@@ -157,19 +157,23 @@ def score_batch(batch: list[dict], profile: dict) -> dict:
     user = ("Score these %d events and write each description:\n\n%s"
             % (len(batch), "\n".join(_candidate_brief(c) for c in batch)))
     res = claude_websearch.ask(system, user, max_uses=6, max_tokens=8000)
+    # Counted on every path out of here, including the two refusals below: a
+    # scoring pass whose answer could not be read cost exactly what a
+    # readable one cost.
+    spend = claude_websearch.spend_of(res)
     if res.get("error"):
-        return {"scores": {},
+        return {"scores": {}, "spend": spend,
                 "error": "%s: %s" % (res["error"]["kind"], res["error"]["detail"])}
     parsed = claude_websearch.extract_json(res.get("text") or "", require="scores")
     if not isinstance(parsed, dict):
-        return {"scores": {},
+        return {"scores": {}, "spend": spend,
                 "error": "The scoring pass ran but its answer could not be read."}
     out = {}
     for s in (parsed.get("scores") or []):
         clean = _clean(s)
         if clean:
             out[score_key(clean["name"])] = clean
-    return {"scores": out, "error": None}
+    return {"scores": out, "error": None, "spend": spend}
 
 
 def deal(candidates: list[dict], size: int = BATCH) -> list[list[dict]]:
@@ -257,6 +261,7 @@ def score_all(candidates: list[dict], profile: dict) -> dict:
     batches = deal(candidates, BATCH)
     merged: dict = {}
     errors: list[str] = []
+    spends: list = []
     if batches:
         with concurrent.futures.ThreadPoolExecutor(
                 max_workers=min(MAX_CONCURRENCY, len(batches))) as pool:
@@ -268,6 +273,7 @@ def score_all(candidates: list[dict], profile: dict) -> dict:
                     logger.exception("event_intel_scorer: batch crashed")
                     errors.append("A scoring batch failed: %s" % str(e)[:200])
                     continue
+                spends.append(r.get("spend"))
                 if r.get("error"):
                     errors.append(r["error"])
                 merged.update(r.get("scores") or {})
@@ -307,7 +313,8 @@ def score_all(candidates: list[dict], profile: dict) -> dict:
         c["client_line"] = s["client_line"]
         scored.append(c)
     return {"scored": scored, "unscored": unscored,
-            "errors": errors, "batches": len(batches)}
+            "errors": errors, "batches": len(batches),
+            "spend": claude_websearch.spend_sum(*spends)}
 
 
 # ── Step 8's anti-pattern, measured rather than requested ─────────────────

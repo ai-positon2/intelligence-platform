@@ -574,3 +574,69 @@ def test_the_trim_leaves_no_dangling_punctuation():
     out = I._text("One two three four five, six seven", 26)
     assert not out[:-1].rstrip().endswith(",")
     assert out.endswith("…")
+
+
+# ── draft fields are prompt input AND client copy ────────────────────────
+#
+# Every draft value is stored on the profile, printed in the report, and
+# pasted verbatim into the find and confirm prompts by
+# `event_intel_discover.profile_brief`. A live run for Position2 returned
+# this as `geo_scope`:
+#
+#   "Global - client logos and case studies reference international/global
+#    brands (...) though no specific office locations are listed on these
+#    pages."
+#
+# The answer is the first word; the rest is the model narrating its own
+# reading, and all of it reached six concurrent event searches as the
+# client's geography. Plus an em dash, in copy headed for a client.
+
+def test_a_draft_field_never_carries_an_em_dash():
+    """House style has none, and this value is printed to a client."""
+    out = I._field("Global \u2014 client logos reference global brands")
+    assert "\u2014" not in out and "\u2013" not in out, out
+    assert out.startswith("Global,"), out
+
+
+def test_a_draft_field_drops_the_model_narrating_its_own_reading():
+    live = ("Global \u2014 client logos and case studies reference "
+            "international/global brands (e.g., 'International Footwear "
+            "Brand') though no specific office locations are listed on "
+            "these pages.")
+    out = I._field(live)
+    assert "these pages" not in out.lower(), out
+    assert "no specific" not in out.lower(), out
+    assert out.startswith("Global"), out
+
+
+def test_a_field_that_is_nothing_but_narration_becomes_an_honest_unknown():
+    """None is already handled: the field joins `unknown` and the page says
+    it could not be found, which is true and useful. A sentence saying the
+    same thing in the model's voice is neither."""
+    for narration in ("Not stated on these pages.",
+                      "The site does not say.",
+                      "Could not find this on the website."):
+        assert I._field(narration) is None, narration
+
+
+def test_a_clean_field_is_left_exactly_alone():
+    """The filter must not tax the normal case."""
+    for good in ("Healthcare, SaaS, cybersecurity",
+                 "$60k ACV",
+                 "Head of Marketing, VP of Product Marketing, CMO",
+                 "United States and Canada"):
+        assert I._field(good) == good, good
+
+
+def test_a_hedged_field_keeps_the_answer_and_drops_the_hedge():
+    assert I._field("Enterprise, though the site does not say the deal "
+                    "size.") == "Enterprise"
+
+
+def test_the_draft_is_built_through_the_field_filter_not_the_raw_text_one():
+    """A grep-level guard on the one line that matters: routing draft values
+    back through `_text` would restore both defects at once."""
+    import inspect
+    src = inspect.getsource(I.draft_profile)
+    assert "_field(parsed.get(f)) for f in DRAFT_FIELDS" in src, (
+        "draft values no longer go through the field filter")

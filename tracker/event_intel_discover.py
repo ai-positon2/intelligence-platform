@@ -152,9 +152,43 @@ PER_CATEGORY = 6
 # call, carrying only the pages it opened itself. Sixteen searches spread that
 # way cost about what eight cost in one call, and they run in parallel.
 FIND_MAX_USES = 6
-FIND_MAX_TOKENS = 3000
+
+# Raised 3000 -> 9000 after a live run truncated a category's answer.
+#
+# With server-side web_search the model narrates between search rounds, and
+# that narration spends the OUTPUT budget alongside the answer. Measured
+# across one live run's six find calls: 2517, 2976, 3134, 3745, 4512 and 5793
+# output tokens. `max_tokens` applies per assistant turn, so the sums above
+# are legitimate; what fails is the FINAL turn, where the JSON is written,
+# being cut off. "Regional flagship" came back stop_reason=max_tokens and the
+# whole category was lost.
+#
+# Output is the cheap half of a search call. One of these calls spends 50k to
+# 59k INPUT tokens; another six thousand output tokens costs about nine
+# cents and removes an entire class of total loss. Raising the search budget
+# would be the expensive change (input grows with the square of the search
+# count); raising the writing budget is not.
+FIND_MAX_TOKENS = 9000
+
+# What the retry asks for, when the first attempt spent its whole search
+# budget and still returned nothing. See `propose_category`.
+RETRY_PER_CATEGORY = 2
 CONFIRM_MAX_USES = 6
-CONFIRM_MAX_TOKENS = 4000
+
+# Raised 4000 -> 9000, for the same reason as FIND_MAX_TOKENS above and on
+# the same evidence. The confirm stage narrates through its six searches too,
+# and its answer is the bigger of the two: a full event record with dates,
+# location, published attendance, exhibitor count, matchmaking evidence,
+# cost note and sources.
+#
+# Measured across one live run's thirteen confirm calls, in output tokens:
+# 2746, 2886, 3004, 3994, 4299, 4715, 4973, 5006, 5105, 5243, 5327, 5614,
+# 6162. The budget was 4000, so the median call was over it and TWO came back
+# stop_reason=max_tokens. A truncated confirmation is not a rejection, it is
+# a candidate that was searched at full cost and then thrown away as
+# unreadable, which is the most expensive way to lose an event in this
+# pipeline.
+CONFIRM_MAX_TOKENS = 9000
 
 # A live production run reported all six categories broken at once: no
 # proposals, `search_complete: false`, budget not spent. That is the model
@@ -833,6 +867,35 @@ def _dedupe_proposals(proposals: list) -> list:
     return out
 
 
+def _find_user(category: str, want: int, narrowed: bool = False) -> str:
+    """The request sent to the finder, for `want` candidates.
+
+    `narrowed` is the retry's version. It says outright that the first
+    attempt came back empty and asks for the strongest few instead of a full
+    slate, because the observed failure is a finder that spends its whole
+    search budget hunting for a full slate and then reports itself incomplete
+    rather than returning the one or two events it did find.
+    """
+    label = rubric.CATEGORY_LABELS[category]
+    if narrowed:
+        return ("An earlier search of the \"%s\" category for this client "
+                "used its whole budget and came back with nothing, so this is "
+                "a second and narrower attempt. Name the %d STRONGEST "
+                "candidate events you can actually support with a page you "
+                "opened. Two well-sourced events are the goal here, not "
+                "coverage: stop searching as soon as you have them and write "
+                "your answer while you still have room. If you genuinely "
+                "cannot find even one, return an empty array, set "
+                "search_complete true and say plainly in `note` what this "
+                "category holds for them."
+                % (label, want))
+    return ("Name up to %d candidate events in the \"%s\" category for this "
+            "client. Search actively, and spend your searches on finding "
+            "events rather than on studying the ones you have found. If this "
+            "category has nothing for them, return an empty array and say why."
+            % (want, label))
+
+
 def _find_reply_is_broken_and_empty(res: dict) -> bool:
     """Whether a find-stage reply is the case FIND_RETRY_BACKOFF_SECONDS
     exists to retry once: nothing found, and not because the model chose to
@@ -875,13 +938,9 @@ def propose_category(category: str, profile: dict) -> dict:
     conclude, which is on a category that came up short.
     """
     system = find_system(category, profile)
-    user = ("Name up to %d candidate events in the \"%s\" category for this "
-            "client. Search actively, and spend your searches on finding "
-            "events rather than on studying the ones you have found. If this "
-            "category has nothing for them, return an empty array and say why."
-            % (PER_CATEGORY, rubric.CATEGORY_LABELS[category]))
-
-    res = _ask(system, user, max_uses=FIND_MAX_USES, max_tokens=FIND_MAX_TOKENS)
+    res = _ask(system, _find_user(category, PER_CATEGORY),
+               max_uses=FIND_MAX_USES, max_tokens=FIND_MAX_TOKENS)
+    spend = claude_websearch.spend_of(res)
 
     # A category that came back broken and empty gets one retry, after the
     # search-tool errors that cause this are usually a moment, not an outage.
@@ -891,12 +950,28 @@ def propose_category(category: str, profile: dict) -> dict:
     if _find_reply_is_broken_and_empty(res):
         logger.warning("event_intel_discover: category %s came back broken "
                        "with nothing found (error=%s, search_count=%s), "
-                       "retrying once", category,
+                       "retrying for %d instead of %d", category,
                        (res.get("error") or {}).get("kind"),
-                       res.get("search_count"))
+                       res.get("search_count"), RETRY_PER_CATEGORY,
+                       PER_CATEGORY)
         time.sleep(FIND_RETRY_BACKOFF_SECONDS)
-        retry = _ask(system, user, max_uses=FIND_MAX_USES,
-                     max_tokens=FIND_MAX_TOKENS)
+        # A NARROWER question, not the same one again.
+        #
+        # The first version of this retry re-sent the identical prompt with
+        # the identical budget, and a live run showed exactly what that buys:
+        # "side_event" came back with search_count=6 and no candidates, was
+        # retried, and came back with search_count=6 and no candidates. Six
+        # more searches and another 55k input tokens for the same answer.
+        #
+        # The failure is not a broken tool, it is an unanswerable question.
+        # Three of six categories in that run spent their whole search budget
+        # hunting for PER_CATEGORY candidates and then declared themselves
+        # incomplete rather than returning the one or two they had. So the
+        # retry asks for what a spent budget can actually deliver: the
+        # strongest two. That is a question the same budget can finish.
+        retry = _ask(system, _find_user(category, RETRY_PER_CATEGORY,
+                                        narrowed=True),
+                     max_uses=FIND_MAX_USES, max_tokens=FIND_MAX_TOKENS)
         if _find_reply_is_broken_and_empty(retry):
             logger.warning("event_intel_discover: category %s still broken "
                            "after retry (error=%s, search_count=%s)",
@@ -905,13 +980,18 @@ def propose_category(category: str, profile: dict) -> dict:
         else:
             logger.info("event_intel_discover: category %s recovered on retry",
                        category)
+        # Both attempts are billed, so both are counted. A retry that is
+        # invisible in the cost of the run is how a 165k-token round of
+        # useless retries went unnoticed in the first instrumented run.
+        spend = claude_websearch.spend_sum(spend, claude_websearch.spend_of(retry))
         res = retry
 
     budget = bool(res.get("budget_spent"))
 
     def _out(status, proposals, note, detail):
         return {"category": category, "status": status, "proposals": proposals,
-                "note": note, "detail": detail, "budget_spent": budget}
+                "note": note, "detail": detail, "budget_spent": budget,
+                "spend": spend}
 
     if res.get("error"):
         err = res["error"]
@@ -1002,7 +1082,24 @@ def _unchecked(name: str, reason: str) -> dict:
 
 
 def confirm_event(proposal: dict, category: str, profile: dict) -> dict:
-    """Stage two: check one candidate with a search that did not propose it.
+    """Stage two, plus what it cost.
+
+    A thin wrapper so that the confirmation's many honest early returns
+    ("no usable name", "answered without a search", "refused with no
+    reason") do not each have to remember to report their own spend. The
+    unchecked paths matter most for cost: an event discarded after six live
+    searches is the most expensive outcome in the pipeline, and it is exactly
+    the one that used to be invisible.
+    """
+    box = {}
+    out = _confirm_event(proposal, category, profile, box)
+    out["spend"] = box.get("spend") or claude_websearch.spend_sum()
+    return out
+
+
+def _confirm_event(proposal: dict, category: str, profile: dict,
+                   box: dict) -> dict:
+    """Check one candidate with a search that did not propose it.
 
     Never raises. Returns {"kind", "event", "name", "reason",
     "facts_complete"} where kind is one of CONFIRM_OK, CONFIRM_REJECTED or
@@ -1024,6 +1121,7 @@ def confirm_event(proposal: dict, category: str, profile: dict) -> dict:
 
     res = _ask(system, user, max_uses=CONFIRM_MAX_USES,
                max_tokens=CONFIRM_MAX_TOKENS)
+    box["spend"] = claude_websearch.spend_of(res)
     if res.get("error"):
         err = res["error"]
         # Named on the "could not be checked" list, next to the event, in the
@@ -1099,7 +1197,8 @@ def search_category(category: str, profile: dict) -> dict:
     proposals = found["proposals"]
     base = {"category": category, "note": found["note"],
             "proposed": len(proposals), "rejected": [],
-            "budget_spent": found.get("budget_spent", False)}
+            "budget_spent": found.get("budget_spent", False),
+            "spend": found.get("spend") or claude_websearch.spend_sum()}
 
     if not proposals:
         return dict(base, status=found["status"], events=[],
@@ -1119,6 +1218,12 @@ def search_category(category: str, profile: dict) -> dict:
                                  (pr.get("name") or "")[:80])
                 results.append(_unchecked(pr.get("name") or "",
                                           "Unexpected failure: %s" % str(e)[:200]))
+
+    # The find call plus every confirmation it triggered. Counted before the
+    # results are sorted into kept and rejected, because a rejected candidate
+    # cost exactly as much to check as a confirmed one.
+    base["spend"] = claude_websearch.spend_sum(
+        base["spend"], *[r.get("spend") for r in results])
 
     events = [r["event"] for r in results if r["kind"] == CONFIRM_OK]
     rejected = [{"name": r["name"], "reason": r["reason"]}
@@ -1179,6 +1284,7 @@ def discover(profile: dict) -> dict:
     by_category: dict[str, list[dict]] = {}
     statuses: dict[str, dict] = {}
 
+    spends = []
     with concurrent.futures.ThreadPoolExecutor(max_workers=MAX_CONCURRENCY) as pool:
         futures = {pool.submit(search_category, cat, profile): cat
                    for cat in rubric.CATEGORIES}
@@ -1193,6 +1299,7 @@ def discover(profile: dict) -> dict:
                      "note": "", "proposed": 0, "rejected": [],
                      "budget_spent": False,
                      "detail": "Unexpected failure: %s" % str(e)[:200]}
+            spends.append(r.get("spend"))
             by_category[cat] = r["events"]
             statuses[cat] = {"status": r["status"], "note": r["note"],
                              "detail": r["detail"],
@@ -1276,4 +1383,8 @@ def discover(profile: dict) -> dict:
         "categories_searched": ran,
         "categories_failed": len(rubric.CATEGORIES) - ran,
         "found": len(candidates),
+        # Every find and every confirmation across all six categories. This
+        # is the expensive stage: in the first instrumented run it was 25 of
+        # the 29 calls and about two thirds of the bill.
+        "spend": claude_websearch.spend_sum(*spends),
     }

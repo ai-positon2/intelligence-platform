@@ -110,6 +110,20 @@ def _failed(confidence: str, reasoning: str) -> dict:
 
 
 def resolve_event(query: str, year_hint: str | None = None) -> dict:
+    """Find one named event, and report what the lookup cost.
+
+    A thin wrapper for the same reason `event_intel_discover.confirm_event`
+    has one: this function refuses a reply in several honest ways and each of
+    them is billed. A ten-search lookup costs about $0.50 whether it lands or
+    is refused, and the refused ones are the version worth being able to see.
+    """
+    box = {}
+    out = _resolve_event(query, year_hint, box)
+    out["spend"] = box.get("spend") or claude_websearch.spend_sum()
+    return out
+
+
+def _resolve_event(query: str, year_hint: str | None, box: dict) -> dict:
     """Resolve one named event. Never raises.
 
     Returns {"ok": bool, "confidence": str, "reasoning": str,
@@ -132,7 +146,19 @@ def resolve_event(query: str, year_hint: str | None = None) -> dict:
     if year_hint:
         user += "\nEdition/year the user is asking about: %s" % year_hint
 
-    res = claude_websearch.ask(_SYSTEM, user, max_uses=10, max_tokens=6000)
+    # max_tokens raised 6000 -> 9000. Same live-run evidence as the budgets
+    # in event_intel_discover and event_intel_audit: with web_search on, the
+    # model narrates between search rounds and that narration spends the
+    # output budget alongside the answer. The two resolve calls in that run
+    # produced 2,399 and 5,410 output tokens, and 5,410 of 6,000 is 90% of
+    # the budget on a sample of two.
+    #
+    # Running out here is not a soft failure. A truncated resolve is a
+    # promoted alternative that cannot be read, and an alternative dropped
+    # between the audit naming it and the store holding it is exactly the
+    # defect `1beed4c` was opened for.
+    res = claude_websearch.ask(_SYSTEM, user, max_uses=10, max_tokens=9000)
+    box["spend"] = claude_websearch.spend_of(res)
     if res.get("error"):
         err = res["error"]
         # The developer detail goes to the log; the person waiting on the

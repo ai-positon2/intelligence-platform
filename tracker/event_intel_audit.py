@@ -111,7 +111,7 @@ def audit_famous(candidates: list[dict], profile: dict) -> dict:
     """
     famous = [c for c in (candidates or []) if c.get("famous")]
     out = {"verdicts": {}, "cut": [], "kept": [], "checked": len(famous),
-           "error": None}
+           "error": None, "spend": claude_websearch.spend_sum()}
     if not famous:
         return out
 
@@ -125,9 +125,30 @@ def audit_famous(candidates: list[dict], profile: dict) -> dict:
         profile=_profile_line(profile),
         where_buyers=rubric.CLASSIFICATION_WHERE_BUYERS_ARE.get(
             profile.get("classification"), "Confirm with the client."))
+    # max_tokens raised 8000 -> 12000 on the same live-run evidence as the
+    # two budgets in event_intel_discover. This reply is the longest of any
+    # stage: a verdict, a reason and a named searched alternative for EVERY
+    # famous event, written after up to ten rounds of search narration that
+    # spend the same output budget. Confirm calls reached 6162 output tokens
+    # on six searches; this one has ten and more to write.
+    #
+    # A truncated audit is not a neutral outcome. `out["error"]` is set and
+    # every marquee event on the client's list is then reported unaudited,
+    # which is the one thing this step exists to prevent.
+    #
+    # The search budget is deliberately NOT touched here. This is still one
+    # call over every famous event, which is the single-call shape
+    # event_intel_discover abandoned because input cost grows with the SQUARE
+    # of a call's search count. Splitting it one-call-per-event is the real
+    # fix and it is a bigger change than a budget; raising max_uses would
+    # make the wrong shape more expensive rather than less.
     res = claude_websearch.ask(
         system, "Audit these %d famous events:\n%s" % (len(famous), listing),
-        max_uses=10, max_tokens=8000)
+        max_uses=10, max_tokens=12000)
+    # Counted before any of the ways this reply can be refused below. A
+    # ten-search audit costs about $0.73 whether or not its answer is usable,
+    # and an audit that gets thrown away is the version worth seeing.
+    out["spend"] = claude_websearch.spend_of(res)
 
     if res.get("error"):
         # The audit not running is recorded, never silently skipped. An
@@ -330,6 +351,41 @@ def alternatives_to_promote(audit: dict, candidates: list[dict]) -> list[dict]:
     return out
 
 
+def _row_for(name: str, by_key: dict) -> dict | None:
+    """The candidate row a name refers to: exact key, else one loose match.
+
+    The same discipline `_verdict_for` needs, for the same reason, and this
+    is the second place the same root cause has bitten. The audit is SHOWN
+    each marquee event as "Name (City) - audience note", so a reply that
+    echoes the name it was given comes back carrying the city, and
+    `name_key` then produces a completely different key:
+
+        name_key("Adobe Summit (Las Vegas)")     -> "adobe las vegas"
+        name_key("Adobe Summit")                 -> "adobe"
+
+    A plain dict lookup misses, the replaced event's CATEGORY cannot be
+    found, and the promotion is refused for having no slot on the list. Two
+    real, upcoming, high-confidence replacements were lost that way in the
+    live run of 2026-09-04, both reported to the client as unconfirmable:
+
+        MAICON                  replacing Adobe Summit (Las Vegas)
+        B2B Marketing Exchange  replacing Content Marketing World (Denver, CO)
+
+    Loose matching is accepted ONLY when it is unambiguous, exactly as in
+    `_verdict_for`: stapling one event's category onto another is worse than
+    the missing promotion this repairs.
+    """
+    key = name_key(name or "")
+    if not key:
+        return None
+    exact = by_key.get(key)
+    if exact is not None:
+        return exact
+    hits = [row for k, row in by_key.items()
+            if k != key and names_match(name or "", row.get("name") or k)]
+    return hits[0] if len(hits) == 1 else None
+
+
 def promote_alternatives(audit: dict, candidates: list[dict],
                          resolver=None, cap: int = MAX_PROMOTED,
                          replaced_from: list[dict] | None = None) -> dict:
@@ -363,7 +419,7 @@ def promote_alternatives(audit: dict, candidates: list[dict],
 
     wanted = alternatives_to_promote(audit, candidates)
     out: dict = {"promoted": [], "unconfirmed": [], "considered": len(wanted),
-                 "not_attempted": []}
+                 "not_attempted": [], "spend": claude_websearch.spend_sum()}
     if not wanted:
         return out
 
@@ -377,10 +433,10 @@ def promote_alternatives(audit: dict, candidates: list[dict],
     # list, and looking it up there always failed: the promoted event got
     # category=None and was dropped by the store for having no category slot.
     # `replaced_from` is the pre-audit list, where the cut event still exists.
-    by_name = {name_key(c.get("name") or ""): c
-               for c in (replaced_from if replaced_from is not None
-                         else candidates) or []}
+    pool = (replaced_from if replaced_from is not None else candidates) or []
+    by_name = {name_key(c.get("name") or ""): c for c in pool}
 
+    spends = []
     for alt in wanted[:max(0, cap)]:
         try:
             res = resolver(alt["name"])
@@ -388,6 +444,10 @@ def promote_alternatives(audit: dict, candidates: list[dict],
             logger.warning("event_intel_audit: resolving alternative %r failed: %s",
                            alt["name"], e)
             res = {"ok": False, "reasoning": "The lookup failed: %s" % str(e)[:200]}
+        # Every lookup is billed at about $0.50, including the ones whose
+        # answer is refused two lines below.
+        spends.append((res or {}).get("spend"))
+        out["spend"] = claude_websearch.spend_sum(*spends)
         if not (res or {}).get("ok") or not (res or {}).get("event"):
             out["unconfirmed"].append({
                 "name": alt["name"], "replaces": alt["replaces"],
@@ -412,7 +472,7 @@ def promote_alternatives(audit: dict, candidates: list[dict],
                 "finished": True,
             })
             continue
-        replaced = by_name.get(name_key(alt["replaces"] or ""))
+        replaced = _row_for(alt["replaces"] or "", by_name)
         candidate = _candidate_from_alternative(res, alt, replaced)
         # A promoted event with no category is dropped by the store, silently,
         # after a live lookup and a live scoring call have already been spent

@@ -2,11 +2,18 @@
 
 import json
 
+import re
+
 import pytest
 
 from tracker import claude_websearch
 from tracker import event_intel_audit as A
 from tracker import event_intel_rubric as R
+
+
+def _soon(days: int = 90) -> str:
+    import datetime
+    return (datetime.date.today() + datetime.timedelta(days=days)).isoformat()
 
 PROFILE = {"client_name": "Northwind", "classification": R.CLASS_B2B_TO_MARKETING,
            "buyer_roles": "VP Marketing", "verticals": "fintech",
@@ -36,6 +43,25 @@ def _stub(monkeypatch, payload=None, error=None, text=None, search_count=4):
 
 
 # ── Step 3: the famous-event audit ────────────────────────────────────────
+
+def test_the_audit_has_room_to_write_a_verdict_for_every_famous_event():
+    """The longest reply of any stage: a verdict, a reason and a named
+    searched alternative per famous event, written after up to ten rounds of
+    search narration that spend the same output budget.
+
+    A live run truncated confirm calls at 4000 with six searches (they
+    reached 6162 output tokens). This call has ten searches and more to
+    write, and a truncated audit sets `error`, which reports every marquee
+    event on the client's list as unaudited.
+    """
+    import inspect
+    src = inspect.getsource(A.audit_famous)
+    m = re.search(r"max_tokens=(\d+)", src)
+    assert m, "audit_famous no longer states an output budget"
+    assert int(m.group(1)) >= 12000, (
+        "%s output tokens is not enough for a ten-search audit that writes a "
+        "verdict per event" % m.group(1))
+
 
 def test_nothing_famous_means_no_audit_call(monkeypatch):
     def boom(*a, **k):
@@ -664,3 +690,105 @@ def test_a_verdict_for_a_different_edition_never_lands_on_this_one():
     assert entry.get("no_verdict"), (
         "the event was cut on another edition's verdict rather than reported "
         "as unaudited: %r" % entry.get("why"))
+
+
+# ── the city suffix, second occurrence ──────────────────────────────────
+#
+# The audit is SHOWN each marquee event as "Name (City) - audience note", so
+# a reply echoing the name it was given comes back carrying the city.
+# `_verdict_for` was taught to cope with that (see its docstring). The
+# CATEGORY lookup in promote_alternatives was not, and it is the same root
+# cause one step later:
+#
+#   name_key("Adobe Summit (Las Vegas)") -> "adobe las vegas"
+#   name_key("Adobe Summit")             -> "adobe"
+#
+# The replaced event's category could not be found, so the promotion was
+# refused for having no slot on the list. Measured in the live run of
+# 2026-09-04: two real, upcoming, high-confidence replacements lost, both
+# reported to the client as unconfirmable.
+
+_LIVE_NAMES = [
+    ("Adobe Summit (Las Vegas)", "Adobe Summit", "MAICON"),
+    ("Content Marketing World (Denver, CO)", "Content Marketing World",
+     "B2B Marketing Exchange"),
+    ("UNBOUND (formerly INBOUND, by HubSpot) (Boston, MA)", "UNBOUND",
+     "SaaStr Annual"),
+]
+
+
+@pytest.mark.parametrize("echoed,real,_alt", _LIVE_NAMES)
+def test_a_city_suffixed_name_still_finds_the_row_it_names(echoed, real, _alt):
+    from tracker.event_intel_discover import name_key
+    pool = [{"name": real, "category": R.CAT_INDUSTRY_FLAGSHIP}]
+    by = {name_key(c["name"]): c for c in pool}
+    assert name_key(echoed) != name_key(real), (
+        "%r no longer reproduces the mismatch this guards" % echoed)
+    row = A._row_for(echoed, by)
+    assert row is not None, (
+        "the audit echoed back the name it was given and the lookup missed it")
+    assert row["category"] == R.CAT_INDUSTRY_FLAGSHIP
+
+
+def test_an_unrelated_name_is_not_loosely_matched_to_something():
+    from tracker.event_intel_discover import name_key
+    by = {name_key("Adobe Summit"): {"name": "Adobe Summit",
+                                     "category": R.CAT_INDUSTRY_FLAGSHIP}}
+    assert A._row_for("Totally Unrelated Expo", by) is None
+    assert A._row_for("", by) is None
+
+
+def test_an_ambiguous_loose_match_is_refused_rather_than_guessed():
+    """Stapling one event's category onto another is worse than the missing
+    promotion this repairs.
+
+    "Adobe Experience Summit (Boston)" loosely matches BOTH "Adobe Summit"
+    and "Adobe Experience Summit", which sit in different categories.
+    Picking either would give a promoted event a category it was never in,
+    and the store would accept it, so the wrongness would be invisible.
+
+    The first fixture written for this used a pair whose `name_key` values
+    COLLIDE ("MarTech Summit" / "MarTech Summit Europe" both key to
+    "martech", because name_key strips region words). A colliding pair
+    cannot be ambiguous in a name_key-keyed dict: it is one entry.
+    """
+    from tracker.event_intel_discover import name_key, names_match
+    rows = [{"name": "Adobe Summit", "category": R.CAT_INDUSTRY_FLAGSHIP},
+            {"name": "Adobe Experience Summit",
+             "category": R.CAT_VERTICAL_SUMMIT}]
+    by = {name_key(r["name"]): r for r in rows}
+    q = "Adobe Experience Summit (Boston)"
+    # The fixture has to be genuinely ambiguous or this tests nothing: two
+    # DISTINCT keys, both loosely matched by the query.
+    assert len(by) == 2, "the fixture names collide to one key"
+    assert sum(1 for r in rows if names_match(q, r["name"])
+               and name_key(q) != name_key(r["name"])) == 2
+    assert A._row_for(q, by) is None, (
+        "an ambiguous name was resolved by guessing")
+
+
+def test_a_promotion_inherits_the_category_through_a_city_suffixed_name():
+    """End to end through promote_alternatives, with the names exactly as the
+    live audit produced them."""
+    audit = {"cut": [{"name": "Adobe Summit (Las Vegas)",
+                      "alternative": "MAICON",
+                      "alternative_website": "https://maicon.example",
+                      "alternative_note": "Tighter room.",
+                      "why": "Adobe's own product conference."}]}
+    pre_audit = [{"name": "Adobe Summit", "category": R.CAT_INDUSTRY_FLAGSHIP,
+                  "famous": True}]
+
+    def resolver(name, year_hint=None):
+        return {"ok": True, "confidence": "high",
+                "pages": [{"url": "https://maicon.example/agenda"}],
+                "event": {"name": "MAICON", "website": "https://maicon.example",
+                          "starts_on": _soon(180), "ends_on": _soon(182),
+                          "city": "Cleveland", "format": "in_person",
+                          "confidence": "high"}}
+
+    out = A.promote_alternatives(audit, [], resolver=resolver,
+                                 replaced_from=pre_audit)
+    assert [c["name"] for c in out["promoted"]] == ["MAICON"], out["unconfirmed"]
+    assert out["promoted"][0]["category"] == R.CAT_INDUSTRY_FLAGSHIP
+    assert not out["unconfirmed"], (
+        "a confirmed replacement was still refused: %s" % out["unconfirmed"])

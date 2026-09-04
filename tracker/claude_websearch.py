@@ -262,6 +262,88 @@ def reader_reason(err) -> str:
     return READER_REASON.get(kind or "", _READER_FALLBACK)
 
 
+# ── what a run cost ──────────────────────────────────────────────────────
+#
+# Every reply already carries `usage`, and until now nothing added it up. The
+# consequence, measured: the only cost figure anyone had for an Event &
+# Conference Intelligence run was $9.13, from a design that had since been
+# replaced, and a later instrumented run came in at $9.64 with a completely
+# different shape (three 10-search calls accounting for a third of the input
+# bill). A paying feature whose unit cost is invisible in production cannot
+# be priced, budgeted, or caught regressing.
+#
+# These totals are summed through RETURN VALUES rather than into a module
+# global on purpose. `event_intel_pipeline.run_job` is a thread entry point
+# and two runs can be in flight in one process, so a shared accumulator
+# would bill one client's run for another's searches. Adding dicts up the
+# call tree cannot get that wrong.
+
+# Sonnet list pricing per million tokens, and the server-side search line
+# item per request. Declared here so a report explaining a cost and the
+# arithmetic producing it cannot drift apart.
+USD_PER_M_INPUT = 3.0
+USD_PER_M_OUTPUT = 15.0
+USD_PER_SEARCH = 0.01
+
+_SPEND_KEYS = ("calls", "input_tokens", "output_tokens", "cache_read_tokens",
+               "searches")
+
+
+def spend_of(res: dict) -> dict:
+    """One reply's usage, as a spend record. Never raises."""
+    u = (res or {}).get("usage") or {}
+
+    def _n(key):
+        try:
+            return int(u.get(key) or 0)
+        except (TypeError, ValueError):
+            return 0
+
+    return {"calls": 1,
+            "input_tokens": _n("input_tokens"),
+            "output_tokens": _n("output_tokens"),
+            "cache_read_tokens": _n("cache_read_input_tokens"),
+            # The reply's own count, which is the billed one. See
+            # SEARCH_BUDGET_CODES: server_tool_use blocks are not searches.
+            "searches": int((res or {}).get("search_count") or 0)}
+
+
+def spend_sum(*records) -> dict:
+    """Add spend records. Accepts None and missing keys."""
+    out = {k: 0 for k in _SPEND_KEYS}
+    for r in records:
+        if not r:
+            continue
+        if isinstance(r, (list, tuple)):
+            r = spend_sum(*r)
+        for k in _SPEND_KEYS:
+            try:
+                out[k] += int(r.get(k) or 0)
+            except (TypeError, ValueError):
+                pass
+    return out
+
+
+def spend_usd(record: dict) -> float:
+    """What a spend record costs, rounded to the cent.
+
+    Cached input is billed at a tenth of fresh input, and is counted
+    separately rather than folded in, so a run that benefits from caching
+    does not silently report the uncached price.
+    """
+    r = record or {}
+    def _n(k):
+        try:
+            return int(r.get(k) or 0)
+        except (TypeError, ValueError):
+            return 0
+    usd = (_n("input_tokens") / 1e6 * USD_PER_M_INPUT
+           + _n("cache_read_tokens") / 1e6 * USD_PER_M_INPUT * 0.1
+           + _n("output_tokens") / 1e6 * USD_PER_M_OUTPUT
+           + _n("searches") * USD_PER_SEARCH)
+    return round(usd, 2)
+
+
 def ask(system: str, user: str, *, max_uses: int = 8, max_tokens: int = 8000,
         timeout: float = 280.0, model: str | None = None) -> dict:
     """One streamed Claude call, with the web_search tool when max_uses > 0.

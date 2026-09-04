@@ -6,6 +6,7 @@ that a category which found nothing is distinguishable from one that failed,
 and that the same event cannot occupy three slots under three labels.
 """
 
+import inspect
 import json
 import re
 
@@ -531,6 +532,124 @@ def test_a_category_that_merely_used_its_own_budget_is_not_retried(monkeypatch):
     monkeypatch.setattr(claude_websearch, "ask", fake_ask)
     D.search_category(R.CAT_EMERGING, PROFILE)
     assert len(finds) == 1
+
+
+def test_the_retry_asks_a_narrower_question_than_the_first_attempt(monkeypatch):
+    """What a live run proved the identical retry is worth.
+
+    "side_event" came back with search_count=6 and no candidates, was
+    retried, and came back with search_count=6 and no candidates. All three
+    retried categories in that run failed identically: six more searches and
+    another 55k input tokens for the same answer. The failure is not a broken
+    tool, it is an unanswerable question, so asking it again cannot help.
+    """
+    monkeypatch.setattr(D, "FIND_RETRY_BACKOFF_SECONDS", 0)
+    asks = []
+
+    def fake_ask(system, user, **kw):
+        asks.append(user)
+        return _find_call(_find_reply([], complete=False), budget=False)
+
+    monkeypatch.setattr(claude_websearch, "ask", fake_ask)
+    D.propose_category(R.CAT_SIDE_EVENT, PROFILE)
+
+    assert len(asks) == 2, "expected one retry"
+    assert asks[0] != asks[1], (
+        "the retry re-sent the identical prompt, which a live run showed "
+        "returns the identical empty answer")
+    assert "up to %d" % D.PER_CATEGORY in asks[0]
+    assert "%d STRONGEST" % D.RETRY_PER_CATEGORY in asks[1], asks[1][:200]
+    assert D.RETRY_PER_CATEGORY < D.PER_CATEGORY, (
+        "the retry has to ask for FEWER events than the attempt that already "
+        "spent its whole budget failing to find that many")
+
+
+def test_the_narrowed_retry_tells_the_finder_to_stop_and_write(monkeypatch):
+    """The observed failure is a finder that searches until its budget is
+    gone and then has no room or no inclination to report what it found. The
+    narrowed ask has to address that directly, not just lower a number."""
+    narrowed = D._find_user(R.CAT_EMERGING, D.RETRY_PER_CATEGORY, narrowed=True)
+    assert "came back with nothing" in narrowed
+    assert "stop searching as soon as you have them" in narrowed
+    assert "search_complete true" in narrowed, (
+        "the narrowed ask must tell it an honest empty is a complete answer, "
+        "or it reports incomplete again and the category is lost again")
+
+
+def test_the_finder_has_room_to_write_its_answer_after_six_searches():
+    """A live run lost a whole category to stop_reason=max_tokens.
+
+    With web_search on, the model narrates between search rounds and that
+    narration spends the OUTPUT budget. Six find calls in that run produced
+    2517, 2976, 3134, 3745, 4512 and 5793 output tokens against a budget of
+    3000. Output is the cheap half of a search call, so this budget is not
+    the one to economise on.
+    """
+    assert D.FIND_MAX_TOKENS >= 8000, (
+        "%d output tokens is not enough room for a finder that narrates "
+        "through six searches and then writes a %d-event JSON answer"
+        % (D.FIND_MAX_TOKENS, D.PER_CATEGORY))
+
+
+def test_the_confirmer_has_room_to_write_its_answer_too():
+    """The confirm stage narrates through six searches as well, and its
+    answer is the bigger of the two: dates, location, published attendance,
+    exhibitor count, matchmaking evidence, cost note and sources.
+
+    Thirteen live confirm calls produced 2746 to 6162 output tokens against a
+    budget of 4000. The median was over it and two were truncated. A
+    truncated confirmation is a candidate searched at full cost and then
+    discarded as unreadable.
+    """
+    assert D.CONFIRM_MAX_TOKENS >= 8000, (
+        "%d output tokens truncated 2 of 13 confirmations in a live run"
+        % D.CONFIRM_MAX_TOKENS)
+
+
+def test_every_searching_stage_has_room_to_write_its_answer():
+    """One guard over all four, because they failed for one reason.
+
+    With web_search on, the model narrates between search rounds and that
+    narration spends the OUTPUT budget alongside the answer. A live run
+    truncated a find call at 3000 and two confirm calls at 4000, produced
+    11,754 output tokens from an audit budgeted at 8,000, and used 5,410 of
+    a resolve call's 6,000. Output is the cheap half of a search call; the
+    input side of one of these is 50k to 180k tokens.
+    """
+    import re as _re
+    from tracker import event_intel_audit as _A
+    from tracker import event_intel_resolve as _RS
+    budgets = {
+        "find": D.FIND_MAX_TOKENS,
+        "confirm": D.CONFIRM_MAX_TOKENS,
+        # Read off the MODULE, not the function: both of these now have a
+        # thin public wrapper in front of the call that spends the budget.
+        "audit": min(int(m) for m in _re.findall(r"max_tokens=(\d+)",
+                                                 inspect.getsource(_A))),
+        "resolve": min(int(m) for m in _re.findall(r"max_tokens=(\d+)",
+                                                   inspect.getsource(_RS))),
+    }
+    thin = {k: v for k, v in budgets.items() if v < 9000}
+    assert not thin, (
+        "these stages cannot write their answer after a full search budget: "
+        "%s" % thin)
+
+
+def test_a_truncated_finder_is_not_retried(monkeypatch):
+    """Running out of output room is not a transient fault and a retry with
+    the same budget would hit the same wall. It stays an error."""
+    monkeypatch.setattr(D, "FIND_RETRY_BACKOFF_SECONDS", 0)
+    asks = []
+
+    def fake_ask(system, user, **kw):
+        asks.append(user)
+        return _find_call("", error={"kind": claude_websearch.ERR_MAX_TOKENS,
+                                     "detail": "out of room"})
+
+    monkeypatch.setattr(claude_websearch, "ask", fake_ask)
+    r = D.propose_category(R.CAT_REGIONAL_FLAGSHIP, PROFILE)
+    assert len(asks) == 1, "a token-budget failure was retried pointlessly"
+    assert r["status"] == D.STATUS_ERROR
 
 
 def test_a_transport_error_with_nothing_found_is_retried_once(monkeypatch):
