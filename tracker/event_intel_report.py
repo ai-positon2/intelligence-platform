@@ -206,7 +206,8 @@ def notes(*, shortfall: list, audit: dict, generic: dict,
           unscored: list, over_cap: list | None = None,
           finished: list | None = None,
           promoted: dict | None = None,
-          scoring_batches: int = 0) -> list[dict]:
+          scoring_batches: int = 0,
+          graded: int | None = None) -> list[dict]:
     """Everything this run could not establish, as {level, head, detail}.
 
     Ordered by how much it should change a reader's confidence, not by the
@@ -373,9 +374,18 @@ def notes(*, shortfall: list, audit: dict, generic: dict,
     # keeps the totals close to comparable, but "close to" is not "identical"
     # and a ranked table invites the reader to assume identical.
     if (scoring_batches or 0) > 1:
+        # `graded` is every event the scorer actually graded. It used to be
+        # computed here as the kept list plus the unscored ones, which was
+        # wrong in the same direction the whole agent was wrong: the grading
+        # pass sees every candidate, and counting only the survivors printed
+        # "The 1 events were graded in 2 separate passes" on a run that
+        # graded seven. Left as a fallback for a stored run whose caller
+        # predates the argument.
+        n_graded = (graded if graded is not None
+                    else len(candidates or []) + len(unscored or []))
         add(LEVEL_NOTE,
-            "The %d events were graded in %d separate passes, not one"
-            % (len(candidates or []) + len(unscored or []), scoring_batches),
+            "%s graded in %d separate passes, not one"
+            % (_n(n_graded, "event was", "events were"), scoring_batches),
             "The categories were dealt evenly across the passes so no pass "
             "saw only one kind of event. Scores are still absolute against "
             "the rubric, but two events one point apart may have been graded "
@@ -509,9 +519,16 @@ def executive_summary(*, profile: dict, ranked: dict, **kw) -> dict:
     p = profile or {}
     client = p.get("client_name") or "Client"
     counts = (ranked or {}).get("counts") or {}
-    facts = notes(candidates=(ranked or {}).get("kept") or [],
-                  over_cap=(ranked or {}).get("over_cap") or [],
-                  finished=(ranked or {}).get("finished") or [],
+    r = ranked or {}
+    facts = notes(candidates=r.get("kept") or [],
+                  over_cap=r.get("over_cap") or [],
+                  finished=r.get("finished") or [],
+                  # Every event the scorer graded, which is all three
+                  # buckets and not just the survivors.
+                  graded=(len(r.get("kept") or []) +
+                          len(r.get("worth_a_look") or []) +
+                          len(r.get("excluded") or []) +
+                          len(kw.get("unscored") or [])),
                   **kw)
     return {
         # 1. Title. No dash: house style is a colon.

@@ -173,11 +173,58 @@ TIER_MIN = {TIER_P1: 80, TIER_P2: 70}
 TIER_LABELS = {
     TIER_P1: "Must-attend. Book it.",
     TIER_P2: "Strong. Attend if budget and calendar allow.",
-    TIER_P3: "Below the bar. Excluded from the ranked list.",
+    TIER_P3: "Below the priority bar. Shown as an option when the audience "
+             "is genuinely this client's.",
 }
 
-# The one line that decides whether a candidate is shown at all.
+# The priority bar. Above it an event is RECOMMENDED.
+#
+# This used to be the one line that decided whether a candidate was shown at
+# all, and that conflated two different questions into one number:
+#
+#   1. Is this event's audience genuinely this client's? A fact about fit.
+#   2. Is it a must-attend? A ranking judgement about priority.
+#
+# Only the second is a 70-out-of-100 question. The first is what keeps
+# irrelevant events off the list, and it has its own measured dimension
+# (`relevance`, 0 to 40) which was being ignored in favour of the total.
+#
+# The cost of conflating them was measured on real clients: a run for one
+# client returned a single event and another returned none, while events that
+# were real, upcoming, cited and squarely aimed at the client's own buyers sat
+# in the discard pile because they were learning-crowd conferences rather than
+# buying-floor ones. `engagement` is only 20 points and `dm_access` is
+# structurally harsh for a conference, so a genuinely well-matched event lands
+# in the sixties and a bar at 70 cuts it. The scoring prompt then compounds it
+# by telling the grader "most events are mediocre for most clients", which
+# pushes the whole distribution down while this threshold stayed put: the
+# calibration instruction and the threshold were set independently and pull
+# against each other.
+#
+# So the bar still decides what is RECOMMENDED, and no longer decides what
+# EXISTS. Below it, the two gates below decide between a real option and a
+# genuine miss.
 RANK_FLOOR = TIER_MIN[TIER_P2]
+
+# The two gates that separate "below the bar but worth your time" from
+# "not for you". A candidate must clear BOTH to be shown as an option.
+#
+# RELEVANCE_GATE is on the `relevance` sub-score, which means precisely "how
+# closely the composition of this event matches the client's ICP". 24 of 40 is
+# a clear majority of the audience being the client's own buyers. It is the
+# gate that answers "is this event actually for them", and it is why widening
+# the list does not mean padding it with anything that was found.
+#
+# CONSIDER_FLOOR is on the total, and it is what stops the right audience at
+# an unworkable event from being offered. Half marks overall. An event can be
+# aimed exactly at the client's buyers and still be a keynote hall nobody can
+# be reached in; that scores relevance well and everything else badly, and it
+# is not an option.
+#
+# Neither gate pads. Nothing is topped up toward a target count, and an event
+# below either gate is still reported, in the same discard bucket as before.
+RELEVANCE_GATE = 24
+CONSIDER_FLOOR = 50
 
 DEFAULT_CAP = 15
 
@@ -559,22 +606,57 @@ def gaps_for(candidate: dict, today=None) -> list[str]:
     return out
 
 
+def is_worth_a_look(candidate: dict) -> bool:
+    """Whether a below-the-bar candidate is a real option or a genuine miss.
+
+    Both gates are measured, and both must pass. See RELEVANCE_GATE and
+    CONSIDER_FLOOR for why there are two.
+
+    An unreadable or missing `relevance` fails. That is deliberate and it is
+    the safe direction: this function's whole job is to assert that an event
+    is genuinely aimed at this client, and a dimension nobody scored is not
+    evidence of anything. `event_intel_scorer` already routes a partially
+    scored event to `unscored` for the same reason, so a row arriving here
+    without a relevance score is one whose fit was never established, and
+    offering it as an option would be padding the list with an unknown.
+    """
+    value, readable = read_subscore(DIM_RELEVANCE, candidate.get(DIM_RELEVANCE))
+    if not readable:
+        return False
+    return value >= RELEVANCE_GATE and (candidate.get("total") or 0) >= CONSIDER_FLOOR
+
+
 def rank(candidates: list[dict], cap: int = DEFAULT_CAP, today=None) -> dict:
-    """Sort, cut everything below the floor, cap, and report what was dropped.
+    """Sort into recommended, worth-a-look and cut, cap, and report the rest.
 
     NEVER pads. The skill: "A short list of P1/P2 events beats a long list
-    diluted with P3s." So the cap is a ceiling and nothing tops the list up
-    toward it.
+    diluted with P3s." So the cap is a ceiling, nothing tops any list up
+    toward it, and the three buckets are decided by measurements rather than
+    by how many rows a section would like to have.
 
-    Returns the kept rows plus `excluded` (every candidate that scored below
-    70, with its score) and `over_cap`. Both are rendered. A list truncated in
-    silence reads as "nothing else was found", which is a different and false
-    claim from "six more were found and none cleared the bar".
+    `kept` is the recommendation: everything at or above RANK_FLOOR, plus
+    anything already committed to.
+
+    `worth_a_look` is the second tier, and it is the answer to a real
+    complaint about this agent: it returned one event for one client and none
+    for another, while events that were real, upcoming, cited and aimed
+    squarely at that client's buyers sat in the discard pile for being
+    learning-crowd conferences. These are full candidate rows, not name
+    chips, because they are offered as options and an option a reader cannot
+    read is not one. Two gates decide membership, both measured: the audience
+    is genuinely this client's (RELEVANCE_GATE on the relevance sub-score),
+    and the event is not structurally unworkable (CONSIDER_FLOOR on the
+    total).
+
+    `excluded` is everything else below the bar, with its score, as before. A
+    list truncated in silence reads as "nothing else was found", which is a
+    different and false claim from "six more were found and none cleared the
+    bar".
     """
     scored = sorted((c for c in candidates or []),
                     key=lambda c: (-(c.get("total") or 0),
                                    (c.get("name") or "").lower()))
-    kept, excluded, below, finished = [], [], [], []
+    kept, excluded, below, finished, considered = [], [], [], [], []
     for c in scored:
         # Before any question of merit: an edition that is over cannot be
         # attended. It is reported in its own bucket rather than dropped,
@@ -596,6 +678,12 @@ def rank(candidates: list[dict], cap: int = DEFAULT_CAP, today=None) -> dict:
             # in with the events that earned their place.
             kept.append(c)
             below.append({"name": c.get("name"), "total": c.get("total") or 0})
+        elif is_worth_a_look(c):
+            # Below the priority bar, but the audience is measurably this
+            # client's and the event is workable. A real option, so it keeps
+            # its whole row: a reader offered an event with no dates, city or
+            # description has not been offered anything.
+            considered.append(c)
         else:
             excluded.append({"name": c.get("name"), "total": c.get("total") or 0,
                              "tier": TIER_P3,
@@ -613,6 +701,9 @@ def rank(candidates: list[dict], cap: int = DEFAULT_CAP, today=None) -> dict:
         kept = head + rescued
     return {
         "kept": kept,
+        # Ordered like the recommendation, and capped the same way: a second
+        # tier that ran to forty rows would bury the list it sits under.
+        "worth_a_look": considered[:cap] if cap else considered,
         "excluded": excluded,
         "over_cap": over_cap,
         "finished": finished,
@@ -622,6 +713,7 @@ def rank(candidates: list[dict], cap: int = DEFAULT_CAP, today=None) -> dict:
             "kept": len(kept),
             TIER_P1: sum(1 for c in kept if c.get("tier") == TIER_P1),
             TIER_P2: sum(1 for c in kept if c.get("tier") == TIER_P2),
+            "worth_a_look": len(considered[:cap] if cap else considered),
             "excluded": len(excluded),
             "over_cap": len(over_cap),
             "finished": len(finished),

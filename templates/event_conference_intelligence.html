@@ -2731,7 +2731,7 @@
         '<div class="st"><span style="width:' + pct + '%"></span></div></div>';
     }
 
-    function candidateRow(c, prior, labels, idx){
+    function candidateRow(c, prior, labels, idx, shortfallLine){
       prior = prior || null; labels = labels || {};
       var site = safeUrl(c.website);
       var when = c.starts_on
@@ -2743,7 +2743,8 @@
       /* The id is what the calendar marker and the column in the spread
          both jump to, so it is derived from the row's position in the kept
          list and from nothing else. */
-      return '<div class="evi-cand ' + tierClass(c.tier) + '" id="' +
+      return '<div class="evi-cand ' + tierClass(c.tier) +
+        (shortfallLine ? ' is-look' : '') + '" id="' +
         esc(candAnchor(idx || 0)) + '">' +
         '<div class="ct">' +
           '<div class="cn">' +
@@ -2791,6 +2792,7 @@
             (c.matchmaking ? '+10 matchmaking' : 'No matchmaking bonus') +
             '<span>' + esc(c.matchmaking_reason || '') + '</span></div>' +
         '</div>' +
+        (shortfallLine ? '<p class="cshort">' + esc(shortfallLine) + '</p>' : '') +
         (c.description ? '<p class="cd">' + esc(c.description) + ' ' +
           '<b>' + esc(c.client_line || '') + '</b></p>' : '') +
         '<details class="cwhy"><summary>Why these scores</summary>' +
@@ -2878,11 +2880,34 @@
 
     var SUB_LABELS = {relevance: 'Relevance', dm_access: 'Decision-maker access',
                       engagement: 'Engagement mode'};
-    var TIER_LABEL = {P1: 'must-attend', P2: 'strong', P3: 'below the bar'};
+    var TIER_LABEL = {P1: 'must-attend', P2: 'strong', P3: 'worth a look'};
     /* Rendered from the rubric rather than typed, on the same grounds as the
        label tables around it: the number the report prints as the bar and the
        number the scorer cuts on have to be the same one. */
     var RANK_FLOOR = {{ rubric.floor }};
+    var RELEVANCE_GATE = {{ rubric.relevance_gate }};
+    var CONSIDER_FLOOR = {{ rubric.consider_floor }};
+    var DIM_MAX = {relevance: 40, dm_access: 40, engagement: 20};
+
+    /* Why a second-tier event is second tier, read off its own sub-scores.
+       An option offered with no account of what is weaker about it asks the
+       reader to trust a number; naming the dimension that cost it the bar is
+       the same honesty the rest of this report applies to itself, and it is
+       what makes this a shortlist rather than a consolation pile. */
+    function belowBarReason(c){
+      var worst = null, worstShare = 2;
+      ['relevance', 'dm_access', 'engagement'].forEach(function(k){
+        var v = Number(c[k]);
+        if (!isFinite(v)) return;
+        var share = v / DIM_MAX[k];
+        if (share < worstShare) { worstShare = share; worst = k; }
+      });
+      if (!worst) return '';
+      var gap = RANK_FLOOR - (Number(c.total) || 0);
+      return 'Short of the bar by ' + gap + ', mostly on ' +
+        SUB_LABELS[worst].toLowerCase() + ' (' + Number(c[worst]) + ' of ' +
+        DIM_MAX[worst] + ').';
+    }
     var CLASSIFICATION_LABELS = {
       {%- for c in classifications %}
       {{ c.key|tojson }}: {{ c.label|tojson }}{{ ',' if not loop.last }}
@@ -2917,7 +2942,8 @@
        reported separately below and a bar would imply they add up to it. */
     function verdictHtml(s, counts) {
       var found = Number(s.discovered) || 0;
-      var scored = (Number(counts.kept) || 0) + (Number(counts.excluded) || 0);
+      var scored = (Number(counts.kept) || 0) + (Number(counts.worth_a_look) || 0) +
+                   (Number(counts.excluded) || 0);
       var cleared = Number(counts.kept) || 0;
       if (!found && !scored) return '';
       var gaps = [];
@@ -2939,17 +2965,45 @@
          cls: 'f-mid',
          note: gaps.length ? 'Including ' + gaps.join(', ') + '.' : ''},
         {n: scored, label: 'Scored against the rubric', cls: 'f-mid'},
+        /* The bar still counts only what cleared it, because the three bars
+           are a containment and a fourth number inside one of them would
+           break that. The second tier goes in the note instead, where it
+           belongs: "1 cleared the bar" drawn against "7 found" and left
+           unqualified was the picture that made this agent look like it had
+           found nothing, on a run that also had four events aimed squarely
+           at the client.
+
+           The zero case used to read "Everything below is what these 0
+           are.", which is not a sentence anybody meant to ship. */
         {n: cleared, label: 'Cleared the bar of ' + RANK_FLOOR, cls: 't-P1',
-         note: cleared === 1 ? 'The one below is what it is.'
-                             : 'Everything below is what these ' + cleared + ' are.'}
+         note: (function(){
+           var l = Number(counts.worth_a_look) || 0;
+           var tail = l ? ' ' + plural(l, 'more event') + ' cleared both ' +
+                          'relevance gates and ' + (l === 1 ? 'is' : 'are') +
+                          ' under Worth a look.' : '';
+           if (!cleared) {
+             return (l ? 'None, and that is the honest answer to the bar.'
+                       : 'None. The list is not padded to a target count.') + tail;
+           }
+           return (cleared === 1 ? 'The one below is what it is.'
+                                 : 'Everything below is what these ' + cleared +
+                                   ' are.') + tail;
+         })()}
       ]);
     }
 
     /* The kept list on a calendar. Same rail the event set uses, so an
        undated event is listed beside it rather than plotted at a guess, and
        the same marker press jumps to the same kind of card. */
-    function planRail(kept){
-      var rows = kept.map(function(c, i){
+    function planRail(kept, look){
+      /* The second tier is on the calendar too. Somebody laying out a year
+         is choosing between everything they could actually attend, and a
+         timeline that plotted only the events above the bar answered a
+         narrower question than the one being asked of it. The band colour
+         and the P3 badge on the card it jumps to are what keep the two
+         tiers apart; the anchor index continues past the kept list so a
+         marker cannot point at the wrong card. */
+      var rows = kept.concat(look || []).map(function(c, i){
         return {ev: {name: c.name, starts_on: c.starts_on, ends_on: c.ends_on},
                 c: c, i: i, rank: i + 1};
       });
@@ -2970,10 +3024,18 @@
        it stopped. Heights are a share of 110, the real maximum, rather than
        of the best score found, so a weak year draws as a low chart. */
     function spreadHtml(kept, s){
+      var look = s.worth_a_look || [];
       var items = kept.map(function(c, i){
         return {n: c.total, label: c.name, cls: tierClass(c.tier), _i: i, _kept: true};
-      }).concat((s.excluded || []).map(function(e){
-        return {n: e.total, label: e.name + ' (cut)', cls: 't-P3', _kept: false};
+      /* The second tier sits under the line too, and calling it "(cut)"
+         alongside the events that really were cut was the chart telling a
+         reader the opposite of what the list under it says. It is jumpable
+         for the same reason the recommendation is: it is an option. */
+      }).concat(look.map(function(c, i){
+        return {n: c.total, label: c.name + ' (worth a look)', cls: 't-P3',
+                _i: kept.length + i, _kept: true};
+      })).concat((s.excluded || []).map(function(e){
+        return {n: e.total, label: e.name + ' (cut)', cls: 't-cut', _kept: false};
       }));
       /* Three, not two. Two columns carry no distribution to read, and the
          cut one is named under "Scored and cut" either way, so at two events
@@ -2986,8 +3048,10 @@
         jump: function(it){
           return it._kept ? "eviReveal('" + candAnchor(it._i) + "')" : null; },
         note: 'One column per scored event, out of the 110 a perfect one would ' +
-              'score. Everything under the line was cut. Pick a column above ' +
-              'the line to jump to it.'
+              'score. Above the line is the recommendation. Under it, the ' +
+              'events whose audience still measured as this client\'s are ' +
+              'under Worth a look and the rest were cut. Pick any column that ' +
+              'is on one of those two lists to jump to it.'
       });
       if (!body) return '';
       return '<div class="evi-sec"><h3>Against the bar</h3>' + body + '</div>';
@@ -3371,9 +3435,16 @@
       var top = kept && kept.length ? kept[0] : null;
       var cv = coverageSplit(s);
       var p1 = Number(counts.P1) || 0, p2 = Number(counts.P2) || 0;
+      var look = Number(counts.worth_a_look) || 0;
+      /* Answer first, and the answer is no longer only about the bar. A run
+         that recommends nothing but found four events aimed at this client's
+         own buyers has said something, and saying "nothing cleared the bar"
+         and stopping there was reporting the emptier half of it. */
       var line = p1 ? plural(p1, 'must-attend event')
                : (p2 ? plural(p2, 'event') + ' worth the trip, none unmissable'
-                     : 'Nothing cleared the bar of ' + RANK_FLOOR);
+                     : (look ? 'Nothing unmissable, ' + plural(look, 'event') +
+                               ' worth a look'
+                             : 'Nothing cleared the bar of ' + RANK_FLOOR));
       /* A ring, not a donut. The glance wants one number against a stated
          maximum, and a donut's centre has to be the sum of its own segments,
          which here would be the constant 6 on every run. */
@@ -3584,6 +3655,8 @@
         '<div class="ex-counts">' +
           '<span class="c-p1"><b>' + (counts.P1 || 0) + '</b>must-attend<i>P1</i></span>' +
           '<span class="c-p2"><b>' + (counts.P2 || 0) + '</b>strong<i>P2</i></span>' +
+          '<span class="c-look"><b>' + (counts.worth_a_look || 0) + '</b>worth a look' +
+            '<i>right audience</i></span>' +
           '<span class="c-cut"><b>' + (counts.excluded || 0) + '</b>scored and cut' +
             '<i>below ' + RANK_FLOOR + '</i></span>' +
         '</div>' +
@@ -3593,7 +3666,7 @@
         notesHtml(s) +
       '</div>';
 
-      html += planRail(kept);
+      html += planRail(kept, s.worth_a_look || []);
       html += spreadHtml(kept, s);
 
       /* The five and the ranked list are the same events written twice, and
@@ -3633,18 +3706,50 @@
           }).join('') + '</ol></div>';
       }
 
+      var look = s.worth_a_look || [];
+
       html += '<div class="evi-sec"><h3>The ranked list</h3>' +
         (kept.length
           ? '<div class="evi-cands">' + kept.map(function(c, i){
               return candidateRow(c, byName[c.name], decLabels, i); }).join('') + '</div>'
-          : '<div class="evi-empty">Nothing cleared ' + RANK_FLOOR + '. That is the answer, not a ' +
-            'failure: the list is not padded to a target count.</div>') +
+          /* Two different empty states, because they are two different
+             facts. "Nothing cleared the bar" used to be printed even when
+             the run had found events squarely aimed at this client that
+             merely scored in the sixties, which read to a client as "we
+             found you nothing" while a shortlist of real options sat in the
+             section below. */
+          : (look.length
+            ? '<div class="evi-empty">Nothing cleared ' + RANK_FLOOR + ', so there is no ' +
+              'must-attend or strong recommendation here. ' + plural(look.length, 'event') +
+              ' did clear both relevance gates and ' +
+              (look.length === 1 ? 'is' : 'are') + ' listed under Worth a look, ' +
+              'with what each one is short on.</div>'
+            : '<div class="evi-empty">Nothing cleared ' + RANK_FLOOR + '. That is the answer, not a ' +
+              'failure: the list is not padded to a target count.</div>')) +
         (outc.note ? '<div class="evi-note" style="margin-top:12px">' +
           esc(outc.note) + '</div>' : '') +
         '<div style="margin-top:14px">' +
         '<a class="evi-btn evi-btn-ghost" style="text-decoration:none;display:inline-block" ' +
         'href="' + BASE + '/runs/' + run.id + '/candidates.csv">Download scored list CSV</a>' +
         '</div></div>';
+
+      /* The second tier. Below the priority bar, and above both gates that
+         say an event is genuinely for this client, so these get the same
+         card the recommendation gets rather than a name and a number. The
+         anchor index continues past the kept list so the two sections cannot
+         mint the same element id. */
+      if (look.length) {
+        html += '<div class="evi-sec evi-look"><h3>Worth a look</h3>' +
+          '<div class="evi-note">Below ' + RANK_FLOOR + ', so not a recommendation. ' +
+          'Every one of these is a real, upcoming event whose audience this run ' +
+          'measured as genuinely this client\'s: at least ' + RELEVANCE_GATE +
+          ' of 40 on relevance and at least ' + CONSIDER_FLOOR + ' of 100 overall. ' +
+          'Each says what it is short on, so it can be judged rather than ' +
+          'taken on faith.</div>' +
+          '<div class="evi-cands">' + look.map(function(c, i){
+            return candidateRow(c, byName[c.name], decLabels, kept.length + i,
+                                belowBarReason(c)); }).join('') + '</div></div>';
+      }
 
       if ((s.excluded || []).length) {
         html += '<div class="evi-sec"><h3>Scored and cut</h3>' +
@@ -3681,10 +3786,27 @@
       var s = run.summary || {};
       document.getElementById('drawerTitle').textContent =
         (run.profile || {}).client_name || run.query;
+      /* The count in the subtitle is what the reader takes away at a
+         glance, and "1 event cleared the bar of 7 found" was the whole
+         complaint about this agent in one line: it described the run as
+         having produced one thing while four more real options sat two
+         screens below. Both numbers are said now, and only when there is a
+         second number to say. */
       document.getElementById('drawerSub').textContent =
         run.status === 'complete'
-          ? plural((s.counts || {}).kept || 0, 'event') + ' cleared the bar of '
-            + (s.discovered || 0) + ' found'
+          ? (function(){
+              var k = (s.counts || {}).kept || 0;
+              var l = (s.counts || {}).worth_a_look || 0;
+              /* The one-tier wording is left exactly as it was. Only a run
+                 that actually has a second tier says anything new, so a run
+                 without one is not churned. */
+              if (!l) {
+                return plural(k, 'event') + ' cleared the bar of ' +
+                       (s.discovered || 0) + ' found';
+              }
+              return plural(k, 'event') + ' cleared the bar and ' + l +
+                     ' more worth a look, from ' + (s.discovered || 0) + ' found';
+            })()
           : (STAGES[run.stage] || 'Working.');
       var html = '';
       if (run.status === 'failed') {

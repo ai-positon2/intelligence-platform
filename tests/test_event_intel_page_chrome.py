@@ -64,6 +64,62 @@ def test_moving_the_floor_moves_what_the_report_cuts_at(monkeypatch):
     assert "var RANK_FLOOR = 64;" in html, "the report still cuts at a typed number"
 
 
+# ── the second tier reaches the page from the module ────────────────────
+#
+# Same failure mode as the floor, and worse: this section's own note tells a
+# client the two thresholds an event had to clear to be offered to them. A
+# number typed here is the page making a specific promise the ranker is not
+# keeping.
+
+def test_the_second_tier_gates_come_from_the_rubric_not_the_template():
+    html = _page()
+    assert "var RELEVANCE_GATE = %d;" % rubric.RELEVANCE_GATE in html
+    assert "var CONSIDER_FLOOR = %d;" % rubric.CONSIDER_FLOOR in html
+
+
+@pytest.mark.parametrize("gate,floor", [(18, 40), (30, 55)])
+def test_moving_the_gates_moves_what_the_page_promises(monkeypatch, gate, floor):
+    monkeypatch.setattr(rubric, "RELEVANCE_GATE", gate)
+    monkeypatch.setattr(rubric, "CONSIDER_FLOOR", floor)
+    html = _page()
+    assert "var RELEVANCE_GATE = %d;" % gate in html
+    assert "var CONSIDER_FLOOR = %d;" % floor in html
+
+
+def test_the_report_renders_a_second_tier_section():
+    """The whole point of the change: events below the bar that are still
+    aimed at this client are offered, with the card the recommendation gets
+    rather than a name and a number."""
+    html = _page()
+    script = re.findall(r"<script(?![^>]*\bsrc=)[^>]*>(.*?)</script>", html, re.S)[0]
+    assert "worth_a_look" in script, "the page never reads the second tier"
+    assert "Worth a look" in script, "the section has no heading"
+    assert "belowBarReason" in script, (
+        "an option is offered with no account of what is weaker about it")
+
+
+def test_the_second_tier_is_drawn_with_its_own_colour_not_the_discard_grey():
+    """P3 used to be the discard pile and was drawn as one: a grey band and
+    no badge colour. It is a shown tier now, so it needs an identity that is
+    neither a weak P2 nor a reject, in both themes."""
+    css = _css()
+    assert "--evi-f-look" in css, "the second tier has no colour of its own"
+    assert ".t-P3 { --band: var(--evi-f-look); }" in css, (
+        "P3 still takes the discard grey")
+    assert ".t-cut" in css, (
+        "a genuinely cut column has nowhere to get the grey from")
+    # Defined in a BARE :root as well as the light override. A colour whose
+    # only definition sits behind [data-theme] never applies in the
+    # un-stamped default state, which is what most viewers see.
+    blocks = re.findall(r"(:root[^{]*)\{([^}]*)\}", css, re.S)
+    bare = [body for sel, body in blocks
+            if "data-theme" not in sel and "--evi-f-look" in body]
+    light = [body for sel, body in blocks
+             if 'data-theme="light"' in sel and "--evi-f-look" in body]
+    assert bare, "the second tier colour is only defined inside a theme block"
+    assert light, "the second tier colour has no light-mode value"
+
+
 def test_the_scoring_model_card_is_gone_from_the_hero():
     """Removed deliberately. If it comes back it needs its guards back with
     it, because its numbers can drift from the rubric that does the scoring."""

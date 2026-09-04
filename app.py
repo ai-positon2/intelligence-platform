@@ -8666,6 +8666,13 @@ def event_conference_intelligence():
                                "total": event_intel_rubric.TOTAL_MAX,
                                "bonus": event_intel_rubric.MATCHMAKING_BONUS,
                                "floor": event_intel_rubric.RANK_FLOOR,
+                               # The two gates the second tier is decided on,
+                               # sent for the same reason as the floor: the
+                               # page explains them in a sentence and must
+                               # not be able to explain a number the ranker
+                               # no longer uses.
+                               "relevance_gate": event_intel_rubric.RELEVANCE_GATE,
+                               "consider_floor": event_intel_rubric.CONSIDER_FLOOR,
                                "p1": event_intel_rubric.TIER_MIN[
                                    event_intel_rubric.TIER_P1],
                                "dimensions": [

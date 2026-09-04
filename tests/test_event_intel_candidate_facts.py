@@ -226,7 +226,13 @@ def test_a_single_pass_makes_no_claim_about_passes():
 
 def test_the_disclosed_total_counts_the_unscored_too():
     """They were handed to a grader like everything else. Counting only the
-    survivors would understate how much was spread across passes."""
+    survivors would understate how much was spread across passes.
+
+    The head lost its leading "The" when the count learned to agree with its
+    own verb: "The 1 events were graded in 2 separate passes" reached a
+    client, and "The 1 event was" is no better. The number and the verb come
+    from one place now, so the article had to go.
+    """
     lines = _assumptions(candidates=_cands(10), unscored=_cands(3),
                          scoring_batches=3)
-    assert any("The 13 events were graded" in x for x in lines)
+    assert any("13 events were graded" in x for x in lines)
