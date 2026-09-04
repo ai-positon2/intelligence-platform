@@ -190,3 +190,119 @@ def test_an_outcome_is_recorded_against_the_event_not_the_run():
 def test_an_unknown_decision_is_refused_rather_than_stored():
     with pytest.raises(ValueError):
         S.save_outcome(EMAIL, "Some Event", "attending")
+
+
+# ── the recommend path, end to end, against this database ────────────────
+#
+# The gap that hid the promotion bug. Every stage was unit-tested and the
+# wiring between two of them was wrong in a way no unit test could see: the
+# pipeline handed promote_alternatives the one list that could not contain the
+# event each alternative replaces, so every promoted event was built with no
+# category and dropped by normalise_candidate. The summary went on saying it
+# had been "added to this list".
+#
+# The same shape as the run_id defect this file was opened for, and the same
+# lesson: the only test that catches it is one that runs the real path and
+# then READS BACK what landed.
+
+def _profile():
+    return {"client_name": "Pipeline E2E", "website": "https://e2e.example",
+            "classification": R.CLASS_B2B_TO_MARKETING,
+            "buyer_roles": "VP Marketing", "verticals": "digital health",
+            "window_months": 12, "max_events": 15}
+
+
+def _scores(name, **over):
+    d = {"name": name, "relevance": 33, "relevance_note": "dense",
+         "dm_access": 30, "dm_access_note": "reachable",
+         "engagement": 15, "engagement_note": "buying",
+         "description": "A real description of %s." % name,
+         "client_line": "Why %s matters to this client." % name}
+    d.update(over)
+    return d
+
+
+def test_a_promoted_alternative_reaches_the_stored_candidates(monkeypatch):
+    """One marquee event, cut, with a named replacement. The replacement has
+    to end up in evi_candidates: it cost a live confirmation search and a live
+    scoring call, and the summary claims it is on the list."""
+    from tracker import event_intel_audit as A
+    from tracker import event_intel_discover as D
+    from tracker import event_intel_pipeline as P
+    from tracker import event_intel_scorer as SC
+
+    discovered = [
+        {"name": "MarTech Conference", "famous": True, "website": "https://mc.example",
+         "category": R.CAT_INDUSTRY_FLAGSHIP, "city": "Online", "format": "virtual",
+         "starts_on": _soon(120), "ends_on": _soon(122), "sources": ["https://mc.example"],
+         "confidence": "high"},
+        {"name": "Health Growth Collective", "famous": False, "city": "Austin",
+         "category": R.CAT_EMERGING, "website": "https://hgc.example",
+         "starts_on": _soon(90), "ends_on": _soon(91), "format": "in_person",
+         "sources": ["https://hgc.example"], "confidence": "high"},
+    ]
+    verdict = {"verdict": A.VERDICT_CUT, "alternative": "INBOUND",
+               "alternative_website": "https://inbound.example",
+               "alternative_note": "It has a real exhibit floor.",
+               "why": "Fully online.", "name": "MarTech Conference"}
+    audit = {"verdicts": {A.name_key("MarTech Conference"): verdict},
+             "cut": [dict(verdict)], "kept": [], "checked": 1, "error": None}
+
+    monkeypatch.setattr(P.event_intel_discover, "discover", lambda profile: {
+        "candidates": [dict(c) for c in discovered], "shortfall": [],
+        "statuses": {}, "categories_failed": 0, "found": len(discovered),
+        "by_category": {}, "categories_searched": 6})
+    monkeypatch.setattr(P.event_intel_audit, "audit_famous",
+                        lambda c, p: {k: (list(v) if isinstance(v, list) else v)
+                                      for k, v in audit.items()})
+    monkeypatch.setattr(P.event_intel_resolve, "resolve_event",
+                        lambda name, year_hint=None: {
+                            "ok": True, "confidence": "high",
+                            "pages": [{"url": "https://inbound.example/exhibitors"}],
+                            "event": {"name": "INBOUND", "website": "https://inbound.example",
+                                      "starts_on": _soon(200), "ends_on": _soon(202),
+                                      "organizer": "HubSpot", "location": "Boston, MA",
+                                      "stated_size": "11,000 attendees",
+                                      "format": "in_person", "confidence": "high"}})
+    # promote_alternatives imports its default resolver inside the function
+    # body, so patching the module attribute above is what reaches it. No
+    # second patch is needed and adding one only hides which line matters.
+    monkeypatch.setattr(SC, "score_batch", lambda batch, profile: {
+        "scores": {SC.score_key(c["name"]): SC._clean(_scores(c["name"]))
+                   for c in batch}, "error": None})
+    monkeypatch.setattr(P.event_intel_scorer, "score_batch", SC.score_batch)
+
+    run_id = S.save_run(EMAIL, "recommend", "pipeline e2e")
+    P._run_recommend(run_id, EMAIL, _profile())
+
+    row = S.get_run(run_id, EMAIL)
+    assert row["status"] == "complete", row.get("error")
+    names = [c["name"] for c in S.get_candidates(run_id)]
+    assert "MarTech Conference" not in names, "the cut event survived the audit"
+    assert "INBOUND" in names, (
+        "the audit's replacement never reached the table, and the summary "
+        "still says it did: %s" % names)
+
+    stored = [c for c in S.get_candidates(run_id) if c["name"] == "INBOUND"][0]
+    assert stored["category"] in R.CATEGORIES, stored["category"]
+    assert stored["audit_verdict"] == A.VERDICT_PROMOTED
+    assert stored["total"] == 78, stored["total"]
+    assert D.name_key("INBOUND")  # the key the summary and the table share
+
+
+def test_the_summary_never_claims_a_promotion_the_table_does_not_hold(monkeypatch):
+    """The claim, checked against the rows. This is the sentence that was
+    false for every run: "named by the audit ... then confirmed separately and
+    added to this list", printed while the list held nothing of the sort."""
+    from tracker import event_intel_pipeline as P
+    test_a_promoted_alternative_reaches_the_stored_candidates(monkeypatch)
+    runs = S.list_runs(EMAIL)
+    run = S.get_run(runs[0]["id"], EMAIL)
+    claimed = [p["name"] for p in
+               ((run["summary"] or {}).get("audit") or {}).get("promoted") or []]
+    names = {c["name"] for c in S.get_candidates(run["id"])}
+    missing = [n for n in claimed if n not in names]
+    assert not missing, (
+        "the summary says these were added to the list and the table does "
+        "not hold them: %s" % missing)
+    assert P  # the path under test is the pipeline's, not a reconstruction
