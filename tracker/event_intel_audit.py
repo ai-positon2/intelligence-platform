@@ -317,7 +317,8 @@ def alternatives_to_promote(audit: dict, candidates: list[dict]) -> list[dict]:
 
 
 def promote_alternatives(audit: dict, candidates: list[dict],
-                         resolver=None, cap: int = MAX_PROMOTED) -> dict:
+                         resolver=None, cap: int = MAX_PROMOTED,
+                         replaced_from: list[dict] | None = None) -> dict:
     """Turn the audit's named alternatives into scoreable candidates.
 
     The gap this closes: the audit would cut a marquee event, name a better
@@ -354,7 +355,17 @@ def promote_alternatives(audit: dict, candidates: list[dict],
 
     # By category of the event being replaced, so a promoted event lands in
     # the same slot on the report as the one it stands in for.
-    by_name = {name_key(c.get("name") or ""): c for c in candidates or []}
+    #
+    # Looked up in `replaced_from` rather than in `candidates`, because they
+    # are two different lists doing two different jobs. `candidates` is what
+    # is already ON the list, and is what a promotion is deduped against. The
+    # event being replaced was just CUT, so by definition it is not on that
+    # list, and looking it up there always failed: the promoted event got
+    # category=None and was dropped by the store for having no category slot.
+    # `replaced_from` is the pre-audit list, where the cut event still exists.
+    by_name = {name_key(c.get("name") or ""): c
+               for c in (replaced_from if replaced_from is not None
+                         else candidates) or []}
 
     for alt in wanted[:max(0, cap)]:
         try:
@@ -388,8 +399,23 @@ def promote_alternatives(audit: dict, candidates: list[dict],
             })
             continue
         replaced = by_name.get(name_key(alt["replaces"] or ""))
-        out["promoted"].append(
-            _candidate_from_alternative(res, alt, replaced))
+        candidate = _candidate_from_alternative(res, alt, replaced)
+        # A promoted event with no category is dropped by the store, silently,
+        # after a live lookup and a live scoring call have already been spent
+        # on it, while the summary goes on saying it was added to the list.
+        # Refused here instead, and named, so the failure is in the report
+        # rather than in a log line nobody reads.
+        if candidate.get("category") not in rubric.CATEGORIES:
+            out["unconfirmed"].append({
+                "name": alt["name"], "replaces": alt["replaces"],
+                "why": ("This was confirmed as a real, upcoming event, but the "
+                        "marquee event it stands in for could not be matched to "
+                        "one of the six discovery categories, so there is no "
+                        "slot on the list to put it in."),
+                "confidence": (res or {}).get("confidence"),
+            })
+            continue
+        out["promoted"].append(candidate)
 
     # Named, never looked at, because the cost ceiling was reached. Said out
     # loud rather than trimmed away, so the reader can ask for the rest.
