@@ -649,3 +649,108 @@ def test_the_choice_grids_are_not_left_to_auto_fit():
         assert "auto-fit" not in cols.group(1) and "auto-fill" not in cols.group(1), (
             "%s is back on auto-fit, so its cards can strand on a second row: %r"
             % (sel, cols.group(1).strip()))
+
+
+# ── the score chart's plot area ─────────────────────────────────────────
+#
+# `.cs` holds the columns AND the dashed floor line, which is positioned
+# left:0 right:0 across it. While `.cs` was full width and the columns capped
+# at 34px and packed from the left, six events used 229px of a 1074px panel
+# and the floor line ran the remaining 845px into empty space with its "the
+# bar, 70" label pinned at the far edge. Measured in a browser at 1440px.
+#
+# The plot is now sized by a calc over `--n`, the column count, which the page
+# script writes onto the chart. Three pieces have to stay in step: the script
+# has to set --n, the CSS has to consume it, and the column's cap has to be
+# the same token the calc multiplies. Any one of them alone leaves a chart
+# that renders without an error and is the wrong width, which is how the
+# first attempt at this (`width: fit-content`) shipped a 55px chart.
+
+def test_the_score_chart_tells_the_css_how_many_columns_it_has():
+    html = _page()
+    script = re.findall(r"<script(?![^>]*\bsrc=)[^>]*>(.*?)</script>", html, re.S)[0]
+    assert "--n:' + items.length" in script, (
+        "the chart no longer states its column count, so the CSS calc that "
+        "sizes the plot falls back to its default and the floor line stops "
+        "agreeing with the columns")
+
+
+def test_the_score_chart_plot_is_only_as_wide_as_its_columns():
+    """Otherwise the floor line and its label are drawn across however much
+    of the panel the columns did not use."""
+    body = _rule(_css(), ".evi-cols .cs")
+    cap = re.search(r"max-width:\s*calc\(([^;]+)\);", body)
+    assert cap, (
+        "the plot has no max-width calc, so it is full width again: %r"
+        % " ".join(body.split())[:140])
+    assert "var(--n" in cap.group(1), (
+        "the plot's width does not depend on the column count: %r"
+        % cap.group(1))
+    assert "var(--evi-col-w" in cap.group(1), (
+        "the plot's width hand-types a column width instead of reading the "
+        "same token the columns cap at, so the two can drift: %r"
+        % cap.group(1))
+    assert re.search(r"width:\s*100%", body), (
+        "without width:100% the plot cannot fall back to the full panel when "
+        "the columns do not fit")
+
+
+def test_the_column_cap_and_the_plot_width_read_one_token():
+    """Two hand-typed copies of the column width drift, and a drifted copy
+    draws the floor line over columns of a different size."""
+    body = _rule(_css(), ".evi-cols .cx")
+    cap = re.search(r"max-width:\s*([^;]+);", body)
+    assert cap and "var(--evi-col-w" in cap.group(1), (
+        "the column caps at a literal rather than the shared token: %r"
+        % (cap and cap.group(1).strip()))
+    assert re.search(r"--evi-col-w:\s*\d+px", _rule(_css(), ".evi-cols")), (
+        "nothing defines --evi-col-w, so the calc above is invalid and the "
+        "max-width is dropped entirely")
+    assert re.search(r"--evi-col-w:\s*\d+px", _rule(_css(), ".evi-cols.few")), (
+        "the few-column override no longer moves the token, so a wider "
+        "column is drawn in a plot sized for a narrow one")
+
+
+def test_the_floor_label_has_room_of_its_own_beside_the_line():
+    """While the plot was full width the label sat at the far right of a mostly
+    empty band and touched nothing. Shrinking the plot to its columns put it
+    on top of the last two of them, which is a silent regression: the chart
+    still renders, it just has a word printed across a bar."""
+    css = _css()
+    plot = _rule(css, ".evi-cols .cs")
+    assert "padding-right: var(--evi-fo-w)" in " ".join(plot.split()), (
+        "the plot reserves no room for the label, so it is drawn over the "
+        "columns: %r" % " ".join(plot.split())[:140])
+    line = _rule(css, ".evi-cols .fo")
+    assert "right: var(--evi-fo-w)" in " ".join(line.split()), (
+        "the floor line runs into the reserved space and back under its own "
+        "label: %r" % " ".join(line.split())[:140])
+    label = " ".join(_rule(css, ".evi-cols .fo b").split())
+    assert "left: 100%" in label, (
+        "the label is positioned inside the plot again: %r" % label[:140])
+    assert "nowrap" in label, (
+        "the label wraps inside its reserved width instead of sitting on one "
+        "line: %r" % label[:140])
+    assert re.search(r"--evi-fo-w:\s*\d+px", _rule(css, ".evi-cols.hasfo")), (
+        "the charts that draw a floor line reserve nothing for its label")
+    assert re.search(r"--evi-fo-w:\s*0px", _rule(css, ".evi-cols")), (
+        "every chart reserves the label's width, including the ones with no "
+        "floor line, so those are drawn off-centre for nothing")
+
+
+def test_the_report_drawer_is_opaque_in_both_themes():
+    """It was 72% over a 74% scrim, so the hero headline behind the page read
+    through the report: 50px of blurred type across the score chart's band, in
+    a document a client opens. Light mode was already solid, which is how the
+    two themes came to disagree about it."""
+    css = _css()
+    body = " ".join(_rule(css, ".evi-drawer").split())
+    m = re.search(r"background-color:\s*([^;]+);", body)
+    assert m, "the drawer sets no opaque background-color: %r" % body[:160]
+    assert not re.search(r"rgba?\([^)]*,\s*0?\.\d+\s*\)", m.group(1)), (
+        "the drawer's background is translucent again, so the page reads "
+        "through the report: %r" % m.group(1).strip())
+    light = " ".join(_rule(css, ':root[data-theme="light"] .evi-drawer').split())
+    assert "background-image: none" in light, (
+        "light mode paints white under the dark panel image rather than "
+        "instead of it: %r" % light[:160])

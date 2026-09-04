@@ -131,7 +131,16 @@ def _clean(raw: dict) -> dict | None:
         return None
     out = {"name": name}
     for dim in rubric.DIMENSIONS:
-        out[dim] = rubric.clamp_subscore(dim, raw.get(dim))
+        # read_subscore, not clamp_subscore. Clamping turns a dimension the
+        # grader never returned into a 0, and 0 is a verdict: rubric.gaps_for
+        # reads the stored value and can no longer tell "we looked and it
+        # scores nothing" from "nobody scored this at all". The second is
+        # worth up to 40 of 100 points, and reported as the first it cuts a
+        # real event off the list at a plausible-looking total. None is kept
+        # here and handled in score_all; rubric.score() still clamps it to 0
+        # for arithmetic, so nothing downstream sees a null total.
+        value, readable = rubric.read_subscore(dim, raw.get(dim))
+        out[dim] = value if readable else None
         out[dim + "_note"] = str(raw.get(dim + "_note") or "").strip()[:800] or None
     out["description"] = str(raw.get("description") or "").strip()[:900] or None
     out["client_line"] = str(raw.get("client_line") or "").strip()[:600] or None
@@ -155,12 +164,11 @@ def score_batch(batch: list[dict], profile: dict) -> dict:
     if not isinstance(parsed, dict):
         return {"scores": {},
                 "error": "The scoring pass ran but its answer could not be read."}
-    from .event_intel_discover import name_key
     out = {}
     for s in (parsed.get("scores") or []):
         clean = _clean(s)
         if clean:
-            out[name_key(clean["name"])] = clean
+            out[score_key(clean["name"])] = clean
     return {"scores": out, "error": None}
 
 
@@ -193,6 +201,51 @@ def deal(candidates: list[dict], size: int = BATCH) -> list[list[dict]]:
     return out
 
 
+def score_key(name: str) -> tuple:
+    """The key `merge` would agree with: the stripped name AND its region.
+
+    name_key alone strips region words, which is right for deciding that
+    "MarTech Summit" and "MarTech Summit Europe" are one event and wrong for
+    deciding that "Money20/20 USA" and "Money20/20 Europe" are. merge() knows
+    that and keeps both; this dict used name_key on its own, so the two
+    editions shared one slot and the second one graded overwrote the first.
+    Both rows were then stored with one edition's scores, notes and
+    description, which reads as a confident grade of the wrong continent.
+    """
+    from .event_intel_discover import name_key, region_key
+    return (name_key(name), region_key(name))
+
+
+def _lookup(scores: dict, name: str) -> dict | None:
+    """This candidate's scores, tolerating a name the grader reworded.
+
+    The prompt asks for the name it was given, back verbatim. Asking is not
+    getting, and the exact-key lookup this replaces sent an event with its own
+    scores to the unscored bucket whenever the grader returned "SaaStr" for
+    "SaaStr Annual". `merge` and `_dedupe_proposals` already treat those as
+    one event, so the strict comparison here disagreed with the rest of the
+    module about what the same event is.
+
+    Loose matching is accepted ONLY when exactly one candidate matches, the
+    same guard event_intel_audit._verdict_for uses: one event wearing
+    another's sub-scores is a worse outcome than the miss.
+    """
+    from .event_intel_discover import names_match
+    key = score_key(name or "")
+    if not key[0]:
+        return None
+    exact = scores.get(key)
+    if exact is not None:
+        return exact
+    # names_match compares regions as well as names, so a reply that dropped
+    # the region cannot be matched to one edition while another edition of the
+    # same series is also in the dict: that comes back ambiguous and the event
+    # is reported unscored, which is the honest answer.
+    hits = [v for k, v in scores.items()
+            if k != key and names_match(name or "", v.get("name") or k[0])]
+    return hits[0] if len(hits) == 1 else None
+
+
 def score_all(candidates: list[dict], profile: dict) -> dict:
     """Score every candidate, in concurrent batches.
 
@@ -219,16 +272,32 @@ def score_all(candidates: list[dict], profile: dict) -> dict:
                     errors.append(r["error"])
                 merged.update(r.get("scores") or {})
 
-    from .event_intel_discover import name_key
     scored, unscored = [], []
     for c in candidates:
         c = dict(c)
-        s = merged.get(name_key(c.get("name") or ""))
+        s = _lookup(merged, c.get("name") or "")
         if not s:
             c["unscored"] = True
             c["scoring_note"] = ("The scoring pass returned no result for this "
                                  "event, so it is unranked rather than ranked "
                                  "low.")
+            unscored.append(c)
+            continue
+        # A reply that scored two of the three dimensions is not a score. The
+        # missing one is worth up to 40 points, so ranking the event on what
+        # did come back presents a partial total as a verdict and quietly
+        # drops a strong event under the floor. Unranked and named is the same
+        # answer this function already gives for a reply that never arrived.
+        missing = [d for d in rubric.DIMENSIONS if s[d] is None]
+        if missing:
+            c["unscored"] = True
+            c["scoring_note"] = (
+                "The scoring pass returned no %s for this event, and that "
+                "dimension is worth up to %d of the 100 points, so it is "
+                "unranked rather than ranked on a partial total."
+                % (" or ".join(rubric.DIMENSION_LABELS[d].lower()
+                               for d in missing),
+                   sum(rubric.DIMENSION_MAX[d] for d in missing)))
             unscored.append(c)
             continue
         for dim in rubric.DIMENSIONS:

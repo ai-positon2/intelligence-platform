@@ -2031,7 +2031,15 @@
          wrapper instead, its percentage was measured against a taller box
          than the columns were, so the bar it drew sat a few pixels above the
          height it was describing. */
-      return '<div class="evi-cols' + (items.length <= 4 ? ' few' : '') + '">' +
+      /* --n is the column count, and the CSS caps the plot's width with a
+         calc over it. That is what makes the dashed floor line stop where
+         the columns stop: the line is positioned across this box, so a
+         full-width box drew it, and its label, across however much of the
+         panel the columns did not use. Six events used 229px of 1074px and
+         the line ran the other 845px into nothing. */
+      return '<div class="evi-cols' + (items.length <= 4 ? ' few' : '') +
+        (floor ? ' hasfo' : '') +
+        '" style="--n:' + items.length + '">' +
         '<div class="cwrap"><div class="cs">' + floor + cols + '</div></div>' +
         (note ? '<div class="cn">' + note + '</div>' : '') + '</div>';
     }
@@ -3336,8 +3344,9 @@
         ? '<b>' + esc(plural(failed, 'category search', 'category searches')) +
           ' did not finish</b>' +
           (gapNames.length ? ' (' + esc(gapNames.join(', ')) + ')' : '') +
-          ', so this list is missing a kind of event rather than having found ' +
-          'none. That is a hole in the analysis, not a finding about the market.'
+          ', so this list is short of a kind of event rather than having ' +
+          'exhausted it. That is a hole in the analysis, not a finding about ' +
+          'the market.'
         : (short
             ? esc(plural(short, 'category', 'categories')) +
               ' came back under quota after ' +
