@@ -4,7 +4,11 @@
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 
 html,body{height:100%;overflow-x:hidden}
-body{background:var(--bg);min-height:100vh;position:relative}
+/* No background here on purpose. aurora-app.css loads after this file and
+   carries `body{background:transparent!important}`, so a body background is
+   discarded; this page takes its ground from that file's `html` rules, which
+   cover both themes. To override it, use `html:root`, not body. */
+body{min-height:100vh;position:relative}
 body::before{
   content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
   background:

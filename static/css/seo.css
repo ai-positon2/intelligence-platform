@@ -2,15 +2,29 @@
 
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-    body {
-      font-family: 'Space Grotesk', sans-serif;
-      color: #e2e8f0; min-height: 100vh;
-      display: flex; flex-direction: column; overflow-x: hidden;
-      background:
+    /* Ground on html:root, not body: aurora-app.css loads after this file and
+   carries `body{background:transparent!important}`, so a body background here
+   is discarded outright. `html:root` scores 0,0,2 and beats that file's
+   `html{...}` at 0,0,1 whatever the load order. Light mode is deliberately NOT
+   overridden: aurora's `html[data-theme="light"]` is 0,1,1 and outranks this on
+   class level, so the page gets its flat light ground for free. Any
+   `!important` here would break that.
+   background-color is its own line because a `background` shorthand listing
+   only images resets background-color to transparent, and macOS rubber-band
+   overscroll then paints the browser's white canvas past the document edge. */
+html:root {
+  background:
         radial-gradient(ellipse 80% 50% at 20% 0%,   rgba(16,185,129,0.11) 0%, transparent 60%),
         radial-gradient(ellipse 60% 40% at 85% 60%,  rgba(99,102,241,0.08) 0%, transparent 55%),
         radial-gradient(ellipse 50% 60% at 50% 100%, rgba(6,30,20,0.5)     0%, transparent 70%),
         linear-gradient(160deg, #080c14 0%, #060d12 40%, #060910 100%);
+  background-color: #060910;
+}
+
+    body {
+      font-family: 'Space Grotesk', sans-serif;
+      color: #e2e8f0; min-height: 100vh;
+      display: flex; flex-direction: column; overflow-x: hidden;
     }
 
     .bg-grid {

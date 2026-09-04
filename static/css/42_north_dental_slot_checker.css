@@ -22,10 +22,12 @@
    discarded outright and a plain `:root{...}` here would lose the later-wins
    tiebreak to its `html{...}`. `html:root` scores 0,0,2 against that 0,0,1 and
    wins on specificity regardless of order.
-   Worth knowing: aurora-app.css's own light-mode ground
-   (`:root[data-theme="light"] html`) can never match, because :root IS html, so
-   it is asking for an html inside a light-themed html. Every page that relies on
-   it gets the dark ground in light mode. This page does not rely on it. */
+   Worth knowing: aurora-app.css's light-mode ground used to be written
+   `:root[data-theme="light"] html`, which can never match, because :root IS
+   html, so it asked for an html inside a light-themed html. Every page relying
+   on it got the dark ground in light mode. It is now `html[data-theme="light"]`
+   and works. This page still defines its own, because its ground is a gradient
+   rather than that file's flat colour. */
 /* `background:` is a shorthand: writing only gradients into it resets the
    longhand background-color to its initial value, transparent -- gradients
    are images, not a colour, and the shorthand does not infer one from them.

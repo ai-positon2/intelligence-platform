@@ -5,14 +5,28 @@
    ds-tokens accent family used for status/type distinctions elsewhere. */
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-body {
-  font-family: 'Space Grotesk', sans-serif; color: #e2e8f0;
-  min-height: 100vh; display: flex; flex-direction: column;
+/* Ground on html:root, not body: aurora-app.css loads after this file and
+   carries `body{background:transparent!important}`, so a body background here
+   is discarded outright. `html:root` scores 0,0,2 and beats that file's
+   `html{...}` at 0,0,1 whatever the load order. Light mode is deliberately NOT
+   overridden: aurora's `html[data-theme="light"]` is 0,1,1 and outranks this on
+   class level, so the page gets its flat light ground for free. Any
+   `!important` here would break that.
+   background-color is its own line because a `background` shorthand listing
+   only images resets background-color to transparent, and macOS rubber-band
+   overscroll then paints the browser's white canvas past the document edge. */
+html:root {
   background:
     radial-gradient(ellipse 80% 50% at 18% 0%,  rgba(244,114,182,.11) 0%, transparent 60%),
     radial-gradient(ellipse 60% 40% at 88% 55%, rgba(124,131,245,.10) 0%, transparent 55%),
     radial-gradient(ellipse 50% 60% at 50% 100%,rgba(40,10,30,.45)   0%, transparent 70%),
     linear-gradient(160deg, #0b0810 0%, #0a0910 40%, #08090f 100%);
+  background-color: #08090f;
+}
+
+body {
+  font-family: 'Space Grotesk', sans-serif; color: #e2e8f0;
+  min-height: 100vh; display: flex; flex-direction: column;
 }
 .bg-grid { position: fixed; inset: 0; z-index: 0; pointer-events: none; background-image: radial-gradient(circle, rgba(244,114,182,.07) 1px, transparent 1px); background-size: 36px 36px; mask-image: radial-gradient(ellipse 85% 85% at 50% 40%, black 30%, transparent 100%); }
 .lps-aurora { position: fixed; inset: -25%; z-index: 0; pointer-events: none; filter: blur(76px); }
