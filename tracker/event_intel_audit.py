@@ -50,26 +50,74 @@ VERDICT_UNAUDITED = "unaudited"
 # so it must never be presented as though it had been.
 VERDICT_PROMOTED = "promoted"
 
-# Each promotion costs one resolve_event call, which is a live search. Three
-# is enough to replace the marquee events a normal run cuts without turning
-# the audit into a second discovery pass.
+# How many replacements a run will actually put on the list. Three is enough
+# to replace the marquee events a normal run cuts without turning the audit
+# into a second discovery pass.
 MAX_PROMOTED = 3
+
+# How many lookups it will spend getting there, which is the COST. These were
+# one number, and a live run showed why they cannot be: the audit named four
+# alternatives, the cap allowed three lookups, and two of those three were
+# confirmed and then dropped for an unrelated reason. Yield was one event out
+# of four named, while the fourth, SaaStr Annual, sat unexamined because
+# lookups spent on events that never made the list had been counted against
+# it. A cap on attempts stops the run at the wrong moment: it should bound
+# what this step is allowed to spend, and keep going until it has the
+# replacements or has run out of budget.
+MAX_PROMOTION_LOOKUPS = 5
 
 # Above this share of a prior list for a DIFFERENT client, the list is
 # generic. The skill's remedy at that point is to replace three to five famous
 # events with vertical-specific or regional alternatives.
 GENERIC_THRESHOLD = 0.5
 
-_AUDIT_SYSTEM = """You audit famous conferences off a shortlist. Your default \
-assumption is that a marquee event is on the list out of habit rather than fit.
+# One call per famous event, and these are that call's budgets.
+#
+# The shape here used to be a single call over every famous event at
+# max_uses=10. Input cost grows with the SQUARE of one call's search count,
+# because every search round re-sends the whole accumulated conversation, so
+# that shape was the most expensive in the codebase: a live run measured
+# 152,820 input tokens and 241 seconds for one ten-search audit, against
+# 50,829 to 58,918 for the six-search calls beside it.
+#
+# Splitting it does not just spread that cost, it REDUCES it. N searches over
+# k calls costs about N**2/k instead of N**2, so five three-search calls buy
+# fifteen searches for roughly 69k input tokens where one ten-search call
+# bought ten for 153k. Each event also gets three searches to itself where
+# the single call had ten to divide among five, so the per-event search budget
+# went UP while the bill went down.
+#
+# Two things beyond cost made this worth the change. A truncated single reply
+# reported EVERY marquee event on the client's list as unaudited, and that
+# reply overran its budget in the one run we measured (11,754 output tokens
+# against 8,000). And the single call had to echo each event's name back so
+# its verdicts could be matched up, which is the source of the city-suffix
+# name-matching bug that has now cost real events twice; a call about one
+# event needs no echo, because the caller already knows which event it asked
+# about.
+AUDIT_MAX_USES = 3
+# Held at the floor every searching stage is held to, not trimmed to what one
+# verdict needs. max_tokens is a CEILING, not a charge: only tokens actually
+# generated are billed, so a generous limit costs nothing and a tight one
+# throws away a search that has already been paid for. Trimming this was how
+# a live run lost two on-profile events at the confirm stage.
+AUDIT_MAX_TOKENS = 9000
+# Concurrent audits in flight. The audits are independent, so the stage's wall
+# time is one call rather than the sum, and this is the same ceiling
+# event_intel_discover applies to its own fan-out.
+AUDIT_MAX_INFLIGHT = 3
+
+_AUDIT_SYSTEM = """You audit ONE famous conference off a client's shortlist. \
+Your default assumption is that a marquee event is on the list out of habit \
+rather than fit.
 
 THE CLIENT
 {profile}
 
 WHERE THIS CLIENT'S BUYERS PHYSICALLY ARE AT AN EVENT: {where_buyers}
 
-For EACH event below, use web search to find the single most targeted \
-alternative that serves this exact buyer profile better, then decide.
+Use web search to find the single most targeted alternative that serves this \
+exact buyer profile better than the event below, then decide.
 
 RULES.
 1. You MUST name a real alternative event you confirmed exists by searching. \
@@ -86,12 +134,13 @@ diluted flagship loses to a dense vertical summit.
 line.
 4. Be willing to cut. A shortlist where every famous event survived its own \
 audit is a shortlist that was not audited.
+5. You have ONE event to judge and a small search budget. Spend it on finding \
+the alternative, not on studying the event you were given, and write your \
+answer while you still have room to finish it.
 
 Respond with ONLY a JSON object:
-{{"audits": [{{"name": str, "verdict": "kept"|"cut", "alternative": str|null, \
-"alternative_website": str|null, "alternative_note": str|null, "why": str}}]}}
-
-`name` must exactly match the event name you were given."""
+{{"verdict": "kept"|"cut", "alternative": str|null, \
+"alternative_website": str|null, "alternative_note": str|null, "why": str}}"""
 
 
 def _profile_line(profile: dict) -> str:
@@ -99,130 +148,193 @@ def _profile_line(profile: dict) -> str:
     return profile_brief(profile)
 
 
+def _event_label(c: dict) -> str:
+    """One famous event, as the audit is shown it."""
+    return "%s%s%s" % (c.get("name") or "",
+                       (" (%s)" % c["city"]) if c.get("city") else "",
+                       (" - %s" % c["audience_note"][:200])
+                       if c.get("audience_note") else "")
+
+
+def _record(cand: dict, a: dict) -> dict:
+    """One reply, as a verdict record for the candidate it was asked about."""
+    alternative = str(a.get("alternative") or "").strip()
+    why = str(a.get("why") or "").strip()[:600]
+    claimed = str(a.get("verdict") or "").strip().lower()
+
+    # The enforcement. A "kept" with no named alternative is a restatement
+    # dressed as a comparison, and it is downgraded to a cut rather than
+    # accepted, because the comparison the step requires never happened.
+    if claimed == VERDICT_KEPT and not alternative:
+        verdict = VERDICT_CUT
+        why = ("Cut: kept was claimed but no more targeted alternative was "
+               "named, so nothing was actually weighed against it. "
+               + why)[:600]
+    else:
+        verdict = VERDICT_KEPT if claimed == VERDICT_KEPT else VERDICT_CUT
+
+    website = str(a.get("alternative_website") or "").strip()
+    if website and not website.lower().startswith(("http://", "https://")):
+        website = ""
+    return {"verdict": verdict, "alternative": alternative or None,
+            "alternative_website": website or None,
+            "alternative_note": str(a.get("alternative_note") or "")[:400] or None,
+            "why": why,
+            # The CANDIDATE's name, never one echoed back by the model. One
+            # call judges one known event, so there is nothing to match up and
+            # no way for a reply that repeats "Adobe Summit (Las Vegas)" to
+            # key itself away from the row it is about.
+            "name": str(cand.get("name") or "")[:250]}
+
+
+def _audit_one(cand: dict, system: str) -> dict:
+    """One famous event, weighed against one searched alternative.
+
+    Returns {"rec": dict|None, "error": str|None, "spend": {...}}. Never
+    raises: a failure here must cost its own event's verdict and nothing
+    else, which is the whole point of splitting the call up.
+    """
+    res = claude_websearch.ask(
+        system, "Audit this famous event:\n- %s" % _event_label(cand),
+        max_uses=AUDIT_MAX_USES, max_tokens=AUDIT_MAX_TOKENS)
+    # Counted before any of the ways this reply can be refused below. The
+    # search is billed whether or not its answer turns out to be usable, and
+    # an audit that gets thrown away is the version worth seeing.
+    box = {"rec": None, "error": None, "spend": claude_websearch.spend_of(res)}
+
+    if res.get("error"):
+        box["error"] = "%s: %s" % (res["error"]["kind"], res["error"]["detail"])
+        return box
+
+    # The same refusal event_intel_discover applies to a category search and
+    # event_intel_recover to a recovered roster. It matters more here than in
+    # either: this reply CUTS an event off a client's list and names its
+    # replacement, and the rule at the top of this module is that the
+    # alternative "must be a real event found by search". A reply that ran no
+    # search is a recollection, and acting on it removes a real recommendation
+    # and promotes a remembered one.
+    if not res.get("search_count"):
+        box["error"] = ("it was answered without a single search being run, so "
+                        "its verdict was recalled rather than checked")
+        return box
+
+    # Read off the reply's OWN outermost object, never by scanning for a
+    # "verdict" key wherever it appears. `extract_json(require=...)` walks
+    # forward until some balanced object carries the key, which for a
+    # single-object schema means a reply in a shape nobody asked for gets
+    # rifled for anything verdict-shaped inside it: a `{"verdicts": [...]}`
+    # envelope would yield its first row, and this function would then cut a
+    # real marquee event off a client's list on the strength of a reply it did
+    # not actually understand. The envelope has to be one of the two we asked
+    # for, or the answer is unreadable.
+    top = claude_websearch.extract_json(res.get("text") or "")
+    parsed = None
+    if isinstance(top, dict):
+        if "verdict" in top:
+            parsed = top
+        elif isinstance(top.get("audits"), list) and top["audits"]:
+            # One verdict wrapped in the list envelope this prompt used to ask
+            # for is still a complete answer to the question, and refusing it
+            # would discard a live search already paid for.
+            first = top["audits"][0]
+            parsed = first if isinstance(first, dict) else None
+    if parsed is None:
+        logger.warning("event_intel_audit: unreadable audit reply for %r "
+                       "(stop=%s, searches=%s, keys=%s)", cand.get("name"),
+                       res.get("stop_reason"), res.get("search_count"),
+                       sorted(top)[:6] if isinstance(top, dict) else None)
+        box["error"] = "its answer could not be read"
+        return box
+
+    box["rec"] = _record(cand, parsed)
+    return box
+
+
 def audit_famous(candidates: list[dict], profile: dict) -> dict:
     """Weigh every famous candidate against a named, searched alternative.
 
     Returns {"verdicts": {name_key: {...}}, "cut": [...], "kept": [...],
-             "checked": int, "error": str|None}.
+             "checked": int, "failed": {name_key: str}, "error": str|None}.
+
+    One call per famous event, run concurrently. See AUDIT_MAX_USES for why
+    that is both cheaper and better than the single call this used to make.
+
+    `failed` is the half of the split that matters for correctness. Five
+    independent calls are five independent chances to lose a call, and
+    apply_audit CUTS a famous event it has no verdict for, so without a record
+    of which events failed their own audit a transport blip would quietly
+    remove a real recommendation from a client's list. `error` is now reserved
+    for the case where NOTHING was audited, which is the only case in which
+    the check as a whole can be said not to have run.
 
     A candidate that is not famous is never audited and never appears here;
     the caller marks those `unaudited`, which is a different thing from
     `kept` and is stored as such.
     """
+    import concurrent.futures
+
     famous = [c for c in (candidates or []) if c.get("famous")]
     out = {"verdicts": {}, "cut": [], "kept": [], "checked": len(famous),
-           "error": None, "spend": claude_websearch.spend_sum()}
+           "failed": {}, "error": None, "spend": claude_websearch.spend_sum()}
     if not famous:
         return out
 
     from . import event_intel_rubric as rubric
-    listing = "\n".join(
-        "- %s%s%s" % (c["name"],
-                      (" (%s)" % c["city"]) if c.get("city") else "",
-                      (" - %s" % c["audience_note"][:200]) if c.get("audience_note") else "")
-        for c in famous)
     system = _AUDIT_SYSTEM.format(
         profile=_profile_line(profile),
         where_buyers=rubric.CLASSIFICATION_WHERE_BUYERS_ARE.get(
             profile.get("classification"), "Confirm with the client."))
-    # max_tokens raised 8000 -> 12000 on the same live-run evidence as the
-    # two budgets in event_intel_discover. This reply is the longest of any
-    # stage: a verdict, a reason and a named searched alternative for EVERY
-    # famous event, written after up to ten rounds of search narration that
-    # spend the same output budget. Confirm calls reached 6162 output tokens
-    # on six searches; this one has ten and more to write.
-    #
-    # A truncated audit is not a neutral outcome. `out["error"]` is set and
-    # every marquee event on the client's list is then reported unaudited,
-    # which is the one thing this step exists to prevent.
-    #
-    # The search budget is deliberately NOT touched here. This is still one
-    # call over every famous event, which is the single-call shape
-    # event_intel_discover abandoned because input cost grows with the SQUARE
-    # of a call's search count. Splitting it one-call-per-event is the real
-    # fix and it is a bigger change than a budget; raising max_uses would
-    # make the wrong shape more expensive rather than less.
-    res = claude_websearch.ask(
-        system, "Audit these %d famous events:\n%s" % (len(famous), listing),
-        max_uses=10, max_tokens=12000)
-    # Counted before any of the ways this reply can be refused below. A
-    # ten-search audit costs about $0.73 whether or not its answer is usable,
-    # and an audit that gets thrown away is the version worth seeing.
-    out["spend"] = claude_websearch.spend_of(res)
 
-    if res.get("error"):
-        # The audit not running is recorded, never silently skipped. An
-        # unaudited flagship on the list is the thing this step exists to
-        # catch, so the report has to be able to say the check did not happen.
-        out["error"] = "%s: %s" % (res["error"]["kind"], res["error"]["detail"])
-        return out
+    boxes: dict = {}
+    with concurrent.futures.ThreadPoolExecutor(
+            max_workers=min(AUDIT_MAX_INFLIGHT, len(famous))) as pool:
+        futures = {pool.submit(_audit_one, c, system): i
+                   for i, c in enumerate(famous)}
+        for fut in concurrent.futures.as_completed(futures):
+            i = futures[fut]
+            try:
+                boxes[i] = fut.result()
+            except Exception as e:                   # never raises upward
+                logger.warning("event_intel_audit: auditing %r raised: %s",
+                               famous[i].get("name"), e)
+                boxes[i] = {"rec": None, "spend": None,
+                            "error": "the audit call failed: %s" % str(e)[:200]}
 
-    # The same refusal event_intel_discover applies to a category search and
-    # event_intel_recover to a recovered roster. It matters more here than in
-    # either: this reply CUTS events off a client's list and names their
-    # replacements, and the rule at the top of this module is that the
-    # alternative "must be a real event found by search". A reply that ran no
-    # search is a recollection, and acting on it removes real recommendations
-    # and promotes remembered ones. Reported as a failed audit, which is the
-    # state apply_audit already handles by cutting nothing.
-    if not res.get("search_count"):
-        out["error"] = ("the audit was answered without a single search being "
-                        "run, so its verdicts were recalled rather than "
-                        "checked and none of them was used")
-        return out
-
-    parsed = claude_websearch.extract_json(res.get("text") or "", require="audits")
-    if not isinstance(parsed, dict):
-        out["error"] = "The famous-event audit ran but its answer could not be read."
-        return out
-
-    for a in (parsed.get("audits") or []):
-        if not isinstance(a, dict):
-            continue
-        key = name_key(str(a.get("name") or ""))
+    # Walked in LIST order, not completion order, so the cut and kept lists
+    # read in the order the client's own shortlist is in.
+    spends = []
+    for i, c in enumerate(famous):
+        box = boxes.get(i) or {}
+        spends.append(box.get("spend"))
+        key = name_key(c.get("name") or "")
         if not key:
             continue
-        alternative = str(a.get("alternative") or "").strip()
-        why = str(a.get("why") or "").strip()[:600]
-        claimed = str(a.get("verdict") or "").strip().lower()
-
-        # The enforcement. A "kept" with no named alternative is a restatement
-        # dressed as a comparison, and it is downgraded to a cut rather than
-        # accepted, because the comparison the step requires never happened.
-        if claimed == VERDICT_KEPT and not alternative:
-            verdict = VERDICT_CUT
-            why = ("Cut: kept was claimed but no more targeted alternative was "
-                   "named, so nothing was actually weighed against it. "
-                   + why)[:600]
-        else:
-            verdict = VERDICT_KEPT if claimed == VERDICT_KEPT else VERDICT_CUT
-
-        website = str(a.get("alternative_website") or "").strip()
-        if website and not website.lower().startswith(("http://", "https://")):
-            website = ""
-        rec = {"verdict": verdict, "alternative": alternative or None,
-               "alternative_website": website or None,
-               "alternative_note": str(a.get("alternative_note") or "")[:400] or None,
-               "why": why,
-               # The name the audit answered under, kept so that a reply which
-               # echoes back more than the event's name can still be matched to
-               # the candidate it is about. See _verdict_for below.
-               "name": str(a.get("name") or "")[:250]}
+        rec = box.get("rec")
+        if box.get("error") or not rec:
+            # The display name is carried alongside the reason because
+            # `name_key` is lossy ("Adobe Summit" -> "adobe") and a report
+            # that cannot name the event it failed to audit is telling the
+            # reader a number they cannot act on.
+            out["failed"][key] = {
+                "name": c.get("name"),
+                "why": box.get("error") or "it returned no usable verdict"}
+            continue
         out["verdicts"][key] = rec
-        (out["kept"] if verdict == VERDICT_KEPT else out["cut"]).append(dict(rec))
+        (out["kept"] if rec["verdict"] == VERDICT_KEPT
+         else out["cut"]).append(dict(rec))
+    out["spend"] = claude_websearch.spend_sum(*spends)
 
-    # A call that succeeded, was given famous events, and yielded not one
-    # usable verdict has audited nothing: it is a parse or shape failure
-    # wearing a success. Reported as a failed audit, because the alternative
-    # is cutting every marquee event on the strength of a reply nobody could
-    # read, which is the same silent wrong answer this module already refuses
-    # to give on a transport error.
+    # Every audit failed, so the check as a whole did not happen. Reported the
+    # way a transport error always has been, because the alternative is
+    # cutting every marquee event on the strength of replies nobody could
+    # read. Individual failures are in `failed` and are handled per event.
     if not out["verdicts"]:
+        first = next((f.get("why") for f in out["failed"].values()),
+                     "nothing was returned")
         out["error"] = (
-            "the call succeeded but returned no usable verdict for %s, so "
-            "nothing was actually weighed"
-            % ("the one marquee event it was given" if len(famous) == 1
-               else "any of the %d marquee events it was given" % len(famous)))
+            "no marquee event could be audited: for %s, %s"
+            % ("the one it was given" if len(famous) == 1
+               else "each of the %d it was given" % len(famous), first))
     return out
 
 
@@ -263,13 +375,25 @@ def apply_audit(candidates: list[dict], audit: dict) -> list[dict]:
 
     A famous event the audit never returned a verdict for is CUT, not kept.
     The skill's rule is that a marquee name justifies its place or goes, and
-    "the auditor did not get to it" is not a justification. The exception is
-    when the audit itself failed to run: then nothing is cut, because cutting
-    every flagship on a transport error would be a silent, wrong answer, and
-    the run reports that the audit did not happen instead.
+    "the auditor did not get to it" is not a justification. There are two
+    exceptions, and both are the same principle: an event is only cut when
+    something was actually weighed against it.
+
+    The audit as a whole failed to run: nothing is cut, because cutting every
+    flagship on a transport error would be a silent, wrong answer, and the run
+    reports that the audit did not happen instead.
+
+    THIS event's own audit call failed, which `audit["failed"]` records: it is
+    marked unaudited and kept. The audit is one call per famous event, so each
+    event carries its own chance of a transport error or an unreadable reply,
+    and a client's real recommendation must not disappear because one call of
+    five came back broken. Without this the split would have made the pipeline
+    strictly worse than the single call it replaced, which set one error for
+    everybody and cut nobody.
     """
     audit_ran = not audit.get("error")
     verdicts = audit.get("verdicts") or {}
+    failed = audit.get("failed") or {}
     out = []
     for c in candidates or []:
         c = dict(c)
@@ -287,6 +411,21 @@ def apply_audit(candidates: list[dict], audit: dict) -> list[dict]:
             continue
         v = _verdict_for(c.get("name") or "", verdicts)
         if not v:
+            entry = failed.get(name_key(c.get("name") or ""))
+            why = (entry.get("why") if isinstance(entry, dict)
+                   else entry) or None
+            if why:
+                # This event's own call broke. Nothing was weighed against it,
+                # so it cannot be cut for losing a comparison that never
+                # happened, and it is reported as unweighed rather than
+                # presented as an audited pick.
+                c["audit_verdict"] = VERDICT_UNAUDITED
+                c["audit_note"] = (
+                    "This is a marquee event and its audit could not be "
+                    "completed (%s), so it has not been weighed against a "
+                    "more targeted alternative." % why)[:1200]
+                out.append(c)
+                continue
             c["audit_verdict"] = VERDICT_CUT
             c["audit_note"] = ("Cut: the famous-event audit returned no verdict "
                                "for this event, so it was never weighed against "
@@ -388,7 +527,8 @@ def _row_for(name: str, by_key: dict) -> dict | None:
 
 def promote_alternatives(audit: dict, candidates: list[dict],
                          resolver=None, cap: int = MAX_PROMOTED,
-                         replaced_from: list[dict] | None = None) -> dict:
+                         replaced_from: list[dict] | None = None,
+                         lookups: int = MAX_PROMOTION_LOOKUPS) -> dict:
     """Turn the audit's named alternatives into scoreable candidates.
 
     The gap this closes: the audit would cut a marquee event, name a better
@@ -437,7 +577,13 @@ def promote_alternatives(audit: dict, candidates: list[dict],
     by_name = {name_key(c.get("name") or ""): c for c in pool}
 
     spends = []
-    for alt in wanted[:max(0, cap)]:
+    looked_up = 0
+    for alt in wanted:
+        # Stop on the goal or on the budget, whichever comes first. See
+        # MAX_PROMOTION_LOOKUPS for why these are two numbers.
+        if len(out["promoted"]) >= max(0, cap) or looked_up >= max(0, lookups):
+            break
+        looked_up += 1
         try:
             res = resolver(alt["name"])
         except Exception as e:                       # never raises upward
@@ -491,9 +637,10 @@ def promote_alternatives(audit: dict, candidates: list[dict],
             continue
         out["promoted"].append(candidate)
 
-    # Named, never looked at, because the cost ceiling was reached. Said out
-    # loud rather than trimmed away, so the reader can ask for the rest.
-    for alt in wanted[max(0, cap):]:
+    # Named, never looked at, because the list was full or the lookup budget
+    # ran out. Said out loud rather than trimmed away, so the reader can ask
+    # for the rest.
+    for alt in wanted[looked_up:]:
         out["not_attempted"].append({"name": alt["name"],
                                      "replaces": alt["replaces"]})
     return out

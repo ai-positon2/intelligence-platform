@@ -492,6 +492,59 @@ def test_a_full_recommend_run_produces_a_ranked_list_and_a_summary(monkeypatch):
     assert s["orientation"] == R.ORIENTATION_BOOTH
 
 
+def test_a_marquee_event_whose_audit_broke_survives_the_whole_run(monkeypatch):
+    """End to end, because every part of this was already unit-tested and the
+    field it depends on was still being dropped on the way to storage.
+
+    The audit is one call per marquee event now. When one of those calls
+    fails, the event is kept and reported unweighed rather than cut, and the
+    run has to carry that fact all the way to the stored summary: `checked`
+    counts what was SENT, so a stored run that keeps no record of the failures
+    reads as five clean audits when two of them never happened.
+    """
+    fake = _FakeStore()
+    _wire(monkeypatch, fake)
+    monkeypatch.setattr(P.event_intel_discover, "discover", lambda profile: {
+        "candidates": [_cand("Dreamforce", famous=True,
+                             category=R.CAT_INDUSTRY_FLAGSHIP),
+                       _cand("CES", famous=True,
+                             category=R.CAT_INDUSTRY_FLAGSHIP)],
+        "by_category": {}, "statuses": {}, "shortfall": [],
+        "categories_searched": 6, "categories_failed": 0, "found": 2})
+    # Dreamforce audited and kept; CES's own call broke.
+    monkeypatch.setattr(P.event_intel_audit, "audit_famous", lambda c, p: {
+        "checked": 2, "error": None, "cut": [], "kept": [],
+        "failed": {D.name_key("CES"): {"name": "CES",
+                                       "why": "transport: HTTP 503"}},
+        "verdicts": {D.name_key("Dreamforce"): {
+            "verdict": A.VERDICT_KEPT, "alternative": "MarTechFest",
+            "why": "Buyers staff the booths here."}}})
+    marks = {"Dreamforce": (36, 34, 17), "CES": (34, 32, 16)}
+    monkeypatch.setattr(P.event_intel_scorer, "score_all", lambda c, p: {
+        "scored": [dict(x, relevance=marks[x["name"]][0],
+                        dm_access=marks[x["name"]][1],
+                        engagement=marks[x["name"]][2],
+                        relevance_note="n", dm_access_note="n",
+                        engagement_note="n", description="Texture.",
+                        client_line="Case for %s." % x["name"])
+                   for x in c],
+        "unscored": [], "errors": [], "batches": 1})
+
+    P._run_recommend(1, "me@p2.example", PROFILE)
+    s = fake.runs[1]["summary"]
+
+    assert "CES" in [t["name"] for t in s["top_five"]], (
+        "a marquee event was cut for losing a comparison that never ran")
+    assert s["audit"]["failed"], (
+        "the run kept no record of which audits failed")
+    assert s["audit"]["failed"][D.name_key("CES")]["name"] == "CES"
+    line = [a for a in s["assumptions"] if "marquee" in a][0]
+    assert "1 marquee event was audited" in line, (
+        "2 were sent and 1 was weighed; the report claims what the stage "
+        "intended: %r" % line)
+    assert "CES" in line
+
+
 def test_the_totals_on_screen_are_recomputed_from_the_sub_scores(monkeypatch):
     fake = _FakeStore()
     _wire(monkeypatch, fake)

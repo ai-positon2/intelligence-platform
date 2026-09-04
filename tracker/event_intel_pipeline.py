@@ -344,6 +344,12 @@ def _run_recommend(run_id: int, email: str, profile: dict) -> None:
         "categories_failed": found["categories_failed"],
         "discovered": found["found"],
         "audit": {"checked": audit["checked"], "error": audit.get("error"),
+                  # Which marquee events could not be audited at all. Stored
+                  # because `checked` counts what was SENT, and one call per
+                  # event means some can fail while others succeed: without
+                  # this a stored run reads as five audits with three
+                  # verdicts and no account of the other two.
+                  "failed": audit.get("failed") or {},
                   "cut": audit.get("cut") or [],
                   "promoted": [{"name": c.get("name"),
                                 "replaces": c.get("audit_note")}

@@ -1063,6 +1063,27 @@ def propose_category(category: str, profile: dict) -> dict:
                    "search rather than a fact about the market."))
         if proposals:
             return _out(STATUS_PARTIAL, proposals, note, detail)
+        # The single biggest hole in the funnel, and until now it left no
+        # evidence behind. Three of six categories in one live run came back
+        # exactly here: the whole search budget spent, no error, no candidates,
+        # search_complete false, and the entire category lost before scoring.
+        #
+        # Two very different things produce that, and they need opposite
+        # fixes. Either the finder genuinely found nothing worth naming, in
+        # which case a narrower question or a bigger budget is wasted money,
+        # or it found candidates and declined to commit them because it felt
+        # unfinished, in which case the ask is what needs changing. Nothing in
+        # the reply distinguishes them, and the reply itself was being thrown
+        # away, so the next run could only be guessed at.
+        #
+        # Logged rather than returned: this is the model's raw prose, and the
+        # return value of this function is rendered to a paying client.
+        logger.warning(
+            "event_intel_discover: category %s spent its budget and returned "
+            "no candidates (searches=%s of %s, budget_spent=%s, stop=%s, "
+            "note=%r, reply=%r)", category, res.get("search_count"),
+            FIND_MAX_USES, budget, res.get("stop_reason"),
+            (parsed.get("note") or "")[:400], (res.get("text") or "")[:1200])
         return _out(STATUS_ERROR, [], note, detail)
 
     if not proposals and complete is None:

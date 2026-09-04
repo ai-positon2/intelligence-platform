@@ -282,7 +282,14 @@ def notes(*, shortfall: list, audit: dict, generic: dict,
             % audit["error"])
     elif audit and audit.get("checked"):
         cut = audit.get("cut") or []
-        n = audit["checked"]
+        # The audit is one call per marquee event, so some can fail while
+        # others succeed. `checked` is how many were SENT; the headline has to
+        # say how many were actually weighed, or a run where two of five calls
+        # broke reports five audits that did not happen. This is the same
+        # defect class as a stage claiming what it intended rather than what
+        # it produced, which a field audit found seven of.
+        failed = audit.get("failed") or {}
+        n = max(0, audit["checked"] - len(failed))
         # Cut events are NAMED. A count on its own leaves the reader unable to
         # tell which marquee event they were expecting to see and did not get,
         # which is the one question a cut list has to answer.
@@ -298,6 +305,15 @@ def notes(*, shortfall: list, audit: dict, generic: dict,
                        "never weighed against anything. "
                        % (_names(skipped),
                           "it was" if len(skipped) == 1 else "they were"))
+        if failed:
+            # Kept on the list, and said so. These were not weighed and are
+            # not being presented as though they had been.
+            names = [f.get("name") for f in failed.values() if f.get("name")]
+            detail += ("%s could not be audited and %s left on the list "
+                       "unweighed%s. "
+                       % (_n(len(failed), "marquee event", "marquee events"),
+                          "was" if len(failed) == 1 else "were",
+                          (": %s" % ", ".join(names)) if names else ""))
         add(LEVEL_NOTE,
             "%s %s audited against a named alternative, %d %s cut"
             % (_n(n, "marquee event", "marquee events"),

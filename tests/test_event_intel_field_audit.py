@@ -40,42 +40,98 @@ FAMOUS = [{"name": "Dreamforce", "famous": True}, {"name": "CES", "famous": True
           {"name": "Data Council", "famous": False}]
 
 
-def test_an_event_the_auditor_skipped_is_counted_and_named(monkeypatch):
-    """It is still cut, which is the skill's rule. What it must not do is
-    leave with its explanation thrown away while the report says nothing was
-    cut, which is how it left before."""
-    _ask(monkeypatch, {"audits": [{"name": "Dreamforce", "verdict": "kept",
-                                   "alternative": "Data Council", "why": "denser"}]})
+def _per_event(monkeypatch, by_name: dict, default=None):
+    """Reply to each per-event audit call according to which event it names.
+
+    The audit is one call per famous event now, so a single canned payload
+    would answer every event identically and could not express "this one
+    worked and that one did not", which is the case these tests are about.
+    """
+    def fake_ask(system, user, **kw):
+        for name, reply in by_name.items():
+            if name in user:
+                return reply
+        return default if default is not None else {
+            "text": "", "error": {"kind": "transport", "detail": "no stub"}}
+    monkeypatch.setattr(claude_websearch, "ask", fake_ask)
+
+
+def _ok(payload):
+    return {"text": json.dumps(payload), "error": None, "search_count": 2}
+
+
+def test_an_event_whose_own_audit_broke_is_counted_and_named(monkeypatch):
+    """The audit is one call per marquee event, so one broken call must cost
+    that event's verdict and nothing else.
+
+    It is NOT cut. The skill's rule is that a marquee name justifies its place
+    or goes, but the justification it lost is a comparison that never
+    happened: nothing was weighed against it, so there is no result to act on.
+    Cutting it would delete a real recommendation from a paying client's list
+    on a transport error, which is exactly what the single-call shape refused
+    to do and what splitting the call would otherwise have made routine.
+
+    What it must never do is leave silently. The reader has to be told which
+    marquee event was left unweighed and why.
+    """
+    _per_event(monkeypatch, {
+        "Dreamforce": _ok({"verdict": "kept", "alternative": "Data Council",
+                           "why": "denser"}),
+        "CES": {"text": "", "error": {"kind": "transport", "detail": "HTTP 503"}},
+    })
     a = AU.audit_famous(FAMOUS, PROF)
+
+    assert a["error"] is None, (
+        "one broken call out of two reported the whole audit as failed")
+    assert list(a["failed"]) == [AU.name_key("CES")]
+    assert a["failed"][AU.name_key("CES")]["name"] == "CES"
+
     survivors = AU.apply_audit(FAMOUS, a)
-    assert "CES" not in [c["name"] for c in survivors]
-    assert [c["name"] for c in a["cut"]] == ["CES"]
-    line = [l for l in _assume(audit=a, candidates=survivors) if "marquee" in l][0]
-    assert "1 was cut" in line
-    assert "CES" in line, "a cut event that is never named cannot be checked"
+    assert "CES" in [c["name"] for c in survivors], (
+        "a marquee event was cut for losing a comparison that never ran")
+    ces = [c for c in survivors if c["name"] == "CES"][0]
+    assert ces["audit_verdict"] == AU.VERDICT_UNAUDITED
+    assert "could not be completed" in ces["audit_note"]
+
+    line = [l for l in _assume(audit=a, candidates=survivors)
+            if "marquee" in l][0]
+    assert "1 marquee event was audited" in line, (
+        "2 were sent and 1 was weighed; claiming 2 is a report describing "
+        "what the stage intended: %r" % line)
+    assert "CES" in line, "an unaudited event that is never named cannot be checked"
 
 
-def test_a_weighed_cut_reads_differently_from_a_skipped_one(monkeypatch):
-    """"We compared it and it lost" and "the auditor never got to it" are
+def test_a_weighed_cut_reads_differently_from_an_unaudited_one(monkeypatch):
+    """"We compared it and it lost" and "its audit never completed" are
     different facts and the report keeps them apart."""
-    _ask(monkeypatch, {"audits": [{"name": "Dreamforce", "verdict": "cut",
-                                   "alternative": "Data Council", "why": "broad"}]})
+    _per_event(monkeypatch, {
+        "Dreamforce": _ok({"verdict": "cut", "alternative": "Data Council",
+                           "why": "broad"}),
+        "CES": {"text": "", "error": {"kind": "transport", "detail": "HTTP 503"}},
+    })
     a = AU.audit_famous(FAMOUS, PROF)
     line = [l for l in _assume(audit=a, candidates=AU.apply_audit(FAMOUS, a))
             if "marquee" in l][0]
     assert "Cut after weighing: Dreamforce" in line
-    assert "no verdict for CES" in line
+    assert "could not be audited" in line and "CES" in line
+    assert "Cut after weighing: Dreamforce, CES" not in line
 
 
 @pytest.mark.parametrize("payload", [
     {"audits": []},                                            # parsed, empty
-    {"verdicts": [{"name": "Dreamforce", "verdict": "kept"}]},  # reshaped reply
-    {"audits": [{"verdict": "kept"}]},                          # no usable name
+    {"verdicts": [{"name": "Dreamforce", "verdict": "kept"}]},  # foreign envelope
+    {"note": "both look fine to me"},                          # no verdict at all
 ])
 def test_an_audit_that_yields_nothing_usable_cuts_nobody(monkeypatch, payload):
     """A call that succeeded and produced no readable verdict has audited
     nothing. Cutting every flagship on it is the same silent wrong answer the
-    module already refuses to give on a transport error."""
+    module already refuses to give on a transport error.
+
+    The middle payload is the one worth keeping. A `{"verdicts": [...]}`
+    envelope is not a shape this prompt asks for, and a parser that scans
+    forward for a "verdict" key anywhere would pull the first row out of it
+    and cut a real event on a reply it never understood.
+    """
     _ask(monkeypatch, payload)
     a = AU.audit_famous(FAMOUS, PROF)
     assert a["error"], "a useless reply was accepted as a clean audit"
@@ -83,6 +139,28 @@ def test_an_audit_that_yields_nothing_usable_cuts_nobody(monkeypatch, payload):
     assert "Dreamforce" in survivors and "CES" in survivors
     line = [l for l in _assume(audit=a, candidates=[]) if "audit" in l][0]
     assert "no usable result" in line
+
+
+def test_a_legacy_envelope_reply_is_still_read_and_still_enforced(monkeypatch):
+    """`{"audits": [{...}]}` was the shape the single-call prompt asked for.
+
+    A reply in it is a complete answer to a one-event question, and refusing
+    it would throw away a live search already paid for. It gets no exemption
+    from the enforcement, though: this one claims "kept" and names nothing it
+    was weighed against, which the module downgrades to a cut. Before the
+    split that same reply was refused wholesale, because there was no way to
+    tell which event an unnamed verdict belonged to; a call about one known
+    event has nothing to match up.
+    """
+    _ask(monkeypatch, {"audits": [{"verdict": "kept"}]})
+    a = AU.audit_famous(FAMOUS[:1], PROF)
+    assert a["error"] is None
+    v = a["verdicts"][AU.name_key("Dreamforce")]
+    assert v["verdict"] == AU.VERDICT_CUT
+    assert "no more targeted alternative was named" in v["why"]
+    assert v["name"] == "Dreamforce", (
+        "the verdict must be keyed and labelled from the candidate, not from "
+        "a name the model never sent")
 
 
 def test_a_run_with_no_famous_events_is_not_reported_as_a_failed_audit(monkeypatch):
