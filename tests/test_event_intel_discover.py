@@ -619,20 +619,73 @@ def test_every_searching_stage_has_room_to_write_its_answer():
     import re as _re
     from tracker import event_intel_audit as _A
     from tracker import event_intel_resolve as _RS
+
+    def _budget(mod, const):
+        """The smallest output budget this module can spend.
+
+        Read off the MODULE, not a function: these stages have a thin public
+        wrapper in front of the call that spends the budget. Both a named
+        constant and any numeric literal at a call site count, and the
+        SMALLEST wins, so neither form can hide a thin budget behind the
+        other. An empty scan is a failure, not a pass: scanning alone once
+        returned nothing at all here, because the stage had moved its number
+        into a constant, and min() of nothing raises rather than reports.
+        """
+        found = [int(m) for m in _re.findall(r"max_tokens=(\d+)",
+                                             inspect.getsource(mod))]
+        declared = getattr(mod, const, None)
+        if isinstance(declared, int):
+            found.append(declared)
+        assert found, "%s declares no output budget at all" % mod.__name__
+        return min(found)
+
     budgets = {
         "find": D.FIND_MAX_TOKENS,
         "confirm": D.CONFIRM_MAX_TOKENS,
-        # Read off the MODULE, not the function: both of these now have a
-        # thin public wrapper in front of the call that spends the budget.
-        "audit": min(int(m) for m in _re.findall(r"max_tokens=(\d+)",
-                                                 inspect.getsource(_A))),
-        "resolve": min(int(m) for m in _re.findall(r"max_tokens=(\d+)",
-                                                   inspect.getsource(_RS))),
+        "audit": _budget(_A, "AUDIT_MAX_TOKENS"),
+        "resolve": _budget(_RS, "RESOLVE_MAX_TOKENS"),
     }
     thin = {k: v for k, v in budgets.items() if v < 9000}
     assert not thin, (
         "these stages cannot write their answer after a full search budget: "
         "%s" % thin)
+
+
+def test_a_starved_category_leaves_the_reply_behind_to_read(monkeypatch,
+                                                            caplog):
+    """The biggest hole in the funnel, made diagnosable.
+
+    Three of six categories in one live run ended exactly here: whole search
+    budget spent, no error, no candidates, search_complete false, and the
+    category lost before scoring. Two opposite causes produce that reply, and
+    they need opposite fixes: the finder found nothing worth naming, or it
+    found candidates and would not commit them because it felt unfinished.
+
+    Nothing in the return value distinguishes them and the reply itself was
+    discarded, so the next fix could only be a guess. The reply goes to the
+    log, not the return value, because the return value is rendered to a
+    paying client and this is raw model prose.
+    """
+    import logging
+    monkeypatch.setattr(D, "FIND_RETRY_BACKOFF_SECONDS", 0)
+    reply = _find_reply([], complete=False,
+                        note="I looked at several vendor pages.")
+    monkeypatch.setattr(claude_websearch, "ask",
+                        lambda s, u, **k: _find_call(reply, searches=6))
+
+    with caplog.at_level(logging.WARNING, logger="tracker.event_intel_discover"):
+        r = D.propose_category(R.CAT_FREE_VENDOR, PROFILE)
+
+    assert r["status"] == D.STATUS_ERROR and r["proposals"] == []
+    starved = [rec.getMessage() for rec in caplog.records
+               if "returned no candidates" in rec.getMessage()]
+    assert starved, (
+        "a whole category was lost and left no evidence of why: %s"
+        % [rec.getMessage()[:80] for rec in caplog.records])
+    msg = starved[0]
+    assert "searches=6" in msg, "the search count is the first thing to check"
+    assert "I looked at several vendor pages." in msg, (
+        "the finder's own account of what it did was thrown away")
 
 
 def test_a_truncated_finder_is_not_retried(monkeypatch):

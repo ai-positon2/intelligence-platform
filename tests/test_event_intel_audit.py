@@ -44,23 +44,173 @@ def _stub(monkeypatch, payload=None, error=None, text=None, search_count=4):
 
 # ── Step 3: the famous-event audit ────────────────────────────────────────
 
-def test_the_audit_has_room_to_write_a_verdict_for_every_famous_event():
-    """The longest reply of any stage: a verdict, a reason and a named
-    searched alternative per famous event, written after up to ten rounds of
-    search narration that spend the same output budget.
+def test_the_audit_is_one_call_per_famous_event(monkeypatch):
+    """The shape, not the budget.
 
-    A live run truncated confirm calls at 4000 with six searches (they
-    reached 6162 output tokens). This call has ten searches and more to
-    write, and a truncated audit sets `error`, which reports every marquee
-    event on the client's list as unaudited.
+    This used to be a single call over every famous event at max_uses=10, and
+    a live run measured what that costs: 152,820 input tokens and 241 seconds,
+    against 50,829 to 58,918 for the six-search calls beside it. Input grows
+    with the SQUARE of one call's search count, because each search round
+    re-sends the whole accumulated conversation, so splitting the call reduces
+    the bill rather than merely spreading it.
+
+    Locked in as a test because the arithmetic is not obvious enough to
+    survive somebody "simplifying" this back into one call.
     """
-    import inspect
-    src = inspect.getsource(A.audit_famous)
-    m = re.search(r"max_tokens=(\d+)", src)
-    assert m, "audit_famous no longer states an output budget"
-    assert int(m.group(1)) >= 12000, (
-        "%s output tokens is not enough for a ten-search audit that writes a "
-        "verdict per event" % m.group(1))
+    seen = []
+
+    def fake_ask(system, user, **kw):
+        seen.append((user, kw.get("max_uses")))
+        return {"text": json.dumps({"verdict": "kept", "alternative": "Alt",
+                                    "why": "w"}),
+                "error": None, "search_count": 2}
+
+    monkeypatch.setattr(claude_websearch, "ask", fake_ask)
+    famous = [_c("Dreamforce", True), _c("CES", True), _c("Web Summit", True)]
+    out = A.audit_famous(famous, PROFILE)
+
+    assert len(seen) == 3, (
+        "3 famous events took %d calls; the audit is meant to make one per "
+        "event" % len(seen))
+    # Each call is about ONE event, so the whole shortlist must not be pasted
+    # into every prompt.
+    for user, _ in seen:
+        assert sum(1 for c in famous if c["name"] in user) == 1, user
+    assert {u for u, _ in seen} == {
+        "Audit this famous event:\n- %s" % c["name"] for c in famous}
+    # A per-call budget bigger than the old whole-audit budget would undo the
+    # squaring saving the split exists to get.
+    assert all(m == A.AUDIT_MAX_USES for _, m in seen)
+    assert A.AUDIT_MAX_USES <= 5, (
+        "%d searches per event is back in the territory the single call was "
+        "abandoned for" % A.AUDIT_MAX_USES)
+    assert len(out["verdicts"]) == 3
+
+
+def _by_event(monkeypatch, replies: dict, calls=None):
+    """Answer each per-event audit call by the event its prompt names."""
+    def fake_ask(system, user, **kw):
+        for name, reply in sorted(replies.items(), key=lambda kv: -len(kv[0])):
+            if name in user:
+                if calls is not None:
+                    calls.append(name)
+                return reply
+        raise AssertionError("unstubbed audit call: %r" % user)
+    monkeypatch.setattr(claude_websearch, "ask", fake_ask)
+
+
+def _reply(payload, search_count=2, usage=None):
+    return {"text": json.dumps(payload), "error": None,
+            "search_count": search_count, "usage": usage or {}}
+
+
+def test_the_verdict_is_labelled_from_the_candidate_not_the_reply(monkeypatch):
+    """The city-suffix bug class, closed at its source.
+
+    The audit is shown "Name (City) - audience note", so a reply that echoes
+    the name it was given comes back carrying the city, and `name_key` then
+    produces a different key: "adobe las vegas" against "adobe". That has cost
+    real events twice, once in the verdict lookup and once in the category
+    lookup a promotion inherits.
+
+    With one call per known event there is nothing to match up, so the name is
+    taken from the candidate and the mismatch cannot arise. The loose matching
+    in `_verdict_for` stays for stored runs written by the old shape.
+    """
+    _by_event(monkeypatch, {"Adobe Summit": _reply({
+        # Exactly what the live run produced.
+        "name": "Adobe Summit (Las Vegas)", "verdict": "cut",
+        "alternative": "MAICON", "why": "Adobe's own product conference."})})
+    cand = _c("Adobe Summit", True, city="Las Vegas")
+    out = A.audit_famous([cand], PROFILE)
+
+    assert list(out["verdicts"]) == [A.name_key("Adobe Summit")], (
+        "the verdict was keyed off the model's echo: %s" % list(out["verdicts"]))
+    assert out["cut"][0]["name"] == "Adobe Summit"
+    # The whole point: the promotion can find the row it stands in for.
+    wanted = A.alternatives_to_promote(out, [])
+    assert wanted[0]["replaces"] == "Adobe Summit"
+
+
+def test_one_broken_audit_costs_only_its_own_event(monkeypatch):
+    """The correctness half of the split. Five calls are five chances to lose
+    one, and apply_audit CUTS a famous event it has no verdict for, so without
+    per-event failure records the split would quietly delete real
+    recommendations that the single call always kept."""
+    _by_event(monkeypatch, {
+        "Dreamforce": _reply({"verdict": "kept", "alternative": "Alt A",
+                              "why": "dense"}),
+        "CES": {"text": "", "error": {"kind": "transport", "detail": "HTTP 503"}},
+        "Web Summit": _reply({"verdict": "cut", "alternative": "Alt B",
+                              "why": "too broad"}),
+    })
+    famous = [_c("Dreamforce", True), _c("CES", True), _c("Web Summit", True)]
+    out = A.audit_famous(famous, PROFILE)
+
+    assert out["error"] is None
+    assert [v["name"] for v in out["kept"]] == ["Dreamforce"]
+    assert [v["name"] for v in out["cut"]] == ["Web Summit"]
+    assert list(out["failed"]) == [A.name_key("CES")]
+
+    survivors = [c["name"] for c in A.apply_audit(famous, out)]
+    assert survivors == ["Dreamforce", "CES"], (
+        "the broken call took an event with it, or spared a cut one")
+
+
+def test_the_cut_and_kept_lists_read_in_shortlist_order(monkeypatch):
+    """The calls finish in whatever order the network returns them, and a
+    report whose cut list is ordered by network latency is not reproducible."""
+    _by_event(monkeypatch, {
+        n: _reply({"verdict": "cut", "alternative": "Alt", "why": "w"})
+        for n in ("Alpha Expo", "Beta Expo", "Gamma Expo", "Delta Expo")})
+    famous = [_c(n, True) for n in
+              ("Alpha Expo", "Beta Expo", "Gamma Expo", "Delta Expo")]
+    out = A.audit_famous(famous, PROFILE)
+    assert [v["name"] for v in out["cut"]] == [c["name"] for c in famous]
+
+
+def test_the_whole_audit_failing_is_one_error_and_cuts_nobody(monkeypatch):
+    """The contract the single call had, preserved. `error` now means "not one
+    marquee event could be audited", which is the only case in which the check
+    as a whole can be said not to have run."""
+    _by_event(monkeypatch, {
+        n: {"text": "", "error": {"kind": "transport", "detail": "HTTP 503"}}
+        for n in ("Dreamforce", "CES")})
+    famous = [_c("Dreamforce", True), _c("CES", True)]
+    out = A.audit_famous(famous, PROFILE)
+    assert out["error"] and "503" in out["error"]
+    assert out["verdicts"] == {} and len(out["failed"]) == 2
+    assert [c["name"] for c in A.apply_audit(famous, out)] == ["Dreamforce", "CES"]
+
+
+def test_the_split_counts_what_every_call_cost(monkeypatch):
+    """One spend record per event, summed. The single call had one reply to
+    read a cost off; this stage now has one per event, and a stage that
+    reports only the last one understates the bill by however many marquee
+    events the client had."""
+    _by_event(monkeypatch, {
+        n: _reply({"verdict": "cut", "alternative": "Alt", "why": "w"},
+                  search_count=3,
+                  usage={"input_tokens": 20000, "output_tokens": 2000})
+        for n in ("Dreamforce", "CES", "Web Summit")})
+    out = A.audit_famous([_c(n, True) for n in
+                          ("Dreamforce", "CES", "Web Summit")], PROFILE)
+    assert out["spend"]["calls"] == 3
+    assert out["spend"]["input_tokens"] == 60000
+    assert out["spend"]["searches"] == 9
+
+
+def test_a_refused_audit_is_still_billed(monkeypatch):
+    """A reply that ran searches and then could not be read has already been
+    paid for. Counting only the usable ones is how a stage looks cheaper than
+    it is, and the unusable calls are the ones worth seeing."""
+    _by_event(monkeypatch, {"Dreamforce": {
+        "text": "no json here", "error": None, "search_count": 3,
+        "usage": {"input_tokens": 21000, "output_tokens": 900}}})
+    out = A.audit_famous([_c("Dreamforce", True)], PROFILE)
+    assert out["failed"], "an unreadable reply was accepted"
+    assert out["spend"]["input_tokens"] == 21000, (
+        "a refused audit was billed to nobody")
 
 
 def test_nothing_famous_means_no_audit_call(monkeypatch):
@@ -393,6 +543,64 @@ def test_the_number_of_lookups_is_capped_and_the_rest_are_named():
     assert [c["name"] for c in out["not_attempted"]] == alts[2:], (
         "alternatives dropped by the cap were not named")
     assert out["considered"] == 5
+
+
+def test_a_failed_lookup_does_not_use_up_a_promotion_slot():
+    """Measured on a live run. The audit named four alternatives, the cap
+    allowed three lookups, and the first two were refused, so the run promoted
+    one event out of four named and never examined the fourth: lookups spent
+    on events that never reached the list had been counted against it.
+
+    The cap is on what reaches the list. The lookup budget is what it costs.
+    They were one number, and one number cannot do both jobs.
+    """
+    marquee = ["Adobe Summit", "Content Marketing World",
+               "MarTech Conference", "UNBOUND"]
+    alts = ["MAICON", "B2BMX", "Gartner Marketing Symposium", "SaaStr Annual"]
+    audit = {"cut": [_cut(m, a) for m, a in zip(marquee, alts)],
+             "checked": 4, "error": None}
+    cands = [_c(m, famous=True) for m in marquee]
+    # The first two named cannot be confirmed; the last two can.
+    mapping = {a: _resolved(a) for a in alts[2:]}
+    out = A.promote_alternatives(audit, cands,
+                                 resolver=_resolver_for(mapping), cap=2)
+    assert [c["name"] for c in out["promoted"]] == alts[2:], (
+        "two refused lookups consumed the promotion budget: promoted %s"
+        % [c["name"] for c in out["promoted"]])
+    assert len(out["unconfirmed"]) == 2
+    assert out["not_attempted"] == [], (
+        "an alternative was left unexamined while the list still had room")
+
+
+def test_the_lookup_budget_still_bounds_what_the_step_can_spend():
+    """The other side of splitting the number in two. Nothing confirms here,
+    so the promotion goal is never reached and the lookup ceiling is the only
+    thing that can stop the step walking a long list at $0.50 a time."""
+    alts = ["A%d Summit" % i for i in range(8)]
+    marquee = ["M%d Expo" % i for i in range(8)]
+    audit = {"cut": [_cut(m, a) for m, a in zip(marquee, alts)],
+             "checked": 8, "error": None}
+    calls = []
+
+    def _r(name):
+        calls.append(name)
+        return {"ok": False, "confidence": "low", "event": None,
+                "reasoning": "No single edition could be pinned down."}
+
+    out = A.promote_alternatives(audit, [_c(m, famous=True) for m in marquee],
+                                 resolver=_r, cap=3, lookups=4)
+    assert len(calls) == 4, "the lookup ceiling did not hold: %d calls" % len(calls)
+    assert out["promoted"] == []
+    assert [c["name"] for c in out["not_attempted"]] == alts[4:], (
+        "the alternatives the budget never reached were not named")
+
+
+def test_the_promotion_goal_and_its_cost_ceiling_are_separate_numbers():
+    """A lookup budget no larger than the promotion cap collapses the two
+    back into one, which is the bug above with extra steps."""
+    assert A.MAX_PROMOTION_LOOKUPS > A.MAX_PROMOTED, (
+        "%d lookups for %d promotions leaves no room for a refused lookup"
+        % (A.MAX_PROMOTION_LOOKUPS, A.MAX_PROMOTED))
 
 
 def test_a_resolver_that_raises_is_reported_rather_than_killing_the_run():
