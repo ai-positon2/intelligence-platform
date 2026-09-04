@@ -136,6 +136,20 @@ def audit_famous(candidates: list[dict], profile: dict) -> dict:
         out["error"] = "%s: %s" % (res["error"]["kind"], res["error"]["detail"])
         return out
 
+    # The same refusal event_intel_discover applies to a category search and
+    # event_intel_recover to a recovered roster. It matters more here than in
+    # either: this reply CUTS events off a client's list and names their
+    # replacements, and the rule at the top of this module is that the
+    # alternative "must be a real event found by search". A reply that ran no
+    # search is a recollection, and acting on it removes real recommendations
+    # and promotes remembered ones. Reported as a failed audit, which is the
+    # state apply_audit already handles by cutting nothing.
+    if not res.get("search_count"):
+        out["error"] = ("the audit was answered without a single search being "
+                        "run, so its verdicts were recalled rather than "
+                        "checked and none of them was used")
+        return out
+
     parsed = claude_websearch.extract_json(res.get("text") or "", require="audits")
     if not isinstance(parsed, dict):
         out["error"] = "The famous-event audit ran but its answer could not be read."

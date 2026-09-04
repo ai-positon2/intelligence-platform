@@ -144,6 +144,19 @@ def resolve_event(query: str, year_hint: str | None = None) -> dict:
         out["error"] = err
         return out
 
+    # A reply that ran no search is a recollection, and this module's whole
+    # subject is the confident false match: the same name is reused every year
+    # and unrelated events share words, which is exactly what recall gets
+    # wrong. It also confirms the famous-event audit's replacements, where the
+    # comment promises "the same standard discovery is held to" and discovery
+    # discards a recalled answer outright.
+    if not res.get("search_count"):
+        return _failed("none",
+                       "The lookup was answered without a single search being "
+                       "run, so this event was recalled rather than found, and "
+                       "a remembered conference is the one thing this step "
+                       "cannot rely on.")
+
     parsed = claude_websearch.extract_json(res.get("text") or "",
                                           require="confidence")
     if not isinstance(parsed, dict):
