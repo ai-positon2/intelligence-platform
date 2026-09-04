@@ -19,12 +19,19 @@ def _c(name, famous=False, **kw):
     return d
 
 
-def _stub(monkeypatch, payload=None, error=None, text=None):
+def _stub(monkeypatch, payload=None, error=None, text=None, search_count=4):
+    """A reply that ran searches, unless a test says otherwise.
+
+    `search_count` is not decoration. The audit refuses a reply that ran no
+    search at all, on the grounds that its verdicts were recalled rather than
+    checked, and a stub that omits the count is stubbing a reply the wrapper
+    does not produce.
+    """
     def fake_ask(system, user, **kw):
         if error:
             return {"text": "", "error": error}
         return {"text": text if text is not None else json.dumps(payload),
-                "error": None}
+                "error": None, "search_count": search_count}
     monkeypatch.setattr(claude_websearch, "ask", fake_ask)
 
 
