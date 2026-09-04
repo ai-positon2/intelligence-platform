@@ -240,6 +240,72 @@ def _err(kind: str, detail: str, pages=None) -> dict:
             "error": {"kind": kind, "detail": detail[:500]}}
 
 
+# A draft field is not free prose. Every one of these values is stored on the
+# profile, printed in the client's report, AND pasted verbatim into the find
+# and confirm prompts by `event_intel_discover.profile_brief`. So a sentence
+# about what the intake could not find on a webpage becomes a sentence six
+# concurrent event searches are told is the client's geography.
+#
+# Measured on a live run for Position2, this is what `geo_scope` came back as:
+#
+#   "Global - client logos and case studies reference international/global
+#    brands (e.g., 'International Footwear Brand', 'Global Automotive
+#    Manufacturer') though no specific office locations are listed on these
+#    pages."
+#
+# The answer is the first word. The rest is the model narrating its own
+# reading, and it went into the prompt and the report. `event_intel_discover`
+# already refuses exactly this for a category note (see `_reader_note` and
+# `_NOTE_PLUMBING` there); the intake had no equivalent for its own fields.
+#
+# The em dash in that value is the other half: the house style has no em
+# dashes, and this one was headed for a client report.
+_FIELD_DASH = re.compile(r"\s*[\u2013\u2014]\s*")
+
+# Split on sentence ends AND on the concessive joins a model reaches for when
+# it starts hedging about the page it just read.
+_FIELD_CLAUSE = re.compile(r"(?<=[.;])\s+|\s+(?=though\b|although\b|however\b)",
+                           re.I)
+
+# A clause carrying any of these is talking about the READING rather than
+# about the client. Dropping one too many is the safe direction: the field
+# falls back to blank, and blank is already handled as an honest unknown.
+_FIELD_NARRATION = (
+    "these pages", "this page", "the pages", "the site does",
+    "the website does", "not listed", "not stated", "not specified",
+    "not mentioned", "no specific", "does not say", "do not say",
+    "does not state", "could not find", "cannot find", "no mention",
+    "is unclear", "unclear from", "not disclosed", "no information",
+    "implied by", "inferred from", "appears to",
+)
+
+
+def _field(raw, cap: int = _CAP) -> str | None:
+    """A draft field value, fit for a prompt and a client's report.
+
+    Em dashes become commas and any clause narrating what was or was not on
+    the pages is dropped. Returns None when nothing survives, which the
+    caller already treats as an honest unknown.
+    """
+    text = _FIELD_DASH.sub(", ", " ".join(str(raw or "").split()))
+    if not text:
+        return None
+    kept = []
+    for piece in _FIELD_CLAUSE.split(text):
+        p = piece.strip().strip(",")
+        if not p:
+            continue
+        low = p.lower()
+        if any(bit in low for bit in _FIELD_NARRATION):
+            continue
+        kept.append(p)
+    if not kept:
+        return None
+    out = " ".join(kept).strip().rstrip(",;:")
+    # A value that was nothing but a parenthetical aside is not an answer.
+    return _text(out, cap)
+
+
 def _text(raw, cap: int = _CAP) -> str | None:
     """Trim to `cap`, on a word boundary, and mark the cut.
 
@@ -483,7 +549,7 @@ def draft_profile(client_name: str, website: str) -> dict:
         out["sources"] = sources
         return out
 
-    draft = {f: _text(parsed.get(f)) for f in DRAFT_FIELDS}
+    draft = {f: _field(parsed.get(f)) for f in DRAFT_FIELDS}
 
     # Whatever the model listed, plus anything it left blank without saying so.
     # Both halves matter: the list is what the page shows as "we could not find
