@@ -260,7 +260,12 @@ def _run_recommend(run_id: int, email: str, profile: dict) -> None:
     # client with a shorter list and no replacement, while the run has already
     # worked out what the replacement should be. Each one is confirmed by its
     # own lookup before it is allowed onto the list.
-    promoted = event_intel_audit.promote_alternatives(audit, survivors)
+    # `survivors` is what is already on the list, for dedup. The pre-audit
+    # list is where the event each alternative REPLACES still exists, and it
+    # is the only place a promoted event can pick up the category slot it
+    # needs to survive the store.
+    promoted = event_intel_audit.promote_alternatives(
+        audit, survivors, replaced_from=found["candidates"])
     if promoted["promoted"]:
         survivors = survivors + promoted["promoted"]
 

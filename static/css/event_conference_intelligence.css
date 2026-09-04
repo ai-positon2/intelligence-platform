@@ -1101,7 +1101,17 @@ table.evi-table { width: 100%; border-collapse: separate; border-spacing: 0;
 }
 
 /* -- column spread ----------------------------------------------------- */
-.evi-cols { display: flex; flex-direction: column; gap: 9px; }
+.evi-cols {
+  display: flex; flex-direction: column; gap: 9px; --evi-col-w: 44px;
+  /* Room at the right of the plot for the floor line's label, reserved only
+     on the charts that draw one. While the plot was full width the label sat
+     at the far right of a mostly empty band and touched nothing; shrinking
+     the plot to its columns put it straight on top of the last two. Reserved
+     space cannot collide at any column count, and being inside the plot it
+     cannot overflow the panel either. */
+  --evi-fo-w: 0px;
+}
+.evi-cols.hasfo { --evi-fo-w: 78px; }
 .evi-cols .cwrap { padding-top: 12px; }
 .evi-cols .cs {
   position: relative; display: flex; align-items: flex-end;
@@ -1111,20 +1121,43 @@ table.evi-table { width: 100%; border-collapse: separate; border-spacing: 0;
      as two lonely blocks pinned to opposite edges of an empty band, which
      reads as a broken chart rather than as two events. */
   justify-content: flex-start; gap: 5px; height: 138px;
+  /* The plot is as wide as its columns and no wider, because the dashed
+     floor line is positioned across THIS box: full width, it drew the line
+     and its "the bar, 70" label across however much of the panel the columns
+     did not use, which at six events was 845px of nothing.
+     Width comes from the column count the template sets in --n, not from
+     `fit-content`. fit-content looks right and collapses the chart: a flex
+     item with a non-zero shrink contributes min(flex-basis, max-content) to
+     the row's max-content width, these items are empty, so the row measured
+     its 5px min-width floor per column and the plot came out 55px wide.
+     `width: 100%` with this max-width shrink-wraps when the columns fit and
+     falls back to the full panel when they do not, so a long list shrinks
+     its columns exactly as it did before. */
+  width: 100%; margin-inline: auto; padding-right: var(--evi-fo-w);
+  max-width: calc(var(--n, 6) * var(--evi-col-w) + (var(--n, 6) - 1) * 5px
+                  + var(--evi-fo-w));
 }
 /* Capped, then spread. Eleven columns filling a 1000px drawer are ninety
    pixels wide each, which reads as a wall of blocks rather than as a
    distribution; capped and evenly spaced, the same eleven read as a chart
    and forty still fit. */
 .evi-cols .cx {
-  flex: 1 1 0; min-width: 5px; max-width: 34px; height: 100%;
+  /* One number, --evi-col-w, caps the column here and sizes the plot above.
+     Two hand-typed copies of it drift, and when they drift the floor line
+     stops agreeing with the columns it is drawn over. 44px rather than the
+     34 this was: fifteen events, the default cap, now fill two thirds of the
+     panel instead of a fifth of it. */
+  flex: 1 1 0; min-width: 5px; max-width: var(--evi-col-w); height: 100%;
   display: flex; align-items: flex-end;
   background: none; border: 0; padding: 0; font: inherit;
 }
 /* A handful of columns get to be wider. The 34px cap exists so that forty
    columns read as a distribution; at two or three it makes them look like
    an accident. */
-.evi-cols.few .cx { max-width: 72px; }
+/* A handful of columns get to be wider, and the plot above has to hear
+   about it: the override sets the token, not the max-width, so the calc that
+   sizes the plot moves with it. */
+.evi-cols.few { --evi-col-w: 72px; }
 .evi-cols button.cx { cursor: pointer; }
 .evi-cols .cl {
   display: block; width: 100%; border-radius: 3px 3px 1px 1px;
@@ -1148,12 +1181,16 @@ table.evi-table { width: 100%; border-collapse: separate; border-spacing: 0;
 }
 .evi-cols button.cx:focus-visible { outline: 2px solid var(--evi-a1); outline-offset: 2px; }
 .evi-cols .fo {
-  position: absolute; left: 0; right: 0; height: 0;
+  /* Stops at the content edge, not the padding edge: an absolutely
+     positioned child is laid out against the padding box, so `right: 0`
+     would run the line back under the label. */
+  position: absolute; left: 0; right: var(--evi-fo-w); height: 0;
   border-top: 1px dashed var(--evi-ink-3); opacity: .75;
   pointer-events: none; z-index: 3;
 }
 .evi-cols .fo b {
-  position: absolute; right: 0; top: -7px; font-size: 9.5px; font-weight: 650;
+  position: absolute; left: 100%; margin-left: 5px; top: -7px;
+  white-space: nowrap; font-size: 9.5px; font-weight: 650;
   letter-spacing: .05em; text-transform: uppercase; color: var(--evi-ink-3);
   background: var(--evi-panel); padding: 1px 5px; border-radius: 4px;
 }
@@ -1704,11 +1741,23 @@ table.evi-table { width: 100%; border-collapse: separate; border-spacing: 0;
 .evi-scrim.on { display: block; }
 .evi-drawer {
   max-width: 1120px; margin: 0 auto; height: 94vh; display: flex; flex-direction: column;
-  background: var(--evi-panel); border: 1px solid var(--evi-line);
+  /* Opaque, in both themes. The panel token is 72% in dark mode, and over
+     the 74% scrim that let the hero headline behind the page read through
+     the report: 50px of blurred type across the score chart's band, in a
+     document a client opens. Light mode was already solid, so the two themes
+     disagreed about it too.
+     #040713 is what the scrim composites to, so the panel laid over it lands
+     on exactly the colour the drawer has always rendered and every card
+     inside keeps the contrast it had. */
+  background-color: #040713;
+  background-image: linear-gradient(var(--evi-panel), var(--evi-panel));
+  border: 1px solid var(--evi-line);
   border-radius: var(--radius-lg, 16px); overflow: hidden;
   box-shadow: 0 40px 120px rgba(0,0,0,.6);
 }
-:root[data-theme="light"] .evi-drawer { background: #fff; }
+:root[data-theme="light"] .evi-drawer {
+  background-color: #fff; background-image: none;
+}
 .evi-drawer-head {
   display: flex; align-items: flex-start; justify-content: space-between; gap: 16px;
   padding: 18px 22px; border-bottom: 1px solid var(--evi-line); flex-shrink: 0;

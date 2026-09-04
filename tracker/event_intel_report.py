@@ -227,7 +227,13 @@ def notes(*, shortfall: list, audit: dict, generic: dict,
         out.append({"level": level, "head": head.strip(), "detail": d})
 
     failed = [s for s in (shortfall or []) if s.get("status") == "error"]
-    empty = [s for s in (shortfall or []) if s.get("status") != "error"]
+    # `partial` is its own bucket, not a quiet member of `empty`. A partial
+    # search is a hole in the coverage even when it confirmed an event, which
+    # is exactly how the page's coverage chart reads it, and folding it into
+    # "searched, and short" made one report describe one category both ways.
+    partial = [s for s in (shortfall or []) if s.get("status") == "partial"]
+    empty = [s for s in (shortfall or [])
+             if s.get("status") not in ("error", "partial")]
     spent = [s for s in (shortfall or []) if s.get("budget_spent")]
     total_cats = len(rubric.CATEGORIES)
 
@@ -239,6 +245,14 @@ def notes(*, shortfall: list, audit: dict, generic: dict,
             "market. %s"
             % " ".join("%s: %s" % (s["label"], _reason(s["why"]))
                        for s in failed))
+    if partial:
+        add(LEVEL_GAP,
+            "%s did not finish searching"
+            % _n(len(partial), "category search", "category searches"),
+            "Whatever these categories hold, this run did not get to the end "
+            "of it, so they are under-searched rather than settled. %s"
+            % " ".join("%s: %s" % (s["label"], _reason(s["why"]))
+                       for s in partial))
     if empty:
         add(LEVEL_THIN,
             "%s came back under the two-event quota"
@@ -409,8 +423,8 @@ def notes(*, shortfall: list, audit: dict, generic: dict,
     gapped = [c for c in (candidates or []) if c.get("gaps")]
     if gapped:
         add(LEVEL_THIN,
-            "%s carry an unmeasured field"
-            % _n(len(gapped), "event", "events"),
+            "%s an unmeasured field"
+            % _n(len(gapped), "event carries", "events carry"),
             "Listed against the row itself, so a score built on partial "
             "information is visible as such.")
 

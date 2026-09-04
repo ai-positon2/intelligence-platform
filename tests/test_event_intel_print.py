@@ -206,6 +206,11 @@ def test_the_category_count_is_never_spelled_categorys(page_script):
 
 # ── a chart with two things in it ────────────────────────────────────────
 
+def _chart_classes(html):
+    """The class list of every column chart in the page, as sets."""
+    return [set(m.split()) for m in
+            re.findall(r'class="(evi-cols[^"]*)"', html)]
+
 def test_a_sparse_spread_does_not_pin_its_columns_to_the_edges(page_script):
     """One kept event and one cut one drew as two blocks at opposite ends of
     an empty band, which reads as a broken chart rather than as two events.
@@ -214,11 +219,16 @@ def test_a_sparse_spread_does_not_pin_its_columns_to_the_edges(page_script):
         [_cand("A", 74, "P2"), _cand("B", 72, "P2")], discovered=4,
         counts={"P1": 0, "P2": 2, "kept": 2, "excluded": 1, "finished": 0},
         excluded=[{"name": "Cut one", "tier": "P3", "total": 61}]))
-    assert 'class="evi-cols few"' in html
+    # Read out of the class list rather than matched as the whole attribute:
+    # the chart also declares whether it draws a floor line, and carries its
+    # column count in a style, both of which the plot's width depends on.
+    assert "few" in _chart_classes(html)[0], _chart_classes(html)
     css = _decommented(_CSS)
     rules = _rules(css[:css.index("@media print")])
     assert "justify-content: flex-start" in rules.get(".evi-cols .cs", "")
-    assert "max-width: 72px" in rules.get(".evi-cols.few .cx", "")
+    # The wider column is set on the token the plot's width calc reads, so
+    # that a wider column and the box drawn around it stay the same size.
+    assert "--evi-col-w: 72px" in rules.get(".evi-cols.few", "")
 
 
 def test_a_crowded_spread_keeps_the_narrow_columns(page_script):
@@ -228,8 +238,9 @@ def test_a_crowded_spread_keeps_the_narrow_columns(page_script):
     html = _render(page_script, _recommend(
         cands, discovered=9,
         counts={"P1": 6, "P2": 0, "kept": 6, "excluded": 0, "finished": 0}))
-    assert 'class="evi-cols few"' not in html
-    assert 'class="evi-cols"' in html
+    classes = _chart_classes(html)
+    assert classes, "no chart was drawn at all"
+    assert not any("few" in c for c in classes), classes
 
 
 # ── the spelling of every counted noun ───────────────────────────────────
