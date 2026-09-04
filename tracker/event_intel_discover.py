@@ -113,9 +113,23 @@ _INFLIGHT = threading.Semaphore(MAX_INFLIGHT)
 # at once because _INFLIGHT, not the pool, is what throttles the API.
 MAX_CONCURRENCY = len(rubric.CATEGORIES)
 
-# Asked-for per category. One above the quota of two, so that a single
-# unusable result does not put the category under quota on its own.
-PER_CATEGORY = 4
+# Asked-for per category. Well above the quota of two, so that confirmation
+# ruling several out does not put the category under quota on its own.
+#
+# Raised from 4 to 6. Two reasons, one of them embarrassing:
+#
+# The finder's own prompt has always said "Naming six plausible candidates is
+# more useful than fully researching one", and then the user message asked it
+# for up to FOUR. The prompt argued for a number the call did not request.
+#
+# The other reason is the complaint this whole change answers: runs were
+# returning one event, or none. Six categories at four candidates is a ceiling
+# of 24 before confirmation rejects anything, and confirmation is designed to
+# reject. Naming candidates is the cheap stage (one call, FIND_MAX_USES
+# searches, whatever it finds) while confirming is the per-candidate cost, so
+# this widens the mouth of the funnel where widening is nearly free and lets
+# the gates further down do the work of keeping the list honest.
+PER_CATEGORY = 6
 
 # Search budgets, per call.
 #

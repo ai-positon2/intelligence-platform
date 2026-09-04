@@ -306,3 +306,101 @@ def test_the_summary_never_claims_a_promotion_the_table_does_not_hold(monkeypatc
         "the summary says these were added to the list and the table does "
         "not hold them: %s" % missing)
     assert P  # the path under test is the pipeline's, not a reconstruction
+
+
+# ── the second tier, through the real path and read back ─────────────────
+#
+# The complaint this answers was measured on live clients: one run returned a
+# single event and another returned none, while events that were real,
+# upcoming, cited and aimed at the client's own buyers were discarded for
+# scoring in the sixties. The fix splits the bar (which ranks) from the
+# relevance gates (which decide what is an option at all).
+#
+# A unit test on `rank` proves the partition. It cannot prove the tier
+# survives the store and reaches the summary the page reads, which is exactly
+# the gap that let the promotion defect above ship inert for weeks.
+
+def test_a_well_matched_event_below_the_bar_reaches_the_stored_summary(monkeypatch):
+    """The whole point, end to end. One event clears 70, two score in the
+    sixties with the right audience, one is for the wrong audience entirely.
+    The run has to come back with one recommendation, two options and one
+    cut, and the page reads all three off the stored summary."""
+    from tracker import event_intel_pipeline as P
+    from tracker import event_intel_scorer as SC
+
+    discovered = [
+        {"name": "Strong Flagship", "famous": False, "city": "Chicago",
+         "category": R.CAT_INDUSTRY_FLAGSHIP, "website": "https://sf.example",
+         "starts_on": _soon(120), "ends_on": _soon(122), "format": "in_person",
+         "sources": ["https://sf.example"], "confidence": "high"},
+        {"name": "On ICP Learning Crowd", "famous": False, "city": "Austin",
+         "category": R.CAT_VERTICAL_SUMMIT, "website": "https://ol.example",
+         "starts_on": _soon(90), "ends_on": _soon(91), "format": "in_person",
+         "sources": ["https://ol.example"], "confidence": "high"},
+        {"name": "Adjacent But Real", "famous": False, "city": "Boston",
+         "category": R.CAT_EMERGING, "website": "https://ab.example",
+         "starts_on": _soon(150), "ends_on": _soon(151), "format": "in_person",
+         "sources": ["https://ab.example"], "confidence": "high"},
+        {"name": "Wrong Audience Expo", "famous": False, "city": "Berlin",
+         "category": R.CAT_FREE_VENDOR, "website": "https://wa.example",
+         "starts_on": _soon(200), "ends_on": _soon(201), "format": "in_person",
+         "sources": ["https://wa.example"], "confidence": "high"},
+    ]
+    # relevance / dm_access / engagement, chosen so each row lands in a
+    # different bucket rather than trusting one number to imply the split.
+    shape = {
+        "Strong Flagship":       (36, 34, 18),   # 88, clears the bar
+        "On ICP Learning Crowd": (32, 22, 10),   # 64, right audience
+        "Adjacent But Real":     (26, 24, 11),   # 61, right audience
+        "Wrong Audience Expo":   (10, 20, 10),   # 40, not for them
+    }
+
+    monkeypatch.setattr(P.event_intel_discover, "discover", lambda profile: {
+        "candidates": [dict(c) for c in discovered], "shortfall": [],
+        "statuses": {}, "categories_failed": 0, "found": len(discovered),
+        "by_category": {}, "categories_searched": 6})
+    monkeypatch.setattr(P.event_intel_audit, "audit_famous", lambda c, p: {
+        "verdicts": {}, "cut": [], "kept": [], "checked": 0, "error": None})
+
+    def _fake_batch(batch, profile):
+        out = {}
+        for c in batch:
+            rel, dm, eng = shape[c["name"]]
+            out[SC.score_key(c["name"])] = SC._clean(_scores(
+                c["name"], relevance=rel, dm_access=dm, engagement=eng))
+        return {"scores": out, "error": None}
+
+    monkeypatch.setattr(SC, "score_batch", _fake_batch)
+    monkeypatch.setattr(P.event_intel_scorer, "score_batch", _fake_batch)
+
+    run_id = S.save_run(EMAIL, "recommend", "second tier e2e")
+    P._run_recommend(run_id, EMAIL, _profile())
+
+    row = S.get_run(run_id, EMAIL)
+    assert row["status"] == "complete", row.get("error")
+    s = row["summary"] or {}
+
+    kept = [c["name"] for c in (s.get("top_five") or [])]
+    look = [c["name"] for c in (s.get("worth_a_look") or [])]
+    cut = [c["name"] for c in (s.get("excluded") or [])]
+
+    assert kept == ["Strong Flagship"], kept
+    assert look == ["On ICP Learning Crowd", "Adjacent But Real"], look
+    assert cut == ["Wrong Audience Expo"], cut
+
+    # Before the split this run handed the client ONE event. The point is the
+    # number of things they can actually act on.
+    assert len(kept) + len(look) == 3, (
+        "the run offers %d options where it used to offer 1" % (len(kept) + len(look)))
+
+    # The card the page draws needs more than a name and a score.
+    opt = (s.get("worth_a_look") or [])[0]
+    for field in ("starts_on", "city", "description", "relevance", "total",
+                  "category"):
+        assert opt.get(field) not in (None, ""), (
+            "%s did not survive the store, so the option cannot be rendered"
+            % field)
+    assert opt["total"] < R.RANK_FLOOR
+    assert opt["relevance"] >= R.RELEVANCE_GATE
+
+    assert (s.get("counts") or {}).get("worth_a_look") == 2, s.get("counts")

@@ -330,6 +330,10 @@ def _run_recommend(run_id: int, email: str, profile: dict) -> None:
                   "unconfirmed": promoted["unconfirmed"],
                   "not_attempted": promoted["not_attempted"]},
         "generic": generic,
+        # The second tier. Full rows, because these are offered as options
+        # and are rendered with their dates, city and description the same
+        # way the recommendation is.
+        "worth_a_look": ranked["worth_a_look"],
         "excluded": ranked["excluded"],
         "over_cap": ranked["over_cap"],
         "finished": ranked["finished"],

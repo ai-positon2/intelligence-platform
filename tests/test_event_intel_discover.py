@@ -890,6 +890,48 @@ def test_a_category_now_gets_more_searches_than_the_single_call_ever_did():
         "exists to solve")
 
 
+def test_the_finder_asks_for_as_many_candidates_as_its_prompt_argues_for():
+    """The prompt has always said "Naming six plausible candidates is more
+    useful than fully researching one", and the user message asked it for
+    four. The prompt was arguing for a number the call did not request, on an
+    agent whose actual complaint was that it returned too few events."""
+    import re as _re
+    m = _re.search(r"Naming (\w+) plausible candidates", D._FIND_SYSTEM)
+    assert m, "the prompt no longer makes a claim about how many to name"
+    words = {"four": 4, "five": 5, "six": 6, "seven": 7, "eight": 8}
+    claimed = words.get(m.group(1).lower())
+    assert claimed is not None, "unrecognised number word %r" % m.group(1)
+    assert D.PER_CATEGORY >= claimed, (
+        "the prompt argues for %d candidates and the call asks for %d"
+        % (claimed, D.PER_CATEGORY))
+
+
+def test_the_finder_is_asked_for_the_number_the_module_declares():
+    """The ceiling on a whole run is PER_CATEGORY times six, so the number in
+    the user message is not decoration."""
+    user_asks = []
+
+    class _Spy:
+        def ask(self, system, user, **kw):
+            user_asks.append(user)
+            return {"text": _find_reply([]), "raw": "", "error": None,
+                    "stop_reason": "end_turn", "text_block_count": 1,
+                    "tool_version": "v", "tool_errors": [], "usage": {},
+                    "search_count": 2, "budget_spent": False}
+
+    spy = _Spy()
+    real = claude_websearch.ask
+    claude_websearch.ask = spy.ask
+    try:
+        D.propose_category(R.CAT_EMERGING, PROFILE)
+    finally:
+        claude_websearch.ask = real
+    assert user_asks, "the finder was never called"
+    assert "up to %d candidate events" % D.PER_CATEGORY in user_asks[0], (
+        "the request does not ask for PER_CATEGORY candidates: %r"
+        % user_asks[0][:120])
+
+
 def test_finding_and_confirming_are_separate_calls(monkeypatch):
     calls = _budgets(monkeypatch,
                      find=_find_reply(_ONE, complete=True),

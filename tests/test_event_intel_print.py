@@ -186,6 +186,84 @@ def test_more_than_one_kept_event_still_reads_as_plural(page_script):
     assert parts["sub"] == "2 events cleared the bar of 9 found"
 
 
+# ── the second tier, as the reader meets it ─────────────────────────────
+#
+# The bar used to decide both what was recommended and what existed, so a run
+# with one P1 and four well-matched events in the sixties told the client it
+# had found them one thing. These execute the page's real render over that
+# exact shape.
+
+def _look(name, total):
+    """A second-tier row: below the bar, above the relevance gate."""
+    return _cand(name, total, "P3", relevance=30, dm_access=22, engagement=11)
+
+
+def test_the_heading_counts_the_second_tier_it_is_about_to_show(page_script):
+    """"1 event cleared the bar of 7 found" was the complaint in one line: it
+    described the run as having produced one thing while four more real
+    options sat below."""
+    parts = _render_parts(page_script, _recommend(
+        [_cand("ADA", 86, "P1")], discovered=7,
+        worth_a_look=[_look("ATTD", 67), _look("AADE", 64),
+                      _look("Payer Forum", 64), _look("Innovation", 58)],
+        counts={"P1": 1, "P2": 0, "kept": 1, "worth_a_look": 4,
+                "excluded": 2, "finished": 0}))
+    assert parts["sub"] == ("1 event cleared the bar and 4 more worth a look, "
+                            "from 7 found"), parts["sub"]
+
+
+def test_a_run_with_no_second_tier_says_exactly_what_it_always_said(page_script):
+    """The wording for a one-tier run is deliberately untouched."""
+    parts = _render_parts(page_script, _recommend(
+        [_cand("ATTD", 74, "P2")], discovered=2,
+        counts={"P1": 0, "P2": 1, "kept": 1, "worth_a_look": 0,
+                "excluded": 1, "finished": 0}))
+    assert parts["sub"] == "1 event cleared the bar of 2 found", parts["sub"]
+
+
+def test_nothing_cleared_the_bar_no_longer_means_nothing_was_found(page_script):
+    """The exact page a client was shown: zero recommendations printed as
+    "Nothing cleared 70. That is the answer, not a failure", with a shortlist
+    of real options rendered underneath it."""
+    html = _render(page_script, _recommend(
+        [], discovered=6,
+        worth_a_look=[_look("ATTD", 67), _look("AADE", 64)],
+        counts={"P1": 0, "P2": 0, "kept": 0, "worth_a_look": 2,
+                "excluded": 4, "finished": 0}))
+    assert "the list is not padded to a target count" not in html, (
+        "a run that found two real options still says it found nothing")
+    assert "Worth a look" in html
+    assert "ATTD" in html and "AADE" in html
+
+
+def test_a_second_tier_event_is_rendered_as_a_card_not_a_chip(page_script):
+    """`excluded` is a name and a score on purpose. These are offered as
+    options, so they arrive with dates, a place and what they are short on."""
+    html = _render(page_script, _recommend(
+        [_cand("ADA", 86, "P1")], discovered=4,
+        worth_a_look=[_look("ATTD", 67)],
+        counts={"P1": 1, "P2": 0, "kept": 1, "worth_a_look": 1,
+                "excluded": 2, "finished": 0}))
+    assert "Short of the bar by" in html, (
+        "an option was offered with no account of what is weaker about it")
+    assert "Berlin" in html, "the second-tier card lost its location"
+    assert "cand-2" in html, (
+        "the second-tier card has no anchor, so the calendar cannot jump to it")
+
+
+def test_the_two_tiers_never_mint_the_same_anchor(page_script):
+    """Both sections build ids from a row index. Sharing a counter would
+    point the calendar and the score chart at the wrong card."""
+    html = _render(page_script, _recommend(
+        [_cand("A", 90, "P1"), _cand("B", 74, "P2")], discovered=9,
+        worth_a_look=[_look("C", 67), _look("D", 64)],
+        counts={"P1": 1, "P2": 1, "kept": 2, "worth_a_look": 2,
+                "excluded": 1, "finished": 0}))
+    ids = re.findall(r'id="(cand-\d+)"', html)
+    assert len(ids) == len(set(ids)), "duplicate card ids: %s" % ids
+    assert set(ids) == {"cand-1", "cand-2", "cand-3", "cand-4"}, ids
+
+
 def test_the_funnel_counts_categories_rather_than_a_typed_six(page_script):
     """It said 'Found across the six searches'. A run makes one finding call
     per category and then one confirmation call per candidate, so the number
