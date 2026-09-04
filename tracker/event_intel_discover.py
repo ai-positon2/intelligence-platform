@@ -77,6 +77,7 @@ import logging
 import re
 import datetime
 import threading
+import time
 from urllib.parse import urlparse
 
 from . import claude_websearch
@@ -140,6 +141,22 @@ FIND_MAX_USES = 6
 FIND_MAX_TOKENS = 3000
 CONFIRM_MAX_USES = 6
 CONFIRM_MAX_TOKENS = 4000
+
+# A live production run reported all six categories broken at once: no
+# proposals, `search_complete: false`, budget not spent. That is the model
+# honestly reporting the ONE thing it is told to report false for (see
+# `_FIND_SYSTEM`): a search that came back rate-limited, unavailable, or
+# erroring. Six independent categories failing identically in one run is the
+# signature of a synchronized rate-limit hit, not six unrelated tool faults,
+# and it is exactly the shape SEARCH_STARVED_CODES already names as
+# unavoidable by the caller -- except a moment later it usually is avoidable,
+# because the thing that was hit clears. So a category that came back with
+# NOTHING and no budget excuse gets one retry after a short pause before it
+# is reported to a client as a hole. A category that already found something
+# is never retried: a partial, honestly-labelled result is worth more than a
+# gamble that might lose it.
+FIND_RETRY_BACKOFF_SECONDS = 2.0
+
 
 # What a confirmation concluded. Three outcomes, never two: an event the
 # confirmer SEARCHED and ruled out is a fact about the market, while an event
@@ -802,6 +819,32 @@ def _dedupe_proposals(proposals: list) -> list:
     return out
 
 
+def _find_reply_is_broken_and_empty(res: dict) -> bool:
+    """Whether a find-stage reply is the case FIND_RETRY_BACKOFF_SECONDS
+    exists to retry once: nothing found, and not because the model chose to
+    return nothing or ran out of its own search budget.
+
+    Deliberately narrow. Excluded on purpose: a reply that found even one
+    candidate (a partial, honestly-labelled result beats a retry that might
+    lose it), a reply that ran out of ITS OWN search budget rather than
+    hitting a broken search (retrying would likely just spend the same
+    budget again), and a reply with no search_count at all (the model chose
+    not to search, which is a different failure this module refuses
+    separately, not a tool outage a retry can fix).
+    """
+    err = res.get("error")
+    if err:
+        return err.get("kind") in (claude_websearch.ERR_SEARCH_LIMIT,
+                                   claude_websearch.ERR_TRANSPORT)
+    if bool(res.get("budget_spent")) or not res.get("search_count"):
+        return False
+    parsed = claude_websearch.extract_json(res.get("text") or "",
+                                           require="candidates")
+    if not isinstance(parsed, dict) or parsed.get("candidates"):
+        return False
+    return parsed.get("search_complete") is False
+
+
 def propose_category(category: str, profile: dict) -> dict:
     """Stage one: name the candidates in one category. Never raises.
 
@@ -825,6 +868,31 @@ def propose_category(category: str, profile: dict) -> dict:
             % (PER_CATEGORY, rubric.CATEGORY_LABELS[category]))
 
     res = _ask(system, user, max_uses=FIND_MAX_USES, max_tokens=FIND_MAX_TOKENS)
+
+    # A category that came back broken and empty gets one retry, after the
+    # search-tool errors that cause this are usually a moment, not an outage.
+    # See FIND_RETRY_BACKOFF_SECONDS for why this exists and what it does not
+    # cover: a category that found anything, or that ran out of its own
+    # search budget, is never retried.
+    if _find_reply_is_broken_and_empty(res):
+        logger.warning("event_intel_discover: category %s came back broken "
+                       "with nothing found (error=%s, search_count=%s), "
+                       "retrying once", category,
+                       (res.get("error") or {}).get("kind"),
+                       res.get("search_count"))
+        time.sleep(FIND_RETRY_BACKOFF_SECONDS)
+        retry = _ask(system, user, max_uses=FIND_MAX_USES,
+                     max_tokens=FIND_MAX_TOKENS)
+        if _find_reply_is_broken_and_empty(retry):
+            logger.warning("event_intel_discover: category %s still broken "
+                           "after retry (error=%s, search_count=%s)",
+                           category, (retry.get("error") or {}).get("kind"),
+                           retry.get("search_count"))
+        else:
+            logger.info("event_intel_discover: category %s recovered on retry",
+                       category)
+        res = retry
+
     budget = bool(res.get("budget_spent"))
 
     def _out(status, proposals, note, detail):

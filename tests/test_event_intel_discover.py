@@ -448,6 +448,107 @@ def test_a_genuinely_cut_off_finder_still_reads_as_a_gap(monkeypatch):
     assert "gap in the search" in r["detail"]
 
 
+# ── a broken search usually clears a moment later ─────────────────────────
+#
+# A live production run reported all SIX categories broken at once: no
+# proposals, search_complete false, no budget spent. Six categories failing
+# identically in one run is the signature of a synchronized rate-limit hit,
+# and that usually clears within seconds, so a category with nothing and no
+# budget excuse gets one retry before it is reported to a client as a hole.
+
+def _find_call(text, searches=3, budget=False, error=None):
+    return {"text": text, "raw": text, "error": error,
+            "stop_reason": "end_turn", "text_block_count": 1,
+            "tool_version": "v", "tool_errors": [], "usage": {},
+            "search_count": searches, "budget_spent": budget}
+
+
+def test_a_category_broken_and_empty_on_the_first_try_gets_one_retry(monkeypatch):
+    monkeypatch.setattr(D, "FIND_RETRY_BACKOFF_SECONDS", 0)
+    finds = []
+
+    def fake_ask(system, user, **kw):
+        if "YOUR ONLY JOB IS TO NAME CANDIDATES" in system:
+            finds.append(1)
+            if len(finds) == 1:
+                return _find_call(_find_reply([], complete=False), budget=False)
+            return _find_call(_find_reply(_ONE, complete=True))
+        return _find_call(_confirm_reply(_EVENT))
+
+    monkeypatch.setattr(claude_websearch, "ask", fake_ask)
+    r = D.search_category(R.CAT_EMERGING, PROFILE)
+    assert len(finds) == 2, "a category that recovered should have been asked twice"
+    assert r["status"] == D.STATUS_OK
+    assert len(r["events"]) == 1, "the recovered proposal was lost"
+
+
+def test_a_category_still_broken_after_one_retry_reports_the_gap_once(monkeypatch):
+    monkeypatch.setattr(D, "FIND_RETRY_BACKOFF_SECONDS", 0)
+    finds = []
+
+    def fake_ask(system, user, **kw):
+        if "YOUR ONLY JOB IS TO NAME CANDIDATES" in system:
+            finds.append(1)
+            return _find_call(_find_reply([], complete=False), budget=False)
+        return _find_call(_confirm_reply(_EVENT))
+
+    monkeypatch.setattr(claude_websearch, "ask", fake_ask)
+    r = D.search_category(R.CAT_EMERGING, PROFILE)
+    assert len(finds) == 2, "a category should be retried exactly once, not looped"
+    assert r["status"] == D.STATUS_ERROR
+    assert "gap in the search" in r["detail"]
+
+
+def test_a_category_that_found_anything_despite_being_broken_is_not_retried(monkeypatch):
+    """A partial, honestly-labelled result beats a retry that might lose it."""
+    monkeypatch.setattr(D, "FIND_RETRY_BACKOFF_SECONDS", 0)
+    finds = []
+
+    def fake_ask(system, user, **kw):
+        if "YOUR ONLY JOB IS TO NAME CANDIDATES" in system:
+            finds.append(1)
+            return _find_call(_find_reply(_ONE, complete=False), budget=False)
+        return _find_call(_confirm_reply(_EVENT))
+
+    monkeypatch.setattr(claude_websearch, "ask", fake_ask)
+    r = D.search_category(R.CAT_EMERGING, PROFILE)
+    assert len(finds) == 1
+    assert r["status"] == D.STATUS_PARTIAL
+
+
+def test_a_category_that_merely_used_its_own_budget_is_not_retried(monkeypatch):
+    """Running out of the budget WE gave it is not a broken search, and
+    retrying would likely just spend the same budget again for nothing."""
+    monkeypatch.setattr(D, "FIND_RETRY_BACKOFF_SECONDS", 0)
+    finds = []
+
+    def fake_ask(system, user, **kw):
+        if "YOUR ONLY JOB IS TO NAME CANDIDATES" in system:
+            finds.append(1)
+            return _find_call(_find_reply([], complete=False), budget=True)
+        return _find_call(_confirm_reply(_EVENT))
+
+    monkeypatch.setattr(claude_websearch, "ask", fake_ask)
+    D.search_category(R.CAT_EMERGING, PROFILE)
+    assert len(finds) == 1
+
+
+def test_a_transport_error_with_nothing_found_is_retried_once(monkeypatch):
+    monkeypatch.setattr(D, "FIND_RETRY_BACKOFF_SECONDS", 0)
+    finds = []
+
+    def fake_ask(system, user, **kw):
+        if "YOUR ONLY JOB IS TO NAME CANDIDATES" in system:
+            finds.append(1)
+            return _find_call("", error={"kind": "transport", "detail": "x"})
+        return _find_call(_confirm_reply(_EVENT))
+
+    monkeypatch.setattr(claude_websearch, "ask", fake_ask)
+    r = D.search_category(R.CAT_EMERGING, PROFILE)
+    assert len(finds) == 2
+    assert r["status"] == D.STATUS_ERROR
+
+
 # ── a limit that arrives with no error block at all ──────────────────────
 #
 # A live probe at a budget of one search sat for 471 seconds, ran ONE search,
