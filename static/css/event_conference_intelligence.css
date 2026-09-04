@@ -230,13 +230,6 @@ body {
 .evi-rail .evi-card + .evi-card { margin-top: 0; }
 .evi-rail .evi-card-pad { padding: 18px 18px 16px; }
 
-.evi-cost { list-style: none; display: flex; flex-direction: column; gap: 10px; }
-.evi-cost li { font-size: 11.5px; line-height: 1.55; color: var(--evi-ink-3);
-  padding-left: 14px; position: relative; }
-.evi-cost li::before { content: ""; position: absolute; left: 0; top: 6px;
-  width: 5px; height: 5px; border-radius: 50%; background: var(--evi-a2); opacity: .7; }
-.evi-cost li b { color: var(--evi-ink-2); font-weight: 600; }
-
 /* ── the plays ─────────────────────────────────────────────────────
    These carry the page. The mode chosen here decides what every field below
    means, so they are given more weight than anything else on screen: their own
@@ -1964,7 +1957,6 @@ table.evi-table { width: 100%; border-collapse: separate; border-spacing: 0;
   body.evi-reading .evi-hero,
   body.evi-reading .evi-plays,
   body.evi-reading .evi-card-main,
-  body.evi-reading .evi-costcard,
   body.evi-reading .evi-runs,
   body.evi-reading .bg-grid { display: none !important; }
   /* The scrim is the page now, so it must not reserve the margins the
