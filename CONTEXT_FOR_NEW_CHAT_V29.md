@@ -1,16 +1,35 @@
-# Intelligence by Position2 - Full Context (v28 - September 2026)
+# Intelligence by Position2 - Full Context (v29 - September 2026)
 
-Paste this entire file at the start of a new chat to give the assistant full context on this platform. **v28 supersedes all earlier context files (v1-v27)** - older versions are stale; ignore any pasted copy, and if `CONTEXT_FOR_NEW_CHAT_V27.md` (or older) still exists in the repo root, delete it as part of landing this file per the standing one-canonical-file convention.
+Paste this entire file at the start of a new chat to give the assistant full context on this platform. **v29 supersedes all earlier context files (v1-v28)** - older versions are stale; ignore any pasted copy, and if `CONTEXT_FOR_NEW_CHAT_V28.md` (or older) still exists in the repo root, delete it as part of landing this file per the standing one-canonical-file convention.
 
-**Latest `main` HEAD at the end of this cycle: `587635d`** (always `git pull` to confirm; Railway auto-deploys every push). `app.py` is **17,879 lines / 199 `@app.route` decorator lines** (225 total registered URL rules including loop-registered `add_url_rule` families and multi-decorator legacy redirects), up from 17,243 / 186 / 212 at v27. The test suite is now **113 files, 2,838 tests, all passing** (`PYTHONDONTWRITEBYTECODE=1 python3 -B -m pytest tests/ -q`), up from 98 files / 2,292 tests at v27. **32 routes carry `@admin_required`.**
+**Latest `main` HEAD at the end of this cycle: `5ce36c7`** (always `git pull` to confirm; Railway auto-deploys every push). `app.py` is **18,067 lines / 203 `@app.route` decorator lines**, up from 17,879 / 199 at v28. The test suite is now **131 files, roughly 3,619 offline tests plus 32 dedicated real-Postgres tests, all passing** (`PYTHONDONTWRITEBYTECODE=1 python3 -B -m pytest tests/ -q`), up from 113 files / 2,838 tests at v28. **32 routes still carry `@admin_required`** (unchanged).
 
-**What kind of cycle this was:** v27 finished an agent. v28 built one, then went back over the pages already shipped and made them look like one product. Three threads. A **tenth B2B agent**, Event & Conference Intelligence: built, rejected outright by the user, rebuilt from the gtm-skills source plays, then audited field by field and redesigned twice. A **platform-wide layout pass** putting every agent page on the same responsive grid, with a test that fails when one drifts off it. And **Unipile going from inert to live for LinkedIn**, which is the first time this platform has read a real company's real LinkedIn posts.
+**What kind of cycle this was:** v28 built the Event & Conference Intelligence agent and got it working. This entire cycle, by far the longest and most eventful single stretch this platform has had, was spent making that one agent trustworthy, then making it good, and touched nothing else. It went in three passes. First, a series of **audits against increasingly real conditions** (code review, then a stubbed pipeline run, then real Anthropic+Apollo+Postgres keys, then a real printed client report) that each found bugs invisible to the pass before it, because this agent's specific failure mode is reporting a clean, confident number while the real thing quietly didn't happen. Second, a **complete redesign of the report itself**, twice, on direct user feedback that a technically-correct report nobody would read is not a report. Third, on the explicit instruction to make it **"crazy good, not just bug-free,"** two brand-new features that use this platform's one real structural advantage over a stateless AI research session: a Postgres database that remembers every run, forever.
 
-The single most transferable lesson of the cycle is in that last thread. Every Unipile route the client shipped with at v27 was a wrong guess, written from the vendor's docs and from a probe run against the wrong host. Three separate assumptions died on contact with the live API, and one of them (where an account's real status lives) would have made every collection fail while the admin panel said "connected". **Probe the live thing before writing anything down about it, and treat a vendor's own documentation as a hint.**
+The single most transferable lesson of the cycle, stated by the user directly and confirmed by everything that followed: this agent is still architecturally "ask an LLM to search the web six times," the same primitive any deep-research tool has, and a platform that ALSO has persistent, cross-run, cross-client memory can do things a stateless session structurally cannot - until this cycle that memory was almost entirely unused. **The second most transferable lesson, found and re-found at every depth of testing: a green suite proves the code runs, not that the thing it claims happened actually did.** Four separate live runs against real money and real keys each found at least one bug an already-fully-passing offline suite had missed, right up through the fourth run, by which point the agent was genuinely solid.
 
 ---
 
-## WHAT V28 ADDS ON TOP OF V27 (this cycle's work)
+## WHAT V29 ADDS ON TOP OF V28 (this cycle's work - full detail is in the EVENT & CONFERENCE INTELLIGENCE section below; this is the index)
+
+Roughly 60 commits, one agent, four escalating rounds of scrutiny plus two new features, in the order they happened.
+
+1. **Code-level audit** (`9686f40`, `7e2ce8d`, `c26a894`, `1f00c4c`, `8338d46`) - found the recommend mode had never actually saved a row to the database (a missing `run_id` column made every INSERT silently fail, and 443 green tests said otherwise), plus date-blindness, a one-word matchmaking bonus, substring category filters, and a JSON-parse bug that made a 300-exhibitor page read as "publishes no exhibitors."
+2. **First live-API run** (same commits) - real Anthropic+Apollo+Postgres money for the first time. Found `find_people` silently discarding 100% of Apollo's real results (it grouped on a field the live API returns null for), Apollo returning masked names on this plan, and a starved web search being reported as a confirmed empty market instead of a hole in the analysis.
+3. **Discover drawer redesign, then retirement** (`302daec` through `fdd0510`) - a full visual rebuild of the results view, four more defects it exposed, then the `discover` play itself was cut entirely (three plays remain: recommend / lookup / workroom) once its own overlap with `recommend` stopped making sense to explain to a user.
+4. **Two-stage discovery + real client intake** (`9ba6186`, `3f276e1`, `5dbea5d`) - replaced one big, expensive web-search call per category with a cheap "propose candidates" call plus one "confirm" call per candidate (a search call's input cost grows with the SQUARE of how many searches happen inside it, so this is both cheaper and more honest), and replaced a 13-field client-profile form with "give us a name and a URL" - the agent now reads the client's own website itself, with no search tool at all, in about 15 seconds instead of up to ten minutes.
+5. **Chart kit + three real live runs** (`79840c6`, `b4b2627`, `816c9ae`, `03ea4e5`, `d875378`) - every report got real drawn charts instead of paragraphs; a "Worth a look" second tier was added after real runs kept returning zero events (one threshold at 70 had been deciding both what's recommended AND what merely exists); the famous-event audit was split to one call per event; a fully cost-instrumented live run ($12.15, 21 minutes) found and fixed six more live-only bugs, including one that silently discarded two genuinely on-ICP events for running out of output budget mid-narration.
+6. **Report rewritten for a human, twice** (`7935891`, `9b639b8`/`20cf11c`, `32f6587`) - on direct feedback that the already-fixed report was still "too text heavy, nobody would read it." Answer-first, one scannable line per problem with the full reason folded behind it, and three separate kinds of writing (raw internal category names, this codebase's own error-log language, and the model's own process narration) were all found reaching a paying client's report and stripped out.
+7. **A worse version of an already-fixed bug** (`d425794`) - the identical "ran out of output budget mid-narration" defect, this time in the step that scores up to 6 events per call, which meant losing just one call could zero out an entire run's results with nothing on screen saying why.
+8. **A full audit of the whole recommend path against a real pipeline run** (`1beed4c`/`91fa2ab`/`7052015`) - seven bugs, every one the same shape: the report said what a stage MEANT to do, not what it actually produced. The costliest: the famous-event audit's own replacement-event feature had been completely inert since the day it shipped, because production could never satisfy the one condition every existing test had faked.
+9. **A dedicated error-free sweep** (`b00d931`, `5cdfddf`) - found a systemic em-dash leak (two independent partial fixes, each unaware of the other, plus nine more completely unenforced fields) and the CSV export quietly disagreeing with the web page for the identical run.
+10. **"Make it crazy good"** (`5ce36c7`) - two new features built on the platform's persistent database: a client's own accept/reject history nudges future recommendations (reorder only, never the score), and k-anonymity-gated cross-client interest ("N other similar clients also kept this event," with no identity in the raw data). A live end-to-end test at zero API cost caught the report's own top-five list silently dropping both brand-new fields.
+
+The v28 material directly below (its own three-thread summary) is left in place as history, not because it is still the current cycle.
+
+---
+
+## WHAT V28 ADDED ON TOP OF V27 (kept as history)
 
 Eleven commits in three threads, in the order they shipped.
 
@@ -77,18 +96,19 @@ Renamed from "Company/Signal Tracker" a cycle ago: display text first (`280bb6c`
 
 ---
 
-## EVENT & CONFERENCE INTELLIGENCE (the 10th B2B agent, built this cycle)
+## EVENT & CONFERENCE INTELLIGENCE (the 10th B2B agent; built at v28, this whole cycle went into hardening it and then making it "crazy good")
 
-**Route base:** `/p2/b2b-agents/event-conference-intelligence`, staff-only (`@position2_required`), 13 routes. Page `templates/event_conference_intelligence.html` (~1,580 lines, report logic inline as JS) + `static/css/event_conference_intelligence.css` (~1,340 lines). Domain in `tracker/event_intel_*.py` (13 modules: `store`, `rubric`, `harvest`, `recover`, `resolve`, `enrich`, `discover`, `audit`, `scorer`, `report`, `workroom`, `pipeline`). Postgres tables `evi_events`, `evi_participants`, `evi_sources`, `evi_runs`, plus `evi_profiles`, `evi_candidates`, `evi_outreach`, `evi_outcomes`.
+**Route base:** `/p2/b2b-agents/event-conference-intelligence`, staff-only (`@position2_required`). Page `templates/event_conference_intelligence.html` (report logic inline as JS) + `static/css/event_conference_intelligence.css`. Domain in `tracker/event_intel_*.py` (`store`, `rubric`, `harvest`, `recover`, `resolve`, `enrich`, `discover`, `audit`, `scorer`, `report`, `workroom`, `pipeline`, `intake`, plus a shared `claude_websearch` helper). Postgres tables `evi_events`, `evi_participants`, `evi_sources`, `evi_runs`, `evi_profiles`, `evi_candidates`, `evi_outreach`, `evi_outcomes`.
 
-**Four modes over one store:**
+**Three modes over one store** (a fourth, `discover`, was built at v28 and RETIRED this cycle - see below):
 
 | Mode | What it answers | Source play |
 |---|---|---|
+| `recommend` | score a client's calendar of events and say which to attend, with a ranked shortlist plus a "worth a look" second tier | gtm-skills `conference-recommendation` |
 | `lookup` | name an event, get the participant roster it publishes | native |
-| `discover` | describe an audience, get events ranked by how many of your own target accounts are actually in them | native |
-| `recommend` | score a calendar of events and say which to attend | gtm-skills `conference-recommendation` |
 | `workroom` | post-event follow-up: who to talk to and what to say | gtm-skills `event-radar` |
+
+**`discover` (describe an audience, get events ranked by target-account overlap) was retired in `fdd0510`.** It overlapped too much with `recommend` on the surface question ("which events?") to explain to a user as a genuinely separate choice, once the two were pinned side by side and it became clear the real difference was depth, not input: `recommend` runs the full six-category search plus a rubric-based audit and score (roughly 20-40 minutes, real cost), while `discover` was one lighter call ranked only by the model's own fit judgment. The read path for stored runs is deliberately KEPT so history still opens - retiring is not deleting. `tracker/event_intel_discover.py` itself was NOT deleted; it is the unrelated six-category search step inside `recommend` and is a trap to confuse with the retired play by name alone.
 
 ### The constraint the whole agent is built around
 
@@ -112,18 +132,24 @@ gtm-skills plays are prompts a human runs in a chat, so every rule in them is a 
 - **The missing CRM is reported as missing.** No CRM is wired. In its place the agent surfaces companies seen on the floor at this user's own earlier events, which is a real signal Postgres can answer and a prompt cannot. The cross-client check is measured against real prior runs, never imagined.
 - **The executive summary is assembled in code**, with no model call.
 
-### The rubric (verbatim from the source skill, implemented in `event_intel_rubric.py`)
+### The rubric (verbatim from the source skill, implemented in `event_intel_rubric.py`) - CHANGED this cycle, do not trust the v28 numbers below without reading this
 
 ```
 Relevance                     /40   how closely composition matches ICP
 Decision-maker accessibility  /40   density of buyers AND structural reach
 Engagement mode               /20   buying mindset vs learning mindset
 + organizer-run matchmaking   +10   bonus, total out of 110
++/- outcome adjustment        +/-5  this client's own history with this category/format (new, see below)
 
-P1  >= 80   must-attend
-P2  70-79   strong
-P3  <  70   EXCLUDED from the ranked list, no padding
+P1  >= 80        must-attend           -> "kept"
+P2  70-79        strong                -> "kept"
+(new) worth a look, 50-69 total AND relevance >= 24/40   -> "worth_a_look" (full row, not excluded)
+below either gate -> EXCLUDED from every list, no padding
 ```
+
+**Why the "worth a look" tier exists (`b4b2627`, 2026-09-04):** real live runs kept coming back with ZERO events for a real client, and the cause was architectural, not strictness. `RANK_FLOOR=70` was doing double duty, deciding both what gets RECOMMENDED and what merely EXISTS as an option, while the scorer's own prompt says "most events are mediocre for most clients" - pushing every score down while the bar stayed fixed. `RELEVANCE_GATE=24` and `CONSIDER_FLOOR=50` (both must pass, via `rubric.is_worth_a_look()`) now decide whether something is an option at all; `RANK_FLOOR` still only ranks within the options. A missing or unreadable relevance score FAILS the gate on purpose - absence is not evidence of fit. Measured on a real client's seeded run: 1 recommendation became 1 recommendation plus 5 "worth a look" options, with the genuinely wrong-audience events still correctly cut. **This is tuned on very little live data (2 runs) and may need revisiting.**
+
+**The outcome adjustment (new, `5ce36c7`, "make it crazy good"), described in full further down this section.** Purely a reorder within a bucket already decided by the rules above - it can never move an event into or out of `kept`/`worth_a_look`, and it never touches `total` or `tier`.
 
 The module is pure: no I/O, no model calls, no imports from the rest of the package. The page reads these numbers from the module at render time rather than typing them, so a reweighting moves the page.
 
@@ -166,9 +192,45 @@ The page first read as "a form on a flat panel" beside Contact Finder and SCI. `
 
 `POST /p2/admin/external-usage/evi-guardrail-check` (offline, free, proves the six refusals hold **on the deployed code** and states what it could NOT check) and `POST /p2/admin/external-usage/evi-resolve-check`.
 
+### Two-stage discovery replaced one big search call per category (`9ba6186`, 2026-09-03)
+
+**Why:** a server-side search call's INPUT cost grows with roughly the SQUARE of how many searches happen inside that one call, not linearly (measured live and confirmed to ~1%: a 6-search call costs 50-59k input tokens, a 10-search call costs 152k, predicted 55k x (10/6)^2 = 153k - see `[[reference-anthropic-web-search-blocks]]`). So a bigger budget was never the fix for categories starving. Each of the six discovery categories is now two stages: `propose_category` names candidates only (no deep verification, `FIND_MAX_USES=6`), then `confirm_event` runs once per named candidate, independently (`CONFIRM_MAX_USES=6`, `MAX_INFLIGHT=4` module-level semaphore held only around the search call itself, never while a category waits on its own confirmations - holding it there would deadlock). This is also more honest: the confirmation step did not propose the event, so it can say no, and a confirmation that cites no page is rejected outright. That creates a real third outcome that must never collapse into the other two: `CONFIRM_OK`, `CONFIRM_REJECTED` (a real, searched, ruled-out fact about the client's year - a legitimate `empty` category) and `CONFIRM_UNCHECKED` (a hole in the analysis, forces `error`).
+
+### The client intake now asks for two things, not thirteen (`3f276e1`, `5dbea5d`, `3712468`)
+
+The old form asked for 13 fields up front. `event_intel_intake.py` + route `POST /profiles/draft` now takes a client name and a URL, fetches that site itself (`event_intel_harvest.fetch_page`, `pick_links` follows a few of the site's own links), and fills the rest of the form in - **with NO search tool at all** (`MAX_USES=0`). The first version let the model search for itself and was measured live at 29s, 167s, 450s, and once over ten minutes with a starve; fetching the pages directly and handing plain text to a model with no tool is **15 seconds**, and is also more honest, since `sources` becomes the pages actually retrieved (with real HTTP status) rather than URLs the model claims it opened. Hard, mutation-tested rules: it saves nothing itself (the profile route is still the only writer); it never overwrites a field the user already typed; an unevidenced field is emptied and named in `unknown`; a draft that ran no fetch or cites no page is discarded outright; **the suggested classification is proposed, never auto-selected** - a person has to click it before it counts, which is the one invariant the whole intake screen rests on.
+
+### The report was completely redrawn, then rewritten for a reader, twice
+
+`79840c6` gave all three surviving plays a shared chart kit (`evDonut`/`evBars`/`evCols`/`evFunnel`/`evRing`), replacing paragraphs with real drawn charts that share one color-band vocabulary across the whole page. But a fixed report still read, in the user's own words after the redesign, as "too text heavy, nobody would read it." **`7935891` introduced the pattern that actually fixed it: HEAD + DETAIL.** Every finding (`event_intel_report.notes()`) is now `{level, head, detail}` - one always-visible scannable line, with every name/count/reason that used to be a wall of paragraph text folded behind a `<details>`. The executive summary now leads with one answer line ("1 event worth the trip, none unmissable") naming the leader as a clickable control, before any of the analysis. **Three separate kinds of writing were then found reaching a paying client's actual report, unedited** (`9b639b8`, `20cf11c`): raw internal category keys and enum values printed verbatim; this codebase's OWN error-log language (a live report literally printed "Raise max_tokens or lower max_uses" under a heading); and the model's own uncensored process narration ("i attempted to research... however the web_search tool hit a hard per-turn call limit..."), printed whole and sometimes cut off mid-word. All three are now filtered at dedicated points (`claude_websearch.reader_reason()`, `_reader_note()`) rather than trusted to be clean by construction. `32f6587` then redrew the Category coverage chart specifically: it no longer takes an inline note at all, reasons live in one grouped block below the chart (grouped by what they actually SAY, not by category, so three categories cut off by the identical cause get one sentence, not three).
+
+### Full audit against a real pipeline run, 2026-09-04 (`1beed4c`/`91fa2ab`/`7052015`)
+
+Run through a complete pipeline (real merge, real audit, real promotion, real store, real rank, real summary - only the three model-facing calls stubbed), not against the modules in isolation. **Seven defects, every one the exact same shape: the report stated something true of what a stage INTENDED and false of what it actually PRODUCED**, and every one of them passed all 978 tests that existed before this audit. The costliest: `promote_alternatives` (the famous-event audit's "here's a real replacement for the marquee event we cut" feature, shipped at v28 in `8338d46`) had been **completely inert in production since the day it shipped** - its category lookup depended on the cut event still being present in a list the pipeline had, by that point, already removed it from, so the lookup could never succeed outside of a hand-built test that (necessarily, since production cannot) passed the cut event back in by hand.
+
+### Four real live-money runs, escalating
+
+1. **First live end-to-end recommend run** (2026-09-03, $9.13, 33.8 min): 3 events found, 1 kept - unusable, but for a precisely diagnosed reason (search starvation under the old single-call-per-category design, fixed by the two-stage split above).
+2. **First run after the two-stage split + the "worth a look" tier** (2026-09-04, `d875378`, $12.15, 21.1 min, fully cost-instrumented for the first time): 4 recommended + 2 second-tier, where the same client had returned ZERO before. Found and fixed SIX more live-only bugs in one pass, the standout being output budgets tuned for a single-item reply that were four times too small once the model's own search narration started eating into the same token budget - two named, genuinely on-ICP events (a Gartner event, a Growth Marketing Summit) were silently discarded mid-run for hitting `stop_reason=max_tokens`, after already being paid for.
+3. **A worse version of the same output-truncation bug** (`d425794`, 2026-09-05): found in `score_batch`, which scores up to 6 events in ONE call - losing that one call zeroes an entire run's results, not just one event's. The same defect was found by inspection (before it ever failed live) in `event_intel_workroom.draft_batch` and fixed the same way. A third live run confirmed both fixes: 0 categories failed, 0 unscored, 5 kept + 1 worth-a-look, $14.44, 25 minutes.
+4. **A dedicated error-free sweep** (2026-09-05, `b00d931`/`5cdfddf`) rendered the two most recent real stored runs through the actual page script (not just unit tests) and found a systemic em-dash leak across the whole pipeline (two independent, incomplete private regexes that didn't know about each other, plus nine more completely unenforced free-text fields - now one shared `claude_websearch.strip_em_dash` applied at every field boundary) and the candidates CSV export quietly disagreeing with the web page for the identical run (the CSV had its own, second copy of the "on the list" policy, missing the `worth_a_look` tier entirely). **A fourth live run, unprompted, then hit the exact per-event-audit-failure case the `03ea4e5` one-call-per-event split exists to survive, and every part of that fix worked correctly on real, unengineered failure.**
+
+### "Make it crazy good" - the two new features built on the platform's own database (`5ce36c7`, 2026-09-05)
+
+The user's framing, after the error-free sweep above: this agent is still architecturally "ask an LLM to search the web six times," the same primitive any deep-research tool has - what would make it categorically different is the one thing a stateless session can never have, a Postgres database that persists across every run and every client. Four directions were proposed; the user chose all four, and `EnterPlanMode` was used given the scope (schema changes, new cross-tenant data access, a new paid-vendor dependency, and a new always-on production job all being on the table).
+
+**Shipped and live-verified:**
+- **Outcome-driven scoring** (`rubric.outcome_adjustment`, `store.outcome_pattern`) - a client's own accumulated went/going/skipped history, per category and format, becomes a small, capped (`OUTCOME_ADJUSTMENT=5`, half the organizer-matchmaking bonus), REORDER-ONLY signal, gated at 3+ decisions and 75%+ agreement. It can never touch `rank()`'s bucket/cap decisions or an event's `total`/`tier` - deliberately the same fit-vs-priority separation `RANK_FLOOR` already established. Scoped by `(email, profile_id)`, not email alone, so one login managing several client profiles can never leak one client's dislikes into another's scores.
+- **Cross-client interest** (`audit.cross_client_signal`, `store.cross_client_interest`) - "N other clients with a similar buyer profile also kept this event," using only the event's own public name. This is the FIRST query in the whole codebase that intentionally crosses `email` boundaries (every existing query, including the pre-existing `genericness()` prior-candidate check, filters to one email). It is held to a stricter privacy bar than that pre-existing check too: `genericness()`'s own return value still carries another client's real name, masked only by the rendered text; this new function's return value has no field an identity could occupy even by accident, verified by a test that JSON-scans the ENTIRE raw structure, not just what gets displayed. Gated by real k-anonymity: `CROSS_CLIENT_MIN_DISTINCT=3` clients **plus** `CROSS_CLIENT_MIN_POPULATION=5` in the whole comparison population - the second gate matters concretely, because the real sandbox has only 3 distinct clients today, so a bare distinct-count floor alone would be close to fully identifying by elimination. A new `evi_profiles.confidential` flag (default off) opts a client out of the feature in both directions at once.
+- **The live-Postgres-only bug this exact discipline exists to catch:** a real end-to-end run (seeded outcome history + seeded peer interest, zero Anthropic API cost since only the 3 model-facing calls were stubbed and everything else hit real SQL) found that `event_intel_report.top_five()` builds a fixed field subset and was silently dropping BOTH brand-new fields - every other surface (CSV, run-detail JSON, template badges) carried them correctly, only the one thing a client actually reads first did not. 3,619 offline + 32 real-Postgres tests, 13/13 targeted mutants killed against a baseline verified green on both suites together (a harness that only ran the offline suite would have missed 3 real survivors entirely).
+
+**Two more directions were explicitly scoped and NOT built, blocked on the user, not on effort:**
+- **Structured event-database integration** (10times/PredictHQ/Bizzabo-style) - the actual fix for categories still starving and for attendee counts being unverified claims rather than real numbers. Needs a vendor choice plus a paid API key only the user can obtain; PredictHQ was suggested as a starting point but nothing was committed to.
+- **Continuous monitoring/alerts.** This repo already has a proven, reusable pattern for exactly this - three existing scheduled GitHub Actions (`refresh-dashboards.yml`, `weekly_tracker.yml`, `sync-job-change-alerts.yml`) already run cron jobs against production. The code itself would be a small addition. What is explicitly NOT done without a fresh, separate confirmation: adding a new workflow with a live schedule and wiring `DATABASE_URL` in as a real GitHub repo secret, since that starts a process running unattended against production data on its own recurring cadence, a different risk class than a normal code push, and outside the "always push code" standing authorization this whole project otherwise operates under.
+
 ### Open on this agent
 
-**It has never been run against a real event with live keys.** The harvest hit rate and the search-recovery hit rate are both unmeasured in production.
+**Still never been run against a live vendor calendar of dozens of real events end to end** - all four live runs so far used a small hand-seeded or lightly-scoped candidate set. `RELEVANCE_GATE=24`/`CONSIDER_FLOOR=50` are tuned on 1-2 runs of real data. Cost is now instrumented per stage but has only been measured across a handful of runs ($9.13 to $14.44, 21-34 minutes). `audit_famous`'s replacement-event promotion path, though now fixed at its root cause, has still never been directly observed promoting a real event end to end in a live run (the two live runs since the fix each had a reason the promotion path correctly did not need to fire). The six burned API keys from earlier sessions (Anthropic, OpenAI, Unipile, Google Cloud/YouTube, Apollo - see `scratchpad/.evi_keys.env` from prior sessions) still need rotating through each provider's own console plus a Railway update; this needs the user's own login and was explicitly deprioritized this cycle ("don't think about key rotation for now"). A mid-session incident this cycle where a sandbox working tree lost 273 untouched tracked files and its `origin` remote was resolved (the token was recovered from a sibling session's clone) but its root cause was never established.
 
 ---
 
@@ -459,8 +521,8 @@ Route `/p2/b2b-agents/linkedin-intelligence`. Renders `templates/linkedin_scrape
 
 ```
 intelligence-platform/
-├── app.py                ← Flask server (~17,879 lines, 199 route decorator lines / 225
-│                            registered rules): auth (3 decorators + client gate), all 4
+├── app.py                ← Flask server (~18,067 lines, 203 route decorator lines): auth
+│                            (3 decorators + client gate), all 4
 │                            surfaces, AGENTS/APP_AGENTS/SIGNALS/INDUSTRIES/CLIENTS/ACCOUNTS
 │                            registries, HIDDEN_AGENT_SLUGS, OpenAI (Vimi x2 + Contact
 │                            Finder's chain) + Anthropic (Contact Finder cross-check, LPS/
@@ -486,14 +548,17 @@ intelligence-platform/
 │                                      ← Social Creative Intelligence Analyst, both vendors
 │                                      (built in the v26 cycle; Unipile made live in v28)
 ├── tracker/event_intel_*.py (store, rubric, harvest, recover, resolve, enrich, discover,
-│       audit, scorer, report, workroom, pipeline) + tracker/claude_websearch.py
-│                                      ← Event & Conference Intelligence (new this cycle)
+│       audit, scorer, report, workroom, pipeline, intake) + tracker/claude_websearch.py
+│                                      ← Event & Conference Intelligence (built at v28; this
+│                                      whole v29 cycle hardened it and added outcome-learning
+│                                      + cross-client intelligence on top of its Postgres store)
 ├── tracker/job_change_parser.py, tracker/job_change_store.py ← Job Change Alert
 ├── scripts/sync_job_change_alerts.py, scripts/import_job_change_tracked_snapshot.py,
 │       scripts/import_slot_checker_snapshot.py ← subprocess-only scripts, never imported
-├── tests/                ← 113 files, 2,838 tests. test_cpi_*.py, test_job_change_*.py,
-│                            test_sci_*.py, test_unipile_*.py, test_event_intel_*.py,
-│                            test_agent_page_grid.py, one per audit/feature.
+├── tests/                ← 131 files, ~3,619 offline tests + 32 dedicated real-Postgres
+│                            tests. test_cpi_*.py, test_job_change_*.py, test_sci_*.py,
+│                            test_unipile_*.py, test_event_intel_*.py (by far the largest
+│                            single group now), test_agent_page_grid.py, one per audit/feature.
 ├── visitor_intelligence/ ← de-anon engine: resolver.py, pipeline.py, identity_graph.py.
 ├── tracker/              ← signal pipeline pkg (news_client, news_relevance, signal_score,
 │                            dashboard_builder [build_dashboard(), takes hiring_opts],
@@ -536,7 +601,7 @@ intelligence-platform/
 
 - **Code/UI** push to `main` -> Railway redeploys (~60-100s). No hot reload locally.
 - **Google Sheets** is the primary store for internal analytics AND for 42 North Dental Slot Checker's live availability data. Job Change Alert's tracked-roster sheet is currently blocked (Workspace DLP) and falls back to a committed snapshot.
-- **Postgres** (`DATABASE_URL`): `agent_run_history`, `cpi_search_history`, Contact Finder's persistent caches, `lps_runs`/`lps_playbooks` (LPS), `sci_runs`/`sci_platform_runs`/`sci_posts`/`sci_spend_log` (SCI), `evi_events`/`evi_participants`/`evi_sources`/`evi_runs`/`evi_profiles`/`evi_candidates`/`evi_outreach`/`evi_outcomes` (Event & Conference Intelligence).
+- **Postgres** (`DATABASE_URL`): `agent_run_history`, `cpi_search_history`, Contact Finder's persistent caches, `lps_runs`/`lps_playbooks` (LPS), `sci_runs`/`sci_platform_runs`/`sci_posts`/`sci_spend_log` (SCI), `evi_events`/`evi_participants`/`evi_sources`/`evi_runs`/`evi_profiles`/`evi_candidates`/`evi_outreach`/`evi_outcomes` (Event & Conference Intelligence - `evi_candidates` gained `name_key`/`format` columns and `evi_outcomes`/`evi_runs` gained `profile_id` this cycle; `evi_profiles` gained `confidential` for the new cross-client feature). **This is the only Postgres store on the whole platform doing genuine cross-run, cross-client learning as of this cycle** - see the "make it crazy good" section above.
 - **SQLite** (committed): `data/tracker.db` (Healthcare), `data/tracker_csg_v2.db` (CSG), `data/tracker_northstar.db` (NorthStar), `data/job_change_alerts.db`. **Gitignored, real PII, NEVER commit: `data/identity_graph.db`.**
 
 ---
@@ -659,6 +724,11 @@ Details that are load-bearing:
 18. **A layout regression that is invisible on its own page and only shows up beside a sibling needs a test, not an eye.** `tests/test_agent_page_grid.py` exists for exactly this class of defect.
 19. **Read the source play before implementing an agent that claims to implement it.** The Event & Conference Intelligence v1 was rejected outright, and the root cause was that the two `gtm-skills` plays it was built from had never been opened. When a play states a rule, make the code refuse it rather than asking a model to honour it.
 13. **A vendor's OWN documentation can lag its live API, and so can your own notes about it.** v27 recorded that Unipile's docs said `/api/v1/...` while the live API was on `/v2/...`. The live API is on `/api/v1`, and that note was written from a probe against the wrong host. Confirm exact endpoint behavior against a real response, from the right base URL, before hardcoding anything.
+20. **A green suite proves the code runs, not that the thing it claims happened actually did.** Four separate live-money runs of Event & Conference Intelligence each found at least one bug a fully-passing offline suite had missed - up through the FOURTH one. When a feature's whole job is reporting whether something real happened (a search ran, an audit returned a verdict, a database row was saved), stub as little as possible and run it against the real thing before trusting it, no matter how green the suite is.
+21. **Any model call that writes output for N items in ONE reply needs its output-token budget scaled by N, not held to the number that was right for a single item.** This exact bug (a budget tuned for one item, silently truncating and discarding results once search narration ate into the same budget) was found and fixed twice on Event & Conference Intelligence, the second time in a call that could zero out an ENTIRE run's results rather than just one item's, because losing one over-budget batch call loses every item inside it.
+22. **A search-tool call's input cost grows with roughly the SQUARE of how many searches happen inside that one call**, not linearly (measured live to ~1% accuracy on this platform - see `[[reference-anthropic-web-search-blocks]]`). Splitting one expensive call that fans out over a list into many small calls (one per item) is both cheaper in total AND more honest, because each item can now independently fail or say no rather than one call grading its own homework across all of them.
+23. **HEAD + DETAIL is the report pattern for anything that must be both scannable and complete: one always-visible short line, with the full reason/name/count list folded behind a `<details>`.** Built for Event & Conference Intelligence's executive summary after direct user feedback that a technically complete, correct report was still "too text heavy, nobody would read it" - a report unread is the same as a report unsaid, especially for a section whose whole job is stating what could not be measured.
+24. **When a feature crosses a privacy boundary the codebase has never crossed before (here: a query spanning more than one client's data), design the RETURN VALUE so it structurally cannot carry the sensitive field, not just the rendered text.** A pre-existing check in this same codebase (`genericness()`) still carries another client's real name in its own return value, safe only because every caller happens to render it carefully; the new cross-client-interest feature was deliberately built so no caller could leak it even by accident, and that guarantee has its own test that scans the entire raw structure rather than just what gets displayed.
 
 ### Gotchas (unchanged, still true)
 
@@ -675,10 +745,9 @@ Details that are load-bearing:
 
 ## OPEN ITEMS / TODO
 
-1. **Rotate the GitHub token.** Pasted into chat each session; flag every session. Eleven pushes were made against the current one this cycle.
-2. **Rotate the Unipile API key.** It was pasted into chat this cycle and reused, so it lives in a durable transcript. Same standing as item 3.
-3. **Rotate the YouTube API key.** A live key was pasted into chat in an earlier session. It lives in `intelligence-platform/.env` (gitignored, `chmod 600`). Standing recommendation, unactioned.
-4. **Event & Conference Intelligence has never been run against a real event with live keys.** The harvest hit rate and the search-recovery hit rate are both unmeasured in production. This is the single largest unknown on the newest agent.
+1. **Rotate the GitHub token.** Pasted into chat each session; flag every session. Many pushes have now been made against the current one across the v28 and v29 cycles.
+2. **Rotate the Unipile API key, the YouTube API key, and now also the Anthropic, OpenAI, and Apollo keys used across this cycle's live Event & Conference Intelligence runs.** The user explicitly deprioritized this for the v29 cycle ("don't think about key rotation for now, focus on making this error-free") - it is not forgotten, it was consciously deferred, and none of it has been done since. All six live in `scratchpad/.evi_keys.env` from prior sessions and need rotating through each provider's own console plus a Railway env var update; this needs the user's own login, it cannot be done from a sandbox session.
+3. **Event & Conference Intelligence has now been run against real conditions four separate times this cycle** (see the agent's own section above for each run's cost/duration/result), but only against small, hand-scoped candidate sets - never against a large, realistic live vendor calendar. `RELEVANCE_GATE`/`CONSIDER_FLOOR` are tuned on 1-2 runs of real scores. The famous-event-audit promotion path is fixed at its root cause but has still never been directly observed promoting a real event end to end.
 5. **Verify Instagram through Unipile.** All 17 workspace accounts are LinkedIn, so `sci_source_instagram_unipile.py`'s field names are docs-derived guesses. Connect an Instagram account through the Data sources panel, then check `normalize()` against one live response.
 6. **Confirm the Data sources panel reads "11 accounts working, 6 need reconnecting"** in production. The admin routes are auth-gated, so the Railway env vars could not be verified from the sandbox; the user set them and reported success, and the client was verified against the live API directly.
 7. **Restore LinkedIn Social Researcher** (the old external tool) to the listings when the owner asks - checklist in `[[project-lsr-hidden]]`.
@@ -704,6 +773,8 @@ Details that are load-bearing:
 27. **The bklit-derived chart layer has one deliberate open judgement:** the radar is offered as a secondary "Shape" view with the table as default, because radar area genuinely invites a wrong read. If it ever becomes the default, the note under it stops being enough.
 28. **Spread Unipile collection across the connected accounts** rather than always using the first healthy one. Cheap insurance against the ~100-lookups-per-account-per-day guidance at higher volume. Noted, not requested.
 29. **Advisory security/design audit (do not start without an explicit ask):** fail-closed `SECRET_KEY`/`GOOGLE_CLIENT_ID`, cookie flags, HSTS/security headers, CSRF, rate limiting, SSRF/`X-Forwarded-For` hardening; CSS token convergence, accessibility.
+30. **Event & Conference Intelligence's two newest features (outcome learning, cross-client interest) are live-verified but have essentially no real usage history yet** - the outcome-adjustment gate (3+ decisions, 75%+ agreement) and the cross-client k-anonymity gates (3 distinct clients AND a 5-client population) will not visibly fire until there is meaningfully more real run history and more real clients than the 3 currently in the sandbox.
+31. **Two Event & Conference Intelligence directions are explicitly scoped, written up, and blocked on the user, not on effort:** a structured events-database vendor integration (needs the user to pick a vendor and obtain a paid API key), and turning the already-built monitoring/alert code into a live, scheduled GitHub Actions job against production (needs the user's explicit go-ahead separately from writing the code, since an unattended recurring production job is a different risk class than a code push).
 
 ---
 
