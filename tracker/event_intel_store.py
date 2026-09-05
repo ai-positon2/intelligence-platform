@@ -388,6 +388,25 @@ def _ensure_tables(conn) -> None:
         # signal TO a confidential profile in the first place.
         cur.execute("ALTER TABLE evi_profiles ADD COLUMN IF NOT EXISTS "
                     "confidential BOOLEAN NOT NULL DEFAULT FALSE")
+        # Legacy outcomes remain untouched: their client/edition ownership is
+        # ambiguous. New decisions are explicitly scoped and never backfilled.
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS evi_decisions (
+                id SERIAL PRIMARY KEY,
+                email TEXT NOT NULL,
+                profile_id INTEGER NOT NULL REFERENCES evi_profiles(id),
+                event_identity TEXT NOT NULL,
+                event_name TEXT NOT NULL,
+                decision VARCHAR(16) NOT NULL CHECK (decision IN ('going','skipped','went')),
+                note TEXT,
+                run_id INTEGER NOT NULL REFERENCES evi_runs(id),
+                category TEXT,
+                format TEXT,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+                UNIQUE (profile_id, event_identity)
+            )
+        """)
     conn.commit()
     _TABLES_READY = True
 
@@ -805,7 +824,9 @@ def normalise_profile(payload: dict) -> dict:
     # for this key and it defaults to False: zero behaviour change until a
     # caller deliberately sets it. See cross_client_interest() for what it
     # actually gates.
-    out["confidential"] = bool(p.get("confidential"))
+    if "confidential" in p and not isinstance(p["confidential"], bool):
+        raise ValueError("Confidential must be true or false.")
+    out["confidential"] = p.get("confidential", False)
     return out
 
 
@@ -888,6 +909,8 @@ def update_profile(profile_id: int, email: str, payload: dict) -> bool:
     """Re-lock an existing profile. Same validation as creating one: an edit
     that blanks the classification must fail the same way a bad create does."""
     clean = normalise_profile(payload)
+    if "confidential" not in payload:
+        clean.pop("confidential", None)
     conn = _pg_conn()
     if conn is None:
         return False
@@ -1360,10 +1383,10 @@ def normalise_outreach(raw: dict, run_id: int, source_run_id: int | None,
         v = str(raw.get(key) or "").strip()
         return v[:limit] or None
 
-    status = str(raw.get("draft_status") or wr.DRAFT_OK).strip()
-    if status not in (wr.DRAFT_OK, wr.DRAFT_NO_EVIDENCE, wr.DRAFT_AGGRESSIVE,
+    status = str(raw.get("draft_status") or wr.DRAFT_REVIEW).strip()
+    if status not in (wr.DRAFT_OK, wr.DRAFT_REVIEW, wr.DRAFT_NO_EVIDENCE, wr.DRAFT_AGGRESSIVE,
                       wr.DRAFT_ACCOUNT):
-        status = wr.DRAFT_OK
+        status = wr.DRAFT_REVIEW
     reason = _txt("draft_reason", 1200)
     if status in (wr.DRAFT_NO_EVIDENCE, wr.DRAFT_AGGRESSIVE) and not reason:
         reason = ("This draft was rewritten by the safety pass, but the reason "
@@ -1511,76 +1534,70 @@ DECISION_LABELS = {
 
 def save_outcome(email: str, event_name: str, decision: str,
                  note: str | None = None, run_id: int | None = None,
-                 profile_id: int | None = None) -> bool:
-    """Record what the user decided about one event.
-
-    Keyed on the event, not the run, so a decision made on one recommendation
-    shows up on every later one that surfaces the same event. That is the
-    whole point: the second time a tool suggests something you already
-    rejected, it should know.
-
-    A decision this does not recognise is refused rather than stored, because
-    the report renders DECISION_LABELS and an unknown key would print raw.
-
-    `profile_id` is which locked client profile this decision belongs to,
-    used by outcome_pattern() to keep one profile's history from leaking into
-    another profile's scoring under the same email. COALESCEd against the
-    existing row on conflict rather than overwritten outright, so a later
-    save that omits it (an older client, or a route that has not been
-    updated) never blanks a profile that was already recorded correctly.
-    """
-    from .event_intel_discover import name_key
-    name = (event_name or "").strip()
-    if not name:
-        raise ValueError("An event name is required to record an outcome.")
+                 profile_id: int | None = None, event_identity: str | None = None) -> bool:
+    """Write one client/edition decision; do not reuse ambiguous legacy history."""
+    from .event_intel_identity import event_key, strict_name
+    if not (event_name or '').strip():
+        raise ValueError('An event name is required to record an outcome.')
     if decision not in DECISIONS:
-        raise ValueError("Unknown decision %r. It must be one of: %s"
-                         % (decision, ", ".join(DECISIONS)))
+        raise ValueError('Unknown decision %r.' % decision)
+    if not run_id or not profile_id:
+        raise ValueError('A client profile and source run are required.')
+    run = get_run(run_id, email)
+    if not run or run.get('profile_id') != profile_id or not get_profile(profile_id, email):
+        raise ValueError('That event run does not belong to this client profile.')
+    rows = get_candidates(run_id)
+    hits = [c for c in rows if (event_key(c) == event_identity if event_identity
+            else strict_name(c.get('name')) == strict_name(event_name))]
+    if len(hits) != 1:
+        raise ValueError('Choose an unambiguous event edition from this report.')
+    row = hits[0]
     conn = _pg_conn()
     if conn is None:
         return False
     try:
         _ensure_tables(conn)
         with conn.cursor() as cur:
-            cur.execute(
-                "INSERT INTO evi_outcomes (email, event_key, event_name, decision, "
-                "note, run_id, profile_id) VALUES (%s, %s, %s, %s, %s, %s, %s) "
-                "ON CONFLICT (email, event_key) DO UPDATE SET "
-                "decision = EXCLUDED.decision, note = EXCLUDED.note, "
-                "event_name = EXCLUDED.event_name, "
-                "profile_id = COALESCE(EXCLUDED.profile_id, evi_outcomes.profile_id), "
-                "updated_at = now()",
-                (email, name_key(name), name[:300], decision,
-                 (note or "").strip()[:2000] or None, run_id, profile_id))
+            cur.execute("""INSERT INTO evi_decisions
+                (email, profile_id, event_identity, event_name, decision, note, run_id, category, format)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                ON CONFLICT (profile_id, event_identity) DO UPDATE SET
+                decision=EXCLUDED.decision, note=EXCLUDED.note, run_id=EXCLUDED.run_id,
+                email=EXCLUDED.email, event_name=EXCLUDED.event_name, updated_at=now()""",
+                (email, profile_id, event_key(row), row['name'], decision,
+                 str(note or '').strip()[:2000] or None, run_id, row.get('category'), row.get('format')))
         conn.commit()
         return True
-    except Exception as e:
-        logger.warning("event_intel_store.save_outcome failed: %s", e)
+    except Exception:
+        conn.rollback()
+        logger.exception('event decision could not be saved')
         return False
     finally:
         conn.close()
 
 
-def get_outcomes(email: str) -> dict:
-    """{event_key: {decision, note, event_name, updated_at}} for this user."""
+def get_outcomes(email: str, profile_id: int | None = None) -> dict:
+    """Only explicit client/edition decisions are eligible for display."""
+    if not profile_id:
+        return {}
     conn = _pg_conn()
     if conn is None:
         return {}
     try:
         _ensure_tables(conn)
         with conn.cursor() as cur:
-            cur.execute(
-                "SELECT event_key, event_name, decision, note, updated_at "
-                "FROM evi_outcomes WHERE email = %s", (email,))
+            cur.execute("""SELECT d.event_identity, d.event_name, d.decision, d.note, d.updated_at
+                FROM evi_decisions d JOIN evi_profiles p ON p.id=d.profile_id
+                WHERE d.profile_id=%s AND d.email=%s AND p.email=%s""", (profile_id,email,email))
             cols = [c[0] for c in cur.description]
-            rows = [dict(zip(cols, r)) for r in cur.fetchall()]
+            rows = [dict(zip(cols,r)) for r in cur.fetchall()]
         out = {}
-        for r in rows:
-            _ts(r, "updated_at")
-            out[r.pop("event_key")] = r
+        for row in rows:
+            _ts(row,'updated_at')
+            out[row.pop('event_identity')] = row
         return out
-    except Exception as e:
-        logger.warning("event_intel_store.get_outcomes failed: %s", e)
+    except Exception:
+        logger.exception('event decisions could not be read')
         return {}
     finally:
         conn.close()
@@ -1588,66 +1605,34 @@ def get_outcomes(email: str) -> dict:
 
 def outcome_pattern(email: str, profile_id: int | None,
                     exclude_run_id: int | None = None) -> dict:
-    """This client profile's own accumulated pattern, by category and by
-    format, over every event they were ever shown and later decided on.
-
-    Returns {"by_category": {cat: {"decisions", "skipped", "went_or_going"}},
-             "by_format": {fmt: {...}}}, feeding rubric.outcome_adjustment().
-
-    Scoped by (email, profile_id), not email alone. One login can hold
-    several locked client profiles -- an agency managing several clients'
-    event calendars under one account -- and evi_outcomes has no per-profile
-    uniqueness of its own (it is keyed on (email, event_key), a pre-existing
-    limitation named in outcome_adjustment's own module, not fixed here).
-    Scoping this JOIN by r.profile_id is what stops one profile's history
-    from depressing or inflating a DIFFERENT profile's scores the moment
-    they share a login: without it, Acme's dislike of vertical summits would
-    silently reach Widget Co.'s candidates.
-
-    A candidate row from before the name_key migration (NULL) cannot be
-    joined to an outcome and is correctly excluded, not guessed at.
-    """
+    """One observation per client/edition, irrespective of repeated discoveries."""
+    out = {'by_category': {}, 'by_format': {}}
     if not profile_id:
-        return {"by_category": {}, "by_format": {}}
+        return out
     conn = _pg_conn()
     if conn is None:
-        return {"by_category": {}, "by_format": {}}
+        return out
     try:
         _ensure_tables(conn)
-        sql = (
-            "SELECT c.category, c.format, o.decision, count(*) AS n "
-            "FROM evi_candidates c "
-            "JOIN evi_runs r ON r.id = c.run_id "
-            "JOIN evi_outcomes o ON o.email = r.email AND o.event_key = c.name_key "
-            "WHERE r.email = %s AND r.profile_id = %s "
-            "AND c.name_key IS NOT NULL AND c.name_key <> ''")
-        args: list[Any] = [email, profile_id]
-        if exclude_run_id:
-            sql += " AND r.id <> %s"
-            args.append(exclude_run_id)
-        sql += " GROUP BY c.category, c.format, o.decision"
         with conn.cursor() as cur:
-            cur.execute(sql, args)
+            sql = """SELECT d.category, d.format, d.decision FROM evi_decisions d
+                JOIN evi_profiles p ON p.id=d.profile_id
+                WHERE d.profile_id=%s AND d.email=%s AND p.email=%s"""
+            args = [profile_id,email,email]
+            if exclude_run_id:
+                sql += ' AND d.run_id <> %s'
+                args.append(exclude_run_id)
+            cur.execute(sql,args)
             rows = cur.fetchall()
-    except Exception as e:
-        logger.warning("event_intel_store.outcome_pattern failed: %s", e)
-        return {"by_category": {}, "by_format": {}}
+        for category, fmt, decision in rows:
+            for group, key in [('by_category',category),('by_format',fmt)]:
+                if key:
+                    b = out[group].setdefault(key,dict(decisions=0,skipped=0,went_or_going=0))
+                    b['decisions'] += 1
+                    b['skipped' if decision == 'skipped' else 'went_or_going'] += 1
+        return out
+    except Exception:
+        logger.exception('event history could not be read')
+        return out
     finally:
         conn.close()
-
-    def _bucket(store: dict, key: str | None, decision: str, n: int) -> None:
-        if not key:
-            return
-        b = store.setdefault(key, {"decisions": 0, "skipped": 0, "went_or_going": 0})
-        b["decisions"] += n
-        if decision == DECISION_SKIPPED:
-            b["skipped"] += n
-        elif decision in (DECISION_WENT, DECISION_GOING):
-            b["went_or_going"] += n
-
-    by_category: dict = {}
-    by_format: dict = {}
-    for category, fmt, decision, n in rows:
-        _bucket(by_category, category, decision, n)
-        _bucket(by_format, fmt, decision, n)
-    return {"by_category": by_category, "by_format": by_format}

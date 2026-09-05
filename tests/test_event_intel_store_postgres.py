@@ -35,6 +35,62 @@ pytestmark = pytest.mark.skipif(
 EMAIL = "store-test@position2.com"
 
 
+def test_phase1_profiles_keep_independent_decisions_for_the_same_event():
+    email='phase1-shared@position2.com'
+    pa=_saved_profile(email,'Alpha');pb=_saved_profile(email,'Beta')
+    ra=S.save_run(email,'recommend','Alpha',profile_id=pa)
+    rb=S.save_run(email,'recommend','Beta',profile_id=pb)
+    for rid in (ra,rb):S.save_candidates(rid,[_cand('Shared Forum')])
+    assert S.save_outcome(email,'Shared Forum','skipped',run_id=ra,profile_id=pa)
+    assert S.outcome_pattern(email,pb)['by_category']=={}
+    assert S.save_outcome(email,'Shared Forum','going',run_id=rb,profile_id=pb)
+    assert next(iter(S.get_outcomes(email,pa).values()))['decision']=='skipped'
+    assert next(iter(S.get_outcomes(email,pb).values()))['decision']=='going'
+    with pytest.raises(ValueError):S.save_outcome(email,'Shared Forum','went',run_id=ra,profile_id=pb)
+
+
+def test_phase1_reruns_do_not_multiply_one_decision():
+    email='phase1-repeat@position2.com';pid=_saved_profile(email,'Repeat')
+    runs=[]
+    for i in range(3):
+        rid=S.save_run(email,'recommend',str(i),profile_id=pid)
+        S.save_candidates(rid,[_cand('Repeat Forum')]);runs.append(rid)
+    assert S.save_outcome(email,'Repeat Forum','skipped',run_id=runs[0],profile_id=pid)
+    pattern=S.outcome_pattern(email,pid)['by_category'][R.CAT_VERTICAL_SUMMIT]
+    assert pattern['decisions']==1
+    assert S.save_outcome(email,'Repeat Forum','going',run_id=runs[2],profile_id=pid)
+    assert S.outcome_pattern(email,pid)['by_category'][R.CAT_VERTICAL_SUMMIT]['decisions']==1
+
+
+def test_phase1_confidentiality_survives_an_ordinary_edit():
+    email='phase1-private@position2.com';pid=_saved_profile(email,'Private',confidential=True)
+    p=S.get_profile(pid,email);p.pop('confidential')
+    assert S.update_profile(pid,email,p)
+    assert S.get_profile(pid,email)['confidential'] is True
+    with pytest.raises(ValueError):S.update_profile(pid,email,dict(p,confidential='false'))
+
+
+def test_phase1_decision_survives_route_reload_and_csv():
+    import app as appmod
+    import csv,io
+    email='phase1-route@position2.com';pid=_saved_profile(email,'Route Client')
+    rid=S.save_run(email,'recommend','Route Client',profile_id=pid)
+    S.save_candidates(rid,[_cand('Reload Forum')]);S.update_run(rid,status='complete')
+    client=appmod.app.test_client()
+    with client.session_transaction() as session:session['google_user']={'email':email,'name':'Audit'}
+    base='/p2/b2b-agents/event-conference-intelligence'
+    posted=client.post(base+'/outcomes',json=dict(run_id=rid,event_name='Reload Forum',decision='going',note='Booked'))
+    assert posted.status_code==200,posted.get_json()
+    run=client.get(base+'/runs/'+str(rid)).get_json()
+    assert run['summary']['outcomes']['by_name']['Reload Forum']['decision']=='going'
+    result=client.get(base+'/runs/'+str(rid)+'/candidates.csv')
+    rows=list(csv.DictReader(io.StringIO(result.get_data(as_text=True))))
+    assert rows[0]['Your decision']=='going' and rows[0]['Decision note']=='Booked'
+    stranger=appmod.app.test_client()
+    with stranger.session_transaction() as session:session['google_user']={'email':'stranger@position2.com','name':'Other'}
+    assert stranger.post(base+'/outcomes',json=dict(run_id=rid,event_name='Reload Forum',decision='skipped')).status_code==400
+
+
 def _soon(days: int = 90) -> str:
     return (datetime.date.today() + datetime.timedelta(days=days)).isoformat()
 
@@ -181,10 +237,13 @@ def test_outreach_rows_round_trip(run):
     assert len(S.get_outreach(w)) == 1
 
 
-def test_an_outcome_is_recorded_against_the_event_not_the_run():
-    S.save_outcome(EMAIL, "Fintech Growth Summit", "going", note="booked")
-    out = S.get_outcomes(EMAIL)
-    assert out, "the decision did not come back"
+def test_an_outcome_is_recorded_for_one_client_and_edition():
+    pid=_saved_profile(EMAIL,'Edition Client')
+    rid=S.save_run(EMAIL,'recommend','Decision',profile_id=pid)
+    S.save_candidates(rid,[_cand('Fintech Growth Summit')])
+    assert S.save_outcome(EMAIL,'Fintech Growth Summit','going',note='booked',run_id=rid,profile_id=pid)
+    assert len(S.get_outcomes(EMAIL,pid))==1
+    assert S.get_outcomes(EMAIL)=={}
 
 
 def test_an_unknown_decision_is_refused_rather_than_stored():
@@ -231,7 +290,7 @@ def test_outcome_pattern_counts_by_category_and_by_format():
     ])
     S.update_run(run, status="complete", stage="done")
     for name in ("Skip Summit A", "Skip Summit B", "Skip Summit C"):
-        S.save_outcome(email, name, "skipped", profile_id=pid)
+        S.save_outcome(email, name, "skipped", profile_id=pid, run_id=run)
 
     pattern = S.outcome_pattern(email, pid)
     assert pattern["by_category"][R.CAT_VERTICAL_SUMMIT] == {
@@ -252,7 +311,7 @@ def test_outcome_pattern_scopes_to_one_profile_not_the_whole_email():
     run_a = S.save_run(email, "recommend", "for A", profile_id=pid_a)
     S.save_candidates(run_a, [_cand("A's Summit", category=R.CAT_SIDE_EVENT)])
     S.update_run(run_a, status="complete", stage="done")
-    S.save_outcome(email, "A's Summit", "skipped", profile_id=pid_a)
+    S.save_outcome(email, "A's Summit", "skipped", profile_id=pid_a, run_id=run_a)
 
     pattern_b = S.outcome_pattern(email, pid_b)
     assert pattern_b["by_category"] == {}, (
@@ -261,36 +320,24 @@ def test_outcome_pattern_scopes_to_one_profile_not_the_whole_email():
     assert pattern_a["by_category"][R.CAT_SIDE_EVENT]["skipped"] == 1
 
 
-def test_outcome_pattern_ignores_legacy_rows_with_no_name_key():
-    email = "legacy-rows@position2.com"
-    pid = _saved_profile(email, "Legacy Co")
-    run = S.save_run(email, "recommend", "legacy test", profile_id=pid)
-    S.save_candidates(run, [_cand("Legacy Event", category=R.CAT_EMERGING)])
-    S.update_run(run, status="complete", stage="done")
-    conn = S._pg_conn()
-    conn.cursor().execute(
-        "UPDATE evi_candidates SET name_key = NULL WHERE run_id = %s", (run,))
-    conn.commit()
-    conn.close()
-    S.save_outcome(email, "Legacy Event", "skipped", profile_id=pid)
-    pattern = S.outcome_pattern(email, pid)
-    assert pattern["by_category"] == {}, (
-        "a row with no name_key was joined to an outcome anyway")
+def test_legacy_outcomes_are_retained_but_not_reassigned():
+    email='legacy-rows@position2.com'
+    pid=_saved_profile(email,'Legacy Co')
+    conn=S._pg_conn()
+    conn.cursor().execute("INSERT INTO evi_outcomes (email,event_key,event_name,decision,profile_id) VALUES (%s,%s,%s,%s,%s)",(email,'legacy event','Legacy Event','skipped',pid))
+    conn.commit();conn.close()
+    assert S.outcome_pattern(email,pid)['by_category']=={}
+    assert S.get_outcomes(email,pid)=={}
 
 
-def test_save_outcome_does_not_blank_a_known_profile_on_a_later_omitted_save():
-    email = "profile-coalesce@position2.com"
-    pid = _saved_profile(email, "Coalesce Co")
-    S.save_outcome(email, "Coalesce Event", "skipped", profile_id=pid)
-    S.save_outcome(email, "Coalesce Event", "going")  # no profile_id this time
-    conn = S._pg_conn()
-    cur = conn.cursor()
-    cur.execute("SELECT profile_id, decision FROM evi_outcomes "
-               "WHERE email = %s AND event_name = %s", (email, "Coalesce Event"))
-    row = cur.fetchone()
-    conn.close()
-    assert row == (pid, "going"), (
-        "a later save that omitted profile_id blanked the one already stored")
+def test_a_later_omitted_profile_cannot_overwrite_a_scoped_decision():
+    email='profile-coalesce@position2.com'
+    pid=_saved_profile(email,'Scoped Co')
+    rid=S.save_run(email,'recommend','Scope',profile_id=pid)
+    S.save_candidates(rid,[_cand('Scoped Event')])
+    S.save_outcome(email,'Scoped Event','skipped',profile_id=pid,run_id=rid)
+    with pytest.raises(ValueError):S.save_outcome(email,'Scoped Event','going')
+    assert next(iter(S.get_outcomes(email,pid).values()))['decision']=='skipped'
 
 
 # ── Cross-client social proof, against real Postgres ────────────────────────
@@ -493,7 +540,7 @@ def test_no_identity_leaks_at_any_count_above_or_below_the_floor():
 # then READS BACK what landed.
 
 def _profile():
-    return {"client_name": "Pipeline E2E", "website": "https://e2e.example",
+    return {"client_name": "Pipeline E2E", "geo_scope":"Global", "website": "https://e2e.example",
             "classification": R.CLASS_B2B_TO_MARKETING,
             "buyer_roles": "VP Marketing", "verticals": "digital health",
             "window_months": 12, "max_events": 15}

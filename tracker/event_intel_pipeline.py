@@ -232,12 +232,23 @@ def _run_recommend(run_id: int, email: str, profile: dict) -> None:
     not displaying.
     """
     store.update_run(run_id, stage="discovering_categories")
+    stage_spend = {}
+    def checkpoint(stage, usage):
+        stage_spend[stage] = usage or {}
+        spend = event_intel_discover.claude_websearch.spend_sum(*stage_spend.values())
+        spend['usd'] = event_intel_discover.claude_websearch.spend_usd(spend)
+        spend['by_stage'] = dict(stage_spend)
+        store.update_run(run_id, summary={'mode':'recommend','completion_state':'running','spend':spend})
     found = event_intel_discover.discover(profile)
+    checkpoint('discover', found.get('spend'))
 
     if not found["candidates"]:
         store.update_run(
-            run_id, status="complete", stage="done",
+            run_id, status="failed" if found['categories_failed'] else "complete", stage="done",
+            error="Event research could not be completed." if found['categories_failed'] else None,
             summary={"mode": "recommend",
+                     "completion_state": "failed" if found['categories_failed'] else "complete",
+                     "spend": dict(found.get('spend') or {}, usd=event_intel_discover.claude_websearch.spend_usd(found.get('spend') or {})),
                      "no_candidates": True,
                      "shortfall": found["shortfall"],
                      "statuses": found["statuses"],
@@ -253,6 +264,7 @@ def _run_recommend(run_id: int, email: str, profile: dict) -> None:
     # they come off the list.
     store.update_run(run_id, stage="auditing")
     audit = event_intel_audit.audit_famous(found["candidates"], profile)
+    checkpoint('audit', audit.get('spend'))
     survivors = event_intel_audit.apply_audit(found["candidates"], audit)
 
     # The other half of Step 3. Cutting a marquee event on the strength of a
@@ -265,21 +277,45 @@ def _run_recommend(run_id: int, email: str, profile: dict) -> None:
     # is the only place a promoted event can pick up the category slot it
     # needs to survive the store.
     promoted = event_intel_audit.promote_alternatives(
-        audit, survivors, replaced_from=found["candidates"])
+        audit, survivors, replaced_from=found["candidates"], profile=profile)
+    checkpoint('promote', promoted.get('spend'))
     if promoted["promoted"]:
         survivors = survivors + promoted["promoted"]
 
     # Step 4 and 8. One rubric, one pass, over everything that survived.
+    from .event_intel_policy import eligibility
+    policy_unconfirmed = []
+    eligible = []
+    for candidate in survivors:
+        reasons = eligibility(candidate, profile)
+        if reasons:
+            policy_unconfirmed.append(dict(candidate, scoring_note=' '.join(reasons)))
+        else:
+            eligible.append(candidate)
+    survivors = eligible
     store.update_run(run_id, stage="scoring")
     scored = event_intel_scorer.score_all(survivors, profile)
+    checkpoint('score', scored.get('spend'))
 
+    scored["unscored"].extend(policy_unconfirmed)
     interchangeable = event_intel_scorer.flag_interchangeable(scored["scored"])
     banned = event_intel_scorer.flag_banned_language(scored["scored"])
     thin = event_intel_scorer.flag_thin_descriptions(scored["scored"])
 
     store.update_run(run_id, stage="ranking")
-    store.save_candidates(run_id, scored["scored"])
+    saved = store.save_candidates(run_id, scored["scored"])
     rows = store.get_candidates(run_id)
+    from .event_intel_identity import event_key
+    expected = {event_key(c) for c in scored['scored']}
+    actual = {event_key(c) for c in rows}
+    if saved != len(scored['scored']) or len(rows) != saved or actual != expected:
+        spend = event_intel_discover.claude_websearch.spend_sum(found.get('spend'), audit.get('spend'), promoted.get('spend'), scored.get('spend'))
+        spend['usd'] = event_intel_discover.claude_websearch.spend_usd(spend)
+        store.update_run(run_id, status='failed', stage='saving',
+            error='The scored events could not all be saved. This report is incomplete.',
+            summary={'mode':'recommend','completion_state':'failed','spend':spend,
+                     'expected_saved':len(scored['scored']),'actual_saved':len(rows)})
+        return
     cap = int(profile.get("max_events") or event_intel_rubric.DEFAULT_CAP)
     ranked = event_intel_rubric.rank(rows, cap=cap)
     if ranked["committed_below_bar"]:
@@ -301,7 +337,7 @@ def _run_recommend(run_id: int, email: str, profile: dict) -> None:
     # to filter: a previously rejected event stays on the list carrying the
     # reason it was rejected.
     outcomes = event_intel_report.annotate_outcomes(
-        ranked["kept"], store.get_outcomes(email))
+        ranked["kept"], store.get_outcomes(email, profile.get("id")))
     ranked["kept"] = outcomes["candidates"]
 
     # This client's own outcome history, as a visible ORDER signal within a
@@ -317,28 +353,9 @@ def _run_recommend(run_id: int, email: str, profile: dict) -> None:
     ranked["worth_a_look"] = event_intel_report.apply_outcome_pattern(
         ranked["worth_a_look"], pattern)
 
-    # Whether other Position2 clients are independently converging on the
-    # same events, aggregated and k-anonymity gated (see
-    # event_intel_audit.CROSS_CLIENT_MIN_DISTINCT/_MIN_POPULATION). Skipped
-    # entirely for a confidential profile, both directions: it must not
-    # CONTRIBUTE to another client's count (cross_client_interest's own SQL
-    # already excludes it) and it must not RECEIVE the insight either.
-    if not profile.get("confidential"):
-        population = store.classification_population(
-            profile.get("classification"), window_days=120, exclude_email=email)
-        raw_counts = store.cross_client_interest(
-            [c.get("name_key") for c in ranked["kept"] if c.get("name_key")],
-            classification=profile.get("classification"), window_days=120,
-            exclude_email=email)
-        cross = event_intel_audit.cross_client_signal(raw_counts, population)
-        ranked["kept"] = event_intel_report.attach_cross_client_signal(
-            ranked["kept"], cross)
-
-    # Step 6, measured against the lists this user was actually handed before.
-    generic = event_intel_audit.genericness(
-        [c.get("name") for c in ranked["kept"]],
-        store.prior_candidate_names(email, exclude_run_id=run_id),
-        this_client=profile.get("client_name"))
+    # Neither cross-client interest nor list-overlap claims are reliable
+    # until client identity, consent, and confidential-profile isolation exist.
+    generic = event_intel_report.disabled_cross_client_check()
 
     summary = event_intel_report.executive_summary(
         profile=profile, ranked=ranked,
@@ -401,9 +418,16 @@ def _run_recommend(run_id: int, email: str, profile: dict) -> None:
         "committed_note": summary_note_committed,
         "outcomes": {"counts": outcomes["counts"], "ruled_on": outcomes["ruled_on"],
                      "note": outcomes["note"], "by_name": outcomes["by_name"],
+                     "by_identity": outcomes["by_identity"],
                      "labels": store.DECISION_LABELS},
     })
-    store.update_run(run_id, status="complete", stage="done", summary=summary)
+    partial = bool(found['categories_failed'] or scored['unscored'] or scored['errors'] or audit.get('error') or audit.get('failed') or promoted['unconfirmed'] or any(s.get('status') == 'partial' for s in found['statuses'].values()))
+    summary['completion_state'] = 'partial' if partial else 'complete'
+    if partial:
+        summary.setdefault('notes', []).append({'level':'warn','head':'Research is incomplete', 'detail':'Some events or checks remain unverified. Review the coverage and unscored events before acting.'})
+    failed = not rows and bool(scored['unscored'] or scored['errors'])
+    store.update_run(run_id, status='failed' if failed else 'complete', stage='done', summary=summary,
+                     error='No event could be verified and scored.' if failed else None)
 
 
 def _run_workroom(run_id: int, email: str, source_run_id: int, profile: dict,
@@ -470,8 +494,12 @@ def _run_workroom(run_id: int, email: str, source_run_id: int, profile: dict,
         store.prior_participant_events(email, exclude_run_id=source_run_id))
 
     store.update_run(run_id, stage="saving")
-    store.save_outreach(run_id, source_run_id, event_name, event_class,
-                        split["kept"] + split["cut"] + split["unqualified"])
+    expected_rows = split["kept"] + split["cut"] + split["unqualified"]
+    saved = store.save_outreach(run_id, source_run_id, event_name, event_class, expected_rows)
+    if saved != len(expected_rows) or len(store.get_outreach(run_id)) != len(expected_rows):
+        store.update_run(run_id, status='failed', stage='saving', error='The drafts could not all be saved. Please retry.',
+                         summary={'mode':'workroom','completion_state':'failed','expected_saved':len(expected_rows),'actual_saved':saved})
+        return
 
     play = event_intel_workroom.play_for(event_class)
     store.update_run(run_id, status="complete", stage="done", summary={

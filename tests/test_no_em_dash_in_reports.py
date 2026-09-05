@@ -139,7 +139,7 @@ def test_a_category_note_still_has_no_dash_after_the_shared_refactor():
 
 def test_a_rejection_reason_is_cleaned(monkeypatch):
     def fake_ask(system, user, **kw):
-        return {"text": json.dumps({"confirmed": False,
+        return {"text": json.dumps({"confirmed": False, "facts_complete": True,
                                     "reject_reason": "too broad" + EM + "wrong audience"}),
                 "error": None, "search_count": 2}
     monkeypatch.setattr(D.claude_websearch, "ask", fake_ask)

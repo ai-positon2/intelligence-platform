@@ -8833,6 +8833,12 @@ def event_conference_intelligence_run():
         if not query:
             return jsonify({"error": "An event name is required."}), 400
 
+    if profile:
+        from tracker.event_intel_policy import intake_errors
+        missing = intake_errors(profile)
+        if missing:
+            return jsonify(error='Complete the client profile before starting: ' + ', '.join(missing) + '.'), 400
+
     # Free text straight from a form, capped before it reaches a model prompt
     # and a TEXT column. Not a security boundary (both handle long input
     # fine), just a refusal to store a pasted document as an event name.
@@ -8894,43 +8900,15 @@ def event_conference_intelligence_run_detail(run_id):
     if run.get("mode") == "recommend":
         run["candidates"] = event_intel_store.get_candidates(run_id)
     if run.get("mode") == "workroom":
-        run["outreach"] = event_intel_store.get_outreach(run_id)
+        from tracker.event_intel_workroom import present_outreach
+        run["outreach"] = present_outreach(run, event_intel_store.get_outreach(run_id))
     if run.get("profile_id"):
         run["profile"] = event_intel_store.get_profile(run["profile_id"], email)
     profile = run.get("profile") or {}
-    if run.get("mode") == "recommend" and run.get("candidates"):
-        # Attached as extra fields on the existing rows, exactly as the CSV
-        # export does it (same shared functions, same reasoning): this
-        # client's own outcome history keeps growing after the run
-        # completed, so it is read live on every page load rather than
-        # trusted from whatever the summary happened to compute at run
-        # time. Not re-sorted here -- the page's own client-side rendering
-        # already has an established order contract over this array that a
-        # server-side reorder risks silently breaking without its own
-        # dedicated verification; the adjustment is visible information on
-        # each row regardless of row order.
-        if profile.get("id"):
-            pattern = event_intel_store.outcome_pattern(
-                email, profile["id"], exclude_run_id=run_id)
-            by_key = {c.get("name_key") or id(c): c for c in
-                     event_intel_report.apply_outcome_pattern(
-                         run["candidates"], pattern)}
-            for c in run["candidates"]:
-                src = by_key.get(c.get("name_key") or id(c)) or {}
-                c["outcome_adjustment"] = src.get("outcome_adjustment", 0)
-                c["outcome_adjustment_basis"] = src.get("outcome_adjustment_basis")
-                c["outcome_adjustment_reason"] = src.get("outcome_adjustment_reason")
-        if not profile.get("confidential"):
-            population = event_intel_store.classification_population(
-                profile.get("classification"), window_days=120,
-                exclude_email=email)
-            raw_counts = event_intel_store.cross_client_interest(
-                [c.get("name_key") for c in run["candidates"] if c.get("name_key")],
-                classification=profile.get("classification"), window_days=120,
-                exclude_email=email)
-            cross = event_intel_audit.cross_client_signal(raw_counts, population)
-            run["candidates"] = event_intel_report.attach_cross_client_signal(
-                run["candidates"], cross)
+    if run.get("mode") == "recommend":
+        run = event_intel_report.present_run(
+            run, profile, run.get("candidates") or [],
+            event_intel_store.get_outcomes(email, profile.get("id")))
     return jsonify(run)
 
 
@@ -8976,42 +8954,14 @@ def event_conference_intelligence_candidates_csv(run_id):
     # against a ceiling that was never actually used on this run.
     profile = (event_intel_store.get_profile(run["profile_id"], email)
               if run.get("profile_id") else None) or {}
-    cap = int(profile.get("max_events") or event_intel_rubric.DEFAULT_CAP)
-    status_by_key = event_intel_report.status_labels(rows, cap=cap)
-
-    # Same shared functions the executive summary and the run-detail route
-    # use, so the export cannot disagree with either about what this
-    # client's own history or other clients' interest says -- the exact
-    # discipline status_labels() above already established for "on the
-    # list". Looked up by name_key from apply_outcome_pattern's OWN return
-    # value rather than applied to `rows` directly, because that function
-    # also RE-SORTS its input (by design, for the page and the summary),
-    # and the CSV's row order is its own separate, existing contract (raw
-    # SQL order) that this addition must not silently change.
-    outcome_by_key = {}
-    if profile.get("id"):
-        pattern = event_intel_store.outcome_pattern(email, profile["id"],
-                                                     exclude_run_id=run_id)
-        for c in event_intel_report.apply_outcome_pattern(rows, pattern):
-            key = name_key(c.get("name") or "")
-            if key:
-                outcome_by_key[key] = c
-
-    # Cross-client interest never reorders (see its own docstring), so it can
-    # be applied to `rows` directly without disturbing CSV row order.
-    cross_by_key = {}
-    if not profile.get("confidential"):
-        population = event_intel_store.classification_population(
-            profile.get("classification"), window_days=120, exclude_email=email)
-        raw_counts = event_intel_store.cross_client_interest(
-            [c.get("name_key") for c in rows if c.get("name_key")],
-            classification=profile.get("classification"), window_days=120,
-            exclude_email=email)
-        cross = event_intel_audit.cross_client_signal(raw_counts, population)
-        for c in event_intel_report.attach_cross_client_signal(rows, cross):
-            key = name_key(c.get("name") or "")
-            if key:
-                cross_by_key[key] = c
+    run = event_intel_report.present_run(run, profile, rows,
+                event_intel_store.get_outcomes(email, profile.get("id")))
+    rows = run['candidates']
+    summary = run['summary']
+    from tracker.event_intel_identity import event_key
+    status_by_key = {event_key(c): c['status_label'] for c in rows}
+    outcome_by_key = {event_key(c): c for c in rows}
+    cross_by_key = {}  # Suppressed until client identity and consent are defined.
 
     buf = io.StringIO()
     w = csv.writer(buf)
@@ -9026,10 +8976,10 @@ def event_conference_intelligence_candidates_csv(run_id):
                 "Starts", "Ends", "City", "Country",
                 "Published attendance (their claim)", "Published exhibitors",
                 "Cost (never scored)", "Not measured", "What it is",
-                "Why it matters to this client", "Website"])
+                "Why it matters to this client", "Website", "Your decision", "Decision note", "Analysis as of"])
     for c in rows:
         total = c.get("total")
-        key = name_key(c.get("name") or "")
+        key = event_key(c)
         status = status_by_key.get(key,
                                    "Not scored" if total is None else
                                    "Excluded, below the bar")
@@ -9056,7 +9006,8 @@ def event_conference_intelligence_candidates_csv(run_id):
             c.get("cost_note") or "",
             " ".join(c.get("gaps") or []),
             c.get("description") or "", c.get("client_line") or "",
-            c.get("website") or "",
+            c.get("website") or "", c.get("prior_decision") or "", c.get("prior_note") or "",
+            summary.get("selection", {}).get("as_of", ""),
         ])
 
     client = (summary.get("title") or run.get("query") or "events")
@@ -9086,7 +9037,7 @@ def event_conference_intelligence_outreach_csv(run_id):
     run = event_intel_store.get_run(run_id, email)
     if not run:
         abort(404)
-    rows = event_intel_store.get_outreach(run_id)
+    rows = event_intel_workroom.present_outreach(run, event_intel_store.get_outreach(run_id))
     labels = event_intel_store.ROLE_LABELS
     summary = run.get("summary") or {}
 
@@ -9149,27 +9100,25 @@ def event_conference_intelligence_outcomes():
     from tracker import event_intel_store
     email = (_get_user() or {}).get("email", "").lower()
     if request.method == "GET":
-        return jsonify({"outcomes": event_intel_store.get_outcomes(email)})
+        profile_id = request.args.get('profile_id', type=int)
+        return jsonify({"outcomes": event_intel_store.get_outcomes(email, profile_id)})
     payload = request.get_json(silent=True) or {}
-    # Looked up rather than trusted from the payload: which profile this
-    # decision belongs to has to come from the run record itself, or a client
-    # could tag its own decision onto someone else's profile_id.
-    run_id = payload.get("run_id")
-    profile_id = None
-    if run_id:
-        source_run = event_intel_store.get_run(run_id, email)
-        if source_run:
-            profile_id = source_run.get("profile_id")
+    try:
+        run_id = int(payload.get('run_id') or 0)
+    except (TypeError, ValueError):
+        return jsonify(error='A valid source run is required.'), 400
+    source_run = event_intel_store.get_run(run_id, email) if run_id else None
+    profile_id = (source_run or {}).get('profile_id')
     try:
         ok = event_intel_store.save_outcome(
             email, str(payload.get("event_name") or ""),
             str(payload.get("decision") or ""), payload.get("note"),
-            run_id, profile_id)
+            run_id, profile_id, event_identity=payload.get('event_identity'))
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
     if not ok:
         return jsonify({"error": "Could not record that. Storage is unavailable."}), 500
-    return jsonify({"outcomes": event_intel_store.get_outcomes(email)})
+    return event_conference_intelligence_run_detail(run_id)
 
 
 @app.route("/p2/b2b-agents/event-conference-intelligence/runs/<int:run_id>/export.csv")

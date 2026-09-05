@@ -11,6 +11,7 @@ import io
 import pytest
 
 import app as appmod
+from tracker.event_intel_identity import event_key
 from tracker import event_intel_report as report
 from tracker import event_intel_store as store
 from tracker import event_intel_workroom as W
@@ -32,7 +33,7 @@ def test_an_event_already_ruled_on_is_annotated_not_hidden():
     to skip last quarter may not be right now, and that is the user's call."""
     cands = [{"name": "Dreamforce"}, {"name": "Data Council"}]
     out = report.annotate_outcomes(cands, {
-        "dreamforce": {"decision": "skipped", "note": "Too broad for us.",
+        event_key({"name":"Dreamforce"}): {"decision": "skipped", "note": "Too broad for us.",
                        "updated_at": "2026-03-01"}})
     assert len(out["candidates"]) == 2
     assert out["candidates"][0]["prior_decision"] == "skipped"
@@ -42,13 +43,13 @@ def test_an_event_already_ruled_on_is_annotated_not_hidden():
     assert "not hidden" in out["note"]
 
 
-def test_the_annotation_matches_an_event_across_spelling_and_year():
+def test_a_legacy_series_decision_does_not_apply_to_a_new_edition():
     """The key has to survive "Dreamforce 2026" against "Dreamforce", or a
     decision silently stops applying the moment the edition rolls over."""
     out = report.annotate_outcomes(
         [{"name": "Dreamforce 2026"}],
-        {"dreamforce": {"decision": "skipped", "note": None, "updated_at": None}})
-    assert out["candidates"][0]["prior_decision"] == "skipped"
+        {event_key({"name":"Dreamforce"}): {"decision": "skipped", "note": None, "updated_at": None}})
+    assert out["candidates"][0]["prior_decision"] is None
 
 
 def test_nothing_ruled_on_produces_no_note_rather_than_a_zero():
@@ -60,16 +61,16 @@ def test_nothing_ruled_on_produces_no_note_rather_than_a_zero():
 def test_the_by_name_map_only_carries_events_with_a_decision():
     out = report.annotate_outcomes(
         [{"name": "A"}, {"name": "B"}],
-        {"a": {"decision": "going", "note": None, "updated_at": None}})
+        {event_key({"name":"A"}): {"decision": "going", "note": None, "updated_at": None}})
     assert list(out["by_name"]) == ["A"]
 
 
 def test_decisions_are_counted_by_kind():
     out = report.annotate_outcomes(
         [{"name": "A"}, {"name": "B"}, {"name": "C"}],
-        {"a": {"decision": "going", "note": None, "updated_at": None},
-         "b": {"decision": "skipped", "note": None, "updated_at": None},
-         "c": {"decision": "went", "note": None, "updated_at": None}})
+        {event_key({"name":"A"}): {"decision": "going", "note": None, "updated_at": None},
+         event_key({"name":"B"}): {"decision": "skipped", "note": None, "updated_at": None},
+         event_key({"name":"C"}): {"decision": "went", "note": None, "updated_at": None}})
     assert out["counts"] == {"going": 1, "skipped": 1, "went": 1}
 
 
@@ -266,7 +267,7 @@ def test_the_status_column_matches_the_runs_own_cap(monkeypatch):
     assert rows[2][status] == "Cleared the bar, cut only by list length"
 
 
-def test_the_export_carries_the_outcome_adjustment_and_its_reason(monkeypatch):
+def test_legacy_export_does_not_recompute_history_after_the_run(monkeypatch):
     monkeypatch.setattr(store, "get_run", lambda rid, email: {
         "id": rid, "query": "N", "summary": {}, "profile_id": 9})
     monkeypatch.setattr(store, "get_profile",
@@ -282,11 +283,11 @@ def test_the_export_carries_the_outcome_adjustment_and_its_reason(monkeypatch):
     head, body = rows[0], rows[1]
     adj = head.index("Your history with this category/format")
     why = head.index("Why")
-    assert body[adj] == "-5"
-    assert "skipped 4 of the last 4" in body[why]
+    assert body[adj] == "0"
+    assert body[why] == ""
 
 
-def test_the_export_carries_the_cross_client_note_with_no_identity(monkeypatch):
+def test_the_export_suppresses_unverified_cross_client_interest(monkeypatch):
     monkeypatch.setattr(store, "get_run", lambda rid, email: {
         "id": rid, "query": "N", "summary": {}, "profile_id": 9})
     monkeypatch.setattr(store, "get_profile",
@@ -302,7 +303,7 @@ def test_the_export_carries_the_cross_client_note_with_no_identity(monkeypatch):
     rows = _rows(_client().get(BASE + "/runs/7/candidates.csv"))
     head, body = rows[0], rows[1]
     col = head.index("Also watched by other clients (aggregate, no names)")
-    assert "4 other clients" in body[col]
+    assert body[col] == ""
     assert "@" not in body[col], "an email address leaked into the export"
 
 

@@ -32,6 +32,7 @@ from html.parser import HTMLParser
 from urllib.parse import urljoin, urlparse
 
 import requests
+from .event_intel_http import public_get
 
 from . import claude_websearch
 from .event_intel_store import (SOURCE_BLOCKED, SOURCE_ERROR, SOURCE_NOT_FOUND,
@@ -186,7 +187,7 @@ def fetch_page(url: str) -> dict:
            "http_status": None, "text": "", "note": "", "truncated": False,
            "spa": None, "redirected": False}
     try:
-        r = requests.get(url, timeout=_TIMEOUT, stream=True, headers={
+        r = public_get(url, timeout=_TIMEOUT, stream=True, headers={
             "User-Agent": _UA,
             "Accept": "text/html,application/xhtml+xml",
             "Accept-Language": "en-US,en;q=0.9",

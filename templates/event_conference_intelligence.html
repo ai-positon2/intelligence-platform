@@ -2849,7 +2849,7 @@
                  let a name containing a quote add attributes of its own. */
               return '<button type="button" class="dbtn' +
                 (prior && prior.decision === d ? ' on' : '') +
-                '" data-outcome="' + d + '" data-event="' + esc(c.name) + '">' +
+                '" data-outcome="' + d + '" data-event="' + esc(c.name) + '" data-event-identity="' + esc(c.event_identity || '') + '">' +
                 esc(labels[d] || d) + '</button>';
             }).join('') +
           '</div>' +
@@ -2868,8 +2868,10 @@
       fetch(BASE + '/outcomes', {
         method: 'POST', headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({event_name: name, decision: decision,
-                              run_id: current ? current.id : null})
-      }).then(function(r){ if (!r.ok) throw new Error('save failed'); })
+                              run_id: current ? current.id : null,
+                              event_identity: btn.getAttribute("data-event-identity") || null})
+      }).then(function(r){ if (!r.ok) throw new Error('save failed'); return r.json(); })
+        .then(function(run){ current = run; render(run); })
         .catch(function(){
           btn.classList.remove('on');
           btn.textContent = 'Could not save';
@@ -3636,12 +3638,15 @@
       // A committed event below the bar is P3 by definition, and showing it is
       // the entire point. Filtering P3 unconditionally hid the one row this
       // feature exists to surface.
-      var kept = cands.filter(function(c){
-        return c.tier !== 'P3' || c.committed;
-      }).slice(0, keepN);
+      var kept = s.selection ? s.selection.kept : cands.filter(function(c){
+        // Compatibility for old inline fixtures; the API always supplies a selection.
+        var end = c.ends_on || c.starts_on;
+        var finished = end && /^\d{4}-\d{2}-\d{2}/.test(end) && end.slice(0,10) < new Date().toISOString().slice(0,10);
+        return !finished && (c.tier !== 'P3' || c.committed);
+      }).sort(function(a,b){ return ((b.total || 0) + (b.outcome_adjustment || 0)) - ((a.total || 0) + (a.outcome_adjustment || 0)); }).slice(0, keepN);
       var counts = counts0;
       var outc = s.outcomes || {};
-      var byName = outc.by_name || {};
+      var byName = outc.by_identity || outc.by_name || {};
       var decLabels = outc.labels || {};
 
       var html = '<div class="evi-exec">' +
@@ -3721,7 +3726,7 @@
       html += '<div class="evi-sec"><h3>The ranked list</h3>' +
         (kept.length
           ? '<div class="evi-cands">' + kept.map(function(c, i){
-              return candidateRow(c, byName[c.name], decLabels, i); }).join('') + '</div>'
+              return candidateRow(c, byName[c.event_identity] || byName[c.name], decLabels, i); }).join('') + '</div>'
           /* Two different empty states, because they are two different
              facts. "Nothing cleared the bar" used to be printed even when
              the run had found events squarely aimed at this client that
@@ -3757,7 +3762,7 @@
           'Each says what it is short on, so it can be judged rather than ' +
           'taken on faith.</div>' +
           '<div class="evi-cands">' + look.map(function(c, i){
-            return candidateRow(c, byName[c.name], decLabels, kept.length + i,
+            return candidateRow(c, byName[c.event_identity] || byName[c.name], decLabels, kept.length + i,
                                 belowBarReason(c)); }).join('') + '</div></div>';
       }
 
@@ -3848,6 +3853,7 @@
     var WINDOW_TONE = {prime: 'ok', closing: 'warn', expired: 'bad', early: 'idle'};
     var WINDOW_BAND = {prime: 'f-ok', closing: 'f-warn', expired: 'f-bad', early: 'f-na'};
     var DRAFT_LABEL = {
+      review_required: 'Review before use',
       rewritten_no_booth_note: 'Opener replaced: claimed a conversation',
       rewritten_aggressive: 'Opener replaced: displacement language',
       account_play: 'Account play, no named person'

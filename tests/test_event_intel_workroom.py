@@ -192,7 +192,7 @@ def test_a_fabricated_conversation_is_replaced_and_the_reason_is_kept():
     assert out["rewritten_count"] == 1
 
 
-def test_a_booth_note_licenses_the_conversation_it_records():
+def test_booth_notes_are_preserved_for_manual_personalization():
     """The rule is about evidence, not about vocabulary. A rep who wrote the
     note gets to reference the conversation."""
     rows = [_row("Acme", person="Dana Lee",
@@ -201,8 +201,8 @@ def test_a_booth_note_licenses_the_conversation_it_records():
                     notes={W.org_key("Acme"): "asked about SOC2"},
                     event_name="FinovateFall", client_name="Northwind")
     row = out["rows"][0]
-    assert row["draft_status"] == W.DRAFT_OK
-    assert row["opener"] == "Great chatting at the booth about SOC2."
+    assert row["draft_status"] == "review_required"
+    assert "Great chatting" not in row["opener"]
     assert row["booth_note"] == "asked about SOC2"
     assert out["rewritten_count"] == 0
 
@@ -263,8 +263,8 @@ def test_the_same_language_is_left_alone_on_a_non_competitor_event():
                  opener="Most teams switch once they outgrow it.")]
     out = W.enforce(rows, event_class=W.CLASS_ATTENDED, notes={},
                     event_name="DataCon", client_name="Northwind")
-    assert out["rows"][0]["draft_status"] == W.DRAFT_OK
-    assert out["rows"][0]["opener"] == "Most teams switch once they outgrow it."
+    assert out["rows"][0]["draft_status"] == "review_required"
+    assert "switch" not in out["rows"][0]["opener"]
 
 
 def test_the_replacement_for_a_competitor_event_is_itself_soft():
@@ -303,7 +303,7 @@ def test_a_named_person_gets_no_account_note():
     rows = [_row("Acme", person="Dana Lee", opener="I saw Acme at the show.")]
     out = W.enforce(rows, event_class=W.CLASS_ATTENDED, notes={},
                     event_name="FinovateFall")
-    assert out["rows"][0]["draft_status"] == W.DRAFT_OK
+    assert out["rows"][0]["draft_status"] == "review_required"
     assert out["rows"][0]["account_note"] is None
 
 
@@ -506,7 +506,7 @@ def test_an_invented_draft_status_falls_back_to_ok_rather_than_stored_raw():
     row = store.normalise_outreach(
         {"org_name": "Acme", "draft_status": "totally_fine"}, 1, 2, "E",
         W.CLASS_OWNED)
-    assert row["draft_status"] == W.DRAFT_OK
+    assert row["draft_status"] == "review_required"
 
 
 def test_an_unknown_event_class_is_refused_at_the_storage_boundary():
