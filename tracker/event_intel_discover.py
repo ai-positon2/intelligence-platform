@@ -622,7 +622,7 @@ def merge(by_category: dict, force_exclude: str | None = None,
 def _clean_event(raw: dict, category: str) -> dict | None:
     if not isinstance(raw, dict):
         return None
-    name = str(raw.get("name") or "").strip()
+    name = claude_websearch.strip_em_dash(str(raw.get("name") or "").strip())
     if not name:
         return None
     website = str(raw.get("website") or "").strip()
@@ -630,7 +630,9 @@ def _clean_event(raw: dict, category: str) -> dict | None:
         website = ""
 
     def _t(k, cap=400):
-        v = str(raw.get(k) or "").strip()
+        # Every free-text field a confirm call can write goes through here,
+        # so this is the one place to sanitise them all rather than six.
+        v = claude_websearch.strip_em_dash(str(raw.get(k) or "").strip())
         return v[:cap] or None
 
     try:
@@ -759,7 +761,6 @@ _NOTE_PLUMBING = ("web_search", "search tool", "tool call", "tool use",
                   "i have not", "my search", "let me", "i will")
 
 _NOTE_SENTENCE = re.compile(r"[^.!?]+(?:[.!?]+|$)")
-_NOTE_DASH = re.compile(r"\s*[\u2013\u2014]\s*")
 
 
 def _reader_note(raw) -> str:
@@ -769,7 +770,7 @@ def _reader_note(raw) -> str:
     absent note is a category that said nothing, and every one of them has a
     sentence of our own to fall back on.
     """
-    text = _NOTE_DASH.sub(", ", " ".join(str(raw or "").split()))
+    text = claude_websearch.strip_em_dash(" ".join(str(raw or "").split()))
     if not text:
         return ""
     kept, used = [], 0
@@ -832,17 +833,27 @@ def _clean_proposal(raw: dict) -> dict | None:
     exactly as `_clean_event` does, because a proposal carrying
     `javascript:alert(1)` would hand that string straight to the confirmer's
     prompt.
+
+    `name` is sanitised of em dashes before the name-key check, not after:
+    house style has none, this is the first place a candidate's name is ever
+    recorded, and a name kept here with a dash in it is the name the audit,
+    the report and every downstream mention of this event will go on echoing.
+    Live evidence: a candidate this finder named came back as "SaaStr AI
+    Annual — Parties & Side Events" and the dash was still there in the
+    client's report, in the audit's cut list, and in the run's own assumptions
+    text, three separate places for one uncleaned field.
     """
     if not isinstance(raw, dict):
         return None
-    name = str(raw.get("name") or "").strip()
+    name = claude_websearch.strip_em_dash(str(raw.get("name") or "").strip())
     if not name or not name_key(name):
         return None
     site = str(raw.get("website") or "").strip()
     if not site.lower().startswith(("http://", "https://")):
         site = ""
     return {"name": name[:250], "website": site or None,
-            "why": str(raw.get("why") or "").strip()[:300]}
+            "why": claude_websearch.strip_em_dash(
+                str(raw.get("why") or "").strip())[:300]}
 
 
 def _dedupe_proposals(proposals: list) -> list:
@@ -1172,7 +1183,8 @@ def _confirm_event(proposal: dict, category: str, profile: dict,
     facts_complete = parsed.get("facts_complete") is not False
 
     if not parsed.get("confirmed"):
-        reason = str(parsed.get("reject_reason") or "").strip()[:400]
+        reason = claude_websearch.strip_em_dash(
+            str(parsed.get("reject_reason") or "").strip())[:400]
         if not reason:
             # Refused without saying why. That is not a finding about the
             # market, so it must not be recorded as one.

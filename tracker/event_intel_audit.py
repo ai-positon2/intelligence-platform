@@ -157,9 +157,17 @@ def _event_label(c: dict) -> str:
 
 
 def _record(cand: dict, a: dict) -> dict:
-    """One reply, as a verdict record for the candidate it was asked about."""
-    alternative = str(a.get("alternative") or "").strip()
-    why = str(a.get("why") or "").strip()[:600]
+    """One reply, as a verdict record for the candidate it was asked about.
+
+    Every free-text field here is the model's own written prose (a name it
+    chose for an alternative, a reason, a caveat), so every one of them goes
+    through strip_em_dash: house style has none, and `alternative` in
+    particular becomes `replaces` for a promotion and a name printed directly
+    in the report's cut list, not just a sentence buried in `why`.
+    """
+    alternative = claude_websearch.strip_em_dash(
+        str(a.get("alternative") or "").strip())
+    why = claude_websearch.strip_em_dash(str(a.get("why") or "").strip())[:600]
     claimed = str(a.get("verdict") or "").strip().lower()
 
     # The enforcement. A "kept" with no named alternative is a restatement
@@ -178,7 +186,8 @@ def _record(cand: dict, a: dict) -> dict:
         website = ""
     return {"verdict": verdict, "alternative": alternative or None,
             "alternative_website": website or None,
-            "alternative_note": str(a.get("alternative_note") or "")[:400] or None,
+            "alternative_note": claude_websearch.strip_em_dash(
+                str(a.get("alternative_note") or ""))[:400] or None,
             "why": why,
             # The CANDIDATE's name, never one echoed back by the model. One
             # call judges one known event, so there is nothing to match up and

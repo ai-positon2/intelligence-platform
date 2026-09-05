@@ -153,7 +153,10 @@ def recover_page(url: str, kind: str, event_name: str, event_host: str = "",
 
     notes = []
     if parsed.get("note"):
-        notes.append(str(parsed["note"])[:300])
+        # The model's own written explanation, unlike the roster fields below
+        # it (org/person names, titles), which are facts copied off a real
+        # page and are left exactly as published.
+        notes.append(claude_websearch.strip_em_dash(str(parsed["note"]))[:300])
     if uncited:
         notes.append("%d recovered row%s named no source page and %s discarded."
                      % (uncited, "" if uncited == 1 else "s",
