@@ -133,9 +133,42 @@ def test_the_scored_export_includes_the_cut_events_and_marks_them(monkeypatch):
         {"name": "Cut", "total": 41, "tier": "P3", "category": "industry_flagship"}])
     rows = _rows(_client().get(BASE + "/runs/7/candidates.csv"))
     head = rows[0]
-    on = head.index("On the list")
+    status = head.index("Status")
     assert [r[0] for r in rows[1:]] == ["Kept", "Cut"]
-    assert rows[1][on] == "yes" and rows[2][on] == "no"
+    assert rows[1][status] == "Recommended"
+    assert rows[2][status] == "Excluded, below the bar"
+
+
+def test_a_worth_a_look_event_says_so_rather_than_a_bare_no(monkeypatch):
+    """The regression this column exists to close. `rank()` has TWO gates
+    below RANK_FLOOR (relevance and consider), not a bare floor comparison,
+    and a real run's export once called a genuine second-tier event "no"
+    while the SAME run's web page showed it under "Worth a look" as an
+    offered option."""
+    monkeypatch.setattr(store, "get_run", lambda rid, email: {"id": rid, "query": "N", "summary": {}})
+    monkeypatch.setattr(store, "get_candidates", lambda rid: [
+        {"name": "Second Tier", "total": 67, "tier": "P3", "relevance": 32,
+         "category": "industry_flagship"}])
+    rows = _rows(_client().get(BASE + "/runs/7/candidates.csv"))
+    head, body = rows[0], rows[1]
+    assert body[head.index("Status")].startswith("Worth a look")
+
+
+def test_the_status_column_matches_the_runs_own_cap(monkeypatch):
+    """A client who raised or lowered max_events must see rows labelled
+    against the ceiling THIS run actually used, not the module default."""
+    monkeypatch.setattr(store, "get_run", lambda rid, email: {
+        "id": rid, "query": "N", "summary": {}, "profile_id": 9})
+    monkeypatch.setattr(store, "get_profile",
+                        lambda pid, email: {"max_events": 1})
+    monkeypatch.setattr(store, "get_candidates", lambda rid: [
+        {"name": "First", "total": 90, "tier": "P1", "category": "industry_flagship"},
+        {"name": "Second", "total": 85, "tier": "P1", "category": "industry_flagship"}])
+    rows = _rows(_client().get(BASE + "/runs/7/candidates.csv"))
+    head = rows[0]
+    status = head.index("Status")
+    assert rows[1][status] == "Recommended"
+    assert rows[2][status] == "Cleared the bar, cut only by list length"
 
 
 def test_an_unscored_event_says_so_in_the_export_rather_than_showing_blank(monkeypatch):

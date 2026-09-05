@@ -8928,18 +8928,25 @@ def event_conference_intelligence_candidates_csv(run_id):
     """
     import csv
     import io
-    from tracker import event_intel_rubric, event_intel_store
+    from tracker import event_intel_report, event_intel_rubric, event_intel_store
+    from tracker.event_intel_discover import name_key
     email = (_get_user() or {}).get("email", "").lower()
     run = event_intel_store.get_run(run_id, email)
     if not run:
         abort(404)
     rows = event_intel_store.get_candidates(run_id)
     summary = run.get("summary") or {}
-    floor = event_intel_rubric.RANK_FLOOR
+    # The run's own cap, not the default: a client who raised or lowered
+    # max_events would otherwise see rows mislabelled "cut by list length"
+    # against a ceiling that was never actually used on this run.
+    profile = (event_intel_store.get_profile(run["profile_id"], email)
+              if run.get("profile_id") else None) or {}
+    cap = int(profile.get("max_events") or event_intel_rubric.DEFAULT_CAP)
+    status_by_key = event_intel_report.status_labels(rows, cap=cap)
 
     buf = io.StringIO()
     w = csv.writer(buf)
-    w.writerow(["Event", "Edition", "Tier", "Total /110", "On the list",
+    w.writerow(["Event", "Edition", "Tier", "Total /110", "Status",
                 "Relevance /40", "Relevance reasoning",
                 "Decision-maker access /40", "DM access reasoning",
                 "Engagement /20", "Engagement reasoning",
@@ -8951,10 +8958,12 @@ def event_conference_intelligence_candidates_csv(run_id):
                 "Why it matters to this client", "Website"])
     for c in rows:
         total = c.get("total")
+        status = status_by_key.get(name_key(c.get("name") or ""),
+                                   "Not scored" if total is None else
+                                   "Excluded, below the bar")
         w.writerow([
             c.get("name") or "", c.get("edition") or "", c.get("tier") or "",
-            total if total is not None else "not scored",
-            "yes" if (total is not None and total >= floor) else "no",
+            total if total is not None else "not scored", status,
             c.get("relevance") if c.get("relevance") is not None else "",
             c.get("relevance_note") or "",
             c.get("dm_access") if c.get("dm_access") is not None else "",

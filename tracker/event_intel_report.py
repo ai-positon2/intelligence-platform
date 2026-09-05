@@ -525,6 +525,55 @@ def top_five(kept: list[dict]) -> list[dict]:
     return out
 
 
+def status_labels(rows: list[dict], cap: int = rubric.DEFAULT_CAP,
+                  today=None) -> dict:
+    """Which bucket every stored candidate actually landed in, by name key.
+
+    Exists because the candidates CSV export used to decide "on the list"
+    with its own one-line rule (`total >= RANK_FLOOR`), a second and
+    disagreeing copy of the exact policy `rubric.rank()` already encodes. A
+    real run's own export called a genuine second-tier event "no" while the
+    web page for the SAME run showed it under "Worth a look" as an offered
+    option, because `rank()` also asks whether the audience clears the
+    relevance and consider gates, which a bare floor comparison cannot see.
+    An event that is unattendable (`finished`) or that cleared the bar but
+    was cut only by list length (`over_cap`) were two more states the export
+    could not distinguish from a plain "no" either.
+
+    This calls `rank()` itself rather than reading the run's stored summary,
+    because the summary's own "top_five" is truncated to MAX_TOP and cannot
+    tell a sixth kept event from an excluded one. Recomputing here is the
+    only way the export and the page are guaranteed to agree, for the same
+    reason `assumptions()` above derives from `notes()` instead of keeping
+    its own copy.
+    """
+    from .event_intel_discover import name_key
+    ranked = rubric.rank(rows, cap=cap, today=today)
+    committed = {name_key(c.get("name") or "") for c in ranked["committed_below_bar"]}
+    out = {}
+
+    def _set(bucket, label):
+        for c in bucket:
+            key = name_key(c.get("name") or "")
+            if key:
+                out[key] = label
+
+    # Order matters: a later call overwrites an earlier one, and `kept` must
+    # win over the finished/excluded default a row would otherwise get if it
+    # somehow appeared in more than one bucket.
+    _set(ranked["excluded"], "Excluded, below the bar")
+    _set(ranked["finished"], "Edition already finished")
+    _set(ranked["over_cap"], "Cleared the bar, cut only by list length")
+    _set(ranked["worth_a_look"],
+        "Worth a look: below the bar, but the audience is genuinely this "
+        "client's")
+    _set(ranked["kept"], "Recommended")
+    for key in committed & set(out):
+        out[key] = ("Recommended: already committed, did not clear the bar "
+                    "on its own merits")
+    return out
+
+
 def executive_summary(*, profile: dict, ranked: dict, **kw) -> dict:
     """The five elements, in the skill's order, and nothing else.
 
