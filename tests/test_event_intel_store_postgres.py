@@ -192,6 +192,293 @@ def test_an_unknown_decision_is_refused_rather_than_stored():
         S.save_outcome(EMAIL, "Some Event", "attending")
 
 
+# ── Outcome-driven order signal, against real Postgres ─────────────────────
+
+def _saved_profile(email, client_name, classification=R.CLASS_B2B_TO_MARKETING,
+            confidential=False):
+    return S.save_profile(email, {
+        "client_name": client_name, "classification": classification,
+        "confidential": confidential})
+
+
+def _backdate(run_id, days_ago):
+    """Only a raw UPDATE can move created_at; update_run's field whitelist
+    deliberately does not include it (nothing in production ever needs to)."""
+    conn = S._pg_conn()
+    conn.cursor().execute(
+        "UPDATE evi_runs SET created_at = now() - (%s || ' days')::interval "
+        "WHERE id = %s", (days_ago, run_id))
+    conn.commit()
+    conn.close()
+
+
+def test_name_key_is_populated_on_save_and_round_trips():
+    run = S.save_run(EMAIL, "recommend", "name_key test")
+    S.save_candidates(run, [_cand("Money20/20 USA")])
+    row = S.get_candidates(run)[0]
+    from tracker.event_intel_discover import name_key
+    assert row["name_key"] == name_key("Money20/20 USA")
+
+
+def test_outcome_pattern_counts_by_category_and_by_format():
+    email = "outcome-pattern@position2.com"
+    pid = _saved_profile(email, "Pattern Co")
+    run = S.save_run(email, "recommend", "pattern test", profile_id=pid)
+    S.save_candidates(run, [
+        _cand("Skip Summit A", category=R.CAT_VERTICAL_SUMMIT, format="hybrid"),
+        _cand("Skip Summit B", category=R.CAT_VERTICAL_SUMMIT, format="hybrid"),
+        _cand("Skip Summit C", category=R.CAT_VERTICAL_SUMMIT, format="virtual"),
+    ])
+    S.update_run(run, status="complete", stage="done")
+    for name in ("Skip Summit A", "Skip Summit B", "Skip Summit C"):
+        S.save_outcome(email, name, "skipped", profile_id=pid)
+
+    pattern = S.outcome_pattern(email, pid)
+    assert pattern["by_category"][R.CAT_VERTICAL_SUMMIT] == {
+        "decisions": 3, "skipped": 3, "went_or_going": 0}
+    assert pattern["by_format"]["hybrid"] == {
+        "decisions": 2, "skipped": 2, "went_or_going": 0}
+    assert pattern["by_format"]["virtual"] == {
+        "decisions": 1, "skipped": 1, "went_or_going": 0}
+
+
+def test_outcome_pattern_scopes_to_one_profile_not_the_whole_email():
+    """The concrete failure this scoping prevents: an agency login with two
+    client profiles must not let one client's dislike of a category leak
+    into the other client's scoring."""
+    email = "shared-login@position2.com"
+    pid_a = _saved_profile(email, "Client A")
+    pid_b = _saved_profile(email, "Client B")
+    run_a = S.save_run(email, "recommend", "for A", profile_id=pid_a)
+    S.save_candidates(run_a, [_cand("A's Summit", category=R.CAT_SIDE_EVENT)])
+    S.update_run(run_a, status="complete", stage="done")
+    S.save_outcome(email, "A's Summit", "skipped", profile_id=pid_a)
+
+    pattern_b = S.outcome_pattern(email, pid_b)
+    assert pattern_b["by_category"] == {}, (
+        "Client A's skip pattern leaked into Client B's own pattern query")
+    pattern_a = S.outcome_pattern(email, pid_a)
+    assert pattern_a["by_category"][R.CAT_SIDE_EVENT]["skipped"] == 1
+
+
+def test_outcome_pattern_ignores_legacy_rows_with_no_name_key():
+    email = "legacy-rows@position2.com"
+    pid = _saved_profile(email, "Legacy Co")
+    run = S.save_run(email, "recommend", "legacy test", profile_id=pid)
+    S.save_candidates(run, [_cand("Legacy Event", category=R.CAT_EMERGING)])
+    S.update_run(run, status="complete", stage="done")
+    conn = S._pg_conn()
+    conn.cursor().execute(
+        "UPDATE evi_candidates SET name_key = NULL WHERE run_id = %s", (run,))
+    conn.commit()
+    conn.close()
+    S.save_outcome(email, "Legacy Event", "skipped", profile_id=pid)
+    pattern = S.outcome_pattern(email, pid)
+    assert pattern["by_category"] == {}, (
+        "a row with no name_key was joined to an outcome anyway")
+
+
+def test_save_outcome_does_not_blank_a_known_profile_on_a_later_omitted_save():
+    email = "profile-coalesce@position2.com"
+    pid = _saved_profile(email, "Coalesce Co")
+    S.save_outcome(email, "Coalesce Event", "skipped", profile_id=pid)
+    S.save_outcome(email, "Coalesce Event", "going")  # no profile_id this time
+    conn = S._pg_conn()
+    cur = conn.cursor()
+    cur.execute("SELECT profile_id, decision FROM evi_outcomes "
+               "WHERE email = %s AND event_name = %s", (email, "Coalesce Event"))
+    row = cur.fetchone()
+    conn.close()
+    assert row == (pid, "going"), (
+        "a later save that omitted profile_id blanked the one already stored")
+
+
+# ── Cross-client social proof, against real Postgres ────────────────────────
+
+def test_cross_client_interest_counts_distinct_clients_not_rows():
+    """Two rows from the SAME other email must count as one client, not
+    two."""
+    watched = "Convergence Con"
+    from tracker.event_intel_discover import name_key
+    key = name_key(watched)
+    querying_email = "querying-client@position2.com"
+    other_email = "other-client@position2.com"
+    pid_other = _saved_profile(other_email, "Other Co")
+    for i in range(2):
+        run = S.save_run(other_email, "recommend", "other run %d" % i,
+                         profile_id=pid_other)
+        S.save_candidates(run, [_cand(watched)])
+        S.update_run(run, status="complete", stage="done")
+
+    counts = S.cross_client_interest([key], classification=None,
+                                     window_days=365, exclude_email=querying_email)
+    assert counts.get(key, {}).get("distinct_clients") == 1, counts
+
+
+def test_cross_client_interest_excludes_the_querying_email():
+    watched = "Self Exclusion Summit"
+    from tracker.event_intel_discover import name_key
+    key = name_key(watched)
+    email = "self-excluded@position2.com"
+    pid = _saved_profile(email, "Self Co")
+    run = S.save_run(email, "recommend", "self run", profile_id=pid)
+    S.save_candidates(run, [_cand(watched)])
+    S.update_run(run, status="complete", stage="done")
+
+    counts = S.cross_client_interest([key], classification=None,
+                                     window_days=365, exclude_email=email)
+    assert key not in counts, "the querying client counted its own run"
+
+
+def test_cross_client_interest_only_counts_kept_events():
+    """Searched-and-cut is not the same claim as kept. A row scored below
+    RANK_FLOOR must never count toward another client's aggregate."""
+    watched = "Below The Bar Con"
+    from tracker.event_intel_discover import name_key
+    key = name_key(watched)
+    other_email = "cut-event-client@position2.com"
+    pid = _saved_profile(other_email, "Cut Co")
+    run = S.save_run(other_email, "recommend", "cut run", profile_id=pid)
+    S.save_candidates(run, [_cand(watched, relevance=5, dm_access=5, engagement=2)])
+    S.update_run(run, status="complete", stage="done")
+
+    counts = S.cross_client_interest([key], classification=None,
+                                     window_days=365,
+                                     exclude_email="querying@position2.com")
+    assert key not in counts, "a below-the-bar row counted as kept interest"
+
+
+def test_cross_client_interest_respects_the_time_window():
+    watched = "Old News Conference"
+    from tracker.event_intel_discover import name_key
+    key = name_key(watched)
+    email = "old-run-client@position2.com"
+    pid = _saved_profile(email, "Old Co")
+    run = S.save_run(email, "recommend", "old run", profile_id=pid)
+    S.save_candidates(run, [_cand(watched)])
+    S.update_run(run, status="complete", stage="done")
+    _backdate(run, days_ago=400)
+
+    counts = S.cross_client_interest([key], classification=None,
+                                     window_days=120,
+                                     exclude_email="querying@position2.com")
+    assert key not in counts, "a run from 400 days ago was inside a 120-day window"
+
+
+def test_cross_client_interest_groups_by_classification():
+    watched = "Vertical Only Con"
+    from tracker.event_intel_discover import name_key
+    key = name_key(watched)
+    other_email = "other-vertical-client@position2.com"
+    pid = _saved_profile(other_email, "Other Vertical Co",
+                  classification=R.CLASS_B2B_OTHER_FUNCTION)
+    run = S.save_run(other_email, "recommend", "vertical run", profile_id=pid)
+    S.save_candidates(run, [_cand(watched)])
+    S.update_run(run, status="complete", stage="done")
+
+    counts_wrong_classification = S.cross_client_interest(
+        [key], classification="a_classification_nobody_has",
+        window_days=365, exclude_email="querying@position2.com")
+    assert key not in counts_wrong_classification
+
+
+def test_a_confidential_profile_never_contributes_a_count():
+    watched = "Confidential Client Con"
+    from tracker.event_intel_discover import name_key
+    key = name_key(watched)
+    email = "confidential-client@position2.com"
+    pid = _saved_profile(email, "Confidential Co", confidential=True)
+    run = S.save_run(email, "recommend", "confidential run", profile_id=pid)
+    S.save_candidates(run, [_cand(watched)])
+    S.update_run(run, status="complete", stage="done")
+
+    counts = S.cross_client_interest([key], classification=None,
+                                     window_days=365,
+                                     exclude_email="querying@position2.com")
+    assert key not in counts, "a confidential profile's event still counted"
+
+
+def test_a_confidential_profile_is_excluded_from_the_population_too():
+    """The other half of the confidential opt-out: excluded from CONTRIBUTING
+    an event to another client's count (test above) is not the same
+    guarantee as excluded from the whole POPULATION gate, and cross_client_
+    interest and classification_population are two separate queries that
+    could drift apart -- this failed silently once already in this exact
+    mutation sweep before this test existed to catch it."""
+    import uuid
+    classification = R.CLASS_B2C_BOOTH_DENSITY
+    before = S.classification_population(
+        classification, window_days=365, exclude_email="querying@position2.com")
+    email = "confidential-population-%s@position2.com" % uuid.uuid4().hex[:8]
+    pid = _saved_profile(email, "Confidential Population Co",
+                         classification=classification, confidential=True)
+    run = S.save_run(email, "recommend", "confidential pop run", profile_id=pid)
+    S.update_run(run, status="complete", stage="done")
+    after = S.classification_population(
+        classification, window_days=365, exclude_email="querying@position2.com")
+    assert after == before, (
+        "a confidential profile still counted toward the population gate")
+
+
+def test_classification_population_counts_distinct_emails():
+    """Measured as a DELTA against the population classification_population
+    itself reports before seeding, not an exact count: `classification` has
+    to be one of the four real, enforced values (orientation_for() raises on
+    anything else, correctly), and a shared sandbox database can already
+    hold other profiles under the same one from earlier runs.
+
+    The two emails are unique to THIS run (uuid4), not fixed literals: this
+    file is meant to be re-run repeatedly against one persistent sandbox
+    database, save_profile is a plain INSERT with no conflict handling, and
+    a fixed email re-inserted on every run is not a NEW distinct email the
+    second time -- the delta this test measures would silently read as 0
+    against a database that already has data from the run before it.
+    """
+    import uuid
+    classification = R.CLASS_B2C_BOOTH_DENSITY
+    before = S.classification_population(
+        classification, window_days=365, exclude_email="querying@position2.com")
+    email_a = "population-a-%s@position2.com" % uuid.uuid4().hex[:8]
+    email_b = "population-b-%s@position2.com" % uuid.uuid4().hex[:8]
+    for email, name in ((email_a, "Pop A"), (email_b, "Pop B")):
+        pid = _saved_profile(email, name, classification=classification)
+        run = S.save_run(email, "recommend", "pop run", profile_id=pid)
+        S.update_run(run, status="complete", stage="done")
+    after = S.classification_population(
+        classification, window_days=365, exclude_email="querying@position2.com")
+    assert after - before == 2
+
+
+def test_no_identity_leaks_at_any_count_above_or_below_the_floor():
+    """The load-bearing test. JSON-scans the ENTIRE returned structure --
+    not just whatever text a report might later render from it -- for any
+    seeded other-client email or client_name, at both a below-floor and an
+    above-floor distinct-client count."""
+    import json as _json
+    watched = "Leak Check Conference"
+    from tracker.event_intel_discover import name_key
+    key = name_key(watched)
+    secrets = []
+    for i in range(4):
+        email = "secret-client-%d@position2.com" % i
+        name = "Secret Competitor %d Inc" % i
+        secrets.append(email)
+        secrets.append(name)
+        pid = _saved_profile(email, name)
+        run = S.save_run(email, "recommend", "secret run %d" % i, profile_id=pid)
+        S.save_candidates(run, [_cand(watched)])
+        S.update_run(run, status="complete", stage="done")
+
+    counts = S.cross_client_interest([key], classification=None,
+                                     window_days=365,
+                                     exclude_email="querying@position2.com")
+    population = S.classification_population(
+        None, window_days=365, exclude_email="querying@position2.com")
+    blob = _json.dumps({"counts": counts, "population": population})
+    for secret in secrets:
+        assert secret not in blob, "an identity leaked into the raw data: %r" % secret
+
+
 # ── the recommend path, end to end, against this database ────────────────
 #
 # The gap that hid the promotion bug. Every stage was unit-tested and the

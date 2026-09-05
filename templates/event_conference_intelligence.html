@@ -2791,6 +2791,16 @@
           '<div class="mm' + (c.matchmaking ? ' on' : '') + '">' +
             (c.matchmaking ? '+10 matchmaking' : 'No matchmaking bonus') +
             '<span>' + esc(c.matchmaking_reason || '') + '</span></div>' +
+          '<div class="oc' + (c.outcome_adjustment > 0 ? ' up' :
+                              c.outcome_adjustment < 0 ? ' down' : '') + '">' +
+            (c.outcome_adjustment > 0 ? '+' + c.outcome_adjustment + ' based on your history' :
+             c.outcome_adjustment < 0 ? c.outcome_adjustment + ' based on your history' :
+             'No history-based adjustment') +
+            '<span>' + esc(c.outcome_adjustment_reason || '') + '</span></div>' +
+          (c.cross_client_count ?
+            '<div class="cci">Watched by ' + c.cross_client_count +
+              ' other clients<span>' + esc(c.cross_client_note || '') +
+              '</span></div>' : '') +
         '</div>' +
         (shortfallLine ? '<p class="cshort">' + esc(shortfallLine) + '</p>' : '') +
         (c.description ? '<p class="cd">' + esc(c.description) + ' ' +

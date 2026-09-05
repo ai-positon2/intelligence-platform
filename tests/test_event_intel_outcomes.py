@@ -73,6 +73,101 @@ def test_decisions_are_counted_by_kind():
     assert out["counts"] == {"going": 1, "skipped": 1, "went": 1}
 
 
+# ── Outcome-driven order signal ────────────────────────────────────────────
+
+def _cand(name, total, category="vertical_summit", format="in_person"):
+    return {"name": name, "total": total, "tier": "P2", "category": category,
+            "format": format}
+
+
+def test_a_strong_skip_pattern_reorders_but_never_touches_total_or_tier():
+    """The one non-obvious design call, locked in: rank() has already
+    decided bucket membership and the cap, and this can only reorder
+    survivors within their bucket. "High but disliked" outscores "Low but
+    liked" on the raw rubric (79 vs 76), but its category carries a strong
+    skip pattern and the other candidate's category carries none, so the
+    -5 adjustment (74) drops it below the untouched 76 -- flipping the
+    order the raw totals alone would give."""
+    kept = [_cand("Low but liked", 76, category="side_event"),
+           _cand("High but disliked", 79, category="vertical_summit")]
+    pattern = {"by_category": {"vertical_summit":
+                               {"decisions": 4, "skipped": 4, "went_or_going": 0}},
+              "by_format": {}}
+    out = report.apply_outcome_pattern(kept, pattern)
+    assert [c["name"] for c in out] == ["Low but liked", "High but disliked"], (
+        "the skip pattern did not reorder the higher-scored, disliked event "
+        "below the lower-scored, neutral one")
+    totals = {c["name"]: c["total"] for c in out}
+    assert totals == {"Low but liked": 76, "High but disliked": 79}, (
+        "total was mutated by an order signal that must never touch it")
+    assert [c["tier"] for c in out] == ["P2", "P2"], "tier was mutated too"
+
+
+def test_a_disliked_event_still_appears_never_excluded():
+    """Direct regression test for the "never exclude" principle: an event a
+    client has a strong negative pattern against outscores a neutral one on
+    the raw rubric (74 vs 70) and is knocked BEHIND it by the -5 adjustment
+    (69 vs 70) -- but it is still ON THE LIST, just last, never dropped."""
+    kept = [_cand("Barely cleared", 70, category="side_event"),
+           _cand("Disliked category", 74, category="vertical_summit")]
+    pattern = {"by_category": {"vertical_summit":
+                               {"decisions": 5, "skipped": 5, "went_or_going": 0}},
+              "by_format": {}}
+    out = report.apply_outcome_pattern(kept, pattern)
+    assert {c["name"] for c in out} == {"Barely cleared", "Disliked category"}
+    assert out[-1]["name"] == "Disliked category"
+
+
+def test_every_row_carries_the_adjustment_and_a_reason_even_at_zero():
+    out = report.apply_outcome_pattern([_cand("X", 75)],
+                                       {"by_category": {}, "by_format": {}})
+    assert out[0]["outcome_adjustment"] == 0
+    assert out[0]["outcome_adjustment_basis"] is None
+    assert out[0]["outcome_adjustment_reason"]
+
+
+def test_an_empty_pattern_changes_nothing_about_order():
+    kept = [_cand("B", 80), _cand("A", 90)]
+    out = report.apply_outcome_pattern(kept, {"by_category": {}, "by_format": {}})
+    assert [c["name"] for c in out] == ["A", "B"]
+
+
+# ── Cross-client social proof ──────────────────────────────────────────────
+
+def test_a_firing_signal_attaches_the_count_and_an_aggregate_only_note():
+    cands = [{"name": "MAICON", "name_key": "maicon"}]
+    signal = {"maicon": {"count": 4, "fires": True}}
+    out = report.attach_cross_client_signal(cands, signal)
+    assert out[0]["cross_client_count"] == 4
+    assert "no client names" in out[0]["cross_client_note"]
+
+
+def test_a_non_firing_signal_attaches_nothing_not_a_zero():
+    """A row that was checked and found to not clear the gate must read
+    differently from a row that was never checked at all -- both get None,
+    neither is presented as a measured zero."""
+    cands = [{"name": "Small Event", "name_key": "small_event"}]
+    signal = {"small_event": {"count": 1, "fires": False}}
+    out = report.attach_cross_client_signal(cands, signal)
+    assert out[0]["cross_client_count"] is None
+    assert out[0]["cross_client_note"] is None
+
+
+def test_a_row_with_no_name_key_gets_no_signal():
+    out = report.attach_cross_client_signal([{"name": "X", "name_key": None}],
+                                            {"x": {"count": 9, "fires": True}})
+    assert out[0]["cross_client_count"] is None
+
+
+def test_the_cross_client_note_never_reorders_the_list():
+    """Pure information: unlike apply_outcome_pattern, nothing in this
+    feature's spec asks it to move anything."""
+    cands = [{"name": "B", "name_key": "b"}, {"name": "A", "name_key": "a"}]
+    signal = {"a": {"count": 5, "fires": True}}
+    out = report.attach_cross_client_signal(cands, signal)
+    assert [c["name"] for c in out] == ["B", "A"]
+
+
 @pytest.mark.parametrize("bad", ["attending", "", "GOING", "maybe", None])
 def test_an_unknown_decision_is_refused_rather_than_stored(bad):
     """The report renders DECISION_LABELS, so an unrecognised key would print
@@ -169,6 +264,65 @@ def test_the_status_column_matches_the_runs_own_cap(monkeypatch):
     status = head.index("Status")
     assert rows[1][status] == "Recommended"
     assert rows[2][status] == "Cleared the bar, cut only by list length"
+
+
+def test_the_export_carries_the_outcome_adjustment_and_its_reason(monkeypatch):
+    monkeypatch.setattr(store, "get_run", lambda rid, email: {
+        "id": rid, "query": "N", "summary": {}, "profile_id": 9})
+    monkeypatch.setattr(store, "get_profile",
+                        lambda pid, email: {"id": 9, "max_events": 15})
+    monkeypatch.setattr(store, "get_candidates", lambda rid: [
+        {"name": "Disliked Summit", "total": 74, "tier": "P2",
+         "category": "vertical_summit", "format": "in_person"}])
+    monkeypatch.setattr(store, "outcome_pattern", lambda email, pid, exclude_run_id=None: {
+        "by_category": {"vertical_summit":
+                        {"decisions": 4, "skipped": 4, "went_or_going": 0}},
+        "by_format": {}})
+    rows = _rows(_client().get(BASE + "/runs/7/candidates.csv"))
+    head, body = rows[0], rows[1]
+    adj = head.index("Your history with this category/format")
+    why = head.index("Why")
+    assert body[adj] == "-5"
+    assert "skipped 4 of the last 4" in body[why]
+
+
+def test_the_export_carries_the_cross_client_note_with_no_identity(monkeypatch):
+    monkeypatch.setattr(store, "get_run", lambda rid, email: {
+        "id": rid, "query": "N", "summary": {}, "profile_id": 9})
+    monkeypatch.setattr(store, "get_profile",
+                        lambda pid, email: {"id": 9, "max_events": 15,
+                                            "classification": "b2b_to_marketing"})
+    monkeypatch.setattr(store, "get_candidates", lambda rid: [
+        {"name": "Watched Summit", "total": 78, "tier": "P2",
+         "category": "vertical_summit", "name_key": "watched"}])
+    monkeypatch.setattr(store, "classification_population",
+                        lambda *a, **k: 10)
+    monkeypatch.setattr(store, "cross_client_interest", lambda *a, **k: {
+        "watched": {"name": "Watched Summit", "distinct_clients": 4}})
+    rows = _rows(_client().get(BASE + "/runs/7/candidates.csv"))
+    head, body = rows[0], rows[1]
+    col = head.index("Also watched by other clients (aggregate, no names)")
+    assert "4 other clients" in body[col]
+    assert "@" not in body[col], "an email address leaked into the export"
+
+
+def test_a_confidential_profile_gets_no_cross_client_column_data(monkeypatch):
+    monkeypatch.setattr(store, "get_run", lambda rid, email: {
+        "id": rid, "query": "N", "summary": {}, "profile_id": 9})
+    monkeypatch.setattr(store, "get_profile",
+                        lambda pid, email: {"id": 9, "max_events": 15,
+                                            "confidential": True})
+    monkeypatch.setattr(store, "get_candidates", lambda rid: [
+        {"name": "Private Summit", "total": 78, "tier": "P2",
+         "category": "vertical_summit", "name_key": "private"}])
+    called = []
+    monkeypatch.setattr(store, "classification_population",
+                        lambda *a, **k: called.append(1) or 10)
+    rows = _rows(_client().get(BASE + "/runs/7/candidates.csv"))
+    head, body = rows[0], rows[1]
+    col = head.index("Also watched by other clients (aggregate, no names)")
+    assert body[col] == ""
+    assert not called, "a confidential profile's export still queried the signal"
 
 
 def test_an_unscored_event_says_so_in_the_export_rather_than_showing_blank(monkeypatch):
