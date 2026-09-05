@@ -553,3 +553,81 @@ def test_the_methodology_paragraph_has_no_verbless_fragment(cls):
     for sentence in R.methodology_note(cls).split(". "):
         s = sentence.strip().rstrip(".")
         assert not s.lower().startswith("so "), s[:60]
+
+
+# ── Outcome-driven order signal (never a score input) ─────────────────────
+
+def _pattern(decisions, skipped=0, went_or_going=0):
+    return {"decisions": decisions, "skipped": skipped, "went_or_going": went_or_going}
+
+
+def test_two_of_two_is_not_enough_data_even_if_unanimous():
+    """OUTCOME_MIN_SAMPLE's whole point: a 2-of-2 streak is a coincidence
+    dressed as a preference."""
+    out = R.outcome_adjustment("vertical_summit", _pattern(2, skipped=2),
+                               None, None)
+    assert out["applied"] is False and out["adjustment"] == 0
+    assert "fewer than" in out["reason"]
+
+
+def test_three_of_three_skipped_applies_a_negative_adjustment():
+    out = R.outcome_adjustment("vertical_summit", _pattern(3, skipped=3),
+                               None, None)
+    assert out["applied"] is True
+    assert out["adjustment"] == -R.OUTCOME_ADJUSTMENT
+    assert out["basis"] == "category"
+    assert "3 of the last 3" in out["reason"]
+    assert "vertical_summit" in out["reason"]
+
+
+def test_three_of_four_went_applies_a_positive_adjustment():
+    out = R.outcome_adjustment(None, None, "hybrid",
+                               _pattern(4, went_or_going=3))
+    assert out["applied"] is True
+    assert out["adjustment"] == R.OUTCOME_ADJUSTMENT
+    assert out["basis"] == "format"
+
+
+def test_two_of_three_does_not_clear_the_rate_gate():
+    """One flipped decision away from a coin flip is not yet a pattern this
+    tool acts on, even quietly and even to reorder."""
+    out = R.outcome_adjustment("side_event", _pattern(3, skipped=2), None, None)
+    assert out["applied"] is False and out["adjustment"] == 0
+
+
+def test_category_wins_over_format_when_both_clear_the_gate():
+    """Category is the more specific dimension this rubric already scores
+    against; format cuts across every category, so it is the weaker signal."""
+    out = R.outcome_adjustment("vertical_summit", _pattern(3, skipped=3),
+                               "hybrid", _pattern(3, went_or_going=3))
+    assert out["basis"] == "category"
+    assert out["adjustment"] == -R.OUTCOME_ADJUSTMENT
+
+
+def test_falls_back_to_format_when_category_has_no_history():
+    out = R.outcome_adjustment("vertical_summit", None,
+                               "hybrid", _pattern(3, went_or_going=3))
+    assert out["basis"] == "format"
+    assert out["adjustment"] == R.OUTCOME_ADJUSTMENT
+
+
+def test_no_history_at_all_returns_a_stated_reason_not_a_silent_zero():
+    """Like matchmaking_bonus: a refused adjustment is visible rather than
+    looking like history was never considered."""
+    out = R.outcome_adjustment(None, None, None, None)
+    assert out["adjustment"] == 0 and out["applied"] is False
+    assert out["reason"]
+
+
+def test_the_adjustment_never_exceeds_its_own_cap():
+    for decisions, skipped, went in ((10, 10, 0), (100, 100, 0), (3, 0, 3)):
+        out = R.outcome_adjustment("side_event",
+                                   _pattern(decisions, skipped, went),
+                                   None, None)
+        assert abs(out["adjustment"]) <= R.OUTCOME_ADJUSTMENT
+
+
+def test_the_adjustment_is_half_the_matchmaking_bonus():
+    """Stated design ratio: inferred client-behaviour history is a full step
+    removed from evidence about THIS event, so it is capped lower."""
+    assert R.OUTCOME_ADJUSTMENT == R.MATCHMAKING_BONUS // 2

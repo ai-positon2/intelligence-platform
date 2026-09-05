@@ -1000,3 +1000,55 @@ def test_a_promotion_inherits_the_category_through_a_city_suffixed_name():
     assert out["promoted"][0]["category"] == R.CAT_INDUSTRY_FLAGSHIP
     assert not out["unconfirmed"], (
         "a confirmed replacement was still refused: %s" % out["unconfirmed"])
+
+
+# ── Cross-client social proof, k-anonymity gated ───────────────────────────
+#
+# cross_client_signal() is pure: it never touches Postgres itself, so these
+# tests exercise the gate logic directly against
+# event_intel_store.cross_client_interest()/classification_population()'s
+# documented shapes without needing a real database.
+
+def test_does_not_fire_below_the_distinct_client_floor():
+    counts = {"maicon": {"name": "MAICON", "distinct_clients": 2}}
+    out = A.cross_client_signal(counts, population=10)
+    assert out["maicon"]["fires"] is False
+    assert out["maicon"]["count"] == 2
+
+
+def test_fires_exactly_at_the_distinct_client_floor():
+    counts = {"maicon": {"name": "MAICON", "distinct_clients": A.CROSS_CLIENT_MIN_DISTINCT}}
+    out = A.cross_client_signal(counts, population=A.CROSS_CLIENT_MIN_POPULATION)
+    assert out["maicon"]["fires"] is True
+
+
+def test_does_not_fire_when_the_whole_population_is_too_small():
+    """The small-population elimination guard: a raw count above the
+    distinct-client floor is still unsafe to say out loud if the whole
+    classification bucket barely has more clients than that floor."""
+    counts = {"maicon": {"name": "MAICON", "distinct_clients": 5}}
+    out = A.cross_client_signal(counts, population=A.CROSS_CLIENT_MIN_POPULATION - 1)
+    assert out["maicon"]["fires"] is False
+
+
+def test_returns_only_count_and_fires_never_an_identity_field():
+    """Structural: no field in the output could ever carry an email, run_id
+    or client_name, at any count, because there is no such field to begin
+    with."""
+    counts = {"maicon": {"name": "MAICON", "distinct_clients": 9},
+             "b2bmx": {"name": "B2BMX", "distinct_clients": 1}}
+    out = A.cross_client_signal(counts, population=50)
+    for row in out.values():
+        assert set(row.keys()) == {"count", "fires"}
+
+
+def test_an_empty_or_falsy_key_is_skipped():
+    out = A.cross_client_signal({"": {"name": "X", "distinct_clients": 9}},
+                                population=50)
+    assert out == {}
+
+
+def test_the_population_floor_is_the_distinct_floor_plus_two():
+    """Stated design ratio in the module's own comment: k=3 plus a margin of
+    two so the classification bucket has a real population to hide within."""
+    assert A.CROSS_CLIENT_MIN_POPULATION == A.CROSS_CLIENT_MIN_DISTINCT + 2
