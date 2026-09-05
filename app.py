@@ -8879,7 +8879,7 @@ def event_conference_intelligence_status(run_id):
 @app.route("/p2/b2b-agents/event-conference-intelligence/runs/<int:run_id>")
 @position2_required
 def event_conference_intelligence_run_detail(run_id):
-    from tracker import event_intel_store
+    from tracker import event_intel_audit, event_intel_report, event_intel_store
     email = (_get_user() or {}).get("email", "").lower()
     run = event_intel_store.get_run(run_id, email)
     if not run:
@@ -8897,6 +8897,40 @@ def event_conference_intelligence_run_detail(run_id):
         run["outreach"] = event_intel_store.get_outreach(run_id)
     if run.get("profile_id"):
         run["profile"] = event_intel_store.get_profile(run["profile_id"], email)
+    profile = run.get("profile") or {}
+    if run.get("mode") == "recommend" and run.get("candidates"):
+        # Attached as extra fields on the existing rows, exactly as the CSV
+        # export does it (same shared functions, same reasoning): this
+        # client's own outcome history keeps growing after the run
+        # completed, so it is read live on every page load rather than
+        # trusted from whatever the summary happened to compute at run
+        # time. Not re-sorted here -- the page's own client-side rendering
+        # already has an established order contract over this array that a
+        # server-side reorder risks silently breaking without its own
+        # dedicated verification; the adjustment is visible information on
+        # each row regardless of row order.
+        if profile.get("id"):
+            pattern = event_intel_store.outcome_pattern(
+                email, profile["id"], exclude_run_id=run_id)
+            by_key = {c.get("name_key") or id(c): c for c in
+                     event_intel_report.apply_outcome_pattern(
+                         run["candidates"], pattern)}
+            for c in run["candidates"]:
+                src = by_key.get(c.get("name_key") or id(c)) or {}
+                c["outcome_adjustment"] = src.get("outcome_adjustment", 0)
+                c["outcome_adjustment_basis"] = src.get("outcome_adjustment_basis")
+                c["outcome_adjustment_reason"] = src.get("outcome_adjustment_reason")
+        if not profile.get("confidential"):
+            population = event_intel_store.classification_population(
+                profile.get("classification"), window_days=120,
+                exclude_email=email)
+            raw_counts = event_intel_store.cross_client_interest(
+                [c.get("name_key") for c in run["candidates"] if c.get("name_key")],
+                classification=profile.get("classification"), window_days=120,
+                exclude_email=email)
+            cross = event_intel_audit.cross_client_signal(raw_counts, population)
+            run["candidates"] = event_intel_report.attach_cross_client_signal(
+                run["candidates"], cross)
     return jsonify(run)
 
 
@@ -8928,7 +8962,8 @@ def event_conference_intelligence_candidates_csv(run_id):
     """
     import csv
     import io
-    from tracker import event_intel_report, event_intel_rubric, event_intel_store
+    from tracker import (event_intel_audit, event_intel_report,
+                         event_intel_rubric, event_intel_store)
     from tracker.event_intel_discover import name_key
     email = (_get_user() or {}).get("email", "").lower()
     run = event_intel_store.get_run(run_id, email)
@@ -8944,6 +8979,40 @@ def event_conference_intelligence_candidates_csv(run_id):
     cap = int(profile.get("max_events") or event_intel_rubric.DEFAULT_CAP)
     status_by_key = event_intel_report.status_labels(rows, cap=cap)
 
+    # Same shared functions the executive summary and the run-detail route
+    # use, so the export cannot disagree with either about what this
+    # client's own history or other clients' interest says -- the exact
+    # discipline status_labels() above already established for "on the
+    # list". Looked up by name_key from apply_outcome_pattern's OWN return
+    # value rather than applied to `rows` directly, because that function
+    # also RE-SORTS its input (by design, for the page and the summary),
+    # and the CSV's row order is its own separate, existing contract (raw
+    # SQL order) that this addition must not silently change.
+    outcome_by_key = {}
+    if profile.get("id"):
+        pattern = event_intel_store.outcome_pattern(email, profile["id"],
+                                                     exclude_run_id=run_id)
+        for c in event_intel_report.apply_outcome_pattern(rows, pattern):
+            key = name_key(c.get("name") or "")
+            if key:
+                outcome_by_key[key] = c
+
+    # Cross-client interest never reorders (see its own docstring), so it can
+    # be applied to `rows` directly without disturbing CSV row order.
+    cross_by_key = {}
+    if not profile.get("confidential"):
+        population = event_intel_store.classification_population(
+            profile.get("classification"), window_days=120, exclude_email=email)
+        raw_counts = event_intel_store.cross_client_interest(
+            [c.get("name_key") for c in rows if c.get("name_key")],
+            classification=profile.get("classification"), window_days=120,
+            exclude_email=email)
+        cross = event_intel_audit.cross_client_signal(raw_counts, population)
+        for c in event_intel_report.attach_cross_client_signal(rows, cross):
+            key = name_key(c.get("name") or "")
+            if key:
+                cross_by_key[key] = c
+
     buf = io.StringIO()
     w = csv.writer(buf)
     w.writerow(["Event", "Edition", "Tier", "Total /110", "Status",
@@ -8951,6 +9020,8 @@ def event_conference_intelligence_candidates_csv(run_id):
                 "Decision-maker access /40", "DM access reasoning",
                 "Engagement /20", "Engagement reasoning",
                 "Matchmaking bonus", "Matchmaking decision",
+                "Your history with this category/format", "Why",
+                "Also watched by other clients (aggregate, no names)",
                 "Discovery category", "Famous-event verdict", "Famous-event note",
                 "Starts", "Ends", "City", "Country",
                 "Published attendance (their claim)", "Published exhibitors",
@@ -8958,9 +9029,12 @@ def event_conference_intelligence_candidates_csv(run_id):
                 "Why it matters to this client", "Website"])
     for c in rows:
         total = c.get("total")
-        status = status_by_key.get(name_key(c.get("name") or ""),
+        key = name_key(c.get("name") or "")
+        status = status_by_key.get(key,
                                    "Not scored" if total is None else
                                    "Excluded, below the bar")
+        outcome_row = outcome_by_key.get(key) or {}
+        cross_row = cross_by_key.get(key) or {}
         w.writerow([
             c.get("name") or "", c.get("edition") or "", c.get("tier") or "",
             total if total is not None else "not scored", status,
@@ -8971,6 +9045,9 @@ def event_conference_intelligence_candidates_csv(run_id):
             c.get("engagement") if c.get("engagement") is not None else "",
             c.get("engagement_note") or "",
             c.get("matchmaking") or 0, c.get("matchmaking_reason") or "",
+            outcome_row.get("outcome_adjustment") or 0,
+            outcome_row.get("outcome_adjustment_reason") or "",
+            cross_row.get("cross_client_note") or "",
             event_intel_rubric.CATEGORY_LABELS.get(c.get("category"), c.get("category") or ""),
             c.get("audit_verdict") or "", c.get("audit_note") or "",
             c.get("starts_on") or "", c.get("ends_on") or "",
@@ -9074,11 +9151,20 @@ def event_conference_intelligence_outcomes():
     if request.method == "GET":
         return jsonify({"outcomes": event_intel_store.get_outcomes(email)})
     payload = request.get_json(silent=True) or {}
+    # Looked up rather than trusted from the payload: which profile this
+    # decision belongs to has to come from the run record itself, or a client
+    # could tag its own decision onto someone else's profile_id.
+    run_id = payload.get("run_id")
+    profile_id = None
+    if run_id:
+        source_run = event_intel_store.get_run(run_id, email)
+        if source_run:
+            profile_id = source_run.get("profile_id")
     try:
         ok = event_intel_store.save_outcome(
             email, str(payload.get("event_name") or ""),
             str(payload.get("decision") or ""), payload.get("note"),
-            payload.get("run_id"))
+            run_id, profile_id)
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
     if not ok:

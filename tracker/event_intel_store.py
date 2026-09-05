@@ -357,6 +357,37 @@ def _ensure_tables(conn) -> None:
         # which renders as nothing rather than as "in person".
         cur.execute("ALTER TABLE evi_candidates ADD COLUMN IF NOT EXISTS "
                     "format VARCHAR(16)")
+        # The same normalisation evi_outcomes.event_key already computes at
+        # write time (name_key(name)), stored on the candidate row too so a
+        # client's outcome history can be joined to what CATEGORY/FORMAT the
+        # event they decided on actually was, without a second copy of the
+        # matching logic re-implemented in SQL. Existing rows get NULL and
+        # are excluded from the join rather than backfilled: a name_key
+        # computed today from a name written months ago is a fresh read of
+        # old data, not a fact this migration should assert on its own.
+        cur.execute("ALTER TABLE evi_candidates ADD COLUMN IF NOT EXISTS "
+                    "name_key VARCHAR(300)")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_evi_candidates_name_key "
+                    "ON evi_candidates (name_key)")
+        # Which locked client profile an outcome was decided under. One email
+        # can hold several profiles (an agency login managing several
+        # clients' calendars); without this, a preference learned for one
+        # profile would leak into another profile's scoring the moment they
+        # share a login. Nullable: existing rows predate profile-scoped
+        # history and are excluded from outcome_pattern() rather than guessed.
+        cur.execute("ALTER TABLE evi_outcomes ADD COLUMN IF NOT EXISTS "
+                    "profile_id INTEGER REFERENCES evi_profiles(id)")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_evi_runs_profile "
+                    "ON evi_runs (profile_id)")
+        # A client this account manages under an arrangement where even the
+        # AGGREGATE fact of their interest in an event must not be shared.
+        # Defaults FALSE, so this ships at zero behaviour change until it is
+        # deliberately set: see cross_client_interest(), which excludes a
+        # confidential profile from ever CONTRIBUTING to another client's
+        # count, and event_intel_pipeline, which skips ever showing the
+        # signal TO a confidential profile in the first place.
+        cur.execute("ALTER TABLE evi_profiles ADD COLUMN IF NOT EXISTS "
+                    "confidential BOOLEAN NOT NULL DEFAULT FALSE")
     conn.commit()
     _TABLES_READY = True
 
@@ -768,6 +799,13 @@ def normalise_profile(payload: dict) -> dict:
     # maximum returned list.
     out["window_months"] = _int("window_months", 12, 1, 36)
     out["max_events"] = _int("max_events", rubric.DEFAULT_CAP, 1, 25)
+    # No settings-page toggle exists yet for this (deliberately deferred --
+    # the copy and any contractual meaning of "confidential" is a real
+    # product/legal surface of its own), so every save today sends nothing
+    # for this key and it defaults to False: zero behaviour change until a
+    # caller deliberately sets it. See cross_client_interest() for what it
+    # actually gates.
+    out["confidential"] = bool(p.get("confidential"))
     return out
 
 
@@ -798,7 +836,7 @@ def save_profile(email: str, payload: dict) -> int | None:
 _PROFILE_COLS = ("id, email, client_name, website, classification, orientation, "
                  "buyer_roles, verticals, acv_band, sales_cycle, geo_scope, "
                  "window_months, force_include, force_exclude, max_events, "
-                 "budget_note, created_at, updated_at")
+                 "budget_note, confidential, created_at, updated_at")
 
 
 def get_profile(profile_id: int, email: str) -> dict | None:
@@ -873,7 +911,7 @@ def update_profile(profile_id: int, email: str, payload: dict) -> bool:
 # ── candidates (scored events) ────────────────────────────────────────────
 
 _CANDIDATE_FIELDS = (
-    "event_id", "name", "edition", "website", "organizer", "starts_on", "ends_on",
+    "event_id", "name", "name_key", "edition", "website", "organizer", "starts_on", "ends_on",
     "country", "city", "quarter", "days", "industry", "attendees", "booths",
     "format", "category", "famous", "audit_verdict", "audit_note",
     "relevance", "relevance_note", "dm_access", "dm_access_note",
@@ -994,9 +1032,16 @@ def normalise_candidate(raw: dict) -> dict | None:
         raw_when = str(r.get("starts_on") or "").strip()
         quarter = raw_when[:12] or None
 
+    # Computed here, once, at write time -- the same idiom evi_outcomes'
+    # own event_key already uses (see save_outcome below). A client's future
+    # outcome history is joined back to this row by this column, in
+    # outcome_pattern(), rather than re-deriving name_key's normalisation a
+    # second time in SQL.
+    from .event_intel_discover import name_key
     out = {
         "event_id": r.get("event_id"),
         "name": name[:250],
+        "name_key": name_key(name) or None,
         "edition": _txt("edition", 80),
         "website": website or None,
         "organizer": _txt("organizer", 200),
@@ -1162,6 +1207,118 @@ def prior_candidate_names(email: str, exclude_run_id: int | None = None,
     except Exception as e:
         logger.warning("event_intel_store.prior_candidate_names failed: %s", e)
         return []
+    finally:
+        conn.close()
+
+
+# ── Cross-client intelligence, k-anonymity gated ───────────────────────────
+#
+# Every query above this line filters WHERE email = %s. This is the first
+# one in this file that crosses email on purpose. genericness() (in
+# event_intel_audit.py) reads like a cross-client check but is not one: it
+# compares different client_name PROFILES under the SAME shared login. The
+# two functions below intentionally cross real tenant boundaries, so they are
+# held to a stricter rule than anything else here: the RETURN VALUE itself
+# must never carry another client's email, run_id or client_name -- not
+# withheld only in whatever text later gets rendered from it. genericness()'s
+# own `worst`/`comparisons` dict still carries the other client's real name
+# today, masked only by its rendered `advice` string; that is a data-layer
+# leak this pair is deliberately built not to repeat.
+#
+# The k-anonymity floor itself (how many distinct clients before a count is
+# safe to say out loud at all) lives in event_intel_audit.cross_client_signal,
+# next to genericness() -- these two functions only ever return raw counts,
+# never a yes/no verdict, so nobody downstream can mistake an unfiltered
+# query result for a cleared privacy check.
+
+def cross_client_interest(name_keys: list[str], classification: str | None,
+                          window_days: int, exclude_email: str) -> dict:
+    """{name_key: {"name": str, "distinct_clients": int}} across OTHER
+    clients' completed recommend runs, for events those clients themselves
+    KEPT (score cleared rubric.RANK_FLOOR -- "also considered or kept", never
+    "was searched and discarded").
+
+    `classification` narrows to profiles with a comparable buyer-access shape
+    (pass None to skip that filter). `window_days` counts from when the
+    OTHER client's run happened (evi_runs.created_at), not the event's own
+    date: the question is whether multiple clients are independently being
+    pointed at this right now, which the event's own start date (often
+    months out) does not answer, and evi_candidates.quarter is a free-text
+    fallback only populated when no real date parsed -- not reliable enough
+    to filter on.
+
+    A confidential profile's candidates never contribute a count here (see
+    evi_profiles.confidential); the calling client is always excluded from
+    its own count via `exclude_email`.
+    """
+    if not name_keys:
+        return {}
+    from . import event_intel_rubric as rubric
+    conn = _pg_conn()
+    if conn is None:
+        return {}
+    try:
+        _ensure_tables(conn)
+        sql = (
+            "SELECT c.name_key, MIN(c.name) AS name, "
+            "       COUNT(DISTINCT r.email) AS distinct_clients "
+            "FROM evi_candidates c "
+            "JOIN evi_runs r ON r.id = c.run_id "
+            "LEFT JOIN evi_profiles p ON p.id = r.profile_id "
+            "WHERE c.name_key = ANY(%s) "
+            "AND r.mode = 'recommend' AND r.status = 'complete' "
+            "AND c.total >= %s "
+            "AND r.created_at >= now() - (%s || ' days')::interval "
+            "AND r.email <> %s "
+            "AND NOT COALESCE(p.confidential, false)")
+        args: list[Any] = [name_keys, rubric.RANK_FLOOR, window_days, exclude_email]
+        if classification:
+            sql += " AND p.classification = %s"
+            args.append(classification)
+        sql += " GROUP BY c.name_key"
+        with conn.cursor() as cur:
+            cur.execute(sql, args)
+            return {row[0]: {"name": row[1], "distinct_clients": row[2]}
+                    for row in cur.fetchall()}
+    except Exception as e:
+        logger.warning("event_intel_store.cross_client_interest failed: %s", e)
+        return {}
+    finally:
+        conn.close()
+
+
+def classification_population(classification: str | None, window_days: int,
+                              exclude_email: str) -> int:
+    """How many DISTINCT clients (this one excluded) have a completed
+    recommend run in this classification within the window.
+
+    The population cross_client_signal's second k-anonymity gate needs: a raw
+    "3 or more other clients" floor is close to meaningless, and arguably
+    re-identifying by elimination, in a classification bucket that only has
+    4 or 5 clients ever -- see CROSS_CLIENT_MIN_POPULATION.
+    """
+    conn = _pg_conn()
+    if conn is None:
+        return 0
+    try:
+        _ensure_tables(conn)
+        sql = (
+            "SELECT COUNT(DISTINCT r.email) "
+            "FROM evi_runs r LEFT JOIN evi_profiles p ON p.id = r.profile_id "
+            "WHERE r.mode = 'recommend' AND r.status = 'complete' "
+            "AND r.created_at >= now() - (%s || ' days')::interval "
+            "AND r.email <> %s "
+            "AND NOT COALESCE(p.confidential, false)")
+        args: list[Any] = [window_days, exclude_email]
+        if classification:
+            sql += " AND p.classification = %s"
+            args.append(classification)
+        with conn.cursor() as cur:
+            cur.execute(sql, args)
+            return cur.fetchone()[0] or 0
+    except Exception as e:
+        logger.warning("event_intel_store.classification_population failed: %s", e)
+        return 0
     finally:
         conn.close()
 
@@ -1353,7 +1510,8 @@ DECISION_LABELS = {
 
 
 def save_outcome(email: str, event_name: str, decision: str,
-                 note: str | None = None, run_id: int | None = None) -> bool:
+                 note: str | None = None, run_id: int | None = None,
+                 profile_id: int | None = None) -> bool:
     """Record what the user decided about one event.
 
     Keyed on the event, not the run, so a decision made on one recommendation
@@ -1363,6 +1521,13 @@ def save_outcome(email: str, event_name: str, decision: str,
 
     A decision this does not recognise is refused rather than stored, because
     the report renders DECISION_LABELS and an unknown key would print raw.
+
+    `profile_id` is which locked client profile this decision belongs to,
+    used by outcome_pattern() to keep one profile's history from leaking into
+    another profile's scoring under the same email. COALESCEd against the
+    existing row on conflict rather than overwritten outright, so a later
+    save that omits it (an older client, or a route that has not been
+    updated) never blanks a profile that was already recorded correctly.
     """
     from .event_intel_discover import name_key
     name = (event_name or "").strip()
@@ -1379,12 +1544,14 @@ def save_outcome(email: str, event_name: str, decision: str,
         with conn.cursor() as cur:
             cur.execute(
                 "INSERT INTO evi_outcomes (email, event_key, event_name, decision, "
-                "note, run_id) VALUES (%s, %s, %s, %s, %s, %s) "
+                "note, run_id, profile_id) VALUES (%s, %s, %s, %s, %s, %s, %s) "
                 "ON CONFLICT (email, event_key) DO UPDATE SET "
                 "decision = EXCLUDED.decision, note = EXCLUDED.note, "
-                "event_name = EXCLUDED.event_name, updated_at = now()",
+                "event_name = EXCLUDED.event_name, "
+                "profile_id = COALESCE(EXCLUDED.profile_id, evi_outcomes.profile_id), "
+                "updated_at = now()",
                 (email, name_key(name), name[:300], decision,
-                 (note or "").strip()[:2000] or None, run_id))
+                 (note or "").strip()[:2000] or None, run_id, profile_id))
         conn.commit()
         return True
     except Exception as e:
@@ -1417,3 +1584,70 @@ def get_outcomes(email: str) -> dict:
         return {}
     finally:
         conn.close()
+
+
+def outcome_pattern(email: str, profile_id: int | None,
+                    exclude_run_id: int | None = None) -> dict:
+    """This client profile's own accumulated pattern, by category and by
+    format, over every event they were ever shown and later decided on.
+
+    Returns {"by_category": {cat: {"decisions", "skipped", "went_or_going"}},
+             "by_format": {fmt: {...}}}, feeding rubric.outcome_adjustment().
+
+    Scoped by (email, profile_id), not email alone. One login can hold
+    several locked client profiles -- an agency managing several clients'
+    event calendars under one account -- and evi_outcomes has no per-profile
+    uniqueness of its own (it is keyed on (email, event_key), a pre-existing
+    limitation named in outcome_adjustment's own module, not fixed here).
+    Scoping this JOIN by r.profile_id is what stops one profile's history
+    from depressing or inflating a DIFFERENT profile's scores the moment
+    they share a login: without it, Acme's dislike of vertical summits would
+    silently reach Widget Co.'s candidates.
+
+    A candidate row from before the name_key migration (NULL) cannot be
+    joined to an outcome and is correctly excluded, not guessed at.
+    """
+    if not profile_id:
+        return {"by_category": {}, "by_format": {}}
+    conn = _pg_conn()
+    if conn is None:
+        return {"by_category": {}, "by_format": {}}
+    try:
+        _ensure_tables(conn)
+        sql = (
+            "SELECT c.category, c.format, o.decision, count(*) AS n "
+            "FROM evi_candidates c "
+            "JOIN evi_runs r ON r.id = c.run_id "
+            "JOIN evi_outcomes o ON o.email = r.email AND o.event_key = c.name_key "
+            "WHERE r.email = %s AND r.profile_id = %s "
+            "AND c.name_key IS NOT NULL AND c.name_key <> ''")
+        args: list[Any] = [email, profile_id]
+        if exclude_run_id:
+            sql += " AND r.id <> %s"
+            args.append(exclude_run_id)
+        sql += " GROUP BY c.category, c.format, o.decision"
+        with conn.cursor() as cur:
+            cur.execute(sql, args)
+            rows = cur.fetchall()
+    except Exception as e:
+        logger.warning("event_intel_store.outcome_pattern failed: %s", e)
+        return {"by_category": {}, "by_format": {}}
+    finally:
+        conn.close()
+
+    def _bucket(store: dict, key: str | None, decision: str, n: int) -> None:
+        if not key:
+            return
+        b = store.setdefault(key, {"decisions": 0, "skipped": 0, "went_or_going": 0})
+        b["decisions"] += n
+        if decision == DECISION_SKIPPED:
+            b["skipped"] += n
+        elif decision in (DECISION_WENT, DECISION_GOING):
+            b["went_or_going"] += n
+
+    by_category: dict = {}
+    by_format: dict = {}
+    for category, fmt, decision, n in rows:
+        _bucket(by_category, category, decision, n)
+        _bucket(by_format, fmt, decision, n)
+    return {"by_category": by_category, "by_format": by_format}

@@ -781,3 +781,71 @@ def genericness(names: list[str], prior_runs: list[dict],
     return {"measured": True, "flagged": flagged, "checked": len(comparisons),
             "worst": worst, "comparisons": comparisons[:5],
             "why_not_measured": "", "advice": advice}
+
+
+# ── Cross-client social proof, k-anonymity gated ───────────────────────────
+#
+# genericness() above compares different client PROFILES under one shared
+# login (the population event_intel_store.prior_candidate_names() reads).
+# This is a genuinely different check: whether OTHER Position2 clients --
+# real different logins, potentially competitors of one another -- are
+# independently converging on the same event. Position2 sells this platform
+# to more than one client at a time, and that shared history is exactly the
+# thing a one-shot deep-research session can never have; the whole point is
+# to use it, safely.
+#
+# "Safely" here means classic k-anonymity, not merely "don't print the
+# name". event_intel_store.cross_client_interest() already withholds every
+# identifying field at the SQL layer -- there is no email, run_id or
+# client_name anywhere in what it returns, so there is nothing for a caller
+# to leak by accident the way genericness()'s own worst/comparisons dict
+# still can. What is left to get right is the THRESHOLD: a raw count is not
+# automatically safe just because it carries no name.
+
+# k=2 is trivially reversible: told "one other client also kept this event",
+# anyone who already suspects a specific competitor is on this list has that
+# suspicion CONFIRMED outright, with certainty, by a system that named no
+# one. k=3 is the standard k-anonymity minimum for exactly this reason: even
+# a reader who correctly guesses ONE of the three cannot tell whether the
+# other two are real or whether the set would not have fired at all with
+# fewer than three, which is what makes the guess unconfirmed.
+CROSS_CLIENT_MIN_DISTINCT = 3
+
+# k-anonymity's guarantee assumes there is a real population to hide within.
+# A classification bucket that only has, say, four clients ever makes "3
+# others" close to fully identifying by elimination for whoever the fourth
+# is. This second gate requires the WHOLE bucket (this client included) to
+# be at least CROSS_CLIENT_MIN_DISTINCT + 2 = 5 distinct clients before the
+# feature is allowed to fire on it AT ALL, regardless of how the count for
+# any one event comes out. On a small client base this correctly suppresses
+# the feature entirely -- that is the gate working, not a bug to chase; it
+# starts firing on its own once the classification's client base actually
+# grows past it.
+CROSS_CLIENT_MIN_POPULATION = CROSS_CLIENT_MIN_DISTINCT + 2
+
+
+def cross_client_signal(counts: dict, population: int) -> dict:
+    """Which of these events are safe to say "N other clients also kept
+    this" about, and how many.
+
+    Pure. `counts` is event_intel_store.cross_client_interest()'s return
+    value ({name_key: {"name", "distinct_clients"}}); `population` is
+    event_intel_store.classification_population()'s count for the same
+    classification and window. Neither carries an identity field, and
+    neither does this function's output: {name_key: {"count": int,
+    "fires": bool}}, nothing else, by construction -- there is no field
+    here FOR an email or client_name to occupy even by accident.
+
+    `fires` requires BOTH gates: the count clears CROSS_CLIENT_MIN_DISTINCT
+    AND the classification's whole population clears
+    CROSS_CLIENT_MIN_POPULATION. Either alone is not enough.
+    """
+    enough_population = population >= CROSS_CLIENT_MIN_POPULATION
+    out = {}
+    for key, row in (counts or {}).items():
+        if not key:
+            continue
+        n = int((row or {}).get("distinct_clients") or 0)
+        out[key] = {"count": n,
+                    "fires": bool(enough_population and n >= CROSS_CLIENT_MIN_DISTINCT)}
+    return out

@@ -369,6 +369,21 @@ def notes(*, shortfall: list, audit: dict, generic: dict,
                       "earlier recommendations"),
                    round((generic.get("worst") or {}).get("overlap", 0) * 100)))
 
+    # Read off `candidates` itself (already annotated by
+    # attach_cross_client_signal before notes() is ever called), the same
+    # way the attendance-claims note just below reads `candidates` directly
+    # rather than taking a separate summary parameter that could drift out
+    # of step with it.
+    watched = [c for c in (candidates or []) if c.get("cross_client_count")]
+    if watched:
+        add(LEVEL_NOTE,
+            "%s on this list %s also being watched by other clients"
+            % (_n(len(watched), "event", "events"),
+               "is" if len(watched) == 1 else "are"),
+            "%s. Aggregate counts only: no client names are ever shown."
+            % "; ".join("%s (%d)" % (c.get("name"), c["cross_client_count"])
+                       for c in watched[:6]))
+
     claimed = [c for c in (candidates or []) if c.get("attendees")]
     if claimed:
         add(LEVEL_NOTE,
@@ -521,6 +536,20 @@ def top_five(kept: list[dict]) -> list[dict]:
                              "no written case was, so read the breakdown "
                              "rather than this line."),
             "case_is_generic": bool(generic and c.get("description")),
+            # Carried through from apply_outcome_pattern/attach_cross_client_
+            # signal, both of which run on `kept` before top_five() truncates
+            # it to this fixed field set. Without this, the flagship "top
+            # five" element of the report -- the one a client actually
+            # reads -- would show neither signal at all: order would change
+            # silently with no reason on screen, and a live end-to-end check
+            # against real Postgres is what caught this being dropped here,
+            # not a unit test, since every existing test asserted on ORDER
+            # or on the full candidate list rather than on this element's
+            # own field set.
+            "outcome_adjustment": c.get("outcome_adjustment"),
+            "outcome_adjustment_reason": c.get("outcome_adjustment_reason"),
+            "cross_client_count": c.get("cross_client_count"),
+            "cross_client_note": c.get("cross_client_note"),
         })
     return out
 
@@ -669,3 +698,56 @@ def annotate_outcomes(candidates: list[dict], outcomes: dict) -> dict:
             "time may not be right now, and that is your call rather than this "
             "tool's." % total) if total else None,
     }
+
+
+def apply_outcome_pattern(candidates: list[dict], pattern: dict) -> list[dict]:
+    """Attach rubric.outcome_adjustment()'s verdict to every row and RE-SORT
+    by it. `total`/`tier` are never touched -- see rubric.outcome_adjustment's
+    own docstring for why -- so this can only reorder candidates that
+    rank() has already put in the SAME bucket; it must never be given the
+    unbucketed, uncapped list to sort (call it separately on `kept` and on
+    `worth_a_look`, after rank() has already decided both).
+    """
+    from . import event_intel_rubric as rubric
+    by_cat = (pattern or {}).get("by_category") or {}
+    by_fmt = (pattern or {}).get("by_format") or {}
+    out = []
+    for c in (candidates or []):
+        c = dict(c)
+        verdict = rubric.outcome_adjustment(
+            c.get("category"), by_cat.get(c.get("category")),
+            c.get("format"), by_fmt.get(c.get("format")))
+        c["outcome_adjustment"] = verdict["adjustment"]
+        c["outcome_adjustment_basis"] = verdict["basis"]
+        c["outcome_adjustment_reason"] = verdict["reason"]
+        out.append(c)
+    out.sort(key=lambda c: (-((c.get("total") or 0) + (c.get("outcome_adjustment") or 0)),
+                            (c.get("name") or "").lower()))
+    return out
+
+
+def attach_cross_client_signal(candidates: list[dict], signal: dict) -> list[dict]:
+    """Attach cross_client_count/cross_client_note per row, from
+    event_intel_audit.cross_client_signal()'s output.
+
+    Pure information, never a reorder: nothing in this feature's spec asks
+    it to move anything, unlike apply_outcome_pattern above. A row whose
+    name_key is not in `signal`, or whose entry does not clear `fires`, gets
+    no count at all -- not a zero, which would read as "checked and found
+    none" about a check this run never actually ran for that event.
+    """
+    out = []
+    for c in (candidates or []):
+        c = dict(c)
+        row = (signal or {}).get(c.get("name_key")) or {}
+        if row.get("fires"):
+            c["cross_client_count"] = row["count"]
+            c["cross_client_note"] = (
+                "Also kept by %d other clients with a similar buyer-access "
+                "profile in the last quarter. Aggregate only: no client "
+                "names are ever shown." % row["count"])
+        else:
+            c["cross_client_count"] = None
+            c["cross_client_note"] = None
+        out.append(c)
+    return out

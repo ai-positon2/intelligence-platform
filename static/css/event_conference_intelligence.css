@@ -2497,6 +2497,38 @@ table.evi-table { width: 100%; border-collapse: separate; border-spacing: 0;
 .evi-cand .mm span {
   display: block; font-weight: 400; color: var(--evi-ink-3); margin-top: 3px;
 }
+
+/* This client's own outcome history, as an order-only signal that never
+   touches the ring above it: same layout as .mm, a neutral base state, and
+   up/down instead of on/off since this can push either direction. */
+.evi-cand .oc {
+  grid-column: 2; font-size: 11px; line-height: 1.5; color: var(--evi-ink-3);
+  padding: 7px 10px; border-radius: var(--radius-sm, 8px);
+  background: var(--evi-line-2); border: 1px solid transparent;
+}
+.evi-cand .oc.up {
+  color: var(--evi-ok); background: rgba(74,222,128,.1);
+  border-color: rgba(74,222,128,.24); font-weight: 600;
+}
+.evi-cand .oc.down {
+  color: var(--evi-bad); background: rgba(251,113,133,.1);
+  border-color: rgba(251,113,133,.24); font-weight: 600;
+}
+.evi-cand .oc span {
+  display: block; font-weight: 400; color: var(--evi-ink-3); margin-top: 3px;
+}
+
+/* Cross-client social proof. Only ever rendered when it actually fires (see
+   the template), so there is no "0 other clients" neutral state to design
+   for -- unlike .mm/.oc, which always show something. */
+.evi-cand .cci {
+  grid-column: 2; font-size: 11px; line-height: 1.5; color: var(--evi-ink-2);
+  padding: 7px 10px; border-radius: var(--radius-sm, 8px);
+  background: var(--evi-line-2); border: 1px solid transparent; font-weight: 600;
+}
+.evi-cand .cci span {
+  display: block; font-weight: 400; color: var(--evi-ink-3); margin-top: 3px;
+}
 .evi-cand .cd {
   font-size: 13.5px; line-height: 1.65; color: var(--evi-ink-2); max-width: 76ch;
 }
@@ -2839,7 +2871,7 @@ table.evi-table { width: 100%; border-collapse: separate; border-spacing: 0;
     grid-row: auto; border-right: none; padding-right: 0; margin-right: 0;
     border-bottom: 1px solid var(--evi-line-2); padding-bottom: 10px; max-width: none;
   }
-  .evi-cand .mm { grid-column: 1; }
+  .evi-cand .mm, .evi-cand .oc, .evi-cand .cci { grid-column: 1; }
   .evi-out .ot { flex-direction: column; }
   .evi-out .ofit { text-align: left; }
 }

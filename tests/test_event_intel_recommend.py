@@ -409,6 +409,22 @@ def test_top_five_marks_a_case_that_is_really_the_generic_description():
     assert top[0]["case_is_generic"] is True
 
 
+def test_top_five_carries_the_outcome_and_cross_client_signals():
+    """A live end-to-end check against real Postgres is what caught this
+    field set being dropped here in the first place: every OTHER test of
+    this feature asserted on ordering or on the full candidate list, never
+    on top_five's own fixed field set, which is the one the report's
+    flagship "top five" element actually reads."""
+    top = REP.top_five([{"name": "E", "total": 76, "outcome_adjustment": -5,
+                         "outcome_adjustment_reason": "Skipped before.",
+                         "cross_client_count": 3,
+                         "cross_client_note": "Watched by 3 other clients."}])
+    assert top[0]["outcome_adjustment"] == -5
+    assert top[0]["outcome_adjustment_reason"] == "Skipped before."
+    assert top[0]["cross_client_count"] == 3
+    assert top[0]["cross_client_note"] == "Watched by 3 other clients."
+
+
 def test_top_five_does_not_mark_a_real_client_case_as_generic():
     top = REP.top_five([{"name": "E", "total": 90,
                          "description": "Six hundred payments people.",
@@ -422,10 +438,21 @@ def test_top_five_does_not_mark_a_real_client_case_as_generic():
 class _FakeStore:
     """Just enough of the store to run the pipeline without Postgres, keeping
     the real normalise_candidate so totals are still recomputed from
-    sub-scores rather than trusted."""
+    sub-scores rather than trusted.
+
+    outcome_pattern_data/cross_client_counts/population default to empty/zero
+    -- the same safe defaults the real store returns with no DATABASE_URL --
+    so every existing test that does not care about these two features is
+    unaffected. Tests that DO care set them directly on the instance before
+    calling _run_recommend.
+    """
 
     def __init__(self):
         self.runs, self.rows = {}, []
+        self.outcomes = {}
+        self.outcome_pattern_data = {"by_category": {}, "by_format": {}}
+        self.cross_client_counts = {}
+        self.population = 0
 
     def update_run(self, run_id, **f):
         self.runs.setdefault(run_id, {}).update(f)
@@ -443,10 +470,27 @@ class _FakeStore:
     def prior_candidate_names(self, email, exclude_run_id=None):
         return [{"id": 7, "client_name": "Acme", "names": ["PMM Summit"]}]
 
+    def get_outcomes(self, email):
+        return dict(self.outcomes)
+
+    def outcome_pattern(self, email, profile_id, exclude_run_id=None):
+        return self.outcome_pattern_data
+
+    def classification_population(self, classification, window_days, exclude_email):
+        return self.population
+
+    def cross_client_interest(self, name_keys, classification, window_days,
+                              exclude_email):
+        # Mirrors the real function's contract: only rows whose key was
+        # actually asked about come back.
+        return {k: v for k, v in self.cross_client_counts.items()
+                if k in (name_keys or [])}
+
 
 def _wire(monkeypatch, fake):
     for name in ("update_run", "save_candidates", "get_candidates",
-                 "prior_candidate_names"):
+                 "prior_candidate_names", "get_outcomes", "outcome_pattern",
+                 "classification_population", "cross_client_interest"):
         monkeypatch.setattr(P.store, name, getattr(fake, name))
 
 
@@ -490,6 +534,111 @@ def test_a_full_recommend_run_produces_a_ranked_list_and_a_summary(monkeypatch):
     # 8 + 8 + 4 = 20, below the floor of 70, so it is excluded and SAID to be.
     assert [e["name"] for e in s["excluded"]] == ["Weak Expo"]
     assert s["orientation"] == R.ORIENTATION_BOOTH
+
+
+def test_outcome_pattern_reorders_top_five_without_touching_score_or_tier(monkeypatch):
+    """End to end, because outcome_adjustment, apply_outcome_pattern and the
+    pipeline wiring were each unit-tested separately, and the wiring between
+    them is exactly where a real defect this session found (the CSV/page
+    disagreement) actually lived. "Higher Score, Disliked" outscores "Lower
+    Score, Liked" on the raw rubric (76 vs 74) but its category carries a
+    real 4-of-4 skip pattern (-5 -> 71), which drops it behind the
+    neutral-history event's untouched 74. Numbers verified against the real
+    rubric.score() before being pinned here, not derived by hand."""
+    fake = _FakeStore()
+    fake.outcome_pattern_data = {
+        "by_category": {R.CAT_VERTICAL_SUMMIT:
+                        {"decisions": 4, "skipped": 4, "went_or_going": 0}},
+        "by_format": {}}
+    _wire(monkeypatch, fake)
+    monkeypatch.setattr(P.event_intel_discover, "discover", lambda profile: {
+        "candidates": [_cand("Higher Score, Disliked", category=R.CAT_VERTICAL_SUMMIT),
+                       _cand("Lower Score, Liked", category=R.CAT_SIDE_EVENT)],
+        "by_category": {}, "statuses": {}, "shortfall": [],
+        "categories_searched": 6, "categories_failed": 0, "found": 2})
+    monkeypatch.setattr(P.event_intel_audit, "audit_famous", lambda c, p: {
+        "checked": 0, "error": None, "cut": [], "kept": [], "verdicts": {}})
+    marks = {"Higher Score, Disliked": (32, 30, 14), "Lower Score, Liked": (30, 30, 14)}
+    monkeypatch.setattr(P.event_intel_scorer, "score_all", lambda c, p: {
+        "scored": [dict(x, relevance=marks[x["name"]][0],
+                        dm_access=marks[x["name"]][1],
+                        engagement=marks[x["name"]][2],
+                        relevance_note="n", dm_access_note="n", engagement_note="n",
+                        description="Texture.", client_line="Case for %s." % x["name"])
+                   for x in c],
+        "unscored": [], "errors": [], "batches": 1})
+
+    P._run_recommend(1, "me@p2.example", PROFILE)
+    s = fake.runs[1]["summary"]
+    names = [t["name"] for t in s["top_five"]]
+    totals = {t["name"]: t["total"] for t in s["top_five"]}
+    assert names == ["Lower Score, Liked", "Higher Score, Disliked"], (
+        "the outcome pattern did not reorder the disliked, higher-scoring "
+        "event behind the neutral, lower-scoring one: %s" % names)
+    assert totals == {"Higher Score, Disliked": 76, "Lower Score, Liked": 74}, (
+        "total was mutated by an order-only signal that must never touch it: %s"
+        % totals)
+
+
+def test_cross_client_signal_reaches_the_executive_summary(monkeypatch):
+    fake = _FakeStore()
+    fake.population = A.CROSS_CLIENT_MIN_POPULATION
+    _wire(monkeypatch, fake)
+    monkeypatch.setattr(P.event_intel_discover, "discover", lambda profile: {
+        "candidates": [_cand("Watched Summit")],
+        "by_category": {}, "statuses": {}, "shortfall": [],
+        "categories_searched": 6, "categories_failed": 0, "found": 1})
+    monkeypatch.setattr(P.event_intel_audit, "audit_famous", lambda c, p: {
+        "checked": 0, "error": None, "cut": [], "kept": [], "verdicts": {}})
+    monkeypatch.setattr(P.event_intel_scorer, "score_all", lambda c, p: {
+        "scored": [dict(c[0], relevance=34, dm_access=30, engagement=14,
+                        relevance_note="n", dm_access_note="n", engagement_note="n",
+                        description="Texture.", client_line="Case.")],
+        "unscored": [], "errors": [], "batches": 1})
+    # Shaped like the REAL store.cross_client_interest()'s return value
+    # ({"name", "distinct_clients"}), which is what event_intel_audit.
+    # cross_client_signal() actually takes as input -- not that function's
+    # OWN output shape ({"count", "fires"}), which is a different contract.
+    fake.cross_client_counts = {
+        D.name_key("Watched Summit"): {"name": "Watched Summit",
+                                       "distinct_clients": A.CROSS_CLIENT_MIN_DISTINCT}}
+
+    P._run_recommend(1, "me@p2.example", PROFILE)
+    s = fake.runs[1]["summary"]
+    assert any("watched by other clients" in a for a in s["assumptions"]), (
+        s["assumptions"])
+    assert any("Watched Summit" in a and "3" in a for a in s["assumptions"])
+    # No identity anywhere in the finished summary -- the fake's own count
+    # dict was already shaped like the real one, and this confirms nothing
+    # downstream added one.
+    import json as _json
+    assert "@position2.com" not in _json.dumps(s), (
+        "an email address reached the client-facing summary")
+
+
+def test_a_confidential_profile_never_queries_cross_client_signal(monkeypatch):
+    fake = _FakeStore()
+    called = []
+    fake.classification_population = lambda *a, **k: called.append("population") or 0
+    fake.cross_client_interest = lambda *a, **k: called.append("interest") or {}
+    _wire(monkeypatch, fake)
+    monkeypatch.setattr(P.event_intel_discover, "discover", lambda profile: {
+        "candidates": [_cand("Any Event")],
+        "by_category": {}, "statuses": {}, "shortfall": [],
+        "categories_searched": 6, "categories_failed": 0, "found": 1})
+    monkeypatch.setattr(P.event_intel_audit, "audit_famous", lambda c, p: {
+        "checked": 0, "error": None, "cut": [], "kept": [], "verdicts": {}})
+    monkeypatch.setattr(P.event_intel_scorer, "score_all", lambda c, p: {
+        "scored": [dict(c[0], relevance=34, dm_access=30, engagement=14,
+                        relevance_note="n", dm_access_note="n", engagement_note="n",
+                        description="Texture.", client_line="Case.")],
+        "unscored": [], "errors": [], "batches": 1})
+
+    confidential_profile = dict(PROFILE, confidential=True)
+    P._run_recommend(1, "me@p2.example", confidential_profile)
+    assert called == [], (
+        "a confidential profile's run still queried cross-client data: %s"
+        % called)
 
 
 def test_a_marquee_event_whose_audit_broke_survives_the_whole_run(monkeypatch):

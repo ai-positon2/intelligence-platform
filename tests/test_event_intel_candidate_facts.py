@@ -236,3 +236,49 @@ def test_the_disclosed_total_counts_the_unscored_too():
     lines = _assumptions(candidates=_cands(10), unscored=_cands(3),
                          scoring_batches=3)
     assert any("13 events were graded" in x for x in lines)
+
+
+# ── Outcome-driven adjustment and cross-client badges, rendered for real ───
+
+def test_a_positive_outcome_adjustment_renders_with_its_reason(page_script):
+    cands = [_cand("Liked Summit", 79, "P2", outcome_adjustment=5,
+                   outcome_adjustment_reason="This client attended or "
+                   "committed to 4 of the last 4 recommended vertical_summit "
+                   "events, so this one is ordered higher.")]
+    body = _render(page_script, _recommend(cands))
+    assert "+5 based on your history" in body
+    assert "attended or committed to 4 of the last 4" in body
+
+
+def test_a_negative_outcome_adjustment_renders_with_its_reason(page_script):
+    cands = [_cand("Disliked Summit", 71, "P2", outcome_adjustment=-5,
+                   outcome_adjustment_reason="This client skipped 4 of the "
+                   "last 4 recommended vertical_summit events, so this one "
+                   "is ordered lower.")]
+    body = _render(page_script, _recommend(cands))
+    assert "-5 based on your history" in body
+    assert "skipped 4 of the last 4" in body
+
+
+def test_no_pattern_yet_reads_as_a_stated_absence_not_a_blank(page_script):
+    cands = [_cand("New To This Client", 75, "P2", outcome_adjustment=0,
+                   outcome_adjustment_reason="Not enough of this client's "
+                   "own history with this category or format yet (fewer "
+                   "than 3 decisions) to adjust anything.")]
+    body = _render(page_script, _recommend(cands))
+    assert "No history-based adjustment" in body
+    assert "fewer than 3 decisions" in body
+
+
+def test_the_cross_client_badge_only_renders_when_it_actually_fires(page_script):
+    watched = _cand("Watched Con", 80, "P1", cross_client_count=4,
+                    cross_client_note="Also kept by 4 other clients with a "
+                    "similar buyer-access profile in the last quarter. "
+                    "Aggregate only: no client names are ever shown.")
+    unwatched = _cand("Unwatched Con", 75, "P2")
+    body = _render(page_script, _recommend([watched, unwatched]))
+    assert "Watched by 4 other clients" in body
+    assert "no client names are ever shown" in body
+    # The unwatched card must not print a false "0" claim -- absence of the
+    # badge, not a badge stating nothing was found.
+    assert "Watched by 0" not in body

@@ -304,6 +304,36 @@ def _run_recommend(run_id: int, email: str, profile: dict) -> None:
         ranked["kept"], store.get_outcomes(email))
     ranked["kept"] = outcomes["candidates"]
 
+    # This client's own outcome history, as a visible ORDER signal within a
+    # bucket rank() has already decided -- never a reason an event appears or
+    # disappears. Run strictly after rank()'s bucket/cap decisions above,
+    # never before: see rubric.outcome_adjustment's docstring for why moving
+    # `total` itself would risk the exact fit-vs-priority exclusion this
+    # feature is built not to do.
+    pattern = store.outcome_pattern(email, profile.get("id"),
+                                    exclude_run_id=run_id)
+    ranked["kept"] = event_intel_report.apply_outcome_pattern(
+        ranked["kept"], pattern)
+    ranked["worth_a_look"] = event_intel_report.apply_outcome_pattern(
+        ranked["worth_a_look"], pattern)
+
+    # Whether other Position2 clients are independently converging on the
+    # same events, aggregated and k-anonymity gated (see
+    # event_intel_audit.CROSS_CLIENT_MIN_DISTINCT/_MIN_POPULATION). Skipped
+    # entirely for a confidential profile, both directions: it must not
+    # CONTRIBUTE to another client's count (cross_client_interest's own SQL
+    # already excludes it) and it must not RECEIVE the insight either.
+    if not profile.get("confidential"):
+        population = store.classification_population(
+            profile.get("classification"), window_days=120, exclude_email=email)
+        raw_counts = store.cross_client_interest(
+            [c.get("name_key") for c in ranked["kept"] if c.get("name_key")],
+            classification=profile.get("classification"), window_days=120,
+            exclude_email=email)
+        cross = event_intel_audit.cross_client_signal(raw_counts, population)
+        ranked["kept"] = event_intel_report.attach_cross_client_signal(
+            ranked["kept"], cross)
+
     # Step 6, measured against the lists this user was actually handed before.
     generic = event_intel_audit.genericness(
         [c.get("name") for c in ranked["kept"]],

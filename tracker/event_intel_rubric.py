@@ -228,6 +228,38 @@ CONSIDER_FLOOR = 50
 
 DEFAULT_CAP = 15
 
+# ── A client's own history, as a visible order signal (never a score input) ─
+#
+# `evi_outcomes` records what a client actually did with a past
+# recommendation (went, going, skipped). Aggregated by discovery category and
+# event format, a strong pattern becomes a small, reasoned nudge on which
+# FUTURE candidates come first among their own bucket-mates -- never a reason
+# to exclude one, and never a fact this rubric's own `score()` can see: that
+# function is deliberately closed (no **kwargs) so nothing outside the three
+# sub-scores and the matchmaking claim can move it, and client history is no
+# more a fact about an event than budget is. See outcome_adjustment() below
+# and event_intel_report.apply_outcome_pattern(), which applies it strictly
+# after rank() has already decided bucket membership and the cap.
+#
+# OUTCOME_MIN_SAMPLE: a 2-of-2 streak is a coincidence dressed as a
+# preference -- if the true rate were even odds, 2-of-2 has a 1-in-4 chance of
+# happening anyway. At 3, a unanimous 3-of-3 has 1-in-8, the same order of
+# strictness RELEVANCE_GATE and CONSIDER_FLOOR apply above.
+OUTCOME_MIN_SAMPLE = 3
+
+# The rate a pattern must clear, once OUTCOME_MIN_SAMPLE is met, before it is
+# allowed to speak. 0.75 means "3 of 4 or better" or "3 of 3"; 2 of 3 (67%)
+# does not clear it, because one flipped decision away from a coin flip is
+# not yet a pattern this tool acts on, even quietly and even to reorder.
+OUTCOME_SIGNAL_RATE = 0.75
+
+# Half of MATCHMAKING_BONUS. That bonus is awarded for a fact ABOUT THE EVENT
+# an auditor can check against a citation; this is inferred from the
+# CLIENT'S OWN past behaviour toward a category or format, a full step
+# removed from evidence about this specific event, so it is capped at half
+# the strongest evidence-based bonus in this rubric.
+OUTCOME_ADJUSTMENT = 5
+
 
 def tier_for(total: int) -> str:
     if total >= TIER_MIN[TIER_P1]:
@@ -444,6 +476,71 @@ def matchmaking_bonus(organizer_run: bool, evidence: str) -> dict:
                            "counterparts matching stated criteria.")}
     return {"bonus": MATCHMAKING_BONUS, "awarded": True,
             "reason": "Organizer-run matchmaking: %s" % text[:300]}
+
+
+def _pattern_signal(pattern: dict | None) -> tuple:
+    """One basis's rate, if OUTCOME_MIN_SAMPLE is met. Returns
+    (direction, skipped, went_or_going, decisions) where direction is
+    -1 (skip pattern), 1 (go pattern) or 0 (no pattern / not enough data)."""
+    if not pattern:
+        return 0, 0, 0, 0
+    decisions = int(pattern.get("decisions") or 0)
+    skipped = int(pattern.get("skipped") or 0)
+    went = int(pattern.get("went_or_going") or 0)
+    if decisions < OUTCOME_MIN_SAMPLE:
+        return 0, skipped, went, decisions
+    if skipped / decisions >= OUTCOME_SIGNAL_RATE:
+        return -1, skipped, went, decisions
+    if went / decisions >= OUTCOME_SIGNAL_RATE:
+        return 1, skipped, went, decisions
+    return 0, skipped, went, decisions
+
+
+def outcome_adjustment(category: str | None, category_pattern: dict | None,
+                       format: str | None, format_pattern: dict | None) -> dict:
+    """A capped, ORDER-ONLY signal from a client's own outcome history with
+    this discovery category or event format.
+
+    Never a fact about THIS event, so it never reaches score(), never
+    touches `total` or `tier`. Like matchmaking_bonus, always returns a
+    reason, including when nothing is applied -- a refused adjustment is
+    visible rather than looking like history was never considered.
+
+    Each pattern is {"decisions": int, "skipped": int, "went_or_going": int}
+    or None/empty. `category` is tried first and wins over `format` when both
+    clear the gate: category is the more specific dimension this rubric
+    already scores against, and format (in_person/virtual/hybrid) cuts
+    across every category, so it is the weaker signal. `went` and `going`
+    count identically as "did not skip": a confirmed attendance is stronger
+    evidence than a stated intent, but the >=75% gate already requires a
+    real majority, so a lone uncommitted "going" cannot swing it alone.
+
+    Returns {"adjustment": -OUTCOME_ADJUSTMENT|0|OUTCOME_ADJUSTMENT,
+             "applied": bool, "basis": "category"|"format"|None, "reason": str}.
+    """
+    for basis, label, pattern in (("category", category, category_pattern),
+                                  ("format", format, format_pattern)):
+        direction, skipped, went, decisions = _pattern_signal(pattern)
+        if direction == 0:
+            continue
+        if direction < 0:
+            return {"adjustment": -OUTCOME_ADJUSTMENT, "applied": True,
+                    "basis": basis,
+                    "reason": ("This client skipped %d of the last %d "
+                              "recommended %s events, so this one is ordered "
+                              "lower. It is still on the list: a pattern in "
+                              "your own history is a reason to look twice, "
+                              "never a reason to hide something."
+                              % (skipped, decisions, label))}
+        return {"adjustment": OUTCOME_ADJUSTMENT, "applied": True,
+                "basis": basis,
+                "reason": ("This client attended or committed to %d of the "
+                          "last %d recommended %s events, so this one is "
+                          "ordered higher." % (went, decisions, label))}
+    return {"adjustment": 0, "applied": False, "basis": None,
+            "reason": ("Not enough of this client's own history with this "
+                      "category or format yet (fewer than %d decisions) to "
+                      "adjust anything." % OUTCOME_MIN_SAMPLE)}
 
 
 # ── Scoring ───────────────────────────────────────────────────────────────
