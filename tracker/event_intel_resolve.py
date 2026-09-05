@@ -196,8 +196,8 @@ def _resolve_event(query: str, year_hint: str | None, box: dict) -> dict:
         return out
 
     confidence = str(parsed.get("confidence") or "none").lower()
-    reasoning = str(parsed.get("reasoning") or "")[:1200]
-    name = (parsed.get("name") or "").strip()
+    reasoning = claude_websearch.strip_em_dash(str(parsed.get("reasoning") or ""))[:1200]
+    name = claude_websearch.strip_em_dash((parsed.get("name") or "").strip())
     website = (parsed.get("website") or "").strip()
 
     if confidence not in _MIN_CONFIDENCE or not name:
@@ -207,18 +207,23 @@ def _resolve_event(query: str, year_hint: str | None, box: dict) -> dict:
                        ("high", "medium", "low", "none") else "none",
                        reasoning or "The event could not be identified confidently.")
 
+    # Every free-text field the model wrote here (not `website`, not the
+    # dates) goes through strip_em_dash: this event dict is what a promoted
+    # alternative's name, edition and audience_note are built from, and a
+    # dash left in `edition` here was found live in a client's top-five list.
+    _clean = claude_websearch.strip_em_dash
     event = {
         "name": name,
-        "edition": (parsed.get("edition") or "").strip() or None,
+        "edition": _clean((parsed.get("edition") or "").strip()) or None,
         "website": website or None,
-        "organizer": (parsed.get("organizer") or "").strip() or None,
+        "organizer": _clean((parsed.get("organizer") or "").strip()) or None,
         "starts_on": (parsed.get("starts_on") or None),
         "ends_on": (parsed.get("ends_on") or None),
-        "location": (parsed.get("location") or "").strip() or None,
-        "venue": (parsed.get("venue") or "").strip() or None,
+        "location": _clean((parsed.get("location") or "").strip()) or None,
+        "venue": _clean((parsed.get("venue") or "").strip()) or None,
         "format": (parsed.get("format") or "").strip() or None,
-        "stated_size": (parsed.get("stated_size") or "").strip() or None,
-        "audience_note": (parsed.get("audience_note") or "").strip() or None,
+        "stated_size": _clean((parsed.get("stated_size") or "").strip()) or None,
+        "audience_note": _clean((parsed.get("audience_note") or "").strip()) or None,
         "confidence": confidence,
         "reasoning": reasoning,
     }

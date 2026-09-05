@@ -430,10 +430,16 @@ def _clean_draft(raw: dict) -> dict | None:
         fit = None
     if fit is not None:
         fit = max(0, min(100, fit))
+    # House style has no em dashes, and these three fields are the actual
+    # outbound message text: an opener sent with a dash in it is the house
+    # style violation reaching a real prospect's inbox, not just a report.
     return {"org": org, "fit": fit,
-            "fit_note": str(raw.get("fit_note") or "").strip()[:600] or None,
-            "angle": str(raw.get("angle") or "").strip()[:600] or None,
-            "opener": str(raw.get("opener") or "").strip()[:900] or None}
+            "fit_note": claude_websearch.strip_em_dash(
+                str(raw.get("fit_note") or "").strip())[:600] or None,
+            "angle": claude_websearch.strip_em_dash(
+                str(raw.get("angle") or "").strip())[:600] or None,
+            "opener": claude_websearch.strip_em_dash(
+                str(raw.get("opener") or "").strip())[:900] or None}
 
 
 def draft_batch(rows: list[dict], profile: dict, event: dict,

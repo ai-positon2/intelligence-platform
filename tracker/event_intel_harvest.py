@@ -583,7 +583,10 @@ def extract_participants(page_text: str, page_url: str, page_kind: str,
             "booth": (str(r.get("booth") or "").strip() or None),
             "source_url": page_url,
         })
-    return {"rows": rows, "note": str(parsed.get("note") or "")[:400], "error": None}
+    # The model's own written note; the roster row fields above it are facts
+    # copied off the page and are left exactly as published.
+    note = claude_websearch.strip_em_dash(str(parsed.get("note") or ""))[:400]
+    return {"rows": rows, "note": note, "error": None}
 
 
 def harvest_page(page: dict, event_name: str, event_host: str = "",

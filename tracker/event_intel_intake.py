@@ -259,8 +259,10 @@ def _err(kind: str, detail: str, pages=None) -> dict:
 # `_NOTE_PLUMBING` there); the intake had no equivalent for its own fields.
 #
 # The em dash in that value is the other half: the house style has no em
-# dashes, and this one was headed for a client report.
-_FIELD_DASH = re.compile(r"\s*[\u2013\u2014]\s*")
+# dashes, and this one was headed for a client report. Was this module's own
+# private regex; now shared as claude_websearch.strip_em_dash, because the
+# same defect turned up in five more fields across two other modules once
+# anyone went looking for it. Same substitution, so no behaviour changes here.
 
 # Split on sentence ends AND on the concessive joins a model reaches for when
 # it starts hedging about the page it just read.
@@ -287,7 +289,7 @@ def _field(raw, cap: int = _CAP) -> str | None:
     the pages is dropped. Returns None when nothing survives, which the
     caller already treats as an honest unknown.
     """
-    text = _FIELD_DASH.sub(", ", " ".join(str(raw or "").split()))
+    text = claude_websearch.strip_em_dash(" ".join(str(raw or "").split()))
     if not text:
         return None
     kept = []

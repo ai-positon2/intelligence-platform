@@ -519,6 +519,40 @@ def strip_citation_markup(text: str) -> str:
     return _CITE_ANY.sub("", _CITE_PAIR.sub(_one, text))
 
 
+_EM_EN_DASH = re.compile(r"\s*[\u2013\u2014]\s*")
+
+
+def strip_em_dash(text: str) -> str:
+    """An em or en dash the model wrote, turned into a comma.
+
+    House style for every client-facing report in this codebase has no em
+    dashes. A model asked to write a sentence reaches for one anyway, and it
+    was found live in five different fields across three different modules
+    (a marquee event's own name, an audit's `why`, a score's `description`
+    and `relevance_note`, a resolved event's `edition`) because each field
+    was sanitised for length and stray markup but never for this. This is the
+    one place that fix now lives; event_intel_intake.py had its own private
+    copy of exactly this substitution before this function existed, written
+    when the same defect first showed up in a single field, and now uses this
+    one instead.
+
+    Comma, not deletion: the two clauses a dash was joining are usually still
+    a complete thought without it, and dropping the dash outright collides
+    two clauses into one run-on. Whitespace on both sides of the dash is
+    absorbed into the substitution so a comma is never doubled against an
+    existing space.
+
+    Callers apply this to a field they already own the cleaning of (a report
+    string, a name, a note), not to a whole raw model reply: a direct quote
+    preserved from a page (see strip_citation_markup above) can legitimately
+    contain a dash as part of the source's own words, and this module cannot
+    tell the two apart once the quotation marks are in place. Every caller
+    of this function is cleaning the model's OWN prose, not someone else's,
+    which is the same call event_intel_intake.py already made.
+    """
+    return _EM_EN_DASH.sub(", ", str(text or ""))
+
+
 def extract_json(raw: str, require: str | None = None):
     """Pull the first balanced JSON object or array out of a reply.
 

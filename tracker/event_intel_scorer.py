@@ -169,9 +169,16 @@ def _clean(raw: dict) -> dict | None:
         # for arithmetic, so nothing downstream sees a null total.
         value, readable = rubric.read_subscore(dim, raw.get(dim))
         out[dim] = value if readable else None
-        out[dim + "_note"] = str(raw.get(dim + "_note") or "").strip()[:800] or None
-    out["description"] = str(raw.get("description") or "").strip()[:900] or None
-    out["client_line"] = str(raw.get("client_line") or "").strip()[:600] or None
+        # House style has no em dashes. This is written prose the grader
+        # composes itself (a note, a description, the client-fit sentence),
+        # not an echo of anything already cleaned upstream, and it was found
+        # live carrying dashes into a client's report before this was added.
+        out[dim + "_note"] = claude_websearch.strip_em_dash(
+            str(raw.get(dim + "_note") or "").strip())[:800] or None
+    out["description"] = claude_websearch.strip_em_dash(
+        str(raw.get("description") or "").strip())[:900] or None
+    out["client_line"] = claude_websearch.strip_em_dash(
+        str(raw.get("client_line") or "").strip())[:600] or None
     return out
 
 
