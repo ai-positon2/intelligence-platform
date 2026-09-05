@@ -200,7 +200,9 @@ def _resolve_event(query: str, year_hint: str | None, box: dict) -> dict:
     name = claude_websearch.strip_em_dash((parsed.get("name") or "").strip())
     website = (parsed.get("website") or "").strip()
 
-    if confidence not in _MIN_CONFIDENCE or not name:
+    from urllib.parse import urlparse
+    parsed_site = urlparse(website)
+    if confidence not in _MIN_CONFIDENCE or not name or parsed_site.scheme not in ('http','https') or not parsed_site.hostname:
         # Deliberately not downgraded into a partial result. A named event we
         # could not pin to one edition has nothing safe to harvest.
         return _failed(confidence if confidence in

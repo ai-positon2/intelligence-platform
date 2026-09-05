@@ -264,7 +264,7 @@ def test_merge_survives_rows_with_no_usable_name():
 # confirming one of them are separate calls parsing different envelopes, so
 # the stub tells them apart the way the module does: by the prompt it sent.
 
-_EVENT = {"name": "Real Event", "starts_on": "2027-03-01",
+_EVENT = {"website":"https://example.com", "country":"USA", "name": "Real Event", "starts_on": "2027-03-01",
           "sources": ["https://example.com/e"], "category_fit": "fits",
           "confidence": "high"}
 
@@ -277,7 +277,7 @@ def _find_reply(candidates, note="n", complete=None):
 
 
 def _confirm_reply(event=None, confirmed=True, reject_reason=None,
-                   facts_complete=None):
+                   facts_complete=True):
     body = {"confirmed": confirmed, "event": event}
     if reject_reason is not None:
         body["reject_reason"] = reject_reason
@@ -288,7 +288,8 @@ def _confirm_reply(event=None, confirmed=True, reject_reason=None,
 
 def _named(**over):
     """One candidate the finder proposes, and the event it confirms to."""
-    ev = dict(_EVENT)
+    from datetime import date, timedelta
+    ev = dict(_EVENT, starts_on=(date.today()+timedelta(days=30)).isoformat(), ends_on=(date.today()+timedelta(days=32)).isoformat(), country="USA", confidence="high")
     ev.update(over)
     return ev
 
@@ -877,16 +878,14 @@ def test_an_unreadable_reply_is_an_error_rather_than_an_empty_category(monkeypat
 
 
 def test_clean_event_rejects_a_non_http_website_and_sources(monkeypatch):
-    _stages(monkeypatch, confirm=_confirm_reply({
-        "name": "X", "website": "javascript:alert(1)",
-        "sources": ["https://ok.example", "javascript:x", 7],
-        "attendees": "9,000+", "organizer_run": True,
-        "matchmaking_evidence": "Hosted buyer programme."}))
-    ev = D.search_category(R.CAT_EMERGING, PROFILE)["events"][0]
-    assert ev["website"] is None
-    assert ev["sources"] == ["https://ok.example"]
-    assert ev["attendees"] == "9,000+"
-    assert ev["organizer_run"] is True
+    raw = {"name":"X", "website":"javascript:alert(1)",
+           "sources":["https://ok.example", "javascript:x", 7]}
+    cleaned = D._clean_event(raw,R.CAT_EMERGING)
+    assert not cleaned['website']
+    assert cleaned['sources']==['https://ok.example']
+    _stages(monkeypatch,confirm=_confirm_reply(raw))
+    result = D.search_category(R.CAT_EMERGING,PROFILE)
+    assert result['events']==[] and result['status']==D.STATUS_ERROR
 
 
 def test_a_proposal_carrying_a_javascript_url_never_reaches_the_confirm_prompt(monkeypatch):
@@ -996,7 +995,7 @@ _ONE = [{"name": "Real Event", "website": "https://example.com/e", "why": "w"}]
 def _run_category(monkeypatch, find, confirm=None):
     _stages(monkeypatch, find=find,
             confirm=confirm if confirm is not None else _confirm_reply(_EVENT))
-    return D.search_category("industry_flagship", {"classification": "b2b_to_marketing"})
+    return D.search_category("industry_flagship", PROFILE)
 
 
 def test_an_unfinished_search_with_nothing_found_is_an_error_not_an_empty_category(monkeypatch):
@@ -1028,8 +1027,9 @@ def test_no_completeness_declaration_reports_what_could_not_be_measured(monkeypa
     """Silence is not a claim of success. An older reply with no
     search_complete field must not be read as a finished search."""
     r = _run_category(monkeypatch, _find_reply([], note="nothing"))
-    assert r["status"] == D.STATUS_EMPTY
-    assert "did not say" in r["detail"] and "cut off" in r["detail"]
+    assert r["status"] == D.STATUS_ERROR
+    assert "did not confirm its coverage" in r["detail"]
+    assert "No verified empty-market conclusion" in r["detail"]
 
 
 def test_the_shortfall_reason_for_a_partial_search_describes_the_SEARCH(monkeypatch):
@@ -1040,7 +1040,7 @@ def test_the_shortfall_reason_for_a_partial_search_describes_the_SEARCH(monkeypa
                                "why": "w"}],
                              note="This market looks quiet.", complete=False),
             confirm=_confirm_reply(_named(name="Only One")))
-    out = D.discover({"classification": "b2b_to_marketing"})
+    out = D.discover(PROFILE)
     reasons = {s["category"]: s["why"] for s in out["shortfall"]}
     for cat, why in reasons.items():
         assert "This market looks quiet." not in why, (
@@ -1384,7 +1384,7 @@ def test_the_page_can_say_how_many_candidates_were_looked_at(monkeypatch):
             confirm=lambda n: (_confirm_reply(_named(name=n)) if n == "A"
                                else _confirm_reply(None, confirmed=False,
                                                    reject_reason="no future edition")))
-    out = D.discover({"classification": "b2b_to_marketing"})
+    out = D.discover(PROFILE)
     st = out["statuses"][R.CAT_INDUSTRY_FLAGSHIP]
     assert st["proposed"] == 2
     assert st["found"] == 1
