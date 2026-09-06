@@ -9149,6 +9149,10 @@ def event_conference_intelligence_export(run_id):
         abort(404)
     rows = event_intel_store.get_participants(run_id)
     labels = event_intel_store.ROLE_LABELS
+    sources = event_intel_store.get_sources(run_id)
+    unreadable = sum(source.get("status") not in (
+        event_intel_store.SOURCE_OK, event_intel_store.SOURCE_RECOVERED)
+        for source in sources)
 
     buf = io.StringIO()
     # csv.writer defaults to \r\n regardless of how the handle was opened,
@@ -9156,9 +9160,12 @@ def event_conference_intelligence_export(run_id):
     w = csv.writer(buf)
     w.writerow(["Organisation", "Domain", "Listed as", "Person", "Title",
                 "Tier", "Booth", "Apollo match", "Industry", "Employees",
-                "Source page"])
+                "Source page", "Evidence status", "Requested edition",
+                "Observed roster editions", "Run status", "Unreadable sources",
+                "Coverage", "Roster caveat"])
     for r in rows:
         ap = r.get("apollo") or {}
+        evidence = r.get("evidence") or {}
         w.writerow([
             r.get("org_name") or "", r.get("org_domain") or "",
             labels.get(r.get("role"), r.get("role") or ""),
@@ -9168,6 +9175,13 @@ def event_conference_intelligence_export(run_id):
             (ap.get("industry") or "") if isinstance(ap, dict) else "",
             (ap.get("employees") or "") if isinstance(ap, dict) else "",
             r.get("source_url") or "",
+            evidence.get("status") or "unverified",
+            evidence.get("expected_edition") or "",
+            ", ".join(str(year) for year in (evidence.get("observed_roster_years") or [])),
+            run.get("status") or "unknown", unreadable,
+            "Not independently verified",
+            "Published companies and roles only; not an attendee list. "
+            "A partial roster does not establish complete event coverage.",
         ])
     events = event_intel_store.get_events(run_id)
     name = (events[0]["name"] if events else run.get("query")) or "event"

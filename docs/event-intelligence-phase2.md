@@ -83,3 +83,9 @@ See `benchmarks/event_intelligence/README.md` for the review workflow. No paid b
 4. Establish retention, invoice reconciliation and operator handling for unknown provider outcomes. Add site-specific directory adapters only where real benchmark misses justify them.
 
 The original Phase 2 exit condition—measured quality, reliability and cost targets on representative data—is not yet met. This patch is a reviewable engineering foundation for that validation, not a declaration of autonomous client readiness.
+
+## Request-to-export validation
+
+The agent's roster CSV now appends evidence status, requested/observed editions, run status, unreadable-source count, an explicit coverage limitation and the roster caveat. The original eleven columns stay in place; consumers enforcing an exact column count need to accept the appended columns. These fields describe evidence limits, not a claim of independently verified coverage.
+
+`tests/test_event_intel_http_pipeline.py` submits authenticated Flask test requests through the real PostgreSQL queue and worker pipeline, harvests synthetic organizer/model fixtures, and compares the persisted JSON report with CSV output. It covers same-key retry/different-input refusal, historical roster withholding, cancellation, foreign-account access and internal authentication requirements. Test sessions do not validate real Google authentication, and synthetic fixtures do not establish live factual accuracy.
