@@ -73,6 +73,7 @@ homework.
 from __future__ import annotations
 
 import concurrent.futures
+from .event_intel_jobs import ContextExecutor
 import logging
 import re
 import datetime
@@ -374,9 +375,12 @@ true|false, "event": {{"name": str, "edition": str|null, "website": str|null, \
 "days": int|null, "industry": str|null, "attendees": str|null, \
 "booths": str|null, "audience_note": str|null, "format": \
 "in_person"|"virtual"|"hybrid"|null, "cost_note": str|null, \
+"availability": "open"|"sold_out"|"cancelled"|"unknown", "availability_source": str|null, \
 "organizer_run": true|false, "matchmaking_evidence": str|null, \
 "famous": true|false, "category_fit": str, "confidence": \
 "high"|"medium"|"low", "sources": [str]}}}}
+
+`availability` must describe this edition, using an organizer URL in `availability_source`. Never assume tickets are available because the event exists.
 
 `name` is the event as it brands itself. Correct the proposed name if the \
 real one differs; you are looking at the page and they were not.
@@ -417,7 +421,8 @@ def profile_brief(profile: dict) -> str:
     lines.append("Classification: %s"
                  % rubric.CLASSIFICATION_LABELS.get(p.get("classification"),
                                                     p.get("classification") or "?"))
-    for label, key in (("Buyer roles", "buyer_roles"), ("Target verticals", "verticals"),
+    for label, key in (("Product or service", "what_they_sell"), ("Selected offer", "selected_product"),
+                       ("Target company characteristics", "firmographics"), ("Buyer roles", "buyer_roles"), ("Target verticals", "verticals"),
                        ("Deal size", "acv_band"), ("Sales cycle", "sales_cycle"),
                        ("Geographic scope", "geo_scope")):
         if p.get(key):
@@ -656,6 +661,8 @@ def _clean_event(raw: dict, category: str) -> dict | None:
         "audience_note": _t("audience_note", 600),
         "format": _t("format", 16),
         "cost_note": _t("cost_note", 400),
+        "availability": raw.get("availability") if raw.get("availability") in ("open","sold_out","cancelled") else "unknown",
+        "availability_source": _t("availability_source", 1000),
         "organizer_run": bool(raw.get("organizer_run")),
         "matchmaking_evidence": _t("matchmaking_evidence", 800),
         "famous": bool(raw.get("famous")),
@@ -1246,7 +1253,7 @@ def search_category(category: str, profile: dict) -> dict:
                     detail=found["detail"])
 
     results = []
-    with concurrent.futures.ThreadPoolExecutor(
+    with ContextExecutor(
             max_workers=max(1, len(proposals))) as pool:
         futures = [pool.submit(confirm_event, pr, category, profile)
                    for pr in proposals]
@@ -1326,7 +1333,7 @@ def discover(profile: dict) -> dict:
     statuses: dict[str, dict] = {}
 
     spends = []
-    with concurrent.futures.ThreadPoolExecutor(max_workers=MAX_CONCURRENCY) as pool:
+    with ContextExecutor(max_workers=MAX_CONCURRENCY) as pool:
         futures = {pool.submit(search_category, cat, profile): cat
                    for cat in rubric.CATEGORIES}
         for fut in concurrent.futures.as_completed(futures):
