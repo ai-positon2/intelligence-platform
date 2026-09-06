@@ -18,7 +18,7 @@ ACTIONS = {
     'monitor': 'Consider a future edition',
 }
 COUNTS = ('conversations', 'meetings', 'qualified_opportunities')
-AMOUNTS = ('planned_budget', 'actual_spend', 'effort_hours', 'reported_pipeline')
+AMOUNTS = ('planned_budget', 'estimated_total_cost', 'actual_spend', 'effort_hours', 'reported_pipeline')
 CURRENCIES = ('USD', 'INR', 'EUR', 'GBP', 'CAD', 'AUD')
 
 
@@ -92,6 +92,18 @@ def validate(payload):
             body['results_as_of'] = observed.isoformat()
         except ValueError:
             raise ValueError('Results need an as-of date no later than today.')
+    body['access_status'] = payload.get('access_status') or 'unknown'
+    if body['access_status'] not in ('unknown', 'confirmed', 'unavailable'):
+        raise ValueError('Choose a valid access status.')
+    body['access_checked_on'] = None
+    if body['access_status'] != 'unknown':
+        try:
+            checked = date.fromisoformat(str(payload.get('access_checked_on') or ''))
+            if checked > date.today():
+                raise ValueError
+            body['access_checked_on'] = checked.isoformat()
+        except ValueError:
+            raise ValueError('Reported access needs a check date no later than today.')
     body['support'] = 'user_reported'
     return body
 
@@ -127,10 +139,26 @@ def context(run_id, email, profile_id=None, identity=None):
             row = cur.fetchone()
             if row:
                 plan = dict(row[0], version=row[1], updated_at=str(row[2]))
-    participants = [row for row in S.get_participants(run_id) if row.get('event_id') == selected.get('id')]
+    from .event_intel_access import assess, organizer_url
+    from urllib.parse import urlsplit
+    participants = [row for row in S.get_participants(run_id) if row.get('event_id') == selected.get('id')] if run.get('mode') == 'lookup' else []
+    try:
+        host = urlsplit(selected.get('website') or '').hostname or ''
+    except ValueError:
+        host = ''
+    links, seen = [], set()
+    for source in S.get_sources(run_id) if run.get('mode') == 'lookup' else []:
+        if source.get('event_id') != selected['id'] or source.get('status') != 'ok':
+            continue
+        for link in (source.get('metadata') or {}).get('access_links', []):
+            key = (link.get('kind'), link.get('url'))
+            if key not in seen and organizer_url(link.get('url'), host) and organizer_url(link.get('source_url'), host):
+                seen.add(key)
+                links.append(dict(link, observed_at=source.get('fetched_at')))
+    comparison = overlay(selected, participants, (plan or {}).get('target_domains', []))
     return dict(run_id=run_id, profile=profile, profiles=profiles, events=events,
                 event=selected, plan=plan, participants=participants,
-                overlay=overlay(selected, participants, (plan or {}).get('target_domains', [])))
+                overlay=comparison, access_links=links, assessment=assess(selected, plan or {}, comparison['matches'], links))
 
 
 def overlay(event, participants, targets):
@@ -175,6 +203,9 @@ def save(run_id, email, payload):
         raise ValueError('Choose a client and event from this report.')
     view = context(run_id, email, profile_id, payload['event_identity'])
     body = validate(payload)
+    if view.get('plan') and view['plan'].get('action') != body['action']:
+        body['access_status'] = 'unknown'
+        body['access_checked_on'] = None
     identity = view['event']['event_identity']
     with db() as conn, conn.cursor() as cur:
         cur.execute('SELECT pg_advisory_xact_lock(hashtext(%s))', ('evi-plan:'+str(profile_id)+':'+identity,))

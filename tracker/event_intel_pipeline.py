@@ -103,7 +103,7 @@ def _harvest_event(run_id: int, event_id: int, event: dict,
         src = got["source"]
         store.save_source(run_id, event_id, src["url"], src["kind"], src["status"],
                           src.get("http_status"), src.get("rows_found", 0),
-                          src.get("note", ""), metadata={k:src[k] for k in ("snapshots", "extraction", "coverage", "pages_read", "pages_seen", "pages_declared", "truncated", "expected_edition", "observed_roster_years") if k in src})
+                          src.get("note", ""), metadata={k:src[k] for k in ("access_links", "snapshots", "extraction", "coverage", "pages_read", "pages_seen", "pages_declared", "truncated", "expected_edition", "observed_roster_years") if k in src})
         if src["status"] == SOURCE_OK:
             readable += 1
         else:
