@@ -154,3 +154,29 @@ def test_foreign_profile_cannot_receive_a_plan(fixture):
                              {'client_name': 'Foreign', 'classification': 'b2b_to_marketing'})
     with pytest.raises(LookupError):
         P.save(rid, email, payload(profile_id=foreign, event_identity=identity))
+
+
+@SQL
+def test_changing_action_resets_reported_access(fixture):
+    email, profile, other, rid, identity, run = fixture
+    data = payload(profile_id=profile,event_identity=identity,access_status='confirmed',access_checked_on=str(date.today()))
+    saved = P.save(rid,email,data)
+    assert saved['plan']['access_status'] == 'confirmed'
+    changed = P.save(rid,email,dict(data,action='sponsor',version=1))
+    assert changed['plan']['access_status'] == 'unknown'
+    assert changed['plan']['access_checked_on'] is None
+
+
+@SQL
+def test_plan_shows_only_selected_event_organizer_links(fixture):
+    email, profile, other, rid, identity, run = fixture
+    target = S.save_event(rid, {'name':'Other Forum','starts_on':'2027-06-01','website':'https://forum.example'})
+    row = next(e for e in S.get_events(rid) if e['id'] == target)
+    from tracker.event_intel_identity import event_key
+    links = [{'kind':'registration','label':'Register','url':'https://forum.example/register',
+              'source_url':'https://forum.example/exhibitors','support':'observed_link_only'},
+             {'kind':'registration','label':'Bad','url':'javascript:alert(1)','source_url':'https://forum.example'}]
+    S.save_source(rid,target,'https://forum.example/exhibitors','exhibitors','ok',metadata={'access_links':links})
+    selected = P.context(rid,email,profile,event_key(row))
+    assert len(selected['access_links']) == 1
+    assert P.context(rid,email,profile,identity)['access_links'] == []

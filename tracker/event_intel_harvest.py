@@ -652,6 +652,8 @@ def harvest_page(page: dict, event_name: str, event_host: str = "",
     if fetched["status"] != SOURCE_OK:
         return {"source": source, "rows": []}
 
+    from .event_intel_access import discover
+    source["access_links"] = discover(fetched["text"], here, event_host)
     source["snapshots"] = []
     source["extraction"] = []
     from .event_intel_evidence import roster_years, source_snapshot
@@ -714,6 +716,7 @@ def harvest_page(page: dict, event_name: str, event_host: str = "",
             stopped = 'A later roster page names a different edition; its rows were withheld.'
             source['snapshots'].append(source_snapshot(nxt,got['text'],observed_roster_years=page_years))
             break
+        source["access_links"].extend(discover(got["text"], nxt, event_host))
         sub = read(got, nxt)
         source["snapshots"].append(sub.get("snapshot", {}))
         source["extraction"].append(sub.get("coverage", {}))

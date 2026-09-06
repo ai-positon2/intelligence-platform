@@ -122,7 +122,7 @@ def test_repeated_pipeline_fetches_sources_but_reuses_extraction(monkeypatch):
         'pages':[{'url':url, 'kind':'exhibitor_list'}]})
     def fetch(url):
         fetches.append(url)
-        return {'status':'ok', 'http_status':200, 'note':'', 'text':'2027 Exhibitors Acme https://acme.example'}
+        return {'status':'ok', 'http_status':200, 'note':'', 'text':'2027 Exhibitors Acme https://acme.example\nRegister [https://fixture.example/register]'}
     monkeypatch.setattr(H, 'fetch_page', fetch)
     def extract(*args):
         calls.append(args)
@@ -136,6 +136,7 @@ def test_repeated_pipeline_fetches_sources_but_reuses_extraction(monkeypatch):
         assert S.get_run(rid, email)['status'] == 'complete'
     assert len(fetches) == 2 and len(calls) == 1
     source = S.get_sources(runs[1])[0]
+    assert source['metadata']['access_links'][0]['url'] == 'https://fixture.example/register'
     reuse = source['metadata']['extraction'][0]['reuse']
     assert reuse['origin_run_id'] == runs[0]
     assert S.get_participants(runs[1])[0]['evidence']['observed_roster_years'] == ['2027']

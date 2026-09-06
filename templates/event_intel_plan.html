@@ -16,6 +16,9 @@
 <label>Chosen action<select name="action" required><option value="">Choose an action</option>{% for key,label in actions.items() %}<option value="{{ key }}" {% if plan.get('action') == key %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
 <label>Currency<select name="currency">{% for currency in currencies %}<option {% if plan.get('currency','USD') == currency %}selected{% endif %}>{{ currency }}</option>{% endfor %}</select></label>
 <label>Planned budget<input name="planned_budget" type="number" min="0" step="0.01" value="{{ plan.get('planned_budget') or '' }}"></label>
+<label>Estimated total cost<input name="estimated_total_cost" type="number" min="0" step="0.01" value="{{ plan.get('estimated_total_cost') or '' }}"></label>
+<label>Access for chosen action<select name="access_status">{% for value,label in [('unknown','Not checked'),('confirmed','Confirmed by me'),('unavailable','Unavailable')] %}<option value="{{ value }}" {% if plan.get('access_status','unknown') == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+<label>Access checked on<input name="access_checked_on" type="date" value="{{ plan.get('access_checked_on') or '' }}"></label>
 <label>Target company domains<textarea name="target_domains" placeholder="example.com&#10;anothercompany.com">{{ plan.get('target_domains',[])|join('\n') }}</textarea></label>
 <label class="wide">Access, budget and other constraints<textarea name="constraints" maxlength="4000">{{ plan.get('constraints','') }}</textarea></label>
 </div><h2 style="margin-top:28px">Actual results</h2><p class="muted">Leave unknown values blank. These are your reported results, not independently attributed ROI. Saving a plan does not affect the recommendation score.</p><div class="grid">
@@ -24,6 +27,13 @@
 <label>Results as of<input name="results_as_of" type="date" value="{{ plan.get('results_as_of') or '' }}"></label>
 <label class="wide">Notes and attribution context<textarea name="notes" maxlength="4000">{{ plan.get('notes','') }}</textarea></label></div>
 <button id="savePlan">Save plan &amp; results</button><p id="message" role="status" aria-live="polite"></p></form></section>
+<section><h2>Action evidence &amp; constraints</h2>
+<p><strong>{{ view.assessment.status|replace('_',' ')|capitalize }}</strong></p>
+<ul>{% for check in view.assessment.checks %}<li>{{ check }}</li>{% endfor %}</ul>
+<p class="muted">Access confirmations and cost estimates are your reports. They are not independently verified. Changing the action requires you to recheck its access terms.</p>
+<h2>Organizer links to check</h2><p class="muted">Observed on pages this report read. Destination content, edition eligibility, price and availability have not been verified.</p>
+{% if view.access_links %}<ul>{% for link in view.access_links %}<li><a href="{{ link.url }}" target="_blank" rel="noopener noreferrer">{{ link.label }}</a> · {{ link.kind }}<br><small>Observed {{ link.observed_at }} on {{ link.source_url }}</small></li>{% endfor %}</ul>{% else %}<p>No matching organizer links were observed. This report may not have read the pages that contain them.</p>{% endif %}
+</section>
 <section><h2>Target-account evidence</h2><p>Save target domains to compare them with this report’s published roster.</p>
 <p class="note">{{ view.overlay.limitation }}</p>
 {% if view.overlay.suggested_action %}<p><strong>Suggested next action:</strong> {{ actions[view.overlay.suggested_action] }}. {{ view.overlay.next_check }} This is a suggestion for review, not a booking or an automated task.</p>{% else %}<p>{{ view.overlay.next_check }}</p>{% endif %}
