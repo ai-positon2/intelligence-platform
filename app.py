@@ -8808,7 +8808,7 @@ def event_conference_intelligence_run():
         except (TypeError, ValueError):
             source_run_id = 0
         source = event_intel_store.get_run(source_run_id, email) if source_run_id else None
-        if not source:
+        if not source or source.get("status") != "complete" or source.get("mode") not in ("lookup", "discover"):
             return jsonify({"error": "Pick a completed event roster to work "
                                      "from. This play reads a roster you have "
                                      "already harvested."}), 400
@@ -8834,6 +8834,8 @@ def event_conference_intelligence_run():
             return jsonify({"error": "An event name is required."}), 400
 
     if profile:
+        if str(payload.get('selected_product') or '').strip():
+            profile = dict(profile, selected_product=str(payload['selected_product']).strip()[:400])
         from tracker.event_intel_policy import intake_errors
         missing = intake_errors(profile)
         if missing:
@@ -8845,28 +8847,33 @@ def event_conference_intelligence_run():
     query = query[:400]
     icp_note = str(payload.get("icp_note") or "").strip()[:2000] or None
 
-    run_id = event_intel_store.save_run(email, mode, query, icp_note,
-                                        profile_id=(profile or {}).get("id"),
-                                        source_run_id=(source_run_id
-                                                       if mode == "workroom" else None))
-    if run_id is None:
-        return jsonify({"error": "Could not start the run. Storage is unavailable."}), 500
-
-    threading.Thread(
-        target=event_intel_pipeline.run_job,
-        args=(run_id, mode, query),
-        kwargs={"year_hint": str(payload.get("year") or "").strip()[:20] or None,
-                "email": email,
-                "profile": profile,
-                "source_run_id": (source_run_id if mode == "workroom" else None),
-                "event_class": (event_class if mode == "workroom" else None),
-                "booth_notes": (str(payload.get("booth_notes") or "")[:8000]
-                                if mode == "workroom" else None),
-                "ends_on": (str(payload.get("ends_on") or "").strip()[:10] or None
-                            if mode == "workroom" else None)},
-        daemon=True,
-    ).start()
+    from tracker import event_intel_jobs
+    import uuid
+    try:
+        run_id = event_intel_jobs.start(email, mode, query, {
+            "year_hint": str(payload.get("year") or "").strip()[:20] or None,
+            "email": email, "profile": profile, "icp_note": icp_note,
+            "source_run_id": source_run_id if mode == "workroom" else None,
+            "event_class": event_class if mode == "workroom" else None,
+            "booth_notes": str(payload.get("booth_notes") or "")[:8000] if mode == "workroom" else None,
+            "ends_on": str(payload.get("ends_on") or "").strip()[:10] or None,
+        }, payload.get('request_key') or str(uuid.uuid4()))
+    except ValueError as exc:
+        return jsonify(error=str(exc)), 400
+    except Exception:
+        app.logger.exception('Event queue submission failed')
+        return jsonify(error='Could not start the run. Storage is unavailable.'), 500
     return jsonify({"run_id": run_id, "status": "running"})
+
+
+@app.route("/p2/b2b-agents/event-conference-intelligence/runs/<int:run_id>/cancel", methods=['POST'])
+@position2_required
+def event_conference_intelligence_cancel(run_id):
+    from tracker import event_intel_jobs, event_intel_store
+    email = (_get_user() or {}).get('email', '').lower()
+    if not event_intel_store.get_run(run_id,email):
+        abort(404)
+    return jsonify(cancelled=event_intel_jobs.cancel(run_id,email))
 
 
 @app.route("/p2/b2b-agents/event-conference-intelligence/runs/<int:run_id>/status")
@@ -8890,6 +8897,11 @@ def event_conference_intelligence_run_detail(run_id):
     run = event_intel_store.get_run(run_id, email)
     if not run:
         abort(404)
+    if os.environ.get('DATABASE_URL'):
+        from tracker.event_intel_evidence import get_observations
+        from tracker.event_intel_jobs import ledger
+        run['evidence_ledger'] = get_observations(run_id,email)
+        run['execution_ledger'] = ledger(run_id,email)
     run["events"] = event_intel_store.get_events(run_id)
     run["participants"] = event_intel_store.get_participants(run_id)
     # Always sent, never conditionally. The list of pages that could NOT be

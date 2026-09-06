@@ -649,7 +649,7 @@ def present_run(run, profile, rows, decisions):
     summary = run.setdefault('summary', {}) or {}
     run['summary'] = summary
     selection = summary.get('selection')
-    if not selection or selection.get('version') != 1:
+    if run.get('status') == 'failed' or not selection or selection.get('version') != 1:
         when = str(run.get('created_at') or '')[:10]
         try:
             when = date.fromisoformat(when)

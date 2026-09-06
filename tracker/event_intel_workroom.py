@@ -49,6 +49,7 @@ and a prompt cannot.
 from __future__ import annotations
 
 import concurrent.futures
+from .event_intel_jobs import ContextExecutor
 import datetime
 import logging
 import re
@@ -383,7 +384,8 @@ _COMPETITOR_RULE_OFF = (
 def profile_brief(profile: dict) -> str:
     """The client, as the qualifier sees them."""
     bits = ["Client: %s" % (profile.get("client_name") or "unnamed")]
-    for label, key in (("sells to", "buyer_roles"), ("verticals", "verticals"),
+    for label, key in (("Product or service", "what_they_sell"), ("Selected offer", "selected_product"),
+                       ("Target company characteristics", "firmographics"), ("sells to", "buyer_roles"), ("verticals", "verticals"),
                        ("deal size", "acv_band"), ("sales cycle", "sales_cycle"),
                        ("geography", "geo_scope"), ("site", "website")):
         if profile.get(key):
@@ -418,6 +420,10 @@ def _roster_brief(rows: list[dict], notes: dict) -> str:
             line += '\n  company enrichment (not attendance evidence): ' + json.dumps(r['apollo'])[:3500]
         if r.get('source_url'):
             line += '\n  roster source: ' + str(r['source_url'])
+        if r.get('evidence'):
+            import json
+            line += '\n  source support and edition limitations: ' + json.dumps(r['evidence'])[:2000]
+        line += '\n  company resolution status: ' + str(r.get('resolution') or 'unresolved')
         note = notes.get(org_key(r.get("org_name") or ""))
         if note:
             line += "\n  BOOTH NOTE WRITTEN BY THE USER: %s" % note
@@ -489,7 +495,7 @@ def draft_all(rows: list[dict], profile: dict, event: dict,
     merged: dict = {}
     errors: list[str] = []
     if batches:
-        with concurrent.futures.ThreadPoolExecutor(
+        with ContextExecutor(
                 max_workers=min(MAX_CONCURRENCY, len(batches))) as pool:
             futures = [pool.submit(draft_batch, b, profile, event,
                                    event_class, notes) for b in batches]
