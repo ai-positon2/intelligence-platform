@@ -162,3 +162,21 @@ def test_cancellation_waits_for_valid_write_then_fences_old_worker(account):
             J.CURRENT.reset(marker)
     assert S.get_run(run_id, account)['stage'] == 'cancelled'
     assert [event['name'] for event in S.get_events(run_id)] == ['Write before cancellation']
+
+
+def test_simultaneous_plan_edits_preserve_one_winner(account):
+    from tracker import event_intel_planning as P, event_intel_store as S
+    profile = S.save_profile(account, {'client_name': 'Fixture', 'classification': 'b2b_to_marketing'})
+    rid = S.save_run(account, 'lookup', 'Forum', profile_id=profile)
+    S.save_event(rid, {'name': 'Forum', 'starts_on': '2027-04-01'})
+    S.update_run(rid, status='complete')
+    identity = P.context(rid, account)['event']['event_identity']
+    def edit(index):
+        try:
+            P.save(rid, account, {'profile_id': profile, 'event_identity': identity,
+                   'version': 0, 'action': 'attend', 'currency': 'USD', 'notes': str(index)})
+            return 'saved'
+        except P.Conflict:
+            return 'conflict'
+    assert sorted(parallel_pair(edit)) == ['conflict', 'saved']
+    assert P.context(rid, account)['plan']['version'] == 1
