@@ -34,6 +34,7 @@ that never happened.
 """
 
 from __future__ import annotations
+from .event_intel_identity import event_key
 
 import logging
 
@@ -281,6 +282,7 @@ def audit_famous(candidates: list[dict], profile: dict) -> dict:
     `kept` and is stored as such.
     """
     import concurrent.futures
+    from .event_intel_jobs import ContextExecutor
 
     famous = [c for c in (candidates or []) if c.get("famous")]
     out = {"verdicts": {}, "cut": [], "kept": [], "checked": len(famous),
@@ -295,7 +297,7 @@ def audit_famous(candidates: list[dict], profile: dict) -> dict:
             profile.get("classification"), "Confirm with the client."))
 
     boxes: dict = {}
-    with concurrent.futures.ThreadPoolExecutor(
+    with ContextExecutor(
             max_workers=min(AUDIT_MAX_INFLIGHT, len(famous))) as pool:
         futures = {pool.submit(_audit_one, c, system): i
                    for i, c in enumerate(famous)}
@@ -315,7 +317,7 @@ def audit_famous(candidates: list[dict], profile: dict) -> dict:
     for i, c in enumerate(famous):
         box = boxes.get(i) or {}
         spends.append(box.get("spend"))
-        key = name_key(c.get("name") or "")
+        key = event_key(c)
         if not key:
             continue
         rec = box.get("rec")
@@ -418,9 +420,13 @@ def apply_audit(candidates: list[dict], audit: dict) -> list[dict]:
                                "against a more targeted alternative.")
             out.append(c)
             continue
-        v = _verdict_for(c.get("name") or "", verdicts)
+        v = verdicts.get(event_key(c))
+        if v is None and not any(k.startswith("evi1:") for k in verdicts):
+            v = _verdict_for(c.get("name") or "", verdicts)
         if not v:
-            entry = failed.get(name_key(c.get("name") or ""))
+            entry = failed.get(event_key(c))
+            if entry is None and not any(k.startswith("evi1:") for k in failed):
+                entry = failed.get(name_key(c.get("name") or ""))
             why = (entry.get("why") if isinstance(entry, dict)
                    else entry) or None
             if why:
@@ -537,7 +543,7 @@ def _row_for(name: str, by_key: dict) -> dict | None:
 def promote_alternatives(audit: dict, candidates: list[dict],
                          resolver=None, cap: int = MAX_PROMOTED,
                          replaced_from: list[dict] | None = None,
-                         lookups: int = MAX_PROMOTION_LOOKUPS) -> dict:
+                         lookups: int = MAX_PROMOTION_LOOKUPS, profile: dict | None = None) -> dict:
     """Turn the audit's named alternatives into scoreable candidates.
 
     The gap this closes: the audit would cut a marquee event, name a better
@@ -583,7 +589,7 @@ def promote_alternatives(audit: dict, candidates: list[dict],
     # category=None and was dropped by the store for having no category slot.
     # `replaced_from` is the pre-audit list, where the cut event still exists.
     pool = (replaced_from if replaced_from is not None else candidates) or []
-    by_name = {name_key(c.get("name") or ""): c for c in pool}
+    by_name = {event_key(c): c for c in pool}
 
     spends = []
     looked_up = 0
@@ -644,6 +650,11 @@ def promote_alternatives(audit: dict, candidates: list[dict],
                 "confidence": (res or {}).get("confidence"),
             })
             continue
+        from .event_intel_policy import eligibility
+        reasons = eligibility(candidate, profile or {})
+        if reasons:
+            out['unconfirmed'].append({'name':alt['name'],'replaces':alt['replaces'],'why':' '.join(reasons)})
+            continue
         out["promoted"].append(candidate)
 
     # Named, never looked at, because the list was full or the lookup budget
@@ -686,8 +697,8 @@ def _candidate_from_alternative(res: dict, alt: dict,
         "organizer": ev.get("organizer"),
         "starts_on": ev.get("starts_on"),
         "ends_on": ev.get("ends_on"),
-        "country": None,
-        "city": ev.get("location"),
+        "country": ev.get("country"),
+        "city": ev.get("city") or ev.get("location"),
         "days": None,
         "industry": None,
         "attendees": ev.get("stated_size"),
@@ -695,6 +706,8 @@ def _candidate_from_alternative(res: dict, alt: dict,
         "audience_note": ev.get("audience_note"),
         "format": ev.get("format"),
         "cost_note": None,
+        "availability": ev.get("availability") or "unknown",
+        "availability_source": ev.get("availability_source"),
         "organizer_run": False,
         # Not carried over from the audit's prose. The bonus needs evidence
         # the rubric has read, and a sentence about why one event beats

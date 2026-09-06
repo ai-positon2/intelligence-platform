@@ -124,7 +124,7 @@ def test_the_verdict_is_labelled_from_the_candidate_not_the_reply(monkeypatch):
     cand = _c("Adobe Summit", True, city="Las Vegas")
     out = A.audit_famous([cand], PROFILE)
 
-    assert list(out["verdicts"]) == [A.name_key("Adobe Summit")], (
+    assert list(out["verdicts"]) == [A.event_key(cand)], (
         "the verdict was keyed off the model's echo: %s" % list(out["verdicts"]))
     assert out["cut"][0]["name"] == "Adobe Summit"
     # The whole point: the promotion can find the row it stands in for.
@@ -150,7 +150,7 @@ def test_one_broken_audit_costs_only_its_own_event(monkeypatch):
     assert out["error"] is None
     assert [v["name"] for v in out["kept"]] == ["Dreamforce"]
     assert [v["name"] for v in out["cut"]] == ["Web Summit"]
-    assert list(out["failed"]) == [A.name_key("CES")]
+    assert list(out["failed"]) == [A.event_key(_c("CES"))]
 
     survivors = [c["name"] for c in A.apply_audit(famous, out)]
     assert survivors == ["Dreamforce", "CES"], (
@@ -228,7 +228,7 @@ def test_a_justified_flagship_is_kept(monkeypatch):
         "alternative_website": "https://mtf.example",
         "why": "Northwind's VP Marketing buyers staff booths here in volume."}]})
     out = A.audit_famous([_c("Dreamforce", famous=True)], PROFILE)
-    v = out["verdicts"][A.name_key("Dreamforce")]
+    v = out["verdicts"][A.event_key(_c("Dreamforce"))]
     assert v["verdict"] == A.VERDICT_KEPT
     assert v["alternative"] == "MarTechFest"
 
@@ -240,7 +240,7 @@ def test_kept_without_a_named_alternative_is_downgraded_to_cut(monkeypatch):
         "name": "Dreamforce", "verdict": "kept", "alternative": None,
         "why": "It is the biggest event in the category and everyone attends."}]})
     out = A.audit_famous([_c("Dreamforce", famous=True)], PROFILE)
-    v = out["verdicts"][A.name_key("Dreamforce")]
+    v = out["verdicts"][A.event_key(_c("Dreamforce"))]
     assert v["verdict"] == A.VERDICT_CUT
     assert "no more targeted alternative was named" in v["why"]
 
@@ -260,7 +260,7 @@ def test_a_non_http_alternative_website_is_dropped(monkeypatch):
                                     "alternative_website": "javascript:alert(1)",
                                     "why": "w"}]})
     out = A.audit_famous([_c("Dreamforce", famous=True)], PROFILE)
-    assert out["verdicts"][A.name_key("Dreamforce")]["alternative_website"] is None
+    assert out["verdicts"][A.event_key(_c("Dreamforce"))]["alternative_website"] is None
 
 
 def test_a_failed_audit_is_recorded_rather_than_passed_over(monkeypatch):
@@ -439,7 +439,7 @@ def test_the_alternative_to_a_cut_event_is_confirmed_and_added(monkeypatch):
                           "https://www.inbound.com", "It has a real expo floor.")],
              "checked": 1, "error": None}
     cands = [_c("MarTech Conference", famous=True)]
-    out = A.promote_alternatives(audit, cands,
+    out = A.promote_alternatives(audit, profile=dict(PROFILE, geo_scope="Global"), candidates= cands,
                                  resolver=_resolver_for({"INBOUND": _resolved("INBOUND")}))
     assert [c["name"] for c in out["promoted"]] == ["INBOUND"]
     got = out["promoted"][0]
@@ -452,7 +452,7 @@ def test_a_promoted_event_says_it_did_not_come_from_a_category_search(monkeypatc
     believes a search found it, and cannot tell that a different check
     confirmed it."""
     audit = {"cut": [_cut("MarTech Conference", "INBOUND")], "checked": 1, "error": None}
-    out = A.promote_alternatives(audit, [_c("MarTech Conference", famous=True)],
+    out = A.promote_alternatives(audit, profile=dict(PROFILE, geo_scope="Global"), candidates= [_c("MarTech Conference", famous=True)],
                                  resolver=_resolver_for({"INBOUND": _resolved("INBOUND")}))
     got = out["promoted"][0]
     assert got["audit_verdict"] == A.VERDICT_PROMOTED
@@ -465,7 +465,7 @@ def test_a_promoted_event_is_never_marked_famous(monkeypatch):
     carried it would be audited, could name its own alternative, and the step
     would recurse. It has also already won the comparison."""
     audit = {"cut": [_cut("MarTech Conference", "INBOUND")], "checked": 1, "error": None}
-    out = A.promote_alternatives(audit, [_c("MarTech Conference", famous=True)],
+    out = A.promote_alternatives(audit, profile=dict(PROFILE, geo_scope="Global"), candidates= [_c("MarTech Conference", famous=True)],
                                  resolver=_resolver_for(
                                      {"INBOUND": _resolved("INBOUND", famous=True)}))
     assert out["promoted"][0]["famous"] is False
@@ -474,7 +474,7 @@ def test_a_promoted_event_is_never_marked_famous(monkeypatch):
 def test_a_promoted_event_inherits_the_category_it_stands_in_for(monkeypatch):
     audit = {"cut": [_cut("MarTech Conference", "INBOUND")], "checked": 1, "error": None}
     cands = [_c("MarTech Conference", famous=True, category=R.CAT_VERTICAL_SUMMIT)]
-    out = A.promote_alternatives(audit, cands,
+    out = A.promote_alternatives(audit, profile=dict(PROFILE, geo_scope="Global"), candidates= cands,
                                  resolver=_resolver_for({"INBOUND": _resolved("INBOUND")}))
     assert out["promoted"][0]["category"] == R.CAT_VERTICAL_SUMMIT
 
@@ -486,7 +486,7 @@ def test_an_alternative_that_cannot_be_confirmed_is_reported_not_injected():
     the promotion step was built to close."""
     audit = {"cut": [_cut("MarTech Conference", "Some Event That Is Not Real")],
              "checked": 1, "error": None}
-    out = A.promote_alternatives(audit, [_c("MarTech Conference", famous=True)],
+    out = A.promote_alternatives(audit, profile=dict(PROFILE, geo_scope="Global"), candidates= [_c("MarTech Conference", famous=True)],
                                  resolver=_resolver_for({}))
     assert out["promoted"] == []
     assert len(out["unconfirmed"]) == 1
@@ -502,7 +502,7 @@ def test_the_alternative_on_a_kept_verdict_is_not_promoted():
     audit = {"cut": [], "kept": [{"name": "INBOUND", "verdict": A.VERDICT_KEPT,
                                   "alternative": "Some Smaller Summit"}],
              "checked": 1, "error": None}
-    out = A.promote_alternatives(audit, [_c("INBOUND", famous=True)],
+    out = A.promote_alternatives(audit, profile=dict(PROFILE, geo_scope="Global"), candidates= [_c("INBOUND", famous=True)],
                                  resolver=_resolver_for(
                                      {"Some Smaller Summit": _resolved("Some Smaller Summit")}))
     assert out["promoted"] == [] and out["considered"] == 0
@@ -513,7 +513,7 @@ def test_an_alternative_already_on_the_list_is_not_added_twice():
     scored twice and can take two slots under the cap."""
     audit = {"cut": [_cut("MarTech Conference", "INBOUND")], "checked": 1, "error": None}
     cands = [_c("MarTech Conference", famous=True), _c("INBOUND")]
-    out = A.promote_alternatives(audit, cands,
+    out = A.promote_alternatives(audit, profile=dict(PROFILE, geo_scope="Global"), candidates= cands,
                                  resolver=_resolver_for({"INBOUND": _resolved("INBOUND")}))
     assert out["promoted"] == [] and out["considered"] == 0
 
@@ -523,7 +523,7 @@ def test_two_cut_events_naming_the_same_replacement_promote_it_once():
                      _cut("Some Other Show", "INBOUND")],
              "checked": 2, "error": None}
     cands = [_c("MarTech Conference", famous=True), _c("Some Other Show", famous=True)]
-    out = A.promote_alternatives(audit, cands,
+    out = A.promote_alternatives(audit, profile=dict(PROFILE, geo_scope="Global"), candidates= cands,
                                  resolver=_resolver_for({"INBOUND": _resolved("INBOUND")}))
     assert [c["name"] for c in out["promoted"]] == ["INBOUND"]
 
@@ -538,7 +538,7 @@ def test_the_number_of_lookups_is_capped_and_the_rest_are_named():
              "checked": 5, "error": None}
     cands = [_c(m, famous=True) for m in marquee]
     mapping = {a: _resolved(a) for a in alts}
-    out = A.promote_alternatives(audit, cands, resolver=_resolver_for(mapping), cap=2)
+    out = A.promote_alternatives(audit, profile=dict(PROFILE, geo_scope="Global"), candidates= cands, resolver=_resolver_for(mapping), cap=2)
     assert len(out["promoted"]) == 2, "the cost ceiling was not applied"
     assert [c["name"] for c in out["not_attempted"]] == alts[2:], (
         "alternatives dropped by the cap were not named")
@@ -562,7 +562,7 @@ def test_a_failed_lookup_does_not_use_up_a_promotion_slot():
     cands = [_c(m, famous=True) for m in marquee]
     # The first two named cannot be confirmed; the last two can.
     mapping = {a: _resolved(a) for a in alts[2:]}
-    out = A.promote_alternatives(audit, cands,
+    out = A.promote_alternatives(audit, profile=dict(PROFILE, geo_scope="Global"), candidates= cands,
                                  resolver=_resolver_for(mapping), cap=2)
     assert [c["name"] for c in out["promoted"]] == alts[2:], (
         "two refused lookups consumed the promotion budget: promoted %s"
@@ -587,7 +587,7 @@ def test_the_lookup_budget_still_bounds_what_the_step_can_spend():
         return {"ok": False, "confidence": "low", "event": None,
                 "reasoning": "No single edition could be pinned down."}
 
-    out = A.promote_alternatives(audit, [_c(m, famous=True) for m in marquee],
+    out = A.promote_alternatives(audit, profile=dict(PROFILE, geo_scope="Global"), candidates= [_c(m, famous=True) for m in marquee],
                                  resolver=_r, cap=3, lookups=4)
     assert len(calls) == 4, "the lookup ceiling did not hold: %d calls" % len(calls)
     assert out["promoted"] == []
@@ -607,7 +607,7 @@ def test_a_resolver_that_raises_is_reported_rather_than_killing_the_run():
     def _boom(name):
         raise RuntimeError("HTTP 503")
     audit = {"cut": [_cut("MarTech Conference", "INBOUND")], "checked": 1, "error": None}
-    out = A.promote_alternatives(audit, [_c("MarTech Conference", famous=True)],
+    out = A.promote_alternatives(audit, profile=dict(PROFILE, geo_scope="Global"), candidates= [_c("MarTech Conference", famous=True)],
                                  resolver=_boom)
     assert out["promoted"] == []
     assert "503" in out["unconfirmed"][0]["why"]
@@ -619,7 +619,7 @@ def test_a_cut_with_no_named_alternative_promotes_nothing():
     audit = {"cut": [{"name": "X", "verdict": A.VERDICT_CUT, "alternative": None,
                       "no_verdict": True, "why": "no verdict"}],
              "checked": 1, "error": None}
-    out = A.promote_alternatives(audit, [_c("X", famous=True)],
+    out = A.promote_alternatives(audit, profile=dict(PROFILE, geo_scope="Global"), candidates= [_c("X", famous=True)],
                                  resolver=_resolver_for({}))
     assert out["considered"] == 0 and out["promoted"] == [] and out["unconfirmed"] == []
 
@@ -631,7 +631,7 @@ def test_the_audit_prose_is_not_reused_as_matchmaking_evidence():
     audit = {"cut": [_cut("MarTech Conference", "INBOUND", None,
                           "It runs a hosted-buyer programme with pre-scheduled 1:1s.")],
              "checked": 1, "error": None}
-    out = A.promote_alternatives(audit, [_c("MarTech Conference", famous=True)],
+    out = A.promote_alternatives(audit, profile=dict(PROFILE, geo_scope="Global"), candidates= [_c("MarTech Conference", famous=True)],
                                  resolver=_resolver_for({"INBOUND": _resolved("INBOUND")}))
     assert out["promoted"][0]["matchmaking_evidence"] is None
 
@@ -728,7 +728,7 @@ def test_a_replacement_whose_only_edition_is_over_is_refused():
     audit = {"cut": [_cut("MarTech Conference", "INBOUND")], "checked": 1,
              "error": None}
     past = _resolved("INBOUND", starts_on="2019-09-03", ends_on="2019-09-05")
-    out = A.promote_alternatives(audit, [_c("MarTech Conference", famous=True)],
+    out = A.promote_alternatives(audit, profile=dict(PROFILE, geo_scope="Global"), candidates= [_c("MarTech Conference", famous=True)],
                                  resolver=_resolver_for({"INBOUND": past}))
     assert out["promoted"] == [], "an event that has already happened was recommended"
     assert out["unconfirmed"][0]["finished"] is True
@@ -738,15 +738,15 @@ def test_a_replacement_whose_only_edition_is_over_is_refused():
 
 
 def test_an_undated_replacement_is_not_treated_as_finished():
-    """No date is not the same as a date in the past. Refusing an undated
-    event here would silently drop replacements for every event that has not
-    published its dates yet."""
+    """Unknown dates require verification; they do not mean the event finished."""
     audit = {"cut": [_cut("MarTech Conference", "INBOUND")], "checked": 1,
              "error": None}
     undated = _resolved("INBOUND", starts_on=None, ends_on=None)
-    out = A.promote_alternatives(audit, [_c("MarTech Conference", famous=True)],
+    out = A.promote_alternatives(audit, profile=dict(PROFILE, geo_scope="Global"), candidates= [_c("MarTech Conference", famous=True)],
                                  resolver=_resolver_for({"INBOUND": undated}))
-    assert [c["name"] for c in out["promoted"]] == ["INBOUND"]
+    assert out["promoted"] == []
+    assert "dates need confirmation" in out["unconfirmed"][0]["why"]
+    assert not out["unconfirmed"][0].get("finished")
 
 
 def test_the_event_lookup_tells_the_model_what_day_it_is():
@@ -994,7 +994,7 @@ def test_a_promotion_inherits_the_category_through_a_city_suffixed_name():
                           "city": "Cleveland", "format": "in_person",
                           "confidence": "high"}}
 
-    out = A.promote_alternatives(audit, [], resolver=resolver,
+    out = A.promote_alternatives(audit, profile=dict(PROFILE, geo_scope="Global"), candidates= [], resolver=resolver,
                                  replaced_from=pre_audit)
     assert [c["name"] for c in out["promoted"]] == ["MAICON"], out["unconfirmed"]
     assert out["promoted"][0]["category"] == R.CAT_INDUSTRY_FLAGSHIP

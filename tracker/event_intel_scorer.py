@@ -30,6 +30,7 @@ of asking a model whether it committed it.
 from __future__ import annotations
 
 import concurrent.futures
+from .event_intel_jobs import ContextExecutor
 import logging
 import re
 
@@ -298,7 +299,7 @@ def score_all(candidates: list[dict], profile: dict) -> dict:
     errors: list[str] = []
     spends: list = []
     if batches:
-        with concurrent.futures.ThreadPoolExecutor(
+        with ContextExecutor(
                 max_workers=min(MAX_CONCURRENCY, len(batches))) as pool:
             futures = [pool.submit(score_batch, b, profile) for b in batches]
             for fut in concurrent.futures.as_completed(futures):

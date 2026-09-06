@@ -155,9 +155,12 @@ def test_the_csv_says_what_the_screen_says(monkeypatch):
     # attending. Same wording as the screen, from the same ROLE_LABELS map.
     assert "Exhibitor" in text
     assert "Publicly said they are attending" in text
-    acme_line = [ln for ln in text.splitlines() if "Acme Robotics" in ln][0]
-    assert "attend" not in acme_line.lower(), acme_line
-    assert "https://widgetexpo.test/exhibitors" in acme_line
+    import csv, io
+    acme_row = next(row for row in csv.DictReader(io.StringIO(text))
+                    if row["Organisation"] == "Acme Robotics")
+    assert "attend" not in acme_row["Listed as"].lower(), acme_row
+    assert "not an attendee list" in acme_row["Roster caveat"]
+    assert acme_row["Source page"] == "https://widgetexpo.test/exhibitors"
 
 
 def test_the_csv_is_crlf_terminated():

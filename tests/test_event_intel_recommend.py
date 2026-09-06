@@ -43,6 +43,8 @@ def _cand(name, **kw):
     d = {"name": name, "category": R.CAT_VERTICAL_SUMMIT, "famous": False,
          "website": "https://%s.example" % name.replace(" ", "").lower(),
          "cost_note": "$28,000 for a 3x3 booth", "attendees": "600"}
+    from datetime import date, timedelta
+    d.update(starts_on=(date.today()+timedelta(days=30)).isoformat(), ends_on=(date.today()+timedelta(days=32)).isoformat(), country="USA", confidence="high", sources=[d["website"]])
     d.update(kw)
     return d
 
@@ -470,7 +472,7 @@ class _FakeStore:
     def prior_candidate_names(self, email, exclude_run_id=None):
         return [{"id": 7, "client_name": "Acme", "names": ["PMM Summit"]}]
 
-    def get_outcomes(self, email):
+    def get_outcomes(self, email, profile_id=None):
         return dict(self.outcomes)
 
     def outcome_pattern(self, email, profile_id, exclude_run_id=None):
@@ -580,7 +582,7 @@ def test_outcome_pattern_reorders_top_five_without_touching_score_or_tier(monkey
         % totals)
 
 
-def test_cross_client_signal_reaches_the_executive_summary(monkeypatch):
+def test_cross_client_interest_is_suppressed_pending_verified_client_identity(monkeypatch):
     fake = _FakeStore()
     fake.population = A.CROSS_CLIENT_MIN_POPULATION
     _wire(monkeypatch, fake)
@@ -605,9 +607,7 @@ def test_cross_client_signal_reaches_the_executive_summary(monkeypatch):
 
     P._run_recommend(1, "me@p2.example", PROFILE)
     s = fake.runs[1]["summary"]
-    assert any("watched by other clients" in a for a in s["assumptions"]), (
-        s["assumptions"])
-    assert any("Watched Summit" in a and "3" in a for a in s["assumptions"])
+    assert not any("watched by other clients" in a for a in s['assumptions'])
     # No identity anywhere in the finished summary -- the fake's own count
     # dict was already shaped like the real one, and this confirms nothing
     # downstream added one.

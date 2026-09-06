@@ -73,6 +73,7 @@ homework.
 from __future__ import annotations
 
 import concurrent.futures
+from .event_intel_jobs import ContextExecutor
 import logging
 import re
 import datetime
@@ -374,9 +375,12 @@ true|false, "event": {{"name": str, "edition": str|null, "website": str|null, \
 "days": int|null, "industry": str|null, "attendees": str|null, \
 "booths": str|null, "audience_note": str|null, "format": \
 "in_person"|"virtual"|"hybrid"|null, "cost_note": str|null, \
+"availability": "open"|"sold_out"|"cancelled"|"unknown", "availability_source": str|null, \
 "organizer_run": true|false, "matchmaking_evidence": str|null, \
 "famous": true|false, "category_fit": str, "confidence": \
 "high"|"medium"|"low", "sources": [str]}}}}
+
+`availability` must describe this edition, using an organizer URL in `availability_source`. Never assume tickets are available because the event exists.
 
 `name` is the event as it brands itself. Correct the proposed name if the \
 real one differs; you are looking at the page and they were not.
@@ -417,7 +421,8 @@ def profile_brief(profile: dict) -> str:
     lines.append("Classification: %s"
                  % rubric.CLASSIFICATION_LABELS.get(p.get("classification"),
                                                     p.get("classification") or "?"))
-    for label, key in (("Buyer roles", "buyer_roles"), ("Target verticals", "verticals"),
+    for label, key in (("Product or service", "what_they_sell"), ("Selected offer", "selected_product"),
+                       ("Target company characteristics", "firmographics"), ("Buyer roles", "buyer_roles"), ("Target verticals", "verticals"),
                        ("Deal size", "acv_band"), ("Sales cycle", "sales_cycle"),
                        ("Geographic scope", "geo_scope")):
         if p.get(key):
@@ -587,8 +592,6 @@ def merge(by_category: dict, force_exclude: str | None = None,
     the narrower label would disguise exactly the bias being guarded against.
     """
     out: list[dict] = []
-    kept_names: list[str] = []
-    seen_sites: set[str] = set()
     committed = committed_keys(force_include)
     for cat in rubric.CATEGORIES:
         for ev in (by_category.get(cat) or []):
@@ -598,16 +601,17 @@ def merge(by_category: dict, force_exclude: str | None = None,
             if _excluded(name, force_exclude):
                 continue
             sk = site_key(ev.get("website") or "")
-            if sk and sk in seen_sites:
-                continue
             # Compared against the names already kept rather than against a set
             # of keys, because "same event" now depends on two names together
             # (their regions have to agree) and cannot be reduced to one string.
-            if any(names_match(name, kept) for kept in kept_names):
+            def same_edition(kept):
+                left, right = ev.get('starts_on'), kept.get('starts_on')
+                if left and right and str(left)[:10] != str(right)[:10]:
+                    return False
+                return names_match(name, kept.get('name') or '') or bool(
+                    sk and sk == site_key(kept.get('website') or ''))
+            if any(same_edition(kept) for kept in out):
                 continue
-            kept_names.append(name)
-            if sk:
-                seen_sites.add(sk)
             # Set here, in code, from the user's own profile. A model that
             # returns committed:true for an event nobody committed to must not
             # be able to promote itself past the floor.
@@ -657,6 +661,8 @@ def _clean_event(raw: dict, category: str) -> dict | None:
         "audience_note": _t("audience_note", 600),
         "format": _t("format", 16),
         "cost_note": _t("cost_note", 400),
+        "availability": raw.get("availability") if raw.get("availability") in ("open","sold_out","cancelled") else "unknown",
+        "availability_source": _t("availability_source", 1000),
         "organizer_run": bool(raw.get("organizer_run")),
         "matchmaking_evidence": _t("matchmaking_evidence", 800),
         "famous": bool(raw.get("famous")),
@@ -1059,6 +1065,9 @@ def propose_category(category: str, profile: dict) -> dict:
     # renders to a paying client as "there is nothing in this category for
     # you", when the truth was that the search never finished.
     complete = parsed.get("search_complete")
+    if complete is None and not proposals:
+        return _out(STATUS_ERROR, [], note,
+                    'The search did not confirm its coverage. No verified empty-market conclusion is available.')
     if complete is False:
         # Two different sentences, because two different things happened. A
         # finder that ran out of the searches we gave it stopped where we told
@@ -1180,9 +1189,11 @@ def _confirm_event(proposal: dict, category: str, profile: dict,
                        res.get("text_block_count"), res.get("stop_reason"))
         return _unchecked(name, "The check ran but its answer could not be read.")
 
-    facts_complete = parsed.get("facts_complete") is not False
+    facts_complete = parsed.get("facts_complete") is True
 
     if not parsed.get("confirmed"):
+        if not facts_complete:
+            return _unchecked(name, 'The evidence was insufficient to accept or rule out this event.')
         reason = claude_websearch.strip_em_dash(
             str(parsed.get("reject_reason") or "").strip())[:400]
         if not reason:
@@ -1206,6 +1217,10 @@ def _confirm_event(proposal: dict, category: str, profile: dict,
                                          "without citing a single page, so "
                                          "nothing here can be checked.")
 
+    from .event_intel_policy import eligibility
+    reasons = eligibility(event, profile)
+    if reasons:
+        return _unchecked(event['name'], ' '.join(reasons))
     event["facts_complete"] = facts_complete
     event["proposed_as"] = (proposal or {}).get("why") or None
     return {"kind": CONFIRM_OK, "event": event, "name": event["name"],
@@ -1238,7 +1253,7 @@ def search_category(category: str, profile: dict) -> dict:
                     detail=found["detail"])
 
     results = []
-    with concurrent.futures.ThreadPoolExecutor(
+    with ContextExecutor(
             max_workers=max(1, len(proposals))) as pool:
         futures = [pool.submit(confirm_event, pr, category, profile)
                    for pr in proposals]
@@ -1318,7 +1333,7 @@ def discover(profile: dict) -> dict:
     statuses: dict[str, dict] = {}
 
     spends = []
-    with concurrent.futures.ThreadPoolExecutor(max_workers=MAX_CONCURRENCY) as pool:
+    with ContextExecutor(max_workers=MAX_CONCURRENCY) as pool:
         futures = {pool.submit(search_category, cat, profile): cat
                    for cat in rubric.CATEGORIES}
         for fut in concurrent.futures.as_completed(futures):

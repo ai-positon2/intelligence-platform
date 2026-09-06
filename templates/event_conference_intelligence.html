@@ -171,6 +171,7 @@
               {% endif %}
               <dl class="ps-grid">
                 {% for lbl, val in [
+                     ('Selected offer', p.selected_product), ('Company characteristics', p.firmographics),
                      ('Buyer roles', p.buyer_roles), ('Verticals', p.verticals),
                      ('Deal size', p.acv_band), ('Sales cycle', p.sales_cycle),
                      ('Geography', p.geo_scope),
@@ -283,6 +284,10 @@
               </div>
               <div class="evi-row">
                 <div class="evi-field">
+                  <label for="selectedProduct">Product or service to promote</label>
+                  <input type="text" id="selectedProduct" placeholder="The specific offer this event plan supports" />
+                  <label for="firmographics">Target company characteristics</label>
+                  <input type="text" id="firmographics" placeholder="Company size, business model, buying situation" />
                   <label for="buyerRoles">Buyer roles</label>
                   <input type="text" id="buyerRoles" placeholder="VP Marketing, CMO, Head of Growth" />
                   <span class="ev" data-ev="buyer_roles" hidden></span>
@@ -460,6 +465,8 @@
 
           <!-- The run sits in its own footer strip rather than loose under the
                last field, so a long intake form has a visible end to it. -->
+          <div class="evi-field"><label for="runOffer">Product or service for this research</label>
+            <input id="runOffer" type="text" placeholder="Use the saved offer, or enter a specific product or service" /></div>
           <div class="evi-actions">
             <button type="submit" class="evi-btn" id="runBtn">Run →</button>
             {# Says so BEFORE the click. The button stays live, because a
@@ -479,6 +486,7 @@
               <span id="runningText">Working. This runs in the background, so you can leave
                 this page and find the result in History when it is done.</span>
             </div>
+            <button type="button" id="cancelEventRun" class="evi-btn">Cancel research</button>
             <ol id="runningSteps" class="evi-steps" aria-label="Run progress"></ol>
           </div>
           <div id="formError" class="evi-err" style="display:none"></div>
@@ -823,6 +831,8 @@
       var read = document.getElementById('draftRead');
       var html = '<span class="rh">What we read</span>';
       if (d.what_they_sell) {
+        var offer = document.getElementById("selectedProduct");
+        if (offer && !offer.value.trim()) offer.value = d.what_they_sell;
         html += '<p class="rs">' + esc(d.what_they_sell) + '</p>' +
           '<p class="rc">If that is not your client, the name matched a ' +
           'different company. Correct the website and read it again.</p>';
@@ -1048,6 +1058,9 @@
         client_name: document.getElementById('clientName').value.trim(),
         website: document.getElementById('clientSite').value.trim(),
         classification: pickedClass,
+        selected_product: (document.getElementById("selectedProduct") || {}).value || "",
+        what_they_sell: (document.getElementById("selectedProduct") || {}).value || "",
+        firmographics: (document.getElementById("firmographics") || {}).value || "",
         buyer_roles: document.getElementById('buyerRoles').value.trim(),
         verticals: document.getElementById('verticals').value.trim(),
         acv_band: document.getElementById('acvBand').value.trim(),
@@ -1157,12 +1170,19 @@
           ? 'Resolving the event and reading the pages it publishes. This runs in the background, so you can leave this page.'
           : 'Qualifying the roster and drafting an opener for each company. This runs in the background, so you can leave this page.';
 
+      if (mode !== 'lookup') body.selected_product = (document.getElementById('runOffer') || {}).value || '';
+      var signature = JSON.stringify(body);
+      if (!window.eviPendingRequest || window.eviPendingRequest.signature !== signature) {
+        window.eviPendingRequest = {signature: signature, key: crypto.randomUUID()};
+      }
+      body.request_key = window.eviPendingRequest.key;
       fetch(BASE + '/run', {
         method: 'POST', headers: {'Content-Type': 'application/json'},
         body: JSON.stringify(body)
       }).then(function(r){ return r.json().then(function(j){ return {ok: r.ok, j: j}; }); })
         .then(function(res){
           if (!res.ok) { throw new Error(res.j.error || 'The run could not be started.'); }
+          window.eviPendingRequest = null;
           watch(res.j.run_id, mode);
         })
         .catch(function(err){
@@ -1178,6 +1198,7 @@
        the second literal silently won, so recommend runs showed the discover
        message. The recommend pipeline now reports `discovering_categories`. */
     var STAGES = {
+      queued: "Queued for an event research worker.",
       discovering_categories: 'Searching all six event categories, one at a time.',
       auditing: 'Weighing every famous name against a more targeted alternative.',
       scoring: 'Scoring each event on relevance, decision-maker access and engagement.',
@@ -1224,6 +1245,16 @@
     }
 
     function watch(runId, mode){
+      var cancelButton = document.getElementById('cancelEventRun');
+      if (cancelButton) {
+        cancelButton.disabled = false;
+        cancelButton.onclick = function(){
+          cancelButton.disabled = true;
+          fetch(BASE + '/runs/' + runId + '/cancel', {method:'POST'})
+            .then(function(response){ if (!response.ok) throw new Error('Cancellation failed'); })
+            .catch(function(){ cancelButton.disabled = false; showFormError('Could not cancel. Please retry.'); });
+        };
+      }
       /* Recursive setTimeout, not setInterval: a status call slower than the
          interval used to stack a second request on top of the first. And a
          failure exit, because .catch(function(){}) meant a route that 404s or
@@ -2849,7 +2880,7 @@
                  let a name containing a quote add attributes of its own. */
               return '<button type="button" class="dbtn' +
                 (prior && prior.decision === d ? ' on' : '') +
-                '" data-outcome="' + d + '" data-event="' + esc(c.name) + '">' +
+                '" data-outcome="' + d + '" data-event="' + esc(c.name) + '" data-event-identity="' + esc(c.event_identity || '') + '">' +
                 esc(labels[d] || d) + '</button>';
             }).join('') +
           '</div>' +
@@ -2868,8 +2899,10 @@
       fetch(BASE + '/outcomes', {
         method: 'POST', headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({event_name: name, decision: decision,
-                              run_id: current ? current.id : null})
-      }).then(function(r){ if (!r.ok) throw new Error('save failed'); })
+                              run_id: current ? current.id : null,
+                              event_identity: btn.getAttribute("data-event-identity") || null})
+      }).then(function(r){ if (!r.ok) throw new Error('save failed'); return r.json(); })
+        .then(function(run){ current = run; render(run); })
         .catch(function(){
           btn.classList.remove('on');
           btn.textContent = 'Could not save';
@@ -3636,12 +3669,15 @@
       // A committed event below the bar is P3 by definition, and showing it is
       // the entire point. Filtering P3 unconditionally hid the one row this
       // feature exists to surface.
-      var kept = cands.filter(function(c){
-        return c.tier !== 'P3' || c.committed;
-      }).slice(0, keepN);
+      var kept = s.selection ? s.selection.kept : cands.filter(function(c){
+        // Compatibility for old inline fixtures; the API always supplies a selection.
+        var end = c.ends_on || c.starts_on;
+        var finished = end && /^\d{4}-\d{2}-\d{2}/.test(end) && end.slice(0,10) < new Date().toISOString().slice(0,10);
+        return !finished && (c.tier !== 'P3' || c.committed);
+      }).sort(function(a,b){ return ((b.total || 0) + (b.outcome_adjustment || 0)) - ((a.total || 0) + (a.outcome_adjustment || 0)); }).slice(0, keepN);
       var counts = counts0;
       var outc = s.outcomes || {};
-      var byName = outc.by_name || {};
+      var byName = outc.by_identity || outc.by_name || {};
       var decLabels = outc.labels || {};
 
       var html = '<div class="evi-exec">' +
@@ -3721,7 +3757,7 @@
       html += '<div class="evi-sec"><h3>The ranked list</h3>' +
         (kept.length
           ? '<div class="evi-cands">' + kept.map(function(c, i){
-              return candidateRow(c, byName[c.name], decLabels, i); }).join('') + '</div>'
+              return candidateRow(c, byName[c.event_identity] || byName[c.name], decLabels, i); }).join('') + '</div>'
           /* Two different empty states, because they are two different
              facts. "Nothing cleared the bar" used to be printed even when
              the run had found events squarely aimed at this client that
@@ -3757,7 +3793,7 @@
           'Each says what it is short on, so it can be judged rather than ' +
           'taken on faith.</div>' +
           '<div class="evi-cands">' + look.map(function(c, i){
-            return candidateRow(c, byName[c.name], decLabels, kept.length + i,
+            return candidateRow(c, byName[c.event_identity] || byName[c.name], decLabels, kept.length + i,
                                 belowBarReason(c)); }).join('') + '</div></div>';
       }
 
@@ -3848,6 +3884,7 @@
     var WINDOW_TONE = {prime: 'ok', closing: 'warn', expired: 'bad', early: 'idle'};
     var WINDOW_BAND = {prime: 'f-ok', closing: 'f-warn', expired: 'f-bad', early: 'f-na'};
     var DRAFT_LABEL = {
+      review_required: 'Review before use',
       rewritten_no_booth_note: 'Opener replaced: claimed a conversation',
       rewritten_aggressive: 'Opener replaced: displacement language',
       account_play: 'Account play, no named person'

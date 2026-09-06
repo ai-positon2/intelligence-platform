@@ -1,0 +1,11 @@
+[
+  {
+    "canonical_name": "UNBOUND",
+    "canonical_host": "unbound.hubspot.com",
+    "aliases": ["INBOUND", "UNBOUND"],
+    "allowed_hosts": ["inbound.com", "unbound.hubspot.com"],
+    "source_url": "https://unbound.hubspot.com/?q=%2F",
+    "reviewed_on": "2026-09-06",
+    "basis": "Organizer explicitly states INBOUND is now UNBOUND. This joins series names, never event dates or attendance."
+  }
+]
