@@ -419,6 +419,8 @@ def _ensure_tables(conn) -> None:
         jobs_schema(cur)
         from .event_intel_planning import schema as planning_schema
         planning_schema(cur)
+        from .event_intel_cache import schema as cache_schema
+        cache_schema(cur)
     conn.commit()
     _TABLES_READY = True
 
