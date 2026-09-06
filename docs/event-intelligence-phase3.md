@@ -1,6 +1,6 @@
 # Event intelligence Phase 3: plans and reported results
 
-This first increment adds a plan and results page to completed lookup and recommendation reports. It is scoped to Event & Conference Intelligence. Phase 3 is not complete, and Phase 2's live Position2 benchmark and independent relevance review remain open.
+The first increment adds a plan and results page to completed lookup and recommendation reports. It is scoped to Event & Conference Intelligence. Phase 3 is not complete, and Phase 2's live Position2 benchmark and independent relevance review remain open.
 
 ## Behavior
 
@@ -29,3 +29,15 @@ Tests cover unknown vs zero results, invalid numeric/date inputs, domain normali
 ## Remaining Phase 3 work
 
 Fresh verified edition-fact reuse needs cache freshness, provenance, invalidation and cross-client isolation rules. Rich account/person context, organizer access routes and agenda fit need reliable sources. Action recommendations need evidence and constraint evaluation beyond the limited roster-based hint here. Results need attribution definitions and review before any learning or ROI claims. CRM, outreach and monitoring require separate integration scope. The live Position2 benchmark and human review still gate business-quality conclusions.
+
+## Second increment: fresh-source extraction reuse
+
+The catalog currently contains model-reported dates and other event facts, not independently verified facts. This increment therefore reuses only roster extraction after a fresh HTTP fetch returns identical readable text. It does not reuse resolver answers or client relevance scores.
+
+The key includes the exact dated event identity, requested extraction URL, page kind, event name/host, source-text hash, extraction prompt hash, configured model and explicit extraction version. Entries expire for reuse after seven days, measured from extraction rather than cache access. Any change causes extraction again. Missing/invalid dates, truncated pages, empty results, chunk failures and incomplete originating jobs cannot provide hits. Fetch failures never fall back to an old roster. Pagination is fetched and checked anew, and each page retains its own roster-year evidence.
+
+Reuse is scoped to the same signed-in account; profiles within that account can benefit because the extraction has no client scoring input. There is no cross-account catalog sharing. Only an originating run and job both marked complete qualify. A database worker fence protects cache writes from cancelled/expired workers. The new `evi_extraction_cache` table is additive and uses the existing schema initialization.
+
+The source metadata records the originating run, extraction timestamp, a fresh source snapshot and reuse status. Original provider spend is not copied into the new run. Literal support and incomplete-directory caveats remain unchanged. Reuse avoids repeat extraction calls; it does not establish independent verification or improve accuracy of an incorrect original extraction. Bump `event_intel_cache.VERSION` whenever extraction parsing, chunking or support rules change. Expired entries are ineligible, but this increment does not add a background storage-purge job.
+
+Validation includes two complete synthetic pipeline runs: both fetch the roster, only the first extracts it, and the second preserves provenance. Tests also cover changed inputs, expiry/version invalidation, account separation, incomplete results, and per-page year evidence. Verified event-fact sharing remains future work pending a real verification/review model.
