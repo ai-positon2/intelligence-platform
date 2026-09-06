@@ -64,6 +64,8 @@ def validate(payload):
             raise ValueError(key+' must be at most 4,000 characters.')
         body[key] = value
     body['target_domains'] = domains(payload.get('target_domains'))
+    from .event_intel_fit import topics
+    body['topic_interests'] = topics(payload.get('topic_interests') or '')
     for key in COUNTS + AMOUNTS:
         value = payload.get(key)
         if value is None or value == '':
@@ -146,19 +148,24 @@ def context(run_id, email, profile_id=None, identity=None):
         host = urlsplit(selected.get('website') or '').hostname or ''
     except ValueError:
         host = ''
-    links, seen = [], set()
+    links, seen, excerpts = [], set(), []
     for source in S.get_sources(run_id) if run.get('mode') == 'lookup' else []:
         if source.get('event_id') != selected['id'] or source.get('status') != 'ok':
             continue
+        for excerpt in (source.get('metadata') or {}).get('agenda_excerpts', []):
+            if organizer_url(excerpt.get('source_url'), host):
+                excerpts.append(dict(excerpt, observed_at=source.get('fetched_at')))
         for link in (source.get('metadata') or {}).get('access_links', []):
             key = (link.get('kind'), link.get('url'))
             if key not in seen and organizer_url(link.get('url'), host) and organizer_url(link.get('source_url'), host):
                 seen.add(key)
                 links.append(dict(link, observed_at=source.get('fetched_at')))
+    from .event_intel_fit import compare
+    fit = compare(selected, plan or {}, participants, excerpts)
     comparison = overlay(selected, participants, (plan or {}).get('target_domains', []))
     return dict(run_id=run_id, profile=profile, profiles=profiles, events=events,
                 event=selected, plan=plan, participants=participants,
-                overlay=comparison, access_links=links, assessment=assess(selected, plan or {}, comparison['matches'], links))
+                overlay=comparison, fit=fit, access_links=links, assessment=assess(selected, plan or {}, comparison['matches'], links))
 
 
 def overlay(event, participants, targets):

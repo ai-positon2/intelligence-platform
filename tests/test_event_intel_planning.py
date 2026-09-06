@@ -180,3 +180,29 @@ def test_plan_shows_only_selected_event_organizer_links(fixture):
     selected = P.context(rid,email,profile,event_key(row))
     assert len(selected['access_links']) == 1
     assert P.context(rid,email,profile,identity)['access_links'] == []
+
+
+@SQL
+def test_topics_persist_and_render_only_selected_event_evidence(fixture):
+    email, profile, other, rid, identity, run = fixture
+    target = S.save_event(rid, {'name':'Agenda Forum','starts_on':'2027-06-01','website':'https://forum.example'})
+    row = next(e for e in S.get_events(rid) if e['id'] == target)
+    from tracker.event_intel_identity import event_key
+    from tracker.event_intel_fit import agenda_evidence
+    excerpt = agenda_evidence('2027 Agenda\nDemand generation <script>alert(1)</script>',
+                              'https://forum.example/agenda','forum.example','agenda')
+    S.save_source(rid,target,'https://forum.example/agenda','agenda','ok',metadata={'agenda_excerpts':excerpt})
+    data = payload(profile_id=profile,event_identity=event_key(row),topic_interests='demand generation')
+    saved = P.save(rid,email,data)
+    assert saved['plan']['topic_interests'] == ['demand generation']
+    assert saved['fit']['topic_matches'][0]['timing'] == 'announced'
+    assert P.context(rid,email,profile,identity)['fit']['topic_matches'] == []
+    import app as appmod
+    http = appmod.app.test_client()
+    with http.session_transaction() as session:
+        session['google_user'] = {'email':email}
+    page = http.get('/p2/b2b-agents/event-conference-intelligence/runs/'+str(rid)+'/plan',
+                    query_string={'profile_id':profile,'event_identity':event_key(row)})
+    assert page.status_code == 200
+    assert '&lt;script&gt;' in page.get_data(as_text=True)
+    assert '<script>alert(1)</script>' not in page.get_data(as_text=True)
