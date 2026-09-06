@@ -2,7 +2,7 @@
 
 Prepared 6 September 2026. Branch: `feat/event-intelligence-phase2`, based on local Phase 1 commit `3355161`.
 
-**The local implementation adds durable execution, research provenance, bounded extraction, richer client context and a Position2 benchmark harness. Phase 2 acceptance is still open.** Native PostgreSQL concurrency, deployed-browser validation, paid-provider quality measurement and human calibration have not been established. No code has been pushed or deployed.
+**The local implementation adds durable execution, research provenance, bounded extraction, richer client context and a Position2 benchmark harness. Phase 2 acceptance is still open.** Native PostgreSQL concurrency, deployed-browser validation, paid-provider quality measurement and human calibration have not been established. The implementation is in draft PR #1. An isolated staging web/worker/database was provisioned before the user limited further work to agent-specific repository changes; production was not changed. No further Railway or Google configuration changes are in scope.
 
 ## What is implemented
 
@@ -16,7 +16,7 @@ Prepared 6 September 2026. Branch: `feat/event-intelligence-phase2`, based on lo
 | Durable execution | PostgreSQL job queue, atomic job/run submission, idempotency keys, bounded active runs, renewable leases, completed-stage checkpoints and retry-safe replay. A separate worker process runs research. | Native transactions, simultaneous workers and deployment behavior remain release gates. |
 | Cancellation and fencing | Owned cancellation endpoint and page control. Database triggers reject stale-worker mutations; a shared lock on the job row coordinates a valid write with cancellation or lease transfer. Failed/cancelled reports cannot retain an approved saved selection. | Calls reserved before cancellation may still be billed. A provider-side request cannot be recalled by cancelling the local run. |
 | Usage and limits | Record each worker-managed model call's stage, model, prompt/input hash, tool version, raw usage, elapsed time and error. Reserve account call/token allowances before dispatch. Preserve unknown provider outcomes and avoid silently repeating them. | Limits are calls and estimated token allowance, not a guaranteed dollar ceiling. Provider invoices and retry/billing edge cases still need reconciliation. |
-| Reproducibility | Pin Python 3.12 through `.python-version` and the locally tested dependency set through `requirements-tested.txt`. Save runtime package versions at submission, hash event code and the alias registry, and retain stage versions. | Linux installation and live SDK/provider compatibility still require staging validation. Code changes invalidate pending/recovering jobs rather than mixing versions. |
+| Reproducibility | Use Python 3.12 and the tested constraints only in the isolated event validation environment (`benchmarks/event_intelligence/requirements.txt`). Save runtime package versions at submission, hash event code and the alias registry, and retain stage versions. | Linux installation passed in native CI; live SDK/provider quality still requires measurement. Code changes invalidate pending/recovering jobs rather than mixing versions. |
 | Evaluation | Position2 scenario, dated organizer-sourced starter references, review format and an offline evaluator that refuses acceptance with missing labels, costs, latency or coverage. | The starter reference set is incomplete. No top-five quality, recall or calibrated-score result is claimed. |
 
 ## Worker behavior
@@ -36,7 +36,7 @@ The database worker token is connection-local. Mutation triggers require the mat
 
 New browser submissions send a request key. Repeating that key with the same inputs returns the same run; different inputs are refused. Compatibility callers omitting a key receive a fresh one and therefore do not get retry deduplication. API integrations should retain the same key across a network retry.
 
-The pinned NumPy package requires Python 3.12 or newer, so the runtime pin is necessary. Nixpacks documents `.python-version` as a supported override; hosting environment overrides must agree with it. [Nixpacks Python provider](https://nixpacks.com/docs/providers/python).
+The isolated event validation constraints require Python 3.12 or newer. The event CI workflow selects Python 3.12 explicitly. Shared requirements, the platform runtime and unrelated workflows retain their original configuration.
 
 ## Operational configuration
 
@@ -65,7 +65,7 @@ Before rollback, drain or explicitly cancel queued/running jobs. Rolling back bo
 
 The workspace results document (`outputs/event-intelligence-phase2-results.md`) contains final counts and logs. The application SQL tests run through an isolated PGlite adapter. New tests exercise submission deduplication, different-input refusal, cancellation ownership, stale-worker write rejection, stage/model-response reuse, unknown provider outcomes, account limits, lease reclaim with output replay, run-owned observations, product context, long-page chunking, unsupported entities, wrong-edition rosters, aliases and benchmark refusal without review.
 
-The adapter autocommits each statement and uses one underlying WASM engine. It cannot establish transaction rollback, simultaneous-connection locking or real process-kill reliability. Native PostgreSQL initialization remains unavailable in this sandbox because shared-memory creation was denied. These are explicit release blockers. The new `event-intelligence-tests.yml` workflow provisions disposable PostgreSQL 16 and opts into four native-only checks: simultaneous same-key submission, distinct worker claims, concurrent budget reservations and transaction rollback. It is configured but has not run. PostgreSQL 16 is a test baseline; repeat on the actual production major version once identified. Existing Python workflows now read `.python-version` so the constrained requirements do not meet a Python 3.11 runtime.
+The adapter autocommits each statement and uses one underlying WASM engine; those local results alone cannot establish native locking or rollback. Subsequent Linux/PostgreSQL 16 CI ran all 59 focused tests successfully, including four native concurrency/rollback checks: https://github.com/ai-positon2/intelligence-platform/actions/runs/34025145992. Process-kill and cancellation/write fault drills remain separate gates. No shared Python workflow or dependency pin is changed by the final patch.
 
 ## Position2 benchmark
 
@@ -73,7 +73,7 @@ The user selected Position2. The starter scenario uses B2B demand-generation/gro
 
 The reference file contains MarketingProfs B2B Forum, Forrester B2B Summit North America and UNBOUND. It deliberately includes edition and access traps: the Forrester sponsor page names 2026 while the next event is 2027; UNBOUND's organizer identifies a rename and sold-out 2026 edition. Each fixture links to its organizer source. These are starter cases, not a comprehensive list of events Position2 should attend.
 
-See `benchmarks/event_intelligence/README.md` for the review workflow. No paid benchmark has been run because this environment has no provider key. No independent reviewer labels or cost/latency targets have been supplied, so calibration and acceptance remain unmeasured.
+See `benchmarks/event_intelligence/README.md` for the review workflow. No paid benchmark has been run. Staging was provisioned with provider access, but its Google sign-in rejected the unregistered origin. Further infrastructure and OAuth changes were stopped at the user's request. One reviewer was nominated, but independent reviewer labels and cost/latency targets have not been supplied, so calibration and acceptance remain unmeasured.
 
 ## Release work still required
 
