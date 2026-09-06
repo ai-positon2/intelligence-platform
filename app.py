@@ -9096,6 +9096,42 @@ def event_conference_intelligence_outreach_csv(run_id):
     return resp
 
 
+@app.route("/p2/b2b-agents/event-conference-intelligence/runs/<int:run_id>/plan")
+@position2_required
+def event_conference_intelligence_plan(run_id):
+    from tracker import event_intel_planning as planning
+    email = (_get_user() or {}).get('email', '').lower()
+    try:
+        view = planning.context(run_id, email, request.args.get('profile_id', type=int), request.args.get('event_identity'))
+    except LookupError:
+        abort(404)
+    except ValueError as exc:
+        return str(exc), 400
+    return render_template('event_intel_plan.html', view=view, actions=planning.ACTIONS,
+                           currencies=planning.CURRENCIES)
+
+
+@app.route("/p2/b2b-agents/event-conference-intelligence/runs/<int:run_id>/plan", methods=['POST'])
+@position2_required
+def event_conference_intelligence_plan_save(run_id):
+    from tracker import event_intel_planning as planning
+    if not request.is_json:
+        return jsonify(error='A JSON plan is required.'), 415
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        return jsonify(error='A JSON object is required.'), 400
+    email = (_get_user() or {}).get('email', '').lower()
+    try:
+        view = planning.save(run_id, email, payload)
+    except LookupError:
+        abort(404)
+    except planning.Conflict as exc:
+        return jsonify(error=str(exc)), 409
+    except ValueError as exc:
+        return jsonify(error=str(exc)), 400
+    return jsonify(view)
+
+
 @app.route("/p2/b2b-agents/event-conference-intelligence/outcomes",
            methods=["GET", "POST"])
 @position2_required
