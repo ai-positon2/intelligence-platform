@@ -27,6 +27,13 @@ def eligibility(event, profile, today=None):
     from .event_intel_discover import _excluded
     today = today or date.today()
     reasons = []
+    availability = event.get('availability')
+    if availability == 'cancelled':
+        reasons.append('The organizer reports this edition is cancelled.')
+    if availability == 'sold_out':
+        from .event_intel_discover import committed_keys, is_committed
+        if not is_committed(event.get('name') or '', committed_keys(profile.get('force_include'))):
+            reasons.append('This edition is sold out; access must be resolved before recommending attendance.')
     if _excluded(event.get('name') or '', profile.get('force_exclude')):
         reasons.append('This event is on the client exclusion list.')
     try:
@@ -67,6 +74,9 @@ def eligibility(event, profile, today=None):
 
 
 def intake_errors(profile):
-    return [label for key, label in [('buyer_roles','buyer roles'),('verticals','target verticals'),
+    missing = [label for key, label in [('buyer_roles','buyer roles'),('verticals','target verticals'),
                                     ('geo_scope','geographic scope'),('website','client website')]
             if not str(profile.get(key) or '').strip()]
+    if not str(profile.get('selected_product') or profile.get('what_they_sell') or '').strip():
+        missing.append('product or service to promote')
+    return missing

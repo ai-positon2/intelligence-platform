@@ -282,6 +282,7 @@ def audit_famous(candidates: list[dict], profile: dict) -> dict:
     `kept` and is stored as such.
     """
     import concurrent.futures
+    from .event_intel_jobs import ContextExecutor
 
     famous = [c for c in (candidates or []) if c.get("famous")]
     out = {"verdicts": {}, "cut": [], "kept": [], "checked": len(famous),
@@ -296,7 +297,7 @@ def audit_famous(candidates: list[dict], profile: dict) -> dict:
             profile.get("classification"), "Confirm with the client."))
 
     boxes: dict = {}
-    with concurrent.futures.ThreadPoolExecutor(
+    with ContextExecutor(
             max_workers=min(AUDIT_MAX_INFLIGHT, len(famous))) as pool:
         futures = {pool.submit(_audit_one, c, system): i
                    for i, c in enumerate(famous)}
@@ -705,6 +706,8 @@ def _candidate_from_alternative(res: dict, alt: dict,
         "audience_note": ev.get("audience_note"),
         "format": ev.get("format"),
         "cost_note": None,
+        "availability": ev.get("availability") or "unknown",
+        "availability_source": ev.get("availability_source"),
         "organizer_run": False,
         # Not carried over from the audit's prose. The bonus needs evidence
         # the rubric has read, and a sentence about why one event beats

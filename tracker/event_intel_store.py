@@ -100,7 +100,12 @@ def _pg_conn():
         return None
     try:
         import psycopg2
-        return psycopg2.connect(database_url, connect_timeout=8)
+        conn = psycopg2.connect(database_url, connect_timeout=8)
+        from .event_intel_jobs import CURRENT
+        job = CURRENT.get()
+        with conn.cursor() as cur:
+            cur.execute("SELECT set_config('evi.worker_token', %s, false)", (job['token'] if job else '',))
+        return conn
     except Exception as e:
         logger.warning("event_intel_store: Postgres connection failed: %s", e)
         return None
@@ -111,6 +116,7 @@ def _ensure_tables(conn) -> None:
     if _TABLES_READY:
         return
     with conn.cursor() as cur:
+        cur.execute("SELECT pg_advisory_xact_lock(hashtext('evi-schema-v2'))")
         cur.execute("""
             CREATE TABLE IF NOT EXISTS evi_runs (
                 id SERIAL PRIMARY KEY,
@@ -407,6 +413,10 @@ def _ensure_tables(conn) -> None:
                 UNIQUE (profile_id, event_identity)
             )
         """)
+        from .event_intel_evidence import schema
+        schema(cur)
+        from .event_intel_jobs import schema as jobs_schema
+        jobs_schema(cur)
     conn.commit()
     _TABLES_READY = True
 
@@ -644,15 +654,15 @@ def save_participants(run_id: int, event_id: int | None, rows: list[dict]) -> in
                  else VIA_SEARCH),
                 r.get("resolution") or "unresolved",
                 json.dumps(r["apollo"]) if r.get("apollo") else None,
-                r.get("icp_score")))
+                r.get("icp_score"), json.dumps(dict(r.get("evidence") or {}, source_text_sha256=r.get("source_text_sha256")))))
         if not payload:
             return 0
         with conn.cursor() as cur:
             cur.executemany(
                 "INSERT INTO evi_participants (run_id, event_id, org_name, org_domain, "
                 "role, tier, person_name, person_title, booth, note, source_url, "
-                "fetched_at, provenance, resolution, apollo, icp_score) "
-                "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)", payload)
+                "fetched_at, provenance, resolution, apollo, icp_score, evidence) "
+                "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s::jsonb)", payload)
         conn.commit()
         return len(payload)
     except Exception as e:
@@ -670,7 +680,7 @@ def get_participants(run_id: int, role: str | None = None) -> list[dict]:
         _ensure_tables(conn)
         sql = ("SELECT id, event_id, org_name, org_domain, role, tier, person_name, "
                "person_title, booth, note, source_url, fetched_at, provenance, "
-               "resolution, apollo, icp_score FROM evi_participants WHERE run_id = %s")
+               "resolution, apollo, icp_score, evidence FROM evi_participants WHERE run_id = %s")
         args: list[Any] = [run_id]
         if role:
             sql += " AND role = %s"
@@ -722,7 +732,7 @@ def update_participant_resolution(participant_ids: list[int], domain: str | None
 
 def save_source(run_id: int, event_id: int | None, url: str, kind: str,
                 status: str, http_status: int | None = None,
-                rows_found: int = 0, note: str = "") -> None:
+                rows_found: int = 0, note: str = "", metadata: dict | None = None) -> None:
     conn = _pg_conn()
     if conn is None:
         return
@@ -731,9 +741,9 @@ def save_source(run_id: int, event_id: int | None, url: str, kind: str,
         with conn.cursor() as cur:
             cur.execute(
                 "INSERT INTO evi_sources (run_id, event_id, url, kind, status, "
-                "http_status, rows_found, note) VALUES (%s,%s,%s,%s,%s,%s,%s,%s)",
+                "http_status, rows_found, note, metadata) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s::jsonb)",
                 (run_id, event_id, url, kind, status, http_status, rows_found,
-                 (note or "")[:500]))
+                 (note or "")[:500], json.dumps(metadata or {}, default=str)))
         conn.commit()
     except Exception as e:
         logger.warning("event_intel_store.save_source failed: %s", e)
@@ -750,7 +760,7 @@ def get_sources(run_id: int) -> list[dict]:
         with conn.cursor() as cur:
             cur.execute(
                 "SELECT id, event_id, url, kind, status, http_status, rows_found, "
-                "note, fetched_at FROM evi_sources WHERE run_id = %s ORDER BY id",
+                "note, metadata, fetched_at FROM evi_sources WHERE run_id = %s ORDER BY id",
                 (run_id,))
             cols = [c[0] for c in cur.description]
             rows = [dict(zip(cols, r)) for r in cur.fetchall()]
@@ -774,7 +784,7 @@ def get_sources(run_id: int) -> list[dict]:
 
 _PROFILE_TEXT_FIELDS = ("client_name", "website", "buyer_roles", "verticals",
                         "acv_band", "sales_cycle", "geo_scope", "force_include",
-                        "force_exclude", "budget_note")
+                        "force_exclude", "budget_note", "what_they_sell", "selected_product", "firmographics")
 
 
 def normalise_profile(payload: dict) -> dict:
@@ -803,7 +813,7 @@ def normalise_profile(payload: dict) -> dict:
     out = {"classification": classification, "orientation": orientation}
     for f in _PROFILE_TEXT_FIELDS:
         v = str(p.get(f) or "").strip()
-        out[f] = (v[:4000] if f in ("force_include", "force_exclude", "budget_note")
+        out[f] = (v[:4000] if f in ("force_include", "force_exclude", "budget_note", "what_they_sell", "selected_product", "firmographics")
                   else v[:400]) or None
     out["client_name"] = name[:200]
 
@@ -857,7 +867,7 @@ def save_profile(email: str, payload: dict) -> int | None:
 _PROFILE_COLS = ("id, email, client_name, website, classification, orientation, "
                  "buyer_roles, verticals, acv_band, sales_cycle, geo_scope, "
                  "window_months, force_include, force_exclude, max_events, "
-                 "budget_note, confidential, created_at, updated_at")
+                 "budget_note, confidential, what_they_sell, selected_product, firmographics, created_at, updated_at")
 
 
 def get_profile(profile_id: int, email: str) -> dict | None:
@@ -940,7 +950,7 @@ _CANDIDATE_FIELDS = (
     "relevance", "relevance_note", "dm_access", "dm_access_note",
     "engagement", "engagement_note", "matchmaking", "matchmaking_evidence",
     "matchmaking_reason", "total", "tier", "description", "client_line",
-    "cost_note", "confidence", "committed", "gaps", "sources")
+    "cost_note", "availability", "availability_source", "confidence", "committed", "gaps", "sources")
 
 
 _ISO_DATE = re.compile(r"^(\d{4})-(\d{1,2})-(\d{1,2})")
@@ -1105,6 +1115,8 @@ def normalise_candidate(raw: dict) -> dict | None:
         # Budget rides along as a note and is never read by the rubric. The
         # rubric's score() has no parameter that could accept it.
         "cost_note": _txt("cost_note", 400),
+        "availability": r.get("availability") if r.get("availability") in ("open","sold_out","cancelled") else "unknown",
+        "availability_source": _txt("availability_source", 1000),
         # Carried through so ranking can read it back. Set in code from the
         # profile at discovery, never taken from a model's own claim.
         "committed": bool(r.get("committed")),

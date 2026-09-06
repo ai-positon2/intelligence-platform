@@ -1,0 +1,48 @@
+name: Event intelligence PostgreSQL validation
+
+on:
+  pull_request:
+    paths:
+      - 'tracker/event_intel*'
+      - 'tracker/claude_websearch.py'
+      - 'tests/test_event_intel*'
+      - 'requirements*.txt'
+      - '.python-version'
+      - '.github/workflows/event-intelligence-tests.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  postgres:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: event_test
+          POSTGRES_PASSWORD: disposable_test_only
+          POSTGRES_DB: event_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U event_test -d event_test"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgresql://event_test:disposable_test_only@localhost:5432/event_test
+      SECRET_KEY: disposable_test_only
+      EVI_TEST_NATIVE_POSTGRES: '1'
+      PGOPTIONS: '-c statement_timeout=15000 -c lock_timeout=10000'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version-file: '.python-version'
+      - run: pip install -r requirements.txt
+      - run: pip check
+      - name: Exercise storage, replay, concurrency and rollback without paid providers
+        run: >-
+          python -m pytest -q tests/test_event_intel_store_postgres.py
+          tests/test_event_intel_phase2.py tests/test_event_intel_postgres_concurrency.py
