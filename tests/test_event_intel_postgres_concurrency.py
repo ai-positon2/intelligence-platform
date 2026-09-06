@@ -87,3 +87,78 @@ def test_failed_transaction_rolls_back_run_insertion(account):
     with J.db() as conn, conn.cursor() as cur:
         cur.execute('SELECT count(*) FROM evi_runs WHERE email=%s', (account,))
         assert cur.fetchone()[0] == 0
+
+
+@pytest.mark.parametrize('boundary', ['before_response', 'after_response', 'after_stage'])
+def test_process_kill_preserves_paid_call_outcome_boundaries(account, boundary):
+    import select
+    import subprocess
+    import sys
+    from pathlib import Path
+    from tracker import event_intel_store as S
+    run_id = J.start(account, 'lookup', 'Probe', {}, 'kill-probe')
+    root = Path(__file__).resolve().parents[1]
+    env = dict(os.environ, PYTHONPATH=str(root), EVI_PROBE_BOUNDARY=boundary)
+    command = [sys.executable, '-u', str(root/'tests/event_intel_worker_probe.py')]
+    child = subprocess.Popen(command, cwd=root, env=env, stdin=subprocess.PIPE,
+                             stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    try:
+        assert select.select([child.stdout], [], [], 20)[0], 'Worker did not reach probe boundary'
+        assert child.stdout.readline().strip() == 'PROBE_READY'
+        child.kill()
+        child.wait(timeout=10)
+        assert child.returncode != 0
+        # Advance lease eligibility deterministically after a real process kill.
+        with J.db() as conn, conn.cursor() as cur:
+            cur.execute("UPDATE evi_jobs SET lease_until=now()-interval '1 second' WHERE run_id=%s", (run_id,))
+        replacement_env = dict(env, EVI_PROBE_BOUNDARY='')
+        subprocess.run(command, cwd=root, env=replacement_env, check=True,
+                       capture_output=True, text=True, timeout=30)
+        ledger = J.ledger(run_id, account)
+        assert ledger['attempts'] == 2
+        assert len(ledger['calls']) == 1
+        if boundary == 'before_response':
+            assert ledger['state'] == 'failed'
+            assert ledger['unknown_provider_outcomes'] == 1
+            assert S.get_events(run_id) == []
+            assert 'unknown outcome' in S.get_run(run_id, account)['error']
+        else:
+            assert ledger['state'] == 'complete'
+            assert ledger['unknown_provider_outcomes'] == 0
+            assert len(ledger['stages']) == 1
+            assert [event['name'] for event in S.get_events(run_id)] == ['Recovered probe event']
+    finally:
+        if child.poll() is None:
+            child.kill()
+        child.communicate(timeout=10)
+
+
+def test_cancellation_waits_for_valid_write_then_fences_old_worker(account):
+    import time
+    from tracker import event_intel_store as S
+    run_id = J.start(account, 'lookup', 'Cancellation', {}, 'cancel-write')
+    job = J.claim()
+    assert job['run_id'] == run_id
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        marker = J.CURRENT.set(job)
+        try:
+            with J.db() as conn, conn.cursor() as cur:
+                cur.execute("INSERT INTO evi_events(run_id,name) VALUES (%s,'Write before cancellation')", (run_id,))
+                cancelled = executor.submit(J.cancel, run_id, account)
+                # Observe a real PostgreSQL lock wait, not a timing-only guess.
+                deadline = time.monotonic() + 5
+                waiting = False
+                while time.monotonic() < deadline:
+                    with J.db() as observer, observer.cursor() as watch:
+                        watch.execute("SELECT count(*) FROM pg_stat_activity WHERE wait_event_type='Lock' AND query LIKE %s", ('%'+account+'%',))
+                        waiting = watch.fetchone()[0] > 0
+                    if waiting:
+                        break
+                    time.sleep(0.02)
+                assert waiting, 'Cancellation did not wait for the valid worker transaction'
+            assert cancelled.result(timeout=10)
+            assert S.save_event(run_id, {'name': 'Stale write after cancellation'}) is None
+        finally:
+            J.CURRENT.reset(marker)
+    assert S.get_run(run_id, account)['stage'] == 'cancelled'
+    assert [event['name'] for event in S.get_events(run_id)] == ['Write before cancellation']
