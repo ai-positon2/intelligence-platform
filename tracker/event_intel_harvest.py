@@ -653,7 +653,9 @@ def harvest_page(page: dict, event_name: str, event_host: str = "",
         return {"source": source, "rows": []}
 
     from .event_intel_access import discover
+    from .event_intel_fit import agenda_evidence
     source["access_links"] = discover(fetched["text"], here, event_host)
+    source["agenda_excerpts"] = agenda_evidence(fetched["text"], here, event_host, kind)
     source["snapshots"] = []
     source["extraction"] = []
     from .event_intel_evidence import roster_years, source_snapshot
@@ -717,6 +719,7 @@ def harvest_page(page: dict, event_name: str, event_host: str = "",
             source['snapshots'].append(source_snapshot(nxt,got['text'],observed_roster_years=page_years))
             break
         source["access_links"].extend(discover(got["text"], nxt, event_host))
+        source["agenda_excerpts"].extend(agenda_evidence(got["text"], nxt, event_host, kind))
         sub = read(got, nxt)
         source["snapshots"].append(sub.get("snapshot", {}))
         source["extraction"].append(sub.get("coverage", {}))
