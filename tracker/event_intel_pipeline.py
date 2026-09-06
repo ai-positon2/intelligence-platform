@@ -77,9 +77,17 @@ def _harvest_event(run_id: int, event_id: int, event: dict,
     """Fetch and extract every page for one event, writing the source ledger
     as it goes. Returns counts for the summary."""
     host = _host(event.get("website"))
+    from datetime import date
+    from .event_intel_identity import event_key
+    try:
+        date.fromisoformat(str(event.get('starts_on') or ''))
+        cache_identity = event_key(event)
+    except ValueError:
+        cache_identity = None
     total_rows, readable, unreadable, recovered = 0, 0, 0, 0
     for page in pages:
-        page = dict(page, edition=str(event.get("starts_on") or event.get("edition") or "")[:4])
+        page = dict(page, edition=str(event.get("starts_on") or event.get("edition") or "")[:4],
+                    cache_identity=cache_identity)
         try:
             got = durable_stage("harvest:" + page["url"], event_intel_harvest.harvest_page, page, event.get("name") or "", host)
         except Exception as e:

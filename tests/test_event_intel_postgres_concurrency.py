@@ -180,3 +180,22 @@ def test_simultaneous_plan_edits_preserve_one_winner(account):
             return 'conflict'
     assert sorted(parallel_pair(edit)) == ['conflict', 'saved']
     assert P.context(rid, account)['plan']['version'] == 1
+
+
+def test_cancelled_worker_cannot_publish_reusable_extraction(account):
+    from tracker import event_intel_cache as C
+    rid = J.start(account, 'lookup', 'Forum', {}, 'cache-cancel')
+    job = J.claim()
+    assert job['run_id'] == rid
+    assert J.cancel(rid, account)
+    marker = J.CURRENT.set(job)
+    try:
+        with pytest.raises(Exception, match='lease expired or cancelled'):
+            C.extract('text', 'https://fixture.example', 'exhibitor_list', 'Forum',
+                      'fixture.example', 'edition', 'rules', lambda *a: {
+                          'rows':[{'org_name':'Acme'}], 'coverage':{'chunks_total':1,'chunks_read':1}})
+    finally:
+        J.CURRENT.reset(marker)
+    with J.db() as conn, conn.cursor() as cur:
+        cur.execute('SELECT count(*) FROM evi_extraction_cache WHERE email=%s', (account,))
+        assert cur.fetchone()[0] == 0
