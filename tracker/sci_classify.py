@@ -1,9 +1,11 @@
 """Step 4 for Social Creative Intelligence Analyst: mechanical pattern
 classification across a run's already-analyzed posts. No vendor calls --
-this is pure aggregation over the creative_analysis + metrics that
-sci_pipeline's Step 3 already wrote onto each sci_posts row. Runs once after
-every platform finishes collecting and analyzing; sci_synthesize.py (Step 5)
-turns this into the cited narrative.
+this is pure aggregation over the creative_analysis(_openai) + metrics that
+sci_pipeline's Step 3 already wrote onto each sci_posts row, pooling BOTH
+Claude's and ChatGPT's independent reads of each post (see _post_keywords)
+so a theme both vendors land on ranks higher than one only one of them saw.
+Runs once after every platform finishes collecting and analyzing;
+sci_synthesize.py (Step 5) turns this into the cited narrative.
 """
 
 from __future__ import annotations
@@ -20,14 +22,13 @@ def _engagement_score(metrics: dict) -> float:
     return sum(v for v in metrics.values() if isinstance(v, (int, float)))
 
 
-def _post_keywords(post: dict) -> list[str]:
-    """Recurring-theme words from one post's creative_analysis -- covers
-    both the image/carousel shape (sci_vision.analyze_image's own fields)
-    and the video shape (sci_vision.summarize_frames's folded lists). tone
-    and format_technique use the SAME key name in both shapes (video folds
-    them into one dedupe-joined string, see summarize_frames), so they only
-    need the singular loop -- no plural variant to also check."""
-    analysis = post.get("creative_analysis") or {}
+def _analysis_keywords(analysis: dict | None) -> list[str]:
+    """Recurring-theme words from ONE vendor's analysis dict -- covers both
+    the image/carousel shape (sci_vision.analyze_image's own fields) and the
+    video shape (sci_vision.summarize_frames's folded lists). tone and
+    format_technique use the SAME key name in both shapes (video folds them
+    into one dedupe-joined string, see summarize_frames), so they only need
+    the singular loop -- no plural variant to also check."""
     if not analysis or "error" in analysis:
         return []
     words = []
@@ -42,8 +43,31 @@ def _post_keywords(post: dict) -> list[str]:
     return words
 
 
+def _post_keywords(post: dict) -> list[str]:
+    """Pools BOTH vendors' independent reads of one post -- Claude's
+    creative_analysis and ChatGPT's creative_analysis_openai, each counted
+    only when THAT vendor's own status is 'ok' (a post where one vendor
+    succeeded and the other failed/was never run still contributes the
+    successful one's words). Deliberately not deduplicated PER post: when
+    both vendors independently land on the same word (e.g. both call the
+    tone "urgent"), that word earns two votes in the run-wide theme_counter
+    below rather than one -- agreement between two independent models is
+    itself a stronger signal than either alone, and top_themes should rank
+    it accordingly."""
+    words = []
+    if post.get("creative_analysis_status") == "ok":
+        words.extend(_analysis_keywords(post.get("creative_analysis")))
+    if post.get("creative_analysis_openai_status") == "ok":
+        words.extend(_analysis_keywords(post.get("creative_analysis_openai")))
+    return words
+
+
 def _group_patterns(posts: list[dict]) -> dict:
-    analyzed = [p for p in posts if p.get("creative_analysis_status") == "ok"]
+    # "Analyzed" means at least one vendor produced a real read -- a post
+    # ChatGPT could describe but Claude's call failed on (or vice versa) is
+    # still real evidence, not a gap.
+    analyzed = [p for p in posts if p.get("creative_analysis_status") == "ok"
+               or p.get("creative_analysis_openai_status") == "ok"]
     format_mix = Counter(p.get("post_type") or "unknown" for p in posts)
     theme_counter = Counter()
     for p in analyzed:
