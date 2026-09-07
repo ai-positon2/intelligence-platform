@@ -31,8 +31,21 @@ def _headers(token: str) -> dict:
     return {"Authorization": "Bearer " + token, "Content-Type": "application/json"}
 
 
+def _normalize_actor_id(actor_id: str) -> str:
+    """Every DEFAULT_ACTOR_ID in sci_source_*.py is written in Apify's own
+    "owner/name" console-URL form (e.g. "apify/facebook-posts-scraper"),
+    because that is the form Apify's docs and store pages show and the one a
+    human would type into an env var override. The REST API does not accept
+    that form as a single path segment: /v2/acts/<actor_id> and
+    /v2/acts/<actor_id>/runs both 404 on a literal slash and require the
+    owner and name joined with "~" instead (confirmed live, unauthenticated,
+    against api.apify.com). Normalize at the transport boundary so every
+    caller and every env var can keep writing the readable slash form."""
+    return actor_id.replace("/", "~", 1) if actor_id and "/" in actor_id else actor_id
+
+
 def _start_run(actor_id: str, run_input: dict, token: str) -> str:
-    url = f"{_BASE_URL}/acts/{actor_id}/runs"
+    url = f"{_BASE_URL}/acts/{_normalize_actor_id(actor_id)}/runs"
     resp = requests.post(url, json=run_input, headers=_headers(token), timeout=30)
     resp.raise_for_status()
     return resp.json()["data"]["id"]
@@ -94,3 +107,46 @@ def run_actor_and_wait(actor_id: str, run_input: dict, token: str, timeout: int 
         if strict:
             raise ApifyTransportError(str(e)) from e
         return []
+
+
+def probe_token(token: str) -> tuple[dict | None, str | None]:
+    """GET /v2/users/me: confirms `token` is valid without starting or
+    paying for anything. Returns (account_info, None) on success, or
+    (None, error_message) on any failure -- never raises, so a self-test
+    route can call this directly and always get a renderable result."""
+    if not token:
+        return None, "No token given."
+    try:
+        resp = requests.get(f"{_BASE_URL}/users/me", headers=_headers(token), timeout=15)
+    except requests.RequestException as e:
+        return None, "Could not reach Apify: %s" % e
+    if resp.status_code == 401:
+        return None, "Apify rejected this token (401 Unauthorized)."
+    try:
+        resp.raise_for_status()
+    except requests.HTTPError as e:
+        return None, "Apify returned HTTP %s: %s" % (resp.status_code, str(e)[:200])
+    return (resp.json().get("data") or {}), None
+
+
+def check_actor(actor_id: str, token: str) -> tuple[dict | None, str | None]:
+    """GET /v2/acts/<actor_id>: confirms the actor exists and this token can
+    see it. A metadata READ, never a run -- costs nothing and starts
+    nothing, unlike run_actor_and_wait. Returns (actor_info, None) or
+    (None, error_message)."""
+    if not actor_id:
+        return None, "No actor id given."
+    try:
+        resp = requests.get(f"{_BASE_URL}/acts/{_normalize_actor_id(actor_id)}",
+                            headers=_headers(token), timeout=15)
+    except requests.RequestException as e:
+        return None, "Could not reach Apify: %s" % e
+    if resp.status_code == 404:
+        return None, "Actor %s not found or not accessible with this token." % actor_id
+    if resp.status_code == 401:
+        return None, "Apify rejected this token (401 Unauthorized)."
+    try:
+        resp.raise_for_status()
+    except requests.HTTPError as e:
+        return None, "Apify returned HTTP %s: %s" % (resp.status_code, str(e)[:200])
+    return (resp.json().get("data") or {}), None

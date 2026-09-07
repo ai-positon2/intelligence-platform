@@ -8306,6 +8306,75 @@ def admin_external_usage_unipile_connect():
     return jsonify(data)
 
 
+_SCI_APIFY_PLATFORMS = ("facebook", "tiktok", "x", "instagram", "linkedin")
+
+
+def _sci_apify_selftest() -> dict:
+    """Prove the Apify integration end to end, in the shape app.py's other
+    vendor self-tests (_apollo_selftest, _arena_selftest, _unipile_selftest)
+    established. Free on every leg: /v2/users/me confirms the token without
+    starting anything, and checking an actor's own metadata (/v2/acts/<id>)
+    is a read, never a run -- this never starts or pays for a single scrape.
+
+    Reports per-platform whether an actor is configured at all (LinkedIn has
+    no default, by design -- see sci_source_linkedin.py) and, if configured,
+    whether Apify actually recognizes that actor id for this token. That
+    second check matters on its own: every DEFAULT_ACTOR_ID in this codebase
+    was written in Apify's console "owner/name" form, which the REST API
+    rejects outright (404) as a literal path segment -- confirmed live,
+    unauthenticated, against api.apify.com. apify_transport normalizes this
+    at the transport boundary, but a manually-set SCI_APIFY_*_ACTOR_ID could
+    still be typed wrong, so this check exercises the real normalized id
+    rather than trusting the string is correct."""
+    token = os.environ.get("APIFY_API_TOKEN", "")
+    out: dict = {"configured": bool(token), "key_len": len(token), "ok": False,
+                "error": "", "account": "", "actors": {}}
+    if not token:
+        out["error"] = "APIFY_API_TOKEN is not set on this environment."
+        return out
+    from tracker import apify_transport
+    from tracker import (sci_source_facebook, sci_source_tiktok, sci_source_x,
+                         sci_source_instagram, sci_source_linkedin)
+    try:
+        account, err = apify_transport.probe_token(token)
+    except Exception as e:  # defensive: probe must never 500 the admin page
+        out["error"] = "%s: %s" % (type(e).__name__, str(e)[:300])
+        return out
+    if err:
+        out["error"] = err
+        return out
+    out["ok"] = True
+    out["account"] = account.get("username") or account.get("email") or ""
+    platform_modules = {
+        "facebook": sci_source_facebook, "tiktok": sci_source_tiktok, "x": sci_source_x,
+        "instagram": sci_source_instagram, "linkedin": sci_source_linkedin,
+    }
+    for platform in _SCI_APIFY_PLATFORMS:
+        actor = platform_modules[platform].actor_id()
+        if not actor:
+            out["actors"][platform] = {"enabled": False, "actor_id": None,
+                                       "accessible": False, "error": ""}
+            continue
+        try:
+            info, aerr = apify_transport.check_actor(actor, token)
+        except Exception as e:
+            info, aerr = None, "%s: %s" % (type(e).__name__, str(e)[:300])
+        out["actors"][platform] = {
+            "enabled": True, "actor_id": actor, "accessible": aerr is None,
+            "name": (info or {}).get("name") if aerr is None else None,
+            "error": aerr or "",
+        }
+    return out
+
+
+@app.route("/p2/admin/external-usage/sci-apify-check", methods=["POST"])
+@admin_required
+def admin_external_usage_sci_apify_check():
+    """Run SCI's Apify self-test (see _sci_apify_selftest). POST so no
+    crawler or prefetch can trigger it, matching the checks next to it."""
+    return jsonify(_sci_apify_selftest())
+
+
 def _lps_insights_selftest() -> dict:
     """Prove the AI Insights synthesis call end to end (see
     lps_enrichment.probe). Costs one small Claude call against a synthetic

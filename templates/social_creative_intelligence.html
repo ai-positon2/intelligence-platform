@@ -274,16 +274,30 @@
     // Unipile doesn't cover them for this feature.
     var UNIPILE_PLATFORMS = ['linkedin', 'instagram'];
 
+    // Apify's own row, same panel, second live check (sci-apify-check calls
+    // apify_transport.probe_token then apify_transport.check_actor per
+    // platform -- both are metadata reads, never a run, so this costs
+    // nothing). Instagram is listed here too even though it is Apify's
+    // FALLBACK for that platform (Unipile is tried first) -- an admin
+    // debugging "why did Instagram scrape_failed" needs to see both paths.
+    // LinkedIn always renders as "not used here by design", never absent,
+    // so its missing row never reads as a bug.
+    var APIFY_PLATFORMS = ['facebook', 'tiktok', 'x', 'instagram', 'linkedin'];
+
     function renderDataSourcesPanel(){
       if(!IS_ADMIN) return;
       var panel = document.getElementById('dataSourcesPanel');
       if(!panel) return;
       panel.innerHTML = '<div class="sci-card sci-datasrc">' +
         '<div class="sci-card-head"><h2>Data sources <span class="sci-datasrc-tag">admin only</span></h2>' +
-        '<button type="button" class="sci-datasrc-refresh" id="dsRefreshBtn" onclick="loadDataSources()">Refresh</button></div>' +
+        '<button type="button" class="sci-datasrc-refresh" id="dsRefreshBtn" onclick="loadDataSources();loadApifyDataSources();">Refresh</button></div>' +
+        '<div class="sci-datasrc-sub">Unipile</div>' +
         '<div class="sci-datasrc-body" id="dsBody"><div class="sci-datasrc-loading"><span class="sci-spinner" style="width:14px;height:14px;border-width:2px"></span>Checking Unipile…</div></div>' +
+        '<div class="sci-datasrc-sub">Apify</div>' +
+        '<div class="sci-datasrc-body" id="dsApifyBody"><div class="sci-datasrc-loading"><span class="sci-spinner" style="width:14px;height:14px;border-width:2px"></span>Checking Apify…</div></div>' +
       '</div>';
       loadDataSources();
+      loadApifyDataSources();
     }
 
     // `working` is the count of accounts that can actually serve a request;
@@ -333,6 +347,52 @@
         .catch(function(){
           if(btn) btn.disabled = false;
           body.innerHTML = '<div class="sci-datasrc-empty">Could not reach the Unipile check.</div>';
+        });
+    }
+
+    // `entry` is one platform's slice of sci-apify-check's `actors` map:
+    // {enabled, actor_id, accessible, name, error}. `enabled` false means
+    // no actor id is configured for this platform at all (LinkedIn, by
+    // design -- see sci_source_linkedin.py); that is a NEUTRAL state, never
+    // rendered as a failure, since turning it on is a deliberate decision
+    // this panel must not appear to be nudging anyone toward.
+    function dsApifyRow(platform, entry){
+      var meta = platformMeta(platform);
+      var statusHtml;
+      if(!entry || !entry.enabled){
+        statusHtml = '<span class="sci-datasrc-status off">not used here (by design)</span>';
+      } else if(entry.accessible){
+        statusHtml = '<span class="sci-datasrc-status ok">actor reachable' +
+          (entry.name ? ' &middot; ' + esc(entry.name) : '') + '</span>';
+      } else {
+        statusHtml = '<span class="sci-datasrc-status err" title="' + esc(entry.error || '') + '">actor not reachable</span>';
+      }
+      return '<div class="sci-datasrc-row" data-platform="' + esc(platform) + '"><span class="sci-datasrc-ic">' + meta.icon + '</span>' +
+        '<span class="sci-datasrc-name">' + esc(platform) + '</span>' + statusHtml + '</div>';
+    }
+
+    function loadApifyDataSources(){
+      var body = document.getElementById('dsApifyBody');
+      if(!body) return;
+      fetch('/p2/admin/external-usage/sci-apify-check', {method: 'POST'})
+        .then(function(r){ return r.json(); })
+        .then(function(d){
+          if(!d.configured){
+            body.innerHTML = '<div class="sci-datasrc-empty">APIFY_API_TOKEN is not set on this deployment.</div>';
+            return;
+          }
+          if(!d.ok){
+            body.innerHTML = '<div class="sci-datasrc-empty">' + esc(d.error || 'Apify is unavailable right now.') + '</div>';
+            return;
+          }
+          var actors = d.actors || {};
+          body.innerHTML = APIFY_PLATFORMS.map(function(p){
+            return dsApifyRow(p, actors[p]);
+          }).join('') + '<div class="sci-datasrc-note">Token verified' + (d.account ? ' for ' + esc(d.account) : '') +
+            '. Each row is a metadata read, never a run &mdash; nothing here spends an Apify credit.</div>';
+        })
+        .catch(function(){
+          body.innerHTML = '<div class="sci-datasrc-empty">Could not reach the Apify check.</div>';
         });
     }
 
