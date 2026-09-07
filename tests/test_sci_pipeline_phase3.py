@@ -212,6 +212,103 @@ def test_video_with_no_frames_and_no_thumbnail_is_marked_failed(monkeypatch):
     assert written["analysis"] is None
 
 
+# ── Claude and ChatGPT vision now run CONCURRENTLY, not sequentially ────────
+# (2026-09-07, following a real production run that took 30+ minutes with
+# only the first platform's posts populated -- see run_platform_creative_
+# analysis's own docstring for the diagnosis).
+
+def test_claude_and_openai_analysis_actually_run_at_the_same_time(monkeypatch):
+    """Deadlock-if-sequential proof: each fake vendor function signals it
+    has STARTED, then blocks until the OTHER vendor's signal fires. If
+    run_platform_creative_analysis still called them one after another (as
+    it did before this fix), the second one would never even be entered
+    until the first returns -- and the first can't return because it's
+    waiting on a signal only the second one sends. Only genuine concurrency
+    lets both proceed. A short, wall-clock timeout on this test itself is
+    the actual assertion: run_platform_creative_analysis must not hang."""
+    import threading
+    from tracker import sci_store, sci_pipeline as pl
+    monkeypatch.setattr(sci_store, "get_posts", lambda run_id, platform: [_post(1, "image")])
+    monkeypatch.setattr(sci_store, "upsert_platform_run", lambda *a, **k: None)
+
+    claude_started = threading.Event()
+    openai_started = threading.Event()
+
+    def fake_claude(post_id, post_type, media_urls, context, frames, thumbnail_url):
+        claude_started.set()
+        assert openai_started.wait(timeout=3), "openai never started -- these ran sequentially"
+
+    def fake_openai(post_id, run_id, platform, post_type, media_urls, context, frames, thumbnail_url):
+        openai_started.set()
+        assert claude_started.wait(timeout=3), "claude never started -- these ran sequentially"
+
+    monkeypatch.setattr(pl, "_run_claude_creative_analysis", fake_claude)
+    monkeypatch.setattr(pl, "_run_openai_creative_analysis", fake_openai)
+
+    pl.run_platform_creative_analysis(1, "instagram")  # must return promptly, not hang/timeout
+
+
+def test_frame_extraction_runs_exactly_once_shared_by_both_vendors(monkeypatch):
+    """The whole point of hoisting frame extraction out of each vendor's own
+    function: there is one real video, read once, regardless of how many
+    vendors go on to analyze the same frames concurrently."""
+    from tracker import sci_store, sci_pipeline as pl
+    monkeypatch.setattr(sci_store, "get_posts", lambda run_id, platform: [_post(1, "video")])
+    monkeypatch.setattr(sci_store, "upsert_platform_run", lambda *a, **k: None)
+    monkeypatch.setattr(sci_store, "update_post_creative_analysis", lambda *a, **k: None)
+    monkeypatch.setattr(sci_store, "update_post_creative_analysis_openai", lambda *a, **k: None)
+
+    extract_calls = []
+    monkeypatch.setattr("tracker.sci_video.extract_frames",
+                        lambda url, n: extract_calls.append(1) or [b"frame1"])
+    monkeypatch.setattr("tracker.sci_vision.analyze_image_bytes",
+                        lambda frame, context=None: {"subject": "x", "summary": "s"})
+    monkeypatch.setattr("tracker.sci_vision.summarize_frames",
+                        lambda analyses, context=None: {"frame_count": len(analyses), "summary": "s"})
+    monkeypatch.setattr("tracker.sci_audio.transcribe_video", lambda url: None)
+    monkeypatch.setattr("tracker.sci_vision_openai.analyze_image_bytes",
+                        lambda frame, context=None: {"subject": "y", "summary": "s2"})
+
+    pl.run_platform_creative_analysis(1, "instagram")
+    assert extract_calls == [1]
+
+
+def test_a_hung_or_slow_openai_call_does_not_delay_claudes_own_stored_result(monkeypatch):
+    """The concrete motivation for this fix: a slow/stuck vendor call must
+    not hold up the other vendor's result from being written."""
+    import time
+    from tracker import sci_store, sci_pipeline as pl
+    monkeypatch.setattr(sci_store, "get_posts", lambda run_id, platform: [_post(1, "image")])
+    monkeypatch.setattr(sci_store, "upsert_platform_run", lambda *a, **k: None)
+
+    claude_write_time = {}
+
+    def fake_claude(post_id, post_type, media_urls, context, frames, thumbnail_url):
+        sci_store.update_post_creative_analysis(post_id, {"subject": "x"}, status="ok")
+        claude_write_time["t"] = time.monotonic()
+
+    def fake_slow_openai(post_id, run_id, platform, post_type, media_urls, context, frames, thumbnail_url):
+        time.sleep(0.3)  # stands in for a genuinely slow vendor call
+        sci_store.update_post_creative_analysis_openai(post_id, {"subject": "y"}, status="ok")
+
+    written = {}
+    monkeypatch.setattr(sci_store, "update_post_creative_analysis",
+                        lambda post_id, analysis, status="ok", error=None: written.setdefault("claude", analysis))
+    monkeypatch.setattr(sci_store, "update_post_creative_analysis_openai",
+                        lambda post_id, analysis, status="ok", error=None: written.setdefault("openai", analysis))
+    monkeypatch.setattr(pl, "_run_claude_creative_analysis", fake_claude)
+    monkeypatch.setattr(pl, "_run_openai_creative_analysis", fake_slow_openai)
+
+    started = time.monotonic()
+    pl.run_platform_creative_analysis(1, "instagram")
+    # Claude's own write happened well before the slow OpenAI call finished
+    # (and thus well before run_platform_creative_analysis itself returned),
+    # proving Claude was never made to wait on it.
+    assert claude_write_time["t"] - started < 0.15
+    assert written["claude"]["subject"] == "x"
+    assert written["openai"]["subject"] == "y"
+
+
 # ── run_platform_creative_analysis: the ChatGPT-vision second opinion ────────
 #
 # 2026-09-07, on explicit user request: ChatGPT vision runs as a second,
