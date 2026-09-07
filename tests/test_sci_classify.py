@@ -10,9 +10,12 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from tracker import sci_classify  # noqa: E402
 
 
-def _post(id_, platform, post_type="image", status="ok", analysis=None, metrics=None):
+def _post(id_, platform, post_type="image", status="ok", analysis=None, metrics=None,
+         openai_status=None, openai_analysis=None):
     return {"id": id_, "platform": platform, "post_type": post_type,
            "creative_analysis_status": status, "creative_analysis": analysis or {},
+           "creative_analysis_openai_status": openai_status,
+           "creative_analysis_openai": openai_analysis or {},
            "metrics": metrics or {}}
 
 
@@ -86,3 +89,46 @@ def test_classify_patterns_treats_a_post_with_no_creative_analysis_as_no_themes(
     posts = [_post(1, "x", status="ok", analysis=None)]
     result = sci_classify._group_patterns(posts)
     assert result["top_themes"] == []
+
+
+# ── Pooling both vendors' independent reads (2026-09-07) ────────────────
+
+def test_a_post_counted_as_analyzed_when_only_openai_succeeded():
+    """Claude erroring on a post Claude vision couldn't score is not the
+    same as nothing being known about it -- ChatGPT's own successful read
+    still counts as real evidence."""
+    posts = [_post(1, "x", status="failed", analysis={"subject": "should not count"},
+                   openai_status="ok", openai_analysis={"subject": "sneakers"})]
+    result = sci_classify._group_patterns(posts)
+    assert result["analyzed_count"] == 1
+    assert "sneakers" in result["top_themes"]
+    assert "should not count" not in result["top_themes"]
+
+
+def test_both_vendors_agreeing_on_a_theme_ranks_it_above_a_single_vendor_theme():
+    posts = [
+        _post(1, "x", status="ok", analysis={"tone": "urgent"},
+             openai_status="ok", openai_analysis={"tone": "urgent"}),
+        _post(2, "x", status="ok", analysis={"tone": "playful"}, openai_status=None),
+    ]
+    result = sci_classify._group_patterns(posts)
+    # "urgent" got two independent votes (Claude + ChatGPT on post 1);
+    # "playful" got exactly one (Claude only, post 2) -- top_themes is
+    # ordered by count, so the two-vendor theme must rank first.
+    assert result["top_themes"].index("urgent") < result["top_themes"].index("playful")
+
+
+def test_a_failed_openai_read_contributes_no_keywords():
+    posts = [_post(1, "x", status="ok", analysis={"subject": "shoes"},
+                   openai_status="failed", openai_analysis={"error": "vendor_call_failed"})]
+    result = sci_classify._group_patterns(posts)
+    assert result["top_themes"] == ["shoes"]
+
+
+def test_pending_openai_status_is_not_treated_as_a_successful_read():
+    """A post whose OpenAI pass simply hasn't been written yet (status
+    'pending', the column's own DEFAULT) must not be read as if it were ok."""
+    posts = [_post(1, "x", status="ok", analysis={"subject": "shoes"},
+                   openai_status="pending", openai_analysis=None)]
+    result = sci_classify._group_patterns(posts)
+    assert result["top_themes"] == ["shoes"]
