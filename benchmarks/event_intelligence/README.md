@@ -39,3 +39,36 @@ The command prints metrics and blockers. Exit code 2 means acceptance is not est
 - Repeat request keys and decisions across clients/accounts; verify deduplication and isolation on native PostgreSQL.
 
 The current unit/SQL fixtures exercise failure handling. They are not the paid benchmark or independent business-quality evaluation.
+
+## Phase 3 plan review
+
+Capture authenticated plan response objects (the JSON returned when saving a plan) into a local JSON array. Keep client-confidential captures outside the repository. Generate a packet:
+
+```sh
+python -m tracker.event_intel_plan_review captured-plans.json > plan-review-packet.json
+```
+
+The packet supplies snapshot fingerprints and required checks with null labels. Each reviewer independently checks the cited sources and the client's objectives, then supplies an object in `reviewers`:
+
+```json
+{
+  "reviewers": [
+    {"name": "Reviewer A", "cases": {"EXACT_SNAPSHOT_FINGERPRINT": {
+      "action_appropriate": null,
+      "access_claims_accurate": null,
+      "no_unsupported_personal_claims": null,
+      "topic_matches_useful": null,
+      "person_company_claims_accurate": null
+    }}},
+    {"name": "Reviewer B", "cases": {}}
+  ]
+}
+```
+
+Copy the required checks for each case from the packet; topic/person checks are required when those outputs exist. Replace null only with an actual Boolean judgment. Distinct names are a declared review record, not authentication of reviewer identity. Do not invent reviewers or labels. Evaluate using:
+
+```sh
+python -m tracker.event_intel_plan_review captured-plans.json --review completed-plan-review.json
+```
+
+A changed plan or evidence snapshot requires new labels. Missing/false judgments block the review; disagreements need correction and another review. Passing this bounded case review **never** establishes release acceptance. The live Phase 2 discovery, factual-accuracy, cost and latency benchmark remains mandatory. A calibrated ranking or verified fact catalog also needs its own broader evaluation, beyond this packet.

@@ -148,9 +148,14 @@ def context(run_id, email, profile_id=None, identity=None):
         host = urlsplit(selected.get('website') or '').hostname or ''
     except ValueError:
         host = ''
-    links, seen, excerpts = [], set(), []
+    links, seen, excerpts, access_checks = [], set(), [], []
     for source in S.get_sources(run_id) if run.get('mode') == 'lookup' else []:
-        if source.get('event_id') != selected['id'] or source.get('status') != 'ok':
+        if source.get('event_id') != selected['id']:
+            continue
+        check = (source.get('metadata') or {}).get('access_review')
+        if check and organizer_url(check.get('url'), host):
+            access_checks.append(dict(check, checked_at=source.get('fetched_at'), scope=(source.get('metadata') or {}).get('access_review_scope', {})))
+        if source.get('status') != 'ok':
             continue
         for excerpt in (source.get('metadata') or {}).get('agenda_excerpts', []):
             if organizer_url(excerpt.get('source_url'), host):
@@ -165,7 +170,7 @@ def context(run_id, email, profile_id=None, identity=None):
     comparison = overlay(selected, participants, (plan or {}).get('target_domains', []))
     return dict(run_id=run_id, profile=profile, profiles=profiles, events=events,
                 event=selected, plan=plan, participants=participants,
-                overlay=comparison, fit=fit, access_links=links, assessment=assess(selected, plan or {}, comparison['matches'], links))
+                overlay=comparison, fit=fit, access_links=links, access_checks=access_checks, assessment=assess(selected, plan or {}, comparison['matches'], links))
 
 
 def overlay(event, participants, targets):

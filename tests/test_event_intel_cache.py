@@ -134,7 +134,9 @@ def test_repeated_pipeline_fetches_sources_but_reuses_extraction(monkeypatch):
         runs.append(rid)
         assert J.run_once()
         assert S.get_run(rid, email)['status'] == 'complete'
-    assert len(fetches) == 2 and len(calls) == 1
+    assert len(fetches) == 4 and len(calls) == 1
+    assert fetches.count("https://fixture.example/register") == 2
+    assert any(source["kind"] == "access_review" for source in S.get_sources(runs[1]))
     source = S.get_sources(runs[1])[0]
     assert source['metadata']['access_links'][0]['url'] == 'https://fixture.example/register'
     reuse = source['metadata']['extraction'][0]['reuse']

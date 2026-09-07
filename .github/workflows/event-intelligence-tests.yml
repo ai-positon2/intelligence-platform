@@ -50,4 +50,4 @@ jobs:
         run: >-
           python -m pytest -q tests/test_event_intel_store_postgres.py
           tests/test_event_intel_phase2.py tests/test_event_intel_postgres_concurrency.py
-          tests/test_event_intel_http_pipeline.py tests/test_event_intel_planning.py tests/test_event_intel_cache.py tests/test_event_intel_access.py tests/test_event_intel_fit.py
+          tests/test_event_intel_http_pipeline.py tests/test_event_intel_planning.py tests/test_event_intel_cache.py tests/test_event_intel_access.py tests/test_event_intel_fit.py tests/test_event_intel_access_review.py tests/test_event_intel_plan_review.py
