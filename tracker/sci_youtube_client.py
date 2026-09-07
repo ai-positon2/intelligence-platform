@@ -162,11 +162,12 @@ def _uploads_playlist_id(channel_id: str, api_key: str) -> str | None:
         return None
 
 
-def list_recent_videos(channel_id: str, api_key: str, max_results: int = 20, days: int = 30) -> list[dict]:
+def list_recent_videos(channel_id: str, api_key: str, max_results: int = 25, days: int = 30) -> list[dict]:
     """Normalized recent videos for a channel: the most recent `max_results`
-    videos, or everything within the last `days`, whichever is more -- same
-    "30 days OR 20 posts, whichever is more" rule the agent spec asks for
-    across every platform. [] on any failure, never raised."""
+    videos, capped there even for a channel posting far more often than that
+    -- sci_pipeline.MAX_POSTS_PER_PLATFORM is the real value passed in, the
+    same per-platform cap every other collector observes. [] on any failure,
+    never raised."""
     if not channel_id or not api_key:
         return []
     playlist_id = _uploads_playlist_id(channel_id, api_key)
@@ -205,19 +206,25 @@ def list_recent_videos(channel_id: str, api_key: str, max_results: int = 20, day
         logger.warning("sci_youtube_client: playlistItems fetch failed for %s: %s", channel_id, e)
         return []
 
-    kept = []
-    for vid in video_ids:
-        snip = snippets.get(vid, {})
-        published_raw = snip.get("publishedAt")
-        in_window = False
-        if published_raw:
-            try:
-                in_window = datetime.fromisoformat(published_raw.replace("Z", "+00:00")) >= cutoff
-            except ValueError:
-                pass
-        if in_window or len(kept) < max_results:
-            kept.append(vid)
-    kept = kept[:max(max_results, sum(1 for v in kept))]
+    # Sorted explicitly by parsed publish date rather than trusted on the
+    # API's own pagination order, then hard-truncated to `max_results` -- the
+    # previous version's `kept[:max(max_results, len(kept))]` was a no-op
+    # (that slice can never be shorter than `len(kept)`), so an active
+    # channel posting more than max_results times inside `days` had every one
+    # of those videos kept, uncapped. A video with no parseable publishedAt
+    # sorts last, same convention as sci_pipeline._window_posts.
+    def _parsed(vid):
+        raw = snippets.get(vid, {}).get("publishedAt")
+        if not raw:
+            return None
+        try:
+            return datetime.fromisoformat(raw.replace("Z", "+00:00"))
+        except ValueError:
+            return None
+
+    dated = sorted(video_ids, key=lambda v: _parsed(v) or datetime.min.replace(tzinfo=timezone.utc),
+                   reverse=True)
+    kept = dated[:max_results]
 
     stats_by_id = _video_stats(kept, api_key)
     out = []

@@ -200,39 +200,78 @@ def test_run_identify_actually_applies_the_youtube_fallback(monkeypatch):
 
 
 # --- per-platform collection depth --------------------------------------
+#
+# 2026-09-07: replaced the old per-platform depth split (YouTube/Reddit at a
+# 100-post floor, everything else at 20) with ONE hard cap shared by every
+# platform, on explicit user request: "it should only search/scrape the last
+# 25 posts/reels/etc on all social media platforms." See
+# sci_pipeline.MAX_POSTS_PER_PLATFORM's own comment for the full reasoning.
 
-def test_youtube_collects_deeper_than_the_billed_platforms():
-    """YouTube's API is sanctioned and effectively free, so it collects the
-    real recent history; every scraped platform stays at the conservative
-    default until its per-scrape cost is measured."""
-    assert sci_pipeline.min_posts_for("youtube") == 100
-    for platform in ("instagram", "linkedin", "x", "tiktok", "facebook"):
-        assert sci_pipeline.min_posts_for(platform) == sci_pipeline.DEFAULT_MIN_POSTS
+def test_every_platform_shares_the_same_cap():
+    assert sci_pipeline.MAX_POSTS_PER_PLATFORM == 25
 
 
-def test_windowing_keeps_the_full_youtube_depth():
-    """The collection call and the _window_posts trim must agree: raising
-    one without the other silently discards what the other fetched."""
+def test_windowing_caps_every_platform_the_same_even_a_very_active_account():
+    """The old floor-only design let _window_posts return MORE than the
+    per-platform depth for an account posting more than that inside the
+    30-day window (that was the whole point of the floor being a floor, not
+    a ceiling). The new design is a hard ceiling: even 60 posts, all within
+    the window, get capped at MAX_POSTS_PER_PLATFORM."""
+    recent = [{"platform_post_id": str(i), "posted_at": "2026-09-01T00:00:00Z"} for i in range(60)]
+    assert len(sci_pipeline._window_posts(recent)) == sci_pipeline.MAX_POSTS_PER_PLATFORM
+
+
+def test_windowing_still_floors_a_low_activity_account():
+    """The union-of-both-rules floor behaviour survives for the case it
+    actually exists for: an account with almost nothing in the last 30 days
+    still gets its most recent posts rather than an empty/near-empty list."""
     old = [{"platform_post_id": str(i), "posted_at": "2015-01-01T00:00:00Z"} for i in range(60)]
-    assert len(sci_pipeline._window_posts(
-        old, min_count=sci_pipeline.min_posts_for("youtube"))) == 60
-    # ...while a billed platform still trims to the conservative default.
-    assert len(sci_pipeline._window_posts(
-        old, min_count=sci_pipeline.min_posts_for("tiktok"))) == 20
+    assert len(sci_pipeline._window_posts(old)) == sci_pipeline.MAX_POSTS_PER_PLATFORM
 
 
-def test_run_platform_collection_windows_with_the_platform_specific_depth(monkeypatch):
-    """Wiring test: run_platform_collection must pass the per-platform depth
-    into _window_posts, not the module default."""
+def test_run_platform_collection_caps_every_platform_the_same(monkeypatch):
+    """Wiring test: run_platform_collection must pass a genuinely capped list
+    to sci_store, for EVERY platform -- not just the previously-special ones."""
     from tracker import sci_store
     written = {}
     monkeypatch.setattr(sci_store, "upsert_platform_run", lambda *a, **k: None)
     monkeypatch.setattr(sci_store, "upsert_posts",
                         lambda run_id, platform, posts: written.setdefault(platform, len(posts)))
-    posts = [{"platform_post_id": str(i), "posted_at": "2015-01-01T00:00:00Z"} for i in range(60)]
+    posts = [{"platform_post_id": str(i), "posted_at": "2026-09-01T00:00:00Z"} for i in range(60)]
     monkeypatch.setattr(sci_pipeline, "_collect_youtube", lambda h: (posts, "youtube_api"))
     sci_pipeline.run_platform_collection(1, "youtube", "@acme")
-    assert written["youtube"] == 60, "youtube was trimmed to the default depth"
+    assert written["youtube"] == sci_pipeline.MAX_POSTS_PER_PLATFORM, \
+        "youtube was not capped to the shared per-platform limit"
+
+
+def test_collect_youtube_requests_exactly_the_shared_cap(monkeypatch):
+    """The cap must reach the actual vendor request, not just the post-hoc
+    trim -- otherwise the API is still asked for (and, for a scraped
+    platform, billed for) more than gets kept."""
+    from tracker import sci_youtube_client
+    calls = {}
+    monkeypatch.setenv("YOUTUBE_API_KEY", "key")
+    monkeypatch.setattr(sci_youtube_client, "resolve_channel", lambda h, k: "chan1")
+
+    def fake_list(channel_id, api_key, max_results=20, days=30):
+        calls["max_results"] = max_results
+        return []
+    monkeypatch.setattr(sci_youtube_client, "list_recent_videos", fake_list)
+    sci_pipeline._collect_youtube("@acme")
+    assert calls["max_results"] == sci_pipeline.MAX_POSTS_PER_PLATFORM
+
+
+def test_collect_via_apify_requests_exactly_the_shared_cap(monkeypatch):
+    from tracker import sci_source_tiktok
+    calls = {}
+    monkeypatch.setenv("APIFY_API_TOKEN", "tok")
+
+    def fake_collect(handle, token, max_posts=25, strict=True):
+        calls["max_posts"] = max_posts
+        return []
+    monkeypatch.setattr(sci_source_tiktok, "collect", fake_collect)
+    sci_pipeline._collect_via_apify("tiktok", "acme")
+    assert calls["max_posts"] == sci_pipeline.MAX_POSTS_PER_PLATFORM
 
 
 # --- Reddit: two different questions, only one of them about owned posts ---
@@ -241,8 +280,17 @@ def test_run_platform_collection_windows_with_the_platform_specific_depth(monkey
 # conversation, which exists for companies with no Reddit account at all.
 # Conflating the two is what would make Reddit a seventh empty row.
 
-def test_reddit_collects_deeper_than_the_billed_platforms():
-    assert sci_pipeline.min_posts_for("reddit") == 100
+def test_collect_reddit_requests_exactly_the_shared_cap(monkeypatch):
+    from tracker import sci_reddit_client
+    calls = {}
+    monkeypatch.setattr(sci_reddit_client, "is_configured", lambda: True)
+
+    def fake_list_user_posts(username, limit=100):
+        calls["limit"] = limit
+        return []
+    monkeypatch.setattr(sci_reddit_client, "list_user_posts", fake_list_user_posts)
+    sci_pipeline._collect_reddit("acme")
+    assert calls["limit"] == sci_pipeline.MAX_POSTS_PER_PLATFORM
 
 
 def test_collect_reddit_refuses_without_credentials(monkeypatch):
