@@ -761,9 +761,7 @@ def rank(candidates: list[dict], cap: int = DEFAULT_CAP, today=None) -> dict:
         # useful statement than silence, and it tells the reader the next
         # edition is the thing to go looking for.
         if has_finished(c, today):
-            finished.append({"name": c.get("name"), "total": c.get("total") or 0,
-                             "ends_on": c.get("ends_on") or c.get("starts_on"),
-                             "category": c.get("category")})
+            finished.append(dict(c))
             continue
         if (c.get("total") or 0) >= RANK_FLOOR:
             kept.append(c)
@@ -782,9 +780,7 @@ def rank(candidates: list[dict], cap: int = DEFAULT_CAP, today=None) -> dict:
             # description has not been offered anything.
             considered.append(c)
         else:
-            excluded.append({"name": c.get("name"), "total": c.get("total") or 0,
-                             "tier": TIER_P3,
-                             "category": c.get("category")})
+            excluded.append(dict(c))
     over_cap = []
     if cap and len(kept) > cap:
         # The cap never drops a committed event. Being pushed off the end of a
@@ -793,9 +789,10 @@ def rank(candidates: list[dict], cap: int = DEFAULT_CAP, today=None) -> dict:
         head = kept[:cap]
         tail = kept[cap:]
         rescued = [c for c in tail if c.get("committed")]
-        over_cap = [{"name": c.get("name"), "total": c.get("total") or 0}
-                    for c in tail if not c.get("committed")]
+        over_cap = [dict(c) for c in tail if not c.get("committed")]
         kept = head + rescued
+    if cap:
+        over_cap.extend(dict(c, cap_bucket="worth_a_look") for c in considered[cap:])
     return {
         "kept": kept,
         # Ordered like the recommendation, and capped the same way: a second

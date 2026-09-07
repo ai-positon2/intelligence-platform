@@ -210,7 +210,7 @@ def test_a_promotion_takes_its_category_from_the_pre_audit_list():
     `survivors` by construction, so the category can only come from the list
     that still holds it."""
     audit, survivors, pre = _survivors_and_pre_audit()
-    out = A.promote_alternatives(audit, survivors, resolver=_resolver,
+    out = A.promote_alternatives(audit, profile=dict(PROFILE, geo_scope="Global"), candidates= survivors, resolver=_resolver,
                                  replaced_from=pre)
     assert out["promoted"], (
         "the replacement was refused: %s" % out["unconfirmed"])
@@ -222,7 +222,7 @@ def test_a_promoted_event_survives_the_store():
     row with no category, which is a silent drop: the row is logged and the
     summary carries on saying the event was added to the list."""
     audit, survivors, pre = _survivors_and_pre_audit()
-    got = A.promote_alternatives(audit, survivors, resolver=_resolver,
+    got = A.promote_alternatives(audit, profile=dict(PROFILE, geo_scope="Global"), candidates= survivors, resolver=_resolver,
                                  replaced_from=pre)["promoted"][0]
     row = ST.normalise_candidate(dict(got, **_FULL, name=got["name"]))
     assert row is not None, "the promoted event is dropped by the store"
@@ -234,7 +234,7 @@ def test_a_promotion_with_no_category_slot_is_named_rather_than_dropped():
     promotion must not be built half-formed and handed to a store that
     discards it without telling anyone."""
     audit, survivors, _pre = _survivors_and_pre_audit()
-    out = A.promote_alternatives(audit, survivors, resolver=_resolver,
+    out = A.promote_alternatives(audit, profile=dict(PROFILE, geo_scope="Global"), candidates= survivors, resolver=_resolver,
                                  replaced_from=[])
     assert not out["promoted"]
     assert out["unconfirmed"] and out["unconfirmed"][0]["name"] == "INBOUND"
@@ -444,7 +444,7 @@ def test_a_promoted_alternative_cannot_be_confirmed_from_memory(monkeypatch):
     from tracker import event_intel_resolve as RES
     _ask(monkeypatch, RES, _RESOLVE_REPLY, search_count=0)
     audit, survivors, pre = _survivors_and_pre_audit()
-    out = A.promote_alternatives(audit, survivors, replaced_from=pre)
+    out = A.promote_alternatives(audit, profile=dict(PROFILE, geo_scope="Global"), candidates= survivors, replaced_from=pre)
     assert not out["promoted"], "a recalled event reached the list"
     assert out["unconfirmed"] and "recalled" in out["unconfirmed"][0]["why"]
     assert RES  # the resolver under test is the real one, not a fake
