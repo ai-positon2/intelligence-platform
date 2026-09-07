@@ -603,6 +603,103 @@ def status_labels(rows: list[dict], cap: int = rubric.DEFAULT_CAP,
     return out
 
 
+def selection_snapshot(ranked, profile):
+    """The persisted ordering is shared by every rendering and export."""
+    from copy import deepcopy
+    from datetime import date
+    from .event_intel_identity import event_key
+    groups = {}
+    labels = {'kept': 'Recommended', 'worth_a_look': 'Worth a look: below the bar, but the audience is genuinely this client\'s',
+              'excluded': 'Excluded, below the bar', 'finished': 'Edition already finished',
+              'over_cap': 'Cleared the bar, cut only by list length',
+              'incomplete': 'Incomplete run: not a recommendation'}
+    for bucket, label in labels.items():
+        groups[bucket] = []
+        for row in ranked.get(bucket, []):
+            row = deepcopy(row)
+            row['event_identity'] = event_key(row)
+            row['disposition'] = bucket
+            row['status_label'] = label
+            if bucket == 'kept' and row.get('committed') and (row.get('total') or 0) < 70:
+                row['status_label'] = 'Recommended: already committed, did not clear the bar on its own merits'
+            if bucket == 'over_cap' and row.get('cap_bucket') == 'worth_a_look':
+                row['status_label'] = 'Worth a look, omitted only by list length'
+            groups[bucket].append(row)
+    return dict(groups, version=1, as_of=date.today().isoformat(),
+                profile=deepcopy(profile), counts=deepcopy(ranked['counts']))
+
+
+def disabled_cross_client_check():
+    return {
+        'measured': False, 'flagged': False, 'checked': 0,
+        'worst': None, 'comparisons': [], 'advice': '',
+        'why_not_measured': 'Cross-client comparisons are disabled pending verified client identity and consent.',
+    }
+
+
+def present_run(run, profile, rows, decisions):
+    """Read a historical selection plus current, profile-scoped decisions.
+
+    Legacy selections are reconstructed once per read in Python. Cross-client
+    claims are suppressed, including claims persisted by older deployments.
+    """
+    from copy import deepcopy
+    from datetime import date
+    run = deepcopy(run)
+    summary = run.setdefault('summary', {}) or {}
+    run['summary'] = summary
+    selection = summary.get('selection')
+    if run.get('status') == 'failed' or not selection or selection.get('version') != 1:
+        when = str(run.get('created_at') or '')[:10]
+        try:
+            when = date.fromisoformat(when)
+        except ValueError:
+            when = date.today()
+        ranked = rubric.rank(rows, cap=int(profile.get('max_events') or 15), today=when)
+        if run.get('status') == 'failed':
+            ranked = rubric.rank([], today=when)
+            ranked['incomplete'] = rows
+            ranked['counts']['incomplete'] = len(rows)
+            summary['no_candidates'] = True
+            summary['note'] = run.get('error') or 'This research could not be completed. No recommendation is approved.'
+        selection = selection_snapshot(ranked, profile)
+        selection['as_of'] = when.isoformat()
+        selection['reconstructed_legacy'] = True
+    def strip_cross(value):
+        if isinstance(value, dict):
+            return {k: strip_cross(v) for k, v in value.items() if not k.startswith('cross_client')}
+        if isinstance(value, list):
+            return [strip_cross(v) for v in value]
+        return value
+    summary = strip_cross(summary)
+    summary['notes'] = [n for n in summary.get('notes', [])
+                        if 'watched by other clients' not in str(n).lower()
+                        and 'cross-client check' not in str(n).lower()]
+    summary['assumptions'] = [n for n in summary.get('assumptions', [])
+                              if 'watched by other clients' not in str(n).lower()
+                        and 'cross-client check' not in str(n).lower()]
+    summary['generic'] = disabled_cross_client_check()
+    selection = strip_cross(selection)
+    all_rows = []
+    for bucket in ('kept', 'worth_a_look', 'excluded', 'over_cap', 'finished', 'incomplete'):
+        selection[bucket] = annotate_outcomes(selection.get(bucket, []), decisions)['candidates']
+        all_rows.extend(selection[bucket])
+    summary['selection'] = selection
+    summary['counts'] = selection['counts']
+    summary['top_five'] = top_five(selection['kept'])
+    for bucket in ('worth_a_look', 'excluded', 'over_cap', 'finished'):
+        summary[bucket] = selection[bucket]
+    outcome = annotate_outcomes(selection['kept'], decisions)
+    from .event_intel_store import DECISION_LABELS
+    summary['outcomes'] = {k: v for k, v in outcome.items() if k != 'candidates'}
+    summary['outcomes']['labels'] = DECISION_LABELS
+    run['summary'] = summary
+    run['candidates'] = all_rows
+    run['profile'] = dict(selection.get('profile') or profile,
+                          confidential=profile.get('confidential', False))
+    return strip_cross(run)
+
+
 def executive_summary(*, profile: dict, ranked: dict, **kw) -> dict:
     """The five elements, in the skill's order, and nothing else.
 
@@ -647,6 +744,7 @@ def executive_summary(*, profile: dict, ranked: dict, **kw) -> dict:
         # 5. Top five must-attend.
         "top_five": top_five((ranked or {}).get("kept") or []),
         "counts": counts,
+        "selection": selection_snapshot(ranked, profile),
     }
 
 
@@ -666,12 +764,13 @@ def annotate_outcomes(candidates: list[dict], outcomes: dict) -> dict:
     the honest version of the source skill's "tighten over time" step, which
     asks for reply-rate data from a sequencer this platform does not have.
     """
-    from .event_intel_discover import name_key
+    from .event_intel_identity import event_key
     seen = {"going": 0, "skipped": 0, "went": 0}
     annotated = []
     for c in (candidates or []):
         c = dict(c)
-        prior = (outcomes or {}).get(name_key(c.get("name") or ""))
+        c['event_identity'] = event_key(c)
+        prior = (outcomes or {}).get(c['event_identity'])
         if prior:
             c["prior_decision"] = prior.get("decision")
             c["prior_note"] = prior.get("note")
@@ -689,6 +788,9 @@ def annotate_outcomes(candidates: list[dict], outcomes: dict) -> dict:
     total = sum(seen.values())
     return {
         "candidates": annotated,
+        "by_identity": {c['event_identity']: {"decision": c['prior_decision'],
+                         "note": c['prior_note'], "on": c['prior_on']}
+                        for c in annotated if c.get('prior_decision')},
         "by_name": by_name,
         "counts": seen,
         "ruled_on": total,

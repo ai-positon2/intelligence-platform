@@ -73,6 +73,7 @@ _SYSTEM = (
     '"ends_on": "YYYY-MM-DD"|null, "location": str|null, "venue": str|null, '
     '"format": "in_person"|"virtual"|"hybrid"|null, '
     '"stated_size": str|null, "audience_note": str|null, '
+    '"country": str|null, "city": str|null, "availability": "open"|"sold_out"|"cancelled"|"unknown", "availability_source": str|null, '
     '"pages": [{"url": str, "kind": "exhibitors"|"sponsors"|"speakers"|'
     '"agenda"|"partners"|"attendees", "note": str}]}\n\n'
     "`stated_size` is the event's OWN published attendance claim, quoted as "
@@ -200,7 +201,9 @@ def _resolve_event(query: str, year_hint: str | None, box: dict) -> dict:
     name = claude_websearch.strip_em_dash((parsed.get("name") or "").strip())
     website = (parsed.get("website") or "").strip()
 
-    if confidence not in _MIN_CONFIDENCE or not name:
+    from urllib.parse import urlparse
+    parsed_site = urlparse(website)
+    if confidence not in _MIN_CONFIDENCE or not name or parsed_site.scheme not in ('http','https') or not parsed_site.hostname:
         # Deliberately not downgraded into a partial result. A named event we
         # could not pin to one edition has nothing safe to harvest.
         return _failed(confidence if confidence in
@@ -220,6 +223,10 @@ def _resolve_event(query: str, year_hint: str | None, box: dict) -> dict:
         "starts_on": (parsed.get("starts_on") or None),
         "ends_on": (parsed.get("ends_on") or None),
         "location": _clean((parsed.get("location") or "").strip()) or None,
+        "country": _clean((parsed.get("country") or "").strip()) or None,
+        "city": _clean((parsed.get("city") or parsed.get("location") or "").strip()) or None,
+        "availability": parsed.get("availability") if parsed.get("availability") in ("open","sold_out","cancelled") else "unknown",
+        "availability_source": (parsed.get("availability_source") or "")[:1000] or None,
         "venue": _clean((parsed.get("venue") or "").strip()) or None,
         "format": (parsed.get("format") or "").strip() or None,
         "stated_size": _clean((parsed.get("stated_size") or "").strip()) or None,

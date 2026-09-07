@@ -83,8 +83,8 @@ def test_an_event_whose_own_audit_broke_is_counted_and_named(monkeypatch):
 
     assert a["error"] is None, (
         "one broken call out of two reported the whole audit as failed")
-    assert list(a["failed"]) == [AU.name_key("CES")]
-    assert a["failed"][AU.name_key("CES")]["name"] == "CES"
+    assert list(a["failed"]) == [AU.event_key(FAMOUS[1])]
+    assert a["failed"][AU.event_key(FAMOUS[1])]["name"] == "CES"
 
     survivors = AU.apply_audit(FAMOUS, a)
     assert "CES" in [c["name"] for c in survivors], (
@@ -155,7 +155,7 @@ def test_a_legacy_envelope_reply_is_still_read_and_still_enforced(monkeypatch):
     _ask(monkeypatch, {"audits": [{"verdict": "kept"}]})
     a = AU.audit_famous(FAMOUS[:1], PROF)
     assert a["error"] is None
-    v = a["verdicts"][AU.name_key("Dreamforce")]
+    v = a["verdicts"][AU.event_key(FAMOUS[0])]
     assert v["verdict"] == AU.VERDICT_CUT
     assert "no more targeted alternative was named" in v["why"]
     assert v["name"] == "Dreamforce", (

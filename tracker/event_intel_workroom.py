@@ -49,6 +49,7 @@ and a prompt cannot.
 from __future__ import annotations
 
 import concurrent.futures
+from .event_intel_jobs import ContextExecutor
 import datetime
 import logging
 import re
@@ -383,7 +384,8 @@ _COMPETITOR_RULE_OFF = (
 def profile_brief(profile: dict) -> str:
     """The client, as the qualifier sees them."""
     bits = ["Client: %s" % (profile.get("client_name") or "unnamed")]
-    for label, key in (("sells to", "buyer_roles"), ("verticals", "verticals"),
+    for label, key in (("Product or service", "what_they_sell"), ("Selected offer", "selected_product"),
+                       ("Target company characteristics", "firmographics"), ("sells to", "buyer_roles"), ("verticals", "verticals"),
                        ("deal size", "acv_band"), ("sales cycle", "sales_cycle"),
                        ("geography", "geo_scope"), ("site", "website")):
         if profile.get(key):
@@ -411,6 +413,17 @@ def _roster_brief(rows: list[dict], notes: dict) -> str:
             line += "\n  named person on the roster: %s%s" % (
                 r["person_name"],
                 ", %s" % r["person_title"] if r.get("person_title") else "")
+        if r.get('org_domain'):
+            line += '\n  company domain: ' + str(r['org_domain'])
+        if r.get('apollo'):
+            import json
+            line += '\n  company enrichment (not attendance evidence): ' + json.dumps(r['apollo'])[:3500]
+        if r.get('source_url'):
+            line += '\n  roster source: ' + str(r['source_url'])
+        if r.get('evidence'):
+            import json
+            line += '\n  source support and edition limitations: ' + json.dumps(r['evidence'])[:2000]
+        line += '\n  company resolution status: ' + str(r.get('resolution') or 'unresolved')
         note = notes.get(org_key(r.get("org_name") or ""))
         if note:
             line += "\n  BOOTH NOTE WRITTEN BY THE USER: %s" % note
@@ -482,7 +495,7 @@ def draft_all(rows: list[dict], profile: dict, event: dict,
     merged: dict = {}
     errors: list[str] = []
     if batches:
-        with concurrent.futures.ThreadPoolExecutor(
+        with ContextExecutor(
                 max_workers=min(MAX_CONCURRENCY, len(batches))) as pool:
             futures = [pool.submit(draft_batch, b, profile, event,
                                    event_class, notes) for b in batches]
@@ -522,6 +535,7 @@ def draft_all(rows: list[dict], profile: dict, event: dict,
 # Everything above asked the model nicely. This is where the asking stops.
 
 DRAFT_OK = "ok"
+DRAFT_REVIEW = "review_required"
 DRAFT_NO_EVIDENCE = "rewritten_no_booth_note"
 DRAFT_AGGRESSIVE = "rewritten_aggressive"
 DRAFT_ACCOUNT = "account_play"
@@ -656,7 +670,19 @@ def enforce(rows: list[dict], *, event_class: str, notes: dict,
         else:
             row["account_note"] = None
 
-        row["opener"] = opener or None
+        # A free-form model sentence cannot establish personal history. Until
+        # interaction facts have a verified evidence model, every outward draft
+        # uses this bounded template. Rep notes remain internal for manual edits.
+        row['opener'] = (
+            'The public materials for %s brought %s to my attention. '
+            'I would welcome a conversation about your current priorities and '
+            'whether there is a useful way to work together.'
+            % (event_name, row.get('org_name') or 'your organization'))
+        row['angle'] = 'Confirm the relevant buyer and their current priorities before personalizing this draft.'
+        row['fit_note'] = 'Model-estimated company fit; verify against the client ICP and company evidence.'
+        if row['draft_status'] == DRAFT_OK:
+            row['draft_status'] = 'review_required'
+            row['draft_reason'] = 'A conservative draft is shown. Review recipient, relevance and source facts; rep notes have not been converted into interaction claims.'
         row["booth_note"] = note
         row["play"] = play["play"]
         if row["draft_status"] in (DRAFT_NO_EVIDENCE, DRAFT_AGGRESSIVE):
@@ -666,6 +692,23 @@ def enforce(rows: list[dict], *, event_class: str, notes: dict,
         out.append(row)
     return {"rows": out, "rewritten": rewritten,
             "rewritten_count": len(rewritten)}
+
+
+def present_outreach(run, rows):
+    """Apply the same conservative claim policy to stored legacy drafts."""
+    summary = run.get('summary') or {}
+    event_class = summary.get('event_class') or next((r.get('event_class') for r in rows if r.get('event_class')), None)
+    if event_class not in EVENT_CLASSES:
+        return [dict(r, opener=None, angle=None, fit_note=None,
+                     draft_status='review_required', draft_reason='The event relationship needs confirmation.') for r in rows]
+    notes = {org_key(r.get('org_name')): r['booth_note'] for r in rows if r.get('booth_note')}
+    safe_rows = enforce(rows, event_class=event_class, notes=notes,
+                   event_name=summary.get('event_name') or run.get('query') or 'this event')['rows']
+    for original, safe in zip(rows, safe_rows):
+        if original.get('draft_status') in (DRAFT_NO_EVIDENCE, DRAFT_AGGRESSIVE):
+            for key in ('draft_status', 'draft_reason', 'draft_flagged'):
+                safe[key] = original.get(key)
+    return safe_rows
 
 
 def split_by_fit(rows: list[dict], floor: int = ICP_FLOOR) -> dict:

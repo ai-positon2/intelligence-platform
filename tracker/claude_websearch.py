@@ -210,7 +210,8 @@ def _client(timeout: float):
     if not key:
         return None
     from anthropic import Anthropic
-    return Anthropic(api_key=key, timeout=timeout, max_retries=2)
+    from .event_intel_jobs import CURRENT
+    return Anthropic(api_key=key, timeout=timeout, max_retries=0 if CURRENT.get() else 2)
 
 
 def _err(kind: str, detail: str) -> dict:
@@ -344,7 +345,7 @@ def spend_usd(record: dict) -> float:
     return round(usd, 2)
 
 
-def ask(system: str, user: str, *, max_uses: int = 8, max_tokens: int = 8000,
+def _ask(system: str, user: str, *, max_uses: int = 8, max_tokens: int = 8000,
         timeout: float = 280.0, model: str | None = None) -> dict:
     """One streamed Claude call, with the web_search tool when max_uses > 0.
 
@@ -610,3 +611,22 @@ def extract_json(raw: str, require: str | None = None):
                         return found
             start = raw.find(opener, start + 1)
     return None
+
+
+def ask(system: str, user: str, *, max_uses: int = 8, max_tokens: int = 8000,
+        timeout: float = 280.0, model: str | None = None):
+    """Record and bound event-worker calls; other platform callers are unchanged."""
+    from .event_intel_jobs import CURRENT, reserve_call, finish_call
+    import time
+    if CURRENT.get() is None:
+        return _ask(system,user,max_uses=max_uses,max_tokens=max_tokens,timeout=timeout,model=model)
+    began = time.monotonic()
+    try:
+        reservation = reserve_call(system,user,model or os.getenv('ANTHROPIC_MODEL','claude-sonnet-5'),max_tokens,max_uses)
+        if reservation['cached'] is not None:
+            return reservation['cached']
+    except RuntimeError as exc:
+        return {'text':'', 'error':{'kind':'operational_limit','detail':str(exc)}, 'usage':{}}
+    result = _ask(system,user,max_uses=max_uses,max_tokens=max_tokens,timeout=timeout,model=model)
+    finish_call(reservation['id'],result,int((time.monotonic()-began)*1000))
+    return result

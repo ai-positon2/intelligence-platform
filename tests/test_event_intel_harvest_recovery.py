@@ -489,7 +489,7 @@ def test_harvest_still_reads_a_complete_reply(monkeypatch):
     _stub_ask(monkeypatch, payload={"rows": [
         {"org_name": "Acme Payments", "org_domain": "acme.com",
          "role": "exhibitor"}], "note": "page 1 of 1"})
-    out = H.extract_participants("text", "https://ev.example/exhibitors",
+    out = H.extract_participants("Exhibitors: Acme Payments https://acme.com", "https://ev.example/exhibitors",
                                  "exhibitor_list", "Money20/20", "ev.example")
     assert out["error"] is None
     assert [r["org_name"] for r in out["rows"]] == ["Acme Payments"]
