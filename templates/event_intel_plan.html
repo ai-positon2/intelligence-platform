@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Event plan &amp; results · Intelligence</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#f5f6fa;color:#19243b;font:16px/1.5 system-ui,sans-serif}main{max-width:1000px;margin:40px auto;padding:0 24px}a{color:#3554b5}h1{font-size:34px;line-height:1.2;margin:12px 0}h2{font-size:22px;margin:0 0 16px}section{background:white;border:1px solid #dce1eb;border-radius:12px;padding:24px;margin:24px 0}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}.wide{grid-column:1/-1}label{display:block;font-weight:600}input,select,textarea{display:block;width:100%;padding:10px;border:1px solid #acb7cb;border-radius:6px;font:inherit;margin-top:6px}textarea{min-height:90px}button{background:#2847a3;color:white;border:0;border-radius:6px;padding:12px 20px;font:inherit;cursor:pointer;margin-top:18px}button:disabled{opacity:.5}.muted{color:#52617b}.note{background:#edf2ff;padding:14px;border-radius:6px}table{border-collapse:collapse;width:100%}th,td{text-align:left;vertical-align:top;padding:10px;border-bottom:1px solid #dce1eb}td{overflow-wrap:anywhere}.table-scroll{overflow-x:auto}#message{white-space:pre-wrap}input:focus,select:focus,textarea:focus,button:focus{outline:3px solid #9bb6ff;outline-offset:2px}@media(max-width:650px){main{margin:24px auto;padding:0 14px}.grid{grid-template-columns:1fr}section{padding:18px}h1{font-size:28px}}
+</style></head><body><main>
+<a href="{{ url_for('event_conference_intelligence') }}">← Event &amp; Conference Intelligence</a>
+<h1>Plan &amp; results</h1><p class="muted">Choose an action, see published target-account matches, and record what happened. Plans stay with this client and event edition.</p>
+<section><h2>Client &amp; edition</h2><form method="get" class="grid">
+<label>Client<select name="profile_id" required><option value="">Choose a client</option>{% for profile in view.profiles %}<option value="{{ profile.id }}" {% if view.profile and view.profile.id == profile.id %}selected{% endif %}>{{ profile.client_name }}</option>{% endfor %}</select></label>
+<label>Event<select name="event_identity">{% for event in view.events %}<option value="{{ event.event_identity }}" {% if view.event.event_identity == event.event_identity %}selected{% endif %}>{{ event.name }} · {{ event.starts_on or 'Date unverified' }} · {{ event.city or 'Location unverified' }}</option>{% endfor %}</select></label>
+<div class="wide"><button>Open plan</button></div></form></section>
+{% if view.profile %}{% set plan = view.plan or {} %}
+<section><h2>{{ view.event.name }}</h2><p class="muted">{{ view.profile.client_name }} · {{ view.event.starts_on or 'Date unverified' }} · {{ view.event.city or 'Location unverified' }}</p>
+<form id="planForm"><div class="grid">
+<label>Chosen action<select name="action" required><option value="">Choose an action</option>{% for key,label in actions.items() %}<option value="{{ key }}" {% if plan.get('action') == key %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+<label>Currency<select name="currency">{% for currency in currencies %}<option {% if plan.get('currency','USD') == currency %}selected{% endif %}>{{ currency }}</option>{% endfor %}</select></label>
+<label>Planned budget<input name="planned_budget" type="number" min="0" step="0.01" value="{{ plan.get('planned_budget') or '' }}"></label>
+<label>Estimated total cost<input name="estimated_total_cost" type="number" min="0" step="0.01" value="{{ plan.get('estimated_total_cost') or '' }}"></label>
+<label>Access for chosen action<select name="access_status">{% for value,label in [('unknown','Not checked'),('confirmed','Confirmed by me'),('unavailable','Unavailable')] %}<option value="{{ value }}" {% if plan.get('access_status','unknown') == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+<label>Access checked on<input name="access_checked_on" type="date" value="{{ plan.get('access_checked_on') or '' }}"></label>
+<label>Target company domains<textarea name="target_domains" placeholder="example.com&#10;anothercompany.com">{{ plan.get('target_domains',[])|join('\n') }}</textarea></label>
+<label class="wide">Topic interests (one phrase per line)<textarea name="topic_interests" placeholder="account based marketing&#10;demand generation">{{ plan.get("topic_interests",[])|join("\n") }}</textarea></label>
+<label class="wide">Access, budget and other constraints<textarea name="constraints" maxlength="4000">{{ plan.get('constraints','') }}</textarea></label>
+</div><h2 style="margin-top:28px">Actual results</h2><p class="muted">Leave unknown values blank. These are your reported results, not independently attributed ROI. Saving a plan does not affect the recommendation score.</p><div class="grid">
+{% for key,label in [('conversations','Conversations'),('meetings','Meetings held'),('qualified_opportunities','Qualified opportunities')] %}<label>{{ label }}<input name="{{ key }}" type="number" min="0" step="1" value="{{ plan.get(key) if plan.get(key) is not none else '' }}"></label>{% endfor %}
+{% for key,label in [('actual_spend','Actual spend'),('effort_hours','Team effort (hours)'),('reported_pipeline','Reported pipeline amount')] %}<label>{{ label }}<input name="{{ key }}" type="number" min="0" step="0.01" value="{{ plan.get(key) if plan.get(key) is not none else '' }}"></label>{% endfor %}
+<label>Results as of<input name="results_as_of" type="date" value="{{ plan.get('results_as_of') or '' }}"></label>
+<label class="wide">Notes and attribution context<textarea name="notes" maxlength="4000">{{ plan.get('notes','') }}</textarea></label></div>
+<button id="savePlan">Save plan &amp; results</button><p id="message" role="status" aria-live="polite"></p></form></section>
+<section><h2>Action evidence &amp; constraints</h2>
+<p><strong>{{ view.assessment.status|replace('_',' ')|capitalize }}</strong></p>
+<ul>{% for check in view.assessment.checks %}<li>{{ check }}</li>{% endfor %}</ul>
+<p class="muted">Access confirmations and cost estimates are your reports. They are not independently verified. Changing the action requires you to recheck its access terms.</p>
+<h2>Organizer links to check</h2><p class="muted">Observed on pages this report read. Destination content, edition eligibility, price and availability have not been verified.</p>
+{% if view.access_links %}<ul>{% for link in view.access_links %}<li><a href="{{ link.url }}" target="_blank" rel="noopener noreferrer">{{ link.label }}</a> · {{ link.kind }}<br><small>Observed {{ link.observed_at }} on {{ link.source_url }}</small></li>{% endfor %}</ul>{% else %}<p>No matching organizer links were observed. This report may not have read the pages that contain them.</p>{% endif %}
+</section>
+<section><h2>Access-page evidence</h2><p class="note">Up to four unique organizer access destinations are read per event. These excerpts do not confirm edition eligibility, current availability, ticket tier, total cost or booking readiness. Missing excerpts do not establish missing terms.</p>
+{% if view.access_checks %}{% for check in view.access_checks %}<article><h3>{{ check.kind|capitalize }} · {{ check.status }}</h3><p>{{ check.note }}</p><p class="muted">{{ check.url }} · checked {{ check.checked_at }}{% if check.truncated %} · truncated read{% endif %}</p>
+{% if check.observed_years %}<p>Years appearing in destination text: {{ check.observed_years|join(', ') }}. Edition ownership needs review.</p>{% endif %}
+{% if check.claims %}<ul>{% for claim in check.claims %}<li><strong>{{ claim.field|capitalize }}</strong><blockquote>{{ claim.text }}</blockquote></li>{% endfor %}</ul>{% else %}<p>No matching terms were established from this read.</p>{% endif %}
+{% if check.scope.not_checked %}<p class="muted">{{ check.scope.not_checked }} additional destination(s) were outside this run’s four-page limit.</p>{% endif %}</article>{% endfor %}{% else %}<p>No access destinations were checked in this report.</p>{% endif %}</section>
+<section><h2>Topic &amp; person evidence</h2><p class="note">{{ view.fit.limitation }}</p>
+<p class="muted">Save topic phrases and target company domains to update this comparison. Matching uses literal phrases, without inferred synonyms. The comparison uses up to 120 readable lines of 12–500 characters per agenda page; it can miss omitted or longer lines. Up to 100 matching excerpts and 100 people are shown.</p>
+{% if view.fit.topic_matches %}<ul>{% for match in view.fit.topic_matches %}<li><strong>{{ match.topics|join(', ') }}</strong> · {{ match.timing|replace('_',' ') }}<blockquote>{{ match.text }}</blockquote><small>Source: {{ match.source_url }} · observed {{ match.observed_at }}</small></li>{% endfor %}</ul>{% else %}<p>No matching agenda excerpts established in the pages read.</p>{% endif %}
+{% if view.fit.unmatched_topics %}<p class="muted">Not observed: {{ view.fit.unmatched_topics|join(', ') }}. This does not prove the agenda excludes these topics.</p>{% endif %}
+{% if view.fit.people %}<ul>{% for person in view.fit.people %}<li><strong>{{ person.name }}</strong>{% if person.title %} · {{ person.title }}{% endif %} · {{ person.company }}<br>{{ person.timing|replace('_',' ') }} · literal support only<br><small>{{ person.source_url }}</small></li>{% endfor %}</ul>{% else %}<p>No source-supported names at the target domains were established.</p>{% endif %}</section>
+<section><h2>Target-account evidence</h2><p>Save target domains to compare them with this report’s published roster.</p>
+<p class="note">{{ view.overlay.limitation }}</p>
+{% if view.overlay.suggested_action %}<p><strong>Suggested next action:</strong> {{ actions[view.overlay.suggested_action] }}. {{ view.overlay.next_check }} This is a suggestion for review, not a booking or an automated task.</p>{% else %}<p>{{ view.overlay.next_check }}</p>{% endif %}
+{% if view.overlay.matches %}<div class="table-scroll"><table><thead><tr><th>Company</th><th>Published role</th><th>Edition context</th><th>Source</th></tr></thead><tbody>{% for match in view.overlay.matches %}<tr><td>{{ match.company }}<br><small>{{ match.domain }}</small></td><td>{{ match.role }}</td><td>{{ match.timing|replace('_',' ') }}<br><small>{{ match.support|replace('_',' ') }}</small></td><td>{{ match.source_url }}</td></tr>{% endfor %}</tbody></table></div>{% else %}<p>No target-domain matches established in this report.</p>{% endif %}
+{% if view.overlay.not_observed %}<p class="muted">Not observed in this roster: {{ view.overlay.not_observed|join(', ') }}. This does not establish absence from the event.</p>{% endif %}
+</section>
+<script>
+const form=document.getElementById('planForm');
+form.addEventListener('submit',async function(event){event.preventDefault();const button=document.getElementById('savePlan'),message=document.getElementById('message');button.disabled=true;message.textContent='Saving…';
+const payload=Object.fromEntries(new FormData(form));payload.profile_id={{ view.profile.id|tojson }};payload.event_identity={{ view.event.event_identity|tojson }};payload.version={{ plan.get('version',0)|tojson }};
+try{const response=await fetch(location.pathname,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});const result=await response.json();if(!response.ok)throw new Error(result.error||'Could not save this plan.');const url=new URL(location.href);url.searchParams.set('profile_id',payload.profile_id);url.searchParams.set('event_identity',payload.event_identity);location.assign(url.toString());}catch(error){message.textContent=error.message;button.disabled=false;}});
+</script>{% endif %}
+</main></body></html>
