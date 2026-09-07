@@ -31,21 +31,28 @@ from datetime import datetime, timedelta, timezone
 logger = logging.getLogger(__name__)
 
 DEFAULT_WINDOW_DAYS = 30
-DEFAULT_MIN_POSTS = 20
 
-# Per-platform collection depth, defaulting to DEFAULT_MIN_POSTS.
+# The hard cap on how many of a company's own posts/reels/videos this
+# pipeline will ever fetch or keep, per platform, per run -- 25, on explicit
+# user request (2026-09-07): "if I type a company's name, it should only
+# search/scrape the last 25 posts/reels/etc on all social media platforms."
 #
-# YouTube and Reddit are the two platforms here with a sanctioned, free API:
-# pulling 100 videos costs about 4 units of a 10,000/day quota, so there is
-# no reason to look at a 20-post slice of a channel when the whole recent
-# history is this cheap. Every other platform either bills per scrape
-# (Apify) or spends against a connected account's own daily lookup budget
-# (Unipile, ~100/day before automation flagging), so those stay at the
-# conservative default until their real cost is measured in production.
+# Governs BOTH ends of collection: it is passed as the actual request size to
+# every vendor (Apify's resultsLimit/maxItems/maxPosts, Unipile's max_posts,
+# the YouTube Data API's maxResults, Reddit's own-post limit), so nothing is
+# even scraped past this count, AND it is the ceiling _window_posts enforces
+# afterward as a backstop in case a vendor slightly overshoots what it was
+# asked for. Raising it in one place without the other would leave a vendor
+# scraping more than gets kept, or (more wastefully) paying to scrape posts
+# that only get discarded.
 #
-# Raising a platform here widens BOTH the collection call and the
-# _window_posts trim; raising one without the other silently does nothing.
-PLATFORM_MIN_POSTS = {"youtube": 100, "reddit": 100}
+# Supersedes what used to be a platform-specific 100-post FLOOR for YouTube
+# and Reddit (their free/cheap official APIs made pulling more harmless, so
+# there was no reason to settle for a 20-post slice of an active channel).
+# That reasoning no longer applies now that every platform is held to the
+# same explicit 25-post ceiling; a floor higher than the ceiling would be a
+# contradiction, not a bigger minimum.
+MAX_POSTS_PER_PLATFORM = 25
 
 LOW_ACTIVITY_THRESHOLD = 3
 MAX_VIDEO_FRAMES = 6
@@ -55,17 +62,22 @@ MAX_VIDEO_FRAMES = 6
 _USABLE_CONFIDENCE = {"high", "medium"}
 
 
-def min_posts_for(platform: str) -> int:
-    return PLATFORM_MIN_POSTS.get(platform, DEFAULT_MIN_POSTS)
-
-
 def _window_posts(posts: list[dict], days: int = DEFAULT_WINDOW_DAYS,
-                  min_count: int = DEFAULT_MIN_POSTS) -> list[dict]:
+                  min_count: int = MAX_POSTS_PER_PLATFORM,
+                  max_count: int = MAX_POSTS_PER_PLATFORM) -> list[dict]:
     """The spec's rule applied uniformly across platforms: keep the last
     `days` days of posts, or the most recent `min_count` posts, whichever is
-    MORE -- i.e. the union of both rules, not the intersection. Posts with no
-    parseable posted_at sort last and count toward the min_count floor only,
-    never the days window."""
+    MORE -- i.e. the union of both rules, not the intersection -- but never
+    more than `max_count`, the per-platform cap. Posts with no parseable
+    posted_at sort last and count toward the min_count floor only, never the
+    days window.
+
+    With min_count and max_count both defaulting to the same
+    MAX_POSTS_PER_PLATFORM, this settles to "the most recent 25 posts,
+    period" in the common case; the two are kept as separate parameters
+    rather than one, because a future caller may legitimately want a lower
+    floor (e.g. to shorten the report for a genuinely low-activity account)
+    without touching the ceiling every caller shares."""
     def _parsed_date(p):
         raw = p.get("posted_at")
         if not raw:
@@ -80,7 +92,7 @@ def _window_posts(posts: list[dict], days: int = DEFAULT_WINDOW_DAYS,
 
     cutoff = datetime.now(timezone.utc) - timedelta(days=days)
     within_window = sum(1 for _, d in dated if d and d >= cutoff)
-    keep = max(within_window, min_count)
+    keep = min(max(within_window, min_count), max_count)
     return [p for p, _ in dated[:keep]]
 
 
@@ -257,7 +269,7 @@ def run_platform_collection(run_id: int, platform: str, handle: str,
         sci_store.upsert_platform_run(run_id, platform, status="scrape_failed", status_detail=str(e)[:500])
         return
 
-    windowed = _window_posts(posts, min_count=min_posts_for(platform))
+    windowed = _window_posts(posts)
     written = sci_store.upsert_posts(run_id, platform, windowed)
 
     if not posts:
@@ -282,7 +294,7 @@ def _collect_via_apify(platform: str, handle: str) -> tuple[list[dict], str]:
     if not token:
         raise RuntimeError("APIFY_API_TOKEN is not configured on this deployment.")
     module = importlib.import_module(f"tracker.{_APIFY_COLLECTORS[platform]}")
-    return module.collect(handle, token, strict=True), "apify"
+    return module.collect(handle, token, max_posts=MAX_POSTS_PER_PLATFORM, strict=True), "apify"
 
 
 def _collect_linkedin(handle: str, company_name: str | None = None,
@@ -303,7 +315,8 @@ def _collect_linkedin(handle: str, company_name: str | None = None,
         from tracker import sci_source_linkedin_unipile
         try:
             posts, note = sci_source_linkedin_unipile.collect_with_page(
-                handle, strict=True, company_name=company_name, company_url=company_url)
+                handle, max_posts=MAX_POSTS_PER_PLATFORM, strict=True,
+                company_name=company_name, company_url=company_url)
             return posts, "unipile", note
         except sci_source_linkedin_unipile.CompanyMismatch:
             # Deliberately not caught by the fallback below. Every other
@@ -324,7 +337,8 @@ def _collect_linkedin(handle: str, company_name: str | None = None,
     token = os.environ.get("APIFY_API_TOKEN", "")
     if not token:
         raise RuntimeError("APIFY_API_TOKEN is not configured on this deployment.")
-    return sci_source_linkedin.collect(handle, token, strict=True), "apify", None
+    return sci_source_linkedin.collect(
+        handle, token, max_posts=MAX_POSTS_PER_PLATFORM, strict=True), "apify", None
 
 
 def _collect_instagram(handle: str) -> tuple[list[dict], str]:
@@ -337,7 +351,8 @@ def _collect_instagram(handle: str) -> tuple[list[dict], str]:
     if unipile_client.is_available("instagram"):
         from tracker import sci_source_instagram_unipile
         try:
-            return sci_source_instagram_unipile.collect(handle, strict=True), "unipile"
+            return sci_source_instagram_unipile.collect(
+                handle, max_posts=MAX_POSTS_PER_PLATFORM, strict=True), "unipile"
         except Exception as e:
             logger.warning("sci_pipeline: Unipile Instagram collection failed for %r, "
                            "falling back to Apify: %s", handle, e)
@@ -348,7 +363,8 @@ def _collect_instagram(handle: str) -> tuple[list[dict], str]:
             "Instagram collection is unavailable "
             "(no Unipile account connected and APIFY_API_TOKEN is not configured).")
     from tracker import sci_source_instagram
-    return sci_source_instagram.collect(handle, token, strict=True), "apify"
+    return sci_source_instagram.collect(
+        handle, token, max_posts=MAX_POSTS_PER_PLATFORM, strict=True), "apify"
 
 
 def _collect_youtube(handle: str) -> tuple[list[dict], str]:
@@ -368,7 +384,7 @@ def _collect_youtube(handle: str) -> tuple[list[dict], str]:
     # alongside tracker/sci_scraper_registry.py's fallback work if it proves
     # to matter in practice.
     posts = sci_youtube_client.list_recent_videos(channel_id, api_key,
-                                                   max_results=min_posts_for('youtube'), days=DEFAULT_WINDOW_DAYS)
+                                                   max_results=MAX_POSTS_PER_PLATFORM, days=DEFAULT_WINDOW_DAYS)
     return posts, "youtube_api"
 
 
@@ -390,7 +406,7 @@ def _collect_reddit(handle: str) -> tuple[list[dict], str]:
         username = username[2:]
     if not username:
         return [], "reddit_api"
-    return sci_reddit_client.list_user_posts(username, limit=min_posts_for("reddit")), "reddit_api"
+    return sci_reddit_client.list_user_posts(username, limit=MAX_POSTS_PER_PLATFORM), "reddit_api"
 
 
 def run_reddit_pulse(run_id: int, company_name: str, company_url: str | None) -> None:

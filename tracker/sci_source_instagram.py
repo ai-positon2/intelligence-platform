@@ -25,7 +25,7 @@ def actor_id() -> str:
     return os.environ.get("SCI_APIFY_INSTAGRAM_ACTOR_ID", DEFAULT_ACTOR_ID)
 
 
-def build_input(handle: str, max_posts: int = 20) -> dict:
+def build_input(handle: str, max_posts: int = 25) -> dict:
     return {
         "directUrls": [f"https://www.instagram.com/{handle.lstrip('@')}/"],
         "resultsType": "posts",
@@ -79,7 +79,7 @@ def normalize(raw_items: list[dict]) -> list[dict]:
     return out
 
 
-def collect(handle: str, token: str, max_posts: int = 40, strict: bool = True) -> list[dict]:
+def collect(handle: str, token: str, max_posts: int = 25, strict: bool = True) -> list[dict]:
     """Scrape + normalize in one call. With strict=True (the pipeline's
     default), a transport/actor failure raises apify_transport.
     ApifyTransportError -- distinct from a clean [] (the actor ran fine and

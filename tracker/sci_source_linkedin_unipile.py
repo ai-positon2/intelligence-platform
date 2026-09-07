@@ -281,7 +281,7 @@ def resolve_company_page(handle: str, account_id: str) -> dict:
     return company
 
 
-def collect_with_page(handle: str, max_posts: int = 40, strict: bool = True,
+def collect_with_page(handle: str, max_posts: int = 25, strict: bool = True,
                       company_name: str | None = None,
                       company_url: str | None = None) -> tuple[list[dict], dict | None]:
     """Posts, plus a note recording which LinkedIn page they came from and how
@@ -324,7 +324,7 @@ def collect_with_page(handle: str, max_posts: int = 40, strict: bool = True,
     return normalize(raw_items), note
 
 
-def collect(handle: str, max_posts: int = 40, strict: bool = True,
+def collect(handle: str, max_posts: int = 25, strict: bool = True,
             company_name: str | None = None, company_url: str | None = None) -> list[dict]:
     """Only ever called by sci_pipeline after it has confirmed a LinkedIn
     account is connected (see sci_pipeline._collect_linkedin). Posts only;
