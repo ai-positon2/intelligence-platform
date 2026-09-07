@@ -381,3 +381,53 @@ def test_every_committed_practice_has_an_identity_worth_displaying():
         assert loc["name"], f"nameless practice: {loc}"
         assert loc["state"], f"stateless practice: {loc['name']}"
         assert loc["office"], f"office-less practice: {loc['name']}"
+
+
+# ── How a date is written ──────────────────────────────────────────────────
+# Month first, "Sep 10". The dashboard shows dates in a dozen places (chart
+# axis and tooltips, the month rail, the day-filter chip and header, the
+# heatmap header, the location rows, the CSV header) and they all read from
+# these fields, so the format lives here and nowhere else.
+
+def test_a_date_is_written_month_first():
+    assert sc._dayfields("2026-09-10")["label"] == "Sep 10"
+
+
+def test_the_day_number_is_not_zero_padded():
+    """"Sep 7", not "Sep 07" -- the axis prints this under a weekday in a
+    narrow column, and a leading zero there reads as a typo."""
+    assert sc._dayfields("2026-09-07")["label"] == "Sep 7"
+    assert sc._dayfields("2026-09-07")["day"] == "7"
+
+
+def test_day_and_month_are_given_as_their_own_fields():
+    """The chart axis needs the day number alone and the month rail needs the
+    month alone. Both used to reach them by splitting the label on its space
+    and taking a fixed position, so flipping the label's order silently swapped
+    them: the axis printed "Sep" under every weekday and the month rail
+    printed day numbers. They are handed over separately for that reason.
+    """
+    f = sc._dayfields("2026-09-10")
+    assert (f["day"], f["month"]) == ("10", "Sep")
+
+
+def test_an_unparseable_date_degrades_to_itself_rather_than_raising():
+    for bad in ("", None, "not-a-date", "2026-13-45"):
+        f = sc._dayfields(bad)
+        assert f["label"] == (bad or "")
+        assert (f["day"], f["month"]) == ("", "")
+
+
+def test_every_date_row_in_a_real_dashboard_carries_the_three_fields():
+    """Both payload sites (`dates` and `by_date`) must carry all three, since
+    the front end reads day/month off whichever list it is rendering."""
+    snap = sc.load_snapshot()
+    if not snap["locations"]:
+        pytest.skip("no committed snapshot in this checkout")
+    d = sc.build_dashboard(snap)
+    rows = list(d["dates"]) + list(d["by_date"])
+    assert rows
+    for r in rows:
+        assert r["month"] == r["label"].split(" ")[0], r
+        assert r["day"] == r["label"].split(" ")[1], r
+        assert not r["day"].startswith("0"), r
