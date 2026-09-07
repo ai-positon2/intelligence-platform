@@ -437,11 +437,32 @@ def _gmail_api_send(subject: str, body: str, to_csv: str, reply_to: str, sender:
     svc.users().messages().send(userId="me", body={"raw": raw}).execute()
 
 
+_DEMO_NOTIFY_FALLBACK = ("krishna.ladha@position2.com, abhilash.dg@position2.com, "
+                         "sudheer.d@position2.com, sparikh@position2.com, "
+                         "pushpendra.k@position2.com, nikhil.ashok@position2.com")
+
+
+def _demo_notify_recipients() -> str:
+    """Comma-separated recipients for a 'Request access' notification.
+
+    This is a notification list, NOT access control -- being on it does not
+    grant anything, and it deliberately does not track ADMIN_EMAILS.
+
+    DEMO_NOTIFY_EMAIL overrides the fallback entirely when it is set on the
+    deployment, so adding someone to the literal above does not reach them on
+    an environment that sets that variable; /p2/admin/email-test reports the
+    list actually in effect. Resolved here rather than at each call site so
+    the real send and that diagnostic can never disagree about who is on the
+    list, which is exactly what two independent copies of one string invite.
+    """
+    return os.environ.get("DEMO_NOTIFY_EMAIL", "") or _DEMO_NOTIFY_FALLBACK
+
+
 def _demo_request_to_email(d: dict) -> bool:
     """Email a 'Request access' submission to the team. Returns True on success.
     Prefers the Gmail API (HTTPS) when GMAIL_SENDER is set (Railway blocks outbound
     SMTP); otherwise falls back to SMTP (SMTP_HOST/PORT/USER/PASS)."""
-    to = os.environ.get("DEMO_NOTIFY_EMAIL", "") or "krishna.ladha@position2.com, abhilash.dg@position2.com, sudheer.d@position2.com, sparikh@position2.com, pushpendra.k@position2.com"
+    to = _demo_notify_recipients()
     subject = "New Request access: %s (%s)" % (d.get("name", ""), d.get("company") or "no company")
     reply_to = d.get("email", "") if _EMAIL_RE.match(d.get("email", "")) else ""
     body = "\n".join([
@@ -7320,7 +7341,7 @@ def admin_email_test():
     user = os.environ.get("SMTP_USER", "")
     pwd  = os.environ.get("SMTP_PASS", "")
     port = os.environ.get("SMTP_PORT", "587")
-    to = os.environ.get("DEMO_NOTIFY_EMAIL", "") or "krishna.ladha@position2.com, abhilash.dg@position2.com, sudheer.d@position2.com, sparikh@position2.com, pushpendra.k@position2.com"
+    to = _demo_notify_recipients()
     gmail_sender = os.environ.get("GMAIL_SENDER", "")
     info = {"host": host or "(unset)", "port": port or "(unset)",
             "user": user or "(unset)", "pass_set": bool(pwd),
