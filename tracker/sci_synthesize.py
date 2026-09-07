@@ -1,8 +1,11 @@
 """Step 5 for Social Creative Intelligence Analyst: turn sci_classify's
 mechanical pattern data into the cited, readable report. One Claude call,
 given the per-platform pattern summary plus a compact digest of every
-analyzed post (what sci_vision actually saw, the post's own metrics and
-URL), so every claim it writes can point at real posts.
+analyzed post (each post's "vision" object carries BOTH Claude's and
+ChatGPT's independent reads, see _post_digest -- this is the merge point
+where the two vendors' opinions actually reach the written narrative, not
+just the word-cloud classification sci_classify.py already pools), so every
+claim it writes can point at real posts.
 
 Every claim carries post_ids: list[int] that must resolve to real
 sci_posts.id values from this run -- _parse()/_clean_claims() strip any id
@@ -27,13 +30,25 @@ _SYSTEM = (
     "organic social content, platform by platform and then across platforms. "
     "You are given, for each platform, a pattern summary (format mix, "
     "recurring visual/production themes, which posts got the most engagement) "
-    "and a digest of individual posts. Each post's \"what_was_seen\" is what "
-    "Claude vision actually saw -- not the caption -- and includes both "
-    "visual fields (subject, setting, people, product, style, on_screen_text: "
-    "grounded strictly in what's depicted) and messaging fields (messaging, "
-    "cta, tone, hook, format_technique, branding: grounded in the depicted "
-    "creative AND the post's real caption/description copy, since that's the "
-    "brand's own words, not a guess).\n\n"
+    "and a digest of individual posts. Each post's \"vision\" object carries "
+    "TWO INDEPENDENT reads of the same creative, from two different vision "
+    "models that never saw each other's answer: \"claude\" and \"chatgpt\". "
+    "Either may be null (that vendor was not run, or failed on this post) -- "
+    "when only one is present, treat it exactly as you would have treated a "
+    "single reading; when BOTH are present, they are your strongest evidence "
+    "for a claim, since two independent models landing on the same read is "
+    "meaningfully more reliable than either alone. If the two genuinely "
+    "disagree on something material (a different subject, a different tone, "
+    "a different read on the CTA), do not silently pick one -- either note "
+    "the disagreement in messaging_and_strategy when it is significant enough "
+    "to matter to the reader, or favor the reading multiple posts corroborate "
+    "over one that stands alone; never fabricate an artificial consensus. "
+    "Each vision reading includes both visual fields (subject, setting, "
+    "people, product, style, on_screen_text: grounded strictly in what's "
+    "depicted) and messaging fields (messaging, cta, tone, hook, "
+    "format_technique, branding: grounded in the depicted creative AND the "
+    "post's real caption/description copy, since that's the brand's own "
+    "words, not a guess).\n\n"
     "Write for someone skimming on a screen, not reading a print essay: "
     "SHORT, SCANNABLE BULLET POINTS, never a dense paragraph. For each "
     "platform with real activity, produce TWO distinct bulleted lists (do "
@@ -82,15 +97,25 @@ def _anthropic():
     return Anthropic(api_key=key, timeout=90.0, max_retries=1)
 
 
+def _clean_vision(analysis: dict | None) -> dict | None:
+    """None for a vendor that was never run, failed, or returned nothing
+    usable -- the model must never mistake an {"error": ...} dict for a real
+    reading, and null is unambiguous in a way an error string embedded in
+    the payload is not."""
+    return analysis if analysis and "error" not in analysis else None
+
+
 def _post_digest(post: dict) -> dict:
-    analysis = post.get("creative_analysis") or {}
     return {
         "id": post["id"],
         "platform": post.get("platform"),
         "post_type": post.get("post_type"),
         "post_url": post.get("post_url"),
         "metrics": post.get("metrics") or {},
-        "what_was_seen": analysis if analysis and "error" not in analysis else None,
+        "vision": {
+            "claude": _clean_vision(post.get("creative_analysis")),
+            "chatgpt": _clean_vision(post.get("creative_analysis_openai")),
+        },
     }
 
 
