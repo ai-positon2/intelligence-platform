@@ -98,7 +98,7 @@ def normalize(raw_items: list[dict]) -> list[dict]:
     return out
 
 
-def collect(handle: str, max_posts: int = 40, strict: bool = True) -> list[dict]:
+def collect(handle: str, max_posts: int = 25, strict: bool = True) -> list[dict]:
     """Only ever called by sci_pipeline after it has confirmed an Instagram
     account is connected (see sci_pipeline._collect_instagram). `handle` is
     the Instagram username, passed straight through as the identifier --

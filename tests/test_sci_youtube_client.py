@@ -59,6 +59,33 @@ def test_list_recent_videos_normalizes_snippet_and_stats(mock_get):
 
 
 @patch("tracker.sci_youtube_client.requests.get")
+def test_list_recent_videos_caps_an_active_channel_at_max_results(mock_get):
+    """Regression: the previous `kept[:max(max_results, len(kept))]` line was
+    a no-op (that slice can never be shorter than len(kept)), so a channel
+    posting more than max_results times inside the day window had every one
+    of those videos kept, uncapped -- exactly the case a very active YouTube
+    channel hits under the new shared 25-post cap. Also proves the kept
+    videos are the MOST RECENT ones, not an arbitrary subset."""
+    items = [
+        {"contentDetails": {"videoId": "v%02d" % i,
+                            "videoPublishedAt": "2026-08-%02dT00:00:00Z" % (i + 1)},
+         "snippet": {"title": "Video %d" % i, "publishedAt": "2026-08-%02dT00:00:00Z" % (i + 1)}}
+        for i in range(1, 31)  # 30 videos, all within the 30-day window
+    ]
+    mock_get.side_effect = [
+        _resp({"items": [{"contentDetails": {"relatedPlaylists": {"uploads": "UUxyz"}}}]}),
+        _resp({"items": items, "nextPageToken": None}),
+        _resp({"items": [{"id": it["contentDetails"]["videoId"], "statistics": {}} for it in items]}),
+    ]
+    out = yt.list_recent_videos("UC123", "key", max_results=25, days=30)
+    assert len(out) == 25, "an active channel was not capped to max_results"
+    # The newest video is 2026-08-30 (i=30); the 25 most recent are i=6..30.
+    kept_ids = {o["platform_post_id"] for o in out}
+    assert "v30" in kept_ids and "v06" in kept_ids
+    assert "v05" not in kept_ids, "an older video survived instead of a newer one"
+
+
+@patch("tracker.sci_youtube_client.requests.get")
 def test_list_recent_videos_folds_the_description_into_the_caption(mock_get):
     mock_get.side_effect = [
         _resp({"items": [{"contentDetails": {"relatedPlaylists": {"uploads": "UUxyz"}}}]}),

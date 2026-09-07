@@ -24,7 +24,7 @@ def actor_id() -> str | None:
     return os.environ.get("SCI_APIFY_LINKEDIN_ACTOR_ID") or None
 
 
-def build_input(handle: str, max_posts: int = 20) -> dict:
+def build_input(handle: str, max_posts: int = 25) -> dict:
     url = handle if handle.startswith("http") else f"https://www.linkedin.com/company/{handle.lstrip('@')}/posts/"
     return {
         "urls": [url],
@@ -76,7 +76,7 @@ def normalize(raw_items: list[dict]) -> list[dict]:
     return out
 
 
-def collect(handle: str, token: str, max_posts: int = 40, strict: bool = True) -> list[dict]:
+def collect(handle: str, token: str, max_posts: int = 25, strict: bool = True) -> list[dict]:
     """Only ever called by sci_pipeline after it has confirmed actor_id() is
     set -- see sci_pipeline._collect_linkedin. Assumes a real actor id."""
     raw_items = apify_transport.run_actor_and_wait(

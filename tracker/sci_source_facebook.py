@@ -24,7 +24,7 @@ def actor_id() -> str:
     return os.environ.get("SCI_APIFY_FACEBOOK_ACTOR_ID", DEFAULT_ACTOR_ID)
 
 
-def build_input(handle: str, max_posts: int = 20) -> dict:
+def build_input(handle: str, max_posts: int = 25) -> dict:
     url = handle if handle.startswith("http") else f"https://www.facebook.com/{handle.lstrip('@')}/"
     return {
         "startUrls": [{"url": url}],
@@ -87,7 +87,7 @@ def normalize(raw_items: list[dict]) -> list[dict]:
     return out
 
 
-def collect(handle: str, token: str, max_posts: int = 40, strict: bool = True) -> list[dict]:
+def collect(handle: str, token: str, max_posts: int = 25, strict: bool = True) -> list[dict]:
     """Scrape + normalize in one call. strict=True (the pipeline's default)
     raises apify_transport.ApifyTransportError on a transport/actor failure,
     distinct from a clean [] (the page really has no organic posts)."""
