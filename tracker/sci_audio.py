@@ -58,11 +58,17 @@ def extract_audio(video_url: str) -> bytes | None:
 
 
 def _openai():
+    """Explicit timeout/max_retries for the same reason tracker/sci_vision.py's
+    _anthropic() sets them: with no timeout the SDK default is a 600s read
+    timeout with 2 retries, and this call runs on the same thread as Claude's
+    own bounded (60s) vision pass in sci_pipeline._run_claude_creative_analysis,
+    so an unbounded Whisper call would silently become that thread's long
+    pole instead of Claude's own vision call."""
     key = os.environ.get("OPENAI_API_KEY", "")
     if not key:
         return None
     from openai import OpenAI
-    return OpenAI(api_key=key)
+    return OpenAI(api_key=key, timeout=60.0, max_retries=1)
 
 
 def transcribe(audio_bytes: bytes) -> str | None:
