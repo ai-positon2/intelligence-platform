@@ -652,6 +652,10 @@ def harvest_page(page: dict, event_name: str, event_host: str = "",
     if fetched["status"] != SOURCE_OK:
         return {"source": source, "rows": []}
 
+    from .event_intel_access import discover
+    from .event_intel_fit import agenda_evidence
+    source["access_links"] = discover(fetched["text"], here, event_host)
+    source["agenda_excerpts"] = agenda_evidence(fetched["text"], here, event_host, kind)
     source["snapshots"] = []
     source["extraction"] = []
     from .event_intel_evidence import roster_years, source_snapshot
@@ -665,7 +669,13 @@ def harvest_page(page: dict, event_name: str, event_host: str = "",
         source['snapshots'] = [source_snapshot(here,fetched['text'])]
         source['coverage'] = {'complete': False, 'edition_mismatch': True}
         return {'source':source,'rows':[]}
-    ext = extract_participants(fetched["text"], here, kind, event_name, event_host)
+    from .event_intel_cache import extract as cached_extract
+    def read(fetched_page, page_url):
+        # Truncated pages never populate or consume the reusable extraction.
+        identity = page.get('cache_identity') if not fetched_page.get('truncated') else None
+        return cached_extract(fetched_page['text'], page_url, kind, event_name,
+                              event_host, identity, _SYSTEM, extract_participants)
+    ext = read(fetched, here)
     source["snapshots"].append(ext.get("snapshot", {}))
     source["extraction"].append(ext.get("coverage", {}))
     source["truncated"] = bool(fetched.get("truncated"))
@@ -676,6 +686,8 @@ def harvest_page(page: dict, event_name: str, event_host: str = "",
         return {"source": source, "rows": []}
 
     rows = list(ext["rows"])
+    for row in rows:
+        row.setdefault('evidence', {}).update(observed_roster_years=observed_years)
     notes = [n for n in (fetched["note"], ext.get("note")) if n]
     source["pages_read"] = 1
 
@@ -706,7 +718,9 @@ def harvest_page(page: dict, event_name: str, event_host: str = "",
             stopped = 'A later roster page names a different edition; its rows were withheld.'
             source['snapshots'].append(source_snapshot(nxt,got['text'],observed_roster_years=page_years))
             break
-        sub = extract_participants(got["text"], nxt, kind, event_name, event_host)
+        source["access_links"].extend(discover(got["text"], nxt, event_host))
+        source["agenda_excerpts"].extend(agenda_evidence(got["text"], nxt, event_host, kind))
+        sub = read(got, nxt)
         source["snapshots"].append(sub.get("snapshot", {}))
         source["extraction"].append(sub.get("coverage", {}))
         source["truncated"] = source["truncated"] or bool(got.get("truncated"))
@@ -717,6 +731,8 @@ def harvest_page(page: dict, event_name: str, event_host: str = "",
                        "page was fetched but could not be read."
                        % (source["pages_read"] + 1, source["pages_seen"]))
             break
+        for row in sub['rows']:
+            row.setdefault('evidence', {}).update(observed_roster_years=page_years)
         rows.extend(sub["rows"])
         source["pages_read"] += 1
         for extra in next_page_links(got["text"], nxt, limit=max_pages):
@@ -759,7 +775,7 @@ def harvest_page(page: dict, event_name: str, event_host: str = "",
             continue
         seen_rows.add(key)
         r.setdefault("provenance", VIA_PAGE)
-        r.setdefault("evidence", {}).update(expected_edition=expected_year or None, observed_roster_years=observed_years)
+        r.setdefault("evidence", {}).update(expected_edition=expected_year or None)
         deduped.append(r)
     if len(deduped) < len(rows):
         notes.append("%d duplicate rows across pages were merged."
