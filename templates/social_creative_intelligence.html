@@ -452,7 +452,7 @@
       var html = '';
       if(error){
         html += '<div class="sci-suggest-error">' +
-          '<div class="sci-suggest-error-msg">' + esc(error.message || 'Company search is unavailable right now — you can still fill this in manually.') + '</div>' +
+          '<div class="sci-suggest-error-msg">' + esc(error.message || 'Company search is unavailable right now. You can still fill this in manually.') + '</div>' +
           (error.detail ? '<pre class="sci-suggest-error-detail">' + esc(error.detail) + '</pre>' : '') +
           sciAdminDiagControl() + '</div>';
       }
@@ -460,7 +460,7 @@
         if(error) html += '<div class="sci-suggest-fallback-note">Companies you have analyzed before are shown below.</div>';
         html += '<div class="sci-suggest-list">' + companies.map(sciSuggestRow).join('') + '</div>';
       } else if(!error){
-        html += '<div class="sci-suggest-empty">No matches for "' + esc(q || '') + '" — you can still type the exact name and analyze it directly.</div>';
+        html += '<div class="sci-suggest-empty">No matches for "' + esc(q || '') + '". You can still type the exact name and analyze it directly.</div>';
       }
       panel.innerHTML = html;
       panel.style.display = 'block';
@@ -527,10 +527,22 @@
       );
       grid.innerHTML = order.map(function(name){
         var p = byName[name], meta = platformMeta(name);
-        return '<div class="pf-chip" data-status="' + esc(p.status) + '" data-platform="' + esc(name) + '">' +
+        // Collection finishing (status 'ok'/'low_activity') is not the same
+        // as this platform being done: run_platform_creative_analysis runs
+        // right after, one post at a time through two vendor vision calls
+        // each, and used to leave the chip reading 'ok' for the rest of that
+        // wait with nothing to show it was still working -- exactly the
+        // ambiguity behind "is it failing somewhere?" on a long run.
+        // analyzed_at (set only once that step actually finishes) is what
+        // tells the two apart; data-status="analyzing" already had its own
+        // pulsing style in this page's CSS, unused until now.
+        var stillAnalyzing = (p.status === 'ok' || p.status === 'low_activity') && !p.analyzed_at;
+        var displayStatus = stillAnalyzing ? 'analyzing' : p.status;
+        var statusText = stillAnalyzing ? 'analyzing creatives' : (p.status || '').replace(/_/g, ' ');
+        return '<div class="pf-chip" data-status="' + esc(displayStatus) + '" data-platform="' + esc(name) + '">' +
           '<div class="pf-chip-ic">' + meta.icon + '</div>' +
           '<div class="pf-chip-txt"><span class="pf-name">' + esc(platformLabel(name)) + '</span>' +
-          '<span class="pf-status">' + esc((p.status || '').replace(/_/g, ' ')) + '</span></div>' +
+          '<span class="pf-status">' + esc(statusText) + '</span></div>' +
           (p.post_count ? '<span class="pf-count">' + p.post_count + '</span>' : '') +
           '</div>';
       }).join('');
@@ -2915,8 +2927,8 @@
       {t:'Hub',d:'Platform home',u:'/p2/hub',i:'⌂'},
       {t:'B2B Agents',d:'Go-to-market intelligence',u:'/p2/b2b-agents',i:'◎'},
       {t:'SEO Tools',d:'Organic intelligence',u:'/p2/seo',i:'⌕'},
-      {t:'ABM Signal Tracker — Healthcare',d:'Company signals & insights',u:'/p2/abm-signal-tracker/healthcare',i:'☆'},
-      {t:'ABM Signal Tracker — CSG',d:'Company signals & insights',u:'/p2/abm-signal-tracker/csg',i:'☆'},
+      {t:'ABM Signal Tracker: Healthcare',d:'Company signals & insights',u:'/p2/abm-signal-tracker/healthcare',i:'☆'},
+      {t:'ABM Signal Tracker: CSG',d:'Company signals & insights',u:'/p2/abm-signal-tracker/csg',i:'☆'},
       {t:'LinkedIn Intelligence',d:'People, companies & posts',u:'/p2/b2b-agents/linkedin-intelligence',i:'⦿'},
       {t:'Ad Intelligence',d:'Competitor ad monitoring',u:'/p2/b2b-agents/ad-intelligence',i:'◈'},
       {t:'Contact Finder',d:'Apollo-powered search & chat',u:'/p2/b2b-agents/company-people-intelligence',i:'⌕'},
@@ -2959,7 +2971,7 @@
     var cur=[],sel=0;
     function esc2(s){return String(s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
     function render(){
-      if(!cur.length){list.innerHTML='<div class="kpal-empty">No matches — try fewer letters</div>';return;}
+      if(!cur.length){list.innerHTML='<div class="kpal-empty">No matches, try fewer letters</div>';return;}
       list.innerHTML=cur.map(function(x,i){
         return '<div class="kpal-it'+(i===sel?' sel':'')+'" data-i="'+i+'"><span class="ki">'+x.i+'</span><span style="min-width:0"><div class="kt">'+esc2(x.t)+'</div><div class="kd">'+esc2(x.d||'')+'</div></span></div>';
       }).join('');
