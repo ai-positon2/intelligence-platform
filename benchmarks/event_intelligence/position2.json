@@ -1,0 +1,77 @@
+{
+  "benchmark_version": 1,
+  "as_of": "2026-09-06",
+  "client": "Position2",
+  "profile": {
+    "client_name": "Position2",
+    "website": "https://www.position2.com/",
+    "classification": "b2b_to_marketing",
+    "selected_product": "B2B demand generation and growth marketing services",
+    "what_they_sell": "Growth marketing services spanning paid marketing, SEO, creative and marketing automation",
+    "buyer_roles": "CMO, VP Marketing, Head of Growth, Head of Demand Generation",
+    "verticals": "B2B SaaS and technology",
+    "firmographics": "B2B companies with a marketing team; company-size and revenue limits not established",
+    "geo_scope": "USA only",
+    "window_months": 12,
+    "max_events": 15
+  },
+  "profile_sources": [
+    "https://www.position2.com/",
+    "https://www.position2.com/paid-marketing",
+    "https://www.position2.com/saas",
+    "https://www.position2.com/marketing-automation/"
+  ],
+  "scenario_assumptions": [
+    "The user selected Position2. The specific offer, buyer-role focus, SaaS segment, US geography and twelve-month window are benchmark assumptions, not approved commercial strategy.",
+    "Service descriptions are grounded in Position2's public pages. No revenue, headcount, deal-size or customer relationship is inferred."
+  ],
+  "reference_complete": false,
+  "reference_status": "Organizer-sourced starter cases; human relevance adjudication and broader coverage pending",
+  "reference_events": [
+    {
+      "name": "MarketingProfs B2B Forum",
+      "aliases": ["MarketingProfs B2B Forum 2026", "B2B Forum 2026"],
+      "starts_on": "2026-11-02",
+      "ends_on": "2026-11-04",
+      "city": "Boston",
+      "country": "USA",
+      "source": "https://mpb2b.marketingprofs.com/2026-registration/",
+      "independent_relevance": null,
+      "fact_note": "November 2–3 main conference, November 4 workshops."
+    },
+    {
+      "name": "Forrester B2B Summit North America",
+      "aliases": ["B2B Summit North America", "Forrester B2B Summit North America 2027"],
+      "starts_on": "2027-05-02",
+      "ends_on": "2027-05-04",
+      "city": "Phoenix",
+      "country": "USA",
+      "source": "https://www.forrester.com/event/b2b-summit-north-america/",
+      "independent_relevance": null,
+      "fact_note": "The 2027 event page and agenda identify May 2–4. The sponsor page separately thanks 2026 sponsors; those are not evidence of 2027 participation.",
+      "historical_roster_source": "https://www.forrester.com/event/b2b-summit-north-america/sponsors/",
+      "historical_roster_year": "2026"
+    },
+    {
+      "name": "UNBOUND",
+      "aliases": ["UNBOUND 2026", "INBOUND", "INBOUND 2026"],
+      "starts_on": "2026-09-16",
+      "ends_on": "2026-09-18",
+      "city": "Boston",
+      "country": "USA",
+      "source": "https://unbound.hubspot.com/?q=%2F",
+      "independent_relevance": null,
+      "registration_status": "sold_out",
+      "fact_note": "Organizer states INBOUND is now UNBOUND and the 2026 edition is sold out. A recommendation must identify the access limitation; an unannounced 2027 date must not be invented."
+    }
+  ],
+  "release_targets": {
+    "top_five_expert_precision": 0.8,
+    "critical_fact_accuracy": 0.95,
+    "known_wrong_editions": 0,
+    "unsupported_personal_claims": 0,
+    "overall_reference_recall": 0.8,
+    "max_run_cost_usd": null,
+    "max_latency_seconds": null
+  }
+}

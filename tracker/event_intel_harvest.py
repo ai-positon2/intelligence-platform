@@ -32,6 +32,7 @@ from html.parser import HTMLParser
 from urllib.parse import urljoin, urlparse
 
 import requests
+from .event_intel_http import public_get
 
 from . import claude_websearch
 from .event_intel_store import (SOURCE_BLOCKED, SOURCE_ERROR, SOURCE_NOT_FOUND,
@@ -45,7 +46,7 @@ _TIMEOUT = 20
 _MAX_BYTES = 3_000_000
 # What we hand the model. Past this, the page is truncated and the source row
 # says so, because a silently clipped exhibitor list undercounts an event.
-_MAX_CHARS = 55_000
+_MAX_CHARS = 240_000
 # Below this much readable text, the page almost certainly rendered its list
 # client-side. Reported as blocked, never as "this event has no exhibitors".
 _MIN_USEFUL_CHARS = 400
@@ -186,7 +187,7 @@ def fetch_page(url: str) -> dict:
            "http_status": None, "text": "", "note": "", "truncated": False,
            "spa": None, "redirected": False}
     try:
-        r = requests.get(url, timeout=_TIMEOUT, stream=True, headers={
+        r = public_get(url, timeout=_TIMEOUT, stream=True, headers={
             "User-Agent": _UA,
             "Accept": "text/html,application/xhtml+xml",
             "Accept-Language": "en-US,en;q=0.9",
@@ -539,7 +540,7 @@ def clean_domain(value: str | None, event_host: str = "") -> str | None:
     return v
 
 
-def extract_participants(page_text: str, page_url: str, page_kind: str,
+def _extract_chunk(page_text: str, page_url: str, page_kind: str,
                          event_name: str, event_host: str = "") -> dict:
     """One Claude call turning a fetched page into participant rows.
 
@@ -557,7 +558,7 @@ def extract_participants(page_text: str, page_url: str, page_kind: str,
 
     res = claude_websearch.ask(_SYSTEM, user, max_uses=0, max_tokens=8000, timeout=180.0)
     if res.get("error"):
-        return {"rows": [], "note": "", "error": res["error"]}
+        return {"rows": [], "note": "", "error": res["error"], "spend": claude_websearch.spend_of(res)}
 
     parsed = claude_websearch.extract_json(res.get("text") or "", require="rows")
     if not isinstance(parsed, dict):
@@ -586,7 +587,37 @@ def extract_participants(page_text: str, page_url: str, page_kind: str,
     # The model's own written note; the roster row fields above it are facts
     # copied off the page and are left exactly as published.
     note = claude_websearch.strip_em_dash(str(parsed.get("note") or ""))[:400]
-    return {"rows": rows, "note": note, "error": None}
+    return {"rows": rows, "note": note, "error": None, "spend": claude_websearch.spend_of(res)}
+
+
+def extract_participants(page_text, page_url, page_kind, event_name, event_host=""):
+    from .event_intel_evidence import chunks, supported_rows, source_snapshot, text_hash
+    pieces = list(chunks(page_text))
+    rows, rejected, errors, spend, notes = [], [], [], [], []
+    for index, piece in enumerate(pieces):
+        result = _extract_chunk(piece, page_url, page_kind, event_name, event_host)
+        spend.append(result.get('spend'))
+        if result.get('error'):
+            errors.append(dict(result['error'], chunk=index))
+            continue
+        accepted, refused = supported_rows(result['rows'], piece, page_kind)
+        rows.extend(accepted)
+        rejected.extend(refused)
+        if result.get('note'):
+            notes.append(result['note'])
+    if rejected:
+        notes.append('%d proposed rows lacked literal organization/role support and were withheld.' % len(rejected))
+    if errors:
+        notes.append('%d of %d extraction chunks failed; the roster is incomplete.' % (len(errors), len(pieces)))
+    return {'rows': rows, 'note': ' '.join(notes),
+            'error': errors[0] if pieces and len(errors) == len(pieces) else None,
+            'spend': claude_websearch.spend_sum(*spend),
+            'coverage': {'chunks_total': len(pieces), 'chunks_read': len(pieces)-len(errors),
+                         'chunker_version': 1,
+                         'chunks': [{'index':i,'text_sha256':text_hash(piece),'characters':len(piece)} for i,piece in enumerate(pieces)],
+                         'rejected_rows': len(rejected), 'errors': errors,
+                         'complete': False, 'scope': 'readable text only; public directory completeness unverified'},
+            'snapshot': source_snapshot(page_url, page_text)}
 
 
 def harvest_page(page: dict, event_name: str, event_host: str = "",
@@ -621,7 +652,23 @@ def harvest_page(page: dict, event_name: str, event_host: str = "",
     if fetched["status"] != SOURCE_OK:
         return {"source": source, "rows": []}
 
+    source["snapshots"] = []
+    source["extraction"] = []
+    from .event_intel_evidence import roster_years, source_snapshot
+    expected_year = str(page.get('edition') or '')[:4]
+    observed_years = roster_years(fetched['text'])
+    source['expected_edition'] = expected_year or None
+    source['observed_roster_years'] = observed_years
+    if expected_year.isdigit() and observed_years and observed_years != [expected_year]:
+        source['status'] = SOURCE_BLOCKED
+        source['note'] = 'The roster names edition(s) %s; the requested edition is %s. Rows were withheld until edition ownership is verified.' % (', '.join(observed_years),expected_year)
+        source['snapshots'] = [source_snapshot(here,fetched['text'])]
+        source['coverage'] = {'complete': False, 'edition_mismatch': True}
+        return {'source':source,'rows':[]}
     ext = extract_participants(fetched["text"], here, kind, event_name, event_host)
+    source["snapshots"].append(ext.get("snapshot", {}))
+    source["extraction"].append(ext.get("coverage", {}))
+    source["truncated"] = bool(fetched.get("truncated"))
     if ext.get("error"):
         source["status"] = SOURCE_ERROR
         source["note"] = ("The page was fetched but could not be read: %s"
@@ -654,7 +701,17 @@ def harvest_page(page: dict, event_name: str, event_host: str = "",
             break
         nxt = got.get("final_url") or nxt
         seen_urls.add(nxt)
+        page_years = roster_years(got['text'])
+        if expected_year.isdigit() and page_years and page_years != [expected_year]:
+            stopped = 'A later roster page names a different edition; its rows were withheld.'
+            source['snapshots'].append(source_snapshot(nxt,got['text'],observed_roster_years=page_years))
+            break
         sub = extract_participants(got["text"], nxt, kind, event_name, event_host)
+        source["snapshots"].append(sub.get("snapshot", {}))
+        source["extraction"].append(sub.get("coverage", {}))
+        source["truncated"] = source["truncated"] or bool(got.get("truncated"))
+        if sub.get("note"):
+            notes.append(sub["note"])
         if sub.get("error"):
             stopped = ("Stopped following this listing at page %d of %d: the "
                        "page was fetched but could not be read."
@@ -702,6 +759,7 @@ def harvest_page(page: dict, event_name: str, event_host: str = "",
             continue
         seen_rows.add(key)
         r.setdefault("provenance", VIA_PAGE)
+        r.setdefault("evidence", {}).update(expected_edition=expected_year or None, observed_roster_years=observed_years)
         deduped.append(r)
     if len(deduped) < len(rows):
         notes.append("%d duplicate rows across pages were merged."
@@ -716,5 +774,9 @@ def harvest_page(page: dict, event_name: str, event_host: str = "",
                      "its list is built in the browser and a plain fetch cannot "
                      "see it. This is not evidence the event has no %s."
                      % (source["spa"], kind if kind != "unknown" else "participants"))
+    source["coverage"] = {"complete": False, "scope": "published pages only",
+        "pages_read": source["pages_read"], "pages_seen": source["pages_seen"],
+        "pages_declared": declared, "truncated": source["truncated"],
+        "pagination_incomplete": bool(stopped or queue or (declared and source["pages_read"] < declared))}
     source["note"] = " ".join(notes)[:800]
     return {"source": source, "rows": deduped}
