@@ -230,7 +230,7 @@ def build_dashboard(snap: dict) -> dict:
     return {
         "generated_at": snap.get("generated_at", ""),
         "source": snap.get("source", {}),
-        "dates": [{"date": d, "weekday": _weekday(d), "label": _daylabel(d)} for d in dates],
+        "dates": [{"date": d, "weekday": _weekday(d), **_dayfields(d)} for d in dates],
         "practices": practices,
         "totals": _totals(practices, dates),
         "by_state": _by_state(practices),
@@ -317,12 +317,31 @@ def _weekday(iso: str) -> str:
         return ""
 
 
-def _daylabel(iso: str) -> str:
+def _dayfields(iso: str) -> dict:
+    """The date fields every dashboard row carries: `label` for display, plus
+    `day` and `month` on their own.
+
+    label is month-first ("Sep 10"), which is this dashboard's format
+    everywhere a date is shown, including the JS-side fmtDay() that formats
+    the window and freshness stamps.
+
+    day/month are handed over as their own fields because the chart needs the
+    halves separately: the x-axis prints the day number under each weekday,
+    and the month rail underneath prints a marker only where the month
+    changes. Both used to reach them by splitting `label` on its space and
+    taking a fixed position, which silently swapped the two the moment the
+    label's order changed -- so they are given, not parsed.
+
+    Built with d.day rather than strftime("%-d") because the no-pad flag is a
+    glibc extension: it is not portable, and on a platform without it this
+    raises instead of formatting.
+    """
     try:
         d = datetime.date.fromisoformat(iso)
     except (ValueError, TypeError):
-        return iso or ""
-    return d.strftime("%-d %b") if hasattr(d, "strftime") else iso
+        return {"label": iso or "", "day": "", "month": ""}
+    month = d.strftime("%b")
+    return {"label": "%s %d" % (month, d.day), "day": str(d.day), "month": month}
 
 
 def _totals(practices: list, dates: list) -> dict:
@@ -396,7 +415,7 @@ def _by_date(practices: list, dates: list) -> list:
         out.append({
             "date": d,
             "weekday": _weekday(d),
-            "label": _daylabel(d),
+            **_dayfields(d),
             "slots": slots,
             "practices_open": sum(1 for p in practices if p["counts"][i] > 0),
             "weekend": _weekday(d) in ("Sat", "Sun"),

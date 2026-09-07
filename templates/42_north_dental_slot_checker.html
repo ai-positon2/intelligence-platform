@@ -323,7 +323,10 @@
       var p=String(iso).slice(0,10).split('-');
       if(p.length!==3) return iso;
       var M=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-      return parseInt(p[2],10)+' '+M[parseInt(p[1],10)-1];
+      /* Month first ("Sep 10"), matching slot_checker._dayfields' own label
+         so the window/freshness stamps read the same way as every date the
+         server sends. */
+      return M[parseInt(p[1],10)-1]+' '+parseInt(p[2],10);
     }
     function fmtStamp(iso){ return fmtDay(iso)+(String(iso).length>10?', '+String(iso).slice(11,16):''); }
 
@@ -462,7 +465,11 @@
       var prevMon=null, cols='', months='';
       d.forEach(function(x,i){
         var h=x.slots>0?Math.max(3,Math.round(x.slots/niceMax*BAR)):1;
-        var parts=String(x.label||'').split(' '), dayNum=parts[0]||'', mon=parts[1]||'';
+        /* day/month come as their own fields (slot_checker._dayfields); the
+           axis and this month rail must never re-derive them by splitting
+           the display label, which silently swapped them when the label
+           order changed. */
+        var dayNum=x.day||'', mon=x.month||'';
         months+='<span class="gd-mo">'+(mon!==prevMon?esc(mon):'')+'</span>';
         prevMon=mon;
         cols+='<div class="gd-col'+(x.weekend?' weekend':'')+(i===peakIdx&&x.slots>0?' is-peak':'')+'" data-i="'+i+'">'+
@@ -904,7 +911,7 @@
       var h='<table class="gd-heat"><thead><tr><th class="rowhead">Location</th>';
       dates.forEach(function(d){
         var wknd=(d.weekday==='Sat'||d.weekday==='Sun');
-        h+='<th class="'+(wknd?'wk':'')+'">'+esc(d.weekday)+'<br>'+esc(d.label.split(' ')[0])+'</th>';
+        h+='<th class="'+(wknd?'wk':'')+'">'+esc(d.weekday)+'<br>'+esc(d.day||'')+'</th>';
       });
       h+='<th class="gd-heat-total-h">Total</th></tr></thead><tbody>';
       rows.forEach(function(p){
@@ -1053,7 +1060,7 @@
       h+='<div class="gd-drw-sec"><div class="gd-drw-sec-t">Day by day</div><div class="gd-drw-dbd" id="drwDbd">';
       dates.forEach(function(d,i){
         var wknd=(d.weekday==='Sat'||d.weekday==='Sun');
-        var dayNum=String(d.label||'').split(' ')[0]||'';
+        var dayNum=d.day||'';
         h+='<div class="gd-dbd-col'+(wknd?' wk':'')+'" data-i="'+i+'">'+
            '<div class="gd-cell '+ramp(p.counts[i])+'"></div>'+
            '<div class="gd-dbd-lbl"><b>'+esc(d.weekday.slice(0,1))+'</b><i>'+esc(dayNum)+'</i></div></div>';

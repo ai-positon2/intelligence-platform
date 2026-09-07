@@ -74,7 +74,11 @@ CEDAR = {
     "services": [{"name": "Cleaning", "counts": [7, 7, 0, 7, 7], "total": 28}],
 }
 
-DATES = [{"date": "2026-08-1%d" % i, "weekday": w, "label": "1%d Aug" % i}
+# Shaped exactly as slot_checker._dayfields sends it: a month-first display
+# label, plus day/month as their own fields (the chart reads those two rather
+# than splitting the label).
+DATES = [{"date": "2026-08-1%d" % i, "weekday": w,
+          "label": "Aug 1%d" % i, "day": "1%d" % i, "month": "Aug"}
          for i, w in enumerate(["Wed", "Thu", "Fri", "Sat", "Sun"])]
 
 DASHBOARD = {
@@ -232,7 +236,7 @@ def test_the_header_says_which_day_the_numbers_are_for(run):
     """A column of day numbers under a header reading "Open slots" is the same
     lie as printing the totals, just moved one row up."""
     head = re.search(r"<thead>(.*?)</thead>", run["filtered"]["table"], re.S).group(1)
-    assert "Slots Fri 12 Aug" in re.sub(r"<[^>]+>", " ", head), head
+    assert "Slots Fri Aug 12" in re.sub(r"<[^>]+>", " ", head), head
     assert "Share of total" in head
 
 
@@ -241,7 +245,7 @@ def test_the_slot_total_beside_the_row_count_is_the_days_total(run):
     narrowed to one day made one number mean two things."""
     txt = run["filtered"]["count"]
     assert "65 slots" in txt, txt
-    assert "on Fri 12 Aug" in txt, txt
+    assert "on Fri Aug 12" in txt, txt
     assert "469" not in txt
 
 
