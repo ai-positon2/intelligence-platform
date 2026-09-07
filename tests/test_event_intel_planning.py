@@ -206,3 +206,26 @@ def test_topics_persist_and_render_only_selected_event_evidence(fixture):
     assert page.status_code == 200
     assert '&lt;script&gt;' in page.get_data(as_text=True)
     assert '<script>alert(1)</script>' not in page.get_data(as_text=True)
+
+
+@SQL
+def test_access_checks_show_failures_and_escape_quoted_terms(fixture):
+    email, profile, other, rid, identity, run = fixture
+    target=S.save_event(rid,{'name':'Access Forum','starts_on':'2027-06-01','website':'https://forum.example'})
+    from tracker.event_intel_identity import event_key
+    row=next(e for e in S.get_events(rid) if e['id']==target)
+    for status in ('ok','blocked'):
+        check={'url':'https://forum.example/register','kind':'registration','status':status,
+               'note':'Fixture read','claims':[{'field':'price','text':'USD 99 <script>alert(1)</script>'}] if status=='ok' else []}
+        S.save_source(rid,target,check['url'],'access_review',status,metadata={'access_review':check})
+    saved=P.save(rid,email,payload(profile_id=profile,event_identity=event_key(row)))
+    assert len(saved['access_checks'])==2
+    assert P.context(rid,email,profile,identity)['access_checks']==[]
+    import app as appmod
+    http=appmod.app.test_client()
+    with http.session_transaction() as session:
+        session['google_user']={'email':email}
+    html=http.get('/p2/b2b-agents/event-conference-intelligence/runs/'+str(rid)+'/plan',
+                  query_string={'profile_id':profile,'event_identity':event_key(row)}).get_data(as_text=True)
+    assert '&lt;script&gt;' in html and 'Registration · blocked' in html
+    assert '<script>alert(1)</script>' not in html
