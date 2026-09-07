@@ -80,3 +80,14 @@ def test_transcribe_video_chains_extract_and_transcribe(monkeypatch):
     monkeypatch.setattr(sci_audio, "extract_audio", lambda url: b"audio bytes")
     monkeypatch.setattr(sci_audio, "transcribe", lambda audio: "transcribed text")
     assert sci_audio.transcribe_video("https://cdn/v.mp4") == "transcribed text"
+
+
+def test_openai_client_has_an_explicit_bounded_timeout(monkeypatch):
+    # Regression guard: with no timeout set, the SDK default is a 600s read
+    # timeout with 2 retries, so one slow Whisper call could run for the
+    # better part of an hour on the same thread as Claude's own 60s-bounded
+    # vision call in sci_pipeline._run_claude_creative_analysis.
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    client = sci_audio._openai()
+    assert client.timeout == 60.0
+    assert client.max_retries == 1
