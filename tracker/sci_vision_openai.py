@@ -46,12 +46,18 @@ DEFAULT_MODEL = "gpt-4o-mini"
 
 def _openai():
     """A configured OpenAI client, or None when this environment has no key.
-    Mirrors tracker/sci_audio.py's _openai()."""
+    timeout/max_retries mirror tracker/sci_vision.py's _anthropic() -- without
+    an explicit timeout the SDK default is a 600s read timeout with 2
+    retries, so one slow call could run for the better part of an hour. That
+    would matter for any OpenAI client, but especially for this one: run_
+    platform_creative_analysis runs this vendor's call concurrently with
+    Claude's own (bounded to 60s) and waits on both, so an unbounded ChatGPT
+    call becomes the run's long pole instead of a red herring next to it."""
     key = os.environ.get("OPENAI_API_KEY", "")
     if not key:
         return None
     from openai import OpenAI
-    return OpenAI(api_key=key)
+    return OpenAI(api_key=key, timeout=60.0, max_retries=1)
 
 
 def _model() -> str:

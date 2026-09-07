@@ -255,3 +255,16 @@ def test_summarize_frames_is_reused_from_sci_vision_not_reimplemented():
     since folding several frame analyses into one video-level result has no
     vendor-specific logic to duplicate."""
     assert not hasattr(sci_vision_openai, "summarize_frames")
+
+
+def test_openai_client_has_an_explicit_bounded_timeout(monkeypatch):
+    # Regression guard: with no timeout set, the SDK default is a 600s read
+    # timeout with 2 retries, so one slow/hanging vision call could run for
+    # the better part of an hour. run_platform_creative_analysis runs this
+    # vendor concurrently with Claude's own call (bounded to 60s in
+    # sci_vision._anthropic()) and waits on both, so an unbounded ChatGPT
+    # call would silently become the run's long pole.
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    client = sci_vision_openai._openai()
+    assert client.timeout == 60.0
+    assert client.max_retries == 1

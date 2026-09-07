@@ -675,8 +675,13 @@
       }
       return posts;
     }
-    function postThemeWords(post){
-      var a = post.creative_analysis;
+    // Pooled across BOTH vendors' independent reads of a post, same rule as
+    // tracker/sci_classify.py's _post_keywords/_analysis_keywords: a theme
+    // both Claude and ChatGPT land on earns two votes, not one, since
+    // agreement between two independent models is itself a stronger signal.
+    // A post where only one vendor succeeded still contributes that one's
+    // words, gated on THAT vendor's own status (never on the other one's).
+    function analysisThemeWords(a){
       if(!a || a.error) return [];
       var words = [];
       ['subject','setting','style','tone','format_technique'].forEach(function(k){
@@ -689,9 +694,15 @@
       });
       return words;
     }
+    function postThemeWords(post){
+      var words = [];
+      if(post.creative_analysis_status === 'ok') words = words.concat(analysisThemeWords(post.creative_analysis));
+      if(post.creative_analysis_openai_status === 'ok') words = words.concat(analysisThemeWords(post.creative_analysis_openai));
+      return words;
+    }
     function topThemes(posts, platform, n){
       var counts = {};
-      (posts || []).filter(function(p){ return p.platform === platform && p.creative_analysis_status === 'ok'; })
+      (posts || []).filter(function(p){ return p.platform === platform && postHasAnalysis(p); })
         .forEach(function(p){ postThemeWords(p).forEach(function(w){ counts[w] = (counts[w] || 0) + 1; }); });
       return Object.keys(counts).sort(function(a,b){ return counts[b] - counts[a]; }).slice(0, n || 8);
     }
@@ -1532,7 +1543,7 @@
     function themeCounts(posts, platform){
       var counts = {};
       (posts || []).filter(function(p){
-        return (!platform || p.platform === platform) && p.creative_analysis_status === 'ok';
+        return (!platform || p.platform === platform) && postHasAnalysis(p);
       }).forEach(function(p){ postThemeWords(p).forEach(function(w){ counts[w] = (counts[w] || 0) + 1; }); });
       return counts;
     }
@@ -1547,7 +1558,7 @@
       if(keys.length < 2) return '';
       keys = keys.slice(0, 10);
       var described = (posts || []).filter(function(p){
-        return (!platform || p.platform === platform) && p.creative_analysis_status === 'ok';
+        return (!platform || p.platform === platform) && postHasAnalysis(p);
       }).length;
       return rankBars(keys.map(function(k){
         return {label: k, value: counts[k], display: String(counts[k]),
@@ -1646,7 +1657,7 @@
       var top = Object.keys(counts).sort(function(a, b){ return counts[b] - counts[a]; })[0];
       if(!top || counts[top] < 2) return null;
       var p = linkablePosts(posts, platform).filter(function(q){
-        return q.creative_analysis_status === 'ok' && postThemeWords(q).indexOf(top) >= 0;
+        return postHasAnalysis(q) && postThemeWords(q).indexOf(top) >= 0;
       }).sort(function(a, b){ return interactionScore(b.metrics) - interactionScore(a.metrics); })[0];
       return p ? {post: p, theme: top} : null;
     }
@@ -1823,7 +1834,7 @@
         avgViews: viewed.length ? viewTotal / viewed.length : null,
         topType: topType, topTypeShare: Math.round(types[topType] / ps.length * 100),
         perWeek: perWeek, spanDays: spanDays,
-        analyzed: ps.filter(function(p){ return p.creative_analysis_status === 'ok'; }).length,
+        analyzed: ps.filter(function(p){ return postHasAnalysis(p); }).length,
         best: best, bestScore: interactionScore(best.metrics)
       };
     }
@@ -2745,7 +2756,7 @@
         '<button type="button" class="sci-act" onclick="printReport()">⎙ Save as PDF</button>';
 
       var videoLike = allPosts.filter(function(p){ return ['video','reel','short'].indexOf(p.post_type) >= 0; }).length;
-      var described = allPosts.filter(function(p){ return p.creative_analysis_status === 'ok'; }).length;
+      var described = allPosts.filter(function(p){ return postHasAnalysis(p); }).length;
       var pulse = run.reddit_pulse || null;
       var band = renderTiles([
         {label: 'Posts analyzed', value: allPosts.length || null},
