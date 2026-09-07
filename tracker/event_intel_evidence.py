@@ -104,6 +104,8 @@ def schema(cur):
         UNIQUE(run_id, observation_key))''')
     cur.execute("ALTER TABLE evi_sources ADD COLUMN IF NOT EXISTS metadata JSONB NOT NULL DEFAULT '{}'")
     cur.execute("ALTER TABLE evi_participants ADD COLUMN IF NOT EXISTS evidence JSONB NOT NULL DEFAULT '{}'")
+    for field in ('country', 'city', 'availability', 'availability_source'):
+        cur.execute('ALTER TABLE evi_events ADD COLUMN IF NOT EXISTS ' + field + ' TEXT')
     for field in ('availability', 'availability_source'):
         cur.execute('ALTER TABLE evi_candidates ADD COLUMN IF NOT EXISTS ' + field + ' TEXT')
     for field in ('what_they_sell', 'selected_product', 'firmographics'):

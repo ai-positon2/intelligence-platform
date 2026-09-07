@@ -229,3 +229,27 @@ def test_access_checks_show_failures_and_escape_quoted_terms(fixture):
                   query_string={'profile_id':profile,'event_identity':event_key(row)}).get_data(as_text=True)
     assert '&lt;script&gt;' in html and 'Registration · blocked' in html
     assert '<script>alert(1)</script>' not in html
+
+
+@SQL
+def test_lookup_preserves_geography_and_availability_for_plans(fixture):
+    email, profile, other, rid, identity, run = fixture
+    r2=run()
+    ids=[]
+    for city in ('Boston','London'):
+        eid=S.save_event(r2,{'name':'Roadshow','starts_on':'2027-05-01','city':city,'country':'fixture',
+                            'availability':'sold_out','availability_source':'https://fixture.example/tickets'})
+        ids.append(eid)
+    events=[row for row in S.get_events(r2) if row['id'] in ids]
+    from tracker.event_intel_identity import event_key
+    assert event_key(events[0]) != event_key(events[1])
+    assert events[0]['city']=='Boston' and events[0]['availability']=='sold_out'
+    saved=P.save(r2,email,payload(profile_id=profile,event_identity=event_key(events[0])))
+    assert saved['assessment']['status']=='blocked_for_review'
+    assert P.context(r2,email,profile,event_key(events[1]))['plan'] is None
+
+
+def test_legacy_location_is_kept_in_edition_identity():
+    from tracker.event_intel_identity import event_key
+    event={'name':'Roadshow','starts_on':'2027-05-01'}
+    assert event_key(dict(event,location='Boston')) != event_key(dict(event,location='London'))

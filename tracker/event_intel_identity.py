@@ -24,8 +24,8 @@ def event_key(event):
         edition_date = None
     if not edition_date:
         scope = ['unverified', event.get('run_id'), event.get('id'), name,
-                 strict_name(event.get('country')), strict_name(event.get('city'))]
+                 strict_name(event.get('country')), strict_name(event.get('city') or event.get('location'))]
     else:
         scope = [re.sub(r'\b20\d{2}\b', '', name).strip(), edition_date,
-                 strict_name(event.get('country')), strict_name(event.get('city'))]
+                 strict_name(event.get('country')), strict_name(event.get('city') or event.get('location'))]
     return 'evi1:' + hashlib.sha256(json.dumps(scope).encode()).hexdigest()[:32]

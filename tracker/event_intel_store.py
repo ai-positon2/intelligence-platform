@@ -568,7 +568,7 @@ def list_runs(email: str, limit: int = 60) -> list[dict]:
 # ── events ────────────────────────────────────────────────────────────────
 
 _EVENT_FIELDS = ("name", "edition", "website", "organizer", "starts_on", "ends_on",
-                 "location", "venue", "format", "audience_note", "stated_size",
+                 "location", "country", "city", "availability", "availability_source", "venue", "format", "audience_note", "stated_size",
                  "confidence", "reasoning", "fit_score", "fit_reasoning")
 
 
@@ -607,7 +607,7 @@ def get_events(run_id: int) -> list[dict]:
         with conn.cursor() as cur:
             cur.execute(
                 "SELECT id, name, edition, website, organizer, starts_on, ends_on, "
-                "location, venue, format, audience_note, stated_size, confidence, "
+                "location, country, city, availability, availability_source, venue, format, audience_note, stated_size, confidence, "
                 "reasoning, fit_score, fit_reasoning FROM evi_events "
                 "WHERE run_id = %s ORDER BY fit_score DESC NULLS LAST, id", (run_id,))
             cols = [c[0] for c in cur.description]
