@@ -17,6 +17,7 @@ import ast
 import os
 import sys
 
+import pytest
 from werkzeug.exceptions import Forbidden
 
 os.environ.setdefault("GOOGLE_CLIENT_ID", "test")
@@ -27,7 +28,12 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import app as appmod  # noqa: E402
 
-_NEW_ADMIN = "sangeeta@position2.com"
+# Accounts whose admin access was granted by name, pinned here so each grant
+# stays a fact this file checks rather than a line someone edited once and
+# nothing ever confirmed. sangeeta@ was the first; pushpendra.k@ and
+# nikhil.ashok@ were confirmed/granted together on 2026-09-07.
+_GRANTED_ADMINS = ("sangeeta@position2.com", "pushpendra.k@position2.com",
+                   "nikhil.ashok@position2.com")
 _STAFF = "not-an-admin@position2.com"          # real Position2 login, no admin rights
 _EXTERNAL = "someone@example.com"              # a public /app member
 _APP_PY = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "app.py")
@@ -82,11 +88,16 @@ def _get(rule, email):
 
 # ── The roster ─────────────────────────────────────────────────────────────
 
-def test_the_new_admin_is_on_the_roster_and_the_roster_is_all_lowercase():
+@pytest.mark.parametrize("email", _GRANTED_ADMINS)
+def test_each_granted_admin_is_on_the_roster(email):
+    assert email in appmod.ADMIN_EMAILS, (
+        "%s was granted admin access but is not in ADMIN_EMAILS" % email)
+
+
+def test_the_roster_is_all_lowercase_position2_addresses():
     """Every gate lowercases the session email before the membership test, so
     an entry carrying a capital letter would be an admin who is never an
     admin -- silently, and only for that one person."""
-    assert _NEW_ADMIN in appmod.ADMIN_EMAILS
     assert all(e == e.lower() for e in appmod.ADMIN_EMAILS), sorted(appmod.ADMIN_EMAILS)
     assert all(e.endswith("@position2.com") for e in appmod.ADMIN_EMAILS)
 
@@ -120,10 +131,13 @@ def _call_gate(email):
         return rv.status_code, rv.headers.get("Location"), calls
 
 
-def test_admin_required_lets_the_new_admin_through_and_stops_everyone_else():
-    status, _, calls = _call_gate(_NEW_ADMIN)
-    assert (status, calls) == (200, [1]), "the new admin never reached the view"
+@pytest.mark.parametrize("email", _GRANTED_ADMINS)
+def test_admin_required_lets_each_granted_admin_through(email):
+    status, _, calls = _call_gate(email)
+    assert (status, calls) == (200, [1]), "%s never reached the view" % email
 
+
+def test_admin_required_stops_everyone_else():
     assert _call_gate(_STAFF)[:1] == (403,), "a non-admin Position2 staffer got in"
     assert _call_gate(_STAFF)[2] == [], "the view body ran for a caller who was refused"
 
@@ -140,43 +154,53 @@ def test_admin_required_lets_the_new_admin_through_and_stops_everyone_else():
     assert calls == []
 
 
-def test_the_gate_is_case_insensitive_about_the_address_google_sends():
+@pytest.mark.parametrize("email", _GRANTED_ADMINS)
+def test_the_gate_is_case_insensitive_about_the_address_google_sends(email):
     """Google decides the casing of the email in the token, not us. An admin
     signing in as Sangeeta@position2.com is the same person."""
-    assert _call_gate(_NEW_ADMIN.upper())[0] == 200
-    assert _call_gate(_NEW_ADMIN.capitalize())[0] == 200
+    assert _call_gate(email.upper())[0] == 200
+    assert _call_gate(email.capitalize())[0] == 200
 
 
 # ── Every admin route, swept ───────────────────────────────────────────────
 
-def test_every_admin_route_is_governed_by_admin_emails_and_nothing_else(monkeypatch):
-    """The sweep that makes "she has access to everything" a fact.
-
-    For each admin route: a Position2 staffer who is not on the roster is
-    refused, and so is the new admin the moment she is taken off it. Since
-    membership in that one set is the only thing separating those two calls,
-    every route that refuses her without it admits her with it -- proved
-    without executing a single view body, which is what keeps a 30-route
-    sweep from needing a database and seven vendor keys.
+def test_every_admin_route_is_gated_and_refuses_a_staffer_off_the_roster():
+    """Half of "they have access to everything": every admin route refuses a
+    Position2 staffer who is not on the roster. A route answering anything
+    but 403 here is one that is not really governed by ADMIN_EMAILS at all.
     """
     rules = _admin_routes()
     assert len(rules) >= 25, "only %d admin routes found; the parse likely broke" % len(rules)
 
-    refused_staff, admitted_off_roster = [], []
-    for rule in rules:
-        if _get(rule, _STAFF).status_code != 403:
-            refused_staff.append(rule.rule)
-
-    without_her = set(appmod.ADMIN_EMAILS) - {_NEW_ADMIN}
-    monkeypatch.setattr(appmod, "ADMIN_EMAILS", without_her)
-    for rule in rules:
-        if _get(rule, _NEW_ADMIN).status_code != 403:
-            admitted_off_roster.append(rule.rule)
-
+    refused_staff = [r.rule for r in rules if _get(r, _STAFF).status_code != 403]
     assert refused_staff == [], "not gated by ADMIN_EMAILS: %s" % refused_staff
+
+
+@pytest.mark.parametrize("email", sorted(appmod.ADMIN_EMAILS))
+def test_admin_emails_is_the_only_thing_granting_each_admin_every_route(email, monkeypatch):
+    """The other half, and the sweep that makes "they have access to
+    everything" a fact rather than a claim.
+
+    For each admin route, this admin is refused the moment they are taken off
+    ADMIN_EMAILS. Paired with the test above (an off-roster staffer is refused
+    everywhere), membership in that one set is the only thing separating a
+    refusal from a pass, so every route that refuses them without it admits
+    them with it -- proved without executing a single view body, which is what
+    keeps a 34-route sweep from needing a database and seven vendor keys.
+
+    Parameterized over the WHOLE roster rather than one hand-picked person, so
+    an admin added next year is covered the day they land, and so this file
+    answers "does this specific person reach every admin page" for each of
+    them individually instead of arguing from one representative.
+    """
+    rules = _admin_routes()
+    monkeypatch.setattr(appmod, "ADMIN_EMAILS", set(appmod.ADMIN_EMAILS) - {email})
+
+    admitted_off_roster = [r.rule for r in rules if _get(r, email).status_code != 403]
     assert admitted_off_roster == [], (
-        "these routes admit her through some gate other than ADMIN_EMAILS, so "
-        "removing her from it would not remove her access: %s" % admitted_off_roster)
+        "these routes admit %s through some gate other than ADMIN_EMAILS, so "
+        "removing them from it would not remove their access: %s"
+        % (email, admitted_off_roster))
 
 
 def test_no_route_under_p2_admin_escapes_the_gate():
@@ -217,26 +241,29 @@ def test_no_route_under_p2_admin_escapes_the_gate():
 
 # ── The flags the client reads ─────────────────────────────────────────────
 
-def test_whoami_reports_the_new_admin_as_an_admin():
+@pytest.mark.parametrize("email", _GRANTED_ADMINS)
+def test_whoami_reports_each_granted_admin_as_an_admin(email):
     """The legacy signal dashboards and the Ad Intelligence bundle render
     their admin links off this flag, not off a server-side template branch."""
-    body = _client(_NEW_ADMIN).get("/api/whoami").get_json()
+    body = _client(email).get("/api/whoami").get_json()
     assert body["is_admin"] is True
-    assert body["email"] == _NEW_ADMIN
+    assert body["email"] == email
     assert _client(_STAFF).get("/api/whoami").get_json()["is_admin"] is False
 
 
-def test_the_template_wide_is_admin_flag_follows_the_same_set():
-    """Pages show or hide the admin analytics menu on this one value. If it
+@pytest.mark.parametrize("email", _GRANTED_ADMINS)
+def test_the_template_wide_is_admin_flag_follows_the_same_set(email):
+    """Pages show or hide the admin analytics menu (templates/_admin_menu.html,
+    one `{% if is_admin %}` around all seven links) on this one value. If it
     ever disagreed with admin_required, a link would be visible and then
     403 -- or, worse, invisible to someone who does have access."""
     with appmod.app.test_request_context("/p2/hub"):
         from flask import session
-        session["google_user"] = {"email": _NEW_ADMIN, "name": "T"}
+        session["google_user"] = {"email": email, "name": "T"}
         assert appmod._inject_app_agents()["is_admin"] is True
         session["google_user"] = {"email": _STAFF, "name": "T"}
         assert appmod._inject_app_agents()["is_admin"] is False
         # Casing comes from Google, not from us: an admin who signs in as
         # Sangeeta@... is the same person and must get the same flag.
-        session["google_user"] = {"email": _NEW_ADMIN.capitalize(), "name": "T"}
+        session["google_user"] = {"email": email.capitalize(), "name": "T"}
         assert appmod._inject_app_agents()["is_admin"] is True
