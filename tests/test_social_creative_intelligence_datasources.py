@@ -50,11 +50,19 @@ def _page_html():
 def _balanced(html, start_at, open_ch, close_ch):
     """From `start_at` (the index of the first `open_ch`), return the index
     just past its matching `close_ch`, tracking string literals so a brace
-    inside a quoted SVG path or a message string is never miscounted."""
+    inside a quoted SVG path or a message string is never miscounted.
+
+    Also skips `//` line comments: an apostrophe in a comment's own prose
+    ("a video's folded fields...", and this codebase's comments are full of
+    exactly that contraction) is not a string delimiter, but a naive scan
+    reads it as one, desyncs the quote-tracking state for everything after
+    it, and silently over-runs the real end of the function -- this bit a
+    ~10-line function once already, extracting 12000+ characters instead."""
     depth = 0
     i = start_at
     in_str = None
-    while i < len(html):
+    n = len(html)
+    while i < n:
         c = html[i]
         if in_str:
             if c == "\\":
@@ -62,6 +70,10 @@ def _balanced(html, start_at, open_ch, close_ch):
                 continue
             if c == in_str:
                 in_str = None
+        elif c == "/" and i + 1 < n and html[i + 1] == "/":
+            nl = html.find("\n", i)
+            i = n if nl == -1 else nl
+            continue
         elif c in ("'", '"'):
             in_str = c
         elif c == open_ch:

@@ -124,6 +124,15 @@
     <div class="sci-drawer" id="drawerPanel"></div>
   </div>
 
+  <!-- Creative detail: Claude's and ChatGPT's independent reads of ONE post,
+       side by side -- a "second opinion" only means something if a reader
+       can actually see both. A separate, smaller overlay layered ABOVE the
+       report drawer (not nested inside it), since a post card lives inside
+       that drawer and this needs to open on top of it, not replace it. -->
+  <div class="sci-cdetail-overlay" id="cdetailOverlay" onclick="if(event.target===this) closeCreativeDetail()">
+    <div class="sci-cdetail" id="cdetailPanel"></div>
+  </div>
+
   {% include 'ppc_chat_widget.html' %}
 
   <script>
@@ -290,14 +299,45 @@
       if(!panel) return;
       panel.innerHTML = '<div class="sci-card sci-datasrc">' +
         '<div class="sci-card-head"><h2>Data sources <span class="sci-datasrc-tag">admin only</span></h2>' +
-        '<button type="button" class="sci-datasrc-refresh" id="dsRefreshBtn" onclick="loadDataSources();loadApifyDataSources();">Refresh</button></div>' +
+        '<button type="button" class="sci-datasrc-refresh" id="dsRefreshBtn" ' +
+        'onclick="loadDataSources();loadApifyDataSources();loadVisionOpenaiCheck();">Refresh</button></div>' +
         '<div class="sci-datasrc-sub">Unipile</div>' +
         '<div class="sci-datasrc-body" id="dsBody"><div class="sci-datasrc-loading"><span class="sci-spinner" style="width:14px;height:14px;border-width:2px"></span>Checking Unipile…</div></div>' +
         '<div class="sci-datasrc-sub">Apify</div>' +
         '<div class="sci-datasrc-body" id="dsApifyBody"><div class="sci-datasrc-loading"><span class="sci-spinner" style="width:14px;height:14px;border-width:2px"></span>Checking Apify…</div></div>' +
+        '<div class="sci-datasrc-sub">ChatGPT vision (second opinion)</div>' +
+        '<div class="sci-datasrc-body" id="dsVisionOpenaiBody"><div class="sci-datasrc-loading"><span class="sci-spinner" style="width:14px;height:14px;border-width:2px"></span>Checking…</div></div>' +
       '</div>';
       loadDataSources();
       loadApifyDataSources();
+      loadVisionOpenaiCheck();
+    }
+
+    // Unlike the two blocks above (which list per-platform rows), this is
+    // one small self-contained check: it costs one real vision call, so it
+    // is NOT re-run automatically on every page load the way the free
+    // Unipile/Apify checks are -- only on an explicit Refresh click.
+    function loadVisionOpenaiCheck(){
+      var body = document.getElementById('dsVisionOpenaiBody');
+      if(!body) return;
+      fetch('/p2/admin/external-usage/sci-vision-openai-check', {method: 'POST'})
+        .then(function(r){ return r.json(); })
+        .then(function(d){
+          if(!d.configured){
+            body.innerHTML = '<div class="sci-datasrc-empty">OPENAI_API_KEY is not set on this deployment.</div>';
+            return;
+          }
+          if(!d.ok){
+            body.innerHTML = '<div class="sci-datasrc-empty">' + esc(d.error || 'ChatGPT vision is unavailable right now.') + '</div>';
+            return;
+          }
+          body.innerHTML = '<div class="sci-datasrc-row"><span class="sci-datasrc-name">model: ' + esc(d.model || '') + '</span>' +
+            '<span class="sci-datasrc-status ok">working (' + (d.elapsed_ms || 0) + 'ms)</span></div>' +
+            '<div class="sci-datasrc-note">Runs as a second, independent pass alongside Claude&#39;s vision analysis on every collected creative &mdash; this check spent one small real vision call to prove it end to end.</div>';
+        })
+        .catch(function(){
+          body.innerHTML = '<div class="sci-datasrc-empty">Could not reach the ChatGPT vision check.</div>';
+        });
     }
 
     // `working` is the count of accounts that can actually serve a request;
@@ -733,6 +773,15 @@
       return t.charAt(0).toUpperCase() + t.slice(1);
     }
 
+    var ANALYZE_GLYPH = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.3-4.3"/></svg>';
+
+    // A card only gets the "compare analyses" toggle when there is at least
+    // one real, non-error analysis to show -- a button opening onto an
+    // empty/error state would be worse than no button at all.
+    function postHasAnalysis(post){
+      return post.creative_analysis_status === 'ok' || post.creative_analysis_openai_status === 'ok';
+    }
+
     function renderPostCard(post, showPlatform){
       var thumb = postThumbnail(post), meta = platformMeta(post.platform), title = postTitle(post);
       // A post with no image is not a broken image. Rendering the 16:9 media
@@ -746,9 +795,16 @@
           'this.closest(\'.sci-postcard-media\').remove()"></div>'
         : '';
       var when = relTime(post.posted_at);
+      // stopPropagation + preventDefault so this button opens the detail
+      // modal INSTEAD of the card's own click-through to the real post --
+      // the two affordances share one card without fighting over a click.
+      var analyzeBtn = postHasAnalysis(post)
+        ? '<button type="button" class="sci-postcard-analyze" title="Compare Claude and ChatGPT\'s reads of this creative" ' +
+          'onclick="event.preventDefault();event.stopPropagation();openCreativeDetail(' + post.id + ');">' + ANALYZE_GLYPH + '</button>'
+        : '';
       return '<a class="sci-postcard' + (thumb ? '' : ' sci-postcard-text') + '" href="' + esc(post.post_url || '#') +
         '" target="_blank" rel="noopener" data-platform="' + esc(post.platform) + '">' +
-        media +
+        media + analyzeBtn +
         '<div class="sci-postcard-body">' +
           // Format label sits BELOW the thumbnail as its own chip rather than
           // overlaid on it: an overlay competes with the image for the eye and
@@ -766,6 +822,80 @@
           '</div>' +
         '</div></a>';
     }
+
+    // ── Creative detail modal: Claude's and ChatGPT's independent reads of
+    // ONE post, side by side. FIELD_ORDER mirrors tracker/sci_vision.FIELDS'
+    // own order (minus "summary", shown separately as the lead line) plus
+    // the two extra fields a video-shaped analysis can carry
+    // (dialogue_transcript, frame_extraction_note) that an image never has. ──
+    var CDETAIL_FIELDS = [
+      ['messaging', 'Messaging'], ['cta', 'Call to action'], ['tone', 'Tone'],
+      ['hook', 'Hook'], ['format_technique', 'Format / technique'], ['branding', 'Branding'],
+      ['subject', 'Subject'], ['setting', 'Setting'], ['people', 'People'],
+      ['product', 'Product'], ['style', 'Style'], ['on_screen_text', 'On-screen text'],
+      ['dialogue_transcript', 'Spoken dialogue'], ['frame_extraction_note', 'Note'],
+    ];
+    function cdetailField(key, label, value){
+      // A video's folded fields (sci_vision.summarize_frames) turn subject/
+      // setting/on_screen_text into ARRAYS of per-frame values; everything
+      // else is already a single string either way.
+      if(Array.isArray(value)) value = value.filter(Boolean).join(' / ');
+      value = (value || '').toString().trim();
+      return '<div class="sci-cdetail-field"><div class="sci-cdetail-label">' + esc(label) + '</div>' +
+        '<div class="sci-cdetail-value' + (value ? '' : ' empty') + '">' + esc(value || 'Not noted') + '</div></div>';
+    }
+    var CDETAIL_ERROR_TEXT = {
+      not_configured: 'Not run: this vendor is not configured on this deployment.',
+      no_image_url: 'Not run: no image URL was available for this post.',
+      no_image_bytes: 'Not run: no frame bytes were available for this post.',
+      vendor_call_failed: 'The vendor call failed for this post.',
+      unparsable_response: 'The vendor replied, but not in a readable shape.',
+      no_frames_analyzed: 'Every sampled video frame failed to analyze.',
+    };
+    function cdetailColumn(vendorClass, vendorLabel, analysis, status){
+      var head = '<div class="sci-cdetail-vendor ' + vendorClass + '"><span class="sci-cdetail-vendor-dot"></span>' + esc(vendorLabel) + '</div>';
+      if(status !== 'ok' || !analysis){
+        var reason = (analysis && analysis.error && CDETAIL_ERROR_TEXT[analysis.error]) ||
+          (status === 'skipped' ? CDETAIL_ERROR_TEXT.not_configured : CDETAIL_ERROR_TEXT.vendor_call_failed);
+        return '<div class="sci-cdetail-col">' + head + '<div class="sci-cdetail-value empty">' + esc(reason) + '</div></div>';
+      }
+      var summary = cdetailField('summary', 'Summary', analysis.summary);
+      var rest = CDETAIL_FIELDS.map(function(pair){ return cdetailField(pair[0], pair[1], analysis[pair[0]]); }).join('');
+      return '<div class="sci-cdetail-col">' + head + summary + rest + '</div>';
+    }
+    function openCreativeDetail(postId){
+      var post = ((CURRENT_RUN && CURRENT_RUN.posts) || []).filter(function(p){ return p.id === postId; })[0];
+      var overlay = document.getElementById('cdetailOverlay'), panel = document.getElementById('cdetailPanel');
+      if(!overlay || !panel) return;
+      if(!post){
+        panel.innerHTML = '<div class="sci-cdetail-empty">This post could not be found.</div>';
+        overlay.classList.add('open');
+        return;
+      }
+      panel.innerHTML =
+        '<div class="sci-cdetail-head"><div class="sci-cdetail-title">' + esc(postTitle(post)) + '</div>' +
+          '<div class="sci-cdetail-meta">' +
+            '<span>' + esc(platformLabel(post.platform)) + '</span><span>&middot;</span><span>' + esc(postFormatLabel(post)) + '</span>' +
+            (post.posted_at ? '<span>&middot;</span><span>' + esc(fmtDate(post.posted_at)) + '</span>' : '') +
+          '</div>' +
+          '<button type="button" class="sci-cdetail-close" onclick="closeCreativeDetail()" aria-label="Close">✕</button>' +
+        '</div>' +
+        '<div class="sci-cdetail-cols">' +
+          cdetailColumn('claude', 'Claude', post.creative_analysis, post.creative_analysis_status) +
+          cdetailColumn('openai', 'ChatGPT', post.creative_analysis_openai, post.creative_analysis_openai_status) +
+        '</div>';
+      overlay.classList.add('open');
+    }
+    function closeCreativeDetail(){
+      var overlay = document.getElementById('cdetailOverlay');
+      if(overlay) overlay.classList.remove('open');
+    }
+    document.addEventListener('keydown', function(e){
+      if(e.key === 'Escape'){
+        var overlay = document.getElementById('cdetailOverlay');
+        if(overlay && overlay.classList.contains('open')) closeCreativeDetail();
+      }
+    });
 
     // ── "Top performing posts" toolbar: Top/Most-recent sort + a capped grid
     // with a "Show all" expand -- reads live from CURRENT_RUN so a toggle
