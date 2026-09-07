@@ -71,3 +71,7 @@ Remaining acceptance and research work: independently reviewed Position2 outputs
 ## Lookup persistence correction
 
 A final integration audit found that the resolver emitted city, country, availability and its source, but lookup storage dropped these fields. Lookup events now persist and return them through additive columns. This makes geographic edition separation and sold-out/cancelled action checks survive a save/reload. Legacy free-text location also participates in identity when city is missing. That conservative identity correction can leave older saved plans under their old identity; they are not automatically merged or reassigned. Reports with no stored structured facts remain incomplete until researched again. Tests cover same-day same-name events in different cities and retained sold-out warnings.
+
+## Release evaluation hardening
+
+Evaluation version 2 rejects invalid measurements/targets, loose completion flags, duplicate/blank reviewer identities and stale report labels. Required fact judgments now cover every recommended event rather than only reference-matched cases. Reference recall distinguishes editions and requires complete matching identity facts; duplicate/ambiguous reference rows and duplicate recommendation identities cannot establish acceptance. No real acceptance result is inferred from the synthetic challenge cases. Generate a fresh report-bound packet using the benchmark README before collecting live review judgments.
