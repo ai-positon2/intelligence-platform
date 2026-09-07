@@ -212,6 +212,218 @@ def test_video_with_no_frames_and_no_thumbnail_is_marked_failed(monkeypatch):
     assert written["analysis"] is None
 
 
+# ── run_platform_creative_analysis: the ChatGPT-vision second opinion ────────
+#
+# 2026-09-07, on explicit user request: ChatGPT vision runs as a second,
+# independent pass on the SAME already-fetched creative Claude just
+# analyzed, storing to its own columns (creative_analysis_openai*) so it can
+# never overwrite or be blocked by Claude's own result.
+
+def test_openai_pass_reuses_the_same_frames_claude_already_extracted(monkeypatch):
+    """The whole point of running the OpenAI pass right after Claude's,
+    inside the same loop iteration, is never re-extracting/re-downloading
+    the video a second time."""
+    from tracker import sci_store
+    monkeypatch.setattr(sci_store, "get_posts", lambda run_id, platform: [_post(1, "video")])
+    extract_calls = []
+    monkeypatch.setattr("tracker.sci_video.extract_frames",
+                        lambda url, n: extract_calls.append(1) or [b"frame1", b"frame2"])
+    monkeypatch.setattr("tracker.sci_vision.analyze_image_bytes",
+                        lambda frame, context=None: {"subject": "x", "summary": "s"})
+    monkeypatch.setattr("tracker.sci_vision.summarize_frames",
+                        lambda analyses, context=None: {"frame_count": len(analyses), "summary": "s"})
+    monkeypatch.setattr("tracker.sci_audio.transcribe_video", lambda url: None)
+
+    openai_frames_seen = []
+    monkeypatch.setattr("tracker.sci_vision_openai.analyze_image_bytes",
+                        lambda frame, context=None: openai_frames_seen.append(frame) or
+                        {"subject": "y", "summary": "s2"})
+    monkeypatch.setattr(sci_store, "update_post_creative_analysis", lambda *a, **k: None)
+    written_openai = {}
+    monkeypatch.setattr(sci_store, "update_post_creative_analysis_openai",
+                        lambda post_id, analysis, status="ok", error=None:
+                        written_openai.update(analysis=analysis, status=status))
+    monkeypatch.setattr(sci_store, "upsert_platform_run", lambda *a, **k: None)
+    monkeypatch.setattr(sci_store, "log_spend", lambda *a, **k: None)
+
+    sci_pipeline.run_platform_creative_analysis(1, "instagram")
+
+    assert extract_calls == [1], "extract_frames was called more than once -- frames were not reused"
+    assert openai_frames_seen == [b"frame1", b"frame2"]
+    assert written_openai["status"] == "ok"
+    # summarize_frames is mocked to ignore its input's content and just
+    # count it, so this proves the OpenAI-analyzed frames (not Claude's, and
+    # not a stale/empty list) are what actually got folded.
+    assert written_openai["analysis"]["frame_count"] == 2
+
+
+def test_openai_pass_runs_on_an_image_post_too(monkeypatch):
+    from tracker import sci_store
+    monkeypatch.setattr(sci_store, "get_posts", lambda run_id, platform: [_post(1, "image")])
+    monkeypatch.setattr("tracker.sci_vision.analyze_image",
+                        lambda url, context=None: {"subject": "claude sees x", "summary": "s"})
+    monkeypatch.setattr(sci_store, "update_post_creative_analysis", lambda *a, **k: None)
+
+    openai_urls_seen = []
+    monkeypatch.setattr("tracker.sci_vision_openai.analyze_image",
+                        lambda url, context=None: openai_urls_seen.append(url) or
+                        {"subject": "gpt sees x", "summary": "s2"})
+    written_openai = {}
+    monkeypatch.setattr(sci_store, "update_post_creative_analysis_openai",
+                        lambda post_id, analysis, status="ok", error=None:
+                        written_openai.update(analysis=analysis, status=status))
+    monkeypatch.setattr(sci_store, "upsert_platform_run", lambda *a, **k: None)
+    monkeypatch.setattr(sci_store, "log_spend", lambda *a, **k: None)
+
+    sci_pipeline.run_platform_creative_analysis(1, "instagram")
+
+    assert openai_urls_seen == ["https://cdn/m"]
+    assert written_openai["analysis"]["subject"] == "gpt sees x"
+
+
+def test_a_claude_failure_never_blocks_the_openai_pass(monkeypatch):
+    """The two vendors' results are genuinely independent -- Claude erroring
+    on a post must not prevent ChatGPT vision from still being tried on it."""
+    from tracker import sci_store
+    monkeypatch.setattr(sci_store, "get_posts", lambda run_id, platform: [_post(1, "image")])
+
+    def claude_boom(url, context=None):
+        raise RuntimeError("claude exploded")
+    monkeypatch.setattr("tracker.sci_vision.analyze_image", claude_boom)
+    monkeypatch.setattr(sci_store, "update_post_creative_analysis", lambda *a, **k: None)
+
+    called = []
+    monkeypatch.setattr("tracker.sci_vision_openai.analyze_image",
+                        lambda url, context=None: called.append(1) or {"subject": "gpt still ran", "summary": "s"})
+    monkeypatch.setattr(sci_store, "update_post_creative_analysis_openai", lambda *a, **k: None)
+    monkeypatch.setattr(sci_store, "upsert_platform_run", lambda *a, **k: None)
+    monkeypatch.setattr(sci_store, "log_spend", lambda *a, **k: None)
+
+    sci_pipeline.run_platform_creative_analysis(1, "instagram")
+    assert called == [1]
+
+
+def test_an_openai_failure_never_touches_claudes_already_stored_result(monkeypatch):
+    from tracker import sci_store
+    monkeypatch.setattr(sci_store, "get_posts", lambda run_id, platform: [_post(1, "image")])
+    monkeypatch.setattr("tracker.sci_vision.analyze_image",
+                        lambda url, context=None: {"subject": "claude's real result", "summary": "s"})
+    claude_written = {}
+    monkeypatch.setattr(sci_store, "update_post_creative_analysis",
+                        lambda post_id, analysis, status="ok", error=None:
+                        claude_written.update(analysis=analysis, status=status))
+
+    def openai_boom(url, context=None):
+        raise RuntimeError("gpt exploded")
+    monkeypatch.setattr("tracker.sci_vision_openai.analyze_image", openai_boom)
+    openai_written = {}
+    monkeypatch.setattr(sci_store, "update_post_creative_analysis_openai",
+                        lambda post_id, analysis, status="ok", error=None:
+                        openai_written.update(analysis=analysis, status=status, error=error))
+    monkeypatch.setattr(sci_store, "upsert_platform_run", lambda *a, **k: None)
+    monkeypatch.setattr(sci_store, "log_spend", lambda *a, **k: None)
+
+    sci_pipeline.run_platform_creative_analysis(1, "instagram")
+
+    assert claude_written["analysis"]["subject"] == "claude's real result"
+    assert claude_written["status"] == "ok"
+    assert openai_written["status"] == "failed"
+    assert openai_written["analysis"] is None
+
+
+def test_openai_not_configured_is_skipped_not_failed(monkeypatch):
+    """A missing OPENAI_API_KEY is a deployment fact, not a per-post error --
+    the status must read 'skipped', the same distinction every other
+    missing-key case in this codebase makes."""
+    from tracker import sci_store
+    monkeypatch.setattr(sci_store, "get_posts", lambda run_id, platform: [_post(1, "image")])
+    monkeypatch.setattr("tracker.sci_vision.analyze_image",
+                        lambda url, context=None: {"subject": "x", "summary": "s"})
+    monkeypatch.setattr(sci_store, "update_post_creative_analysis", lambda *a, **k: None)
+    monkeypatch.setattr("tracker.sci_vision_openai.analyze_image",
+                        lambda url, context=None: {"error": "not_configured"})
+    written_openai = {}
+    monkeypatch.setattr(sci_store, "update_post_creative_analysis_openai",
+                        lambda post_id, analysis, status="ok", error=None:
+                        written_openai.update(status=status, error=error))
+    monkeypatch.setattr(sci_store, "upsert_platform_run", lambda *a, **k: None)
+    spend_calls = []
+    monkeypatch.setattr(sci_store, "log_spend", lambda *a, **k: spend_calls.append(1))
+
+    sci_pipeline.run_platform_creative_analysis(1, "instagram")
+
+    assert written_openai["status"] == "skipped"
+    assert spend_calls == [], "spend must never be logged for a call that never actually ran"
+
+
+def test_a_successful_openai_analysis_logs_spend(monkeypatch):
+    from tracker import sci_store
+    monkeypatch.setattr(sci_store, "get_posts", lambda run_id, platform: [_post(1, "image")])
+    monkeypatch.setattr("tracker.sci_vision.analyze_image",
+                        lambda url, context=None: {"subject": "x", "summary": "s"})
+    monkeypatch.setattr(sci_store, "update_post_creative_analysis", lambda *a, **k: None)
+    monkeypatch.setattr("tracker.sci_vision_openai.analyze_image",
+                        lambda url, context=None: {"subject": "y", "summary": "s2"})
+    monkeypatch.setattr(sci_store, "update_post_creative_analysis_openai", lambda *a, **k: None)
+    monkeypatch.setattr(sci_store, "upsert_platform_run", lambda *a, **k: None)
+    spend_calls = []
+    monkeypatch.setattr(sci_store, "log_spend",
+                        lambda run_id, platform, vendor, operation, **k: spend_calls.append(
+                            (run_id, platform, vendor, operation)))
+
+    sci_pipeline.run_platform_creative_analysis(7, "tiktok")
+    assert spend_calls == [(7, "tiktok", "openai", "vision_second_opinion")]
+
+
+def test_openai_pass_also_falls_back_to_the_thumbnail_when_frames_failed(monkeypatch):
+    from tracker import sci_store
+    post = _yt_post(1, thumbnails={"high": {"url": "https://i.ytimg.com/vi/v1/hqdefault.jpg"}})
+    monkeypatch.setattr(sci_store, "get_posts", lambda run_id, platform: [post])
+    monkeypatch.setattr("tracker.sci_video.extract_frames", lambda url, n: [])
+    monkeypatch.setattr("tracker.sci_vision.analyze_image",
+                        lambda url, context=None: {"subject": "claude thumb", "summary": "s"})
+    monkeypatch.setattr(sci_store, "update_post_creative_analysis", lambda *a, **k: None)
+
+    openai_urls_seen = []
+    monkeypatch.setattr("tracker.sci_vision_openai.analyze_image",
+                        lambda url, context=None: openai_urls_seen.append(url) or
+                        {"subject": "gpt thumb", "summary": "s2"})
+    written_openai = {}
+    monkeypatch.setattr(sci_store, "update_post_creative_analysis_openai",
+                        lambda post_id, analysis, status="ok", error=None:
+                        written_openai.update(analysis=analysis, status=status))
+    monkeypatch.setattr(sci_store, "upsert_platform_run", lambda *a, **k: None)
+    monkeypatch.setattr(sci_store, "log_spend", lambda *a, **k: None)
+
+    sci_pipeline.run_platform_creative_analysis(1, "youtube")
+
+    assert openai_urls_seen == ["https://i.ytimg.com/vi/v1/hqdefault.jpg"]
+    assert written_openai["analysis"]["frame_extraction_note"]
+
+
+def test_openai_pass_is_also_marked_failed_with_no_frames_and_no_thumbnail(monkeypatch):
+    from tracker import sci_store
+    post = _yt_post(1, thumbnails={})
+    monkeypatch.setattr(sci_store, "get_posts", lambda run_id, platform: [post])
+    monkeypatch.setattr("tracker.sci_video.extract_frames", lambda url, n: [])
+    monkeypatch.setattr("tracker.sci_vision.analyze_image", lambda *a, **k: None)
+    monkeypatch.setattr(sci_store, "update_post_creative_analysis", lambda *a, **k: None)
+
+    called = []
+    monkeypatch.setattr("tracker.sci_vision_openai.analyze_image", lambda *a, **k: called.append(1))
+    written_openai = {}
+    monkeypatch.setattr(sci_store, "update_post_creative_analysis_openai",
+                        lambda post_id, analysis, status="ok", error=None:
+                        written_openai.update(analysis=analysis, status=status, error=error))
+    monkeypatch.setattr(sci_store, "upsert_platform_run", lambda *a, **k: None)
+
+    sci_pipeline.run_platform_creative_analysis(1, "youtube")
+
+    assert called == [], "must not attempt an image analysis with no image to analyze"
+    assert written_openai["status"] == "failed"
+    assert written_openai["analysis"] is None
+
+
 def test_a_failed_frame_analysis_never_calls_transcription(monkeypatch):
     """summarize_frames returning an error dict (every frame failed) must
     skip transcription entirely -- there is nothing to attach it to."""

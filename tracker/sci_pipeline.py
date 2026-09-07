@@ -445,12 +445,66 @@ def _video_thumbnail_url(post: dict) -> str | None:
     return None
 
 
+def _run_openai_creative_analysis(post_id: int, run_id: int, platform: str, post_type: str,
+                                  media_urls: list, context: dict,
+                                  frames: list | None, thumbnail_url: str | None) -> None:
+    """The ChatGPT-vision second opinion on the SAME creative Claude just
+    analyzed, reusing whatever Claude's own branch already produced (the
+    same extracted video `frames`, the same fallback `thumbnail_url`) rather
+    than re-extracting or re-downloading anything. Entirely self-contained
+    (own try/except, own store call) so a failure here can NEVER touch
+    Claude's already-stored creative_analysis for this post -- the two
+    vendors' results are independent columns for exactly this reason.
+
+    OPENAI_API_KEY absent is not logged as a failure: sci_vision_openai
+    degrades to {"error": "not_configured"} same as every other missing-key
+    case in this codebase, and creative_analysis_openai_status='skipped'
+    (not 'failed') is what a report should read when this second opinion was
+    simply never enabled on this deployment."""
+    from tracker import sci_store, sci_vision, sci_vision_openai
+
+    try:
+        if post_type in ("video", "reel", "short"):
+            if frames:
+                frame_analyses = [sci_vision_openai.analyze_image_bytes(f, context=context) for f in frames]
+                analysis = sci_vision.summarize_frames(frame_analyses, context=context)
+            elif thumbnail_url:
+                analysis = sci_vision_openai.analyze_image(thumbnail_url, context=context)
+                if "error" not in analysis:
+                    analysis["frame_extraction_note"] = (
+                        "Video frame extraction was unavailable for this post; "
+                        "analyzed the platform-provided thumbnail instead.")
+            else:
+                sci_store.update_post_creative_analysis_openai(
+                    post_id, None, status="failed", error="Could not extract any video frames.")
+                return
+        else:
+            analysis = sci_vision_openai.analyze_image(media_urls[0], context=context)
+    except Exception as e:
+        logger.warning("sci_pipeline: OpenAI creative analysis failed for post %s: %s", post_id, e)
+        sci_store.update_post_creative_analysis_openai(post_id, None, status="failed", error=str(e)[:500])
+        return
+
+    err = analysis.get("error")
+    status = "skipped" if err == "not_configured" else ("failed" if err else "ok")
+    sci_store.update_post_creative_analysis_openai(post_id, analysis, status=status, error=err)
+    if status == "ok":
+        sci_store.log_spend(run_id, platform, "openai", "vision_second_opinion", units=1)
+
+
 def run_platform_creative_analysis(run_id: int, platform: str) -> None:
     """Step 3 for one platform's already-collected posts, staged per-post so
     one slow/failed video never blocks the rest of the platform. Marks the
     platform row analyzed_at when done, regardless of individual post
     failures -- per-post failure is recorded on the post row itself
-    (creative_analysis_status), not surfaced as a platform-level failure."""
+    (creative_analysis_status), not surfaced as a platform-level failure.
+
+    Runs Claude vision (the primary pass) and then, on the exact same
+    already-fetched creative, ChatGPT vision as an independent second
+    opinion -- see _run_openai_creative_analysis. The OpenAI pass NEVER
+    blocks or is blocked by Claude's: it runs after Claude's result is
+    already durably stored, in its own try/except, writing to its own
+    columns."""
     from tracker import sci_store, sci_vision, sci_video, sci_audio
 
     posts = sci_store.get_posts(run_id, platform)
@@ -461,7 +515,10 @@ def run_platform_creative_analysis(run_id: int, platform: str) -> None:
         if not media_urls:
             sci_store.update_post_creative_analysis(post["id"], None, status="skipped",
                                                      error="No media URL to analyze.")
+            sci_store.update_post_creative_analysis_openai(post["id"], None, status="skipped",
+                                                            error="No media URL to analyze.")
             continue
+        frames, thumbnail_url = None, None
         try:
             if post_type in ("video", "reel", "short"):
                 frames = sci_video.extract_frames(media_urls[0], n=MAX_VIDEO_FRAMES)
@@ -470,6 +527,8 @@ def run_platform_creative_analysis(run_id: int, platform: str) -> None:
                     if not thumbnail_url:
                         sci_store.update_post_creative_analysis(
                             post["id"], None, status="failed", error="Could not extract any video frames.")
+                        _run_openai_creative_analysis(post["id"], run_id, platform, post_type,
+                                                      media_urls, context, frames, thumbnail_url)
                         continue
                     # Frame extraction failed (most commonly YouTube blocking
                     # yt-dlp) -- fall back to the platform's own thumbnail
@@ -483,6 +542,8 @@ def run_platform_creative_analysis(run_id: int, platform: str) -> None:
                     status = "failed" if "error" in analysis else "ok"
                     sci_store.update_post_creative_analysis(
                         post["id"], analysis, status=status, error=analysis.get("error"))
+                    _run_openai_creative_analysis(post["id"], run_id, platform, post_type,
+                                                  media_urls, context, frames, thumbnail_url)
                     continue
                 frame_analyses = [sci_vision.analyze_image_bytes(f, context=context) for f in frames]
                 analysis = sci_vision.summarize_frames(frame_analyses, context=context)
@@ -501,6 +562,8 @@ def run_platform_creative_analysis(run_id: int, platform: str) -> None:
         except Exception as e:
             logger.warning("sci_pipeline: creative analysis failed for post %s: %s", post["id"], e)
             sci_store.update_post_creative_analysis(post["id"], None, status="failed", error=str(e)[:500])
+        _run_openai_creative_analysis(post["id"], run_id, platform, post_type,
+                                      media_urls, context, frames, thumbnail_url)
 
     sci_store.upsert_platform_run(run_id, platform, analyzed_at=datetime.now(timezone.utc).isoformat())
 
