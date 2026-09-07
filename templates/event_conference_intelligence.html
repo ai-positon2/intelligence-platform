@@ -544,6 +544,7 @@
         <div style="min-width:0">
           <h2 id="drawerTitle">Loading</h2>
           <div class="sub" id="drawerSub"></div>
+          <a id="eventPlanLink" class="evi-btn" hidden>Plan &amp; results</a>
         </div>
         <button class="evi-x" onclick="closeDrawer()" aria-label="Close">×</button>
       </div>
@@ -4164,6 +4165,11 @@
        lookup and the query in a discover, because a discover run had no one
        subject event. */
     function render(run){
+      var planLink = document.getElementById('eventPlanLink');
+      if (planLink) {
+        planLink.hidden = run.status !== 'complete' || !['lookup', 'recommend'].includes(run.mode);
+        planLink.href = BASE + '/runs/' + run.id + '/plan';
+      }
       if (run.mode === 'recommend') { return renderRecommend(run); }
       if (run.mode === 'workroom') { return renderWorkroom(run); }
       var evs = run.events || [];
