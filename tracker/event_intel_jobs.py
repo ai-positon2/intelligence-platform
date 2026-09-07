@@ -307,4 +307,7 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    # -m executes this file as __main__. Research and storage import its
+    # canonical name, so dispatch there to share CURRENT/STAGE ContextVars.
+    from tracker.event_intel_jobs import main as worker_main
+    worker_main()
