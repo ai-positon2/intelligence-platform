@@ -8375,6 +8375,26 @@ def admin_external_usage_sci_apify_check():
     return jsonify(_sci_apify_selftest())
 
 
+def _sci_vision_openai_selftest() -> dict:
+    """Prove the ChatGPT-vision second opinion end to end (see
+    tracker/sci_vision_openai.probe). Costs one small real vision call
+    against a tiny inert test image, never a real post's creative."""
+    from tracker import sci_vision_openai
+    try:
+        return sci_vision_openai.probe()
+    except Exception as e:
+        return {"configured": False, "error": "%s: %s" % (type(e).__name__, str(e)[:300])}
+
+
+@app.route("/p2/admin/external-usage/sci-vision-openai-check", methods=["POST"])
+@admin_required
+def admin_external_usage_sci_vision_openai_check():
+    """Run the ChatGPT-vision self-test (see _sci_vision_openai_selftest).
+    POST so no crawler or prefetch can trigger it, matching the checks next
+    to it -- this one spends a small real vision call."""
+    return jsonify(_sci_vision_openai_selftest())
+
+
 def _lps_insights_selftest() -> dict:
     """Prove the AI Insights synthesis call end to end (see
     lps_enrichment.probe). Costs one small Claude call against a synthetic

@@ -4,7 +4,14 @@ what's depicted, never infer it from the caption. Mirrors
 tracker/lps_enrichment.py's _anthropic() convention: degrades to a clear
 error dict on any failure (no key, a timeout, a malformed reply), never
 raises -- one bad image must not fail the platform or the run.
-"""
+
+SYSTEM_PROMPT and FIELDS are public (not module-private) specifically so
+tracker/sci_vision_openai.py's second-opinion pass can import them rather
+than keep its own copy: the two vendors must be asked the identical
+question in the identical shape for a "second opinion" to mean anything,
+and a second copy of this prompt would drift out of sync with this one the
+first time either got edited. summarize_frames() is vendor-agnostic (pure
+aggregation, no API call) and is reused as-is by the OpenAI path too."""
 
 from __future__ import annotations
 
@@ -14,7 +21,7 @@ import os
 
 logger = logging.getLogger(__name__)
 
-_SYSTEM = (
+SYSTEM_PROMPT = (
     "You are a creative and messaging analyst describing one social media post for a "
     "competitive-intelligence report -- both what is visually depicted AND what message "
     "is being communicated.\n\n"
@@ -45,7 +52,7 @@ _SYSTEM = (
     'strings for fields that do not apply -- never omit a key.'
 )
 
-_FIELDS = ("subject", "setting", "people", "product", "style", "on_screen_text",
+FIELDS = ("subject", "setting", "people", "product", "style", "on_screen_text",
           "messaging", "cta", "tone", "hook", "format_technique", "branding", "summary")
 
 
@@ -72,7 +79,7 @@ def _parse(raw: str) -> dict | None:
         return None
     if not isinstance(parsed, dict):
         return None
-    return {f: str(parsed.get(f) or "") for f in _FIELDS}
+    return {f: str(parsed.get(f) or "") for f in FIELDS}
 
 
 def analyze_image(image_url: str, context: dict | None = None) -> dict:
@@ -96,7 +103,7 @@ def analyze_image(image_url: str, context: dict | None = None) -> dict:
         resp = client.messages.create(
             model=os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-5"),
             max_tokens=900,
-            system=_SYSTEM,
+            system=SYSTEM_PROMPT,
             messages=[{
                 "role": "user",
                 "content": [
@@ -140,7 +147,7 @@ def analyze_image_bytes(image_bytes: bytes, media_type: str = "image/jpeg",
         resp = client.messages.create(
             model=os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-5"),
             max_tokens=900,
-            system=_SYSTEM,
+            system=SYSTEM_PROMPT,
             messages=[{
                 "role": "user",
                 "content": [
