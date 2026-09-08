@@ -257,3 +257,106 @@ def test_the_still_chooser_never_returns_a_video():
 
 def test_the_video_types_tuple_is_named_once():
     assert sci_pipeline.VIDEO_POST_TYPES == ("video", "reel", "short")
+
+
+# ── The two resolvers for one question must know the same shapes ───────────
+#
+# templates/social_creative_intelligence.html's postThumbnail() answers the
+# same question in JS, to draw each post's card. That one is proven -- the
+# cards render -- and this one was written to match it. They cannot share
+# code across the language boundary, so this is the join: if the page learns
+# a raw field this module does not know, the analysis step goes back to
+# reporting "could not extract any frames" on a post whose cover image is
+# visibly on screen. Two copies of one policy is this codebase's most
+# repeated bug (see the CSV-vs-page divergence on the events agent, and the
+# analyzed-count and notification-list duplications before it).
+
+def _page_thumbnail_fields():
+    """The raw-payload field names postThumbnail() reads, from the page's
+    real text."""
+    import re
+    html = io.open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                                "templates", "social_creative_intelligence.html"),
+                   encoding="utf-8").read()
+    start = html.index("function postThumbnail(post)")
+    body = html[start:start + html[start:].index("\n    }")]
+    names = set()
+    # raw.foo / vm.foo / media0.foo / at.foo style reads, plus ['name'] lookups.
+    for m in re.finditer(r"\b(?:raw|vm|media0|at|im|photo|thumbs|t|imgs)\.([A-Za-z_][A-Za-z0-9_]*)", body):
+        names.add(m.group(1))
+    for m in re.finditer(r"\['([A-Za-z_][A-Za-z0-9_]*)'\]", body):
+        names.add(m.group(1))
+    # JS-only plumbing, not payload fields.
+    names -= {"length", "toLowerCase", "url", "uri", "media_url_https", "post_type",
+              "media_urls", "platform", "raw"}
+    return names
+
+
+import io  # noqa: E402  (used by _page_thumbnail_fields above)
+
+
+def test_this_module_knows_every_raw_field_the_page_resolver_does():
+    import inspect
+    source = inspect.getsource(sci_pipeline._poster_candidates)
+    missing = sorted(f for f in _page_thumbnail_fields() if f not in source)
+    assert not missing, (
+        "templates/social_creative_intelligence.html's postThumbnail() reads %s, which "
+        "_poster_candidates does not know. A post whose cover image the page can draw "
+        "must not be reported as unanalyzable." % missing)
+
+
+def test_a_reddit_post_falls_back_to_its_thumbnail(monkeypatch):
+    post = _post(platform="reddit", post_type="video",
+                 media_urls=["https://v.redd.it/abc/DASH_720.mp4"],
+                 raw={"thumbnail_url": "https://b.thumbs.redditmedia.com/x.jpg"})
+    seen, stored = _drive(monkeypatch, post)
+    assert seen["claude_urls"] == ["https://b.thumbs.redditmedia.com/x.jpg"]
+    assert stored["claude"][1] == "ok"
+
+
+def test_a_linkedin_video_uses_the_image_attachment_beside_it(monkeypatch):
+    """Unipile puts the displayable image in an attachment of type 'img',
+    whose `url` IS the image. A video row's url is the mp4 and must never
+    be picked."""
+    post = _post(platform="linkedin", post_type="video",
+                 media_urls=["https://dms.licdn.com/playlist/vid/clip.mp4"],
+                 raw={"attachments": [
+                     {"type": "video", "url": "https://dms.licdn.com/playlist/vid/clip.mp4"},
+                     {"type": "img", "url": "https://media.licdn.com/dms/image/still.jpg"}]})
+    seen, _ = _drive(monkeypatch, post)
+    assert seen["claude_urls"] == ["https://media.licdn.com/dms/image/still.jpg"]
+
+
+def test_an_unavailable_linkedin_attachment_is_never_used(monkeypatch):
+    """LinkedIn marks expired media unavailable and leaves the row in place,
+    so an unfiltered read hands a vision model a URL that 404s."""
+    post = _post(platform="linkedin", post_type="video",
+                 media_urls=["https://dms.licdn.com/playlist/vid/clip.mp4"],
+                 raw={"attachments": [
+                     {"type": "img", "url": "https://media.licdn.com/gone.jpg", "unavailable": True}]})
+    seen, stored = _drive(monkeypatch, post)
+    assert seen["claude_urls"] == []
+    assert stored["claude"][1] == "failed"
+
+
+def test_a_linkedin_link_post_falls_back_to_the_article_cover(monkeypatch):
+    post = _post(platform="linkedin", post_type="video",
+                 media_urls=["https://dms.licdn.com/playlist/vid/clip.mp4"],
+                 raw={"article": {"picture_url": "https://media.licdn.com/article-cover.jpg"}})
+    seen, _ = _drive(monkeypatch, post)
+    assert seen["claude_urls"] == ["https://media.licdn.com/article-cover.jpg"]
+
+
+def test_tiktoks_other_cover_fields_are_read_too(monkeypatch):
+    for raw, expected in (
+        ({"videoMeta": {"originCover": "https://p16.tiktokcdn.com/origin.jpeg"}},
+         "https://p16.tiktokcdn.com/origin.jpeg"),
+        ({"videoMeta": {"dynamicCover": "https://p16.tiktokcdn.com/dyn.jpeg"}},
+         "https://p16.tiktokcdn.com/dyn.jpeg"),
+        ({"covers": {"default": "https://p16.tiktokcdn.com/default.jpeg"}},
+         "https://p16.tiktokcdn.com/default.jpeg"),
+    ):
+        post = _post(platform="tiktok", post_type="video",
+                     media_urls=["https://www.tiktok.com/@b/video/1"], raw=raw)
+        seen, _ = _drive(monkeypatch, post)
+        assert seen["claude_urls"] == [expected], raw
