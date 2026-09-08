@@ -468,6 +468,15 @@ def _first_video_url(media_urls: list) -> str | None:
 # One list rather than a chain of ifs so adding a platform is one line, and
 # so the shapes are readable side by side.
 #
+# It is the SAME question templates/social_creative_intelligence.html's
+# postThumbnail() answers in JS to draw each post's card, and the two must
+# know the same shapes: that resolver is proven (the cards render), so this
+# one is written to match it field for field, and
+# tests/test_sci_pipeline_creative_target.py fails if the page learns a
+# shape this does not. Two copies of one policy is this codebase's most
+# repeated bug, and the two cannot share code across the language boundary,
+# so the test is the join.
+#
 # This started life as a YouTube-only lookup (raw.snippet.thumbnails), added
 # because yt-dlp/ffmpeg frame extraction is routinely blocked from a
 # datacenter IP like Railway's. The problem is that YouTube is not the only
@@ -505,18 +514,28 @@ def _poster_candidates(raw: dict) -> list:
     for child in (raw.get("carousel_media") or raw.get("children") or []):
         if isinstance(child, dict):
             out += [child.get("preview_image"), child.get("image_url")]
-    # TikTok via Apify.
-    out += [_dig("videoMeta", "coverUrl"), _dig("videoMeta", "originalCoverUrl"),
-            _dig("videoMeta", "cover")]
-    for cover in raw.get("covers") or []:
-        out.append(cover if isinstance(cover, str) else None)
-    # LinkedIn: Unipile attachments carry a poster alongside the video;
-    # Apify hands back plain image lists.
+    # TikTok via Apify. `covers` is an object of named sizes, not a list.
+    out += [_dig("videoMeta", "coverUrl"), _dig("videoMeta", "originCover"),
+            _dig("videoMeta", "dynamicCover"), _dig("videoMeta", "originalCoverUrl"),
+            _dig("videoMeta", "cover"), _dig("covers", "default")]
+    # LinkedIn. Unipile and the Apify actor describe a post's media
+    # completely differently and both shapes land in this one field, so both
+    # are read. Unipile: attachments[] of {type: 'img'|'video', url}, where
+    # an img row's url IS the displayable image (a video row's url is the
+    # mp4, which is what must never be returned here); some also carry a
+    # separate poster alongside the video.
     for att in raw.get("attachments") or []:
-        if isinstance(att, dict) and not att.get("unavailable"):
-            out += [att.get("preview_url"), att.get("thumbnail_url"), att.get("poster")]
+        if not isinstance(att, dict) or att.get("unavailable"):
+            continue
+        if (att.get("type") or "").lower() == "img":
+            out.append(att.get("url"))
+        out += [att.get("preview_url"), att.get("thumbnail_url"), att.get("poster")]
+    out.append(_dig("article", "picture_url"))
+    # Apify: a flat images/imageUrls array.
     for img in raw.get("images") or raw.get("imageUrls") or []:
         out.append(img.get("url") if isinstance(img, dict) else img)
+    # Reddit.
+    out.append(raw.get("thumbnail_url"))
     # Facebook via Apify.
     out.append(raw.get("thumbnail"))
     for m in raw.get("media") or []:
