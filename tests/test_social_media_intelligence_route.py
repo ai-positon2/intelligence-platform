@@ -1,4 +1,4 @@
-"""/p2/b2b-agents/social-creative-intelligence (page + analyze/status/run).
+"""/p2/b2b-agents/social-media-intelligence (page + analyze/status/run).
 Every data route is @position2_required and scopes reads by the
 server-verified session email, never a client-supplied one -- same pattern
 as tests/test_linkedin_playbook_studio_route.py, which this mirrors.
@@ -57,14 +57,14 @@ def _owner_scoped_get_run(monkeypatch, run=None):
 
 def test_page_renders_for_any_position2_staff(monkeypatch):
     monkeypatch.setattr(sci_store, "list_runs", lambda email: [])
-    resp = _client("someone@position2.com").get("/p2/b2b-agents/social-creative-intelligence")
+    resp = _client("someone@position2.com").get("/p2/b2b-agents/social-media-intelligence")
     assert resp.status_code == 200
     assert b"Social Media Intelligence" in resp.data
 
 
 def test_page_requires_login():
     c = appmod.app.test_client()
-    resp = c.get("/p2/b2b-agents/social-creative-intelligence", follow_redirects=False)
+    resp = c.get("/p2/b2b-agents/social-media-intelligence", follow_redirects=False)
     assert resp.status_code in (302, 401, 403)
 
 
@@ -72,14 +72,14 @@ def test_non_position2_email_is_bounced_to_app():
     c = appmod.app.test_client()
     with c.session_transaction() as sess:
         sess["google_user"] = {"email": "outsider@gmail.com", "name": "T"}
-    resp = c.get("/p2/b2b-agents/social-creative-intelligence", follow_redirects=False)
+    resp = c.get("/p2/b2b-agents/social-media-intelligence", follow_redirects=False)
     assert resp.status_code == 302
     assert resp.headers.get("Location", "").rstrip("/").endswith("/app")
 
 
 def test_analyze_requires_login():
     c = appmod.app.test_client()
-    resp = c.post("/p2/b2b-agents/social-creative-intelligence/analyze",
+    resp = c.post("/p2/b2b-agents/social-media-intelligence/analyze",
                   json={"company_name": "Acme"}, follow_redirects=False)
     assert resp.status_code in (302, 401, 403)
 
@@ -95,7 +95,7 @@ def test_analyze_requires_login():
 def test_search_returns_companies_from_sci_company_search(monkeypatch):
     monkeypatch.setattr(sci_company_search, "search_companies_result",
                         lambda q: {"companies": [{"id": "", "name": "Acme", "website": "acme.com"}], "error": None})
-    resp = _client().get("/p2/b2b-agents/social-creative-intelligence/search?q=Acme")
+    resp = _client().get("/p2/b2b-agents/social-media-intelligence/search?q=Acme")
     assert resp.status_code == 200
     body = resp.get_json()
     assert body["companies"] == [{"id": "", "name": "Acme", "website": "acme.com"}]
@@ -106,14 +106,14 @@ def test_search_with_no_query_returns_an_empty_list_without_calling_apollo(monke
     called = []
     monkeypatch.setattr(sci_company_search, "search_companies_result",
                         lambda q: called.append(q) or {"companies": [], "error": None})
-    resp = _client().get("/p2/b2b-agents/social-creative-intelligence/search")
+    resp = _client().get("/p2/b2b-agents/social-media-intelligence/search")
     assert resp.get_json()["companies"] == []
     assert called == []
 
 
 def test_search_degrades_to_an_empty_list_without_a_configured_key(monkeypatch):
     monkeypatch.delenv("APOLLO_API_KEY", raising=False)
-    resp = _client().get("/p2/b2b-agents/social-creative-intelligence/search?q=apple")
+    resp = _client().get("/p2/b2b-agents/social-media-intelligence/search?q=apple")
     assert resp.status_code == 200
     assert resp.get_json()["companies"] == []
 
@@ -129,7 +129,7 @@ def _failing_search(monkeypatch, kind="http_status", status=401, detail="HTTP 40
 def test_a_failed_search_returns_a_reason_not_a_bare_empty_list(monkeypatch):
     _failing_search(monkeypatch)
     monkeypatch.setattr(sci_store, "search_known_companies", lambda *a, **k: [])
-    body = _client().get("/p2/b2b-agents/social-creative-intelligence/search?q=apple").get_json()
+    body = _client().get("/p2/b2b-agents/social-media-intelligence/search?q=apple").get_json()
     assert body["companies"] == []
     assert body["error"]["code"] == "http_status"
     assert "rejected our API key" in body["error"]["message"]
@@ -138,14 +138,14 @@ def test_a_failed_search_returns_a_reason_not_a_bare_empty_list(monkeypatch):
 def test_a_dead_key_is_not_offered_as_retryable(monkeypatch):
     _failing_search(monkeypatch)
     monkeypatch.setattr(sci_store, "search_known_companies", lambda *a, **k: [])
-    body = _client().get("/p2/b2b-agents/social-creative-intelligence/search?q=apple").get_json()
+    body = _client().get("/p2/b2b-agents/social-media-intelligence/search?q=apple").get_json()
     assert body["error"]["retryable"] is False
 
 
 def test_a_rate_limit_is_offered_as_retryable(monkeypatch):
     _failing_search(monkeypatch, status=429, detail="HTTP 429")
     monkeypatch.setattr(sci_store, "search_known_companies", lambda *a, **k: [])
-    body = _client().get("/p2/b2b-agents/social-creative-intelligence/search?q=apple").get_json()
+    body = _client().get("/p2/b2b-agents/social-media-intelligence/search?q=apple").get_json()
     assert body["error"]["retryable"] is True
 
 
@@ -154,9 +154,9 @@ def test_the_vendors_own_words_go_only_to_admins(monkeypatch):
     monkeypatch.setattr(sci_store, "search_known_companies", lambda *a, **k: [])
     admin = sorted(appmod.ADMIN_EMAILS)[0]
     admin_body = _client(admin).get(
-        "/p2/b2b-agents/social-creative-intelligence/search?q=apple").get_json()
+        "/p2/b2b-agents/social-media-intelligence/search?q=apple").get_json()
     plain_body = _client("nobody@position2.com").get(
-        "/p2/b2b-agents/social-creative-intelligence/search?q=apple").get_json()
+        "/p2/b2b-agents/social-media-intelligence/search?q=apple").get_json()
     assert admin_body["error"]["detail"] == "HTTP 401. Body: bad key"
     assert admin_body["error"]["status"] == 401
     assert "detail" not in plain_body["error"]
@@ -172,7 +172,7 @@ def test_a_failed_search_falls_back_to_the_users_own_analyzed_companies(monkeypa
         return [{"id": "", "name": "Google", "website": "google.com", "from_history": True}]
 
     monkeypatch.setattr(sci_store, "search_known_companies", _known)
-    body = _client().get("/p2/b2b-agents/social-creative-intelligence/search?q=goo").get_json()
+    body = _client().get("/p2/b2b-agents/social-media-intelligence/search?q=goo").get_json()
     assert [c["name"] for c in body["companies"]] == ["Google"]
     assert body["companies"][0]["from_history"] is True
     assert seen["args"] == (_OWNER, "goo")
@@ -185,7 +185,7 @@ def test_a_successful_search_never_consults_history(monkeypatch):
                         lambda q: {"companies": [{"id": "", "name": "Acme"}], "error": None})
     monkeypatch.setattr(sci_store, "search_known_companies",
                         lambda *a, **k: called.append(1) or [])
-    body = _client().get("/p2/b2b-agents/social-creative-intelligence/search?q=Acme").get_json()
+    body = _client().get("/p2/b2b-agents/social-media-intelligence/search?q=Acme").get_json()
     assert not called
     assert body["companies"][0]["name"] == "Acme"
 
@@ -193,20 +193,20 @@ def test_a_successful_search_never_consults_history(monkeypatch):
 def test_a_genuine_zero_result_carries_no_error_at_all(monkeypatch):
     monkeypatch.setattr(sci_company_search, "search_companies_result",
                         lambda q: {"companies": [], "error": None})
-    body = _client().get("/p2/b2b-agents/social-creative-intelligence/search?q=zzz").get_json()
+    body = _client().get("/p2/b2b-agents/social-media-intelligence/search?q=zzz").get_json()
     assert body == {"companies": []}
 
 
 def test_search_requires_login():
     c = appmod.app.test_client()
-    resp = c.get("/p2/b2b-agents/social-creative-intelligence/search?q=Acme", follow_redirects=False)
+    resp = c.get("/p2/b2b-agents/social-media-intelligence/search?q=Acme", follow_redirects=False)
     assert resp.status_code in (302, 401, 403)
 
 
 # ── /analyze ──────────────────────────────────────────────────────────────
 
 def test_analyze_requires_a_company_name(monkeypatch):
-    resp = _client().post("/p2/b2b-agents/social-creative-intelligence/analyze", json={})
+    resp = _client().post("/p2/b2b-agents/social-media-intelligence/analyze", json={})
     assert resp.status_code == 400
 
 
@@ -222,7 +222,7 @@ def test_analyze_starts_running_even_without_any_vendor_keys_configured(monkeypa
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     monkeypatch.setattr(sci_store, "save_run", lambda *a, **k: 1)
     monkeypatch.setattr(sci_pipeline, "_sci_run_analysis_job", lambda *a, **k: None)
-    resp = _client().post("/p2/b2b-agents/social-creative-intelligence/analyze",
+    resp = _client().post("/p2/b2b-agents/social-media-intelligence/analyze",
                           json={"company_name": "Acme Inc"})
     assert resp.status_code == 200
     body = resp.get_json()
@@ -232,7 +232,7 @@ def test_analyze_starts_running_even_without_any_vendor_keys_configured(monkeypa
 
 def test_analyze_returns_500_when_the_run_cannot_be_saved(monkeypatch):
     monkeypatch.setattr(sci_store, "save_run", lambda *a, **k: None)
-    resp = _client().post("/p2/b2b-agents/social-creative-intelligence/analyze",
+    resp = _client().post("/p2/b2b-agents/social-media-intelligence/analyze",
                           json={"company_name": "Acme Inc"})
     assert resp.status_code == 500
 
@@ -241,13 +241,13 @@ def test_analyze_returns_500_when_the_run_cannot_be_saved(monkeypatch):
 
 def test_run_status_404s_for_a_run_that_belongs_to_someone_else(monkeypatch):
     _owner_scoped_get_run(monkeypatch, _run(run_id=1, email=_OTHER))
-    resp = _client(_OWNER).get("/p2/b2b-agents/social-creative-intelligence/runs/1/status")
+    resp = _client(_OWNER).get("/p2/b2b-agents/social-media-intelligence/runs/1/status")
     assert resp.status_code == 404
 
 
 def test_run_status_404s_for_a_nonexistent_run(monkeypatch):
     _owner_scoped_get_run(monkeypatch, _run(run_id=1, email=_OWNER))
-    resp = _client(_OWNER).get("/p2/b2b-agents/social-creative-intelligence/runs/999/status")
+    resp = _client(_OWNER).get("/p2/b2b-agents/social-media-intelligence/runs/999/status")
     assert resp.status_code == 404
 
 
@@ -257,7 +257,7 @@ def test_run_status_200s_and_includes_platforms_for_the_owner(monkeypatch):
         {"platform": "instagram", "status": "ok", "post_count": 12},
         {"platform": "youtube", "status": "no_presence", "post_count": 0},
     ])
-    resp = _client(_OWNER).get("/p2/b2b-agents/social-creative-intelligence/runs/1/status")
+    resp = _client(_OWNER).get("/p2/b2b-agents/social-media-intelligence/runs/1/status")
     assert resp.status_code == 200
     body = resp.get_json()
     assert body["status"] == "done"
@@ -266,7 +266,7 @@ def test_run_status_200s_and_includes_platforms_for_the_owner(monkeypatch):
 
 def test_run_detail_404s_for_a_run_that_belongs_to_someone_else(monkeypatch):
     _owner_scoped_get_run(monkeypatch, _run(run_id=1, email=_OTHER))
-    resp = _client(_OWNER).get("/p2/b2b-agents/social-creative-intelligence/runs/1")
+    resp = _client(_OWNER).get("/p2/b2b-agents/social-media-intelligence/runs/1")
     assert resp.status_code == 404
 
 
@@ -274,7 +274,7 @@ def test_run_detail_200s_with_platforms_and_posts_for_the_owner(monkeypatch):
     run = _owner_scoped_get_run(monkeypatch, _run(run_id=1, email=_OWNER, status="done"))
     monkeypatch.setattr(sci_store, "get_platform_runs", lambda run_id: [])
     monkeypatch.setattr(sci_store, "get_posts", lambda run_id: [])
-    resp = _client(_OWNER).get("/p2/b2b-agents/social-creative-intelligence/runs/1")
+    resp = _client(_OWNER).get("/p2/b2b-agents/social-media-intelligence/runs/1")
     assert resp.status_code == 200
     body = resp.get_json()
     assert body["company_name"] == "Acme Inc"

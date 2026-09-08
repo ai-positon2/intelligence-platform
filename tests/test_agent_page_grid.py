@@ -28,7 +28,7 @@ CSS_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 # a new page has to be added here on purpose rather than quietly skipped.
 PAGES = [
     ("gtm.css", ".main"),                          # the B2B Agents listing
-    ("social_creative_intelligence.css", ".main"),
+    ("social_media_intelligence.css", ".main"),
     ("company_people_intelligence.css", ".shell"),  # Contact Finder
     ("linkedin.css", ".shell"),                     # LinkedIn Intelligence
     ("job_change_alert.css", ".main"),

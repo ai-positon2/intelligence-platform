@@ -5,7 +5,7 @@ than only present in raw JSON.
 
 Runs the REAL text of the new functions (extracted from the page's own
 inline script, not retyped) in node against a minimal document/CURRENT_RUN
-shim. Extraction helpers are IMPORTED from test_social_creative_intelligence_
+shim. Extraction helpers are IMPORTED from test_social_media_intelligence_
 datasources, not copied -- two copies of the same extraction logic drift,
 exactly the lesson tests/test_event_intel_client_picker.py's own docstring
 already states about this codebase's node harnesses.
@@ -26,7 +26,7 @@ os.environ.setdefault("GOOGLE_CLIENT_SECRET", "test")
 os.environ.setdefault("FLASK_SECRET_KEY", "test")
 
 import app as appmod  # noqa: E402
-from test_social_creative_intelligence_datasources import (  # noqa: E402
+from test_social_media_intelligence_datasources import (  # noqa: E402
     _extract_var, _extract_fn, _extract_line_fn, _page_html as _sci_page_html,
 )
 

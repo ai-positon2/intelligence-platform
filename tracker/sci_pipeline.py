@@ -468,7 +468,7 @@ def _first_video_url(media_urls: list) -> str | None:
 # One list rather than a chain of ifs so adding a platform is one line, and
 # so the shapes are readable side by side.
 #
-# It is the SAME question templates/social_creative_intelligence.html's
+# It is the SAME question templates/social_media_intelligence.html's
 # postThumbnail() answers in JS to draw each post's card, and the two must
 # know the same shapes: that resolver is proven (the cards render), so this
 # one is written to match it field for field, and
