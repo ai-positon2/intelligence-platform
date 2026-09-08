@@ -1,4 +1,4 @@
-"""Orchestration for Social Creative Intelligence Analyst. Keeps app.py thin
+"""Orchestration for Social Media Intelligence. Keeps app.py thin
 per repo convention -- every route does a cheap DB call or kicks off
 _sci_run_analysis_job in a daemon thread; all the real work lives here.
 

@@ -1,4 +1,4 @@
-"""Video frame extraction for Social Creative Intelligence Analyst, Phase 1
+"""Video frame extraction for Social Media Intelligence, Phase 1
 scope: sampled frames only, fed through sci_vision.analyze_image per frame
 and folded into a post-level summary by sci_vision.summarize_frames(). Audio
 transcription is a later phase (tracker/sci_audio.py).

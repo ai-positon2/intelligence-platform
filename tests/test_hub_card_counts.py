@@ -143,13 +143,13 @@ def test_social_creative_intelligence_analyst_is_one_of_the_live_dashboards(dash
     """The dashboard that took the count from 8/8 to 9/9 on 2026-08-26, once
     all 6 platforms and the synthesis report shipped and it came out from
     behind HIDDEN_AGENT_SLUGS."""
-    assert "Social Creative Intelligence Analyst" in dashboard_cards["live"]
+    assert "Social Media Intelligence" in dashboard_cards["live"]
 
 
 def test_the_description_mentions_creative_analysis(hub_card, dashboard_cards):
     """Same "every live capability is named" rule as the others above."""
     assert "creative analysis" in hub_card["desc"].lower()
-    assert "Social Creative Intelligence Analyst" in dashboard_cards["live"]
+    assert "Social Media Intelligence" in dashboard_cards["live"]
 
 
 def test_the_description_does_not_call_it_scraping(hub_card):

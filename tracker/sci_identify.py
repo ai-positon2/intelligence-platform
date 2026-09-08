@@ -1,4 +1,4 @@
-"""Step 1 (IDENTIFY) for Social Creative Intelligence Analyst: resolve a
+"""Step 1 (IDENTIFY) for Social Media Intelligence: resolve a
 company name/URL to its actual handle on each of the 7 platforms, using
 Claude's server-side web_search tool. Refusal to guess is enforced by a
 confidence threshold on the model's own output, not by prompt wording alone

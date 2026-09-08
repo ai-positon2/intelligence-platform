@@ -1,4 +1,4 @@
-"""Facebook adapter for Social Creative Intelligence Analyst -- owns only the
+"""Facebook adapter for Social Media Intelligence -- owns only the
 actor id, its input shape, and normalizing its output into the shared post
 dict shape (see sci_pipeline.py's module docstring for that shape). Actor
 swap is a one-line env var change, never a code change here.

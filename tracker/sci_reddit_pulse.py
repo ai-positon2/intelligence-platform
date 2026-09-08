@@ -1,4 +1,4 @@
-"""Reddit brand conversation ("pulse") for Social Creative Intelligence.
+"""Reddit brand conversation ("pulse") for Social Media Intelligence.
 
 WHY THIS EXISTS AT ALL, AND WHY IT IS NOT JUST A SEVENTH POST FEED:
 
