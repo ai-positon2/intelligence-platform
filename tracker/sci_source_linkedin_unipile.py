@@ -1,4 +1,4 @@
-"""LinkedIn adapter for Social Creative Intelligence Analyst, backed by
+"""LinkedIn adapter for Social Media Intelligence, backed by
 Unipile instead of Apify -- tried FIRST by tracker/sci_pipeline.py's
 _collect_linkedin, ahead of the Apify actor path
 (tracker/sci_source_linkedin.py), since a connected Unipile account is a

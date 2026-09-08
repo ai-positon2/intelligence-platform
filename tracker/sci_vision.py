@@ -1,4 +1,4 @@
-"""Claude vision for Social Creative Intelligence Analyst -- the core of
+"""Claude vision for Social Media Intelligence -- the core of
 Step 3 ("understand the creative"): actually look at an image and describe
 what's depicted, never infer it from the caption. Mirrors
 tracker/lps_enrichment.py's _anthropic() convention: degrades to a clear

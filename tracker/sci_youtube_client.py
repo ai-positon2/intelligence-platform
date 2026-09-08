@@ -1,4 +1,4 @@
-"""YouTube Data API v3 client for Social Creative Intelligence Analyst.
+"""YouTube Data API v3 client for Social Media Intelligence.
 
 The one platform with a real, sanctioned public API -- no scraper needed.
 Hand-rolled HTTP on `requests` (already a dependency) rather than pulling in

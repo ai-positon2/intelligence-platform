@@ -1,4 +1,4 @@
-"""Native (Apollo-backed) company search for Social Creative Intelligence's
+"""Native (Apollo-backed) company search for Social Media Intelligence's
 disambiguation picker -- no dependency on the Arena vendor.
 
 tracker/arena_client.py's own company search periodically fails because

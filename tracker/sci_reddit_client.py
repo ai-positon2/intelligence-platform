@@ -1,4 +1,4 @@
-"""Reddit API client for Social Creative Intelligence Analyst.
+"""Reddit API client for Social Media Intelligence.
 
 WHY OAUTH AND NOT THE PUBLIC .json ENDPOINTS: Reddit's old
 "append .json to any URL" trick is gone for server traffic. Probed live
@@ -44,7 +44,7 @@ PLATFORM = "reddit"
 
 _TOKEN_URL = "https://www.reddit.com/api/v1/access_token"
 _API_BASE = "https://oauth.reddit.com"
-_DEFAULT_USER_AGENT = "python:position2-intelligence-platform:v1.0 (Social Creative Intelligence Analyst)"
+_DEFAULT_USER_AGENT = "python:position2-intelligence-platform:v1.0 (Social Media Intelligence)"
 
 # App-only tokens last 24h. Cached module-level with a safety margin so a
 # 6-call collection does not fetch 6 tokens; Reddit counts token requests

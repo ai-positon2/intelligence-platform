@@ -1,4 +1,4 @@
-"""Postgres-backed storage for Social Creative Intelligence Analyst runs.
+"""Postgres-backed storage for Social Media Intelligence runs.
 
 Mirrors tracker/linkedin_playbook_store.py's shape: a standalone _pg_conn()
 (this Flask app runs on Railway with no persistent disk, so a run a user just

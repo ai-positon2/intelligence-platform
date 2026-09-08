@@ -1,4 +1,4 @@
-"""Instagram adapter for Social Creative Intelligence Analyst, backed by
+"""Instagram adapter for Social Media Intelligence, backed by
 Unipile instead of Apify -- tried FIRST by tracker/sci_pipeline.py's
 _collect_instagram, ahead of the Apify actor path
 (tracker/sci_source_instagram.py).

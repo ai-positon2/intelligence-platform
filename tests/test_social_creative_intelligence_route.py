@@ -59,7 +59,7 @@ def test_page_renders_for_any_position2_staff(monkeypatch):
     monkeypatch.setattr(sci_store, "list_runs", lambda email: [])
     resp = _client("someone@position2.com").get("/p2/b2b-agents/social-creative-intelligence")
     assert resp.status_code == 200
-    assert b"Social Creative Intelligence Analyst" in resp.data
+    assert b"Social Media Intelligence" in resp.data
 
 
 def test_page_requires_login():
