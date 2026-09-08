@@ -83,7 +83,7 @@
         <div class="sci-suggest-panel" id="sciSuggestPanel" style="display:none"></div>
 
         <div id="runningWrap" style="display:none;margin-top:20px">
-          <div class="sci-running-note"><span class="sci-spinner"></span><span>Identifying platforms and collecting posts. This runs in the background and can take a few minutes &mdash; you can leave this page; your run will be here in History when it's done.</span></div>
+          <div class="sci-running-note"><span class="sci-spinner"></span><span>Identifying platforms and collecting posts. This runs in the background and can take a few minutes. You can leave this page; your run will be here in History when it's done.</span></div>
           <div class="sci-platform-grid" id="platformGrid"></div>
         </div>
       </div>
@@ -114,7 +114,7 @@
           </div>
           {% endfor %}
         {% else %}
-          <div class="sci-empty">No analyses yet &mdash; run one above and it'll show up here.</div>
+          <div class="sci-empty">No analyses yet. Run one above and it'll show up here.</div>
         {% endif %}
       </div>
     </div>
@@ -300,17 +300,46 @@
       panel.innerHTML = '<div class="sci-card sci-datasrc">' +
         '<div class="sci-card-head"><h2>Data sources <span class="sci-datasrc-tag">admin only</span></h2>' +
         '<button type="button" class="sci-datasrc-refresh" id="dsRefreshBtn" ' +
-        'onclick="loadDataSources();loadApifyDataSources();loadVisionOpenaiCheck();">Refresh</button></div>' +
+        'onclick="loadDataSources();loadApifyDataSources();loadVisionClaudeCheck();loadVisionOpenaiCheck();">Refresh</button></div>' +
         '<div class="sci-datasrc-sub">Unipile</div>' +
         '<div class="sci-datasrc-body" id="dsBody"><div class="sci-datasrc-loading"><span class="sci-spinner" style="width:14px;height:14px;border-width:2px"></span>Checking Unipile…</div></div>' +
         '<div class="sci-datasrc-sub">Apify</div>' +
         '<div class="sci-datasrc-body" id="dsApifyBody"><div class="sci-datasrc-loading"><span class="sci-spinner" style="width:14px;height:14px;border-width:2px"></span>Checking Apify…</div></div>' +
+        '<div class="sci-datasrc-sub">Claude vision (creative analysis)</div>' +
+        '<div class="sci-datasrc-body" id="dsVisionClaudeBody"><div class="sci-datasrc-loading"><span class="sci-spinner" style="width:14px;height:14px;border-width:2px"></span>Checking…</div></div>' +
         '<div class="sci-datasrc-sub">ChatGPT vision (second opinion)</div>' +
         '<div class="sci-datasrc-body" id="dsVisionOpenaiBody"><div class="sci-datasrc-loading"><span class="sci-spinner" style="width:14px;height:14px;border-width:2px"></span>Checking…</div></div>' +
       '</div>';
       loadDataSources();
       loadApifyDataSources();
+      loadVisionClaudeCheck();
       loadVisionOpenaiCheck();
+    }
+
+    // The primary vision pass, checked the same way and for the same reason
+    // as the second opinion below it. Both spend one real vision call
+    // against a tiny inert test image, so neither re-runs on its own.
+    function loadVisionClaudeCheck(){
+      var body = document.getElementById('dsVisionClaudeBody');
+      if(!body) return;
+      fetch('/p2/admin/external-usage/sci-vision-claude-check', {method: 'POST'})
+        .then(function(r){ return r.json(); })
+        .then(function(d){
+          if(!d.configured){
+            body.innerHTML = '<div class="sci-datasrc-empty">ANTHROPIC_API_KEY is not set on this deployment.</div>';
+            return;
+          }
+          if(!d.ok){
+            body.innerHTML = '<div class="sci-datasrc-empty">' + esc(d.error || 'Claude vision is unavailable right now.') + '</div>';
+            return;
+          }
+          body.innerHTML = '<div class="sci-datasrc-row"><span class="sci-datasrc-name">model: ' + esc(d.model || '') + '</span>' +
+            '<span class="sci-datasrc-status ok">working (' + (d.elapsed_ms || 0) + 'ms)</span></div>' +
+            '<div class="sci-datasrc-note">Reads every collected creative and writes the subject, setting, messaging, tone, hook and CTA shown on each post. This check spent one small real vision call to prove it end to end.</div>';
+        })
+        .catch(function(){
+          body.innerHTML = '<div class="sci-datasrc-empty">Could not reach the Claude vision check.</div>';
+        });
     }
 
     // Unlike the two blocks above (which list per-platform rows), this is
@@ -333,7 +362,7 @@
           }
           body.innerHTML = '<div class="sci-datasrc-row"><span class="sci-datasrc-name">model: ' + esc(d.model || '') + '</span>' +
             '<span class="sci-datasrc-status ok">working (' + (d.elapsed_ms || 0) + 'ms)</span></div>' +
-            '<div class="sci-datasrc-note">Runs as a second, independent pass alongside Claude&#39;s vision analysis on every collected creative &mdash; this check spent one small real vision call to prove it end to end.</div>';
+            '<div class="sci-datasrc-note">Runs as a second, independent pass alongside Claude&#39;s vision analysis on every collected creative. This check spent one small real vision call to prove it end to end.</div>';
         })
         .catch(function(){
           body.innerHTML = '<div class="sci-datasrc-empty">Could not reach the ChatGPT vision check.</div>';
@@ -382,7 +411,7 @@
           var listed = d.by_platform || {}, working = d.connected_by_platform || {};
           body.innerHTML = UNIPILE_PLATFORMS.map(function(p){
             return dsRow(p, working[p] || 0, listed[p] || 0);
-          }).join('') + '<div class="sci-datasrc-note">Facebook, TikTok and X collect through Apify once its key is configured &mdash; Unipile only covers LinkedIn and Instagram here.</div>';
+          }).join('') + '<div class="sci-datasrc-note">Facebook, TikTok and X collect through Apify once its key is configured. Unipile only covers LinkedIn and Instagram here.</div>';
         })
         .catch(function(){
           if(btn) btn.disabled = false;
@@ -429,7 +458,7 @@
           body.innerHTML = APIFY_PLATFORMS.map(function(p){
             return dsApifyRow(p, actors[p]);
           }).join('') + '<div class="sci-datasrc-note">Token verified' + (d.account ? ' for ' + esc(d.account) : '') +
-            '. Each row is a metadata read, never a run &mdash; nothing here spends an Apify credit.</div>';
+            '. Each row is a metadata read, never a run, so nothing here spends an Apify credit.</div>';
         })
         .catch(function(){
           body.innerHTML = '<div class="sci-datasrc-empty">Could not reach the Apify check.</div>';
@@ -873,14 +902,30 @@
       no_image_bytes: 'Not run: no frame bytes were available for this post.',
       vendor_call_failed: 'The vendor call failed for this post.',
       unparsable_response: 'The vendor replied, but not in a readable shape.',
+      response_truncated: 'The vendor ran out of room mid-answer, so nothing could be read from it.',
+      empty_response: 'The vendor answered but described nothing about this creative.',
       no_frames_analyzed: 'Every sampled video frame failed to analyze.',
     };
-    function cdetailColumn(vendorClass, vendorLabel, analysis, status){
+    // The stored per-vendor error column, when it carries something the map
+    // above does not already say in plain language. Worth showing: the
+    // pipeline records the real reason a post failed (an HTTP status, a
+    // "Could not extract any video frames"), and the page used to collapse
+    // every one of them into "The vendor call failed for this post" -- which
+    // is exactly the sentence that tells whoever is debugging nothing at all.
+    function cdetailDetail(rawError, reason){
+      var text = (rawError || '').toString().trim();
+      if(!text) return '';
+      if(CDETAIL_ERROR_TEXT[text]) return '';   // already said, in better words
+      if(text === reason) return '';
+      return '<div class="sci-cdetail-value empty">' + esc(text) + '</div>';
+    }
+    function cdetailColumn(vendorClass, vendorLabel, analysis, status, rawError){
       var head = '<div class="sci-cdetail-vendor ' + vendorClass + '"><span class="sci-cdetail-vendor-dot"></span>' + esc(vendorLabel) + '</div>';
       if(status !== 'ok' || !analysis){
         var reason = (analysis && analysis.error && CDETAIL_ERROR_TEXT[analysis.error]) ||
           (status === 'skipped' ? CDETAIL_ERROR_TEXT.not_configured : CDETAIL_ERROR_TEXT.vendor_call_failed);
-        return '<div class="sci-cdetail-col">' + head + '<div class="sci-cdetail-value empty">' + esc(reason) + '</div></div>';
+        return '<div class="sci-cdetail-col">' + head + '<div class="sci-cdetail-value empty">' + esc(reason) + '</div>' +
+          cdetailDetail(rawError, reason) + '</div>';
       }
       var summary = cdetailField('summary', 'Summary', analysis.summary);
       var rest = CDETAIL_FIELDS.map(function(pair){ return cdetailField(pair[0], pair[1], analysis[pair[0]]); }).join('');
@@ -904,8 +949,10 @@
           '<button type="button" class="sci-cdetail-close" onclick="closeCreativeDetail()" aria-label="Close">✕</button>' +
         '</div>' +
         '<div class="sci-cdetail-cols">' +
-          cdetailColumn('claude', 'Claude', post.creative_analysis, post.creative_analysis_status) +
-          cdetailColumn('openai', 'ChatGPT', post.creative_analysis_openai, post.creative_analysis_openai_status) +
+          cdetailColumn('claude', 'Claude', post.creative_analysis, post.creative_analysis_status,
+                        post.creative_analysis_error) +
+          cdetailColumn('openai', 'ChatGPT', post.creative_analysis_openai, post.creative_analysis_openai_status,
+                        post.creative_analysis_openai_error) +
         '</div>';
       overlay.classList.add('open');
     }

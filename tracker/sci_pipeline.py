@@ -425,28 +425,157 @@ def run_reddit_pulse(run_id: int, company_name: str, company_url: str | None) ->
         logger.warning("sci_pipeline: Reddit pulse failed for run %s: %s", run_id, e)
 
 
-def _video_thumbnail_url(post: dict) -> str | None:
-    """Best-effort static thumbnail for a video post whose frames couldn't be
-    extracted -- most commonly YouTube, where yt-dlp/ffmpeg frame extraction
-    (tracker/sci_video.py) frequently gets blocked by YouTube's bot detection
-    from a datacenter IP like Railway's, leaving creative_analysis null for
-    every video on that platform. YouTube's Data API returns a real
-    thumbnail URL for free (tracker/sci_youtube_client.py already stores it
-    under raw.snippet.thumbnails); analyzing that instead of giving up keeps
-    the post grounded in real visual data rather than leaving it blank.
-    Written platform-agnostically so any other adapter that starts
-    populating the same raw.snippet.thumbnails shape benefits automatically."""
-    thumbs = ((post.get("raw") or {}).get("snippet") or {}).get("thumbnails") or {}
-    for key in ("maxres", "standard", "high", "medium", "default"):
-        entry = thumbs.get(key)
-        url = entry.get("url") if isinstance(entry, dict) else None
-        if url:
-            return url
+# Post types read frame by frame rather than as a single still. Named once
+# because three separate places used to spell the same tuple out inline.
+VIDEO_POST_TYPES = ("video", "reel", "short")
+
+# What a URL's own path says it is. Deliberately path-only: a signed CDN
+# link carries a query string full of tokens and sizes that would produce
+# false matches on either list.
+_IMAGE_SUFFIXES = (".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp",
+                   ".heic", ".heif", ".avif")
+_VIDEO_SUFFIXES = (".mp4", ".mov", ".m4v", ".webm", ".mkv", ".avi",
+                   ".m3u8", ".mpd", ".ts")
+
+
+def _url_suffix(url: str) -> str:
+    from urllib.parse import urlsplit
+    try:
+        path = urlsplit(url or "").path
+    except ValueError:
+        return ""
+    dot = path.rfind(".")
+    slash = path.rfind("/")
+    return path[dot:].lower() if dot > slash else ""
+
+
+def _is_image_url(url: str) -> bool:
+    return _url_suffix(url) in _IMAGE_SUFFIXES
+
+
+def _is_video_url(url: str) -> bool:
+    return _url_suffix(url) in _VIDEO_SUFFIXES
+
+
+def _first_video_url(media_urls: list) -> str | None:
+    for u in media_urls or []:
+        if _is_video_url(u):
+            return u
     return None
 
 
+# Where each adapter leaves a video's own cover/poster image on the raw item.
+# One list rather than a chain of ifs so adding a platform is one line, and
+# so the shapes are readable side by side.
+#
+# This started life as a YouTube-only lookup (raw.snippet.thumbnails), added
+# because yt-dlp/ffmpeg frame extraction is routinely blocked from a
+# datacenter IP like Railway's. The problem is that YouTube is not the only
+# platform whose frames fail to extract, and it is the only one that was
+# given a fallback: an Instagram reel, a TikTok video, a LinkedIn video or a
+# Facebook video whose extraction failed was recorded as "Could not extract
+# any video frames" by BOTH vendors, while the cover image the platform had
+# already handed us sat unused on the same row. On an account that posts
+# mostly reels that is most of the creative in the report.
+def _poster_candidates(raw: dict) -> list:
+    def _dig(*path):
+        cur = raw
+        for key in path:
+            if not isinstance(cur, dict):
+                return None
+            cur = cur.get(key)
+        return cur
+
+    out = []
+    # YouTube Data API (tracker/sci_youtube_client.py), best size first.
+    thumbs = _dig("snippet", "thumbnails")
+    if isinstance(thumbs, dict):
+        for key in ("maxres", "standard", "high", "medium", "default"):
+            entry = thumbs.get(key)
+            if isinstance(entry, dict):
+                out.append(entry.get("url"))
+    # Instagram via Apify: displayUrl IS the reel cover; a carousel keeps
+    # its slides' covers on childPosts.
+    out.append(raw.get("displayUrl"))
+    for child in raw.get("childPosts") or []:
+        if isinstance(child, dict):
+            out.append(child.get("displayUrl"))
+    # Instagram via Unipile.
+    out += [raw.get("preview_image"), raw.get("image_url")]
+    for child in (raw.get("carousel_media") or raw.get("children") or []):
+        if isinstance(child, dict):
+            out += [child.get("preview_image"), child.get("image_url")]
+    # TikTok via Apify.
+    out += [_dig("videoMeta", "coverUrl"), _dig("videoMeta", "originalCoverUrl"),
+            _dig("videoMeta", "cover")]
+    for cover in raw.get("covers") or []:
+        out.append(cover if isinstance(cover, str) else None)
+    # LinkedIn: Unipile attachments carry a poster alongside the video;
+    # Apify hands back plain image lists.
+    for att in raw.get("attachments") or []:
+        if isinstance(att, dict) and not att.get("unavailable"):
+            out += [att.get("preview_url"), att.get("thumbnail_url"), att.get("poster")]
+    for img in raw.get("images") or raw.get("imageUrls") or []:
+        out.append(img.get("url") if isinstance(img, dict) else img)
+    # Facebook via Apify.
+    out.append(raw.get("thumbnail"))
+    for m in raw.get("media") or []:
+        if isinstance(m, dict):
+            photo = m.get("photo_image")
+            out += [m.get("thumbnail"),
+                    photo.get("uri") if isinstance(photo, dict) else None]
+    photo = raw.get("photo_image")
+    out += [photo.get("uri") if isinstance(photo, dict) else None,
+            raw.get("picture"), raw.get("photoUrl")]
+    # X: a video's media row carries its poster frame under media_url_https.
+    for m in (raw.get("media") or (raw.get("extendedEntities") or {}).get("media") or []):
+        if isinstance(m, dict):
+            out.append(m.get("media_url_https"))
+    return out
+
+
+def _poster_image_url(post: dict) -> str | None:
+    """The platform's own cover image for this post, or None.
+
+    Never returns something that declares itself a video: the whole point is
+    to hand a vision model a still it can actually read. A candidate with no
+    file extension at all is accepted, since plenty of CDN image URLs have
+    none."""
+    raw = post.get("raw") or {}
+    if not isinstance(raw, dict):
+        return None
+    for url in _poster_candidates(raw):
+        if isinstance(url, str) and url.strip() and not _is_video_url(url):
+            return url.strip()
+    return None
+
+
+def _still_image_url(post: dict, media_urls: list) -> str | None:
+    """The single still to analyze for a post that is not read frame by frame.
+
+    Was `media_urls[0]`, unconditionally, which is wrong whenever the leading
+    media URL is a video while the post is not typed as one. That really
+    happens: an Instagram carousel is typed "carousel" the moment it has
+    childPosts even if the parent item carries a videoUrl, and an X or
+    Facebook post with several media is typed "carousel" whichever kind
+    leads. In each of those cases an .mp4 URL was being sent to two vision
+    models, which is a guaranteed failure at both of them."""
+    for u in media_urls or []:
+        if _is_image_url(u):
+            return u
+    poster = _poster_image_url(post)
+    if poster:
+        return poster
+    first = (media_urls or [None])[0]
+    # No candidate announces itself either way: the leading URL is still the
+    # best guess (and the long-standing behaviour), unless it announces
+    # itself a video, in which case the caller reads the post as one.
+    return None if (first and _is_video_url(first)) else first
+
+
 def _run_claude_creative_analysis(post_id: int, post_type: str, media_urls: list,
-                                  context: dict, frames: list | None, thumbnail_url: str | None) -> None:
+                                  context: dict, frames: list | None, thumbnail_url: str | None,
+                                  image_url: str | None = None) -> None:
     """Claude's own creative-analysis pass. Structured to mirror
     _run_openai_creative_analysis exactly (own try/except, own store call,
     takes the SAME already-extracted frames/thumbnail_url rather than
@@ -458,14 +587,17 @@ def _run_claude_creative_analysis(post_id: int, post_type: str, media_urls: list
     from tracker import sci_store, sci_vision, sci_audio
 
     try:
-        if post_type in ("video", "reel", "short"):
+        if post_type in VIDEO_POST_TYPES:
             if frames:
                 frame_analyses = [sci_vision.analyze_image_bytes(f, context=context) for f in frames]
                 analysis = sci_vision.summarize_frames(frame_analyses, context=context)
                 if "error" not in analysis:
                     # A failed/absent transcript degrades to None here -- it
                     # never turns a working frame analysis into a failure.
-                    analysis["dialogue_transcript"] = sci_audio.transcribe_video(media_urls[0])
+                    # Same URL choice as frame extraction: the video, not
+                    # whichever media URL happens to lead.
+                    analysis["dialogue_transcript"] = sci_audio.transcribe_video(
+                        _first_video_url(media_urls) or media_urls[0])
             elif thumbnail_url:
                 # Frame extraction failed (most commonly YouTube blocking
                 # yt-dlp) -- fall back to the platform's own thumbnail image
@@ -481,10 +613,12 @@ def _run_claude_creative_analysis(post_id: int, post_type: str, media_urls: list
                     post_id, None, status="failed", error="Could not extract any video frames.")
                 return
         else:
-            # image or carousel -- analyze the first image; carousel's
-            # remaining images are in media_urls for a later phase that
+            # image or carousel -- analyze the still the caller picked (see
+            # _still_image_url; NOT blindly media_urls[0], which can be a
+            # video on a post that is not typed as one). The carousel's
+            # remaining images stay in media_urls for a later phase that
             # wants to describe every slide, not just the cover.
-            analysis = sci_vision.analyze_image(media_urls[0], context=context)
+            analysis = sci_vision.analyze_image(image_url, context=context)
     except Exception as e:
         logger.warning("sci_pipeline: Claude creative analysis failed for post %s: %s", post_id, e)
         sci_store.update_post_creative_analysis(post_id, None, status="failed", error=str(e)[:500])
@@ -496,7 +630,8 @@ def _run_claude_creative_analysis(post_id: int, post_type: str, media_urls: list
 
 def _run_openai_creative_analysis(post_id: int, run_id: int, platform: str, post_type: str,
                                   media_urls: list, context: dict,
-                                  frames: list | None, thumbnail_url: str | None) -> None:
+                                  frames: list | None, thumbnail_url: str | None,
+                                  image_url: str | None = None) -> None:
     """The ChatGPT-vision second opinion on the SAME creative Claude
     analyzes, reusing the SAME already-extracted video `frames`/fallback
     `thumbnail_url` (computed once, by the caller, shared between both
@@ -514,7 +649,7 @@ def _run_openai_creative_analysis(post_id: int, run_id: int, platform: str, post
     from tracker import sci_store, sci_vision, sci_vision_openai
 
     try:
-        if post_type in ("video", "reel", "short"):
+        if post_type in VIDEO_POST_TYPES:
             if frames:
                 frame_analyses = [sci_vision_openai.analyze_image_bytes(f, context=context) for f in frames]
                 analysis = sci_vision.summarize_frames(frame_analyses, context=context)
@@ -529,7 +664,7 @@ def _run_openai_creative_analysis(post_id: int, run_id: int, platform: str, post
                     post_id, None, status="failed", error="Could not extract any video frames.")
                 return
         else:
-            analysis = sci_vision_openai.analyze_image(media_urls[0], context=context)
+            analysis = sci_vision_openai.analyze_image(image_url, context=context)
     except Exception as e:
         logger.warning("sci_pipeline: OpenAI creative analysis failed for post %s: %s", post_id, e)
         sci_store.update_post_creative_analysis_openai(post_id, None, status="failed", error=str(e)[:500])
@@ -551,14 +686,18 @@ def _extract_video_evidence(post: dict, media_urls: list) -> tuple[list | None, 
     their own 'Could not extract any video frames' if even the thumbnail
     lookup comes up empty."""
     from tracker import sci_video
+    # The video, not just the first media URL: LinkedIn deliberately puts a
+    # video ahead of its poster image, but nothing guarantees every adapter
+    # does, and handing ffmpeg a JPEG to sample frames from is wasted work.
+    video_url = _first_video_url(media_urls) or media_urls[0]
     try:
-        frames = sci_video.extract_frames(media_urls[0], n=MAX_VIDEO_FRAMES)
+        frames = sci_video.extract_frames(video_url, n=MAX_VIDEO_FRAMES)
     except Exception as e:
         logger.warning("sci_pipeline: frame extraction failed for post %s: %s", post.get("id"), e)
         frames = None
     if frames:
         return frames, None
-    return None, _video_thumbnail_url(post)
+    return None, _poster_image_url(post)
 
 
 def run_platform_creative_analysis(run_id: int, platform: str) -> None:
@@ -591,15 +730,28 @@ def run_platform_creative_analysis(run_id: int, platform: str) -> None:
                                                             error="No media URL to analyze.")
             continue
 
+        # How to read this creative comes from what the post actually
+        # carries, not from its type label alone. A post typed image or
+        # carousel whose only media is a video (an Instagram carousel with a
+        # videoUrl on the parent item, for one) has to be sampled as a
+        # video; sending its .mp4 URL to two vision models, which is what
+        # the type label alone did, fails at both of them every time.
+        image_url = _still_image_url(post, media_urls)
+        read_as_video = post_type in VIDEO_POST_TYPES or (
+            image_url is None and _first_video_url(media_urls) is not None)
+        effective_type = post_type if post_type in VIDEO_POST_TYPES else (
+            "video" if read_as_video else post_type)
+
         frames, thumbnail_url = None, None
-        if post_type in ("video", "reel", "short"):
+        if read_as_video:
             frames, thumbnail_url = _extract_video_evidence(post, media_urls)
 
         with ThreadPoolExecutor(max_workers=2) as pool:
-            claude_future = pool.submit(_run_claude_creative_analysis, post["id"], post_type,
-                                        media_urls, context, frames, thumbnail_url)
+            claude_future = pool.submit(_run_claude_creative_analysis, post["id"], effective_type,
+                                        media_urls, context, frames, thumbnail_url, image_url)
             openai_future = pool.submit(_run_openai_creative_analysis, post["id"], run_id, platform,
-                                        post_type, media_urls, context, frames, thumbnail_url)
+                                        effective_type, media_urls, context, frames, thumbnail_url,
+                                        image_url)
             claude_future.result()
             openai_future.result()
 

@@ -234,11 +234,12 @@ def test_claude_and_openai_analysis_actually_run_at_the_same_time(monkeypatch):
     claude_started = threading.Event()
     openai_started = threading.Event()
 
-    def fake_claude(post_id, post_type, media_urls, context, frames, thumbnail_url):
+    def fake_claude(post_id, post_type, media_urls, context, frames, thumbnail_url, image_url=None):
         claude_started.set()
         assert openai_started.wait(timeout=3), "openai never started -- these ran sequentially"
 
-    def fake_openai(post_id, run_id, platform, post_type, media_urls, context, frames, thumbnail_url):
+    def fake_openai(post_id, run_id, platform, post_type, media_urls, context, frames,
+                    thumbnail_url, image_url=None):
         openai_started.set()
         assert claude_started.wait(timeout=3), "claude never started -- these ran sequentially"
 
@@ -283,11 +284,12 @@ def test_a_hung_or_slow_openai_call_does_not_delay_claudes_own_stored_result(mon
 
     claude_write_time = {}
 
-    def fake_claude(post_id, post_type, media_urls, context, frames, thumbnail_url):
+    def fake_claude(post_id, post_type, media_urls, context, frames, thumbnail_url, image_url=None):
         sci_store.update_post_creative_analysis(post_id, {"subject": "x"}, status="ok")
         claude_write_time["t"] = time.monotonic()
 
-    def fake_slow_openai(post_id, run_id, platform, post_type, media_urls, context, frames, thumbnail_url):
+    def fake_slow_openai(post_id, run_id, platform, post_type, media_urls, context, frames,
+                         thumbnail_url, image_url=None):
         time.sleep(0.3)  # stands in for a genuinely slow vendor call
         sci_store.update_post_creative_analysis_openai(post_id, {"subject": "y"}, status="ok")
 
