@@ -1626,7 +1626,7 @@ APP_AGENTS = [
         "tags": ["LinkedIn", "Competitive", "AI"],
     },
     {
-        "slug": "social-creative-intelligence", "name": "Social Media Intelligence",
+        "slug": "social-media-intelligence", "name": "Social Media Intelligence",
         "tagline": "Cross-Platform Social Analysis",
         "ac": "#fb923c", "ac2": "#f472b6", "icon": _asvg("<rect x=\"3\" y=\"5\" width=\"18\" height=\"14\" rx=\"2\"/><circle cx=\"12\" cy=\"12\" r=\"3.5\"/><path d=\"M8 5l1.5-2h5L16 5\"/>"),
         "pill1": "Cross-Platform Social Analysis", "pill2": "7 platforms · two vision models",
@@ -1735,7 +1735,8 @@ APP_AGENTS_BY_SLUG = {a["slug"]: a for a in APP_AGENTS}
 #   linkedin-social-researcher: HIDDEN 2026-08-14 at the owner's request,
 #   expected back in a few days. (Renamed from linkedin-strategy-researcher
 #   on 2026-08-20 when that slug moved to a new, unrelated agent.)
-#   social-creative-intelligence: was HIDDEN 2026-08-25 to 2026-08-26 for a
+#   social-media-intelligence (then social-creative-intelligence): was
+#   HIDDEN 2026-08-25 to 2026-08-26 for a
 #   staged rollout (Instagram + YouTube shipped first, then the remaining 4
 #   platforms and the cross-platform synthesis report) -- unhidden now that
 #   all 6 platforms + synthesis + the report UI are live. Left as a worked
@@ -1756,6 +1757,10 @@ _LEGACY_AGENT_SLUGS = {
     "keyword-compass": "keyword-finder",
     "brief-architect": "content-brief-generator",
     "content-alchemist": "content-enhancer",
+    # Social Creative Intelligence Analyst -> Social Media Intelligence,
+    # 2026-09-08. Safe to fold forward: the old slug is retired, not reused,
+    # so every row already logged under it means this one agent.
+    "social-creative-intelligence": "social-media-intelligence",
 }
 
 # ── Per-agent run cap ─────────────────────────────────────────────────────────
@@ -2046,7 +2051,12 @@ def _agent_access_requested_slugs(email: str) -> set:
     if not email:
         return set()
     e = email.lower()
-    return {r["slug"] for r in _agent_access_requests_raw() if (r["email"] or "").lower() == e and r["slug"]}
+    # Through _canonical_agent_slug for the same reason every 'Agent Runs'
+    # reader goes through it: a row logged before a rename still carries the
+    # old slug, so an un-mapped read shows "Request access" again to someone
+    # who already asked, and logs a duplicate when they click it.
+    return {_canonical_agent_slug(r["slug"]) for r in _agent_access_requests_raw()
+            if (r["email"] or "").lower() == e and r["slug"]}
 
 def _slack_mrkdwn_escape(s: str) -> str:
     """Escape &, <, > for Slack mrkdwn text — untrusted input (a user's typed
@@ -5022,13 +5032,16 @@ _PAGE_LABEL_ALIASES = (
     ("Gentle Dental Slot Checker", "42 North Dental Slot Checker"),
     # "Social Creative Intelligence Analyst" -> "Social Media Intelligence",
     # 2026-09-08, on the grounds that the agent had grown well past creative
-    # analysis. Title axis only: the slug is deliberately unchanged, so no
-    # path alias is needed and none is added. Safe to fold forward for the
-    # same reason as the two above: the old title is retired, not reused, so
-    # every historical row under it means this one agent. The longer form
-    # comes first because this list is applied in order and a substring
-    # match on the bare form would otherwise leave "Social Media
-    # Intelligence Analyst" behind.
+    # analysis, with the slug moved to match. Both axes are aliased, because
+    # a page view recorded before the rename carries the old title AND the
+    # old path. Safe to fold forward for the same reason as the two above:
+    # neither the old title nor the old slug is reused by anything else, so
+    # every historical row under either means this one agent.
+    #
+    # The two title rules are ordered longest-first on purpose: this list is
+    # applied in sequence with a substring match, so the bare form running
+    # first would leave "Social Media Intelligence Analyst" behind.
+    ("/p2/b2b-agents/social-creative-intelligence", "/p2/b2b-agents/social-media-intelligence"),
     ("Social Creative Intelligence Analyst", "Social Media Intelligence"),
     ("Social Creative Intelligence", "Social Media Intelligence"),
     # NOT aliased, deliberately: the old hidden agent's slug/title
@@ -8645,19 +8658,41 @@ def _sci_run_status_payload(run_id: int, email: str):
     }
 
 
+# The slug moved with the rename (2026-09-08). Two different shims below,
+# for two different reasons.
+#
+# THE PAGE gets a 301 from the old path so a shared link or a bookmark still
+# lands, and so the address bar settles on the one canonical URL. Same
+# pattern as the nine legacy /p2/admin/* shims and _LEGACY_AGENT_SLUGS.
+#
+# THE FOUR API ROUTES below instead answer on BOTH paths, with no redirect.
+# A 301 is the wrong tool there: it is not reliably replayed as a POST by
+# every client (which would break /analyze), and more to the point a page
+# already open in someone's browser when this deploys is still polling the
+# OLD paths from the BASE constant baked into the JS it loaded. Redirecting
+# those would be a broken run for anyone mid-analysis at deploy time;
+# answering both is not.
 @app.route("/p2/b2b-agents/social-creative-intelligence")
+def social_media_intelligence_legacy():
+    """Old slug. No decorator on purpose: the gate answers at the
+    destination, exactly like the legacy /p2/admin/* redirects."""
+    return redirect("/p2/b2b-agents/social-media-intelligence", code=301)
+
+
+@app.route("/p2/b2b-agents/social-media-intelligence")
 @position2_required
-def social_creative_intelligence():
+def social_media_intelligence():
     from tracker import sci_store
     user = _get_user() or {}
     email = user.get("email", "").lower()
-    return render_template("social_creative_intelligence.html", user=user,
+    return render_template("social_media_intelligence.html", user=user,
                            runs=sci_store.list_runs(email))
 
 
+@app.route("/p2/b2b-agents/social-media-intelligence/search")
 @app.route("/p2/b2b-agents/social-creative-intelligence/search")
 @position2_required
-def social_creative_intelligence_search():
+def social_media_intelligence_search():
     """Company search shown before a run starts, so an ambiguous free-text
     name (e.g. "apple") can be disambiguated into one real company + domain
     before the seven-platform identify step ever spends a call guessing.
@@ -8698,9 +8733,10 @@ def social_creative_intelligence_search():
     return jsonify(payload)
 
 
+@app.route("/p2/b2b-agents/social-media-intelligence/analyze", methods=["POST"])
 @app.route("/p2/b2b-agents/social-creative-intelligence/analyze", methods=["POST"])
 @position2_required
-def social_creative_intelligence_analyze():
+def social_media_intelligence_analyze():
     from tracker import sci_pipeline, sci_store
     payload = request.get_json(silent=True) or {}
     company_name = str(payload.get("company_name") or "").strip()
@@ -8722,9 +8758,10 @@ def social_creative_intelligence_analyze():
     return jsonify({"run_id": run_id, "status": "running"})
 
 
+@app.route("/p2/b2b-agents/social-media-intelligence/runs/<int:run_id>/status")
 @app.route("/p2/b2b-agents/social-creative-intelligence/runs/<int:run_id>/status")
 @position2_required
-def social_creative_intelligence_run_status(run_id):
+def social_media_intelligence_run_status(run_id):
     email = (_get_user() or {}).get("email", "").lower()
     payload = _sci_run_status_payload(run_id, email)
     if payload is None:
@@ -8732,9 +8769,10 @@ def social_creative_intelligence_run_status(run_id):
     return jsonify(payload)
 
 
+@app.route("/p2/b2b-agents/social-media-intelligence/runs/<int:run_id>")
 @app.route("/p2/b2b-agents/social-creative-intelligence/runs/<int:run_id>")
 @position2_required
-def social_creative_intelligence_run(run_id):
+def social_media_intelligence_run(run_id):
     from tracker import sci_store
     email = (_get_user() or {}).get("email", "").lower()
     run = sci_store.get_run(run_id, email)

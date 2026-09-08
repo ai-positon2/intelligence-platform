@@ -261,7 +261,7 @@ def test_the_video_types_tuple_is_named_once():
 
 # ── The two resolvers for one question must know the same shapes ───────────
 #
-# templates/social_creative_intelligence.html's postThumbnail() answers the
+# templates/social_media_intelligence.html's postThumbnail() answers the
 # same question in JS, to draw each post's card. That one is proven -- the
 # cards render -- and this one was written to match it. They cannot share
 # code across the language boundary, so this is the join: if the page learns
@@ -276,7 +276,7 @@ def _page_thumbnail_fields():
     real text."""
     import re
     html = io.open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                                "templates", "social_creative_intelligence.html"),
+                                "templates", "social_media_intelligence.html"),
                    encoding="utf-8").read()
     start = html.index("function postThumbnail(post)")
     body = html[start:start + html[start:].index("\n    }")]
@@ -300,7 +300,7 @@ def test_this_module_knows_every_raw_field_the_page_resolver_does():
     source = inspect.getsource(sci_pipeline._poster_candidates)
     missing = sorted(f for f in _page_thumbnail_fields() if f not in source)
     assert not missing, (
-        "templates/social_creative_intelligence.html's postThumbnail() reads %s, which "
+        "templates/social_media_intelligence.html's postThumbnail() reads %s, which "
         "_poster_candidates does not know. A post whose cover image the page can draw "
         "must not be reported as unanalyzable." % missing)
 

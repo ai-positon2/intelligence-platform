@@ -21,7 +21,7 @@ import tempfile
 import pytest
 
 _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-_TEMPLATE = os.path.join(_ROOT, "templates", "social_creative_intelligence.html")
+_TEMPLATE = os.path.join(_ROOT, "templates", "social_media_intelligence.html")
 
 pytestmark = pytest.mark.skipif(shutil.which("node") is None, reason="node is not installed")
 

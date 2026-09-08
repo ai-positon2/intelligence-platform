@@ -139,7 +139,7 @@ def test_the_description_mentions_appointment_availability(hub_card, dashboard_c
     assert "42 North Dental Slot Checker" in dashboard_cards["live"]
 
 
-def test_social_creative_intelligence_analyst_is_one_of_the_live_dashboards(dashboard_cards):
+def test_social_media_intelligence_analyst_is_one_of_the_live_dashboards(dashboard_cards):
     """The dashboard that took the count from 8/8 to 9/9 on 2026-08-26, once
     all 6 platforms and the synthesis report shipped and it came out from
     behind HIDDEN_AGENT_SLUGS."""

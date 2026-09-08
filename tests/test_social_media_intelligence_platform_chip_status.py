@@ -31,7 +31,7 @@ os.environ.setdefault("GOOGLE_CLIENT_ID", "test")
 os.environ.setdefault("GOOGLE_CLIENT_SECRET", "test")
 os.environ.setdefault("FLASK_SECRET_KEY", "test")
 
-from test_social_creative_intelligence_datasources import (  # noqa: E402
+from test_social_media_intelligence_datasources import (  # noqa: E402
     _extract_fn, _extract_var, _extract_line_fn, _page_html,
 )
 

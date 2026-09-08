@@ -100,7 +100,7 @@ def test_the_light_ground_outranks_the_unconditional_one():
 
 @pytest.mark.parametrize("page", [
     "event_conference_intelligence.css",
-    "social_creative_intelligence.css",
+    "social_media_intelligence.css",
     "42_north_dental_slot_checker.css",
 ])
 def test_a_page_with_its_own_light_ground_still_outranks_auroras(page):
