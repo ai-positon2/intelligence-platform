@@ -1,4 +1,4 @@
-"""LinkedIn adapter for Social Creative Intelligence Analyst -- feature
+"""LinkedIn adapter for Social Media Intelligence -- feature
 flagged, unlike every other platform adapter. SCI_APIFY_LINKEDIN_ACTOR_ID
 must be set explicitly (no shipped default) because LinkedIn is the platform
 most exposed to scraping-detection and ToS enforcement action. actor_id()

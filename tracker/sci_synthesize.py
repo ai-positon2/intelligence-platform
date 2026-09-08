@@ -1,4 +1,4 @@
-"""Step 5 for Social Creative Intelligence Analyst: turn sci_classify's
+"""Step 5 for Social Media Intelligence: turn sci_classify's
 mechanical pattern data into the cited, readable report. One Claude call,
 given the per-platform pattern summary plus a compact digest of every
 analyzed post (each post's "vision" object carries BOTH Claude's and

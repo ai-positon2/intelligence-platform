@@ -1,4 +1,4 @@
-"""ChatGPT (OpenAI) vision for Social Creative Intelligence Analyst -- a
+"""ChatGPT (OpenAI) vision for Social Media Intelligence -- a
 SECOND, independent creative-analysis pass, run alongside tracker/sci_vision.py's
 existing Claude pass, on the user's explicit request (2026-09-07): "add a
 layer of ChatGPT Vision to read and analyze each creative... understand the

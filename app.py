@@ -1626,15 +1626,15 @@ APP_AGENTS = [
         "tags": ["LinkedIn", "Competitive", "AI"],
     },
     {
-        "slug": "social-creative-intelligence", "name": "Social Creative Intelligence Analyst",
-        "tagline": "Cross-Platform Creative Analysis",
+        "slug": "social-creative-intelligence", "name": "Social Media Intelligence",
+        "tagline": "Cross-Platform Social Analysis",
         "ac": "#fb923c", "ac2": "#f472b6", "icon": _asvg("<rect x=\"3\" y=\"5\" width=\"18\" height=\"14\" rx=\"2\"/><circle cx=\"12\" cy=\"12\" r=\"3.5\"/><path d=\"M8 5l1.5-2h5L16 5\"/>"),
-        "pill1": "Cross-Platform Creative Analysis", "pill2": "7 platforms · vision-analyzed",
-        "lead": ("Given a company name or URL, find its organic presence across Instagram, LinkedIn, X, TikTok, YouTube and Facebook, then actually look at every image and video to report what the creative shows and why it works."),
+        "pill1": "Cross-Platform Social Analysis", "pill2": "7 platforms · two vision models",
+        "lead": ("Given a company name or URL, find its organic presence across Instagram, LinkedIn, X, TikTok, YouTube, Facebook and Reddit, then report what they post, how often, what earns engagement, the messaging and tone behind it, what every image and video actually shows, and what people are saying about the brand."),
         "trips": [
-            {"t": "What it does", "d": "Goes past post counts and captions to describe the actual creative: subject, style, narrative, tone, and ties it back to what drives engagement."},
-            {"t": "How it works", "d": "Resolves the company's handle on each platform, pulls recent organic posts, runs every image and video through Claude vision, then synthesizes per-platform and cross-platform patterns."},
-            {"t": "Best for", "d": "Marketing and creative teams studying a competitor's (or their own) content strategy."},
+            {"t": "What it does", "d": "Reports the whole organic picture: posting mix and cadence, which posts earned engagement and which did not, the messaging, tone, hooks and CTAs behind them, what each image and video depicts, and the Reddit conversation about the brand."},
+            {"t": "How it works", "d": "Resolves the company's handle on each platform, pulls its recent organic posts with their engagement, reads every image and video with two independent vision models, transcribes what is said in videos, then writes a per-platform and cross-platform report with every claim cited back to real posts."},
+            {"t": "Best for", "d": "Marketing, brand and demand-gen teams studying a competitor's organic strategy, or auditing their own."},
         ],
         "tags": ["Social", "Vision", "AI"],
     },
@@ -5020,6 +5020,17 @@ _PAGE_LABEL_ALIASES = (
     # the rename would drop out of this page's totals on the day it shipped.
     ("/p2/b2b-agents/gentle-dental-slot-checker", "/p2/b2b-agents/42-north-dental-slot-checker"),
     ("Gentle Dental Slot Checker", "42 North Dental Slot Checker"),
+    # "Social Creative Intelligence Analyst" -> "Social Media Intelligence",
+    # 2026-09-08, on the grounds that the agent had grown well past creative
+    # analysis. Title axis only: the slug is deliberately unchanged, so no
+    # path alias is needed and none is added. Safe to fold forward for the
+    # same reason as the two above: the old title is retired, not reused, so
+    # every historical row under it means this one agent. The longer form
+    # comes first because this list is applied in order and a substring
+    # match on the bare form would otherwise leave "Social Media
+    # Intelligence Analyst" behind.
+    ("Social Creative Intelligence Analyst", "Social Media Intelligence"),
+    ("Social Creative Intelligence", "Social Media Intelligence"),
     # NOT aliased, deliberately: the old hidden agent's slug/title
     # ("linkedin-strategy-researcher" / "LinkedIn Strategy Researcher") were
     # reassigned the same day to the new agent above, rather than retired. That
@@ -8321,7 +8332,7 @@ def admin_external_usage_unipile_connect():
         providers,
         success_redirect_url=base + "/p2/admin/external-usage",
         failure_redirect_url=base + "/p2/admin/external-usage",
-        name="Social Creative Intelligence")
+        name="Social Media Intelligence")
     if err is not None:
         return jsonify({"error": unipile_client.describe_error(err)}), 502
     return jsonify(data)
@@ -8607,7 +8618,7 @@ def linkedin_playbook_studio_legacy_redirect(rest=""):
     return redirect(target, code=308)
 
 
-# ── Social Creative Intelligence Analyst ──────────────────────────────────────
+# ── Social Media Intelligence ──────────────────────────────────────
 # Internal, staff-only agent: given a company name/URL, identify its organic
 # presence across Instagram/LinkedIn/X/TikTok/YouTube/Facebook, scrape recent
 # posts, and run every image/video through Claude vision (plus audio

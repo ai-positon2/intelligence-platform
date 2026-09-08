@@ -1,4 +1,4 @@
-"""Step 4 for Social Creative Intelligence Analyst: mechanical pattern
+"""Step 4 for Social Media Intelligence: mechanical pattern
 classification across a run's already-analyzed posts. No vendor calls --
 this is pure aggregation over the creative_analysis(_openai) + metrics that
 sci_pipeline's Step 3 already wrote onto each sci_posts row, pooling BOTH
