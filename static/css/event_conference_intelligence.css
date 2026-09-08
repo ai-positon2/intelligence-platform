@@ -6,7 +6,7 @@
    it apart from .c-lps.
 
    Follows the same convention as 42_north_dental_slot_checker.css and
-   social_creative_intelligence.css: this page defines its own .main/.card/
+   social_media_intelligence.css: this page defines its own .main/.card/
    .topbar rather than assuming a shared base, because there isn't one. */
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -108,7 +108,7 @@ body {
    classes come from the shared _admin_menu.html include, but no stylesheet
    this page loads defines them, so without this block the dropdown renders
    permanently open (it has no display:none to start from). Same reason
-   social_creative_intelligence.css carries its own copy. */
+   social_media_intelligence.css carries its own copy. */
 .brand { display: flex; align-items: center; gap: 10px; text-decoration: none; }
 .user-menu { position: relative; }
 .user-pill {

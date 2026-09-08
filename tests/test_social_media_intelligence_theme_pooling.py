@@ -7,7 +7,7 @@ sites on the page (the headline "Creative described" tile, each platform's
 post" link) checked creative_analysis_status alone -- a post Claude failed
 on but ChatGPT successfully described was invisible to all of them, visible
 only in the per-post detail modal (postHasAnalysis, tested separately in
-test_social_creative_intelligence_creative_detail.py).
+test_social_media_intelligence_creative_detail.py).
 
 Runs the REAL text of these functions (extracted from the page's own inline
 script, not retyped) in node -- a text match cannot tell a fixed call site
@@ -28,7 +28,7 @@ os.environ.setdefault("GOOGLE_CLIENT_ID", "test")
 os.environ.setdefault("GOOGLE_CLIENT_SECRET", "test")
 os.environ.setdefault("FLASK_SECRET_KEY", "test")
 
-from test_social_creative_intelligence_datasources import _extract_fn, _page_html  # noqa: E402
+from test_social_media_intelligence_datasources import _extract_fn, _page_html  # noqa: E402
 
 pytestmark = pytest.mark.skipif(shutil.which("node") is None,
                                 reason="node is needed to execute the page script")
