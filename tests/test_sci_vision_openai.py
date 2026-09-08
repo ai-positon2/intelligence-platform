@@ -35,20 +35,24 @@ class _FakeMessage:
 
 
 class _FakeChoice:
-    def __init__(self, content):
+    def __init__(self, content, finish_reason="stop"):
         self.message = _FakeMessage(content)
+        self.finish_reason = finish_reason
 
 
 class _FakeCompletions:
-    def __init__(self, response_text=None, exc=None, no_choices=False):
+    def __init__(self, response_text=None, exc=None, no_choices=False, finish_reason="stop"):
         self._text = response_text
         self._exc = exc
         self._no_choices = no_choices
+        self._finish_reason = finish_reason
+        self.calls = []
 
     def create(self, **kwargs):
+        self.calls.append(kwargs)
         if self._exc:
             raise self._exc
-        choices = [] if self._no_choices else [_FakeChoice(self._text)]
+        choices = [] if self._no_choices else [_FakeChoice(self._text, self._finish_reason)]
         return type("FakeResponse", (), {"choices": choices})()
 
 
@@ -58,8 +62,9 @@ class _FakeChat:
 
 
 class _FakeClient:
-    def __init__(self, response_text=None, exc=None, no_choices=False):
-        self.chat = _FakeChat(response_text=response_text, exc=exc, no_choices=no_choices)
+    def __init__(self, response_text=None, exc=None, no_choices=False, finish_reason="stop"):
+        self.chat = _FakeChat(response_text=response_text, exc=exc, no_choices=no_choices,
+                              finish_reason=finish_reason)
 
 
 _GOOD_REPLY = json.dumps({
@@ -268,3 +273,66 @@ def test_openai_client_has_an_explicit_bounded_timeout(monkeypatch):
     client = sci_vision_openai._openai()
     assert client.timeout == 60.0
     assert client.max_retries == 1
+
+
+# ── The same two guards Claude's pass now carries ──────────────────────────
+#
+# Both matter more on this vendor, not less: the call runs in JSON mode, so
+# a reply cut off at max_tokens is guaranteed to be an unterminated object.
+
+def test_a_reply_describing_nothing_is_an_error_not_a_blank_success(monkeypatch):
+    monkeypatch.setattr(sci_vision_openai, "_openai", lambda: _FakeClient(response_text="{}"))
+    assert sci_vision_openai.analyze_image("https://cdn/x.jpg") == {"error": "empty_response"}
+
+
+def test_a_frame_reply_describing_nothing_is_an_error_too(monkeypatch):
+    monkeypatch.setattr(sci_vision_openai, "_openai", lambda: _FakeClient(response_text="{}"))
+    assert sci_vision_openai.analyze_image_bytes(b"jpeg") == {"error": "empty_response"}
+
+
+def test_a_truncated_reply_is_reported_as_truncated_not_unparsable(monkeypatch):
+    monkeypatch.setattr(sci_vision_openai, "_openai",
+                        lambda: _FakeClient(response_text=_GOOD_REPLY, finish_reason="length"))
+    assert sci_vision_openai.analyze_image("https://cdn/x.jpg") == {"error": "response_truncated"}
+
+
+def test_a_truncated_frame_reply_is_reported_as_truncated(monkeypatch):
+    monkeypatch.setattr(sci_vision_openai, "_openai",
+                        lambda: _FakeClient(response_text=_GOOD_REPLY, finish_reason="length"))
+    assert sci_vision_openai.analyze_image_bytes(b"jpeg") == {"error": "response_truncated"}
+
+
+def test_a_normal_finish_reason_is_not_treated_as_truncation(monkeypatch):
+    monkeypatch.setattr(sci_vision_openai, "_openai",
+                        lambda: _FakeClient(response_text=_GOOD_REPLY, finish_reason="stop"))
+    assert "error" not in sci_vision_openai.analyze_image("https://cdn/x.jpg")
+
+
+def test_a_missing_finish_reason_is_not_treated_as_truncation(monkeypatch):
+    """Defensive: the SDK's own shape is the vendor's contract, not ours."""
+    monkeypatch.setattr(sci_vision_openai, "_openai",
+                        lambda: _FakeClient(response_text=_GOOD_REPLY, finish_reason=None))
+    assert "error" not in sci_vision_openai.analyze_image("https://cdn/x.jpg")
+
+
+def test_both_vendors_are_given_the_identical_output_budget(monkeypatch):
+    """A second opinion asked the same question with less room to answer it
+    is not the same question."""
+    for call in (lambda: sci_vision_openai.analyze_image("https://cdn/x.jpg"),
+                 lambda: sci_vision_openai.analyze_image_bytes(b"jpeg")):
+        client = _FakeClient(response_text=_GOOD_REPLY)
+        monkeypatch.setattr(sci_vision_openai, "_openai", lambda c=client: c)
+        call()
+        assert client.chat.completions.calls[0]["max_tokens"] == sci_vision.MAX_TOKENS
+
+
+def test_the_probe_image_is_shared_with_claudes_own_probe_not_copied():
+    assert sci_vision_openai._PROBE_IMAGE_B64 is sci_vision._PROBE_IMAGE_B64
+
+
+def test_probe_fails_when_the_vendor_describes_nothing(monkeypatch):
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+    monkeypatch.setattr(sci_vision_openai, "_openai", lambda: _FakeClient(response_text="{}"))
+    out = sci_vision_openai.probe()
+    assert out["ok"] is False
+    assert out["error"] == "empty_response"

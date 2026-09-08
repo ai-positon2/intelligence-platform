@@ -8396,6 +8396,30 @@ def admin_external_usage_sci_apify_check():
     return jsonify(_sci_apify_selftest())
 
 
+def _sci_vision_claude_selftest() -> dict:
+    """Prove Claude's own creative-analysis pass end to end (see
+    tracker/sci_vision.probe). Costs one small real vision call against a
+    tiny inert test image, never a real post's creative.
+
+    Added alongside the ChatGPT check below because only the SECOND opinion
+    had a self-test: an admin could confirm the second vendor was healthy
+    and had no way to ask the same question of the primary one."""
+    from tracker import sci_vision
+    try:
+        return sci_vision.probe()
+    except Exception as e:
+        return {"configured": False, "error": "%s: %s" % (type(e).__name__, str(e)[:300])}
+
+
+@app.route("/p2/admin/external-usage/sci-vision-claude-check", methods=["POST"])
+@admin_required
+def admin_external_usage_sci_vision_claude_check():
+    """Run the Claude-vision self-test (see _sci_vision_claude_selftest).
+    POST so no crawler or prefetch can trigger it, matching the checks next
+    to it -- this one spends a small real vision call."""
+    return jsonify(_sci_vision_claude_selftest())
+
+
 def _sci_vision_openai_selftest() -> dict:
     """Prove the ChatGPT-vision second opinion end to end (see
     tracker/sci_vision_openai.probe). Costs one small real vision call

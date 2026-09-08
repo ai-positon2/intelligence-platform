@@ -83,6 +83,18 @@ def _parse(raw: str) -> dict | None:
     return {f: str(parsed.get(f) or "") for f in sci_vision.FIELDS}
 
 
+def _truncated(resp) -> bool:
+    """OpenAI's spelling of the same condition sci_vision._truncated names:
+    finish_reason == "length" means the reply hit max_tokens. It matters
+    more here, not less, than on the Claude side: this call runs in JSON
+    mode, so a cut-off reply is guaranteed to be an unterminated object that
+    json.loads refuses, every time."""
+    try:
+        return (resp.choices[0].finish_reason or "") == "length"
+    except (AttributeError, IndexError, TypeError):
+        return False
+
+
 def _user_text(subject: str, caption: str) -> str:
     text = "Analyze this %s: describe what is depicted, and read its messaging and creative approach." % subject
     if caption:
@@ -107,7 +119,7 @@ def analyze_image(image_url: str, context: dict | None = None) -> dict:
     try:
         resp = client.chat.completions.create(
             model=_model(),
-            max_tokens=900,
+            max_tokens=sci_vision.MAX_TOKENS,
             response_format={"type": "json_object"},
             messages=[
                 {"role": "system", "content": sci_vision.SYSTEM_PROMPT},
@@ -119,13 +131,28 @@ def analyze_image(image_url: str, context: dict | None = None) -> dict:
         )
     except Exception as e:
         logger.warning("sci_vision_openai: analyze_image failed for %s: %s", image_url, e)
-        return {"error": "vendor_call_failed"}
+        # Same retry, same reason, same shared fetcher as the Claude pass:
+        # a refused vendor-side fetch of a signed CDN link is not a broken
+        # integration, and it fails identically at both vendors, which is
+        # exactly what makes it look like one. See
+        # tracker/sci_vision.fetch_image_bytes.
+        data, media_type = sci_vision.fetch_image_bytes(image_url)
+        if not data:
+            return {"error": "vendor_call_failed"}
+        logger.info("sci_vision_openai: retrying %s with bytes fetched here", image_url)
+        return analyze_image_bytes(data, media_type=media_type, context=context)
 
+    if _truncated(resp):
+        logger.warning("sci_vision_openai: reply for %s was cut off at max_tokens", image_url)
+        return {"error": "response_truncated"}
     raw = (resp.choices[0].message.content or "") if resp.choices else ""
     parsed = _parse(raw)
     if parsed is None:
         logger.warning("sci_vision_openai: unparsable response for %s", image_url)
         return {"error": "unparsable_response"}
+    if not sci_vision._usable(parsed):
+        logger.warning("sci_vision_openai: reply for %s described nothing", image_url)
+        return {"error": "empty_response"}
     return parsed
 
 
@@ -151,7 +178,7 @@ def analyze_image_bytes(image_bytes: bytes, media_type: str = "image/jpeg",
     try:
         resp = client.chat.completions.create(
             model=_model(),
-            max_tokens=900,
+            max_tokens=sci_vision.MAX_TOKENS,
             response_format={"type": "json_object"},
             messages=[
                 {"role": "system", "content": sci_vision.SYSTEM_PROMPT},
@@ -165,21 +192,25 @@ def analyze_image_bytes(image_bytes: bytes, media_type: str = "image/jpeg",
         logger.warning("sci_vision_openai: analyze_image_bytes failed: %s", e)
         return {"error": "vendor_call_failed"}
 
+    if _truncated(resp):
+        logger.warning("sci_vision_openai: a video frame's reply was cut off at max_tokens")
+        return {"error": "response_truncated"}
     raw = (resp.choices[0].message.content or "") if resp.choices else ""
     parsed = _parse(raw)
     if parsed is None:
         logger.warning("sci_vision_openai: unparsable response for a video frame")
         return {"error": "unparsable_response"}
+    if not sci_vision._usable(parsed):
+        logger.warning("sci_vision_openai: a video frame's reply described nothing")
+        return {"error": "empty_response"}
     return parsed
 
 
-# A tiny, fully inert 1x1 transparent PNG -- used only to prove the vendor
-# round trip end to end (key valid, model reachable, a reply actually
-# parses) without depending on any external image URL staying up.
-_PROBE_IMAGE_B64 = (
-    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk"
-    "+A8AAQUBAScY42YAAAAASUVORK5CYII="
-)
+# The probe image lives in tracker/sci_vision.py and is imported here rather
+# than copied: both vendors' self-tests must be answering the same question
+# about the same input, and two byte strings that are meant to be identical
+# are two things that can stop being identical.
+_PROBE_IMAGE_B64 = sci_vision._PROBE_IMAGE_B64
 
 
 def probe() -> dict:

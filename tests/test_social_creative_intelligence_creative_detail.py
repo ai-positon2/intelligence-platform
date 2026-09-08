@@ -58,6 +58,7 @@ def _run(post_id, current_run):
         _extract_var(html, "CDETAIL_FIELDS"),
         _extract_fn(html, "cdetailField"),
         _extract_var(html, "CDETAIL_ERROR_TEXT"),
+        _extract_fn(html, "cdetailDetail"),
         _extract_fn(html, "cdetailColumn"),
         _extract_fn(html, "openCreativeDetail"),
         _extract_fn(html, "closeCreativeDetail"),
@@ -179,3 +180,75 @@ def test_the_analyze_button_only_renders_when_there_is_something_to_show():
     # The click must never also trigger the card's own navigation.
     assert "event.preventDefault()" in block
     assert "event.stopPropagation()" in block
+
+
+# ── The reason a post has no reading, in the reader's own words ────────────
+#
+# The pipeline records the real cause on creative_analysis_error (an HTTP
+# status, "Could not extract any video frames"), and this panel used to
+# collapse every one of them into "The vendor call failed for this post" --
+# the one sentence that tells whoever is debugging nothing at all.
+
+def test_the_stored_error_detail_is_shown_alongside_the_plain_reason():
+    post = _post(
+        creative_analysis=None, creative_analysis_status="failed",
+        creative_analysis_error="Could not extract any video frames.",
+        creative_analysis_openai=None, creative_analysis_openai_status="failed",
+        creative_analysis_openai_error="Could not extract any video frames.",
+    )
+    out = _run(1, {"posts": [post]})
+    assert "Could not extract any video frames." in out["panel"]
+
+
+def test_a_raw_vendor_message_reaches_the_panel_rather_than_being_swallowed():
+    post = _post(
+        creative_analysis={"summary": "s"}, creative_analysis_status="ok",
+        creative_analysis_openai=None, creative_analysis_openai_status="failed",
+        creative_analysis_openai_error="Error code: 400 - could not fetch the supplied image URL",
+    )
+    out = _run(1, {"posts": [post]})
+    assert "could not fetch the supplied image URL" in out["panel"]
+
+
+def test_an_error_code_already_said_in_plain_language_is_not_repeated():
+    """The stored column often carries the same short code the map above
+    already renders as a sentence. Printing both would just be noise."""
+    post = _post(
+        creative_analysis={"summary": "s"}, creative_analysis_status="ok",
+        creative_analysis_openai={"error": "unparsable_response"},
+        creative_analysis_openai_status="failed",
+        creative_analysis_openai_error="unparsable_response",
+    )
+    out = _run(1, {"posts": [post]})
+    assert "not in a readable shape" in out["panel"]
+    assert "unparsable_response" not in out["panel"]
+
+
+def test_a_truncated_reply_is_named_as_such():
+    post = _post(
+        creative_analysis={"error": "response_truncated"}, creative_analysis_status="failed",
+        creative_analysis_error="response_truncated",
+    )
+    out = _run(1, {"posts": [post]})
+    assert "ran out of room mid-answer" in out["panel"]
+
+
+def test_a_vendor_that_described_nothing_is_named_as_such():
+    """Not "the call failed": the call worked and the answer was empty, and
+    those point at completely different things to go and look at."""
+    post = _post(
+        creative_analysis={"error": "empty_response"}, creative_analysis_status="failed",
+        creative_analysis_error="empty_response",
+    )
+    out = _run(1, {"posts": [post]})
+    assert "described nothing about this creative" in out["panel"]
+
+
+def test_a_stored_error_is_escaped_like_any_other_text():
+    post = _post(
+        creative_analysis=None, creative_analysis_status="failed",
+        creative_analysis_error='<img src=x onerror="alert(1)">',
+    )
+    out = _run(1, {"posts": [post]})
+    assert "<img src=x" not in out["panel"]
+    assert "&lt;img" in out["panel"]
