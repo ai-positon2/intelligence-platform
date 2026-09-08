@@ -18,6 +18,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import time
 
 logger = logging.getLogger(__name__)
 
@@ -55,6 +56,15 @@ SYSTEM_PROMPT = (
 FIELDS = ("subject", "setting", "people", "product", "style", "on_screen_text",
           "messaging", "cta", "tone", "hook", "format_technique", "branding", "summary")
 
+# One reading of one creative: 13 fields of a sentence or two each. 900 was
+# the original budget and it is too tight for a text-heavy creative (an
+# infographic or a carousel cover whose on_screen_text alone runs long) --
+# and a reply cut off mid-JSON does not degrade gracefully, it fails to parse
+# and the whole post is reported as unreadable. See _truncated() below: the
+# cut-off case is now named rather than silently blamed on the model's
+# formatting.
+MAX_TOKENS = 1500
+
 
 def _anthropic():
     """A configured Anthropic client, or None when this environment has no
@@ -82,6 +92,116 @@ def _parse(raw: str) -> dict | None:
     return {f: str(parsed.get(f) or "") for f in FIELDS}
 
 
+# ── Fetching the image ourselves when the vendor cannot ────────────────────
+#
+# Both vendors accept an image as a URL and fetch it from their own
+# infrastructure. That is the cheap path and the one tried first, but it
+# depends on a third party being able to reach a link we did not issue, and
+# most of what this pipeline collects is a signed, expiring, sometimes
+# geo-fenced CDN URL (scontent.cdninstagram.com, video.xx.fbcdn.net,
+# pbs.twimg.com, media.licdn.com). When one of those refuses the vendor's
+# fetcher, the call comes back as a plain API error and the post is recorded
+# as "vendor_call_failed" -- at BOTH vendors, for the same reason, which
+# looks exactly like a broken integration and is not one.
+#
+# So a failed URL call is retried once with the bytes fetched from here.
+# Railway can generally reach these CDNs even when the vendors cannot, and
+# both modules already have a base64 path built for video frames.
+#
+# The fetch goes through event_intel_http.public_get rather than plain
+# requests, deliberately: these URLs arrive from third-party scrapers, so
+# fetching one server-side is an SSRF surface, and that helper is this
+# repo's reviewed answer to it (DNS pinning, private and reserved addresses
+# refused, every redirect revalidated). It is named for the events agent
+# only because that is where it was first needed; nothing in it is specific
+# to that feature.
+IMAGE_FETCH_TIMEOUT = 20
+MAX_IMAGE_BYTES = 5 * 1024 * 1024
+_FETCH_UA = ("Mozilla/5.0 (compatible; Position2-Intelligence/1.0; "
+             "+https://intelligence.position2.com)")
+
+# What both vendors will actually accept. An image in any other format is
+# not worth sending: it would come back as the same error we are retrying.
+_MEDIA_TYPES = {"image/jpeg": "image/jpeg", "image/jpg": "image/jpeg",
+                "image/pjpeg": "image/jpeg", "image/png": "image/png",
+                "image/webp": "image/webp", "image/gif": "image/gif"}
+
+
+def fetch_image_bytes(url: str) -> tuple[bytes | None, str]:
+    """(bytes, media_type) for `url`, or (None, "") on any failure.
+
+    Never raises, and never returns something the vendors cannot read: an
+    unknown content type, an empty body, or anything over MAX_IMAGE_BYTES
+    is treated as a failure rather than sent on."""
+    if not url:
+        return None, ""
+    resp = None
+    try:
+        from .event_intel_http import public_get
+        resp = public_get(url, timeout=IMAGE_FETCH_TIMEOUT, stream=True, headers={
+            "User-Agent": _FETCH_UA,
+            "Accept": "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
+        })
+        if resp.status_code != 200:
+            logger.warning("sci_vision: image fetch for %s returned HTTP %s",
+                           url, resp.status_code)
+            return None, ""
+        ctype = (resp.headers.get("Content-Type") or "").split(";")[0].strip().lower()
+        media_type = _MEDIA_TYPES.get(ctype)
+        if not media_type:
+            logger.warning("sci_vision: image fetch for %s served %r, not an image "
+                           "either vendor reads", url, ctype)
+            return None, ""
+        data = resp.raw.read(MAX_IMAGE_BYTES + 1, decode_content=True)
+        if not data:
+            return None, ""
+        if len(data) > MAX_IMAGE_BYTES:
+            logger.warning("sci_vision: image at %s is larger than %s bytes",
+                           url, MAX_IMAGE_BYTES)
+            return None, ""
+        return data, media_type
+    except Exception as e:
+        logger.warning("sci_vision: image fetch for %s failed: %s", url, e)
+        return None, ""
+    finally:
+        try:
+            if resp is not None:
+                resp.close()
+        except Exception:
+            pass
+
+
+def _usable(parsed: dict | None) -> bool:
+    """True when a parsed reply actually says something about the creative.
+
+    _parse() coerces a reply into all thirteen FIELDS with `str(x or "")`,
+    which means a reply of `{}` -- or one whose keys are all different from
+    the ones asked for -- comes back as a complete, well-formed dict of
+    thirteen empty strings. Without this check that is stored as
+    creative_analysis_status='ok': the post counts toward "Creative
+    described", the detail panel prints "Not noted" thirteen times, and the
+    synthesis step is handed a reading that contains no information while
+    looking exactly like one that does. A vendor that told us nothing has to
+    be visible as such."""
+    if not parsed:
+        return False
+    return any((parsed.get(f) or "").strip() for f in FIELDS)
+
+
+def _truncated(resp) -> bool:
+    """Whether the model ran out of output budget mid-reply.
+
+    The reply is a JSON object, so being cut off never yields a shorter
+    answer -- it yields an unterminated one that json.loads refuses. Left
+    unchecked that surfaces as "the vendor replied, but not in a readable
+    shape", which points the reader at the wrong thing entirely: the vendor
+    answered fine, we simply did not leave it room to finish. This repo has
+    already paid for the same defect once on the events agent (a truncated
+    score_batch reply wiped an entire run's results to zero), which is why
+    it is named explicitly here rather than inferred."""
+    return getattr(resp, "stop_reason", None) == "max_tokens"
+
+
 def analyze_image(image_url: str, context: dict | None = None) -> dict:
     """Describe one image. Returns the parsed fields dict on success, or
     {"error": "..."} on any failure -- callers check for the "error" key to
@@ -102,7 +222,7 @@ def analyze_image(image_url: str, context: dict | None = None) -> dict:
     try:
         resp = client.messages.create(
             model=os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-5"),
-            max_tokens=900,
+            max_tokens=MAX_TOKENS,
             system=SYSTEM_PROMPT,
             messages=[{
                 "role": "user",
@@ -114,13 +234,27 @@ def analyze_image(image_url: str, context: dict | None = None) -> dict:
         )
     except Exception as e:
         logger.warning("sci_vision: analyze_image failed for %s: %s", image_url, e)
-        return {"error": "vendor_call_failed"}
+        # The vendor could not complete the call on this URL. Very often
+        # that is the vendor's own fetch of a signed CDN link being refused
+        # rather than anything wrong with the request, so fetch the image
+        # here and ask again with the bytes. See fetch_image_bytes.
+        data, media_type = fetch_image_bytes(image_url)
+        if not data:
+            return {"error": "vendor_call_failed"}
+        logger.info("sci_vision: retrying %s with bytes fetched here", image_url)
+        return analyze_image_bytes(data, media_type=media_type, context=context)
 
+    if _truncated(resp):
+        logger.warning("sci_vision: reply for %s was cut off at max_tokens", image_url)
+        return {"error": "response_truncated"}
     raw = "".join(b.text for b in resp.content if getattr(b, "type", "") == "text")
     parsed = _parse(raw)
     if parsed is None:
         logger.warning("sci_vision: unparsable response for %s", image_url)
         return {"error": "unparsable_response"}
+    if not _usable(parsed):
+        logger.warning("sci_vision: reply for %s described nothing", image_url)
+        return {"error": "empty_response"}
     return parsed
 
 
@@ -146,7 +280,7 @@ def analyze_image_bytes(image_bytes: bytes, media_type: str = "image/jpeg",
     try:
         resp = client.messages.create(
             model=os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-5"),
-            max_tokens=900,
+            max_tokens=MAX_TOKENS,
             system=SYSTEM_PROMPT,
             messages=[{
                 "role": "user",
@@ -160,12 +294,65 @@ def analyze_image_bytes(image_bytes: bytes, media_type: str = "image/jpeg",
         logger.warning("sci_vision: analyze_image_bytes failed: %s", e)
         return {"error": "vendor_call_failed"}
 
+    if _truncated(resp):
+        logger.warning("sci_vision: a video frame's reply was cut off at max_tokens")
+        return {"error": "response_truncated"}
     raw = "".join(b.text for b in resp.content if getattr(b, "type", "") == "text")
     parsed = _parse(raw)
     if parsed is None:
         logger.warning("sci_vision: unparsable response for a video frame")
         return {"error": "unparsable_response"}
+    if not _usable(parsed):
+        logger.warning("sci_vision: a video frame's reply described nothing")
+        return {"error": "empty_response"}
     return parsed
+
+
+# A tiny, fully inert 1x1 transparent PNG -- used only to prove the vendor
+# round trip end to end (key valid, model reachable, a reply actually
+# parses) without depending on any external image URL staying up. Byte for
+# byte the same probe image tracker/sci_vision_openai.py uses, so the two
+# vendors' self-tests are answering the same question about the same input.
+_PROBE_IMAGE_B64 = (
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk"
+    "+A8AAQUBAScY42YAAAAASUVORK5CYII="
+)
+
+
+def probe() -> dict:
+    """Prove the Claude-vision pass end to end, in the shape app.py's other
+    vendor self-tests established (_apollo_selftest, _arena_selftest,
+    unipile_client.probe, sci_reddit_client.probe, sci_vision_openai.probe).
+
+    This existed for the ChatGPT second opinion and NOT for Claude's own
+    pass, which is the wrong way round: Claude is the primary vendor here,
+    and the one asymmetry meant an admin could prove the second opinion was
+    healthy while having no way at all to ask the same question of the
+    first. "ANTHROPIC_API_KEY is set" does not prove the key is valid, the
+    model name is one the account can reach, or that a reply parses; one
+    small real call does.
+
+    An all-empty reading counts as a FAILURE here, not a pass: see _usable.
+    A probe that goes green on a vendor returning nothing would be worse
+    than no probe at all."""
+    import base64
+    key = os.environ.get("ANTHROPIC_API_KEY", "")
+    out: dict = {"configured": bool(key), "key_len": len(key),
+                 "model": os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-5"),
+                 "ok": False, "elapsed_ms": 0, "error": ""}
+    if not key:
+        out["error"] = "ANTHROPIC_API_KEY is not set on this environment."
+        return out
+    started = time.monotonic()
+    result = analyze_image_bytes(base64.b64decode(_PROBE_IMAGE_B64), media_type="image/png",
+                                 context={"caption": "self-test probe"})
+    out["elapsed_ms"] = int((time.monotonic() - started) * 1000)
+    if "error" in result:
+        out["error"] = result["error"]
+        return out
+    out["ok"] = True
+    out["sample_summary"] = (result.get("summary") or "")[:200]
+    return out
 
 
 def _dedupe_join(values, limit: int = 3, sep: str = "; ") -> str:

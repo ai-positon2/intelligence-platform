@@ -30,13 +30,42 @@ _FFMPEG_TIMEOUT = 30
 _YTDLP_TIMEOUT = 30
 
 
+_DIRECT_MEDIA_SUFFIXES = (".mp4", ".mov", ".m4v", ".webm", ".mkv", ".avi",
+                          ".m3u8", ".mpd", ".ts")
+
+
+def _is_direct_media_url(url: str) -> bool:
+    """Whether the URL's own path names a media file ffmpeg can open.
+
+    Query-string agnostic on purpose: the Instagram/Facebook/TikTok CDN
+    links this module is fed are signed, so the path is the only reliable
+    part to read."""
+    from urllib.parse import urlsplit
+    try:
+        path = urlsplit(url or "").path
+    except ValueError:
+        return False
+    dot, slash = path.rfind("."), path.rfind("/")
+    return dot > slash and path[dot:].lower() in _DIRECT_MEDIA_SUFFIXES
+
+
 def resolve_playable_url(video_url: str) -> str | None:
     """A direct, ffmpeg-readable media URL for `video_url`. Returns the input
-    unchanged for a non-YouTube URL (already a direct CDN link); resolves a
-    YouTube watch URL via yt-dlp; None if resolution fails. Public -- also
-    used by tracker/sci_audio.py, which needs the same playable URL to pull
-    a video's audio track."""
-    if "youtube.com" not in video_url and "youtu.be" not in video_url:
+    unchanged when it already names a media file; otherwise resolves it via
+    yt-dlp; None if resolution fails. Public -- also used by
+    tracker/sci_audio.py, which needs the same playable URL to pull a
+    video's audio track.
+
+    Originally this routed only youtube.com/youtu.be through yt-dlp and
+    passed everything else straight to ffmpeg as "already a direct CDN
+    link". That is not true of every adapter: tracker/sci_source_tiktok.py
+    falls back to `webVideoUrl`, a TikTok WATCH PAGE, whenever the scrape
+    returns no downloadable address -- which is the normal case, since the
+    actor is called with shouldDownloadVideos false. ffmpeg cannot open a
+    watch page, so those posts failed extraction outright. yt-dlp handles
+    TikTok (and Instagram, and X) the same way it handles YouTube, so the
+    decision is now "does this name a media file", not "is this YouTube"."""
+    if _is_direct_media_url(video_url):
         return video_url
     try:
         result = subprocess.run(
