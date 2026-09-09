@@ -421,6 +421,13 @@ html::-webkit-scrollbar-thumb:hover { background-image: linear-gradient(180deg, 
 .sci-nav-cap { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 9px; font-weight: 700; letter-spacing: .11em; text-transform: uppercase; color: #8a7e91; padding: 7px 11px 5px; }
 
 .sci-panes { overflow-y: auto; min-height: 0; min-width: 0; padding: 24px 30px 44px; }
+/* A soft fade over the last ~54px of the currently visible area -- a mask
+   on the scroller itself, so it tracks the viewport and not the scrolled
+   content -- says "keep scrolling" at a glance whenever a section's last
+   card happens to land right at the visible edge. Gone the moment there is
+   genuinely nothing left below (see updatePaneFade). */
+.sci-panes.sci-panes-more { -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 54px), transparent 100%); mask-image: linear-gradient(to bottom, #000 calc(100% - 54px), transparent 100%); }
+@media (prefers-reduced-motion: no-preference) { .sci-panes { transition: -webkit-mask-image .15s ease; } }
 .sci-panes::-webkit-scrollbar { width: 8px; }
 .sci-panes::-webkit-scrollbar-track { background: transparent; }
 .sci-panes::-webkit-scrollbar-thumb { background-image: linear-gradient(180deg, rgba(251,146,60,.5), rgba(244,114,182,.4)); border-radius: var(--radius-pill, 80px); }

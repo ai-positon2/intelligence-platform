@@ -11,7 +11,7 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-components.css') }}">
   <script src="/static/js/theme.js"></script>
   <link rel="stylesheet" href="/static/css/grid-tokens.css">
-  <link rel="stylesheet" href="/static/css/social_media_intelligence.css?v=9">
+  <link rel="stylesheet" href="/static/css/social_media_intelligence.css?v=10">
   <link rel="stylesheet" href="/static/css/aurora-app.css?v=3">
 </head>
 <body>
@@ -2340,9 +2340,33 @@ function dsApifyRow(platform, entry){
         p.classList.toggle('active', p.getAttribute('data-ns') === ns);
       });
       var scroller = root.querySelector('.sci-panes');
-      if(scroller) scroller.scrollTop = 0;
+      if(scroller){ scroller.scrollTop = 0; updatePaneFade(scroller); }
       revealCharts();
     }
+    // A long pane (this section is routinely the tail end of one: Content
+    // patterns, Messaging & strategy, Evidence from real posts, one after
+    // another) can look like it simply stopped rendering when its last card
+    // happens to land right at the visible edge -- there is nothing on
+    // screen to say "keep scrolling, there is more" versus "this is the
+    // real end." A soft fade over the last ~50px of the CURRENTLY VISIBLE
+    // area (a mask on the scroller itself, not a fixed overlay -- it tracks
+    // the viewport, not the scrolled content) answers that at a glance, and
+    // disappears the moment there genuinely is nothing left below.
+    function updatePaneFade(scroller){
+      if(!scroller) return;
+      var moreBelow = scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight > 24;
+      scroller.classList.toggle('sci-panes-more', moreBelow);
+    }
+    document.addEventListener('scroll', function(e){
+      var el = e.target;
+      if(el && el.classList && el.classList.contains('sci-panes')) updatePaneFade(el);
+    }, true);
+    // A resize (maximizing the window, rotating a tablet) can turn "more
+    // below" into "already at the end" or back, with no scroll event of its
+    // own to trigger the check above.
+    window.addEventListener('resize', function(){
+      updatePaneFade(document.querySelector('#drawerPanel .sci-panes'));
+    });
 
     // Tiles rise in one after another, but only the ones on screen: running
     // the stagger across every hidden pane at open would burn the effect on
@@ -3057,6 +3081,7 @@ function dsApifyRow(platform, entry){
           '<div class="sci-panes">' + panes + '</div>' +
         '</div>';
       document.getElementById('drawerOverlay').classList.add('open');
+      updatePaneFade(document.querySelector('#drawerPanel .sci-panes'));
       revealCharts();
     }
 
