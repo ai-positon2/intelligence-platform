@@ -11,7 +11,7 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-components.css') }}">
   <script src="/static/js/theme.js"></script>
   <link rel="stylesheet" href="/static/css/grid-tokens.css">
-  <link rel="stylesheet" href="/static/css/social_media_intelligence.css?v=2">
+  <link rel="stylesheet" href="/static/css/social_media_intelligence.css?v=3">
   <link rel="stylesheet" href="/static/css/aurora-app.css?v=3">
 </head>
 <body>
@@ -89,8 +89,6 @@
       </div>
     </div>
 
-    <div id="dataSourcesPanel"></div>
-
     <div class="sci-card">
       <div class="sci-card-head">
         <h2>History</h2>
@@ -132,6 +130,8 @@
         {% endif %}
       </div>
     </div>
+
+    <div id="dataSourcesPanel"></div>
   </div>
 
   <div class="sci-drawer-overlay" id="drawerOverlay" onclick="if(event.target===this) closeReport()">
