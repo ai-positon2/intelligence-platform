@@ -239,6 +239,32 @@ def probe() -> dict:
     return out
 
 
+def probe_url() -> dict:
+    """Same proof as probe(), but over analyze_image(url) -- the code path
+    every real post's still image actually takes -- rather than
+    analyze_image_bytes(). See sci_vision.PROBE_IMAGE_URL for why this is a
+    distinct question from probe()'s: a deployment can pass the bytes-only
+    probe while the URL-fetch path (the vendor's own fetch of a link, or
+    this repo's local retry of it) is what is actually broken for every real
+    post."""
+    key = os.environ.get("OPENAI_API_KEY", "")
+    out: dict = {"configured": bool(key), "key_len": len(key), "model": _model(),
+                "probe_url": sci_vision.PROBE_IMAGE_URL,
+                "ok": False, "elapsed_ms": 0, "error": ""}
+    if not key:
+        out["error"] = "OPENAI_API_KEY is not set on this environment."
+        return out
+    started = time.monotonic()
+    result = analyze_image(sci_vision.PROBE_IMAGE_URL, context={"caption": "self-test probe"})
+    out["elapsed_ms"] = int((time.monotonic() - started) * 1000)
+    if "error" in result:
+        out["error"] = result["error"]
+        return out
+    out["ok"] = True
+    out["sample_summary"] = (result.get("summary") or "")[:200]
+    return out
+
+
 # summarize_frames is intentionally NOT redefined here -- tracker.sci_vision.
 # summarize_frames takes a list of already-parsed FIELDS dicts and does pure
 # aggregation (dedupe/join/first-frame-hook), with no vendor-specific logic

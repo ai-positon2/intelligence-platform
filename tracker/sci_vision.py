@@ -355,6 +355,48 @@ def probe() -> dict:
     return out
 
 
+# A small, permanent, publicly reachable image already served by this
+# deployment -- used to probe the URL-fetch path specifically, which probe()
+# above does NOT exercise: probe() sends the tiny inert image as base64,
+# exactly the shape a video frame takes, but every real POST's still image
+# goes through analyze_image(image_url), where the vendor fetches the link
+# itself server-side (see the module docs above fetch_image_bytes for why
+# that is a different, less reliable path than handing over bytes we already
+# hold). A deployment can pass probe() -- key valid, model reachable, a
+# reply parses -- while every real post still fails, if the vendor's own
+# fetch of a signed third-party CDN link (or this repo's SSRF-guarded local
+# retry of the same link) is what is actually broken. Pointing at our own
+# already-public favicon isolates that question from "is Instagram/TikTok/
+# LinkedIn's CDN specifically blocking this" -- it answers "can either vendor
+# fetch ANY external URL at all" first, which is the cheaper, more diagnostic
+# question to answer before chasing a CDN-specific block.
+PROBE_IMAGE_URL = "https://intelligence.position2.com/static/favicon.png"
+
+
+def probe_url() -> dict:
+    """Same proof as probe(), but over analyze_image(url) -- the code path
+    every real post's still image actually takes -- rather than
+    analyze_image_bytes(). See PROBE_IMAGE_URL above for why this is a
+    distinct question from probe()'s."""
+    key = os.environ.get("ANTHROPIC_API_KEY", "")
+    out: dict = {"configured": bool(key), "key_len": len(key),
+                 "model": os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-5"),
+                 "probe_url": PROBE_IMAGE_URL,
+                 "ok": False, "elapsed_ms": 0, "error": ""}
+    if not key:
+        out["error"] = "ANTHROPIC_API_KEY is not set on this environment."
+        return out
+    started = time.monotonic()
+    result = analyze_image(PROBE_IMAGE_URL, context={"caption": "self-test probe"})
+    out["elapsed_ms"] = int((time.monotonic() - started) * 1000)
+    if "error" in result:
+        out["error"] = result["error"]
+        return out
+    out["ok"] = True
+    out["sample_summary"] = (result.get("summary") or "")[:200]
+    return out
+
+
 def _dedupe_join(values, limit: int = 3, sep: str = "; ") -> str:
     """Unique, order-preserving, non-empty values folded into one string --
     used for the messaging-level fields (messaging/cta/tone/format_technique/

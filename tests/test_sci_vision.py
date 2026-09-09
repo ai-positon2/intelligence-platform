@@ -315,3 +315,79 @@ def test_every_admin_can_reach_the_new_check(monkeypatch):
     for admin in sorted(appmod.ADMIN_EMAILS):
         r = _admin_client(admin).post(_CLAUDE_VISION_ROUTE)
         assert r.status_code == 200, admin
+
+
+# ── probe_url(): the same proof, but over the URL-fetch path every real ────
+# post's still image actually takes -- a deployment can pass probe() (bytes)
+# while this fails, if the vendor's own fetch of a link is what is broken.
+
+_CLAUDE_VISION_URL_ROUTE = "/p2/admin/external-usage/sci-vision-claude-url-check"
+
+
+def test_probe_url_says_so_when_no_key_is_configured(monkeypatch):
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    out = sci_vision.probe_url()
+    assert out["configured"] is False and out["ok"] is False
+    assert "ANTHROPIC_API_KEY" in out["error"]
+
+
+def test_probe_url_passes_on_a_real_reading(monkeypatch):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test")
+    monkeypatch.setattr(sci_vision, "_anthropic", lambda: _FakeClient(response_text=_RICH_REPLY))
+    out = sci_vision.probe_url()
+    assert out["ok"] is True
+    assert out["probe_url"] == sci_vision.PROBE_IMAGE_URL
+
+
+def test_probe_url_reports_a_vendor_fetch_failure_distinctly_from_probe(monkeypatch):
+    """The whole point of this second check: it can fail while probe()
+    (bytes) passes, and that distinction has to survive to the reader."""
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test")
+    monkeypatch.setattr(sci_vision, "_anthropic", lambda: _FakeClient(exc=RuntimeError("blocked")))
+    monkeypatch.setattr(sci_vision, "fetch_image_bytes", lambda url: (None, ""))
+    out = sci_vision.probe_url()
+    assert out["ok"] is False
+    assert out["error"] == "vendor_call_failed"
+
+
+def test_probe_url_calls_analyze_image_not_analyze_image_bytes(monkeypatch):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test")
+    seen = {}
+    monkeypatch.setattr(sci_vision, "analyze_image", lambda url, context=None: (seen.update(url=url), {"summary": "ok"})[1])
+    monkeypatch.setattr(sci_vision, "analyze_image_bytes", lambda *a, **k: (_ for _ in ()).throw(AssertionError("should not be called")))
+    sci_vision.probe_url()
+    assert seen["url"] == sci_vision.PROBE_IMAGE_URL
+
+
+def test_url_route_requires_admin():
+    r = _admin_client("nobody@position2.com").post(_CLAUDE_VISION_URL_ROUTE)
+    assert r.status_code == 403
+
+
+def test_url_route_requires_login():
+    r = appmod.app.test_client().post(_CLAUDE_VISION_URL_ROUTE)
+    assert r.status_code in (302, 401)
+
+
+def test_url_route_get_is_not_allowed():
+    admin = sorted(appmod.ADMIN_EMAILS)[0]
+    assert _admin_client(admin).get(_CLAUDE_VISION_URL_ROUTE).status_code == 405
+
+
+def test_url_route_returns_the_probe_json_for_an_admin(monkeypatch):
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    admin = sorted(appmod.ADMIN_EMAILS)[0]
+    body = _admin_client(admin).post(_CLAUDE_VISION_URL_ROUTE).get_json()
+    assert body["configured"] is False
+    assert body["ok"] is False
+    # Distinguishes this route from the bytes-only check beside it -- both
+    # return {"configured": False, "ok": False} with no key set, so without
+    # this the two routes could be wired to the same self-test undetected.
+    assert body["probe_url"] == sci_vision.PROBE_IMAGE_URL
+
+
+def test_every_admin_can_reach_the_url_check(monkeypatch):
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    for admin in sorted(appmod.ADMIN_EMAILS):
+        r = _admin_client(admin).post(_CLAUDE_VISION_URL_ROUTE)
+        assert r.status_code == 200, admin
