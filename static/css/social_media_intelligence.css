@@ -265,7 +265,7 @@ html::-webkit-scrollbar-thumb:hover { background-image: linear-gradient(180deg, 
 .sci-drawer-close { position: absolute; top: 20px; right: 20px; width: 32px; height: 32px; border-radius: 50%; border: 1px solid rgba(255,255,255,.12); background: rgba(255,255,255,.05); color: #b3a6b8; font-size: 13px; cursor: pointer; transition: background .15s, color .15s; z-index: 3; flex-shrink: 0; }
 .sci-drawer-close:hover { background: rgba(255,255,255,.12); color: #f3ecf5; }
 
-/* ── Creative detail: one post, both vendors' reads side by side. A post
+/* ── Creative detail: what the AI made of one post. A post
    card lives INSIDE .sci-drawer, so this is a SEPARATE overlay stacked
    above it (z-index 9500+ vs the report's 9000/9001), not nested inside
    it -- closing this must never also close the report underneath. Smaller
@@ -278,9 +278,9 @@ html::-webkit-scrollbar-thumb:hover { background-image: linear-gradient(180deg, 
 .sci-cdetail-close { position: absolute; top: 16px; right: 16px; z-index: 2; width: 32px; height: 32px; border-radius: 50%; border: 1px solid rgba(255,255,255,.16); background: rgba(10,6,10,.55); backdrop-filter: blur(4px); color: #f3ecf5; font-size: 12px; cursor: pointer; transition: background .15s, color .15s, transform .15s; }
 .sci-cdetail-close:hover { background: rgba(10,6,10,.85); transform: scale(1.06); }
 /* The hero: the post itself (real thumbnail, its own caption, when it went
-   up, how it performed, one way back to it) ahead of the two vendor
-   columns -- answering "what is this post" before "what did the models
-   make of it", the same ordering a reader would want in person. */
+   up, how it performed, one way back to it) ahead of what the AI made of
+   it -- answering "what is this post" before "what does it mean", the
+   same ordering a reader would want in person. */
 .sci-cdetail-hero { position: relative; display: flex; gap: 20px; padding: 24px 52px 22px 24px; border-bottom: 1px solid rgba(255,255,255,.08); background: linear-gradient(165deg, rgba(251,146,60,.06), transparent 55%); }
 .sci-cdetail-hero-media { width: 208px; height: 208px; flex-shrink: 0; border-radius: var(--radius-md, 14px); overflow: hidden; background: rgba(255,255,255,.04); box-shadow: 0 18px 38px -20px rgba(0,0,0,.7); }
 .sci-cdetail-hero-media img { width: 100%; height: 100%; object-fit: cover; display: block; }
@@ -295,23 +295,8 @@ html::-webkit-scrollbar-thumb:hover { background-image: linear-gradient(180deg, 
 .sci-cdetail-original:hover { transform: translateY(-1px); box-shadow: 0 16px 32px -14px rgba(244,114,182,.7); }
 .sci-cdetail-section-label { display: flex; align-items: center; gap: 8px; padding: 18px 22px 6px; font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: #a99fb0; }
 .sci-cdetail-section-label span { font-size: 11px; color: #c084fc; }
-.sci-cdetail-vendors { padding: 16px 22px 6px; }
-.sci-cdetail-vendor-status { display: flex; align-items: baseline; gap: 8px; font-size: 12px; padding: 7px 0; }
-.sci-cdetail-vendor-status + .sci-cdetail-vendor-status { border-top: 1px solid rgba(255,255,255,.07); }
-.sci-cdetail-vendor-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; margin-top: 4px; }
-.sci-cdetail-vendor-name { font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; flex-shrink: 0; }
-.sci-cdetail-vendor-status.claude.ok .sci-cdetail-vendor-dot { background: #fb923c; box-shadow: 0 0 0 3px rgba(251,146,60,.16); }
-.sci-cdetail-vendor-status.claude.ok .sci-cdetail-vendor-name { color: #fdba74; }
-.sci-cdetail-vendor-status.openai.ok .sci-cdetail-vendor-dot { background: #4ade80; box-shadow: 0 0 0 3px rgba(74,222,128,.16); }
-.sci-cdetail-vendor-status.openai.ok .sci-cdetail-vendor-name { color: #86efac; }
-.sci-cdetail-vendor-status.err .sci-cdetail-vendor-dot { background: #55495b; }
-.sci-cdetail-vendor-status.err .sci-cdetail-vendor-name { color: #a99fb0; }
-.sci-cdetail-vendor-reason { font-size: 11.5px; color: #877b8f; line-height: 1.5; }
-/* The merged reading: one row per topic, not two columns. A field both
-   vendors described alike collapses to a single line; a real disagreement
-   earns two lines, each carrying a small colour-coded vendor tag so the
-   reader can still tell who said what without two separate panes. */
-.sci-cdetail-rows { padding: 6px 22px 24px; }
+/* One row per topic: a label above a plain reading, no per-vendor noise. */
+.sci-cdetail-rows { padding: 10px 22px 24px; }
 .sci-cdetail-row { padding: 12px 0; border-top: 1px solid rgba(255,255,255,.07); }
 .sci-cdetail-row:first-child { border-top: none; padding-top: 2px; }
 .sci-cdetail-row-lead { padding-bottom: 16px; margin-bottom: 6px; border-bottom: 1px solid rgba(255,255,255,.1); }
@@ -320,13 +305,8 @@ html::-webkit-scrollbar-thumb:hover { background-image: linear-gradient(180deg, 
 .sci-cdetail-row-lead .sci-cdetail-line::before { content: '“'; margin-right: 2px; color: #c084fc; font-style: normal; }
 .sci-cdetail-row-lead .sci-cdetail-line::after { content: '”'; margin-left: 1px; color: #c084fc; font-style: normal; }
 .sci-cdetail-label { font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; color: #6b5f72; margin-bottom: 6px; }
-.sci-cdetail-line { display: flex; align-items: flex-start; gap: 9px; font-size: 12.5px; color: #d6c9db; line-height: 1.55; }
-.sci-cdetail-line + .sci-cdetail-line { margin-top: 7px; }
-.sci-cdetail-tag { flex-shrink: 0; margin-top: 1px; font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; padding: 2.5px 7px; border-radius: 6px; }
-.sci-cdetail-tag.claude { background: rgba(251,146,60,.15); color: #fdba74; }
-.sci-cdetail-tag.openai { background: rgba(74,222,128,.15); color: #86efac; }
-.sci-cdetail-tag.both { background: transparent; color: #7d7383; padding-left: 0; }
-.sci-cdetail-empty-rows { padding: 8px 22px 26px; font-size: 12.5px; color: #877b8f; font-style: italic; }
+.sci-cdetail-line { display: flex; align-items: flex-start; font-size: 12.5px; color: #d6c9db; line-height: 1.55; }
+.sci-cdetail-empty-rows { padding: 18px 22px 26px; font-size: 12.5px; color: #877b8f; font-style: italic; }
 .sci-cdetail-empty { padding: 30px 22px; text-align: center; font-size: 12.5px; color: #877b8f; }
 @media (max-width: 640px) {
   .sci-cdetail-hero { flex-direction: column; padding: 22px 46px 20px 20px; }
@@ -341,20 +321,11 @@ html::-webkit-scrollbar-thumb:hover { background-image: linear-gradient(180deg, 
 [data-theme="light"] .sci-cdetail-section-label { color: #6b5f72; }
 [data-theme="light"] .sci-cdetail-close { background: rgba(18,26,54,.06); border-color: rgba(18,26,54,.12); color: #5c5163; }
 [data-theme="light"] .sci-cdetail-close:hover { background: rgba(18,26,54,.12); color: #1c1420; }
-[data-theme="light"] .sci-cdetail-vendor-status + .sci-cdetail-vendor-status { border-top-color: rgba(18,26,54,.08); }
-[data-theme="light"] .sci-cdetail-vendor-status.claude.ok .sci-cdetail-vendor-name { color: #b8500a; }
-[data-theme="light"] .sci-cdetail-vendor-status.openai.ok .sci-cdetail-vendor-name { color: #15803d; }
-[data-theme="light"] .sci-cdetail-vendor-status.err .sci-cdetail-vendor-dot { background: #c7bece; }
-[data-theme="light"] .sci-cdetail-vendor-status.err .sci-cdetail-vendor-name { color: #6a5f73; }
-[data-theme="light"] .sci-cdetail-vendor-reason { color: #6a5f73; }
 [data-theme="light"] .sci-cdetail-row { border-top-color: rgba(18,26,54,.08); }
 [data-theme="light"] .sci-cdetail-row-lead { border-bottom-color: rgba(18,26,54,.12); }
 [data-theme="light"] .sci-cdetail-row-lead .sci-cdetail-line { color: #1c1420; }
 [data-theme="light"] .sci-cdetail-label { color: #6a5f73; }
 [data-theme="light"] .sci-cdetail-line { color: #302631; }
-[data-theme="light"] .sci-cdetail-tag.claude { background: rgba(184,80,10,.12); color: #94420a; }
-[data-theme="light"] .sci-cdetail-tag.openai { background: rgba(21,128,61,.12); color: #116932; }
-[data-theme="light"] .sci-cdetail-tag.both { color: #8a7f92; }
 [data-theme="light"] .sci-cdetail-empty-rows { color: #6a5f73; }
 
 /* .sci-postcard is now the whole card's own click target (see
@@ -706,8 +677,8 @@ a.sci-phero-handle:hover { color: #ffffff; border-bottom-color: var(--pf-color, 
 .sci-datasrc-badge { flex-shrink: 0; display: inline-flex; align-items: center; gap: 5px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; padding: 4px 10px; border-radius: var(--radius-pill, 80px); background: color-mix(in srgb, var(--dsc) 15%, transparent); border: 1px solid color-mix(in srgb, var(--dsc) 32%, transparent); color: var(--dsc); white-space: nowrap; }
 .sci-datasrc-badge .d { width: 5px; height: 5px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
 /* Sits between the card head and each vendor's own card grid, so one
-   "Data sources" card can hold Unipile, Apify and both vision vendors as
-   clearly separate groups without becoming four separate cards. A hairline
+   "Data sources" card can hold Unipile, Apify and the vision checks as
+   clearly separate groups without becoming separate cards. A hairline
    trails off after the label instead of the label sitting alone, which is
    what made this panel read as a wall of text rather than sections. */
 .sci-datasrc-sub { display: flex; align-items: center; gap: 10px; font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: var(--ls-caps, .07em); color: #948899; padding: 20px 28px 10px; }

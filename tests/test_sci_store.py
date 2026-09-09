@@ -173,21 +173,9 @@ class _FakeCursor:
                     "caption": caption, "posted_at": posted_at, "media_urls": media_urls,
                     "metrics": metrics, "raw": raw, "creative_analysis": None,
                     "creative_analysis_status": "pending", "creative_analysis_error": None,
-                    "creative_analysis_openai": None,
-                    "creative_analysis_openai_status": "pending", "creative_analysis_openai_error": None,
                     "created_at": _FIXED_TS, "updated_at": _FIXED_TS,
                 })
                 self.db.next_post_id += 1
-            self._result = []
-            return
-
-        if sql.startswith("UPDATE sci_posts SET creative_analysis_openai"):
-            analysis, status, error, post_id = params
-            for p in self.db.posts:
-                if p["id"] == post_id:
-                    p["creative_analysis_openai"] = analysis
-                    p["creative_analysis_openai_status"] = status
-                    p["creative_analysis_openai_error"] = error
             self._result = []
             return
 
@@ -399,46 +387,6 @@ def test_upsert_posts_then_update_creative_analysis_round_trips(fake_db):
     posts = store.get_posts(run_id, "instagram")
     assert posts[0]["creative_analysis_status"] == "ok"
     assert posts[0]["creative_analysis"]["subject"] == "a product shot"
-
-
-def test_the_openai_second_opinion_round_trips_independently_of_claudes(fake_db):
-    """The two vendors' columns must never collide -- writing one must leave
-    the other's already-stored result completely untouched."""
-    run_id = store.save_run("alice@position2.com", "Acme Inc")
-    store.upsert_posts(run_id, "instagram", [
-        {"platform_post_id": "p1", "post_url": "https://instagram.com/p/p1",
-         "post_type": "image", "caption": "hello", "posted_at": None,
-         "media_urls": ["https://cdn/p1.jpg"], "metrics": {"likes": 10}, "raw": {}},
-    ])
-    post_id = store.get_posts(run_id, "instagram")[0]["id"]
-    assert store.get_posts(run_id, "instagram")[0]["creative_analysis_openai_status"] == "pending"
-
-    store.update_post_creative_analysis(post_id, {"subject": "claude's take"}, status="ok")
-    store.update_post_creative_analysis_openai(post_id, {"subject": "gpt's take"}, status="ok")
-
-    post = store.get_posts(run_id, "instagram")[0]
-    assert post["creative_analysis"]["subject"] == "claude's take"
-    assert post["creative_analysis_openai"]["subject"] == "gpt's take"
-    assert post["creative_analysis_status"] == "ok"
-    assert post["creative_analysis_openai_status"] == "ok"
-
-
-def test_an_openai_failure_does_not_touch_claudes_stored_column(fake_db):
-    run_id = store.save_run("alice@position2.com", "Acme Inc")
-    store.upsert_posts(run_id, "instagram", [
-        {"platform_post_id": "p1", "post_url": "https://instagram.com/p/p1",
-         "post_type": "image", "caption": "hello", "posted_at": None,
-         "media_urls": ["https://cdn/p1.jpg"], "metrics": {"likes": 10}, "raw": {}},
-    ])
-    post_id = store.get_posts(run_id, "instagram")[0]["id"]
-    store.update_post_creative_analysis(post_id, {"subject": "claude's take"}, status="ok")
-    store.update_post_creative_analysis_openai(post_id, None, status="failed", error="vendor_call_failed")
-
-    post = store.get_posts(run_id, "instagram")[0]
-    assert post["creative_analysis"]["subject"] == "claude's take"
-    assert post["creative_analysis_status"] == "ok"
-    assert post["creative_analysis_openai"] is None
-    assert post["creative_analysis_openai_status"] == "failed"
 
 
 # ── Abandoned runs: a daemon thread a process restart killed mid-flight ────

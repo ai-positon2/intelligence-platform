@@ -22,7 +22,7 @@ os.environ.setdefault("FLASK_SECRET_KEY", "test")
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from tracker import sci_vision, sci_vision_openai  # noqa: E402
+from tracker import sci_vision  # noqa: E402
 
 _REPLY = json.dumps({"subject": "a pair of running shoes", "summary": "A product shot.",
                      "messaging": "Discount urgency", "cta": "Shop now", "tone": "urgent"})
@@ -196,31 +196,3 @@ def test_the_retry_happens_once_and_does_not_loop(monkeypatch):
     assert calls["n"] == 2  # the URL attempt, then exactly one bytes attempt
 
 
-def test_chatgpt_retries_the_same_way_with_the_same_fetcher(monkeypatch):
-    state = {"url": 0, "bytes": 0}
-
-    class _Completions:
-        def create(self, **kwargs):
-            part = kwargs["messages"][1]["content"][0]
-            if part["image_url"]["url"].startswith("data:"):
-                state["bytes"] += 1
-                choice = type("C", (), {"message": type("M", (), {"content": _REPLY})(),
-                                        "finish_reason": "stop"})()
-                return type("R", (), {"choices": [choice]})()
-            state["url"] += 1
-            raise RuntimeError("Error code: 400 - Timeout while downloading the image")
-
-    class _Client:
-        def __init__(self):
-            self.chat = type("Chat", (), {"completions": _Completions()})()
-
-    monkeypatch.setattr(sci_vision_openai, "_openai", lambda: _Client())
-    _patch_get(monkeypatch, _fake_get(_FakeResponse(data=b"JPEGDATA")))
-    result = sci_vision_openai.analyze_image("https://pbs.twimg.com/media/a.jpg")
-    assert "error" not in result
-    assert result["cta"] == "Shop now"
-    assert (state["url"], state["bytes"]) == (1, 1)
-
-
-def test_chatgpt_reuses_claudes_fetcher_rather_than_keeping_its_own():
-    assert not hasattr(sci_vision_openai, "fetch_image_bytes")

@@ -595,14 +595,12 @@ def _still_image_url(post: dict, media_urls: list) -> str | None:
 def _run_claude_creative_analysis(post_id: int, post_type: str, media_urls: list,
                                   context: dict, frames: list | None, thumbnail_url: str | None,
                                   image_url: str | None = None) -> None:
-    """Claude's own creative-analysis pass. Structured to mirror
-    _run_openai_creative_analysis exactly (own try/except, own store call,
-    takes the SAME already-extracted frames/thumbnail_url rather than
-    re-deriving them) so run_platform_creative_analysis can run the two
-    vendors CONCURRENTLY on one thread pool instead of one waiting on the
-    other -- they are otherwise completely independent, and running them
-    sequentially (the original shape of this code) was pure wasted
-    wall-clock time, doubled again on every video frame."""
+    """The creative-analysis pass for one post: own try/except, own store
+    call, takes the already-extracted frames/thumbnail_url from the caller
+    rather than re-deriving them. This used to run alongside a second,
+    independent ChatGPT-vision pass (see git history) -- that second opinion
+    was removed for consistently lower-quality output, so this is now the
+    only vision pass a post gets."""
     from tracker import sci_store, sci_vision, sci_audio
 
     try:
@@ -647,55 +645,6 @@ def _run_claude_creative_analysis(post_id: int, post_type: str, media_urls: list
     sci_store.update_post_creative_analysis(post_id, analysis, status=status, error=analysis.get("error"))
 
 
-def _run_openai_creative_analysis(post_id: int, run_id: int, platform: str, post_type: str,
-                                  media_urls: list, context: dict,
-                                  frames: list | None, thumbnail_url: str | None,
-                                  image_url: str | None = None) -> None:
-    """The ChatGPT-vision second opinion on the SAME creative Claude
-    analyzes, reusing the SAME already-extracted video `frames`/fallback
-    `thumbnail_url` (computed once, by the caller, shared between both
-    vendors) rather than re-extracting or re-downloading anything. Entirely
-    self-contained (own try/except, own store call) so a failure here can
-    NEVER touch Claude's own creative_analysis for this post -- the two
-    vendors' results are independent columns for exactly this reason, and
-    (see run_platform_creative_analysis) run on independent threads.
-
-    OPENAI_API_KEY absent is not logged as a failure: sci_vision_openai
-    degrades to {"error": "not_configured"} same as every other missing-key
-    case in this codebase, and creative_analysis_openai_status='skipped'
-    (not 'failed') is what a report should read when this second opinion was
-    simply never enabled on this deployment."""
-    from tracker import sci_store, sci_vision, sci_vision_openai
-
-    try:
-        if post_type in VIDEO_POST_TYPES:
-            if frames:
-                frame_analyses = [sci_vision_openai.analyze_image_bytes(f, context=context) for f in frames]
-                analysis = sci_vision.summarize_frames(frame_analyses, context=context)
-            elif thumbnail_url:
-                analysis = sci_vision_openai.analyze_image(thumbnail_url, context=context)
-                if "error" not in analysis:
-                    analysis["frame_extraction_note"] = (
-                        "Video frame extraction was unavailable for this post; "
-                        "analyzed the platform-provided thumbnail instead.")
-            else:
-                sci_store.update_post_creative_analysis_openai(
-                    post_id, None, status="failed", error="Could not extract any video frames.")
-                return
-        else:
-            analysis = sci_vision_openai.analyze_image(image_url, context=context)
-    except Exception as e:
-        logger.warning("sci_pipeline: OpenAI creative analysis failed for post %s: %s", post_id, e)
-        sci_store.update_post_creative_analysis_openai(post_id, None, status="failed", error=str(e)[:500])
-        return
-
-    err = analysis.get("error")
-    status = "skipped" if err == "not_configured" else ("failed" if err else "ok")
-    sci_store.update_post_creative_analysis_openai(post_id, analysis, status=status, error=err)
-    if status == "ok":
-        sci_store.log_spend(run_id, platform, "openai", "vision_second_opinion", units=1)
-
-
 def _extract_video_evidence(post: dict, media_urls: list) -> tuple[list | None, str | None]:
     """Frame extraction (or its thumbnail fallback), done ONCE per post --
     there is exactly one real video to read regardless of how many vendors
@@ -724,18 +673,8 @@ def run_platform_creative_analysis(run_id: int, platform: str) -> None:
     one slow/failed video never blocks the rest of the platform. Marks the
     platform row analyzed_at when done, regardless of individual post
     failures -- per-post failure is recorded on the post row itself
-    (creative_analysis_status), not surfaced as a platform-level failure.
-
-    Runs Claude vision and ChatGPT vision as two INDEPENDENT, CONCURRENT
-    passes per post -- see _run_claude_creative_analysis and
-    _run_openai_creative_analysis. They used to run sequentially (Claude,
-    then wait for it to fully finish, then ChatGPT), which simply doubled
-    the wall-clock cost of every single post's analysis for no reason: the
-    two vendors share nothing but the read-only frames/thumbnail computed
-    once below, and neither vendor's success or failure can affect the
-    other's own stored result."""
+    (creative_analysis_status), not surfaced as a platform-level failure."""
     from tracker import sci_store
-    from concurrent.futures import ThreadPoolExecutor
 
     posts = sci_store.get_posts(run_id, platform)
     for post in posts:
@@ -745,8 +684,6 @@ def run_platform_creative_analysis(run_id: int, platform: str) -> None:
         if not media_urls:
             sci_store.update_post_creative_analysis(post["id"], None, status="skipped",
                                                      error="No media URL to analyze.")
-            sci_store.update_post_creative_analysis_openai(post["id"], None, status="skipped",
-                                                            error="No media URL to analyze.")
             continue
 
         # How to read this creative comes from what the post actually
@@ -765,14 +702,8 @@ def run_platform_creative_analysis(run_id: int, platform: str) -> None:
         if read_as_video:
             frames, thumbnail_url = _extract_video_evidence(post, media_urls)
 
-        with ThreadPoolExecutor(max_workers=2) as pool:
-            claude_future = pool.submit(_run_claude_creative_analysis, post["id"], effective_type,
-                                        media_urls, context, frames, thumbnail_url, image_url)
-            openai_future = pool.submit(_run_openai_creative_analysis, post["id"], run_id, platform,
-                                        effective_type, media_urls, context, frames, thumbnail_url,
-                                        image_url)
-            claude_future.result()
-            openai_future.result()
+        _run_claude_creative_analysis(post["id"], effective_type, media_urls, context,
+                                      frames, thumbnail_url, image_url)
 
     sci_store.upsert_platform_run(run_id, platform, analyzed_at=datetime.now(timezone.utc).isoformat())
 

@@ -8421,13 +8421,9 @@ def admin_external_usage_sci_apify_check():
 
 
 def _sci_vision_claude_selftest() -> dict:
-    """Prove Claude's own creative-analysis pass end to end (see
+    """Prove the creative-analysis pass end to end (see
     tracker/sci_vision.probe). Costs one small real vision call against a
-    tiny inert test image, never a real post's creative.
-
-    Added alongside the ChatGPT check below because only the SECOND opinion
-    had a self-test: an admin could confirm the second vendor was healthy
-    and had no way to ask the same question of the primary one."""
+    tiny inert test image, never a real post's creative."""
     from tracker import sci_vision
     try:
         return sci_vision.probe()
@@ -8438,34 +8434,14 @@ def _sci_vision_claude_selftest() -> dict:
 @app.route("/p2/admin/external-usage/sci-vision-claude-check", methods=["POST"])
 @admin_required
 def admin_external_usage_sci_vision_claude_check():
-    """Run the Claude-vision self-test (see _sci_vision_claude_selftest).
+    """Run the vision self-test (see _sci_vision_claude_selftest).
     POST so no crawler or prefetch can trigger it, matching the checks next
     to it -- this one spends a small real vision call."""
     return jsonify(_sci_vision_claude_selftest())
 
 
-def _sci_vision_openai_selftest() -> dict:
-    """Prove the ChatGPT-vision second opinion end to end (see
-    tracker/sci_vision_openai.probe). Costs one small real vision call
-    against a tiny inert test image, never a real post's creative."""
-    from tracker import sci_vision_openai
-    try:
-        return sci_vision_openai.probe()
-    except Exception as e:
-        return {"configured": False, "error": "%s: %s" % (type(e).__name__, str(e)[:300])}
-
-
-@app.route("/p2/admin/external-usage/sci-vision-openai-check", methods=["POST"])
-@admin_required
-def admin_external_usage_sci_vision_openai_check():
-    """Run the ChatGPT-vision self-test (see _sci_vision_openai_selftest).
-    POST so no crawler or prefetch can trigger it, matching the checks next
-    to it -- this one spends a small real vision call."""
-    return jsonify(_sci_vision_openai_selftest())
-
-
 def _sci_vision_claude_url_selftest() -> dict:
-    """Prove Claude can fetch and read an image BY URL (see
+    """Prove the vision pass can fetch and read an image BY URL (see
     tracker/sci_vision.probe_url) -- the actual path every real post's still
     image takes, and a different question from _sci_vision_claude_selftest
     above: that one sends bytes directly, so a deployment can pass it while
@@ -8481,29 +8457,10 @@ def _sci_vision_claude_url_selftest() -> dict:
 @app.route("/p2/admin/external-usage/sci-vision-claude-url-check", methods=["POST"])
 @admin_required
 def admin_external_usage_sci_vision_claude_url_check():
-    """Run the Claude-vision URL-fetch self-test (see
+    """Run the vision URL-fetch self-test (see
     _sci_vision_claude_url_selftest). POST so no crawler or prefetch can
     trigger it -- this one spends a small real vision call."""
     return jsonify(_sci_vision_claude_url_selftest())
-
-
-def _sci_vision_openai_url_selftest() -> dict:
-    """The ChatGPT counterpart to _sci_vision_claude_url_selftest (see
-    tracker/sci_vision_openai.probe_url)."""
-    from tracker import sci_vision_openai
-    try:
-        return sci_vision_openai.probe_url()
-    except Exception as e:
-        return {"configured": False, "error": "%s: %s" % (type(e).__name__, str(e)[:300])}
-
-
-@app.route("/p2/admin/external-usage/sci-vision-openai-url-check", methods=["POST"])
-@admin_required
-def admin_external_usage_sci_vision_openai_url_check():
-    """Run the ChatGPT-vision URL-fetch self-test (see
-    _sci_vision_openai_url_selftest). POST so no crawler or prefetch can
-    trigger it -- this one spends a small real vision call."""
-    return jsonify(_sci_vision_openai_url_selftest())
 
 
 def _lps_insights_selftest() -> dict:

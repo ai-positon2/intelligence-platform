@@ -4,10 +4,10 @@ happens when the reply runs out of room.
 The bug these exist for: the payload was assembled and then sliced with
 `json.dumps(payload)[:180000]`. That does not send less evidence, it sends
 BROKEN evidence -- a JSON document ending inside a quoted string, which the
-model has to guess at. With sci_pipeline.MAX_POSTS_PER_PLATFORM at 25 and two
-vision readings stored per post, four active platforms already serialize past
-that limit, so on any busy account the synthesis step was reading a corrupted
-digest. The report it wrote is the "insights" half of this agent.
+model has to guess at. With sci_pipeline.MAX_POSTS_PER_PLATFORM at 25, four
+active platforms could already serialize past that limit, so on any busy
+account the synthesis step was reading a corrupted digest. The report it
+wrote is the "insights" half of this agent.
 """
 
 import json
@@ -24,12 +24,11 @@ _VISION = {f: _FIELD_VALUE for f in (
     "messaging", "cta", "tone", "hook", "format_technique", "branding", "summary")}
 
 
-def _post(pid, readings=2, likes=100, platform="instagram"):
+def _post(pid, has_reading=True, likes=100, platform="instagram"):
     p = {"id": pid, "platform": platform, "post_type": "image",
          "post_url": "https://www.instagram.com/p/C%08d/" % pid,
          "metrics": {"likes": likes, "comments": 4}}
-    p["creative_analysis"] = dict(_VISION) if readings >= 1 else {"error": "vendor_call_failed"}
-    p["creative_analysis_openai"] = dict(_VISION) if readings >= 2 else {"error": "vendor_call_failed"}
+    p["creative_analysis"] = dict(_VISION) if has_reading else {"error": "vendor_call_failed"}
     return p
 
 
@@ -115,27 +114,18 @@ def test_a_normal_run_is_sent_whole_with_nothing_omitted(monkeypatch):
 def test_posts_with_a_real_vision_reading_beat_posts_without_one(monkeypatch):
     """A post no vendor could read supports no claim about the creative,
     however popular it was, so it must not crowd out one that can."""
-    unread = [_post(i, readings=0, likes=10 ** 6) for i in range(400)]
-    read = [_post(1000 + i, readings=2, likes=1) for i in range(400)]
+    unread = [_post(i, has_reading=False, likes=10 ** 6) for i in range(400)]
+    read = [_post(1000 + i, has_reading=True, likes=1) for i in range(400)]
     digests, omitted = sci_synthesize._select_digests(unread + read, 90000, 400)
     kept = {d["id"] for d in digests}
-    with_reading = [d for d in digests if any(d["vision"].values())]
+    with_reading = [d for d in digests if d["vision"]]
     assert omitted > 0
     assert len(with_reading) >= 25
     assert any(i >= 1000 for i in kept)
 
 
-def test_two_readings_of_a_post_beat_one(monkeypatch):
-    both = [_post(i, readings=2, likes=1) for i in range(200)]
-    one = [_post(1000 + i, readings=1, likes=10 ** 6) for i in range(200)]
-    digests, _ = sci_synthesize._select_digests(one + both, 40000, 400)
-    two_reading = sum(1 for d in digests if all(d["vision"].values()))
-    one_reading = sum(1 for d in digests if len([v for v in d["vision"].values() if v]) == 1)
-    assert two_reading > one_reading
-
-
 def test_the_posts_that_survive_stay_in_the_runs_own_order(monkeypatch):
-    posts = [_post(i, readings=2, likes=i) for i in range(400)]
+    posts = [_post(i, likes=i) for i in range(400)]
     digests, _ = sci_synthesize._select_digests(posts, 60000, 400)
     ids = [d["id"] for d in digests]
     assert ids == sorted(ids)
