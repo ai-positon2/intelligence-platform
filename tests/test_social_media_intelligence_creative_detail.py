@@ -1,7 +1,8 @@
 """The creative-detail modal: Claude's and ChatGPT's independent reads of
-one post, side by side -- the UI surface that makes the second-opinion data
-tracker/sci_vision_openai.py collects actually visible to a reader, rather
-than only present in raw JSON.
+one post, merged into a single readable account rather than two parallel
+columns -- the UI surface that makes the second-opinion data tracker/
+sci_vision_openai.py collects actually visible to a reader, rather than
+only present in raw JSON.
 
 Runs the REAL text of the new functions (extracted from the page's own
 inline script, not retyped) in node against a minimal document/CURRENT_RUN
@@ -67,10 +68,14 @@ def _run(post_id, current_run):
         _extract_fn(html, "postHasAnalysis"),
         _extract_fn(html, "cdetailHero"),
         _extract_var(html, "CDETAIL_FIELDS"),
-        _extract_fn(html, "cdetailField"),
+        _extract_fn(html, "cdetailNorm"),
+        _extract_fn(html, "cdetailTextEqual"),
         _extract_var(html, "CDETAIL_ERROR_TEXT"),
-        _extract_fn(html, "cdetailDetail"),
-        _extract_fn(html, "cdetailColumn"),
+        _extract_fn(html, "cdetailReason"),
+        _extract_fn(html, "cdetailVendorStatus"),
+        _extract_fn(html, "cdetailLine"),
+        _extract_fn(html, "cdetailRow"),
+        _extract_fn(html, "cdetailInsights"),
         _extract_fn(html, "openCreativeDetail"),
         _extract_fn(html, "closeCreativeDetail"),
     ])
@@ -178,7 +183,7 @@ def test_a_stray_caption_is_escaped_not_executed():
     assert "&lt;img src=x onerror" in html
 
 
-def test_a_not_configured_openai_column_says_so_not_a_generic_failure():
+def test_a_not_configured_openai_status_says_so_not_a_generic_failure():
     post = _post(
         creative_analysis={"summary": "s"}, creative_analysis_status="ok",
         creative_analysis_openai=None, creative_analysis_openai_status="skipped",
@@ -187,7 +192,7 @@ def test_a_not_configured_openai_column_says_so_not_a_generic_failure():
     assert "not configured on this deployment" in out["panel"]
 
 
-def test_a_failed_column_shows_the_specific_vendor_error_text():
+def test_a_failed_vendor_status_shows_the_specific_vendor_error_text():
     post = _post(
         creative_analysis={"summary": "s"}, creative_analysis_status="ok",
         creative_analysis_openai={"error": "unparsable_response"}, creative_analysis_openai_status="failed",
@@ -246,7 +251,7 @@ def test_every_card_opens_the_detail_modal_regardless_of_analysis_status():
     """Static-source check on renderPostCard itself: the whole card opens the
     modal unconditionally now -- not gated by postHasAnalysis the way the
     small analyze-button toggle used to be, since the modal itself already
-    says plainly when a reading was never run or failed (see cdetailColumn).
+    says plainly when a reading was never run or failed (see cdetailInsights).
     A post with nothing to show yet still deserves one click to confirm
     that, not to be quietly excluded from the affordance every other post
     card gets."""
@@ -347,3 +352,102 @@ def test_a_stored_error_is_escaped_like_any_other_text():
     out = _run(1, {"posts": [post]})
     assert "<img src=x" not in out["panel"]
     assert "&lt;img" in out["panel"]
+
+
+# ── The merge itself: one reading, not two buckets fighting for the eye ────
+#
+# The whole point of this redesign is that Claude and ChatGPT no longer sit
+# in two parallel columns repeating each other or "Not noted" past each
+# other -- a field both vendors described the same way renders ONCE, a real
+# disagreement earns two attributed lines, and a field only one vendor
+# addressed renders once with no noise about the one that didn't.
+
+def test_a_field_both_vendors_agree_on_renders_once_not_twice():
+    post = _post(
+        creative_analysis={"summary": "s", "tone": "Subscribe to our Channel."},
+        creative_analysis_status="ok",
+        creative_analysis_openai={"summary": "s", "tone": "Subscribe to our Channel"},
+        creative_analysis_openai_status="ok",
+    )
+    out = _run(1, {"posts": [post]})
+    html = out["panel"]
+    # Trailing-punctuation-only difference must still merge to one line --
+    # cdetailTextEqual normalizes exactly this.
+    assert html.count("Subscribe to our Channel") == 1
+    assert "Agree" in html
+
+
+def test_a_field_the_vendors_disagree_on_shows_both_tagged():
+    post = _post(
+        creative_analysis={"summary": "s", "tone": "urgent"}, creative_analysis_status="ok",
+        creative_analysis_openai={"summary": "s", "tone": "playful"}, creative_analysis_openai_status="ok",
+    )
+    out = _run(1, {"posts": [post]})
+    html = out["panel"]
+    assert "urgent" in html and "playful" in html
+    assert '<span class="sci-cdetail-tag claude">Claude</span>' in html
+    assert '<span class="sci-cdetail-tag openai">ChatGPT</span>' in html
+
+
+def test_a_field_only_one_vendor_addressed_is_still_attributed():
+    """Both vendors ran, but only Claude said anything about branding -- it
+    still gets a "Claude" tag (not silently presented as if both agreed)
+    since the other vendor genuinely said nothing here."""
+    post = _post(
+        creative_analysis={"summary": "s", "branding": "Speed Stick logo"}, creative_analysis_status="ok",
+        creative_analysis_openai={"summary": "s"}, creative_analysis_openai_status="ok",
+    )
+    out = _run(1, {"posts": [post]})
+    html = out["panel"]
+    assert "Speed Stick logo" in html
+    assert '<span class="sci-cdetail-tag claude">Claude</span><span>Speed Stick logo</span>' in html
+
+
+def test_when_only_one_vendor_succeeded_no_row_carries_a_vendor_tag():
+    """showTags is only true when BOTH vendors ran -- with just one working
+    vendor, every row came from it, so a per-row "Claude" tag on all of them
+    would just repeat what the status line at the top already says once."""
+    post = _post(
+        creative_analysis={"summary": "s", "tone": "urgent", "cta": "Shop now"},
+        creative_analysis_status="ok",
+        creative_analysis_openai=None, creative_analysis_openai_status="skipped",
+    )
+    out = _run(1, {"posts": [post]})
+    html = out["panel"]
+    # Substring-safe against the unrelated "sci-cdetail-tags" hero wrapper
+    # class -- the real tag class is always followed by a space then a
+    # modifier (claude/openai/both), never immediately by the closing quote.
+    assert 'class="sci-cdetail-tag ' not in html
+
+
+def test_the_status_row_names_both_vendors_by_name_even_when_one_failed():
+    post = _post(
+        creative_analysis={"summary": "s"}, creative_analysis_status="ok",
+        creative_analysis_openai=None, creative_analysis_openai_status="skipped",
+    )
+    out = _run(1, {"posts": [post]})
+    html = out["panel"]
+    assert "sci-cdetail-vendor-status claude ok" in html
+    assert "sci-cdetail-vendor-status openai err" in html
+
+
+def test_when_both_vendors_fail_the_rows_area_says_so_once():
+    post = _post(
+        creative_analysis=None, creative_analysis_status="failed",
+        creative_analysis_openai=None, creative_analysis_openai_status="skipped",
+    )
+    out = _run(1, {"posts": [post]})
+    assert "No readable analysis for this post yet." in out["panel"]
+
+
+def test_cdetail_text_equal_ignores_case_whitespace_and_trailing_punctuation():
+    html = _sci_page_html()
+    src = _extract_fn(html, "cdetailTextEqual")
+    js = (src +
+         "\nconsole.log(JSON.stringify(["
+         "  cdetailTextEqual('Subscribe to our Channel.', 'subscribe to our channel'),"
+         "  cdetailTextEqual('Urgent', 'Playful')"
+         "]));")
+    r = subprocess.run(["node", "-e", js], capture_output=True, text=True, timeout=30)
+    assert r.returncode == 0, r.stderr[-2000:]
+    assert json.loads(r.stdout.strip().splitlines()[-1]) == [True, False]
