@@ -295,15 +295,20 @@ html::-webkit-scrollbar-thumb:hover { background-image: linear-gradient(180deg, 
 .sci-cdetail-original:hover { transform: translateY(-1px); box-shadow: 0 16px 32px -14px rgba(244,114,182,.7); }
 .sci-cdetail-section-label { display: flex; align-items: center; gap: 8px; padding: 18px 22px 6px; font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: #a99fb0; }
 .sci-cdetail-section-label span { font-size: 11px; color: #c084fc; }
+/* The lead reading: short, scannable pointers in a distinct tinted card,
+   never a wall of quoted prose -- a sparkle mark per point instead of one
+   pair of quotation marks trying to bracket several separate thoughts. */
+.sci-cdetail-summary { margin: 16px 22px 4px; padding: 18px 20px; border-radius: var(--radius-md, 14px);
+  background: linear-gradient(155deg, rgba(196,132,252,.12), rgba(244,114,182,.05) 60%, transparent);
+  border: 1px solid rgba(196,132,252,.22); }
+.sci-cdetail-summary-point { display: flex; align-items: flex-start; gap: 11px; font-family: 'Instrument Serif', Georgia, serif;
+  font-style: italic; font-size: 17px; line-height: 1.5; color: #f6eef9; }
+.sci-cdetail-summary-point::before { content: '✦'; flex-shrink: 0; font-style: normal; font-size: 11px; color: #c084fc; margin-top: 6px; }
+.sci-cdetail-summary-point + .sci-cdetail-summary-point { margin-top: 12px; padding-top: 12px; border-top: 1px dashed rgba(196,132,252,.18); }
 /* One row per topic: a label above a plain reading, no per-vendor noise. */
 .sci-cdetail-rows { padding: 10px 22px 24px; }
 .sci-cdetail-row { padding: 12px 0; border-top: 1px solid rgba(255,255,255,.07); }
 .sci-cdetail-row:first-child { border-top: none; padding-top: 2px; }
-.sci-cdetail-row-lead { padding-bottom: 16px; margin-bottom: 6px; border-bottom: 1px solid rgba(255,255,255,.1); }
-.sci-cdetail-row-lead .sci-cdetail-label { display: none; }
-.sci-cdetail-row-lead .sci-cdetail-line { font-size: 14.5px; line-height: 1.6; color: #f3ecf5; font-style: italic; }
-.sci-cdetail-row-lead .sci-cdetail-line::before { content: '“'; margin-right: 2px; color: #c084fc; font-style: normal; }
-.sci-cdetail-row-lead .sci-cdetail-line::after { content: '”'; margin-left: 1px; color: #c084fc; font-style: normal; }
 .sci-cdetail-label { font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; color: #6b5f72; margin-bottom: 6px; }
 .sci-cdetail-line { display: flex; align-items: flex-start; font-size: 12.5px; color: #d6c9db; line-height: 1.55; }
 .sci-cdetail-empty-rows { padding: 18px 22px 26px; font-size: 12.5px; color: #877b8f; font-style: italic; }
@@ -322,11 +327,13 @@ html::-webkit-scrollbar-thumb:hover { background-image: linear-gradient(180deg, 
 [data-theme="light"] .sci-cdetail-close { background: rgba(18,26,54,.06); border-color: rgba(18,26,54,.12); color: #5c5163; }
 [data-theme="light"] .sci-cdetail-close:hover { background: rgba(18,26,54,.12); color: #1c1420; }
 [data-theme="light"] .sci-cdetail-row { border-top-color: rgba(18,26,54,.08); }
-[data-theme="light"] .sci-cdetail-row-lead { border-bottom-color: rgba(18,26,54,.12); }
-[data-theme="light"] .sci-cdetail-row-lead .sci-cdetail-line { color: #1c1420; }
 [data-theme="light"] .sci-cdetail-label { color: #6a5f73; }
 [data-theme="light"] .sci-cdetail-line { color: #302631; }
 [data-theme="light"] .sci-cdetail-empty-rows { color: #6a5f73; }
+[data-theme="light"] .sci-cdetail-summary { background: linear-gradient(155deg, rgba(147,51,234,.07), rgba(219,39,119,.04) 60%, transparent); border-color: rgba(147,51,234,.18); }
+[data-theme="light"] .sci-cdetail-summary-point { color: #271b30; }
+[data-theme="light"] .sci-cdetail-summary-point::before { color: #9333ea; }
+[data-theme="light"] .sci-cdetail-summary-point + .sci-cdetail-summary-point { border-top-color: rgba(147,51,234,.16); }
 
 /* .sci-postcard is now the whole card's own click target (see
    renderPostCard) rather than a native <a>, so it needs its own visible
