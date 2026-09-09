@@ -11,7 +11,7 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-components.css') }}">
   <script src="/static/js/theme.js"></script>
   <link rel="stylesheet" href="/static/css/grid-tokens.css">
-  <link rel="stylesheet" href="/static/css/social_media_intelligence.css?v=4">
+  <link rel="stylesheet" href="/static/css/social_media_intelligence.css?v=5">
   <link rel="stylesheet" href="/static/css/aurora-app.css?v=3">
 </head>
 <body>
@@ -897,8 +897,6 @@ function dsApifyRow(platform, entry){
       return t.charAt(0).toUpperCase() + t.slice(1);
     }
 
-    var ANALYZE_GLYPH = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.3-4.3"/></svg>';
-
     // A card only gets the "compare analyses" toggle when there is at least
     // one real, non-error analysis to show -- a button opening onto an
     // empty/error state would be worse than no button at all.
@@ -906,6 +904,17 @@ function dsApifyRow(platform, entry){
       return post.creative_analysis_status === 'ok' || post.creative_analysis_openai_status === 'ok';
     }
 
+    // The whole card opens the full creative detail modal now -- every post,
+    // not only ones with a finished analysis, since the modal itself already
+    // says plainly when a reading was never run or failed (see cdetailColumn)
+    // rather than needing this card to pre-filter which posts are "worth"
+    // opening. A plain click-through to the real post used to be the card's
+    // only affordance; that is now a single explicit "View ↗" link in the
+    // footer (stopPropagation so it does not also open the modal underneath
+    // it), so both destinations stay one click away without fighting for the
+    // same click. tabindex/role/onkeydown carry the keyboard behaviour a
+    // native <a> got for free, since this is now a <div> with a job to do
+    // rather than a link with a destination.
     function renderPostCard(post, showPlatform){
       var thumb = postThumbnail(post), meta = platformMeta(post.platform), title = postTitle(post);
       // A post with no image is not a broken image. Rendering the 16:9 media
@@ -919,16 +928,11 @@ function dsApifyRow(platform, entry){
           'this.closest(\'.sci-postcard-media\').remove()"></div>'
         : '';
       var when = relTime(post.posted_at);
-      // stopPropagation + preventDefault so this button opens the detail
-      // modal INSTEAD of the card's own click-through to the real post --
-      // the two affordances share one card without fighting over a click.
-      var analyzeBtn = postHasAnalysis(post)
-        ? '<button type="button" class="sci-postcard-analyze" title="Compare Claude and ChatGPT\'s reads of this creative" ' +
-          'onclick="event.preventDefault();event.stopPropagation();openCreativeDetail(' + post.id + ');">' + ANALYZE_GLYPH + '</button>'
-        : '';
-      return '<a class="sci-postcard' + (thumb ? '' : ' sci-postcard-text') + '" href="' + esc(post.post_url || '#') +
-        '" target="_blank" rel="noopener" data-platform="' + esc(post.platform) + '">' +
-        media + analyzeBtn +
+      return '<div class="sci-postcard' + (thumb ? '' : ' sci-postcard-text') + '" tabindex="0" role="button" ' +
+        'aria-label="' + esc('Open details for ' + title) + '" data-platform="' + esc(post.platform) + '" ' +
+        'onclick="openCreativeDetail(' + post.id + ')" ' +
+        'onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();openCreativeDetail(' + post.id + ');}">' +
+        media +
         '<div class="sci-postcard-body">' +
           // Format label sits BELOW the thumbnail as its own chip rather than
           // overlaid on it: an overlay competes with the image for the eye and
@@ -942,9 +946,10 @@ function dsApifyRow(platform, entry){
           '<div class="sci-postcard-foot">' +
             (when ? '<span class="sci-postcard-date" title="' + esc(fmtDate(post.posted_at)) + '">' + esc(when) + '</span>' : '') +
             metricChips(post.metrics) +
-            (post.post_url ? '<span class="sci-postcard-view">View ' + VIEW_GLYPH + '</span>' : '') +
+            (post.post_url ? '<a class="sci-postcard-view" href="' + esc(post.post_url) + '" target="_blank" rel="noopener" ' +
+              'onclick="event.stopPropagation()">View ' + VIEW_GLYPH + '</a>' : '') +
           '</div>' +
-        '</div></a>';
+        '</div></div>';
     }
 
     // ── Creative detail modal: Claude's and ChatGPT's independent reads of
@@ -1003,6 +1008,32 @@ function dsApifyRow(platform, entry){
       var rest = CDETAIL_FIELDS.map(function(pair){ return cdetailField(pair[0], pair[1], analysis[pair[0]]); }).join('');
       return '<div class="sci-cdetail-col">' + head + summary + rest + '</div>';
     }
+    // The hero block: everything about the post itself (the real thumbnail,
+    // its own caption, when it went up, how it performed, and one clear way
+    // back to the original) ahead of what the two vision models made of it --
+    // so "what this post actually is" is answered before "what it means",
+    // never leaving a reader to infer the post from Claude/ChatGPT's own
+    // descriptions of it.
+    function cdetailHero(post){
+      var thumb = postThumbnail(post), meta = platformMeta(post.platform);
+      var media = thumb ? '<div class="sci-cdetail-hero-media"><img src="' + esc(thumb) + '" alt="" loading="lazy"></div>' : '';
+      var caption = (post.caption || '').trim();
+      var when = relTime(post.posted_at);
+      return '<div class="sci-cdetail-hero' + (thumb ? '' : ' sci-cdetail-hero-notext') + '">' + media +
+        '<div class="sci-cdetail-hero-body">' +
+          '<div class="sci-cdetail-tags">' +
+            '<span class="sci-postcard-plat"><span class="sci-postcard-plat-ic">' + meta.icon + '</span>' + esc(platformLabel(post.platform)) + '</span>' +
+            '<span class="sci-postcard-type">' + esc(postFormatLabel(post)) + '</span>' +
+          '</div>' +
+          '<div class="sci-cdetail-caption' + (caption ? '' : ' empty') + '">' + esc(caption || 'No caption on this post.') + '</div>' +
+          '<div class="sci-cdetail-hero-foot">' +
+            (when ? '<span class="sci-cdetail-date" title="' + esc(fmtDate(post.posted_at)) + '">' + esc(when) + '</span>' : '') +
+            metricChips(post.metrics) +
+          '</div>' +
+          (post.post_url ? '<a class="sci-cdetail-original" href="' + esc(post.post_url) + '" target="_blank" rel="noopener">' +
+            'View original post ' + VIEW_GLYPH + '</a>' : '') +
+        '</div></div>';
+    }
     function openCreativeDetail(postId){
       var post = ((CURRENT_RUN && CURRENT_RUN.posts) || []).filter(function(p){ return p.id === postId; })[0];
       var overlay = document.getElementById('cdetailOverlay'), panel = document.getElementById('cdetailPanel');
@@ -1013,13 +1044,9 @@ function dsApifyRow(platform, entry){
         return;
       }
       panel.innerHTML =
-        '<div class="sci-cdetail-head"><div class="sci-cdetail-title">' + esc(postTitle(post)) + '</div>' +
-          '<div class="sci-cdetail-meta">' +
-            '<span>' + esc(platformLabel(post.platform)) + '</span><span>&middot;</span><span>' + esc(postFormatLabel(post)) + '</span>' +
-            (post.posted_at ? '<span>&middot;</span><span>' + esc(fmtDate(post.posted_at)) + '</span>' : '') +
-          '</div>' +
-          '<button type="button" class="sci-cdetail-close" onclick="closeCreativeDetail()" aria-label="Close">✕</button>' +
-        '</div>' +
+        '<button type="button" class="sci-cdetail-close" onclick="closeCreativeDetail()" aria-label="Close">✕</button>' +
+        cdetailHero(post) +
+        '<div class="sci-cdetail-section-label"><span>◆</span>What the vision models see</div>' +
         '<div class="sci-cdetail-cols">' +
           cdetailColumn('claude', 'Claude', post.creative_analysis, post.creative_analysis_status,
                         post.creative_analysis_error) +
