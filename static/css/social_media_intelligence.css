@@ -275,13 +275,28 @@ html::-webkit-scrollbar-thumb:hover { background-image: linear-gradient(180deg, 
 .sci-cdetail-overlay.open { opacity: 1; pointer-events: auto; }
 .sci-cdetail { position: fixed; top: 50%; left: 50%; width: min(780px, 94vw); max-height: 88vh; overflow-y: auto; background: rgba(19,12,16,.98); border: 1px solid rgba(255,255,255,.1); border-radius: var(--radius-lg, 18px); box-shadow: 0 50px 120px rgba(0,0,0,.7); z-index: 9501; transform: translate(-50%,-50%) scale(.95) translateY(6px); opacity: 0; pointer-events: none; transition: transform .25s cubic-bezier(.22,1.3,.36,1), opacity .2s ease; }
 .sci-cdetail-overlay.open .sci-cdetail { transform: translate(-50%,-50%) scale(1) translateY(0); opacity: 1; pointer-events: auto; }
-.sci-cdetail-head { position: relative; padding: 20px 52px 16px 22px; border-bottom: 1px solid rgba(255,255,255,.08); }
-.sci-cdetail-title { font-size: 14.5px; font-weight: 600; color: #f3ecf5; line-height: 1.5; margin-bottom: 6px; }
-.sci-cdetail-meta { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 11px; color: #948899; }
-.sci-cdetail-close { position: absolute; top: 16px; right: 16px; width: 30px; height: 30px; border-radius: 50%; border: 1px solid rgba(255,255,255,.12); background: rgba(255,255,255,.05); color: #b3a6b8; font-size: 12px; cursor: pointer; transition: background .15s, color .15s; }
-.sci-cdetail-close:hover { background: rgba(255,255,255,.12); color: #f3ecf5; }
+.sci-cdetail-close { position: absolute; top: 16px; right: 16px; z-index: 2; width: 32px; height: 32px; border-radius: 50%; border: 1px solid rgba(255,255,255,.16); background: rgba(10,6,10,.55); backdrop-filter: blur(4px); color: #f3ecf5; font-size: 12px; cursor: pointer; transition: background .15s, color .15s, transform .15s; }
+.sci-cdetail-close:hover { background: rgba(10,6,10,.85); transform: scale(1.06); }
+/* The hero: the post itself (real thumbnail, its own caption, when it went
+   up, how it performed, one way back to it) ahead of the two vendor
+   columns -- answering "what is this post" before "what did the models
+   make of it", the same ordering a reader would want in person. */
+.sci-cdetail-hero { position: relative; display: flex; gap: 20px; padding: 24px 52px 22px 24px; border-bottom: 1px solid rgba(255,255,255,.08); background: linear-gradient(165deg, rgba(251,146,60,.06), transparent 55%); }
+.sci-cdetail-hero-media { width: 208px; height: 208px; flex-shrink: 0; border-radius: var(--radius-md, 14px); overflow: hidden; background: rgba(255,255,255,.04); box-shadow: 0 18px 38px -20px rgba(0,0,0,.7); }
+.sci-cdetail-hero-media img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.sci-cdetail-hero-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 12px; }
+.sci-cdetail-hero-notext .sci-cdetail-hero-body { gap: 14px; }
+.sci-cdetail-tags { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.sci-cdetail-caption { font-size: 13.5px; line-height: 1.62; color: #ece2ee; white-space: pre-wrap; max-height: 168px; overflow-y: auto; padding-right: 6px; }
+.sci-cdetail-caption.empty { color: #6b5f72; font-style: italic; }
+.sci-cdetail-hero-foot { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: auto; padding-top: 2px; }
+.sci-cdetail-date { font-size: 11.5px; color: #948899; }
+.sci-cdetail-original { align-self: flex-start; display: inline-flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 700; color: #1a0a02; background: linear-gradient(110deg,#fb923c,#f472b6); border-radius: var(--radius-pill, 80px); padding: 8px 16px; text-decoration: none; box-shadow: 0 12px 26px -14px rgba(244,114,182,.6); transition: transform .16s, box-shadow .16s; }
+.sci-cdetail-original:hover { transform: translateY(-1px); box-shadow: 0 16px 32px -14px rgba(244,114,182,.7); }
+.sci-cdetail-section-label { display: flex; align-items: center; gap: 8px; padding: 18px 22px 6px; font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: #a99fb0; }
+.sci-cdetail-section-label span { font-size: 11px; color: #c084fc; }
 .sci-cdetail-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: rgba(255,255,255,.08); }
-.sci-cdetail-col { background: rgba(19,12,16,.98); padding: 18px 20px 22px; min-width: 0; }
+.sci-cdetail-col { background: rgba(19,12,16,.98); padding: 16px 20px 22px; min-width: 0; }
 .sci-cdetail-vendor { display: flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; margin-bottom: 14px; }
 .sci-cdetail-vendor-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
 .sci-cdetail-vendor.claude { color: #fdba74; } .sci-cdetail-vendor.claude .sci-cdetail-vendor-dot { background: #fb923c; }
@@ -292,28 +307,28 @@ html::-webkit-scrollbar-thumb:hover { background-image: linear-gradient(180deg, 
 .sci-cdetail-value { font-size: 12.5px; color: #d6c9db; line-height: 1.55; }
 .sci-cdetail-value.empty { color: #55495b; font-style: italic; }
 .sci-cdetail-empty { padding: 30px 22px; text-align: center; font-size: 12.5px; color: #877b8f; }
-@media (max-width: 640px) { .sci-cdetail-cols { grid-template-columns: 1fr; } }
+@media (max-width: 640px) {
+  .sci-cdetail-cols { grid-template-columns: 1fr; }
+  .sci-cdetail-hero { flex-direction: column; padding: 22px 46px 20px 20px; }
+  .sci-cdetail-hero-media { width: 100%; height: 180px; }
+}
 [data-theme="light"] .sci-cdetail-overlay { background: rgba(18,26,54,.4); }
 [data-theme="light"] .sci-cdetail, [data-theme="light"] .sci-cdetail-col { background: rgba(255,255,255,.98); }
-[data-theme="light"] .sci-cdetail-title { color: #1c1420; }
+[data-theme="light"] .sci-cdetail-hero { background: linear-gradient(165deg, rgba(251,146,60,.08), transparent 55%); }
+[data-theme="light"] .sci-cdetail-hero-media { background: rgba(18,26,54,.05); }
+[data-theme="light"] .sci-cdetail-caption { color: #302631; }
+[data-theme="light"] .sci-cdetail-date { color: #6a5f73; }
+[data-theme="light"] .sci-cdetail-section-label { color: #6b5f72; }
 [data-theme="light"] .sci-cdetail-value { color: #302631; }
-[data-theme="light"] .sci-cdetail-close { background: rgba(18,26,54,.05); border-color: rgba(18,26,54,.12); color: #5c5163; }
-[data-theme="light"] .sci-cdetail-close:hover { background: rgba(18,26,54,.1); color: #1c1420; }
+[data-theme="light"] .sci-cdetail-close { background: rgba(18,26,54,.06); border-color: rgba(18,26,54,.12); color: #5c5163; }
+[data-theme="light"] .sci-cdetail-close:hover { background: rgba(18,26,54,.12); color: #1c1420; }
 
-/* The small, non-navigating toggle overlaid on a post card that opens the
-   detail above -- absolutely positioned INSIDE .sci-postcard (which stays
-   an <a>, unchanged; its own `position: relative` is set alongside its
-   other rules above, not a second rule here -- a later, second rule for a
-   selector that already exists is exactly the losing-declaration trap this
-   codebase has been burned by before), with its own click handler stopping
-   the card's own navigation so the two affordances never fight over one click. */
-.sci-postcard-analyze { position: absolute; top: 8px; right: 8px; z-index: 2; width: 26px; height: 26px; border-radius: 50%; border: 1px solid rgba(255,255,255,.16); background: rgba(10,6,10,.6); backdrop-filter: blur(3px); color: #f3ecf5; display: flex; align-items: center; justify-content: center; cursor: pointer; opacity: 0; transition: opacity .15s, background .15s; }
-.sci-postcard-analyze svg { width: 13px; height: 13px; }
-.sci-postcard:hover .sci-postcard-analyze, .sci-postcard-analyze:focus-visible { opacity: 1; }
-.sci-postcard-analyze:hover { background: rgba(10,6,10,.85); }
-.sci-postcard-text .sci-postcard-analyze { top: 10px; right: 10px; }
-[data-theme="light"] .sci-postcard-analyze { background: rgba(255,255,255,.8); border-color: rgba(18,26,54,.14); color: #1c1420; }
-[data-theme="light"] .sci-postcard-analyze:hover { background: rgba(255,255,255,.96); }
+/* .sci-postcard is now the whole card's own click target (see
+   renderPostCard) rather than a native <a>, so it needs its own visible
+   focus state and pointer cursor -- a plain <div>, even with role="button",
+   gets neither from the browser for free the way an <a href> did. */
+.sci-postcard { cursor: pointer; }
+.sci-postcard:focus-visible { outline: 2px solid color-mix(in srgb, var(--pf-color, #fb923c) 70%, transparent); outline-offset: 2px; }
 
 /* ── Report header ───────────────────────────────────────────────────────── */
 .sci-rep-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; padding: 24px 30px 16px; flex-wrap: wrap; flex-shrink: 0; }
@@ -567,7 +582,12 @@ a.sci-phero-handle:hover { color: #ffffff; border-bottom-color: var(--pf-color, 
 .sci-metric-chip { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 600; color: #a79dae; font-variant-numeric: tabular-nums; white-space: nowrap; flex-shrink: 0; }
 .sci-metric-ic { width: 12.5px; height: 12.5px; display: inline-flex; flex-shrink: 0; color: #6b5f72; }
 .sci-metric-ic svg { width: 100%; height: 100%; }
-.sci-postcard-view { margin-left: auto; font-size: 11px; font-weight: 700; color: color-mix(in srgb, var(--pf-color, #7dd3fc) 52%, #ffffff); white-space: nowrap; flex-shrink: 0; }
+/* Now a real <a> (was a <span> the card's own <a> wrapper made clickable)
+   so it can stopPropagation and go straight to the source without also
+   opening the modal underneath it -- text-decoration:none is load-bearing
+   here in a way it never had to be as a span, which browsers never
+   underline by default. */
+.sci-postcard-view { margin-left: auto; font-size: 11px; font-weight: 700; color: color-mix(in srgb, var(--pf-color, #7dd3fc) 52%, #ffffff); white-space: nowrap; flex-shrink: 0; text-decoration: none; }
 .sci-postcard:hover .sci-postcard-view { text-decoration: underline; }
 
 /* ── Posts toolbar: Top / Most-recent toggle, count, show-all ──────────── */

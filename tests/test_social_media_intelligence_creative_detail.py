@@ -27,7 +27,7 @@ os.environ.setdefault("FLASK_SECRET_KEY", "test")
 
 import app as appmod  # noqa: E402
 from test_social_media_intelligence_datasources import (  # noqa: E402
-    _extract_var, _extract_fn, _extract_line_fn, _page_html as _sci_page_html,
+    _extract_var, _extract_fn, _extract_line_fn, _extract_line_var, _page_html as _sci_page_html,
 )
 
 pytestmark = pytest.mark.skipif(shutil.which("node") is None,
@@ -53,8 +53,19 @@ def _run(post_id, current_run):
         _extract_fn(html, "platformLabel"),
         _extract_fn(html, "postFormatLabel"),
         _extract_fn(html, "fmtDate"),
+        _extract_fn(html, "relTime"),
+        _extract_fn(html, "fmtNum"),
+        _extract_line_fn(html, "fmtFullNum"),
+        _extract_var(html, "METRIC_ICONS"),
+        _extract_fn(html, "metricChips"),
+        _extract_var(html, "PLATFORM_META"),
+        _extract_var(html, "DEFAULT_META"),
+        _extract_line_fn(html, "platformMeta"),
+        _extract_fn(html, "postThumbnail"),
+        _extract_line_var(html, "VIEW_GLYPH"),
         _extract_fn(html, "postTitle"),
         _extract_fn(html, "postHasAnalysis"),
+        _extract_fn(html, "cdetailHero"),
         _extract_var(html, "CDETAIL_FIELDS"),
         _extract_fn(html, "cdetailField"),
         _extract_var(html, "CDETAIL_ERROR_TEXT"),
@@ -102,6 +113,69 @@ def test_opens_and_shows_both_vendors_when_both_succeeded():
     assert "Claude" in html and "ChatGPT" in html
     assert "New launch" in html and "Launch energy" in html
     assert "Shop now" in html and "Buy now" in html
+
+
+# ── The hero: the post itself, ahead of what the vision models made of it ──
+
+def test_the_hero_shows_the_real_caption_and_platform_and_format():
+    post = _post(caption="Big news for our team today!", platform="linkedin", post_type="video")
+    out = _run(1, {"posts": [post]})
+    html = out["panel"]
+    assert "Big news for our team today!" in html
+    assert "Linkedin" not in html  # platformLabel must fix the capitalize-mangled proper noun
+    assert "LinkedIn" in html
+    assert "Video" in html
+
+
+def test_a_caption_less_post_says_so_rather_than_showing_nothing():
+    post = _post(caption="")
+    out = _run(1, {"posts": [post]})
+    assert "No caption on this post." in out["panel"]
+
+
+def test_the_hero_shows_metrics_and_relative_age():
+    post = _post(metrics={"likes": 24, "comments": 3, "views": 336})
+    out = _run(1, {"posts": [post]})
+    html = out["panel"]
+    assert "24" in html and "336" in html
+
+
+def test_a_real_post_url_becomes_a_view_original_link():
+    post = _post(post_url="https://instagram.com/p/abc123/")
+    out = _run(1, {"posts": [post]})
+    html = out["panel"]
+    assert 'href="https://instagram.com/p/abc123/"' in html
+    assert "View original post" in html
+
+
+def test_a_post_with_no_url_gets_no_dead_link():
+    post = _post(post_url=None)
+    out = _run(1, {"posts": [post]})
+    assert "View original post" not in out["panel"]
+
+
+def test_a_thumbnail_renders_when_the_post_has_one():
+    post = _post(post_type="image", raw={}, media_urls=["https://cdn.example/p1.jpg"])
+    out = _run(1, {"posts": [post]})
+    html = out["panel"]
+    assert 'sci-cdetail-hero-media' in html
+    assert 'src="https://cdn.example/p1.jpg"' in html
+
+
+def test_a_thumbnailless_post_gets_the_notext_hero_variant_not_a_broken_image():
+    post = _post(post_type="text", raw={}, media_urls=[])
+    out = _run(1, {"posts": [post]})
+    html = out["panel"]
+    assert "sci-cdetail-hero-notext" in html
+    assert "sci-cdetail-hero-media" not in html
+
+
+def test_a_stray_caption_is_escaped_not_executed():
+    post = _post(caption="<img src=x onerror=alert(1)>")
+    out = _run(1, {"posts": [post]})
+    html = out["panel"]
+    assert "<img src=x onerror" not in html
+    assert "&lt;img src=x onerror" in html
 
 
 def test_a_not_configured_openai_column_says_so_not_a_generic_failure():
@@ -168,18 +242,39 @@ def test_post_has_analysis_true_when_either_vendor_succeeded():
     assert json.loads(r.stdout.strip().splitlines()[-1]) == [True, True, False]
 
 
-def test_the_analyze_button_only_renders_when_there_is_something_to_show():
-    """Static-source check on renderPostCard itself: the button must be
-    gated by postHasAnalysis, not always present -- a dead button on every
-    card (most of which will have nothing yet, or an error) would be worse
-    than none."""
+def test_every_card_opens_the_detail_modal_regardless_of_analysis_status():
+    """Static-source check on renderPostCard itself: the whole card opens the
+    modal unconditionally now -- not gated by postHasAnalysis the way the
+    small analyze-button toggle used to be, since the modal itself already
+    says plainly when a reading was never run or failed (see cdetailColumn).
+    A post with nothing to show yet still deserves one click to confirm
+    that, not to be quietly excluded from the affordance every other post
+    card gets."""
     html = _sci_page_html()
     block = _extract_fn(html, "renderPostCard")
-    assert "postHasAnalysis(post)" in block
-    assert "openCreativeDetail(" in block
-    # The click must never also trigger the card's own navigation.
-    assert "event.preventDefault()" in block
+    assert "postHasAnalysis" not in block
+    assert 'onclick="openCreativeDetail(' in block
+    # Keyboard-operable: this is a <div>, not the <a> it used to be, so it
+    # has to carry its own focusability and activation keys.
+    assert 'tabindex="0"' in block
+    assert 'role="button"' in block
+    assert "onkeydown=" in block
+    # The one explicit way out to the real post must stop its own click from
+    # also opening the modal underneath it.
+    assert 'class="sci-postcard-view"' in block
     assert "event.stopPropagation()" in block
+
+
+def test_the_card_is_not_an_anchor_wrapping_the_whole_post():
+    """The card used to be `<a href=post_url>`, so every click navigated
+    away from the report. It must not be an <a> at the top level any more --
+    the whole point is that a click opens the modal instead."""
+    html = _sci_page_html()
+    block = _extract_fn(html, "renderPostCard")
+    # Substring-safe against the unrelated nested `sci-postcard-view` anchor:
+    # matches only the exact top-level class, not anything it prefixes.
+    assert "'<a class=\"sci-postcard' + (" not in block
+    assert "'<div class=\"sci-postcard' + (" in block
 
 
 # ── The reason a post has no reading, in the reader's own words ────────────
