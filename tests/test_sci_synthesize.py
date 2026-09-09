@@ -266,6 +266,18 @@ def test_the_system_prompt_instructs_treating_agreement_as_stronger_evidence():
     assert "disagree" in sci_synthesize._SYSTEM.lower()
 
 
+def test_the_system_prompt_caps_every_bullet_to_one_short_pointer():
+    """A real report showed bullets running two dense sentences long -- the
+    prompt has to say, explicitly, that this is wrong, not just that bullets
+    should be "short" (a word the model was already given and clearly
+    under-constrained by)."""
+    system = sci_synthesize._SYSTEM.lower()
+    assert "6-14 words" in sci_synthesize._SYSTEM
+    assert "one crisp pointer" in system
+    assert "never two sentences" in system
+    assert "semicolon" in system
+
+
 def test_synthesize_report_includes_scrape_failed_and_low_activity_platforms_in_the_payload(monkeypatch):
     """The narrative must be able to flag platforms with little or no
     activity rather than silently omit them -- the payload the model sees
