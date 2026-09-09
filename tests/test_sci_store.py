@@ -10,7 +10,7 @@ with the original code.
 import os
 import re
 import sys
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import pytest
 
@@ -64,6 +64,23 @@ class _FakeCursor:
     def execute(self, sql, params=()):
         sql = " ".join(sql.split())
         params = tuple(_unwrap(p) for p in params)
+
+        if sql.startswith("SELECT GREATEST("):
+            # run_last_activity's own query -- the max updated_at across this
+            # run's own row and every sci_platform_runs/sci_posts row under
+            # it. Checked FIRST, and separately from the generic "FROM
+            # sci_runs" branch below, because this query's nested subqueries
+            # contain "FROM sci_runs" as a substring too and would otherwise
+            # be misrouted into that branch's column-parsing regex. Computed
+            # here the same way Postgres's GREATEST(...) would, over the fake
+            # tables, rather than hand-asserting an answer that never
+            # actually depended on the SQL's own run_id placement.
+            run_id = params[0]
+            timestamps = [r["updated_at"] for r in self.db.runs if r["id"] == run_id]
+            timestamps += [p["updated_at"] for p in self.db.platform_runs if p["run_id"] == run_id]
+            timestamps += [p["updated_at"] for p in self.db.posts if p["run_id"] == run_id]
+            self._result = [(max(timestamps),)] if timestamps else [(None,)]
+            return
 
         if sql.startswith("INSERT INTO sci_runs"):
             row = {"id": self.db.next_run_id, "email": params[0], "company_name": params[1],
@@ -422,3 +439,144 @@ def test_an_openai_failure_does_not_touch_claudes_stored_column(fake_db):
     assert post["creative_analysis_status"] == "ok"
     assert post["creative_analysis_openai"] is None
     assert post["creative_analysis_openai_status"] == "failed"
+
+
+# ── Abandoned runs: a daemon thread a process restart killed mid-flight ────
+# leaves sci_runs.status='running' forever with nothing left to ever finish
+# it (see sci_store.resolve_stale_run's own docs). These prove the fix
+# without ever touching real wall-clock time in the test itself.
+
+def _touch(row, when):
+    row["updated_at"] = when
+
+
+def test_run_last_activity_reads_the_run_row_when_nothing_else_exists(fake_db):
+    run_id = store.save_run("alice@position2.com", "Acme Inc")
+    assert store.run_last_activity(run_id) == _FIXED_TS
+
+
+def test_run_last_activity_prefers_the_freshest_platform_touch(fake_db):
+    run_id = store.save_run("alice@position2.com", "Acme Inc")
+    store.upsert_platform_run(run_id, "instagram", status="collecting")
+    later = _FIXED_TS + timedelta(minutes=5)
+    _touch(fake_db.platform_runs[0], later)
+    assert store.run_last_activity(run_id) == later
+
+
+def test_run_last_activity_prefers_the_freshest_post_touch(fake_db):
+    run_id = store.save_run("alice@position2.com", "Acme Inc")
+    store.upsert_posts(run_id, "instagram", [
+        {"platform_post_id": "p1", "post_url": None, "post_type": "image", "caption": "",
+         "posted_at": None, "media_urls": ["https://cdn/p1.jpg"], "metrics": {}, "raw": {}},
+    ])
+    later = _FIXED_TS + timedelta(minutes=9)
+    _touch(fake_db.posts[0], later)
+    assert store.run_last_activity(run_id) == later
+
+
+def test_run_last_activity_is_none_without_postgres(monkeypatch):
+    monkeypatch.setattr(store, "_pg_conn", lambda: None)
+    assert store.run_last_activity(1) is None
+
+
+def test_resolve_stale_run_ignores_runs_that_are_not_running(fake_db):
+    """Must not even ask the question for a run that has already finished --
+    a done/errored run's own error text (if any) must survive untouched."""
+    run = {"id": 1, "status": "done", "error": None}
+    assert store.resolve_stale_run(run) == run
+    run = {"id": 2, "status": "error", "error": "a real vendor failure"}
+    assert store.resolve_stale_run(run) == run
+
+
+def test_resolve_stale_run_ignores_a_done_run_even_with_a_stale_activity_signal(fake_db, monkeypatch):
+    """A finished run naturally goes quiet forever -- that must never be
+    read as abandonment. Pins the status check ahead of the time check,
+    rather than the two coincidentally agreeing only because a finished
+    run's last-activity lookup happens to come back empty in other tests."""
+    calls = []
+    monkeypatch.setattr(store, "run_last_activity", lambda rid: calls.append(rid) or
+                        (datetime.now(timezone.utc) - timedelta(days=30)))
+    called_update = []
+    monkeypatch.setattr(store, "update_run_status", lambda *a, **k: called_update.append(a) or True)
+    run = {"id": 1, "status": "done", "error": None}
+    assert store.resolve_stale_run(run) == run
+    assert not called_update
+
+
+def test_resolve_stale_run_leaves_a_recently_active_run_alone(fake_db, monkeypatch):
+    run_id = store.save_run("alice@position2.com", "Acme Inc")
+    monkeypatch.setattr(store, "run_last_activity", lambda rid: datetime.now(timezone.utc))
+    run = store.get_run(run_id, "alice@position2.com")
+    resolved = store.resolve_stale_run(run)
+    assert resolved["status"] == "running"
+    # Not just the returned dict -- the stored row itself must be untouched.
+    assert store.get_run(run_id, "alice@position2.com")["status"] == "running"
+
+
+def test_resolve_stale_run_leaves_a_running_run_alone_with_no_activity_signal(fake_db, monkeypatch):
+    """Defensive: an unreadable signal must never be treated as proof of
+    abandonment -- that would flip every run to 'error' the instant Postgres
+    itself has a bad moment."""
+    run_id = store.save_run("alice@position2.com", "Acme Inc")
+    monkeypatch.setattr(store, "run_last_activity", lambda rid: None)
+    run = store.get_run(run_id, "alice@position2.com")
+    assert store.resolve_stale_run(run)["status"] == "running"
+
+
+def test_resolve_stale_run_flips_a_long_silent_run_to_error(fake_db, monkeypatch):
+    run_id = store.save_run("alice@position2.com", "Acme Inc")
+    long_ago = datetime.now(timezone.utc) - timedelta(minutes=store.STALE_RUN_MINUTES + 1)
+    monkeypatch.setattr(store, "run_last_activity", lambda rid: long_ago)
+    run = store.get_run(run_id, "alice@position2.com")
+    resolved = store.resolve_stale_run(run)
+    assert resolved["status"] == "error"
+    assert "interrupted" in resolved["error"]
+    # And persisted, not just returned -- the whole point is that the NEXT
+    # reader (History, a reopened tab) sees it fixed too, not just this one.
+    assert store.get_run(run_id, "alice@position2.com")["status"] == "error"
+
+
+def _freeze_now(monkeypatch, when):
+    """Pins resolve_stale_run's own datetime.now(timezone.utc) to `when`, so
+    a boundary test isn't at the mercy of however many microseconds elapse
+    between the test computing its input and the function computing its own
+    threshold from a second, later call to the real clock -- which would
+    make ANY exact-boundary assertion pass or fail by accident of timing,
+    not by the >= the code actually uses."""
+    monkeypatch.setattr(store, "datetime",
+                        type("_FrozenDatetime", (), {"now": staticmethod(lambda tz=None: when)}))
+
+
+def test_resolve_stale_run_treats_exactly_the_threshold_as_still_fresh(fake_db, monkeypatch):
+    """The boundary itself, at zero drift: last activity exactly
+    STALE_RUN_MINUTES old has not yet gone quiet for MORE than that long, so
+    it reads as fresh (>=) -- the conservative side of the line, favoring a
+    real still-working run over a fast false positive."""
+    frozen_now = datetime(2026, 9, 9, 12, 0, 0, tzinfo=timezone.utc)
+    _freeze_now(monkeypatch, frozen_now)
+    run_id = store.save_run("alice@position2.com", "Acme Inc")
+    exactly_at = frozen_now - timedelta(minutes=store.STALE_RUN_MINUTES)
+    monkeypatch.setattr(store, "run_last_activity", lambda rid: exactly_at)
+    run = store.get_run(run_id, "alice@position2.com")
+    assert store.resolve_stale_run(run)["status"] == "running"
+
+
+def test_resolve_stale_run_treats_one_second_past_the_threshold_as_stale(fake_db, monkeypatch):
+    """The other side of the same boundary, at the same zero drift."""
+    frozen_now = datetime(2026, 9, 9, 12, 0, 0, tzinfo=timezone.utc)
+    _freeze_now(monkeypatch, frozen_now)
+    run_id = store.save_run("alice@position2.com", "Acme Inc")
+    one_second_past = frozen_now - timedelta(minutes=store.STALE_RUN_MINUTES) - timedelta(seconds=1)
+    monkeypatch.setattr(store, "run_last_activity", lambda rid: one_second_past)
+    run = store.get_run(run_id, "alice@position2.com")
+    assert store.resolve_stale_run(run)["status"] == "error"
+
+
+def test_resolve_stale_run_uses_a_generous_margin_not_a_hair_trigger(fake_db, monkeypatch):
+    """One minute short of the threshold must still read as active -- this
+    is the boundary a real run's own worst-case legitimate gap sits inside."""
+    run_id = store.save_run("alice@position2.com", "Acme Inc")
+    just_inside = datetime.now(timezone.utc) - timedelta(minutes=store.STALE_RUN_MINUTES - 1)
+    monkeypatch.setattr(store, "run_last_activity", lambda rid: just_inside)
+    run = store.get_run(run_id, "alice@position2.com")
+    assert store.resolve_stale_run(run)["status"] == "running"

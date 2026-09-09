@@ -18,11 +18,33 @@ from __future__ import annotations
 
 import logging
 import os
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 logger = logging.getLogger(__name__)
 
 _TABLES_READY = False
+
+# How long a 'running' run's own row, its platform rows, and its posts can
+# all go untouched before it is treated as abandoned rather than merely
+# slow. _sci_run_analysis_job (tracker/sci_pipeline.py) is one daemon thread
+# with no queue or worker behind it -- this module's own docstring above
+# says a run must "survive past the next deploy", but Postgres only makes
+# the DATA survive; the thread computing it does not. A Railway redeploy (or
+# any process restart) while a run is mid-flight kills that thread outright,
+# with nothing left to ever write 'done' or 'error', so the row stays
+# 'running' forever and the page's poll loop (which has no timeout of its
+# own) shows "still in progress" indefinitely -- indistinguishable, to
+# whoever is looking at it, from a run that is one second from finishing.
+#
+# 30 minutes is generous against every legitimate gap in this pipeline:
+# Apify's own actor-run timeout is 300s (tracker/apify_transport.
+# run_actor_and_wait), and upsert_platform_run(status="collecting") fires
+# BEFORE that wait even starts, so a real run touches sci_platform_runs at
+# least once every ~5 minutes purely from platform collection attempts
+# marching forward, worst case. 30 minutes of total silence across every
+# table this run touches is six times that worst case, not a tight cutoff.
+STALE_RUN_MINUTES = 30
 
 
 def _pg_conn():
@@ -236,6 +258,77 @@ def update_run_status(run_id: int, status: str, error: str | None = None,
             conn.close()
         except Exception:
             pass
+
+
+def run_last_activity(run_id: int) -> datetime | None:
+    """The most recent timestamp touched anywhere for this run: its own row,
+    every sci_platform_runs row, and every sci_posts row. None on any
+    failure or if the run has no rows at all anywhere (which get_run already
+    would have rejected before this is ever called).
+
+    sci_runs.updated_at alone under-counts badly: the bulk of a run's actual
+    wall-clock work happens inside run_platform_collection and
+    run_platform_creative_analysis, which only ever touch sci_platform_runs/
+    sci_posts, not the run row itself (see update_run_status's own call
+    sites in tracker/sci_pipeline.py -- only identify, the Reddit pulse, and
+    synthesis touch sci_runs directly). Reading only the run row would call
+    a run "stale" while it is still visibly making progress everywhere else."""
+    conn = _pg_conn()
+    if not conn:
+        return None
+    try:
+        _ensure_tables(conn)
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT GREATEST("
+                "  (SELECT updated_at FROM sci_runs WHERE id = %s),"
+                "  COALESCE((SELECT MAX(updated_at) FROM sci_platform_runs WHERE run_id = %s), 'epoch'::timestamptz),"
+                "  COALESCE((SELECT MAX(updated_at) FROM sci_posts WHERE run_id = %s), 'epoch'::timestamptz)"
+                ")",
+                (run_id, run_id, run_id),
+            )
+            row = cur.fetchone()
+        return row[0] if row else None
+    except Exception as e:
+        logger.warning("sci_store: run_last_activity failed for run %s: %s", run_id, e)
+        return None
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+
+_STALE_RUN_ERROR = (
+    "This analysis stopped making progress and was very likely interrupted "
+    "(most often a deployment restarting the app mid-run) before it "
+    "finished. Start a new analysis for this company."
+)
+
+
+def resolve_stale_run(run: dict) -> dict:
+    """A 'running' run gone quiet, everywhere, for STALE_RUN_MINUTES is not
+    still working -- it is a daemon thread (see tracker/sci_pipeline.
+    _sci_run_analysis_job) that a process restart killed with nothing left
+    to ever mark it 'done' or 'error'. Left alone that row stays 'running'
+    forever, and the page's own poll loop has no timeout of its own, so an
+    abandoned run looks identical, indefinitely, to one about to finish.
+
+    Fixed here, on read, the same way this agent's CSV/report agreement gap
+    was fixed earlier: at the point something is read, not by adding a
+    scheduled sweep this app has no worker infrastructure to run. Every
+    caller that reads a run (the status poll, the run-detail route, the
+    History list) passes it through this first, so whichever one notices
+    first repairs it for all of them. Returns `run` unchanged when it is
+    not 'running', or when it is running but still recently active."""
+    if run.get("status") != "running":
+        return run
+    last = run_last_activity(run["id"])
+    if not last or last >= datetime.now(timezone.utc) - timedelta(minutes=STALE_RUN_MINUTES):
+        return run
+    if update_run_status(run["id"], "error", error=_STALE_RUN_ERROR):
+        run = dict(run, status="error", error=_STALE_RUN_ERROR)
+    return run
 
 
 def list_runs(email: str, limit: int = 100) -> list[dict]:
