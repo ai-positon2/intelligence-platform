@@ -8694,6 +8694,10 @@ def _sci_run_status_payload(run_id: int, email: str):
     run = sci_store.get_run(run_id, email)
     if not run:
         return None
+    # This is the page's own poll target -- the one place a run interrupted
+    # mid-flight (see sci_store.resolve_stale_run) is soonest noticed, since
+    # a page left open on it polls here every few seconds regardless.
+    run = sci_store.resolve_stale_run(run)
     return {
         "id": run["id"], "status": run["status"], "error": run.get("error"),
         "platforms": sci_store.get_platform_runs(run_id),
@@ -8727,8 +8731,12 @@ def social_media_intelligence():
     from tracker import sci_store
     user = _get_user() or {}
     email = user.get("email", "").lower()
-    return render_template("social_media_intelligence.html", user=user,
-                           runs=sci_store.list_runs(email))
+    # A run this user abandoned mid-flight days ago (see sci_store.
+    # resolve_stale_run) would otherwise show "running" in History forever,
+    # since nothing else ever visits it again to notice. Only 'running' rows
+    # cost the extra query -- a done/errored run passes through unchanged.
+    runs = [sci_store.resolve_stale_run(r) for r in sci_store.list_runs(email)]
+    return render_template("social_media_intelligence.html", user=user, runs=runs)
 
 
 @app.route("/p2/b2b-agents/social-media-intelligence/search")
@@ -8820,6 +8828,7 @@ def social_media_intelligence_run(run_id):
     run = sci_store.get_run(run_id, email)
     if not run:
         abort(404)
+    run = sci_store.resolve_stale_run(run)
     run["platforms"] = sci_store.get_platform_runs(run_id)
     run["posts"] = sci_store.get_posts(run_id)
     return jsonify(run)
