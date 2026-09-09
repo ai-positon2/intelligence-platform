@@ -89,3 +89,20 @@ The original Phase 2 exit condition—measured quality, reliability and cost tar
 The agent's roster CSV now appends evidence status, requested/observed editions, run status, unreadable-source count, an explicit coverage limitation and the roster caveat. The original eleven columns stay in place; consumers enforcing an exact column count need to accept the appended columns. These fields describe evidence limits, not a claim of independently verified coverage.
 
 `tests/test_event_intel_http_pipeline.py` submits authenticated Flask test requests through the real PostgreSQL queue and worker pipeline, harvests synthetic organizer/model fixtures, and compares the persisted JSON report with CSV output. It covers same-key retry/different-input refusal, historical roster withholding, cancellation, foreign-account access and internal authentication requirements. Test sessions do not validate real Google authentication, and synthetic fixtures do not establish live factual accuracy.
+
+## Production CLI context correction (2026-09-07)
+
+The first live Position2 benchmark (run 6) revealed a deployment-path bug: running
+`python -m tracker.event_intel_jobs` created `CURRENT` and `STAGE` in `__main__`,
+while provider and storage modules imported different instances from
+`tracker.event_intel_jobs`. Research proceeded without the intended provider
+ledger, budget checks and storage lease context. The run was cancelled and is
+not valid cost, cancellation or recovery evidence; provider charges from it
+remain unreconciled.
+
+The CLI now dispatches to the canonical module's `main`, retaining the existing
+service command. A regression executes the module as `__main__`, dispatches one
+job, propagates context through a thread pool and checks provider reservation
+and completion tracking. It fails before the correction. Imported-function tests
+alone did not cover this deployment entry point. A new live benchmark is required
+after both web and worker deploy the correction.
