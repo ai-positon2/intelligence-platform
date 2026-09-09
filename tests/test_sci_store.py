@@ -360,6 +360,23 @@ def test_source_vendor_round_trips_through_upsert_platform_run(fake_db):
     assert rows[0]["source_vendor"] == "unipile"
 
 
+def test_profile_url_round_trips_through_upsert_platform_run(fake_db):
+    """The bug this guards against: sci_identify resolves a profile_url per
+    platform, but the column/allowlist to actually persist it did not exist
+    -- the account directory could never link to a platform no matter how
+    successfully it was identified."""
+    run_id = store.save_run("alice@position2.com", "Acme Inc")
+    store.upsert_platform_run(run_id, "instagram", status="identifying", handle="acme",
+                              profile_url="https://instagram.com/acme")
+    rows = store.get_platform_runs(run_id)
+    assert rows[0]["profile_url"] == "https://instagram.com/acme"
+    # A later partial update (collection finishing) must not wipe it out --
+    # the same "earlier field survives" contract every other column gets.
+    store.upsert_platform_run(run_id, "instagram", status="ok", post_count=12)
+    rows = store.get_platform_runs(run_id)
+    assert rows[0]["profile_url"] == "https://instagram.com/acme"
+
+
 def test_one_platform_failing_does_not_touch_another_platforms_row(fake_db):
     run_id = store.save_run("alice@position2.com", "Acme Inc")
     store.upsert_platform_run(run_id, "instagram", status="ok", post_count=5)

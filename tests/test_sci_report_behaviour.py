@@ -872,6 +872,85 @@ def test_the_directory_lists_the_platforms_with_no_account_too():
     assert "example.invalid/instagram/acme" in got["html"]
 
 
+def test_an_unlinked_platform_gets_a_coloured_status_badge_not_a_blank_card():
+    """Every off card carries a small coloured pill naming the real reason
+    -- never a card with just an icon and a name and nothing else, which is
+    indistinguishable from broken rendering."""
+    probe = """
+      var run = {platforms: [%s]};
+      seedAccountUrls(run);
+      var html = renderAccounts(run);
+      ({badges: (html.match(/sci-acc-badge/g)||[]).length, html: html});
+    """ % json.dumps(_run_row("x", status="scrape_failed", post_count=0,
+                              handle=None, profile_url=None))
+    got = _run(probe)
+    assert got["badges"] == 1
+    assert "Collection failed" in got["html"]
+
+
+def test_a_live_platform_never_carries_a_status_badge():
+    probe = """
+      var run = {platforms: [%s]};
+      seedAccountUrls(run);
+      renderAccounts(run);
+    """ % json.dumps(_run_row("instagram"))
+    got = _run(probe)
+    assert "sci-acc-badge" not in got
+
+
+def test_a_platform_identified_with_a_handle_but_no_captured_link_still_shows_something():
+    """The exact regression this was built for: sci_identify resolves a
+    handle with real confidence (status not in NO_ACTIVITY_STATUSES) but no
+    profile_url ever made it onto the row. That must not render as a blank,
+    unexplained card -- the handle shows as text and an amber pill says
+    plainly that no link was captured, rather than nothing at all."""
+    probe = """
+      var run = {platforms: [
+        {platform:'linkedin', status:'ok', post_count: 5, handle: '@acmeco', profile_url: null}
+      ]};
+      seedAccountUrls(run);
+      var html = renderAccounts(run);
+      ({anchors: (html.match(/<a class="sci-acc/g)||[]).length, html: html});
+    """
+    got = _run(probe)
+    assert got["anchors"] == 0                  # not clickable -- no real URL
+    assert "@acmeco" in got["html"]              # but the handle is not hidden
+    assert "Link not captured" in got["html"]
+    assert "sci-acc-badge" in got["html"]
+
+
+def test_an_unlinked_ok_status_never_gets_the_working_green_pill():
+    """A card that ends up unclickable must never be coloured the same
+    green as a real working link -- however "ok" the underlying platform
+    status is, a card with no way out of the report is not fine."""
+    probe = """
+      var run = {platforms: [
+        {platform:'linkedin', status:'ok', post_count: 5, handle: '@acmeco', profile_url: null}
+      ]};
+      seedAccountUrls(run);
+      var html = renderAccounts(run);
+      (html.indexOf('--bc:' + DS_OK) === -1);
+    """
+    assert _run(probe) is True
+
+
+def test_posts_collected_with_no_handle_or_link_still_says_link_not_captured():
+    """Same regression, the other shape of it: a platform can collect real
+    posts (status 'ok') with no handle ever resolved either -- still
+    evidence something real happened, so it must not read as "Not
+    identified" (which implies nothing at all was found)."""
+    probe = """
+      var run = {platforms: [
+        {platform:'instagram', status:'ok', post_count: 20, handle: null, profile_url: null}
+      ]};
+      seedAccountUrls(run);
+      renderAccounts(run);
+    """
+    got = _run(probe)
+    assert "Link not captured" in got
+    assert "Not identified" not in got
+
+
 def test_a_platform_we_could_not_identify_leaks_no_url():
     """handle_not_found means we do not have this account. A profile_url still
     sitting on the row is a half-resolved guess, and every surface that could
