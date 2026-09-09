@@ -295,33 +295,67 @@ html::-webkit-scrollbar-thumb:hover { background-image: linear-gradient(180deg, 
 .sci-cdetail-original:hover { transform: translateY(-1px); box-shadow: 0 16px 32px -14px rgba(244,114,182,.7); }
 .sci-cdetail-section-label { display: flex; align-items: center; gap: 8px; padding: 18px 22px 6px; font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: #a99fb0; }
 .sci-cdetail-section-label span { font-size: 11px; color: #c084fc; }
-.sci-cdetail-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: rgba(255,255,255,.08); }
-.sci-cdetail-col { background: rgba(19,12,16,.98); padding: 16px 20px 22px; min-width: 0; }
-.sci-cdetail-vendor { display: flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; margin-bottom: 14px; }
-.sci-cdetail-vendor-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-.sci-cdetail-vendor.claude { color: #fdba74; } .sci-cdetail-vendor.claude .sci-cdetail-vendor-dot { background: #fb923c; }
-.sci-cdetail-vendor.openai { color: #86efac; } .sci-cdetail-vendor.openai .sci-cdetail-vendor-dot { background: #4ade80; }
-.sci-cdetail-field { margin-bottom: 13px; }
-.sci-cdetail-field:last-child { margin-bottom: 0; }
-.sci-cdetail-label { font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; color: #6b5f72; margin-bottom: 3px; }
-.sci-cdetail-value { font-size: 12.5px; color: #d6c9db; line-height: 1.55; }
-.sci-cdetail-value.empty { color: #55495b; font-style: italic; }
+.sci-cdetail-vendors { padding: 16px 22px 6px; }
+.sci-cdetail-vendor-status { display: flex; align-items: baseline; gap: 8px; font-size: 12px; padding: 7px 0; }
+.sci-cdetail-vendor-status + .sci-cdetail-vendor-status { border-top: 1px solid rgba(255,255,255,.07); }
+.sci-cdetail-vendor-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; margin-top: 4px; }
+.sci-cdetail-vendor-name { font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; flex-shrink: 0; }
+.sci-cdetail-vendor-status.claude.ok .sci-cdetail-vendor-dot { background: #fb923c; box-shadow: 0 0 0 3px rgba(251,146,60,.16); }
+.sci-cdetail-vendor-status.claude.ok .sci-cdetail-vendor-name { color: #fdba74; }
+.sci-cdetail-vendor-status.openai.ok .sci-cdetail-vendor-dot { background: #4ade80; box-shadow: 0 0 0 3px rgba(74,222,128,.16); }
+.sci-cdetail-vendor-status.openai.ok .sci-cdetail-vendor-name { color: #86efac; }
+.sci-cdetail-vendor-status.err .sci-cdetail-vendor-dot { background: #55495b; }
+.sci-cdetail-vendor-status.err .sci-cdetail-vendor-name { color: #a99fb0; }
+.sci-cdetail-vendor-reason { font-size: 11.5px; color: #877b8f; line-height: 1.5; }
+/* The merged reading: one row per topic, not two columns. A field both
+   vendors described alike collapses to a single line; a real disagreement
+   earns two lines, each carrying a small colour-coded vendor tag so the
+   reader can still tell who said what without two separate panes. */
+.sci-cdetail-rows { padding: 6px 22px 24px; }
+.sci-cdetail-row { padding: 12px 0; border-top: 1px solid rgba(255,255,255,.07); }
+.sci-cdetail-row:first-child { border-top: none; padding-top: 2px; }
+.sci-cdetail-row-lead { padding-bottom: 16px; margin-bottom: 6px; border-bottom: 1px solid rgba(255,255,255,.1); }
+.sci-cdetail-row-lead .sci-cdetail-label { display: none; }
+.sci-cdetail-row-lead .sci-cdetail-line { font-size: 14.5px; line-height: 1.6; color: #f3ecf5; font-style: italic; }
+.sci-cdetail-row-lead .sci-cdetail-line::before { content: '“'; margin-right: 2px; color: #c084fc; font-style: normal; }
+.sci-cdetail-row-lead .sci-cdetail-line::after { content: '”'; margin-left: 1px; color: #c084fc; font-style: normal; }
+.sci-cdetail-label { font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; color: #6b5f72; margin-bottom: 6px; }
+.sci-cdetail-line { display: flex; align-items: flex-start; gap: 9px; font-size: 12.5px; color: #d6c9db; line-height: 1.55; }
+.sci-cdetail-line + .sci-cdetail-line { margin-top: 7px; }
+.sci-cdetail-tag { flex-shrink: 0; margin-top: 1px; font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; padding: 2.5px 7px; border-radius: 6px; }
+.sci-cdetail-tag.claude { background: rgba(251,146,60,.15); color: #fdba74; }
+.sci-cdetail-tag.openai { background: rgba(74,222,128,.15); color: #86efac; }
+.sci-cdetail-tag.both { background: transparent; color: #7d7383; padding-left: 0; }
+.sci-cdetail-empty-rows { padding: 8px 22px 26px; font-size: 12.5px; color: #877b8f; font-style: italic; }
 .sci-cdetail-empty { padding: 30px 22px; text-align: center; font-size: 12.5px; color: #877b8f; }
 @media (max-width: 640px) {
-  .sci-cdetail-cols { grid-template-columns: 1fr; }
   .sci-cdetail-hero { flex-direction: column; padding: 22px 46px 20px 20px; }
   .sci-cdetail-hero-media { width: 100%; height: 180px; }
 }
 [data-theme="light"] .sci-cdetail-overlay { background: rgba(18,26,54,.4); }
-[data-theme="light"] .sci-cdetail, [data-theme="light"] .sci-cdetail-col { background: rgba(255,255,255,.98); }
+[data-theme="light"] .sci-cdetail { background: rgba(255,255,255,.98); }
 [data-theme="light"] .sci-cdetail-hero { background: linear-gradient(165deg, rgba(251,146,60,.08), transparent 55%); }
 [data-theme="light"] .sci-cdetail-hero-media { background: rgba(18,26,54,.05); }
 [data-theme="light"] .sci-cdetail-caption { color: #302631; }
 [data-theme="light"] .sci-cdetail-date { color: #6a5f73; }
 [data-theme="light"] .sci-cdetail-section-label { color: #6b5f72; }
-[data-theme="light"] .sci-cdetail-value { color: #302631; }
 [data-theme="light"] .sci-cdetail-close { background: rgba(18,26,54,.06); border-color: rgba(18,26,54,.12); color: #5c5163; }
 [data-theme="light"] .sci-cdetail-close:hover { background: rgba(18,26,54,.12); color: #1c1420; }
+[data-theme="light"] .sci-cdetail-vendor-status + .sci-cdetail-vendor-status { border-top-color: rgba(18,26,54,.08); }
+[data-theme="light"] .sci-cdetail-vendor-status.claude.ok .sci-cdetail-vendor-name { color: #b8500a; }
+[data-theme="light"] .sci-cdetail-vendor-status.openai.ok .sci-cdetail-vendor-name { color: #15803d; }
+[data-theme="light"] .sci-cdetail-vendor-status.err .sci-cdetail-vendor-dot { background: #c7bece; }
+[data-theme="light"] .sci-cdetail-vendor-status.err .sci-cdetail-vendor-name { color: #6a5f73; }
+[data-theme="light"] .sci-cdetail-vendor-reason { color: #6a5f73; }
+[data-theme="light"] .sci-cdetail-row { border-top-color: rgba(18,26,54,.08); }
+[data-theme="light"] .sci-cdetail-row-lead { border-bottom-color: rgba(18,26,54,.12); }
+[data-theme="light"] .sci-cdetail-row-lead .sci-cdetail-line { color: #1c1420; }
+[data-theme="light"] .sci-cdetail-label { color: #6a5f73; }
+[data-theme="light"] .sci-cdetail-line { color: #302631; }
+[data-theme="light"] .sci-cdetail-tag.claude { background: rgba(184,80,10,.12); color: #94420a; }
+[data-theme="light"] .sci-cdetail-tag.openai { background: rgba(21,128,61,.12); color: #116932; }
+[data-theme="light"] .sci-cdetail-tag.both { color: #8a7f92; }
+[data-theme="light"] .sci-cdetail-empty-rows { color: #6a5f73; }
 
 /* .sci-postcard is now the whole card's own click target (see
    renderPostCard) rather than a native <a>, so it needs its own visible

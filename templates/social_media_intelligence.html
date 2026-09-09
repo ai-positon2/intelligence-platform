@@ -11,7 +11,7 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-components.css') }}">
   <script src="/static/js/theme.js"></script>
   <link rel="stylesheet" href="/static/css/grid-tokens.css">
-  <link rel="stylesheet" href="/static/css/social_media_intelligence.css?v=5">
+  <link rel="stylesheet" href="/static/css/social_media_intelligence.css?v=6">
   <link rel="stylesheet" href="/static/css/aurora-app.css?v=3">
 </head>
 <body>
@@ -952,11 +952,16 @@ function dsApifyRow(platform, entry){
         '</div></div>';
     }
 
-    // ── Creative detail modal: Claude's and ChatGPT's independent reads of
-    // ONE post, side by side. FIELD_ORDER mirrors tracker/sci_vision.FIELDS'
-    // own order (minus "summary", shown separately as the lead line) plus
-    // the two extra fields a video-shaped analysis can carry
-    // (dialogue_transcript, frame_extraction_note) that an image never has. ──
+    // ── Creative detail modal: ONE merged read of a post, not two parallel
+    // buckets. Claude and ChatGPT are independent vendors, but a reader does
+    // not care which model said what unless the two disagree -- so a field
+    // both vendors described the same way renders once, a field only one of
+    // them addressed renders once with a small attribution tag, and only a
+    // genuine disagreement earns two lines. FIELD_ORDER mirrors tracker/
+    // sci_vision.FIELDS' own order (minus "summary", handled separately as
+    // the lead line) plus the two extra fields a video-shaped analysis can
+    // carry (dialogue_transcript, frame_extraction_note) that an image never
+    // has.
     var CDETAIL_FIELDS = [
       ['messaging', 'Messaging'], ['cta', 'Call to action'], ['tone', 'Tone'],
       ['hook', 'Hook'], ['format_technique', 'Format / technique'], ['branding', 'Branding'],
@@ -964,14 +969,19 @@ function dsApifyRow(platform, entry){
       ['product', 'Product'], ['style', 'Style'], ['on_screen_text', 'On-screen text'],
       ['dialogue_transcript', 'Spoken dialogue'], ['frame_extraction_note', 'Note'],
     ];
-    function cdetailField(key, label, value){
-      // A video's folded fields (sci_vision.summarize_frames) turn subject/
-      // setting/on_screen_text into ARRAYS of per-frame values; everything
-      // else is already a single string either way.
+    // A video's folded fields (sci_vision.summarize_frames) turn subject/
+    // setting/on_screen_text into ARRAYS of per-frame values; everything
+    // else is already a single string either way.
+    function cdetailNorm(value){
       if(Array.isArray(value)) value = value.filter(Boolean).join(' / ');
-      value = (value || '').toString().trim();
-      return '<div class="sci-cdetail-field"><div class="sci-cdetail-label">' + esc(label) + '</div>' +
-        '<div class="sci-cdetail-value' + (value ? '' : ' empty') + '">' + esc(value || 'Not noted') + '</div></div>';
+      return (value || '').toString().trim();
+    }
+    // Loose enough to merge "Subscribe to our Channel." against "Subscribe
+    // to our Channel" -- two vendors phrasing the identical fact should not
+    // read as a disagreement just because one added a period.
+    function cdetailTextEqual(a, b){
+      var norm = function(s){ return s.toLowerCase().replace(/\s+/g, ' ').replace(/[.!,;:]+$/, '').trim(); };
+      return norm(a) === norm(b);
     }
     var CDETAIL_ERROR_TEXT = {
       not_configured: 'Not run: this vendor is not configured on this deployment.',
@@ -983,30 +993,68 @@ function dsApifyRow(platform, entry){
       empty_response: 'The vendor answered but described nothing about this creative.',
       no_frames_analyzed: 'Every sampled video frame failed to analyze.',
     };
-    // The stored per-vendor error column, when it carries something the map
-    // above does not already say in plain language. Worth showing: the
-    // pipeline records the real reason a post failed (an HTTP status, a
-    // "Could not extract any video frames"), and the page used to collapse
-    // every one of them into "The vendor call failed for this post" -- which
-    // is exactly the sentence that tells whoever is debugging nothing at all.
-    function cdetailDetail(rawError, reason){
-      var text = (rawError || '').toString().trim();
-      if(!text) return '';
-      if(CDETAIL_ERROR_TEXT[text]) return '';   // already said, in better words
-      if(text === reason) return '';
-      return '<div class="sci-cdetail-value empty">' + esc(text) + '</div>';
+    // A vendor's status in one shape: whether it produced a reading, and, if
+    // not, the reason in plain language -- plus the stored per-vendor error
+    // column when it carries something the map above does not already say
+    // (an HTTP status, a "Could not extract any video frames"). Printing
+    // both a canned reason AND the identical raw code would just be noise,
+    // so the raw detail is only appended when it adds information.
+    function cdetailReason(analysis, status, rawError){
+      if(status === 'ok' && analysis) return {ok: true, text: ''};
+      var code = analysis && analysis.error;
+      var reason = (code && CDETAIL_ERROR_TEXT[code]) ||
+        (status === 'skipped' ? CDETAIL_ERROR_TEXT.not_configured : CDETAIL_ERROR_TEXT.vendor_call_failed);
+      var raw = (rawError || '').toString().trim();
+      var extra = (raw && !CDETAIL_ERROR_TEXT[raw] && raw !== reason) ? raw : '';
+      return {ok: false, text: extra ? (reason + ' ' + extra) : reason};
     }
-    function cdetailColumn(vendorClass, vendorLabel, analysis, status, rawError){
-      var head = '<div class="sci-cdetail-vendor ' + vendorClass + '"><span class="sci-cdetail-vendor-dot"></span>' + esc(vendorLabel) + '</div>';
-      if(status !== 'ok' || !analysis){
-        var reason = (analysis && analysis.error && CDETAIL_ERROR_TEXT[analysis.error]) ||
-          (status === 'skipped' ? CDETAIL_ERROR_TEXT.not_configured : CDETAIL_ERROR_TEXT.vendor_call_failed);
-        return '<div class="sci-cdetail-col">' + head + '<div class="sci-cdetail-value empty">' + esc(reason) + '</div>' +
-          cdetailDetail(rawError, reason) + '</div>';
+    function cdetailVendorStatus(label, cls, state){
+      return '<div class="sci-cdetail-vendor-status ' + cls + (state.ok ? ' ok' : ' err') + '">' +
+        '<span class="sci-cdetail-vendor-dot"></span><span class="sci-cdetail-vendor-name">' + esc(label) + '</span>' +
+        (state.ok ? '' : '<span class="sci-cdetail-vendor-reason">' + esc(state.text) + '</span>') +
+        '</div>';
+    }
+    function cdetailLine(text, tagLabel, tagCls){
+      var tag = tagLabel ? '<span class="sci-cdetail-tag ' + tagCls + '">' + esc(tagLabel) + '</span>' : '';
+      return '<div class="sci-cdetail-line">' + tag + '<span>' + esc(text) + '</span></div>';
+    }
+    // The merge itself: agree once, differ twice, one vendor only once --
+    // never two full-height columns repeating "Not noted" past each other.
+    function cdetailRow(label, cVal, oVal, showTags, isLead){
+      if(!cVal && !oVal) return '';
+      var body;
+      if(cVal && oVal && cdetailTextEqual(cVal, oVal)){
+        body = cdetailLine(cVal, showTags ? 'Agree' : '', 'both');
+      } else if(cVal && oVal){
+        body = cdetailLine(cVal, showTags ? 'Claude' : '', 'claude') + cdetailLine(oVal, showTags ? 'ChatGPT' : '', 'openai');
+      } else {
+        body = cdetailLine(cVal || oVal, showTags ? (cVal ? 'Claude' : 'ChatGPT') : '', cVal ? 'claude' : 'openai');
       }
-      var summary = cdetailField('summary', 'Summary', analysis.summary);
-      var rest = CDETAIL_FIELDS.map(function(pair){ return cdetailField(pair[0], pair[1], analysis[pair[0]]); }).join('');
-      return '<div class="sci-cdetail-col">' + head + summary + rest + '</div>';
+      return '<div class="sci-cdetail-row' + (isLead ? ' sci-cdetail-row-lead' : '') + '">' +
+        '<div class="sci-cdetail-label">' + esc(label) + '</div>' + body + '</div>';
+    }
+    // showTags only earns its keep when BOTH vendors actually ran: if only
+    // one did, every row came from that one vendor anyway and a tag on each
+    // line would just repeat what the status row above already says once.
+    function cdetailInsights(post){
+      var cState = cdetailReason(post.creative_analysis, post.creative_analysis_status, post.creative_analysis_error);
+      var oState = cdetailReason(post.creative_analysis_openai, post.creative_analysis_openai_status, post.creative_analysis_openai_error);
+      var statusRow = '<div class="sci-cdetail-vendors">' +
+        cdetailVendorStatus('Claude', 'claude', cState) +
+        cdetailVendorStatus('ChatGPT', 'openai', oState) +
+        '</div>';
+      var cA = cState.ok ? post.creative_analysis : null;
+      var oA = oState.ok ? post.creative_analysis_openai : null;
+      var showTags = cState.ok && oState.ok;
+      var rowsHtml = '';
+      if(cA || oA){
+        rowsHtml += cdetailRow('Summary', cdetailNorm(cA && cA.summary), cdetailNorm(oA && oA.summary), showTags, true);
+        rowsHtml += CDETAIL_FIELDS.map(function(pair){
+          return cdetailRow(pair[1], cdetailNorm(cA && cA[pair[0]]), cdetailNorm(oA && oA[pair[0]]), showTags, false);
+        }).join('');
+      }
+      if(!rowsHtml) rowsHtml = '<div class="sci-cdetail-empty-rows">No readable analysis for this post yet.</div>';
+      return statusRow + '<div class="sci-cdetail-rows">' + rowsHtml + '</div>';
     }
     // The hero block: everything about the post itself (the real thumbnail,
     // its own caption, when it went up, how it performed, and one clear way
@@ -1047,12 +1095,7 @@ function dsApifyRow(platform, entry){
         '<button type="button" class="sci-cdetail-close" onclick="closeCreativeDetail()" aria-label="Close">✕</button>' +
         cdetailHero(post) +
         '<div class="sci-cdetail-section-label"><span>◆</span>What the vision models see</div>' +
-        '<div class="sci-cdetail-cols">' +
-          cdetailColumn('claude', 'Claude', post.creative_analysis, post.creative_analysis_status,
-                        post.creative_analysis_error) +
-          cdetailColumn('openai', 'ChatGPT', post.creative_analysis_openai, post.creative_analysis_openai_status,
-                        post.creative_analysis_openai_error) +
-        '</div>';
+        cdetailInsights(post);
       overlay.classList.add('open');
     }
     function closeCreativeDetail(){
