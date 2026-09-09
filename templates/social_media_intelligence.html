@@ -11,7 +11,7 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-components.css') }}">
   <script src="/static/js/theme.js"></script>
   <link rel="stylesheet" href="/static/css/grid-tokens.css">
-  <link rel="stylesheet" href="/static/css/social_media_intelligence.css?v=7">
+  <link rel="stylesheet" href="/static/css/social_media_intelligence.css?v=8">
   <link rel="stylesheet" href="/static/css/aurora-app.css?v=3">
 </head>
 <body>
@@ -953,12 +953,35 @@ function dsApifyRow(platform, entry){
       var extra = (raw && !CDETAIL_ERROR_TEXT[raw] && raw !== reason) ? raw : '';
       return {ok: false, text: extra ? (reason + ' ' + extra) : reason};
     }
-    function cdetailRow(label, value, isLead){
+    function cdetailRow(label, value){
       value = cdetailNorm(value);
       if(!value) return '';
-      return '<div class="sci-cdetail-row' + (isLead ? ' sci-cdetail-row-lead' : '') + '">' +
+      return '<div class="sci-cdetail-row">' +
         '<div class="sci-cdetail-label">' + esc(label) + '</div>' +
         '<div class="sci-cdetail-line"><span>' + esc(value) + '</span></div></div>';
+    }
+    // The lead summary as short, scannable pointers rather than one quoted
+    // paragraph. A stored video summary can predate sci_vision.
+    // summarize_frames' own 2-frame cap (or simply run long even capped),
+    // so this splits and truncates defensively on the READ side too --
+    // never trusting stored data to already be short, the same discipline
+    // this page's report-bullet rendering already applies elsewhere.
+    var CDETAIL_SUMMARY_MAX_POINTS = 3;
+    var CDETAIL_SUMMARY_MAX_CHARS = 150;
+    function cdetailSummaryPoints(summary){
+      return cdetailNorm(summary).split(' / ').map(function(s){ return s.trim(); }).filter(Boolean)
+        .slice(0, CDETAIL_SUMMARY_MAX_POINTS)
+        .map(function(s){
+          if(s.length <= CDETAIL_SUMMARY_MAX_CHARS) return s;
+          return s.slice(0, CDETAIL_SUMMARY_MAX_CHARS).replace(/\s+\S*$/, '') + '…';
+        });
+    }
+    function cdetailSummaryCard(summary){
+      var points = cdetailSummaryPoints(summary);
+      if(!points.length) return '';
+      return '<div class="sci-cdetail-summary">' +
+        points.map(function(p){ return '<div class="sci-cdetail-summary-point">' + esc(p) + '</div>'; }).join('') +
+        '</div>';
     }
     function cdetailInsights(post){
       var state = cdetailReason(post.creative_analysis, post.creative_analysis_status, post.creative_analysis_error);
@@ -966,9 +989,8 @@ function dsApifyRow(platform, entry){
         return '<div class="sci-cdetail-empty-rows">' + esc(state.text) + '</div>';
       }
       var a = post.creative_analysis;
-      var rowsHtml = cdetailRow('Summary', a.summary, true) +
-        CDETAIL_FIELDS.map(function(pair){ return cdetailRow(pair[1], a[pair[0]]); }).join('');
-      return '<div class="sci-cdetail-rows">' + rowsHtml + '</div>';
+      var rowsHtml = CDETAIL_FIELDS.map(function(pair){ return cdetailRow(pair[1], a[pair[0]]); }).join('');
+      return cdetailSummaryCard(a.summary) + '<div class="sci-cdetail-rows">' + rowsHtml + '</div>';
     }
     // The hero block: everything about the post itself (the real thumbnail,
     // its own caption, when it went up, how it performed, and one clear way

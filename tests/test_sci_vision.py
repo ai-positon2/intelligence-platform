@@ -179,6 +179,21 @@ def test_summarize_frames_takes_hook_only_from_the_opening_frame():
     assert result["hook"] == "Bold opening headline"
 
 
+def test_summarize_frames_caps_the_summary_at_two_frames_not_every_frame():
+    """The bug this guards against: joining every sampled frame's own
+    summary sentence produced a run-on wall of near-duplicate paragraphs
+    for a video whose frames mostly show the same scene. Capped the same
+    way as the other whole-video fields (_dedupe_join, limit=2)."""
+    frames = [{"subject": "s", "summary": "Frame one summary."},
+             {"subject": "s", "summary": "Frame two summary."},
+             {"subject": "s", "summary": "Frame three summary."},
+             {"subject": "s", "summary": "Frame four summary."}]
+    result = sci_vision.summarize_frames(frames)
+    assert result["summary"] == "Frame one summary. / Frame two summary."
+    assert "Frame three" not in result["summary"]
+    assert "Frame four" not in result["summary"]
+
+
 # ── A reply that says nothing is a failure, not a success ───────────────────
 #
 # The bug: _parse coerces whatever came back into all thirteen FIELDS with
