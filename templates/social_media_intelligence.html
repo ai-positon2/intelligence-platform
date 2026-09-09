@@ -11,7 +11,7 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-components.css') }}">
   <script src="/static/js/theme.js"></script>
   <link rel="stylesheet" href="/static/css/grid-tokens.css">
-  <link rel="stylesheet" href="/static/css/social_media_intelligence.css?v=8">
+  <link rel="stylesheet" href="/static/css/social_media_intelligence.css?v=9">
   <link rel="stylesheet" href="/static/css/aurora-app.css?v=3">
 </head>
 <body>
@@ -1740,6 +1740,7 @@ function dsApifyRow(platform, entry){
       return names.map(function(n){
         var pr = byName[n], live = !NO_ACTIVITY_STATUSES[pr.status];
         return {platform: n, label: platformLabel(n), icon: platformMeta(n).icon,
+          status: pr.status,
           url: live ? absUrl(pr.profile_url) : null,
           handle: live ? (pr.handle || null) : null,
           posts: pr.post_count || 0,
@@ -1835,10 +1836,27 @@ function dsApifyRow(platform, entry){
     // Every way out of this report in one grid: the company's own site, each
     // account we resolved, and the subreddit the conversation lives in. The
     // platforms with nothing behind them are listed too, unclickable and
-    // carrying their reason, so the row of links is the whole footprint
-    // rather than the flattering half of it.
+    // carrying a coloured status pill naming the real reason, so the row of
+    // cards is the whole footprint rather than the flattering half of it --
+    // and never a blank box with no explanation at all.
+    // Deliberately covers only the terminal NO_ACTIVITY statuses -- 'ok'/
+    // 'identifying'/'collecting' never appear here on purpose. Those only
+    // reach an off (unclickable) card in the rare case a link was never
+    // captured despite a real handle or posts, and renderAccounts' own
+    // `collected` fallback below colours that amber, never green: a status
+    // of 'ok' colouring its own unlinked card the same green as a working
+    // link would read as "this is fine" when the whole point of the card
+    // is that it is not.
+    var ACC_STATUS_COLOR = {low_activity: DS_WARN, scrape_failed: DS_ERR, error: DS_ERR,
+      no_presence: DS_OFF, handle_not_found: DS_OFF};
     function accountCard(o){
       var live = !!o.url, tag = live ? 'a' : 'div';
+      // The badge sits where the URL line sits on a live card -- the same
+      // third line either says where this goes or plainly why it doesn't,
+      // never nothing at all.
+      var badge = (!live && o.badge)
+        ? '<span class="sci-acc-badge" style="--bc:' + (o.badgeColor || DS_OFF) + '"><span class="d"></span>' + esc(o.badge) + '</span>'
+        : '';
       return '<' + tag + ' class="sci-acc' + (live ? '' : ' sci-acc-off') + '"' +
         (o.platform ? ' data-platform="' + esc(o.platform) + '"' : '') +
         (live ? ' href="' + esc(o.url) + '" target="_blank" rel="noopener" title="' + esc(o.url) + '"' : '') + '>' +
@@ -1849,7 +1867,7 @@ function dsApifyRow(platform, entry){
           // The bare URL is printed, not just linked. On paper a link is a
           // piece of text, and a card that only said "Instagram ↗" would be
           // an instruction to click something that is not there.
-          (live ? '<span class="sci-acc-u">' + esc(prettyUrl(o.url)) + '</span>' : '') +
+          (live ? '<span class="sci-acc-u">' + esc(prettyUrl(o.url)) + '</span>' : badge) +
         '</span>' +
         (live ? '<span class="sci-acc-go">' + VIEW_GLYPH + '</span>' : '') +
       '</' + tag + '>';
@@ -1861,10 +1879,19 @@ function dsApifyRow(platform, entry){
           sub: run.company_name || 'Owned site', url: site}));
       }
       socialAccounts(run).forEach(function(a){
+        var live = !!a.url, collected = live || a.handle || a.posts;
+        // A handle can be identified, or posts even collected, with real
+        // confidence even when no clickable profile link was captured for
+        // it (rare, but the map between the two is not guaranteed) -- that
+        // still deserves the handle shown as text and an amber "in
+        // progress" pill, never the same blank, unexplained box as a
+        // platform nothing was found on at all.
         cards.push(accountCard({platform: a.platform, icon: a.icon, name: a.label,
-          sub: a.url ? (a.handle || (a.posts ? a.posts + ' post' + (a.posts === 1 ? '' : 's') + ' collected' : 'Account found'))
-                     : a.reason,
-          url: a.url}));
+          sub: live ? (a.handle || (a.posts ? a.posts + ' post' + (a.posts === 1 ? '' : 's') + ' collected' : 'Account found'))
+                    : (a.handle ? '@' + a.handle.replace(/^@/, '') : null),
+          url: a.url,
+          badge: live ? null : (a.reason || (collected ? 'Link not captured' : 'Not identified')),
+          badgeColor: live ? null : (ACC_STATUS_COLOR[a.status] || (collected ? DS_WARN : DS_OFF))}));
       });
       var pulse = run.reddit_pulse || null;
       var community = pulse && pulse.community ? absUrl(pulse.community.url) : null;

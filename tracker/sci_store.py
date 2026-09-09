@@ -124,6 +124,15 @@ def _ensure_tables(conn) -> None:
         # UI can show it and so a Unipile-vs-Apify fallback is visible in the
         # data, not just in logs.
         cur.execute("ALTER TABLE sci_platform_runs ADD COLUMN IF NOT EXISTS source_vendor VARCHAR(20)")
+        # sci_identify.identify_handles() (and its YouTube/Reddit fallbacks)
+        # always resolve a profile_url alongside the handle, but run_identify
+        # never had anywhere to put it -- the account directory ("Every
+        # account, in one place") read pr.profile_url, always got undefined,
+        # and rendered every platform but the company's own website and the
+        # special-cased Reddit community as an unclickable card with no
+        # explanation, regardless of whether that platform's collection
+        # actually succeeded.
+        cur.execute("ALTER TABLE sci_platform_runs ADD COLUMN IF NOT EXISTS profile_url TEXT")
         cur.execute("""
             CREATE TABLE IF NOT EXISTS sci_posts (
                 id SERIAL PRIMARY KEY,
@@ -445,7 +454,7 @@ def get_run(run_id: int, email: str) -> dict | None:
 _PLATFORM_RUN_COLUMNS = ["id", "run_id", "platform", "handle", "handle_confidence", "status",
                          "status_detail", "post_count", "last_post_at", "window_start",
                          "window_end", "collected_at", "analyzed_at", "error",
-                         "created_at", "updated_at", "source_vendor"]
+                         "created_at", "updated_at", "source_vendor", "profile_url"]
 
 
 def upsert_platform_run(run_id: int, platform: str, **fields: Any) -> int | None:
@@ -453,10 +462,10 @@ def upsert_platform_run(run_id: int, platform: str, **fields: Any) -> int | None
     scoped -- the background worker already knows its own run_id. Accepts any
     subset of: handle, handle_confidence, status, status_detail, post_count,
     last_post_at, window_start, window_end, collected_at, analyzed_at, error,
-    source_vendor."""
+    source_vendor, profile_url."""
     allowed = {"handle", "handle_confidence", "status", "status_detail", "post_count",
               "last_post_at", "window_start", "window_end", "collected_at",
-              "analyzed_at", "error", "source_vendor"}
+              "analyzed_at", "error", "source_vendor", "profile_url"}
     fields = {k: v for k, v in fields.items() if k in allowed}
     conn = _pg_conn()
     if not conn:

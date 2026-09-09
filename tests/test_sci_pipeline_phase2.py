@@ -199,6 +199,32 @@ def test_run_identify_actually_applies_the_youtube_fallback(monkeypatch):
     assert rows["facebook"]["status"] == "handle_not_found"
 
 
+def test_run_identify_persists_the_resolved_profile_url(monkeypatch):
+    """The bug this guards against: sci_identify.identify_handles always
+    resolves a profile_url alongside the handle, but run_identify used to
+    drop it on the floor -- upsert_platform_run was never even called with
+    it -- so the account directory could never link to a platform, however
+    successfully it was identified."""
+    from tracker import sci_store, sci_identify
+
+    rows = {}
+    monkeypatch.setattr(sci_store, "update_run_status", lambda *a, **k: None)
+    monkeypatch.setattr(sci_store, "upsert_platform_run",
+                        lambda run_id, platform, **k: rows.__setitem__(platform, k))
+    monkeypatch.setattr(sci_identify, "identify_handles", lambda *a, **k: {
+        **_all_none(),
+        "instagram": {"handle": "acmeco", "profile_url": "https://instagram.com/acmeco",
+                     "confidence": "high", "reasoning": "Confirmed via the company's own site."},
+    })
+
+    sci_pipeline.run_identify(1, "Acme Co", "http://acme.co")
+
+    assert rows["instagram"]["profile_url"] == "https://instagram.com/acmeco"
+    # A platform identify could not confidently resolve must not crash on a
+    # missing profile_url -- it stays None, same as handle.
+    assert rows["facebook"]["profile_url"] is None
+
+
 # --- per-platform collection depth --------------------------------------
 #
 # 2026-09-07: replaced the old per-platform depth split (YouTube/Reddit at a
