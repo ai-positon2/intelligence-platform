@@ -181,6 +181,26 @@ def test_a_real_programme_still_qualifies_when_the_app_is_also_mentioned():
     assert r["bonus"] == R.MATCHMAKING_BONUS
 
 
+@pytest.mark.parametrize("evidence", [
+    'Thousands of pre-scheduled 1-on-1s and a "Who Do You Want to Meet" '
+    'matchmaking app producing 3,000+ scheduled meetings event-wide.',
+    'Pre-scheduled meetings through the conference app, booked by attendees.',
+    'Pre-scheduled meetings in Brella, with self-serve sign-up.',
+    'Thousands of pre-scheduled 1-on-1 meetings.',
+])
+def test_advance_booking_does_not_establish_organizer_pairing(evidence):
+    result = R.matchmaking_bonus(True, evidence)
+    assert result['bonus'] == 0
+    assert result['awarded'] is False
+
+
+def test_explicit_organizer_pairing_can_coexist_with_matchmaking_app():
+    result = R.matchmaking_bonus(
+        True, 'The organizer pairs buyers and vendors against stated criteria; '
+        'confirmed meetings appear in the matchmaking app.')
+    assert result['bonus'] == R.MATCHMAKING_BONUS
+
+
 def test_a_refused_bonus_says_why():
     r = R.matchmaking_bonus(True, "Attendees book their own meetings in Whova.")
     assert r["reason"] and len(r["reason"]) > 20
