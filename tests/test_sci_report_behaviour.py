@@ -1310,3 +1310,51 @@ def test_a_linkedin_link_post_falls_back_to_the_article_cover():
       ({thumb: postThumbnail(post)});
     """
     assert _run(probe)["thumb"] == "https://example.invalid/cover.jpg"
+
+
+# ── The bottom-of-pane fade: "keep scrolling" vs "this really is the end" ──
+#
+# A long pane's last card can land right at the visible edge with nothing on
+# screen to say whether there is more below -- that reads as content having
+# stopped rendering rather than a scrollable page. updatePaneFade toggles a
+# CSS mask class based purely on scroll geometry, so it is testable with a
+# plain object standing in for the real scroller element.
+
+def _fake_scroller(scroll_height, scroll_top, client_height):
+    return ("{scrollHeight:%d, scrollTop:%d, clientHeight:%d, "
+           "classList:{_on:false, toggle:function(cls,on){this._on=on;}}}"
+           % (scroll_height, scroll_top, client_height))
+
+
+def test_the_fade_appears_when_meaningfully_more_content_sits_below():
+    probe = """
+      var s = %s;
+      updatePaneFade(s);
+      s.classList._on;
+    """ % _fake_scroller(2000, 0, 600)
+    assert _run(probe) is True
+
+
+def test_the_fade_is_gone_once_scrolled_to_the_true_bottom():
+    probe = """
+      var s = %s;
+      updatePaneFade(s);
+      s.classList._on;
+    """ % _fake_scroller(2000, 1400, 600)
+    assert _run(probe) is False
+
+
+def test_a_pane_that_fits_entirely_on_screen_never_gets_a_fade():
+    probe = """
+      var s = %s;
+      updatePaneFade(s);
+      s.classList._on;
+    """ % _fake_scroller(500, 0, 600)
+    assert _run(probe) is False
+
+
+def test_updatepanefade_never_throws_on_a_missing_scroller():
+    """switchPane and renderReport call this before any pane necessarily
+    has a live scroller (e.g. an empty run) -- it must be a plain no-op,
+    never a crash that takes the rest of the render down with it."""
+    assert _run("updatePaneFade(null); 'ok';") == "ok"
