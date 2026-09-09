@@ -300,20 +300,27 @@
       panel.innerHTML = '<div class="sci-card sci-datasrc">' +
         '<div class="sci-card-head"><h2>Data sources <span class="sci-datasrc-tag">admin only</span></h2>' +
         '<button type="button" class="sci-datasrc-refresh" id="dsRefreshBtn" ' +
-        'onclick="loadDataSources();loadApifyDataSources();loadVisionClaudeCheck();loadVisionOpenaiCheck();">Refresh</button></div>' +
+        'onclick="loadDataSources();loadApifyDataSources();loadVisionClaudeCheck();loadVisionOpenaiCheck();' +
+        'loadVisionClaudeUrlCheck();loadVisionOpenaiUrlCheck();">Refresh</button></div>' +
         '<div class="sci-datasrc-sub">Unipile</div>' +
         '<div class="sci-datasrc-body" id="dsBody"><div class="sci-datasrc-loading"><span class="sci-spinner" style="width:14px;height:14px;border-width:2px"></span>Checking Unipile…</div></div>' +
         '<div class="sci-datasrc-sub">Apify</div>' +
         '<div class="sci-datasrc-body" id="dsApifyBody"><div class="sci-datasrc-loading"><span class="sci-spinner" style="width:14px;height:14px;border-width:2px"></span>Checking Apify…</div></div>' +
         '<div class="sci-datasrc-sub">Claude vision (creative analysis)</div>' +
         '<div class="sci-datasrc-body" id="dsVisionClaudeBody"><div class="sci-datasrc-loading"><span class="sci-spinner" style="width:14px;height:14px;border-width:2px"></span>Checking…</div></div>' +
+        '<div class="sci-datasrc-sub">Claude vision (image URL fetch)</div>' +
+        '<div class="sci-datasrc-body" id="dsVisionClaudeUrlBody"><div class="sci-datasrc-loading"><span class="sci-spinner" style="width:14px;height:14px;border-width:2px"></span>Checking…</div></div>' +
         '<div class="sci-datasrc-sub">ChatGPT vision (second opinion)</div>' +
         '<div class="sci-datasrc-body" id="dsVisionOpenaiBody"><div class="sci-datasrc-loading"><span class="sci-spinner" style="width:14px;height:14px;border-width:2px"></span>Checking…</div></div>' +
+        '<div class="sci-datasrc-sub">ChatGPT vision (image URL fetch)</div>' +
+        '<div class="sci-datasrc-body" id="dsVisionOpenaiUrlBody"><div class="sci-datasrc-loading"><span class="sci-spinner" style="width:14px;height:14px;border-width:2px"></span>Checking…</div></div>' +
       '</div>';
       loadDataSources();
       loadApifyDataSources();
       loadVisionClaudeCheck();
       loadVisionOpenaiCheck();
+      loadVisionClaudeUrlCheck();
+      loadVisionOpenaiUrlCheck();
     }
 
     // The primary vision pass, checked the same way and for the same reason
@@ -366,6 +373,59 @@
         })
         .catch(function(){
           body.innerHTML = '<div class="sci-datasrc-empty">Could not reach the ChatGPT vision check.</div>';
+        });
+    }
+
+    // The two checks above send the test image as bytes, exactly the shape
+    // a video frame takes -- NOT the shape every real post's still image
+    // takes, which is a URL the vendor fetches itself. A deployment can pass
+    // the bytes check while every real post still fails, if the vendor's own
+    // fetch of a link (or this repo's SSRF-guarded local retry of the same
+    // link) is what is broken. These two point at a small image already
+    // public on this deployment's own domain to isolate that question.
+    function loadVisionClaudeUrlCheck(){
+      var body = document.getElementById('dsVisionClaudeUrlBody');
+      if(!body) return;
+      fetch('/p2/admin/external-usage/sci-vision-claude-url-check', {method: 'POST'})
+        .then(function(r){ return r.json(); })
+        .then(function(d){
+          if(!d.configured){
+            body.innerHTML = '<div class="sci-datasrc-empty">ANTHROPIC_API_KEY is not set on this deployment.</div>';
+            return;
+          }
+          if(!d.ok){
+            body.innerHTML = '<div class="sci-datasrc-empty">' + esc(d.error || 'Claude could not fetch an image by URL right now.') + '</div>';
+            return;
+          }
+          body.innerHTML = '<div class="sci-datasrc-row"><span class="sci-datasrc-name">model: ' + esc(d.model || '') + '</span>' +
+            '<span class="sci-datasrc-status ok">working (' + (d.elapsed_ms || 0) + 'ms)</span></div>' +
+            '<div class="sci-datasrc-note">Proves Claude can fetch and read an image by URL, the way it reads every real post\'s still image -- not just accept bytes handed to it directly.</div>';
+        })
+        .catch(function(){
+          body.innerHTML = '<div class="sci-datasrc-empty">Could not reach the Claude vision URL check.</div>';
+        });
+    }
+
+    function loadVisionOpenaiUrlCheck(){
+      var body = document.getElementById('dsVisionOpenaiUrlBody');
+      if(!body) return;
+      fetch('/p2/admin/external-usage/sci-vision-openai-url-check', {method: 'POST'})
+        .then(function(r){ return r.json(); })
+        .then(function(d){
+          if(!d.configured){
+            body.innerHTML = '<div class="sci-datasrc-empty">OPENAI_API_KEY is not set on this deployment.</div>';
+            return;
+          }
+          if(!d.ok){
+            body.innerHTML = '<div class="sci-datasrc-empty">' + esc(d.error || 'ChatGPT could not fetch an image by URL right now.') + '</div>';
+            return;
+          }
+          body.innerHTML = '<div class="sci-datasrc-row"><span class="sci-datasrc-name">model: ' + esc(d.model || '') + '</span>' +
+            '<span class="sci-datasrc-status ok">working (' + (d.elapsed_ms || 0) + 'ms)</span></div>' +
+            '<div class="sci-datasrc-note">Proves ChatGPT can fetch and read an image by URL, the way it reads every real post\'s still image -- not just accept bytes handed to it directly.</div>';
+        })
+        .catch(function(){
+          body.innerHTML = '<div class="sci-datasrc-empty">Could not reach the ChatGPT vision URL check.</div>';
         });
     }
 

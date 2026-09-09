@@ -336,3 +336,64 @@ def test_probe_fails_when_the_vendor_describes_nothing(monkeypatch):
     out = sci_vision_openai.probe()
     assert out["ok"] is False
     assert out["error"] == "empty_response"
+
+
+# ── probe_url(): the URL-fetch counterpart, same reason as sci_vision's ────
+# own probe_url() -- a deployment can pass the bytes-only probe() above
+# while every real post still fails, if fetching an image BY URL is what is
+# actually broken.
+
+_VISION_URL_ROUTE = "/p2/admin/external-usage/sci-vision-openai-url-check"
+
+
+def test_probe_url_says_so_when_no_key_is_configured(monkeypatch):
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    out = sci_vision_openai.probe_url()
+    assert out["configured"] is False and out["ok"] is False
+    assert "OPENAI_API_KEY" in out["error"]
+
+
+def test_probe_url_passes_on_a_real_reading(monkeypatch):
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+    monkeypatch.setattr(sci_vision_openai, "_openai", lambda: _FakeClient(response_text=_GOOD_REPLY))
+    out = sci_vision_openai.probe_url()
+    assert out["ok"] is True
+    assert out["probe_url"] == sci_vision.PROBE_IMAGE_URL
+
+
+def test_probe_url_calls_analyze_image_not_analyze_image_bytes(monkeypatch):
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+    seen = {}
+    monkeypatch.setattr(sci_vision_openai, "analyze_image",
+                        lambda url, context=None: (seen.update(url=url), {"summary": "ok"})[1])
+    monkeypatch.setattr(sci_vision_openai, "analyze_image_bytes",
+                        lambda *a, **k: (_ for _ in ()).throw(AssertionError("should not be called")))
+    sci_vision_openai.probe_url()
+    assert seen["url"] == sci_vision.PROBE_IMAGE_URL
+
+
+def test_url_route_is_admin_only():
+    r = _client("nobody@position2.com").post(_VISION_URL_ROUTE)
+    assert r.status_code == 403
+
+
+def test_url_route_requires_login():
+    r = appmod.app.test_client().post(_VISION_URL_ROUTE)
+    assert r.status_code in (302, 401)
+
+
+def test_url_route_get_is_not_allowed():
+    admin = sorted(appmod.ADMIN_EMAILS)[0]
+    assert _client(admin).get(_VISION_URL_ROUTE).status_code == 405
+
+
+def test_url_route_returns_the_probe_json_for_an_admin(monkeypatch):
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    admin = sorted(appmod.ADMIN_EMAILS)[0]
+    body = _client(admin).post(_VISION_URL_ROUTE).get_json()
+    assert body["configured"] is False
+    assert body["ok"] is False
+    # Distinguishes this route from the bytes-only check beside it -- both
+    # return {"configured": False, "ok": False} with no key set, so without
+    # this the two routes could be wired to the same self-test undetected.
+    assert body["probe_url"] == sci_vision.PROBE_IMAGE_URL

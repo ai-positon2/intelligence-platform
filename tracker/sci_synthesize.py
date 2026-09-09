@@ -73,7 +73,7 @@ _SYSTEM = (
     "title, date), never bare numbers.\n\n"
     "Ground every claim in what was actually seen, and every claim must cite "
     "2-3 real post ids from the digest that support it, using the \"id\" "
-    "field exactly as given -- never invent an id. If a platform has little "
+    "field exactly as given -- never invent an id.\n\n"
     "The payload's \"evidence\" block says how many of the run's posts are "
     "actually included below: when posts_included is lower than posts_total, "
     "the digest is the run's best-evidenced and most-engaging posts rather "
