@@ -42,6 +42,9 @@ SYSTEM_PROMPT = (
     "testimonial, behind-the-scenes, carousel infographic).\n"
     "- branding: visible logo, brand colors, or other identifiable brand elements -- "
     "empty string if none are visible.\n\n"
+    "summary: ONE crisp, plain-language sentence (roughly 12-20 words) giving the single "
+    "clearest description of what this shows and communicates -- never a paragraph, never "
+    "multiple sentences, and never restate the caption verbatim.\n\n"
     "Respond with ONLY a JSON object, no prose before or after: "
     '{"subject": str, "setting": str, "people": str, "product": str, "style": str, '
     '"on_screen_text": str, "messaging": str, "cta": str, "tone": str, "hook": str, '
@@ -416,7 +419,13 @@ def summarize_frames(frame_analyses: list[dict], context: dict | None = None) ->
     this also keeps their key names identical to analyze_image()'s
     single-image shape, so callers never need to branch on post_type to
     read them. hook is taken from the OPENING frame only, since that's the
-    one moment "hook" actually describes."""
+    one moment "hook" actually describes. summary is capped the same way
+    as the messaging-level fields (_dedupe_join, limit=2): every sampled
+    frame of one video tends to describe near-identical content in
+    slightly different words, so joining all of them (the original shape
+    of this line) produced a run-on wall of near-duplicate sentences
+    instead of a readable summary -- two is enough to note a real scene
+    change without that."""
     ok_frames = [f for f in frame_analyses if "error" not in f]
     if not ok_frames:
         return {"error": "no_frames_analyzed", "frame_count": len(frame_analyses)}
@@ -432,5 +441,5 @@ def summarize_frames(frame_analyses: list[dict], context: dict | None = None) ->
         "format_technique": _dedupe_join(f.get("format_technique") for f in ok_frames),
         "branding": _dedupe_join(f.get("branding") for f in ok_frames),
         "hook": ok_frames[0].get("hook", ""),
-        "summary": " / ".join(f["summary"] for f in ok_frames if f.get("summary")),
+        "summary": _dedupe_join((f.get("summary") for f in ok_frames), limit=2, sep=" / "),
     }

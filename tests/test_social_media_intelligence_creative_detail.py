@@ -70,6 +70,10 @@ def _run(post_id, current_run):
         _extract_fn(html, "cdetailNorm"),
         _extract_var(html, "CDETAIL_ERROR_TEXT"),
         _extract_fn(html, "cdetailReason"),
+        _extract_line_var(html, "CDETAIL_SUMMARY_MAX_POINTS"),
+        _extract_line_var(html, "CDETAIL_SUMMARY_MAX_CHARS"),
+        _extract_fn(html, "cdetailSummaryPoints"),
+        _extract_fn(html, "cdetailSummaryCard"),
         _extract_fn(html, "cdetailRow"),
         _extract_fn(html, "cdetailInsights"),
         _extract_fn(html, "openCreativeDetail"),
@@ -341,3 +345,71 @@ def test_a_stored_error_is_escaped_like_any_other_text():
     out = _run(1, {"posts": [post]})
     assert "<img src=x" not in out["panel"]
     assert "&lt;img" in out["panel"]
+
+
+# ── The lead summary: short pointers, never a wall of quoted prose ─────────
+#
+# The bug this guards against: a video's folded summary (tracker/sci_vision.
+# summarize_frames) used to join EVERY sampled frame's own full-sentence
+# summary with " / ", producing a run-on paragraph of near-duplicate
+# sentences. The backend caps that at 2 frames now, but this page must not
+# trust stored data (written before that cap, or simply still long) to
+# already be short -- it splits and truncates defensively on read.
+
+def test_a_short_single_sentence_summary_renders_as_one_point():
+    post = _post(creative_analysis={"summary": "A candid shot from a company event."},
+                 creative_analysis_status="ok")
+    out = _run(1, {"posts": [post]})
+    html = out["panel"]
+    assert html.count("sci-cdetail-summary-point") == 1
+    assert "A candid shot from a company event." in html
+
+
+def test_a_slash_joined_video_summary_becomes_separate_pointers():
+    post = _post(
+        creative_analysis={"summary": "Opens on the logo. / Shows the product in hand."},
+        creative_analysis_status="ok",
+    )
+    out = _run(1, {"posts": [post]})
+    html = out["panel"]
+    assert html.count("sci-cdetail-summary-point") == 2
+    assert "Opens on the logo." in html
+    assert "Shows the product in hand." in html
+
+
+def test_more_than_three_joined_sentences_are_capped_not_all_shown():
+    post = _post(
+        creative_analysis={"summary": "One. / Two. / Three. / Four. / Five."},
+        creative_analysis_status="ok",
+    )
+    out = _run(1, {"posts": [post]})
+    html = out["panel"]
+    assert html.count("sci-cdetail-summary-point") == 3
+    assert "Four." not in html
+    assert "Five." not in html
+
+
+def test_an_overlong_single_sentence_is_truncated_with_an_ellipsis():
+    long_sentence = "This is a very long run-on summary sentence " + ("padding word " * 20) + "at the very end."
+    post = _post(creative_analysis={"summary": long_sentence}, creative_analysis_status="ok")
+    out = _run(1, {"posts": [post]})
+    html = out["panel"]
+    assert "…" in html
+    assert "at the very end." not in html
+    # Truncated at a word boundary, not mid-word.
+    assert "…</div>" in html or "… " in html
+
+
+def test_a_post_with_no_summary_shows_no_summary_card():
+    post = _post(creative_analysis={"messaging": "something"}, creative_analysis_status="ok")
+    out = _run(1, {"posts": [post]})
+    assert "sci-cdetail-summary" not in out["panel"]
+
+
+def test_the_summary_is_no_longer_a_field_row_among_the_others():
+    """Summary is pulled out into its own card, not left in CDETAIL_FIELDS
+    -- it must never render twice."""
+    post = _post(creative_analysis={"summary": "s"}, creative_analysis_status="ok")
+    out = _run(1, {"posts": [post]})
+    html = out["panel"]
+    assert '<div class="sci-cdetail-label">Summary</div>' not in html
