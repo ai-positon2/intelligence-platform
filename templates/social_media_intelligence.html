@@ -2357,6 +2357,14 @@
       if(run.status === 'running'){
         html += '<div class="sci-banner"><span class="bic">⏳</span><div>This run is still in progress. Leave this open and it keeps polling, or come back from History once it finishes.</div></div>';
       }
+      // run.error was being computed and stored (see sci_store.
+      // update_run_status) but never actually shown anywhere on this page --
+      // an errored run's status pill said only the bare word "error", with
+      // no way for whoever is looking at it to tell a stalled-and-abandoned
+      // run apart from a real vendor failure.
+      if(run.status === 'error' && run.error){
+        html += '<div class="sci-banner sci-banner-none"><span class="bic">⚠</span><div>' + esc(run.error) + '</div></div>';
+      }
       // Every platform unresolved at once is the shape of the identify step
       // itself failing (a broken vendor call), not seven independent "this
       // company has no account here" verdicts -- surface the admin check.

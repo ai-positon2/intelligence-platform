@@ -282,6 +282,65 @@ def test_run_detail_200s_with_platforms_and_posts_for_the_owner(monkeypatch):
     assert body["posts"] == []
 
 
+# ── Abandoned runs: every read path must offer a 'running' run to
+# sci_store.resolve_stale_run before returning it. resolve_stale_run's own
+# staleness logic has its own tests in tests/test_sci_store.py -- these only
+# prove each route actually calls it and actually uses its answer, by
+# swapping in a fake that always "resolves" a run to 'error' and confirming
+# that is what the route returns, not the original 'running' value.
+
+def _always_resolves_to_error(monkeypatch):
+    def fake_resolve(run):
+        if run.get("status") != "running":
+            return run
+        return dict(run, status="error", error="stopped making progress")
+    monkeypatch.setattr(sci_store, "resolve_stale_run", fake_resolve)
+
+
+def test_run_status_route_applies_stale_run_resolution(monkeypatch):
+    _owner_scoped_get_run(monkeypatch, _run(run_id=1, email=_OWNER, status="running"))
+    monkeypatch.setattr(sci_store, "get_platform_runs", lambda run_id: [])
+    _always_resolves_to_error(monkeypatch)
+    resp = _client(_OWNER).get("/p2/b2b-agents/social-media-intelligence/runs/1/status")
+    body = resp.get_json()
+    assert body["status"] == "error"
+    assert body["error"] == "stopped making progress"
+
+
+def test_run_detail_route_applies_stale_run_resolution(monkeypatch):
+    _owner_scoped_get_run(monkeypatch, _run(run_id=1, email=_OWNER, status="running"))
+    monkeypatch.setattr(sci_store, "get_platform_runs", lambda run_id: [])
+    monkeypatch.setattr(sci_store, "get_posts", lambda run_id: [])
+    _always_resolves_to_error(monkeypatch)
+    resp = _client(_OWNER).get("/p2/b2b-agents/social-media-intelligence/runs/1")
+    body = resp.get_json()
+    assert body["status"] == "error"
+
+
+def test_history_page_applies_stale_run_resolution(monkeypatch):
+    """A run abandoned days ago must not sit in History as 'running' forever
+    just because nobody happened to reopen its own status/detail routes."""
+    monkeypatch.setattr(sci_store, "list_runs", lambda email: [_run(run_id=7, status="running")])
+    _always_resolves_to_error(monkeypatch)
+    resp = _client(_OWNER).get("/p2/b2b-agents/social-media-intelligence")
+    assert resp.status_code == 200
+    # The literal server-rendered class attribute, not just the bare word --
+    # "st-error"/"st-running" as bare substrings also appear in this page's
+    # own static client-side JS regardless of any run's data, so only the
+    # actual Jinja-rendered <span class="status-pill st-error"> is a real
+    # signal that THIS run's row was rendered with the resolved status.
+    assert b'class="status-pill st-error"' in resp.data
+
+
+def test_history_page_leaves_a_genuinely_active_run_alone(monkeypatch):
+    monkeypatch.setattr(sci_store, "list_runs", lambda email: [_run(run_id=7, status="running")])
+    monkeypatch.setattr(sci_store, "resolve_stale_run", lambda run: run)
+    resp = _client(_OWNER).get("/p2/b2b-agents/social-media-intelligence")
+    assert resp.status_code == 200
+    assert b'class="status-pill st-running"' in resp.data
+    assert b'class="status-pill st-error"' not in resp.data
+
+
 # ── Background job: per-platform fault isolation, run synchronously ────────
 
 def test_one_platform_failing_does_not_stop_the_others_from_completing(monkeypatch):
