@@ -109,8 +109,13 @@ html::-webkit-scrollbar-thumb:hover { background-image: linear-gradient(180deg, 
 /* Idle platform-coverage preview strip, shown under the hero copy before any
    run exists so the six platforms are legible up front, not a surprise. */
 .ph-platforms { display: flex; gap: 8px; margin-top: 18px; flex-wrap: wrap; }
-.ph-plat-ic { width: 34px; height: 34px; border-radius: var(--radius-md, 12px); display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.08); color: #a99fb0; opacity: .75; transition: transform .2s ease, opacity .2s ease, border-color .2s ease; }
-.ph-plat-ic:hover { opacity: 1; transform: translateY(-2px); }
+/* Each icon carries its own brand colour as an inline style="color:..."
+   (see the markup below) -- background/border/glow are all derived from
+   that SAME currentColor via color-mix, rather than a flat grey shared by
+   every platform, so the row reads as seven distinct brands at a glance
+   instead of seven identical grey tiles with different line art inside. */
+.ph-plat-ic { width: 36px; height: 36px; border-radius: var(--radius-md, 12px); display: flex; align-items: center; justify-content: center; color: #a99fb0; background: color-mix(in srgb, currentColor 13%, transparent); border: 1px solid color-mix(in srgb, currentColor 28%, transparent); transition: transform .2s cubic-bezier(.34,1.56,.64,1), background .2s ease, border-color .2s ease, box-shadow .2s ease; }
+.ph-plat-ic:hover { transform: translateY(-3px) scale(1.06); background: color-mix(in srgb, currentColor 20%, transparent); border-color: color-mix(in srgb, currentColor 45%, transparent); box-shadow: 0 12px 26px -12px color-mix(in srgb, currentColor 75%, transparent); }
 .ph-plat-ic svg { width: 17px; height: 17px; }
 
 /* ── Command card ────────────────────────────────────────────────────────── */
@@ -189,10 +194,15 @@ html::-webkit-scrollbar-thumb:hover { background-image: linear-gradient(180deg, 
 .sci-card-head { display: flex; align-items: center; justify-content: space-between; padding: 22px 28px 0; }
 .sci-card-head h2 { font-family: 'Bricolage Grotesque', var(--au-display, sans-serif); font-size: 17px; font-weight: 700; color: #f3ecf5; letter-spacing: -.01em; }
 .sci-card-head .cnt { font-size: 12px; color: #877b8f; font-variant-numeric: tabular-nums; }
-.sci-run-list { padding: 16px 14px 14px; display: flex; flex-direction: column; gap: 6px; }
-.sci-run-row { display: flex; align-items: center; gap: 14px; border: 1px solid transparent; border-radius: var(--radius-md, 12px); padding: 13px 14px; cursor: pointer; transition: background .15s, border-color .15s, transform .15s; }
+.sci-run-list { padding: 16px 14px 14px; display: flex; flex-direction: column; }
+.sci-run-row { position: relative; display: flex; align-items: center; gap: 15px; border: 1px solid transparent; border-radius: var(--radius-md, 12px); padding: 14px; cursor: pointer; transition: background .15s, border-color .15s, transform .15s; }
+/* A hairline between rows, not on the first/last (the card edge already
+   closes those off) -- gives the list rhythm at rest, before hover ever
+   kicks in, rather than relying only on the 6px gap this replaces. */
+.sci-run-row + .sci-run-row::before { content: ''; position: absolute; left: 14px; right: 14px; top: -1px; height: 1px; background: rgba(255,255,255,.06); }
 .sci-run-row:hover { background: rgba(255,255,255,.035); border-color: rgba(251,146,60,.22); transform: translateX(3px); }
-.sci-run-mono { position: relative; overflow: hidden; width: 38px; height: 38px; border-radius: var(--radius-md, 12px); flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 13.5px; font-weight: 800; color: #1a0a02; background: linear-gradient(135deg,#fb923c,#f472b6); }
+.sci-run-row:hover::before, .sci-run-row:hover + .sci-run-row::before { opacity: 0; }
+.sci-run-mono { position: relative; overflow: hidden; width: 40px; height: 40px; border-radius: var(--radius-md, 12px); flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 800; color: #1a0a02; box-shadow: 0 8px 18px -10px rgba(0,0,0,.5); }
 .sci-run-mono img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; background: #fff; }
 .sci-run-initial { display: none; }
 .sci-run-mono.sci-run-nologo .sci-run-initial { display: block; }
@@ -572,40 +582,68 @@ a.sci-phero-handle:hover { color: #ffffff; border-bottom-color: var(--pf-color, 
 .sci-chip-txt { font-size: 10.5px; font-weight: 600; color: #d6c9db; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 
-/* Admin-only "Data sources" panel: per-platform Unipile connection status
-   plus a one-click connect link. Reuses .sci-card's own look; only the
-   inner row/status/connect pieces are new. */
+/* Admin-only "Data sources" panel: a scannable grid of small status cards,
+   one per vendor/platform/vision check, rather than a flat stack of text
+   rows -- the densest, least designed part of this page before this pass.
+   Reuses .sci-card's own look for the outer container; everything below is
+   the card-grid system inside it. */
 .sci-datasrc-tag { font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: var(--ls-caps, .06em); color: #877b8f; background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.09); border-radius: var(--radius-pill, 80px); padding: 2px 8px; margin-left: 8px; vertical-align: middle; }
-.sci-datasrc-refresh { background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.09); color: #877b8f; border-radius: var(--radius-sm, 8px); padding: 5px 12px; font-family: inherit; font-size: 11px; font-weight: 600; cursor: pointer; transition: background .15s, color .15s; }
-.sci-datasrc-refresh:hover { background: rgba(255,255,255,.09); color: #d6c9db; }
-.sci-datasrc-refresh:disabled { opacity: .6; cursor: default; }
-.sci-datasrc-body { padding: 16px 28px 22px; display: flex; flex-direction: column; gap: 10px; }
-.sci-datasrc-loading { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: #877b8f; }
-.sci-datasrc-row { display: flex; align-items: center; gap: 10px; }
-.sci-datasrc-ic { width: 24px; height: 24px; flex-shrink: 0; display: inline-flex; }
-.sci-datasrc-ic svg { width: 100%; height: 100%; }
-.sci-datasrc-name { font-size: 13px; font-weight: 600; color: #d6c9db; text-transform: capitalize; }
-.sci-datasrc-status { margin-left: auto; font-size: 11px; font-weight: 600; }
+.sci-datasrc-refresh { display: inline-flex; align-items: center; gap: 6px; background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.09); color: #877b8f; border-radius: var(--radius-pill, 80px); padding: 6px 14px; font-family: inherit; font-size: 11px; font-weight: 600; cursor: pointer; transition: background .15s, color .15s, border-color .15s; }
+.sci-datasrc-refresh:hover { background: rgba(255,255,255,.09); color: #d6c9db; border-color: rgba(255,255,255,.16); }
+.sci-datasrc-refresh:disabled { opacity: .55; cursor: default; }
+/* One responsive grid per vendor group -- platform cards fall into as many
+   columns as fit; a lone loading/empty line or a wide vision-check card
+   simply spans the row on its own. */
+.sci-datasrc-body { padding: 4px 22px 22px; display: grid; grid-template-columns: repeat(auto-fit, minmax(228px, 1fr)); gap: 10px; }
+.sci-datasrc-loading { grid-column: 1 / -1; display: flex; align-items: center; gap: 9px; font-size: 12.5px; color: #877b8f; padding: 8px 6px; }
+.sci-datasrc-empty { grid-column: 1 / -1; font-size: 12.5px; color: #877b8f; padding: 8px 6px; }
+.sci-datasrc-note { grid-column: 1 / -1; font-size: 11px; color: #6b5f72; line-height: 1.55; padding: 2px 6px 0; }
+
+/* One status card. --dsc carries the accent colour (set per status below)
+   through to the left rail, the icon tint, and the badge together, so a
+   card reads as one coloured object instead of three separately-tinted
+   pieces that happen to sit next to each other. */
+.sci-datasrc-row { --dsc: #6b5f72; position: relative; display: flex; align-items: flex-start; gap: 11px; padding: 12px 13px; border-radius: var(--radius-md, 12px); background: rgba(255,255,255,.03); border: 1px solid rgba(255,255,255,.08); overflow: hidden; transition: background .18s, border-color .18s, transform .18s; }
+.sci-datasrc-row::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--dsc); opacity: .85; }
+.sci-datasrc-row:hover { background: rgba(255,255,255,.05); border-color: color-mix(in srgb, var(--dsc) 40%, rgba(255,255,255,.08)); transform: translateY(-1px); }
+/* The four vision self-tests carry a model line AND a full description --
+   too much for a grid cell, so they claim the whole row's width. */
+.sci-datasrc-row.wide { grid-column: 1 / -1; }
+.sci-datasrc-ic { width: 30px; height: 30px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; border-radius: var(--radius-sm, 9px); color: var(--dsc); background: color-mix(in srgb, var(--dsc) 16%, transparent); border: 1px solid color-mix(in srgb, var(--dsc) 30%, transparent); }
+.sci-datasrc-ic svg { width: 16px; height: 16px; }
+.sci-datasrc-main { min-width: 0; flex: 1; padding-top: 1px; }
+.sci-datasrc-name { font-size: 12.5px; font-weight: 700; color: #ece2ee; text-transform: capitalize; line-height: 1.3; }
+.sci-datasrc-name .unit { display: block; text-transform: none; font-weight: 500; color: #948899; font-size: 10px; margin-top: 1px; }
+.sci-datasrc-status { display: block; margin-top: 5px; font-size: 10.5px; font-weight: 700; letter-spacing: .01em; }
 .sci-datasrc-status.ok { color: #4ade80; }
 /* A platform whose only accounts have signed out: not an error (nothing
    is broken until a run needs it) but not "connected" either, so it gets
    its own amber rather than borrowing either neighbour's colour. */
-.sci-datasrc-status.warn { color: #fbbf24; margin-right: 10px; }
+.sci-datasrc-status.warn { color: #fbbf24; }
 /* A configured actor Apify itself can't find with this token -- a real
    failure, distinct from .warn's "not broken yet, just untidy". */
 .sci-datasrc-status.err { color: #fb7185; cursor: help; }
 /* A platform deliberately not wired to this vendor (LinkedIn via Apify) --
    neutral, not a failure, so it must not read as red or amber. */
-.sci-datasrc-status.off { color: #6b5f72; font-weight: 500; }
-.sci-datasrc-connect { margin-left: auto; background: rgba(251,191,36,.14); border: 1px solid rgba(251,191,36,.4); color: #fbbf24; border-radius: var(--radius-sm, 8px); padding: 6px 13px; font-family: inherit; font-size: 11.5px; font-weight: 600; cursor: pointer; transition: background .15s; }
+.sci-datasrc-status.off { color: #948899; font-weight: 500; }
+.sci-datasrc-connect { margin-top: 8px; background: rgba(251,191,36,.14); border: 1px solid rgba(251,191,36,.4); color: #fbbf24; border-radius: var(--radius-sm, 8px); padding: 5px 12px; font-family: inherit; font-size: 11px; font-weight: 600; cursor: pointer; transition: background .15s; }
 .sci-datasrc-connect:hover { background: rgba(251,191,36,.24); }
-.sci-datasrc-empty { font-size: 12.5px; color: #877b8f; }
-.sci-datasrc-note { font-size: 11px; color: #6b5f72; line-height: 1.5; margin-top: 4px; }
-/* Sits between the card head and each vendor's own row block, so one
-   "Data sources" card can hold Unipile and Apify as clearly separate
-   groups without becoming two separate cards. */
-.sci-datasrc-sub { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: var(--ls-caps, .06em); color: #6b5f72; padding: 14px 28px 0; }
-.sci-datasrc-sub:first-of-type { padding-top: 4px; }
+/* The vision self-tests only: model + timing (monospace, matches this
+   page's other numeric readouts) and the description underneath it. */
+.sci-datasrc-modelline { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 10.5px; color: #948899; margin-top: 4px; }
+.sci-datasrc-desc { font-size: 11.5px; color: #877b8f; line-height: 1.55; margin-top: 7px; max-width: 62ch; }
+/* One dot in a small badge, reused for both the vision checks' "working"
+   pill and (via colour only) anywhere else a status needs the same shape. */
+.sci-datasrc-badge { flex-shrink: 0; display: inline-flex; align-items: center; gap: 5px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; padding: 4px 10px; border-radius: var(--radius-pill, 80px); background: color-mix(in srgb, var(--dsc) 15%, transparent); border: 1px solid color-mix(in srgb, var(--dsc) 32%, transparent); color: var(--dsc); white-space: nowrap; }
+.sci-datasrc-badge .d { width: 5px; height: 5px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
+/* Sits between the card head and each vendor's own card grid, so one
+   "Data sources" card can hold Unipile, Apify and both vision vendors as
+   clearly separate groups without becoming four separate cards. A hairline
+   trails off after the label instead of the label sitting alone, which is
+   what made this panel read as a wall of text rather than sections. */
+.sci-datasrc-sub { display: flex; align-items: center; gap: 10px; font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: var(--ls-caps, .07em); color: #948899; padding: 20px 28px 10px; }
+.sci-datasrc-sub:first-of-type { padding-top: 22px; }
+.sci-datasrc-sub::after { content: ''; flex: 1; height: 1px; background: linear-gradient(90deg, rgba(255,255,255,.14), transparent); }
 
 /* ══ CHARTS ═══════════════════════════════════════════════════════════════
    Every chart in the report is one of four primitives (trend, ranked bars,
@@ -1017,7 +1055,8 @@ a.sci-rank-row:hover { background: rgba(255,255,255,.045); }
 [data-theme="light"] .eyebrow { color: #7a3a10; background: rgba(255,255,255,.7); border-color: rgba(18,26,54,.1); }
 [data-theme="light"] .ph h1 { color: #1c1420; }
 [data-theme="light"] .ph p { color: #5c5163; }
-[data-theme="light"] .ph-plat-ic { background: rgba(255,255,255,.7); border-color: rgba(18,26,54,.1); color: #7a6d80; }
+[data-theme="light"] .ph-plat-ic { color: #7a6d80; background: color-mix(in srgb, currentColor 11%, #fff 89%); border-color: color-mix(in srgb, currentColor 30%, transparent); }
+[data-theme="light"] .ph-plat-ic:hover { background: color-mix(in srgb, currentColor 18%, #fff 82%); }
 
 [data-theme="light"] .sci-card { background: linear-gradient(180deg, rgba(255,255,255,.92), rgba(255,255,255,.75)); border-color: rgba(18,26,54,.1); box-shadow: 0 1px 0 rgba(255,255,255,.9) inset, 0 24px 60px -34px rgba(30,40,80,.25); }
 [data-theme="light"] .sci-field label { color: #8b7f92; }
@@ -1149,7 +1188,10 @@ a.sci-rank-row:hover { background: rgba(255,255,255,.045); }
 [data-theme="light"] .sci-datasrc-tag { color: #7a6f82; background: rgba(18,26,54,.04); border-color: rgba(18,26,54,.09); }
 [data-theme="light"] .sci-datasrc-refresh { background: rgba(18,26,54,.04); border-color: rgba(18,26,54,.1); color: #5c5163; }
 [data-theme="light"] .sci-datasrc-refresh:hover { background: rgba(18,26,54,.08); color: #1c1420; }
+[data-theme="light"] .sci-datasrc-row { background: rgba(18,26,54,.025); border-color: rgba(18,26,54,.09); }
+[data-theme="light"] .sci-datasrc-row:hover { background: rgba(18,26,54,.045); }
 [data-theme="light"] .sci-datasrc-name { color: #1c1420; }
+[data-theme="light"] .sci-datasrc-name .unit { color: #7a6f82; }
 [data-theme="light"] .sci-datasrc-status.ok { color: #16a34a; }
 [data-theme="light"] .sci-datasrc-status.warn { color: #92600a; }
 [data-theme="light"] .sci-datasrc-status.err { color: #b3261e; }
@@ -1157,7 +1199,10 @@ a.sci-rank-row:hover { background: rgba(255,255,255,.045); }
 [data-theme="light"] .sci-datasrc-connect { background: rgba(180,120,10,.1); border-color: rgba(180,120,10,.35); color: #8a5806; }
 [data-theme="light"] .sci-datasrc-empty { color: #8b7f92; }
 [data-theme="light"] .sci-datasrc-note { color: #a89bb0; }
-[data-theme="light"] .sci-datasrc-sub { color: #8b7f92; }
+[data-theme="light"] .sci-datasrc-modelline { color: #7a6f82; }
+[data-theme="light"] .sci-datasrc-desc { color: #6a5f72; }
+[data-theme="light"] .sci-datasrc-sub { color: #7a6f82; }
+[data-theme="light"] .sci-datasrc-sub::after { background: linear-gradient(90deg, rgba(18,26,54,.14), transparent); }
 
 /* ── Reddit conversation ───────────────────────────────────────────────────
    Given its own visual register rather than the per-platform one above,

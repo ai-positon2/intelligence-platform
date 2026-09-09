@@ -11,7 +11,7 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-components.css') }}">
   <script src="/static/js/theme.js"></script>
   <link rel="stylesheet" href="/static/css/grid-tokens.css">
-  <link rel="stylesheet" href="/static/css/social_media_intelligence.css?v=1">
+  <link rel="stylesheet" href="/static/css/social_media_intelligence.css?v=2">
   <link rel="stylesheet" href="/static/css/aurora-app.css?v=3">
 </head>
 <body>
@@ -98,10 +98,24 @@
       </div>
       <div class="sci-run-list" id="historyList">
         {% if runs %}
+          {# A monogram's colour cycles by position rather than every row
+             sharing one identical orange-pink square -- with no logo (the
+             common case) that was the only thing distinguishing eight
+             companies from each other in a skimmed list. Six stops, all
+             drawn from this page's own established gradient family
+             (orange/pink/purple/amber/rose/cyan), so it reads as variety
+             within one palette rather than an unrelated rainbow. #}
+          {% set monograms = [
+            'linear-gradient(135deg,#fb923c,#f472b6)',
+            'linear-gradient(135deg,#f472b6,#a855f7)',
+            'linear-gradient(135deg,#a855f7,#818cf8)',
+            'linear-gradient(135deg,#fbbf24,#fb923c)',
+            'linear-gradient(135deg,#fb7185,#e879f9)',
+            'linear-gradient(135deg,#22d3ee,#60a5fa)'] %}
           {% for r in runs %}
           {% set st = 'st-running' if r.status == 'running' else ('st-error' if r.status == 'error' else 'st-done') %}
           <div class="sci-run-row" onclick="viewRun({{ r.id }})">
-            <div class="sci-run-mono{{ '' if r.company_logo else ' sci-run-nologo' }}">
+            <div class="sci-run-mono{{ '' if r.company_logo else ' sci-run-nologo' }}" style="background:{{ monograms[loop.index0 % monograms|length] }}">
               {% if r.company_logo %}<img src="{{ r.company_logo }}" alt="" loading="lazy" onerror="this.closest('.sci-run-mono').classList.add('sci-run-nologo');this.remove()">{% endif %}
               <span class="sci-run-initial">{{ (r.company_name or '?')[0]|upper }}</span>
             </div>
@@ -323,6 +337,37 @@
       loadVisionOpenaiUrlCheck();
     }
 
+    // A single glyph for all four vision self-tests -- an eye, since that's
+    // literally what each one is proving works. The colour (--dsc) carries
+    // the actual verdict; the icon just says "this is a vision check".
+    var DS_VISION_IC = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 12S6 5 12 5s9.5 7 9.5 7-3.5 7-9.5 7-9.5-7-9.5-7z"/><circle cx="12" cy="12" r="3"/></svg>';
+
+    // Builds one wide status card for a vision self-test, in whichever of
+    // its four possible shapes applies: not configured, errored, unreachable,
+    // or a real passing reading with its model/timing and what it proves.
+    // All four loaders below share this one renderer so the four checks
+    // read as one consistent family of cards rather than four hand-built
+    // strings that could drift apart from each other one edit at a time.
+    function dsVisionCard(bodyEl, title, note, d, err){
+      var dsc = DS_ERR, badge = 'Error', inner;
+      if(err){
+        inner = '<div class="sci-datasrc-desc">Could not reach this check.</div>';
+      } else if(!d.configured){
+        dsc = DS_OFF; badge = 'Not configured';
+        inner = '<div class="sci-datasrc-desc">' + esc(d.error || '') + '</div>';
+      } else if(!d.ok){
+        inner = '<div class="sci-datasrc-desc">' + esc(d.error || 'Unavailable right now.') + '</div>';
+      } else {
+        dsc = DS_OK; badge = 'Working (' + (d.elapsed_ms || 0) + 'ms)';
+        inner = '<div class="sci-datasrc-modelline">model: ' + esc(d.model || '') + '</div>' +
+          '<div class="sci-datasrc-desc">' + note + '</div>';
+      }
+      bodyEl.innerHTML = '<div class="sci-datasrc-row wide" style="--dsc:' + dsc + '">' +
+        '<span class="sci-datasrc-ic">' + DS_VISION_IC + '</span>' +
+        '<div class="sci-datasrc-main"><div class="sci-datasrc-name">' + title + '</div>' + inner + '</div>' +
+        '<span class="sci-datasrc-badge" style="color:' + dsc + '"><span class="d"></span>' + esc(badge) + '</span></div>';
+    }
+
     // The primary vision pass, checked the same way and for the same reason
     // as the second opinion below it. Both spend one real vision call
     // against a tiny inert test image, so neither re-runs on its own.
@@ -332,21 +377,10 @@
       fetch('/p2/admin/external-usage/sci-vision-claude-check', {method: 'POST'})
         .then(function(r){ return r.json(); })
         .then(function(d){
-          if(!d.configured){
-            body.innerHTML = '<div class="sci-datasrc-empty">ANTHROPIC_API_KEY is not set on this deployment.</div>';
-            return;
-          }
-          if(!d.ok){
-            body.innerHTML = '<div class="sci-datasrc-empty">' + esc(d.error || 'Claude vision is unavailable right now.') + '</div>';
-            return;
-          }
-          body.innerHTML = '<div class="sci-datasrc-row"><span class="sci-datasrc-name">model: ' + esc(d.model || '') + '</span>' +
-            '<span class="sci-datasrc-status ok">working (' + (d.elapsed_ms || 0) + 'ms)</span></div>' +
-            '<div class="sci-datasrc-note">Reads every collected creative and writes the subject, setting, messaging, tone, hook and CTA shown on each post. This check spent one small real vision call to prove it end to end.</div>';
+          dsVisionCard(body, 'Claude vision', 'Reads every collected creative and writes the subject, setting, ' +
+            'messaging, tone, hook and CTA shown on each post.', d);
         })
-        .catch(function(){
-          body.innerHTML = '<div class="sci-datasrc-empty">Could not reach the Claude vision check.</div>';
-        });
+        .catch(function(){ dsVisionCard(body, 'Claude vision', '', {}, true); });
     }
 
     // Unlike the two blocks above (which list per-platform rows), this is
@@ -359,21 +393,10 @@
       fetch('/p2/admin/external-usage/sci-vision-openai-check', {method: 'POST'})
         .then(function(r){ return r.json(); })
         .then(function(d){
-          if(!d.configured){
-            body.innerHTML = '<div class="sci-datasrc-empty">OPENAI_API_KEY is not set on this deployment.</div>';
-            return;
-          }
-          if(!d.ok){
-            body.innerHTML = '<div class="sci-datasrc-empty">' + esc(d.error || 'ChatGPT vision is unavailable right now.') + '</div>';
-            return;
-          }
-          body.innerHTML = '<div class="sci-datasrc-row"><span class="sci-datasrc-name">model: ' + esc(d.model || '') + '</span>' +
-            '<span class="sci-datasrc-status ok">working (' + (d.elapsed_ms || 0) + 'ms)</span></div>' +
-            '<div class="sci-datasrc-note">Runs as a second, independent pass alongside Claude&#39;s vision analysis on every collected creative. This check spent one small real vision call to prove it end to end.</div>';
+          dsVisionCard(body, 'ChatGPT vision', 'Runs as a second, independent pass alongside Claude\'s vision ' +
+            'analysis on every collected creative.', d);
         })
-        .catch(function(){
-          body.innerHTML = '<div class="sci-datasrc-empty">Could not reach the ChatGPT vision check.</div>';
-        });
+        .catch(function(){ dsVisionCard(body, 'ChatGPT vision', '', {}, true); });
     }
 
     // The two checks above send the test image as bytes, exactly the shape
@@ -389,21 +412,10 @@
       fetch('/p2/admin/external-usage/sci-vision-claude-url-check', {method: 'POST'})
         .then(function(r){ return r.json(); })
         .then(function(d){
-          if(!d.configured){
-            body.innerHTML = '<div class="sci-datasrc-empty">ANTHROPIC_API_KEY is not set on this deployment.</div>';
-            return;
-          }
-          if(!d.ok){
-            body.innerHTML = '<div class="sci-datasrc-empty">' + esc(d.error || 'Claude could not fetch an image by URL right now.') + '</div>';
-            return;
-          }
-          body.innerHTML = '<div class="sci-datasrc-row"><span class="sci-datasrc-name">model: ' + esc(d.model || '') + '</span>' +
-            '<span class="sci-datasrc-status ok">working (' + (d.elapsed_ms || 0) + 'ms)</span></div>' +
-            '<div class="sci-datasrc-note">Proves Claude can fetch and read an image by URL, the way it reads every real post\'s still image -- not just accept bytes handed to it directly.</div>';
+          dsVisionCard(body, 'Claude vision', 'Proves Claude can fetch and read an image by URL, the way it reads ' +
+            'every real post\'s still image -- not just accept bytes handed to it directly.', d);
         })
-        .catch(function(){
-          body.innerHTML = '<div class="sci-datasrc-empty">Could not reach the Claude vision URL check.</div>';
-        });
+        .catch(function(){ dsVisionCard(body, 'Claude vision', '', {}, true); });
     }
 
     function loadVisionOpenaiUrlCheck(){
@@ -412,21 +424,10 @@
       fetch('/p2/admin/external-usage/sci-vision-openai-url-check', {method: 'POST'})
         .then(function(r){ return r.json(); })
         .then(function(d){
-          if(!d.configured){
-            body.innerHTML = '<div class="sci-datasrc-empty">OPENAI_API_KEY is not set on this deployment.</div>';
-            return;
-          }
-          if(!d.ok){
-            body.innerHTML = '<div class="sci-datasrc-empty">' + esc(d.error || 'ChatGPT could not fetch an image by URL right now.') + '</div>';
-            return;
-          }
-          body.innerHTML = '<div class="sci-datasrc-row"><span class="sci-datasrc-name">model: ' + esc(d.model || '') + '</span>' +
-            '<span class="sci-datasrc-status ok">working (' + (d.elapsed_ms || 0) + 'ms)</span></div>' +
-            '<div class="sci-datasrc-note">Proves ChatGPT can fetch and read an image by URL, the way it reads every real post\'s still image -- not just accept bytes handed to it directly.</div>';
+          dsVisionCard(body, 'ChatGPT vision', 'Proves ChatGPT can fetch and read an image by URL, the way it reads ' +
+            'every real post\'s still image -- not just accept bytes handed to it directly.', d);
         })
-        .catch(function(){
-          body.innerHTML = '<div class="sci-datasrc-empty">Could not reach the ChatGPT vision URL check.</div>';
-        });
+        .catch(function(){ dsVisionCard(body, 'ChatGPT vision', '', {}, true); });
     }
 
     // `working` is the count of accounts that can actually serve a request;
@@ -435,21 +436,29 @@
     // purpose: a lapsed account is listed forever, so collapsing the two
     // numbers would print "17 accounts connected" on a workspace where six
     // of them fail every call.
+// Status severity drives the card's accent (--dsc), not the platform's own
+    // brand colour -- the icon already says which platform this is; the
+    // colour's job here is to say at a glance whether it needs attention.
+    var DS_OK = '#4ade80', DS_WARN = '#fbbf24', DS_ERR = '#fb7185', DS_OFF = '#948899';
+
     function dsRow(platform, working, listed){
       var meta = platformMeta(platform);
       var stale = Math.max(0, listed - working);
-      var statusHtml;
+      var dsc = DS_OFF, statusHtml;
       if(working > 0){
+        dsc = DS_OK;
         statusHtml = '<span class="sci-datasrc-status ok">' + working + ' account' + (working === 1 ? '' : 's') + ' working' +
           (stale ? ', ' + stale + (stale === 1 ? ' needs' : ' need') + ' reconnecting' : '') + '</span>';
       } else if(listed > 0){
+        dsc = DS_WARN;
         statusHtml = '<span class="sci-datasrc-status warn">' + listed + ' account' + (listed === 1 ? '' : 's') + ' signed out</span>' +
           '<button type="button" class="sci-datasrc-connect" onclick="connectUnipile([\'' + platform.toUpperCase() + '\'])">Reconnect ' + esc(platform) + '</button>';
       } else {
         statusHtml = '<button type="button" class="sci-datasrc-connect" onclick="connectUnipile([\'' + platform.toUpperCase() + '\'])">Connect ' + esc(platform) + '</button>';
       }
-      return '<div class="sci-datasrc-row" data-platform="' + esc(platform) + '"><span class="sci-datasrc-ic">' + meta.icon + '</span>' +
-        '<span class="sci-datasrc-name">' + esc(platform) + '</span>' + statusHtml + '</div>';
+      return '<div class="sci-datasrc-row" data-platform="' + esc(platform) + '" style="--dsc:' + dsc + '">' +
+        '<span class="sci-datasrc-ic">' + meta.icon + '</span>' +
+        '<div class="sci-datasrc-main"><div class="sci-datasrc-name">' + esc(platform) + '</div>' + statusHtml + '</div></div>';
     }
 
     function loadDataSources(){
@@ -485,19 +494,22 @@
     // design -- see sci_source_linkedin.py); that is a NEUTRAL state, never
     // rendered as a failure, since turning it on is a deliberate decision
     // this panel must not appear to be nudging anyone toward.
-    function dsApifyRow(platform, entry){
+function dsApifyRow(platform, entry){
       var meta = platformMeta(platform);
-      var statusHtml;
+      var dsc = DS_OFF, statusHtml;
       if(!entry || !entry.enabled){
         statusHtml = '<span class="sci-datasrc-status off">not used here (by design)</span>';
       } else if(entry.accessible){
+        dsc = DS_OK;
         statusHtml = '<span class="sci-datasrc-status ok">actor reachable' +
           (entry.name ? ' &middot; ' + esc(entry.name) : '') + '</span>';
       } else {
+        dsc = DS_ERR;
         statusHtml = '<span class="sci-datasrc-status err" title="' + esc(entry.error || '') + '">actor not reachable</span>';
       }
-      return '<div class="sci-datasrc-row" data-platform="' + esc(platform) + '"><span class="sci-datasrc-ic">' + meta.icon + '</span>' +
-        '<span class="sci-datasrc-name">' + esc(platform) + '</span>' + statusHtml + '</div>';
+      return '<div class="sci-datasrc-row" data-platform="' + esc(platform) + '" style="--dsc:' + dsc + '">' +
+        '<span class="sci-datasrc-ic">' + meta.icon + '</span>' +
+        '<div class="sci-datasrc-main"><div class="sci-datasrc-name">' + esc(platform) + '</div>' + statusHtml + '</div></div>';
     }
 
     function loadApifyDataSources(){
