@@ -7,6 +7,41 @@ from tracker import event_intel_evidence as E, event_intel_harvest as H
 from tracker import event_intel_jobs as J, event_intel_store as S
 
 
+def test_cli_worker_shares_provider_context_with_imported_modules(monkeypatch):
+    """The deployed -m entry point must use the same ContextVars as research."""
+    import runpy
+    import sys
+    from tracker import claude_websearch as search
+
+    calls = []
+    job = {'run_id': 123, 'token': 'test-lease'}
+
+    def reserve(*args):
+        assert J.CURRENT.get() is job
+        calls.append('reserve')
+        return {'id': 42, 'cached': None}
+
+    def process_one():
+        marker = J.CURRENT.set(job)
+        try:
+            with J.ContextExecutor(max_workers=1) as pool:
+                result = pool.submit(search.ask, 'system', 'user').result(timeout=5)
+            assert result == {'text': 'recorded'}
+        finally:
+            J.CURRENT.reset(marker)
+
+    monkeypatch.setattr(J, 'run_once', process_one)
+    monkeypatch.setattr(J, 'reserve_call', reserve)
+    monkeypatch.setattr(J, 'finish_call', lambda call_id, result, elapsed: calls.append(('finish', call_id)))
+    monkeypatch.setattr(search, '_ask', lambda *args, **kwargs: {'text': 'recorded'})
+    # Make the old duplicate-module path fail immediately, without touching a DB.
+    monkeypatch.setattr(S, '_pg_conn', lambda: None)
+    monkeypatch.setattr(sys, 'argv', ['tracker.event_intel_jobs', '--once'])
+    with pytest.warns(RuntimeWarning, match='found in sys.modules'):
+        runpy.run_module('tracker.event_intel_jobs', run_name='__main__')
+    assert calls == ['reserve', ('finish', 42)]
+
+
 def test_chunking_retains_the_tail_and_bounds_every_model_input():
     text = '\n'.join('Exhibitor Company %04d https://company%d.example' % (i,i) for i in range(1000))
     pieces = list(E.chunks(text))
