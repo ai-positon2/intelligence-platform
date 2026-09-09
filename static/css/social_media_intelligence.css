@@ -485,23 +485,31 @@ a.sci-phero-handle:hover { color: #ffffff; border-bottom-color: var(--pf-color, 
    cards dim through explicit colours rather than opacity: an opacity that
    halves a card's contrast is invisible to a contrast checker, which is
    exactly how unreadable text survives a green audit. */
-.sci-accs { display: grid; grid-template-columns: repeat(auto-fill, minmax(238px, 1fr)); gap: 10px; }
-.sci-acc { position: relative; display: flex; align-items: center; gap: 12px; padding: 13px 15px; border-radius: var(--radius-md, 13px); border: 1px solid rgba(255,255,255,.08); background: linear-gradient(140deg, color-mix(in srgb, var(--pf-color, #fb923c) 10%, transparent), rgba(255,255,255,.02) 64%); text-decoration: none; overflow: hidden; transition: transform .2s, border-color .2s; }
+.sci-accs { display: grid; grid-template-columns: repeat(auto-fill, minmax(248px, 1fr)); gap: 11px; }
+.sci-acc { position: relative; display: flex; align-items: center; gap: 12px; padding: 14px 16px; border-radius: var(--radius-md, 13px); border: 1px solid rgba(255,255,255,.08); background: linear-gradient(140deg, color-mix(in srgb, var(--pf-color, #fb923c) 10%, transparent), rgba(255,255,255,.02) 64%); text-decoration: none; overflow: hidden; transition: transform .2s, border-color .2s, box-shadow .2s; }
 .sci-acc::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 2px; background: var(--pf-color, #fb923c); }
-.sci-acc:hover { transform: translateY(-2px); border-color: color-mix(in srgb, var(--pf-color, #fb923c) 55%, transparent); }
-.sci-acc-ic { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; flex-shrink: 0; color: color-mix(in srgb, var(--pf-color, #fb923c) 78%, #ffffff); background: color-mix(in srgb, var(--pf-color, #fb923c) 16%, transparent); border: 1px solid color-mix(in srgb, var(--pf-color, #fb923c) 30%, transparent); }
-.sci-acc-ic svg { width: 18px; height: 18px; }
-.sci-acc-txt { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 2px; }
-.sci-acc-n { font-size: 13px; font-weight: 700; color: #f3ecf5; }
+.sci-acc:hover { transform: translateY(-2px); border-color: color-mix(in srgb, var(--pf-color, #fb923c) 55%, transparent); box-shadow: 0 14px 28px -18px color-mix(in srgb, var(--pf-color, #fb923c) 70%, transparent); }
+.sci-acc-ic { width: 36px; height: 36px; border-radius: 11px; display: grid; place-items: center; flex-shrink: 0; color: color-mix(in srgb, var(--pf-color, #fb923c) 78%, #ffffff); background: color-mix(in srgb, var(--pf-color, #fb923c) 16%, transparent); border: 1px solid color-mix(in srgb, var(--pf-color, #fb923c) 30%, transparent); transition: transform .2s; }
+.sci-acc:hover .sci-acc-ic { transform: scale(1.06); }
+.sci-acc-ic svg { width: 19px; height: 19px; }
+.sci-acc-txt { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 3px; }
+.sci-acc-n { font-size: 13px; font-weight: 700; color: #f3ecf5; letter-spacing: -.005em; }
 .sci-acc-s { font-size: 11px; color: #b3a6b8; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.sci-acc-u { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 10px; color: #948899; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sci-acc-u { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 10px; color: #948899; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 1px; }
 .sci-acc-go { flex-shrink: 0; font-size: 13px; color: color-mix(in srgb, var(--pf-color, #fdba74) 58%, #ffffff); transition: transform .2s; }
 .sci-acc:hover .sci-acc-go { transform: translate(2px, -2px); }
 .sci-acc-off { background: rgba(255,255,255,.022); }
 .sci-acc-off::before { background: #6b6272; }
+.sci-acc-off:hover { transform: none; box-shadow: none; border-color: rgba(255,255,255,.1); }
 .sci-acc-off .sci-acc-ic { color: #948899; background: rgba(255,255,255,.05); border-color: rgba(255,255,255,.09); }
+.sci-acc-off:hover .sci-acc-ic { transform: none; }
 .sci-acc-off .sci-acc-n { color: #b3a6b8; }
 .sci-acc-off .sci-acc-s { color: #948899; }
+/* A small coloured pill naming the real reason -- reuses the same status
+   language (--bc, a dot, a pill) the Data Sources panel's own badges use,
+   so an unlinked platform reads as diagnosed rather than just missing. */
+.sci-acc-badge { align-self: flex-start; display: inline-flex; align-items: center; gap: 5px; margin-top: 2px; font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .03em; padding: 3px 9px 3px 8px; border-radius: var(--radius-pill, 80px); background: color-mix(in srgb, var(--bc) 14%, transparent); border: 1px solid color-mix(in srgb, var(--bc) 30%, transparent); color: var(--bc); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.sci-acc-badge .d { width: 4.5px; height: 4.5px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
 
 /* ── Pane-level empty and degraded states ────────────────────────────────── */
 .sci-pane-empty { text-align: center; padding: 42px 26px; border-radius: var(--radius-lg, 16px); border: 1px dashed rgba(255,255,255,.13); background: rgba(255,255,255,.022); }

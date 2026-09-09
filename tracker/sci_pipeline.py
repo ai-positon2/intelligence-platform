@@ -189,14 +189,19 @@ def run_identify(run_id: int, company_name: str, company_url: str | None) -> dic
 
     for platform, entry in result.items():
         confidence = entry.get("confidence", "none")
+        # sci_identify.identify_handles (and the YouTube/Reddit fallbacks
+        # above) always resolve a profile_url alongside the handle -- this
+        # used to be dropped on the floor here, so the account directory
+        # ("Every account, in one place") could never link to a platform,
+        # however successfully it was identified or collected.
         if confidence in _USABLE_CONFIDENCE and entry.get("handle"):
             sci_store.upsert_platform_run(
                 run_id, platform, handle=entry["handle"], handle_confidence=confidence,
-                status="identifying", status_detail=None)
+                status="identifying", status_detail=None, profile_url=entry.get("profile_url"))
         else:
             sci_store.upsert_platform_run(
                 run_id, platform, handle=entry.get("handle"), handle_confidence=confidence,
-                status="handle_not_found",
+                status="handle_not_found", profile_url=entry.get("profile_url"),
                 status_detail=entry.get("reasoning") or "Could not confidently identify this platform's account.")
     return result
 
