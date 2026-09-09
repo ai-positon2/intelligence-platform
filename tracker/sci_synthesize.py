@@ -1,11 +1,9 @@
 """Step 5 for Social Media Intelligence: turn sci_classify's
 mechanical pattern data into the cited, readable report. One Claude call,
 given the per-platform pattern summary plus a compact digest of every
-analyzed post (each post's "vision" object carries BOTH Claude's and
-ChatGPT's independent reads, see _post_digest -- this is the merge point
-where the two vendors' opinions actually reach the written narrative, not
-just the word-cloud classification sci_classify.py already pools), so every
-claim it writes can point at real posts.
+analyzed post (each post's "vision" field carries its creative-analysis
+reading, see _post_digest), so every claim it writes can point at real
+posts.
 
 Every claim carries post_ids: list[int] that must resolve to real
 sci_posts.id values from this run -- _parse()/_clean_claims() strip any id
@@ -30,20 +28,10 @@ _SYSTEM = (
     "organic social content, platform by platform and then across platforms. "
     "You are given, for each platform, a pattern summary (format mix, "
     "recurring visual/production themes, which posts got the most engagement) "
-    "and a digest of individual posts. Each post's \"vision\" object carries "
-    "TWO INDEPENDENT reads of the same creative, from two different vision "
-    "models that never saw each other's answer: \"claude\" and \"chatgpt\". "
-    "Either may be null (that vendor was not run, or failed on this post) -- "
-    "when only one is present, treat it exactly as you would have treated a "
-    "single reading; when BOTH are present, they are your strongest evidence "
-    "for a claim, since two independent models landing on the same read is "
-    "meaningfully more reliable than either alone. If the two genuinely "
-    "disagree on something material (a different subject, a different tone, "
-    "a different read on the CTA), do not silently pick one -- either note "
-    "the disagreement in messaging_and_strategy when it is significant enough "
-    "to matter to the reader, or favor the reading multiple posts corroborate "
-    "over one that stands alone; never fabricate an artificial consensus. "
-    "Each vision reading includes both visual fields (subject, setting, "
+    "and a digest of individual posts. Each post's \"vision\" field carries "
+    "a vision model's read of that creative -- may be null when that post "
+    "was never analyzed or the read failed. Each vision reading includes "
+    "both visual fields (subject, setting, "
     "people, product, style, on_screen_text: grounded strictly in what's "
     "depicted) and messaging fields (messaging, cta, tone, hook, "
     "format_technique, branding: grounded in the depicted creative AND the "
@@ -107,15 +95,15 @@ _SYSTEM = (
 # PAYLOAD_CHAR_BUDGET replaces a `json.dumps(payload)[:180000]` slice that
 # cut the payload mid-string. That slice did not send less evidence, it sent
 # BROKEN evidence: with 25 posts allowed per platform (sci_pipeline.
-# MAX_POSTS_PER_PLATFORM) and two vision readings per post, four active
-# platforms already serialize past 180,000 characters, so the model was
-# handed a JSON document that ends inside a quoted string and never closes.
-# _select_digests below drops whole posts instead, so what arrives is always
-# valid and the payload says plainly how many posts it represents.
+# MAX_POSTS_PER_PLATFORM), four active platforms could already serialize
+# past 180,000 characters, so the model was handed a JSON document that ends
+# inside a quoted string and never closes. _select_digests below drops
+# whole posts instead, so what arrives is always valid and the payload says
+# plainly how many posts it represents.
 #
 # The number itself is also raised from that slice's 180,000. The old figure
 # was low enough to discard most of a busy run's evidence -- the expensive
-# part of this pipeline, two vision readings per post, already paid for --
+# part of this pipeline, a vision reading per post, already paid for --
 # while 480,000 characters is roughly 120k tokens, which fits a maximal
 # seven-platform run (175 posts) inside the model's context with room to
 # spare for one cheap call per run. So the budget now almost never bites,
@@ -142,10 +130,10 @@ def _anthropic():
 
 
 def _clean_vision(analysis: dict | None) -> dict | None:
-    """None for a vendor that was never run, failed, or returned nothing
-    usable -- the model must never mistake an {"error": ...} dict for a real
-    reading, and null is unambiguous in a way an error string embedded in
-    the payload is not."""
+    """None when this post was never analyzed, or the analysis failed or
+    returned nothing usable -- the model must never mistake an
+    {"error": ...} dict for a real reading, and null is unambiguous in a way
+    an error string embedded in the payload is not."""
     return analysis if analysis and "error" not in analysis else None
 
 
@@ -156,10 +144,7 @@ def _post_digest(post: dict) -> dict:
         "post_type": post.get("post_type"),
         "post_url": post.get("post_url"),
         "metrics": post.get("metrics") or {},
-        "vision": {
-            "claude": _clean_vision(post.get("creative_analysis")),
-            "chatgpt": _clean_vision(post.get("creative_analysis_openai")),
-        },
+        "vision": _clean_vision(post.get("creative_analysis")),
     }
 
 
@@ -173,12 +158,12 @@ def _engagement(post: dict) -> float:
 
 def _digest_rank(post: dict, digest: dict) -> tuple:
     """Sort key deciding which posts earn a place in the payload when they
-    cannot all fit. Posts BOTH vendors read come first, then posts one
-    vendor read, then the most engaging -- in that order because every claim
-    the report makes has to cite real posts, and a post with no vision
-    reading can support no claim about the creative, however popular it was."""
-    readings = sum(1 for v in digest["vision"].values() if v)
-    return (-readings, -_engagement(post))
+    cannot all fit. Posts with a real vision reading come first, then the
+    most engaging -- in that order because every claim the report makes has
+    to cite real posts, and a post with no vision reading can support no
+    claim about the creative, however popular it was."""
+    has_reading = 1 if digest["vision"] else 0
+    return (-has_reading, -_engagement(post))
 
 
 def _select_digests(posts: list[dict], budget: int = PAYLOAD_CHAR_BUDGET,

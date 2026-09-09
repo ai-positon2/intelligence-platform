@@ -36,12 +36,11 @@ def _post(pid=1, platform="instagram", post_type="reel", media_urls=None, raw=No
 
 
 def _drive(monkeypatch, post, frames=None):
-    """Run the real run_platform_creative_analysis over one post with both
-    vendors and frame extraction faked, and report what each vendor was
-    shown and what got stored."""
+    """Run the real run_platform_creative_analysis over one post with the
+    vendor call and frame extraction faked, and report what it was shown
+    and what got stored."""
     from tracker import sci_store
-    seen = {"claude_urls": [], "openai_urls": [], "claude_frames": 0,
-            "openai_frames": 0, "extract_urls": [], "transcribed": []}
+    seen = {"claude_urls": [], "claude_frames": 0, "extract_urls": [], "transcribed": []}
     stored = {}
 
     monkeypatch.setattr(sci_store, "get_posts", lambda run_id, platform: [post])
@@ -50,9 +49,6 @@ def _drive(monkeypatch, post, frames=None):
     monkeypatch.setattr(sci_store, "update_post_creative_analysis",
                         lambda post_id, analysis, status="ok", error=None:
                         stored.update(claude=(analysis, status, error)))
-    monkeypatch.setattr(sci_store, "update_post_creative_analysis_openai",
-                        lambda post_id, analysis, status="ok", error=None:
-                        stored.update(openai=(analysis, status, error)))
 
     def fake_extract(url, n):
         seen["extract_urls"].append(url)
@@ -65,17 +61,10 @@ def _drive(monkeypatch, post, frames=None):
     monkeypatch.setattr("tracker.sci_vision.analyze_image",
                         lambda url, context=None: (seen["claude_urls"].append(url),
                                                    ok("claude"))[1])
-    monkeypatch.setattr("tracker.sci_vision_openai.analyze_image",
-                        lambda url, context=None: (seen["openai_urls"].append(url),
-                                                   ok("chatgpt"))[1])
     monkeypatch.setattr("tracker.sci_vision.analyze_image_bytes",
                         lambda b, context=None: (seen.__setitem__("claude_frames",
                                                                   seen["claude_frames"] + 1),
                                                  ok("claude"))[1])
-    monkeypatch.setattr("tracker.sci_vision_openai.analyze_image_bytes",
-                        lambda b, context=None: (seen.__setitem__("openai_frames",
-                                                                  seen["openai_frames"] + 1),
-                                                 ok("chatgpt"))[1])
     monkeypatch.setattr("tracker.sci_audio.transcribe_video",
                         lambda url: (seen["transcribed"].append(url), "a transcript")[1])
 
@@ -91,8 +80,7 @@ def test_an_instagram_reel_falls_back_to_its_display_image(monkeypatch):
                  raw={"displayUrl": "https://scontent.cdninstagram.com/v/cover.jpg?oe=2"})
     seen, stored = _drive(monkeypatch, post)
     assert seen["claude_urls"] == ["https://scontent.cdninstagram.com/v/cover.jpg?oe=2"]
-    assert seen["openai_urls"] == ["https://scontent.cdninstagram.com/v/cover.jpg?oe=2"]
-    assert stored["claude"][1] == "ok" and stored["openai"][1] == "ok"
+    assert stored["claude"][1] == "ok"
     assert "frame_extraction_note" in stored["claude"][0]
 
 
@@ -147,7 +135,7 @@ def test_a_video_with_no_frames_and_no_cover_anywhere_is_still_marked_failed(mon
     post = _post(platform="instagram", post_type="reel",
                  media_urls=["https://scontent.cdninstagram.com/v/clip.mp4"], raw={})
     seen, stored = _drive(monkeypatch, post)
-    assert seen["claude_urls"] == [] and seen["openai_urls"] == []
+    assert seen["claude_urls"] == []
     assert stored["claude"][1] == "failed"
     assert stored["claude"][2] == "Could not extract any video frames."
 
@@ -173,8 +161,7 @@ def test_a_carousel_whose_leading_media_is_a_video_is_read_as_a_video(monkeypatc
                       "childPosts": [{"videoUrl": "https://scontent.cdninstagram.com/v/clip.mp4"}]})
     seen, stored = _drive(monkeypatch, post, frames=[b"f1", b"f2"])
     assert seen["claude_urls"] == []      # never sent an mp4 as a still
-    assert seen["openai_urls"] == []
-    assert seen["claude_frames"] == 2 and seen["openai_frames"] == 2
+    assert seen["claude_frames"] == 2
     assert seen["extract_urls"] == ["https://scontent.cdninstagram.com/v/clip.mp4"]
     assert stored["claude"][1] == "ok"
 
@@ -187,7 +174,6 @@ def test_a_carousel_leading_with_a_video_still_prefers_a_real_image_slide(monkey
                              "https://pbs.twimg.com/media/b.jpg"])
     seen, stored = _drive(monkeypatch, post)
     assert seen["claude_urls"] == ["https://pbs.twimg.com/media/b.jpg"]
-    assert seen["openai_urls"] == ["https://pbs.twimg.com/media/b.jpg"]
     assert seen["extract_urls"] == []
     assert stored["claude"][1] == "ok"
 
@@ -210,21 +196,11 @@ def test_an_extensionless_cdn_url_is_still_analyzed(monkeypatch):
     assert stored["claude"][1] == "ok"
 
 
-def test_both_vendors_are_always_shown_the_same_still(monkeypatch):
-    """A second opinion on a different image is not a second opinion."""
-    post = _post(platform="facebook", post_type="carousel",
-                 media_urls=["https://video.xx.fbcdn.net/v/clip.mp4"],
-                 raw={"thumbnail": "https://scontent.xx.fbcdn.net/v/thumb.jpg"})
-    seen, _ = _drive(monkeypatch, post)
-    assert seen["claude_urls"] == seen["openai_urls"]
-    assert seen["claude_urls"] == ["https://scontent.xx.fbcdn.net/v/thumb.jpg"]
-
-
-def test_a_post_with_no_media_at_all_is_still_skipped_for_both_vendors(monkeypatch):
+def test_a_post_with_no_media_at_all_is_skipped(monkeypatch):
     post = _post(platform="x", post_type="text", media_urls=[])
     seen, stored = _drive(monkeypatch, post)
     assert seen["claude_urls"] == [] and seen["extract_urls"] == []
-    assert stored["claude"][1] == "skipped" and stored["openai"][1] == "skipped"
+    assert stored["claude"][1] == "skipped"
 
 
 # ── 3. Frame extraction and transcription read the video, not whatever leads ─
