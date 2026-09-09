@@ -557,6 +557,8 @@ def _scores(name, **over):
 
 
 def test_a_promoted_alternative_reaches_the_stored_candidates(monkeypatch):
+    from tests.test_event_intel_admission import stub_readable_sources
+    stub_readable_sources(monkeypatch)
     """One marquee event, cut, with a named replacement. The replacement has
     to end up in evi_candidates: it cost a live confirmation search and a live
     scoring call, and the summary claims it is on the list."""
@@ -655,6 +657,8 @@ def test_the_summary_never_claims_a_promotion_the_table_does_not_hold(monkeypatc
 # the gap that let the promotion defect above ship inert for weeks.
 
 def test_a_well_matched_event_below_the_bar_reaches_the_stored_summary(monkeypatch):
+    from tests.test_event_intel_admission import stub_readable_sources
+    stub_readable_sources(monkeypatch)
     """The whole point, end to end. One event clears 70, two score in the
     sixties with the right audience, one is for the wrong audience entirely.
     The run has to come back with one recommendation, two options and one

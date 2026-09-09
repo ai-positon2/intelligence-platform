@@ -106,3 +106,15 @@ job, propagates context through a thread pool and checks provider reservation
 and completion tracking. It fails before the correction. Imported-function tests
 alone did not cover this deployment entry point. A new live benchmark is required
 after both web and worker deploy the correction.
+
+### Source admission before recommendation scoring
+
+New recommendation runs read up to two event-host pages for each surviving candidate, including audit replacements, before scoring. Four context-preserving threads bound concurrent fetches. The existing public-URL fetcher enforces network restrictions, response limits and timeouts. A durable `source-admission` stage saves checks for replay; the final report summary retains source URLs, text hashes, dated excerpts and unresolved reasons.
+
+A candidate needs its exact name and date range near one another in readable organizer text. Supported formats are ISO dates and common English dates/ranges. This is labelled `literal_name_and_dates_only`: proximity is not semantic proof that the dates belong to that event, nor verification of location, attendance, eligibility or a matching programme. Unrecognized formats remain unresolved. Explicit JavaScript fallback pages and truncated/unreadable responses do not supply support; framework markers on otherwise readable pages are not sufficient to reject them.
+
+Observed invitation-only, membership-only, application-only or unavailable access requires review before attendance recommendation. Conditional wording such as “available until sold out” does not establish closure. Restriction detection is conservative and can still flag an unrelated ticket tier or sub-event; a reviewer must resolve applicability. There is no automatic override claiming the client has access.
+
+Unresolved events enter the existing unscored list with a reason and make the run partial. Existing saved reports are unchanged. This safeguard can shorten lists and does not replace rendered-page evidence, semantic edition checks, calibrated discovery recall or human review.
+
+A bounded September 9 source check accepted literal dates for B2B Marketing Exchange and MarketingProfs B2B Forum, and withheld the SaaStr CMO Summit whose fetched page was a JavaScript fallback describing the parent conference. These three checks are challenge cases, not overall release acceptance.

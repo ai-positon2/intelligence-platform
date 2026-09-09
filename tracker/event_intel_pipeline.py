@@ -312,8 +312,11 @@ def _run_recommend(run_id: int, email: str, profile: dict) -> None:
     from .event_intel_policy import eligibility
     policy_unconfirmed = []
     eligible = []
-    for candidate in survivors:
+    from .event_intel_admission import inspect_all
+    admission = durable_stage('source-admission', inspect_all, survivors)
+    for candidate, source_check in zip(survivors, admission):
         reasons = eligibility(candidate, profile)
+        reasons.extend(source_check['reasons'])
         if reasons:
             policy_unconfirmed.append(dict(candidate, scoring_note=' '.join(reasons)))
         else:
@@ -393,6 +396,7 @@ def _run_recommend(run_id: int, email: str, profile: dict) -> None:
         scoring_errors=scored["errors"], interchangeable=interchangeable,
         banned=banned, thin=thin, unscored=scored["unscored"],
         promoted=promoted, scoring_batches=scored.get("batches") or 0)
+    summary['source_admission'] = admission
     # What the run cost, summed from every stage's own report rather than
     # from a shared counter: `run_job` is a thread entry point and two runs
     # can be in flight in one process, so a global would bill one client for

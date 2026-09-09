@@ -490,6 +490,8 @@ class _FakeStore:
 
 
 def _wire(monkeypatch, fake):
+    from tests.test_event_intel_admission import stub_readable_sources
+    stub_readable_sources(monkeypatch)
     for name in ("update_run", "save_candidates", "get_candidates",
                  "prior_candidate_names", "get_outcomes", "outcome_pattern",
                  "classification_population", "cross_client_interest"):
