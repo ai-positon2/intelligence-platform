@@ -359,7 +359,7 @@ def category_shortfall(by_category: dict) -> list[dict]:
 
 _MATCHMAKING_VETO = (
     "whova", "brella", "swapcard", "grip app", "conference app",
-    "event app", "networking lounge", "networking app",
+    "event app", "networking lounge", "networking app", "matchmaking app",
     "schedule a meeting button", "self-serve", "self serve",
     "pre-booking encouraged", "attendees can book", "attendees are encouraged",
     "meeting scheduler in the app", "app-based networking",
@@ -399,7 +399,6 @@ _MATCHMAKING_HEDGE = tuple(re.compile(p, re.I) for p in (
 _MATCHMAKING_STRONG = tuple(re.compile(p, re.I) for p in (
     r"hosted[-\s]?buyer",
     r"hosted[-\s]?delegate",
-    r"pre[-\s]?schedul",
     r"curated\s+(1:1|one[-\s]to[-\s]one|meeting|introduc)",
     r"organi[sz]e(r|rs|d)?[^.]{0,40}?(match|pair|schedul|introduc|curat)",
     r"organi[sz]er[-\s]run",
@@ -411,6 +410,7 @@ _MATCHMAKING_STRONG = tuple(re.compile(p, re.I) for p in (
 ))
 
 _MATCHMAKING_SUPPORTING = tuple(re.compile(p, re.I) for p in (
+    # Advance booking alone does not establish who selected the pair.
     r"matchmak",
     r"concierge",
     r"speed[-\s]?dating",

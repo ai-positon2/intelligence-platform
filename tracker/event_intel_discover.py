@@ -348,6 +348,13 @@ you did not confirm.
 has already finished cannot be attended. If only a past edition exists, set \
 `confirmed` false and say so. If the next edition is announced but undated, \
 confirm it with null dates rather than guessing one.
+For a summit, dinner or other event within a parent conference, verify the \
+named sub-event's own edition and dates. The parent's dates do not establish \
+the sub-event's schedule. A 2027 page title or navigation header does not \
+override a body or application form that still describes 2026. If these \
+conflict and no current sub-event announcement resolves them, return null \
+dates and explain the unresolved edition in `category_fit`. Do not copy \
+historical attendee counts, entry requirements or agendas into a new edition.
 3. `attendees` and `booths` are the event's OWN published claims, quoted as \
 they state them ("12,000+ attendees", "430 exhibitors"), or null. NEVER \
 estimate either. A number you invented is indistinguishable from one they \
@@ -358,6 +365,12 @@ book their own meetings (Whova, Brella, Swapcard and the like), say exactly \
 that: it is a real and useful answer. Set `organizer_run` true only when the \
 organiser takes active responsibility for pairing people against stated \
 criteria.
+Apply this test to the named event and this client's access, not a separate \
+parent-conference programme. Invite-only admission or curation of the \
+attendee list is not buyer matching. Pre-scheduled meetings do not by \
+themselves establish organizer pairing. A founder-to-investor programme \
+does not prove agency-to-marketing-buyer access. If this distinction cannot \
+be verified, set `organizer_run` false and describe the limitation.
 5. `famous` is honest self-assessment: true if you could have named this event \
 without searching. Being famous is not disqualifying, it just gets audited.
 6. `cost_note` is any published cost to attend, exhibit or sponsor, quoted as \
