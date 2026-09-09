@@ -96,9 +96,17 @@ html::-webkit-scrollbar-thumb:hover { background-image: linear-gradient(180deg, 
 .dd-item.danger:hover { background: rgba(239,68,68,.08); color: #f87171; }
 
 /* ── Page shell ──────────────────────────────────────────────────────────── */
-.main { flex: 1; position: relative; z-index: 1; max-width: 1180px; margin: 0 auto; padding: 40px var(--margin) 72px; width: 100%; }
+/* A flex column with its own `gap`, not per-child margin, is deliberate:
+   the page's top-level sections are a mix of .sci-card elements and plain
+   wrapper divs (#dataSourcesPanel, filled by JS after load) -- a rule like
+   `.sci-card + .sci-card { margin-top }` silently stops applying the moment
+   a wrapper div sits between two cards, which is exactly what left this
+   page's sections touching with no gap at all. `gap` on the parent doesn't
+   care what any child element is, so it can't be defeated by a wrapper the
+   same way. */
+.main { flex: 1; position: relative; z-index: 1; max-width: 1180px; margin: 0 auto; padding: 40px var(--margin) 72px; width: 100%; display: flex; flex-direction: column; gap: 24px; }
 
-.ph { display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; margin-bottom: 30px; flex-wrap: wrap; }
+.ph { display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; flex-wrap: wrap; }
 .eyebrow { display: inline-flex; align-items: center; gap: 8px; font-family: 'JetBrains Mono', ui-monospace, 'Space Grotesk', monospace; font-size: 10.5px; font-weight: 600; letter-spacing: var(--ls-caps, .07em); text-transform: uppercase; color: #c9bfce; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.09); border-radius: var(--radius-pill, 80px); padding: 6px 13px 6px 10px; margin-bottom: 16px; }
 .eyebrow .dot { width: 6px; height: 6px; border-radius: 50%; background: #fb923c; box-shadow: 0 0 0 3px rgba(251,146,60,.22); animation: sci-pulse 2.4s ease-in-out infinite; flex-shrink: 0; }
 @keyframes sci-pulse { 0%,100%{box-shadow:0 0 0 0 rgba(251,146,60,.45)} 50%{box-shadow:0 0 0 6px rgba(251,146,60,0)} }
@@ -120,7 +128,6 @@ html::-webkit-scrollbar-thumb:hover { background-image: linear-gradient(180deg, 
 
 /* ── Command card ────────────────────────────────────────────────────────── */
 .sci-card { position: relative; background: linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.018)); border: 1px solid rgba(255,255,255,.09); border-radius: var(--radius-xl, 20px); box-shadow: 0 1px 0 rgba(255,255,255,.06) inset, 0 30px 70px -36px rgba(0,0,0,.85); overflow: hidden; opacity: 0; transform: translateY(16px); animation: sci-rise .5s cubic-bezier(.22,1,.36,1) forwards; }
-.sci-card + .sci-card { margin-top: 22px; }
 @keyframes sci-rise { to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) { .sci-card { animation: none; opacity: 1; transform: none; } }
 .sci-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: linear-gradient(90deg,#fb923c,#f472b6,#a855f7); }
