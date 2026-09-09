@@ -100,6 +100,16 @@ def _extract_var(html, name):
     return html[m.start():semi + 1]
 
 
+def _extract_line_var(html, name):
+    """`var NAME = ..., OTHER = ...;` confined to one source line -- for the
+    severity-colour constants (DS_OK/DS_WARN/DS_ERR/DS_OFF) dsApifyRow now
+    depends on, declared as one short multi-variable statement rather than
+    the object/array shape _extract_var expects."""
+    m = re.search(r"var %s = .*" % re.escape(name), html)
+    assert m, "no `var %s = ...` on the page" % name
+    return m.group(0)
+
+
 def _extract_fn(html, name):
     """`function NAME(...) { ... }`, real text from the page."""
     m = re.search(r"function %s\(" % re.escape(name), html)
@@ -145,6 +155,7 @@ def _run(fetch_reply):
         _extract_line_fn(html, "platformMeta"),
         _extract_line_fn(html, "esc"),
         _extract_var(html, "APIFY_PLATFORMS"),
+        _extract_line_var(html, "DS_OK"),
         _extract_fn(html, "dsApifyRow"),
         _extract_fn(html, "loadApifyDataSources"),
     ])
