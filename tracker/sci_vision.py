@@ -5,13 +5,9 @@ tracker/lps_enrichment.py's _anthropic() convention: degrades to a clear
 error dict on any failure (no key, a timeout, a malformed reply), never
 raises -- one bad image must not fail the platform or the run.
 
-SYSTEM_PROMPT and FIELDS are public (not module-private) specifically so
-tracker/sci_vision_openai.py's second-opinion pass can import them rather
-than keep its own copy: the two vendors must be asked the identical
-question in the identical shape for a "second opinion" to mean anything,
-and a second copy of this prompt would drift out of sync with this one the
-first time either got edited. summarize_frames() is vendor-agnostic (pure
-aggregation, no API call) and is reused as-is by the OpenAI path too."""
+SYSTEM_PROMPT and FIELDS are public (not module-private) so the rest of the
+pipeline can read the exact question this module asks and the exact fields
+it answers, without a second copy of either drifting out of sync."""
 
 from __future__ import annotations
 
@@ -94,19 +90,19 @@ def _parse(raw: str) -> dict | None:
 
 # ── Fetching the image ourselves when the vendor cannot ────────────────────
 #
-# Both vendors accept an image as a URL and fetch it from their own
+# The vendor accepts an image as a URL and fetches it from its own
 # infrastructure. That is the cheap path and the one tried first, but it
 # depends on a third party being able to reach a link we did not issue, and
 # most of what this pipeline collects is a signed, expiring, sometimes
 # geo-fenced CDN URL (scontent.cdninstagram.com, video.xx.fbcdn.net,
 # pbs.twimg.com, media.licdn.com). When one of those refuses the vendor's
 # fetcher, the call comes back as a plain API error and the post is recorded
-# as "vendor_call_failed" -- at BOTH vendors, for the same reason, which
-# looks exactly like a broken integration and is not one.
+# as "vendor_call_failed", which looks exactly like a broken integration
+# and is not one.
 #
 # So a failed URL call is retried once with the bytes fetched from here.
-# Railway can generally reach these CDNs even when the vendors cannot, and
-# both modules already have a base64 path built for video frames.
+# Railway can generally reach these CDNs even when the vendor cannot, and
+# this module already has a base64 path built for video frames.
 #
 # The fetch goes through event_intel_http.public_get rather than plain
 # requests, deliberately: these URLs arrive from third-party scrapers, so
@@ -120,7 +116,7 @@ MAX_IMAGE_BYTES = 5 * 1024 * 1024
 _FETCH_UA = ("Mozilla/5.0 (compatible; Position2-Intelligence/1.0; "
              "+https://intelligence.position2.com)")
 
-# What both vendors will actually accept. An image in any other format is
+# What the vendor will actually accept. An image in any other format is
 # not worth sending: it would come back as the same error we are retrying.
 _MEDIA_TYPES = {"image/jpeg": "image/jpeg", "image/jpg": "image/jpeg",
                 "image/pjpeg": "image/jpeg", "image/png": "image/png",
@@ -130,7 +126,7 @@ _MEDIA_TYPES = {"image/jpeg": "image/jpeg", "image/jpg": "image/jpeg",
 def fetch_image_bytes(url: str) -> tuple[bytes | None, str]:
     """(bytes, media_type) for `url`, or (None, "") on any failure.
 
-    Never raises, and never returns something the vendors cannot read: an
+    Never raises, and never returns something the vendor cannot read: an
     unknown content type, an empty body, or anything over MAX_IMAGE_BYTES
     is treated as a failure rather than sent on."""
     if not url:
@@ -150,7 +146,7 @@ def fetch_image_bytes(url: str) -> tuple[bytes | None, str]:
         media_type = _MEDIA_TYPES.get(ctype)
         if not media_type:
             logger.warning("sci_vision: image fetch for %s served %r, not an image "
-                           "either vendor reads", url, ctype)
+                           "the vendor reads", url, ctype)
             return None, ""
         data = resp.raw.read(MAX_IMAGE_BYTES + 1, decode_content=True)
         if not data:
@@ -310,9 +306,7 @@ def analyze_image_bytes(image_bytes: bytes, media_type: str = "image/jpeg",
 
 # A tiny, fully inert 1x1 transparent PNG -- used only to prove the vendor
 # round trip end to end (key valid, model reachable, a reply actually
-# parses) without depending on any external image URL staying up. Byte for
-# byte the same probe image tracker/sci_vision_openai.py uses, so the two
-# vendors' self-tests are answering the same question about the same input.
+# parses) without depending on any external image URL staying up.
 _PROBE_IMAGE_B64 = (
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk"
     "+A8AAQUBAScY42YAAAAASUVORK5CYII="
@@ -320,17 +314,11 @@ _PROBE_IMAGE_B64 = (
 
 
 def probe() -> dict:
-    """Prove the Claude-vision pass end to end, in the shape app.py's other
+    """Prove the vision pass end to end, in the shape app.py's other
     vendor self-tests established (_apollo_selftest, _arena_selftest,
-    unipile_client.probe, sci_reddit_client.probe, sci_vision_openai.probe).
-
-    This existed for the ChatGPT second opinion and NOT for Claude's own
-    pass, which is the wrong way round: Claude is the primary vendor here,
-    and the one asymmetry meant an admin could prove the second opinion was
-    healthy while having no way at all to ask the same question of the
-    first. "ANTHROPIC_API_KEY is set" does not prove the key is valid, the
-    model name is one the account can reach, or that a reply parses; one
-    small real call does.
+    unipile_client.probe, sci_reddit_client.probe). "ANTHROPIC_API_KEY is
+    set" does not prove the key is valid, the model name is one the account
+    can reach, or that a reply parses; one small real call does.
 
     An all-empty reading counts as a FAILURE here, not a pass: see _usable.
     A probe that goes green on a vendor returning nothing would be worse
@@ -367,7 +355,7 @@ def probe() -> dict:
 # fetch of a signed third-party CDN link (or this repo's SSRF-guarded local
 # retry of the same link) is what is actually broken. Pointing at our own
 # already-public favicon isolates that question from "is Instagram/TikTok/
-# LinkedIn's CDN specifically blocking this" -- it answers "can either vendor
+# LinkedIn's CDN specifically blocking this" -- it answers "can the vendor
 # fetch ANY external URL at all" first, which is the cheaper, more diagnostic
 # question to answer before chasing a CDN-specific block.
 PROBE_IMAGE_URL = "https://intelligence.position2.com/static/favicon.png"

@@ -149,11 +149,13 @@ def _ensure_tables(conn) -> None:
             CREATE INDEX IF NOT EXISTS idx_sci_posts_run_platform
             ON sci_posts (run_id, platform)
         """)
-        # Added when ChatGPT (OpenAI) vision joined as a second, independent
-        # creative-analysis vendor alongside Claude (tracker/sci_vision_openai.py):
-        # its own column triplet, mirroring creative_analysis/_status/_error
-        # exactly, so the two vendors' results can be compared rather than
-        # one silently overwriting the other.
+        # Legacy: a second, independent ChatGPT (OpenAI) creative-analysis
+        # vendor used to write its own column triplet here, mirroring
+        # creative_analysis/_status/_error. That second opinion was removed
+        # for consistently lower-quality output -- these ALTERs stay
+        # (idempotent, harmless) so an already-provisioned database does not
+        # need a migration, but nothing writes to these columns any more and
+        # _POST_COLUMNS below no longer selects them.
         cur.execute("ALTER TABLE sci_posts ADD COLUMN IF NOT EXISTS creative_analysis_openai JSONB")
         cur.execute("ALTER TABLE sci_posts ADD COLUMN IF NOT EXISTS "
                    "creative_analysis_openai_status VARCHAR(10) NOT NULL DEFAULT 'pending'")
@@ -574,9 +576,7 @@ def upsert_posts(run_id: int, platform: str, posts: list[dict]) -> int:
 
 _POST_COLUMNS = ["id", "run_id", "platform", "platform_post_id", "post_url", "post_type",
                  "caption", "posted_at", "media_urls", "metrics", "raw", "creative_analysis",
-                 "creative_analysis_status", "creative_analysis_error",
-                 "creative_analysis_openai", "creative_analysis_openai_status",
-                 "creative_analysis_openai_error", "created_at", "updated_at"]
+                 "creative_analysis_status", "creative_analysis_error", "created_at", "updated_at"]
 
 
 def get_posts(run_id: int, platform: str | None = None) -> list[dict]:
@@ -635,40 +635,6 @@ def update_post_creative_analysis(post_id: int, analysis: dict, status: str = "o
         return True
     except Exception as e:
         logger.warning("sci_store: update_post_creative_analysis failed for post %s: %s", post_id, e)
-        try:
-            conn.rollback()
-        except Exception:
-            pass
-        return False
-    finally:
-        try:
-            conn.close()
-        except Exception:
-            pass
-
-
-def update_post_creative_analysis_openai(post_id: int, analysis: dict, status: str = "ok",
-                                        error: str | None = None) -> bool:
-    """The OpenAI (ChatGPT vision) second-opinion counterpart to
-    update_post_creative_analysis -- own columns, so this never overwrites
-    Claude's already-stored analysis of the same post."""
-    conn = _pg_conn()
-    if not conn:
-        return False
-    try:
-        _ensure_tables(conn)
-        from psycopg2.extras import Json
-        with conn.cursor() as cur:
-            cur.execute(
-                "UPDATE sci_posts SET creative_analysis_openai = %s, "
-                "creative_analysis_openai_status = %s, creative_analysis_openai_error = %s, "
-                "updated_at = now() WHERE id = %s",
-                (Json(analysis) if analysis is not None else None, status, error, post_id),
-            )
-        conn.commit()
-        return True
-    except Exception as e:
-        logger.warning("sci_store: update_post_creative_analysis_openai failed for post %s: %s", post_id, e)
         try:
             conn.rollback()
         except Exception:

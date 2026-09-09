@@ -1,17 +1,10 @@
 """postHasAnalysis / postThemeWords: the report page's own "is this post
-analyzed" and "what theme words does it contribute" logic must pool BOTH
-vendors, the same rule tracker/sci_classify.py's _post_keywords/
-_analysis_keywords already apply server-side. Before this fix, six call
-sites on the page (the headline "Creative described" tile, each platform's
-"Analyzed" stat, the "Recurring creative themes" chart, and its "example
-post" link) checked creative_analysis_status alone -- a post Claude failed
-on but ChatGPT successfully described was invisible to all of them, visible
-only in the per-post detail modal (postHasAnalysis, tested separately in
-test_social_media_intelligence_creative_detail.py).
+analyzed" and "what theme words does it contribute" logic, gated on the
+post's own creative_analysis_status -- the same rule tracker/sci_classify.
+py's _post_keywords/_analysis_keywords apply server-side.
 
 Runs the REAL text of these functions (extracted from the page's own inline
-script, not retyped) in node -- a text match cannot tell a fixed call site
-from one still checking a single vendor.
+script, not retyped) in node.
 """
 
 import json
@@ -35,10 +28,7 @@ pytestmark = pytest.mark.skipif(shutil.which("node") is None,
 
 
 def _post(**overrides):
-    base = {
-        "creative_analysis": None, "creative_analysis_status": "pending",
-        "creative_analysis_openai": None, "creative_analysis_openai_status": "pending",
-    }
+    base = {"creative_analysis": None, "creative_analysis_status": "pending"}
     base.update(overrides)
     return base
 
@@ -61,7 +51,7 @@ def _run(post):
     return json.loads(r.stdout.strip().splitlines()[-1])
 
 
-def test_claude_only_success_counts_as_analyzed_and_contributes_words():
+def test_a_successful_analysis_counts_as_analyzed_and_contributes_words():
     post = _post(creative_analysis_status="ok",
                  creative_analysis={"subject": "shoe", "tone": "urgent"})
     result = _run(post)
@@ -69,35 +59,14 @@ def test_claude_only_success_counts_as_analyzed_and_contributes_words():
     assert set(result["words"]) == {"shoe", "urgent"}
 
 
-def test_openai_only_success_counts_as_analyzed_and_contributes_words():
-    # The exact regression: Claude's own pass failed, ChatGPT's succeeded.
-    post = _post(creative_analysis_status="failed", creative_analysis=None,
-                 creative_analysis_openai_status="ok",
-                 creative_analysis_openai={"subject": "shoe", "tone": "urgent"})
-    result = _run(post)
-    assert result["hasAnalysis"] is True
-    assert set(result["words"]) == {"shoe", "urgent"}
-
-
-def test_agreement_between_both_vendors_counts_a_theme_twice():
-    post = _post(creative_analysis_status="ok",
-                 creative_analysis={"subject": "shoe", "tone": "urgent"},
-                 creative_analysis_openai_status="ok",
-                 creative_analysis_openai={"subject": "shoe", "tone": "playful"})
-    result = _run(post)
-    assert result["hasAnalysis"] is True
-    assert result["words"].count("shoe") == 2
-    assert set(result["words"]) == {"shoe", "urgent", "playful"}
-
-
-def test_neither_vendor_succeeding_is_not_analyzed():
-    post = _post(creative_analysis_status="failed", creative_analysis_openai_status="skipped")
+def test_a_failed_analysis_is_not_analyzed():
+    post = _post(creative_analysis_status="failed")
     result = _run(post)
     assert result["hasAnalysis"] is False
     assert result["words"] == []
 
 
-def test_a_vendors_own_error_dict_never_leaks_words_even_if_status_disagrees():
+def test_an_error_dict_never_leaks_words_even_if_status_disagrees():
     # Defense in depth: analysisThemeWords' own {error} guard, independent of
     # the status field a caller already checked.
     post = _post(creative_analysis_status="ok", creative_analysis={"error": "unparsable_response"})

@@ -195,7 +195,7 @@ def test_synthesize_report_degrades_on_a_vendor_exception(monkeypatch):
     assert result == {"error": "vendor_call_failed"}
 
 
-# ── Merging both vendors' vision into the payload the model sees (2026-09-07) ──
+# ── The vision reading in the payload the model sees ────────────────────────
 
 def _capture_payload(monkeypatch, posts, reply=None):
     from tracker import sci_store
@@ -217,53 +217,34 @@ def _capture_payload(monkeypatch, posts, reply=None):
     return json.loads(captured["content"])
 
 
-def test_the_payload_carries_both_vendors_readings_for_one_post(monkeypatch):
+def test_the_payload_carries_the_vision_reading_for_one_post(monkeypatch):
     posts = [{"id": 101, "platform": "instagram", "post_type": "image", "post_url": "u1",
-             "metrics": {"likes": 10}, "creative_analysis": {"subject": "shoes", "tone": "urgent"},
-             "creative_analysis_openai": {"subject": "sneakers", "tone": "excited"}}]
+             "metrics": {"likes": 10}, "creative_analysis": {"subject": "shoes", "tone": "urgent"}}]
     payload = _capture_payload(monkeypatch, posts)
-    vision = payload["posts"][0]["vision"]
-    assert vision["claude"]["subject"] == "shoes"
-    assert vision["chatgpt"]["subject"] == "sneakers"
+    assert payload["posts"][0]["vision"]["subject"] == "shoes"
 
 
-def test_a_vendor_that_was_never_run_is_null_in_the_payload_not_omitted():
-    """The model must be able to tell 'this vendor said nothing' apart from
-    'this vendor was never asked' -- both collapse to null, but the KEY is
-    always present so the model never has to guess which case it's in."""
+def test_a_post_never_analyzed_is_null_in_the_payload_not_omitted():
+    """The model must be able to tell 'nothing was seen' apart from 'this
+    field is missing' -- both collapse to null, but the KEY is always
+    present so the model never has to guess which case it's in."""
     from tracker import sci_synthesize as mod
     digest = mod._post_digest({"id": 1, "platform": "x", "post_type": "image",
-                               "post_url": "u", "metrics": {},
-                               "creative_analysis": {"subject": "shoes"}})
-    assert "chatgpt" in digest["vision"]
-    assert digest["vision"]["chatgpt"] is None
-    assert digest["vision"]["claude"]["subject"] == "shoes"
+                               "post_url": "u", "metrics": {}, "creative_analysis": None})
+    assert "vision" in digest
+    assert digest["vision"] is None
 
 
-def test_a_failed_vendor_reading_is_null_not_the_raw_error_dict(monkeypatch):
+def test_a_failed_vision_reading_is_null_not_the_raw_error_dict(monkeypatch):
     posts = [{"id": 101, "platform": "instagram", "post_type": "image", "post_url": "u1",
-             "metrics": {}, "creative_analysis": {"subject": "shoes"},
-             "creative_analysis_openai": {"error": "vendor_call_failed"}}]
+             "metrics": {}, "creative_analysis": {"error": "vendor_call_failed"}}]
     payload = _capture_payload(monkeypatch, posts)
-    assert payload["posts"][0]["vision"]["chatgpt"] is None
+    assert payload["posts"][0]["vision"] is None
 
 
-def test_a_post_with_only_an_openai_reading_still_reaches_the_model(monkeypatch):
-    """Claude failing on a post must not silently drop it from the payload
-    -- ChatGPT's own successful read is still real evidence to cite."""
-    posts = [{"id": 101, "platform": "instagram", "post_type": "image", "post_url": "u1",
-             "metrics": {}, "creative_analysis": None,
-             "creative_analysis_openai": {"subject": "sneakers"}}]
-    payload = _capture_payload(monkeypatch, posts)
-    vision = payload["posts"][0]["vision"]
-    assert vision["claude"] is None
-    assert vision["chatgpt"]["subject"] == "sneakers"
-
-
-def test_the_system_prompt_instructs_treating_agreement_as_stronger_evidence():
-    assert "independent" in sci_synthesize._SYSTEM.lower()
-    assert "chatgpt" in sci_synthesize._SYSTEM.lower()
-    assert "disagree" in sci_synthesize._SYSTEM.lower()
+def test_the_system_prompt_never_mentions_a_second_vendor():
+    assert "chatgpt" not in sci_synthesize._SYSTEM.lower()
+    assert "openai" not in sci_synthesize._SYSTEM.lower()
 
 
 def test_the_system_prompt_caps_every_bullet_to_one_short_pointer():
