@@ -20,3 +20,11 @@ Source admission now normalizes Unicode/punctuation and “&”/“and”, strip
 Access checks retain individual observations. Explicit hotel/VIP inventory restrictions do not establish whole-event closure when the same page explicitly says general admission or event registration is open. Otherwise access remains unresolved. Application requirements and approval conditions are not treated as confirmed client eligibility. A later event-wide cancellation still blocks admission. Dynamic fallback reads retain hashes and read-mode metadata, without being promoted to rendered-page evidence.
 
 These are deterministic literal-support checks, not semantic proof or browser rendering. Unsupported layouts, formats and ambiguous access remain unverified. Part 3 must measure the resulting coverage and factual accuracy; the bounded organizer challenge check is not the complete benchmark.
+
+## Part 3 measurement support
+
+Full research can be downloaded as JSON through the same account-scoped run-detail response. The file includes source and execution ledgers, partial-report caveats and unverified observations. Downloads are attachments with private/no-store caching. Running or failed reports remain exportable for diagnostics and must not be treated as completed benchmarks.
+
+The Events ledger estimates cost using recorded model IDs and usage at dated standard direct-API list rates. Sonnet 5 uses $2/$10 per million input/output tokens as checked September 10; Sonnet 4.6/4.5 uses $3/$15. Reported searches and cache hits are included. Missing usage, unknown models or cache writes without a recorded duration prevent a complete estimate. Known-call subtotal is separate from the full estimate. Neither is an invoice reconciliation. The original fixed-rate estimate remains labelled as legacy in the exported report.
+
+Run 8 is the fresh production benchmark for Parts 1 and 2. Its results and the cancellation checks are documented in the workspace audit record after completion. Native process-kill/replay and transactional cancellation checks run against disposable PostgreSQL, not by disrupting production services.
