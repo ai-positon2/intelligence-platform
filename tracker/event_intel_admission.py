@@ -5,8 +5,9 @@ Dynamic pages and restricted access require review rather than optimistic dates.
 """
 import calendar
 import re
+import unicodedata
 from datetime import date
-from urllib.parse import urlsplit
+from urllib.parse import urlsplit, urldefrag
 
 from .event_intel_access import organizer_url
 from .event_intel_evidence import source_snapshot
@@ -14,18 +15,67 @@ from .event_intel_jobs import ContextExecutor
 
 MAX_PAGES = 2
 _RESTRICTED = re.compile(r'\b(?:invite[- ]only|invitation[- ]only|members[- ]only|'
-                         r'by invitation|application[- ]only|sold out|waitlist|'
+                         r'by invitation|application[- ]only|application required|subject to approval|sold out|waitlist|'
                          r'registration (?:is )?closed|cancelled|canceled)\b', re.I)
 
 
-def _restriction(text):
+def _fold(text):
+    text = unicodedata.normalize('NFKC',text).casefold().replace('&',' and ')
+    return ' '.join(re.findall(r'\w+',text))
+
+
+def _names(event, year):
+    name = str(event.get('name') or '').strip()
+    if any(y != str(year) for y in re.findall(r'\b20\d{2}\b',name)):
+        return []
+    # Strip only a matching year and an explicit acronym, never regional names.
+    name = re.sub(r'\s*\([A-Z0-9]{2,12}\)\s*$', '', name)
+    name = re.sub(r'\s+'+str(year)+r'$', '', name)
+    return [_fold(name)] if _fold(name) else []
+
+
+def _owns_date(prefix, names, year):
+    last_clause = re.split(r'[.!?]\s+',prefix)[-1]
+    opening = _fold(last_clause).split()[:1]
+    if last_clause.strip() and opening not in (['get'],['choose'],['join'],['register'],['book']):
+        prefix = last_clause
+    folded = _fold(prefix)
+    for name in names:
+        matches = list(re.finditer(r'(?<!\w)'+re.escape(name)+r'(?!\w)',folded))
+        if not matches:
+            continue
+        tail = folded[matches[-1].end():].strip()
+        if any(y != str(year) for y in re.findall(r'\b20\d{2}\b',tail)):
+            continue
+        tail = re.sub(r'^'+str(year)+r'\b', '', tail).strip()
+        # A bare regional suffix or another event name is a different identity.
+        first = tail.split()[0] if tail else ''
+        allowed = {'on','runs','returns','takes','starts','is','join','at','from','get','choose','register','book'}
+        allowed.update(m.casefold() for m in calendar.month_name if m)
+        allowed.update(m.casefold() for m in calendar.month_abbr if m)
+        if not first or first in allowed or first.isdigit():
+            return True
+    return False
+
+
+def _access(text, event_name=''):
+    observations, blocking = [], []
+    general_open = bool(re.search(r'\b(?:general admission|event registration) (?:is |remains )?open\b',text,re.I))
     for match in _RESTRICTED.finditer(text):
-        prefix = text[max(0,match.start()-45):match.start()]
-        # Conditional sales copy is not an announcement of closure.
+        prefix=text[max(0,match.start()-80):match.start()]
         if re.search(r'\b(?:until|if|unless|not|never|no longer)\s*$',prefix,re.I):
             continue
-        return match
-    return None
+        # Use the current clause so a different preceding inventory item does
+        # not explain away an event-wide closure later in the same paragraph.
+        clause=re.split(r'[.;!\n]',prefix)[-1]
+        other=bool(re.search(r'\b(?:hotel room|room block|accommodation|VIP (?:pass|ticket|dinner))',clause,re.I))
+        named_inventory = bool(re.search(r'\b(?:VIP|dinner|hotel room|room block)\b',event_name,re.I))
+        scoped = other and general_open and not named_inventory
+        excerpt=text[max(0,match.start()-80):match.end()+120]
+        observations.append({'text':excerpt,'scope':'other_inventory' if scoped else 'unresolved_event_access'})
+        if not scoped:
+            blocking.append(excerpt)
+    return observations, blocking
 
 
 def _date_patterns(start, end):
@@ -44,6 +94,10 @@ def _date_patterns(start, end):
         days = str(start.day) + r'(?:st|nd|rd|th)?\s*(?:-|–|—|to|through)\s*' + str(end.day) + r'(?:st|nd|rd|th)?'
         patterns += [month + r'\s+' + days + r',?\s+' + str(start.year),
                      days + r'\s+' + month + r',?\s+' + str(start.year)]
+    if start.year == end.year and start.month != end.month:
+        left = '(?:'+calendar.month_name[start.month]+'|'+calendar.month_abbr[start.month]+r'\.?)'
+        right = '(?:'+calendar.month_name[end.month]+'|'+calendar.month_abbr[end.month]+r'\.?)'
+        patterns.append(left+r'\s+'+str(start.day)+r'\s*(?:-|–|—|to)\s*'+right+r'\s+'+str(end.day)+r',?\s+'+str(end.year))
     return [re.compile(r'(?<!\w)' + p + r'(?!\w)', re.I) for p in patterns]
 
 
@@ -61,10 +115,12 @@ def inspect(event, fetcher=None):
         return result
     urls = []
     for url in [event.get('website')] + list(event.get('sources') or []):
-        if organizer_url(url,host) and url not in urls:
-            urls.append(url)
+        if organizer_url(url,host):
+            url = urldefrag(url)[0]
+            if url not in urls:
+                urls.append(url)
     # Keep the actual event name, not just a parent brand shared by summits.
-    name = re.sub(r'\s+', ' ', str(event.get('name') or '')).strip().casefold()
+    names = _names(event,start.year)
     supported = False
     restrictions = []
     for url in urls[:MAX_PAGES]:
@@ -81,20 +137,27 @@ def inspect(event, fetcher=None):
         raw_text = fetched.get('text') or ''
         fallback = fetched.get('spa') and re.search(
             r'javascript is disabled|please enable javascript|enable javascript to', raw_text, re.I)
+        check['read_mode'] = 'javascript_fallback' if fallback else 'extracted_html'
+        if raw_text:
+            check['snapshot'] = source_snapshot(final,raw_text)
         # WordPress/React markers alone also occur on fully readable pages.
         if fetched.get('status') != 'ok' or fallback or fetched.get('truncated'):
             check['reason'] = 'The complete rendered page could not be read reliably.'
             continue
-        text = re.sub(r'\s+', ' ', raw_text).strip()
-        check['snapshot'] = source_snapshot(final,text)
-        restricted = _restriction(text)
-        if restricted:
+        # Link destinations are provenance, not visible evidence of names/dates.
+        visible = re.sub(r'\[https?://[^\]\s]+\]', '', raw_text)
+        text = re.sub(r'\s+', ' ', visible).strip()
+        check['visible_text_snapshot'] = source_snapshot(final,text)
+        observations, blocked = _access(visible,str(event.get('name') or ''))
+        check['access_observations'] = observations
+        if blocked:
             restrictions.append('The organizer page describes restricted or unavailable access; verify this client’s access before recommending attendance.')
-            check['access_excerpt'] = text[max(0,restricted.start()-80):restricted.end()+120]
+            check['access_excerpt'] = blocked[0]
         for pattern in patterns:
             for match in pattern.finditer(text):
                 context = text[max(0,match.start()-180):match.end()+180]
-                if name and name in context.casefold():
+                prefix = text[max(0,match.start()-180):match.start()]
+                if _owns_date(prefix,names,start.year):
                     supported = True
                     check['date_excerpt'] = context
                     check['support'] = 'literal_name_and_dates_only'
