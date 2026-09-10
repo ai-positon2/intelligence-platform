@@ -3489,6 +3489,11 @@
                      : (look ? 'Nothing unmissable, ' + plural(look, 'event') +
                                ' worth a look'
                              : 'Nothing cleared the bar of ' + RANK_FLOOR));
+      var provisional = s.completion_state && s.completion_state !== 'complete';
+      provisional = provisional || (s.shortfall || []).some(function(r){
+        return r.status === 'error' || r.status === 'partial';
+      }) || (s.unscored || []).length > 0;
+      if (provisional) line = 'Research incomplete — shortlist needs verification';
       /* A ring, not a donut. The glance wants one number against a stated
          maximum, and a donut's centre has to be the sum of its own segments,
          which here would be the constant 6 on every run. */
@@ -3497,7 +3502,7 @@
         cv.failed ? 'f-bad' : (cv.short ? 'f-mid' : 'f-hi'),
         (cv.short ? cv.short + ' came up short' : '') +
         (cv.short && cv.failed ? ', ' : '') +
-        (cv.failed ? cv.failed + ' did not run' : '')) : '';
+        (cv.failed ? cv.failed + ' returned no usable result' : '')) : '';
 
       return '<div class="evi-answer">' +
         '<div class="aw">' +

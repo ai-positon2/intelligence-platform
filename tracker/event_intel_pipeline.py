@@ -273,17 +273,18 @@ def _run_recommend(run_id: int, email: str, profile: dict) -> None:
             run_id, status="failed" if found['categories_failed'] else "complete", stage="done",
             error="Event research could not be completed." if found['categories_failed'] else None,
             summary={"mode": "recommend",
-                     "completion_state": "failed" if found['categories_failed'] else "complete",
+                     "completion_state": ("failed" if found['categories_failed'] else
+                                          "partial" if any(s.get('status') == 'partial' for s in found['statuses'].values()) else "complete"),
                      "spend": dict(found.get('spend') or {}, usd=event_intel_discover.claude_websearch.spend_usd(found.get('spend') or {})),
                      "no_candidates": True,
                      "shortfall": found["shortfall"],
                      "statuses": found["statuses"],
                      "categories_failed": found["categories_failed"],
                      "note": (
-                         "No events were found for this profile. Every category "
-                         "result is listed below, including the ones that failed "
-                         "to run, so this can be told apart from a market with "
-                         "genuinely nothing in it.")})
+                         "No verified candidates survived this run. Review the "
+                         "category results below: incomplete searches or "
+                         "verification do not establish that the market has "
+                         "no suitable events.")})
         return
 
     # Step 3. Marquee names justify themselves against a named alternative or

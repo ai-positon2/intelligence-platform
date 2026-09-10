@@ -885,7 +885,7 @@ def test_clean_event_rejects_a_non_http_website_and_sources(monkeypatch):
     assert cleaned['sources']==['https://ok.example']
     _stages(monkeypatch,confirm=_confirm_reply(raw))
     result = D.search_category(R.CAT_EMERGING,PROFILE)
-    assert result['events']==[] and result['status']==D.STATUS_ERROR
+    assert result['events']==[] and result['status']==D.STATUS_PARTIAL
 
 
 def test_a_proposal_carrying_a_javascript_url_never_reaches_the_confirm_prompt(monkeypatch):
@@ -1187,7 +1187,7 @@ def test_candidates_the_confirmer_ruled_out_make_an_empty_category(monkeypatch):
     assert "last one" in r["detail"]
 
 
-def test_candidates_the_confirmer_could_not_check_are_an_error_not_an_empty(monkeypatch):
+def test_candidates_with_unfinished_confirmation_are_partial_not_empty(monkeypatch):
     """The mirror image, and the one that costs a client money. A confirmation
     that never ran says nothing about the market, so it must never be able to
     produce the sentence 'this category has nothing for you'."""
@@ -1198,7 +1198,7 @@ def test_candidates_the_confirmer_could_not_check_are_an_error_not_an_empty(monk
     _stages(monkeypatch, find=_find_reply(_ONE, complete=True),
             confirm_error={"kind": "transport", "detail": "HTTP 503"})
     r = D.search_category(R.CAT_EMERGING, PROFILE)
-    assert r["status"] == D.STATUS_ERROR
+    assert r["status"] == D.STATUS_PARTIAL
     assert r["rejected"] == []
     assert "could not be checked" in r["detail"]
     assert "503" not in r["detail"], "the transport detail reached the report"
@@ -1212,7 +1212,7 @@ def test_a_confirmation_that_cites_nothing_is_not_a_confirmation(monkeypatch):
     r = _run_category(monkeypatch, _find_reply(_ONE, complete=True),
                       confirm=_confirm_reply(_named(sources=[])))
     assert r["events"] == []
-    assert r["status"] == D.STATUS_ERROR
+    assert r["status"] == D.STATUS_PARTIAL
     assert "without citing" in r["detail"]
 
 
@@ -1223,7 +1223,7 @@ def test_a_confirmation_that_ran_no_search_is_discarded(monkeypatch):
             confirm=_confirm_reply(_EVENT), confirm_searches=0)
     r = D.search_category(R.CAT_EMERGING, PROFILE)
     assert r["events"] == []
-    assert r["status"] == D.STATUS_ERROR
+    assert r["status"] == D.STATUS_PARTIAL
     assert "without a single search being run" in r["detail"]
     # "The model" is our word for our own machinery. A reader of this
     # report needs to know what the SEARCH did.
@@ -1235,7 +1235,7 @@ def test_a_refusal_with_no_reason_is_unchecked_rather_than_a_market_finding(monk
     about the market, so its silence must not be promoted into one."""
     r = _run_category(monkeypatch, _find_reply(_ONE, complete=True),
                       confirm=_confirm_reply(None, confirmed=False))
-    assert r["status"] == D.STATUS_ERROR
+    assert r["status"] == D.STATUS_PARTIAL
     assert r["rejected"] == []
     assert "without saying what it found" in r["detail"]
 
