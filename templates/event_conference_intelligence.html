@@ -545,6 +545,7 @@
           <h2 id="drawerTitle">Loading</h2>
           <div class="sub" id="drawerSub"></div>
           <a id="eventPlanLink" class="evi-btn" hidden>Plan &amp; results</a>
+          <a id="eventExportLink" class="evi-btn evi-btn-ghost" hidden>Download full research (JSON)</a>
         </div>
         <button class="evi-x" onclick="closeDrawer()" aria-label="Close">×</button>
       </div>
@@ -1356,6 +1357,7 @@
       document.getElementById('drawer').classList.add('on');
       readingMode(true);
       document.getElementById('drawerTitle').textContent = 'Loading';
+      document.getElementById('eventExportLink').hidden = true;
       document.getElementById('drawerSub').textContent = '';
       document.getElementById('drawerBody').innerHTML =
         '<div class="evi-empty"><span class="ic"><span class="evi-spinner"></span></span>' +
@@ -4170,6 +4172,11 @@
        lookup and the query in a discover, because a discover run had no one
        subject event. */
     function render(run){
+      var exportLink = document.getElementById('eventExportLink');
+      if (exportLink) {
+        exportLink.hidden = !run.id;
+        exportLink.href = BASE + '/runs/' + run.id + '?download=1';
+      }
       var planLink = document.getElementById('eventPlanLink');
       if (planLink) {
         planLink.hidden = run.status !== 'complete' || !['lookup', 'recommend'].includes(run.mode);
