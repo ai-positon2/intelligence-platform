@@ -3841,7 +3841,7 @@
           'Left out of the ranking rather than ranked low.</div><div class="evi-cut">' +
           s.unscored.map(function(e){
             return '<span class="cutp">' + esc(e.name) + '<b>' +
-              esc(e.scoring_note || 'The research did not establish enough evidence to score this event.') +
+              esc(e.note || e.scoring_note || 'The research did not establish enough evidence to score this event.') +
               '</b></span>'; }).join('') +
           '</div></div>';
       }
