@@ -9093,6 +9093,12 @@ def event_conference_intelligence_run_detail(run_id):
         from tracker.event_intel_jobs import ledger
         run['evidence_ledger'] = get_observations(run_id,email)
         run['execution_ledger'] = ledger(run_id,email)
+        if run['execution_ledger']:
+            run['summary'] = run.get('summary') or {}
+            spend = run['summary']['spend'] = run['summary'].get('spend') or {}
+            spend['legacy_fixed_rate_usd'] = spend.get('usd')
+            spend['usd'] = run['execution_ledger']['cost_estimate']['estimated_usd']
+            spend['pricing_basis'] = 'Execution ledger model-specific list-rate estimate; not invoice reconciled.'
     run["events"] = event_intel_store.get_events(run_id)
     run["participants"] = event_intel_store.get_participants(run_id)
     # Always sent, never conditionally. The list of pages that could NOT be
@@ -9112,7 +9118,11 @@ def event_conference_intelligence_run_detail(run_id):
         run = event_intel_report.present_run(
             run, profile, run.get("candidates") or [],
             event_intel_store.get_outcomes(email, profile.get("id")))
-    return jsonify(run)
+    response = jsonify(run)
+    response.headers['Cache-Control'] = 'private, no-store'
+    if request.args.get('download') == '1':
+        response.headers['Content-Disposition'] = f'attachment; filename="event-research-{run_id}.json"'
+    return response
 
 
 @app.route("/p2/b2b-agents/event-conference-intelligence/runs/<int:run_id>/resolve",
