@@ -684,3 +684,16 @@ def test_the_funnel_never_shows_more_kept_than_confirmed(page_script):
     assert nums == [7, 5, 2], nums
     assert nums[0] >= nums[1] >= nums[2]
     assert "3 events already listed under another category" in body
+
+
+@pytest.mark.parametrize('extra', [
+    {'completion_state':'partial'},
+    {'shortfall':[{'category':'side_event','status':'partial','found':0,'required':2,'label':'Side event','why':'Verification unfinished'}]},
+    {'unscored':[{'name':'Unresolved summit','note':'Dates need confirmation'}]},
+])
+def test_incomplete_research_leads_with_provisional_answer(page_script,extra):
+    html = _render(page_script,_recommend([_cand('Winner',90,'P1')],**extra))
+    assert 'Research incomplete' in html
+    answer = re.search(r'<div class="al">(.*?)</div>',html).group(1)
+    assert 'must-attend' not in answer
+    assert 'needs verification' in answer
