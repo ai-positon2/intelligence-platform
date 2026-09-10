@@ -240,7 +240,7 @@ def notes(*, shortfall: list, audit: dict, generic: dict,
 
     if failed:
         add(LEVEL_GAP,
-            "%d of %d category searches did not run" % (len(failed), total_cats),
+            "%d of %d category searches returned no usable result" % (len(failed), total_cats),
             "This list is missing a kind of event rather than having found "
             "none. That is a hole in the analysis, not a finding about the "
             "market. %s"
