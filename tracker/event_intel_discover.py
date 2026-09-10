@@ -1295,6 +1295,7 @@ def search_category(category: str, profile: dict) -> dict:
                 for r in results if r["kind"] == CONFIRM_REJECTED]
     unchecked = [r for r in results if r["kind"] == CONFIRM_UNCHECKED]
     base["rejected"] = rejected
+    base["unverified"] = [{"name": r["name"], "reason": r["reason"]} for r in unchecked]
 
     bits = []
     if unchecked:
@@ -1379,7 +1380,8 @@ def discover(profile: dict) -> dict:
                              # showing two events and letting the reader assume
                              # two were all there ever was.
                              "proposed": r.get("proposed", len(r["events"])),
-                             "rejected": r.get("rejected") or []}
+                             "rejected": r.get("rejected") or [],
+                             "unverified": r.get("unverified") or []}
 
     candidates = merge(by_category, (profile or {}).get("force_exclude"),
                        (profile or {}).get("force_include"))
