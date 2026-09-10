@@ -728,7 +728,7 @@ def test_a_run_that_discovers_nothing_explains_itself(monkeypatch):
     s = fake.runs[1]["summary"]
     assert s["no_candidates"] is True
     assert s["categories_failed"] == 1
-    assert "told apart from a market" in s["note"]
+    assert "do not establish that the market" in s["note"]
 
 
 def test_recommend_without_a_locked_classification_fails_the_run(monkeypatch):
@@ -851,3 +851,13 @@ def test_a_spent_budget_is_its_own_pointer_not_folded_into_the_short_one():
     heads = [n["head"] for n in s["notes"]]
     assert any("used every search allowed" in h for h in heads)
     assert any("under the two-event quota" in h for h in heads)
+
+
+def test_zero_candidates_with_partial_search_is_not_complete_market_evidence(monkeypatch):
+    fake = _FakeStore()
+    _wire(monkeypatch,fake)
+    monkeypatch.setattr(P.event_intel_discover,'discover',lambda p: {
+        'candidates':[], 'categories_failed':0, 'shortfall':[],
+        'statuses':{'side_event':{'status':'partial'}}})
+    P._run_recommend(1,'me@p2.example',PROFILE)
+    assert fake.runs[1]['summary']['completion_state'] == 'partial'

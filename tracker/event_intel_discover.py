@@ -286,8 +286,10 @@ say about their market, return an empty string. A note that describes your \
 own process is dropped, so it costs you the chance to say anything at all.
 
 YOUR SEARCH BUDGET IS {max_uses} SEARCHES. That is a deliberate limit, not an \
-accident, and using every one of it is the expected outcome rather than a \
-problem. When you reach for one more the tool will answer with \
+accident. Stop once you have enough distinct, relevant candidates to answer \
+the request; do not spend searches just to consume the allowance. Reserve \
+room for the final JSON instead of narrating each result. When you reach for \
+one more the tool will answer with \
 `max_uses_exceeded`. That is this budget being enforced. It is not a fault, \
 it is not the tool breaking, and it does not invalidate anything you found \
 before it. Plan for {max_uses} searches and answer with what they gave you.
@@ -403,8 +405,10 @@ of these happened in plain words: the event does not exist, it has been \
 discontinued, it has no edition starting on or after {today}, or you could \
 not find enough to tell. Set `event` to null when you reject.
 
-YOUR SEARCH BUDGET IS {max_uses} SEARCHES for this one event. Using all of \
-them is expected. When you reach for one more the tool answers with \
+YOUR SEARCH BUDGET IS {max_uses} SEARCHES for this one event. Stop when the \
+required facts are supported or a decisive exclusion is established. Leave \
+unknown optional facts null and return the JSON; do not spend searches only \
+to consume the allowance. When you reach for one more the tool answers with \
 `max_uses_exceeded`, which is that budget being enforced rather than anything \
 going wrong, and it takes nothing away from what you already read.
 
@@ -1295,7 +1299,7 @@ def search_category(category: str, profile: dict) -> dict:
     bits = []
     if unchecked:
         bits.append("%d of the %d candidates found here could not be checked "
-                    "at all (%s)."
+                    "to a conclusion (%s)."
                     % (len(unchecked), len(proposals),
                        "; ".join(sorted({u["reason"] for u in unchecked}))[:400]))
     incomplete = [e for e in events if not e.get("facts_complete")]
@@ -1319,7 +1323,7 @@ def search_category(category: str, profile: dict) -> dict:
     if unchecked or found["status"] == STATUS_PARTIAL:
         detail = " ".join(([found["detail"]] if found["status"] == STATUS_PARTIAL
                            else []) + bits)
-        return dict(base, status=STATUS_ERROR, events=[], detail=detail)
+        return dict(base, status=STATUS_PARTIAL, events=[], detail=detail)
 
     # Every candidate was searched and ruled out. That is a finished piece of
     # work and a real finding: this category has nothing UPCOMING here.
