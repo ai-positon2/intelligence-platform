@@ -728,7 +728,7 @@ def test_a_run_that_discovers_nothing_explains_itself(monkeypatch):
     s = fake.runs[1]["summary"]
     assert s["no_candidates"] is True
     assert s["categories_failed"] == 1
-    assert "told apart from a market" in s["note"]
+    assert "do not establish that the market" in s["note"]
 
 
 def test_recommend_without_a_locked_classification_fails_the_run(monkeypatch):
