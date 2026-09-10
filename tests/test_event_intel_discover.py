@@ -1310,6 +1310,8 @@ def test_one_candidate_crashing_does_not_cost_the_others(monkeypatch):
             confirm=confirm)
     r = D.search_category(R.CAT_EMERGING, PROFILE)
     assert [e["name"] for e in r["events"]] == ["Good One"]
+    assert r['unverified'][0]['name'] == 'Bad One'
+    assert r['unverified'][0]['reason']
     assert r["status"] == D.STATUS_ERROR or r["status"] == D.STATUS_PARTIAL
     assert "could not be checked" in r["detail"]
 
