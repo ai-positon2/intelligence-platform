@@ -3144,7 +3144,7 @@
       });
       if (!keys.length) return '';
 
-      var named = 0, confirmed = 0, kept = 0, ruled = [];
+      var named = 0, confirmed = 0, kept = 0, ruled = [], unverified = [];
       keys.forEach(function(k){
         var st = statuses[k];
         named += Number(st.proposed) || 0;
@@ -3153,6 +3153,10 @@
         (st.rejected || []).forEach(function(r){
           ruled.push({name: r.name, reason: r.reason,
                       label: catLabel(k) || st.label});
+        });
+        (st.unverified || []).forEach(function(r){
+          unverified.push({name: r.name, reason: r.reason,
+                           label: catLabel(k) || st.label});
         });
       });
       if (!named) return '';
@@ -3185,8 +3189,15 @@
       if (unchecked) {
         html += '<div class="evi-coverage warn"><span class="ic">!</span><span class="tx">' +
           '<b>' + esc(plural(unchecked, 'candidate')) + ' could not be checked ' +
-          'at all.</b> Those are missing from this list because the check ' +
-          'failed, not because they were found wanting.</span></div>';
+          'to a conclusion.</b> They remain unverified, not because they were found wanting.</span></div>';
+      }
+      if (unverified.length) {
+        html += '<div class="evi-unverified"><h4>Verification unresolved</h4>' +
+          unverified.map(function(r){
+            return '<div class="rr"><span class="rn">' + esc(r.name) + '</span>' +
+              '<span class="rc">' + esc(r.label) + '</span>' +
+              '<span class="rw">' + esc(r.reason) + '</span></div>';
+          }).join('') + '</div>';
       }
       if (ruled.length) {
         html += '<div class="evi-ruled">' + ruled.map(function(r){
@@ -3829,7 +3840,9 @@
         html += '<div class="evi-sec"><h3>Not scored</h3><div class="evi-note">' +
           'Left out of the ranking rather than ranked low.</div><div class="evi-cut">' +
           s.unscored.map(function(e){
-            return '<span class="cutp">' + esc(e.name) + '</span>'; }).join('') +
+            return '<span class="cutp">' + esc(e.name) + '<b>' +
+              esc(e.scoring_note || 'The research did not establish enough evidence to score this event.') +
+              '</b></span>'; }).join('') +
           '</div></div>';
       }
       html += coverageHtml(s);
@@ -3861,7 +3874,7 @@
               return plural(k, 'event') + ' cleared the bar and ' + l +
                      ' more worth a look, from ' + (s.discovered || 0) + ' found';
             })()
-          : (STAGES[run.stage] || 'Working.');
+          : (run.status === 'failed' ? (run.stage === 'cancelled' ? 'Cancelled' : 'Research failed') : (STAGES[run.stage] || 'Working.'));
       var html = '';
       if (run.status === 'failed') {
         html += '<div class="evi-err">' + esc(run.error || 'This run failed.') + '</div>';
@@ -4034,7 +4047,7 @@
       document.getElementById('drawerSub').textContent =
         run.status === 'complete'
           ? (c.kept || 0) + ' of ' + (c.roster || 0) + ' companies cleared the ICP floor'
-          : (STAGES[run.stage] || 'Working.');
+          : (run.status === 'failed' ? (run.stage === 'cancelled' ? 'Cancelled' : 'Research failed') : (STAGES[run.stage] || 'Working.'));
 
       var html = '';
       if (run.status === 'failed') {
