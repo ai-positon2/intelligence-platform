@@ -280,6 +280,8 @@ def ledger(run_id,email):
         job['runtime_versions'] = job['payload'].get('runtime_versions')
         job['code_version'] = job.pop('payload').get('code_version')
         job['billing_status'] = 'usage reported where available; not reconciled to provider invoice'
+        from .event_intel_costs import estimate
+        job['cost_estimate'] = estimate(job['calls'])
         return job
 
 
