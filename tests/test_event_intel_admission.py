@@ -100,3 +100,88 @@ def test_pipeline_keeps_unsupported_event_out_of_scoring_and_reports_why(monkeyp
     assert summary['source_admission'][0]['reasons']
     assert 'parent-event dates' in str(summary)
     assert summary['completion_state'] != 'complete'
+
+
+@pytest.mark.parametrize('name,text', [
+    ('CMO Summit 2027','CMO Summit: May 11–12, 2027'),
+    ('CMO Summit (CMOS)','CMO Summit: May 11–12, 2027'),
+    ('Growth & Marketing Summit','Growth and Marketing Summit: May 11–12, 2027'),
+    ('CMO Summit','CMO-Summit: May 11–12, 2027'),
+])
+def test_safe_name_variations_keep_literal_identity(name,text):
+    assert A.inspect(dict(EVENT,name=name),lambda url: page(text))['reasons'] == []
+
+
+@pytest.mark.parametrize('text', [
+    'Parent Conference May 11–12, 2027. CMO Summit dates to be announced.',
+    'CMO Summit Europe May 11–12, 2027',
+    'Old CMO Summit [https://event.example/CMO-Summit-May-11-12-2027]',
+    'CMO Summit 2026. Parent Conference May 11–12, 2027.',
+])
+def test_neighbor_or_different_edition_cannot_supply_dates(text):
+    assert A.inspect(EVENT,lambda url: page(text))['reasons']
+
+
+def test_shared_year_cross_month_date_range():
+    event = dict(EVENT,starts_on='2027-05-31',ends_on='2027-06-02')
+    assert A.inspect(event,lambda url: page('CMO Summit May 31–June 2, 2027'))['reasons'] == []
+
+
+@pytest.mark.parametrize('copy', [
+    'Hotel room block is sold out. Event registration is open.',
+    'VIP passes are sold out. General admission is open.',
+    'VIP dinner is invite-only. General admission is open.',
+])
+def test_explicit_other_inventory_does_not_close_general_event(copy):
+    r=A.inspect(EVENT,lambda url: page('CMO Summit May 11–12, 2027. '+copy))
+    assert r['reasons'] == []
+    assert r['checks'][0]['access_observations']
+
+
+def test_unknown_tier_access_remains_unresolved():
+    assert A.inspect(EVENT,lambda url: page('CMO Summit May 11–12, 2027. VIP passes sold out.'))['reasons']
+
+
+def test_duplicate_fragment_does_not_use_second_source_slot():
+    event=dict(EVENT,sources=[EVENT['website']+'#agenda','https://event.example/details'])
+    fetch=Mock(side_effect=lambda url: page('CMO Summit May 11–12, 2027') if url.endswith('details') else page('No dated announcement'))
+    assert A.inspect(event,fetch)['reasons'] == []
+    assert fetch.call_args_list[-1].args[0] == 'https://event.example/details'
+
+
+def test_dynamic_fallback_records_evidence_without_admitting_it():
+    r=A.inspect(EVENT,lambda url: page('CMO Summit May 11–12, 2027. Please enable JavaScript.',spa='root'))
+    assert r['reasons']
+    assert r['checks'][0]['read_mode'] == 'javascript_fallback'
+    assert r['checks'][0]['snapshot']['text_sha256']
+
+
+@pytest.mark.parametrize('copy',['Application required','Subject to approval'])
+def test_application_condition_is_not_confirmed_client_access(copy):
+    assert A.inspect(EVENT,lambda url: page('CMO Summit May 11–12, 2027. '+copy))['reasons']
+
+
+def test_other_inventory_exception_cannot_hide_event_closure():
+    text='CMO Summit May 11–12, 2027. Hotel room block sold out. Event registration is open. CMO Summit is cancelled.'
+    assert A.inspect(EVENT,lambda url: page(text))['reasons']
+
+
+def test_intervening_sentence_cannot_transfer_parent_dates():
+    text='CMO Summit is planned. Parent Conference May 11–12, 2027.'
+    assert A.inspect(EVENT,lambda url: page(text))['reasons']
+
+
+def test_conflicting_year_in_candidate_name_is_not_normalized_away():
+    event=dict(EVENT,name='CMO Summit 2026')
+    assert A.inspect(event,lambda url: page('CMO Summit 2026 May 11–12, 2027'))['reasons']
+
+
+def test_registration_call_to_action_keeps_nearby_named_event():
+    text='CMO Summit 2027. Choose your pass to join us May 11–12, 2027.'
+    assert A.inspect(EVENT,lambda url: page(text))['reasons'] == []
+
+
+def test_parent_general_admission_does_not_unlock_named_vip_dinner():
+    event=dict(EVENT,name='VIP Dinner')
+    text='VIP Dinner May 11–12, 2027. VIP dinner is invite-only. General admission is open.'
+    assert A.inspect(event,lambda url: page(text))['reasons']
