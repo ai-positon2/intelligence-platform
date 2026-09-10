@@ -672,6 +672,28 @@ def test_no_warning_when_every_candidate_reached_a_verdict(page_script):
     assert "could not be checked" not in body
 
 
+def test_unscored_events_show_escaped_evidence_reasons(page_script):
+    body = _render(page_script, _recommend([], unscored=[
+        {'name':'Partner day', 'scoring_note':'Eligibility <unverified> & registration closed.'},
+        {'name':'Legacy event'},
+    ]))
+    assert 'Eligibility &lt;unverified&gt; &amp; registration closed.' in body
+    assert 'The research did not establish enough evidence to score this event.' in body
+    assert '<unverified>' not in body
+
+
+def test_unverified_candidate_reasons_are_separate_from_rejections(page_script):
+    statuses = _statuses(industry_flagship=(2, 1, 1, []))
+    statuses['industry_flagship']['unverified'] = [
+        {'name':'Pending summit', 'reason':'Source <unreadable>'}]
+    body = _render(page_script, _recommend([], statuses=statuses))
+    assert 'Verification unresolved' in body
+    assert 'Pending summit' in body
+    assert 'Source &lt;unreadable&gt;' in body
+    assert 'at all.' not in body
+    assert 'class="evi-ruled"' not in body
+
+
 def test_the_funnel_never_shows_more_kept_than_confirmed(page_script):
     """Dedup happens after confirmation, so kept is confirmed minus the events
     already listed under another category. A funnel that widened would mean
@@ -697,3 +719,12 @@ def test_incomplete_research_leads_with_provisional_answer(page_script,extra):
     answer = re.search(r'<div class="al">(.*?)</div>',html).group(1)
     assert 'must-attend' not in answer
     assert 'needs verification' in answer
+
+
+@pytest.mark.parametrize('mode', ['recommend', 'workroom'])
+@pytest.mark.parametrize('stage,label', [('cancelled','Cancelled'), ('discovering','Research failed')])
+def test_terminal_research_does_not_say_working(page_script, mode, stage, label):
+    parts = _render_parts(page_script, dict(id=9, mode=mode, status='failed',
+        stage=stage, query='Position2', error='Stopped', summary={}))
+    assert parts['sub'] == label
+    assert 'Stopped' in parts['body']
