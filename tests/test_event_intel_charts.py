@@ -728,3 +728,11 @@ def test_terminal_research_does_not_say_working(page_script, mode, stage, label)
         stage=stage, query='Position2', error='Stopped', summary={}))
     assert parts['sub'] == label
     assert 'Stopped' in parts['body']
+
+
+def test_unscored_report_reads_pipeline_persisted_note(page_script):
+    body = _render(page_script, _recommend([], unscored=[
+        {'name':'Partner Day', 'note':'Access restricted: partner eligibility is unverified.'}
+    ]))
+    assert 'Access restricted: partner eligibility is unverified.' in body
+    assert 'The research did not establish enough evidence' not in body
