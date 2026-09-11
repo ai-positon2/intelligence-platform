@@ -264,7 +264,7 @@ def test_run_platform_collection_caps_every_platform_the_same(monkeypatch):
     monkeypatch.setattr(sci_store, "upsert_posts",
                         lambda run_id, platform, posts: written.setdefault(platform, len(posts)))
     posts = [{"platform_post_id": str(i), "posted_at": "2026-09-01T00:00:00Z"} for i in range(60)]
-    monkeypatch.setattr(sci_pipeline, "_collect_youtube", lambda h: (posts, "youtube_api"))
+    monkeypatch.setattr(sci_pipeline, "_collect_youtube", lambda h: (posts, "youtube_api", "chan1"))
     sci_pipeline.run_platform_collection(1, "youtube", "@acme")
     assert written["youtube"] == sci_pipeline.MAX_POSTS_PER_PLATFORM, \
         "youtube was not capped to the shared per-platform limit"

@@ -456,6 +456,81 @@ _PLATFORM_RUN_COLUMNS = ["id", "run_id", "platform", "handle", "handle_confidenc
                          "window_end", "collected_at", "analyzed_at", "error",
                          "created_at", "updated_at", "source_vendor", "profile_url"]
 
+# Statuses where run_platform_collection actually reached the page (even
+# "no_presence" means the page answered, just with nothing in it) -- as
+# opposed to "identifying"/"handle_not_found"/"scrape_failed", where nothing
+# was ever confirmed and a guessed link would be worse than none.
+_COLLECTED_STATUSES = {"ok", "low_activity", "no_presence"}
+
+
+def canonical_profile_url(platform: str, handle: str | None, note: dict | None = None,
+                          youtube_channel_id: str | None = None) -> str | None:
+    """The confirmed profile URL for a platform + handle that a collection
+    just succeeded against (or, read-time, that a past collection recorded a
+    handle for) -- built from the SAME identifier that actually fetched
+    posts, not the identify step's own pre-collection guess.
+
+    Why this exists at all: identify_handles() is a language model told to
+    return a profile_url alongside each handle, and it does not reliably do
+    so -- a handle can resolve, collection can succeed and return real posts,
+    and profile_url still comes back empty. That used to mean "Every account,
+    in one place" showed LINK NOT CAPTURED next to a platform whose post
+    count proved the account WAS found. This is the fix: once a platform's
+    posts are in hand, the handle that fetched them is the one thing this run
+    has actually verified, so the link is built from that instead of trusted
+    to a pre-collection guess.
+
+    LinkedIn and YouTube need help beyond the bare handle:
+      - `note` is sci_source_linkedin_unipile.collect_with_page's return value
+        (or None on the Apify path / at read time for an old row). Its
+        "public_identifier" is the vanity slug LinkedIn's own API confirmed
+        for the exact page posts were read from -- more trustworthy than the
+        raw handle, which identify's language model is free to hand back as
+        "position2", "@position2", "company/position2", or a full URL (see
+        sci_source_linkedin_unipile.company_slug). Without a note, that same
+        slug-normalization is applied to the raw handle offline, which is
+        weaker (no live confirmation the page exists) but still far better
+        than nothing for an old row this function is backfilling at read
+        time.
+      - `youtube_channel_id` is the id resolve_channel() already resolved
+        during collection. There is no offline way to derive it from a bare
+        handle (it can be a channel id, an @handle, a company name guess, or
+        a full URL -- disambiguating those is exactly what the YouTube API
+        call does), so a caller that cannot supply it (the read-time
+        fallback, backfilling an old row from stored columns alone) gets
+        None back for YouTube rather than a guess that might point at the
+        wrong channel or nowhere at all.
+
+    Returns None whenever nothing safe can be built, on purpose: the caller
+    treats that as "leave the previously stored value alone", never as
+    "overwrite it with nothing"."""
+    if platform == "youtube":
+        return f"https://www.youtube.com/channel/{youtube_channel_id}" if youtube_channel_id else None
+    if platform == "linkedin":
+        slug = (note or {}).get("public_identifier")
+        if not slug:
+            from tracker.sci_source_linkedin_unipile import company_slug
+            slug = company_slug(handle or "")
+        return f"https://www.linkedin.com/company/{slug}/" if slug else None
+    h = (handle or "").strip()
+    if h.lower().startswith("http"):
+        return h
+    h = h.lstrip("@")
+    if not h:
+        return None
+    if platform == "instagram":
+        return f"https://www.instagram.com/{h}/"
+    if platform == "facebook":
+        return f"https://www.facebook.com/{h}/"
+    if platform == "tiktok":
+        return f"https://www.tiktok.com/@{h}"
+    if platform == "x":
+        return f"https://x.com/{h}"
+    if platform == "reddit":
+        u = h[2:] if h.lower().startswith("u/") else h
+        return f"https://www.reddit.com/user/{u}/"
+    return None
+
 
 def upsert_platform_run(run_id: int, platform: str, **fields: Any) -> int | None:
     """Create-or-update the one row for (run_id, platform). Not ownership-
@@ -522,6 +597,17 @@ def get_platform_runs(run_id: int) -> list[dict]:
             d = dict(zip(_PLATFORM_RUN_COLUMNS, row))
             _ts(d, "last_post_at", "window_start", "window_end", "collected_at",
                 "analyzed_at", "created_at", "updated_at")
+            # Backfill for a row from before this fix: run_platform_collection
+            # now stores a confirmed profile_url itself (see sci_pipeline.py),
+            # but a run analyzed before that ships can still have posts and a
+            # handle with no link -- recompute one offline rather than leaving
+            # every pre-existing report stuck showing LINK NOT CAPTURED next
+            # to a platform whose own post count proves the account was
+            # found. No live confirmation happens here (see
+            # canonical_profile_url's docstring on the LinkedIn/YouTube
+            # gap), so this stays a fallback, never touching what's stored.
+            if not d.get("profile_url") and d.get("handle") and d.get("status") in _COLLECTED_STATUSES:
+                d["profile_url"] = canonical_profile_url(d["platform"], d["handle"])
             out.append(d)
         return out
     except Exception as e:

@@ -377,6 +377,128 @@ def test_profile_url_round_trips_through_upsert_platform_run(fake_db):
     assert rows[0]["profile_url"] == "https://instagram.com/acme"
 
 
+# ── canonical_profile_url ────────────────────────────────────────────────────
+# The bug this whole function exists to fix: identify_handles() is a language
+# model told to return a profile_url alongside each handle, and it does not
+# reliably do so. A handle can resolve, collection can succeed with real
+# posts, and profile_url still comes back empty -- "Every account, in one
+# place" then shows LINK NOT CAPTURED next to a platform whose own post count
+# proves the account was found. This builds the link instead from the handle
+# that actually fetched those posts.
+
+@pytest.mark.parametrize("platform,handle,expected", [
+    ("instagram", "acme", "https://www.instagram.com/acme/"),
+    ("instagram", "@acme", "https://www.instagram.com/acme/"),
+    ("facebook", "Acme.Co", "https://www.facebook.com/Acme.Co/"),
+    ("tiktok", "@acmeco", "https://www.tiktok.com/@acmeco"),
+    ("x", "@acme", "https://x.com/acme"),
+    ("reddit", "u/acmeco", "https://www.reddit.com/user/acmeco/"),
+    ("reddit", "acmeco", "https://www.reddit.com/user/acmeco/"),
+])
+def test_canonical_profile_url_builds_the_right_shape_per_platform(platform, handle, expected):
+    assert store.canonical_profile_url(platform, handle) == expected
+
+
+def test_canonical_profile_url_passes_through_a_handle_that_is_already_a_url():
+    """identify's language model is free to hand back a full URL as "handle"
+    for any platform, not just LinkedIn (see company_slug's own docstring) --
+    wrapping one in another platform's template would double it up into
+    garbage like https://www.instagram.com/https://instagram.com/acme/."""
+    url = "https://www.instagram.com/acme.official/"
+    assert store.canonical_profile_url("instagram", url) == url
+
+
+def test_canonical_profile_url_is_none_for_an_empty_handle():
+    assert store.canonical_profile_url("instagram", "") is None
+    assert store.canonical_profile_url("instagram", None) is None
+
+
+def test_canonical_profile_url_is_none_for_an_unknown_platform():
+    assert store.canonical_profile_url("mastodon", "acme") is None
+
+
+def test_canonical_profile_url_linkedin_prefers_the_confirmed_slug_from_the_note():
+    """note["public_identifier"] is LinkedIn's own API confirming which page
+    was actually read -- more trustworthy than the raw handle, which
+    identify's language model can hand back as "position2", "@position2",
+    "company/position2", or a full URL."""
+    url = store.canonical_profile_url(
+        "linkedin", "some raw guess identify made", note={"public_identifier": "acme-corp"})
+    assert url == "https://www.linkedin.com/company/acme-corp/"
+
+
+def test_canonical_profile_url_linkedin_falls_back_to_the_handle_without_a_note():
+    """No note (the Apify path, or a read-time backfill with nothing but the
+    stored handle) still gets a link, normalized the same way
+    sci_source_linkedin_unipile.company_slug normalizes it everywhere else."""
+    assert (store.canonical_profile_url("linkedin", "company/acme-corp/")
+            == "https://www.linkedin.com/company/acme-corp/")
+
+
+def test_canonical_profile_url_youtube_needs_the_resolved_channel_id():
+    """There is no offline way to turn identify's raw "handle" guess into a
+    channel URL -- it can be a channel id, an @handle, a company-name guess,
+    or a full URL, and disambiguating those is exactly what the YouTube API
+    call already did during collection. Without that resolved id, this
+    returns None rather than a guess that might point at the wrong channel."""
+    assert store.canonical_profile_url("youtube", "@acmeco") is None
+    assert (store.canonical_profile_url("youtube", "@acmeco", youtube_channel_id="UC12345")
+            == "https://www.youtube.com/channel/UC12345")
+
+
+# ── get_platform_runs' read-time fallback ────────────────────────────────────
+
+def test_get_platform_runs_backfills_a_missing_link_for_a_pre_fix_row(fake_db):
+    """The actual screenshot this guards against: a row from before
+    run_platform_collection started storing profile_url itself, with real
+    posts and a real handle, but no link -- must not keep reading as LINK NOT
+    CAPTURED forever."""
+    run_id = store.save_run("alice@position2.com", "Acme Inc")
+    store.upsert_platform_run(run_id, "instagram", status="ok", post_count=20, handle="acmeco")
+    rows = store.get_platform_runs(run_id)
+    assert rows[0]["profile_url"] == "https://www.instagram.com/acmeco/"
+
+
+def test_get_platform_runs_never_overwrites_an_already_stored_link(fake_db):
+    run_id = store.save_run("alice@position2.com", "Acme Inc")
+    store.upsert_platform_run(run_id, "instagram", status="ok", post_count=20, handle="acmeco",
+                              profile_url="https://www.instagram.com/the.real.page/")
+    rows = store.get_platform_runs(run_id)
+    assert rows[0]["profile_url"] == "https://www.instagram.com/the.real.page/"
+
+
+@pytest.mark.parametrize("status", ["identifying", "handle_not_found", "scrape_failed", "collecting"])
+def test_get_platform_runs_does_not_backfill_a_status_that_never_confirmed_the_page(fake_db, status):
+    """A handle can be stored long before anything about it is confirmed
+    (identifying), or after collection outright failed (scrape_failed) -- in
+    neither case has this run actually verified the handle points anywhere,
+    so guessing a link would be worse than leaving it blank."""
+    run_id = store.save_run("alice@position2.com", "Acme Inc")
+    store.upsert_platform_run(run_id, "instagram", status=status, handle="acmeco")
+    rows = store.get_platform_runs(run_id)
+    assert rows[0]["profile_url"] is None
+
+
+def test_get_platform_runs_backfills_no_presence_too(fake_db):
+    """no_presence means the page answered with nothing in it, not that
+    nothing was ever confirmed -- the link is still worth showing."""
+    run_id = store.save_run("alice@position2.com", "Acme Inc")
+    store.upsert_platform_run(run_id, "facebook", status="no_presence", post_count=0, handle="acmeco")
+    rows = store.get_platform_runs(run_id)
+    assert rows[0]["profile_url"] == "https://www.facebook.com/acmeco/"
+
+
+def test_get_platform_runs_leaves_youtube_unbackfilled_without_a_channel_id(fake_db):
+    """The one gap this fallback can't close: a pre-fix YouTube row has no
+    resolved channel id stored anywhere, and the raw handle alone isn't
+    enough to build a trustworthy link (see canonical_profile_url). Re-
+    analyzing is what fixes an old YouTube row; this fallback can't."""
+    run_id = store.save_run("alice@position2.com", "Acme Inc")
+    store.upsert_platform_run(run_id, "youtube", status="ok", post_count=22, handle="@acmeco")
+    rows = store.get_platform_runs(run_id)
+    assert rows[0]["profile_url"] is None
+
+
 def test_one_platform_failing_does_not_touch_another_platforms_row(fake_db):
     run_id = store.save_run("alice@position2.com", "Acme Inc")
     store.upsert_platform_run(run_id, "instagram", status="ok", post_count=5)
