@@ -118,7 +118,7 @@ def _load_ledger() -> dict:
     return {
         "_readme": (
             "Source-of-truth ledger for the Job Change Alert page "
-            "(/p2/b2b-agents/job-change-alert). scripts/sync_job_change_alerts.py "
+            "(/p2/strategic-agents/job-change-alert). scripts/sync_job_change_alerts.py "
             "appends new events here on every sync and keeps data/job_change_alerts.db "
             "in lockstep -- this file is the one to hand-edit/audit, the .db is derived."
         ),

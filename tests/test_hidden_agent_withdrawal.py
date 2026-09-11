@@ -71,12 +71,12 @@ def _rendered(client, path):
 # ── The three surfaces the owner named ──────────────────────────────────────
 
 def test_the_b2b_agents_dashboard_does_not_list_it(client):
-    assert _NAME not in _rendered(client, "/p2/b2b-agents")
+    assert _NAME not in _rendered(client, "/p2/strategic-agents")
 
 
 def test_the_b2b_agents_dashboard_still_lists_the_others(client):
     """The mirror. A card grid that lost every card would pass the test above."""
-    body = _rendered(client, "/p2/b2b-agents")
+    body = _rendered(client, "/p2/strategic-agents")
     for name in ("LinkedIn Intelligence", "Contact Finder", "Anonymous Visitors"):
         assert name in body, "%s went missing too" % name
 
@@ -84,10 +84,10 @@ def test_the_b2b_agents_dashboard_still_lists_the_others(client):
 def test_the_command_palette_does_not_offer_it(client):
     """Ctrl+K is a second listing on the same page and was missed the first time
     a card was pulled from it. The card and the palette entry hide together."""
-    body = _rendered(client, "/p2/b2b-agents")
+    body = _rendered(client, "/p2/strategic-agents")
     palette = body.split("var BASE=", 1)[1].split("];", 1)[0]
     assert _SLUG not in palette
-    assert "/p2/b2b-agents/linkedin-intelligence" in palette, "the palette emptied out"
+    assert "/p2/strategic-agents/linkedin-intelligence" in palette, "the palette emptied out"
 
 
 def test_the_app_workspace_does_not_list_it(client):
@@ -135,7 +135,7 @@ def test_the_agent_page_itself_still_resolves():
     Sentiment Pulse, which was pulled because its data was fake and therefore
     also had its route abort(404)ed."""
     rules = {str(r) for r in appmod.app.url_map.iter_rules()}
-    assert "/p2/b2b-agents/" + _SLUG in rules
+    assert "/p2/strategic-agents/" + _SLUG in rules
 
 
 def test_the_registry_entry_is_untouched():

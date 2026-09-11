@@ -49,7 +49,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import app as appmod  # noqa: E402
 import tracker.apollo_client as ac  # noqa: E402
 
-_CHAT = "/p2/b2b-agents/company-people-intelligence/chat"
+_CHAT = "/p2/strategic-agents/company-people-intelligence/chat"
 _ROLE = {"found": True, "name": "Julie Woods-Moss",
          "title": "Chief Marketing Officer",
          "source": "https://www.thoughtworks.com/en-us/profiles/leaders/julie-woods-moss"}

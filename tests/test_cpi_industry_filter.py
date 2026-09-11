@@ -199,14 +199,14 @@ def test_the_company_search_still_asks_apollo_broadly(client, monkeypatch):
     """The keyword-tag parameter is a useful recall net and stays. It is the
     guarantee that moves into code, not the request."""
     calls = _stub(monkeypatch, _REPORTED_PAGE)
-    client.post("/p2/b2b-agents/company-people-intelligence/search",
+    client.post("/p2/strategic-agents/company-people-intelligence/search",
                 json={"entity": "companies", "filters": {"industries": ["Healthcare"]}})
     assert calls["companies"][0]["q_organization_keyword_tags"] == ["Healthcare"]
 
 
 def test_the_company_search_returns_only_the_industry_asked_for(client, monkeypatch):
     _stub(monkeypatch, _REPORTED_PAGE)
-    r = client.post("/p2/b2b-agents/company-people-intelligence/search",
+    r = client.post("/p2/strategic-agents/company-people-intelligence/search",
                     json={"entity": "companies",
                           "filters": {"industries": ["Healthcare"]}})
     out = r.get_json()
@@ -223,7 +223,7 @@ def test_apollos_total_is_dropped_once_we_filter_it_ourselves(client, monkeypatc
     """"9.9K matches in Apollo" counted Apollo's looser match. Reporting it beside
     a page we just pruned overstates the real number by whatever we removed."""
     _stub(monkeypatch, _REPORTED_PAGE)
-    r = client.post("/p2/b2b-agents/company-people-intelligence/search",
+    r = client.post("/p2/strategic-agents/company-people-intelligence/search",
                     json={"entity": "companies",
                           "filters": {"industries": ["Healthcare"]}})
     assert r.get_json()["total"] is None
@@ -233,7 +233,7 @@ def test_an_unfiltered_company_search_keeps_its_total(client, monkeypatch):
     """The other side of that: without an industry filter there is nothing to
     prune, so Apollo's own count is still the honest one."""
     _stub(monkeypatch, _REPORTED_PAGE)
-    r = client.post("/p2/b2b-agents/company-people-intelligence/search",
+    r = client.post("/p2/strategic-agents/company-people-intelligence/search",
                     json={"entity": "companies", "filters": {"name": "Acme"}})
     out = r.get_json()
     assert out["total"] == 9900
@@ -252,7 +252,7 @@ def test_people_are_filtered_by_their_employers_industry(client, monkeypatch):
     people = [_person("1", "o1"), _person("2", "o2"), _person("3", "o3"),
               _person("4", "o4")]
     _stub(monkeypatch, _REPORTED_PAGE, people)
-    r = client.post("/p2/b2b-agents/company-people-intelligence/search",
+    r = client.post("/p2/strategic-agents/company-people-intelligence/search",
                     json={"entity": "people",
                           "filters": {"titles": ["VP"], "industries": ["Healthcare"]}})
     out = r.get_json()
@@ -269,7 +269,7 @@ def test_a_persons_employer_is_judged_on_its_full_classification(client, monkeyp
            "industry": "information technology & services",
            "industries": ["hospital & health care"]}
     _stub(monkeypatch, [org], [_person("9", "o9")])
-    r = client.post("/p2/b2b-agents/company-people-intelligence/search",
+    r = client.post("/p2/strategic-agents/company-people-intelligence/search",
                     json={"entity": "people",
                           "filters": {"titles": ["VP"], "industries": ["Healthcare"]}})
     out = r.get_json()
@@ -282,7 +282,7 @@ def test_an_industry_search_turns_the_company_lookup_back_on(client, monkeypatch
     described before the filter can be honored. Asking for an industry and no
     company detail is a contradiction, and the filter that was typed wins."""
     _stub(monkeypatch, _REPORTED_PAGE, [_person("1", "o1"), _person("3", "o3")])
-    r = client.post("/p2/b2b-agents/company-people-intelligence/search",
+    r = client.post("/p2/strategic-agents/company-people-intelligence/search",
                     json={"entity": "people",
                           "filters": {"titles": ["VP"], "industries": ["Healthcare"],
                                       "company_detail": False}})
@@ -296,7 +296,7 @@ def test_the_toggle_is_left_alone_when_no_industry_is_asked_for(client, monkeypa
     """Forcing it must be specific to the contradiction, not a way to quietly
     ignore the toggle."""
     _stub(monkeypatch, _REPORTED_PAGE, [_person("1", "o1")])
-    r = client.post("/p2/b2b-agents/company-people-intelligence/search",
+    r = client.post("/p2/strategic-agents/company-people-intelligence/search",
                     json={"entity": "people",
                           "filters": {"titles": ["VP"], "company_detail": False}})
     out = r.get_json()

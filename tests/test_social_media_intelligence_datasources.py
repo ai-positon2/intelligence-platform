@@ -35,7 +35,7 @@ import app as appmod  # noqa: E402
 pytestmark = pytest.mark.skipif(shutil.which("node") is None,
                                 reason="node is needed to execute the page script")
 
-_PAGE = "/p2/b2b-agents/social-media-intelligence"
+_PAGE = "/p2/strategic-agents/social-media-intelligence"
 
 
 def _page_html():

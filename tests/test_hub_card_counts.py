@@ -53,8 +53,8 @@ def dashboard_cards():
 def hub_card():
     with open(_HUB) as fh:
         body = _strip_comments(fh.read())
-    # The B2B Agents card, up to the start of the next card.
-    block = body.split('href="/p2/b2b-agents"', 1)[1].split("</a>", 1)[0]
+    # The Strategic Agents card, up to the start of the next card.
+    block = body.split('href="/p2/strategic-agents"', 1)[1].split("</a>", 1)[0]
     stats = dict((label, int(n)) for n, label in
                  re.findall(r'class="card-stat"><span>(\d+)</span>\s*(\w+)', block))
     desc = re.sub(r"\s+", " ",
@@ -110,7 +110,7 @@ def test_linkedin_playbook_studio_is_one_of_the_live_dashboards(dashboard_cards)
 # ── The prose ───────────────────────────────────────────────────────────────
 
 def test_the_card_is_named_b2b_agents(hub_card):
-    assert hub_card["title"] == "B2B Agents"
+    assert hub_card["title"] == "Strategic Agents"
 
 
 def test_the_description_mentions_contact_lookup(hub_card):
@@ -219,7 +219,7 @@ def test_the_hub_band_dashboard_total_matches_the_live_cards(hub_card, dashboard
 
 
 def test_the_card_copy_makes_no_unverifiable_headcount_claim(hub_card):
-    """The B2B Agents card cites no company figure of its own. The two places that
+    """The Strategic Agents card cites no company figure of its own. The two places that
     do quote one (the band below, and the ABM card on the dashboard page) now both
     derive it from the dashboards, which is what stopped them disagreeing; adding a
     third hardcoded figure here would restart the problem."""

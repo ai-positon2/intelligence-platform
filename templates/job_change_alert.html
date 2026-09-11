@@ -28,7 +28,7 @@
       </a>
       <div class="bc">
         <a href="/p2/hub">Hub</a><span class="bc-sep">›</span>
-        <a href="/p2/b2b-agents">B2B Agents</a><span class="bc-sep">›</span>
+        <a href="/p2/strategic-agents">Strategic Agents</a><span class="bc-sep">›</span>
         <span class="bc-cur">Job Change Alert</span>
       </div>
     </div>
@@ -54,7 +54,7 @@
   <div class="main">
     <div class="ph">
       <div>
-        <div class="eyebrow">B2B Agents · Decision-maker signals</div>
+        <div class="eyebrow">Strategic Agents · Decision-maker signals</div>
         <h1>Job Change Alert</h1>
         <p>Key people at target accounts who recently started a new role — the best time to reach out is within days of a job change — plus the full roster of people and companies being watched for the next one.</p>
       </div>
@@ -415,7 +415,7 @@
     document.addEventListener('keydown',function(e){ if(e.key==='Escape')closeDrawer(); });
 
     function loadEvents(){
-      fetch('/p2/b2b-agents/job-change-alert/data').then(function(r){return r.json();}).then(function(data){
+      fetch('/p2/strategic-agents/job-change-alert/data').then(function(r){return r.json();}).then(function(data){
         EVENTS=data.events||[];
         countUp(document.getElementById('statEvents'),data.total||0);
         var cutoff=Date.now()-7*86400000;
@@ -433,7 +433,7 @@
     function loadTracked(){
       if(TRACKED||TRACKED_LOADING)return;
       TRACKED_LOADING=true;
-      fetch('/p2/b2b-agents/job-change-alert/tracked').then(function(r){return r.json();}).then(function(data){
+      fetch('/p2/strategic-agents/job-change-alert/tracked').then(function(r){return r.json();}).then(function(data){
         TRACKED=data;
         TRACKED_LOADING=false;
         countUp(document.getElementById('statPeople'),(data.totals&&data.totals.contacts)||0);
@@ -830,7 +830,7 @@
     function runSync(){
       var btn=document.getElementById('syncBtn'), msg=document.getElementById('syncMsg');
       btn.disabled=true; btn.classList.add('spinning'); msg.className='sync-msg'; msg.textContent='Syncing…';
-      fetch('/p2/b2b-agents/job-change-alert/sync',{method:'POST'}).then(function(r){return r.json();}).then(function(data){
+      fetch('/p2/strategic-agents/job-change-alert/sync',{method:'POST'}).then(function(r){return r.json();}).then(function(data){
         btn.disabled=false; btn.classList.remove('spinning');
         if(data.ok){
           msg.className='sync-msg ok'; msg.textContent='Synced — '+(data.added||0)+' new event(s).';
@@ -856,17 +856,17 @@
   if(window.__kpal)return;window.__kpal=1;
   var BASE=[
     {t:'Hub',d:'Platform home',u:'/p2/hub',i:'⌂'},
-    {t:'B2B Agents',d:'Go-to-market intelligence',u:'/p2/b2b-agents',i:'◎'},
+    {t:'Strategic Agents',d:'Go-to-market intelligence',u:'/p2/strategic-agents',i:'◎'},
     {t:'SEO Tools',d:'Organic intelligence',u:'/p2/seo',i:'⌕'},
     {t:'ABM Signal Tracker — Healthcare',d:'Company signals & insights',u:'/p2/abm-signal-tracker/healthcare',i:'☆'},
     {t:'ABM Signal Tracker — CSG',d:'Company signals & insights',u:'/p2/abm-signal-tracker/csg',i:'☆'},
-    {t:'LinkedIn Intelligence',d:'People, companies & posts',u:'/p2/b2b-agents/linkedin-intelligence',i:'⦿'},
-    {t:'Ad Intelligence',d:'Competitor ad monitoring',u:'/p2/b2b-agents/ad-intelligence',i:'◈'},
-    {t:'Anonymous Visitors',d:'Website visitor signals',u:'/p2/b2b-agents/anonymous-visitors',i:'◌'},
-    {t:'Job Change Alert',d:'Decision-maker job changes',u:'/p2/b2b-agents/job-change-alert',i:'⇉'},
-    {t:'LinkedIn Strategy Researcher',d:'Competitive strategy playbooks',u:'/p2/b2b-agents/linkedin-strategy-researcher',i:'▤'},
-    {t:'42 North Dental Slot Checker',d:'Appointment availability',u:'/p2/b2b-agents/42-north-dental-slot-checker',i:'◷'},
-    {t:'Social Media Intelligence',d:'Cross-platform social analysis',u:'/p2/b2b-agents/social-media-intelligence',i:'▣'},
+    {t:'LinkedIn Intelligence',d:'People, companies & posts',u:'/p2/strategic-agents/linkedin-intelligence',i:'⦿'},
+    {t:'Ad Intelligence',d:'Competitor ad monitoring',u:'/p2/strategic-agents/ad-intelligence',i:'◈'},
+    {t:'Anonymous Visitors',d:'Website visitor signals',u:'/p2/strategic-agents/anonymous-visitors',i:'◌'},
+    {t:'Job Change Alert',d:'Decision-maker job changes',u:'/p2/strategic-agents/job-change-alert',i:'⇉'},
+    {t:'LinkedIn Strategy Researcher',d:'Competitive strategy playbooks',u:'/p2/strategic-agents/linkedin-strategy-researcher',i:'▤'},
+    {t:'42 North Dental Slot Checker',d:'Appointment availability',u:'/p2/strategic-agents/42-north-dental-slot-checker',i:'◷'},
+    {t:'Social Media Intelligence',d:'Cross-platform social analysis',u:'/p2/strategic-agents/social-media-intelligence',i:'▣'},
     {t:'Switch Account',d:'Healthcare / CSG picker',u:'/p2/abm-signal-tracker/accounts',i:'⇄'}
   ];
   var ITEMS=(window.__KP_ITEMS||[]).concat(BASE);

@@ -113,7 +113,7 @@ def test_every_template_carrying_the_roster_names_it_the_same_way():
             if not name.endswith(".html"):
                 continue
             text = io.open(os.path.join(base, name), encoding="utf-8").read()
-            for m in re.finditer(r"\{t:'([^']*)',d:'([^']*)',u:'/p2/b2b-agents/%s'" % _SLUG, text):
+            for m in re.finditer(r"\{t:'([^']*)',d:'([^']*)',u:'/p2/strategic-agents/%s'" % _SLUG, text):
                 title, desc = m.group(1), m.group(2)
                 assert title == _NEW, "%s calls it %r" % (name, title)
                 assert "creative" not in desc.lower(), "%s still describes it as %r" % (name, desc)
@@ -139,7 +139,7 @@ def test_the_alias_is_idempotent_on_the_new_name():
 def test_the_url_is_deliberately_not_aliased():
     """The slug is unchanged, so every historical row already carries the
     current path. An alias here would be rewriting correct data."""
-    path = "/p2/b2b-agents/%s" % _SLUG
+    path = "/p2/strategic-agents/%s" % _SLUG
     assert appmod._page_label(path) == path
 
 
@@ -207,14 +207,14 @@ def test_the_precise_measurement_labels_are_left_alone():
 
 def test_the_new_url_serves_the_page():
     rules = {r.rule for r in appmod.app.url_map.iter_rules()}
-    assert "/p2/b2b-agents/%s" % _SLUG in rules
+    assert "/p2/strategic-agents/%s" % _SLUG in rules
 
 
 def test_the_old_page_url_permanently_redirects_to_the_new_one():
     c = appmod.app.test_client()
-    r = c.get("/p2/b2b-agents/%s" % _OLD_SLUG, follow_redirects=False)
+    r = c.get("/p2/strategic-agents/%s" % _OLD_SLUG, follow_redirects=False)
     assert r.status_code == 301
-    assert r.headers["Location"].endswith("/p2/b2b-agents/%s" % _SLUG)
+    assert r.headers["Location"].endswith("/p2/strategic-agents/%s" % _SLUG)
 
 
 def test_the_redirect_shim_carries_no_auth_decorator_of_its_own():
@@ -222,7 +222,7 @@ def test_the_redirect_shim_carries_no_auth_decorator_of_its_own():
     the destination. A logged-out visitor on an old link should land on the
     new URL and be sent to login from there, not be bounced from the shim."""
     c = appmod.app.test_client()
-    r = c.get("/p2/b2b-agents/%s" % _OLD_SLUG, follow_redirects=False)
+    r = c.get("/p2/strategic-agents/%s" % _OLD_SLUG, follow_redirects=False)
     assert r.status_code == 301  # not 302-to-login
 
 
@@ -234,19 +234,19 @@ def test_the_four_api_paths_answer_on_both_slugs():
     rules = {r.rule for r in appmod.app.url_map.iter_rules()}
     for tail in ("/search", "/analyze", "/runs/<int:run_id>/status", "/runs/<int:run_id>"):
         for slug in (_SLUG, _OLD_SLUG):
-            assert "/p2/b2b-agents/%s%s" % (slug, tail) in rules, (slug, tail)
+            assert "/p2/strategic-agents/%s%s" % (slug, tail) in rules, (slug, tail)
 
 
 def test_the_api_paths_are_not_redirects():
     """If the old API paths were shims, /analyze would break on POST."""
     c = appmod.app.test_client()
-    r = c.post("/p2/b2b-agents/%s/analyze" % _OLD_SLUG, json={}, follow_redirects=False)
+    r = c.post("/p2/strategic-agents/%s/analyze" % _OLD_SLUG, json={}, follow_redirects=False)
     assert r.status_code != 301
 
 
 def test_the_page_javascript_calls_the_new_paths():
     page = _read("templates", "social_media_intelligence.html")
-    assert "var BASE = '/p2/b2b-agents/%s'" % _SLUG in page
+    assert "var BASE = '/p2/strategic-agents/%s'" % _SLUG in page
 
 
 def test_run_counts_and_caps_still_see_runs_logged_under_the_old_slug():
@@ -266,8 +266,12 @@ def test_the_access_request_dedupe_reads_through_the_slug_alias(monkeypatch):
 
 
 def test_page_view_history_folds_on_the_path_axis_too():
+    # This agent's own rename (2026-09-08) predates the section-level rename
+    # to "Strategic Agents" (2026-09-11), so a page view actually logged back
+    # then was recorded under the section's name AT THE TIME: /p2/b2b-agents,
+    # not /p2/strategic-agents. The fold has to cross both renames at once.
     old = "/p2/b2b-agents/%s" % _OLD_SLUG
-    new = "/p2/b2b-agents/%s" % _SLUG
+    new = "/p2/strategic-agents/%s" % _SLUG
     assert appmod._page_label(old) == new
     assert appmod._page_label(old + "/runs/4") == new + "/runs/4"
     assert appmod._page_label(new) == new       # idempotent

@@ -26,7 +26,7 @@
       </a>
       <div class="bc">
         <a href="/p2/hub">Hub</a><span class="bc-sep">›</span>
-        <a href="/p2/b2b-agents">B2B Agents</a><span class="bc-sep">›</span>
+        <a href="/p2/strategic-agents">Strategic Agents</a><span class="bc-sep">›</span>
         <span class="bc-cur">Social Media Intelligence</span>
       </div>
     </div>
@@ -52,7 +52,7 @@
   <div class="main">
     <div class="ph">
       <div>
-        <div class="eyebrow"><span class="dot"></span>B2B Agents · Cross-platform social analysis</div>
+        <div class="eyebrow"><span class="dot"></span>Strategic Agents · Cross-platform social analysis</div>
         <h1>See what a company is really doing on <em>social</em>.</h1>
         <p>Give it a company name or URL. It finds the company's organic presence across seven platforms, then reports what they post and how often, which posts earn engagement, the messaging and tone behind them, what every image and video actually shows, and what people are saying about the brand, all cited back to real posts.</p>
         <div class="ph-platforms" aria-hidden="true">
@@ -159,7 +159,7 @@
 
   <script>
     var POLL_TIMER = null;
-    var BASE = '/p2/b2b-agents/social-media-intelligence';
+    var BASE = '/p2/strategic-agents/social-media-intelligence';
     var IS_ADMIN = {{ 'true' if is_admin else 'false' }};
 
     var PLATFORM_META = {
@@ -3110,18 +3110,18 @@ function dsApifyRow(platform, entry){
     if(window.__kpal)return;window.__kpal=1;
     var BASE_KP=[
       {t:'Hub',d:'Platform home',u:'/p2/hub',i:'⌂'},
-      {t:'B2B Agents',d:'Go-to-market intelligence',u:'/p2/b2b-agents',i:'◎'},
+      {t:'Strategic Agents',d:'Go-to-market intelligence',u:'/p2/strategic-agents',i:'◎'},
       {t:'SEO Tools',d:'Organic intelligence',u:'/p2/seo',i:'⌕'},
       {t:'ABM Signal Tracker: Healthcare',d:'Company signals & insights',u:'/p2/abm-signal-tracker/healthcare',i:'☆'},
       {t:'ABM Signal Tracker: CSG',d:'Company signals & insights',u:'/p2/abm-signal-tracker/csg',i:'☆'},
-      {t:'LinkedIn Intelligence',d:'People, companies & posts',u:'/p2/b2b-agents/linkedin-intelligence',i:'⦿'},
-      {t:'Ad Intelligence',d:'Competitor ad monitoring',u:'/p2/b2b-agents/ad-intelligence',i:'◈'},
-      {t:'Contact Finder',d:'Apollo-powered search & chat',u:'/p2/b2b-agents/company-people-intelligence',i:'⌕'},
-      {t:'Anonymous Visitors',d:'Website visitor signals',u:'/p2/b2b-agents/anonymous-visitors',i:'◌'},
-      {t:'Job Change Alert',d:'Decision-maker job changes',u:'/p2/b2b-agents/job-change-alert',i:'⇉'},
-      {t:'LinkedIn Strategy Researcher',d:'Competitive strategy playbooks',u:'/p2/b2b-agents/linkedin-strategy-researcher',i:'▤'},
-      {t:'42 North Dental Slot Checker',d:'Appointment availability',u:'/p2/b2b-agents/42-north-dental-slot-checker',i:'◷'},
-      {t:'Social Media Intelligence',d:'Cross-platform social analysis',u:'/p2/b2b-agents/social-media-intelligence',i:'▣'},
+      {t:'LinkedIn Intelligence',d:'People, companies & posts',u:'/p2/strategic-agents/linkedin-intelligence',i:'⦿'},
+      {t:'Ad Intelligence',d:'Competitor ad monitoring',u:'/p2/strategic-agents/ad-intelligence',i:'◈'},
+      {t:'Contact Finder',d:'Apollo-powered search & chat',u:'/p2/strategic-agents/company-people-intelligence',i:'⌕'},
+      {t:'Anonymous Visitors',d:'Website visitor signals',u:'/p2/strategic-agents/anonymous-visitors',i:'◌'},
+      {t:'Job Change Alert',d:'Decision-maker job changes',u:'/p2/strategic-agents/job-change-alert',i:'⇉'},
+      {t:'LinkedIn Strategy Researcher',d:'Competitive strategy playbooks',u:'/p2/strategic-agents/linkedin-strategy-researcher',i:'▤'},
+      {t:'42 North Dental Slot Checker',d:'Appointment availability',u:'/p2/strategic-agents/42-north-dental-slot-checker',i:'◷'},
+      {t:'Social Media Intelligence',d:'Cross-platform social analysis',u:'/p2/strategic-agents/social-media-intelligence',i:'▣'},
       {t:'Switch Account',d:'Healthcare / CSG picker',u:'/p2/abm-signal-tracker/accounts',i:'⇄'}
     ];
     var ITEMS=(window.__KP_ITEMS||[]).concat(BASE_KP);

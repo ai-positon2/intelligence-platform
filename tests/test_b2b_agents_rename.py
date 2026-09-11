@@ -1,4 +1,13 @@
-"""The "GTM" section was renamed to "B2B Agents".
+"""The "GTM" section was renamed to "B2B Agents", 2026-08-11.
+
+That rename has since been superseded by a second one -- "B2B Agents" to
+"Strategic Agents", 2026-09-11 -- covered by test_strategic_agents_rename.py.
+This file keeps testing what it always tested (the GTM-era legacy behavior
+and its page-label folding), with its "current name" assertions updated to
+match reality: /p2/b2b-agents is no longer the canonical path, so tests that
+described it as such now describe it as what it has become -- a second
+legacy alias that redirects straight through to /p2/strategic-agents,
+skipping the intermediate hop, exactly like /p2/gtm does.
 
 Two things have to survive a rename like this, and neither is the new name
 itself, which is easy. What breaks quietly:
@@ -42,35 +51,41 @@ def client():
     return c
 
 
-# ── The new canonical paths ─────────────────────────────────────────────────
+# ── /p2/b2b-agents is itself legacy now (superseded 2026-09-11) ────────────
 
-def test_the_section_is_served_at_its_new_path(client):
-    assert client.get("/p2/b2b-agents").status_code == 200
+def test_the_old_b2b_agents_root_now_redirects_too(client):
+    """It used to be the canonical path; a second rename made it a legacy
+    alias, same shape as /p2/gtm below."""
+    r = client.get("/p2/b2b-agents")
+    assert r.status_code == 308
+    assert r.headers["Location"].endswith("/p2/strategic-agents")
 
 
-def test_the_page_says_b2b_agents_not_gtm(client):
-    body = client.get("/p2/b2b-agents").get_data(as_text=True)
-    assert "B2B Agents" in body
-    # The CSS hook (card-gtm) and bucket keys are allowed to keep the old token;
-    # what must not survive is the NAME shown to a reader.
+def test_old_links_eventually_reach_the_current_name(client):
+    """Following an old bookmark all the way through must land on a page
+    that says the CURRENT name, not either prior one."""
+    body = client.get("/p2/b2b-agents", follow_redirects=True).get_data(as_text=True)
+    assert "Strategic Agents" in body
     assert ">GTM<" not in body
+    assert ">B2B Agents<" not in body
 
 
-def test_the_hub_card_is_renamed_and_points_at_the_new_path(client):
+def test_the_hub_card_carries_the_current_name(client):
     body = client.get("/p2/hub").get_data(as_text=True)
-    assert '<div class="card-title">B2B Agents</div>' in body
-    assert 'href="/p2/b2b-agents"' in body
+    assert '<div class="card-title">Strategic Agents</div>' in body
+    assert 'href="/p2/strategic-agents"' in body
     assert '<div class="card-title">GTM</div>' not in body
+    assert '<div class="card-title">B2B Agents</div>' not in body
 
 
 @pytest.mark.parametrize("path", [
-    "/p2/b2b-agents",
-    "/p2/b2b-agents/company-people-intelligence",
-    "/p2/b2b-agents/anonymous-visitors",
-    "/p2/b2b-agents/linkedin-intelligence",
-    "/p2/b2b-agents/ad-intelligence",
-    "/p2/b2b-agents/linkedin-strategy-researcher",
-    "/p2/b2b-agents/42-north-dental-slot-checker",
+    "/p2/strategic-agents",
+    "/p2/strategic-agents/company-people-intelligence",
+    "/p2/strategic-agents/anonymous-visitors",
+    "/p2/strategic-agents/linkedin-intelligence",
+    "/p2/strategic-agents/ad-intelligence",
+    "/p2/strategic-agents/linkedin-strategy-researcher",
+    "/p2/strategic-agents/42-north-dental-slot-checker",
 ])
 def test_every_renamed_page_is_routed(path):
     """Registered, not necessarily 200 (some need live upstreams). A missing
@@ -81,10 +96,12 @@ def test_every_renamed_page_is_routed(path):
 
 # ── Old links keep working ──────────────────────────────────────────────────
 
-def test_the_old_section_root_redirects(client):
+def test_the_old_gtm_root_redirects_straight_through(client):
+    """/p2/gtm now lands directly on the CURRENT name rather than chaining
+    through the intermediate /p2/b2b-agents hop."""
     r = client.get("/p2/gtm")
     assert r.status_code == 308
-    assert r.headers["Location"].endswith("/p2/b2b-agents")
+    assert r.headers["Location"].endswith("/p2/strategic-agents")
 
 
 @pytest.mark.parametrize("rest", [
@@ -99,12 +116,12 @@ def test_any_old_sub_path_redirects(client, rest):
     the alias instead of quietly 404ing for anyone with an old link."""
     r = client.get("/p2/gtm/" + rest)
     assert r.status_code == 308
-    assert r.headers["Location"].endswith("/p2/b2b-agents/" + rest)
+    assert r.headers["Location"].endswith("/p2/strategic-agents/" + rest)
 
 
 def test_a_query_string_survives_the_redirect(client):
     r = client.get("/p2/gtm/linkedin-intelligence/data?fresh=1")
-    assert r.headers["Location"].endswith("/p2/b2b-agents/linkedin-intelligence/data?fresh=1")
+    assert r.headers["Location"].endswith("/p2/strategic-agents/linkedin-intelligence/data?fresh=1")
 
 
 def test_a_post_keeps_its_method_and_body(client):
@@ -113,7 +130,7 @@ def test_a_post_keeps_its_method_and_body(client):
     question the user just typed."""
     r = client.post("/p2/gtm/company-people-intelligence/chat", json={"message": "x"})
     assert r.status_code == 308, "301 would let the browser downgrade this to GET"
-    assert r.headers["Location"].endswith("/p2/b2b-agents/company-people-intelligence/chat")
+    assert r.headers["Location"].endswith("/p2/strategic-agents/company-people-intelligence/chat")
 
 
 def test_a_delete_keeps_its_method(client):
@@ -121,31 +138,31 @@ def test_a_delete_keeps_its_method(client):
     assert r.status_code == 308
 
 
-def test_the_older_ppc_links_now_land_on_the_new_name(client):
-    """These were already redirecting to /p2/gtm; they must not now redirect to
-    a path that no longer exists."""
+def test_the_older_ppc_links_now_land_on_the_current_name(client):
+    """These were already redirecting to /p2/gtm, then /p2/b2b-agents; they
+    must not now land on a path that no longer exists."""
     r = client.get("/ppc")
-    assert r.headers["Location"].endswith("/p2/b2b-agents")
+    assert r.headers["Location"].endswith("/p2/strategic-agents")
 
 
 def test_the_ad_intel_bundle_asset_paths_still_serve():
     """The built React app requests these by absolute path, baked in at build
-    time, so they must keep SERVING rather than redirecting. The new paths are
-    added alongside instead of replacing them."""
+    time, so they must keep SERVING rather than redirecting. Every generation's
+    path is added alongside instead of replacing the previous one."""
     rules = {str(r) for r in appmod.app.url_map.iter_rules()}
     assert "/gtm/ad-intelligence/assets/<path:filename>" in rules
     assert "/b2b-agents/ad-intelligence/assets/<path:filename>" in rules
 
 
-# ── Analytics written under the old name ────────────────────────────────────
+# ── Analytics written under an old name ─────────────────────────────────────
 
-def test_the_old_page_title_folds_into_the_new_one():
-    assert appmod._page_label("GTM Dashboards") == "B2B Agents Dashboards"
+def test_the_old_page_title_folds_all_the_way_to_the_current_one():
+    assert appmod._page_label("GTM Dashboards") == "Strategic Agents Dashboards"
 
 
-def test_an_old_recorded_path_folds_too():
+def test_an_old_recorded_path_folds_all_the_way_too():
     assert (appmod._page_label("/p2/gtm/company-people-intelligence")
-            == "/p2/b2b-agents/company-people-intelligence")
+            == "/p2/strategic-agents/company-people-intelligence")
 
 
 def test_an_unrelated_label_is_untouched():
@@ -160,13 +177,13 @@ def test_a_missing_label_does_not_crash(junk):
     assert appmod._page_label(junk) == ""
 
 
-def test_top_pages_would_not_fork_across_the_rename():
-    """The actual failure mode, stated as a test: two rows recorded either side
-    of the rename have to count as one page."""
+def test_top_pages_would_not_fork_across_either_rename():
+    """The actual failure mode, stated as a test: rows recorded across BOTH
+    renames have to count as one page under the current name."""
     from collections import Counter
-    rows = ["GTM Dashboards"] * 3 + ["B2B Agents Dashboards"] * 2
+    rows = ["GTM Dashboards"] * 3 + ["B2B Agents Dashboards"] * 2 + ["Strategic Agents Dashboards"] * 1
     folded = Counter(appmod._page_label(r) for r in rows)
-    assert folded == {"B2B Agents Dashboards": 5}, "a rename must not split its own history"
+    assert folded == {"Strategic Agents Dashboards": 6}, "a rename must not split its own history"
 
 
 # ── The two things named GTM that are NOT this section ──────────────────────

@@ -1,4 +1,4 @@
-"""/p2/b2b-agents/job-change-alert (page + /data + /sync). The page itself is
+"""/p2/strategic-agents/job-change-alert (page + /data + /sync). The page itself is
 @position2_required (any Position2 staff); /sync is admin_required since it
 shells out to an external API and writes to the db, matching every other
 side-effecting admin action in this app."""
@@ -56,13 +56,13 @@ def _client(email="reporting@position2.com"):
 
 
 def test_page_renders_for_any_position2_staff(seeded_db):
-    resp = _client("someone@position2.com").get("/p2/b2b-agents/job-change-alert")
+    resp = _client("someone@position2.com").get("/p2/strategic-agents/job-change-alert")
     assert resp.status_code == 200
     assert b"Job Change Alert" in resp.data
 
 
 def test_data_endpoint_returns_the_seeded_event(seeded_db):
-    resp = _client().get("/p2/b2b-agents/job-change-alert/data")
+    resp = _client().get("/p2/strategic-agents/job-change-alert/data")
     body = resp.get_json()
     assert body["total"] == 1
     assert body["events"][0]["person_name"] == "Jane Doe"
@@ -72,19 +72,19 @@ def test_data_endpoint_returns_the_seeded_event(seeded_db):
 def test_data_endpoint_never_leaks_the_literal_unavailable_string(seeded_db, monkeypatch):
     """The parser already normalizes '[Unavailable]' to None -- this pins that
     the route doesn't re-introduce it (e.g. via a default-value fallback)."""
-    resp = _client().get("/p2/b2b-agents/job-change-alert/data")
+    resp = _client().get("/p2/strategic-agents/job-change-alert/data")
     body = json.dumps(resp.get_json())
     assert "[Unavailable]" not in body
 
 
 def test_sync_route_is_forbidden_for_non_admin_position2_staff(seeded_db):
-    resp = _client("someone@position2.com").post("/p2/b2b-agents/job-change-alert/sync")
+    resp = _client("someone@position2.com").post("/p2/strategic-agents/job-change-alert/sync")
     assert resp.status_code == 403
 
 
 def test_sync_route_requires_login():
     c = appmod.app.test_client()
-    resp = c.post("/p2/b2b-agents/job-change-alert/sync", follow_redirects=False)
+    resp = c.post("/p2/strategic-agents/job-change-alert/sync", follow_redirects=False)
     assert resp.status_code in (302, 401, 403)
 
 
@@ -93,7 +93,7 @@ def test_sync_route_degrades_gracefully_without_a_slack_token(seeded_db, monkeyp
     channel history yet. The sync script must still exit cleanly (added=0),
     not 500 the request."""
     monkeypatch.delenv("SLACK_BOT_TOKEN", raising=False)
-    resp = _client().post("/p2/b2b-agents/job-change-alert/sync")
+    resp = _client().post("/p2/strategic-agents/job-change-alert/sync")
     assert resp.status_code == 200
     body = resp.get_json()
     assert body["ok"] is True
@@ -109,6 +109,6 @@ def test_sync_route_reports_failure_if_the_script_itself_errors(seeded_db, monke
         stderr = "boom"
 
     monkeypatch.setattr(_subprocess, "run", lambda *a, **k: _FailedProc())
-    resp = _client().post("/p2/b2b-agents/job-change-alert/sync")
+    resp = _client().post("/p2/strategic-agents/job-change-alert/sync")
     assert resp.status_code == 500
     assert resp.get_json()["ok"] is False

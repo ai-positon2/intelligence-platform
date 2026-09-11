@@ -293,7 +293,7 @@ def test_learning_is_capped():
 # ── The endpoint ─────────────────────────────────────────────────────────────
 
 def test_the_picker_endpoint_answers_a_partial_word(client):
-    r = client.get("/p2/b2b-agents/company-people-intelligence/industries?q=heal")
+    r = client.get("/p2/strategic-agents/company-people-intelligence/industries?q=heal")
     assert r.status_code == 200
     body = r.get_json()
     assert body["query"] == "heal"
@@ -304,19 +304,19 @@ def test_the_picker_endpoint_needs_no_apollo_key(client, monkeypatch):
     """It reads a written-down list and a local table, so it must work on an
     environment with no Apollo credentials at all, and cost nothing."""
     monkeypatch.delenv("APOLLO_API_KEY", raising=False)
-    r = client.get("/p2/b2b-agents/company-people-intelligence/industries")
+    r = client.get("/p2/strategic-agents/company-people-intelligence/industries")
     assert r.status_code == 200
     assert len(r.get_json()["entries"]) > 20
 
 
 def test_the_picker_endpoint_is_staff_only():
     anon = appmod.app.test_client()
-    r = anon.get("/p2/b2b-agents/company-people-intelligence/industries?q=heal")
+    r = anon.get("/p2/strategic-agents/company-people-intelligence/industries?q=heal")
     assert r.status_code in (301, 302, 401, 403)
 
 
 def test_an_overlong_query_is_truncated_not_rejected(client):
-    r = client.get("/p2/b2b-agents/company-people-intelligence/industries?q="
+    r = client.get("/p2/strategic-agents/company-people-intelligence/industries?q="
                    + "a" * 500)
     assert r.status_code == 200
     assert len(r.get_json()["query"]) <= 60

@@ -65,8 +65,8 @@
       <div class="hb-eyebrow">One intelligence layer</div>
     <div class="hub-grid" data-cz-reveal>
 
-      <!-- B2B Agents (formerly "GTM"; card-gtm is the CSS hook, not the name) -->
-      <a href="/p2/b2b-agents" class="hub-card card-gtm">
+      <!-- Strategic Agents (formerly "GTM"; card-gtm is the CSS hook, not the name) -->
+      <a href="/p2/strategic-agents" class="hub-card card-gtm">
         <div class="card-preview">
           <div class="card-preview-icon"><svg class="au-ic" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M13 2 4 14h7l-1 8 9-12h-7l1-8Z"/></svg></div>
           <div class="card-status-badge badge-live">
@@ -75,7 +75,7 @@
         </div>
         <div class="card-body">
           <div class="card-category">Go-To-Market</div>
-          <div class="card-title">B2B Agents</div>
+          <div class="card-title">Strategic Agents</div>
           <div class="card-desc">
             Buyer signals, job-change alerts, competitor ad intelligence, anonymous visitor
             de-anonymisation, LinkedIn engagement, appointment availability, cross-platform
@@ -83,7 +83,7 @@
           </div>
           <div class="card-footer">
             <div class="card-meta">
-              <!-- Counts the cards on /p2/b2b-agents: all 10 are live as of
+              <!-- Counts the cards on /p2/strategic-agents: all 10 are live as of
                    2026-08-31 (Event & Conference Intelligence added).
                    test_hub_card_counts.py fails if these drift from the dashboard
                    page again. Was 9/9 before this, 8/8 before the Slot Checker,
@@ -136,7 +136,7 @@
         <div><b data-lxn="{{ tracked_companies }}" data-lxs="+">0</b><span>companies tracked</span></div>
         {% endif %}
         <div><b data-lxn="300" data-lxs="+">0</b><span>live signals</span></div>
-        {# Live dashboards across both workspaces: 10 on /p2/b2b-agents (Event
+        {# Live dashboards across both workspaces: 10 on /p2/strategic-agents (Event
            & Conference Intelligence added 2026-08-31) + 16 SEO tools.
            Was 25 before this, 24 before Social Media Intelligence, 23
            before the Slot Checker, and 22 before LinkedIn Strategy Researcher. #}
@@ -190,17 +190,17 @@
   if(window.__kpal)return;window.__kpal=1;
   var BASE=[
     {t:'Hub',d:'Platform home',u:'/p2/hub',i:'⌂'},
-    {t:'B2B Agents',d:'Go-to-market intelligence',u:'/p2/b2b-agents',i:'◎'},
+    {t:'Strategic Agents',d:'Go-to-market intelligence',u:'/p2/strategic-agents',i:'◎'},
     {t:'SEO Tools',d:'Organic intelligence',u:'/p2/seo',i:'⌕'},
     {t:'ABM Signal Tracker — Healthcare',d:'Company signals & insights',u:'/p2/abm-signal-tracker/healthcare',i:'☆'},
     {t:'ABM Signal Tracker — CSG',d:'Company signals & insights',u:'/p2/abm-signal-tracker/csg',i:'☆'},
-    {t:'LinkedIn Intelligence',d:'People, companies & posts',u:'/p2/b2b-agents/linkedin-intelligence',i:'⦿'},
-    {t:'Ad Intelligence',d:'Competitor ad monitoring',u:'/p2/b2b-agents/ad-intelligence',i:'◈'},
-    {t:'Anonymous Visitors',d:'Website visitor signals',u:'/p2/b2b-agents/anonymous-visitors',i:'◌'},
-    {t:'Job Change Alert',d:'Decision-maker job changes',u:'/p2/b2b-agents/job-change-alert',i:'⇉'},
-    {t:'LinkedIn Strategy Researcher',d:'Competitive strategy playbooks',u:'/p2/b2b-agents/linkedin-strategy-researcher',i:'▤'},
-    {t:'42 North Dental Slot Checker',d:'Appointment availability',u:'/p2/b2b-agents/42-north-dental-slot-checker',i:'◷'},
-    {t:'Social Media Intelligence',d:'Cross-platform social analysis',u:'/p2/b2b-agents/social-media-intelligence',i:'▣'},
+    {t:'LinkedIn Intelligence',d:'People, companies & posts',u:'/p2/strategic-agents/linkedin-intelligence',i:'⦿'},
+    {t:'Ad Intelligence',d:'Competitor ad monitoring',u:'/p2/strategic-agents/ad-intelligence',i:'◈'},
+    {t:'Anonymous Visitors',d:'Website visitor signals',u:'/p2/strategic-agents/anonymous-visitors',i:'◌'},
+    {t:'Job Change Alert',d:'Decision-maker job changes',u:'/p2/strategic-agents/job-change-alert',i:'⇉'},
+    {t:'LinkedIn Strategy Researcher',d:'Competitive strategy playbooks',u:'/p2/strategic-agents/linkedin-strategy-researcher',i:'▤'},
+    {t:'42 North Dental Slot Checker',d:'Appointment availability',u:'/p2/strategic-agents/42-north-dental-slot-checker',i:'◷'},
+    {t:'Social Media Intelligence',d:'Cross-platform social analysis',u:'/p2/strategic-agents/social-media-intelligence',i:'▣'},
     {t:'Switch Account',d:'Healthcare / CSG picker',u:'/p2/abm-signal-tracker/accounts',i:'⇄'}
   ];
   var ITEMS=(window.__KP_ITEMS||[]).concat(BASE);

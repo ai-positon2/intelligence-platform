@@ -14,7 +14,7 @@ from tracker import event_intel_jobs as J, event_intel_store as S
 from tracker import event_intel_harvest as H, event_intel_resolve as R
 
 pytestmark = pytest.mark.skipif(not os.getenv('DATABASE_URL'), reason='requires disposable PostgreSQL')
-BASE = '/p2/b2b-agents/event-conference-intelligence'
+BASE = '/p2/strategic-agents/event-conference-intelligence'
 SOURCE = 'https://fixture-event.example/exhibitors'
 
 

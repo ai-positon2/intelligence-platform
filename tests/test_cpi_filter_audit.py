@@ -119,14 +119,14 @@ def _stub(monkeypatch, orgs=None, people=None):
 
 
 def _companies(client, **filters):
-    r = client.post("/p2/b2b-agents/company-people-intelligence/search",
+    r = client.post("/p2/strategic-agents/company-people-intelligence/search",
                     json={"entity": "companies", "filters": filters})
     assert r.status_code == 200
     return r.get_json()
 
 
 def _people(client, **filters):
-    r = client.post("/p2/b2b-agents/company-people-intelligence/search",
+    r = client.post("/p2/strategic-agents/company-people-intelligence/search",
                     json={"entity": "people", "filters": filters})
     assert r.status_code == 200
     return r.get_json()

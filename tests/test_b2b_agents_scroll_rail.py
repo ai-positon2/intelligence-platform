@@ -1,4 +1,5 @@
-"""The scroll rail on /p2/b2b-agents.
+"""The scroll rail on /p2/strategic-agents (rendered from templates/b2b_agents.html,
+whose filename kept its pre-rename name on purpose -- see test_b2b_agents_rename.py).
 
 gtm.css zeroes the native scrollbar on every element it touches, so this page
 ships its own hairline rail instead. Its behaviour (sizing, dragging, going
@@ -37,7 +38,7 @@ def _page(monkeypatch):
     # process every other test file runs in, and a permanent stub here is a
     # stub in tests/test_tracked_company_count.py too.
     monkeypatch.setattr(appmod, "_tracked_company_floor", lambda *a, **k: 1200)
-    r = _client().get("/p2/b2b-agents")
+    r = _client().get("/p2/strategic-agents")
     assert r.status_code == 200, r.status_code
     return r.get_data(as_text=True)
 

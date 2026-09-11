@@ -16,7 +16,7 @@ from tracker import event_intel_report as report
 from tracker import event_intel_store as store
 from tracker import event_intel_workroom as W
 
-BASE = "/p2/b2b-agents/event-conference-intelligence"
+BASE = "/p2/strategic-agents/event-conference-intelligence"
 
 
 def _client():

@@ -1484,7 +1484,7 @@ APP_AGENTS = [
     },
     {
         # Connected via "external_url" instead of "seo_slug" -- it embeds the same
-        # Position2-hosted watchtower tool as the internal /p2/b2b-agents copy (its own
+        # Position2-hosted watchtower tool as the internal /p2/strategic-agents copy (its own
         # host masked behind this path), not a SERP-app tool. "uncapped": True
         # means it's exempt from AGENT_RUN_CAP everywhere that cap is enforced
         # (app_use, app_use_log_run, app.html, app_detail.html, app_embed.html):
@@ -3833,15 +3833,15 @@ def p2_context_chapter(slug):
     """Legacy URL, kept as a redirect so old bookmarks and links still work."""
     return redirect(url_for("p2_playbook_chapter", slug=slug), code=301)
 
-@app.route("/p2/b2b-agents")
+@app.route("/p2/strategic-agents")
 @position2_required
 def b2b_agents():
     return render_template("b2b_agents.html", user=_get_user(),
                            tracked_companies=_tracked_company_floor())
 
 
-# ── /p2/gtm/* -> /p2/b2b-agents/* ────────────────────────────────────────────
-# The section was renamed from "GTM" to "B2B Agents". One catch-all covers the
+# ── /p2/gtm/* -> /p2/strategic-agents/* ────────────────────────────────────────────
+# The section was renamed from "GTM" to "Strategic Agents". One catch-all covers the
 # whole old tree rather than a redirect per route, so nothing can be missed and
 # a route added later inherits the alias for free.
 #
@@ -3854,7 +3854,30 @@ def b2b_agents():
 @app.route("/p2/gtm/", methods=["GET", "POST", "DELETE"])
 @app.route("/p2/gtm/<path:rest>", methods=["GET", "POST", "DELETE"])
 def b2b_agents_gtm_legacy_redirect(rest=""):
-    target = "/p2/b2b-agents" + (("/" + rest) if rest else "")
+    target = "/p2/strategic-agents" + (("/" + rest) if rest else "")
+    if request.query_string:
+        target += "?" + request.query_string.decode("utf-8", "ignore")
+    return redirect(target, code=308)
+
+
+# ── /p2/b2b-agents/* -> /p2/strategic-agents/* ──────────────────────────────
+# The section was renamed again, from "B2B Agents" to "Strategic Agents",
+# 2026-09-11. Same shape and same reasoning as the /p2/gtm/* redirect above:
+# one catch-all for the whole old tree so nothing added later is missed, and
+# 308 (not 301) so a browser still holding the previous JS bundle can still
+# POST/DELETE (chat, search, enrich, export, history, ...) without the body
+# being silently dropped by a 301-triggered GET retry.
+#
+# This does NOT shadow the three ad_intelligence asset/favicon/icon routes
+# kept below at their literal /p2/b2b-agents/... paths: those are more
+# specific (mostly static segments) than this single <path:rest> catch-all,
+# so Werkzeug matches them first and they keep SERVING rather than
+# redirecting, exactly as they did through the GTM rename.
+@app.route("/p2/b2b-agents", methods=["GET", "POST", "DELETE"])
+@app.route("/p2/b2b-agents/", methods=["GET", "POST", "DELETE"])
+@app.route("/p2/b2b-agents/<path:rest>", methods=["GET", "POST", "DELETE"])
+def strategic_agents_b2b_legacy_redirect(rest=""):
+    target = "/p2/strategic-agents" + (("/" + rest) if rest else "")
     if request.query_string:
         target += "?" + request.query_string.decode("utf-8", "ignore")
     return redirect(target, code=308)
@@ -3866,8 +3889,8 @@ def b2b_agents_gtm_legacy_redirect(rest=""):
 # co-branded client-portal copy of this agent, which is capped).
 LINKEDIN_RESEARCHER_URL = "https://watchtower-by-position2.vercel.app/linkedin.html"
 
-@app.route("/p2/b2b-agents/linkedin-social-researcher")
-@app.route("/p2/b2b-agents/linkedin-social-researcher/")
+@app.route("/p2/strategic-agents/linkedin-social-researcher")
+@app.route("/p2/strategic-agents/linkedin-social-researcher/")
 @position2_required
 def linkedin_social_researcher():
     """Competitive LinkedIn analysis tool, embedded from watchtower. Uncapped."""
@@ -3875,7 +3898,7 @@ def linkedin_social_researcher():
         user=_get_user(),
         title="LinkedIn Social Researcher",
         embed_url=LINKEDIN_RESEARCHER_URL,
-        breadcrumb=[("Hub", "/p2/hub"), ("B2B Agents", "/p2/b2b-agents")],
+        breadcrumb=[("Hub", "/p2/hub"), ("Strategic Agents", "/p2/strategic-agents")],
         current="LinkedIn Social Researcher",
         accent="#a855f7",
     )
@@ -3886,8 +3909,8 @@ def linkedin_social_researcher():
 # design (see the route registered further down in this file).
 
 
-@app.route("/p2/b2b-agents/sentiment-pulse")
-@app.route("/p2/b2b-agents/sentiment-pulse/")
+@app.route("/p2/strategic-agents/sentiment-pulse")
+@app.route("/p2/strategic-agents/sentiment-pulse/")
 @position2_required
 def call_sentiment():
     # HIDDEN 2026-07-23: Sentiment Pulse was a demo/proxy dashboard (seeded
@@ -3911,20 +3934,20 @@ def call_sentiment_legacy():
 @app.route("/ppc")
 @app.route("/ppc/")
 def ppc_redirect():
-    return redirect("/p2/b2b-agents", code=301)
+    return redirect("/p2/strategic-agents", code=301)
 
 @app.route("/ppc/ad-intelligence")
 @app.route("/ppc/ad-intelligence/")
 def ppc_ad_intelligence_redirect():
-    return redirect("/p2/b2b-agents/ad-intelligence", code=301)
+    return redirect("/p2/strategic-agents/ad-intelligence", code=301)
 
 @app.route("/ppc/anonymous-visitors")
 def ppc_anonymous_visitors_redirect():
-    return redirect("/p2/b2b-agents/anonymous-visitors", code=301)
+    return redirect("/p2/strategic-agents/anonymous-visitors", code=301)
 
 @app.route("/ppc/linkedin-scraper")
 def ppc_linkedin_scraper_redirect():
-    return redirect("/p2/b2b-agents/linkedin-intelligence", code=301)
+    return redirect("/p2/strategic-agents/linkedin-intelligence", code=301)
 
 @app.route("/p2/seo")
 @position2_required
@@ -3937,12 +3960,13 @@ _SERP_BASE = "https://seo-apps-production-37a6.up.railway.app"
 # ── Ad Intelligence (built React app served directly — no iframe) ────────────
 AD_INTEL_SHEET_ID = "16U5_QSxMmrAGKvK5dHScBu1Et4BJ1p8Q1ns5LycRA0s"
 
-@app.route("/p2/b2b-agents/ad-intelligence")
-@app.route("/p2/b2b-agents/ad-intelligence/")
+@app.route("/p2/strategic-agents/ad-intelligence")
+@app.route("/p2/strategic-agents/ad-intelligence/")
 @position2_required
 def ad_intelligence():
     return send_from_directory("ad_intelligence", "index.html")
 
+@app.route("/p2/strategic-agents/ad-intelligence/assets/<path:filename>")
 @app.route("/p2/b2b-agents/ad-intelligence/assets/<path:filename>")
 @app.route("/b2b-agents/ad-intelligence/assets/<path:filename>")
 @app.route("/gtm/ad-intelligence/assets/<path:filename>")
@@ -3950,6 +3974,7 @@ def ad_intelligence():
 def ad_intelligence_assets(filename):
     return send_from_directory("ad_intelligence/assets", filename)
 
+@app.route("/p2/strategic-agents/ad-intelligence/favicon.svg")
 @app.route("/p2/b2b-agents/ad-intelligence/favicon.svg")
 @app.route("/b2b-agents/ad-intelligence/favicon.svg")
 @app.route("/gtm/ad-intelligence/favicon.svg")
@@ -3960,6 +3985,7 @@ def ad_intelligence_favicon():
     # site, not the app's own bundled ad_intelligence/favicon.svg.
     return send_from_directory("static", "favicon.svg", mimetype="image/svg+xml")
 
+@app.route("/p2/strategic-agents/ad-intelligence/icons.svg")
 @app.route("/p2/b2b-agents/ad-intelligence/icons.svg")
 @app.route("/b2b-agents/ad-intelligence/icons.svg")
 @app.route("/gtm/ad-intelligence/icons.svg")
@@ -3974,12 +4000,12 @@ def ad_intelligence_icons():
 # own the parsing/storage; this app only ever reads the resulting SQLite db.
 JOB_CHANGE_DB_PATH = Path(__file__).parent / "data" / "job_change_alerts.db"
 
-@app.route("/p2/b2b-agents/job-change-alert")
+@app.route("/p2/strategic-agents/job-change-alert")
 @position2_required
 def job_change_alert():
     return render_template("job_change_alert.html", user=_get_user())
 
-@app.route("/p2/b2b-agents/job-change-alert/data")
+@app.route("/p2/strategic-agents/job-change-alert/data")
 @position2_required
 def job_change_alert_data():
     from tracker.job_change_store import JobChangeStore
@@ -3988,7 +4014,7 @@ def job_change_alert_data():
     return jsonify({"events": events, "total": len(events),
                      "last_synced": store.get_latest_detected_at()})
 
-@app.route("/p2/b2b-agents/job-change-alert/sync", methods=["POST"])
+@app.route("/p2/strategic-agents/job-change-alert/sync", methods=["POST"])
 @admin_required
 def job_change_alert_sync():
     """Runs the sync script as a subprocess (never imported into this process --
@@ -4143,7 +4169,7 @@ def _fetch_job_change_tracked_data(force: bool = False) -> dict:
     return result
 
 
-@app.route("/p2/b2b-agents/job-change-alert/tracked")
+@app.route("/p2/strategic-agents/job-change-alert/tracked")
 @position2_required
 def job_change_alert_tracked():
     """JSON data endpoint for the "who's tracked" roster (gzipped, cached)."""
@@ -4184,28 +4210,28 @@ def job_change_alert_tracked():
 # and a dead link reads as "the tool was taken away".
 
 
-@app.route("/p2/b2b-agents/gentle-dental-slot-checker")
+@app.route("/p2/strategic-agents/gentle-dental-slot-checker")
 def gentle_dental_slot_checker_legacy():
-    return redirect("/p2/b2b-agents/42-north-dental-slot-checker", code=301)
+    return redirect("/p2/strategic-agents/42-north-dental-slot-checker", code=301)
 
 
-@app.route("/p2/b2b-agents/gentle-dental-slot-checker/data")
+@app.route("/p2/strategic-agents/gentle-dental-slot-checker/data")
 def gentle_dental_slot_checker_data_legacy():
-    return redirect("/p2/b2b-agents/42-north-dental-slot-checker/data", code=301)
+    return redirect("/p2/strategic-agents/42-north-dental-slot-checker/data", code=301)
 
 
-@app.route("/p2/b2b-agents/gentle-dental-slot-checker/insights")
+@app.route("/p2/strategic-agents/gentle-dental-slot-checker/insights")
 def gentle_dental_slot_checker_insights_legacy():
-    return redirect("/p2/b2b-agents/42-north-dental-slot-checker/insights", code=301)
+    return redirect("/p2/strategic-agents/42-north-dental-slot-checker/insights", code=301)
 
 
-@app.route("/p2/b2b-agents/42-north-dental-slot-checker")
+@app.route("/p2/strategic-agents/42-north-dental-slot-checker")
 @position2_required
 def slot_checker_page():
     return render_template("42_north_dental_slot_checker.html", user=_get_user())
 
 
-@app.route("/p2/b2b-agents/42-north-dental-slot-checker/data")
+@app.route("/p2/strategic-agents/42-north-dental-slot-checker/data")
 @position2_required
 def slot_checker_data():
     """JSON payload for the Slot Checker dashboard.
@@ -4224,7 +4250,7 @@ def slot_checker_data():
     return resp
 
 
-@app.route("/p2/b2b-agents/42-north-dental-slot-checker/insights")
+@app.route("/p2/strategic-agents/42-north-dental-slot-checker/insights")
 @position2_required
 def slot_checker_insights_route():
     """AI-synthesized weekly briefing over the current dashboard numbers.
@@ -5052,6 +5078,14 @@ _PAGE_LABEL_ALIASES = (
     # the old agent instead. The old agent's pre-2026-08-20 history under that
     # label is a small, permanent, unfixable-by-substring ambiguity -- the
     # one-time cost of reusing a name rather than a reason to add an alias.
+    # "B2B Agents" -> "Strategic Agents", 2026-09-11. Safe to fold forward on
+    # both axes for the same reason as the renames above: this rule runs LAST
+    # in the sequential substitution below, so every "/p2/b2b-agents..." path or
+    # "...B2B Agents..." title already produced by an EARLIER rule in this tuple
+    # (GTM, linkedin-playbook-studio, gentle-dental, social-creative-intelligence)
+    # passes through this final fold too, landing on the current name in one call.
+    ("B2B Agents", "Strategic Agents"),
+    ("/p2/b2b-agents", "/p2/strategic-agents"),
 )
 
 
@@ -7520,7 +7554,7 @@ def _fetch_anon_visitors_data(force: bool = False) -> dict:
     return _result
 
 
-@app.route("/p2/b2b-agents/anonymous-visitors")
+@app.route("/p2/strategic-agents/anonymous-visitors")
 @position2_required
 def anonymous_visitors():
     """Anonymous Visitors dashboard shell — loads data async."""
@@ -7833,13 +7867,13 @@ def _linkedin_data_response(sheet_id: str, force: bool):
     return resp
 
 
-@app.route("/p2/b2b-agents/linkedin-scraper")
+@app.route("/p2/strategic-agents/linkedin-scraper")
 @position2_required
 def linkedin_scraper_old_redirect():
-    return redirect("/p2/b2b-agents/linkedin-intelligence", code=301)
+    return redirect("/p2/strategic-agents/linkedin-intelligence", code=301)
 
 
-@app.route("/p2/b2b-agents/linkedin-intelligence")
+@app.route("/p2/strategic-agents/linkedin-intelligence")
 @position2_required
 def linkedin_scraper():
     """LinkedIn Intelligence dashboard — Post & People Intelligence, live from Google Sheets."""
@@ -7849,13 +7883,13 @@ def linkedin_scraper():
                                    "employerTokens": ["position"]})
 
 
-@app.route("/p2/b2b-agents/linkedin-scraper/data")
+@app.route("/p2/strategic-agents/linkedin-scraper/data")
 @position2_required
 def linkedin_scraper_data_old_redirect():
-    return redirect("/p2/b2b-agents/linkedin-intelligence/data", code=301)
+    return redirect("/p2/strategic-agents/linkedin-intelligence/data", code=301)
 
 
-@app.route("/p2/b2b-agents/linkedin-intelligence/data")
+@app.route("/p2/strategic-agents/linkedin-intelligence/data")
 @position2_required
 def linkedin_scraper_data():
     """JSON data endpoint for the LinkedIn Intelligence dashboard (gzipped, cached).
@@ -8021,7 +8055,7 @@ def _lps_run_playbook_job(run_id: int, email: str, mode: str) -> None:
         log.warning("LinkedIn Strategy Researcher: playbook job failed for run %s: %s", run_id, e)
 
 
-@app.route("/p2/b2b-agents/linkedin-strategy-researcher")
+@app.route("/p2/strategic-agents/linkedin-strategy-researcher")
 @position2_required
 def linkedin_playbook_studio():
     user = _get_user() or {}
@@ -8029,7 +8063,7 @@ def linkedin_playbook_studio():
                            is_admin=(user.get("email") or "").lower() in ADMIN_EMAILS)
 
 
-@app.route("/p2/b2b-agents/linkedin-strategy-researcher/search")
+@app.route("/p2/strategic-agents/linkedin-strategy-researcher/search")
 @position2_required
 def linkedin_playbook_studio_search():
     """Company search, which reports WHY it came back empty.
@@ -8482,7 +8516,7 @@ def admin_external_usage_lps_insights_check():
     return jsonify(_lps_insights_selftest())
 
 
-@app.route("/p2/b2b-agents/linkedin-strategy-researcher/analyze", methods=["POST"])
+@app.route("/p2/strategic-agents/linkedin-strategy-researcher/analyze", methods=["POST"])
 @position2_required
 def linkedin_playbook_studio_analyze():
     from tracker import linkedin_playbook_store as lps_store
@@ -8521,7 +8555,7 @@ def linkedin_playbook_studio_analyze():
     return jsonify({"run_id": run_id, "status": "running"})
 
 
-@app.route("/p2/b2b-agents/linkedin-strategy-researcher/runs/<int:run_id>/status")
+@app.route("/p2/strategic-agents/linkedin-strategy-researcher/runs/<int:run_id>/status")
 @position2_required
 def linkedin_playbook_studio_run_status(run_id):
     from tracker import linkedin_playbook_store as lps_store
@@ -8532,7 +8566,7 @@ def linkedin_playbook_studio_run_status(run_id):
     return jsonify({"id": run["id"], "status": run["status"], "error": run.get("error")})
 
 
-@app.route("/p2/b2b-agents/linkedin-strategy-researcher/history")
+@app.route("/p2/strategic-agents/linkedin-strategy-researcher/history")
 @position2_required
 def linkedin_playbook_studio_history():
     from tracker import linkedin_playbook_store as lps_store
@@ -8540,7 +8574,7 @@ def linkedin_playbook_studio_history():
     return jsonify({"runs": lps_store.list_runs(email)})
 
 
-@app.route("/p2/b2b-agents/linkedin-strategy-researcher/runs/<int:run_id>")
+@app.route("/p2/strategic-agents/linkedin-strategy-researcher/runs/<int:run_id>")
 @position2_required
 def linkedin_playbook_studio_run(run_id):
     from tracker import linkedin_playbook_store as lps_store
@@ -8570,7 +8604,7 @@ def linkedin_playbook_studio_run(run_id):
     return jsonify(run)
 
 
-@app.route("/p2/b2b-agents/linkedin-strategy-researcher/runs/<int:run_id>/insights", methods=["POST"])
+@app.route("/p2/strategic-agents/linkedin-strategy-researcher/runs/<int:run_id>/insights", methods=["POST"])
 @position2_required
 def linkedin_playbook_studio_insights(run_id):
     """Backfill (or regenerate) the AI Insights synthesis for one saved run.
@@ -8594,7 +8628,7 @@ def linkedin_playbook_studio_insights(run_id):
     return jsonify({"status": "running"})
 
 
-@app.route("/p2/b2b-agents/linkedin-strategy-researcher/runs/<int:run_id>/playbook", methods=["GET", "POST"])
+@app.route("/p2/strategic-agents/linkedin-strategy-researcher/runs/<int:run_id>/playbook", methods=["GET", "POST"])
 @position2_required
 def linkedin_playbook_studio_playbook(run_id):
     from tracker import linkedin_playbook_store as lps_store
@@ -8620,11 +8654,11 @@ def linkedin_playbook_studio_playbook(run_id):
 # status, history, runs, playbook) the same way the /p2/gtm legacy redirect
 # does; 308 preserves method/body for the POST-based /analyze and /playbook
 # endpoints a still-open tab might call.
-@app.route("/p2/b2b-agents/linkedin-playbook-studio", methods=["GET", "POST"])
-@app.route("/p2/b2b-agents/linkedin-playbook-studio/", methods=["GET", "POST"])
-@app.route("/p2/b2b-agents/linkedin-playbook-studio/<path:rest>", methods=["GET", "POST"])
+@app.route("/p2/strategic-agents/linkedin-playbook-studio", methods=["GET", "POST"])
+@app.route("/p2/strategic-agents/linkedin-playbook-studio/", methods=["GET", "POST"])
+@app.route("/p2/strategic-agents/linkedin-playbook-studio/<path:rest>", methods=["GET", "POST"])
 def linkedin_playbook_studio_legacy_redirect(rest=""):
-    target = "/p2/b2b-agents/linkedin-strategy-researcher" + (("/" + rest) if rest else "")
+    target = "/p2/strategic-agents/linkedin-strategy-researcher" + (("/" + rest) if rest else "")
     if request.query_string:
         target += "?" + request.query_string.decode("utf-8", "ignore")
     return redirect(target, code=308)
@@ -8675,14 +8709,14 @@ def _sci_run_status_payload(run_id: int, email: str):
 # OLD paths from the BASE constant baked into the JS it loaded. Redirecting
 # those would be a broken run for anyone mid-analysis at deploy time;
 # answering both is not.
-@app.route("/p2/b2b-agents/social-creative-intelligence")
+@app.route("/p2/strategic-agents/social-creative-intelligence")
 def social_media_intelligence_legacy():
     """Old slug. No decorator on purpose: the gate answers at the
     destination, exactly like the legacy /p2/admin/* redirects."""
-    return redirect("/p2/b2b-agents/social-media-intelligence", code=301)
+    return redirect("/p2/strategic-agents/social-media-intelligence", code=301)
 
 
-@app.route("/p2/b2b-agents/social-media-intelligence")
+@app.route("/p2/strategic-agents/social-media-intelligence")
 @position2_required
 def social_media_intelligence():
     from tracker import sci_store
@@ -8696,8 +8730,8 @@ def social_media_intelligence():
     return render_template("social_media_intelligence.html", user=user, runs=runs)
 
 
-@app.route("/p2/b2b-agents/social-media-intelligence/search")
-@app.route("/p2/b2b-agents/social-creative-intelligence/search")
+@app.route("/p2/strategic-agents/social-media-intelligence/search")
+@app.route("/p2/strategic-agents/social-creative-intelligence/search")
 @position2_required
 def social_media_intelligence_search():
     """Company search shown before a run starts, so an ambiguous free-text
@@ -8740,8 +8774,8 @@ def social_media_intelligence_search():
     return jsonify(payload)
 
 
-@app.route("/p2/b2b-agents/social-media-intelligence/analyze", methods=["POST"])
-@app.route("/p2/b2b-agents/social-creative-intelligence/analyze", methods=["POST"])
+@app.route("/p2/strategic-agents/social-media-intelligence/analyze", methods=["POST"])
+@app.route("/p2/strategic-agents/social-creative-intelligence/analyze", methods=["POST"])
 @position2_required
 def social_media_intelligence_analyze():
     from tracker import sci_pipeline, sci_store
@@ -8765,8 +8799,8 @@ def social_media_intelligence_analyze():
     return jsonify({"run_id": run_id, "status": "running"})
 
 
-@app.route("/p2/b2b-agents/social-media-intelligence/runs/<int:run_id>/status")
-@app.route("/p2/b2b-agents/social-creative-intelligence/runs/<int:run_id>/status")
+@app.route("/p2/strategic-agents/social-media-intelligence/runs/<int:run_id>/status")
+@app.route("/p2/strategic-agents/social-creative-intelligence/runs/<int:run_id>/status")
 @position2_required
 def social_media_intelligence_run_status(run_id):
     email = (_get_user() or {}).get("email", "").lower()
@@ -8776,8 +8810,8 @@ def social_media_intelligence_run_status(run_id):
     return jsonify(payload)
 
 
-@app.route("/p2/b2b-agents/social-media-intelligence/runs/<int:run_id>")
-@app.route("/p2/b2b-agents/social-creative-intelligence/runs/<int:run_id>")
+@app.route("/p2/strategic-agents/social-media-intelligence/runs/<int:run_id>")
+@app.route("/p2/strategic-agents/social-creative-intelligence/runs/<int:run_id>")
 @position2_required
 def social_media_intelligence_run(run_id):
     from tracker import sci_store
@@ -8817,7 +8851,7 @@ def social_media_intelligence_run(run_id):
 # per call). Same rule Contact Finder arrived at over thirteen audit rounds:
 # only an explicit user action reaches a billed endpoint.
 
-@app.route("/p2/b2b-agents/event-conference-intelligence")
+@app.route("/p2/strategic-agents/event-conference-intelligence")
 @position2_required
 def event_conference_intelligence():
     from tracker import event_intel_rubric, event_intel_store, event_intel_workroom
@@ -8881,7 +8915,7 @@ def event_conference_intelligence():
                                    "total": event_intel_workroom.WINDOW_HOURS})
 
 
-@app.route("/p2/b2b-agents/event-conference-intelligence/profiles",
+@app.route("/p2/strategic-agents/event-conference-intelligence/profiles",
            methods=["GET", "POST"])
 @position2_required
 def event_conference_intelligence_profiles():
@@ -8907,7 +8941,7 @@ def event_conference_intelligence_profiles():
     return jsonify({"profile": event_intel_store.get_profile(profile_id, email)})
 
 
-@app.route("/p2/b2b-agents/event-conference-intelligence/profiles/draft",
+@app.route("/p2/strategic-agents/event-conference-intelligence/profiles/draft",
            methods=["POST"])
 @position2_required
 def event_conference_intelligence_profile_draft():
@@ -8943,7 +8977,7 @@ def event_conference_intelligence_profile_draft():
     return jsonify(out)
 
 
-@app.route("/p2/b2b-agents/event-conference-intelligence/profiles/<int:profile_id>",
+@app.route("/p2/strategic-agents/event-conference-intelligence/profiles/<int:profile_id>",
            methods=["POST"])
 @position2_required
 def event_conference_intelligence_profile_update(profile_id):
@@ -8959,7 +8993,7 @@ def event_conference_intelligence_profile_update(profile_id):
     return jsonify({"profile": event_intel_store.get_profile(profile_id, email)})
 
 
-@app.route("/p2/b2b-agents/event-conference-intelligence/run", methods=["POST"])
+@app.route("/p2/strategic-agents/event-conference-intelligence/run", methods=["POST"])
 @position2_required
 def event_conference_intelligence_run():
     from tracker import event_intel_pipeline, event_intel_store, event_intel_workroom
@@ -9057,7 +9091,7 @@ def event_conference_intelligence_run():
     return jsonify({"run_id": run_id, "status": "running"})
 
 
-@app.route("/p2/b2b-agents/event-conference-intelligence/runs/<int:run_id>/cancel", methods=['POST'])
+@app.route("/p2/strategic-agents/event-conference-intelligence/runs/<int:run_id>/cancel", methods=['POST'])
 @position2_required
 def event_conference_intelligence_cancel(run_id):
     from tracker import event_intel_jobs, event_intel_store
@@ -9067,7 +9101,7 @@ def event_conference_intelligence_cancel(run_id):
     return jsonify(cancelled=event_intel_jobs.cancel(run_id,email))
 
 
-@app.route("/p2/b2b-agents/event-conference-intelligence/runs/<int:run_id>/status")
+@app.route("/p2/strategic-agents/event-conference-intelligence/runs/<int:run_id>/status")
 @position2_required
 def event_conference_intelligence_status(run_id):
     from tracker import event_intel_store
@@ -9080,7 +9114,7 @@ def event_conference_intelligence_status(run_id):
                     "credits_spent": run.get("credits_spent", 0)})
 
 
-@app.route("/p2/b2b-agents/event-conference-intelligence/runs/<int:run_id>")
+@app.route("/p2/strategic-agents/event-conference-intelligence/runs/<int:run_id>")
 @position2_required
 def event_conference_intelligence_run_detail(run_id):
     from tracker import event_intel_audit, event_intel_report, event_intel_store
@@ -9125,7 +9159,7 @@ def event_conference_intelligence_run_detail(run_id):
     return response
 
 
-@app.route("/p2/b2b-agents/event-conference-intelligence/runs/<int:run_id>/resolve",
+@app.route("/p2/strategic-agents/event-conference-intelligence/runs/<int:run_id>/resolve",
            methods=["POST"])
 @position2_required
 def event_conference_intelligence_resolve(run_id):
@@ -9141,7 +9175,7 @@ def event_conference_intelligence_resolve(run_id):
     return jsonify(result)
 
 
-@app.route("/p2/b2b-agents/event-conference-intelligence/runs/<int:run_id>/candidates.csv")
+@app.route("/p2/strategic-agents/event-conference-intelligence/runs/<int:run_id>/candidates.csv")
 @position2_required
 def event_conference_intelligence_candidates_csv(run_id):
     """The ranked table as a file, with every sub-score in its own column.
@@ -9232,7 +9266,7 @@ def event_conference_intelligence_candidates_csv(run_id):
     return resp
 
 
-@app.route("/p2/b2b-agents/event-conference-intelligence/runs/<int:run_id>/outreach.csv")
+@app.route("/p2/strategic-agents/event-conference-intelligence/runs/<int:run_id>/outreach.csv")
 @position2_required
 def event_conference_intelligence_outreach_csv(run_id):
     """The drafts as a file.
@@ -9297,7 +9331,7 @@ def event_conference_intelligence_outreach_csv(run_id):
     return resp
 
 
-@app.route("/p2/b2b-agents/event-conference-intelligence/runs/<int:run_id>/plan")
+@app.route("/p2/strategic-agents/event-conference-intelligence/runs/<int:run_id>/plan")
 @position2_required
 def event_conference_intelligence_plan(run_id):
     from tracker import event_intel_planning as planning
@@ -9312,7 +9346,7 @@ def event_conference_intelligence_plan(run_id):
                            currencies=planning.CURRENCIES)
 
 
-@app.route("/p2/b2b-agents/event-conference-intelligence/runs/<int:run_id>/plan", methods=['POST'])
+@app.route("/p2/strategic-agents/event-conference-intelligence/runs/<int:run_id>/plan", methods=['POST'])
 @position2_required
 def event_conference_intelligence_plan_save(run_id):
     from tracker import event_intel_planning as planning
@@ -9333,7 +9367,7 @@ def event_conference_intelligence_plan_save(run_id):
     return jsonify(view)
 
 
-@app.route("/p2/b2b-agents/event-conference-intelligence/outcomes",
+@app.route("/p2/strategic-agents/event-conference-intelligence/outcomes",
            methods=["GET", "POST"])
 @position2_required
 def event_conference_intelligence_outcomes():
@@ -9370,7 +9404,7 @@ def event_conference_intelligence_outcomes():
     return event_conference_intelligence_run_detail(run_id)
 
 
-@app.route("/p2/b2b-agents/event-conference-intelligence/runs/<int:run_id>/export.csv")
+@app.route("/p2/strategic-agents/event-conference-intelligence/runs/<int:run_id>/export.csv")
 @position2_required
 def event_conference_intelligence_export(run_id):
     """CSV of the roster. Every row carries the role and the source URL, so
@@ -9438,7 +9472,7 @@ def event_conference_intelligence_export(run_id):
 # CMO of Acme?") that resolves ambiguous company names by asking rather than
 # guessing. See tracker/apollo_client.py for the underlying search functions.
 
-@app.route("/p2/b2b-agents/company-people-intelligence")
+@app.route("/p2/strategic-agents/company-people-intelligence")
 @position2_required
 def cpi_home():
     return render_template("company_people_intelligence.html", user=_get_user(),
@@ -9675,7 +9709,7 @@ def _cpi_search_no_match_note(filters: dict, resolved_names, api_key: str, spend
     return {"answer": answer, "researched": researched, "web_search": web}
 
 
-@app.route("/p2/b2b-agents/company-people-intelligence/search", methods=["POST"])
+@app.route("/p2/strategic-agents/company-people-intelligence/search", methods=["POST"])
 @position2_required
 def cpi_search():
     """Live Apollo search for the results grid. People search is free; company
@@ -10141,7 +10175,7 @@ def _cpi_industries_seen() -> set:
             pass
 
 
-@app.route("/p2/b2b-agents/company-people-intelligence/industries")
+@app.route("/p2/strategic-agents/company-people-intelligence/industries")
 @position2_required
 def cpi_industries():
     """Industry picker entries for what has been typed so far. Costs nothing and
@@ -10300,7 +10334,7 @@ def _cpi_record_vocab(orgs) -> None:
         _cpi_vocab_learn("location", places)
 
 
-@app.route("/p2/b2b-agents/company-people-intelligence/vocab")
+@app.route("/p2/strategic-agents/company-people-intelligence/vocab")
 @position2_required
 def cpi_vocab():
     """Picker entries for the NAICS, SIC, technology and location filters.
@@ -11277,7 +11311,7 @@ def _cpi_enrich_company(domain: str, apollo_id: str, spend=None) -> dict:
         return {"matched": False, "lookup_failed": True}
 
 
-@app.route("/p2/b2b-agents/company-people-intelligence/enrich", methods=["POST"])
+@app.route("/p2/strategic-agents/company-people-intelligence/enrich", methods=["POST"])
 @position2_required
 def cpi_enrich():
     body = request.get_json(silent=True) or {}
@@ -11366,7 +11400,7 @@ _CPI_ID_CACHE_SV_KEY = "_cpi_sv"
 _CPI_ID_CACHE_VERSION = 1
 
 
-@app.route("/p2/b2b-agents/company-people-intelligence/enrich-bulk", methods=["POST"])
+@app.route("/p2/strategic-agents/company-people-intelligence/enrich-bulk", methods=["POST"])
 @position2_required
 def cpi_enrich_bulk():
     """Reveal a chosen set of people by Apollo id, in one batch.
@@ -11768,7 +11802,7 @@ def _cpi_history_label(entity: str, filters: dict) -> str:
                                        else "All people")
 
 
-@app.route("/p2/b2b-agents/company-people-intelligence/history", methods=["GET", "POST"])
+@app.route("/p2/strategic-agents/company-people-intelligence/history", methods=["GET", "POST"])
 @position2_required
 def cpi_history():
     """POST saves a result set; GET lists this user's recent saved searches."""
@@ -11873,7 +11907,7 @@ def cpi_history():
             pass
 
 
-@app.route("/p2/b2b-agents/company-people-intelligence/history/<int:entry_id>",
+@app.route("/p2/strategic-agents/company-people-intelligence/history/<int:entry_id>",
            methods=["GET", "DELETE"])
 @position2_required
 def cpi_history_entry(entry_id: int):
@@ -12215,7 +12249,7 @@ def _cpi_list_key(row: dict, entity: str) -> str:
     return key or "?"
 
 
-@app.route("/p2/b2b-agents/company-people-intelligence/list",
+@app.route("/p2/strategic-agents/company-people-intelligence/list",
            methods=["GET", "POST", "DELETE"])
 @position2_required
 def cpi_list():
@@ -12428,7 +12462,7 @@ def _cpi_rate_limited(route_key: str, email: str) -> bool:
 
 
 # ── Typed sentence to filter panel ────────────────────────────────────────────
-@app.route("/p2/b2b-agents/company-people-intelligence/parse-query", methods=["POST"])
+@app.route("/p2/strategic-agents/company-people-intelligence/parse-query", methods=["POST"])
 @position2_required
 def cpi_parse_query():
     """Turn "CMOs at healthcare companies over 200 people" into filter values.
@@ -12532,7 +12566,7 @@ _CPI_COUNT_VERIFIED_FILTERS = ("industries", "employee_min", "employee_max",
                                "company_domains")
 
 
-@app.route("/p2/b2b-agents/company-people-intelligence/count", methods=["POST"])
+@app.route("/p2/strategic-agents/company-people-intelligence/count", methods=["POST"])
 @position2_required
 def cpi_count():
     """How many people Apollo says match, for 0 credits. See the note above."""
@@ -12675,7 +12709,7 @@ def _cpi_credit_record(action: str, credits) -> None:
             pass
 
 
-@app.route("/p2/b2b-agents/company-people-intelligence/credits")
+@app.route("/p2/strategic-agents/company-people-intelligence/credits")
 @position2_required
 def cpi_credits():
     """What this tool has spent from the shared Apollo pool.
@@ -12714,7 +12748,7 @@ def cpi_credits():
             pass
 
 
-@app.route("/p2/b2b-agents/company-people-intelligence/export", methods=["POST"])
+@app.route("/p2/strategic-agents/company-people-intelligence/export", methods=["POST"])
 @position2_required
 def cpi_export():
     """Download the selected rows as .csv or .xlsx.
@@ -15016,7 +15050,7 @@ def _cpi_chat_remember(fields: dict, credits: int) -> None:
         log.warning("cpi chat history hook failed: %s", e)
 
 
-@app.route("/p2/b2b-agents/company-people-intelligence/chat", methods=["POST"])
+@app.route("/p2/strategic-agents/company-people-intelligence/chat", methods=["POST"])
 @position2_required
 def cpi_chat():
     """Grounded NL Q&A over live Apollo data. Stateless: the client resends the
@@ -15896,7 +15930,7 @@ _ACCOUNTS_HTML_UNUSED = """
       </a>
       <div class="bc">
         <a href="/hub">Hub</a><span class="bc-sep">›</span>
-        <a href="/p2/b2b-agents">B2B Agents</a><span class="bc-sep">›</span>
+        <a href="/p2/strategic-agents">Strategic Agents</a><span class="bc-sep">›</span>
         <span class="bc-cur">Signal Tracker</span>
       </div>
     </div>
@@ -16319,7 +16353,7 @@ THREE SURFACES: (1) public marketing site, logged out; (2) /app member workspace
 account, curated SEO/GEO agents + saved run history; (3) /p2/* internal staff app, @position2.com only
 (this chat lives here) — Hub, GTM tools, SEO Studio, Accounts/ABM Signal Tracker, Admin dashboards.
 
-ANONYMOUS VISITORS (de-anonymisation engine, /p2/admin/anonymous-traffic, /p2/b2b-agents/anonymous-visitors):
+ANONYMOUS VISITORS (de-anonymisation engine, /p2/admin/anonymous-traffic, /p2/strategic-agents/anonymous-visitors):
 Identifies which COMPANIES (not usually individual people) visit the Position2 site, by fusing three
 signals per visitor IP: IPinfo (org/ASN/hostname/privacy), reverse DNS, and RDAP registrant/netblock.
 Each visitor gets a connection_type: "business" (a real company network — the only type that gets
@@ -16339,7 +16373,7 @@ recency (signals decay after about 90 days). Sourced from Apollo.io + news feeds
 refreshed weekly via a GitHub Actions pipeline. Exact company/signal counts per account are in the LIVE
 DATA section below when available — use those numbers, never a memorised figure.
 
-AD INTELLIGENCE (/p2/b2b-agents/ad-intelligence): tracks competitors' running ads (headline, CTA, format,
+AD INTELLIGENCE (/p2/strategic-agents/ad-intelligence): tracks competitors' running ads (headline, CTA, format,
 keywords, messaging angle, first/last seen) pulled from a shared Google Sheet.
 
 SEO STUDIO (/p2/seo/<tool>) and the /app agents: a suite of SEO/GEO tools (Keyword Finder, Content Brief

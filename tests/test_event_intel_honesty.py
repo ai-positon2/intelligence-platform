@@ -34,7 +34,7 @@ import app as appmod  # noqa: E402
 from tracker import event_intel_harvest as harvest  # noqa: E402
 from tracker import event_intel_store as store  # noqa: E402
 
-_PAGE = "/p2/b2b-agents/event-conference-intelligence"
+_PAGE = "/p2/strategic-agents/event-conference-intelligence"
 
 
 def _node_available():

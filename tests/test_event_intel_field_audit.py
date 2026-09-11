@@ -318,7 +318,7 @@ import sys
 
 import app as appmod
 
-_PAGE = "/p2/b2b-agents/event-conference-intelligence"
+_PAGE = "/p2/strategic-agents/event-conference-intelligence"
 _IIFE_CLOSE = "\n  })();"
 _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 

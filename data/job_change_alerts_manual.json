@@ -1,5 +1,5 @@
 {
-  "_readme": "Source-of-truth ledger for the Job Change Alert page (/p2/b2b-agents/job-change-alert). scripts/sync_job_change_alerts.py appends new events here on every sync and keeps data/job_change_alerts.db in lockstep -- this file is the one to hand-edit/audit, the .db is derived.",
+  "_readme": "Source-of-truth ledger for the Job Change Alert page (/p2/strategic-agents/job-change-alert). scripts/sync_job_change_alerts.py appends new events here on every sync and keeps data/job_change_alerts.db in lockstep -- this file is the one to hand-edit/audit, the .db is derived.",
   "events": [
     {
       "apollo_contact_id": "69f2feab3ac19c0001bb6c84",

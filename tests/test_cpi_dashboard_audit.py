@@ -38,7 +38,7 @@ import app as appmod  # noqa: E402
 
 _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _JS = os.path.join(_ROOT, "static", "js", "company_people_intelligence.js")
-_EXPORT = "/p2/b2b-agents/company-people-intelligence/export"
+_EXPORT = "/p2/strategic-agents/company-people-intelligence/export"
 
 
 def _js():

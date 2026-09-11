@@ -36,7 +36,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import app as appmod  # noqa: E402
 import tracker.apollo_client as ac  # noqa: E402
 
-_SEARCH = "/p2/b2b-agents/company-people-intelligence/search"
+_SEARCH = "/p2/strategic-agents/company-people-intelligence/search"
 
 
 @pytest.fixture

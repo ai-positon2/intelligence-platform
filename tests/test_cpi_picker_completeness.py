@@ -45,8 +45,8 @@ from tracker import apollo_vocab as av  # noqa: E402
 
 _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _TPL = os.path.join(_ROOT, "templates", "company_people_intelligence.html")
-_VOCAB = "/p2/b2b-agents/company-people-intelligence/vocab"
-_INDUSTRIES = "/p2/b2b-agents/company-people-intelligence/industries"
+_VOCAB = "/p2/strategic-agents/company-people-intelligence/vocab"
+_INDUSTRIES = "/p2/strategic-agents/company-people-intelligence/industries"
 
 # Bigger than any vocabulary here, so "what would an uncapped call return" is
 # expressible without hardcoding a size that will change as seeds are added.

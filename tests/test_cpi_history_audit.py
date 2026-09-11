@@ -37,9 +37,9 @@ import tracker.apollo_client as ac  # noqa: E402
 _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _JS = os.path.join(_ROOT, "static", "js", "company_people_intelligence.js")
 
-_BULK = "/p2/b2b-agents/company-people-intelligence/enrich-bulk"
-_ENRICH = "/p2/b2b-agents/company-people-intelligence/enrich"
-_HISTORY = "/p2/b2b-agents/company-people-intelligence/history"
+_BULK = "/p2/strategic-agents/company-people-intelligence/enrich-bulk"
+_ENRICH = "/p2/strategic-agents/company-people-intelligence/enrich"
+_HISTORY = "/p2/strategic-agents/company-people-intelligence/history"
 
 
 def _js():
