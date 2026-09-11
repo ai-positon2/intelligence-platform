@@ -3327,8 +3327,45 @@ def logout():
 # three with a "seo_slug" are live (their "Use Agent" embeds the real SERP tool, same
 # as /app/<slug>/use); the rest render an "in setup" dashboard shell until wired.
 #
+# One exception: "slot-checker" (see _SLOT_CHECKER_CLIENT_AGENT below) is
+# deliberately NOT an APP_AGENTS entry. APP_AGENTS backs /app, the public
+# catalog shown to every signed-in Google user (see app_home's own
+# docstring), and Slot Checker is a bespoke Position2-staff dashboard
+# (already live at /p2/strategic-agents/42-north-dental-slot-checker) that
+# should stay off that catalog -- 42 North Dental should see it only inside
+# their own gated portal. _client_agent_view resolves it from this standalone
+# dict instead, so the rest of the client-portal machinery (which only ever
+# reads _client_agent_view's return shape, never APP_AGENTS directly) treats
+# it exactly like a normal catalog agent.
+#
 # Routes are registered explicitly per known client slug (see the loop below), so an
 # unknown top-level path never resolves here -- there is no catch-all "/<anything>".
+_SLOT_CHECKER_CLIENT_AGENT = {
+    "slug": "slot-checker",
+    "name": "42 North Dental Slot Checker",
+    "tagline": "Appointment availability",
+    "ac": "#4ade80", "ac2": "#14b8a6",
+    "icon": _asvg("<circle cx=\"12\" cy=\"12\" r=\"9\"/><path d=\"M12 7v5l3.5 2\"/>"),
+    "pill1": "Appointment availability", "pill2": "82 practices · checked weekly",
+    "lead": ("What a new patient would actually be offered if they tried to book "
+             "right now, across every location the agent checks: which services "
+             "are open, on which days, and where the calendar is full."),
+    "trips": [
+        {"t": "What it does", "d": "See exactly what a new patient would be offered "
+                                    "if they tried to book right now, across every "
+                                    "42 North Dental location: which services are "
+                                    "open, which days have room, and where the "
+                                    "calendar is already full."},
+        {"t": "How it works", "d": "A weekly crawl checks live booking availability "
+                                    "across every practice, groups it by service and "
+                                    "location, and flags the ones that are fully "
+                                    "booked or have gone quiet."},
+        {"t": "Best for", "d": "Practice operations and marketing teams tracking "
+                                "booking friction across the portfolio."},
+    ],
+    "tags": ["Weekly crawl", "Booking availability", "AI Insights"],
+}
+
 CLIENTS = {
     "northstaranesthesia": {
         "slug":     "northstaranesthesia",
@@ -3371,6 +3408,24 @@ CLIENTS = {
             "linkedin-social-researcher": "https://watchtower-by-position2.vercel.app/linkedin.html",
         },
     },
+    "42northdental": {
+        "slug":     "42northdental",
+        "name":     "42 North Dental",
+        "short":    "42 North Dental",
+        # Email domains allowed in addition to @position2.com (always allowed).
+        "domains":  ["42northdental.com"],
+        "accent":   "#4ade80",
+        "accent2":  "#14b8a6",
+        "tagline":  "Your agent, ready to go.",
+        "blurb":    "",
+        "agents":   ["slot-checker"],
+        # No per-client sheet to point at (unlike linkedin_sheet above): 42 North
+        # Dental is the one practice group Slot Checker covers, so this flag just
+        # tells _client_live_dashboard/_client_agent_dashboard to render the same
+        # portfolio-wide dashboard Position2 staff see internally, through the
+        # client-gated data/insights routes instead of @position2_required ones.
+        "slot_checker_live": True,
+    },
 }
 
 @app.template_filter("nodash")
@@ -3395,11 +3450,18 @@ def _client_dashboard_path(client, agent_slug):
 
 def _client_live_dashboard(client, agent_slug):
     """True if this agent renders a *live* (Flask-rendered) co-branded dashboard for
-    the client, rather than a pre-built static HTML file. Currently: LinkedIn
-    Intelligence, when the client has its own engagement sheet configured. Same UI
-    as the internal /p2 dashboard, just pointed at the client's sheet."""
-    return bool(client and agent_slug == "linkedin-intelligence"
-                and client.get("linkedin_sheet"))
+    the client, rather than a pre-built static HTML file: LinkedIn Intelligence, when
+    the client has its own engagement sheet configured (same UI as the internal /p2
+    dashboard, just pointed at the client's sheet), or 42 North Dental's Slot Checker,
+    when this client is flagged as reading the one shared portfolio-wide sheet (see
+    "slot_checker_live" on CLIENTS["42northdental"])."""
+    if not client:
+        return False
+    if agent_slug == "linkedin-intelligence":
+        return bool(client.get("linkedin_sheet"))
+    if agent_slug == "slot-checker":
+        return bool(client.get("slot_checker_live"))
+    return False
 
 def _client_external_tool(client, agent_slug):
     """External, Position2-hosted tool URL for an agent in this client's portal, or
@@ -3411,13 +3473,15 @@ def _client_external_tool(client, agent_slug):
     return (client.get("external_tools") or {}).get(agent_slug) if client else None
 
 def _client_agent_view(slug, client=None):
-    """APP_AGENTS entry for a slug, enriched with `connected` (has a live surface),
-    `is_dashboard` (backed by a co-branded dashboard — static file or live route — for
-    this client, so it renders a dashboard in the embed shell and is NOT run-metered)
-    and `is_external` (the embed is a Position2-hosted external tool: it renders in the
+    """APP_AGENTS entry for a slug (or _SLOT_CHECKER_CLIENT_AGENT for "slot-checker",
+    which is deliberately kept out of the public APP_AGENTS catalog -- see that dict's
+    own comment), enriched with `connected` (has a live surface), `is_dashboard`
+    (backed by a co-branded dashboard — static file or live route — for this client,
+    so it renders a dashboard in the embed shell and is NOT run-metered) and
+    `is_external` (the embed is a Position2-hosted external tool: it renders in the
     embed shell but IS run-metered like a SERP tool, capped at AGENT_RUN_CAP per user).
     Returns None for unknown slugs."""
-    a = APP_AGENTS_BY_SLUG.get(slug)
+    a = _SLOT_CHECKER_CLIENT_AGENT if slug == "slot-checker" else APP_AGENTS_BY_SLUG.get(slug)
     if not a:
         return None
     has_dash = bool(client and (_client_dashboard_path(client, slug)
@@ -3563,7 +3627,7 @@ def _client_agent_dashboard(client_slug, agent_slug):
         abort(404)
     # Live LinkedIn Intelligence: render the exact /p2 dashboard template in client
     # mode (internal chrome hidden), pointed at this client's gated data endpoint.
-    if _client_live_dashboard(client, agent_slug):
+    if _client_live_dashboard(client, agent_slug) and agent_slug == "linkedin-intelligence":
         data_url = "/%s/agents/%s/dashboard/data" % (client_slug, agent_slug)
         # The dashboard's target company is this client, so "Employee" (relative to
         # target) must be labelled as the client, not Position². Token feeds the
@@ -3577,6 +3641,20 @@ def _client_agent_dashboard(client_slug, agent_slug):
         resp.headers.update({"Cache-Control": "no-cache, no-store, must-revalidate",
                              "Pragma": "no-cache", "Expires": "0"})
         return resp
+    # Live Slot Checker: render the exact /p2 dashboard template in client mode
+    # (internal-ops topbar, admin menu and cross-tool ⌘K nav all hidden -- see
+    # 42_north_dental_slot_checker.html's own `client_mode` guards), pointed at
+    # this client's gated data/insights endpoints instead of the
+    # @position2_required ones.
+    if _client_live_dashboard(client, agent_slug) and agent_slug == "slot-checker":
+        resp = make_response(render_template(
+            "42_north_dental_slot_checker.html", user=_get_user(), client_mode=True,
+            client=client,
+            data_url="/%s/agents/%s/dashboard/data" % (client_slug, agent_slug),
+            insights_url="/%s/agents/%s/dashboard/insights" % (client_slug, agent_slug)))
+        resp.headers.update({"Cache-Control": "no-cache, no-store, must-revalidate",
+                             "Pragma": "no-cache", "Expires": "0"})
+        return resp
     path = _client_dashboard_path(client, agent_slug)
     if not path:
         abort(404)
@@ -3585,9 +3663,11 @@ def _client_agent_dashboard(client_slug, agent_slug):
                          "Pragma": "no-cache", "Expires": "0"})
     return resp
 
-def _client_linkedin_data(client_slug, agent_slug):
-    """Gated JSON data endpoint for a client's live LinkedIn Intelligence dashboard.
-    Same shape/response as the internal /p2 endpoint, read from this client's sheet.
+def _client_dashboard_data(client_slug, agent_slug):
+    """Gated JSON data endpoint for a client's live dashboard-backed agent. Dispatches
+    on agent_slug since each live dashboard reads a different underlying source:
+    LinkedIn Intelligence reads this client's own engagement sheet, Slot Checker reads
+    the one shared 42 North Dental portfolio sheet (same as the internal dashboard).
     ?fresh=1 forces a live re-pull (the dashboard's Refresh button)."""
     client = CLIENTS.get(client_slug)
     if not client:
@@ -3598,7 +3678,26 @@ def _client_linkedin_data(client_slug, agent_slug):
     if not _client_live_dashboard(client, agent_slug):
         abort(404)
     force = request.args.get("fresh") in ("1", "true", "yes")
-    return _linkedin_data_response(client["linkedin_sheet"], force)
+    if agent_slug == "linkedin-intelligence":
+        return _linkedin_data_response(client["linkedin_sheet"], force)
+    if agent_slug == "slot-checker":
+        return _slot_checker_data_json(force)
+    abort(404)
+
+def _client_dashboard_insights(client_slug, agent_slug):
+    """Gated JSON endpoint for a live dashboard's AI-insights companion route. Only
+    Slot Checker has one today -- LinkedIn Intelligence's live dashboard has no
+    equivalent -- so any other agent_slug 404s the same as an unknown one."""
+    client = CLIENTS.get(client_slug)
+    if not client:
+        abort(404)
+    gate = _client_gate(client)
+    if gate is not None:
+        return gate
+    if agent_slug != "slot-checker" or not _client_live_dashboard(client, agent_slug):
+        abort(404)
+    force = request.args.get("fresh") in ("1", "true", "yes")
+    return _slot_checker_insights_json(force)
 
 def _client_agent_log_run(client_slug, agent_slug):
     """Logs one real run of a client-portal agent, cap-enforced. Called client-side
@@ -3703,7 +3802,9 @@ for _cslug in CLIENTS:
     app.add_url_rule("/" + _cslug + "/agents/<agent_slug>/dashboard", "client_dashboard__" + _cslug,
                      (lambda agent_slug, cs=_cslug: _client_agent_dashboard(cs, agent_slug)))
     app.add_url_rule("/" + _cslug + "/agents/<agent_slug>/dashboard/data", "client_dashboard_data__" + _cslug,
-                     (lambda agent_slug, cs=_cslug: _client_linkedin_data(cs, agent_slug)))
+                     (lambda agent_slug, cs=_cslug: _client_dashboard_data(cs, agent_slug)))
+    app.add_url_rule("/" + _cslug + "/agents/<agent_slug>/dashboard/insights", "client_dashboard_insights__" + _cslug,
+                     (lambda agent_slug, cs=_cslug: _client_dashboard_insights(cs, agent_slug)))
     app.add_url_rule("/" + _cslug + "/agents/<agent_slug>/use/log-run", "client_logrun__" + _cslug,
                      (lambda agent_slug, cs=_cslug: _client_agent_log_run(cs, agent_slug)), methods=["POST"])
     app.add_url_rule("/" + _cslug + "/agents/<agent_slug>/use/finish-run", "client_finishrun__" + _cslug,
@@ -4250,10 +4351,11 @@ def slot_checker_page():
     return render_template("42_north_dental_slot_checker.html", user=_get_user())
 
 
-@app.route("/p2/strategic-agents/42-north-dental-slot-checker/data")
-@position2_required
-def slot_checker_data():
-    """JSON payload for the Slot Checker dashboard.
+def _slot_checker_data_json(force):
+    """JSON payload for the Slot Checker dashboard, shared by the internal
+    Position2 route and the gated 42 North Dental client-portal copy (see
+    CLIENTS["42northdental"]) -- both read the same portfolio-wide sheet, so
+    there's no per-caller variance to branch on here.
 
     No hand-rolled gzip here, unlike the three older data routes above: the
     _compress_response after_request hook already gzips any JSON response over
@@ -4263,16 +4365,22 @@ def slot_checker_data():
     already-derived data, not a re-parse.
     """
     from tracker import slot_checker
-    force = request.args.get("fresh") in ("1", "true", "yes")
     resp = jsonify(slot_checker.fetch(force=force))
     resp.headers["Cache-Control"] = "private, max-age=60"
     return resp
 
 
-@app.route("/p2/strategic-agents/42-north-dental-slot-checker/insights")
+@app.route("/p2/strategic-agents/42-north-dental-slot-checker/data")
 @position2_required
-def slot_checker_insights_route():
+def slot_checker_data():
+    force = request.args.get("fresh") in ("1", "true", "yes")
+    return _slot_checker_data_json(force)
+
+
+def _slot_checker_insights_json(force):
     """AI-synthesized weekly briefing over the current dashboard numbers.
+    Shared by the internal route and the 42 North Dental client portal, same
+    reasoning as _slot_checker_data_json above.
 
     tracker/slot_checker_insights.py degrades to (None, None) when
     ANTHROPIC_API_KEY isn't configured -- that is a deployment state, not a
@@ -4283,7 +4391,6 @@ def slot_checker_insights_route():
     AI Insights (see _lps_run_insights_job).
     """
     from tracker import slot_checker, slot_checker_insights
-    force = request.args.get("fresh") in ("1", "true", "yes")
     dashboard = slot_checker.fetch()
     if not dashboard.get("practices"):
         return jsonify({"configured": bool(os.environ.get("ANTHROPIC_API_KEY", "")),
@@ -4302,6 +4409,13 @@ def slot_checker_insights_route():
                          "retryable": slot_checker_insights.is_retryable(err)})
     resp.headers["Cache-Control"] = "private, max-age=60"
     return resp
+
+
+@app.route("/p2/strategic-agents/42-north-dental-slot-checker/insights")
+@position2_required
+def slot_checker_insights_route():
+    force = request.args.get("fresh") in ("1", "true", "yes")
+    return _slot_checker_insights_json(force)
 
 
 _SEO_TOOLS_FALLBACK = [
