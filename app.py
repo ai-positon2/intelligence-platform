@@ -3346,7 +3346,7 @@ _SLOT_CHECKER_CLIENT_AGENT = {
     "tagline": "Appointment availability",
     "ac": "#4ade80", "ac2": "#14b8a6",
     "icon": _asvg("<circle cx=\"12\" cy=\"12\" r=\"9\"/><path d=\"M12 7v5l3.5 2\"/>"),
-    "pill1": "Appointment availability", "pill2": "82 practices · checked weekly",
+    "pill1": "Appointment availability", "pill2": "82 practices · checked daily",
     "lead": ("What a new patient would actually be offered if they tried to book "
              "right now, across every location the agent checks: which services "
              "are open, on which days, and where the calendar is full."),
@@ -3356,14 +3356,14 @@ _SLOT_CHECKER_CLIENT_AGENT = {
                                     "42 North Dental location: which services are "
                                     "open, which days have room, and where the "
                                     "calendar is already full."},
-        {"t": "How it works", "d": "A weekly crawl checks live booking availability "
+        {"t": "How it works", "d": "A daily crawl checks live booking availability "
                                     "across every practice, groups it by service and "
                                     "location, and flags the ones that are fully "
                                     "booked or have gone quiet."},
         {"t": "Best for", "d": "Practice operations and marketing teams tracking "
                                 "booking friction across the portfolio."},
     ],
-    "tags": ["Weekly crawl", "Booking availability", "AI Insights"],
+    "tags": ["Daily crawl", "Booking availability", "AI Insights"],
 }
 
 CLIENTS = {
@@ -3412,6 +3412,13 @@ CLIENTS = {
         "slug":     "42northdental",
         "name":     "42 North Dental",
         "short":    "42 North Dental",
+        # Client's own logo (their white wordmark, for the dark dashboard), same
+        # treatment as northstaranesthesia's above: served locally rather than
+        # hotlinked so this portal never depends on 42northdental.com's uptime,
+        # sourced from that site's own footer (the header lockup is dark text,
+        # unreadable on this dark background; the footer one is already the
+        # white-on-dark variant).
+        "logo":     "/static/clients/42northdental/logo-white.png",
         # Email domains allowed in addition to @position2.com (always allowed).
         "domains":  ["42northdental.com"],
         "accent":   "#4ade80",
@@ -3425,6 +3432,13 @@ CLIENTS = {
         # portfolio-wide dashboard Position2 staff see internally, through the
         # client-gated data/insights routes instead of @position2_required ones.
         "slot_checker_live": True,
+        # A dashboard agent is never run-metered (see _client_agent_log_run), so
+        # History would only ever show empty for this client -- hide the sidebar
+        # link rather than ship a workspace tab that can never have anything in
+        # it. The /history route itself still resolves (same "hidden means
+        # unlisted, not gone" principle as HIDDEN_AGENT_SLUGS) in case anyone
+        # bookmarks it before or after this changes.
+        "hide_history": True,
     },
 }
 

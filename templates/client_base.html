@@ -47,6 +47,7 @@
           </a>
           {% endfor %}
         </div>
+        {% if not client.hide_history %}
         <div class="sb-group">
           <div class="sb-eyebrow">Workspace</div>
           <a class="sb-item{{ ' active' if request.path == '/' + client.slug + '/history' }}" href="/{{ client.slug }}/history">
@@ -55,6 +56,7 @@
             <span class="lbl">History</span>
           </a>
         </div>
+        {% endif %}
       </nav>
       <div class="sb-foot">
         <div class="sfa">
