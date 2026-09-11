@@ -251,11 +251,14 @@ def run_platform_collection(run_id: int, platform: str, handle: str,
     sci_store.upsert_platform_run(run_id, platform, status="collecting")
     # Which LinkedIn page the posts came from, and how well it was
     # corroborated as this company. None for every other platform, and for
-    # LinkedIn served by Apify, which cannot report one.
+    # LinkedIn served by Apify, which cannot report one. Both feed
+    # sci_store.canonical_profile_url below, alongside the plain `handle`
+    # every platform has.
     note = None
+    youtube_channel_id = None
     try:
         if platform == "youtube":
-            posts, vendor = _collect_youtube(handle)
+            posts, vendor, youtube_channel_id = _collect_youtube(handle)
         elif platform == "reddit":
             posts, vendor = _collect_reddit(handle)
         elif platform == "linkedin":
@@ -285,12 +288,25 @@ def run_platform_collection(run_id: int, platform: str, handle: str,
         status = "ok"
 
     dated = [p.get("posted_at") for p in windowed if p.get("posted_at")]
+    # The handle that JUST fetched real posts is the one thing this run has
+    # actually verified, which makes it more trustworthy than identify's own
+    # pre-collection guess at profile_url (see canonical_profile_url's
+    # docstring for why that guess goes missing often enough to matter: the
+    # language model behind identify is simply not reliable about including
+    # it). Only include the key when something resolves, so a platform this
+    # function can't build a confident link for (bare `handle` on
+    # LinkedIn with no `note`, YouTube's guess-prone handle formats without
+    # a resolved channel id) keeps whatever identify already stored instead
+    # of having it overwritten with nothing.
+    resolved_url = sci_store.canonical_profile_url(
+        platform, handle, note=note, youtube_channel_id=youtube_channel_id)
     sci_store.upsert_platform_run(
         run_id, platform, status=status, post_count=written,
         last_post_at=max(dated) if dated else None,
         collected_at=datetime.now(timezone.utc).isoformat(),
         source_vendor=vendor,
-        status_detail=_collection_note(status, note))
+        status_detail=_collection_note(status, note),
+        **({"profile_url": resolved_url} if resolved_url else {}))
 
 
 def _collect_via_apify(platform: str, handle: str) -> tuple[list[dict], str]:
@@ -372,7 +388,7 @@ def _collect_instagram(handle: str) -> tuple[list[dict], str]:
         handle, token, max_posts=MAX_POSTS_PER_PLATFORM, strict=True), "apify"
 
 
-def _collect_youtube(handle: str) -> tuple[list[dict], str]:
+def _collect_youtube(handle: str) -> tuple[list[dict], str, str | None]:
     from tracker import sci_youtube_client
     api_key = os.environ.get("YOUTUBE_API_KEY", "")
     if not api_key:
@@ -381,7 +397,7 @@ def _collect_youtube(handle: str) -> tuple[list[dict], str]:
     if not channel_id:
         # Distinct from a real scrape failure: the handle just didn't resolve
         # to a channel. Treated as "found nothing" rather than "failed".
-        return [], "youtube_api"
+        return [], "youtube_api", None
     # Note: list_recent_videos currently degrades a mid-fetch API failure to
     # [] rather than raising, unlike the Apify collectors -- acceptable for
     # Phase 1 since the official API is far less prone to the opaque
@@ -390,7 +406,12 @@ def _collect_youtube(handle: str) -> tuple[list[dict], str]:
     # to matter in practice.
     posts = sci_youtube_client.list_recent_videos(channel_id, api_key,
                                                    max_results=MAX_POSTS_PER_PLATFORM, days=DEFAULT_WINDOW_DAYS)
-    return posts, "youtube_api"
+    # channel_id, not handle: resolve_channel() is what actually disambiguates
+    # whatever shape identify guessed (a display name, "@handle", a full URL,
+    # or a bare channel id) into the one thing a URL can safely be built
+    # from. See sci_store.canonical_profile_url for why the caller needs it
+    # by itself rather than a URL already built here.
+    return posts, "youtube_api", channel_id
 
 
 def _collect_reddit(handle: str) -> tuple[list[dict], str]:

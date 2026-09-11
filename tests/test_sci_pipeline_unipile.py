@@ -125,6 +125,146 @@ def test_run_platform_collection_records_source_vendor(mock_available, mock_coll
     assert terminal[-1]["source_vendor"] == "unipile"
 
 
+# ── run_platform_collection stores a confirmed profile_url ─────────────────
+# The bug this whole section guards against: identify's language model is
+# told to return a profile_url alongside each handle and does not reliably
+# do so, so an account could be successfully collected -- real posts, a
+# working handle -- and "Every account, in one place" would still show LINK
+# NOT CAPTURED. run_platform_collection now builds one from whichever
+# identifier actually fetched the posts, once collection succeeds.
+
+@patch("tracker.sci_source_instagram_unipile.collect")
+@patch("tracker.unipile_client.is_available")
+def test_run_platform_collection_stores_a_profile_url_on_success(mock_available, mock_collect):
+    from tracker import sci_store
+    mock_available.return_value = True
+    mock_collect.return_value = [{"platform_post_id": "1", "posted_at": None}]
+    calls = []
+    with patch.object(sci_store, "upsert_platform_run",
+                      side_effect=lambda run_id, platform, **kw: calls.append(kw)), \
+         patch.object(sci_store, "upsert_posts", return_value=1):
+        sci_pipeline.run_platform_collection(1, "instagram", "acmeco")
+    terminal = [kw for kw in calls if kw.get("status")][-1]
+    assert terminal["profile_url"] == "https://www.instagram.com/acmeco/"
+
+
+@patch("tracker.sci_source_linkedin_unipile.collect_with_page")
+@patch("tracker.unipile_client.is_available")
+def test_run_platform_collection_linkedin_uses_the_confirmed_slug_not_the_raw_handle(
+        mock_available, mock_collect):
+    """The raw handle identify produced can be anything -- "acme", "Acme
+    Corp", a full URL. note["public_identifier"] is LinkedIn's own API
+    confirming which page was actually read, and that is what the link must
+    be built from, not whatever the identify step originally guessed."""
+    from tracker import sci_store
+    mock_available.return_value = True
+    mock_collect.return_value = (
+        [{"platform_post_id": "1", "posted_at": None}],
+        {"verification": "domain", "page": "x", "public_identifier": "acme-official"},
+    )
+    calls = []
+    with patch.object(sci_store, "upsert_platform_run",
+                      side_effect=lambda run_id, platform, **kw: calls.append(kw)), \
+         patch.object(sci_store, "upsert_posts", return_value=1):
+        sci_pipeline.run_platform_collection(1, "linkedin", "some ambiguous guess")
+    terminal = [kw for kw in calls if kw.get("status")][-1]
+    assert terminal["profile_url"] == "https://www.linkedin.com/company/acme-official/"
+
+
+@patch("tracker.sci_source_linkedin.collect")
+@patch("tracker.sci_source_linkedin.actor_id", return_value="some/actor")
+@patch("tracker.unipile_client.is_available", return_value=False)
+def test_run_platform_collection_linkedin_falls_back_to_the_handle_via_apify(
+        mock_available, mock_actor_id, mock_apify_collect, monkeypatch):
+    """No note on the Apify path -- still gets a link, normalized the same
+    way sci_source_linkedin_unipile.company_slug normalizes it everywhere
+    else, rather than being left uncaptured."""
+    from tracker import sci_store
+    monkeypatch.setenv("APIFY_API_TOKEN", "tok")
+    mock_apify_collect.return_value = [{"platform_post_id": "1", "posted_at": None}]
+    calls = []
+    with patch.object(sci_store, "upsert_platform_run",
+                      side_effect=lambda run_id, platform, **kw: calls.append(kw)), \
+         patch.object(sci_store, "upsert_posts", return_value=1):
+        sci_pipeline.run_platform_collection(1, "linkedin", "company/acme-corp/")
+    terminal = [kw for kw in calls if kw.get("status")][-1]
+    assert terminal["profile_url"] == "https://www.linkedin.com/company/acme-corp/"
+
+
+def test_run_platform_collection_youtube_uses_the_resolved_channel_id(monkeypatch):
+    """resolve_channel() is what disambiguates identify's raw handle guess
+    (a display name, "@handle", a full URL, a bare channel id) into the one
+    identifier a URL can safely be built from -- the link must come from
+    that resolved id, not the original guess."""
+    from tracker import sci_store, sci_youtube_client
+    monkeypatch.setenv("YOUTUBE_API_KEY", "key")
+    monkeypatch.setattr(sci_youtube_client, "resolve_channel", lambda h, k: "UC12345")
+    monkeypatch.setattr(sci_youtube_client, "list_recent_videos",
+                        lambda channel_id, api_key, max_results=20, days=30:
+                        [{"platform_post_id": "1", "posted_at": None}])
+    calls = []
+    with patch.object(sci_store, "upsert_platform_run",
+                      side_effect=lambda run_id, platform, **kw: calls.append(kw)), \
+         patch.object(sci_store, "upsert_posts", return_value=1):
+        sci_pipeline.run_platform_collection(1, "youtube", "some guess")
+    terminal = [kw for kw in calls if kw.get("status")][-1]
+    assert terminal["profile_url"] == "https://www.youtube.com/channel/UC12345"
+
+
+def test_run_platform_collection_youtube_omits_the_key_when_nothing_resolved(monkeypatch):
+    """A handle that didn't resolve to any channel: no_presence, and no key
+    at all in the update -- never an explicit None that would overwrite
+    whatever identify's own guess already stored."""
+    from tracker import sci_store, sci_youtube_client
+    monkeypatch.setenv("YOUTUBE_API_KEY", "key")
+    monkeypatch.setattr(sci_youtube_client, "resolve_channel", lambda h, k: None)
+    calls = []
+    with patch.object(sci_store, "upsert_platform_run",
+                      side_effect=lambda run_id, platform, **kw: calls.append(kw)), \
+         patch.object(sci_store, "upsert_posts", return_value=0):
+        sci_pipeline.run_platform_collection(1, "youtube", "some guess")
+    terminal = [kw for kw in calls if kw.get("status")][-1]
+    assert terminal["status"] == "no_presence"
+    assert "profile_url" not in terminal
+
+
+@patch("tracker.sci_source_instagram_unipile.collect")
+@patch("tracker.unipile_client.is_available")
+def test_run_platform_collection_a_failed_collection_never_touches_profile_url(
+        mock_available, mock_collect):
+    """A platform this run never actually reached must not get a guessed
+    link either -- the terminal update on a scrape failure carries no
+    profile_url key at all."""
+    from tracker import sci_store
+    mock_available.return_value = True
+    mock_collect.side_effect = RuntimeError("actor blocked")
+    calls = []
+    with patch.object(sci_store, "upsert_platform_run",
+                      side_effect=lambda run_id, platform, **kw: calls.append(kw)), \
+         patch("tracker.sci_source_instagram.collect", side_effect=RuntimeError("blocked")):
+        sci_pipeline.run_platform_collection(1, "instagram", "acmeco")
+    terminal = [kw for kw in calls if kw.get("status")][-1]
+    assert terminal["status"] == "scrape_failed"
+    assert "profile_url" not in terminal
+
+
+@patch("tracker.sci_source_facebook.collect")
+def test_run_platform_collection_stores_a_profile_url_for_no_presence_too(mock_collect, monkeypatch):
+    """no_presence means the page answered with nothing in it, not that
+    nothing was confirmed -- the link is still worth showing."""
+    from tracker import sci_store
+    monkeypatch.setenv("APIFY_API_TOKEN", "tok")
+    mock_collect.return_value = []
+    calls = []
+    with patch.object(sci_store, "upsert_platform_run",
+                      side_effect=lambda run_id, platform, **kw: calls.append(kw)), \
+         patch.object(sci_store, "upsert_posts", return_value=0):
+        sci_pipeline.run_platform_collection(1, "facebook", "acmeco")
+    terminal = [kw for kw in calls if kw.get("status")][-1]
+    assert terminal["status"] == "no_presence"
+    assert terminal["profile_url"] == "https://www.facebook.com/acmeco/"
+
+
 # ── instagram is no longer dispatched through the generic Apify registry ───
 
 def test_instagram_is_not_in_the_apify_collectors_registry():
