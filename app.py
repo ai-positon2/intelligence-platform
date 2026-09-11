@@ -1416,7 +1416,7 @@ def index():
                            related=[], signals_list=SIGNALS)
 
 # ── Public agents on the signed-in home (/app) ───────────────────────────────────
-# These are the SAME SEO tools embedded internally at /p2/seo/<seo_slug> (served by
+# These are the SAME SEO tools embedded internally at /p2/seo-aeo/<seo_slug> (served by
 # the SERP app), just re-presented for ALL signed-in Google users under public,
 # fancily-named slugs. "Use this agent" embeds the live tool (see /app/<slug>/use).
 _SVG_COMPASS = ('<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" '
@@ -3058,7 +3058,7 @@ def _fmt_run_ts(iso_str: str) -> str:
 def _app_embed_url(agent):
     """Build the live tool URL for an agent: either a hardcoded external tool
     (via "external_url", e.g. the watchtower-hosted LinkedIn Social Researcher)
-    or the SERP tool (via "seo_slug", same as the internal /p2/seo embed)."""
+    or the SERP tool (via "seo_slug", same as the internal /p2/seo-aeo embed)."""
     if agent.get("external_url"):
         return agent["external_url"]
     seo_slug = agent.get("seo_slug")
@@ -3071,7 +3071,7 @@ def _app_embed_url(agent):
         return ext
     pt = os.environ.get("SERP_PLATFORM_TOKEN", "")
     # embed=1 tells the SERP app to render chrome-less (no sidebar / studio nav),
-    # so public users only see the single agent they opened. Internal /p2/seo does
+    # so public users only see the single agent they opened. Internal /p2/seo-aeo does
     # NOT pass this, so staff keep the full SEO Studio.
     qs = ([("pt", pt)] if pt else []) + [("embed", "1")]
     sep = "&" if "?" in path else "?"
@@ -3949,10 +3949,29 @@ def ppc_anonymous_visitors_redirect():
 def ppc_linkedin_scraper_redirect():
     return redirect("/p2/strategic-agents/linkedin-intelligence", code=301)
 
-@app.route("/p2/seo")
+@app.route("/p2/seo-aeo")
 @position2_required
 def seo():
     return render_template("seo.html", user=_get_user(), seo_tools=_seo_tools())
+
+
+# ── /p2/seo/* -> /p2/seo-aeo/* ───────────────────────────────────────────────
+# The section was renamed from "SEO" to "SEO + AEO", 2026-09-11. Same shape as
+# the B2B Agents -> Strategic Agents catch-all: one redirect for the whole old
+# tree, 308 (not 301) because the embedded-tool page's own JS pushState's
+# sub-paths like /p2/seo/<tool> as the visitor switches tools client-side (see
+# templates/embed.html), so a bookmark or shared link to one of those still
+# has to resolve, and a 301 would let a browser retry any POST under this
+# prefix as a GET and silently drop the body.
+@app.route("/p2/seo", methods=["GET", "POST", "DELETE"])
+@app.route("/p2/seo/", methods=["GET", "POST", "DELETE"])
+@app.route("/p2/seo/<path:rest>", methods=["GET", "POST", "DELETE"])
+def seo_aeo_legacy_redirect(rest=""):
+    target = "/p2/seo-aeo" + (("/" + rest) if rest else "")
+    if request.query_string:
+        target += "?" + request.query_string.decode("utf-8", "ignore")
+    return redirect(target, code=308)
+
 
 # ── Embedded dashboards ─────────────────────────────────────────────────────────
 _SERP_BASE = "https://seo-apps-production-37a6.up.railway.app"
@@ -4330,7 +4349,7 @@ def _seo_tools():
     _SEO_MANIFEST.update(ts=now, tools=tools)
     return tools
 
-@app.route("/p2/seo/<tool_slug>")
+@app.route("/p2/seo-aeo/<tool_slug>")
 @position2_required
 def seo_tool(tool_slug: str):
     tool = next((t for t in _seo_tools() if t.get("slug") == tool_slug), None)
@@ -4348,7 +4367,7 @@ def seo_tool(tool_slug: str):
         user=_get_user(),
         title=tool["name"],
         embed_url=embed_url,
-        breadcrumb=[("Hub", "/p2/hub"), ("SEO", "/p2/seo")],
+        breadcrumb=[("Hub", "/p2/hub"), ("SEO + AEO", "/p2/seo-aeo")],
         current=tool["name"],
         accent="#34d399",
     )
@@ -5086,6 +5105,12 @@ _PAGE_LABEL_ALIASES = (
     # passes through this final fold too, landing on the current name in one call.
     ("B2B Agents", "Strategic Agents"),
     ("/p2/b2b-agents", "/p2/strategic-agents"),
+    # "SEO" -> "SEO + AEO", 2026-09-11. First rename for this section, so
+    # unlike the ones above there is no earlier generation to also fold
+    # forward -- a recorded title and a recorded path never share one string
+    # here (see the two call sites below), so these two rules don't interact.
+    ("SEO Dashboards", "SEO + AEO Dashboards"),
+    ("/p2/seo", "/p2/seo-aeo"),
 )
 
 
@@ -16376,7 +16401,7 @@ DATA section below when available — use those numbers, never a memorised figur
 AD INTELLIGENCE (/p2/strategic-agents/ad-intelligence): tracks competitors' running ads (headline, CTA, format,
 keywords, messaging angle, first/last seen) pulled from a shared Google Sheet.
 
-SEO STUDIO (/p2/seo/<tool>) and the /app agents: a suite of SEO/GEO tools (Keyword Finder, Content Brief
+SEO STUDIO (/p2/seo-aeo/<tool>) and the /app agents: a suite of SEO/GEO tools (Keyword Finder, Content Brief
 Generator, Content Enhancer, SEO & GEO Audit, Agentic Readiness Audit, Competitor Analysis, and more).
 Some are fully live and connected; others are request-access only.
 

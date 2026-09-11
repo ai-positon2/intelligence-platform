@@ -1,6 +1,6 @@
 """Competitor Analysis went live on the SEO Studio SERP app at /competitor-analysis
 (confirmed live 2026-08-14: real SEMrush data, a client picker, traffic/keyword/
-backlink/authority comparisons against competitors), wired into /p2/seo (the
+backlink/authority comparisons against competitors), wired into /p2/seo-aeo (the
 internal staff SEO Suite listing) and, one step later the same day, opened up for
 requests on the dormant "Competitor Analysis" placeholder in APP_AGENTS (slug
 competitor-seo-intelligence, on /app, the public member workspace) -- two
@@ -9,7 +9,7 @@ different registries that happen to share a display name.
 _seo_tools() prefers a live /tools.json manifest from the SERP app and only falls
 back to _SEO_TOOLS_FALLBACK when that fetch fails (it currently always fails: the
 SERP app is a client-routed SPA with no such endpoint), so the fallback list is
-the actual, only source of truth for what /p2/seo can show today.
+the actual, only source of truth for what /p2/seo-aeo can show today.
 
 The /app placeholder is deliberately requestable but NOT connected. The live
 tool's client picker shows every client's data (Tealium, Beta Bionics, ...) with
@@ -57,20 +57,20 @@ def test_it_is_registered_in_the_fallback_list():
 
 
 def test_the_suite_page_lists_it(client):
-    body = client.get("/p2/seo").get_data(as_text=True)
+    body = client.get("/p2/seo-aeo").get_data(as_text=True)
     assert "Competitor Analysis" in body
-    assert '/p2/seo/%s"' % _SLUG in body
+    assert '/p2/seo-aeo/%s"' % _SLUG in body
 
 
 def test_opening_it_embeds_the_real_serp_apps_page(client):
-    r = client.get("/p2/seo/%s" % _SLUG)
+    r = client.get("/p2/seo-aeo/%s" % _SLUG)
     assert r.status_code == 200
     body = r.get_data(as_text=True)
     assert appmod._SERP_BASE + "/competitor-analysis" in body
 
 
 def test_an_unknown_seo_slug_still_404s(client):
-    r = client.get("/p2/seo/not-a-real-tool")
+    r = client.get("/p2/seo-aeo/not-a-real-tool")
     assert r.status_code == 404
 
 

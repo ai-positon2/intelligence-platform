@@ -4,7 +4,7 @@
 <script>(function(){try{if('scrollRestoration' in history)history.scrollRestoration='manual';}catch(e){}var toTop=function(){window.scrollTo(0,0);};window.addEventListener('load',toTop);window.addEventListener('pageshow',function(e){if(e.persisted)toTop();});})();</script>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>SEO Dashboards — Platform</title>
+  <title>SEO + AEO Dashboards — Platform</title>
   <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=4">
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -31,7 +31,7 @@
       <div class="breadcrumb">
         <a href="/p2/hub" class="bc-link">Hub</a>
         <span class="bc-sep">›</span>
-        <span class="bc-cur">SEO</span>
+        <span class="bc-cur">SEO + AEO</span>
       </div>
     </div>
     <div class="topbar-right">
@@ -58,9 +58,9 @@
   <!-- Main -->
   <div class="main">
     <div class="page-header">
-      <div class="au-eyebrow"><span class="d"></span>Organic growth · SEO Studio</div>
+      <div class="au-eyebrow"><span class="d"></span>Organic growth · SEO + AEO Studio</div>
       <h1 class="page-title">Own the <em>answer.</em></h1>
-      <p class="page-sub">{{ seo_tools|length }} SEO and content intelligence tools — powered by SEO Studio.</p>
+      <p class="page-sub">{{ seo_tools|length }} SEO + AEO and content intelligence tools — powered by SEO + AEO Studio.</p>
       <div class="hb-cue"><span></span></div>
     </div>
 
@@ -68,7 +68,7 @@
       {% set _themes = {'seo-geo-audit':'c-seo-geo','article-recommendation':'c-article','content-enhancement':'c-enhancement','content-research':'c-research','keyword-research':'c-keyword','agent-readiness-audit':'c-agent','image-alt-audit':'c-image','knowledge-base':'c-knowledge','team-insights':'c-team','location-page-builder':'c-location','competitor-analysis':'c-competitor'} %}
       {% set _cycle = ['c-seo-geo','c-article','c-enhancement','c-research','c-keyword','c-agent','c-image','c-knowledge','c-team','c-location'] %}
       {% for t in seo_tools %}
-      <a href="/p2/seo/{{ t.slug }}" class="dash-card active {{ _themes.get(t.slug) or _cycle[loop.index0 % (_cycle|length)] }}">
+      <a href="/p2/seo-aeo/{{ t.slug }}" class="dash-card active {{ _themes.get(t.slug) or _cycle[loop.index0 % (_cycle|length)] }}">
         <div class="card-band"></div>
         <div class="card-thumb">
           <div class="card-thumb-icon">{{ t.icon or "🌿" }}</div>
@@ -101,7 +101,7 @@
       function _send(){
         if(_sent) return; _sent = true;
         fetch('/api/track', {method:'POST', headers:{'Content-Type':'application/json'},
-          body: JSON.stringify({page: window.location.pathname, title: 'SEO Dashboards',
+          body: JSON.stringify({page: window.location.pathname, title: 'SEO + AEO Dashboards',
           seconds: Math.round((Date.now()-_start)/1000),
           email: '{{ user.email if user else "" }}'}), keepalive: true}).catch(function(){});
       }
@@ -116,7 +116,7 @@
   var BASE=[
     {t:'Hub',d:'Platform home',u:'/p2/hub',i:'⌂'},
     {t:'Strategic Agents',d:'Go-to-market intelligence',u:'/p2/strategic-agents',i:'◎'},
-    {t:'SEO Tools',d:'Organic intelligence',u:'/p2/seo',i:'⌕'},
+    {t:'SEO + AEO Tools',d:'Organic intelligence',u:'/p2/seo-aeo',i:'⌕'},
     {t:'ABM Signal Tracker — Healthcare',d:'Company signals & insights',u:'/p2/abm-signal-tracker/healthcare',i:'☆'},
     {t:'ABM Signal Tracker — CSG',d:'Company signals & insights',u:'/p2/abm-signal-tracker/csg',i:'☆'},
     {t:'LinkedIn Intelligence',d:'People, companies & posts',u:'/p2/strategic-agents/linkedin-intelligence',i:'⦿'},

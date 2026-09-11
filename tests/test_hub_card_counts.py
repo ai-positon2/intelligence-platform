@@ -175,7 +175,7 @@ def test_the_seo_card_count_matches_the_tool_list():
     import app as appmod
     with open(_HUB) as fh:
         body = _strip_comments(fh.read())
-    block = body.split('href="/p2/seo"', 1)[1].split("</a>", 1)[0]
+    block = body.split('href="/p2/seo-aeo"', 1)[1].split("</a>", 1)[0]
     stats = dict((label, int(n)) for n, label in
                  re.findall(r'class="card-stat"><span>(\d+)</span>\s*(\w+)', block))
     assert stats["dashboards"] == len(appmod._seo_tools())
