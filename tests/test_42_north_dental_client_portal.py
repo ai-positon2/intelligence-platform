@@ -321,8 +321,63 @@ def test_insights_404s_for_any_other_agent_slug():
 # ── history: no runs, since a dashboard is never run-metered ────────────────
 
 def test_history_page_renders_empty_rather_than_erroring():
+    """The route itself still resolves -- hide_history only pulls the sidebar
+    link, the same "hidden means unlisted, not gone" principle HIDDEN_AGENT_SLUGS
+    already established for agents (see test_hidden_agent_withdrawal.py)."""
     resp = _client("front.desk@42northdental.com").get(HOME + "/history")
     assert resp.status_code == 200
+
+
+def test_the_sidebar_hides_the_history_link_for_this_client():
+    body = _client("front.desk@42northdental.com").get(HOME).data.decode()
+    assert 'href="/42northdental/history"' not in body
+    assert appmod.CLIENTS[CLIENT]["hide_history"] is True
+
+
+def test_northstar_still_shows_history_unaffected():
+    """The mirror: hide_history is opt-in per client, not a global default that
+    quietly took NorthStar's History tab away too."""
+    c = appmod.app.test_client()
+    with c.session_transaction() as sess:
+        sess["google_user"] = {"email": "someone@position2.com", "name": "T"}
+    body = c.get("/northstaranesthesia").data.decode()
+    assert 'href="/northstaranesthesia/history"' in body
+    assert not appmod.CLIENTS["northstaranesthesia"].get("hide_history")
+
+
+# ── the real 42 North Dental wordmark, not a placeholder ─────────────────────
+
+def test_the_portal_shows_the_clients_own_logo():
+    body = _client("front.desk@42northdental.com").get(HOME).data.decode()
+    assert appmod.CLIENTS[CLIENT]["logo"] in body
+
+
+def test_the_logo_is_served_locally_not_hotlinked():
+    """Same reasoning as northstaranesthesia's own logo: never depend on the
+    client's live site for this portal's own chrome to render correctly."""
+    logo = appmod.CLIENTS[CLIENT]["logo"]
+    assert logo.startswith("/static/")
+    path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                         logo.lstrip("/"))
+    assert os.path.isfile(path), "CLIENTS points at a logo file that isn't committed"
+
+
+# ── the crawl cadence is daily, not weekly ───────────────────────────────────
+
+def test_the_agent_description_says_daily_not_weekly():
+    a = appmod._SLOT_CHECKER_CLIENT_AGENT
+    assert "daily" in a["pill2"].lower()
+    assert "weekly" not in a["pill2"].lower()
+    hiw = next(t["d"] for t in a["trips"] if t["t"] == "How it works")
+    assert "daily crawl" in hiw.lower()
+    assert "weekly" not in hiw.lower()
+    assert not any("weekly" in t.lower() for t in a["tags"])
+
+
+def test_the_detail_page_renders_daily_not_weekly():
+    body = _client("front.desk@42northdental.com").get(DETAIL).data.decode()
+    assert "checked daily" in body
+    assert "weekly" not in body.lower()
 
 
 # ── the internal @position2_required route is untouched by the refactor ─────
