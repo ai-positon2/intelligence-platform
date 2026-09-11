@@ -189,6 +189,31 @@ class _FakeCursor:
             self._result = []
             return
 
+        if sql.startswith("SELECT raw->'snippet'->>'channelId' FROM sci_posts"):
+            # youtube_channel_id_from_posts' own query. Each condition is
+            # applied only if the SQL TEXT actually carries it (a JSON path
+            # expression doesn't fit _where_conditions' "col = %s" regex, so
+            # "platform = 'youtube'" and the IS NOT NULL check are read
+            # straight off the string instead) -- dropping any one of them
+            # in the real code changes what this fake matches too, the same
+            # way it would change what Postgres matches, rather than a fixed
+            # assertion an exception handler upstream would just swallow.
+            conds = _where_conditions(sql)
+            scope_platform = "platform = 'youtube'" in sql
+            require_channel_id = "IS NOT NULL" in sql
+            matches = []
+            for p in self.db.posts:
+                if conds and not _row_matches(p, conds, params):
+                    continue
+                if scope_platform and p["platform"] != "youtube":
+                    continue
+                channel_id = (p.get("raw") or {}).get("snippet", {}).get("channelId")
+                if require_channel_id and not channel_id:
+                    continue
+                matches.append((channel_id,))
+            self._result = matches[:1] if "LIMIT 1" in sql else matches
+            return
+
         if sql.startswith("SELECT") and "FROM sci_posts" in sql:
             cols_m = re.search(r"SELECT (.+?) FROM sci_posts", sql)
             cols = [c.strip() for c in cols_m.group(1).split(",")]
@@ -488,11 +513,90 @@ def test_get_platform_runs_backfills_no_presence_too(fake_db):
     assert rows[0]["profile_url"] == "https://www.facebook.com/acmeco/"
 
 
+def test_youtube_channel_id_from_posts_ignores_a_different_runs_video(fake_db):
+    """Scoped to run_id, not just platform -- a channel id belonging to some
+    OTHER company's run must never leak into this one's backfill."""
+    other_run = store.save_run("alice@position2.com", "Some Other Co")
+    store.upsert_posts(other_run, "youtube", [
+        {"platform_post_id": "v1", "post_url": None, "post_type": "video", "caption": "",
+         "posted_at": None, "media_urls": [], "metrics": {},
+         "raw": {"snippet": {"channelId": "UC-WRONG"}}},
+    ])
+    run_id = store.save_run("alice@position2.com", "Acme Inc")
+    assert store.youtube_channel_id_from_posts(run_id) is None
+
+
+def test_youtube_channel_id_from_posts_ignores_a_post_missing_the_field(fake_db):
+    """Defensive against the field simply not being where it's expected --
+    read as "nothing to recover" rather than raising."""
+    run_id = store.save_run("alice@position2.com", "Acme Inc")
+    store.upsert_posts(run_id, "youtube", [
+        {"platform_post_id": "v1", "post_url": None, "post_type": "video", "caption": "",
+         "posted_at": None, "media_urls": [], "metrics": {}, "raw": {"snippet": {}}},
+    ])
+    assert store.youtube_channel_id_from_posts(run_id) is None
+
+
+def test_youtube_channel_id_from_posts_skips_past_one_with_no_channel_id(fake_db):
+    """LIMIT 1 with no ORDER BY means whichever row Postgres happens to
+    return first -- if that one lacks a channelId, the query itself (not
+    Python re-checking the result afterward) must be what skips it, or a run
+    whose FIRST stored video happens to be missing the field would stay
+    unbackfilled even though a later one has it."""
+    run_id = store.save_run("alice@position2.com", "Acme Inc")
+    store.upsert_posts(run_id, "youtube", [
+        {"platform_post_id": "v1", "post_url": None, "post_type": "video", "caption": "",
+         "posted_at": None, "media_urls": [], "metrics": {}, "raw": {"snippet": {}}},
+        {"platform_post_id": "v2", "post_url": None, "post_type": "video", "caption": "",
+         "posted_at": None, "media_urls": [], "metrics": {},
+         "raw": {"snippet": {"channelId": "UC12345"}}},
+    ])
+    assert store.youtube_channel_id_from_posts(run_id) == "UC12345"
+
+
+def test_youtube_channel_id_from_posts_ignores_a_different_platforms_post(fake_db):
+    """Scoped to platform, not just run_id -- a post recorded for some other
+    platform in the SAME run must never be read as a YouTube channel id,
+    however its raw JSON happens to be shaped."""
+    run_id = store.save_run("alice@position2.com", "Acme Inc")
+    store.upsert_posts(run_id, "instagram", [
+        {"platform_post_id": "p1", "post_url": None, "post_type": "image", "caption": "",
+         "posted_at": None, "media_urls": [], "metrics": {},
+         "raw": {"snippet": {"channelId": "UC-NOT-YOUTUBE"}}},
+    ])
+    assert store.youtube_channel_id_from_posts(run_id) is None
+
+
+def test_youtube_channel_id_from_posts_returns_none_without_postgres(monkeypatch):
+    monkeypatch.setattr(store, "_pg_conn", lambda: None)
+    assert store.youtube_channel_id_from_posts(1) is None
+
+
+def test_get_platform_runs_backfills_youtube_from_its_own_stored_videos(fake_db):
+    """A pre-fix YouTube row has no resolved channel id stored on the
+    platform_runs row itself, but every video this pipeline has ever
+    collected carries playlistItems.snippet.channelId in its own `raw` --
+    the channel whose uploads playlist was read, which is exactly the
+    channel the handle resolved to. Reading that back off an already-stored
+    post is what closes the one gap canonical_profile_url can't close from
+    the bare handle alone, with no live API call and no re-analysis needed."""
+    run_id = store.save_run("alice@position2.com", "Acme Inc")
+    store.upsert_platform_run(run_id, "youtube", status="ok", post_count=22, handle="@acmeco")
+    store.upsert_posts(run_id, "youtube", [
+        {"platform_post_id": "v1", "post_url": "https://www.youtube.com/watch?v=v1",
+         "post_type": "video", "caption": "hi", "posted_at": None, "media_urls": [],
+         "metrics": {}, "raw": {"snippet": {"channelId": "UC12345"}, "statistics": {}}},
+    ])
+    rows = store.get_platform_runs(run_id)
+    assert rows[0]["profile_url"] == "https://www.youtube.com/channel/UC12345"
+
+
 def test_get_platform_runs_leaves_youtube_unbackfilled_without_a_channel_id(fake_db):
-    """The one gap this fallback can't close: a pre-fix YouTube row has no
-    resolved channel id stored anywhere, and the raw handle alone isn't
+    """The one gap this fallback still can't close: a pre-fix YouTube row
+    with no stored videos at all (or none carrying a channelId) has nowhere
+    offline to recover a channel id from, and the raw handle alone isn't
     enough to build a trustworthy link (see canonical_profile_url). Re-
-    analyzing is what fixes an old YouTube row; this fallback can't."""
+    analyzing is what fixes a row like this; this fallback can't."""
     run_id = store.save_run("alice@position2.com", "Acme Inc")
     store.upsert_platform_run(run_id, "youtube", status="ok", post_count=22, handle="@acmeco")
     rows = store.get_platform_runs(run_id)

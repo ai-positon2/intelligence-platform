@@ -493,13 +493,14 @@ def canonical_profile_url(platform: str, handle: str | None, note: dict | None =
         than nothing for an old row this function is backfilling at read
         time.
       - `youtube_channel_id` is the id resolve_channel() already resolved
-        during collection. There is no offline way to derive it from a bare
-        handle (it can be a channel id, an @handle, a company name guess, or
-        a full URL -- disambiguating those is exactly what the YouTube API
-        call does), so a caller that cannot supply it (the read-time
-        fallback, backfilling an old row from stored columns alone) gets
-        None back for YouTube rather than a guess that might point at the
-        wrong channel or nowhere at all.
+        during collection, or (see youtube_channel_id_from_posts below)
+        recovered offline from a video this run already stored. There is no
+        way to derive it from the bare handle alone -- it can be a channel
+        id, an @handle, a company name guess, or a full URL, and
+        disambiguating those is exactly what the YouTube API call does --
+        so a caller that cannot supply it either way gets None back for
+        YouTube rather than a guess that might point at the wrong channel or
+        nowhere at all.
 
     Returns None whenever nothing safe can be built, on purpose: the caller
     treats that as "leave the previously stored value alone", never as
@@ -576,6 +577,43 @@ def upsert_platform_run(run_id: int, platform: str, **fields: Any) -> int | None
             pass
 
 
+def youtube_channel_id_from_posts(run_id: int) -> str | None:
+    """The channel id embedded in this run's own already-collected videos --
+    playlistItems.snippet.channelId, present on every YouTube post this
+    pipeline has ever stored (see sci_youtube_client.list_recent_videos'
+    `raw`), because it names the channel whose uploads playlist was read:
+    exactly the channel this run's YouTube handle resolved to when
+    collection ran. Lets a pre-fix YouTube row get backfilled offline too,
+    the same as every other platform -- no live API call and no guessing
+    from the raw stored handle, just reading back what a real collection
+    already confirmed and left sitting in sci_posts. A run with zero
+    YouTube posts (no_presence, or nothing survived a partial failure) has
+    nothing to read here and gets None, same as canonical_profile_url's own
+    "nothing safe to build" case."""
+    conn = _pg_conn()
+    if not conn:
+        return None
+    try:
+        _ensure_tables(conn)
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT raw->'snippet'->>'channelId' FROM sci_posts "
+                "WHERE run_id = %s AND platform = 'youtube' "
+                "AND raw->'snippet'->>'channelId' IS NOT NULL LIMIT 1",
+                (run_id,),
+            )
+            row = cur.fetchone()
+        return row[0] if row else None
+    except Exception as e:
+        logger.warning("sci_store: youtube_channel_id_from_posts failed for run %s: %s", run_id, e)
+        return None
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+
 def get_platform_runs(run_id: int) -> list[dict]:
     """Not ownership-scoped by itself -- callers must have already resolved
     run_id through get_run(run_id, email) before calling this, same as
@@ -603,11 +641,12 @@ def get_platform_runs(run_id: int) -> list[dict]:
             # handle with no link -- recompute one offline rather than leaving
             # every pre-existing report stuck showing LINK NOT CAPTURED next
             # to a platform whose own post count proves the account was
-            # found. No live confirmation happens here (see
-            # canonical_profile_url's docstring on the LinkedIn/YouTube
-            # gap), so this stays a fallback, never touching what's stored.
+            # found. YouTube's own stored videos carry the one thing that
+            # would otherwise be missing (see youtube_channel_id_from_posts);
+            # every other platform's handle is already enough on its own.
             if not d.get("profile_url") and d.get("handle") and d.get("status") in _COLLECTED_STATUSES:
-                d["profile_url"] = canonical_profile_url(d["platform"], d["handle"])
+                yt_id = youtube_channel_id_from_posts(run_id) if d["platform"] == "youtube" else None
+                d["profile_url"] = canonical_profile_url(d["platform"], d["handle"], youtube_channel_id=yt_id)
             out.append(d)
         return out
     except Exception as e:
