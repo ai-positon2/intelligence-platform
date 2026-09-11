@@ -245,7 +245,7 @@ def test_the_enrich_route_reports_the_credit_it_spent(client, monkeypatch):
     _match_stub(monkeypatch)
     monkeypatch.setattr(appmod, "_cpi_id_cache_read", lambda ids: {})
     monkeypatch.setattr(appmod, "_cpi_id_cache_write", lambda profiles: None)
-    r = client.post("/p2/b2b-agents/company-people-intelligence/enrich",
+    r = client.post("/p2/strategic-agents/company-people-intelligence/enrich",
                     json={"type": "person", "name": "Binal Shah",
                           "domain": "tealium.com", "apollo_id": "p1"})
     body = r.get_json()
@@ -258,7 +258,7 @@ def test_a_miss_is_reported_as_costing_nothing(client, monkeypatch):
     1 credit either way."""
     monkeypatch.setattr(ac, "_post", lambda *a, **k: {"person": {}})
     monkeypatch.setattr(appmod, "_cpi_id_cache_read", lambda ids: {})
-    r = client.post("/p2/b2b-agents/company-people-intelligence/enrich",
+    r = client.post("/p2/strategic-agents/company-people-intelligence/enrich",
                     json={"type": "person", "name": "Nobody At All",
                           "domain": "example.com", "apollo_id": "zz"})
     body = r.get_json()
@@ -269,7 +269,7 @@ def test_a_miss_is_reported_as_costing_nothing(client, monkeypatch):
 def test_a_cache_hit_is_reported_as_costing_nothing(client, monkeypatch):
     monkeypatch.setattr(appmod, "_cpi_id_cache_read", lambda ids: {"p1": dict(_PERSON)})
     monkeypatch.setattr(ac, "_post", lambda *a, **k: pytest.fail("must not call Apollo"))
-    r = client.post("/p2/b2b-agents/company-people-intelligence/enrich",
+    r = client.post("/p2/strategic-agents/company-people-intelligence/enrich",
                     json={"type": "person", "name": "Binal Shah",
                           "domain": "tealium.com", "apollo_id": "p1"})
     body = r.get_json()
@@ -304,7 +304,7 @@ def test_bulk_enrich_is_capped_so_one_click_cannot_drain_the_pool(client, monkey
         return {i: dict(_PERSON, id=i) for i in ids}
 
     monkeypatch.setattr(ac, "bulk_match_people", _bulk)
-    r = client.post("/p2/b2b-agents/company-people-intelligence/enrich-bulk",
+    r = client.post("/p2/strategic-agents/company-people-intelligence/enrich-bulk",
                     json={"ids": ["id%03d" % i for i in range(120)]})
     body = r.get_json()
     assert seen["n"] == appmod._CPI_BULK_ENRICH_CAP
@@ -320,7 +320,7 @@ def test_bulk_enrich_reports_cache_hits_separately_from_purchases(client, monkey
     monkeypatch.setattr(appmod, "_cpi_id_cache_write", lambda profiles: None)
     monkeypatch.setattr(ac, "bulk_match_people",
                         lambda ids, api_key, **_kw: {i: dict(_PERSON, id=i) for i in ids})
-    r = client.post("/p2/b2b-agents/company-people-intelligence/enrich-bulk",
+    r = client.post("/p2/strategic-agents/company-people-intelligence/enrich-bulk",
                     json={"ids": ["a", "b"]})
     body = r.get_json()
     assert body["cached"] == 1

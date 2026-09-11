@@ -1,4 +1,4 @@
-"""_fetch_job_change_tracked_data() + /p2/b2b-agents/job-change-alert/tracked.
+"""_fetch_job_change_tracked_data() + /p2/strategic-agents/job-change-alert/tracked.
 
 Header-name-driven column mapping (not fixed column letters) because the
 "Contact List (Being Monitored)" / "Tracked Companies" Google Sheet tabs get
@@ -186,7 +186,7 @@ def test_second_call_within_ttl_is_served_from_cache(monkeypatch):
 
 def test_tracked_route_requires_position2_auth():
     c = appmod.app.test_client()
-    resp = c.get("/p2/b2b-agents/job-change-alert/tracked")
+    resp = c.get("/p2/strategic-agents/job-change-alert/tracked")
     assert resp.status_code in (302, 401, 403)
 
 
@@ -199,7 +199,7 @@ def test_tracked_route_returns_fetched_data_as_json(monkeypatch):
     }
     monkeypatch.setattr(appmod, "_fetch_job_change_tracked_data", lambda force=False: canned)
 
-    resp = _client().get("/p2/b2b-agents/job-change-alert/tracked")
+    resp = _client().get("/p2/strategic-agents/job-change-alert/tracked")
 
     assert resp.status_code == 200
     assert resp.get_json() == canned
@@ -209,7 +209,7 @@ def test_tracked_route_gzips_when_client_accepts_it(monkeypatch):
     canned = {"contacts": [], "companies": [], "totals": {"contacts": 0, "companies": 0}, "fetched_at": None}
     monkeypatch.setattr(appmod, "_fetch_job_change_tracked_data", lambda force=False: canned)
 
-    resp = _client().get("/p2/b2b-agents/job-change-alert/tracked",
+    resp = _client().get("/p2/strategic-agents/job-change-alert/tracked",
                           headers={"Accept-Encoding": "gzip"})
 
     assert resp.headers.get("Content-Encoding") == "gzip"

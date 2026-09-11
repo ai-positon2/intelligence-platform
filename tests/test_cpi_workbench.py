@@ -33,10 +33,10 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import app as appmod  # noqa: E402
 import tracker.apollo_client as ac  # noqa: E402
 
-_COUNT = "/p2/b2b-agents/company-people-intelligence/count"
-_CREDITS = "/p2/b2b-agents/company-people-intelligence/credits"
-_LIST = "/p2/b2b-agents/company-people-intelligence/list"
-_PARSE = "/p2/b2b-agents/company-people-intelligence/parse-query"
+_COUNT = "/p2/strategic-agents/company-people-intelligence/count"
+_CREDITS = "/p2/strategic-agents/company-people-intelligence/credits"
+_LIST = "/p2/strategic-agents/company-people-intelligence/list"
+_PARSE = "/p2/strategic-agents/company-people-intelligence/parse-query"
 
 
 @pytest.fixture

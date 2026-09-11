@@ -78,7 +78,7 @@ def test_phase1_decision_survives_route_reload_and_csv():
     S.save_candidates(rid,[_cand('Reload Forum')]);S.update_run(rid,status='complete')
     client=appmod.app.test_client()
     with client.session_transaction() as session:session['google_user']={'email':email,'name':'Audit'}
-    base='/p2/b2b-agents/event-conference-intelligence'
+    base='/p2/strategic-agents/event-conference-intelligence'
     posted=client.post(base+'/outcomes',json=dict(run_id=rid,event_name='Reload Forum',decision='going',note='Booked'))
     assert posted.status_code==200,posted.get_json()
     run=client.get(base+'/runs/'+str(rid)).get_json()

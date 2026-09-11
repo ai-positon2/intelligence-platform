@@ -38,7 +38,7 @@ import app as appmod  # noqa: E402
 # per id and made half a file pass vacuously.
 from test_event_intel_form_init import _run, keys  # noqa: E402,F401
 
-_PAGE = "/p2/b2b-agents/event-conference-intelligence"
+_PAGE = "/p2/strategic-agents/event-conference-intelligence"
 _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _CSS = os.path.join(_ROOT, "static", "css", "event_conference_intelligence.css")
 _TPL = os.path.join(_ROOT, "templates", "event_conference_intelligence.html")

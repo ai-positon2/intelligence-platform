@@ -121,7 +121,7 @@ def test_the_reported_query_no_longer_sets_a_self_defeating_keyword():
 
 # ── The parse-query route wires the guard in ─────────────────────────────────
 
-_PARSE = "/p2/b2b-agents/company-people-intelligence/parse-query"
+_PARSE = "/p2/strategic-agents/company-people-intelligence/parse-query"
 
 
 @pytest.fixture

@@ -6,7 +6,7 @@ import pytest
 import app as appmod
 from tracker import event_intel_store as S
 
-BASE='/p2/b2b-agents/event-conference-intelligence/runs/8'
+BASE='/p2/strategic-agents/event-conference-intelligence/runs/8'
 
 
 def client():

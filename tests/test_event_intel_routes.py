@@ -19,7 +19,7 @@ os.environ.setdefault("FLASK_SECRET_KEY", "test")
 import app as appmod  # noqa: E402
 from tracker import event_intel_store as store  # noqa: E402
 
-BASE = "/p2/b2b-agents/event-conference-intelligence"
+BASE = "/p2/strategic-agents/event-conference-intelligence"
 
 ROUTES = [
     (BASE, "GET"),

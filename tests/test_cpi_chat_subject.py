@@ -46,7 +46,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import app as appmod  # noqa: E402
 
-_URL = "/p2/b2b-agents/company-people-intelligence/chat"
+_URL = "/p2/strategic-agents/company-people-intelligence/chat"
 
 # The reported pair of questions, verbatim.
 _Q1 = "Tell me about Snowflake"

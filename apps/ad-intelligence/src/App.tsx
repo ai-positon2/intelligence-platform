@@ -159,7 +159,7 @@ function PlatformBar() {
       <div className="hidden sm:flex" style={{ alignItems: 'center', gap: 8, fontSize: 12.5, minWidth: 0, marginLeft: 2, paddingLeft: 14, borderLeft: '1px solid rgba(255,255,255,.1)' }}>
         <a href="/p2/hub" style={{ color: '#64748b', textDecoration: 'none' }}>Hub</a>
         <span style={{ color: '#334155' }}>›</span>
-        <a href="/p2/b2b-agents" style={{ color: '#64748b', textDecoration: 'none' }}>B2B Agents</a>
+        <a href="/p2/strategic-agents" style={{ color: '#64748b', textDecoration: 'none' }}>Strategic Agents</a>
         <span style={{ color: '#334155' }}>›</span>
         <span style={{ color: '#818cf8', fontWeight: 600 }}>Ad Intelligence</span>
       </div>

@@ -101,7 +101,7 @@ def test_http_auth_validation_conflict_and_escaping(fixture):
     import app as appmod
     email, profile, other, rid, identity, run = fixture
     http = appmod.app.test_client()
-    path = '/p2/b2b-agents/event-conference-intelligence/runs/'+str(rid)+'/plan'
+    path = '/p2/strategic-agents/event-conference-intelligence/runs/'+str(rid)+'/plan'
     assert http.get(path).status_code == 302
     with http.session_transaction() as session:
         session['google_user'] = {'email': email}
@@ -201,7 +201,7 @@ def test_topics_persist_and_render_only_selected_event_evidence(fixture):
     http = appmod.app.test_client()
     with http.session_transaction() as session:
         session['google_user'] = {'email':email}
-    page = http.get('/p2/b2b-agents/event-conference-intelligence/runs/'+str(rid)+'/plan',
+    page = http.get('/p2/strategic-agents/event-conference-intelligence/runs/'+str(rid)+'/plan',
                     query_string={'profile_id':profile,'event_identity':event_key(row)})
     assert page.status_code == 200
     assert '&lt;script&gt;' in page.get_data(as_text=True)
@@ -225,7 +225,7 @@ def test_access_checks_show_failures_and_escape_quoted_terms(fixture):
     http=appmod.app.test_client()
     with http.session_transaction() as session:
         session['google_user']={'email':email}
-    html=http.get('/p2/b2b-agents/event-conference-intelligence/runs/'+str(rid)+'/plan',
+    html=http.get('/p2/strategic-agents/event-conference-intelligence/runs/'+str(rid)+'/plan',
                   query_string={'profile_id':profile,'event_identity':event_key(row)}).get_data(as_text=True)
     assert '&lt;script&gt;' in html and 'Registration · blocked' in html
     assert '<script>alert(1)</script>' not in html

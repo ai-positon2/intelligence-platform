@@ -243,7 +243,7 @@ def test_every_entry_has_the_shape_the_one_widget_renders():
 
 def test_the_endpoint_serves_each_vocabulary(client):
     for kind in av.kinds():
-        r = client.get("/p2/b2b-agents/company-people-intelligence/vocab?kind=%s" % kind)
+        r = client.get("/p2/strategic-agents/company-people-intelligence/vocab?kind=%s" % kind)
         assert r.status_code == 200
         body = r.get_json()
         assert body["kind"] == kind
@@ -251,15 +251,15 @@ def test_the_endpoint_serves_each_vocabulary(client):
 
 
 def test_the_endpoint_refuses_a_vocabulary_it_does_not_have(client):
-    r = client.get("/p2/b2b-agents/company-people-intelligence/vocab?kind=colour")
+    r = client.get("/p2/strategic-agents/company-people-intelligence/vocab?kind=colour")
     assert r.status_code == 400
     assert "naics" in r.get_json()["kinds"]
 
 
 def test_the_endpoint_returns_the_format_hint_for_a_code_vocabulary(client):
-    r = client.get("/p2/b2b-agents/company-people-intelligence/vocab?kind=naics")
+    r = client.get("/p2/strategic-agents/company-people-intelligence/vocab?kind=naics")
     assert "6 digits" in r.get_json()["hint"]
-    r = client.get("/p2/b2b-agents/company-people-intelligence/vocab?kind=technology")
+    r = client.get("/p2/strategic-agents/company-people-intelligence/vocab?kind=technology")
     assert r.get_json()["hint"] == ""
 
 
@@ -272,7 +272,7 @@ def test_the_endpoint_costs_nothing_and_calls_apollo_for_nothing(client, monkeyp
     monkeypatch.setattr(ac, "search_companies", _boom)
     monkeypatch.setattr(ac, "search_people", _boom)
     for kind in av.kinds():
-        r = client.get("/p2/b2b-agents/company-people-intelligence/vocab"
+        r = client.get("/p2/strategic-agents/company-people-intelligence/vocab"
                        "?kind=%s&q=a" % kind)
         assert r.status_code == 200
 
@@ -291,7 +291,7 @@ def _stub(monkeypatch):
 
 
 def _companies(client, **filters):
-    r = client.post("/p2/b2b-agents/company-people-intelligence/search",
+    r = client.post("/p2/strategic-agents/company-people-intelligence/search",
                     json={"entity": "companies", "filters": filters})
     assert r.status_code == 200
     return r.get_json()
@@ -520,7 +520,7 @@ def test_reopening_a_saved_search_refills_every_picker():
 
 
 def test_the_page_tells_the_browser_where_the_vocabulary_endpoint_is(client):
-    r = client.get("/p2/b2b-agents/company-people-intelligence")
+    r = client.get("/p2/strategic-agents/company-people-intelligence")
     assert r.status_code == 200
     body = r.get_data(as_text=True)
     assert "__CPI_VOCAB_URL__" in body

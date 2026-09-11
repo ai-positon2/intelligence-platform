@@ -25,7 +25,7 @@ from tracker import event_intel_rubric as rubric
 from tracker import event_intel_store
 
 _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-_PAGE = "/p2/b2b-agents/event-conference-intelligence"
+_PAGE = "/p2/strategic-agents/event-conference-intelligence"
 _IIFE_CLOSE = "\n  })();"
 
 

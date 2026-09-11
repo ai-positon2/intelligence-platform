@@ -165,7 +165,7 @@ def _rendered_bundle():
     c = appmod.app.test_client()
     with c.session_transaction() as sess:
         sess["google_user"] = {"email": "reporting@position2.com", "name": "T"}
-    body = c.get("/p2/b2b-agents/42-north-dental-slot-checker").get_data(as_text=True)
+    body = c.get("/p2/strategic-agents/42-north-dental-slot-checker").get_data(as_text=True)
     scripts = re.findall(r"<script(?![^>]*\bsrc=)[^>]*>(.*?)</script>", body, re.S)
     # By content, not by size. The largest inline script on this page belongs
     # to an unrelated assistant widget, and picking it produced a driver that

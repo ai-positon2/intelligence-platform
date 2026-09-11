@@ -1,4 +1,4 @@
-"""/p2/b2b-agents/42-north-dental-slot-checker (page + /data).
+"""/p2/strategic-agents/42-north-dental-slot-checker (page + /data).
 
 Both routes are @position2_required: this is internal availability data for a
 client's practice network, not something to serve to any signed-in user.
@@ -29,7 +29,7 @@ import app as appmod  # noqa: E402
 from tracker import slot_checker as sc  # noqa: E402
 from tracker import slot_checker_insights as sci  # noqa: E402
 
-URL = "/p2/b2b-agents/42-north-dental-slot-checker"
+URL = "/p2/strategic-agents/42-north-dental-slot-checker"
 DATA = URL + "/data"
 INSIGHTS = URL + "/insights"
 
@@ -314,7 +314,16 @@ def test_insights_fresh_param_bypasses_the_cache(monkeypatch, snapshot):
 # a previous one got the third wrong: the old links, the analytics history, and
 # the data that happens to contain the old words.
 
-OLD = "/p2/b2b-agents/gentle-dental-slot-checker"
+OLD = "/p2/strategic-agents/gentle-dental-slot-checker"
+
+# The genuinely historical value: this sub-agent's own rename (2026-09-02)
+# predates the section-level rename to "Strategic Agents" (2026-09-11), so a
+# page view actually logged back then was recorded under the section's name
+# AT THE TIME -- "/p2/b2b-agents/...", not "/p2/strategic-agents/...". OLD
+# above is deliberately NOT reused here: it names where the live redirect
+# decorator lives today, which is a different thing from what a historical
+# analytics row actually contains.
+OLD_BEFORE_SECTION_RENAME = "/p2/b2b-agents/gentle-dental-slot-checker"
 
 
 @pytest.mark.parametrize("suffix", ["", "/data", "/insights"])
@@ -324,7 +333,7 @@ def test_the_old_paths_redirect_instead_of_404ing(suffix):
     resp = _client().get(OLD + suffix, follow_redirects=False)
     assert resp.status_code == 301, "an old bookmark now 404s"
     assert resp.headers["Location"].endswith(
-        "/p2/b2b-agents/42-north-dental-slot-checker" + suffix)
+        "/p2/strategic-agents/42-north-dental-slot-checker" + suffix)
 
 
 def test_the_redirect_does_not_require_a_session():
@@ -341,15 +350,15 @@ def test_analytics_history_from_before_the_rename_still_counts():
     ships, which is how a rename silently forks its own history."""
     assert appmod._page_label("Gentle Dental Slot Checker") == \
         "42 North Dental Slot Checker"
-    assert appmod._page_label(OLD) == \
-        "/p2/b2b-agents/42-north-dental-slot-checker"
+    assert appmod._page_label(OLD_BEFORE_SECTION_RENAME) == \
+        "/p2/strategic-agents/42-north-dental-slot-checker"
 
 
 def test_the_new_label_is_stable_under_the_alias_map():
     """A substring alias that also matches its own output would rewrite the
     new name on every pass."""
     for s in ("42 North Dental Slot Checker",
-              "/p2/b2b-agents/42-north-dental-slot-checker"):
+              "/p2/strategic-agents/42-north-dental-slot-checker"):
         assert appmod._page_label(s) == s
 
 

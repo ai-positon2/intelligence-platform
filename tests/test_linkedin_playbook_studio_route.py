@@ -1,4 +1,4 @@
-"""/p2/b2b-agents/linkedin-strategy-researcher (page + search/analyze/history/
+"""/p2/strategic-agents/linkedin-strategy-researcher (page + search/analyze/history/
 runs/playbook). Every data route is @position2_required and scopes reads by
 the server-verified session email, never a client-supplied one -- the direct
 fix for a prior standalone tool's IDOR (its saved-run lookup trusted a bare
@@ -65,14 +65,14 @@ def _owner_scoped_get_run(monkeypatch, run=None):
 # ── Page ──────────────────────────────────────────────────────────────────
 
 def test_page_renders_for_any_position2_staff():
-    resp = _client("someone@position2.com").get("/p2/b2b-agents/linkedin-strategy-researcher")
+    resp = _client("someone@position2.com").get("/p2/strategic-agents/linkedin-strategy-researcher")
     assert resp.status_code == 200
     assert b"LinkedIn Strategy Researcher" in resp.data
 
 
 def test_page_requires_login():
     c = appmod.app.test_client()
-    resp = c.get("/p2/b2b-agents/linkedin-strategy-researcher", follow_redirects=False)
+    resp = c.get("/p2/strategic-agents/linkedin-strategy-researcher", follow_redirects=False)
     assert resp.status_code in (302, 401, 403)
 
 
@@ -81,7 +81,7 @@ def test_page_requires_login():
 def test_search_returns_companies_from_the_arena_client(monkeypatch):
     monkeypatch.setattr(arena_client, "search_companies_result",
                         lambda q: {"companies": [{"id": "1", "name": "Acme"}], "error": None})
-    resp = _client().get("/p2/b2b-agents/linkedin-strategy-researcher/search?q=Acme")
+    resp = _client().get("/p2/strategic-agents/linkedin-strategy-researcher/search?q=Acme")
     assert resp.status_code == 200
     body = resp.get_json()
     assert body["companies"] == [{"id": "1", "name": "Acme"}]
@@ -94,14 +94,14 @@ def test_search_with_no_query_returns_an_empty_list_without_calling_arena(monkey
     called = []
     monkeypatch.setattr(arena_client, "search_companies_result",
                         lambda q: called.append(q) or {"companies": [], "error": None})
-    resp = _client().get("/p2/b2b-agents/linkedin-strategy-researcher/search")
+    resp = _client().get("/p2/strategic-agents/linkedin-strategy-researcher/search")
     assert resp.get_json()["companies"] == []
     assert called == []
 
 
 def test_search_degrades_to_an_empty_list_without_a_configured_key(monkeypatch):
     monkeypatch.delenv("ARENA_API_KEY", raising=False)
-    resp = _client().get("/p2/b2b-agents/linkedin-strategy-researcher/search?q=Acme")
+    resp = _client().get("/p2/strategic-agents/linkedin-strategy-researcher/search?q=Acme")
     assert resp.status_code == 200
     assert resp.get_json()["companies"] == []
 
@@ -109,13 +109,13 @@ def test_search_degrades_to_an_empty_list_without_a_configured_key(monkeypatch):
 # ── Analyze ───────────────────────────────────────────────────────────────
 
 def test_analyze_requires_company_id_and_name():
-    resp = _client().post("/p2/b2b-agents/linkedin-strategy-researcher/analyze", json={"mode": "OWN"})
+    resp = _client().post("/p2/strategic-agents/linkedin-strategy-researcher/analyze", json={"mode": "OWN"})
     assert resp.status_code == 400
 
 
 def test_analyze_own_brand_starts_a_run_and_returns_its_id(monkeypatch):
     monkeypatch.setattr(lps_store, "save_run", lambda *a, **k: 42)
-    resp = _client().post("/p2/b2b-agents/linkedin-strategy-researcher/analyze",
+    resp = _client().post("/p2/strategic-agents/linkedin-strategy-researcher/analyze",
                           json={"company_id": "c1", "company_name": "Acme", "mode": "OWN"})
     assert resp.status_code == 200
     body = resp.get_json()
@@ -124,7 +124,7 @@ def test_analyze_own_brand_starts_a_run_and_returns_its_id(monkeypatch):
 
 def test_analyze_competitor_requires_a_completed_own_brand_parent(monkeypatch):
     monkeypatch.setattr(lps_store, "get_run", lambda run_id, email: None)
-    resp = _client().post("/p2/b2b-agents/linkedin-strategy-researcher/analyze",
+    resp = _client().post("/p2/strategic-agents/linkedin-strategy-researcher/analyze",
                           json={"company_id": "c2", "company_name": "Globex",
                                 "mode": "COMPETITOR", "parent_run_id": "1"})
     assert resp.status_code == 404
@@ -132,7 +132,7 @@ def test_analyze_competitor_requires_a_completed_own_brand_parent(monkeypatch):
 
 def test_analyze_competitor_refuses_a_parent_run_that_is_not_yet_complete(monkeypatch):
     _owner_scoped_get_run(monkeypatch, _run(run_id=1, status="running"))
-    resp = _client().post("/p2/b2b-agents/linkedin-strategy-researcher/analyze",
+    resp = _client().post("/p2/strategic-agents/linkedin-strategy-researcher/analyze",
                           json={"company_id": "c2", "company_name": "Globex",
                                 "mode": "COMPETITOR", "parent_run_id": "1"})
     assert resp.status_code == 404
@@ -143,7 +143,7 @@ def test_analyze_competitor_cannot_use_someone_elses_run_as_the_parent(monkeypat
     everything else -- a stranger's run id is indistinguishable from a
     nonexistent one."""
     _owner_scoped_get_run(monkeypatch, _run(run_id=1, email=_OTHER, status="complete"))
-    resp = _client(_OWNER).post("/p2/b2b-agents/linkedin-strategy-researcher/analyze",
+    resp = _client(_OWNER).post("/p2/strategic-agents/linkedin-strategy-researcher/analyze",
                                 json={"company_id": "c2", "company_name": "Globex",
                                       "mode": "COMPETITOR", "parent_run_id": "1"})
     assert resp.status_code == 404
@@ -154,7 +154,7 @@ def test_analyze_starts_running_even_without_a_configured_key(monkeypatch):
     starting it must not be blocked just because ARENA_API_KEY happens to be unset."""
     monkeypatch.delenv("ARENA_API_KEY", raising=False)
     monkeypatch.setattr(lps_store, "save_run", lambda *a, **k: 1)
-    resp = _client().post("/p2/b2b-agents/linkedin-strategy-researcher/analyze",
+    resp = _client().post("/p2/strategic-agents/linkedin-strategy-researcher/analyze",
                           json={"company_id": "c1", "company_name": "Acme", "mode": "OWN"})
     assert resp.status_code == 200
 
@@ -256,13 +256,13 @@ def test_analysis_job_never_calls_enrichment_when_the_vendor_analysis_itself_fai
 
 def test_run_status_404s_for_a_run_that_belongs_to_someone_else(monkeypatch):
     _owner_scoped_get_run(monkeypatch, _run(run_id=1, email=_OTHER))
-    resp = _client(_OWNER).get("/p2/b2b-agents/linkedin-strategy-researcher/runs/1/status")
+    resp = _client(_OWNER).get("/p2/strategic-agents/linkedin-strategy-researcher/runs/1/status")
     assert resp.status_code == 404
 
 
 def test_run_status_returns_the_status_for_the_owning_user(monkeypatch):
     _owner_scoped_get_run(monkeypatch, _run(run_id=1, status="running"))
-    resp = _client(_OWNER).get("/p2/b2b-agents/linkedin-strategy-researcher/runs/1/status")
+    resp = _client(_OWNER).get("/p2/strategic-agents/linkedin-strategy-researcher/runs/1/status")
     assert resp.status_code == 200
     assert resp.get_json()["status"] == "running"
 
@@ -270,14 +270,14 @@ def test_run_status_returns_the_status_for_the_owning_user(monkeypatch):
 def test_run_detail_404s_for_a_run_that_belongs_to_someone_else(monkeypatch):
     _owner_scoped_get_run(monkeypatch, _run(run_id=1, email=_OTHER))
     monkeypatch.setattr(lps_store, "get_children", lambda *a, **k: [])
-    resp = _client(_OWNER).get("/p2/b2b-agents/linkedin-strategy-researcher/runs/1")
+    resp = _client(_OWNER).get("/p2/strategic-agents/linkedin-strategy-researcher/runs/1")
     assert resp.status_code == 404
 
 
 def test_run_detail_returns_the_full_run_for_its_owner(monkeypatch):
     _owner_scoped_get_run(monkeypatch)
     monkeypatch.setattr(lps_store, "get_children", lambda *a, **k: [])
-    resp = _client(_OWNER).get("/p2/b2b-agents/linkedin-strategy-researcher/runs/1")
+    resp = _client(_OWNER).get("/p2/strategic-agents/linkedin-strategy-researcher/runs/1")
     assert resp.status_code == 200
     assert resp.get_json()["company_name"] == "Acme"
 
@@ -290,7 +290,7 @@ def test_history_only_reflects_the_calling_users_own_email(monkeypatch):
         return [_run()] if email == _OWNER else []
 
     monkeypatch.setattr(lps_store, "list_runs", fake_list_runs)
-    resp = _client(_OWNER).get("/p2/b2b-agents/linkedin-strategy-researcher/history")
+    resp = _client(_OWNER).get("/p2/strategic-agents/linkedin-strategy-researcher/history")
     assert resp.status_code == 200
     assert len(resp.get_json()["runs"]) == 1
     assert seen_emails == [_OWNER]
@@ -300,14 +300,14 @@ def test_history_only_reflects_the_calling_users_own_email(monkeypatch):
 
 def test_playbook_get_404s_for_a_run_that_belongs_to_someone_else(monkeypatch):
     _owner_scoped_get_run(monkeypatch, _run(run_id=1, email=_OTHER))
-    resp = _client(_OWNER).get("/p2/b2b-agents/linkedin-strategy-researcher/runs/1/playbook")
+    resp = _client(_OWNER).get("/p2/strategic-agents/linkedin-strategy-researcher/runs/1/playbook")
     assert resp.status_code == 404
 
 
 def test_playbook_get_returns_none_when_not_yet_generated(monkeypatch):
     _owner_scoped_get_run(monkeypatch)
     monkeypatch.setattr(lps_store, "get_playbook", lambda *a, **k: None)
-    resp = _client(_OWNER).get("/p2/b2b-agents/linkedin-strategy-researcher/runs/1/playbook")
+    resp = _client(_OWNER).get("/p2/strategic-agents/linkedin-strategy-researcher/runs/1/playbook")
     assert resp.status_code == 200
     assert resp.get_json()["playbook"] is None
 
@@ -317,14 +317,14 @@ def test_playbook_post_404s_for_a_run_that_belongs_to_someone_else(monkeypatch):
     a stranger cannot spend this account's Arena credits generating a
     playbook for a run they don't own."""
     _owner_scoped_get_run(monkeypatch, _run(run_id=1, email=_OTHER))
-    resp = _client(_OWNER).post("/p2/b2b-agents/linkedin-strategy-researcher/runs/1/playbook",
+    resp = _client(_OWNER).post("/p2/strategic-agents/linkedin-strategy-researcher/runs/1/playbook",
                                 json={"mode": "OWN"})
     assert resp.status_code == 404
 
 
 def test_playbook_post_starts_generation_for_the_runs_owner(monkeypatch):
     _owner_scoped_get_run(monkeypatch)
-    resp = _client(_OWNER).post("/p2/b2b-agents/linkedin-strategy-researcher/runs/1/playbook",
+    resp = _client(_OWNER).post("/p2/strategic-agents/linkedin-strategy-researcher/runs/1/playbook",
                                 json={"mode": "OWN"})
     assert resp.status_code == 200
     assert resp.get_json()["status"] == "running"
@@ -332,40 +332,40 @@ def test_playbook_post_starts_generation_for_the_runs_owner(monkeypatch):
 
 # ── Old slug redirects ───────────────────────────────────────────────────────
 # This agent briefly launched as "LinkedIn Playbook Studio" at
-# /p2/b2b-agents/linkedin-playbook-studio before being renamed the same day.
+# /p2/strategic-agents/linkedin-playbook-studio before being renamed the same day.
 # 308 (not 301) so a still-open tab's POST to /analyze or /playbook keeps its
 # body instead of the browser silently retrying it as a bodyless GET.
 
 def test_the_old_slug_root_redirects(monkeypatch):
-    resp = _client().get("/p2/b2b-agents/linkedin-playbook-studio", follow_redirects=False)
+    resp = _client().get("/p2/strategic-agents/linkedin-playbook-studio", follow_redirects=False)
     assert resp.status_code == 308
-    assert resp.headers["Location"].endswith("/p2/b2b-agents/linkedin-strategy-researcher")
+    assert resp.headers["Location"].endswith("/p2/strategic-agents/linkedin-strategy-researcher")
 
 
 def test_the_old_slug_preserves_query_string_on_redirect(monkeypatch):
-    resp = _client().get("/p2/b2b-agents/linkedin-playbook-studio/search?q=Acme", follow_redirects=False)
+    resp = _client().get("/p2/strategic-agents/linkedin-playbook-studio/search?q=Acme", follow_redirects=False)
     assert resp.status_code == 308
     assert resp.headers["Location"].endswith(
-        "/p2/b2b-agents/linkedin-strategy-researcher/search?q=Acme")
+        "/p2/strategic-agents/linkedin-strategy-researcher/search?q=Acme")
 
 
 def test_the_old_slug_preserves_method_and_body_on_redirect(monkeypatch):
     """A 301 here would let the browser downgrade this to a bodyless GET,
     silently dropping the analysis request -- the same reasoning as the
     /p2/gtm legacy redirect."""
-    resp = _client().post("/p2/b2b-agents/linkedin-playbook-studio/analyze",
+    resp = _client().post("/p2/strategic-agents/linkedin-playbook-studio/analyze",
                           json={"company_id": "c1", "company_name": "Acme", "mode": "OWN"},
                           follow_redirects=False)
     assert resp.status_code == 308
-    assert resp.headers["Location"].endswith("/p2/b2b-agents/linkedin-strategy-researcher/analyze")
+    assert resp.headers["Location"].endswith("/p2/strategic-agents/linkedin-strategy-researcher/analyze")
 
 
 def test_the_old_slug_redirects_deep_sub_paths_too(monkeypatch):
-    resp = _client().get("/p2/b2b-agents/linkedin-playbook-studio/runs/1/playbook",
+    resp = _client().get("/p2/strategic-agents/linkedin-playbook-studio/runs/1/playbook",
                          follow_redirects=False)
     assert resp.status_code == 308
     assert resp.headers["Location"].endswith(
-        "/p2/b2b-agents/linkedin-strategy-researcher/runs/1/playbook")
+        "/p2/strategic-agents/linkedin-strategy-researcher/runs/1/playbook")
 
 
 # ── Read-time augmentation: derived analytics + text repair ────────────────
@@ -407,7 +407,7 @@ def test_run_detail_adds_computed_analytics_that_the_stored_output_lacks(monkeyp
     monkeypatch.setattr(lps_store, "update_run_status",
                         lambda *a, **k: pytest.fail("read path must not persist"))
 
-    body = _client().get("/p2/b2b-agents/linkedin-strategy-researcher/runs/1").get_json()
+    body = _client().get("/p2/strategic-agents/linkedin-strategy-researcher/runs/1").get_json()
 
     assert not [k for k in stored_keys if k.startswith("derived.")], \
         "the stored blob is vendor-only before the request"
@@ -422,7 +422,7 @@ def test_run_detail_repairs_mojibake_in_post_text(monkeypatch):
     _owner_scoped_get_run(monkeypatch, _run_with_posts())
     monkeypatch.setattr(lps_store, "get_children", lambda *a, **k: [])
 
-    body = _client().get("/p2/b2b-agents/linkedin-strategy-researcher/runs/1").get_json()
+    body = _client().get("/p2/strategic-agents/linkedin-strategy-researcher/runs/1").get_json()
     assert body["output"]["getcompanypost.items"][0]["text"] == "we’re shipping"
 
 
@@ -448,7 +448,7 @@ def test_run_detail_hides_the_insights_error_detail_from_non_admins(monkeypatch)
     monkeypatch.setattr(lps_store, "get_children", lambda *a, **k: [])
 
     plain_body = _client(_OWNER).get(
-        "/p2/b2b-agents/linkedin-strategy-researcher/runs/1").get_json()
+        "/p2/strategic-agents/linkedin-strategy-researcher/runs/1").get_json()
     assert "detail" not in plain_body["output"]["aienrichment.error"]
     assert plain_body["output"]["aienrichment.error"]["message"] == \
         "The AI's reply couldn't be understood. Try again."
@@ -459,7 +459,7 @@ def test_run_detail_hides_the_insights_error_detail_from_non_admins(monkeypatch)
     admin_run["output"]["aienrichment.error"] = _insights_error()
     _owner_scoped_get_run(monkeypatch, admin_run)
     admin_body = _client(admin).get(
-        "/p2/b2b-agents/linkedin-strategy-researcher/runs/1").get_json()
+        "/p2/strategic-agents/linkedin-strategy-researcher/runs/1").get_json()
     assert admin_body["output"]["aienrichment.error"]["detail"] == \
         "JSONDecodeError: Unterminated string at line 28"
 
@@ -470,7 +470,7 @@ def test_run_detail_survives_an_output_that_is_not_a_dict(monkeypatch):
     _owner_scoped_get_run(monkeypatch, run)
     monkeypatch.setattr(lps_store, "get_children", lambda *a, **k: [])
 
-    resp = _client().get("/p2/b2b-agents/linkedin-strategy-researcher/runs/1")
+    resp = _client().get("/p2/strategic-agents/linkedin-strategy-researcher/runs/1")
     assert resp.status_code == 200
     assert resp.get_json()["output"] is None
 
@@ -482,7 +482,7 @@ def test_run_detail_still_scopes_by_owner_after_augmentation(monkeypatch):
     monkeypatch.setattr(lps_store, "get_children", lambda *a, **k: [])
 
     assert _client().get(
-        "/p2/b2b-agents/linkedin-strategy-researcher/runs/1").status_code == 404
+        "/p2/strategic-agents/linkedin-strategy-researcher/runs/1").status_code == 404
 
 
 # ── The analysis job's own two contracts ───────────────────────────────────
@@ -547,7 +547,7 @@ def test_analysis_job_merges_the_newer_enrichment_list_fields(monkeypatch):
 # time). This route makes the one Claude call against the vendor output that
 # is already saved, instead of re-running the multi-minute vendor workflow.
 
-_INSIGHTS_URL = "/p2/b2b-agents/linkedin-strategy-researcher/runs/1/insights"
+_INSIGHTS_URL = "/p2/strategic-agents/linkedin-strategy-researcher/runs/1/insights"
 
 
 def _enrichment():
@@ -734,7 +734,7 @@ def _failing_search(monkeypatch, kind="http_status", status=401, detail="HTTP 40
 def test_a_failed_search_returns_a_reason_not_a_bare_empty_list(monkeypatch):
     _failing_search(monkeypatch)
     monkeypatch.setattr(lps_store, "search_known_companies", lambda *a, **k: [])
-    body = _client().get("/p2/b2b-agents/linkedin-strategy-researcher/search?q=apple").get_json()
+    body = _client().get("/p2/strategic-agents/linkedin-strategy-researcher/search?q=apple").get_json()
     assert body["companies"] == []
     assert body["error"]["code"] == "http_status"
     assert "rejected our API key" in body["error"]["message"]
@@ -743,14 +743,14 @@ def test_a_failed_search_returns_a_reason_not_a_bare_empty_list(monkeypatch):
 def test_a_dead_key_is_not_offered_as_retryable(monkeypatch):
     _failing_search(monkeypatch)
     monkeypatch.setattr(lps_store, "search_known_companies", lambda *a, **k: [])
-    body = _client().get("/p2/b2b-agents/linkedin-strategy-researcher/search?q=apple").get_json()
+    body = _client().get("/p2/strategic-agents/linkedin-strategy-researcher/search?q=apple").get_json()
     assert body["error"]["retryable"] is False
 
 
 def test_a_rate_limit_is_offered_as_retryable(monkeypatch):
     _failing_search(monkeypatch, status=429, detail="HTTP 429")
     monkeypatch.setattr(lps_store, "search_known_companies", lambda *a, **k: [])
-    body = _client().get("/p2/b2b-agents/linkedin-strategy-researcher/search?q=apple").get_json()
+    body = _client().get("/p2/strategic-agents/linkedin-strategy-researcher/search?q=apple").get_json()
     assert body["error"]["retryable"] is True
 
 
@@ -761,9 +761,9 @@ def test_the_vendors_own_words_go_only_to_admins(monkeypatch):
     monkeypatch.setattr(lps_store, "search_known_companies", lambda *a, **k: [])
     admin = sorted(appmod.ADMIN_EMAILS)[0]
     admin_body = _client(admin).get(
-        "/p2/b2b-agents/linkedin-strategy-researcher/search?q=apple").get_json()
+        "/p2/strategic-agents/linkedin-strategy-researcher/search?q=apple").get_json()
     plain_body = _client("nobody@position2.com").get(
-        "/p2/b2b-agents/linkedin-strategy-researcher/search?q=apple").get_json()
+        "/p2/strategic-agents/linkedin-strategy-researcher/search?q=apple").get_json()
     assert admin_body["error"]["detail"] == "HTTP 401. Body: bad key"
     assert admin_body["error"]["status"] == 401
     assert "detail" not in plain_body["error"]
@@ -779,7 +779,7 @@ def test_a_failed_search_falls_back_to_the_users_own_analyzed_companies(monkeypa
         return [{"id": "1441", "name": "Google", "logo": None, "from_history": True}]
 
     monkeypatch.setattr(lps_store, "search_known_companies", _known)
-    body = _client().get("/p2/b2b-agents/linkedin-strategy-researcher/search?q=goo").get_json()
+    body = _client().get("/p2/strategic-agents/linkedin-strategy-researcher/search?q=goo").get_json()
     assert [c["name"] for c in body["companies"]] == ["Google"]
     assert body["companies"][0]["from_history"] is True
     # Scoped to the session's own email, never a client-supplied one.
@@ -794,7 +794,7 @@ def test_a_successful_search_never_consults_history(monkeypatch):
                         lambda q: {"companies": [{"id": "1", "name": "Acme"}], "error": None})
     monkeypatch.setattr(lps_store, "search_known_companies",
                         lambda *a, **k: called.append(1) or [])
-    body = _client().get("/p2/b2b-agents/linkedin-strategy-researcher/search?q=Acme").get_json()
+    body = _client().get("/p2/strategic-agents/linkedin-strategy-researcher/search?q=Acme").get_json()
     assert not called
     assert body["companies"][0]["name"] == "Acme"
 
@@ -804,15 +804,15 @@ def test_a_genuine_zero_result_carries_no_error_at_all(monkeypatch):
     only in this case."""
     monkeypatch.setattr(arena_client, "search_companies_result",
                         lambda q: {"companies": [], "error": None})
-    body = _client().get("/p2/b2b-agents/linkedin-strategy-researcher/search?q=zzz").get_json()
+    body = _client().get("/p2/strategic-agents/linkedin-strategy-researcher/search?q=zzz").get_json()
     assert body == {"companies": []}
 
 
 def test_the_page_tells_admins_they_can_run_the_provider_check():
     admin = sorted(appmod.ADMIN_EMAILS)[0]
-    admin_page = _client(admin).get("/p2/b2b-agents/linkedin-strategy-researcher").data
+    admin_page = _client(admin).get("/p2/strategic-agents/linkedin-strategy-researcher").data
     plain_page = _client("nobody@position2.com").get(
-        "/p2/b2b-agents/linkedin-strategy-researcher").data
+        "/p2/strategic-agents/linkedin-strategy-researcher").data
     assert b"IS_ADMIN = true" in admin_page
     assert b"IS_ADMIN = false" in plain_page
 

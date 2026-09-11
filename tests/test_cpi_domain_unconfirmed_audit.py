@@ -55,7 +55,7 @@ import app as appmod  # noqa: E402
 import tracker.apollo_client as ac  # noqa: E402
 
 _FAKE_API_KEY = "test-key"
-_SEARCH = "/p2/b2b-agents/company-people-intelligence/search"
+_SEARCH = "/p2/strategic-agents/company-people-intelligence/search"
 
 
 def _mock_response(json_data: dict) -> MagicMock:

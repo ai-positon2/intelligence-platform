@@ -118,7 +118,7 @@ def _stub_search(monkeypatch, people, orgs, org_fail=False):
 
 
 def _search(client, **filters):
-    r = client.post("/p2/b2b-agents/company-people-intelligence/search",
+    r = client.post("/p2/strategic-agents/company-people-intelligence/search",
                     json={"entity": "people", "filters": filters or {"titles": ["VP"]}})
     assert r.status_code == 200
     return r.get_json()
@@ -187,7 +187,7 @@ def test_the_companies_tab_has_nothing_to_switch_off(client, monkeypatch):
     """That tab pays for full records either way, so echoing a toggle state for it
     would imply a choice that does not exist."""
     _stub_search(monkeypatch, [], [_org()])
-    r = client.post("/p2/b2b-agents/company-people-intelligence/search",
+    r = client.post("/p2/strategic-agents/company-people-intelligence/search",
                     json={"entity": "companies", "filters": {"name": "Acme"}})
     assert "company_detail" not in r.get_json()
 
@@ -343,7 +343,7 @@ def test_a_company_search_is_untouched_by_any_of_this(client, monkeypatch):
     """The Companies tab already pays for full records; it must not get a second
     lookup bolted on."""
     calls = _stub_search(monkeypatch, [], [_org()])
-    r = client.post("/p2/b2b-agents/company-people-intelligence/search",
+    r = client.post("/p2/strategic-agents/company-people-intelligence/search",
                     json={"entity": "companies", "filters": {"name": "Acme"}})
     assert r.status_code == 200
     assert len(calls["companies"]) == 1

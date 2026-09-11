@@ -158,7 +158,7 @@ def test_the_band_drops_the_stat_when_nothing_can_be_counted(client, monkeypatch
 
 def test_the_abm_card_stays_a_sentence_when_nothing_can_be_counted(client, monkeypatch):
     monkeypatch.setattr(appmod, "_tracked_company_total", lambda: 0)
-    body = client.get("/p2/b2b-agents").get_data(as_text=True)
+    body = client.get("/p2/strategic-agents").get_data(as_text=True)
     assert "across every tracked company:" in body
     assert "+ companies" not in body
 
@@ -177,7 +177,7 @@ def test_the_hub_band_quotes_the_derived_figure(client):
 
 
 def test_the_abm_card_quotes_the_same_figure(client):
-    body = client.get("/p2/b2b-agents").get_data(as_text=True)
+    body = client.get("/p2/strategic-agents").get_data(as_text=True)
     shown = "{:,}".format(appmod._tracked_company_floor())
     assert "across %s+ companies" % shown in body
 
@@ -188,7 +188,7 @@ def test_neither_surface_still_carries_the_old_hardcoded_numbers(client):
     hub = client.get("/p2/hub").get_data(as_text=True)
     band = hub.split('class="lx-stats2"', 1)[1].split("</section>", 1)[0]
     assert 'data-lxn="1200"' not in band
-    b2b = client.get("/p2/b2b-agents").get_data(as_text=True)
+    b2b = client.get("/p2/strategic-agents").get_data(as_text=True)
     assert "1,500+ companies" not in b2b or appmod._tracked_company_floor() == 1500
 
 
@@ -197,7 +197,7 @@ def test_the_two_surfaces_cannot_disagree(client, monkeypatch):
     that was missing before: two independent literals could not track each other."""
     monkeypatch.setattr(appmod, "_tracked_company_total", lambda: 2750)
     hub = client.get("/p2/hub").get_data(as_text=True)
-    b2b = client.get("/p2/b2b-agents").get_data(as_text=True)
+    b2b = client.get("/p2/strategic-agents").get_data(as_text=True)
     assert _band_companies(hub) == 2700
     assert "across 2,700+ companies" in b2b
 

@@ -142,7 +142,7 @@ def test_context_key_is_omitted_when_not_given(monkeypatch):
 
 # ── Wired into the parse-query route end to end ──────────────────────────────
 
-_PARSE = "/p2/b2b-agents/company-people-intelligence/parse-query"
+_PARSE = "/p2/strategic-agents/company-people-intelligence/parse-query"
 
 
 @pytest.fixture
@@ -198,7 +198,7 @@ def test_parse_query_is_unaffected_when_claude_is_not_configured(client, monkeyp
 
 # ── Wired into chat, with conversation history as context ───────────────────
 
-_CHAT = "/p2/b2b-agents/company-people-intelligence/chat"
+_CHAT = "/p2/strategic-agents/company-people-intelligence/chat"
 
 
 def test_chat_passes_recent_history_as_context_to_the_verifier(client, monkeypatch):

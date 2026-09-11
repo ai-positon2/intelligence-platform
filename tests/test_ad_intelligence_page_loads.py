@@ -7,7 +7,7 @@ This broke in production: the page rendered a blank/broken app because the
 built index.html referenced /assets/index-*.js (site root) while Flask only
 served that file under a path-prefixed route (originally
 /gtm/ad-intelligence/assets/..., later needed at
-/p2/b2b-agents/ad-intelligence/assets/...). A prior fix hand-patched the
+/p2/strategic-agents/ad-intelligence/assets/...). A prior fix hand-patched the
 committed index.html to the right prefix, but the CI "rebuild frontend"
 workflow (.github/workflows/build-frontend.yml) regenerates index.html from
 vite.config.ts on every push to apps/ad-intelligence/**, silently reverting
@@ -32,7 +32,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import app as appmod  # noqa: E402
 
-PAGE_PATH = "/p2/b2b-agents/ad-intelligence"
+PAGE_PATH = "/p2/strategic-agents/ad-intelligence"
 
 
 @pytest.fixture
@@ -47,7 +47,7 @@ def _referenced_urls(html):
     urls = re.findall(r'(?:src|href)="(/[^"]+)"', html)
     # Only ones the page load itself depends on: same-origin JS/CSS/icon, not
     # the Google-fonts stylesheets or any anchor hrefs to other pages.
-    return [u for u in urls if u.startswith("/p2/b2b-agents/ad-intelligence/")]
+    return [u for u in urls if u.startswith("/p2/strategic-agents/ad-intelligence/")]
 
 
 def test_the_page_itself_loads(client):
@@ -71,8 +71,8 @@ def test_the_script_and_stylesheet_are_specifically_covered():
     because the JS/CSS tags got dropped from the markup entirely."""
     html = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                               "ad_intelligence", "index.html"), encoding="utf-8").read()
-    assert re.search(r'<script[^>]+src="/p2/b2b-agents/ad-intelligence/assets/[^"]+\.js"', html)
-    assert re.search(r'<link[^>]+href="/p2/b2b-agents/ad-intelligence/assets/[^"]+\.css"', html)
+    assert re.search(r'<script[^>]+src="/p2/strategic-agents/ad-intelligence/assets/[^"]+\.js"', html)
+    assert re.search(r'<link[^>]+href="/p2/strategic-agents/ad-intelligence/assets/[^"]+\.css"', html)
 
 
 def test_vite_base_matches_the_flask_mount_path():
@@ -81,14 +81,14 @@ def test_vite_base_matches_the_flask_mount_path():
     index.html's asset URLs and Flask must have a route to match."""
     cfg = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                              "apps", "ad-intelligence", "vite.config.ts"), encoding="utf-8").read()
-    assert "base: '/p2/b2b-agents/ad-intelligence/'" in cfg
+    assert "base: '/p2/strategic-agents/ad-intelligence/'" in cfg
 
 
 # ── Favicon must match every other page, not this app's own bundled icon ────
 #
 # This app used to ship its own favicon.svg (apps/ad-intelligence/public/) and
 # reference it as href="/favicon.svg", which vite's `base` then rewrote to
-# /p2/b2b-agents/ad-intelligence/favicon.svg at build time. That routed to a
+# /p2/strategic-agents/ad-intelligence/favicon.svg at build time. That routed to a
 # different icon than every other page's plain /favicon.svg, so the browser
 # tab looked wrong specifically on this page. Fixed by dropping the app's own
 # public/favicon.svg entirely, so nothing in apps/ad-intelligence/public/
@@ -124,14 +124,14 @@ def test_the_app_no_longer_bundles_its_own_favicon():
 
 
 # ── Header must use the Arena logo (not a lightning-bolt icon) and the
-#    current "B2B Agents" naming (not the stale "PPC" name it shipped with) ──
+#    current "Strategic Agents" naming (not the stale "PPC" name it shipped with) ──
 #
 # App.tsx's PlatformBar (its site-wide nav strip), sidebar logo, and page
 # header all used a lucide-react `Zap` (lightning bolt) icon as a stand-in
 # brand mark, and PlatformBar's breadcrumb hardcoded "Hub › PPC › Ad
 # Intelligence" from when this section was still called PPC. Both went stale:
 # every other page uses the real static/logo-lockup.svg ("arena by
-# Position2") / static/logo-mark.svg, and the section has been "B2B Agents"
+# Position2") / static/logo-mark.svg, and the section has been "Strategic Agents"
 # since #22-26 above. Checked at both the TSX source (authoritative, survives
 # a rebuild) and the compiled bundle actually being served (catches a source
 # edit that was never rebuilt into ad_intelligence/) -- string literals like
@@ -156,8 +156,8 @@ def test_source_uses_the_arena_logo_files():
 
 def test_source_breadcrumb_says_b2b_agents_not_ppc():
     src = _read("apps", "ad-intelligence", "src", "App.tsx")
-    assert 'href="/p2/b2b-agents"' in src
-    assert '>B2B Agents<' in src
+    assert 'href="/p2/strategic-agents"' in src
+    assert '>Strategic Agents<' in src
     assert '>PPC<' not in src, "breadcrumb still shows the pre-rename section label"
     assert 'href="/ppc"' not in src, "breadcrumb link should point straight at the canonical path, not the legacy alias"
 
@@ -172,5 +172,5 @@ def test_compiled_bundle_matches_the_source_fix():
     bundle = open(os.path.join(assets_dir, js_files[0]), encoding="utf-8").read()
     assert "/static/logo-lockup.svg" in bundle
     assert "/static/logo-mark.svg" in bundle
-    assert "B2B Agents" in bundle
+    assert "Strategic Agents" in bundle
     assert ">PPC<" not in bundle

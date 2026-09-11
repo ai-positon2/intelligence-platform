@@ -27,7 +27,7 @@ CSS_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 # (stylesheet, container selector). One row per agent page, listed explicitly so
 # a new page has to be added here on purpose rather than quietly skipped.
 PAGES = [
-    ("gtm.css", ".main"),                          # the B2B Agents listing
+    ("gtm.css", ".main"),                          # the Strategic Agents listing
     ("social_media_intelligence.css", ".main"),
     ("company_people_intelligence.css", ".shell"),  # Contact Finder
     ("linkedin.css", ".shell"),                     # LinkedIn Intelligence

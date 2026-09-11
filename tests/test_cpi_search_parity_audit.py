@@ -47,7 +47,7 @@ import tracker.apollo_client as ac  # noqa: E402
 _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _JS = os.path.join(_ROOT, "static", "js", "company_people_intelligence.js")
 
-_SEARCH = "/p2/b2b-agents/company-people-intelligence/search"
+_SEARCH = "/p2/strategic-agents/company-people-intelligence/search"
 _DOMAIN = "betabionics.com"
 _ORG = {"id": "57c4ab6ca6da98689038ddf4", "name": "Beta Bionics", "domain": _DOMAIN}
 
@@ -270,7 +270,7 @@ def test_a_company_scoped_count_is_offered_but_marked_approximate(client, monkey
     upper bound and has to read as one -- "about 355", not "355"."""
     _apollo(monkeypatch, {"people": [_person("p1")],
                           "pagination": {"total_entries": 355, "total_pages": 15}})
-    body = client.post("/p2/b2b-agents/company-people-intelligence/count",
+    body = client.post("/p2/strategic-agents/company-people-intelligence/count",
                        json={"entity": "people",
                              "filters": {"company_domains": [_DOMAIN]}}).get_json()
     assert body["count"] == 355
@@ -295,7 +295,7 @@ def test_every_locally_rechecked_filter_is_marked_approximate():
 # never got asked. The toast said "Revealed 40 profiles" either way, so the ten
 # worth retrying for free read as ten dead ends.
 
-_BULK_URL = "/p2/b2b-agents/company-people-intelligence/enrich-bulk"
+_BULK_URL = "/p2/strategic-agents/company-people-intelligence/enrich-bulk"
 
 
 def _chunk_failer(fail_on_second=True):
