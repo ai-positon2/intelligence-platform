@@ -242,7 +242,7 @@ html::-webkit-scrollbar,body::-webkit-scrollbar{width:0;height:0;display:none;}
        The tool lives in a cross-origin iframe, so we can't read its URL — the
        SEO app posts a {source:'p2-seo-tool', type:'route-change', tool, name}
        message on every navigation (see seo-apps' RouteBridge). We reflect that
-       into /p2/seo/<slug> via pushState so the URL always names the current
+       into /p2/seo-aeo/<slug> via pushState so the URL always names the current
        agent and the browser's back/forward works across agents. */
     (function(){
       var frame = document.getElementById('embed-frame');
@@ -252,7 +252,7 @@ html::-webkit-scrollbar,body::-webkit-scrollbar{width:0;height:0;display:none;}
         if(expectedOrigin && e.origin !== expectedOrigin) return;
         var d = e.data;
         if(!d || d.source !== 'p2-seo-tool' || d.type !== 'route-change' || !d.tool) return;
-        var target = '/p2/seo/' + d.tool;
+        var target = '/p2/seo-aeo/' + d.tool;
         if(location.pathname === target) return;
         history.pushState({seoTool:d.tool}, '', target);
         var cur = document.querySelector('.bc-cur');
@@ -263,7 +263,7 @@ html::-webkit-scrollbar,body::-webkit-scrollbar{width:0;height:0;display:none;}
          won't follow on its own, so reload to let the server render the tool
          that the (now-current) URL points at. */
       window.addEventListener('popstate', function(){
-        if(/^\/p2\/seo\/[^/]+/.test(location.pathname)) window.location.reload();
+        if(/^\/p2\/seo-aeo\/[^/]+/.test(location.pathname)) window.location.reload();
       });
     })();
   </script>
