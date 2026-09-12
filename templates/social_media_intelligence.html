@@ -1925,10 +1925,17 @@ function dsApifyRow(platform, entry){
       return '<ul class="' + cls + '">' + pts.map(function(p){ return '<li>' + esc(p) + '</li>'; }).join('') + '</ul>';
     }
 
-    function renderStrategy(text){
+    // Same outer label row as renderSection (icon slot, uppercase mono
+    // heading, optional right-aligned link chip) -- this used to bake its own
+    // smaller, indented label into the top of the card instead, which put
+    // Content patterns and Messaging & strategy, two adjacent sections of the
+    // same shape, on two different header baselines and only one of them
+    // able to carry a link chip at all.
+    function renderStrategy(text, link){
       var pts = toPoints(text);
       if(!pts.length) return '';
-      return '<div class="sci-strategy"><div class="sci-strategy-label"><span>◆</span>Messaging &amp; strategy</div>' +
+      return '<div class="sci-section"><div class="sci-section-label sci-section-label-strategy"><span>◆</span>Messaging &amp; strategy' +
+        sectionLink(link) + '</div>' +
         '<ul class="sci-strategy-list">' + pts.map(function(p){ return '<li>' + esc(p) + '</li>'; }).join('') + '</ul></div>';
     }
 
@@ -2840,7 +2847,7 @@ function dsApifyRow(platform, entry){
       return '<div class="sci-cross-lede">One read across every platform at once, cited back to the individual posts it came from.</div>' +
         renderSection('Content patterns', '◈', renderBulletList(cross.summary, 'sci-summary-list'),
           siteLink(run)) +
-        renderStrategy(cross.messaging_and_strategy) +
+        renderStrategy(cross.messaging_and_strategy, siteLink(run)) +
         // Evidence gets no chip on purpose. Every line inside it is already a
         // link to the post it cites; a ninth link in the heading would point
         // somewhere less specific than the eight below it.
@@ -2919,7 +2926,7 @@ function dsApifyRow(platform, entry){
         if(entry){
           body += renderSection('Content patterns', '◈', renderBulletList(entry.summary, 'sci-summary-list'),
               profileLink(name)) +
-            renderStrategy(entry.messaging_and_strategy) +
+            renderStrategy(entry.messaging_and_strategy, profileLink(name)) +
             renderSection('Evidence from real posts', '◇',
               (entry.claims && entry.claims.length) ? '<div class="sci-claims">' + renderClaims(entry.claims, postsById) + '</div>' : '');
         } else if(synthState){

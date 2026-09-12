@@ -547,6 +547,12 @@ a.sci-phero-handle:hover { color: #ffffff; border-bottom-color: var(--pf-color, 
 /* Scoped to the glyph, not to every span in the row: the section's link chip
    lives here too and must not inherit the glyph's size and orange. */
 .sci-section-label > span:first-child { font-size: 11px; color: #fdba74; }
+/* Messaging & strategy keeps its own purple tint on the heading text (not
+   just the glyph) so the label still reads as a distinct analytical section
+   now that it shares the generic .sci-section-label row instead of its own
+   bespoke one. */
+.sci-section-label-strategy { color: #e2a6dc; }
+.sci-section-label-strategy > span:first-child { color: #c084fc; }
 
 /* A section's own way out, right-aligned so the eye finds it in the same
    place in every section, and set in sans sentence case so it reads as a
@@ -575,12 +581,14 @@ a.sci-phero-handle:hover { color: #ffffff; border-bottom-color: var(--pf-color, 
 
 /* Messaging & strategy panel -- a distinct analytical read, deliberately
    separated from the descriptive content-patterns bullets above it so "what
-   it looks like" and "what it means strategically" don't blur together. */
-.sci-strategy { position: relative; margin: 0 0 18px; padding: 15px 18px 15px 22px; border-radius: var(--radius-md, 12px); background: linear-gradient(135deg, rgba(168,85,247,.09), rgba(244,114,182,.05)); border: 1px solid rgba(168,85,247,.24); }
-.sci-strategy::before { content: ''; position: absolute; left: 0; top: 13px; bottom: 13px; width: 3px; border-radius: var(--radius-pill, 80px); background: linear-gradient(180deg,#a855f7,#f472b6,#fb923c); }
-.sci-strategy-label { display: flex; align-items: center; gap: 7px; font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 10px; font-weight: 700; letter-spacing: var(--ls-caps, .08em); text-transform: uppercase; color: #e2a6dc; margin-bottom: 9px; }
-.sci-strategy-label span { font-size: 11px; color: #c084fc; }
-.sci-strategy-list { list-style: none; display: flex; flex-direction: column; gap: 10px; }
+   it looks like" and "what it means strategically" don't blur together. The
+   card shape (box on the list itself, accent rail via ::before) mirrors
+   .sci-summary-list exactly, and the heading is a plain .sci-section-label
+   like every other section in the report -- only the accent hue and the
+   glyph colour are its own, via .sci-section-label-strategy (declared
+   alongside .sci-section-label above). */
+.sci-strategy-list { list-style: none; display: flex; flex-direction: column; gap: 10px; position: relative; margin: 0; padding: 15px 18px 15px 22px; border-radius: var(--radius-md, 12px); background: linear-gradient(135deg, rgba(168,85,247,.09), rgba(244,114,182,.05)); border: 1px solid rgba(168,85,247,.24); }
+.sci-strategy-list::before { content: ''; position: absolute; left: 0; top: 13px; bottom: 13px; width: 3px; border-radius: var(--radius-pill, 80px); background: linear-gradient(180deg,#a855f7,#f472b6,#fb923c); }
 .sci-strategy-list li { position: relative; padding-left: 17px; font-size: 13.5px; font-weight: 500; line-height: 1.48; color: #f6eef8; }
 .sci-strategy-list li::before { content: '›'; position: absolute; left: -1px; top: -2.5px; font-size: 15px; font-weight: 800; line-height: 1; color: #c084fc; }
 
@@ -1223,9 +1231,9 @@ a.sci-rank-row:hover { background: rgba(255,255,255,.045); }
 [data-theme="light"] .sci-seclink:hover { color: #1c1420; background: color-mix(in srgb, var(--pf-color, #c2410c) 10%, transparent); }
 [data-theme="light"] .sci-seclink-ic { color: color-mix(in srgb, var(--pf-color, #c2410c) 74%, #140c18); }
 [data-theme="light"] .sci-summary-list li { color: #443a4a; }
-[data-theme="light"] .sci-strategy { background: linear-gradient(135deg, rgba(168,85,247,.08), rgba(244,114,182,.05)); border-color: rgba(168,85,247,.22); }
-[data-theme="light"] .sci-strategy-label { color: #9333ea; }
-[data-theme="light"] .sci-strategy-label span { color: #7e22ce; }
+[data-theme="light"] .sci-strategy-list { background: linear-gradient(135deg, rgba(168,85,247,.08), rgba(244,114,182,.05)); border-color: rgba(168,85,247,.22); }
+[data-theme="light"] .sci-section-label-strategy { color: #9333ea; }
+[data-theme="light"] .sci-section-label-strategy > span:first-child { color: #7e22ce; }
 [data-theme="light"] .sci-strategy-list li { color: #362a3d; }
 [data-theme="light"] .sci-postcard { background: rgba(255,255,255,.6); border-color: rgba(18,26,54,.09); }
 [data-theme="light"] .sci-postcard-title { color: #1c1420; }
