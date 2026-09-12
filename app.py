@@ -163,7 +163,7 @@ def _log_login_to_sheet(user: dict) -> None:
         else:
             log.warning("Login sheet: no credentials found (set GOOGLE_SA_JSON env var)")
             return
-        svc = build("sheets", "v4", credentials=creds, cache_discovery=False)
+        svc = build("sheets", "v4", credentials=creds, cache_discovery=False, static_discovery=True)
 
         now = datetime.now(IST)
         ua_raw  = request.headers.get("User-Agent", "")
@@ -325,7 +325,7 @@ def _demo_request_to_sheet(row: list) -> bool:
         else:
             log.warning("Demo request: no Google credentials (set GOOGLE_SA_JSON)")
             return False
-        svc = build("sheets", "v4", credentials=creds, cache_discovery=False)
+        svc = build("sheets", "v4", credentials=creds, cache_discovery=False, static_discovery=True)
         tab = "Demo Requests"
         # Make sure the tab exists (values.append errors on an unknown range).
         try:
@@ -4228,6 +4228,8 @@ def _fetch_job_change_tracked_data(force: bool = False) -> dict:
 
     def _fetch(tab_range):
         try:
+            # each concurrent read gets its own service instance -- httplib2
+            # (the transport underneath) is not safe to share across threads.
             svc = _sheets_service()
             r = svc.spreadsheets().values().get(
                 spreadsheetId=JOB_CHANGE_TRACKED_SHEET_ID, range=tab_range).execute()
@@ -4236,8 +4238,15 @@ def _fetch_job_change_tracked_data(force: bool = False) -> dict:
             log.warning("job_change tracked-sheet read failed (%s): %s", tab_range, e)
             return []
 
-    contact_rows = _fetch("'Contact List (Being Monitored)'!A5:BZ2000")
-    company_rows = _fetch("'Tracked Companies'!A1:BZ2000")
+    # These two tabs are independent reads -- run them concurrently instead of
+    # one after another (same fix as _fetch_anon_visitors_data / the Visitor
+    # Analytics dashboard).
+    from concurrent.futures import ThreadPoolExecutor
+    with ThreadPoolExecutor(max_workers=2) as ex:
+        contact_fut = ex.submit(_fetch, "'Contact List (Being Monitored)'!A5:BZ2000")
+        company_fut = ex.submit(_fetch, "'Tracked Companies'!A1:BZ2000")
+        contact_rows = contact_fut.result()
+        company_rows = company_fut.result()
 
     contacts = []
     if len(contact_rows) > 1:
@@ -4670,7 +4679,7 @@ def track_page():
         sa_info = _j.loads(sa_str)
         creds   = service_account.Credentials.from_service_account_info(
             sa_info, scopes=["https://www.googleapis.com/auth/spreadsheets"])
-        svc = build("sheets", "v4", credentials=creds, cache_discovery=False)
+        svc = build("sheets", "v4", credentials=creds, cache_discovery=False, static_discovery=True)
 
         # Auto-create header on first write to Page Views tab
         try:
@@ -4725,7 +4734,7 @@ def _va_sheets_service():
     sa_info = _j.loads(sa_str)
     creds = service_account.Credentials.from_service_account_info(
         sa_info, scopes=["https://www.googleapis.com/auth/spreadsheets"])
-    return build("sheets","v4",credentials=creds,cache_discovery=False)
+    return build("sheets","v4",credentials=creds,cache_discovery=False, static_discovery=True)
 
 
 def _va_sheets_service_st():
@@ -6070,7 +6079,7 @@ def _fetch_usage_data(internal: bool = True) -> dict:
             sa_info = _j.loads(sa_str)
             creds = service_account.Credentials.from_service_account_info(
                 sa_info, scopes=["https://www.googleapis.com/auth/spreadsheets"])
-            svc = build("sheets", "v4", credentials=creds, cache_discovery=False)
+            svc = build("sheets", "v4", credentials=creds, cache_discovery=False, static_discovery=True)
             r = svc.spreadsheets().values().get(
                 spreadsheetId=LOGIN_LOG_SHEET_ID, range=tab_range).execute()
             return r.get("values", [])
@@ -6091,14 +6100,20 @@ def _fetch_usage_data(internal: bool = True) -> dict:
     # tab (see _log_member_signin) — _log_login_to_sheet is never called for them.
     # So External Usage must read Member Signins or it would show almost nobody.
     # The two tabs put browser/os/device/visitor-id in different columns; LC maps them.
-    if internal:
-        login_rows = _fetch("A:U")
-        LC = {"br": 10, "os": 12, "dev": 13, "vid": 20}
-    else:
-        login_rows = _fetch("%s!A:T" % _MEMBER_TAB)
-        LC = {"br": 11, "os": 13, "dev": 14, "vid": 9}
-    page_rows  = _fetch("Page Views!A:N")
-    va_rows    = _fetch("Visitor Analytics!A:AM")
+    login_range = "A:U" if internal else ("%s!A:T" % _MEMBER_TAB)
+    LC = {"br": 10, "os": 12, "dev": 13, "vid": 20} if internal else {"br": 11, "os": 13, "dev": 14, "vid": 9}
+    # Three independent tab reads -- run them concurrently instead of one
+    # after another (same fix as _fetch_anon_visitors_data / the Visitor
+    # Analytics dashboard: each _fetch() call was also rebuilding its own
+    # credentials + client from scratch, serially, on every cache miss).
+    from concurrent.futures import ThreadPoolExecutor
+    with ThreadPoolExecutor(max_workers=3) as ex:
+        login_fut = ex.submit(_fetch, login_range)
+        page_fut = ex.submit(_fetch, "Page Views!A:N")
+        va_fut = ex.submit(_fetch, "Visitor Analytics!A:AM")
+        login_rows = login_fut.result()
+        page_rows = page_fut.result()
+        va_rows = va_fut.result()
     login_data = login_rows[1:] if len(login_rows) > 1 else []
     page_data  = page_rows[1:]  if len(page_rows)  > 1 else []
     va_data    = va_rows[1:]    if len(va_rows)    > 1 else []
@@ -6367,7 +6382,7 @@ def _read_access_requests(limit=300):
             return []
         creds = service_account.Credentials.from_service_account_info(
             _j.loads(sa_str), scopes=["https://www.googleapis.com/auth/spreadsheets.readonly"])
-        svc = build("sheets", "v4", credentials=creds, cache_discovery=False)
+        svc = build("sheets", "v4", credentials=creds, cache_discovery=False, static_discovery=True)
         r = svc.spreadsheets().values().get(
             spreadsheetId=DEMO_REQUEST_SHEET_ID, range="Demo Requests!A1:J2000").execute()
         rows = r.get("values", [])
@@ -7134,7 +7149,7 @@ def _cu_read_tab(tab_range):
         sa_info = _j.loads(sa_str)
         creds = service_account.Credentials.from_service_account_info(
             sa_info, scopes=["https://www.googleapis.com/auth/spreadsheets"])
-        svc = build("sheets", "v4", credentials=creds, cache_discovery=False)
+        svc = build("sheets", "v4", credentials=creds, cache_discovery=False, static_discovery=True)
         r = svc.spreadsheets().values().get(
             spreadsheetId=LOGIN_LOG_SHEET_ID, range=tab_range).execute()
         return r.get("values", [])
@@ -7143,11 +7158,17 @@ def _cu_read_tab(tab_range):
         return []
 
 
-def _cu_name_map():
-    """email(lower) -> {'name':.., 'picture':..} from both sign-in tabs."""
+_CU_SIGNIN_TABS = ("A:U", "%s!A:T" % _MEMBER_TAB)
+_CU_SIGNIN_PIC_COL = (None, 8)  # picture column index per tab above, if any
+
+def _cu_name_map_from_rows(signin_row_sets):
+    """email(lower) -> {'name':.., 'picture':..} from both sign-in tabs' rows.
+
+    Pure (no Sheets I/O) so the caller can fetch the two tabs once and reuse
+    the same rows for both this and the login-count pass below, instead of
+    each reading the same two tabs independently."""
     m = {}
-    for rng, pic_i in (("A:U", None), ("%s!A:T" % _MEMBER_TAB, 8)):
-        rows = _cu_read_tab(rng)
+    for (rng, pic_i), rows in zip(zip(_CU_SIGNIN_TABS, _CU_SIGNIN_PIC_COL), signin_row_sets):
         for r in rows[1:] if len(rows) > 1 else []:
             email = (r[5].strip().lower() if len(r) > 5 else "")
             if not email:
@@ -7193,8 +7214,22 @@ def _fetch_client_usage(slug, force=False):
     if not force and cached and (now - cached["ts"]) < _CU_TTL:
         return cached["data"]
 
-    name_map = _cu_name_map()
-    pv = _cu_read_tab("Page Views!A:N")
+    # This used to read the two sign-in tabs for the name/picture map, then
+    # separately re-read those SAME two tabs again later (for the login-count
+    # pass below) and read Page Views and Agent Runs on top of that, mostly one
+    # after another -- up to 6 sequential Sheets reads (2 of them pure
+    # duplicates) for what is only 4 distinct tabs. Fetch each tab exactly
+    # once, all four concurrently, and reuse the rows everywhere they're needed.
+    from concurrent.futures import ThreadPoolExecutor
+    ar_range = "%s!A:F" % _AR_TAB
+    with ThreadPoolExecutor(max_workers=4) as ex:
+        signin_futs = [ex.submit(_cu_read_tab, rng) for rng in _CU_SIGNIN_TABS]
+        pv_fut = ex.submit(_cu_read_tab, "Page Views!A:N")
+        ar_fut = ex.submit(_cu_read_tab, ar_range)
+        signin_row_sets = [f.result() for f in signin_futs]
+        pv = pv_fut.result()
+        ar_rows = ar_fut.result()
+    name_map = _cu_name_map_from_rows(signin_row_sets)
     rows = pv[1:] if len(pv) > 1 else []
 
     def col(r, i, d=""):
@@ -7279,8 +7314,8 @@ def _fetch_client_usage(slug, force=False):
     portal_days_by_email = {e: {ev["ts"][:10] for ev in p["_events"] if ev.get("ts")}
                              for e, p in people.items()}
     login_map = {}   # email(lower) -> [ts, ...]
-    for rng in ("A:U", "%s!A:T" % _MEMBER_TAB):
-        for r in _cu_read_tab(rng)[1:]:
+    for rows_ in signin_row_sets:  # same rows the name map was built from above, not re-fetched
+        for r in rows_[1:] if len(rows_) > 1 else []:
             e = (r[5].strip().lower() if len(r) > 5 else "")
             t = (r[0].strip() if len(r) > 0 else "")
             if e and t and t[:10] in portal_days_by_email.get(e, ()):
@@ -7296,7 +7331,7 @@ def _fetch_client_usage(slug, force=False):
     def _arv(r, n, d=""):
         i = _ARIDX.get(n, -1)
         return r[i] if 0 <= i < len(r) else d
-    for r in _cu_read_tab("%s!A:F" % _AR_TAB)[1:]:
+    for r in ar_rows[1:] if len(ar_rows) > 1 else []:  # fetched once, above
         e = (_arv(r, "Email") or "").strip().lower()
         if not e:
             continue
@@ -7614,35 +7649,56 @@ _ANON_CACHE = {"data": None, "ts": 0.0}
 _ANON_GZ = {"ts": None, "raw": b"", "gz": b""}
 _ANON_CACHE_TTL = 300  # seconds — Sheets reads are slow; serve cached data between refreshes
 
+def _anon_sheets_service():
+    """Sheets client for the Anonymous Visitors sheet. static_discovery=True means
+    building this does no network call of its own (see _va_sheets_service_st) --
+    module-level (not a closure) so a concurrent read can get one instance per
+    thread (httplib2's transport is not thread-safe to share) and so tests can
+    monkeypatch it directly."""
+    import json as _j
+    from google.oauth2 import service_account
+    from googleapiclient.discovery import build
+    sa_str = os.environ.get("GOOGLE_SA_JSON", "")
+    if not sa_str:
+        return None
+    creds = service_account.Credentials.from_service_account_info(
+        _j.loads(sa_str), scopes=["https://www.googleapis.com/auth/spreadsheets.readonly"])
+    return build("sheets", "v4", credentials=creds, cache_discovery=False, static_discovery=True)
+
+def _fetch_anon_tab(tab_range):
+    try:
+        svc = _anon_sheets_service()
+        if svc is None:
+            return []
+        r = svc.spreadsheets().values().get(
+            spreadsheetId=ANON_VISITORS_SHEET_ID, range=tab_range).execute()
+        return r.get("values", [])
+    except Exception as e:
+        log.warning("anon_visitors sheet read failed: %s", e)
+        return []
+
 def _fetch_anon_visitors_data(force: bool = False) -> dict:
-    """Fetch people + company data from the Anonymous Visitors Google Sheet (TTL-cached)."""
+    """Fetch people + company data from the Anonymous Visitors Google Sheet (TTL-cached).
+
+    The two tab reads used to happen one after another, each rebuilding its own
+    credentials + Sheets client from scratch -- two full network round-trips
+    plus two client-construction costs, serially. Now the client is built once
+    per read (cheap: static_discovery=True means no discovery-doc network call)
+    and the two ranges are read concurrently, the same fix already proven for
+    the Visitor Analytics dashboard (see _fetch_visitor_analytics_uncached)."""
     now = time.time()
     if not force and _ANON_CACHE["data"] is not None and (now - _ANON_CACHE["ts"]) < _ANON_CACHE_TTL:
         return _ANON_CACHE["data"]
-    def _fetch(tab_range):
-        try:
-            import json as _j
-            from google.oauth2 import service_account
-            from googleapiclient.discovery import build
-            sa_str = os.environ.get("GOOGLE_SA_JSON", "")
-            if not sa_str:
-                return []
-            sa_info = _j.loads(sa_str)
-            creds = service_account.Credentials.from_service_account_info(
-                sa_info, scopes=["https://www.googleapis.com/auth/spreadsheets.readonly"])
-            svc = build("sheets", "v4", credentials=creds, cache_discovery=False)
-            r = svc.spreadsheets().values().get(
-                spreadsheetId=ANON_VISITORS_SHEET_ID, range=tab_range).execute()
-            return r.get("values", [])
-        except Exception as e:
-            log.warning("anon_visitors sheet read failed: %s", e)
-            return []
 
     def col(row, i, default=""):
         return row[i] if len(row) > i else default
 
-    people_rows  = _fetch("People Enriched!A:K")
-    company_rows = _fetch("Visitors By Company!A:J")
+    from concurrent.futures import ThreadPoolExecutor
+    with ThreadPoolExecutor(max_workers=2) as ex:
+        people_fut = ex.submit(_fetch_anon_tab, "People Enriched!A:K")
+        company_fut = ex.submit(_fetch_anon_tab, "Visitors By Company!A:J")
+        people_rows = people_fut.result()
+        company_rows = company_fut.result()
 
     people_data  = people_rows[1:]  if len(people_rows)  > 1 else []
     company_data = company_rows[1:] if len(company_rows) > 1 else []
@@ -16221,7 +16277,7 @@ def _sheets_service():
     sa_info = _j.loads(sa_str)
     creds = service_account.Credentials.from_service_account_info(
         sa_info, scopes=["https://www.googleapis.com/auth/spreadsheets.readonly"])
-    return build("sheets", "v4", credentials=creds, cache_discovery=False)
+    return build("sheets", "v4", credentials=creds, cache_discovery=False, static_discovery=True)
 
 
 # ── Chatbot data functions ────────────────────────────────────────────────────

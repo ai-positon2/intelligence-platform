@@ -178,6 +178,35 @@
     var SORT = { events: {key:'detected_at', dir:-1}, people: {key:'name', dir:1}, companies: {key:'name', dir:1} };
     var FILTERS = { events: {}, people: {}, companies: {} };
     var LAST_ROWS = { events: [], people: [], companies: [] };
+    var _tblJobs = {};  // wrapId -> job token, so a stale background fill can cancel itself
+
+    // Shared by renderEvents/renderPeople/renderCompanies: each used to build
+    // its ENTIRE row set via .map().join('') then one innerHTML= write --
+    // fine for a handful of rows, but this roster can run into the hundreds
+    // (see TRACKED.contacts/companies) to low thousands (EVENTS, which only
+    // grows), and that single write is exactly the kind of long blocking
+    // task that shows up as "the page doesn't scroll properly" (same bug
+    // already fixed on the Anonymous Visitors agent's tables). First 150 rows
+    // render instantly; the rest fill in over background animation-frame
+    // batches, capped the same way the per-row entrance animation already is.
+    function renderTableProgressive(wrapId, headHtml, rows, rowFn){
+      var wrap = document.getElementById(wrapId);
+      var job = (_tblJobs[wrapId] = (_tblJobs[wrapId]||0) + 1);
+      var tbodyId = wrapId + '-tbody';
+      var FIRST = 150, n = rows.length, e0 = Math.min(FIRST, n);
+      var first = ''; for (var i = 0; i < e0; i++) first += rowFn(rows[i], i);
+      wrap.innerHTML = '<table class="jc-table">' + headHtml + '<tbody id="' + tbodyId + '">' + first + '</tbody></table>';
+      if (n <= FIRST) return;
+      var tbody = document.getElementById(tbodyId), idx = e0, CHUNK = 200;
+      (function step(){
+        if (job !== _tblJobs[wrapId] || !tbody || !tbody.isConnected) return;
+        var e = Math.min(idx + CHUNK, n), more = '';
+        for (var i = idx; i < e; i++) more += rowFn(rows[i], i);
+        tbody.insertAdjacentHTML('beforeend', more);
+        idx = e;
+        if (idx < n) requestAnimationFrame(step);
+      })();
+    }
 
     function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
     function initials(name){
@@ -708,7 +737,7 @@
         +'</tr></thead>';
       var cutoff=Date.now()-7*86400000;
       var freshCutoff=Date.now()-48*3600000;
-      var body='<tbody>'+rows.map(function(e,i){
+      function eventRow(e,i){
         var hot=e.detected_at&&new Date(e.detected_at).getTime()>=cutoff;
         var fresh=e.detected_at&&new Date(e.detected_at).getTime()>=freshCutoff;
         return '<tr class="jc-row-in'+(fresh?' jc-fresh':'')+'" data-idx="'+i+'" style="animation-delay:'+Math.min(i*25,400)+'ms">'
@@ -723,8 +752,8 @@
           +'<td class="jc-muted">'+esc(e.job_start_date||'—')+'</td>'
           +'<td class="jc-muted"><span class="hot-dot'+(hot?'':' cold')+'">'+esc(relTime(e.detected_at))+'</span></td>'
           +'</tr>';
-      }).join('')+'</tbody>';
-      document.getElementById('tableWrap-events').innerHTML='<table class="jc-table">'+head+body+'</table>';
+      }
+      renderTableProgressive('tableWrap-events', head, rows, eventRow);
     }
 
     function renderPeople(){
@@ -760,7 +789,7 @@
         +'<th onclick="sortBy(\'department\')">Department</th>'
         +'<th onclick="sortBy(\'city\')">Location</th>'
         +'</tr></thead>';
-      var body='<tbody>'+rows.map(function(c,i){
+      function peopleRow(c,i){
         return '<tr class="jc-row-in" data-idx="'+i+'" style="animation-delay:'+Math.min(i*12,400)+'ms">'
           +'<td><div class="jc-person"><div class="jc-avatar roster">'+esc(initials(c.name))+'</div>'
           +'<div><div class="jc-name">'+esc(c.name||'Unknown')+'</div>'
@@ -772,8 +801,8 @@
           +'<td class="jc-muted">'+esc(c.department||'—')+'</td>'
           +'<td class="jc-muted">'+esc([c.city,c.state].filter(Boolean).join(', ')||'—')+'</td>'
           +'</tr>';
-      }).join('')+'</tbody>';
-      document.getElementById('tableWrap-people').innerHTML='<table class="jc-table">'+head+body+'</table>';
+      }
+      renderTableProgressive('tableWrap-people', head, rows, peopleRow);
     }
 
     function renderCompanies(){
@@ -811,7 +840,7 @@
         +'<th onclick="sortBy(\'city\')">Location</th>'
         +'<th onclick="sortBy(\'total_funding\')">Funding</th>'
         +'</tr></thead>';
-      var body='<tbody>'+rows.map(function(c,i){
+      function companiesRow(c,i){
         return '<tr class="jc-row-in" data-idx="'+i+'" style="animation-delay:'+Math.min(i*12,400)+'ms">'
           +'<td><div class="jc-person">'+logoAvatar(c.website,(c.name||'?')[0].toUpperCase())
           +'<div><div class="jc-name">'+esc(c.name||'Unknown')+'</div>'
@@ -823,8 +852,8 @@
           +'<td class="jc-muted">'+esc([c.city,c.state].filter(Boolean).join(', ')||'—')+'</td>'
           +'<td>'+(c.total_funding?'<span class="jc-badge fund-badge">'+fmtMoney(c.total_funding)+'</span>':'<span class="jc-muted">—</span>')+'</td>'
           +'</tr>';
-      }).join('')+'</tbody>';
-      document.getElementById('tableWrap-companies').innerHTML='<table class="jc-table">'+head+body+'</table>';
+      }
+      renderTableProgressive('tableWrap-companies', head, rows, companiesRow);
     }
 
     function runSync(){

@@ -2634,8 +2634,11 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
     frame();
   }
   function initNebula(canvas){
-    var renderer; try{ renderer=new THREE.WebGLRenderer({canvas:canvas,antialias:true,alpha:true}); }catch(e){ return false; }
-    renderer.setPixelRatio(Math.min(devicePixelRatio,2)); renderer.setSize(innerWidth,innerHeight);
+    // antialias off + DPR capped at 1 (was 2, i.e. up to 4x the fragment work on
+    // Retina/HiDPI): the shader's own soft circular falloff makes MSAA invisible
+    // here, so this is pure render-cost savings on the site's highest-traffic page.
+    var renderer; try{ renderer=new THREE.WebGLRenderer({canvas:canvas,antialias:false,alpha:true}); }catch(e){ return false; }
+    renderer.setPixelRatio(Math.min(devicePixelRatio,1)); renderer.setSize(innerWidth,innerHeight);
     var scene=new THREE.Scene(), camera=new THREE.PerspectiveCamera(60,innerWidth/innerHeight,0.1,200); camera.position.set(0,0,13.5);
     var group=new THREE.Group(); scene.add(group); var clock=new THREE.Clock();
     var MOB=window.matchMedia&&window.matchMedia('(max-width:760px)').matches;
@@ -2659,7 +2662,7 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
       fragmentShader:['varying vec3 vColor; varying float vTw; uniform float uPulse;','void main(){','float dd=length(gl_PointCoord-0.5);','float core=smoothstep(0.40,0.35,dd);','float glow=smoothstep(0.43,0.0,dd);','float aa=pow(core,1.4)+pow(glow,5.5)*0.06;','vec3 col=vColor*(0.42+0.5*uPulse)*vTw;','gl_FragColor=vec4(col,aa);','}'].join('\n') });
     var points=new THREE.Points(geo,mat); group.add(points);
     var lines=null,linePos=null,edges=[];
-    if(!MOB){ var CONN=170,K=2,aa,bb,kk;
+    if(!MOB){ var CONN=100,K=2,aa,bb,kk;
       for(aa=0;aa<CONN;aa++){ var ai=(aa*5+1)%N, best=[];
         for(bb=0;bb<N;bb+=6){ if(bb===ai) continue; var dx=bp[ai*3]-bp[bb*3],dy=bp[ai*3+1]-bp[bb*3+1],dz=bp[ai*3+2]-bp[bb*3+2]; best.push([dx*dx+dy*dy+dz*dz,bb]); }
         best.sort(function(p,q){return p[0]-q[0];}); for(kk=0;kk<K;kk++) edges.push([ai,best[kk][1]]); }
@@ -2668,13 +2671,19 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
     var ptr={x:0,y:0,tx:0,ty:0};
     if(FINE) window.addEventListener('mousemove',function(e){ ptr.tx=(e.clientX/innerWidth-0.5)*2; ptr.ty=(e.clientY/innerHeight-0.5)*2; },{passive:true});
     window.addEventListener('resize',function(){ camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth,innerHeight); });
-    function frame(){ var time=clock.getElapsedTime(); uniforms.uTime.value=time; uniforms.uPulse.value=0.12+0.06*Math.sin(time*0.55);
-      var dk=0.4,i; for(i=0;i<N;i++){ var ph=R[i*5+4]*6.2832+time*(0.25+R[i*5]*0.45);
-        cur[i*3]=bp[i*3]+Math.sin(ph)*dk; cur[i*3+1]=bp[i*3+1]+Math.cos(ph*0.9)*dk; cur[i*3+2]=bp[i*3+2]+Math.sin(ph*0.7)*dk; }
-      geo.attributes.position.needsUpdate=true;
-      if(lines){ for(i=0;i<edges.length;i++){ var i0=edges[i][0],i1=edges[i][1],o=i*6;
-        linePos[o]=cur[i0*3];linePos[o+1]=cur[i0*3+1];linePos[o+2]=cur[i0*3+2];linePos[o+3]=cur[i1*3];linePos[o+4]=cur[i1*3+1];linePos[o+5]=cur[i1*3+2]; }
-        lines.geometry.attributes.position.needsUpdate=true; lines.material.opacity=0.04+0.1*uniforms.uPulse.value; }
+    var _fc=0;
+    function frame(){
+      if(document.hidden){ requestAnimationFrame(frame); return; } // don't burn CPU/GPU in a background tab
+      var time=clock.getElapsedTime(); uniforms.uTime.value=time; uniforms.uPulse.value=0.12+0.06*Math.sin(time*0.55);
+      _fc++;
+      if(_fc%2===0){ // the O(N) rewrite + full GPU buffer re-upload only needs to happen every other frame --
+        var dk=0.4,i; for(i=0;i<N;i++){ var ph=R[i*5+4]*6.2832+time*(0.25+R[i*5]*0.45);
+          cur[i*3]=bp[i*3]+Math.sin(ph)*dk; cur[i*3+1]=bp[i*3+1]+Math.cos(ph*0.9)*dk; cur[i*3+2]=bp[i*3+2]+Math.sin(ph*0.7)*dk; }
+        geo.attributes.position.needsUpdate=true;
+        if(lines){ for(i=0;i<edges.length;i++){ var i0=edges[i][0],i1=edges[i][1],o=i*6;
+          linePos[o]=cur[i0*3];linePos[o+1]=cur[i0*3+1];linePos[o+2]=cur[i0*3+2];linePos[o+3]=cur[i1*3];linePos[o+4]=cur[i1*3+1];linePos[o+5]=cur[i1*3+2]; }
+          lines.geometry.attributes.position.needsUpdate=true; lines.material.opacity=0.04+0.1*uniforms.uPulse.value; }
+      }
       ptr.x+=(ptr.tx-ptr.x)*0.04; ptr.y+=(ptr.ty-ptr.y)*0.04;
       group.rotation.y=time*0.022+ptr.x*0.35; group.rotation.x=ptr.y*0.2;
       camera.position.x+=(ptr.tx*1.2-camera.position.x)*0.035; camera.position.y+=(-ptr.ty*0.8-camera.position.y)*0.035; camera.lookAt(0,0,0);

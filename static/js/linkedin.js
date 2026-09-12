@@ -1,5 +1,7 @@
 /* LinkedIn Scraper — page logic. Data is fetched live from window.__LI_DATA_URL__ (see template). */
 let D = {posts:[],people:[],companies:[],company_lb:[],stats:{}};
+let _pfCard=null, _pfJob=0;  // applyPF()'s progressive-render helpers
+let _cfCard=null, _cfJob=0;  // applyCF()'s progressive-render helpers
 /* ── helpers ── */
 const esc=s=>(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 const ini=n=>(n||'?').trim().split(/\s+/).map(w=>w[0]||'').join('').toUpperCase().slice(0,2);
@@ -314,13 +316,12 @@ function applyPF(){
   if(!filtered.length){g.innerHTML='<div class="nores" style="grid-column:1/-1"><div class="nores-ico">🔍</div><h3>No results</h3><p>Try adjusting filters</p></div>';return;}
   if(PF.sort==='eng')filtered.sort((a,b)=>b.fe.length-a.fe.length);
   _filteredPosts=filtered;
-  g.innerHTML=filtered.map((p,pi)=>{
+  _pfCard=function(p,pi){
     const eng=p.fe,dmN=eng.filter(e=>e.dm?.toLowerCase()==='yes').length;
     const csN=eng.filter(e=>e.seniority?.includes('C-Level')||e.seniority?.includes('Founder')).length;
     const cmN=eng.filter(e=>e.commented).length;
     const reacts=[...new Set(eng.map(e=>e.reaction).filter(Boolean))].slice(0,2);
-    const ori=D.posts.indexOf(p);
-    return`<div class="pcard" id="pc-${pi}" onclick="openPostModal(${pi})" style="animation-delay:${pi*.05}s">
+    return`<div class="pcard" id="pc-${pi}" onclick="openPostModal(${pi})" style="animation-delay:${Math.min(pi,40)*.05}s">
       <div class="ptop">
         <div class="pdot"></div>
         <div class="pauth">${esc(p.author||EMP_FULL)}</div>
@@ -335,7 +336,28 @@ function applyPF(){
         ${p.url?`<a href="${esc(p.url)}" target="_blank" class="post-view-btn" onclick="event.stopPropagation()">View Post ↗</a>`:''}
       </div>
     </div>`;
-  }).join('');
+  };
+  // Every card also carries a nested filter over its own engagers array
+  // (built above, in the .map/.filter chain), so building all of them
+  // synchronously is the same "one long blocking task" bug already fixed on
+  // the Anonymous Visitors people/company tables: first 60 cards render
+  // instantly, the rest fill in over background animation-frame batches. A
+  // job token cancels a stale in-flight fill when filters change again.
+  _pfJob++;const job=_pfJob;
+  const FIRST=60,n=filtered.length,e0=Math.min(FIRST,n);
+  let html='';for(let i=0;i<e0;i++)html+=_pfCard(filtered[i],i);
+  g.innerHTML=html;
+  if(n>FIRST){
+    let idx=e0;const CHUNK=40;
+    (function step(){
+      if(job!==_pfJob||!g.isConnected)return;
+      const e=Math.min(idx+CHUNK,n);let more='';
+      for(let i=idx;i<e;i++)more+=_pfCard(filtered[i],i);
+      g.insertAdjacentHTML('beforeend',more);
+      idx=e;
+      if(idx<n)requestAnimationFrame(step);
+    })();
+  }
 }
 function filterToDM(postIdx){PF.dm=true;document.getElementById('pf-dm').classList.add('on');applyPF();}
 function togglePost(pi){
@@ -589,7 +611,7 @@ function applyCF(){
   var tcco=document.getElementById('tc-companies');if(tcco)tcco.textContent=fil.length;
   if(!fil.length){g.innerHTML='<div class="nores" style="grid-column:1/-1"><div class="nores-ico">🔍</div><h3>No results</h3></div>';return;}
   const maxCnt=Math.max(...fil.map(c=>c.people_count),1);
-  g.innerHTML=fil.map((c,ci)=>{
+  _cfCard=function(c,ci){
     const idx=D.companies.indexOf(c);
     const icos=ini(c.name);
     const [cc1,cc2]=gradFor(c.name);
@@ -603,7 +625,7 @@ function applyCF(){
     // mini avatars
     const ppl=c.people.slice(0,5);
     const avs=ppl.map(p=>{const[c1,c2]=gradFor(p.name);return`<div class="mini-av" style="background:linear-gradient(135deg,${c1},${c2})" title="${esc(p.name)}">${ini(p.name)}</div>`;}).join('');
-    return`<div class="ccrd" onclick="openCompanyDrawer(${idx})" style="animation-delay:${ci*.04}s">
+    return`<div class="ccrd" onclick="openCompanyDrawer(${idx})" style="animation-delay:${Math.min(ci,40)*.04}s">
       <div class="cctop">
         <div class="ccico" style="background:linear-gradient(135deg,${cc1},${cc2})">${icos}</div>
         <div><div class="ccn">${esc(c.name)}</div><div class="ccsub">${esc(c.industry||'-')}${c.size?' · '+esc(c.size):''}</div></div>
@@ -617,8 +639,27 @@ function applyCF(){
       </div>`:``}
       <div class="cc-bar">${segs}</div>
     </div>`;
-  }).join('');
+  };
+  // Same "one long blocking task" fix as applyPF/the Anonymous Visitors
+  // tables: first 60 cards render instantly, the rest fill in over
+  // background animation-frame batches.
+  _cfJob++;const job=_cfJob;
+  const FIRST=60,n=fil.length,e0=Math.min(FIRST,n);
+  let html='';for(let i=0;i<e0;i++)html+=_cfCard(fil[i],i);
+  g.innerHTML=html;
   setTimeout(countUp,50);
+  if(n>FIRST){
+    let idx=e0;const CHUNK=40;
+    (function step(){
+      if(job!==_cfJob||!g.isConnected)return;
+      const e=Math.min(idx+CHUNK,n);let more='';
+      for(let i=idx;i<e;i++)more+=_cfCard(fil[i],i);
+      g.insertAdjacentHTML('beforeend',more);
+      idx=e;
+      if(idx<n)requestAnimationFrame(step);
+      else countUp();  // animate the stats of the cards that just finished filling in
+    })();
+  }
 }
 
 /* ═══════════════════════════════════

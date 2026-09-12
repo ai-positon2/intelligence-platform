@@ -298,24 +298,45 @@
   }
 
   /* RENDER — COMPANIES TABLE */
+  function _companyRow(c,i){
+    var loc=[c.city,c.state].filter(Boolean).join(', ')||c.country||'-';
+    return'<tr style="animation:row-in .22s ease '+(Math.min(i,40)*9)+'ms both" onclick="openCompanyDrawer('+i+')" title="Click to view company">'+
+      '<td><div class="company-cell">'+
+        '<div class="company-av">'+esc(initials(c.name))+'</div>'+
+        '<div style="min-width:0;overflow:hidden"><div class="company-name" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(c.name)+'</div><div class="company-site" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(c.website)+'</div></div>'+
+      '</div></td>'+
+      '<td style="color:#cbd5e1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(c.industry)+'</td>'+
+      '<td style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(loc)+'</td>'+
+      '<td style="color:#94a3b8">'+fmtEmp(c.employees)+'</td>'+
+      '<td><span class="revenue-badge">'+fmtRevenue(c.revenue)+'</span></td>'+
+    '</tr>';
+  }
+  function _companyRows(rows,start,end){var o='';for(var i=start;i<end;i++)o+=_companyRow(rows[i],i);return o;}
+  var _cmpJob=0;
+  // Same fix as renderPeopleProgressive: this used to build every row (can be
+  // hundreds to thousands) in one synchronous innerHTML write, which is exactly
+  // the kind of single long task that shows up as "the page doesn't scroll
+  // properly" -- the main thread is busy building/animating rows it hasn't
+  // painted yet. First 200 rows render instantly, the rest fill in over
+  // background animation-frame batches; a job token cancels a stale in-flight
+  // fill when the list is re-filtered.
   function renderCompanies(rows){
-    if(!rows||!rows.length)return'<div class="empty">No matching companies found.</div>';
+    _cmpJob++; var job=_cmpJob;
+    var pane=document.getElementById('pane-companies'); if(!pane)return;
+    if(!rows||!rows.length){pane.innerHTML='<div class="empty">No matching companies found.</div>';return;}
     var cols='<colgroup><col style="width:260px"><col style="width:220px"><col style="width:200px"><col style="width:100px"><col style="width:110px"></colgroup>';
     var h='<thead><tr><th>Company</th><th>Industry</th><th>Location</th><th>Employees</th><th>Revenue</th></tr></thead>';
-    var b='<tbody>'+rows.map(function(c,i){
-      var loc=[c.city,c.state].filter(Boolean).join(', ')||c.country||'-';
-      return'<tr style="animation:row-in .22s ease '+(Math.min(i,40)*9)+'ms both" onclick="openCompanyDrawer('+i+')" title="Click to view company">'+
-        '<td><div class="company-cell">'+
-          '<div class="company-av">'+esc(initials(c.name))+'</div>'+
-          '<div style="min-width:0;overflow:hidden"><div class="company-name" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(c.name)+'</div><div class="company-site" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(c.website)+'</div></div>'+
-        '</div></td>'+
-        '<td style="color:#cbd5e1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(c.industry)+'</td>'+
-        '<td style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(loc)+'</td>'+
-        '<td style="color:#94a3b8">'+fmtEmp(c.employees)+'</td>'+
-        '<td><span class="revenue-badge">'+fmtRevenue(c.revenue)+'</span></td>'+
-      '</tr>';
-    }).join('')+'</tbody>';
-    return'<div class="tbl-wrap"><table>'+cols+h+b+'</table></div>';
+    var FIRST=200, n=rows.length, e0=Math.min(FIRST,n);
+    pane.innerHTML='<div class="tbl-wrap"><table>'+cols+h+'<tbody id="cmp-tbody">'+_companyRows(rows,0,e0)+'</tbody></table></div>';
+    if(n<=FIRST)return;
+    var tb=document.getElementById('cmp-tbody'), idx=e0, CHUNK=300;
+    (function step(){
+      if(job!==_cmpJob||!tb||!tb.isConnected)return;
+      var e=Math.min(idx+CHUNK,n);
+      tb.insertAdjacentHTML('beforeend',_companyRows(rows,idx,e));
+      idx=e;
+      if(idx<n)requestAnimationFrame(step);
+    })();
   }
 
   /* FILTERS */
@@ -355,7 +376,7 @@
         if(sz&&empSize(c.employees)!==sz)return false;
         return true;
       });
-      document.getElementById('pane-companies').innerHTML=renderCompanies(_filteredCompanies);
+      renderCompanies(_filteredCompanies);
       document.getElementById('resultCount').textContent=_filteredCompanies.length+' of '+_allCompanies.length;
     }
   }
