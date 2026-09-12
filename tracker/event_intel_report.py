@@ -832,6 +832,12 @@ def attach_cross_client_signal(candidates: list[dict], signal: dict) -> list[dic
     """Attach cross_client_count/cross_client_note per row, from
     event_intel_audit.cross_client_signal()'s output.
 
+    CURRENTLY UNREFERENCED: _run_recommend calls disabled_cross_client_check()
+    instead, pending unambiguous client identity/consent/confidential-profile
+    isolation (see that function and event_intel_audit.cross_client_signal's
+    own comment). Kept fully implemented and tested as the foundation to wire
+    back in once that exists, not as an oversight.
+
     Pure information, never a reorder: nothing in this feature's spec asks
     it to move anything, unlike apply_outcome_pattern above. A row whose
     name_key is not in `signal`, or whose entry does not clear `fires`, gets

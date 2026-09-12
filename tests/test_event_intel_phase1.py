@@ -177,6 +177,18 @@ def test_redirect_to_private_destination_is_revalidated(monkeypatch):
     assert constructor.call_args.args[0]=='8.8.8.8'
 
 
+def test_an_explicit_port_zero_is_rejected_not_silently_rewritten_to_80(monkeypatch):
+    """port = target.port or 80 treats an explicit `:0` (falsy, but a real,
+    distinct port the URL actually named) the same as no port at all, and
+    would have silently connected on 80 instead of rejecting it like any
+    other nonstandard port."""
+    monkeypatch.setattr(HTTP.socket,'getaddrinfo',lambda *a,**k:[(None,None,None,None,('8.8.8.8',0))])
+    transport=Mock()
+    monkeypatch.setattr(HTTP.urllib3,'HTTPConnectionPool',transport)
+    with pytest.raises(ValueError): HTTP.public_get('http://event.example:0/')
+    transport.assert_not_called()
+
+
 def test_failed_discovery_keeps_spend_and_failed_status(monkeypatch):
     updates=[]
     monkeypatch.setattr(P.store,'update_run',lambda rid,**fields:updates.append(fields))

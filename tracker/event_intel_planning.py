@@ -184,13 +184,19 @@ def overlay(event, participants, targets):
             org_domain = domains(row.get('org_domain'))
         except ValueError:
             continue
-        if not org_domain or org_domain[0] not in targets or not row.get('source_url'):
+        # A participant's own org_domain is extracted as one value per
+        # company, but domains() is a general splitter, so checking only
+        # index 0 would silently miss a real match if that field ever held
+        # more than one domain -- a false negative (a target never surfaces
+        # as matched), never a false positive.
+        matched_domain = next((d for d in org_domain if d in targets), None)
+        if not matched_domain or not row.get('source_url'):
             continue
         evidence = row.get('evidence') or {}
         years = [str(year) for year in (evidence.get('observed_roster_years') or [])]
         same_edition = bool(row.get('role') in ('exhibitor', 'sponsor', 'speaker', 'partner', 'media') and starts and years == [str(starts.year)] and evidence.get('status') == 'literal_support_only')
         timing = ('historical' if starts < date.today() else 'announced') if same_edition else 'edition_not_established'
-        matches.append(dict(company=row.get('org_name'), domain=org_domain[0], role=row.get('role'),
+        matches.append(dict(company=row.get('org_name'), domain=matched_domain, role=row.get('role'),
                             source_url=row['source_url'], timing=timing, support=evidence.get('status') or 'unverified'))
     unavailable = event.get('availability') in ('sold_out', 'cancelled') or not starts or starts < date.today()
     suggestion = 'monitor' if unavailable else ('meetings' if any(m['timing'] == 'announced' for m in matches) else None)

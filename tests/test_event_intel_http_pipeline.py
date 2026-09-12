@@ -2,6 +2,11 @@
 
 Sessions are test fixtures, not live Google sign-ins. Organizer/model responses
 are synthetic; no provider is contacted or business-quality result inferred.
+
+Despite the filename, this does NOT exercise the SSRF-hardened HTTP fetcher
+itself (event_intel_http.py) -- fetch_page is monkeypatched throughout. Those
+tests are test_event_intel_phase1.py's test_private_destinations_block_before_http
+and test_redirect_to_private_destination_is_revalidated.
 """
 import csv
 import io

@@ -197,6 +197,31 @@ def finish_call(call_id,result,elapsed_ms):
         cur.execute('UPDATE evi_provider_calls SET result=%s::jsonb,response=%s::jsonb,elapsed_ms=%s WHERE id=%s', (json.dumps(metadata),json.dumps(result),elapsed_ms,call_id))
 
 
+def _renew_loop(job, stop):
+    """The renewal thread's body. A module-level function (not a closure
+    inside run_once()) so a test can drive it directly, through a real
+    thread boundary, without waiting through 20 real seconds of `stop.wait`.
+
+    A new thread starts with its own fresh top-level contextvars Context, not
+    a copy of the caller's -- CURRENT.set(job) elsewhere on the main thread
+    has no effect here regardless of ordering. heartbeat() itself doesn't
+    need CURRENT (it targets evi_jobs, an unguarded table, by the real
+    run_id/token bound as query parameters), but store._pg_conn() reads
+    CURRENT to set this connection's session-level evi.worker_token, the same
+    as every other thread in this codebase that touches storage goes through
+    ContextExecutor for. Setting it directly, once, is the equivalent for a
+    single dedicated thread: without it, a future guarded-table write added
+    here would be silently fenced by the trigger despite a valid lease.
+    """
+    CURRENT.set(job)
+    while not stop.wait(20):
+        try:
+            if not heartbeat(job):
+                return
+        except Exception:
+            return  # The database fences later writes after lease expiry.
+
+
 def run_once():
     """Claim one job; daemon heartbeat never performs the research itself."""
     import threading
@@ -210,14 +235,7 @@ def run_once():
                 cur.execute("UPDATE evi_runs SET status='failed',stage='interrupted',error='Worker recovery attempts exhausted.' WHERE id=%s", (run_id,))
         return False
     stop = threading.Event()
-    def renew():
-        while not stop.wait(20):
-            try:
-                if not heartbeat(job):
-                    return
-            except Exception:
-                return  # The database fences later writes after lease expiry.
-    thread = threading.Thread(target=renew, daemon=True)
+    thread = threading.Thread(target=_renew_loop, args=(job, stop), daemon=True)
     thread.start()
     marker = CURRENT.set(job)
     try:

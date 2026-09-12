@@ -60,6 +60,20 @@ def test_overlay_does_not_turn_historical_or_unverified_rosters_into_future_atte
     assert P.overlay(event, [dict(row, source_url='')], ['acme.example'])['matches'] == []
 
 
+def test_overlay_checks_every_domain_a_participant_row_carries_not_just_the_first():
+    """org_domain is one value per company in practice, but domains() is a
+    general splitter; checking only index 0 would silently miss a real match
+    (a false negative) if the field ever held more than one."""
+    day = date.today()+timedelta(days=400)
+    event = {'starts_on': str(day)}
+    row = {'org_domain': 'other.example, acme.example', 'org_name': 'Acme', 'role': 'exhibitor',
+          'source_url': 'https://event.example/roster',
+          'evidence': {'status': 'literal_support_only', 'observed_roster_years': [day.year]}}
+    result = P.overlay(event, [row], ['acme.example'])
+    assert result['matches'][0]['domain'] == 'acme.example'
+    assert result['not_observed'] == []
+
+
 @pytest.fixture
 def fixture():
     email = 'plan-'+uuid.uuid4().hex+'@position2.com'

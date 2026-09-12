@@ -1269,6 +1269,12 @@ def prior_candidate_names(email: str, exclude_run_id: int | None = None,
 # next to genericness() -- these two functions only ever return raw counts,
 # never a yes/no verdict, so nobody downstream can mistake an unfiltered
 # query result for a cleared privacy check.
+#
+# CURRENTLY UNREFERENCED: event_intel_pipeline._run_recommend calls
+# event_intel_report.disabled_cross_client_check() instead, pending
+# unambiguous client identity/consent/confidential-profile isolation across
+# staff logins. Both functions below are kept fully implemented and tested as
+# the foundation to wire back in once that exists, not as an oversight.
 
 def cross_client_interest(name_keys: list[str], classification: str | None,
                           window_days: int, exclude_email: str) -> dict:

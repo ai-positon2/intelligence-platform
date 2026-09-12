@@ -723,6 +723,12 @@ def _candidate_from_alternative(res: dict, alt: dict,
     }
 
 
+# CURRENTLY UNREFERENCED, for the same reason cross_client_signal() below is:
+# event_intel_pipeline._run_recommend calls
+# event_intel_report.disabled_cross_client_check() instead, pending
+# unambiguous client identity/consent/confidential-profile isolation. Kept
+# fully implemented and tested as the foundation to wire back in once that
+# exists, not as an oversight.
 def genericness(names: list[str], prior_runs: list[dict],
                 this_client: str | None = None) -> dict:
     """How much of this list has already been handed to a different client.
@@ -797,6 +803,16 @@ def genericness(names: list[str], prior_runs: list[dict],
 
 
 # ── Cross-client social proof, k-anonymity gated ───────────────────────────
+#
+# CURRENTLY UNREFERENCED. event_intel_pipeline._run_recommend calls
+# event_intel_report.disabled_cross_client_check() instead of this, with its
+# own comment: "Neither cross-client interest nor list-overlap claims are
+# reliable until client identity, consent, and confidential-profile isolation
+# exist." That applies here too. This function, cross_client_signal(), and
+# genericness() below are kept -- fully implemented and tested -- as the
+# reviewed, safe (k-anonymity-gated) foundation to wire back in once identity
+# is unambiguous, not as an oversight. Don't re-enable a call site here
+# without re-solving that identity problem first.
 #
 # genericness() above compares different client PROFILES under one shared
 # login (the population event_intel_store.prior_candidate_names() reads).

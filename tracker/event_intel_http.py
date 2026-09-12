@@ -33,7 +33,11 @@ def public_get(url, *, timeout=20, stream=True, headers=None):
         target = urlsplit(url)
         if target.scheme not in ('http','https') or target.username or target.password:
             raise ValueError('Only public HTTP(S) pages without URL credentials are allowed.')
-        port = target.port or (443 if target.scheme == 'https' else 80)
+        # `or`, not `is None`, would treat an explicit `:0` in the URL (falsy,
+        # but a real, distinct port a caller wrote) the same as no port at
+        # all and silently substitute 80/443 for it instead of rejecting it
+        # below like any other non-standard port.
+        port = target.port if target.port is not None else (443 if target.scheme == 'https' else 80)
         if port not in (80,443):
             raise ValueError('Only standard web ports are allowed.')
         host = target.hostname

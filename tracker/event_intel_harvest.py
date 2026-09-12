@@ -200,8 +200,9 @@ def fetch_page(url: str) -> dict:
         return out
 
     out["http_status"] = r.status_code
-    # Where we actually ended up. `requests` follows redirects by default, so
-    # until this was read every relative link on a redirected page resolved
+    # Where we actually ended up. event_intel_http.public_get follows and
+    # revalidates every redirect itself, so until this was read every relative
+    # link on a redirected page resolved
     # against the URL we asked for rather than the one we got, and every
     # next-page link failed the same-path test below, which stopped the walk
     # at page one and said nothing. Event sites redirect constantly:
