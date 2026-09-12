@@ -50,7 +50,15 @@ def _owns_date(prefix, names, year):
         tail = re.sub(r'^'+str(year)+r'\b', '', tail).strip()
         # A bare regional suffix or another event name is a different identity.
         first = tail.split()[0] if tail else ''
-        allowed = {'on','runs','returns','takes','starts','is','join','at','from','get','choose','register','book'}
+        # Real organizer copy routinely uses one of these openers between an
+        # event's name and its date ("TechConf 2026, taking place March 3-5",
+        # "TechConf 2026 will be held March 3-5", "TechConf 2026 convenes
+        # March 3-5"). Only the first word after the name is checked, so
+        # "will"/"taking" alone is enough to cover the whole connecting
+        # phrase that follows it. The list was originally narrow enough to
+        # reject several of these on real, perfectly legitimate pages.
+        allowed = {'on','runs','returns','takes','taking','starts','is','join','at','from',
+                  'get','choose','register','book','will','convenes','occurs','happens'}
         allowed.update(m.casefold() for m in calendar.month_name if m)
         allowed.update(m.casefold() for m in calendar.month_abbr if m)
         if not first or first in allowed or first.isdigit():
@@ -68,8 +76,16 @@ def _access(text, event_name=''):
         # Use the current clause so a different preceding inventory item does
         # not explain away an event-wide closure later in the same paragraph.
         clause=re.split(r'[.;!\n]',prefix)[-1]
-        other=bool(re.search(r'\b(?:hotel room|room block|accommodation|VIP (?:pass|ticket|dinner))',clause,re.I))
-        named_inventory = bool(re.search(r'\b(?:VIP|dinner|hotel room|room block)\b',event_name,re.I))
+        # A real organizer page routinely phrases a sold-out SUB-inventory item
+        # in ways this list did not originally cover ("VIP suite", "VIP box",
+        # "exhibit booth", "sponsor table"), and each of those is exactly as
+        # much "not the whole event" as the phrases already here.
+        other=bool(re.search(r'\b(?:hotel room|room block|accommodation|'
+                             r'VIP (?:pass|ticket|dinner|suite|box|table)|'
+                             r'(?:exhibit|sponsor) (?:booth|table))',clause,re.I))
+        named_inventory = bool(re.search(
+            r'\b(?:VIP|dinner|hotel room|room block|suite|box|exhibit booth|sponsor table)\b',
+            event_name,re.I))
         scoped = other and general_open and not named_inventory
         excerpt=text[max(0,match.start()-80):match.end()+120]
         observations.append({'text':excerpt,'scope':'other_inventory' if scoped else 'unresolved_event_access'})
@@ -83,8 +99,18 @@ def _date_patterns(start, end):
     def single(d):
         month = '(?:' + calendar.month_name[d.month] + '|' + calendar.month_abbr[d.month] + r'\.?)'
         day = str(d.day) + r'(?:st|nd|rd|th)?'
-        return [re.escape(d.isoformat()), month + r'\s+' + day + r',?\s+' + str(d.year),
-                day + r'\s+' + month + r',?\s+' + str(d.year)]
+        out = [re.escape(d.isoformat()), month + r'\s+' + day + r',?\s+' + str(d.year),
+               day + r'\s+' + month + r',?\s+' + str(d.year)]
+        # A numeric date (3/3/2026, 03/03/2026, 3-3-2026, 3/3/26) had no
+        # branch at all before this: an otherwise perfectly readable,
+        # correctly-dated organizer page was marked unverified for no reason
+        # but the format it wrote its own date in.
+        for sep in ('/', '-'):
+            for mm in dict.fromkeys((str(d.month), '%02d' % d.month)):
+                for dd in dict.fromkeys((str(d.day), '%02d' % d.day)):
+                    for yy in dict.fromkeys((str(d.year), str(d.year)[2:])):
+                        out.append(re.escape(mm + sep + dd + sep + yy))
+        return out
     patterns = []
     for a in single(start):
         for b in single(end):

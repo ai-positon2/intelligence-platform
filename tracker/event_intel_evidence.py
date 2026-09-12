@@ -45,7 +45,14 @@ def supported_rows(rows, text, page_kind):
                   'sponsor': ('sponsor', 'sponsors'),
                   'speaker': ('speaker', 'speakers'),
                   'partner': ('partner', 'partners'),
-                  'media': ('media',)}
+                  'media': ('media',),
+                  # Missing entirely until now: role_words.get(role, ()) fell
+                  # through to an empty tuple for this role, so `not any(...)`
+                  # was unconditionally True and every attendee_declared row
+                  # was rejected regardless of what the page actually said.
+                  # declared_attendees has been silently 0 on every run since
+                  # this role was added.
+                  'attendee_declared': ('attending', 'attendee', 'attendees')}
     kept, rejected = [], []
     for source_row in rows:
         row = dict(source_row)

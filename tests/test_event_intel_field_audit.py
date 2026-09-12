@@ -288,6 +288,26 @@ def test_a_commitment_matches_across_editions(written, found, expected):
     assert D.is_committed(found, D.committed_keys(written)) is expected
 
 
+@pytest.mark.parametrize("written,found,expected", [
+    # Genuinely the same edition, or neither side names a region at all: the
+    # stricter check still waives a safety warning here, same as is_committed.
+    ("Money20/20 USA", "Money20/20 USA 2026", True),
+    ("SaaStr Annual", "SaaStr Annual 2026", True),
+    ("SaaStr", "SaaStr Annual", True),
+    # The bypass this function exists to close: a commitment with no stated
+    # region must not be treated as covering a candidate that DOES name one --
+    # is_committed alone would say True here, which is what let a sold-out
+    # "Money20/20 Europe" silently clear its warning for a client who only
+    # ever wrote "Money20/20".
+    ("Money20/20", "Money20/20 Europe Amsterdam", False),
+    ("MarTech Summit", "MarTech Summit Europe", False),
+    ("Money20/20", "Data Council", False),
+    ("", "Anything", False),
+])
+def test_same_edition_commitment_requires_region_agreement(written, found, expected):
+    assert D.is_committed_same_edition(found, D.committed_keys(written)) is expected
+
+
 def test_every_line_of_the_commitment_list_is_its_own_event():
     """Parsed as one blob, "Money20/20\nSaaStr" becomes a single key that
     matches neither, and both commitments silently stop being honoured."""

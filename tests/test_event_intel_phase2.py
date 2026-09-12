@@ -64,6 +64,26 @@ def test_classifier_label_alone_cannot_establish_the_published_role():
     assert E.supported_rows([dict(org_name='Acme',role='speaker')], 'Acme', 'speaker_list')[0]==[]
 
 
+def test_attendee_declared_is_kept_when_the_page_actually_says_so():
+    """role_words had no entry for this role at all, so `not any(())` was
+    unconditionally True and every attendee_declared row was rejected
+    regardless of what the page said -- the sibling test above only proves
+    an UNSUPPORTED claim is withheld, which is true either way and cannot
+    catch a role that is rejected no matter what the text says."""
+    rows = [dict(org_name='Acme', role='attendee_declared')]
+    kept, rejected = E.supported_rows(
+        rows, 'Acme is attending this year as a confirmed attendee.', 'attendee_list')
+    assert rejected == []
+    assert len(kept) == 1
+    assert kept[0]['evidence']['status'] == 'literal_support_only'
+
+
+def test_attendee_declared_without_the_word_is_still_withheld():
+    assert E.supported_rows(
+        [dict(org_name='Acme', role='attendee_declared')],
+        'Exhibitors: Acme', 'exhibitor_list')[0] == []
+
+
 def test_partial_chunk_failure_preserves_good_rows_and_reports_incompleteness(monkeypatch):
     monkeypatch.setattr(E,'chunks',lambda text: iter(['Exhibitors Acme', 'broken']))
     def extract(text,*args):

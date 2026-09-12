@@ -194,7 +194,9 @@ def test_a_fabricated_conversation_is_replaced_and_the_reason_is_kept():
 
 def test_booth_notes_are_preserved_for_manual_personalization():
     """The rule is about evidence, not about vocabulary. A rep who wrote the
-    note gets to reference the conversation."""
+    note gets to reference the conversation -- so the model's own, real
+    opener referencing it survives untouched rather than being swapped for a
+    generic template the same as a row that failed the check."""
     rows = [_row("Acme", person="Dana Lee",
                  opener="Great chatting at the booth about SOC2.")]
     out = W.enforce(rows, event_class=W.CLASS_EXHIBITED,
@@ -202,9 +204,40 @@ def test_booth_notes_are_preserved_for_manual_personalization():
                     event_name="FinovateFall", client_name="Northwind")
     row = out["rows"][0]
     assert row["draft_status"] == "review_required"
-    assert "Great chatting" not in row["opener"]
+    assert "Great chatting" in row["opener"]
     assert row["booth_note"] == "asked about SOC2"
     assert out["rewritten_count"] == 0
+
+
+def test_a_clean_row_keeps_its_real_angle_and_fit_note_too_not_just_the_opener():
+    """Every row used to get the exact same templated opener/angle/fit_note
+    regardless of what the model actually wrote, even though the model was
+    still called (and billed) per company to draft real text first. A row
+    that passes both checks now keeps all three of its own fields, not only
+    the opener."""
+    rows = [_row("Acme", person="Dana Lee", opener="I saw Acme on the exhibitor list.",
+                 angle="Ask about their Q1 expansion into EMEA.",
+                 fit_note="Strong ICP match: 200 employees, Series B, uses Salesforce.")]
+    out = W.enforce(rows, event_class=W.CLASS_EXHIBITED, notes={},
+                    event_name="FinovateFall", client_name="Northwind")
+    row = out["rows"][0]
+    assert row["draft_status"] == "review_required"
+    assert row["angle"] == "Ask about their Q1 expansion into EMEA."
+    assert row["fit_note"] == "Strong ICP match: 200 employees, Series B, uses Salesforce."
+
+
+def test_a_fabrication_in_the_angle_field_is_caught_even_when_the_opener_is_clean():
+    """The fabrication rule used to check `opener` only. A false conversation
+    claim sitting in `angle` instead went straight to render before this,
+    every bit as false as the same words in `opener`."""
+    rows = [_row("Acme", person="Dana Lee", opener="I saw Acme on the exhibitor list.",
+                 angle="Following up on our conversation at the booth about pricing.")]
+    out = W.enforce(rows, event_class=W.CLASS_EXHIBITED, notes={},
+                    event_name="FinovateFall", client_name="Northwind")
+    row = out["rows"][0]
+    assert row["draft_status"] == W.DRAFT_NO_EVIDENCE
+    assert W.claims_contact(row["angle"]) == []
+    assert row["angle"] == W._SAFE_ANGLE
 
 
 @pytest.mark.parametrize("event_class", list(W.EVENT_CLASSES))
@@ -258,13 +291,15 @@ def test_a_competitor_event_draft_with_displacement_is_replaced():
 
 def test_the_same_language_is_left_alone_on_a_non_competitor_event():
     """The ban is specific to a competitor's event, and over-applying it would
-    censor a legitimate migration pitch at a neutral conference."""
+    censor a legitimate migration pitch at a neutral conference -- so this
+    row's real opener survives untouched rather than being swapped for the
+    same generic template a row that failed the check would get."""
     rows = [_row("Acme", person="Dana",
                  opener="Most teams switch once they outgrow it.")]
     out = W.enforce(rows, event_class=W.CLASS_ATTENDED, notes={},
                     event_name="DataCon", client_name="Northwind")
     assert out["rows"][0]["draft_status"] == "review_required"
-    assert "switch" not in out["rows"][0]["opener"]
+    assert "switch" in out["rows"][0]["opener"]
 
 
 def test_the_replacement_for_a_competitor_event_is_itself_soft():

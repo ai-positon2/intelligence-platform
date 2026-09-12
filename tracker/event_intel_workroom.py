@@ -540,6 +540,13 @@ DRAFT_NO_EVIDENCE = "rewritten_no_booth_note"
 DRAFT_AGGRESSIVE = "rewritten_aggressive"
 DRAFT_ACCOUNT = "account_play"
 
+# The non-personalized fallback for `angle`/`fit_note` on a row Rule 1 or
+# Rule 2 rewrote. `opener` gets a real, per-class deterministic sentence from
+# fallback_opener(); these two fields have no per-class equivalent, so they
+# fall back to a plain statement of what is NOT established, same as before.
+_SAFE_ANGLE = "Confirm the relevant buyer and their current priorities before personalizing this draft."
+_SAFE_FIT_NOTE = "Model-estimated company fit; verify against the client ICP and company evidence."
+
 
 def fallback_opener(*, org: str, event_name: str, role_label: str,
                     event_class: str, client_name: str | None = None) -> str:
@@ -621,13 +628,19 @@ def enforce(rows: list[dict], *, event_class: str, notes: dict,
         row["draft_reason"] = None
         row["draft_flagged"] = []
         opener = row.get("opener") or ""
+        angle = row.get("angle") or ""
+        fit_note = row.get("fit_note") or ""
         key = org_key(row.get("org_name") or "")
         note = notes.get(key)
         role_label = ROLE_LABELS.get(row.get("role"), row.get("role") or "roster")
 
         # Rule 1. A conversation may be referenced only where a human wrote a
-        # note about this specific company.
-        claims = claims_contact(opener) if opener else []
+        # note about this specific company. Checked across every field that
+        # reaches an inbox, not just the opener: a fabricated "following up
+        # on our conversation" is exactly as false sitting in `angle` or
+        # `fit_note` as it is in `opener`.
+        claims = sorted({c for text in (opener, angle, fit_note) if text
+                        for c in claims_contact(text)})
         if claims and not note:
             row["draft_flagged"] = claims
             row["draft_status"] = DRAFT_NO_EVIDENCE
@@ -641,10 +654,12 @@ def enforce(rows: list[dict], *, event_class: str, notes: dict,
                 org=row.get("org_name") or "this company", event_name=event_name,
                 role_label=role_label, event_class=event_class,
                 client_name=client_name)
+            angle, fit_note = _SAFE_ANGLE, _SAFE_FIT_NOTE
 
         # Rule 2. Displacement, on a competitor's event.
-        if event_class == CLASS_COMPETITOR and opener:
-            harsh = is_aggressive(opener)
+        if event_class == CLASS_COMPETITOR:
+            harsh = sorted({h for text in (opener, angle, fit_note) if text
+                           for h in is_aggressive(text)})
             if harsh:
                 row["draft_flagged"] = harsh
                 row["draft_status"] = DRAFT_AGGRESSIVE
@@ -657,6 +672,7 @@ def enforce(rows: list[dict], *, event_class: str, notes: dict,
                     org=row.get("org_name") or "this company",
                     event_name=event_name, role_label=role_label,
                     event_class=event_class, client_name=client_name)
+                angle, fit_note = _SAFE_ANGLE, _SAFE_FIT_NOTE
 
         # Rule 3. Nobody named means no personal outreach.
         if not (row.get("person_name") or "").strip():
@@ -670,19 +686,20 @@ def enforce(rows: list[dict], *, event_class: str, notes: dict,
         else:
             row["account_note"] = None
 
-        # A free-form model sentence cannot establish personal history. Until
-        # interaction facts have a verified evidence model, every outward draft
-        # uses this bounded template. Rep notes remain internal for manual edits.
-        row['opener'] = (
-            'The public materials for %s brought %s to my attention. '
-            'I would welcome a conversation about your current priorities and '
-            'whether there is a useful way to work together.'
-            % (event_name, row.get('org_name') or 'your organization'))
-        row['angle'] = 'Confirm the relevant buyer and their current priorities before personalizing this draft.'
-        row['fit_note'] = 'Model-estimated company fit; verify against the client ICP and company evidence.'
-        if row['draft_status'] == DRAFT_OK:
-            row['draft_status'] = 'review_required'
-            row['draft_reason'] = 'A conservative draft is shown. Review recipient, relevance and source facts; rep notes have not been converted into interaction claims.'
+        # A row that passed both checks above keeps its real, model-drafted,
+        # company-specific opener/angle/fit_note. Only a row a check actually
+        # rewrote falls back to the safe, non-personalized fields set above --
+        # replacing every row's text regardless of whether it said anything
+        # wrong discarded the whole point of running a model over each
+        # company's own context, for text nobody would ever see.
+        row["opener"] = opener or None
+        row["angle"] = angle or None
+        row["fit_note"] = fit_note or None
+        if row["draft_status"] == DRAFT_OK:
+            row["draft_status"] = DRAFT_REVIEW
+            row["draft_reason"] = (
+                "Review recipient, relevance and source facts before sending. "
+                "Nothing here has been sent yet.")
         row["booth_note"] = note
         row["play"] = play["play"]
         if row["draft_status"] in (DRAFT_NO_EVIDENCE, DRAFT_AGGRESSIVE):

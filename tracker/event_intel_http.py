@@ -12,7 +12,13 @@ def public_addresses(host, port):
     if not host:
         raise ValueError('A public host is required.')
     addresses = list(dict.fromkeys(r[4][0] for r in socket.getaddrinfo(host, port, type=socket.SOCK_STREAM)))
-    if not addresses or any(not ipaddress.ip_address(a).is_global for a in addresses):
+    # is_global is True for multicast ranges (224.0.0.0/4, ff00::/8): they are
+    # not privately-routed, but they are not a legitimate organizer-page
+    # destination either, so they get their own explicit check rather than
+    # silently passing this "public" gate and failing downstream with a
+    # confusing socket error instead of this function's own clear message.
+    if not addresses or any(not ipaddress.ip_address(a).is_global
+                            or ipaddress.ip_address(a).is_multicast for a in addresses):
         raise ValueError('Private or reserved page destinations are not allowed.')
     return addresses
 

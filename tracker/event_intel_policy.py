@@ -31,8 +31,12 @@ def eligibility(event, profile, today=None):
     if availability == 'cancelled':
         reasons.append('The organizer reports this edition is cancelled.')
     if availability == 'sold_out':
-        from .event_intel_discover import committed_keys, is_committed
-        if not is_committed(event.get('name') or '', committed_keys(profile.get('force_include'))):
+        from .event_intel_discover import committed_keys, is_committed_same_edition
+        # is_committed_same_edition, not is_committed: a client's own real
+        # commitment must agree on region before it waives this specific
+        # sold-out warning, or "MarTech Summit" (no region) would clear a
+        # sold-out "MarTech Summit Europe" they never actually committed to.
+        if not is_committed_same_edition(event.get('name') or '', committed_keys(profile.get('force_include'))):
             reasons.append('This edition is sold out; access must be resolved before recommending attendance.')
     if _excluded(event.get('name') or '', profile.get('force_exclude')):
         reasons.append('This event is on the client exclusion list.')

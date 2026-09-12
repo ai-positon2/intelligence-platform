@@ -111,19 +111,53 @@ def test_valid_event_and_explicit_exclusion():
     assert eligibility(event('Forum'),dict(PROFILE,force_exclude='Forum'))
 
 
+def test_a_generic_commitment_does_not_waive_a_different_regions_sold_out_warning():
+    """A client who wrote "MarTech Summit" (no region) has not committed to
+    any SPECIFIC regional edition, and this must not silently clear a
+    sold-out warning about "MarTech Summit Europe", an edition they never
+    actually named. geo_scope is 'global' so the geography check (a separate
+    gate) cannot also catch this, isolating the sold-out check on its own."""
+    profile = dict(PROFILE, geo_scope='global', force_include='MarTech Summit')
+    ev = event('MarTech Summit Europe', availability='sold_out',
+              country='Netherlands', city='Amsterdam')
+    reasons = eligibility(ev, profile)
+    assert any('sold out' in r for r in reasons), reasons
+
+
+def test_a_commitment_naming_the_same_region_still_waives_sold_out():
+    profile = dict(PROFILE, geo_scope='global', force_include='MarTech Summit Europe')
+    ev = event('MarTech Summit Europe', availability='sold_out',
+              country='Netherlands', city='Amsterdam')
+    assert not any('sold out' in r for r in eligibility(ev, profile))
+
+
+def test_a_fully_generic_commitment_still_waives_a_fully_generic_sold_out_event():
+    profile = dict(PROFILE, geo_scope='global', force_include='SaaStr Annual')
+    assert not any('sold out' in r
+                  for r in eligibility(event('SaaStr Annual', availability='sold_out'), profile))
+
+
 @pytest.mark.parametrize('opener,note',[
     ('It was a pleasure discussing your expansion plans with you at FutureExpo.',''),
     ('Thanks for attending FutureExpo, Alex.',''),
     ('As promised, here is the proposal.','Did not speak with anyone from Acme.')])
 def test_no_model_interaction_claim_is_approved(opener,note):
+    """"Approved" means kept, not silently swapped for a generic template: a
+    row nothing here actually flagged keeps its own real, model-drafted
+    text (still routed to review_required, since every draft needs a
+    human's review before it reaches an inbox regardless of content)."""
     row=dict(org_name='Acme',person_name='Alex',role='exhibitor',opener=opener,
              angle=opener,fit_note=opener)
     out=W.enforce([row],event_class='exhibited',notes={W.org_key('Acme'):note} if note else {},event_name='FutureExpo')['rows'][0]
-    assert out['draft_status']!='ok'
-    assert all(opener not in out[k] for k in ('opener','angle','fit_note'))
+    assert out['draft_status']=='review_required'
+    assert all(out[k]==opener for k in ('opener','angle','fit_note'))
 
 
-@pytest.mark.parametrize('address',['127.0.0.1','10.0.0.1','169.254.169.254','::1','fc00::1'])
+@pytest.mark.parametrize('address',['127.0.0.1','10.0.0.1','169.254.169.254','::1','fc00::1',
+                                    # is_global is True for multicast: it is not privately
+                                    # routed, but it is not a legitimate organizer-page
+                                    # destination either, and used to pass this check.
+                                    '224.0.0.1','ff02::1'])
 def test_private_destinations_block_before_http(monkeypatch,address):
     monkeypatch.setattr(HTTP.socket,'getaddrinfo',lambda *a,**k:[(None,None,None,None,(address,80))])
     transport=Mock()

@@ -22,6 +22,23 @@ def test_named_edition_has_literal_support(dates):
     assert result['checks'][0]['snapshot']['text_sha256']
 
 
+@pytest.mark.parametrize('text', [
+    # These connector phrases and this date format were previously rejected
+    # on an otherwise perfectly readable, correctly-dated page: _owns_date's
+    # allowed-opener list didn't cover them, and _date_patterns had no
+    # numeric branch at all.
+    'CMO Summit, taking place May 11-12, 2027 in Austin.',
+    'CMO Summit will be held May 11-12, 2027 in Austin.',
+    'CMO Summit convenes May 11-12, 2027 in Austin.',
+    'CMO Summit takes place 5/11/2027 - 5/12/2027 in Austin.',
+    'CMO Summit takes place 05/11/2027 - 05/12/2027 in Austin.',
+])
+def test_realistic_connector_phrasing_and_numeric_dates_are_recognised(text):
+    result = A.inspect(EVENT, lambda url: page(text))
+    assert result['reasons'] == []
+    assert result['support'] == 'literal_name_and_dates_only'
+
+
 @pytest.mark.parametrize('fetched', [
     page('Parent Conference May 11–12, 2027'),
     page('CMO Summit May 14, 2026'),
@@ -131,6 +148,12 @@ def test_shared_year_cross_month_date_range():
     'Hotel room block is sold out. Event registration is open.',
     'VIP passes are sold out. General admission is open.',
     'VIP dinner is invite-only. General admission is open.',
+    # Real organizer copy phrases the same "not the whole event" restriction
+    # in ways the original list didn't cover.
+    'The VIP suite is sold out. General admission is open.',
+    'The VIP box is sold out. General admission is open.',
+    'The exhibit booth is sold out. General admission is open.',
+    'The sponsor table is sold out. General admission is open.',
 ])
 def test_explicit_other_inventory_does_not_close_general_event(copy):
     r=A.inspect(EVENT,lambda url: page('CMO Summit May 11–12, 2027. '+copy))
@@ -184,4 +207,10 @@ def test_registration_call_to_action_keeps_nearby_named_event():
 def test_parent_general_admission_does_not_unlock_named_vip_dinner():
     event=dict(EVENT,name='VIP Dinner')
     text='VIP Dinner May 11–12, 2027. VIP dinner is invite-only. General admission is open.'
+    assert A.inspect(event,lambda url: page(text))['reasons']
+
+
+def test_parent_general_admission_does_not_unlock_named_vip_suite():
+    event=dict(EVENT,name='VIP Suite Experience')
+    text='VIP Suite Experience May 11–12, 2027. VIP suite is invite-only. General admission is open.'
     assert A.inspect(event,lambda url: page(text))['reasons']

@@ -599,6 +599,32 @@ def is_committed(name: str, keys: set) -> bool:
     return any(names_match(name, k) for k in (keys or set()))
 
 
+def is_committed_same_edition(name: str, keys: set) -> bool:
+    """The stricter check a safety OVERRIDE needs, as opposed to a display
+    badge or a score-floor exemption.
+
+    names_match (and so is_committed) deliberately treats a commitment with
+    no stated region as compatible with ANY region, so a client who writes
+    "MarTech Summit" does not have to spell out which regional edition they
+    meant. That is the right call for "does this event count as already on
+    the client's calendar" -- but eligibility() also uses is_committed to
+    fully WAIVE the sold-out/geography check, and reusing the same looseness
+    there means a generic commitment silently clears a warning about a
+    SPECIFIC sold-out edition the client never actually named: writing
+    "MarTech Summit" would waive the flag on a sold-out "MarTech Summit
+    Europe" nobody committed to.
+
+    This keeps the same token-containment test but additionally requires the
+    matched commitment and the candidate to agree on region -- both stating
+    none counts as agreeing, since that is the genuinely unambiguous case.
+    """
+    if not name_key(name):
+        return False
+    region = region_key(name)
+    return any(names_match(name, k) and region_key(k) == region
+              for k in (keys or set()))
+
+
 def merge(by_category: dict, force_exclude: str | None = None,
           force_include: str | None = None) -> list[dict]:
     """Flatten the six category results into one deduped candidate list.
