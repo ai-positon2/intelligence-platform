@@ -20,7 +20,7 @@ import re
 import sys
 from pathlib import Path
 
-ROOT = Path(__file__).parent
+ROOT = Path(__file__).resolve().parent.parent.parent  # repo root -- this script lives in scripts/legacy/, but data/ and reports/ (and the tracker package) live at the actual repo root, three levels up
 sys.path.insert(0, str(ROOT))
 
 try:
@@ -32,7 +32,8 @@ except ImportError:
 from tracker.dashboard_builder import build_dashboard
 from tracker.snapshot_store import SnapshotStore
 
-XLSX_PATH = ROOT / "CSG-company-list.xlsx"
+HERE = Path(__file__).parent  # CSG-company-list.xlsx moved here alongside this script
+XLSX_PATH = HERE / "CSG-company-list.xlsx"
 OUT_PATH  = ROOT / "reports" / "dashboard_csg.html"
 DB_PATH   = ROOT / "data" / "tracker_csg_v2.db"
 

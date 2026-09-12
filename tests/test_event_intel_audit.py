@@ -410,8 +410,13 @@ def _cut(name, alternative=None, website=None, note=None):
 
 
 def _resolved(name, **kw):
+    # starts_on/ends_on default to _soon() (relative to today), not a fixed
+    # calendar date -- eligibility()'s date-window check is relative to
+    # date.today(), so a hardcoded past date here would silently start
+    # failing every one of these tests the moment real time caught up to it
+    # (which is exactly what happened: these dates were once in the future).
     ev = {"name": name, "edition": "2026", "website": "https://%s.com" % name.lower().replace(" ", ""),
-          "organizer": "Org", "starts_on": "2026-09-08", "ends_on": "2026-09-11",
+          "organizer": "Org", "starts_on": _soon(90), "ends_on": _soon(93),
           "location": "Boston, MA", "venue": None, "format": "in_person",
           "stated_size": "12,000", "audience_note": "Marketers and sales leaders.",
           "confidence": "high", "reasoning": "Confirmed on the official site."}
@@ -443,7 +448,7 @@ def test_the_alternative_to_a_cut_event_is_confirmed_and_added(monkeypatch):
                                  resolver=_resolver_for({"INBOUND": _resolved("INBOUND")}))
     assert [c["name"] for c in out["promoted"]] == ["INBOUND"]
     got = out["promoted"][0]
-    assert got["starts_on"] == "2026-09-08", "promoted without confirmed dates"
+    assert got["starts_on"] == _soon(90), "promoted without confirmed dates"
     assert got["sources"], "promoted with nothing to check it against"
 
 

@@ -23,7 +23,7 @@ import argparse
 import sys
 from pathlib import Path
 
-ROOT = Path(__file__).parent
+ROOT = Path(__file__).resolve().parent.parent.parent  # repo root -- this script lives in scripts/legacy/, but data/ and reports/ (and the tracker package) live at the actual repo root, three levels up
 sys.path.insert(0, str(ROOT))
 
 from tracker import sheets_client

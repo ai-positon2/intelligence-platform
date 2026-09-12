@@ -1,20 +1,20 @@
 """
-fetch_healthcare_jobs.py
+fetch_csg_jobs.py
 =================
-Detects creative / 3D hiring activity for all Healthcare companies via free
+Detects creative / 3D hiring activity for all CSG companies via free
 job-board + careers RSS (tracker/jobs_client.py) and inserts new
-"Creative Hiring" signals (MEDIUM) into data/tracker.db.
+"Creative Hiring" signals (MEDIUM) into data/tracker_csg_v2.db.
 
 Each unique posting (by title) is stored as its own signal. Re-running is
 safe: duplicates (same title within the dedup window) are skipped.
 
 Usage
 -----
-    python fetch_healthcare_jobs.py                     # all companies
-    python fetch_healthcare_jobs.py --company "Dell"    # single company
-    python fetch_healthcare_jobs.py --dry-run           # preview, no DB writes
-    python fetch_healthcare_jobs.py --max-age 60        # override 90-day window
-    python fetch_healthcare_jobs.py --limit 5           # only first N companies
+    python fetch_csg_jobs.py                     # all companies
+    python fetch_csg_jobs.py --company "Dell"    # single company
+    python fetch_csg_jobs.py --dry-run           # preview, no DB writes
+    python fetch_csg_jobs.py --max-age 60        # override 90-day window
+    python fetch_csg_jobs.py --limit 5           # only first N companies
 
 After running, rebuild and push:
     python build_csg_dashboard.py
@@ -34,7 +34,7 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-ROOT = Path(__file__).parent
+ROOT = Path(__file__).resolve().parent.parent.parent  # repo root -- this script lives in scripts/legacy/, but data/ and reports/ (and the tracker package) live at the actual repo root, three levels up
 sys.path.insert(0, str(ROOT))
 
 import time
@@ -44,7 +44,7 @@ from tracker.jobs_client import get_job_postings
 from tracker.news_client import _parse_article_date
 from tracker.snapshot_store import SnapshotStore
 
-DB_PATH = ROOT / "data" / "tracker.db"
+DB_PATH = ROOT / "data" / "tracker_csg_v2.db"
 
 DEFAULT_MAX_AGE_DAYS = 90
 DEFAULT_MAX_POSTINGS = 5
@@ -64,7 +64,7 @@ def _headline(posting: dict, company: str) -> str:
     return title or f"{company} hiring: {role}"
 
 
-def fetch_healthcare_jobs(
+def fetch_csg_jobs(
     company_filter: str | None = None,
     dry_run: bool = False,
     max_age_days: int = DEFAULT_MAX_AGE_DAYS,
@@ -93,7 +93,7 @@ def fetch_healthcare_jobs(
 
     total = len(all_companies)
     mode = "[DRY RUN] " if dry_run else ""
-    print(f"\n{mode}Scanning creative/3D hiring for {total} Healthcare companies "
+    print(f"\n{mode}Scanning creative/3D hiring for {total} CSG companies "
           f"(last {max_age_days} days, up to {max_postings} postings each)…\n")
 
     added_total = 0
@@ -172,14 +172,14 @@ def fetch_healthcare_jobs(
 
 def main() -> None:
     ap = argparse.ArgumentParser(
-        description="Detect creative/3D hiring for Healthcare companies and insert signals.")
+        description="Detect creative/3D hiring for CSG companies and insert signals.")
     ap.add_argument("--company", help="only this company (substring match)")
     ap.add_argument("--dry-run", action="store_true", help="preview, no DB writes")
     ap.add_argument("--max-age", type=int, default=DEFAULT_MAX_AGE_DAYS)
     ap.add_argument("--max-postings", type=int, default=DEFAULT_MAX_POSTINGS)
     ap.add_argument("--limit", type=int, default=None, help="only first N companies")
     args = ap.parse_args()
-    fetch_healthcare_jobs(
+    fetch_csg_jobs(
         company_filter=args.company,
         dry_run=args.dry_run,
         max_age_days=args.max_age,

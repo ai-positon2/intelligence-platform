@@ -19,6 +19,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 os.chdir(ROOT)
 sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(ROOT / "scripts" / "legacy"))  # build_csg_dashboard.py lives here
 
 from tracker.dashboard_builder import build_dashboard
 from tracker.snapshot_store import SnapshotStore

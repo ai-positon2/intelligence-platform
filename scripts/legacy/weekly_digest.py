@@ -16,7 +16,7 @@ Usage: python weekly_digest.py            # both accounts
 from __future__ import annotations
 import argparse, csv, json, os, sqlite3, urllib.request
 from pathlib import Path
-ROOT = Path(__file__).parent
+ROOT = Path(__file__).resolve().parent.parent.parent  # repo root -- this script lives in scripts/legacy/, but data/ and reports/ (and the tracker package) live at the actual repo root, three levels up
 import sys; sys.path.insert(0, str(ROOT))
 from tracker.signal_score import score_company_signals
 
