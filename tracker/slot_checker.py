@@ -43,6 +43,7 @@ import logging
 import os
 import time
 from collections import Counter, defaultdict
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 log = logging.getLogger(__name__)
@@ -109,7 +110,11 @@ def _sheets_service():
         json.loads(sa_str),
         scopes=["https://www.googleapis.com/auth/spreadsheets.readonly"],
     )
-    return build("sheets", "v4", credentials=creds, cache_discovery=False)
+    # static_discovery=True: without it, build() fetches the API discovery
+    # document over the network on every single call -- an entire extra
+    # round-trip on top of the actual data read (see app.py's own
+    # _va_sheets_service_st docstring, which names this same fix).
+    return build("sheets", "v4", credentials=creds, cache_discovery=False, static_discovery=True)
 
 
 def _iso_stamp_from_sheet(v: str) -> str:
@@ -165,11 +170,19 @@ def _rows_from_live_sheet() -> tuple:
     keeps in spare columns and is simply never read. "Locations" is reordered
     by _reorder_locations_rows() into the "Available Slots Final" shape.
     """
-    svc = _sheets_service()
-    lp_rows = svc.spreadsheets().values().get(
-        spreadsheetId=SLOT_CHECKER_SHEET_ID, range=f"{LP_TAB}!A1:N500").execute().get("values", [])
-    loc_rows = svc.spreadsheets().values().get(
-        spreadsheetId=SLOT_CHECKER_SHEET_ID, range=f"{LOCATIONS_TAB}!A1:AF5000").execute().get("values", [])
+    def _read(tab_range):
+        # each concurrent read gets its own service instance -- httplib2 (the
+        # transport underneath) is not safe to share across threads.
+        return _sheets_service().spreadsheets().values().get(
+            spreadsheetId=SLOT_CHECKER_SHEET_ID, range=tab_range).execute().get("values", [])
+
+    # "LPs" and "Locations" are independent reads -- run them concurrently
+    # instead of one after another.
+    with ThreadPoolExecutor(max_workers=2) as ex:
+        lp_fut = ex.submit(_read, f"{LP_TAB}!A1:N500")
+        loc_fut = ex.submit(_read, f"{LOCATIONS_TAB}!A1:AF5000")
+        lp_rows = lp_fut.result()
+        loc_rows = loc_fut.result()
     return lp_rows, _reorder_locations_rows(loc_rows)
 
 

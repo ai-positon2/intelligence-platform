@@ -736,7 +736,7 @@ window.__LUX_CFG={kinetic:'.page-title',ghost:'STRATEGIC AGENTS',marquee:'ABM SI
       smoothWheel:true,wheelMultiplier:1,touchMultiplier:1.5,gestureOrientation:'vertical'});
     window.__lenis=lenis;
     lenis.on('scroll',function(e){frame(e.scroll||e.animatedScroll||0);});
-    function raf(t){lenis.raf(t);requestAnimationFrame(raf);}
+    function raf(t){if(!document.hidden)lenis.raf(t);requestAnimationFrame(raf);}
     requestAnimationFrame(raf);
     window.addEventListener('resize',function(){collect();});
     document.addEventListener('click',function(e){

@@ -11,6 +11,8 @@ import gzip as gzip_mod
 import json
 import os
 import sys
+import threading
+import time
 
 import pytest
 
@@ -182,6 +184,50 @@ def test_second_call_within_ttl_is_served_from_cache(monkeypatch):
     appmod._fetch_job_change_tracked_data(force=False)
 
     assert len(fake.calls) == calls_after_first, "cached call should not re-hit the Sheets API"
+
+
+def test_the_contact_and_company_tabs_are_read_concurrently(monkeypatch):
+    """These two reads used to happen one after another; they're independent
+    (neither's range depends on the other's result), so they should overlap
+    instead of costing two serial network round-trips."""
+    barrier = threading.Barrier(2, timeout=5.0)
+    broke = {"v": False}
+
+    class SlowExec:
+        def __init__(self, rows):
+            self._rows = rows
+
+        def execute(self):
+            try:
+                barrier.wait()
+            except threading.BrokenBarrierError:
+                broke["v"] = True
+            time.sleep(0.05)
+            return {"values": self._rows}
+
+    class SlowFakeSheetsService:
+        def spreadsheets(self):
+            return self
+
+        def values(self):
+            return self
+
+        def get(self, spreadsheetId, range):  # noqa: A002
+            rows = {CONTACT_RANGE: CONTACT_ROWS, COMPANY_RANGE: COMPANY_ROWS}.get(range, [])
+            return SlowExec(rows)
+
+    # each concurrent read must build its own service instance (a shared one
+    # isn't thread-safe against the real httplib2 transport), so every call
+    # to _sheets_service() returns a fresh instance here, same as production.
+    monkeypatch.setattr(appmod, "_sheets_service", lambda: SlowFakeSheetsService())
+
+    started = time.time()
+    data = appmod._fetch_job_change_tracked_data(force=True)
+    elapsed = time.time() - started
+
+    assert not broke["v"], "the two tab reads never actually overlapped"
+    assert elapsed < 1.0, "reads took as long as if they ran one after another"
+    assert data["totals"] == {"contacts": 1, "companies": 1}
 
 
 def test_tracked_route_requires_position2_auth():
