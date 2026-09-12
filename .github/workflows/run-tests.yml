@@ -1,0 +1,40 @@
+name: Test suite
+
+# Runs the full pytest suite on every pull request and on pushes to main.
+# Previously only Event Intelligence's Postgres-backed tests ran in CI
+# (event-intelligence-tests.yml) -- everything else only ran when someone
+# remembered to run it locally. No credentials required: network calls are
+# mocked throughout, and dummy env vars below only satisfy app.py's import-time
+# checks (matching the fallbacks it already logs a warning for when unset).
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      GOOGLE_CLIENT_ID: test
+      GOOGLE_CLIENT_SECRET: test
+      FLASK_SECRET_KEY: test
+      SECRET_KEY: test
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - run: pip install -r requirements.txt
+      - run: pip check
+
+      - name: Run the test suite
+        run: python -m pytest tests/ -q

@@ -20,14 +20,15 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-ROOT = Path(__file__).parent
+ROOT = Path(__file__).resolve().parent.parent.parent  # repo root -- this script lives in scripts/legacy/, but data/ and reports/ (and the tracker package) live at the actual repo root, three levels up
 sys.path.insert(0, str(ROOT))
 
 from tracker.csv_loader import load_companies
 from tracker.dashboard_builder import build_dashboard
 from tracker.snapshot_store import SnapshotStore
 
-CSV_PATH = ROOT / "northstar-company-details.csv"
+HERE = Path(__file__).parent  # northstar-company-details.csv moved here alongside this script
+CSV_PATH = HERE / "northstar-company-details.csv"
 OUT_PATH = ROOT / "reports" / "dashboard_northstar.html"
 OUT_CLIENT_PATH = ROOT / "reports" / "dashboard_northstar_client.html"
 DB_PATH  = ROOT / "data" / "tracker_northstar.db"

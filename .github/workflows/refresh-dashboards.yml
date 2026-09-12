@@ -46,11 +46,11 @@ jobs:
         continue-on-error: true
 
       - name: Fetch CSG news
-        run: python fetch_csg_news.py
+        run: python scripts/legacy/fetch_csg_news.py
         continue-on-error: true
 
       - name: Fetch CSG HIGH signals (Sheets - C-Suite / IPO / M&A / Funding)
-        run: python fetch_csg_sheets.py
+        run: python scripts/legacy/fetch_csg_sheets.py
         continue-on-error: true
 
       - name: Restore Vimi dashboards
@@ -62,7 +62,7 @@ jobs:
         run: python scripts/refresh-dashboards.py
 
       - name: Generate weekly opportunity brief (CSV + AI brief + Slack)
-        run: python weekly_digest.py
+        run: python scripts/legacy/weekly_digest.py
         continue-on-error: true
 
       - name: Commit & publish
