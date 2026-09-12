@@ -45,6 +45,7 @@ CREATE TABLE IF NOT EXISTS snapshots (
     crm_stage             TEXT,
     retail_locations      INTEGER,
     subsidiary_of         TEXT,
+    description           TEXT,
     raw_json              TEXT
 );
 
@@ -107,6 +108,10 @@ class SnapshotStore:
                 conn.execute("ALTER TABLE alerts_sent ADD COLUMN source_url TEXT DEFAULT ''")
             except Exception:
                 pass  # Column already exists
+            try:
+                conn.execute("ALTER TABLE snapshots ADD COLUMN description TEXT")
+            except Exception:
+                pass  # Column already exists
 
     # ── Companies ──────────────────────────────────────────────────────────────
 
@@ -133,6 +138,13 @@ class SnapshotStore:
     # ── Snapshots ──────────────────────────────────────────────────────────────
 
     def save_snapshot(self, apollo_id: str, data: dict) -> None:
+        # raw_json used to store the ENTIRE incoming payload (~4.2KB average) on
+        # every snapshot, for every company, every run -- but the only thing
+        # ever read back out of it (change_detector.py's Description Update
+        # check) is a single field. At ~1,250 companies this table alone grew
+        # to 90MB+ in three months and was closing in on GitHub's 100MB
+        # per-file hard limit (this repo commits its databases -- see
+        # README/.gitignore). Store just the field that's actually used.
         with _connect(self.db_path) as conn:
             conn.execute(
                 """
@@ -141,13 +153,13 @@ class SnapshotStore:
                     latest_funding_type, latest_funding_amount, last_raised_at,
                     hq_city, hq_state, tech_stack, leadership_json, open_job_count,
                     intent_score_1, intent_topic_1, intent_score_2, intent_topic_2,
-                    crm_stage, retail_locations, subsidiary_of, raw_json
+                    crm_stage, retail_locations, subsidiary_of, description
                 ) VALUES (
                     :apollo_id, :snapshot_date, :employees, :annual_revenue, :total_funding,
                     :latest_funding_type, :latest_funding_amount, :last_raised_at,
                     :hq_city, :hq_state, :tech_stack, :leadership_json, :open_job_count,
                     :intent_score_1, :intent_topic_1, :intent_score_2, :intent_topic_2,
-                    :crm_stage, :retail_locations, :subsidiary_of, :raw_json
+                    :crm_stage, :retail_locations, :subsidiary_of, :description
                 )
                 """,
                 {
@@ -171,7 +183,7 @@ class SnapshotStore:
                     "crm_stage": data.get("crm_stage"),
                     "retail_locations": data.get("retail_locations"),
                     "subsidiary_of": data.get("subsidiary_of"),
-                    "raw_json": json.dumps(data, default=str),
+                    "description": data.get("description"),
                 },
             )
             conn.execute(

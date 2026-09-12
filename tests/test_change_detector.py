@@ -350,3 +350,63 @@ def test_news_article_with_recent_date_fires():
     })
     events = detect_changes(_BASE_OLD, new, _BASE_CONFIG)
     assert any(e.signal_type == "News Mention" for e in events)
+
+
+# ── Description Update: reads old_snapshot["description"] (its own column as
+# of snapshot_store.py's raw_json removal) with a raw_json fallback for a
+# snapshot written before that change ──────────────────────────────────────
+
+def test_description_change_fires_from_the_description_column():
+    old = dict(_BASE_OLD, description="Makes widgets for the enterprise market.")
+    new = _new({"description": "Makes AI-powered widgets for the enterprise market, now with more AI."})
+    events = detect_changes(old, new, _BASE_CONFIG)
+    assert any(e.signal_type == "Description Update" for e in events)
+
+
+def test_no_description_change_does_not_fire():
+    old = dict(_BASE_OLD, description="Makes widgets for the enterprise market.")
+    new = _new({"description": "Makes widgets for the enterprise market."})
+    events = detect_changes(old, new, _BASE_CONFIG)
+    assert not any(e.signal_type == "Description Update" for e in events)
+
+
+def test_description_change_still_fires_from_legacy_raw_json():
+    """A snapshot saved before raw_json was replaced by a dedicated description
+    column has no "description" key at all, only the old full-payload blob."""
+    import json
+    old = dict(_BASE_OLD)
+    old.pop("description", None)
+    old["raw_json"] = json.dumps({"description": "Makes widgets for the enterprise market."})
+    new = _new({"description": "Makes AI-powered widgets for the enterprise market, now with more AI."})
+    events = detect_changes(old, new, _BASE_CONFIG)
+    assert any(e.signal_type == "Description Update" for e in events)
+
+
+def test_description_column_takes_precedence_over_raw_json():
+    """Once a snapshot has been re-saved under the new schema, description is
+    populated and any leftover raw_json (there won't be any post-migration,
+    but nothing should assume that) must not be consulted at all."""
+    import json
+    old = dict(_BASE_OLD, description="Makes widgets for the enterprise market.")
+    old["raw_json"] = json.dumps({"description": "A completely different, stale description."})
+    new = _new({"description": "Makes AI-powered widgets for the enterprise market, now with more AI."})
+    events = detect_changes(old, new, _BASE_CONFIG)
+    assert any(e.signal_type == "Description Update" for e in events)
+
+
+def test_missing_description_and_raw_json_does_not_crash():
+    old = dict(_BASE_OLD)
+    old.pop("description", None)
+    old.pop("raw_json", None)
+    new = _new({"description": "Makes AI-powered widgets for the enterprise market, now with more AI."})
+    events = detect_changes(old, new, _BASE_CONFIG)
+    assert not any(e.signal_type == "Description Update" for e in events)
+
+
+def test_malformed_legacy_raw_json_does_not_crash():
+    old = dict(_BASE_OLD)
+    old.pop("description", None)
+    old["raw_json"] = "{not valid json"
+    new = _new({"description": "Makes AI-powered widgets for the enterprise market, now with more AI."})
+    events = detect_changes(old, new, _BASE_CONFIG)
+    assert not any(e.signal_type == "Description Update" for e in events)
