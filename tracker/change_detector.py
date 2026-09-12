@@ -388,15 +388,19 @@ def detect_changes(
         ))
 
     # 21. Description Update
-    old_desc = ""
-    try:
-        raw = old_snapshot.get("raw_json", "{}")
-        if isinstance(raw, str):
-            old_desc = json.loads(raw).get("description", "")
-        elif isinstance(raw, dict):
-            old_desc = raw.get("description", "")
-    except Exception:
-        pass
+    # description is its own column now (see snapshot_store.py) -- it used to
+    # be pulled out of the full raw_json blob that save_snapshot() stored per
+    # row per company per run, which was the entire reason that table grew to
+    # 90MB+ in three months. raw_json itself is gone from new rows; the
+    # fallback below only matters for a snapshot written before this change.
+    old_desc = _str(old_snapshot.get("description"))
+    if not old_desc:
+        try:
+            raw = old_snapshot.get("raw_json") or ""
+            parsed = json.loads(raw) if isinstance(raw, str) and raw else raw
+            old_desc = parsed.get("description", "") if isinstance(parsed, dict) else ""
+        except Exception:
+            pass
     new_desc = _str(new_snapshot.get("description"))
     if old_desc and new_desc and old_desc.strip() != new_desc.strip() and len(new_desc) > 20:
         events.append(e("Description Update", "LOW", "Short description was updated"))
