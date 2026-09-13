@@ -790,3 +790,18 @@ def test_the_fallback_prompt_never_leaks_the_budget():
     p = I._SYSTEM_SEARCH.format(client_name="X", website=SITE,
                                 classification_menu=I._classification_menu())
     assert "budget" not in p.lower()
+
+
+def test_the_fallback_prompt_anchors_identity_on_the_domain_not_the_typed_name():
+    """A live production case: client name typed as "Amazom" (a typo) against
+    https://amazon.com. The direct read failed (amazon.com blocks it), so the
+    fallback searched on the typed name alone, found unrelated near-matches,
+    and rejected the whole draft as an unidentifiable company -- exactly the
+    false positive this instruction exists to prevent. The site-read path
+    does not need the same instruction: it is handed the domain's own pages
+    directly and sees the typo corrected by the content itself."""
+    p = I._SYSTEM_SEARCH.format(client_name="Amazom", website="https://amazon.com",
+                                classification_menu=I._classification_menu())
+    assert "GROUND TRUTH" in p
+    assert "misspelled" in p
+    assert "https://amazon.com" in p

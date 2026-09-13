@@ -290,10 +290,18 @@ you fill must be something you found through the search tool just now and can \
 point to, not something you already knew about a company with this name \
 before you searched.
 
-FIRST, MAKE SURE IT IS THE RIGHT COMPANY. Two businesses sharing a name is \
-common. If what you find plainly describes a different company than the one \
-named, say so in `wrong_company` and stop rather than describing whichever \
-one came up first.
+FIRST, MAKE SURE IT IS THE RIGHT COMPANY -- BUT THE WEBSITE YOU WERE GIVEN, \
+NOT THE TYPED NAME, IS THE GROUND TRUTH FOR WHICH ONE. A name can arrive \
+misspelled, abbreviated, or slightly off from the company's real trading \
+name, and that alone is not a mismatch: you have no page from that domain in \
+hand to catch a typo the way a direct read would, so start by searching for \
+the domain itself (who owns {website}, what they are called) rather than \
+searching on the typed name alone and treating an imperfect match as a \
+different company. Only say so in `wrong_company`, and stop, when what you \
+find about that DOMAIN plainly describes a different, unrelated business \
+than a person would reasonably expect from the name they typed -- not \
+because search results for the name turned up other, unrelated companies \
+that merely share a similar name.
 
 RULES.
 1. ANY FIELD YOU CANNOT SUPPORT WITH SOMETHING YOU FOUND MUST be null, and its \
