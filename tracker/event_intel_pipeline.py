@@ -603,6 +603,20 @@ def run_job(run_id: int, mode: str, query: str, **kwargs) -> None:
             _run_workroom(run_id, kwargs.get("email") or "", int(source_run_id),
                           profile, event_class, kwargs.get("booth_notes"),
                           kwargs.get("ends_on"))
+        elif mode == "discover":
+            # Retired play (see the module docstring above). The only way a
+            # job can carry this mode today is a leftover row that was queued
+            # before discover was removed, or before a worker existed to ever
+            # claim it. It must fail here, explicitly: falling through to the
+            # `else` below would silently run it as a lookup instead, treating
+            # an audience description as an event name and handing back a
+            # nonsensical result rather than an honest error.
+            store.update_run(
+                run_id, status="failed", stage="retired",
+                error=("Audience search was retired before this run could be "
+                       "processed. No new discover runs can be started, and "
+                       "this leftover one will not run now."))
+            return
         else:
             _run_lookup(run_id, query, kwargs.get("year_hint"))
     except Exception as e:

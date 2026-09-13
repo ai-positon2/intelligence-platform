@@ -741,6 +741,21 @@ def test_recommend_without_a_locked_classification_fails_the_run(monkeypatch):
     assert "which side of the event floor" in fake.runs[1]["error"]
 
 
+def test_a_retired_discover_job_fails_cleanly_instead_of_silently_running_as_a_lookup(monkeypatch):
+    """A leftover run from before discover was retired, or from before a
+    worker ever existed to claim it, must not fall through to `_run_lookup`
+    -- that would treat an audience description as an event name and hand
+    back a wrong result instead of an honest error."""
+    fake = _FakeStore()
+    _wire(monkeypatch, fake)
+    def unexpected(*args, **kwargs):
+        pytest.fail("A retired discover job was routed to _run_lookup")
+    monkeypatch.setattr(P, "_run_lookup", unexpected)
+    P.run_job(1, "discover", "Fintech buyers in the Northeast")
+    assert fake.runs[1]["status"] == "failed"
+    assert "retired" in fake.runs[1]["error"]
+
+
 def test_an_unexpected_crash_never_leaves_a_run_stuck_on_running(monkeypatch):
     fake = _FakeStore()
     _wire(monkeypatch, fake)
