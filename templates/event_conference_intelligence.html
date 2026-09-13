@@ -658,6 +658,13 @@
 
     function onProfilePick(){
       var v = document.getElementById('profilePick').value;
+      // A refusal from a PREVIOUS run attempt ("Complete the client profile
+      // before starting: buyer roles, target verticals.") stays on screen
+      // otherwise: startRun() only clears it at the top of its own next
+      // attempt, so picking a different, complete client -- or saving the
+      // one just drafted, which calls this same function on success --
+      // left a stale error sitting under a button that was actually ready.
+      showFormError('');
       document.getElementById('profileForm').style.display = v === 'new' ? '' : 'none';
       // Show the terms of the profile that is actually selected, and only
       // that one.

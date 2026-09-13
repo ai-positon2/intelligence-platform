@@ -358,6 +358,25 @@ def test_choosing_a_saved_profile_closes_the_intake_form(keys):
     assert out["display"] == "none"
 
 
+def test_picking_a_different_client_clears_a_stale_run_refusal(keys):
+    """A live case: "Score the calendar" was refused for client A ("Complete
+    the client profile before starting: buyer roles, target verticals."),
+    then a DIFFERENT, complete client was picked or saved -- startRun() only
+    clears this on its own next attempt, so the old refusal sat under a
+    button that was actually ready to run."""
+    out = _run(
+        "document.getElementById('formError').textContent = "
+        "'Complete the client profile before starting: buyer roles, target verticals.';"
+        "document.getElementById('formError').style.display = '';"
+        "document.getElementById('profilePick').value = '7';"
+        "onProfilePick();"
+        "console.log(JSON.stringify({"
+        "  text: document.getElementById('formError').textContent,"
+        "  shown: document.getElementById('formError').style.display}));", *keys)
+    assert out["text"] == "", "the stale refusal text was not cleared"
+    assert out["shown"] == "none", "the stale refusal banner was left visible"
+
+
 def test_running_without_a_locked_profile_lands_the_cursor_in_the_form(keys):
     """A refusal that does not show the way out is a dead end with a
     paragraph attached."""
@@ -840,6 +859,30 @@ def test_an_answered_form_is_actually_sent(keys):
         "  shown: !document.getElementById('classError').hidden}));", *keys)
     assert out["fetches"] == 1
     assert out["shown"] is False
+
+
+def test_saving_a_profile_also_clears_a_stale_run_refusal(keys):
+    """The live case this actually happened in: "Score the calendar" was
+    refused for one client, then a DIFFERENT client was drafted and saved --
+    saveProfile()'s own success path calls onProfilePick(), so it does not
+    need its own separate fix, but it does need its own test: this is the
+    exact call sequence a real save goes through, not just onProfilePick()
+    called directly."""
+    out = _run(
+        "document.getElementById('formError').textContent = "
+        "'Complete the client profile before starting: buyer roles, target verticals.';"
+        "document.getElementById('formError').style.display = '';"
+        "pickClass(CLASS_KEYS[1]);"
+        "document.getElementById('clientName').value = 'Acme';"
+        "__fetchReply = {ok: true, body: {profile: {id: 9, client_name: 'Acme', "
+        "classification: CLASS_KEYS[1]}}};"
+        "saveProfile();"
+        "setTimeout(function(){ console.log(JSON.stringify({"
+        "  text: document.getElementById('formError').textContent,"
+        "  shown: document.getElementById('formError').style.display}));}, 0);",
+        *keys)
+    assert out["text"] == "", "the stale refusal text survived a successful save"
+    assert out["shown"] == "none", "the stale refusal banner was left visible after saving"
 
 
 def test_the_servers_enum_never_reaches_the_page(keys):
