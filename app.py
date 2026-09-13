@@ -9150,6 +9150,52 @@ def event_conference_intelligence_profiles():
     return jsonify({"profile": event_intel_store.get_profile(profile_id, email)})
 
 
+@app.route("/p2/strategic-agents/event-conference-intelligence/search")
+@position2_required
+def event_conference_intelligence_search():
+    """Company search shown while typing the client name, so a name someone
+    half-remembers or mistypes (see the "Amazom" / amazon.com case that
+    motivated this) resolves to one real company + a confirmed domain before
+    "Read their site" ever runs, instead of relying on that later step to
+    reconcile a typo against whatever a search fallback happens to find.
+
+    Same route shape as Social Media Intelligence's own company search
+    (see social_media_intelligence_search): built on the same
+    tracker/sci_company_search.py, which wraps the Apollo integration this
+    app already pays for. Not SCI-specific despite the module name -- it has
+    no SCI coupling, it is a generic Apollo company-search adapter, which is
+    why it is safe to reuse here rather than duplicate.
+
+    On a provider failure this falls back to the user's own already-set-up
+    client profiles (event_intel_store.search_known_profiles) rather than
+    SCI's run history, since that is the equivalent "something to show while
+    the vendor is down" for this agent."""
+    from tracker import sci_company_search, event_intel_store
+    q = (request.args.get("q") or "").strip()
+    if not q:
+        return jsonify({"companies": []})
+    email = (_get_user() or {}).get("email") or ""
+    result = sci_company_search.search_companies_result(q)
+    companies = result.get("companies") or []
+    err = result.get("error")
+    payload = {"companies": companies}
+    if err:
+        fallback = event_intel_store.search_known_profiles(email, q)
+        payload["companies"] = fallback
+        payload["error"] = {
+            "code": err.get("kind") or "unavailable",
+            "message": sci_company_search.describe_error(err),
+            "retryable": sci_company_search.is_retryable(err),
+        }
+        if email.lower() in ADMIN_EMAILS:
+            payload["error"]["detail"] = err.get("detail") or ""
+            payload["error"]["status"] = err.get("status")
+            payload["error"]["attempts"] = err.get("attempts")
+        app.logger.warning("event conference intelligence search failed for "
+                          "%r: %s (%s)", q, err.get("kind"), err.get("detail"))
+    return jsonify(payload)
+
+
 @app.route("/p2/strategic-agents/event-conference-intelligence/profiles/draft",
            methods=["POST"])
 @position2_required

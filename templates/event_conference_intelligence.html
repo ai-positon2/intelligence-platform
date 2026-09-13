@@ -213,7 +213,8 @@
                 <div class="evi-field">
                   <label for="clientName">Client name</label>
                   <input type="text" id="clientName" autocomplete="off"
-                         placeholder="e.g. Northwind Analytics" />
+                         placeholder="e.g. Northwind Analytics"
+                         oninput="onClientNameInput()" />
                 </div>
                 <div class="evi-field">
                   <label for="clientSite">Website</label>
@@ -221,6 +222,15 @@
                          placeholder="https://northwind.example" />
                 </div>
               </div>
+              {# Picking a real, Apollo-confirmed company here is what makes a
+                 typo or an ambiguous name (a client typed "Amazom" against
+                 amazon.com, and the read-their-site fallback had to guess)
+                 a non-issue: the domain is settled before that step ever
+                 runs. Sits directly under the name/website row, not
+                 absolutely positioned, so it pushes the form down rather
+                 than floating over it -- same choice Social Media
+                 Intelligence's own picker made. #}
+              <div class="evi-suggest-panel" id="eviSuggestPanel" style="display:none"></div>
               {# The read is a helper, so it is styled as one. It used to be a
                  full-weight gradient pill, identical to the button that runs
                  the search, one above the other: two identical buttons is a
@@ -982,6 +992,103 @@
         btn.textContent = 'Read their site';
       }
     }
+
+    /* Client-name autocomplete: pick a real, Apollo-confirmed company before
+       "Read their site" ever runs, instead of leaving that step to reconcile
+       a typo or an ambiguous name against whatever it finds. Deliberately the
+       same shape as Social Media Intelligence's own picker (same debounce,
+       same 2-character floor, same row layout) so a person who has used that
+       agent already knows how this one behaves. */
+    function debounce(fn, ms){
+      var t = null;
+      return function(){
+        var a = arguments;
+        clearTimeout(t);
+        t = setTimeout(function(){ fn.apply(null, a); }, ms);
+      };
+    }
+
+    var CLIENT_SUGGESTIONS = [];
+
+    function eviSuggestRow(c, i){
+      var logo = c.logo
+        ? '<div class="evi-suggest-logo"><img src="' + esc(c.logo) + '" ' +
+          'onerror="this.parentNode.classList.add(\'evi-suggest-nologo\');' +
+          'this.remove()" /><span class="evi-suggest-initial">' +
+          esc((c.name || '?').charAt(0).toUpperCase()) + '</span></div>'
+        : '<div class="evi-suggest-logo evi-suggest-nologo">' +
+          '<span class="evi-suggest-initial">' +
+          esc((c.name || '?').charAt(0).toUpperCase()) + '</span></div>';
+      var meta = c.from_history ? 'Already set up as a client'
+        : [c.industry, c.location].filter(Boolean).join(' · ');
+      return '<div class="evi-suggest-row" onclick="pickClient(' + i + ')">' +
+        logo +
+        '<div class="evi-suggest-info">' +
+          '<div class="evi-suggest-name">' + esc(c.name || '') + '</div>' +
+          (meta ? '<div class="evi-suggest-meta">' + esc(meta) + '</div>' : '') +
+        '</div>' +
+        (c.website ? '<div class="evi-suggest-site">' + esc(shortUrl(c.website)) + '</div>' : '') +
+        '</div>';
+    }
+
+    function renderClientSuggestions(companies, error, q){
+      CLIENT_SUGGESTIONS = companies || [];
+      var panel = document.getElementById('eviSuggestPanel');
+      var html = '';
+      if (error) {
+        html += '<div class="evi-suggest-error"><div class="evi-suggest-error-msg">' +
+          esc(error.message || 'The company search is unavailable right now.') +
+          '</div></div>';
+      }
+      if (CLIENT_SUGGESTIONS.length) {
+        html += '<div class="evi-suggest-list">' +
+          CLIENT_SUGGESTIONS.map(eviSuggestRow).join('') + '</div>';
+      } else if (!error) {
+        html += '<div class="evi-suggest-empty">No matches for “' + esc(q) + '”. ' +
+          'Type it in below and set the website yourself.</div>';
+      }
+      panel.innerHTML = html;
+      panel.style.display = html ? 'block' : 'none';
+    }
+
+    function runClientSearch(){
+      var q = (document.getElementById('clientName').value || '').trim();
+      var panel = document.getElementById('eviSuggestPanel');
+      if (q.length < 2) {
+        panel.style.display = 'none';
+        panel.innerHTML = '';
+        return Promise.resolve();
+      }
+      panel.style.display = 'block';
+      panel.innerHTML = '<div class="evi-suggest-loading">Searching…</div>';
+      // Returned, same as draftProfile(), so a test can wait for it. Nothing
+      // in the page uses the return value itself.
+      return fetch(BASE + '/search?q=' + encodeURIComponent(q))
+        .then(function(r){ return r.json(); })
+        .then(function(data){
+          // A stale reply for an earlier keystroke must not overwrite what
+          // is now in the box: nothing here cancels an in-flight request, so
+          // the response has to check itself against the current value.
+          if ((document.getElementById('clientName').value || '').trim() !== q) return;
+          renderClientSuggestions(data.companies || [], data.error || null, q);
+        })
+        .catch(function(){
+          renderClientSuggestions([], {message: 'The search request itself failed to complete.'}, q);
+        });
+    }
+    var onClientNameInput = debounce(runClientSearch, 350);
+
+    function pickClient(idx){
+      var c = CLIENT_SUGGESTIONS[idx];
+      if (!c) return;
+      document.getElementById('clientName').value = c.name || '';
+      document.getElementById('clientSite').value = c.website || '';
+      var panel = document.getElementById('eviSuggestPanel');
+      panel.style.display = 'none';
+      panel.innerHTML = '';
+    }
+    window.onClientNameInput = onClientNameInput;
+    window.pickClient = pickClient;
 
     function draftProfile(){
       var btn = document.getElementById('draftBtn');

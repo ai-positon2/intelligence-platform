@@ -531,6 +531,53 @@ body {
 }
 .evi-field .hint { font-size: 11.5px; color: var(--evi-ink-3); line-height: 1.5; }
 
+/* ── client-name autocomplete: pick a real, verified company ───────────
+   Same layout as Social Media Intelligence's own picker (.sci-suggest-*),
+   built from this page's own tokens rather than shared classes so this
+   stylesheet stays self-contained, matching the file header's own
+   "defines its own .main/.card/.topbar" convention. */
+.evi-suggest-panel { margin-top: 10px; }
+.evi-suggest-list {
+  display: flex; flex-direction: column; gap: 6px;
+  max-height: 320px; overflow-y: auto;
+}
+.evi-suggest-row {
+  display: flex; align-items: center; gap: 12px; padding: 10px 13px;
+  border: 1px solid var(--evi-line); background: var(--evi-panel-2);
+  border-radius: var(--radius-md, 10px); cursor: pointer;
+  transition: background .15s, border-color .15s, transform .15s;
+}
+.evi-suggest-row:hover {
+  background: rgba(99,102,241,.08); border-color: rgba(99,102,241,.4);
+  transform: translateX(2px);
+}
+.evi-suggest-logo {
+  position: relative; width: 34px; height: 34px; border-radius: var(--radius-sm, 8px);
+  flex-shrink: 0; overflow: hidden; display: flex; align-items: center;
+  justify-content: center; background: linear-gradient(135deg, var(--evi-a1), var(--evi-a3));
+}
+.evi-suggest-logo img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.evi-suggest-initial { display: none; font-size: 13px; font-weight: 800; color: #0a0f1f; }
+.evi-suggest-logo.evi-suggest-nologo .evi-suggest-initial { display: flex; }
+.evi-suggest-info { min-width: 0; flex: 1; }
+.evi-suggest-name {
+  font-size: 13.5px; font-weight: 700; color: var(--evi-ink);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.evi-suggest-meta {
+  font-size: 11px; color: var(--evi-ink-3); margin-top: 2px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.evi-suggest-site { font-size: 11px; color: var(--evi-ink-3); flex-shrink: 0; }
+.evi-suggest-loading, .evi-suggest-empty {
+  font-size: 12.5px; color: var(--evi-ink-3); padding: 10px 2px; line-height: 1.5;
+}
+.evi-suggest-error {
+  margin-bottom: 10px; padding: 14px 16px; border-radius: var(--radius-md, 10px);
+  background: rgba(251,191,36,.08); border: 1px solid rgba(251,191,36,.3);
+}
+.evi-suggest-error-msg { font-size: 12.5px; color: var(--evi-ink-2); line-height: 1.55; }
+
 
 /* ── drafting the profile from the client's own site ──────────────────
    The form proposes; the person confirms. Everything in this block exists to

@@ -897,6 +897,41 @@ def get_profile(profile_id: int, email: str) -> dict | None:
         conn.close()
 
 
+def search_known_profiles(email: str, query: str, limit: int = 8) -> list[dict]:
+    """Clients this user has already set up, matching `query` by name -- the
+    fallback for when the company-search vendor behind the client-name
+    autocomplete (see app.py's search route) is unavailable. Shaped like an
+    Apollo company dict (sci_company_search._to_company) so the same picker
+    row renderer works for either source; `from_history: True` marks a row as
+    an existing profile rather than a live vendor result. No `logo`: nothing
+    here comes from Apollo, so the picker falls back to its initial-letter
+    avatar for these rows, same as it already does for any company with no
+    logo. [] on any failure."""
+    conn = _pg_conn()
+    q = (query or "").strip()
+    if conn is None or not email or not q:
+        return []
+    try:
+        _ensure_tables(conn)
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT DISTINCT ON (client_name) client_name, website FROM evi_profiles "
+                "WHERE email = %s AND client_name ILIKE %s "
+                "ORDER BY client_name, updated_at DESC LIMIT %s",
+                (email, "%" + q + "%", limit))
+            rows = cur.fetchall()
+        return [{"id": "", "name": name, "logo": None, "industry": None,
+                "location": None, "description": None, "summary": None,
+                "followers_count": None, "profile_url": None,
+                "website": website, "from_history": True}
+               for name, website in rows if name]
+    except Exception as e:
+        logger.warning("event_intel_store.search_known_profiles failed: %s", e)
+        return []
+    finally:
+        conn.close()
+
+
 def list_profiles(email: str, limit: int = 40) -> list[dict]:
     conn = _pg_conn()
     if conn is None:

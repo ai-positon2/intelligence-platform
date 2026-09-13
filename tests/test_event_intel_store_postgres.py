@@ -775,6 +775,50 @@ def test_a_finished_run_records_what_it_cost(monkeypatch):
     assert spend["usd"] == CW.spend_usd(spend)
 
 
+# ── the client-name autocomplete's provider-down fallback ──────────────────
+
+def test_search_known_profiles_matches_by_name_and_scopes_to_the_account():
+    email = "search-profiles@position2.com"
+    other = "someone-else@position2.com"
+    S.save_profile(email, {"client_name": "Northwind Analytics",
+                           "website": "https://northwind.example",
+                           "classification": R.CLASS_B2B_TO_MARKETING})
+    S.save_profile(email, {"client_name": "Southwind Retail",
+                           "website": "https://southwind.example",
+                           "classification": R.CLASS_B2C_GENERAL})
+    S.save_profile(other, {"client_name": "Northwind Consulting",
+                           "website": "https://not-this-one.example",
+                           "classification": R.CLASS_B2B_TO_MARKETING})
+    out = S.search_known_profiles(email, "north")
+    names = [c["name"] for c in out]
+    assert "Northwind Analytics" in names
+    assert "Southwind Retail" not in names, "matched a name that does not contain the query"
+    assert "Northwind Consulting" not in names, (
+        "another account's profile leaked into this one's autocomplete")
+    row = out[0]
+    assert row["website"] == "https://northwind.example"
+    assert row["from_history"] is True
+    assert row["logo"] is None, "a profile has no logo; a real one must not be invented"
+
+
+def test_search_known_profiles_collapses_repeat_saves_of_the_same_client():
+    email = "search-profiles-dupe@position2.com"
+    for _ in range(3):
+        S.save_profile(email, {"client_name": "Repeat Co",
+                               "website": "https://repeat.example",
+                               "classification": R.CLASS_B2B_TO_MARKETING})
+    out = S.search_known_profiles(email, "repeat")
+    assert len([c for c in out if c["name"] == "Repeat Co"]) == 1
+
+
+def test_search_known_profiles_is_empty_for_a_blank_query():
+    S.save_profile("search-profiles-blank@position2.com",
+                   {"client_name": "Anything", "website": "https://a.example",
+                    "classification": R.CLASS_B2B_TO_MARKETING})
+    assert S.search_known_profiles("search-profiles-blank@position2.com", "") == []
+    assert S.search_known_profiles("search-profiles-blank@position2.com", "   ") == []
+
+
 def test_the_recorded_cost_counts_the_calls_that_were_refused(monkeypatch):
     """The expensive failures are the ones worth seeing. A confirmation
     discarded after six live searches, a scoring pass whose answer could not
