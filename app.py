@@ -9168,7 +9168,10 @@ def event_conference_intelligence_profile_draft():
     every later score measures; a person confirming a model's reading is not
     the system inferring it, and a draft that arrived pre-accepted would be.
 
-    Costs one Claude call with web search, and no Apollo credits.
+    Costs one Claude call with no search tool at all when their site could be
+    read directly, and one more call WITH web search only as a fallback when
+    it could not (see event_intel_intake's module docstring). No Apollo
+    credits either way.
     """
     from tracker import event_intel_intake
     email = ((_get_user() or {}).get("email") or "").lower()

@@ -32,6 +32,33 @@ corpus rather than a growing conversation. And it is more honest, because
 `sources` becomes the list of pages WE retrieved and can report the HTTP
 status of, rather than a list of URLs the model asserts it opened.
 
+WHEN THE SITE ITSELF WON'T COOPERATE
+-------------------------------------
+
+A live site can refuse a plain fetch for reasons that have nothing to do with
+whether the company is real or findable: Akamai or Cloudflare bot mitigation
+silently stalling a non-browser request (myntra.com, timing out rather than
+answering), an overloaded origin turning away automated traffic with a 529, a
+page that only renders in a browser. None of that means there is nothing to
+say about the company, and reporting a hard failure in exactly those cases is
+the least useful moment to do it: a large, real, well-covered company is
+usually the one whose own site fights back the hardest.
+
+So a site that could not be read directly gets one more try, THROUGH web
+search, before this module gives up: `_search_draft` asks a model, with the
+real web_search tool on, to find public information from other sources
+(their LinkedIn or Crunchbase page, press coverage, a partner naming them)
+instead of their own pages. It keeps every rule below intact -- a field still
+needs a citable source or it stays null, `wrong_company` is still checked,
+and a reply that ran no real search (`search_count == 0`, the same guard
+`claude_websearch` documents for exactly this) is discarded rather than
+accepted as an answer drawn from the model's own memory. The result says so:
+`via` is `"search"` rather than `"site"`, and `note` states plainly that the
+company's own site could not be read and this came from public search
+instead, so the person reviewing it weighs it accordingly. Only when neither
+path finds anything does this module report the honest failure the rest of
+this docstring describes.
+
 WHAT THIS MODULE IS NOT ALLOWED TO DO
 -------------------------------------
 
@@ -60,11 +87,16 @@ WHAT THIS MODULE IS NOT ALLOWED TO DO
    because with no search tool the only thing left for it to have come from is
    the model's own recall.
 
-4. **A site we could not read is reported, not worked around.** Plenty of
-   sites render their text in the browser, and `fetch_page` says so plainly
-   when it sees one. Saying "we could not read this, fill it in yourself" is a
-   worse feature and a better answer than a profile assembled from what a
-   model happens to remember about a company with this name.
+4. **A site we could not read gets one honest fallback, not a shrug and not a
+   fabrication.** Plenty of sites render their text in the browser, block
+   automated readers outright, or are simply down when this runs, and
+   `fetch_page` says so plainly when it sees one. Rather than stopping there,
+   this module tries a bounded web search for the same information from
+   OTHER sources -- but that search still owes every field a real, checkable
+   source. "We could not find this anywhere, fill it in yourself" remains a
+   better answer than a profile assembled from what a model happens to
+   remember about a company with this name, and is still what this module
+   says when the search comes back with nothing either.
 """
 
 from __future__ import annotations
@@ -94,6 +126,14 @@ MAX_TOKENS = 12000
 # Generous for a call that runs no searches, and far short of the ten minutes
 # the search version could take. `claude_websearch.ask` defaults to 280.
 TIMEOUT = 180.0
+
+# The web-search fallback, used only when the site itself could not be read.
+# Sized like event_intel_resolve's single-entity lookup (max_uses=10),
+# slightly lower because a company overview needs fewer searches than
+# resolving one event's identity and dates. Timeout matches
+# claude_websearch.ask's own default for a call that actually searches.
+SEARCH_MAX_USES = 8
+SEARCH_TIMEOUT = 280.0
 
 # The homepage plus this many of its own links.
 MAX_PAGES = 6
@@ -230,6 +270,84 @@ write it for that purpose rather than as a summary.
 `note` is anything the person filling this form should know that does not fit \
 a field: something ambiguous, two plausible readings, a business that has \
 clearly changed shape recently, or a page you expected and did not get."""
+
+
+# Used only when the company's own site could not be fetched directly. Same
+# shape and the same discipline as `_SYSTEM` -- a field with no source stays
+# null -- except the source is now whatever the search tool actually turned
+# up rather than a fixed set of pages this module fetched itself, so this
+# variant asks for `sources` in the reply (the direct-read path already owns
+# that list, since it is the pages it fetched) and asks each evidence
+# sentence to name where it came from.
+_SYSTEM_SEARCH = """You are filling in a form on {client_name}'s behalf, the \
+same as always, but their own website at {website} could not be read \
+directly just now -- it may block automated readers, or it may simply be \
+unreachable right now. You have a web search tool instead. Use it to find \
+public information about this company from OTHER sources: their LinkedIn or \
+Crunchbase page, press coverage, review sites, industry directories, a \
+partner or customer naming them. Do not answer from memory alone: every field \
+you fill must be something you found through the search tool just now and can \
+point to, not something you already knew about a company with this name \
+before you searched.
+
+FIRST, MAKE SURE IT IS THE RIGHT COMPANY. Two businesses sharing a name is \
+common. If what you find plainly describes a different company than the one \
+named, say so in `wrong_company` and stop rather than describing whichever \
+one came up first.
+
+RULES.
+1. ANY FIELD YOU CANNOT SUPPORT WITH SOMETHING YOU FOUND MUST be null, and its \
+name must appear in `unknown`. The person checking your work cannot tell which \
+fields you actually confirmed unless you say. Leaving a field blank is a good \
+answer.
+2. `acv_band` and `sales_cycle` are usually not published anywhere. Fill them \
+only from something concrete: a price, a published plan, a case study naming a \
+contract value or an evaluation length. "Enterprise software so probably six \
+figures" is a guess. Leave it null and put it in `unknown`.
+3. `buyer_roles` are the job titles that sign or champion the purchase, as \
+your sources describe them, comma separated. `verticals` are the industries \
+they sell INTO, comma separated, not the industry they are in.
+4. `geo_scope` is where they actually sell, as evidenced by offices, case \
+studies, currencies or stated coverage. It is not where they might like to \
+sell.
+5. Every field you fill needs a matching entry in `evidence` naming WHERE you \
+found it (the source, by name or URL) and what it said, in one short sentence. \
+A field with no named source is a guess wearing a fact's clothes, and it will \
+be thrown away.
+6. `sources` is every URL you actually consulted through the search tool, in \
+the order you used them. Only URLs you genuinely visited, never one you are \
+inferring exists because it would be the obvious place to look.
+
+THE CLASSIFICATION. A person will confirm this before anything runs, so give \
+them your best reading and your real reasoning, not a hedge. It decides which \
+side of a trade-show floor gets measured, and the four options are:
+
+{classification_menu}
+
+The distinction people get wrong: a B2B company selling to marketing, growth \
+or sales teams finds its buyers WORKING the exhibitor booths, because at most \
+B2B events every booth is staffed by exactly those people. A B2B company \
+selling to any other function finds its buyers in the audience and the \
+session tracks instead. Say which of those two the company is, and why, in \
+`classification_why`.
+
+Respond with ONLY a JSON object, no prose before or after:
+{{"wrong_company": str|null, "what_they_sell": str, \
+"classification": str|null, "classification_why": str, \
+"classification_confidence": "high"|"medium"|"low", \
+"buyer_roles": str|null, "verticals": str|null, "acv_band": str|null, \
+"sales_cycle": str|null, "geo_scope": str|null, \
+"evidence": {{"field name": "where you found it and what it said"}}, \
+"unknown": [str], "sources": [str], "note": str}}
+
+`what_they_sell` is one plain sentence a reader can check at a glance. It is \
+the fastest way for them to notice you found the wrong company, so write it \
+for that purpose rather than as a summary.
+
+`note` is anything the person filling this form should know that does not fit \
+a field: something ambiguous, two plausible readings, a business that has \
+clearly changed shape recently, or that public information about them turned \
+out to be limited."""
 
 
 def _err(kind: str, detail: str, pages=None) -> dict:
@@ -489,62 +607,37 @@ def _unreadable_detail(pages: list) -> str:
             "the form in from. " + " ".join(bits))
 
 
-def draft_profile(client_name: str, website: str) -> dict:
-    """Propose an intake for one company. Never raises.
+# A handful of plausible URLs, in the order the model listed them. Capped and
+# de-duplicated for the same reason `_text` caps everything else here: this
+# came from a reply, not from something this module fetched itself, so it
+# gets the same "trust but bound it" treatment as every other model-supplied
+# field rather than being passed straight to the page.
+_MAX_SEARCH_SOURCES = 12
 
-    Returns a dict with `draft` (the fields to put in the form), `evidence`
-    (per field, what was read), `unknown` (fields deliberately left empty),
-    `classification` plus its reasoning, `sources` (the pages actually read),
-    `pages` (every page tried, with its status) and `error`.
 
-    `classification` is a PROPOSAL. Nothing in this module or its route saves
-    it. See the module docstring for why that distinction is the whole point.
+def _search_sources(raw) -> list:
+    out = []
+    for u in (raw or []):
+        u = str(u or "").strip()
+        if u.lower().startswith(("http://", "https://")) and u not in out:
+            out.append(u)
+        if len(out) >= _MAX_SEARCH_SOURCES:
+            break
+    return out
+
+
+def _shape_draft(parsed: dict, sources: list, pages: list, via: str,
+                 forced_note: str = "") -> dict:
+    """Turn one model reply into the dict `draft_profile` returns.
+
+    Shared by the direct site-read path and the search fallback below: both
+    hand this the same JSON shape, and both owe the reader the same
+    discipline -- a field with no evidence is thrown away rather than kept as
+    a guess, whichever path found it. `via` ("site" or "search") says which
+    one actually produced this draft; `forced_note`, when given, is prepended
+    to whatever the model itself wrote in `note` rather than replacing it, so
+    the fallback's disclosure survives even if the model's own note is empty.
     """
-    name = str(client_name or "").strip()
-    site = str(website or "").strip()
-    if not name:
-        return _err("bad_request", "A company name is required.")
-    if not site.lower().startswith(("http://", "https://")):
-        # Not a nicety. The site is the only thing that separates two firms
-        # with one name, so a draft without one is guessing which company it
-        # is before it starts guessing anything else.
-        return _err("bad_request",
-                    "A website starting with http:// or https:// is required. "
-                    "It is the only thing that tells two companies with the "
-                    "same name apart.")
-
-    pages = read_site(site)
-    read = [p for p in pages if p.get("status") == harvest.SOURCE_OK]
-    corpus = build_corpus(pages)
-    if not corpus:
-        return _err("unreadable", _unreadable_detail(pages), pages)
-
-    system = _SYSTEM.format(client_name=name[:200], website=site[:400],
-                            classification_menu=_classification_menu())
-    user = ("Fill in the form for %s from these pages, and leave blank "
-            "anything they do not tell you.\n\n%s" % (name[:200], corpus))
-
-    res = claude_websearch.ask(system, user, max_uses=MAX_USES,
-                               max_tokens=MAX_TOKENS, timeout=TIMEOUT)
-    if res.get("error"):
-        e = res["error"]
-        return _err(e["kind"], e["detail"], pages)
-
-    parsed = claude_websearch.extract_json(res.get("text") or "",
-                                           require="what_they_sell")
-    if not isinstance(parsed, dict):
-        logger.warning("event_intel_intake: unparsable draft for %r "
-                       "(blocks=%s, stop=%s)", name[:80],
-                       res.get("text_block_count"), res.get("stop_reason"))
-        return _err("unparsable", "The pages were read but the answer could "
-                                  "not be understood, so nothing was filled "
-                                  "in.", pages)
-
-    # Ours, not the model's. It was handed a fixed set of pages and had no way
-    # to open another, so what was read is a fact this module owns rather than
-    # a claim it has to take on trust.
-    sources = [p.get("url") for p in read if p.get("url")]
-
     wrong = _text(parsed.get("wrong_company"), 600)
     if wrong:
         out = _err("wrong_company", wrong, pages)
@@ -574,9 +667,9 @@ def draft_profile(client_name: str, website: str) -> dict:
                     evidence[f] = t
 
     # A filled field with no evidence is a guess wearing a fact's clothes, and
-    # with no search tool the only place it can have come from is the model's
-    # own memory of a company with this name. The prompt asks for evidence;
-    # asking is not the same as getting.
+    # neither path here has a search tool free to go looking beyond what it
+    # was given or what it just found. The prompt asks for evidence; asking is
+    # not the same as getting.
     for f in DRAFT_FIELDS:
         if draft[f] is not None and f not in evidence:
             draft[f] = None
@@ -585,6 +678,10 @@ def draft_profile(client_name: str, website: str) -> dict:
     classification = str(parsed.get("classification") or "").strip()
     if classification not in rubric.CLASSIFICATIONS:
         classification = None
+
+    note = _text(parsed.get("note"), 600) or ""
+    if forced_note:
+        note = (forced_note + " " + note).strip() if note else forced_note
 
     return {
         "draft": draft,
@@ -599,6 +696,121 @@ def draft_profile(client_name: str, website: str) -> dict:
         "sources": sources,
         "pages": [{"url": p.get("url"), "status": p.get("status"),
                    "note": p.get("note") or ""} for p in pages],
-        "note": _text(parsed.get("note"), 600) or "",
+        "note": note,
+        "via": via,
         "error": None,
     }
+
+
+def _search_draft(name: str, site: str) -> dict | None:
+    """The web-search fallback. Returns a parsed reply dict, or None on any
+    failure -- the caller reports that exactly as it would have reported the
+    direct read failing, since from the reader's side both mean the same
+    thing: nothing usable was found.
+
+    `search_count == 0` is treated as a failure, not a thin success. A reply
+    that ran no real search answered from the model's own recall regardless
+    of what it claims in `evidence`, which is the one thing this whole module
+    exists to refuse. See claude_websearch's own note on why `search_count`,
+    not the presence of an answer, is the only honest signal of whether a
+    search actually happened.
+    """
+    system = _SYSTEM_SEARCH.format(client_name=name[:200], website=site[:400],
+                                   classification_menu=_classification_menu())
+    user = ("%s's own site could not be read directly. Search for public "
+            "information about them from other sources and fill in the form, "
+            "leaving blank anything you cannot find and point to." % name[:200])
+    res = claude_websearch.ask(system, user, max_uses=SEARCH_MAX_USES,
+                               max_tokens=MAX_TOKENS, timeout=SEARCH_TIMEOUT)
+    if res.get("error") or not res.get("search_count"):
+        if res.get("error"):
+            logger.info("event_intel_intake: search fallback failed for %r: %s",
+                        name[:80], res["error"])
+        else:
+            logger.info("event_intel_intake: search fallback for %r ran no "
+                       "real search, discarding", name[:80])
+        return None
+    parsed = claude_websearch.extract_json(res.get("text") or "",
+                                           require="what_they_sell")
+    if not isinstance(parsed, dict):
+        logger.warning("event_intel_intake: unparsable search fallback for %r "
+                       "(blocks=%s, stop=%s)", name[:80],
+                       res.get("text_block_count"), res.get("stop_reason"))
+        return None
+    return parsed
+
+
+def draft_profile(client_name: str, website: str) -> dict:
+    """Propose an intake for one company. Never raises.
+
+    Returns a dict with `draft` (the fields to put in the form), `evidence`
+    (per field, what was read), `unknown` (fields deliberately left empty),
+    `classification` plus its reasoning, `sources` (the pages actually read,
+    or the URLs a search fallback actually visited), `pages` (every page this
+    module itself tried, with its status), `via` ("site" or "search") and
+    `error`.
+
+    `classification` is a PROPOSAL. Nothing in this module or its route saves
+    it. See the module docstring for why that distinction is the whole point.
+    """
+    name = str(client_name or "").strip()
+    site = str(website or "").strip()
+    if not name:
+        return _err("bad_request", "A company name is required.")
+    if not site.lower().startswith(("http://", "https://")):
+        # Not a nicety. The site is the only thing that separates two firms
+        # with one name, so a draft without one is guessing which company it
+        # is before it starts guessing anything else.
+        return _err("bad_request",
+                    "A website starting with http:// or https:// is required. "
+                    "It is the only thing that tells two companies with the "
+                    "same name apart.")
+
+    pages = read_site(site)
+    read = [p for p in pages if p.get("status") == harvest.SOURCE_OK]
+    corpus = build_corpus(pages)
+
+    if not corpus:
+        # The direct read failed. See the module docstring's "WHEN THE SITE
+        # ITSELF WON'T COOPERATE" section: this is exactly the case a bot
+        # block or an overloaded origin produces, and it says nothing about
+        # whether the company is real or findable. Try search before giving
+        # up, and if THAT also finds nothing, report the original, honest
+        # failure rather than the fallback's.
+        parsed = _search_draft(name, site)
+        if parsed is not None:
+            return _shape_draft(
+                parsed, _search_sources(parsed.get("sources")), pages, "search",
+                forced_note=("%s's own site could not be read directly, so "
+                            "this draft comes from public search results "
+                            "instead. Check it a little more carefully."
+                            % name[:200]))
+        return _err("unreadable", _unreadable_detail(pages), pages)
+
+    system = _SYSTEM.format(client_name=name[:200], website=site[:400],
+                            classification_menu=_classification_menu())
+    user = ("Fill in the form for %s from these pages, and leave blank "
+            "anything they do not tell you.\n\n%s" % (name[:200], corpus))
+
+    res = claude_websearch.ask(system, user, max_uses=MAX_USES,
+                               max_tokens=MAX_TOKENS, timeout=TIMEOUT)
+    if res.get("error"):
+        e = res["error"]
+        return _err(e["kind"], e["detail"], pages)
+
+    parsed = claude_websearch.extract_json(res.get("text") or "",
+                                           require="what_they_sell")
+    if not isinstance(parsed, dict):
+        logger.warning("event_intel_intake: unparsable draft for %r "
+                       "(blocks=%s, stop=%s)", name[:80],
+                       res.get("text_block_count"), res.get("stop_reason"))
+        return _err("unparsable", "The pages were read but the answer could "
+                                  "not be understood, so nothing was filled "
+                                  "in.", pages)
+
+    # Ours, not the model's. It was handed a fixed set of pages and had no way
+    # to open another, so what was read is a fact this module owns rather than
+    # a claim it has to take on trust.
+    sources = [p.get("url") for p in read if p.get("url")]
+
+    return _shape_draft(parsed, sources, pages, "site")

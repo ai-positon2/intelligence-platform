@@ -635,8 +635,158 @@ def test_a_hedged_field_keeps_the_answer_and_drops_the_hedge():
 
 def test_the_draft_is_built_through_the_field_filter_not_the_raw_text_one():
     """A grep-level guard on the one line that matters: routing draft values
-    back through `_text` would restore both defects at once."""
+    back through `_text` would restore both defects at once.
+
+    Lives in `_shape_draft` now, not `draft_profile` itself: both the direct
+    site-read path and the search fallback hand their reply through the same
+    shaping function, so this one line covers both."""
     import inspect
-    src = inspect.getsource(I.draft_profile)
+    src = inspect.getsource(I._shape_draft)
     assert "_field(parsed.get(f)) for f in DRAFT_FIELDS" in src, (
         "draft values no longer go through the field filter")
+
+
+# ── the search fallback, for a site that will not cooperate ───────────────
+#
+# myntra.com and flipkart.com, both real production attempts, timed out and
+# 529'd respectively: large, real, well-covered companies whose own sites
+# happen to fight automated readers the hardest. Reporting "unreadable" and
+# stopping there was a worse answer than searching for the same company from
+# other sources, so a site that fails the direct read gets exactly one more
+# try before this module gives up on it.
+
+def _fallback_body(**over):
+    """Same shape as `_body`, plus `sources`: the fallback has no fixed page
+    list of its own, so the model is asked to name what it actually visited."""
+    sources = over.pop("sources", ["https://www.linkedin.com/company/northwind-analytics",
+                                   "https://www.crunchbase.com/organization/northwind"])
+    b = _body(**over)
+    b["sources"] = sources
+    return b
+
+
+def _stub_fallback(monkeypatch, body=None, search_count=1, error=None, text=None):
+    """The homepage cannot be read at all, so the direct, tool-free call never
+    happens and `claude_websearch.ask` is the fallback call itself."""
+    fetched = {}
+
+    def fake_fetch(url):
+        return _page(url, status=H.SOURCE_BLOCKED, text="",
+                     note="Server refused the request (HTTP 529).")
+
+    def fake_ask(system, user, **kw):
+        fetched["kw"] = kw
+        fetched["user"] = user
+        fetched["system"] = system
+        return {"text": text if text is not None else json.dumps(body or _fallback_body()),
+                "raw": "", "error": error, "stop_reason": "end_turn",
+                "text_block_count": 1, "tool_version": "web_search_20260318",
+                "search_count": search_count, "tool_errors": [], "usage": {}}
+
+    monkeypatch.setattr(H, "fetch_page", fake_fetch)
+    monkeypatch.setattr(claude_websearch, "ask", fake_ask)
+    return fetched
+
+
+def test_an_unreadable_site_falls_back_to_search_instead_of_giving_up(monkeypatch):
+    seen = _stub_fallback(monkeypatch)
+    out = I.draft_profile("Northwind", SITE)
+    assert out["error"] is None
+    assert out["via"] == "search"
+    assert seen["kw"]["max_uses"] == I.SEARCH_MAX_USES
+    assert out["draft"]["verticals"]
+
+
+def test_a_site_that_reads_fine_never_falls_back(monkeypatch):
+    """The fast, cheap, no-search path stays untouched when it already works."""
+    seen = _stub(monkeypatch)
+    out = I.draft_profile("Northwind", SITE)
+    assert out["via"] == "site"
+    assert seen["kw"]["max_uses"] == 0
+
+
+def test_the_fallback_discloses_it_used_search_not_the_site(monkeypatch):
+    _stub_fallback(monkeypatch)
+    out = I.draft_profile("Northwind", SITE)
+    assert "could not be read directly" in out["note"]
+    assert "public search" in out["note"]
+
+
+def test_the_failed_direct_read_is_still_reported_alongside_the_fallback(monkeypatch):
+    """The reader is owed both halves: what was tried on the site and why it
+    failed, not just that a search happened afterwards."""
+    _stub_fallback(monkeypatch)
+    out = I.draft_profile("Northwind", SITE)
+    assert out["pages"] and out["pages"][0]["url"] == SITE
+    assert out["pages"][0]["status"] == H.SOURCE_BLOCKED
+
+
+def test_a_fallback_reply_that_ran_no_real_search_is_discarded(monkeypatch):
+    """search_count == 0 means the model answered from its own memory
+    regardless of what it claims in `evidence` -- the one thing this whole
+    module exists to refuse, whichever path produced it. Falls back to the
+    same honest failure the direct read would have reported."""
+    _stub_fallback(monkeypatch, search_count=0)
+    out = I.draft_profile("Northwind", SITE)
+    assert out["error"]["kind"] == "unreadable"
+
+
+def test_a_fallback_call_that_errors_reports_the_original_unreadable_site(monkeypatch):
+    _stub_fallback(monkeypatch, error={"kind": "transport", "detail": "HTTP 503"})
+    out = I.draft_profile("Northwind", SITE)
+    assert out["error"]["kind"] == "unreadable"
+
+
+def test_an_unparsable_fallback_reply_reports_the_original_unreadable_site(monkeypatch):
+    _stub_fallback(monkeypatch, text="Sure! Here is what I found about Northwind.")
+    out = I.draft_profile("Northwind", SITE)
+    assert out["error"]["kind"] == "unreadable"
+
+
+def test_a_wrong_company_is_still_caught_through_the_fallback(monkeypatch):
+    _stub_fallback(monkeypatch, body=_fallback_body(
+        wrong_company="Public sources describe a garden-furniture retailer, "
+                      "not an analytics firm."))
+    out = I.draft_profile("Northwind Analytics", SITE)
+    assert out["error"]["kind"] == "wrong_company"
+
+
+def test_a_fallback_field_with_no_evidence_is_still_emptied(monkeypatch):
+    """The same discipline, whichever path produced the reply: with no named
+    source the only place a value can have come from is recall."""
+    _stub_fallback(monkeypatch,
+                   body=_fallback_body(acv_band="$50k to $150k", unknown=[]))
+    out = I.draft_profile("Northwind", SITE)
+    assert out["draft"]["acv_band"] is None
+    assert "acv_band" in out["unknown"]
+
+
+def test_the_fallback_sources_are_capped_deduplicated_and_url_shaped(monkeypatch):
+    body = _fallback_body(
+        sources=["https://a.example/x"] * 5 + ["not-a-url"] +
+                ["https://b.example/%d" % i for i in range(20)])
+    _stub_fallback(monkeypatch, body=body)
+    out = I.draft_profile("Northwind", SITE)
+    assert out["sources"].count("https://a.example/x") == 1
+    assert "not-a-url" not in out["sources"]
+    assert len(out["sources"]) <= I._MAX_SEARCH_SOURCES
+
+
+def test_the_fallback_prompt_offers_every_classification_the_rubric_knows():
+    p = I._SYSTEM_SEARCH.format(client_name="X", website=SITE,
+                                classification_menu=I._classification_menu())
+    for k in R.CLASSIFICATIONS:
+        assert k in p
+
+
+def test_the_fallback_prompt_also_checks_for_the_wrong_company():
+    p = I._SYSTEM_SEARCH.format(client_name="X", website=SITE,
+                                classification_menu=I._classification_menu())
+    assert "MAKE SURE IT IS THE RIGHT COMPANY" in p
+    assert "wrong_company" in p
+
+
+def test_the_fallback_prompt_never_leaks_the_budget():
+    p = I._SYSTEM_SEARCH.format(client_name="X", website=SITE,
+                                classification_menu=I._classification_menu())
+    assert "budget" not in p.lower()
