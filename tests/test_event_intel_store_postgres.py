@@ -614,7 +614,9 @@ def test_a_promoted_alternative_reaches_the_stored_candidates(monkeypatch):
     row = S.get_run(run_id, EMAIL)
     assert row["status"] == "complete", row.get("error")
     names = [c["name"] for c in S.get_candidates(run_id)]
-    assert "MarTech Conference" not in names, "the cut event survived the audit"
+    assert "MarTech Conference" in names, "comparison removed the original before scoring"
+    assert row["summary"]["audit"]["comparison_only"] is True
+    assert row["summary"]["audit"]["cut"] == []
     assert "INBOUND" in names, (
         "the audit's replacement never reached the table, and the summary "
         "still says it did: %s" % names)
