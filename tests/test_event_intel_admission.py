@@ -214,3 +214,54 @@ def test_parent_general_admission_does_not_unlock_named_vip_suite():
     event=dict(EVENT,name='VIP Suite Experience')
     text='VIP Suite Experience May 11–12, 2027. VIP suite is invite-only. General admission is open.'
     assert A.inspect(event,lambda url: page(text))['reasons']
+@pytest.mark.parametrize('row,accepted', [
+    ({'name':'CMO Summit','startDate':'2027-05-11T09:00:00-07:00','endDate':'2027-05-12T17:00:00-07:00'},True),
+    ({'name':'Parent Conference','startDate':'2027-05-11','endDate':'2027-05-12'},False),
+    ({'name':'CMO Summit','startDate':'2026-05-11','endDate':'2026-05-12'},False),
+    ({'name':'CMO Summit','startDate':'2027-05-11'},False),
+    ({'name':'CMO Summit Europe','startDate':'2027-05-11','endDate':'2027-05-12'},False),
+    ({'name':'CMO Summit','startDate':'2027-05-11','endDate':'2027-05-12','eventStatus':'https://schema.org/EventCancelled'},False),
+    ({'name':'CMO Summit','startDate':'2027-05-11','endDate':'2027-05-12','offers':{'availability':'https://schema.org/SoldOut'}},False),
+])
+def test_structured_organizer_edition_does_not_borrow_parent_or_old_dates(row, accepted):
+    fetched = dict(status='blocked',http_status=200,text='Please enable JavaScript',spa='react',structured_events=[row])
+    result = A.inspect(EVENT, lambda url: fetched)
+    assert (not result['reasons']) == accepted
+    if accepted:
+        assert result['support'] == 'organizer_structured_name_and_dates'
+        assert result['checks'][0]['structured_snapshot']['text_sha256']
+        assert result['checks'][0]['read_mode'] == 'javascript_fallback'
+
+
+@pytest.mark.parametrize('override', [{'truncated':True},{'http_status':403},{'final_url':'https://foreign.example/'}])
+def test_structured_evidence_does_not_override_fetch_boundaries(override):
+    fetched = dict(status='blocked',http_status=200,text='',structured_events=[
+        {'name':'CMO Summit','startDate':'2027-05-11','endDate':'2027-05-12'}])
+    fetched.update(override)
+    assert A.inspect(EVENT,lambda url:fetched)['reasons']
+
+
+def test_extract_only_typed_event_jsonld_and_ignore_broken_scripts():
+    from tracker.event_intel_structured import events
+    markup = '<script>window.event={"name":"Invented"}</script>'
+    markup += '<script type="application/ld+json">not json</script>'
+    markup += '<script type="application/ld+json">{"@graph":[{"@type":"WebPage","name":"Parent"},{"@type":"Event","name":"CMO Summit","startDate":"2027-05-11"}]}</script>'
+    assert events(markup) == [{'name':'CMO Summit','startDate':'2027-05-11'}]
+
+
+@pytest.mark.parametrize("start,end", [
+    ("2027-05-11junk", "2027-05-12"),
+    ("2027-05-11T99:00:00", "2027-05-12"),
+    ("2027-05-11", None),
+])
+def test_structured_dates_require_complete_valid_values(start, end):
+    fetched = dict(status='blocked', http_status=200, text='', structured_events=[
+        {'name':'CMO Summit','startDate':start,'endDate':end}])
+    assert A.inspect(EVENT, lambda _: fetched)['reasons']
+
+
+def test_structured_metadata_cannot_clear_visible_access_restriction():
+    fetched = dict(status='blocked', http_status=200,
+        text='CMO Summit is invite-only.',
+        structured_events=[{'name':'CMO Summit','startDate':'2027-05-11','endDate':'2027-05-12'}])
+    assert A.inspect(EVENT, lambda _: fetched)['reasons']

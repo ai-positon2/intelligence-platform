@@ -4,9 +4,10 @@ Literal support is a necessary admission condition, not semantic verification.
 Dynamic pages and restricted access require review rather than optimistic dates.
 """
 import calendar
+import json
 import re
 import unicodedata
-from datetime import date
+from datetime import date, datetime
 from urllib.parse import urlsplit, urldefrag
 
 from .event_intel_access import organizer_url
@@ -133,6 +134,42 @@ def _date_patterns(start, end, text=""):
     return [re.compile(r'(?<!\w)' + p + r'(?!\w)', re.I) for p in patterns]
 
 
+def _structured_date(value):
+    if not isinstance(value, str):
+        raise ValueError("Missing structured date")
+    if len(value) == 10:
+        return date.fromisoformat(value)
+    if len(value) > 10 and value[10] == 'T':
+        return datetime.fromisoformat(value.replace('Z', '+00:00')).date()
+    raise ValueError("Invalid structured date")
+
+
+def _structured_support(rows, names, start, end):
+    matches, restrictions = [], []
+    for row in rows or []:
+        if not isinstance(row, dict) or not isinstance(row.get('name'), str):
+            continue
+        if not set(_names({'name': row['name']}, start.year)).intersection(names):
+            continue
+        try:
+            actual_start = _structured_date(row.get('startDate'))
+            actual_end = _structured_date(row.get('endDate'))
+        except ValueError:
+            continue
+        if (actual_start, actual_end) != (start, end):
+            continue
+        matches.append(row)
+        status = str(row.get('eventStatus') or '').rsplit('/',1)[-1]
+        if status in ('EventCancelled', 'EventPostponed', 'EventRescheduled'):
+            restrictions.append('Organizer structured data reports a cancelled, postponed or rescheduled edition; verify current dates and access.')
+        offers = row.get('offers') or []
+        offers = offers if isinstance(offers, list) else [offers]
+        if any(isinstance(o, dict) and str(o.get('availability') or '').rsplit('/',1)[-1] in
+               ('SoldOut', 'Discontinued', 'OutOfStock') for o in offers):
+            restrictions.append('Organizer structured ticket data reports unavailable inventory; verify access.')
+    return matches, restrictions
+
+
 def inspect(event, fetcher=None):
     from .event_intel_harvest import fetch_page
     fetcher = fetcher or fetch_page
@@ -171,6 +208,21 @@ def inspect(event, fetcher=None):
         check['read_mode'] = 'javascript_fallback' if fallback else 'extracted_html'
         if raw_text:
             check['snapshot'] = source_snapshot(final,raw_text)
+        # Public JSON-LD is organizer metadata, explicitly distinct from rendered text.
+        # It must match this event and the complete date range; parent metadata cannot admit a subevent.
+        structured = []
+        if not fetched.get('truncated') and fetched.get('http_status') == 200:
+            structured, structured_restrictions = _structured_support(
+                fetched.get('structured_events'), names, start, end)
+            restrictions.extend(structured_restrictions)
+        if structured:
+            check['structured_event_evidence'] = structured
+            check['structured_snapshot'] = source_snapshot(final,json.dumps(structured,sort_keys=True))
+            check['support'] = 'organizer_structured_name_and_dates'
+            supported = True
+            _, blocked = _access(raw_text, str(event.get('name') or ''))
+            if blocked:
+                restrictions.append('The organizer page describes restricted or unavailable access; verify this client’s access before recommending attendance.')
         # WordPress/React markers alone also occur on fully readable pages.
         if fetched.get('status') != 'ok' or fallback or fetched.get('truncated'):
             check['reason'] = 'The complete rendered page could not be read reliably.'
@@ -199,7 +251,8 @@ def inspect(event, fetcher=None):
         result['reasons'].append('The named event and its date range could not be found together in readable organizer text; parent-event dates or model claims alone are insufficient.')
     result['reasons'].extend(sorted(set(restrictions)))
     if supported and not result['reasons']:
-        result['support'] = 'literal_name_and_dates_only'
+        result['support'] = ('organizer_structured_name_and_dates' if any(
+            c.get('structured_event_evidence') for c in result['checks']) else 'literal_name_and_dates_only')
     result['not_read'] = max(0,len(urls)-MAX_PAGES)
     return result
 

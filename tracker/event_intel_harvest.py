@@ -235,12 +235,15 @@ def fetch_page(url: str) -> dict:
             chunks.append(chunk)
             total += len(chunk)
             if total >= _MAX_BYTES:
+                out["truncated"] = True
                 break
         markup = b"".join(chunks).decode(r.encoding or "utf-8", errors="replace")
     finally:
         r.close()
 
     # Relative links resolve against where the document actually came from.
+    from .event_intel_structured import events as structured_events
+    out["structured_events"] = structured_events(markup)
     text = html_to_linked_text(markup, out["final_url"])
     out["spa"] = client_render_marker(markup)
     if len(text) < _MIN_USEFUL_CHARS:

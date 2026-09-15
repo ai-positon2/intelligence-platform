@@ -61,3 +61,18 @@ def test_download_uses_ledger_estimate_and_preserves_legacy_amount(monkeypatch):
     spend=result.json['summary']['spend']
     assert spend['usd'] is None
     assert spend['legacy_fixed_rate_usd']==20
+
+
+def test_download_link_uses_native_attachment_semantics():
+    from html.parser import HTMLParser
+    from pathlib import Path
+    class Links(HTMLParser):
+        def handle_starttag(self, tag, attrs):
+            attrs = dict(attrs)
+            if attrs.get("id") == "eventExportLink":
+                self.export = (tag, attrs)
+    parser = Links()
+    parser.feed(Path("templates/event_conference_intelligence.html").read_text())
+    tag, attrs = parser.export
+    assert tag == "a"
+    assert "download" in attrs
