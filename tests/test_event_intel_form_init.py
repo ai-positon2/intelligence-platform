@@ -298,7 +298,7 @@ def _run(probe, class_keys, event_keys):
              json.dumps(_EV_FIELDS), json.dumps(_hidden_ids(html)),
              json.dumps(event_intel_rubric.CLASSIFICATION_LABELS),
              _SHIM, script))
-    r = subprocess.run(["node", "-e", js], capture_output=True, text=True, timeout=60)
+    r = subprocess.run(["node"], input=js, capture_output=True, text=True, timeout=60)
     assert r.returncode == 0, "the page script threw:\n%s" % r.stderr[-2000:]
     return json.loads(r.stdout.strip().splitlines()[-1])
 

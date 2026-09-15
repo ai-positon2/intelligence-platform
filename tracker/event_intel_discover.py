@@ -621,7 +621,9 @@ def is_committed_same_edition(name: str, keys: set) -> bool:
     if not name_key(name):
         return False
     region = region_key(name)
+    years = set(re.findall(r"\b(?:19|20)\d{2}\b", name))
     return any(names_match(name, k) and region_key(k) == region
+              and set(re.findall(r"\b(?:19|20)\d{2}\b", k)) == years
               for k in (keys or set()))
 
 

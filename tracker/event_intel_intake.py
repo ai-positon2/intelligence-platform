@@ -745,6 +745,8 @@ def _search_draft(name: str, site: str) -> dict | None:
                        "(blocks=%s, stop=%s)", name[:80],
                        res.get("text_block_count"), res.get("stop_reason"))
         return None
+    if not _search_sources(parsed.get("sources")):
+        return None
     return parsed
 
 

@@ -108,45 +108,40 @@ AUDIT_MAX_TOKENS = 9000
 # event_intel_discover applies to its own fan-out.
 AUDIT_MAX_INFLIGHT = 3
 
-_AUDIT_SYSTEM = """You audit ONE famous conference off a client's shortlist. \
-Your default assumption is that a marquee event is on the list out of habit \
-rather than fit.
+_AUDIT_SYSTEM = """Compare ONE well-known conference with a relevant alternative for this client.
+Fame alone is neither evidence of fit nor a reason for exclusion.
 
 THE CLIENT
 {profile}
 
-WHERE THIS CLIENT'S BUYERS PHYSICALLY ARE AT AN EVENT: {where_buyers}
+WHERE THIS CLIENT'S BUYERS ARE: {where_buyers}
 
-Use web search to find the single most targeted alternative that serves this \
-exact buyer profile better than the event below, then decide.
+Use web search to find an alternative in the client's geography and time window.
+Compare the specific editions and the client's actual eligibility. A sold-out,
+past, undated or invitation-restricted replacement is not an actionable improvement.
+The supplied event dates and website identify the edition to compare; do not
+borrow a different year's audience, programme or access facts.
 
-RULES.
-1. You MUST name a real alternative event you confirmed exists by searching. \
-"No alternative exists" is almost never true and is not an acceptable answer \
-for a broad market; if you genuinely cannot find one after searching, say so \
-in `alternative_note` and set `alternative` to null, and understand that the \
-famous event will then be CUT, because an unaudited marquee name is exactly \
-what this step removes.
-2. Verdict "kept" means this famous event beats that named alternative FOR \
-THIS CLIENT, and `why` explains it by referring to the client's buyer roles \
-and verticals above. Scale, prestige and "everyone goes" are not reasons. A \
-diluted flagship loses to a dense vertical summit.
-3. Verdict "cut" means the alternative is better. Say which one and why in one \
-line.
-4. Be willing to cut. A shortlist where every famous event survived its own \
-audit is a shortlist that was not audited.
-5. You have ONE event to judge and a small search budget. Spend it on finding \
-the alternative, not on studying the event you were given, and write your \
-answer while you still have room to finish it.
+Return verdict "kept" when the original has the stronger supported fit, and
+"cut" only as a proposal when a named alternative has the stronger supported fit.
+These are comparison preferences: both events still undergo source admission and
+common rubric scoring. Do not force a preference, invent an alternative or reject
+an event just because no alternative was found. Use a null alternative and explain
+uncertainty when the evidence is insufficient. A self-service networking app does
+not establish organizer-run matching or this client's ability to meet buyers.
+
+Stop once the comparison is supported. Leave unknown facts unknown, avoid search
+narration and return only the final JSON. Use the small search allowance to find a
+real alternative, not repeat optional audience-count or ticket-price searches.
 
 Respond with ONLY a JSON object:
-{{"verdict": "kept"|"cut", "alternative": str|null, \
+{{"verdict": "kept"|"cut", "alternative": str|null,
 "alternative_website": str|null, "alternative_note": str|null, "why": str}}"""
 
 
 def _profile_line(profile: dict) -> str:
-    from .event_intel_discover import profile_brief
-    return profile_brief(profile)
+    from .event_intel_discover import profile_brief, _today
+    return "TODAY: %s\n%s" % (_today(), profile_brief(profile))
 
 
 def _event_label(c: dict) -> str:
@@ -205,7 +200,8 @@ def _audit_one(cand: dict, system: str) -> dict:
     else, which is the whole point of splitting the call up.
     """
     res = claude_websearch.ask(
-        system, "Audit this famous event:\n- %s" % _event_label(cand),
+        system, "Audit this famous event:\n- %s\nEdition: %s to %s\nOrganizer: %s" % (
+            _event_label(cand), cand.get("starts_on"), cand.get("ends_on"), cand.get("website")),
         max_uses=AUDIT_MAX_USES, max_tokens=AUDIT_MAX_TOKENS)
     # Counted before any of the ways this reply can be refused below. The
     # search is billed whether or not its answer turns out to be usable, and
@@ -468,6 +464,27 @@ def apply_audit(candidates: list[dict], audit: dict) -> list[dict]:
 
 
 # ── Step 6: the cross-client pattern check, measured ──────────────────────
+
+
+def retain_for_scoring(candidates: list[dict], audit: dict) -> list[dict]:
+    """Comparisons propose alternatives; source admission and scores decide inclusion.
+
+    A qualitative preference is not evidence that the original is unsuitable.
+    Keep original identities available, including cycles and missing verdicts.
+    Passing the full pool to promotion also prevents paying to rediscover it.
+    """
+    audit['comparison_only'] = True
+    retained = {event_key(c): c for c in apply_audit(candidates, audit)}
+    verdicts = audit.get('verdicts') or {}
+    for original in candidates or []:
+        key = event_key(original)
+        if key in retained:
+            continue
+        verdict = verdicts.get(key) or _verdict_for(original.get('name') or '', verdicts) or {}
+        reason = verdict.get('why') or 'The comparison returned no usable verdict.'
+        retained[key] = dict(original, audit_verdict='compared',
+            audit_note=('Alternative comparison only; source checks and the scoring rubric decide inclusion. ' + reason)[:1200])
+    return [retained[event_key(c)] for c in candidates or []]
 
 
 def alternatives_to_promote(audit: dict, candidates: list[dict]) -> list[dict]:

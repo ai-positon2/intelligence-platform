@@ -291,8 +291,8 @@ def test_a_commitment_matches_across_editions(written, found, expected):
 @pytest.mark.parametrize("written,found,expected", [
     # Genuinely the same edition, or neither side names a region at all: the
     # stricter check still waives a safety warning here, same as is_committed.
-    ("Money20/20 USA", "Money20/20 USA 2026", True),
-    ("SaaStr Annual", "SaaStr Annual 2026", True),
+    ("Money20/20 USA", "Money20/20 USA 2026", False),
+    ("SaaStr Annual", "SaaStr Annual 2026", False),
     ("SaaStr", "SaaStr Annual", True),
     # The bypass this function exists to close: a commitment with no stated
     # region must not be treated as covering a candidate that DOES name one --

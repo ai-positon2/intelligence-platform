@@ -4,9 +4,10 @@ Literal support is a necessary admission condition, not semantic verification.
 Dynamic pages and restricted access require review rather than optimistic dates.
 """
 import calendar
+import json
 import re
 import unicodedata
-from datetime import date
+from datetime import date, datetime
 from urllib.parse import urlsplit, urldefrag
 
 from .event_intel_access import organizer_url
@@ -94,22 +95,28 @@ def _access(text, event_name=''):
     return observations, blocking
 
 
-def _date_patterns(start, end):
+def _date_patterns(start, end, text=""):
     """Explicit ISO or English dates/ranges; unsupported formats stay unknown."""
     def single(d):
         month = '(?:' + calendar.month_name[d.month] + '|' + calendar.month_abbr[d.month] + r'\.?)'
         day = str(d.day) + r'(?:st|nd|rd|th)?'
         out = [re.escape(d.isoformat()), month + r'\s+' + day + r',?\s+' + str(d.year),
                day + r'\s+' + month + r',?\s+' + str(d.year)]
-        # A numeric date (3/3/2026, 03/03/2026, 3-3-2026, 3/3/26) had no
-        # branch at all before this: an otherwise perfectly readable,
-        # correctly-dated organizer page was marked unverified for no reason
-        # but the format it wrote its own date in.
-        for sep in ('/', '-'):
-            for mm in dict.fromkeys((str(d.month), '%02d' % d.month)):
-                for dd in dict.fromkeys((str(d.day), '%02d' % d.day)):
-                    for yy in dict.fromkeys((str(d.year), str(d.year)[2:])):
-                        out.append(re.escape(mm + sep + dd + sep + yy))
+        # Numeric ordering must be explicit or unambiguous.
+        formats = re.findall(r"\b(?:DD[/.-]MM|MM[/.-]DD)[/.-](?:YYYY|YY)\b", text, re.I)
+        orders = {f[:2].upper() for f in formats}
+        if len(orders) > 1:
+            return out
+        order = next(iter(orders), None)
+        if order is None and d.day <= 12 and d.day != d.month:
+            return out
+        pairs = [(d.month, d.day)] if order == 'MM' else [(d.day, d.month)] if order == 'DD' else [(d.month, d.day), (d.day, d.month)]
+        for first, second in pairs:
+            for sep in ('/', '-'):
+                for aa in dict.fromkeys((str(first), '%02d' % first)):
+                    for bb in dict.fromkeys((str(second), '%02d' % second)):
+                        for yy in (str(d.year), str(d.year)[2:]):
+                            out.append(re.escape(aa + sep + bb + sep + yy))
         return out
     patterns = []
     for a in single(start):
@@ -127,6 +134,42 @@ def _date_patterns(start, end):
     return [re.compile(r'(?<!\w)' + p + r'(?!\w)', re.I) for p in patterns]
 
 
+def _structured_date(value):
+    if not isinstance(value, str):
+        raise ValueError("Missing structured date")
+    if len(value) == 10:
+        return date.fromisoformat(value)
+    if len(value) > 10 and value[10] == 'T':
+        return datetime.fromisoformat(value.replace('Z', '+00:00')).date()
+    raise ValueError("Invalid structured date")
+
+
+def _structured_support(rows, names, start, end):
+    matches, restrictions = [], []
+    for row in rows or []:
+        if not isinstance(row, dict) or not isinstance(row.get('name'), str):
+            continue
+        if not set(_names({'name': row['name']}, start.year)).intersection(names):
+            continue
+        try:
+            actual_start = _structured_date(row.get('startDate'))
+            actual_end = _structured_date(row.get('endDate'))
+        except ValueError:
+            continue
+        if (actual_start, actual_end) != (start, end):
+            continue
+        matches.append(row)
+        status = str(row.get('eventStatus') or '').rsplit('/',1)[-1]
+        if status in ('EventCancelled', 'EventPostponed', 'EventRescheduled'):
+            restrictions.append('Organizer structured data reports a cancelled, postponed or rescheduled edition; verify current dates and access.')
+        offers = row.get('offers') or []
+        offers = offers if isinstance(offers, list) else [offers]
+        if any(isinstance(o, dict) and str(o.get('availability') or '').rsplit('/',1)[-1] in
+               ('SoldOut', 'Discontinued', 'OutOfStock') for o in offers):
+            restrictions.append('Organizer structured ticket data reports unavailable inventory; verify access.')
+    return matches, restrictions
+
+
 def inspect(event, fetcher=None):
     from .event_intel_harvest import fetch_page
     fetcher = fetcher or fetch_page
@@ -135,7 +178,6 @@ def inspect(event, fetcher=None):
         start = date.fromisoformat(str(event.get('starts_on') or ''))
         end = date.fromisoformat(str(event.get('ends_on') or event.get('starts_on') or ''))
         host = urlsplit(event.get('website') or '').hostname
-        patterns = _date_patterns(start,end)
     except (ValueError, TypeError):
         result['reasons'] = ['The named edition has no usable date range.']
         return result
@@ -166,6 +208,21 @@ def inspect(event, fetcher=None):
         check['read_mode'] = 'javascript_fallback' if fallback else 'extracted_html'
         if raw_text:
             check['snapshot'] = source_snapshot(final,raw_text)
+        # Public JSON-LD is organizer metadata, explicitly distinct from rendered text.
+        # It must match this event and the complete date range; parent metadata cannot admit a subevent.
+        structured = []
+        if not fetched.get('truncated') and fetched.get('http_status') == 200:
+            structured, structured_restrictions = _structured_support(
+                fetched.get('structured_events'), names, start, end)
+            restrictions.extend(structured_restrictions)
+        if structured:
+            check['structured_event_evidence'] = structured
+            check['structured_snapshot'] = source_snapshot(final,json.dumps(structured,sort_keys=True))
+            check['support'] = 'organizer_structured_name_and_dates'
+            supported = True
+            _, blocked = _access(raw_text, str(event.get('name') or ''))
+            if blocked:
+                restrictions.append('The organizer page describes restricted or unavailable access; verify this client’s access before recommending attendance.')
         # WordPress/React markers alone also occur on fully readable pages.
         if fetched.get('status') != 'ok' or fallback or fetched.get('truncated'):
             check['reason'] = 'The complete rendered page could not be read reliably.'
@@ -179,7 +236,7 @@ def inspect(event, fetcher=None):
         if blocked:
             restrictions.append('The organizer page describes restricted or unavailable access; verify this client’s access before recommending attendance.')
             check['access_excerpt'] = blocked[0]
-        for pattern in patterns:
+        for pattern in _date_patterns(start, end, text):
             for match in pattern.finditer(text):
                 context = text[max(0,match.start()-180):match.end()+180]
                 prefix = text[max(0,match.start()-180):match.start()]
@@ -194,7 +251,8 @@ def inspect(event, fetcher=None):
         result['reasons'].append('The named event and its date range could not be found together in readable organizer text; parent-event dates or model claims alone are insufficient.')
     result['reasons'].extend(sorted(set(restrictions)))
     if supported and not result['reasons']:
-        result['support'] = 'literal_name_and_dates_only'
+        result['support'] = ('organizer_structured_name_and_dates' if any(
+            c.get('structured_event_evidence') for c in result['checks']) else 'literal_name_and_dates_only')
     result['not_read'] = max(0,len(urls)-MAX_PAGES)
     return result
 
