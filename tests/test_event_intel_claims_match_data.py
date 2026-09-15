@@ -274,8 +274,8 @@ def test_the_pipeline_hands_promotion_a_list_that_still_holds_the_cut_event(monk
         "counts": {}, "ruled_on": 0, "note": "", "by_name": {}})
 
     P._run_recommend(1, "e@x.com", dict(PROFILE))
-    assert "MarTech Conference" not in seen["candidates"], (
-        "the fixture is wrong: the cut event should be gone from survivors")
+    assert "MarTech Conference" in seen["candidates"], (
+        "comparison preferences must not remove the original before scoring")
     assert "MarTech Conference" in seen["replaced_from"], (
         "the pipeline gave promotion no list containing the event being "
         "replaced, so no promoted event can ever carry a category")

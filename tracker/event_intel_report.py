@@ -280,6 +280,15 @@ def notes(*, shortfall: list, audit: dict, generic: dict,
             "Any marquee event below has not been weighed against a more "
             "targeted alternative and may be there out of habit. %s"
             % audit["error"])
+    elif audit and audit.get('comparison_only') and audit.get('checked'):
+        failed = audit.get('failed') or {}
+        add(LEVEL_GAP if failed else LEVEL_NOTE,
+            'Marquee comparisons inform research; they do not remove candidates',
+            '%s %s audited; %d unresolved (%s). Original events and confirmed alternatives '
+            'must pass the same source checks and scoring rubric.' % (
+                _n(max(0,audit['checked']-len(failed)), 'marquee event', 'marquee events'),
+                'was' if audit['checked']-len(failed) == 1 else 'were', len(failed),
+                ', '.join(str(v.get('name') or '') for v in failed.values() if isinstance(v,dict)) or 'none'))
     elif audit and audit.get("checked"):
         cut = audit.get("cut") or []
         # The audit is one call per marquee event, so some can fail while
@@ -328,7 +337,13 @@ def notes(*, shortfall: list, audit: dict, generic: dict,
     pr = promoted or {}
     added, unconfirmed = pr.get("promoted") or [], pr.get("unconfirmed") or []
     not_attempted = pr.get("not_attempted") or []
-    if added or unconfirmed or not_attempted:
+    if (added or unconfirmed or not_attempted) and (audit or {}).get('comparison_only'):
+        add(LEVEL_THIN if unconfirmed or not_attempted else LEVEL_NOTE,
+            'Alternatives researched: %d confirmed, %d unresolved, %d not attempted' %
+            (len(added), len(unconfirmed), len(not_attempted)),
+            'Confirmed alternatives proceed to source checks and scoring. An unavailable replacement '
+            'does not remove the original event. %s' % _names(added + unconfirmed + not_attempted))
+    elif added or unconfirmed or not_attempted:
         bits = []
         if added:
             bits.append("%s %s named by the audit as a better fit than a "

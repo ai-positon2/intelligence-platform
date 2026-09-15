@@ -30,8 +30,8 @@ def test_named_edition_has_literal_support(dates):
     'CMO Summit, taking place May 11-12, 2027 in Austin.',
     'CMO Summit will be held May 11-12, 2027 in Austin.',
     'CMO Summit convenes May 11-12, 2027 in Austin.',
-    'CMO Summit takes place 5/11/2027 - 5/12/2027 in Austin.',
-    'CMO Summit takes place 05/11/2027 - 05/12/2027 in Austin.',
+    'CMO Summit takes place 5/11/2027 - 5/12/2027 in Austin. Format MM/DD/YYYY.',
+    'CMO Summit takes place 05/11/2027 - 05/12/2027 in Austin. Format MM/DD/YYYY.',
 ])
 def test_realistic_connector_phrasing_and_numeric_dates_are_recognised(text):
     result = A.inspect(EVENT, lambda url: page(text))

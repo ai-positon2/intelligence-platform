@@ -154,7 +154,7 @@ def _render(page_script, run, sort="ranked"):
     js = "var __PAGE_IDS = %s;\n%s\nvar __RUN = %s;\n%s" % (
         json.dumps(page_script.ids), _SHIM, json.dumps(run),
         src[:at] + probe + src[at:])
-    r = subprocess.run(["node", "-e", js], capture_output=True, text=True, timeout=90)
+    r = subprocess.run(["node"], input=js, capture_output=True, text=True, timeout=90)
     assert r.returncode == 0, "the page script threw:\n%s" % r.stderr[-2500:]
     return json.loads(r.stdout.strip().splitlines()[-1])["body"]
 
@@ -174,7 +174,7 @@ def _drive(page_script, run, js, sort="ranked"):
     src = "var __PAGE_IDS = %s;\n%s\nvar __RUN = %s;\n%s" % (
         json.dumps(page_script.ids), _SHIM, json.dumps(run),
         page[:at] + probe + page[at:])
-    r = subprocess.run(["node", "-e", src], capture_output=True, text=True, timeout=90)
+    r = subprocess.run(["node"], input=src, capture_output=True, text=True, timeout=90)
     assert r.returncode == 0, "the page script threw:\n%s" % r.stderr[-2500:]
     return json.loads(r.stdout.strip().splitlines()[-1])
 
@@ -464,7 +464,7 @@ def test_every_onclick_this_view_writes_is_a_function_that_exists(page_script):
     js = "var __PAGE_IDS = %s;\n%s\nvar __RUN = %s;\n%s" % (
         json.dumps(page_script.ids), _SHIM, json.dumps(run),
         src[:at] + probe + src[at:])
-    r = subprocess.run(["node", "-e", js], capture_output=True, text=True, timeout=90)
+    r = subprocess.run(["node"], input=js, capture_output=True, text=True, timeout=90)
     assert r.returncode == 0, r.stderr[-2000:]
     kinds = json.loads(r.stdout.strip().splitlines()[-1])
     missing = [n for n, t in kinds if t != "function"]

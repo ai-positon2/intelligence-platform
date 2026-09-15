@@ -76,7 +76,7 @@ def test_the_audit_is_one_call_per_famous_event(monkeypatch):
     # into every prompt.
     for user, _ in seen:
         assert sum(1 for c in famous if c["name"] in user) == 1, user
-    assert {u for u, _ in seen} == {
+    assert {u.split("\nEdition:")[0] for u, _ in seen} == {
         "Audit this famous event:\n- %s" % c["name"] for c in famous}
     # A per-call budget bigger than the old whole-audit budget would undo the
     # squaring saving the split exists to get.

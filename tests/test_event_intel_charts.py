@@ -55,7 +55,7 @@ def _render_parts(page_script, run):
     js = "var __PAGE_IDS = %s;\n%s\nvar __RUN = %s;\n%s" % (
         json.dumps(page_script.ids), _SHIM, json.dumps(run),
         src[:at] + probe + src[at:])
-    r = subprocess.run(["node", "-e", js], capture_output=True, text=True, timeout=90)
+    r = subprocess.run(["node"], input=js, capture_output=True, text=True, timeout=90)
     assert r.returncode == 0, "the page script threw:\n%s" % r.stderr[-2500:]
     return json.loads(r.stdout.strip().splitlines()[-1])
 
@@ -530,7 +530,7 @@ def test_a_segment_with_nothing_in_it_is_not_drawn(page_script):
     src = page_script.script
     js = "var __PAGE_IDS = %s;\n%s\n%s" % (
         json.dumps(page_script.ids), _SHIM, src[:at] + probe + src[at:])
-    r = subprocess.run(["node", "-e", js], capture_output=True, text=True, timeout=90)
+    r = subprocess.run(["node"], input=js, capture_output=True, text=True, timeout=90)
     assert r.returncode == 0, r.stderr[-2000:]
     html = json.loads(r.stdout.strip().splitlines()[-1])["html"]
     assert "Three" in html, "the donut drew nothing at all"
@@ -580,7 +580,7 @@ def test_the_armer_is_reached_and_needs_a_frame_to_fire(page_script):
     js = ("var __PAGE_IDS = %s;\n%s\nvar __RUN = %s;\n%s"
           % (json.dumps(page_script.ids), _SHIM, json.dumps(
               _recommend([_cand("A", 99, "P1")])), src[:at] + probe + src[at:]))
-    r = subprocess.run(["node", "-e", js], capture_output=True, text=True, timeout=90)
+    r = subprocess.run(["node"], input=js, capture_output=True, text=True, timeout=90)
     assert r.returncode == 0, r.stderr[-2000:]
     got = json.loads(r.stdout.strip().splitlines()[-1])
     assert got["queued"] == 1, (

@@ -287,22 +287,13 @@ def _run_recommend(run_id: int, email: str, profile: dict) -> None:
                          "no suitable events.")})
         return
 
-    # Step 3. Marquee names justify themselves against a named alternative or
-    # they come off the list.
+    # Comparisons propose alternatives; admission and scoring determine inclusion.
     store.update_run(run_id, stage="auditing")
     audit = durable_stage("audit", event_intel_audit.audit_famous, found["candidates"], profile)
     checkpoint('audit', audit.get('spend'))
-    survivors = event_intel_audit.apply_audit(found["candidates"], audit)
+    survivors = event_intel_audit.retain_for_scoring(found["candidates"], audit)
 
-    # The other half of Step 3. Cutting a marquee event on the strength of a
-    # named alternative and then never looking that alternative up leaves the
-    # client with a shorter list and no replacement, while the run has already
-    # worked out what the replacement should be. Each one is confirmed by its
-    # own lookup before it is allowed onto the list.
-    # `survivors` is what is already on the list, for dedup. The pre-audit
-    # list is where the event each alternative REPLACES still exists, and it
-    # is the only place a promoted event can pick up the category slot it
-    # needs to survive the store.
+    # Keep originals in the pool to avoid cyclic or duplicate alternative lookup.
     promoted = durable_stage("promote", event_intel_audit.promote_alternatives,
         audit, survivors, replaced_from=found["candidates"], profile=profile)
     checkpoint('promote', promoted.get('spend'))
@@ -432,7 +423,9 @@ def _run_recommend(run_id: int, email: str, profile: dict) -> None:
                   # this a stored run reads as five audits with three
                   # verdicts and no account of the other two.
                   "failed": audit.get("failed") or {},
-                  "cut": audit.get("cut") or [],
+                  "cut": [] if audit.get("comparison_only") else audit.get("cut") or [],
+                  "comparison_only": bool(audit.get("comparison_only")),
+                  "preferred_alternatives": audit.get("cut") or [],
                   "promoted": [{"name": c.get("name"),
                                 "replaces": c.get("audit_note")}
                                for c in promoted["promoted"]],

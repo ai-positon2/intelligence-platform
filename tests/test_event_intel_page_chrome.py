@@ -539,7 +539,7 @@ def _exec(probe, pick="new", profile_ids=("3", "4")):
                  .replace("EVENT_KEYS", json.dumps(
                      list(__import__("tracker.event_intel_workroom",
                                      fromlist=["x"]).EVENT_CLASSES))))
-    r = subprocess.run(["node", "-e", shim + "\n" + script],
+    r = subprocess.run(["node"], input=shim + "\n" + script,
                        capture_output=True, text=True, timeout=60)
     assert r.returncode == 0, "the page script threw:\n%s" % r.stderr[-2000:]
     return json.loads(r.stdout.strip().splitlines()[-1])
