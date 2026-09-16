@@ -135,6 +135,74 @@
     [data-theme="light"] tr.af-row-down{background:rgba(251,113,133,.07)}
     [data-theme="light"] tr.af-row-up{background:rgba(52,211,153,.06)}
 
+    /* Everything that opens a detail popup gets a hand cursor and a hover
+       lift/tint so the affordance reads before anyone actually clicks. */
+    .af-kpis .card.kpi{cursor:pointer}
+    #summaryBody tr,#recentBody tr{cursor:pointer;transition:background .12s,box-shadow .12s}
+    #summaryBody tr:focus-visible,#recentBody tr:focus-visible,.af-kpis .card.kpi:focus-visible{
+      outline:2px solid var(--accent);outline-offset:-2px;
+    }
+
+    .af-modal-overlay{
+      position:fixed;inset:0;z-index:9999;
+      background:rgba(4,6,16,.72);backdrop-filter:blur(6px);
+      display:flex;align-items:center;justify-content:center;padding:24px;
+      opacity:0;pointer-events:none;transition:opacity .2s var(--ease);
+    }
+    .af-modal-overlay.open{opacity:1;pointer-events:auto}
+    .af-modal{
+      width:min(700px,100%);max-height:82vh;overflow-y:auto;
+      background:linear-gradient(165deg, rgba(34,38,64,.98), rgba(10,12,22,.98));
+      border:1px solid rgba(255,255,255,.1);border-radius:20px;
+      box-shadow:0 40px 120px -20px rgba(0,0,0,.85);
+      transform:scale(.94) translateY(10px);opacity:0;
+      transition:transform .22s var(--ease),opacity .22s var(--ease);
+    }
+    .af-modal-overlay.open .af-modal{transform:scale(1) translateY(0);opacity:1}
+    .af-modal-head{
+      display:flex;align-items:center;justify-content:space-between;gap:14px;
+      padding:20px 24px;border-bottom:1px solid rgba(255,255,255,.08);
+      position:sticky;top:0;background:inherit;border-radius:20px 20px 0 0;z-index:1;
+    }
+    .af-modal-head h3{margin:0;font-size:16px;font-weight:700;color:#f1f5f9;
+      display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+    .af-modal-close{
+      appearance:none;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.04);
+      color:#8b94be;width:30px;height:30px;border-radius:50%;cursor:pointer;font-size:13px;
+      display:inline-flex;align-items:center;justify-content:center;flex:none;
+      transition:background .15s,color .15s,transform .15s;
+    }
+    .af-modal-close:hover{background:rgba(251,113,133,.15);color:#fb7185;transform:rotate(90deg)}
+    .af-modal-body{padding:20px 24px 26px}
+
+    .af-detail-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:16px;margin-bottom:22px}
+    .af-detail-item{display:flex;flex-direction:column;gap:6px}
+    .af-detail-k{font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:#5a6488}
+    .af-detail-v{font-size:14px;font-weight:600;color:#e2e8f0}
+
+    .af-modal-subhead{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;
+      color:#7e89b8;margin:6px 0 10px}
+    .af-modal-body .empty{padding:20px 0;text-align:center}
+
+    .af-mini-row{
+      display:grid;grid-template-columns:auto auto 1fr auto;gap:12px;align-items:center;
+      padding:10px 12px;border-radius:10px;cursor:pointer;
+      border:1px solid transparent;transition:background .15s,border-color .15s;
+    }
+    .af-mini-row:hover{background:rgba(255,255,255,.05);border-color:rgba(255,255,255,.1)}
+    .af-mini-row.down{box-shadow:inset 2px 0 0 rgba(251,113,133,.5)}
+    .af-mini-row.up{box-shadow:inset 2px 0 0 rgba(52,211,153,.5)}
+    .af-mini-who{font-size:12px;color:#cbd5f5;white-space:nowrap}
+    .af-mini-when{font-size:11px;color:#5a6488;white-space:nowrap}
+    .af-mini-reason{font-size:12px;color:#8b94be;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .af-mini-agent{font-size:12px;font-weight:700}
+
+    [data-theme="light"] .af-modal{background:linear-gradient(165deg,#fff,#f3f5fb)}
+    [data-theme="light"] .af-modal-head h3{color:#17213a}
+    [data-theme="light"] .af-detail-v{color:#17213a}
+    [data-theme="light"] .af-mini-who{color:#334155}
+    [data-theme="light"] .af-mini-row:hover{background:rgba(18,26,54,.05)}
+
     @media(max-width:640px){
       .af-toolbar{flex-direction:column;align-items:stretch}
       .af-segment{justify-content:center}
@@ -231,6 +299,16 @@
     </div>
   </div>
 
+  <div class="af-modal-overlay" id="afModalOverlay">
+    <div class="af-modal" role="dialog" aria-modal="true" aria-labelledby="afModalTitle">
+      <div class="af-modal-head">
+        <h3 id="afModalTitle"></h3>
+        <button type="button" class="af-modal-close" id="afModalClose" aria-label="Close">✕</button>
+      </div>
+      <div class="af-modal-body" id="afModalBody"></div>
+    </div>
+  </div>
+
   <script>
     var AGENT_LABELS = {{ agent_labels|tojson }};
     /* One stable hue per agent so the same agent reads as the same color in
@@ -274,10 +352,10 @@
       rows.forEach(function(r){ up+=r.up; down+=r.down; });
       var total=up+down, rate=total?Math.round(down/total*100):0;
       document.getElementById('kpis').innerHTML=
-        '<div class="card kpi af-kpi-total"><div class="af-kpi-icon">💬</div><b>'+total+'</b><span>Total feedback</span></div>'+
-        '<div class="card kpi af-kpi-up"><div class="af-kpi-icon">👍</div><b>'+up+'</b><span>Thumbs up</span></div>'+
-        '<div class="card kpi af-kpi-down"><div class="af-kpi-icon">👎</div><b>'+down+'</b><span>Thumbs down</span></div>'+
-        '<div class="card kpi af-kpi-rate"><div class="af-kpi-icon">📉</div><b>'+rate+'%</b><span>Down rate</span></div>';
+        '<div class="card kpi af-kpi-total" data-kpi="total" tabindex="0"><div class="af-kpi-icon">💬</div><b>'+total+'</b><span>Total feedback</span></div>'+
+        '<div class="card kpi af-kpi-up" data-kpi="up" tabindex="0"><div class="af-kpi-icon">👍</div><b>'+up+'</b><span>Thumbs up</span></div>'+
+        '<div class="card kpi af-kpi-down" data-kpi="down" tabindex="0"><div class="af-kpi-icon">👎</div><b>'+down+'</b><span>Thumbs down</span></div>'+
+        '<div class="card kpi af-kpi-rate" data-kpi="rate" tabindex="0"><div class="af-kpi-icon">📉</div><b>'+rate+'%</b><span>Down rate</span></div>';
     }
 
     function renderSummary(rows){
@@ -286,7 +364,7 @@
       body.innerHTML=rows.map(function(r,i){
         var rankClass = i===0 ? 'sev-1' : (i<3 ? 'sev-23' : '');
         var sev = severity(r.down_pct);
-        return '<tr>'+
+        return '<tr data-summary-idx="'+i+'" tabindex="0">'+
           '<td class="af-agent" style="--ag-color:'+agentColor(r.agent_slug)+'">'+esc(agentLabel(r.agent_slug))+'</td>'+
           '<td class="af-section"><span class="af-rank '+rankClass+'">'+(i+1)+'</span>'+esc(r.section_label||r.section_key)+'</td>'+
           '<td class="af-rating down">👎 '+r.down+'</td>'+
@@ -308,9 +386,9 @@
     function renderRecent(rows){
       var body=document.getElementById('recentBody');
       if(!rows.length){ body.innerHTML='<tr><td colspan="6" class="empty">No feedback recorded yet.</td></tr>'; return; }
-      body.innerHTML=rows.map(function(r){
+      body.innerHTML=rows.map(function(r,i){
         var ac=emailColor(r.email);
-        return '<tr class="'+(r.rating==='down'?'af-row-down':'af-row-up')+'">'+
+        return '<tr class="'+(r.rating==='down'?'af-row-down':'af-row-up')+'" data-recent-idx="'+i+'" tabindex="0">'+
           '<td title="'+esc(r.created_at)+'">'+relTime(r.created_at)+'</td>'+
           '<td class="af-agent" style="--ag-color:'+agentColor(r.agent_slug)+'">'+esc(agentLabel(r.agent_slug))+'</td>'+
           '<td class="af-section">'+esc(r.section_label||r.section_key)+'</td>'+
@@ -332,6 +410,17 @@
       load();
     });
 
+    /* Snapshots of the last fetch, kept around so a click on a row/card can
+       look up its full record without re-fetching -- renderSummary/renderRecent
+       give each row a data-*-idx pointing straight back into these. */
+    var lastSummary=[];
+    var lastRecent=[];
+    /* Rows shown inside the currently-open section-detail popup (fetched
+       fresh per open, since the toolbar's rating filter may be hiding half
+       of a section's actual history) -- a separate array so a click inside
+       the modal never collides with the page's own two tables. */
+    var modalEntries=[];
+
     function load(){
       var agent=document.getElementById('agentFilter').value;
       var qs=[];
@@ -340,9 +429,11 @@
       fetch('/p2/admin/agent-feedback/data'+(qs.length?'?'+qs.join('&'):''))
         .then(function(r){return r.json();})
         .then(function(d){
-          renderKpis(d.summary||[]);
-          renderSummary(d.summary||[]);
-          renderRecent(d.recent||[]);
+          lastSummary=d.summary||[];
+          lastRecent=d.recent||[];
+          renderKpis(lastSummary);
+          renderSummary(lastSummary);
+          renderRecent(lastRecent);
         })
         .catch(function(){
           document.getElementById('summaryBody').innerHTML='<tr><td colspan="5" class="empty">Could not load feedback.</td></tr>';
@@ -353,6 +444,135 @@
 
     function toggleMenu(){var d=document.getElementById('userDropdown'),p=document.getElementById('userPill');var o=d.classList.contains('open');d.classList.toggle('open',!o);p.classList.toggle('open',!o);}
     document.addEventListener('click',function(e){var m=document.getElementById('userMenu');if(m&&!m.contains(e.target)){document.getElementById('userDropdown').classList.remove('open');document.getElementById('userPill').classList.remove('open');}});
+
+    /* ── Click-to-detail: KPI cards, both tables, and the mini-rows inside a
+       section popup all open the same modal with a view-specific body. ── */
+
+    function openModal(titleHtml, bodyHtml){
+      document.getElementById('afModalTitle').innerHTML=titleHtml;
+      document.getElementById('afModalBody').innerHTML=bodyHtml;
+      document.getElementById('afModalOverlay').classList.add('open');
+      document.body.style.overflow='hidden';
+    }
+    function closeModal(){
+      document.getElementById('afModalOverlay').classList.remove('open');
+      document.body.style.overflow='';
+    }
+    document.getElementById('afModalClose').addEventListener('click', closeModal);
+    document.getElementById('afModalOverlay').addEventListener('click', function(e){
+      if(e.target===e.currentTarget) closeModal();
+    });
+    document.addEventListener('keydown', function(e){
+      if(e.key==='Escape'){ closeModal(); return; }
+      if(e.key==='Enter' || e.key===' '){
+        var el=document.activeElement;
+        if(el && el.matches('[data-kpi],[data-summary-idx],[data-recent-idx],.af-mini-row[data-entry-idx]')){
+          e.preventDefault(); el.click();
+        }
+      }
+    });
+
+    function detailRow(k, v){
+      return '<div class="af-detail-item"><span class="af-detail-k">'+esc(k)+'</span><span class="af-detail-v">'+v+'</span></div>';
+    }
+
+    function openRecentDetail(r){
+      var ac=emailColor(r.email);
+      var html='<div class="af-detail-grid">'+
+        detailRow('Agent', '<span class="af-agent" style="--ag-color:'+agentColor(r.agent_slug)+'">'+esc(agentLabel(r.agent_slug))+'</span>')+
+        detailRow('Section', esc(r.section_label||r.section_key))+
+        detailRow('Rating', '<span class="af-rating '+r.rating+'">'+(r.rating==='up'?'👍 Up':'👎 Down')+'</span>')+
+        detailRow('When', esc(r.created_at||'—')+' <span style="color:#5a6488">('+relTime(r.created_at)+')</span>')+
+        detailRow('Who', '<span class="af-who"><span class="af-avatar" style="background:'+ac+'26;color:'+ac+'">'+esc(initials(r.email))+'</span>'+esc(r.email)+'</span>')+
+        '</div>'+
+        '<div class="af-modal-subhead">Reason</div>'+
+        '<div class="af-reason'+(r.reason?' has-text':' none')+'" style="max-width:none">'+esc(r.reason||'No reason given')+'</div>';
+      openModal('Feedback detail', html);
+    }
+
+    function miniRow(x, idx){
+      return '<div class="af-mini-row '+(x.rating==='down'?'down':'up')+'" data-entry-idx="'+idx+'" tabindex="0">'+
+        '<span class="af-rating '+x.rating+'">'+(x.rating==='up'?'👍':'👎')+'</span>'+
+        '<span class="af-mini-who">'+esc(x.email)+'</span>'+
+        '<span class="af-mini-reason">'+esc(x.reason||(x.rating==='down'?'No reason given':'—'))+'</span>'+
+        '<span class="af-mini-when">'+relTime(x.created_at)+'</span>'+
+      '</div>';
+    }
+
+    function openSectionDetail(r){
+      var sev=severity(r.down_pct);
+      var titleHtml='<span class="af-agent" style="--ag-color:'+agentColor(r.agent_slug)+'">'+esc(agentLabel(r.agent_slug))+'</span> &rsaquo; '+esc(r.section_label||r.section_key);
+      var html='<div class="af-detail-grid">'+
+        detailRow('Down', '<span class="af-rating down">👎 '+r.down+'</span>')+
+        detailRow('Up', '<span class="af-rating up">👍 '+r.up+'</span>')+
+        detailRow('Down share', '<span class="af-bar-pct '+sev+'">'+r.down_pct+'%</span>')+
+        '</div>'+
+        '<div class="af-modal-subhead">Individual entries</div>'+
+        '<div id="afSectionEntries" class="empty">Loading…</div>';
+      openModal(titleHtml, html);
+
+      fetch('/p2/admin/agent-feedback/data?agent_slug='+encodeURIComponent(r.agent_slug))
+        .then(function(x){return x.json();})
+        .then(function(d){
+          var el=document.getElementById('afSectionEntries');
+          if(!el) return; /* modal moved on to something else meanwhile */
+          modalEntries=(d.recent||[]).filter(function(x){ return x.section_key===r.section_key; });
+          if(!modalEntries.length){ el.outerHTML='<div class="empty">No individual entries in the recent-feedback window.</div>'; return; }
+          el.outerHTML=modalEntries.map(miniRow).join('');
+        })
+        .catch(function(){
+          var el=document.getElementById('afSectionEntries');
+          if(el) el.outerHTML='<div class="empty">Could not load entries.</div>';
+        });
+    }
+
+    function aggregateByAgent(rows){
+      var m={};
+      rows.forEach(function(r){
+        var a=m[r.agent_slug] || (m[r.agent_slug]={agent_slug:r.agent_slug, down:0, up:0});
+        a.down+=r.down; a.up+=r.up;
+      });
+      return Object.keys(m).map(function(k){
+        var a=m[k], total=a.down+a.up;
+        a.total=total; a.rate=total?Math.round(a.down/total*100):0;
+        return a;
+      });
+    }
+
+    function openKpiDetail(kind){
+      var sortKey = kind==='rate' ? 'rate' : (kind==='up' ? 'up' : (kind==='down' ? 'down' : 'total'));
+      var agg=aggregateByAgent(lastSummary).sort(function(a,b){ return b[sortKey]-a[sortKey]; });
+      var titles={total:'💬 Total feedback', up:'👍 Thumbs up', down:'👎 Thumbs down', rate:'📉 Down rate'};
+      var bodyHtml;
+      if(!agg.length){
+        bodyHtml='<div class="empty">No feedback recorded in the last 30 days.</div>';
+      } else {
+        bodyHtml='<div class="af-modal-subhead">By agent, last 30 days</div>'+agg.map(function(a){
+          var sev=severity(a.rate);
+          return '<div class="af-mini-row" style="grid-template-columns:1.4fr auto auto auto">'+
+            '<span class="af-mini-agent af-agent" style="--ag-color:'+agentColor(a.agent_slug)+'">'+esc(agentLabel(a.agent_slug))+'</span>'+
+            '<span class="af-rating down">👎 '+a.down+'</span>'+
+            '<span class="af-rating up">👍 '+a.up+'</span>'+
+            '<span class="af-bar-pct '+sev+'">'+a.rate+'%</span>'+
+          '</div>';
+        }).join('');
+      }
+      openModal(titles[kind]||'Feedback', bodyHtml);
+    }
+
+    document.addEventListener('click', function(e){
+      var kpi=e.target.closest('[data-kpi]');
+      if(kpi){ openKpiDetail(kpi.getAttribute('data-kpi')); return; }
+
+      var srow=e.target.closest('#summaryBody tr[data-summary-idx]');
+      if(srow){ var si=+srow.getAttribute('data-summary-idx'); if(lastSummary[si]) openSectionDetail(lastSummary[si]); return; }
+
+      var rrow=e.target.closest('#recentBody tr[data-recent-idx]');
+      if(rrow){ var ri=+rrow.getAttribute('data-recent-idx'); if(lastRecent[ri]) openRecentDetail(lastRecent[ri]); return; }
+
+      var mrow=e.target.closest('.af-mini-row[data-entry-idx]');
+      if(mrow){ var mi=+mrow.getAttribute('data-entry-idx'); if(modalEntries[mi]) openRecentDetail(modalEntries[mi]); return; }
+    });
   </script>
   <script>(function(){if(window.__trk)return;window.__trk=1;var _s=Date.now(),_d=false;function f(){if(_d)return;_d=true;var s=Math.round((Date.now()-_s)/1000);fetch('/api/track',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({page:location.pathname,title:'Agent Feedback',seconds:s,email:'{{ user.email if user else "" }}'}),keepalive:true}).catch(function(){});}document.addEventListener('visibilitychange',function(){if(document.visibilityState==='hidden')f();});window.addEventListener('beforeunload',f);})();</script>
 </body>
