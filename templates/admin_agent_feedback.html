@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<script>(function(){try{if('scrollRestoration' in history)history.scrollRestoration='manual';}catch(e){}window.addEventListener('load',function(){window.scrollTo(0,0);});})();</script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Agent Feedback — Admin</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=4">
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-tokens.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/grid-tokens.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">
+  <script src="/static/js/theme.js"></script>
+  <link rel="stylesheet" href="/static/css/aurora-app.css?v=3">
+  <style>
+    .af-toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:18px 0 22px}
+    .af-toolbar select{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);
+      color:#cbd5f5;border-radius:var(--radius-sm);padding:8px 12px;font-size:13px;font-family:inherit}
+    .af-rating{display:inline-flex;align-items:center;gap:5px;font-size:13px;font-weight:600}
+    .af-rating.up{color:#34d399}
+    .af-rating.down{color:#fb7185}
+    .af-section{color:#e2e8f0;font-weight:600}
+    .af-agent{font-size:11px;color:#7e89b8}
+    .af-bar-wrap{display:flex;align-items:center;gap:8px;min-width:140px}
+    .af-bar{flex:1;height:6px;border-radius:3px;background:rgba(255,255,255,.06);overflow:hidden}
+    .af-bar-fill{height:100%;background:linear-gradient(90deg,#fb7185,#f87171)}
+    .af-reason{color:#cbd5f5;max-width:420px;white-space:pre-wrap}
+    .af-reason.none{color:#5a6488;font-style:italic}
+    [data-theme="light"] .af-toolbar select{background:#fff;color:#17213a;border-color:rgba(18,26,54,.14)}
+    [data-theme="light"] .af-bar{background:rgba(18,26,54,.06)}
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <div class="tl">
+      <a href="/p2/hub" class="brand">
+        <div class="brand-icon" style="background:#151b2e;box-shadow:none;border-radius:var(--radius-md);overflow:hidden;display:inline-flex;align-items:center;justify-content:center;padding:5px 8px"><img src="/static/logo-lockup.svg?v=1" alt="arena by Position2" style="display:block;width:auto;height:36px;object-fit:contain"></div>
+      </a>
+      <div class="bc">
+        <a href="/p2/hub">Hub</a><span class="bc-sep">›</span>
+        <a href="/p2/admin/internal-usage">Admin</a><span class="bc-sep">›</span>
+        <span class="bc-cur">Agent Feedback</span>
+      </div>
+    </div>
+    <div class="tr">
+      <div class="user-menu" id="userMenu">
+        <div class="user-pill" id="userPill" onclick="toggleMenu()">
+          <div class="avatar">
+            {% if user.picture %}<img src="{{ user.picture }}" alt="" />
+            {% else %}{{ (user.name or 'U')[:2]|upper }}{% endif %}
+          </div>
+          <span class="uname">{{ user.given_name or user.name or 'Admin' }}</span>
+          <span class="pill-chevron">▼</span>
+        </div>
+        <div class="user-dropdown" id="userDropdown">
+          <div class="dd-header">
+            <div class="dd-name">{{ user.name or 'User' }}</div>
+            <div class="dd-email">{{ user.email }}</div>
+          </div>
+          <div class="dd-items">{% include "_admin_menu.html" %}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="ph">
+      <div class="ph-left">
+        <div class="eyebrow">Admin · Platform Intelligence</div>
+        <h1>Agent Feedback</h1>
+        <p style="margin:8px 0 0;max-width:680px;font-size:13px;line-height:1.55;color:#64748b">
+          Every thumbs up/down left on a Strategic Agent's generated report, grouped by which
+          section of which agent it was on. Sorted by what's being rejected most, so the first
+          row here is where to look first.
+        </p>
+      </div>
+      <a class="refresh-btn" href="#" onclick="load();return false;"><span class="refresh-icon">↻</span> Refresh</a>
+    </div>
+
+    <div class="af-toolbar">
+      <select id="agentFilter" onchange="load()">
+        <option value="">All agents</option>
+        {% for slug, label in agent_labels.items() %}
+        <option value="{{ slug }}">{{ label }}</option>
+        {% endfor %}
+      </select>
+      <select id="ratingFilter" onchange="load()">
+        <option value="down" selected>Thumbs down only</option>
+        <option value="up">Thumbs up only</option>
+        <option value="">Both</option>
+      </select>
+    </div>
+
+    <div class="sect">
+      <h2>By section, last 30 days</h2>
+      <div class="card" style="padding:6px">
+        <div class="tbl-wrap">
+          <table>
+            <thead><tr><th>Agent</th><th>Section</th><th>Down</th><th>Up</th><th>Down share</th></tr></thead>
+            <tbody id="summaryBody"><tr><td colspan="5" class="empty">Loading…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="sect">
+      <h2>Recent feedback</h2>
+      <div class="card" style="padding:6px">
+        <div class="tbl-wrap">
+          <table>
+            <thead><tr><th>When</th><th>Agent</th><th>Section</th><th>Who</th><th>Rating</th><th>Reason</th></tr></thead>
+            <tbody id="recentBody"><tr><td colspan="6" class="empty">Loading…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    var AGENT_LABELS = {{ agent_labels|tojson }};
+    function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
+    function agentLabel(slug){ return AGENT_LABELS[slug] || slug; }
+    function relTime(iso){
+      if(!iso)return '—';
+      var d=new Date(iso), s=Math.floor((Date.now()-d.getTime())/1000);
+      if(s<0)s=0;
+      var units=[[31536000,'y'],[2592000,'mo'],[86400,'d'],[3600,'h'],[60,'m']];
+      for(var i=0;i<units.length;i++){var v=Math.floor(s/units[i][0]);if(v>=1)return v+units[i][1]+' ago';}
+      return 'just now';
+    }
+
+    function renderSummary(rows){
+      var body=document.getElementById('summaryBody');
+      if(!rows.length){ body.innerHTML='<tr><td colspan="5" class="empty">No feedback recorded in the last 30 days.</td></tr>'; return; }
+      body.innerHTML=rows.map(function(r){
+        return '<tr>'+
+          '<td class="af-agent">'+esc(agentLabel(r.agent_slug))+'</td>'+
+          '<td class="af-section">'+esc(r.section_label||r.section_key)+'</td>'+
+          '<td class="af-rating down">'+r.down+'</td>'+
+          '<td class="af-rating up">'+r.up+'</td>'+
+          '<td><div class="af-bar-wrap"><div class="af-bar"><div class="af-bar-fill" style="width:'+r.down_pct+'%"></div></div><span>'+r.down_pct+'%</span></div></td>'+
+        '</tr>';
+      }).join('');
+    }
+
+    function renderRecent(rows){
+      var body=document.getElementById('recentBody');
+      if(!rows.length){ body.innerHTML='<tr><td colspan="6" class="empty">No feedback recorded yet.</td></tr>'; return; }
+      body.innerHTML=rows.map(function(r){
+        return '<tr>'+
+          '<td title="'+esc(r.created_at)+'">'+relTime(r.created_at)+'</td>'+
+          '<td class="af-agent">'+esc(agentLabel(r.agent_slug))+'</td>'+
+          '<td class="af-section">'+esc(r.section_label||r.section_key)+'</td>'+
+          '<td>'+esc(r.email)+'</td>'+
+          '<td><span class="af-rating '+r.rating+'">'+(r.rating==='up'?'👍 up':'👎 down')+'</span></td>'+
+          '<td class="af-reason'+(r.reason?'':' none')+'">'+esc(r.reason||'No reason given')+'</td>'+
+        '</tr>';
+      }).join('');
+    }
+
+    function load(){
+      var agent=document.getElementById('agentFilter').value;
+      var rating=document.getElementById('ratingFilter').value;
+      var qs=[];
+      if(agent) qs.push('agent_slug='+encodeURIComponent(agent));
+      if(rating) qs.push('rating='+encodeURIComponent(rating));
+      fetch('/p2/admin/agent-feedback/data'+(qs.length?'?'+qs.join('&'):''))
+        .then(function(r){return r.json();})
+        .then(function(d){
+          renderSummary(d.summary||[]);
+          renderRecent(d.recent||[]);
+        })
+        .catch(function(){
+          document.getElementById('summaryBody').innerHTML='<tr><td colspan="5" class="empty">Could not load feedback.</td></tr>';
+          document.getElementById('recentBody').innerHTML='<tr><td colspan="6" class="empty">Could not load feedback.</td></tr>';
+        });
+    }
+    load();
+
+    function toggleMenu(){var d=document.getElementById('userDropdown'),p=document.getElementById('userPill');var o=d.classList.contains('open');d.classList.toggle('open',!o);p.classList.toggle('open',!o);}
+    document.addEventListener('click',function(e){var m=document.getElementById('userMenu');if(m&&!m.contains(e.target)){document.getElementById('userDropdown').classList.remove('open');document.getElementById('userPill').classList.remove('open');}});
+  </script>
+  <script>(function(){if(window.__trk)return;window.__trk=1;var _s=Date.now(),_d=false;function f(){if(_d)return;_d=true;var s=Math.round((Date.now()-_s)/1000);fetch('/api/track',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({page:location.pathname,title:'Agent Feedback',seconds:s,email:'{{ user.email if user else "" }}'}),keepalive:true}).catch(function(){});}document.addEventListener('visibilitychange',function(){if(document.visibilityState==='hidden')f();});window.addEventListener('beforeunload',f);})();</script>
+</body>
+</html>

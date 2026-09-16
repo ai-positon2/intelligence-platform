@@ -2358,6 +2358,7 @@ function fmtAnswer(text){
   return out.join("") || "<p>"+safe+"</p>";
 }
 
+var CPI_CHAT_MSG_SEQ=0;
 function addAssistantMsg(answer, choices, credits, researched, webSearch, enrich){
   CHAT_HISTORY.push({role:"assistant", content:answer||""});
   var b=document.getElementById("cpiChatBody");
@@ -2405,7 +2406,15 @@ function addAssistantMsg(answer, choices, credits, researched, webSearch, enrich
         return '<button class="cpi-enrich-chip" data-name="'+esc(e.name||"")+'" data-domain="'+esc(e.domain||"")+'" data-title="'+esc(e.title||"")+'" data-apollo-id="'+esc(e.apollo_id||"")+'">'+SVG_LI+" Enrich "+esc(e.label||e.name||"this person")+"</button>";
       }).join("")+"</div>"
     : "";
-  b.insertAdjacentHTML("beforeend", '<div class="cpi-msg assistant"><div class="cpi-msg-av">'+ARENA_AV+'</div><div class="cpi-bub">'+fmtAnswer(answer||"I could not find an answer for that.")+choicesHtml+enrichHtml+costHtml+"</div></div>");
+  /* Chat has no persisted run to attach feedback to (see
+     tracker/agent_feedback.py's module docstring), so each reply gets its
+     own client-side sequence number as its section key -- stable for the
+     life of this page view, which is all a rating here needs to mean. */
+  var fbHtml = (window.agentFeedbackHtml && answer)
+    ? window.agentFeedbackHtml({agentSlug:"company-people-intelligence", runId:null,
+                                 sectionKey:"chat:"+(++CPI_CHAT_MSG_SEQ), sectionLabel:"Assistant reply"})
+    : "";
+  b.insertAdjacentHTML("beforeend", '<div class="cpi-msg assistant"><div class="cpi-msg-av">'+ARENA_AV+'</div><div class="cpi-bub">'+fmtAnswer(answer||"I could not find an answer for that.")+choicesHtml+enrichHtml+costHtml+fbHtml+"</div></div>");
   var justAdded=b.lastElementChild;
   if(justAdded){
     justAdded.querySelectorAll(".cpi-choice").forEach(function(btn){

@@ -1,0 +1,58 @@
+/* Shared thumbs up/down control, used across every Strategic Agent report
+   (see static/js/agent_feedback.js). Built only from ds-tokens.css variables
+   so it is theme-correct (light/dark) on every page that loads it without
+   its own media query. */
+
+.agent-fb{
+  display:flex;align-items:center;gap:var(--sp2);
+  margin-top:var(--sp4);padding:var(--sp2) var(--sp3);
+  border:1px solid var(--b1);border-radius:var(--radius-md);
+  background:var(--s1);
+  flex-wrap:wrap;
+}
+.agent-fb-q{
+  font-size:var(--fs-xs);color:var(--tx3);
+  margin-right:auto;
+}
+.agent-fb-btn{
+  appearance:none;border:1px solid var(--b1);background:var(--s2);
+  color:var(--tx2);border-radius:var(--radius-sm);
+  width:30px;height:26px;line-height:1;font-size:var(--fs-sm);
+  cursor:pointer;transition:background var(--dur) var(--ease),border-color var(--dur) var(--ease),
+    transform var(--dur-fast) var(--ease);
+}
+.agent-fb-btn:hover{background:var(--s3);border-color:var(--b2);}
+.agent-fb-btn:active{transform:scale(0.92);}
+.agent-fb-btn.agent-fb-up.active{
+  background:var(--green-d);border-color:var(--green);
+}
+.agent-fb-btn.agent-fb-down.active{
+  background:var(--rose-d);border-color:var(--rose);
+}
+.agent-fb-ack{
+  font-size:var(--fs-xs);color:var(--tx3);
+}
+.agent-fb-reason{
+  flex:1 1 100%;display:flex;gap:var(--sp2);align-items:flex-start;
+  margin-top:var(--sp2);
+}
+.agent-fb-reason-input{
+  flex:1 1 auto;min-width:180px;min-height:36px;max-height:120px;
+  resize:vertical;font:inherit;font-size:var(--fs-xs);
+  color:var(--tx);background:var(--s2);border:1px solid var(--b1);
+  border-radius:var(--radius-sm);padding:var(--sp2) var(--sp3);
+}
+.agent-fb-reason-input:focus{outline:none;border-color:var(--accent);}
+.agent-fb-reason-send,.agent-fb-reason-skip{
+  appearance:none;border:1px solid var(--b1);background:var(--s2);
+  color:var(--tx2);border-radius:var(--radius-sm);
+  font-size:var(--fs-xs);padding:var(--sp2) var(--sp3);cursor:pointer;
+  white-space:nowrap;
+}
+.agent-fb-reason-send{background:var(--accent-d);border-color:var(--accent);color:var(--tx);}
+.agent-fb-reason-send:hover{background:var(--accent-g);}
+.agent-fb-reason-skip:hover{background:var(--s3);}
+
+/* Never printed: an opinion tap has no place on a page someone hands to a
+   colleague or a client, and it is not part of the analysis itself. */
+@media print{ .agent-fb{ display:none !important; } }

@@ -13,6 +13,8 @@
   <link rel="stylesheet" href="/static/css/grid-tokens.css">
   <link rel="stylesheet" href="/static/css/social_media_intelligence.css?v=10">
   <link rel="stylesheet" href="/static/css/aurora-app.css?v=3">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/agent-feedback.css') }}">
+  <script src="{{ url_for('static', filename='js/agent_feedback.js') }}"></script>
 </head>
 <body>
   <div class="bg-grid"></div>
@@ -3055,10 +3057,18 @@ function dsApifyRow(platform, entry){
         toPoints(cross.messaging_and_strategy).length || (cross.claims || []).length));
 
       var nav = '', panes = '';
+      // Feedback attaches to each pane individually -- a reader who thinks
+      // the LinkedIn read is spot on and the TikTok read is off is a real,
+      // different opinion about the same run, and a single run-level rating
+      // would average the two into something nobody actually said.
       function addPane(ns, label, content, platform){
+        var fb = window.agentFeedbackHtml
+          ? window.agentFeedbackHtml({agentSlug: 'social-media-intelligence', runId: run.id,
+                                       sectionKey: ns, sectionLabel: label})
+          : '';
         panes += '<section class="sci-pane' + (panes ? '' : ' active') + '" data-ns="' + esc(ns) + '"' +
           (platform ? ' data-platform="' + esc(platform) + '"' : '') + '>' +
-          '<h4 class="sci-pane-title">' + esc(label) + '</h4>' + content + '</section>';
+          '<h4 class="sci-pane-title">' + esc(label) + '</h4>' + content + fb + '</section>';
       }
 
       nav += navItem({ns: 'overview', label: 'Overview', icon: NAV_ICONS.overview, has: true, active: true});

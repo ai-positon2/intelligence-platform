@@ -2266,6 +2266,79 @@ def _list_agent_run_titles(limit=5000) -> list:
             pass
 
 # ─────────────────────────────────────────────────────────────────────────────
+# AGENT FEEDBACK — thumbs up/down on Strategic Agents' generated reports
+# ─────────────────────────────────────────────────────────────────────────────
+# One shared table/route for all five agents that produce an actual generated
+# analysis (see tracker/agent_feedback.py's AGENT_LABELS for why the other
+# five agents under Strategic Agents don't get this control at all). The
+# widget itself (static/js/agent_feedback.js) posts here immediately on a tap
+# so a vote is never lost to someone closing the drawer before typing a
+# reason; a reason typed afterwards PATCHes the same row via the second route
+# below rather than inserting a duplicate.
+
+
+@app.route("/api/agent-feedback", methods=["POST"])
+@position2_required
+def agent_feedback_submit():
+    from tracker import agent_feedback
+    body = request.get_json(silent=True) or {}
+    agent_slug = str(body.get("agent_slug") or "").strip()
+    if agent_slug not in agent_feedback.AGENT_LABELS:
+        return jsonify({"saved": False, "error": "unknown agent"}), 404
+    rating = str(body.get("rating") or "").strip()
+    if rating not in agent_feedback.RATINGS:
+        return jsonify({"saved": False, "error": "rating must be 'up' or 'down'"}), 400
+    section_key = str(body.get("section_key") or "").strip()[:200]
+    if not section_key:
+        return jsonify({"saved": False, "error": "missing section_key"}), 400
+    section_label = str(body.get("section_label") or "").strip()[:200] or None
+    run_id = body.get("run_id")
+    run_id = str(run_id).strip()[:200] if run_id not in (None, "") else None
+    reason = str(body.get("reason") or "").strip()[:2000] or None
+    email = (_get_user() or {}).get("email", "").lower()
+    fb_id = agent_feedback.save(email=email, agent_slug=agent_slug, run_id=run_id,
+                                 section_key=section_key, section_label=section_label,
+                                 rating=rating, reason=reason)
+    return jsonify({"saved": fb_id is not None, "id": fb_id})
+
+
+@app.route("/api/agent-feedback/<int:feedback_id>/reason", methods=["POST"])
+@position2_required
+def agent_feedback_add_reason(feedback_id):
+    """Attach (or replace) the free-text reason on an already-submitted
+    thumbs-down. Ownership-scoped inside update_reason itself, so an id that
+    isn't this user's own row -- or isn't a 'down' row at all -- updates
+    nothing rather than 404ing, which would otherwise leak whether a given id
+    exists."""
+    from tracker import agent_feedback
+    body = request.get_json(silent=True) or {}
+    reason = str(body.get("reason") or "").strip()[:2000]
+    email = (_get_user() or {}).get("email", "").lower()
+    ok = agent_feedback.update_reason(feedback_id, email, reason)
+    return jsonify({"saved": ok})
+
+
+@app.route("/p2/admin/agent-feedback")
+@admin_required
+def admin_agent_feedback():
+    from tracker import agent_feedback
+    return render_template("admin_agent_feedback.html", user=_get_user(),
+                            agent_labels=agent_feedback.AGENT_LABELS)
+
+
+@app.route("/p2/admin/agent-feedback/data")
+@admin_required
+def admin_agent_feedback_data():
+    from tracker import agent_feedback
+    agent_slug = request.args.get("agent_slug") or None
+    rating = request.args.get("rating") or None
+    return jsonify({
+        "summary": agent_feedback.summary(agent_slug=agent_slug),
+        "recent": agent_feedback.list_recent(agent_slug=agent_slug, rating=rating, limit=300),
+    })
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # PERSON ENRICHMENT (Apollo) — powers the External Usage profile modal
 # ─────────────────────────────────────────────────────────────────────────────
 # The Sheets logs only know an email, a display name and a device string. To
@@ -4425,7 +4498,13 @@ def _slot_checker_insights_json(force):
                          "retryable": False})
     insights, err = slot_checker_insights.fetch(dashboard, force=force)
     if insights:
-        resp = jsonify({"configured": True, "ok": True, "insights": insights})
+        # generated_at identifies WHICH week's briefing this is, for the
+        # thumbs up/down control (see tracker/agent_feedback.py) -- this
+        # agent has no run id of its own, only a snapshot stamp, and without
+        # it every week's feedback would collapse onto one undifferentiated
+        # bucket.
+        resp = jsonify({"configured": True, "ok": True, "insights": insights,
+                         "generated_at": dashboard.get("generated_at")})
     else:
         resp = jsonify({"configured": True, "ok": False,
                          "error": slot_checker_insights.describe_error(err),

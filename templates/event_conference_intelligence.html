@@ -13,6 +13,8 @@
   <link rel="stylesheet" href="/static/css/grid-tokens.css">
   <link rel="stylesheet" href="/static/css/event_conference_intelligence.css?v=2">
   <link rel="stylesheet" href="/static/css/aurora-app.css?v=3">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/agent-feedback.css') }}">
+  <script src="{{ url_for('static', filename='js/agent_feedback.js') }}"></script>
 </head>
 <body>
   <div class="bg-grid"></div>
@@ -581,6 +583,21 @@
       return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){
         return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
       });
+    }
+
+    /* Thumbs up/down for one section of a report, keyed by run + a stable
+       section key (never a name or count, which would mint a brand-new,
+       never-repeated section on every run -- see static/js/agent_feedback.js).
+       Not every evi-sec block in this file gets one: the exclusion lists
+       (Scored and cut, Already over, Not qualified, Seen before...) are
+       housekeeping, not a judgement call, and a thumbs-down on "here is who
+       was cut" has nowhere useful to point. This is called only at the
+       sections that represent this run's actual recommendation or draft. */
+    function eviFb(runId, sectionKey, sectionLabel){
+      return window.agentFeedbackHtml
+        ? window.agentFeedbackHtml({agentSlug: 'event-conference-intelligence', runId: runId,
+                                     sectionKey: sectionKey, sectionLabel: sectionLabel})
+        : '';
     }
 
     /* Every href rendered below goes through this. A roster is assembled from
@@ -3843,6 +3860,7 @@
         '<details class="ex-method"><summary>How these were scored</summary><p>' +
           esc(s.methodology || '') + '</p></details>' +
         notesHtml(s) +
+        eviFb(run.id, 'recommend:summary', 'Executive summary') +
       '</div>';
 
       html += planRail(kept, s.worth_a_look || []);
@@ -3882,7 +3900,7 @@
                 : '<button type="button" class="tw" onclick="eviReveal(\'' +
                   esc(candAnchor(at)) + '\')" aria-label="Jump to ' + esc(t.name) +
                   ' in the ranked list">' + body + '</button>') + '</li>';
-          }).join('') + '</ol></div>';
+          }).join('') + '</ol>' + eviFb(run.id, 'recommend:top_five', 'Top five') + '</div>';
       }
 
       var look = s.worth_a_look || [];
@@ -3910,7 +3928,7 @@
         '<div style="margin-top:14px">' +
         '<a class="evi-btn evi-btn-ghost" style="text-decoration:none;display:inline-block" ' +
         'href="' + BASE + '/runs/' + run.id + '/candidates.csv">Download scored list CSV</a>' +
-        '</div></div>';
+        '</div>' + eviFb(run.id, 'recommend:ranked_list', 'The ranked list') + '</div>';
 
       /* The second tier. Below the priority bar, and above both gates that
          say an event is genuinely for this client, so these get the same
@@ -3927,7 +3945,8 @@
           'taken on faith.</div>' +
           '<div class="evi-cands">' + look.map(function(c, i){
             return candidateRow(c, byName[c.event_identity] || byName[c.name], decLabels, kept.length + i,
-                                belowBarReason(c)); }).join('') + '</div></div>';
+                                belowBarReason(c)); }).join('') + '</div>' +
+          eviFb(run.id, 'recommend:worth_a_look', 'Worth a look') + '</div>';
       }
 
       if ((s.excluded || []).length) {
@@ -4220,7 +4239,7 @@
             'A sponsor bought its way onto the page and an exhibitor booked a stand, ' +
             'which are different sizes of commitment and worth different openers.' +
             '</p></div>' : '') +
-          '</div></div>';
+          '</div>' + eviFb(run.id, 'workroom:roster_breakdown', 'What happened to the roster') + '</div>';
       }
       var spread = roomSpread(keptRows, cutRows, floorN);
       if (spread) {
@@ -4270,7 +4289,7 @@
         '<div style="margin-top:14px">' +
         '<a class="evi-btn evi-btn-ghost" style="text-decoration:none;display:inline-block" ' +
         'href="' + BASE + '/runs/' + run.id + '/outreach.csv">Download drafts CSV</a></div>' +
-        '</div>';
+        eviFb(run.id, 'workroom:worth_contacting', 'Worth contacting') + '</div>';
 
       if (cut.length) {
         html += '<div class="evi-sec"><h3>Cut below the ICP floor</h3>' +
@@ -4352,7 +4371,8 @@
         html += '<div class="evi-sec"><h3>Roster</h3>' + roleBar(run) + rosterTable(run) +
           '<div style="margin-top:14px;display:flex;gap:10px;flex-wrap:wrap">' +
           '<a class="evi-btn evi-btn-ghost" style="text-decoration:none;display:inline-block" ' +
-          'href="' + BASE + '/runs/' + run.id + '/export.csv">Download CSV</a></div></div>';
+          'href="' + BASE + '/runs/' + run.id + '/export.csv">Download CSV</a></div>' +
+          (run.mode === 'lookup' ? eviFb(run.id, 'lookup:roster', 'Roster') : '') + '</div>';
         html += resolveBar(run);
       } else if (run.status === 'complete' && !s.no_pages && !s.no_events) {
         html += '<div class="evi-empty">No participants were published on the pages that ' +

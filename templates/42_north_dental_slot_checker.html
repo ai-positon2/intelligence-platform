@@ -11,9 +11,11 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-tokens.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-components.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/42_north_dental_slot_checker.css') }}?v=7">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/agent-feedback.css') }}">
   <script src="/static/js/theme.js"></script>
   <link rel="stylesheet" href="/static/css/aurora-app.css?v=3">
   <script src="/static/js/pfx_bg.js?v=3" defer></script>
+  <script src="{{ url_for('static', filename='js/agent_feedback.js') }}"></script>
 </head>
 <body>
   <div class="bg-grid"></div>
@@ -389,6 +391,12 @@
       if(cols) more+='<div class="gd-ai-cols">'+cols+'</div>';
       if(ins.coverage) more+='<div class="gd-ai-coverage">'+esc(ins.coverage)+'</div>';
       if(more) h+='<div class="gd-ai-more" id="aiMore">'+more+'</div>';
+      // One control for the whole briefing, not per-paragraph: unlike the
+      // other four agents this card has no separate tabs/panes, so
+      // generated_at (the underlying snapshot's own version stamp -- see
+      // slot_checker_insights.fetch's cache-invalidation key) stands in for
+      // a run id, keeping one week's feedback from blending into the next.
+      if(window.agentFeedbackHtml) h+=window.agentFeedbackHtml({agentSlug:'42-north-dental-slot-checker',runId:d.generated_at,sectionKey:'ai-insights',sectionLabel:'AI Insights'});
       body.innerHTML=h;
       document.getElementById('aiMeta').textContent="This week's snapshot";
     }
