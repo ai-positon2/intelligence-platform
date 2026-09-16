@@ -1,58 +1,132 @@
 /* Shared thumbs up/down control, used across every Strategic Agent report
    (see static/js/agent_feedback.js). Built only from ds-tokens.css variables
    so it is theme-correct (light/dark) on every page that loads it without
-   its own media query. */
+   its own media query. Class names and DOM structure are dictated by the
+   widget's own HTML builder + click handler (and by tests/test_agent_feedback.py's
+   Node-driven behavioral suite) -- this file is visuals only, nothing here
+   changes what element receives a click. */
 
 .agent-fb{
-  display:flex;align-items:center;gap:var(--sp2);
-  margin-top:var(--sp4);padding:var(--sp2) var(--sp3);
-  border:1px solid var(--b1);border-radius:var(--radius-md);
-  background:var(--s1);
+  display:flex;align-items:center;gap:var(--sp3);
+  margin-top:var(--sp4);padding:var(--sp3) var(--sp4);
+  border:1px solid var(--b1);border-radius:var(--radius-lg);
+  background:linear-gradient(135deg, var(--s1), var(--s2));
   flex-wrap:wrap;
+  transition:border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
+}
+.agent-fb:hover{
+  border-color:var(--b2);
+  box-shadow:var(--shadow-sm);
 }
 .agent-fb-q{
-  font-size:var(--fs-xs);color:var(--tx3);
+  font-size:var(--fs-xs);color:var(--tx3);letter-spacing:var(--ls-label);
   margin-right:auto;
+  display:inline-flex;align-items:center;gap:6px;
 }
+.agent-fb-q::before{content:'✦';color:var(--accent2);font-size:11px;line-height:1;}
+
 .agent-fb-btn{
   appearance:none;border:1px solid var(--b1);background:var(--s2);
-  color:var(--tx2);border-radius:var(--radius-sm);
-  width:30px;height:26px;line-height:1;font-size:var(--fs-sm);
-  cursor:pointer;transition:background var(--dur) var(--ease),border-color var(--dur) var(--ease),
-    transform var(--dur-fast) var(--ease);
+  color:var(--tx2);border-radius:var(--radius-full);
+  width:34px;height:34px;line-height:1;font-size:15px;
+  display:inline-flex;align-items:center;justify-content:center;
+  cursor:pointer;
+  transition:background var(--dur) var(--ease),border-color var(--dur) var(--ease),
+    transform var(--dur-fast) var(--ease),box-shadow var(--dur) var(--ease),
+    opacity var(--dur) var(--ease),filter var(--dur) var(--ease);
 }
-.agent-fb-btn:hover{background:var(--s3);border-color:var(--b2);}
-.agent-fb-btn:active{transform:scale(0.92);}
+.agent-fb-btn:hover{
+  background:var(--s3);border-color:var(--b3);
+  transform:translateY(-2px) scale(1.06);
+}
+.agent-fb-btn:active{transform:scale(0.9);}
+
 .agent-fb-btn.agent-fb-up.active{
-  background:var(--green-d);border-color:var(--green);
+  background:linear-gradient(135deg, var(--green-d), rgba(45,212,170,.24));
+  border-color:var(--green);
+  box-shadow:0 0 0 3px var(--green-d);
+  animation:agentFbPop var(--dur-slow) var(--ease);
 }
 .agent-fb-btn.agent-fb-down.active{
-  background:var(--rose-d);border-color:var(--rose);
+  background:linear-gradient(135deg, var(--rose-d), rgba(251,113,133,.24));
+  border-color:var(--rose);
+  box-shadow:0 0 0 3px var(--rose-d);
+  animation:agentFbPop var(--dur-slow) var(--ease);
 }
+/* Once a side is picked, the road-not-taken recedes rather than staying at
+   full weight next to the winner -- a quieter tell than a bare highlight. */
+.agent-fb:has(.agent-fb-btn.active) .agent-fb-btn:not(.active){
+  opacity:.4;filter:grayscale(.5);
+}
+@keyframes agentFbPop{
+  0%{transform:scale(.7);}
+  55%{transform:scale(1.18);}
+  100%{transform:scale(1);}
+}
+
 .agent-fb-ack{
-  font-size:var(--fs-xs);color:var(--tx3);
+  font-size:var(--fs-xs);color:var(--tx2);
+  display:inline-flex;align-items:center;gap:5px;
+  animation:agentFbFadeIn var(--dur-slow) var(--ease);
 }
+.agent-fb-ack[hidden]{display:none;}
+.agent-fb-ack::before{content:'✓';color:var(--green);font-weight:700;}
+@keyframes agentFbFadeIn{
+  from{opacity:0;transform:translateY(-3px);}
+  to{opacity:1;transform:translateY(0);}
+}
+
 .agent-fb-reason{
   flex:1 1 100%;display:flex;gap:var(--sp2);align-items:flex-start;
-  margin-top:var(--sp2);
+  margin-top:var(--sp1);padding-top:var(--sp3);
+  border-top:1px dashed var(--b1);
+  animation:agentFbSlideDown var(--dur-slow) var(--ease);
+}
+/* An author rule that sets `display` on an element beats the UA's own
+   `[hidden]{display:none}` even at equal specificity, so without this the
+   reason box (and the ack line above) would stay visibly laid out --
+   full-width and taking real space -- the whole time, `hidden` attribute or
+   not. Caught by rendering the real widget in a browser, not by the Node
+   suite, which only checks the `hidden` property, never the computed style. */
+.agent-fb-reason[hidden]{display:none;}
+@keyframes agentFbSlideDown{
+  from{opacity:0;transform:translateY(-6px);}
+  to{opacity:1;transform:translateY(0);}
 }
 .agent-fb-reason-input{
-  flex:1 1 auto;min-width:180px;min-height:36px;max-height:120px;
+  flex:1 1 auto;min-width:180px;min-height:38px;max-height:120px;
   resize:vertical;font:inherit;font-size:var(--fs-xs);
   color:var(--tx);background:var(--s2);border:1px solid var(--b1);
   border-radius:var(--radius-sm);padding:var(--sp2) var(--sp3);
+  transition:border-color var(--dur) var(--ease),box-shadow var(--dur) var(--ease),background var(--dur) var(--ease);
 }
-.agent-fb-reason-input:focus{outline:none;border-color:var(--accent);}
+.agent-fb-reason-input::placeholder{color:var(--tx3);}
+.agent-fb-reason-input:focus{
+  outline:none;border-color:var(--accent);
+  box-shadow:0 0 0 3px var(--accent-d);
+  background:var(--s3);
+}
 .agent-fb-reason-send,.agent-fb-reason-skip{
   appearance:none;border:1px solid var(--b1);background:var(--s2);
   color:var(--tx2);border-radius:var(--radius-sm);
-  font-size:var(--fs-xs);padding:var(--sp2) var(--sp3);cursor:pointer;
+  font-size:var(--fs-xs);font-weight:600;padding:var(--sp2) var(--sp3);cursor:pointer;
   white-space:nowrap;
+  transition:background var(--dur) var(--ease),border-color var(--dur) var(--ease),
+    transform var(--dur-fast) var(--ease),box-shadow var(--dur) var(--ease),filter var(--dur) var(--ease);
 }
-.agent-fb-reason-send{background:var(--accent-d);border-color:var(--accent);color:var(--tx);}
-.agent-fb-reason-send:hover{background:var(--accent-g);}
-.agent-fb-reason-skip:hover{background:var(--s3);}
+.agent-fb-reason-send{
+  background:linear-gradient(135deg, var(--accent), var(--accent2));
+  border-color:var(--accent);color:#fff;
+}
+.agent-fb-reason-send:hover{filter:brightness(1.08);transform:translateY(-1px);box-shadow:0 4px 14px -4px var(--accent-g);}
+.agent-fb-reason-send:active{transform:translateY(0) scale(.97);}
+.agent-fb-reason-skip:hover{background:var(--s3);border-color:var(--b2);}
 
 /* Never printed: an opinion tap has no place on a page someone hands to a
    colleague or a client, and it is not part of the analysis itself. */
 @media print{ .agent-fb{ display:none !important; } }
+
+@media (prefers-reduced-motion: reduce){
+  .agent-fb-btn,.agent-fb-btn.agent-fb-up.active,.agent-fb-btn.agent-fb-down.active,
+  .agent-fb-ack,.agent-fb-reason,.agent-fb-reason-send{ animation:none !important; }
+}
