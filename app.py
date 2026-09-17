@@ -9802,6 +9802,78 @@ def event_conference_intelligence_export(run_id):
     return resp
 
 
+# ── Thought Leader Intelligence ──────────────────────────────────────────────
+# Phase 0 only, so far: identity resolution. Given a person's name (+ optional
+# company/title hint or a LinkedIn URL/X handle already known), resolve to ONE
+# real public figure before any later phase (owned-platform posts, sentiment,
+# earned media, synthesis) spends a single call researching them. See
+# tracker/thought_leader_pr.py's module docstring for why this is refused
+# rather than guessed at low confidence, same discipline as
+# event_intel_resolve.resolve_event. /resolve is the only billed step (a
+# claude_websearch call), so -- same rule Contact Finder and Event & Conference
+# Intelligence both arrived at -- it only ever runs on an explicit user action,
+# never on page load.
+
+@app.route("/p2/strategic-agents/thought-leader-pr")
+@position2_required
+def thought_leader_pr():
+    from tracker import thought_leader_pr as tlpr
+    user = _get_user() or {}
+    email = (user.get("email") or "").lower()
+    return render_template("thought_leader_pr.html", user=user,
+                          runs=tlpr.list_runs(email))
+
+
+@app.route("/p2/strategic-agents/thought-leader-pr/resolve", methods=["POST"])
+@position2_required
+def thought_leader_pr_resolve():
+    from tracker import thought_leader_pr as tlpr
+    user = _get_user() or {}
+    email = (user.get("email") or "").lower()
+    body = request.get_json(silent=True) or {}
+    name = (body.get("name") or "").strip()
+    if not name:
+        return jsonify({"ok": False, "error": "A name is required."}), 400
+
+    company_hint = (body.get("company_hint") or "").strip() or None
+    title_hint = (body.get("title_hint") or "").strip() or None
+    linkedin_url = (body.get("linkedin_url") or "").strip() or None
+    x_handle = (body.get("x_handle") or "").strip().lstrip("@") or None
+
+    run_id = tlpr.create_run(email=email, input_name=name, company_hint=company_hint,
+                             title_hint=title_hint, linkedin_url_hint=linkedin_url,
+                             x_handle_hint=x_handle)
+    result = tlpr.resolve_identity(name, company_hint=company_hint, title_hint=title_hint,
+                                   linkedin_url=linkedin_url, x_handle=x_handle)
+    if run_id:
+        tlpr.save_result(run_id, email, result)
+    return jsonify({"run_id": run_id, **result})
+
+
+@app.route("/p2/strategic-agents/thought-leader-pr/runs/<int:run_id>/confirm", methods=["POST"])
+@position2_required
+def thought_leader_pr_confirm(run_id):
+    from tracker import thought_leader_pr as tlpr
+    user = _get_user() or {}
+    email = (user.get("email") or "").lower()
+    ok = tlpr.confirm_run(run_id, email)
+    if not ok:
+        return jsonify({"ok": False, "error": "Run not found or not awaiting confirmation."}), 404
+    return jsonify({"ok": True})
+
+
+@app.route("/p2/strategic-agents/thought-leader-pr/runs/<int:run_id>")
+@position2_required
+def thought_leader_pr_run(run_id):
+    from tracker import thought_leader_pr as tlpr
+    user = _get_user() or {}
+    email = (user.get("email") or "").lower()
+    run = tlpr.get_run(run_id, email)
+    if not run:
+        return jsonify({"error": "Not found"}), 404
+    return jsonify(run)
+
+
 # ── Contact Finder ────────────────────────────────────────────────────────────
 # Internal, staff-only Apollo search + chat agent: filter/browse companies and
 # people live against Apollo (search_people is free; search_companies and any

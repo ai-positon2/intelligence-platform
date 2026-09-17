@@ -312,6 +312,31 @@ def get_company(identifier: str, account_id: str) -> tuple[dict | None, dict | N
     return data, None
 
 
+def get_user_profile(identifier: str, account_id: str) -> tuple[dict | None, dict | None]:
+    """A person's LinkedIn profile by public identifier ("satyanadella" from
+    linkedin.com/in/satyanadella/, per Unipile's own docs -- the last path
+    segment, not the full URL), fetched through `account_id`'s connected
+    session. Mirrors get_company() for an individual.
+
+    This is how a person's LinkedIn URL becomes the numeric-ish provider_id
+    list_posts(..., is_company=False) needs, exactly as get_company turns a
+    company's vanity slug into the id its own posts call requires.
+
+    UNLIKE get_company and list_posts, this route is documented (GET
+    /users/{provider_public_id}, developer.unipile.com/docs/retrieving-users)
+    but has not yet been confirmed against a live response the way those two
+    were on 2026-09-01 -- treat its response shape as likely-correct, not
+    verified, until a real call against a connected workspace confirms it."""
+    data, err = _request("GET", f"{_API}/users/{identifier}",
+                         params={"account_id": account_id})
+    if err is not None:
+        return None, err
+    if not _is_dict(data) or not data.get("provider_id"):
+        return None, _err(ERR_SHAPE, "HTTP 200 but no provider_id in response. Keys: %s" %
+                          (sorted(data.keys())[:12] if _is_dict(data) else type(data).__name__))
+    return data, None
+
+
 def list_posts(account_id: str, identifier: str, is_company: bool = True,
                cursor: str | None = None, limit: int = 50) -> tuple[dict | None, dict | None]:
     """Recent posts for `identifier`, fetched through `account_id`'s

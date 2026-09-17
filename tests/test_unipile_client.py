@@ -330,6 +330,27 @@ def test_an_unreachable_profile_is_explained_as_such_not_as_a_server_error():
     assert "identifier" in uc.describe_error(uc._err(uc.ERR_HTTP, "", status=422))
 
 
+def test_get_user_profile_turns_a_public_identifier_into_a_provider_id(monkeypatch):
+    """Mirrors get_company's own test: a person's vanity slug in, their
+    provider_id out -- the id list_posts(..., is_company=False) needs."""
+    monkeypatch.setenv("UNIPILE_API_KEY", "k")
+    body = json.dumps({"object": "UserProfile", "provider_id": "urn:li:member:123",
+                       "public_identifier": "satyanadella", "headline": "Chairman and CEO at Microsoft"})
+    monkeypatch.setattr(uc.requests, "request", _request_returning(_FakeResp(200, body)))
+    profile, err = uc.get_user_profile("satyanadella", "acct-1")
+    assert err is None
+    assert profile["provider_id"] == "urn:li:member:123"
+    assert profile["headline"] == "Chairman and CEO at Microsoft"
+
+
+def test_get_user_profile_reports_a_shape_error_rather_than_a_profile_with_no_id(monkeypatch):
+    monkeypatch.setenv("UNIPILE_API_KEY", "k")
+    monkeypatch.setattr(uc.requests, "request",
+                        _request_returning(_FakeResp(200, json.dumps({"headline": "no id here"}))))
+    profile, err = uc.get_user_profile("satyanadella", "acct-1")
+    assert profile is None and err["kind"] == uc.ERR_SHAPE
+
+
 def test_list_posts_never_asks_for_more_than_the_vendor_s_page_cap(monkeypatch):
     monkeypatch.setenv("UNIPILE_API_KEY", "k")
     req = _request_returning(_FakeResp(200, json.dumps({"items": []})))

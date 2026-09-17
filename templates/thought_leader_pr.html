@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Thought Leader Intelligence, Platform</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=4">
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-tokens.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-components.css') }}">
+  <script src="/static/js/theme.js"></script>
+  <link rel="stylesheet" href="/static/css/thought_leader_pr.css?v=1">
+  <link rel="stylesheet" href="/static/css/aurora-app.css?v=3">
+</head>
+<body>
+  <div class="bg-grid"></div>
+
+  <div class="topbar">
+    <div class="tl">
+      <a href="/p2/hub" class="brand">
+        <div class="brand-icon" style="background:#151b2e;box-shadow:none;border-radius:var(--radius-md);overflow:hidden;display:inline-flex;align-items:center;justify-content:center;padding:5px 8px;width:auto;height:auto"><img src="/static/logo-lockup.svg?v=1" alt="arena by Position2" style="display:block;width:auto;height:36px;object-fit:contain"></div>
+      </a>
+      <div class="bc">
+        <a href="/p2/hub">Hub</a><span class="bc-sep">›</span>
+        <a href="/p2/strategic-agents">Strategic Agents</a><span class="bc-sep">›</span>
+        <span class="bc-cur">Thought Leader Intelligence</span>
+      </div>
+    </div>
+    <div class="user-menu" id="userMenu">
+      <div class="user-pill" id="userPill" onclick="toggleMenu()">
+        <div class="user-avatar">
+          {% if user.picture %}<img src="{{ user.picture }}" alt="" />
+          {% else %}{{ (user.name or 'U')[:2]|upper }}{% endif %}
+        </div>
+        <span class="user-name">{{ user.given_name or user.name or 'User' }}</span>
+        <span class="pill-chevron">▼</span>
+      </div>
+      <div class="user-dropdown" id="userDropdown">
+        <div class="dd-header">
+          <div class="dd-name">{{ user.name or 'User' }}</div>
+          <div class="dd-email">{{ user.email }}</div>
+        </div>
+        <div class="dd-items">{% include "_admin_menu.html" %}</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="tlpr-hero">
+      <div class="au-eyebrow"><span class="d"></span>Strategic Agents · Reputation &amp; PR Intelligence</div>
+      <h1>Know their <em>reputation</em> before you're in the room.</h1>
+      <p>Name a thought leader. Confirm who they are, then see what they post, how the room reacts, and what the press already says.</p>
+    </div>
+
+    <div class="tlpr-search-card">
+      <div class="tlpr-search-row">
+        <div class="tlpr-input-wrap">
+          <svg class="tlpr-input-ic" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-3.4-3.4"/></svg>
+          <input id="tlprName" type="text" placeholder="e.g. Satya Nadella" autocomplete="off" maxlength="120">
+        </div>
+        <button type="button" id="tlprResolveBtn" class="tlpr-resolve-btn">
+          <svg class="tlpr-ic-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-3.4-3.4"/></svg>
+          <svg class="tlpr-spin" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" stroke-dasharray="42" stroke-dashoffset="14" fill="none" stroke-width="2.4"/></svg>
+          <span>Resolve identity</span>
+        </button>
+      </div>
+      <button type="button" id="tlprRefineToggle" class="tlpr-refine-toggle">
+        <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+        <span>Add company, title, or a LinkedIn URL to skip ambiguity</span>
+      </button>
+      <div class="tlpr-refine-row" id="tlprRefineRow" hidden>
+        <input id="tlprCompany" placeholder="Company (optional)" maxlength="120">
+        <input id="tlprTitle" placeholder="Title (optional)" maxlength="120">
+        <input id="tlprLinkedin" placeholder="LinkedIn URL (optional)" maxlength="300">
+        <input id="tlprX" placeholder="X / Twitter handle (optional)" maxlength="60">
+      </div>
+    </div>
+
+    <div class="tlpr-loading" id="tlprLoading" hidden>
+      <div class="tlpr-skel-avatar"></div>
+      <div class="tlpr-skel-lines">
+        <div class="tlpr-skel-line w60"></div>
+        <div class="tlpr-skel-line w40"></div>
+        <div class="tlpr-skel-line w80"></div>
+      </div>
+      <div class="tlpr-loading-label" id="tlprLoadingLabel">Searching Apollo, LinkedIn and the web…</div>
+    </div>
+
+    <div class="tlpr-result" id="tlprResult"></div>
+
+    <div class="tlpr-history">
+      <div class="tlpr-history-head">Recent lookups</div>
+      <div class="tlpr-history-list" id="tlprHistoryList"></div>
+    </div>
+  </div>
+
+  <script>
+    const RUNS = {{ runs|tojson }};
+
+    function esc(s){
+      return String(s == null ? '' : s).replace(/[&<>"']/g, c => (
+        {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    }
+    function initials(name){
+      const parts = (name || '').trim().split(/\s+/).filter(Boolean);
+      if (!parts.length) return '?';
+      return (parts[0][0] + (parts[1] ? parts[1][0] : '')).toUpperCase();
+    }
+    function confLabel(c){
+      return {high: 'High match', medium: 'Medium match', low: 'Low match', none: 'No match'}[c] || 'Unknown';
+    }
+
+    const ICON_LINKEDIN = '<svg viewBox="0 0 24 24"><path d="M6.94 8.5H3.56V20h3.38V8.5ZM5.25 3a1.94 1.94 0 1 0 0 3.88A1.94 1.94 0 0 0 5.25 3ZM20.44 20h-3.37v-5.6c0-1.34-.03-3.06-1.87-3.06-1.87 0-2.16 1.46-2.16 2.96V20H9.68V8.5h3.24v1.57h.05c.45-.86 1.56-1.77 3.21-1.77 3.43 0 4.26 2.26 4.26 5.2V20Z"/></svg>';
+    const ICON_X = '<svg viewBox="0 0 24 24"><path d="m14.2 10.24 6.87-7.99h-1.63l-5.97 6.94-4.76-6.94H2.4l7.2 10.49-7.2 8.37h1.63l6.3-7.32 5.03 7.32h6.31l-7.47-10.87Zm-2.23 2.6-.73-1.04L5.4 3.5h2.5l4.7 6.72.73 1.04 6.11 8.74h-2.5l-4.97-7.16Z"/></svg>';
+    const ICON_YT = '<svg viewBox="0 0 24 24"><path d="M8 6.5v11l10-5.5-10-5.5Z"/></svg>';
+
+    function platformChip(kind, label, icon, on, url){
+      const inner = `<span class="tlpr-chip-ic">${icon}</span><span>${esc(label)}</span>`;
+      if (on && url) return `<a class="tlpr-chip is-on" href="${esc(url)}" target="_blank" rel="noopener">${inner}</a>`;
+      if (on) return `<span class="tlpr-chip is-on">${inner}</span>`;
+      return `<span class="tlpr-chip is-off">${inner}</span>`;
+    }
+
+    function identityCardHtml(identity, runId, confirmed){
+      const p = identity.platforms || {};
+      const li = p.linkedin || {}, x = p.x || {}, yt = p.youtube || {};
+      const avatarInner = identity.photo_url
+        ? `<img src="${esc(identity.photo_url)}" alt="">`
+        : esc(initials(identity.full_name));
+      const subtitle = [identity.current_title, identity.current_company].filter(Boolean).join(' at ');
+      const facts = (identity.disambiguating_facts || []);
+      const factsHtml = facts.length
+        ? `<div class="tlpr-facts">
+             <div class="tlpr-facts-label"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg>Why we think this is the right person</div>
+             <ul>${facts.map(f => `<li>${esc(f)}</li>`).join('')}</ul>
+             ${identity.reasoning ? `<div class="tlpr-reasoning">${esc(identity.reasoning)}</div>` : ''}
+           </div>`
+        : '';
+      const confirmBtn = confirmed
+        ? `<button type="button" class="tlpr-btn-confirm is-done" disabled>
+             <svg viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg> Confirmed</button>`
+        : `<button type="button" class="tlpr-btn-confirm" id="tlprConfirmBtn" data-run-id="${runId || ''}">
+             <svg viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg> This is them — continue</button>`;
+      return `
+        <div class="tlpr-card tlpr-card--identity">
+          <div class="tlpr-identity-top">
+            <div class="tlpr-avatar">${avatarInner}</div>
+            <div class="tlpr-identity-info">
+              <div class="tlpr-name-row">
+                <h2>${esc(identity.full_name)}</h2>
+                <span class="tlpr-conf-pill conf-${esc(identity.confidence)}">${esc(confLabel(identity.confidence))}</span>
+              </div>
+              <div class="tlpr-headline">${esc(identity.headline || subtitle || 'No headline found')}</div>
+            </div>
+          </div>
+          <div class="tlpr-platforms">
+            ${platformChip('linkedin', li.resolved ? 'LinkedIn · Verified' : 'LinkedIn · Not found', ICON_LINKEDIN, !!li.url, li.url)}
+            ${platformChip('x', x.resolved ? ('X · @' + x.handle) : 'X · Not found', ICON_X, !!x.resolved, x.url)}
+            ${platformChip('youtube', yt.resolved ? 'YouTube · Found' : 'YouTube · Not found', ICON_YT, !!yt.resolved, yt.url)}
+          </div>
+          ${factsHtml}
+          <div class="tlpr-actions">
+            ${confirmBtn}
+            <button type="button" class="tlpr-btn-secondary" id="tlprNotThemBtn">Not them — refine search</button>
+            <div class="tlpr-confirm-note">Confirming saves this identity for the research phases coming next — nothing further runs yet.</div>
+          </div>
+        </div>`;
+    }
+
+    function emptyCardHtml(reasoning, confidence){
+      const isLow = confidence === 'low';
+      return `
+        <div class="tlpr-card tlpr-card--empty">
+          <svg class="tlpr-empty-ic" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-3.4-3.4"/><path d="M8 11h6"/></svg>
+          <h3>${isLow ? "Couldn't narrow this to one person" : "No public figure found"}</h3>
+          <p>${esc(reasoning || 'Try adding a company, title, or a LinkedIn URL to help disambiguate.')}</p>
+        </div>`;
+    }
+
+    function errorCardHtml(message){
+      return `
+        <div class="tlpr-card tlpr-card--empty">
+          <svg class="tlpr-empty-ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg>
+          <h3>The lookup didn't complete</h3>
+          <p>${esc(message)}</p>
+        </div>`;
+    }
+
+    function setBusy(busy, label){
+      const btn = document.getElementById('tlprResolveBtn');
+      btn.classList.toggle('is-busy', busy);
+      btn.disabled = busy;
+      document.getElementById('tlprLoading').hidden = !busy;
+      if (label) document.getElementById('tlprLoadingLabel').textContent = label;
+    }
+
+    function renderResult(payload){
+      // payload.reasoning is always the reader-facing text (resolve_identity
+      // never returns a raw vendor error there) -- error vs. empty only
+      // changes which card shell wraps it.
+      const el = document.getElementById('tlprResult');
+      if (payload.ok && payload.identity){
+        el.innerHTML = identityCardHtml(payload.identity, payload.run_id, false);
+      } else if (payload.error) {
+        el.innerHTML = errorCardHtml(payload.reasoning || 'Please try again.');
+      } else {
+        el.innerHTML = emptyCardHtml(payload.reasoning, payload.confidence);
+      }
+    }
+
+    async function resolveIdentity(){
+      const name = document.getElementById('tlprName').value.trim();
+      if (!name) { document.getElementById('tlprName').focus(); return; }
+      setBusy(true, 'Searching Apollo, LinkedIn and the web…');
+      document.getElementById('tlprResult').innerHTML = '';
+      try {
+        const res = await fetch('/p2/strategic-agents/thought-leader-pr/resolve', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({
+            name,
+            company_hint: document.getElementById('tlprCompany').value.trim(),
+            title_hint: document.getElementById('tlprTitle').value.trim(),
+            linkedin_url: document.getElementById('tlprLinkedin').value.trim(),
+            x_handle: document.getElementById('tlprX').value.trim(),
+          })
+        });
+        const payload = await res.json();
+        renderResult(payload);
+        if (payload.run_id) prependHistory(payload);
+      } catch (e) {
+        renderResult({ok:false, error:{detail:''}, reasoning:'A network error interrupted the lookup.'});
+      } finally {
+        setBusy(false);
+      }
+    }
+
+    function prependHistory(payload){
+      RUNS.unshift({
+        id: payload.run_id, input_name: (payload.identity && payload.identity.full_name)
+          || document.getElementById('tlprName').value.trim(),
+        status: payload.ok ? 'needs_review' : 'failed',
+        identity: payload.identity || null,
+      });
+      renderHistory();
+    }
+
+    function statusLabel(status){
+      return {resolving: 'Resolving…', needs_review: 'Awaiting confirmation',
+              confirmed: 'Confirmed', failed: 'Not found'}[status] || status;
+    }
+
+    function renderHistory(){
+      const list = document.getElementById('tlprHistoryList');
+      if (!RUNS.length){
+        list.innerHTML = '<div class="tlpr-history-empty">No lookups yet — search a name above to get started.</div>';
+        return;
+      }
+      list.innerHTML = RUNS.map(r => {
+        const identity = r.identity || {};
+        const avatar = identity.photo_url
+          ? `<img src="${esc(identity.photo_url)}" alt="">`
+          : esc(initials(r.input_name));
+        return `<div class="tlpr-history-row" data-run-id="${r.id}" tabindex="0">
+                  <div class="tlpr-history-avatar">${avatar}</div>
+                  <div class="tlpr-history-name">${esc(r.input_name)}</div>
+                  <div class="tlpr-history-status">${esc(statusLabel(r.status))}</div>
+                </div>`;
+      }).join('');
+    }
+
+    async function openHistoryRun(runId){
+      setBusy(true, 'Loading…');
+      document.getElementById('tlprResult').innerHTML = '';
+      try {
+        const res = await fetch(`/p2/strategic-agents/thought-leader-pr/runs/${runId}`);
+        const run = await res.json();
+        if (run.identity){
+          document.getElementById('tlprResult').innerHTML =
+            identityCardHtml(run.identity, run.id, run.status === 'confirmed');
+        } else {
+          renderResult({ok:false, reasoning: run.reasoning || 'This lookup did not resolve to a person.'});
+        }
+      } finally {
+        setBusy(false);
+      }
+    }
+
+    document.getElementById('tlprResolveBtn').addEventListener('click', resolveIdentity);
+    document.getElementById('tlprName').addEventListener('keydown', e => {
+      if (e.key === 'Enter') resolveIdentity();
+    });
+    document.getElementById('tlprRefineToggle').addEventListener('click', function(){
+      const row = document.getElementById('tlprRefineRow');
+      row.hidden = !row.hidden;
+      this.classList.toggle('is-open', !row.hidden);
+    });
+
+    document.addEventListener('click', async (e) => {
+      const confirmBtn = e.target.closest('#tlprConfirmBtn');
+      if (confirmBtn){
+        const runId = confirmBtn.dataset.runId;
+        if (!runId) return;
+        confirmBtn.disabled = true;
+        try {
+          const res = await fetch(`/p2/strategic-agents/thought-leader-pr/runs/${runId}/confirm`, {method:'POST'});
+          const out = await res.json();
+          if (out.ok){
+            confirmBtn.classList.add('is-done');
+            confirmBtn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg> Confirmed';
+            const row = RUNS.find(r => String(r.id) === String(runId));
+            if (row) row.status = 'confirmed';
+            renderHistory();
+          } else {
+            confirmBtn.disabled = false;
+          }
+        } catch (e) { confirmBtn.disabled = false; }
+        return;
+      }
+      const notThemBtn = e.target.closest('#tlprNotThemBtn');
+      if (notThemBtn){
+        document.getElementById('tlprResult').innerHTML = '';
+        const row = document.getElementById('tlprRefineRow');
+        row.hidden = false;
+        document.getElementById('tlprRefineToggle').classList.add('is-open');
+        document.getElementById('tlprLinkedin').focus();
+        window.scrollTo({top: 0, behavior: 'smooth'});
+        return;
+      }
+      const historyRow = e.target.closest('.tlpr-history-row');
+      if (historyRow){
+        openHistoryRun(historyRow.dataset.runId);
+        window.scrollTo({top: 0, behavior: 'smooth'});
+        return;
+      }
+    });
+    document.addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter' && e.key !== ' ') return;
+      const row = e.target.closest && e.target.closest('.tlpr-history-row');
+      if (row){ e.preventDefault(); openHistoryRun(row.dataset.runId); }
+    });
+
+    renderHistory();
+
+    /* 'open', not 'on': the stylesheet's .user-dropdown.open is what reveals
+       it, and the two must agree or the menu never opens. */
+    function toggleMenu(){
+      const pill = document.getElementById('userPill'), dd = document.getElementById('userDropdown');
+      pill.classList.toggle('open', !dd.classList.contains('open'));
+      dd.classList.toggle('open');
+    }
+    function closeUserMenu(){
+      document.getElementById('userPill').classList.remove('open');
+      document.getElementById('userDropdown').classList.remove('open');
+    }
+    document.addEventListener('click', (e) => {
+      const m = document.getElementById('userMenu');
+      if (m && !m.contains(e.target)) closeUserMenu();
+    });
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') closeUserMenu();
+    });
+  </script>
+
+  <script>(function(){if(window.__trk)return;window.__trk=1;var _s=Date.now(),_d=false;function f(){if(_d)return;_d=true;var s=Math.round((Date.now()-_s)/1000);fetch('/api/track',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({page:location.pathname,title:'Thought Leader Intelligence',seconds:s,email:{{ (user.email if user else "")|tojson }}}),keepalive:true}).catch(function(){});}document.addEventListener('visibilitychange',function(){if(document.visibilityState==='hidden')f();});window.addEventListener('beforeunload',f);})();</script>
+</body>
+</html>
