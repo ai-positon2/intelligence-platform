@@ -35,19 +35,25 @@ import logging
 import os
 from urllib.parse import urlparse
 
-from tracker import apollo_client, claude_websearch, sci_youtube_client, unipile_client, unipile_transport
+from datetime import datetime, timedelta, timezone
+
+from tracker import (apify_transport, apollo_client, claude_websearch, sci_source_linkedin_unipile,
+                     sci_source_x, sci_youtube_client, unipile_client, unipile_transport)
 
 logger = logging.getLogger(__name__)
 
 _TABLES_READY = False
 
 # Mirrors sci_store.py's STALE_RUN_MINUTES: this app runs on Railway with no
-# persistent worker queue, so a background thread that died mid-resolve
-# leaves a "resolving" row behind forever unless something else says how old
-# is too old to still be someone waiting on it.
+# persistent worker queue, so a background thread that died mid-resolve (or
+# mid-collect, once Phase 1's own thread is running) leaves a "resolving" or
+# "collecting" row behind forever unless something else says how old is too
+# old to still be someone waiting on it.
 STALE_RUN_MINUTES = 10
 
 STATUSES = ("resolving", "needs_review", "confirmed", "failed")
+POSTS_STATUSES = ("idle", "collecting", "ready", "failed")
+_STALE_POSTS_ERROR = "The collection stalled and did not finish -- try collecting again."
 
 
 # ───────────────────────── Postgres store ─────────────────────────
@@ -89,6 +95,10 @@ def _ensure_tables(conn) -> None:
                 reasoning TEXT,
                 identity JSONB,
                 error TEXT,
+                posts_status TEXT NOT NULL DEFAULT 'idle',
+                posts JSONB,
+                posts_errors JSONB,
+                posts_updated_at TIMESTAMPTZ,
                 created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
                 updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
             )
@@ -97,6 +107,15 @@ def _ensure_tables(conn) -> None:
             CREATE INDEX IF NOT EXISTS idx_tlpr_runs_email_created
             ON thought_leader_pr_runs (email, created_at DESC)
         """)
+        # Added for Phase 1 (owned-platform posts) after the table shipped
+        # with Phase 0 only -- see sci_store.py's own company_logo/
+        # reddit_pulse columns for the same "already in CREATE TABLE above,
+        # ALSO added here" pattern, so this is correct whether Railway
+        # already created the Phase-0-only table or not.
+        cur.execute("ALTER TABLE thought_leader_pr_runs ADD COLUMN IF NOT EXISTS posts_status TEXT NOT NULL DEFAULT 'idle'")
+        cur.execute("ALTER TABLE thought_leader_pr_runs ADD COLUMN IF NOT EXISTS posts JSONB")
+        cur.execute("ALTER TABLE thought_leader_pr_runs ADD COLUMN IF NOT EXISTS posts_errors JSONB")
+        cur.execute("ALTER TABLE thought_leader_pr_runs ADD COLUMN IF NOT EXISTS posts_updated_at TIMESTAMPTZ")
     conn.commit()
     _TABLES_READY = True
 
@@ -190,6 +209,11 @@ def confirm_run(run_id: int, email: str) -> bool:
         conn.close()
 
 
+_RUN_COLUMNS = ("id, input_name, company_hint, title_hint, status, confidence, "
+               "reasoning, identity, error, posts_status, posts, posts_errors, "
+               "posts_updated_at, created_at, updated_at")
+
+
 def get_run(run_id: int, email: str) -> dict | None:
     conn = _pg_conn()
     if not conn:
@@ -197,15 +221,14 @@ def get_run(run_id: int, email: str) -> dict | None:
     try:
         _ensure_tables(conn)
         with conn.cursor() as cur:
-            cur.execute("""
-                SELECT id, input_name, company_hint, title_hint, status, confidence,
-                       reasoning, identity, error, created_at, updated_at
+            cur.execute(f"""
+                SELECT {_RUN_COLUMNS}
                 FROM thought_leader_pr_runs WHERE id = %s AND email = %s
             """, (run_id, email))
             row = cur.fetchone()
             if not row:
                 return None
-            return _row_to_dict(row)
+            return _resolve_stale_posts(_row_to_dict(row), email)
     except Exception as e:
         logger.warning("thought_leader_pr: get_run failed for run %s: %s", run_id, e)
         return None
@@ -220,13 +243,12 @@ def list_runs(email: str, limit: int = 25) -> list[dict]:
     try:
         _ensure_tables(conn)
         with conn.cursor() as cur:
-            cur.execute("""
-                SELECT id, input_name, company_hint, title_hint, status, confidence,
-                       reasoning, identity, error, created_at, updated_at
+            cur.execute(f"""
+                SELECT {_RUN_COLUMNS}
                 FROM thought_leader_pr_runs WHERE email = %s
                 ORDER BY created_at DESC LIMIT %s
             """, (email, limit))
-            return [_row_to_dict(row) for row in cur.fetchall()]
+            return [_resolve_stale_posts(_row_to_dict(row), email) for row in cur.fetchall()]
     except Exception as e:
         logger.warning("thought_leader_pr: list_runs failed: %s", e)
         return []
@@ -236,14 +258,117 @@ def list_runs(email: str, limit: int = 25) -> list[dict]:
 
 def _row_to_dict(row) -> dict:
     (rid, input_name, company_hint, title_hint, status, confidence, reasoning,
-     identity, error, created_at, updated_at) = row
+     identity, error, posts_status, posts, posts_errors, posts_updated_at,
+     created_at, updated_at) = row
     return {
         "id": rid, "input_name": input_name, "company_hint": company_hint,
         "title_hint": title_hint, "status": status, "confidence": confidence,
         "reasoning": reasoning, "identity": identity, "error": error,
+        "posts_status": posts_status or "idle", "posts": posts, "posts_errors": posts_errors,
+        "posts_updated_at": posts_updated_at.isoformat() if posts_updated_at else None,
         "created_at": created_at.isoformat() if created_at else None,
         "updated_at": updated_at.isoformat() if updated_at else None,
     }
+
+
+def _resolve_stale_posts(run: dict, email: str) -> dict:
+    """A 'collecting' row gone quiet for STALE_RUN_MINUTES is a daemon thread
+    a process restart killed with nothing left to ever mark it 'ready' or
+    'failed' -- same fix, same place, as sci_store.resolve_stale_run: on
+    read, not via a sweep this app has no worker infrastructure to run."""
+    if run.get("posts_status") != "collecting":
+        return run
+    updated_at = run.get("updated_at")
+    if not updated_at:
+        return run
+    last = datetime.fromisoformat(updated_at)
+    if last >= datetime.now(timezone.utc) - timedelta(minutes=STALE_RUN_MINUTES):
+        return run
+    if save_posts_failed(run["id"], email, _STALE_POSTS_ERROR):
+        run = dict(run, posts_status="failed", posts_errors={"_run": _STALE_POSTS_ERROR})
+    return run
+
+
+def start_collecting(run_id: int, email: str) -> bool:
+    """Flip posts_status to 'collecting' before the background thread
+    starts, so a poll immediately after the /collect request returns sees
+    the real in-progress state rather than a stale 'idle'."""
+    conn = _pg_conn()
+    if not conn:
+        return False
+    try:
+        _ensure_tables(conn)
+        with conn.cursor() as cur:
+            cur.execute("""
+                UPDATE thought_leader_pr_runs
+                SET posts_status = 'collecting', posts_errors = NULL, updated_at = now()
+                WHERE id = %s AND email = %s AND status = 'confirmed'
+            """, (run_id, email))
+            updated = cur.rowcount > 0
+        conn.commit()
+        return updated
+    except Exception as e:
+        logger.warning("thought_leader_pr: start_collecting failed for run %s: %s", run_id, e)
+        return False
+    finally:
+        conn.close()
+
+
+def save_posts(run_id: int, email: str, posts: dict, errors: dict) -> bool:
+    """posts_status becomes 'ready' even when every platform failed --
+    per-platform failure is recorded in `errors`, not a top-level run
+    failure. A partial result across 3 independent platforms is not the
+    same defect class as the collection job itself crashing (see
+    save_posts_failed); conflating them would hide which platforms actually
+    worked behind one blanket 'failed' the moment any single one didn't."""
+    conn = _pg_conn()
+    if not conn:
+        return False
+    import json
+    try:
+        _ensure_tables(conn)
+        with conn.cursor() as cur:
+            cur.execute("""
+                UPDATE thought_leader_pr_runs
+                SET posts_status = 'ready', posts = %s, posts_errors = %s,
+                    posts_updated_at = now(), updated_at = now()
+                WHERE id = %s AND email = %s
+            """, (json.dumps(posts), json.dumps(errors) if errors else None, run_id, email))
+            updated = cur.rowcount > 0
+        conn.commit()
+        return updated
+    except Exception as e:
+        logger.warning("thought_leader_pr: save_posts failed for run %s: %s", run_id, e)
+        return False
+    finally:
+        conn.close()
+
+
+def save_posts_failed(run_id: int, email: str, message: str) -> bool:
+    """The collection job itself crashed (an unexpected exception, or a
+    staleness timeout) -- distinct from save_posts, which always means the
+    job ran to completion, however partial the result."""
+    conn = _pg_conn()
+    if not conn:
+        return False
+    import json
+    try:
+        _ensure_tables(conn)
+        with conn.cursor() as cur:
+            cur.execute("""
+                UPDATE thought_leader_pr_runs
+                SET posts_status = 'failed', posts_errors = %s, posts_updated_at = now(),
+                    updated_at = now()
+                WHERE id = %s AND email = %s
+            """, (json.dumps({"_run": message}), run_id, email))
+            updated = cur.rowcount > 0
+        conn.commit()
+        return updated
+    except Exception as e:
+        logger.warning("thought_leader_pr: save_posts_failed failed for run %s: %s", run_id, e)
+        return False
+    finally:
+        conn.close()
 
 
 # ───────────────────────── Identity resolution ─────────────────────────
@@ -369,7 +494,7 @@ def _resolve_youtube_platform(name: str) -> dict:
     underlying lookup (an authoritative forHandle try, then a
     title-plausibility-checked search) has nothing company-specific about
     it -- only its docstring does."""
-    out = {"url": None, "title": None, "resolved": False, "note": None}
+    out = {"url": None, "title": None, "channel_id": None, "resolved": False, "note": None}
     api_key = os.environ.get("YOUTUBE_API_KEY", "")
     if not api_key:
         out["note"] = "YouTube is not configured on this deployment."
@@ -383,6 +508,7 @@ def _resolve_youtube_platform(name: str) -> dict:
         out["note"] = "No YouTube channel confidently matched this name."
         return out
     out["resolved"] = True
+    out["channel_id"] = channel.get("channel_id")
     out["url"] = channel.get("profile_url")
     out["title"] = channel.get("title")
     return out
@@ -501,3 +627,110 @@ def resolve_identity(name: str, *, company_hint: str | None = None,
     }
     return {"ok": True, "confidence": confidence, "reasoning": reasoning,
             "identity": identity, "spend": spend, "error": None}
+
+
+# ───────────────────────── Phase 1: owned-platform posts ─────────────────────────
+#
+# Collects each platform independently and never lets one's failure block the
+# others -- the same fault isolation Social Media Intelligence's own
+# per-platform collectors rely on (tracker/sci_pipeline.py). A platform with
+# nothing to show is recorded in `errors`, never silently merged into the
+# empty-but-succeeded case: "no posts because there is no connected LinkedIn
+# account" and "no posts because this person genuinely doesn't post there"
+# are different facts a reader needs told apart.
+#
+# Reuses each platform's existing, already-tested SCI adapter rather than
+# writing a fourth copy of "call a vendor, normalize the response": LinkedIn
+# via unipile_transport.fetch_posts + sci_source_linkedin_unipile.normalize
+# (is_company=False is the one branch nothing in SCI itself ever exercises),
+# X via tracker/sci_source_x.py's collect() unmodified (it is already
+# handle-agnostic -- see this feature's own plan file), and YouTube via
+# sci_youtube_client.list_recent_videos, which already returns the exact
+# same shared post shape as the other two.
+
+MAX_POSTS_PER_PLATFORM = 20
+
+
+def _collect_linkedin_posts(platform: dict, max_posts: int) -> tuple[list[dict], str | None]:
+    provider_id = (platform or {}).get("provider_id")
+    if not provider_id:
+        return [], "No verified LinkedIn profile to collect posts from."
+    account_id = unipile_transport.account_for_platform("linkedin")
+    if not account_id:
+        return [], "No connected LinkedIn account is available to collect posts."
+    try:
+        raw = unipile_transport.fetch_posts(provider_id, "linkedin", is_company=False,
+                                            max_posts=max_posts, strict=True, account_id=account_id)
+    except unipile_transport.UnipileTransportError as e:
+        return [], str(e)
+    return sci_source_linkedin_unipile.normalize(raw), None
+
+
+def _collect_x_posts(platform: dict, max_posts: int) -> tuple[list[dict], str | None]:
+    handle = (platform or {}).get("handle")
+    if not handle:
+        return [], "No X handle to collect posts from."
+    token = os.environ.get("APIFY_API_TOKEN", "")
+    if not token:
+        return [], "Apify is not configured on this deployment."
+    try:
+        posts = sci_source_x.collect(handle, token, max_posts=max_posts, strict=True)
+    except apify_transport.ApifyTransportError as e:
+        return [], str(e)
+    return posts, None
+
+
+def _collect_youtube_posts(platform: dict, max_posts: int) -> tuple[list[dict], str | None]:
+    channel_id = (platform or {}).get("channel_id")
+    if not channel_id:
+        return [], "No YouTube channel to collect videos from."
+    api_key = os.environ.get("YOUTUBE_API_KEY", "")
+    if not api_key:
+        return [], "YouTube is not configured on this deployment."
+    # list_recent_videos never raises (see its own docstring) -- an empty
+    # result and a vendor failure are indistinguishable from here, which is
+    # the same limit every other caller of this function already accepts.
+    videos = sci_youtube_client.list_recent_videos(channel_id, api_key, max_results=max_posts, days=365)
+    if not videos:
+        return [], "No recent videos found in the last year."
+    return videos, None
+
+
+def collect_posts_job(run_id: int, email: str, max_posts: int = MAX_POSTS_PER_PLATFORM) -> None:
+    """Runs on a background thread started by the /collect route, mirroring
+    sci_pipeline's job-thread convention (this app has no persistent worker
+    queue, so a request that fetched three vendors live would time out
+    before a Railway response could return). Always leaves the run in a
+    terminal posts_status ('ready' or 'failed') -- never raises past this
+    function, so a run can never be left stuck 'collecting' by anything
+    short of the process itself dying (which _resolve_stale_posts covers on
+    the next read)."""
+    try:
+        run = get_run(run_id, email)
+        if not run or not run.get("identity"):
+            save_posts_failed(run_id, email, "This run has no confirmed identity to collect posts for.")
+            return
+        platforms = (run["identity"] or {}).get("platforms") or {}
+
+        posts: dict[str, list] = {}
+        errors: dict[str, str] = {}
+
+        li_posts, li_err = _collect_linkedin_posts(platforms.get("linkedin"), max_posts)
+        posts["linkedin"] = li_posts
+        if li_err:
+            errors["linkedin"] = li_err
+
+        x_posts, x_err = _collect_x_posts(platforms.get("x"), max_posts)
+        posts["x"] = x_posts
+        if x_err:
+            errors["x"] = x_err
+
+        yt_posts, yt_err = _collect_youtube_posts(platforms.get("youtube"), max_posts)
+        posts["youtube"] = yt_posts
+        if yt_err:
+            errors["youtube"] = yt_err
+
+        save_posts(run_id, email, posts, errors)
+    except Exception:
+        logger.exception("thought_leader_pr: collect_posts_job crashed for run %s", run_id)
+        save_posts_failed(run_id, email, "An unexpected error stopped the collection.")

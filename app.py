@@ -9874,6 +9874,26 @@ def thought_leader_pr_run(run_id):
     return jsonify(run)
 
 
+@app.route("/p2/strategic-agents/thought-leader-pr/runs/<int:run_id>/collect", methods=["POST"])
+@position2_required
+def thought_leader_pr_collect(run_id):
+    # Phase 1 (owned-platform posts). Its own explicit action, distinct from
+    # confirming the identity: this is the step that actually spends an
+    # Apify actor run (X) and real API quota (LinkedIn, YouTube), so -- same
+    # rule as /resolve, and as Contact Finder/Event & Conference
+    # Intelligence's own billed steps -- it only ever runs on its own
+    # explicit click, never bundled into confirm.
+    from tracker import thought_leader_pr as tlpr
+    user = _get_user() or {}
+    email = (user.get("email") or "").lower()
+    started = tlpr.start_collecting(run_id, email)
+    if not started:
+        return jsonify({"ok": False,
+                        "error": "Run not found or its identity isn't confirmed yet."}), 404
+    threading.Thread(target=tlpr.collect_posts_job, args=(run_id, email), daemon=True).start()
+    return jsonify({"ok": True, "posts_status": "collecting"})
+
+
 # ── Contact Finder ────────────────────────────────────────────────────────────
 # Internal, staff-only Apollo search + chat agent: filter/browse companies and
 # people live against Apollo (search_people is free; search_companies and any

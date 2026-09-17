@@ -114,6 +114,13 @@
     const ICON_LINKEDIN = '<svg viewBox="0 0 24 24"><path d="M6.94 8.5H3.56V20h3.38V8.5ZM5.25 3a1.94 1.94 0 1 0 0 3.88A1.94 1.94 0 0 0 5.25 3ZM20.44 20h-3.37v-5.6c0-1.34-.03-3.06-1.87-3.06-1.87 0-2.16 1.46-2.16 2.96V20H9.68V8.5h3.24v1.57h.05c.45-.86 1.56-1.77 3.21-1.77 3.43 0 4.26 2.26 4.26 5.2V20Z"/></svg>';
     const ICON_X = '<svg viewBox="0 0 24 24"><path d="m14.2 10.24 6.87-7.99h-1.63l-5.97 6.94-4.76-6.94H2.4l7.2 10.49-7.2 8.37h1.63l6.3-7.32 5.03 7.32h6.31l-7.47-10.87Zm-2.23 2.6-.73-1.04L5.4 3.5h2.5l4.7 6.72.73 1.04 6.11 8.74h-2.5l-4.97-7.16Z"/></svg>';
     const ICON_YT = '<svg viewBox="0 0 24 24"><path d="M8 6.5v11l10-5.5-10-5.5Z"/></svg>';
+    const ICON_LIKE = '<svg viewBox="0 0 24 24"><path d="M12 21s-7.2-4.6-9.8-9.1C.6 8.4 1.8 4.5 5.6 4.5c2.1 0 3.6 1.3 4.6 2.6.9-1.3 2.4-2.6 4.6-2.6 3.8 0 5 3.9 3.4 7.4C19.2 16.4 12 21 12 21Z"/></svg>';
+    const ICON_COMMENT = '<svg viewBox="0 0 24 24"><path d="M4 4h16v12H8l-4 4V4Z"/></svg>';
+    const ICON_SHARE = '<svg viewBox="0 0 24 24"><path d="M7 7h6V3l8 7-8 7v-4H7a4 4 0 0 0-4 4v1a7 7 0 0 1 4-11Z"/></svg>';
+    const ICON_VIEW = '<svg viewBox="0 0 24 24"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7Z"/><circle cx="12" cy="12" r="3"/></svg>';
+    const PLATFORM_LABEL = {linkedin: 'LinkedIn', x: 'X', youtube: 'YouTube'};
+    const PLATFORM_ICON = {linkedin: ICON_LINKEDIN, x: ICON_X, youtube: ICON_YT};
+    const PLATFORM_ORDER = ['linkedin', 'x', 'youtube'];
 
     function platformChip(kind, label, icon, on, url){
       const inner = `<span class="tlpr-chip-ic">${icon}</span><span>${esc(label)}</span>`;
@@ -163,9 +170,139 @@
           <div class="tlpr-actions">
             ${confirmBtn}
             <button type="button" class="tlpr-btn-secondary" id="tlprNotThemBtn">Not them — refine search</button>
-            <div class="tlpr-confirm-note">Confirming saves this identity for the research phases coming next — nothing further runs yet.</div>
+            <div class="tlpr-confirm-note">Confirming saves this identity, then you can collect what they've posted.</div>
           </div>
+        </div>
+        <div id="tlprPostsSection"></div>`;
+    }
+
+    function compactNumber(n){
+      if (n == null) return null;
+      n = Number(n);
+      if (!isFinite(n)) return null;
+      if (n < 1000) return String(n);
+      if (n < 1000000) return (n/1000).toFixed(n < 10000 ? 1 : 0).replace(/\.0$/, '') + 'k';
+      return (n/1000000).toFixed(1).replace(/\.0$/, '') + 'M';
+    }
+    function formatPostDate(iso){
+      if (!iso) return 'Unknown date';
+      const d = new Date(iso);
+      if (isNaN(d.getTime())) return 'Unknown date';
+      return d.toLocaleDateString(undefined, {month: 'short', day: 'numeric', year: 'numeric'});
+    }
+    function postCardHtml(platform, post){
+      const m = post.metrics || {};
+      const metricParts = [];
+      if (m.likes != null) metricParts.push(`<span>${ICON_LIKE}${compactNumber(m.likes)}</span>`);
+      if (m.comments != null) metricParts.push(`<span>${ICON_COMMENT}${compactNumber(m.comments)}</span>`);
+      if (m.shares != null) metricParts.push(`<span>${ICON_SHARE}${compactNumber(m.shares)}</span>`);
+      if (m.views != null) metricParts.push(`<span>${ICON_VIEW}${compactNumber(m.views)}</span>`);
+      const caption = (post.caption || '').trim();
+      return `
+        <a class="tlpr-post-card" href="${esc(post.post_url || '#')}" target="_blank" rel="noopener">
+          <div class="tlpr-post-head">
+            <span class="tlpr-post-date">${esc(formatPostDate(post.posted_at))}</span>
+            ${post.post_type ? `<span class="tlpr-post-type">${esc(post.post_type)}</span>` : ''}
+          </div>
+          <div class="tlpr-post-caption${caption ? '' : ' tlpr-post-caption--empty'}">${esc(caption || '(no caption)')}</div>
+          ${metricParts.length ? `<div class="tlpr-post-metrics">${metricParts.join('')}</div>` : ''}
+        </a>`;
+    }
+    function platformPostsBlockHtml(platform, posts, errorMsg){
+      const label = PLATFORM_LABEL[platform];
+      if (!posts.length){
+        return `<div class="tlpr-posts-empty-platform">
+                  <span class="tlpr-post-platform-ic">${PLATFORM_ICON[platform]}</span>
+                  <span><b>${label}:</b> ${esc(errorMsg || 'Nothing found.')}</span>
+                </div>`;
+      }
+      return `<div class="tlpr-posts-platform-block">
+                <div class="tlpr-posts-platform-head">
+                  <span class="tlpr-post-platform-ic">${PLATFORM_ICON[platform]}</span>${label}
+                  <span class="tlpr-posts-count">${posts.length}</span>
+                </div>
+                <div class="tlpr-posts-grid">${posts.map(p => postCardHtml(platform, p)).join('')}</div>
+              </div>`;
+    }
+    function postsReadyHtml(run){
+      const posts = run.posts || {};
+      const errors = run.posts_errors || {};
+      const total = PLATFORM_ORDER.reduce((n, pl) => n + ((posts[pl] || []).length), 0);
+      const blocks = PLATFORM_ORDER.map(pl => platformPostsBlockHtml(pl, posts[pl] || [], errors[pl])).join('');
+      return `
+        <div class="tlpr-card tlpr-card--posts">
+          <div class="tlpr-posts-head">
+            <h3>What they've been posting</h3>
+            <button type="button" class="tlpr-btn-secondary tlpr-btn-recollect" data-run-id="${run.id}">Refresh</button>
+          </div>
+          ${total === 0 ? `<p class="tlpr-posts-none">No posts could be collected from any platform right now.</p>` : ''}
+          ${blocks}
         </div>`;
+    }
+    function postsIdleHtml(runId){
+      return `
+        <div class="tlpr-card tlpr-card--posts-cta">
+          <div class="tlpr-posts-cta-text">
+            <h3>See what they've been posting</h3>
+            <p>Pulls their recent LinkedIn, X and YouTube activity.</p>
+          </div>
+          <button type="button" class="tlpr-btn-collect" id="tlprCollectBtn" data-run-id="${runId}">
+            <svg viewBox="0 0 24 24"><path d="M4 4h16v16H4zM4 9h16M9 4v16"/></svg> Collect posts</button>
+        </div>`;
+    }
+    function postsLoadingHtml(){
+      return `
+        <div class="tlpr-card tlpr-card--posts-loading">
+          <div class="tlpr-posts-loading-spin"></div>
+          <div>Collecting their recent posts across LinkedIn, X and YouTube…</div>
+        </div>`;
+    }
+    function postsFailedHtml(runId, message){
+      return `
+        <div class="tlpr-card tlpr-card--posts-cta">
+          <div class="tlpr-posts-cta-text">
+            <h3>The collection didn't finish</h3>
+            <p>${esc(message || 'Something went wrong.')}</p>
+          </div>
+          <button type="button" class="tlpr-btn-collect" id="tlprCollectBtn" data-run-id="${runId}">Try again</button>
+        </div>`;
+    }
+    function renderPostsSection(run){
+      const el = document.getElementById('tlprPostsSection');
+      if (!el || !run) return;
+      const status = run.posts_status || 'idle';
+      if (status === 'ready') el.innerHTML = postsReadyHtml(run);
+      else if (status === 'collecting') { el.innerHTML = postsLoadingHtml(); pollPosts(run.id); }
+      else if (status === 'failed') el.innerHTML = postsFailedHtml(run.id, (run.posts_errors || {})._run);
+      else el.innerHTML = postsIdleHtml(run.id);
+    }
+
+    let _pollTimer = null;
+    function pollPosts(runId){
+      clearTimeout(_pollTimer);
+      _pollTimer = setTimeout(async () => {
+        try {
+          const res = await fetch(`/p2/strategic-agents/thought-leader-pr/runs/${runId}`);
+          const run = await res.json();
+          if (run.posts_status === 'collecting') pollPosts(runId);
+          else renderPostsSection(run);
+        } catch (e) {
+          pollPosts(runId); // a transient hiccup shouldn't strand the user on the spinner
+        }
+      }, 2500);
+    }
+
+    async function startCollecting(runId){
+      document.getElementById('tlprPostsSection').innerHTML = postsLoadingHtml();
+      try {
+        const res = await fetch(`/p2/strategic-agents/thought-leader-pr/runs/${runId}/collect`, {method: 'POST'});
+        const out = await res.json();
+        if (out.ok) pollPosts(runId);
+        else renderPostsSection({id: runId, posts_status: 'failed', posts_errors: {_run: out.error}});
+      } catch (e) {
+        renderPostsSection({id: runId, posts_status: 'failed',
+                            posts_errors: {_run: 'A network error interrupted this.'}});
+      }
     }
 
     function emptyCardHtml(reasoning, confidence){
@@ -279,6 +416,7 @@
         if (run.identity){
           document.getElementById('tlprResult').innerHTML =
             identityCardHtml(run.identity, run.id, run.status === 'confirmed');
+          if (run.status === 'confirmed') renderPostsSection(run);
         } else {
           renderResult({ok:false, reasoning: run.reasoning || 'This lookup did not resolve to a person.'});
         }
@@ -312,10 +450,17 @@
             const row = RUNS.find(r => String(r.id) === String(runId));
             if (row) row.status = 'confirmed';
             renderHistory();
+            renderPostsSection({id: runId, posts_status: 'idle'});
           } else {
             confirmBtn.disabled = false;
           }
         } catch (e) { confirmBtn.disabled = false; }
+        return;
+      }
+      const collectBtn = e.target.closest('#tlprCollectBtn, .tlpr-btn-recollect');
+      if (collectBtn){
+        const runId = collectBtn.dataset.runId;
+        if (runId) startCollecting(runId);
         return;
       }
       const notThemBtn = e.target.closest('#tlprNotThemBtn');
