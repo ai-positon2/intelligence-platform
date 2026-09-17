@@ -173,7 +173,8 @@
             <div class="tlpr-confirm-note">Confirming saves this identity, then you can collect what they've posted.</div>
           </div>
         </div>
-        <div id="tlprPostsSection"></div>`;
+        <div id="tlprPostsSection"></div>
+        <div id="tlprReactionSection"></div>`;
     }
 
     function compactNumber(n){
@@ -275,6 +276,10 @@
       else if (status === 'collecting') { el.innerHTML = postsLoadingHtml(); pollPosts(run.id); }
       else if (status === 'failed') el.innerHTML = postsFailedHtml(run.id, (run.posts_errors || {})._run);
       else el.innerHTML = postsIdleHtml(run.id);
+      // The reaction step follows posts, once they're actually ready to
+      // read -- rendered here (not only from openHistoryRun) so it shows up
+      // the moment a fresh collection finishes too.
+      if (status === 'ready') renderReactionSection(run);
     }
 
     let _pollTimer = null;
@@ -302,6 +307,152 @@
       } catch (e) {
         renderPostsSection({id: runId, posts_status: 'failed',
                             posts_errors: {_run: 'A network error interrupted this.'}});
+      }
+    }
+
+    // ---- Phase 2: audience reaction ----
+    const SENTIMENT_LABEL = {positive: 'Positive', neutral: 'Neutral', negative: 'Negative', mixed: 'Mixed'};
+
+    function sentimentBarsHtml(counts, total){
+      counts = counts || {};
+      return ['positive', 'neutral', 'negative', 'mixed'].map(k => {
+        const pct = total ? Math.round((counts[k] || 0) / total * 100) : 0;
+        return `<div class="tlpr-sent-row">
+                  <span class="tlpr-sent-label sent-${k}">${SENTIMENT_LABEL[k]}</span>
+                  <div class="tlpr-sent-track"><div class="tlpr-sent-fill sent-${k}" style="width:${pct}%"></div></div>
+                  <span class="tlpr-sent-pct">${pct}%</span>
+                </div>`;
+      }).join('');
+    }
+    function themeRowsHtml(themes){
+      return (themes || []).map(t => `
+        <div class="tlpr-theme-row">
+          <span class="tlpr-theme-stance stance-${esc(t.stance || 'neutral')}">${esc(t.stance || '')}</span>
+          <div class="tlpr-theme-body"><b>${esc(t.label)}</b><p>${esc(t.detail)}</p></div>
+        </div>`).join('');
+    }
+    function commentSentimentHtml(cs, commentsAnalyzed){
+      if (!commentsAnalyzed){
+        return `<div class="tlpr-reaction-empty">No comments were available from their recent posts to analyze.</div>`;
+      }
+      if (!cs || cs.error){
+        return `<div class="tlpr-reaction-empty">${esc((cs && cs.error) || 'The comment analysis did not complete.')}</div>`;
+      }
+      const s = cs.sentiment || {};
+      const notable = (cs.notable_comments || []).map(n => `<li>${esc(n.why)}</li>`).join('');
+      return `
+        <div class="tlpr-reaction-verdict">${esc(cs.verdict || '')}</div>
+        <div class="tlpr-sent-bars">${sentimentBarsHtml(s.counts, s.labelled)}</div>
+        ${themeRowsHtml(cs.themes)}
+        ${notable ? `<div class="tlpr-facts" style="margin-top:14px;">
+            <div class="tlpr-facts-label">Notable comments</div><ul>${notable}</ul></div>` : ''}`;
+    }
+    function redditPulseHtml(rp){
+      if (!rp) return '<div class="tlpr-reaction-empty">The Reddit conversation read did not complete.</div>';
+      if (!rp.thread_count){
+        return `<div class="tlpr-reaction-empty">${esc(rp.note || 'No Reddit conversation about them was found.')}</div>`;
+      }
+      const a = rp.analysis || {};
+      if (a.error){
+        return `<div class="tlpr-reaction-empty">Found ${rp.thread_count} Reddit threads, but the analysis
+                  could not be completed: ${esc(a.error)}</div>`;
+      }
+      const s = a.sentiment || {};
+      const subs = (rp.subreddits || []).slice(0, 6).map(sr =>
+        `<span class="tlpr-sub-chip">r/${esc(sr.name)} <b>${sr.threads}</b></span>`).join('');
+      const riskFlags = (a.risk_flags || []).map(r => `<li>${esc(r)}</li>`).join('');
+      return `
+        <div class="tlpr-reaction-verdict">${esc(a.verdict || '')}</div>
+        <div class="tlpr-sent-bars">${sentimentBarsHtml(s.counts, s.labelled)}</div>
+        <div class="tlpr-subs">${subs}</div>
+        ${themeRowsHtml(a.themes)}
+        ${riskFlags ? `<div class="tlpr-facts tlpr-facts--risk" style="margin-top:14px;">
+            <div class="tlpr-facts-label">Risk flags</div><ul>${riskFlags}</ul></div>` : ''}`;
+    }
+    function reactionReadyHtml(run){
+      const r = run.reaction || {};
+      return `
+        <div class="tlpr-card tlpr-card--reaction">
+          <div class="tlpr-posts-head">
+            <h3>How the room reacts</h3>
+            <button type="button" class="tlpr-btn-secondary tlpr-btn-reanalyze" data-run-id="${run.id}">Refresh</button>
+          </div>
+          <div class="tlpr-reaction-cols">
+            <div class="tlpr-reaction-col">
+              <div class="tlpr-reaction-col-head">Comments on their own posts</div>
+              ${commentSentimentHtml(r.comment_sentiment, r.comments_analyzed)}
+            </div>
+            <div class="tlpr-reaction-col">
+              <div class="tlpr-reaction-col-head">Reddit conversation about them</div>
+              ${redditPulseHtml(r.reddit)}
+            </div>
+          </div>
+        </div>`;
+    }
+    function reactionIdleHtml(runId){
+      return `
+        <div class="tlpr-card tlpr-card--posts-cta">
+          <div class="tlpr-posts-cta-text">
+            <h3>See how the room reacts</h3>
+            <p>Reads comments on their own posts, plus what Reddit says about them.</p>
+          </div>
+          <button type="button" class="tlpr-btn-collect" id="tlprReactBtn" data-run-id="${runId}">
+            <svg viewBox="0 0 24 24"><path d="M12 21s-7.2-4.6-9.8-9.1C.6 8.4 1.8 4.5 5.6 4.5c2.1 0 3.6 1.3 4.6 2.6.9-1.3 2.4-2.6 4.6-2.6 3.8 0 5 3.9 3.4 7.4C19.2 16.4 12 21 12 21Z"/></svg>
+            Analyze reaction</button>
+        </div>`;
+    }
+    function reactionLoadingHtml(){
+      return `
+        <div class="tlpr-card tlpr-card--posts-loading">
+          <div class="tlpr-posts-loading-spin"></div>
+          <div>Reading comments and the Reddit conversation…</div>
+        </div>`;
+    }
+    function reactionFailedHtml(runId, message){
+      return `
+        <div class="tlpr-card tlpr-card--posts-cta">
+          <div class="tlpr-posts-cta-text">
+            <h3>The analysis didn't finish</h3>
+            <p>${esc(message || 'Something went wrong.')}</p>
+          </div>
+          <button type="button" class="tlpr-btn-collect" id="tlprReactBtn" data-run-id="${runId}">Try again</button>
+        </div>`;
+    }
+    function renderReactionSection(run){
+      const el = document.getElementById('tlprReactionSection');
+      if (!el || !run) return;
+      const status = run.reaction_status || 'idle';
+      if (status === 'ready') el.innerHTML = reactionReadyHtml(run);
+      else if (status === 'collecting') { el.innerHTML = reactionLoadingHtml(); pollReaction(run.id); }
+      else if (status === 'failed') el.innerHTML = reactionFailedHtml(run.id, (run.reaction_errors || {})._run);
+      else el.innerHTML = reactionIdleHtml(run.id);
+    }
+
+    let _reactionPollTimer = null;
+    function pollReaction(runId){
+      clearTimeout(_reactionPollTimer);
+      _reactionPollTimer = setTimeout(async () => {
+        try {
+          const res = await fetch(`/p2/strategic-agents/thought-leader-pr/runs/${runId}`);
+          const run = await res.json();
+          if (run.reaction_status === 'collecting') pollReaction(runId);
+          else renderReactionSection(run);
+        } catch (e) {
+          pollReaction(runId);
+        }
+      }, 2500);
+    }
+
+    async function startAnalyzingReaction(runId){
+      document.getElementById('tlprReactionSection').innerHTML = reactionLoadingHtml();
+      try {
+        const res = await fetch(`/p2/strategic-agents/thought-leader-pr/runs/${runId}/collect-reaction`, {method: 'POST'});
+        const out = await res.json();
+        if (out.ok) pollReaction(runId);
+        else renderReactionSection({id: runId, reaction_status: 'failed', reaction_errors: {_run: out.error}});
+      } catch (e) {
+        renderReactionSection({id: runId, reaction_status: 'failed',
+                               reaction_errors: {_run: 'A network error interrupted this.'}});
       }
     }
 
@@ -461,6 +612,12 @@
       if (collectBtn){
         const runId = collectBtn.dataset.runId;
         if (runId) startCollecting(runId);
+        return;
+      }
+      const reactBtn = e.target.closest('#tlprReactBtn, .tlpr-btn-reanalyze');
+      if (reactBtn){
+        const runId = reactBtn.dataset.runId;
+        if (runId) startAnalyzingReaction(runId);
         return;
       }
       const notThemBtn = e.target.closest('#tlprNotThemBtn');

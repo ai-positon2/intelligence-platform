@@ -271,3 +271,46 @@ def test_resolve_company_channel_trusts_a_handle_hit_without_a_title_check(mock_
                                       "customUrl": "@acme"}}]}),
     ]
     assert yt.resolve_company_channel("Acme", "key") is not None
+
+
+# ── list_video_comments (Thought Leader Intelligence Phase 2) ──────────────
+
+@patch("tracker.sci_youtube_client.requests.get")
+def test_list_video_comments_normalizes_the_top_level_comment(mock_get):
+    mock_get.return_value = _resp({"items": [
+        {"snippet": {"topLevelComment": {"id": "c1", "snippet": {
+            "textDisplay": "Great talk!", "authorDisplayName": "Alex",
+            "publishedAt": "2026-08-01T00:00:00Z", "likeCount": 12}}}},
+    ]})
+    out = yt.list_video_comments("v1", "key", max_results=10)
+    assert out == [{"comment_id": "c1", "text": "Great talk!", "author": "Alex",
+                    "posted_at": "2026-08-01T00:00:00Z", "likes": 12}]
+
+
+def test_list_video_comments_returns_empty_without_a_key():
+    assert yt.list_video_comments("v1", "") == []
+
+
+def test_list_video_comments_returns_empty_without_a_video_id():
+    assert yt.list_video_comments("", "key") == []
+
+
+@patch("tracker.sci_youtube_client.requests.get")
+def test_list_video_comments_degrades_quietly_when_disabled_or_failing(mock_get):
+    """403 (comments disabled) and any other transport failure look
+    identical from here -- both must degrade to [], never raise."""
+    import requests
+    mock_get.side_effect = requests.RequestException("403")
+    assert yt.list_video_comments("v1", "key") == []
+
+
+@patch("tracker.sci_youtube_client.requests.get")
+def test_list_video_comments_stops_paging_once_max_results_is_reached(mock_get):
+    page = _resp({"items": [
+        {"snippet": {"topLevelComment": {"id": "c%d" % i, "snippet": {"textDisplay": "x"}}}}
+        for i in range(5)
+    ], "nextPageToken": "more"})
+    mock_get.return_value = page
+    out = yt.list_video_comments("v1", "key", max_results=5)
+    assert len(out) == 5
+    assert mock_get.call_count == 1

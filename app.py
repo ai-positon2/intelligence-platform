@@ -9894,6 +9894,25 @@ def thought_leader_pr_collect(run_id):
     return jsonify({"ok": True, "posts_status": "collecting"})
 
 
+@app.route("/p2/strategic-agents/thought-leader-pr/runs/<int:run_id>/collect-reaction", methods=["POST"])
+@position2_required
+def thought_leader_pr_collect_reaction(run_id):
+    # Phase 2 (audience reaction). Reads Phase 1's already-collected posts
+    # for per-platform comment/reply sentiment (LinkedIn + a new Apify actor
+    # for X replies + YouTube commentThreads) and separately runs the
+    # Reddit-conversation read -- its own explicit action for the same
+    # billed-step reason /collect is.
+    from tracker import thought_leader_pr as tlpr
+    user = _get_user() or {}
+    email = (user.get("email") or "").lower()
+    started = tlpr.start_reacting(run_id, email)
+    if not started:
+        return jsonify({"ok": False,
+                        "error": "Run not found or its identity isn't confirmed yet."}), 404
+    threading.Thread(target=tlpr.collect_reaction_job, args=(run_id, email), daemon=True).start()
+    return jsonify({"ok": True, "reaction_status": "collecting"})
+
+
 # ── Contact Finder ────────────────────────────────────────────────────────────
 # Internal, staff-only Apollo search + chat agent: filter/browse companies and
 # people live against Apollo (search_people is free; search_companies and any

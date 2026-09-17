@@ -263,6 +263,44 @@ def _video_stats(video_ids: list[str], api_key: str) -> dict[str, dict]:
     return out
 
 
+def list_video_comments(video_id: str, api_key: str, max_results: int = 50) -> list[dict]:
+    """Top-level comments on a video, ordered by relevance. [] on any
+    failure OR when comments are disabled for the video (both surface as a
+    RequestException from commentThreads -- YouTube answers 403 for a
+    disabled thread the same way it would for a bad key, and this client
+    has no way to tell those apart from the response alone) -- never
+    raised, same convention as list_recent_videos. A partial page fetched
+    before a later page fails is kept rather than discarded."""
+    if not video_id or not api_key:
+        return []
+    out: list[dict] = []
+    page_token = None
+    try:
+        while len(out) < max_results:
+            data = _get("commentThreads", api_key, part="snippet", videoId=video_id,
+                       maxResults=min(100, max_results - len(out)), order="relevance",
+                       pageToken=page_token, textFormat="plainText")
+            items = data.get("items") or []
+            if not items:
+                break
+            for item in items:
+                top = ((item.get("snippet") or {}).get("topLevelComment") or {})
+                snip = top.get("snippet") or {}
+                out.append({
+                    "comment_id": top.get("id"),
+                    "text": snip.get("textDisplay") or snip.get("textOriginal") or "",
+                    "author": snip.get("authorDisplayName"),
+                    "posted_at": snip.get("publishedAt"),
+                    "likes": snip.get("likeCount"),
+                })
+            page_token = data.get("nextPageToken")
+            if not page_token:
+                break
+    except requests.RequestException as e:
+        logger.warning("sci_youtube_client: commentThreads fetch failed for %s: %s", video_id, e)
+    return out[:max_results]
+
+
 def _caption(snippet: dict) -> str:
     """Title alone is rarely more than a few words -- the real marketing
     copy (offers, CTAs, messaging) usually lives in the description, so fold

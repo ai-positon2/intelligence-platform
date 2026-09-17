@@ -31,14 +31,16 @@ on `identity` once a run is confirmed; nothing here fetches a single post.
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 from urllib.parse import urlparse
 
 from datetime import datetime, timedelta, timezone
 
-from tracker import (apify_transport, apollo_client, claude_websearch, sci_source_linkedin_unipile,
-                     sci_source_x, sci_youtube_client, unipile_client, unipile_transport)
+from tracker import (apify_transport, apify_x_replies, apollo_client, claude_websearch,
+                     sci_source_linkedin_unipile, sci_source_x, sci_youtube_client,
+                     tlpr_reddit_pulse, unipile_client, unipile_transport)
 
 logger = logging.getLogger(__name__)
 
@@ -54,6 +56,7 @@ STALE_RUN_MINUTES = 10
 STATUSES = ("resolving", "needs_review", "confirmed", "failed")
 POSTS_STATUSES = ("idle", "collecting", "ready", "failed")
 _STALE_POSTS_ERROR = "The collection stalled and did not finish -- try collecting again."
+_STALE_REACTION_ERROR = "The analysis stalled and did not finish -- try again."
 
 
 # ───────────────────────── Postgres store ─────────────────────────
@@ -99,6 +102,10 @@ def _ensure_tables(conn) -> None:
                 posts JSONB,
                 posts_errors JSONB,
                 posts_updated_at TIMESTAMPTZ,
+                reaction_status TEXT NOT NULL DEFAULT 'idle',
+                reaction JSONB,
+                reaction_errors JSONB,
+                reaction_updated_at TIMESTAMPTZ,
                 created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
                 updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
             )
@@ -116,6 +123,11 @@ def _ensure_tables(conn) -> None:
         cur.execute("ALTER TABLE thought_leader_pr_runs ADD COLUMN IF NOT EXISTS posts JSONB")
         cur.execute("ALTER TABLE thought_leader_pr_runs ADD COLUMN IF NOT EXISTS posts_errors JSONB")
         cur.execute("ALTER TABLE thought_leader_pr_runs ADD COLUMN IF NOT EXISTS posts_updated_at TIMESTAMPTZ")
+        # Added for Phase 2 (audience reaction), same reasoning.
+        cur.execute("ALTER TABLE thought_leader_pr_runs ADD COLUMN IF NOT EXISTS reaction_status TEXT NOT NULL DEFAULT 'idle'")
+        cur.execute("ALTER TABLE thought_leader_pr_runs ADD COLUMN IF NOT EXISTS reaction JSONB")
+        cur.execute("ALTER TABLE thought_leader_pr_runs ADD COLUMN IF NOT EXISTS reaction_errors JSONB")
+        cur.execute("ALTER TABLE thought_leader_pr_runs ADD COLUMN IF NOT EXISTS reaction_updated_at TIMESTAMPTZ")
     conn.commit()
     _TABLES_READY = True
 
@@ -157,7 +169,6 @@ def save_result(run_id: int, email: str, result: dict) -> bool:
     conn = _pg_conn()
     if not conn:
         return False
-    import json
     status = "needs_review"
     if result.get("ok"):
         status = "needs_review"  # still awaits the user's explicit confirm
@@ -211,7 +222,8 @@ def confirm_run(run_id: int, email: str) -> bool:
 
 _RUN_COLUMNS = ("id, input_name, company_hint, title_hint, status, confidence, "
                "reasoning, identity, error, posts_status, posts, posts_errors, "
-               "posts_updated_at, created_at, updated_at")
+               "posts_updated_at, reaction_status, reaction, reaction_errors, "
+               "reaction_updated_at, created_at, updated_at")
 
 
 def get_run(run_id: int, email: str) -> dict | None:
@@ -228,7 +240,8 @@ def get_run(run_id: int, email: str) -> dict | None:
             row = cur.fetchone()
             if not row:
                 return None
-            return _resolve_stale_posts(_row_to_dict(row), email)
+            run = _resolve_stale_posts(_row_to_dict(row), email)
+            return _resolve_stale_reaction(run, email)
     except Exception as e:
         logger.warning("thought_leader_pr: get_run failed for run %s: %s", run_id, e)
         return None
@@ -248,7 +261,8 @@ def list_runs(email: str, limit: int = 25) -> list[dict]:
                 FROM thought_leader_pr_runs WHERE email = %s
                 ORDER BY created_at DESC LIMIT %s
             """, (email, limit))
-            return [_resolve_stale_posts(_row_to_dict(row), email) for row in cur.fetchall()]
+            return [_resolve_stale_reaction(_resolve_stale_posts(_row_to_dict(row), email), email)
+                   for row in cur.fetchall()]
     except Exception as e:
         logger.warning("thought_leader_pr: list_runs failed: %s", e)
         return []
@@ -259,6 +273,7 @@ def list_runs(email: str, limit: int = 25) -> list[dict]:
 def _row_to_dict(row) -> dict:
     (rid, input_name, company_hint, title_hint, status, confidence, reasoning,
      identity, error, posts_status, posts, posts_errors, posts_updated_at,
+     reaction_status, reaction, reaction_errors, reaction_updated_at,
      created_at, updated_at) = row
     return {
         "id": rid, "input_name": input_name, "company_hint": company_hint,
@@ -266,6 +281,9 @@ def _row_to_dict(row) -> dict:
         "reasoning": reasoning, "identity": identity, "error": error,
         "posts_status": posts_status or "idle", "posts": posts, "posts_errors": posts_errors,
         "posts_updated_at": posts_updated_at.isoformat() if posts_updated_at else None,
+        "reaction_status": reaction_status or "idle", "reaction": reaction,
+        "reaction_errors": reaction_errors,
+        "reaction_updated_at": reaction_updated_at.isoformat() if reaction_updated_at else None,
         "created_at": created_at.isoformat() if created_at else None,
         "updated_at": updated_at.isoformat() if updated_at else None,
     }
@@ -286,6 +304,23 @@ def _resolve_stale_posts(run: dict, email: str) -> dict:
         return run
     if save_posts_failed(run["id"], email, _STALE_POSTS_ERROR):
         run = dict(run, posts_status="failed", posts_errors={"_run": _STALE_POSTS_ERROR})
+    return run
+
+
+def _resolve_stale_reaction(run: dict, email: str) -> dict:
+    """Same self-heal as _resolve_stale_posts, for Phase 2's own
+    'collecting' status -- a separate column, so a stuck posts collection
+    must never be able to also strand the reaction poll (or vice versa)."""
+    if run.get("reaction_status") != "collecting":
+        return run
+    updated_at = run.get("updated_at")
+    if not updated_at:
+        return run
+    last = datetime.fromisoformat(updated_at)
+    if last >= datetime.now(timezone.utc) - timedelta(minutes=STALE_RUN_MINUTES):
+        return run
+    if save_reaction_failed(run["id"], email, _STALE_REACTION_ERROR):
+        run = dict(run, reaction_status="failed", reaction_errors={"_run": _STALE_REACTION_ERROR})
     return run
 
 
@@ -324,7 +359,6 @@ def save_posts(run_id: int, email: str, posts: dict, errors: dict) -> bool:
     conn = _pg_conn()
     if not conn:
         return False
-    import json
     try:
         _ensure_tables(conn)
         with conn.cursor() as cur:
@@ -351,7 +385,6 @@ def save_posts_failed(run_id: int, email: str, message: str) -> bool:
     conn = _pg_conn()
     if not conn:
         return False
-    import json
     try:
         _ensure_tables(conn)
         with conn.cursor() as cur:
@@ -366,6 +399,84 @@ def save_posts_failed(run_id: int, email: str, message: str) -> bool:
         return updated
     except Exception as e:
         logger.warning("thought_leader_pr: save_posts_failed failed for run %s: %s", run_id, e)
+        return False
+    finally:
+        conn.close()
+
+
+def start_reacting(run_id: int, email: str) -> bool:
+    """Flip reaction_status to 'collecting' before Phase 2's background
+    thread starts -- same reason start_collecting exists for posts_status,
+    kept as a separate gate so Phase 2 can be re-run without needing
+    posts_status to also be 'confirmed'-adjacent (it already requires an
+    actual identity, checked in collect_reaction_job itself, not here)."""
+    conn = _pg_conn()
+    if not conn:
+        return False
+    try:
+        _ensure_tables(conn)
+        with conn.cursor() as cur:
+            cur.execute("""
+                UPDATE thought_leader_pr_runs
+                SET reaction_status = 'collecting', reaction_errors = NULL, updated_at = now()
+                WHERE id = %s AND email = %s AND status = 'confirmed'
+            """, (run_id, email))
+            updated = cur.rowcount > 0
+        conn.commit()
+        return updated
+    except Exception as e:
+        logger.warning("thought_leader_pr: start_reacting failed for run %s: %s", run_id, e)
+        return False
+    finally:
+        conn.close()
+
+
+def save_reaction(run_id: int, email: str, reaction: dict, errors: dict) -> bool:
+    """reaction_status becomes 'ready' even when every source failed --
+    same "partial is not a failure" rule save_posts follows, per-source
+    failure lives in `errors`."""
+    conn = _pg_conn()
+    if not conn:
+        return False
+    try:
+        _ensure_tables(conn)
+        with conn.cursor() as cur:
+            cur.execute("""
+                UPDATE thought_leader_pr_runs
+                SET reaction_status = 'ready', reaction = %s, reaction_errors = %s,
+                    reaction_updated_at = now(), updated_at = now()
+                WHERE id = %s AND email = %s
+            """, (json.dumps(reaction), json.dumps(errors) if errors else None, run_id, email))
+            updated = cur.rowcount > 0
+        conn.commit()
+        return updated
+    except Exception as e:
+        logger.warning("thought_leader_pr: save_reaction failed for run %s: %s", run_id, e)
+        return False
+    finally:
+        conn.close()
+
+
+def save_reaction_failed(run_id: int, email: str, message: str) -> bool:
+    """The analysis job itself crashed -- distinct from save_reaction, which
+    always means the job ran to completion, however partial the result."""
+    conn = _pg_conn()
+    if not conn:
+        return False
+    try:
+        _ensure_tables(conn)
+        with conn.cursor() as cur:
+            cur.execute("""
+                UPDATE thought_leader_pr_runs
+                SET reaction_status = 'failed', reaction_errors = %s, reaction_updated_at = now(),
+                    updated_at = now()
+                WHERE id = %s AND email = %s
+            """, (json.dumps({"_run": message}), run_id, email))
+            updated = cur.rowcount > 0
+        conn.commit()
+        return updated
+    except Exception as e:
+        logger.warning("thought_leader_pr: save_reaction_failed failed for run %s: %s", run_id, e)
         return False
     finally:
         conn.close()
@@ -734,3 +845,296 @@ def collect_posts_job(run_id: int, email: str, max_posts: int = MAX_POSTS_PER_PL
     except Exception:
         logger.exception("thought_leader_pr: collect_posts_job crashed for run %s", run_id)
         save_posts_failed(run_id, email, "An unexpected error stopped the collection.")
+
+
+# ───────────────────────── Phase 2: audience reaction ─────────────────────────
+#
+# Two independent sources, combined into one read of "how does the room
+# react": (1) real comments/replies on the person's OWN posts collected in
+# Phase 1 (LinkedIn/X/YouTube), and (2) the Reddit conversation ABOUT them
+# anywhere on Reddit, via tracker/tlpr_reddit_pulse.py. The first needs
+# Phase 1's posts to already exist (comments are fetched per already-
+# collected post); the second needs only the resolved identity and runs
+# independently of whether Phase 1 ever ran.
+#
+# Same fault isolation as Phase 1: one platform's comment fetch failing
+# never blocks the others, and a failure here is recorded in `errors`, never
+# conflated with the analysis job itself crashing (reaction_status='failed'
+# via save_reaction_failed).
+
+MAX_POSTS_FOR_REACTION = 5
+MAX_COMMENTS_PER_POST = 20
+MAX_COMMENTS_DIGEST = 80
+
+_REACTION_SYSTEM = (
+    "You analyze how people react to a public figure's own social media "
+    "posts, for a PR/reputation research tool used by a marketing agency. "
+    "You are given real comments and replies left on their recent posts "
+    "across platforms: which platform, an excerpt of the text, and its "
+    "engagement. Report what is genuinely there, including criticism, "
+    "rather than a flattering summary.\n\n"
+    "Ground everything in the comments you were given. Never infer a fact "
+    "this data doesn't support, and never soften a recurring criticism into "
+    "a neutral observation. If the comments are mostly generic reactions "
+    "(\"nice post!\", emoji-only) with no real substance, say that "
+    "plainly -- that is a real finding, not a failure.\n\n"
+    "Respond with ONLY a JSON object, no prose before or after:\n"
+    '{"verdict": str, '
+    '"comment_sentiment": {"<comment_id>": "positive"|"neutral"|"negative"|"mixed"}, '
+    '"themes": [{"label": str, "stance": "praise"|"complaint"|"question"|"neutral", '
+    '"detail": str, "comment_ids": [str, ...]}], '
+    '"notable_comments": [{"comment_id": str, "why": str}]}\n\n'
+    "Rules: \"verdict\" is ONE sentence a comms lead could repeat in a "
+    "meeting. \"comment_sentiment\" must label EVERY comment id you were "
+    "given. \"themes\" is 2-5 recurring reactions, each with a concrete "
+    "\"detail\" (specific to these comments, never generic advice) and 1-4 "
+    "supporting comment_ids copied exactly from the data. \"notable_comments\" "
+    "is 2-4 comments genuinely worth reading directly (a strong compliment, "
+    "a sharp criticism, a widely-liked reply), each citing a real "
+    "comment_id and a one-sentence \"why\"."
+)
+
+_COMMENT_SENTIMENTS = ("positive", "neutral", "negative", "mixed")
+
+
+def _top_engaged_posts(posts: list[dict], n: int) -> list[dict]:
+    def _engagement(p):
+        m = p.get("metrics") or {}
+        return sum(int(m.get(k) or 0) for k in ("likes", "comments", "shares", "views"))
+    return sorted(posts or [], key=_engagement, reverse=True)[:n]
+
+
+def _collect_linkedin_comments(posts: list[dict], max_posts: int,
+                               max_comments: int) -> tuple[list[dict], str | None]:
+    top = _top_engaged_posts(posts, max_posts)
+    if not top:
+        return [], "No LinkedIn posts to read comments from."
+    account_id = unipile_transport.account_for_platform("linkedin")
+    if not account_id:
+        return [], "No connected LinkedIn account is available."
+    out: list[dict] = []
+    for post in top:
+        pid = post.get("platform_post_id")
+        if not pid:
+            continue
+        try:
+            data, err = unipile_client.list_comments(pid, account_id, limit=max_comments)
+        except Exception:
+            logger.exception("thought_leader_pr: linkedin comments fetch crashed for post %s", pid)
+            continue
+        if err is not None or not isinstance(data, dict):
+            continue
+        for c in (data.get("items") or [])[:max_comments]:
+            author_details = c.get("author_details") or {}
+            out.append({
+                "platform": "linkedin",
+                "comment_id": c.get("id") or c.get("comment_id"),
+                "text": c.get("text") or "",
+                "author": author_details.get("name") or c.get("author"),
+                "posted_at": c.get("date"), "likes": c.get("reaction_counter"),
+            })
+    if not out:
+        return [], "No comments could be read from their recent LinkedIn posts."
+    return out, None
+
+
+def _collect_x_replies(posts: list[dict], max_posts: int,
+                       max_comments: int) -> tuple[list[dict], str | None]:
+    top = _top_engaged_posts(posts, max_posts)
+    if not top:
+        return [], "No X posts to read replies from."
+    token = os.environ.get("APIFY_API_TOKEN", "")
+    if not token:
+        return [], "Apify is not configured on this deployment."
+    out: list[dict] = []
+    for post in top:
+        pid = post.get("platform_post_id")
+        if not pid:
+            continue
+        try:
+            replies = apify_x_replies.collect(pid, token, max_replies=max_comments, strict=True)
+        except apify_transport.ApifyTransportError as e:
+            logger.warning("thought_leader_pr: x replies fetch failed for tweet %s: %s", pid, e)
+            continue
+        for r in replies:
+            out.append({"platform": "x", "comment_id": r.get("comment_id"), "text": r.get("text") or "",
+                       "author": r.get("author"), "posted_at": r.get("posted_at"), "likes": r.get("likes")})
+    if not out:
+        return [], "No replies could be read from their recent X posts."
+    return out, None
+
+
+def _collect_youtube_comments(posts: list[dict], max_posts: int,
+                              max_comments: int) -> tuple[list[dict], str | None]:
+    top = _top_engaged_posts(posts, max_posts)
+    if not top:
+        return [], "No YouTube videos to read comments from."
+    api_key = os.environ.get("YOUTUBE_API_KEY", "")
+    if not api_key:
+        return [], "YouTube is not configured on this deployment."
+    out: list[dict] = []
+    for post in top:
+        vid = post.get("platform_post_id")
+        if not vid:
+            continue
+        for c in sci_youtube_client.list_video_comments(vid, api_key, max_results=max_comments):
+            out.append({"platform": "youtube", "comment_id": c.get("comment_id"),
+                       "text": c.get("text") or "", "author": c.get("author"),
+                       "posted_at": c.get("posted_at"), "likes": c.get("likes")})
+    if not out:
+        return [], "No comments could be read from their recent YouTube videos."
+    return out, None
+
+
+def _digest_comments(comments: list[dict], max_items: int = MAX_COMMENTS_DIGEST) -> list[dict]:
+    """What Claude actually reads. Ordered by likes so a cap drops the
+    comments nobody engaged with rather than an arbitrary slice. The id
+    given to the model is platform-prefixed (never just the raw vendor id)
+    because a LinkedIn comment id and an X comment id share no namespace and
+    could otherwise collide."""
+    ordered = sorted(comments, key=lambda c: int(c.get("likes") or 0), reverse=True)[:max_items]
+    out = []
+    for i, c in enumerate(ordered):
+        raw_id = c.get("comment_id") or str(i)
+        out.append({"id": "%s:%s" % (c.get("platform"), raw_id), "platform": c.get("platform"),
+                   "text": (c.get("text") or "")[:400], "likes": c.get("likes")})
+    return out
+
+
+def _clean_reaction_analysis(parsed: dict, valid_ids: set[str]) -> dict:
+    """Same discipline as tlpr_reddit_pulse._clean_analysis: strip every
+    comment id the model was not actually given, drop any theme left with
+    no real citation, compute sentiment counts from the labels rather than
+    trust a self-reported tally, and strip_em_dash every free-text field the
+    model wrote -- this dict's "detail"/"why"/"verdict" strings are exactly
+    the kind of model-authored prose that shipped a dash to a live report
+    before b00d931 unified this fix."""
+    _clean = claude_websearch.strip_em_dash
+
+    def _cited(entries, *, name_key):
+        out = []
+        for entry in entries if isinstance(entries, list) else []:
+            if not isinstance(entry, dict):
+                continue
+            ids = [str(i) for i in (entry.get("comment_ids") or []) if str(i) in valid_ids]
+            name = _clean(str(entry.get(name_key) or "").strip())
+            if not ids or not name:
+                continue
+            cleaned = dict(entry, comment_ids=ids[:4], **{name_key: name})
+            if "detail" in cleaned:
+                cleaned["detail"] = _clean(str(cleaned["detail"] or ""))
+            out.append(cleaned)
+        return out
+
+    sentiment_raw = parsed.get("comment_sentiment")
+    labels = {}
+    if isinstance(sentiment_raw, dict):
+        for cid, label in sentiment_raw.items():
+            if str(cid) in valid_ids and label in _COMMENT_SENTIMENTS:
+                labels[str(cid)] = label
+    from collections import Counter
+    counts = Counter(labels.values())
+    total = sum(counts.values())
+
+    notable = []
+    for entry in (parsed.get("notable_comments") or []):
+        if not isinstance(entry, dict):
+            continue
+        cid = str(entry.get("comment_id") or "")
+        why = _clean(str(entry.get("why") or "").strip())
+        if cid in valid_ids and why:
+            notable.append({"comment_id": cid, "why": why[:300]})
+
+    return {
+        "verdict": _clean(str(parsed.get("verdict") or "").strip()),
+        "sentiment": {
+            "counts": {s: counts.get(s, 0) for s in _COMMENT_SENTIMENTS},
+            "labelled": total,
+            "negative_share": round(counts.get("negative", 0) / total, 3) if total else None,
+        },
+        "themes": _cited(parsed.get("themes"), name_key="label")[:5],
+        "notable_comments": notable[:4],
+    }
+
+
+def analyze_comment_sentiment(comments: list[dict]) -> dict:
+    """The judgement half for Phase 2's own-post comments. Never raises --
+    returns {"error": ...} so a failed analysis still leaves the raw
+    comment count intact and rendered."""
+    if not comments:
+        return {"error": "No comments were collected to analyze."}
+    key = os.environ.get("ANTHROPIC_API_KEY", "")
+    if not key:
+        return {"error": "ANTHROPIC_API_KEY is not configured on this deployment."}
+    digest = _digest_comments(comments)
+    valid_ids = {d["id"] for d in digest}
+    try:
+        from anthropic import Anthropic
+        client = Anthropic(api_key=key, timeout=120.0, max_retries=1)
+        resp = client.messages.create(
+            model=os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-5"),
+            max_tokens=3000, system=_REACTION_SYSTEM,
+            messages=[{"role": "user",
+                      "content": json.dumps({"comments": digest}, ensure_ascii=False)}],
+        )
+    except Exception as e:
+        logger.warning("thought_leader_pr: comment sentiment analysis failed: %s", e)
+        return {"error": "The comment sentiment analysis could not be completed (%s)."
+                         % (str(e)[:160] or type(e).__name__)}
+    raw = "".join(b.text for b in resp.content if getattr(b, "type", "") == "text")
+    parsed = claude_websearch.extract_json(raw, require="verdict")
+    if not isinstance(parsed, dict):
+        return {"error": "The comment sentiment analysis returned an unreadable response."}
+    return _clean_reaction_analysis(parsed, valid_ids)
+
+
+def collect_reaction_job(run_id: int, email: str, max_posts: int = MAX_POSTS_FOR_REACTION,
+                         max_comments: int = MAX_COMMENTS_PER_POST) -> None:
+    """Runs on a background thread started by the /collect-reaction route,
+    same job-thread convention as collect_posts_job. Always leaves the run
+    in a terminal reaction_status ('ready' or 'failed')."""
+    try:
+        run = get_run(run_id, email)
+        if not run or not run.get("identity"):
+            save_reaction_failed(run_id, email, "This run has no confirmed identity to analyze.")
+            return
+        identity = run["identity"] or {}
+        full_name = identity.get("full_name") or run.get("input_name") or ""
+        company_hint = identity.get("current_company") or run.get("company_hint")
+        posts = run.get("posts") or {}
+
+        comments: list[dict] = []
+        errors: dict[str, str] = {}
+
+        li_comments, li_err = _collect_linkedin_comments(posts.get("linkedin") or [], max_posts, max_comments)
+        comments.extend(li_comments)
+        if li_err:
+            errors["linkedin"] = li_err
+
+        x_comments, x_err = _collect_x_replies(posts.get("x") or [], max_posts, max_comments)
+        comments.extend(x_comments)
+        if x_err:
+            errors["x"] = x_err
+
+        yt_comments, yt_err = _collect_youtube_comments(posts.get("youtube") or [], max_posts, max_comments)
+        comments.extend(yt_comments)
+        if yt_err:
+            errors["youtube"] = yt_err
+
+        comment_sentiment = analyze_comment_sentiment(comments) if comments else None
+
+        try:
+            reddit = tlpr_reddit_pulse.build_pulse(full_name, company_hint)
+        except Exception:
+            logger.exception("thought_leader_pr: reddit pulse crashed for run %s", run_id)
+            reddit = {"note": "The Reddit conversation read could not be completed.", "thread_count": 0}
+
+        reaction = {
+            "comments_analyzed": len(comments),
+            "comment_sentiment": comment_sentiment,
+            "reddit": reddit,
+        }
+        save_reaction(run_id, email, reaction, errors)
+    except Exception:
+        logger.exception("thought_leader_pr: collect_reaction_job crashed for run %s", run_id)
+        save_reaction_failed(run_id, email, "An unexpected error stopped the analysis.")

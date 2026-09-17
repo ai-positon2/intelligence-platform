@@ -181,3 +181,39 @@ class TestCollectRoute:
         assert resp.get_json() == {"ok": True, "posts_status": "collecting"}
         assert started.wait(timeout=2), "background job never ran"
         assert captured == {"run_id": 4, "email": _OWNER}
+
+
+class TestCollectReactionRoute:
+    """Phase 2's own billed action -- same discipline as /collect: only its
+    own explicit POST may start it, and it must hand off to a background
+    thread rather than blocking on live vendor calls."""
+
+    def test_collect_reaction_requires_auth(self):
+        c = appmod.app.test_client()
+        resp = c.post("/p2/strategic-agents/thought-leader-pr/runs/1/collect-reaction")
+        assert resp.status_code in (302, 401, 403)
+
+    def test_not_confirmed_or_missing_is_404_and_never_starts_a_job(self, monkeypatch):
+        monkeypatch.setattr(T, "start_reacting", lambda run_id, email: False)
+        monkeypatch.setattr(T, "collect_reaction_job",
+                            lambda *a, **kw: pytest.fail("must not start analyzing an unconfirmed run"))
+        resp = _client().post("/p2/strategic-agents/thought-leader-pr/runs/1/collect-reaction")
+        assert resp.status_code == 404
+
+    def test_confirmed_run_starts_a_background_job(self, monkeypatch):
+        import threading
+        started = threading.Event()
+        captured = {}
+
+        def fake_job(run_id, email):
+            captured.update(run_id=run_id, email=email)
+            started.set()
+
+        monkeypatch.setattr(T, "start_reacting", lambda run_id, email: True)
+        monkeypatch.setattr(T, "collect_reaction_job", fake_job)
+
+        resp = _client().post("/p2/strategic-agents/thought-leader-pr/runs/6/collect-reaction")
+        assert resp.status_code == 200
+        assert resp.get_json() == {"ok": True, "reaction_status": "collecting"}
+        assert started.wait(timeout=2), "background job never ran"
+        assert captured == {"run_id": 6, "email": _OWNER}

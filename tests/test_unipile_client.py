@@ -374,3 +374,30 @@ def test_probe_separates_accounts_that_work_from_accounts_that_are_merely_listed
     assert result["by_platform"] == {"linkedin": 3}
     assert result["connected_by_platform"] == {"linkedin": 2}
     assert [a["connected"] for a in result["accounts"]] == [True, False, True]
+
+
+def test_list_comments_returns_the_raw_envelope(monkeypatch):
+    monkeypatch.setenv("UNIPILE_API_KEY", "k")
+    body = json.dumps({"object": "CommentList", "items": [{"text": "nice post"}], "cursor": None})
+    req = _request_returning(_FakeResp(200, body))
+    monkeypatch.setattr(uc.requests, "request", req)
+    data, err = uc.list_comments("social123", "acct-1")
+    assert err is None
+    assert data["items"] == [{"text": "nice post"}]
+    assert req.calls[0]["params"]["account_id"] == "acct-1"
+
+
+def test_list_comments_passes_comment_id_for_replies(monkeypatch):
+    monkeypatch.setenv("UNIPILE_API_KEY", "k")
+    req = _request_returning(_FakeResp(200, json.dumps({"items": []})))
+    monkeypatch.setattr(uc.requests, "request", req)
+    uc.list_comments("social123", "acct-1", comment_id="c1")
+    assert req.calls[0]["params"]["comment_id"] == "c1"
+
+
+def test_list_comments_surfaces_a_transport_error(monkeypatch):
+    monkeypatch.setenv("UNIPILE_API_KEY", "k")
+    monkeypatch.setattr(uc.requests, "request",
+                        _request_returning(_FakeResp(422, "")))
+    data, err = uc.list_comments("social123", "acct-1")
+    assert data is None and err["kind"] == uc.ERR_HTTP

@@ -337,6 +337,32 @@ def get_user_profile(identifier: str, account_id: str) -> tuple[dict | None, dic
     return data, None
 
 
+def list_comments(post_id: str, account_id: str, cursor: str | None = None,
+                  limit: int = 100, comment_id: str | None = None) -> tuple[Any, dict | None]:
+    """Comments on a LinkedIn post, fetched through `account_id`'s connected
+    session. Pass `comment_id` to instead list REPLIES on that one comment
+    (the same endpoint serves both, per Unipile's own docs).
+
+    `post_id` must be the post's social_id -- the same id sci_source_
+    linkedin_unipile.normalize() already extracts as platform_post_id --
+    never the URL id; Unipile's docs are explicit that only social_id works
+    reliably across every comment/reaction endpoint, the same rule
+    get_company exists to satisfy for posts themselves.
+
+    Confirmed against Unipile's published API reference
+    (developer.unipile.com/reference/postscontroller_listallcomments) on
+    2026-09-17 -- like get_user_profile, NOT yet against a live response.
+    Returns the raw parsed response (an envelope with an `items` list, plus
+    `cursor`); normalizing a platform's comment shape is each caller's job,
+    same division as list_posts."""
+    params: dict[str, Any] = {"account_id": account_id, "limit": max(1, min(limit, 100))}
+    if cursor:
+        params["cursor"] = cursor
+    if comment_id:
+        params["comment_id"] = comment_id
+    return _request("GET", f"{_API}/posts/{post_id}/comments", params=params)
+
+
 def list_posts(account_id: str, identifier: str, is_company: bool = True,
                cursor: str | None = None, limit: int = 50) -> tuple[dict | None, dict | None]:
     """Recent posts for `identifier`, fetched through `account_id`'s
