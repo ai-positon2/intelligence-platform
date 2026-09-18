@@ -440,6 +440,20 @@ body{font-family:'Space Grotesk',-apple-system,BlinkMacSystemFont,sans-serif;min
   .tlpr-reaction-cols{grid-template-columns:1fr;gap:var(--sp6);}
 }
 
+/* ---- Press section (Phase 3) ---- */
+#tlprPressSection:not(:empty){margin-top:var(--sp5);}
+.tlpr-press-meta{
+  font-size:var(--fs-2xs);color:var(--tx3);font-variant-numeric:tabular-nums;margin-bottom:14px;
+}
+.tlpr-notable-list li{padding-left:0;}
+.tlpr-notable-list li::before{display:none;}
+.tlpr-notable-item a{
+  color:var(--tx);font-weight:600;text-decoration:none;border-bottom:1px dashed var(--b2);
+}
+.tlpr-notable-item a:hover{color:var(--amber);border-bottom-color:var(--amber);}
+.tlpr-notable-item .tlpr-notable-source{color:var(--tx3);font-weight:400;}
+.tlpr-notable-item p{margin:4px 0 0;color:var(--tx2);font-size:var(--fs-xs);line-height:var(--lh-snug);}
+
 /* ---- Recent lookups ---- */
 .tlpr-history{margin-top:var(--sp7);}
 .tlpr-history-head{

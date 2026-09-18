@@ -602,3 +602,83 @@ class TestCollectReactionJob:
         monkeypatch.setattr(T, "save_reaction_failed", lambda run_id, email, msg: captured.update(msg=msg) or True)
         T.collect_reaction_job(3, "a@b.com")
         assert "unexpected error" in captured["msg"]
+
+
+class TestPhase3StoreFailSoft:
+    def test_start_press_returns_false(self):
+        assert T.start_press(1, "a@b.com") is False
+
+    def test_save_press_returns_false(self):
+        assert T.save_press(1, "a@b.com", {}, {}) is False
+
+    def test_save_press_failed_returns_false(self):
+        assert T.save_press_failed(1, "a@b.com", "boom") is False
+
+
+class TestResolveStalePress:
+    def test_a_fresh_collecting_run_is_left_alone(self):
+        run = {"id": 1, "press_status": "collecting",
+              "updated_at": T.datetime.now(T.timezone.utc).isoformat()}
+        assert T._resolve_stale_press(run, "a@b.com")["press_status"] == "collecting"
+
+    def test_a_stale_collecting_run_is_flipped_to_failed(self, monkeypatch):
+        stale_time = (T.datetime.now(T.timezone.utc) - T.timedelta(minutes=T.STALE_RUN_MINUTES + 1)).isoformat()
+        run = {"id": 1, "press_status": "collecting", "updated_at": stale_time}
+        monkeypatch.setattr(T, "save_press_failed", lambda *a, **kw: True)
+        out = T._resolve_stale_press(run, "a@b.com")
+        assert out["press_status"] == "failed"
+        assert "_run" in out["press_errors"]
+
+    def test_a_stuck_reaction_analysis_never_strands_the_press_poll(self):
+        """The three 'collecting' states are independent columns -- a
+        reaction analysis stuck mid-flight must not make _resolve_stale_press
+        think there is a press job to time out."""
+        run = {"id": 1, "reaction_status": "collecting", "press_status": "idle",
+              "updated_at": "2020-01-01T00:00:00+00:00"}
+        assert T._resolve_stale_press(run, "a@b.com") == run
+
+
+class TestCollectPressJob:
+    def _identity_run(self):
+        return {"input_name": "Jane Doe",
+               "identity": {"full_name": "Jane Doe", "current_company": "Acme"}}
+
+    def test_no_run_or_identity_saves_a_failed_state(self, monkeypatch):
+        monkeypatch.setattr(T, "get_run", lambda run_id, email: None)
+        captured = {}
+        monkeypatch.setattr(T, "save_press_failed", lambda run_id, email, msg: captured.update(
+            run_id=run_id, msg=msg) or True)
+        monkeypatch.setattr(T, "save_press", lambda *a, **kw: pytest.fail("must not save a partial press result"))
+        T.collect_press_job(5, "a@b.com")
+        assert captured["run_id"] == 5 and "no confirmed identity" in captured["msg"]
+
+    def test_builds_press_and_saves_ready_with_its_errors_split_out(self, monkeypatch):
+        monkeypatch.setattr(T, "get_run", lambda run_id, email: self._identity_run())
+        monkeypatch.setattr(T.tlpr_press, "build_press", lambda name, hint: {
+            "article_count": 3, "errors": {"serpapi": "not configured"}})
+
+        captured = {}
+        monkeypatch.setattr(T, "save_press", lambda run_id, email, press_data, errors: captured.update(
+            press_data=press_data, errors=errors) or True)
+        T.collect_press_job(9, "a@b.com")
+
+        assert captured["errors"] == {"serpapi": "not configured"}
+        assert captured["press_data"] == {"article_count": 3}
+
+    def test_a_build_press_call_with_no_errors_key_saves_an_empty_errors_dict(self, monkeypatch):
+        monkeypatch.setattr(T, "get_run", lambda run_id, email: self._identity_run())
+        monkeypatch.setattr(T.tlpr_press, "build_press", lambda name, hint: {"article_count": 0})
+        captured = {}
+        monkeypatch.setattr(T, "save_press", lambda run_id, email, press_data, errors: captured.update(
+            errors=errors) or True)
+        T.collect_press_job(9, "a@b.com")
+        assert captured["errors"] == {}
+
+    def test_an_unexpected_crash_still_reaches_a_terminal_state(self, monkeypatch):
+        def boom(run_id, email):
+            raise RuntimeError("kaboom")
+        monkeypatch.setattr(T, "get_run", boom)
+        captured = {}
+        monkeypatch.setattr(T, "save_press_failed", lambda run_id, email, msg: captured.update(msg=msg) or True)
+        T.collect_press_job(3, "a@b.com")
+        assert "unexpected error" in captured["msg"]

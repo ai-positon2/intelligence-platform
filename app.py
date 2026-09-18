@@ -9913,6 +9913,25 @@ def thought_leader_pr_collect_reaction(run_id):
     return jsonify({"ok": True, "reaction_status": "collecting"})
 
 
+@app.route("/p2/strategic-agents/thought-leader-pr/runs/<int:run_id>/collect-press", methods=["POST"])
+@position2_required
+def thought_leader_pr_collect_press(run_id):
+    # Phase 3 (earned media / press): real news coverage via GDELT + SerpAPI
+    # (tracker/tlpr_press.py). Needs only the confirmed identity, not Phase
+    # 1's posts, so it's its own explicit action for the same billed-step
+    # reason /collect and /collect-reaction are, but never gated on either
+    # of those having run first.
+    from tracker import thought_leader_pr as tlpr
+    user = _get_user() or {}
+    email = (user.get("email") or "").lower()
+    started = tlpr.start_press(run_id, email)
+    if not started:
+        return jsonify({"ok": False,
+                        "error": "Run not found or its identity isn't confirmed yet."}), 404
+    threading.Thread(target=tlpr.collect_press_job, args=(run_id, email), daemon=True).start()
+    return jsonify({"ok": True, "press_status": "collecting"})
+
+
 # ── Contact Finder ────────────────────────────────────────────────────────────
 # Internal, staff-only Apollo search + chat agent: filter/browse companies and
 # people live against Apollo (search_people is free; search_companies and any

@@ -40,7 +40,7 @@ from datetime import datetime, timedelta, timezone
 
 from tracker import (apify_transport, apify_x_replies, apollo_client, claude_websearch,
                      sci_source_linkedin_unipile, sci_source_x, sci_youtube_client,
-                     tlpr_reddit_pulse, unipile_client, unipile_transport)
+                     tlpr_press, tlpr_reddit_pulse, unipile_client, unipile_transport)
 
 logger = logging.getLogger(__name__)
 
@@ -57,6 +57,7 @@ STATUSES = ("resolving", "needs_review", "confirmed", "failed")
 POSTS_STATUSES = ("idle", "collecting", "ready", "failed")
 _STALE_POSTS_ERROR = "The collection stalled and did not finish -- try collecting again."
 _STALE_REACTION_ERROR = "The analysis stalled and did not finish -- try again."
+_STALE_PRESS_ERROR = "The press search stalled and did not finish -- try again."
 
 
 # ───────────────────────── Postgres store ─────────────────────────
@@ -106,6 +107,10 @@ def _ensure_tables(conn) -> None:
                 reaction JSONB,
                 reaction_errors JSONB,
                 reaction_updated_at TIMESTAMPTZ,
+                press_status TEXT NOT NULL DEFAULT 'idle',
+                press JSONB,
+                press_errors JSONB,
+                press_updated_at TIMESTAMPTZ,
                 created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
                 updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
             )
@@ -128,6 +133,11 @@ def _ensure_tables(conn) -> None:
         cur.execute("ALTER TABLE thought_leader_pr_runs ADD COLUMN IF NOT EXISTS reaction JSONB")
         cur.execute("ALTER TABLE thought_leader_pr_runs ADD COLUMN IF NOT EXISTS reaction_errors JSONB")
         cur.execute("ALTER TABLE thought_leader_pr_runs ADD COLUMN IF NOT EXISTS reaction_updated_at TIMESTAMPTZ")
+        # Added for Phase 3 (earned media / press), same reasoning.
+        cur.execute("ALTER TABLE thought_leader_pr_runs ADD COLUMN IF NOT EXISTS press_status TEXT NOT NULL DEFAULT 'idle'")
+        cur.execute("ALTER TABLE thought_leader_pr_runs ADD COLUMN IF NOT EXISTS press JSONB")
+        cur.execute("ALTER TABLE thought_leader_pr_runs ADD COLUMN IF NOT EXISTS press_errors JSONB")
+        cur.execute("ALTER TABLE thought_leader_pr_runs ADD COLUMN IF NOT EXISTS press_updated_at TIMESTAMPTZ")
     conn.commit()
     _TABLES_READY = True
 
@@ -223,7 +233,8 @@ def confirm_run(run_id: int, email: str) -> bool:
 _RUN_COLUMNS = ("id, input_name, company_hint, title_hint, status, confidence, "
                "reasoning, identity, error, posts_status, posts, posts_errors, "
                "posts_updated_at, reaction_status, reaction, reaction_errors, "
-               "reaction_updated_at, created_at, updated_at")
+               "reaction_updated_at, press_status, press, press_errors, "
+               "press_updated_at, created_at, updated_at")
 
 
 def get_run(run_id: int, email: str) -> dict | None:
@@ -241,7 +252,8 @@ def get_run(run_id: int, email: str) -> dict | None:
             if not row:
                 return None
             run = _resolve_stale_posts(_row_to_dict(row), email)
-            return _resolve_stale_reaction(run, email)
+            run = _resolve_stale_reaction(run, email)
+            return _resolve_stale_press(run, email)
     except Exception as e:
         logger.warning("thought_leader_pr: get_run failed for run %s: %s", run_id, e)
         return None
@@ -261,8 +273,11 @@ def list_runs(email: str, limit: int = 25) -> list[dict]:
                 FROM thought_leader_pr_runs WHERE email = %s
                 ORDER BY created_at DESC LIMIT %s
             """, (email, limit))
-            return [_resolve_stale_reaction(_resolve_stale_posts(_row_to_dict(row), email), email)
-                   for row in cur.fetchall()]
+            runs = []
+            for row in cur.fetchall():
+                run = _resolve_stale_reaction(_resolve_stale_posts(_row_to_dict(row), email), email)
+                runs.append(_resolve_stale_press(run, email))
+            return runs
     except Exception as e:
         logger.warning("thought_leader_pr: list_runs failed: %s", e)
         return []
@@ -274,6 +289,7 @@ def _row_to_dict(row) -> dict:
     (rid, input_name, company_hint, title_hint, status, confidence, reasoning,
      identity, error, posts_status, posts, posts_errors, posts_updated_at,
      reaction_status, reaction, reaction_errors, reaction_updated_at,
+     press_status, press, press_errors, press_updated_at,
      created_at, updated_at) = row
     return {
         "id": rid, "input_name": input_name, "company_hint": company_hint,
@@ -284,6 +300,8 @@ def _row_to_dict(row) -> dict:
         "reaction_status": reaction_status or "idle", "reaction": reaction,
         "reaction_errors": reaction_errors,
         "reaction_updated_at": reaction_updated_at.isoformat() if reaction_updated_at else None,
+        "press_status": press_status or "idle", "press": press, "press_errors": press_errors,
+        "press_updated_at": press_updated_at.isoformat() if press_updated_at else None,
         "created_at": created_at.isoformat() if created_at else None,
         "updated_at": updated_at.isoformat() if updated_at else None,
     }
@@ -321,6 +339,23 @@ def _resolve_stale_reaction(run: dict, email: str) -> dict:
         return run
     if save_reaction_failed(run["id"], email, _STALE_REACTION_ERROR):
         run = dict(run, reaction_status="failed", reaction_errors={"_run": _STALE_REACTION_ERROR})
+    return run
+
+
+def _resolve_stale_press(run: dict, email: str) -> dict:
+    """Same self-heal as _resolve_stale_posts/_resolve_stale_reaction, for
+    Phase 3's own 'collecting' status -- a separate column, so a stuck
+    press search can't strand the posts or reaction polls, or vice versa."""
+    if run.get("press_status") != "collecting":
+        return run
+    updated_at = run.get("updated_at")
+    if not updated_at:
+        return run
+    last = datetime.fromisoformat(updated_at)
+    if last >= datetime.now(timezone.utc) - timedelta(minutes=STALE_RUN_MINUTES):
+        return run
+    if save_press_failed(run["id"], email, _STALE_PRESS_ERROR):
+        run = dict(run, press_status="failed", press_errors={"_run": _STALE_PRESS_ERROR})
     return run
 
 
@@ -477,6 +512,85 @@ def save_reaction_failed(run_id: int, email: str, message: str) -> bool:
         return updated
     except Exception as e:
         logger.warning("thought_leader_pr: save_reaction_failed failed for run %s: %s", run_id, e)
+        return False
+    finally:
+        conn.close()
+
+
+def start_press(run_id: int, email: str) -> bool:
+    """Flip press_status to 'collecting' before Phase 3's background thread
+    starts -- same gate as start_reacting, kept independent so press search
+    can be run (or re-run) without depending on posts_status or
+    reaction_status at all: GDELT/SerpAPI only need the confirmed identity,
+    not Phase 1's collected posts."""
+    conn = _pg_conn()
+    if not conn:
+        return False
+    try:
+        _ensure_tables(conn)
+        with conn.cursor() as cur:
+            cur.execute("""
+                UPDATE thought_leader_pr_runs
+                SET press_status = 'collecting', press_errors = NULL, updated_at = now()
+                WHERE id = %s AND email = %s AND status = 'confirmed'
+            """, (run_id, email))
+            updated = cur.rowcount > 0
+        conn.commit()
+        return updated
+    except Exception as e:
+        logger.warning("thought_leader_pr: start_press failed for run %s: %s", run_id, e)
+        return False
+    finally:
+        conn.close()
+
+
+def save_press(run_id: int, email: str, press: dict, errors: dict) -> bool:
+    """press_status becomes 'ready' even when a source came back empty or
+    unconfigured -- same "partial is not a failure" rule save_posts and
+    save_reaction follow, per-source failure lives in `errors`."""
+    conn = _pg_conn()
+    if not conn:
+        return False
+    try:
+        _ensure_tables(conn)
+        with conn.cursor() as cur:
+            cur.execute("""
+                UPDATE thought_leader_pr_runs
+                SET press_status = 'ready', press = %s, press_errors = %s,
+                    press_updated_at = now(), updated_at = now()
+                WHERE id = %s AND email = %s
+            """, (json.dumps(press), json.dumps(errors) if errors else None, run_id, email))
+            updated = cur.rowcount > 0
+        conn.commit()
+        return updated
+    except Exception as e:
+        logger.warning("thought_leader_pr: save_press failed for run %s: %s", run_id, e)
+        return False
+    finally:
+        conn.close()
+
+
+def save_press_failed(run_id: int, email: str, message: str) -> bool:
+    """The press search job itself crashed -- distinct from save_press,
+    which always means the job ran to completion, however partial the
+    result."""
+    conn = _pg_conn()
+    if not conn:
+        return False
+    try:
+        _ensure_tables(conn)
+        with conn.cursor() as cur:
+            cur.execute("""
+                UPDATE thought_leader_pr_runs
+                SET press_status = 'failed', press_errors = %s, press_updated_at = now(),
+                    updated_at = now()
+                WHERE id = %s AND email = %s
+            """, (json.dumps({"_run": message}), run_id, email))
+            updated = cur.rowcount > 0
+        conn.commit()
+        return updated
+    except Exception as e:
+        logger.warning("thought_leader_pr: save_press_failed failed for run %s: %s", run_id, e)
         return False
     finally:
         conn.close()
@@ -1138,3 +1252,32 @@ def collect_reaction_job(run_id: int, email: str, max_posts: int = MAX_POSTS_FOR
     except Exception:
         logger.exception("thought_leader_pr: collect_reaction_job crashed for run %s", run_id)
         save_reaction_failed(run_id, email, "An unexpected error stopped the analysis.")
+
+
+# ───────────────────────── Phase 3: earned media / press ─────────────────────────
+#
+# What real news coverage exists about this person, via tracker/tlpr_press.py
+# (GDELT + SerpAPI). Needs only the confirmed identity -- unlike Phase 2's
+# own-post comment sentiment, this does not depend on Phase 1's posts ever
+# having been collected, so it can run in parallel with either earlier phase.
+
+def collect_press_job(run_id: int, email: str) -> None:
+    """Runs on a background thread started by the /collect-press route, same
+    job-thread convention as collect_posts_job and collect_reaction_job.
+    Always leaves the run in a terminal press_status ('ready' or
+    'failed')."""
+    try:
+        run = get_run(run_id, email)
+        if not run or not run.get("identity"):
+            save_press_failed(run_id, email, "This run has no confirmed identity to search press for.")
+            return
+        identity = run["identity"] or {}
+        full_name = identity.get("full_name") or run.get("input_name") or ""
+        company_hint = identity.get("current_company") or run.get("company_hint")
+
+        press = tlpr_press.build_press(full_name, company_hint)
+        errors = press.pop("errors", {}) or {}
+        save_press(run_id, email, press, errors)
+    except Exception:
+        logger.exception("thought_leader_pr: collect_press_job crashed for run %s", run_id)
+        save_press_failed(run_id, email, "An unexpected error stopped the press search.")

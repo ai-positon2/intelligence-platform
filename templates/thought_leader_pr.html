@@ -174,7 +174,8 @@
           </div>
         </div>
         <div id="tlprPostsSection"></div>
-        <div id="tlprReactionSection"></div>`;
+        <div id="tlprReactionSection"></div>
+        <div id="tlprPressSection"></div>`;
     }
 
     function compactNumber(n){
@@ -456,6 +457,133 @@
       }
     }
 
+    // ---- Phase 3: earned media / press ----
+    // Needs only the confirmed identity, not Phase 1's posts -- so this
+    // section is rendered straight from identityCardHtml, independent of
+    // whether posts/reaction have ever been collected.
+
+    function pressMetaLineHtml(p){
+      const parts = [`${p.article_count} article${p.article_count === 1 ? '' : 's'}`];
+      if (p.source_count) parts.push(`${p.source_count} outlet${p.source_count === 1 ? '' : 's'}`);
+      if (p.earliest && p.latest) parts.push(`${formatPostDate(p.earliest)} – ${formatPostDate(p.latest)}`);
+      return parts.join(' · ');
+    }
+    function pressSourceChipsHtml(sources){
+      return (sources || []).slice(0, 8).map(s =>
+        `<span class="tlpr-sub-chip">${esc(s.name)} <b>${s.articles}</b></span>`).join('');
+    }
+    function notableArticlesHtml(items){
+      return (items || []).map(n => {
+        const title = esc(n.title || 'Read the coverage');
+        const source = n.source ? ` <span class="tlpr-notable-source">· ${esc(n.source)}</span>` : '';
+        const headline = n.url
+          ? `<a href="${esc(n.url)}" target="_blank" rel="noopener">${title}</a>${source}`
+          : `<b>${title}</b>${source}`;
+        return `<li class="tlpr-notable-item">${headline}<p>${esc(n.why)}</p></li>`;
+      }).join('');
+    }
+    function pressReadyHtml(run){
+      const p = run.press || {};
+      const a = p.analysis || {};
+      const head = `
+        <div class="tlpr-posts-head">
+          <h3>What the press says</h3>
+          <button type="button" class="tlpr-btn-secondary tlpr-btn-repress" data-run-id="${run.id}">Refresh</button>
+        </div>`;
+      if (!p.article_count){
+        return `<div class="tlpr-card tlpr-card--press">${head}
+                  <div class="tlpr-reaction-empty">${esc(p.note || 'No recent press coverage was found.')}</div>
+                </div>`;
+      }
+      const meta = `<div class="tlpr-press-meta">${pressMetaLineHtml(p)}</div>`;
+      if (!a || a.error){
+        return `<div class="tlpr-card tlpr-card--press">${head}${meta}
+                  <div class="tlpr-reaction-empty">${esc((a && a.error) || 'The press analysis did not complete.')}</div>
+                </div>`;
+      }
+      const s = a.sentiment || {};
+      const notable = notableArticlesHtml(a.notable_articles);
+      const riskFlags = (a.risk_flags || []).map(r => `<li>${esc(r)}</li>`).join('');
+      return `
+        <div class="tlpr-card tlpr-card--press">${head}${meta}
+          <div class="tlpr-reaction-verdict">${esc(a.verdict || '')}</div>
+          <div class="tlpr-sent-bars">${sentimentBarsHtml(s.counts, s.labelled)}</div>
+          <div class="tlpr-subs">${pressSourceChipsHtml(p.sources)}</div>
+          ${themeRowsHtml(a.themes)}
+          ${notable ? `<div class="tlpr-facts" style="margin-top:14px;">
+              <div class="tlpr-facts-label">Notable coverage</div>
+              <ul class="tlpr-notable-list">${notable}</ul></div>` : ''}
+          ${riskFlags ? `<div class="tlpr-facts tlpr-facts--risk" style="margin-top:14px;">
+              <div class="tlpr-facts-label">Risk flags</div><ul>${riskFlags}</ul></div>` : ''}
+        </div>`;
+    }
+    function pressIdleHtml(runId){
+      return `
+        <div class="tlpr-card tlpr-card--posts-cta">
+          <div class="tlpr-posts-cta-text">
+            <h3>See what the press says</h3>
+            <p>Searches real news coverage of them via GDELT and SerpAPI.</p>
+          </div>
+          <button type="button" class="tlpr-btn-collect" id="tlprPressBtn" data-run-id="${runId}">
+            <svg viewBox="0 0 24 24"><path d="M4 4h13v16H4zM17 8h3v10a2 2 0 0 1-2 2H6M8 8h5M8 12h5M8 16h3"/></svg>
+            Find press coverage</button>
+        </div>`;
+    }
+    function pressLoadingHtml(){
+      return `
+        <div class="tlpr-card tlpr-card--posts-loading">
+          <div class="tlpr-posts-loading-spin"></div>
+          <div>Searching for press coverage…</div>
+        </div>`;
+    }
+    function pressFailedHtml(runId, message){
+      return `
+        <div class="tlpr-card tlpr-card--posts-cta">
+          <div class="tlpr-posts-cta-text">
+            <h3>The press search didn't finish</h3>
+            <p>${esc(message || 'Something went wrong.')}</p>
+          </div>
+          <button type="button" class="tlpr-btn-collect" id="tlprPressBtn" data-run-id="${runId}">Try again</button>
+        </div>`;
+    }
+    function renderPressSection(run){
+      const el = document.getElementById('tlprPressSection');
+      if (!el || !run) return;
+      const status = run.press_status || 'idle';
+      if (status === 'ready') el.innerHTML = pressReadyHtml(run);
+      else if (status === 'collecting') { el.innerHTML = pressLoadingHtml(); pollPress(run.id); }
+      else if (status === 'failed') el.innerHTML = pressFailedHtml(run.id, (run.press_errors || {})._run);
+      else el.innerHTML = pressIdleHtml(run.id);
+    }
+
+    let _pressPollTimer = null;
+    function pollPress(runId){
+      clearTimeout(_pressPollTimer);
+      _pressPollTimer = setTimeout(async () => {
+        try {
+          const res = await fetch(`/p2/strategic-agents/thought-leader-pr/runs/${runId}`);
+          const run = await res.json();
+          if (run.press_status === 'collecting') pollPress(runId);
+          else renderPressSection(run);
+        } catch (e) {
+          pollPress(runId);
+        }
+      }, 2500);
+    }
+
+    async function startFindingPress(runId){
+      document.getElementById('tlprPressSection').innerHTML = pressLoadingHtml();
+      try {
+        const res = await fetch(`/p2/strategic-agents/thought-leader-pr/runs/${runId}/collect-press`, {method: 'POST'});
+        const out = await res.json();
+        if (out.ok) pollPress(runId);
+        else renderPressSection({id: runId, press_status: 'failed', press_errors: {_run: out.error}});
+      } catch (e) {
+        renderPressSection({id: runId, press_status: 'failed',
+                            press_errors: {_run: 'A network error interrupted this.'}});
+      }
+    }
+
     function emptyCardHtml(reasoning, confidence){
       const isLow = confidence === 'low';
       return `
@@ -567,7 +695,7 @@
         if (run.identity){
           document.getElementById('tlprResult').innerHTML =
             identityCardHtml(run.identity, run.id, run.status === 'confirmed');
-          if (run.status === 'confirmed') renderPostsSection(run);
+          if (run.status === 'confirmed') { renderPostsSection(run); renderPressSection(run); }
         } else {
           renderResult({ok:false, reasoning: run.reasoning || 'This lookup did not resolve to a person.'});
         }
@@ -602,6 +730,7 @@
             if (row) row.status = 'confirmed';
             renderHistory();
             renderPostsSection({id: runId, posts_status: 'idle'});
+            renderPressSection({id: runId, press_status: 'idle'});
           } else {
             confirmBtn.disabled = false;
           }
@@ -618,6 +747,12 @@
       if (reactBtn){
         const runId = reactBtn.dataset.runId;
         if (runId) startAnalyzingReaction(runId);
+        return;
+      }
+      const pressBtn = e.target.closest('#tlprPressBtn, .tlpr-btn-repress');
+      if (pressBtn){
+        const runId = pressBtn.dataset.runId;
+        if (runId) startFindingPress(runId);
         return;
       }
       const notThemBtn = e.target.closest('#tlprNotThemBtn');
