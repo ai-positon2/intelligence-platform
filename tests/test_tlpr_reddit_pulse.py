@@ -188,6 +188,48 @@ def test_build_pulse_explains_an_unconfigured_deployment(monkeypatch):
     assert out["analysis"] is None
 
 
+class _FakeTextBlock:
+    def __init__(self, text):
+        self.type = "text"
+        self.text = text
+
+
+class _FakeResponse:
+    def __init__(self, text, stop_reason):
+        self.content = [_FakeTextBlock(text)]
+        self.stop_reason = stop_reason
+
+
+class _FakeMessages:
+    def __init__(self, text, stop_reason):
+        self._text, self._stop_reason = text, stop_reason
+
+    def create(self, **kwargs):
+        return _FakeResponse(self._text, self._stop_reason)
+
+
+class _FakeClient:
+    def __init__(self, text, stop_reason="end_turn"):
+        self.messages = _FakeMessages(text, stop_reason)
+
+
+def test_analyze_names_a_truncated_reply_distinctly_from_a_generic_unreadable_one(monkeypatch):
+    """Same fix as tests/test_tlpr_press.py's twin of this test -- see there
+    for why the distinction matters."""
+    monkeypatch.setattr(pulse, "_anthropic",
+                        lambda: _FakeClient('{"verdict": "cut off mid-sen', stop_reason="max_tokens"))
+    out = pulse.analyze("Jane Doe", [_post("a")])
+    assert "max_tokens" in out["error"]
+    assert "unreadable response" not in out["error"]
+
+
+def test_analyze_still_reports_a_generic_unreadable_response_when_not_truncated(monkeypatch):
+    monkeypatch.setattr(pulse, "_anthropic",
+                        lambda: _FakeClient("Sorry, I can't help with that.", stop_reason="end_turn"))
+    out = pulse.analyze("Jane Doe", [_post("a")])
+    assert out["error"] == "The Reddit conversation analysis returned an unreadable response."
+
+
 def test_build_pulse_calls_a_genuine_zero_a_finding_not_an_error(monkeypatch):
     from tracker import sci_reddit_client
     monkeypatch.setattr(sci_reddit_client, "is_configured", lambda: True)

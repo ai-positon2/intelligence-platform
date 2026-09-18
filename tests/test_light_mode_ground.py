@@ -177,3 +177,28 @@ def test_a_moved_ground_never_carries_important(page):
         "%s: a gradient-only `background` shorthand resets background-color to "
         "transparent, and macOS overscroll then paints white past the document "
         "edge" % page)
+
+
+@pytest.mark.parametrize("page", [
+    "event_conference_intelligence.css",
+    "social_media_intelligence.css",
+    "42_north_dental_slot_checker.css",
+    "thought_leader_pr.css",
+])
+def test_a_page_with_its_own_dark_ground_still_sets_a_background_color(page):
+    """These four define BOTH grounds themselves (see
+    test_a_page_with_its_own_light_ground_still_outranks_auroras above for the
+    light half) rather than falling back to aurora's, so trap #3 has to be
+    checked on their own unconditional `html:root{...}` too: a gradient-only
+    `background` shorthand resets background-color to transparent, and
+    whatever the four radial gradients don't tile -- a wide/tall viewport, or
+    what a fast overscroll bounce exposes beyond the document box -- falls
+    through to the browser's white canvas. thought_leader_pr.css shipped
+    without this (caught 2026-09-18): its dark ground computed
+    rgba(0,0,0,0), confirmed live before the fix."""
+    body = _strip_comments(_read(page))
+    m = re.search(r"(?:^|\n)html:root\s*\{([^}]*)\}", body)
+    assert m, "%s no longer sets its own ground on html:root" % page
+    assert "background-color" in m.group(1), (
+        "%s: this page's own dark html:root ground has no background-color, "
+        "so gaps in its gradients render the browser's white canvas" % page)

@@ -9824,6 +9824,28 @@ def thought_leader_pr():
                           runs=tlpr.list_runs(email))
 
 
+@app.route("/p2/strategic-agents/thought-leader-pr/search")
+@position2_required
+def thought_leader_pr_search():
+    """Candidate list shown as the user types a name, so a common one
+    ("John Smith") can be disambiguated against a real business-database
+    match before /resolve's own websearch grounding call ever spends a
+    call guessing which one was meant. Same cheap-before-expensive shape as
+    Social Media Intelligence's own /search ahead of /analyze -- see
+    tracker/thought_leader_pr.py's search_name_candidates for why this is a
+    separate Apollo call from resolve_identity's own candidate lookup."""
+    from tracker import thought_leader_pr as tlpr
+    q = (request.args.get("q") or "").strip()
+    if not q:
+        return jsonify({"candidates": []})
+    company_hint = (request.args.get("company") or "").strip() or None
+    candidates, error = tlpr.search_name_candidates(q, company_hint)
+    payload = {"candidates": candidates}
+    if error:
+        payload["error"] = error
+    return jsonify(payload)
+
+
 @app.route("/p2/strategic-agents/thought-leader-pr/resolve", methods=["POST"])
 @position2_required
 def thought_leader_pr_resolve():

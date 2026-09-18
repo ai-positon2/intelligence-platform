@@ -10,7 +10,7 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-tokens.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-components.css') }}">
   <script src="/static/js/theme.js"></script>
-  <link rel="stylesheet" href="/static/css/thought_leader_pr.css?v=1">
+  <link rel="stylesheet" href="/static/css/thought_leader_pr.css?v=3">
   <link rel="stylesheet" href="/static/css/aurora-app.css?v=3">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/agent-feedback.css') }}">
   <script src="{{ url_for('static', filename='js/agent_feedback.js') }}"></script>
@@ -59,7 +59,7 @@
       <div class="tlpr-search-row">
         <div class="tlpr-input-wrap">
           <svg class="tlpr-input-ic" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-3.4-3.4"/></svg>
-          <input id="tlprName" type="text" placeholder="e.g. Satya Nadella" autocomplete="off" maxlength="120">
+          <input id="tlprName" type="text" placeholder="e.g. Satya Nadella" autocomplete="off" maxlength="120" oninput="onNameInput()">
         </div>
         <button type="button" id="tlprResolveBtn" class="tlpr-resolve-btn">
           <svg class="tlpr-ic-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-3.4-3.4"/></svg>
@@ -67,6 +67,7 @@
           <span>Resolve identity</span>
         </button>
       </div>
+      <div class="tlpr-suggest-panel" id="tlprSuggestPanel" style="display:none"></div>
       <button type="button" id="tlprRefineToggle" class="tlpr-refine-toggle">
         <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
         <span>Add company, title, or a LinkedIn URL to skip ambiguity</span>
@@ -111,6 +112,84 @@
     }
     function confLabel(c){
       return {high: 'High match', medium: 'Medium match', low: 'Low match', none: 'No match'}[c] || 'Unknown';
+    }
+
+    /* ── Name disambiguation, before /resolve ever spends a websearch call ──
+       A cheap Apollo-only candidate list shown as the user types, so a
+       common name ("John Smith") can be picked from real business-database
+       rows instead of typed blind. Same pattern as Social Media
+       Intelligence's own company picker: picking a row just fills the
+       refine fields, which stay editable -- there's no hard requirement to
+       pick one, since this has to work for people Apollo's database
+       doesn't know about too. */
+    function debounce(fn, ms){
+      let t = null;
+      return function(){ const a = arguments; clearTimeout(t); t = setTimeout(() => fn.apply(null, a), ms); };
+    }
+
+    function tlprCandidateRow(c, i){
+      const initial = esc((c.full_name || '?').trim().charAt(0).toUpperCase() || '?');
+      const avatar = `<div class="tlpr-suggest-avatar${c.photo_url ? '' : ' tlpr-suggest-noavatar'}">` +
+        (c.photo_url ? `<img src="${esc(c.photo_url)}" alt="" loading="lazy" onerror="this.closest('.tlpr-suggest-avatar').classList.add('tlpr-suggest-noavatar');this.remove()">` : '') +
+        `<span class="tlpr-suggest-initial">${initial}</span></div>`;
+      const meta = [c.title, c.company].filter(Boolean).join(' at ') || c.location || '';
+      return `<div class="tlpr-suggest-row" onclick="pickNameCandidate(${i})">${avatar}` +
+        `<div class="tlpr-suggest-info"><div class="tlpr-suggest-name">${esc(c.full_name)}</div>` +
+        (meta ? `<div class="tlpr-suggest-meta">${esc(meta)}</div>` : '') + '</div>' +
+        (c.location && c.title && c.company ? `<div class="tlpr-suggest-loc">${esc(c.location)}</div>` : '') +
+        '</div>';
+    }
+
+    function renderNameSuggestions(candidates, error, q){
+      const panel = document.getElementById('tlprSuggestPanel');
+      window.__tlprCandidates = candidates || [];
+      let html = '';
+      if (error && error.code !== 'not_configured'){
+        html += `<div class="tlpr-suggest-error">${esc(error.message || 'The candidate search is unavailable right now. You can still fill this in manually.')}</div>`;
+      }
+      if (candidates && candidates.length){
+        html += `<div class="tlpr-suggest-list">${candidates.map(tlprCandidateRow).join('')}</div>`;
+      } else if (!error){
+        html += `<div class="tlpr-suggest-empty">No business-database match for "${esc(q || '')}". You can still resolve it directly.</div>`;
+      }
+      if (!html){ panel.style.display = 'none'; panel.innerHTML = ''; return; }
+      panel.innerHTML = html;
+      panel.style.display = 'block';
+    }
+
+    function runNameSearch(){
+      const nameEl = document.getElementById('tlprName');
+      const q = (nameEl.value || '').trim();
+      const panel = document.getElementById('tlprSuggestPanel');
+      if (q.length < 2){ panel.style.display = 'none'; panel.innerHTML = ''; return; }
+      const company = document.getElementById('tlprCompany').value.trim();
+      const url = '/p2/strategic-agents/thought-leader-pr/search?q=' + encodeURIComponent(q) +
+        (company ? '&company=' + encodeURIComponent(company) : '');
+      fetch(url)
+        .then(res => res.json())
+        .then(data => {
+          if ((document.getElementById('tlprName').value || '').trim() !== q) return; // stale reply
+          renderNameSuggestions(data.candidates || [], data.error || null, q);
+        })
+        .catch(() => renderNameSuggestions([], {message: 'The search request itself failed to complete.'}, q));
+    }
+    const onNameInput = debounce(runNameSearch, 350);
+
+    function pickNameCandidate(idx){
+      const c = (window.__tlprCandidates || [])[idx];
+      if (!c) return;
+      document.getElementById('tlprName').value = c.full_name;
+      document.getElementById('tlprCompany').value = c.company || '';
+      document.getElementById('tlprTitle').value = c.title || '';
+      document.getElementById('tlprLinkedin').value = c.linkedin_url || '';
+      if ((c.company || c.title || c.linkedin_url)){
+        const row = document.getElementById('tlprRefineRow');
+        row.hidden = false;
+        document.getElementById('tlprRefineToggle').classList.add('is-open');
+      }
+      const panel = document.getElementById('tlprSuggestPanel');
+      panel.style.display = 'none';
+      panel.innerHTML = '';
     }
 
     /* Thumbs up/down for one section of a report, keyed by run + a stable
@@ -762,6 +841,9 @@
     async function resolveIdentity(){
       const name = document.getElementById('tlprName').value.trim();
       if (!name) { document.getElementById('tlprName').focus(); return; }
+      const suggestPanel = document.getElementById('tlprSuggestPanel');
+      suggestPanel.style.display = 'none';
+      suggestPanel.innerHTML = '';
       setBusy(true, 'Searching Apollo, LinkedIn and the web…');
       document.getElementById('tlprResult').innerHTML = '';
       try {
@@ -937,7 +1019,13 @@
       if (m && !m.contains(e.target)) closeUserMenu();
     });
     document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape') closeUserMenu();
+      if (e.key !== 'Escape') return;
+      closeUserMenu();
+      const panel = document.getElementById('tlprSuggestPanel');
+      if (panel && panel.style.display !== 'none' && panel.innerHTML) {
+        panel.style.display = 'none';
+        panel.innerHTML = '';
+      }
     });
   </script>
 

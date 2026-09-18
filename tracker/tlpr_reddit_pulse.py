@@ -326,7 +326,7 @@ def analyze(full_name: str, posts: list[dict]) -> dict:
     try:
         resp = client.messages.create(
             model=os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-5"),
-            max_tokens=4000,
+            max_tokens=8000,
             system=_SYSTEM,
             messages=[{"role": "user", "content": json.dumps(payload, ensure_ascii=False)}],
         )
@@ -334,9 +334,17 @@ def analyze(full_name: str, posts: list[dict]) -> dict:
         logger.warning("tlpr_reddit_pulse: analysis call failed for %r: %s", full_name, e)
         return {"error": "The Reddit conversation analysis could not be completed (%s)."
                          % (str(e)[:160] or type(e).__name__)}
-    raw = "".join(b.text for b in resp.content if getattr(b, "type", "") == "text")
+    text_blocks = [b.text for b in resp.content if getattr(b, "type", "") == "text"]
+    raw = "".join(text_blocks)
     candidate = _extract_json_object(raw)
     if candidate is None:
+        stop_reason = getattr(resp, "stop_reason", None)
+        logger.warning("tlpr_reddit_pulse: unparsable analysis for %r (stop_reason=%s, text_blocks=%d, chars=%d)",
+                       full_name, stop_reason, len(text_blocks), len(raw))
+        if stop_reason == "max_tokens":
+            return {"error": "The Reddit conversation analysis ran out of output budget before "
+                             "it finished (stop_reason=max_tokens). Raise max_tokens in "
+                             "tracker/tlpr_reddit_pulse.py or reduce MAX_THREADS_ANALYZED."}
         return {"error": "The Reddit conversation analysis returned an unreadable response."}
     try:
         parsed = json.loads(candidate)

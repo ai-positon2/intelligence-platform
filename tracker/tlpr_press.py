@@ -321,7 +321,7 @@ def analyze(full_name: str, articles: list[dict], company_hint: str | None = Non
     try:
         resp = client.messages.create(
             model=os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-5"),
-            max_tokens=4000,
+            max_tokens=8000,
             system=_SYSTEM,
             messages=[{"role": "user", "content": json.dumps(payload, ensure_ascii=False)}],
         )
@@ -329,9 +329,23 @@ def analyze(full_name: str, articles: list[dict], company_hint: str | None = Non
         logger.warning("tlpr_press: analysis call failed for %r: %s", full_name, e)
         return {"error": "The press coverage analysis could not be completed (%s)."
                          % (str(e)[:160] or type(e).__name__)}
-    raw = "".join(b.text for b in resp.content if getattr(b, "type", "") == "text")
+    text_blocks = [b.text for b in resp.content if getattr(b, "type", "") == "text"]
+    raw = "".join(text_blocks)
     candidate = _extract_json_object(raw)
     if candidate is None:
+        stop_reason = getattr(resp, "stop_reason", None)
+        logger.warning("tlpr_press: unparsable analysis for %r (stop_reason=%s, text_blocks=%d, chars=%d)",
+                       full_name, stop_reason, len(text_blocks), len(raw))
+        # Named separately from the generic unreadable-response case -- a
+        # response that ran out of room mid-JSON (no closing brace, so the
+        # brace-depth scan in _extract_json_object never reaches 0) is a
+        # different, actionable failure than one that wrote no JSON at all,
+        # same distinction sci_identify.py already draws for this exact
+        # symptom.
+        if stop_reason == "max_tokens":
+            return {"error": "The press coverage analysis ran out of output budget before it "
+                             "finished (stop_reason=max_tokens). Raise max_tokens in "
+                             "tracker/tlpr_press.py or reduce MAX_ARTICLES_DIGEST."}
         return {"error": "The press coverage analysis returned an unreadable response."}
     try:
         parsed = json.loads(candidate)

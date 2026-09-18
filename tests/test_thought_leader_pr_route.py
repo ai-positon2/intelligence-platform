@@ -68,6 +68,39 @@ class TestPageRenders:
         assert resp.status_code == 200
 
 
+class TestSearchRoute:
+    def test_a_blank_query_never_touches_apollo(self, monkeypatch):
+        monkeypatch.setattr(T, "search_name_candidates",
+                            lambda *a, **kw: pytest.fail("must not search for a blank query"))
+        resp = _client().get("/p2/strategic-agents/thought-leader-pr/search?q=")
+        assert resp.status_code == 200
+        assert resp.get_json() == {"candidates": []}
+
+    def test_candidates_and_the_company_hint_pass_through(self, monkeypatch):
+        captured = {}
+        monkeypatch.setattr(T, "search_name_candidates", lambda q, company_hint=None: (
+            captured.update(q=q, company_hint=company_hint) or
+            [{"full_name": "Jane Doe", "title": "CEO", "company": "Acme"}], None))
+        resp = _client().get("/p2/strategic-agents/thought-leader-pr/search?q=Jane+Doe&company=Acme")
+        assert resp.status_code == 200
+        body = resp.get_json()
+        assert body["candidates"][0]["full_name"] == "Jane Doe"
+        assert "error" not in body
+        assert captured == {"q": "Jane Doe", "company_hint": "Acme"}
+
+    def test_an_error_is_forwarded_alongside_any_fallback_candidates(self, monkeypatch):
+        monkeypatch.setattr(T, "search_name_candidates", lambda *a, **kw: (
+            [], {"code": "not_configured", "message": "Apollo is not configured on this deployment."}))
+        resp = _client().get("/p2/strategic-agents/thought-leader-pr/search?q=Jane+Doe")
+        body = resp.get_json()
+        assert body["candidates"] == []
+        assert body["error"]["code"] == "not_configured"
+
+    def test_search_requires_auth_too(self):
+        resp = appmod.app.test_client().get("/p2/strategic-agents/thought-leader-pr/search?q=Jane")
+        assert resp.status_code in (302, 401, 403)
+
+
 class TestResolveRoute:
     def test_blank_name_is_rejected_before_touching_the_resolver(self, monkeypatch):
         monkeypatch.setattr(T, "resolve_identity",

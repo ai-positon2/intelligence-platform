@@ -260,3 +260,49 @@ def test_build_press_never_raises_when_collection_explodes(monkeypatch):
     out = press.build_press("Jane Doe")
     assert out["article_count"] == 0
     assert out["note"]
+
+
+class _FakeTextBlock:
+    def __init__(self, text):
+        self.type = "text"
+        self.text = text
+
+
+class _FakeResponse:
+    def __init__(self, text, stop_reason):
+        self.content = [_FakeTextBlock(text)]
+        self.stop_reason = stop_reason
+
+
+class _FakeMessages:
+    def __init__(self, text, stop_reason):
+        self._text, self._stop_reason = text, stop_reason
+
+    def create(self, **kwargs):
+        return _FakeResponse(self._text, self._stop_reason)
+
+
+class _FakeClient:
+    def __init__(self, text, stop_reason="end_turn"):
+        self.messages = _FakeMessages(text, stop_reason)
+
+
+def test_analyze_names_a_truncated_reply_distinctly_from_a_generic_unreadable_one(monkeypatch):
+    """Regression: a reply cut off mid-JSON by max_tokens (no closing brace,
+    so _extract_json_object's brace-depth scan never returns) used to
+    collapse into the exact same "unreadable response" text as a reply that
+    wrote no JSON at all -- indistinguishable from a live run, and from a
+    log line, whether the fix is "raise max_tokens" or something else
+    entirely. stop_reason is on the response already; this just names it."""
+    monkeypatch.setattr(press, "_anthropic",
+                        lambda: _FakeClient('{"verdict": "cut off mid-sen', stop_reason="max_tokens"))
+    out = press.analyze("Jane Doe", [_article()])
+    assert "max_tokens" in out["error"]
+    assert "unreadable response" not in out["error"]
+
+
+def test_analyze_still_reports_a_generic_unreadable_response_when_not_truncated(monkeypatch):
+    monkeypatch.setattr(press, "_anthropic",
+                        lambda: _FakeClient("Sorry, I can't help with that.", stop_reason="end_turn"))
+    out = press.analyze("Jane Doe", [_article()])
+    assert out["error"] == "The press coverage analysis returned an unreadable response."

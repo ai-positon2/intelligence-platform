@@ -875,3 +875,79 @@ class TestCollectSynthesisJob:
         monkeypatch.setattr(T, "save_synthesis_failed", lambda run_id, email, msg: captured.update(msg=msg) or True)
         T.collect_synthesis_job(3, "a@b.com")
         assert "unexpected error" in captured["msg"]
+
+
+class TestSearchNameCandidates:
+    """The cheap Apollo-only picker shown as the user types a name, ahead of
+    resolve_identity's own paid websearch call -- same shape as Social Media
+    Intelligence's /search ahead of /analyze."""
+
+    def test_a_blank_name_searches_nothing(self, monkeypatch):
+        monkeypatch.setenv("APOLLO_API_KEY", "test-key")
+        monkeypatch.setattr(T.apollo_client, "search_people",
+                            lambda *a, **kw: pytest.fail("must not call Apollo for a blank name"))
+        candidates, error = T.search_name_candidates("")
+        assert candidates == [] and error is None
+
+    def test_no_api_key_reports_a_typed_not_configured_error(self):
+        candidates, error = T.search_name_candidates("Jane Doe")
+        assert candidates == []
+        assert error == {"code": "not_configured",
+                         "message": "Apollo is not configured on this deployment."}
+
+    def test_multiple_apollo_rows_become_real_candidates(self, monkeypatch):
+        monkeypatch.setenv("APOLLO_API_KEY", "test-key")
+        rows = [
+            {"full_name": "Jane Doe", "title": "CEO", "organization_name": "Acme Corp",
+             "city": "Austin", "state": "TX", "country": "US",
+             "photo_url": "https://img.example/1.jpg", "linkedin_url": "https://linkedin.com/in/jane1"},
+            {"full_name": "Jane Doe", "title": "VP Marketing", "organization_name": "Globex",
+             "city": None, "state": None, "country": "UK",
+             "photo_url": None, "linkedin_url": "https://linkedin.com/in/jane2"},
+        ]
+        monkeypatch.setattr(T.apollo_client, "search_people", lambda *a, **kw: rows)
+        candidates, error = T.search_name_candidates("Jane Doe")
+        assert error is None
+        assert len(candidates) == 2
+        assert candidates[0] == {
+            "full_name": "Jane Doe", "title": "CEO", "company": "Acme Corp",
+            "location": "Austin, TX, US", "photo_url": "https://img.example/1.jpg",
+            "linkedin_url": "https://linkedin.com/in/jane1",
+        }
+        assert candidates[1]["location"] == "UK"
+
+    def test_a_company_hint_is_folded_into_the_apollo_keywords(self, monkeypatch):
+        monkeypatch.setenv("APOLLO_API_KEY", "test-key")
+        captured = {}
+        def fake_search(filters, api_key, per_page=None):
+            captured["filters"] = filters
+            return []
+        monkeypatch.setattr(T.apollo_client, "search_people", fake_search)
+        T.search_name_candidates("Jane Doe", company_hint="Acme")
+        assert captured["filters"]["keywords"] == "Jane Doe Acme"
+
+    def test_a_duplicate_name_and_company_pair_is_collapsed(self, monkeypatch):
+        monkeypatch.setenv("APOLLO_API_KEY", "test-key")
+        rows = [
+            {"full_name": "Jane Doe", "organization_name": "Acme Corp"},
+            {"full_name": "Jane Doe", "organization_name": "Acme Corp"},
+        ]
+        monkeypatch.setattr(T.apollo_client, "search_people", lambda *a, **kw: rows)
+        candidates, error = T.search_name_candidates("Jane Doe")
+        assert len(candidates) == 1
+
+    def test_a_row_with_no_name_is_dropped_not_crashed_on(self, monkeypatch):
+        monkeypatch.setenv("APOLLO_API_KEY", "test-key")
+        monkeypatch.setattr(T.apollo_client, "search_people",
+                            lambda *a, **kw: [{"full_name": "", "organization_name": "Acme"}])
+        candidates, error = T.search_name_candidates("Jane Doe")
+        assert candidates == [] and error is None
+
+    def test_an_apollo_crash_is_reported_not_raised(self, monkeypatch):
+        monkeypatch.setenv("APOLLO_API_KEY", "test-key")
+        def boom(*a, **kw):
+            raise RuntimeError("apollo is down")
+        monkeypatch.setattr(T.apollo_client, "search_people", boom)
+        candidates, error = T.search_name_candidates("Jane Doe")
+        assert candidates == []
+        assert error["code"] == "error"

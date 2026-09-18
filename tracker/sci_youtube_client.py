@@ -156,8 +156,10 @@ def _uploads_playlist_id(channel_id: str, api_key: str) -> str | None:
         items = data.get("items") or []
         if not items:
             return None
-        return items[0]["contentDetails"]["relatedPlaylists"]["uploads"]
-    except (requests.RequestException, KeyError) as e:
+        content_details = items[0].get("contentDetails") or {}
+        related_playlists = content_details.get("relatedPlaylists") or {}
+        return related_playlists.get("uploads")
+    except (requests.RequestException, KeyError, TypeError, AttributeError) as e:
         logger.warning("sci_youtube_client: uploads playlist lookup failed for %s: %s", channel_id, e)
         return None
 
@@ -186,23 +188,24 @@ def list_recent_videos(channel_id: str, api_key: str, max_results: int = 25, day
             if not items:
                 break
             for item in items:
-                vid = item.get("contentDetails", {}).get("videoId")
-                published = item.get("contentDetails", {}).get("videoPublishedAt")
+                content_details = item.get("contentDetails") or {}
+                vid = content_details.get("videoId")
+                published = content_details.get("videoPublishedAt")
                 if not vid:
                     continue
                 video_ids.append(vid)
-                snippets[vid] = item.get("snippet", {}) | {"publishedAt": published}
+                snippets[vid] = (item.get("snippet") or {}) | {"publishedAt": published}
             page_token = data.get("nextPageToken")
             if not page_token:
                 break
-            oldest_this_page = items[-1].get("contentDetails", {}).get("videoPublishedAt")
+            oldest_this_page = (items[-1].get("contentDetails") or {}).get("videoPublishedAt")
             if oldest_this_page and len(video_ids) >= max_results:
                 try:
                     if datetime.fromisoformat(oldest_this_page.replace("Z", "+00:00")) < cutoff:
                         break
                 except ValueError:
                     pass
-    except requests.RequestException as e:
+    except (requests.RequestException, TypeError, AttributeError) as e:
         logger.warning("sci_youtube_client: playlistItems fetch failed for %s: %s", channel_id, e)
         return []
 
@@ -257,8 +260,9 @@ def _video_stats(video_ids: list[str], api_key: str) -> dict[str, dict]:
             batch = video_ids[i:i + 50]
             data = _get("videos", api_key, part="statistics", id=",".join(batch))
             for item in data.get("items") or []:
-                out[item["id"]] = item.get("statistics", {})
-    except requests.RequestException as e:
+                if item.get("id"):
+                    out[item["id"]] = item.get("statistics") or {}
+    except (requests.RequestException, TypeError) as e:
         logger.warning("sci_youtube_client: videos.statistics fetch failed: %s", e)
     return out
 

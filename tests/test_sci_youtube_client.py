@@ -133,6 +133,58 @@ def test_list_recent_videos_returns_empty_without_a_channel_or_key():
     assert yt.list_recent_videos("UC123", "") == []
 
 
+@patch("tracker.sci_youtube_client.requests.get")
+def test_list_recent_videos_survives_a_deleted_video_with_null_fields(mock_get):
+    """Regression: YouTube's playlistItems answers a deleted/private video
+    still sitting in the uploads playlist with `contentDetails` and/or
+    `snippet` set to JSON null (not merely absent) rather than omitted or
+    empty. `dict.get(key, {})` only substitutes its default when the key is
+    MISSING -- a present null still comes back as None -- so this used to
+    raise TypeError/AttributeError out of list_recent_videos, contradicting
+    its own "[] on any failure, never raised" docstring and taking down the
+    whole collect_posts_job with a generic, undiagnosable failure. A good
+    video elsewhere in the same page must still come through."""
+    mock_get.side_effect = [
+        _resp({"items": [{"contentDetails": {"relatedPlaylists": {"uploads": "UUxyz"}}}]}),
+        _resp({"items": [
+            {"contentDetails": None, "snippet": None},
+            {"contentDetails": {"videoId": "v1", "videoPublishedAt": "2026-08-01T00:00:00Z"},
+             "snippet": {"title": "Still here", "publishedAt": "2026-08-01T00:00:00Z"}},
+        ], "nextPageToken": None}),
+        _resp({"items": [{"id": "v1", "statistics": {"viewCount": "10"}}]}),
+    ]
+    out = yt.list_recent_videos("UC123", "key", max_results=5, days=30)
+    assert len(out) == 1
+    assert out[0]["platform_post_id"] == "v1"
+
+
+@patch("tracker.sci_youtube_client.requests.get")
+def test_uploads_playlist_id_survives_a_null_content_details(mock_get):
+    """Same null-vs-missing gap as above, one call earlier: a channel whose
+    /channels response carries `"contentDetails": null` must resolve to
+    None, not raise."""
+    mock_get.return_value = _resp({"items": [{"contentDetails": None}]})
+    assert yt._uploads_playlist_id("UC123", "key") is None
+
+
+@patch("tracker.sci_youtube_client.requests.get")
+def test_list_recent_videos_survives_a_null_statistics_object(mock_get):
+    """The videos.statistics call can answer a real item with
+    `"statistics": null` (e.g. a video with stats hidden) -- must not crash
+    the whole collection, just leave that video's metrics empty."""
+    mock_get.side_effect = [
+        _resp({"items": [{"contentDetails": {"relatedPlaylists": {"uploads": "UUxyz"}}}]}),
+        _resp({"items": [
+            {"contentDetails": {"videoId": "v1", "videoPublishedAt": "2026-08-01T00:00:00Z"},
+             "snippet": {"title": "Hidden stats", "publishedAt": "2026-08-01T00:00:00Z"}},
+        ], "nextPageToken": None}),
+        _resp({"items": [{"id": "v1", "statistics": None}]}),
+    ]
+    out = yt.list_recent_videos("UC123", "key", max_results=5, days=30)
+    assert len(out) == 1
+    assert out[0]["metrics"]["views"] is None
+
+
 # --- resolve_company_channel: YouTube resolved without the identify step ---
 
 @patch("tracker.sci_youtube_client.requests.get")

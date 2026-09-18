@@ -778,6 +778,59 @@ def _handle_from_url(url: str | None) -> str | None:
     return parts[-1].lstrip("@") if parts else None
 
 
+MAX_NAME_CANDIDATES = 6
+
+
+def search_name_candidates(name: str, company_hint: str | None = None) -> tuple[list[dict], dict | None]:
+    """A cheap, Apollo-only candidate list for a typed name, shown BEFORE
+    resolve_identity's own websearch grounding call ever runs -- same
+    cheap-before-expensive shape as Social Media Intelligence's own /search
+    ahead of /analyze (tracker/sci_company_search.py), so a common name
+    ("John Smith") can be disambiguated by a business-database match before
+    a paid Claude+web_search call has to guess which one was meant.
+
+    Deliberately a separate Apollo call from _best_apollo_candidate's, not a
+    refactor of it: that function needs exactly one best-effort row to seed
+    the grounding pass and already has its own tests; this one needs the
+    other rows Apollo returned, that function throws away, surfaced as real
+    choices instead. Never raises -- returns ([], error) so a down or
+    unconfigured Apollo degrades to "type it yourself", never a 500."""
+    name = (name or "").strip()
+    if not name:
+        return [], None
+    api_key = os.environ.get("APOLLO_API_KEY", "")
+    if not api_key:
+        return [], {"code": "not_configured",
+                    "message": "Apollo is not configured on this deployment."}
+    filters = {"max_people": MAX_NAME_CANDIDATES,
+              "keywords": ("%s %s" % (name, company_hint)).strip() if company_hint else name}
+    try:
+        people = apollo_client.search_people(filters, api_key, per_page=MAX_NAME_CANDIDATES)
+    except Exception as e:
+        logger.warning("thought_leader_pr: name candidate search failed for %r: %s", name, e)
+        return [], {"code": "error", "message": "The candidate search could not be completed."}
+
+    seen = set()
+    candidates = []
+    for p in people:
+        full_name = (p.get("full_name") or "").strip()
+        if not full_name:
+            continue
+        key = (full_name.lower(), (p.get("organization_name") or "").lower())
+        if key in seen:
+            continue
+        seen.add(key)
+        candidates.append({
+            "full_name": full_name,
+            "title": p.get("title"),
+            "company": p.get("organization_name"),
+            "location": ", ".join(b for b in (p.get("city"), p.get("state"), p.get("country")) if b) or None,
+            "photo_url": p.get("photo_url"),
+            "linkedin_url": p.get("linkedin_url"),
+        })
+    return candidates, None
+
+
 def _best_apollo_candidate(name: str, company_hint: str | None,
                            linkedin_url: str | None, api_key: str) -> dict | None:
     """A business-database candidate to hand to the websearch grounding pass
