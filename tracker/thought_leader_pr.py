@@ -40,7 +40,7 @@ from datetime import datetime, timedelta, timezone
 
 from tracker import (apify_transport, apify_x_replies, apollo_client, claude_websearch,
                      sci_source_linkedin_unipile, sci_source_x, sci_youtube_client,
-                     tlpr_press, tlpr_reddit_pulse, unipile_client, unipile_transport)
+                     tlpr_press, tlpr_reddit_pulse, tlpr_x_pulse, unipile_client, unipile_transport)
 
 logger = logging.getLogger(__name__)
 
@@ -1131,13 +1131,16 @@ def collect_posts_job(run_id: int, email: str, max_posts: int = MAX_POSTS_PER_PL
 
 # ───────────────────────── Phase 2: audience reaction ─────────────────────────
 #
-# Two independent sources, combined into one read of "how does the room
+# Three independent sources, combined into one read of "how does the room
 # react": (1) real comments/replies on the person's OWN posts collected in
-# Phase 1 (LinkedIn/X/YouTube), and (2) the Reddit conversation ABOUT them
-# anywhere on Reddit, via tracker/tlpr_reddit_pulse.py. The first needs
-# Phase 1's posts to already exist (comments are fetched per already-
-# collected post); the second needs only the resolved identity and runs
-# independently of whether Phase 1 ever ran.
+# Phase 1 (LinkedIn/X/YouTube), (2) what OTHER people independently post on
+# X about them (tracker/tlpr_x_pulse.py -- a real X-wide search, not replies
+# on their own tweets), and (3) the Reddit conversation ABOUT them anywhere
+# on Reddit, including each mention-thread's own comment section
+# (tracker/tlpr_reddit_pulse.py). Only the first needs Phase 1's posts to
+# already exist (comments are fetched per already-collected post); the
+# other two need only the resolved identity and run independently of
+# whether Phase 1 ever ran.
 #
 # Same fault isolation as Phase 1: one platform's comment fetch failing
 # never blocks the others, and a failure here is recorded in `errors`, never
@@ -1383,6 +1386,7 @@ def collect_reaction_job(run_id: int, email: str, max_posts: int = MAX_POSTS_FOR
         identity = run["identity"] or {}
         full_name = identity.get("full_name") or run.get("input_name") or ""
         company_hint = identity.get("current_company") or run.get("company_hint")
+        x_handle = (identity.get("platforms") or {}).get("x", {}).get("handle")
         posts = run.get("posts") or {}
 
         comments: list[dict] = []
@@ -1411,10 +1415,17 @@ def collect_reaction_job(run_id: int, email: str, max_posts: int = MAX_POSTS_FOR
             logger.exception("thought_leader_pr: reddit pulse crashed for run %s", run_id)
             reddit = {"note": "The Reddit conversation read could not be completed.", "thread_count": 0}
 
+        try:
+            x_pulse = tlpr_x_pulse.build_pulse(full_name, x_handle)
+        except Exception:
+            logger.exception("thought_leader_pr: x pulse crashed for run %s", run_id)
+            x_pulse = {"note": "The X conversation read could not be completed.", "tweet_count": 0}
+
         reaction = {
             "comments_analyzed": len(comments),
             "comment_sentiment": comment_sentiment,
             "reddit": reddit,
+            "x_pulse": x_pulse,
         }
         save_reaction(run_id, email, reaction, errors)
     except Exception:

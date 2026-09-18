@@ -321,6 +321,40 @@ def _slug_candidates(company_name: str) -> list[str]:
     return out
 
 
+def get_post_comments(post_id: str, subreddit: str | None = None, limit: int = 15) -> list[dict]:
+    """Top-level comments on ONE submission, sorted best-first. [] on any
+    failure. Reddit's standard, documented `/comments/{article}` endpoint --
+    deliberately NOT the same thing as a site-wide full-text comment
+    SEARCH, which Reddit's public API does not expose at all (its
+    documented `/search` `type` values are `sr`/`link`/`user` only; the
+    "Comments" tab on reddit.com's own search UI is not backed by this
+    OAuth API). This is the feasible alternative for "what are people
+    saying in the comments about this person": once a thread is already
+    known to be ABOUT them (via title/body search, see search_posts), read
+    what its own comment section actually says, rather than searching
+    comment bodies across all of Reddit blind."""
+    pid = (post_id or "").strip()
+    if not pid:
+        return []
+    path = f"/r/{subreddit}/comments/{pid}" if subreddit else f"/comments/{pid}"
+    payload = _get(path, limit=limit, sort="top", depth=1)
+    if not isinstance(payload, list) or len(payload) < 2:
+        return []
+    out = []
+    for data in _children(payload[1]):
+        body = (data.get("body") or "").strip()
+        if not body or body in ("[deleted]", "[removed]"):
+            continue
+        out.append({
+            "id": data.get("id"),
+            "author": data.get("author"),
+            "body": body,
+            "score": data.get("score"),
+            "permalink": data.get("permalink"),
+        })
+    return out[:limit]
+
+
 def get_user_about(username: str) -> dict | None:
     payload = _get(f"/user/{username}/about")
     data = (payload or {}).get("data")

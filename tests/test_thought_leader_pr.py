@@ -26,7 +26,7 @@ def _no_side_effect_keys(monkeypatch):
     """No test in this file should ever reach a real vendor: clear every key
     resolve_identity() checks so a missing monkeypatch fails loudly (a
     network error) rather than silently hitting a real API."""
-    for key in ("APOLLO_API_KEY", "YOUTUBE_API_KEY", "DATABASE_URL"):
+    for key in ("APOLLO_API_KEY", "YOUTUBE_API_KEY", "DATABASE_URL", "APIFY_API_TOKEN"):
         monkeypatch.delenv(key, raising=False)
 
 
@@ -561,13 +561,16 @@ class TestCollectReactionJob:
         T.collect_reaction_job(5, "a@b.com")
         assert captured["run_id"] == 5 and "no confirmed identity" in captured["msg"]
 
-    def test_combines_comments_and_reddit_and_saves_ready(self, monkeypatch):
+    def test_combines_comments_and_reddit_and_x_pulse_and_saves_ready(self, monkeypatch):
         monkeypatch.setattr(T, "get_run", lambda run_id, email: self._identity_run())
         monkeypatch.setattr(T, "_collect_linkedin_comments", lambda p, mp, mc: ([{"platform": "linkedin"}], None))
         monkeypatch.setattr(T, "_collect_x_replies", lambda p, mp, mc: ([], "No X posts to read replies from."))
         monkeypatch.setattr(T, "_collect_youtube_comments", lambda p, mp, mc: ([{"platform": "youtube"}], None))
         monkeypatch.setattr(T, "analyze_comment_sentiment", lambda comments: {"verdict": "ok"})
         monkeypatch.setattr(T.tlpr_reddit_pulse, "build_pulse", lambda name, hint: {"thread_count": 3})
+        captured_x_call = {}
+        monkeypatch.setattr(T.tlpr_x_pulse, "build_pulse", lambda name, handle: captured_x_call.update(
+            name=name, handle=handle) or {"tweet_count": 7})
 
         captured = {}
         monkeypatch.setattr(T, "save_reaction", lambda run_id, email, reaction, errors: captured.update(
@@ -578,12 +581,30 @@ class TestCollectReactionJob:
         assert captured["reaction"]["comments_analyzed"] == 2
         assert captured["reaction"]["comment_sentiment"] == {"verdict": "ok"}
         assert captured["reaction"]["reddit"] == {"thread_count": 3}
+        assert captured["reaction"]["x_pulse"] == {"tweet_count": 7}
+        assert captured_x_call == {"name": "Jane Doe", "handle": None}
+
+    def test_x_pulse_is_called_with_the_resolved_handle(self, monkeypatch):
+        run = self._identity_run()
+        run["identity"]["platforms"] = {"x": {"handle": "janedoe", "resolved": True}}
+        monkeypatch.setattr(T, "get_run", lambda run_id, email: run)
+        monkeypatch.setattr(T, "_collect_linkedin_comments", lambda p, mp, mc: ([], None))
+        monkeypatch.setattr(T, "_collect_x_replies", lambda p, mp, mc: ([], None))
+        monkeypatch.setattr(T, "_collect_youtube_comments", lambda p, mp, mc: ([], None))
+        monkeypatch.setattr(T.tlpr_reddit_pulse, "build_pulse", lambda name, hint: {"thread_count": 0})
+        captured_x_call = {}
+        monkeypatch.setattr(T.tlpr_x_pulse, "build_pulse", lambda name, handle: captured_x_call.update(
+            handle=handle) or {"tweet_count": 0})
+        monkeypatch.setattr(T, "save_reaction", lambda *a, **kw: True)
+        T.collect_reaction_job(9, "a@b.com")
+        assert captured_x_call["handle"] == "janedoe"
 
     def test_a_reddit_pulse_crash_degrades_rather_than_failing_the_whole_run(self, monkeypatch):
         monkeypatch.setattr(T, "get_run", lambda run_id, email: self._identity_run())
         monkeypatch.setattr(T, "_collect_linkedin_comments", lambda p, mp, mc: ([], "x"))
         monkeypatch.setattr(T, "_collect_x_replies", lambda p, mp, mc: ([], "x"))
         monkeypatch.setattr(T, "_collect_youtube_comments", lambda p, mp, mc: ([], "x"))
+        monkeypatch.setattr(T.tlpr_x_pulse, "build_pulse", lambda name, handle: {"tweet_count": 0})
 
         def boom(name, hint):
             raise RuntimeError("reddit api down")
@@ -593,6 +614,22 @@ class TestCollectReactionJob:
             reaction=reaction) or True)
         T.collect_reaction_job(1, "a@b.com")
         assert captured["reaction"]["reddit"]["thread_count"] == 0
+
+    def test_an_x_pulse_crash_degrades_rather_than_failing_the_whole_run(self, monkeypatch):
+        monkeypatch.setattr(T, "get_run", lambda run_id, email: self._identity_run())
+        monkeypatch.setattr(T, "_collect_linkedin_comments", lambda p, mp, mc: ([], "x"))
+        monkeypatch.setattr(T, "_collect_x_replies", lambda p, mp, mc: ([], "x"))
+        monkeypatch.setattr(T, "_collect_youtube_comments", lambda p, mp, mc: ([], "x"))
+        monkeypatch.setattr(T.tlpr_reddit_pulse, "build_pulse", lambda name, hint: {"thread_count": 0})
+
+        def boom(name, handle):
+            raise RuntimeError("apify down")
+        monkeypatch.setattr(T.tlpr_x_pulse, "build_pulse", boom)
+        captured = {}
+        monkeypatch.setattr(T, "save_reaction", lambda run_id, email, reaction, errors: captured.update(
+            reaction=reaction) or True)
+        T.collect_reaction_job(1, "a@b.com")
+        assert captured["reaction"]["x_pulse"]["tweet_count"] == 0
 
     def test_an_unexpected_crash_still_reaches_a_terminal_state(self, monkeypatch):
         def boom(run_id, email):

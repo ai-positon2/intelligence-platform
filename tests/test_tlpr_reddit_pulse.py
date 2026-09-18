@@ -6,6 +6,7 @@ that is also allowed to tally its own judgements produces a confident
 sentiment split that does not match the threads it was derived from.
 """
 
+import json
 import os
 import sys
 
@@ -100,6 +101,127 @@ def test_aggregate_counts_by_subreddit_and_month():
 def test_top_threads_rank_by_real_engagement():
     posts = [_post("low", score=1, comments=1), _post("high", score=900, comments=40)]
     assert pulse.aggregate(posts)["top_threads"][0]["id"] == "high"
+
+
+# ── reading each thread's own comment section ─────────────────────────────
+#
+# "What are people discussing in the comments" is a real, distinct ask from
+# "how many threads mention this person" -- Reddit's own comment section is
+# where most of a discussion's actual opinion lives, and none of it was
+# read before this.
+
+def test_collect_thread_comments_fetches_only_the_most_engaged_threads(monkeypatch):
+    from tracker import sci_reddit_client
+    posts = [_post("p%d" % i, score=i) for i in range(pulse.MAX_THREADS_FOR_COMMENTS + 5)]
+    fetched = []
+    monkeypatch.setattr(sci_reddit_client, "get_post_comments",
+                        lambda pid, subreddit=None, limit=None: fetched.append(pid) or [])
+    pulse._collect_thread_comments(posts)
+    assert len(fetched) == pulse.MAX_THREADS_FOR_COMMENTS
+    # the highest-scoring threads, not an arbitrary slice
+    assert "p%d" % (len(posts) - 1) in fetched
+    assert "p0" not in fetched
+
+
+def test_collect_thread_comments_tags_each_comment_with_its_own_thread(monkeypatch):
+    from tracker import sci_reddit_client
+    posts = [_post("p1", subreddit="technology", title="Jane Doe keynote")]
+    monkeypatch.setattr(sci_reddit_client, "get_post_comments", lambda pid, subreddit=None, limit=None: [
+        {"id": "c1", "author": "u1", "body": "Great talk", "score": 5, "permalink": "/r/x/c1/"},
+    ])
+    out = pulse._collect_thread_comments(posts)
+    assert out == [{"id": "c1", "thread_id": "p1", "thread_title": "Jane Doe keynote",
+                   "subreddit": "technology", "body": "Great talk", "score": 5,
+                   "permalink": "/r/x/c1/"}]
+
+
+def test_collect_thread_comments_one_threads_fetch_failing_never_blocks_the_others(monkeypatch):
+    from tracker import sci_reddit_client
+    posts = [_post("bad", score=2), _post("good", score=1)]
+    def fake(pid, subreddit=None, limit=None):
+        if pid == "bad":
+            raise RuntimeError("boom")
+        return [{"id": "c1", "body": "ok", "score": 1, "permalink": "/x/"}]
+    monkeypatch.setattr(sci_reddit_client, "get_post_comments", fake)
+    out = pulse._collect_thread_comments(posts)
+    assert len(out) == 1 and out[0]["thread_id"] == "good"
+
+
+def test_collect_thread_comments_drops_a_comment_with_no_id(monkeypatch):
+    from tracker import sci_reddit_client
+    posts = [_post("p1")]
+    monkeypatch.setattr(sci_reddit_client, "get_post_comments",
+                        lambda pid, subreddit=None, limit=None: [{"body": "no id here"}])
+    assert pulse._collect_thread_comments(posts) == []
+
+
+def test_digest_merges_threads_and_comments_with_distinct_id_prefixes():
+    posts = [_post("p1", title="Jane Doe keynote")]
+    comments = [{"id": "c1", "thread_id": "p1", "thread_title": "Jane Doe keynote",
+                "subreddit": "technology", "body": "Great talk", "score": 5,
+                "permalink": "/r/x/comments/p1/t/c1/"}]
+    digest = pulse._digest(posts, comments)
+    ids = {d["id"] for d in digest}
+    assert "p1" in ids and "c_c1" in ids
+    comment_entry = next(d for d in digest if d["id"] == "c_c1")
+    assert comment_entry["kind"] == "comment"
+    assert "Great talk" in comment_entry["excerpt"]
+    assert comment_entry["title"] == "Comment on: Jane Doe keynote"
+    assert comment_entry["url"] == "https://www.reddit.com/r/x/comments/p1/t/c1/"
+
+
+def test_digest_works_unchanged_with_no_comments_at_all():
+    """Every analysis stored before this feature existed cites bare thread
+    ids -- passing no comments must reproduce exactly the old digest."""
+    posts = [_post("p1")]
+    assert pulse._digest(posts) == pulse._digest(posts, None) == pulse._digest(posts, [])
+
+
+def test_analyze_can_cite_a_comment_id_in_a_theme(monkeypatch):
+    posts = [_post("p1", title="Jane Doe keynote")]
+    comments = [{"id": "c1", "thread_id": "p1", "thread_title": "Jane Doe keynote",
+                "subreddit": "technology", "body": "Overrated, honestly", "score": 5,
+                "permalink": "/r/x/c1/"}]
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+    monkeypatch.setattr(pulse, "_anthropic", lambda: _FakeClient(json.dumps({
+        "verdict": "Mixed.",
+        "thread_sentiment": {"c_c1": "negative"},
+        "themes": [{"label": "Criticism", "stance": "complaint", "detail": "Called overrated.",
+                   "thread_ids": ["c_c1"]}],
+        "compared_to": [], "audience": [], "risk_flags": [],
+    })))
+    out = pulse.analyze("Jane Doe", posts, comments)
+    assert out["thread_sentiment"] == {"c_c1": "negative"}
+    assert out["themes"][0]["thread_ids"] == ["c_c1"]
+
+
+def test_build_pulse_collects_and_counts_comments(monkeypatch):
+    from tracker import sci_reddit_client
+    monkeypatch.setattr(sci_reddit_client, "is_configured", lambda: True)
+    posts = [_post("p1")]
+    monkeypatch.setattr(pulse, "collect_mentions", lambda n, c=None: posts)
+    monkeypatch.setattr(sci_reddit_client, "get_post_comments",
+                        lambda pid, subreddit=None, limit=None: [
+                            {"id": "c1", "body": "ok", "score": 1, "permalink": "/x/"}])
+    captured = {}
+    monkeypatch.setattr(pulse, "analyze", lambda n, p, c=None: captured.update(comments=c) or {"verdict": "ok"})
+    out = pulse.build_pulse("Jane Doe")
+    assert out["comment_sample_count"] == 1
+    assert len(captured["comments"]) == 1
+
+
+def test_build_pulse_comment_collection_failing_never_blocks_the_analysis(monkeypatch):
+    from tracker import sci_reddit_client
+    monkeypatch.setattr(sci_reddit_client, "is_configured", lambda: True)
+    posts = [_post("p1")]
+    monkeypatch.setattr(pulse, "collect_mentions", lambda n, c=None: posts)
+    def boom(posts):
+        raise RuntimeError("kaboom")
+    monkeypatch.setattr(pulse, "_collect_thread_comments", boom)
+    monkeypatch.setattr(pulse, "analyze", lambda n, p, c=None: {"verdict": "ok"})
+    out = pulse.build_pulse("Jane Doe")
+    assert out["comment_sample_count"] == 0
+    assert out["analysis"] == {"verdict": "ok"}
 
 
 # ── the model's output is never trusted unchecked ────────────────────────
@@ -244,7 +366,7 @@ def test_build_pulse_carries_every_analyzed_thread_for_citations(monkeypatch):
     monkeypatch.setattr(sci_reddit_client, "is_configured", lambda: True)
     posts = [_post("p%d" % i, score=i) for i in range(20)]
     monkeypatch.setattr(pulse, "collect_mentions", lambda n, c=None: posts)
-    monkeypatch.setattr(pulse, "analyze", lambda n, p: {"verdict": "ok"})
+    monkeypatch.setattr(pulse, "analyze", lambda n, p, c=None: {"verdict": "ok"})
     out = pulse.build_pulse("Jane Doe")
     assert len(out["threads"]) == 20
     assert len(out["top_threads"]) == pulse.MAX_TOP_THREADS

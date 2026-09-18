@@ -273,6 +273,81 @@ def test_search_posts_needs_a_query(monkeypatch):
     assert rc.search_posts("   ") == []
 
 
+# ── get_post_comments ──────────────────────────────────────────────────
+
+def test_get_post_comments_reads_the_second_listing_of_the_pair(monkeypatch):
+    """/comments/{id} answers a 2-element array: [post listing, comments
+    listing] -- unlike every other endpoint here, which is one bare
+    Listing dict."""
+    _configured(monkeypatch)
+    seen = {}
+    def fake_get(path, **params):
+        seen["path"] = path
+        seen["params"] = params
+        return [
+            _listing({"id": "post1"}),
+            _listing({"id": "c1", "author": "u1", "body": "Great talk.", "score": 5,
+                     "permalink": "/r/x/comments/post1/t/c1/"}),
+        ]
+    monkeypatch.setattr(rc, "_get", fake_get)
+    out = rc.get_post_comments("post1")
+    assert seen["path"] == "/comments/post1"
+    assert len(out) == 1
+    assert out[0] == {"id": "c1", "author": "u1", "body": "Great talk.", "score": 5,
+                      "permalink": "/r/x/comments/post1/t/c1/"}
+
+
+def test_get_post_comments_scopes_to_the_subreddit_when_given_one(monkeypatch):
+    _configured(monkeypatch)
+    seen = {}
+    def fake_get(path, **params):
+        seen["path"] = path
+        return [_listing({"id": "post1"}), _listing()]
+    monkeypatch.setattr(rc, "_get", fake_get)
+    rc.get_post_comments("post1", subreddit="technology")
+    assert seen["path"] == "/r/technology/comments/post1"
+
+
+def test_get_post_comments_drops_deleted_and_removed_bodies(monkeypatch):
+    _configured(monkeypatch)
+    monkeypatch.setattr(rc, "_get", lambda path, **p: [
+        _listing({"id": "post1"}),
+        _listing({"id": "c1", "body": "[deleted]"}, {"id": "c2", "body": "[removed]"},
+                {"id": "c3", "body": "a real comment"}),
+    ])
+    out = rc.get_post_comments("post1")
+    assert [c["id"] for c in out] == ["c3"]
+
+
+def test_get_post_comments_ignores_a_more_stub_with_no_body(monkeypatch):
+    """A "load more comments" stub has kind "more" and no body at all --
+    _children() only unwraps the data dict regardless of kind, so this
+    must not crash or be mistaken for a real (empty) comment."""
+    _configured(monkeypatch)
+    payload = [
+        {"data": {"children": [{"kind": "t3", "data": {"id": "post1"}}]}},
+        {"data": {"children": [
+            {"kind": "more", "data": {"children": ["x", "y"]}},
+            {"kind": "t1", "data": {"id": "c1", "body": "real"}},
+        ]}},
+    ]
+    monkeypatch.setattr(rc, "_get", lambda path, **p: payload)
+    out = rc.get_post_comments("post1")
+    assert [c["id"] for c in out] == ["c1"]
+
+
+def test_get_post_comments_needs_a_post_id():
+    assert rc.get_post_comments("") == []
+
+
+def test_get_post_comments_returns_empty_on_an_unrecognised_shape(monkeypatch):
+    _configured(monkeypatch)
+    monkeypatch.setattr(rc, "_get", lambda path, **p: {"not": "a list"})
+    assert rc.get_post_comments("post1") == []
+    monkeypatch.setattr(rc, "_get", lambda path, **p: None)
+    assert rc.get_post_comments("post1") == []
+
+
 # ── probe ────────────────────────────────────────────────────────────────
 
 def test_probe_reports_unconfigured_without_calling_out(monkeypatch):

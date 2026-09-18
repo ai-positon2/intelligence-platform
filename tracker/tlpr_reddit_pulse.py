@@ -16,6 +16,16 @@ praise or a complaint, who else does Reddit compare them to), plain Python
 counts (how many threads, in which subreddits, trending which way). Asking
 a model to also tally its own judgements is how you get a confident
 sentiment split that does not match the threads it was derived from.
+
+Also reads each mention-thread's own COMMENT SECTION, not just the
+submission's title/body -- "what are people discussing in the comments"
+is a real, distinct ask from "how many threads mention this person," and
+a thread's own comments are where most of a Reddit discussion's actual
+opinion lives. This is deliberately NOT a site-wide comment SEARCH:
+Reddit's public API has no such endpoint (see
+sci_reddit_client.get_post_comments's docstring for why), so this reads
+the comment section only of threads ALREADY confirmed to be about this
+person via search_posts, via Reddit's standard /comments/{id} endpoint.
 """
 
 from __future__ import annotations
@@ -34,36 +44,44 @@ logger = logging.getLogger(__name__)
 PER_QUERY_LIMIT = 100
 MAX_THREADS_ANALYZED = 60
 MAX_TOP_THREADS = 12
+MAX_THREADS_FOR_COMMENTS = 15   # only the most-engaged threads get a comments fetch
+MAX_COMMENTS_PER_THREAD = 8
+MAX_COMMENTS_DIGEST = 40
 
 _SENTIMENTS = ("positive", "neutral", "negative", "mixed")
 
 _SYSTEM = (
     "You analyze what people on Reddit actually say about a named public "
     "figure, for a PR/reputation research tool used by a marketing agency. "
-    "You are given real Reddit threads: subreddit, title, an excerpt of the "
-    "body, score and comment count. Reddit is candid and unfiltered, which "
-    "is exactly why it is worth reading -- report what is genuinely there, "
+    "You are given a mix of Reddit THREADS (subreddit, title, an excerpt "
+    "of the body, score and comment count) and individual COMMENTS from "
+    "inside those threads' own comment sections (each tagged kind, with "
+    "which thread it came from) -- the comments are where most of a "
+    "Reddit discussion's actual opinion lives, so read them as seriously "
+    "as the threads themselves. Reddit is candid and unfiltered, which is "
+    "exactly why it is worth reading -- report what is genuinely there, "
     "including criticism, rather than a flattering summary.\n\n"
-    "Ground everything in the threads you were given. Never infer a fact "
-    "about this person that no thread supports, and never soften a "
-    "recurring complaint into a neutral observation. If the threads are "
-    "mostly incidental mentions rather than real discussion of the person, "
-    "say that plainly -- that is a real and useful finding, not a "
-    "failure.\n\n"
+    "Ground everything in the items you were given. Never infer a fact "
+    "about this person that no thread or comment supports, and never "
+    "soften a recurring complaint into a neutral observation. If the "
+    "items are mostly incidental mentions rather than real discussion of "
+    "the person, say that plainly -- that is a real and useful finding, "
+    "not a failure.\n\n"
     "Respond with ONLY a JSON object, no prose before or after:\n"
     '{"verdict": str, '
-    '"thread_sentiment": {"<thread_id>": "positive"|"neutral"|"negative"|"mixed"}, '
+    '"thread_sentiment": {"<id>": "positive"|"neutral"|"negative"|"mixed"}, '
     '"themes": [{"label": str, "stance": "praise"|"complaint"|"question"|'
     '"comparison"|"neutral", "detail": str, "thread_ids": [str, ...]}], '
     '"compared_to": [{"name": str, "context": str, "thread_ids": [str, ...]}], '
     '"audience": [str, ...], "risk_flags": [str, ...]}\n\n'
     "Rules: \"verdict\" is ONE sentence a comms lead could repeat in a "
-    "meeting. \"thread_sentiment\" must label EVERY thread id you were "
-    "given, judged toward this person specifically, not the thread's "
-    "general mood. \"themes\" is 3-6 recurring topics, each with a concrete "
-    "\"detail\" (one or two sentences, specific to this person, never "
-    "generic advice) and 1-4 supporting thread_ids copied exactly from the "
-    "digest. \"compared_to\" lists other people or organizations Reddit "
+    "meeting. \"thread_sentiment\" must label EVERY id you were given "
+    "(thread or comment alike), judged toward this person specifically, "
+    "not the item's general mood. \"themes\" is 3-6 recurring topics, each "
+    "with a concrete \"detail\" (one or two sentences, specific to this "
+    "person, never generic advice) and 1-4 supporting ids (thread or "
+    "comment, mixed freely) copied exactly from the digest. \"compared_to\" "
+    "lists other people or organizations Reddit "
     "users actually name alongside this person, with what the comparison "
     "was about; empty list if none appear. \"audience\" is 2-4 short notes "
     "on who is talking and what they care about. \"risk_flags\" is 0-4 "
@@ -146,6 +164,43 @@ def collect_mentions(full_name: str, company_hint: str | None = None,
     return list(seen.values())
 
 
+def _collect_thread_comments(posts: list[dict]) -> list[dict]:
+    """The comment section of each of the most-engaged mention-threads,
+    flattened into one list tagged with which thread each comment came
+    from. Only the top MAX_THREADS_FOR_COMMENTS threads get a fetch --
+    fetching every thread's comments for a person with hundreds of
+    mentions would be a lot of extra calls for the threads nobody actually
+    discussed. One thread's fetch failing never blocks the others."""
+    from tracker import sci_reddit_client
+
+    out = []
+    for post in sorted(posts, key=_engagement, reverse=True)[:MAX_THREADS_FOR_COMMENTS]:
+        pid = post.get("platform_post_id")
+        if not pid:
+            continue
+        raw = post.get("raw") or {}
+        try:
+            comments = sci_reddit_client.get_post_comments(
+                pid, subreddit=raw.get("subreddit"), limit=MAX_COMMENTS_PER_THREAD)
+        except Exception as e:
+            logger.warning("tlpr_reddit_pulse: comment fetch failed for thread %s: %s", pid, e)
+            continue
+        thread_title = raw.get("title") or (post.get("caption") or "")[:120]
+        for c in comments:
+            if not c.get("id"):
+                continue
+            out.append({
+                "id": c["id"],
+                "thread_id": pid,
+                "thread_title": thread_title,
+                "subreddit": raw.get("subreddit"),
+                "body": c.get("body"),
+                "score": c.get("score"),
+                "permalink": c.get("permalink"),
+            })
+    return out
+
+
 def _month(posted_at: str | None) -> str | None:
     if not posted_at:
         return None
@@ -211,10 +266,29 @@ def _thread_card(post: dict) -> dict:
     }
 
 
-def _digest(posts: list[dict]) -> list[dict]:
-    """What Claude actually reads. Ordered by engagement so that if the cap
-    bites, it drops the threads nobody engaged with rather than an
-    arbitrary slice."""
+def _comment_card(comment: dict) -> dict:
+    permalink = comment.get("permalink") or ""
+    return {
+        "id": "c_" + str(comment["id"]),
+        "kind": "comment",
+        "subreddit": comment.get("subreddit"),
+        "title": "Comment on: %s" % (comment.get("thread_title") or "(untitled thread)"),
+        "excerpt": (comment.get("body") or "")[:700],
+        "score": comment.get("score"),
+        "comments": None,
+        "posted_at": None,
+        "url": ("https://www.reddit.com" + permalink) if permalink else None,
+    }
+
+
+def _digest(posts: list[dict], comments: list[dict] | None = None) -> list[dict]:
+    """What Claude actually reads: the top-engaged THREADS plus, tagged
+    "kind": "comment", individual comments pulled from inside those
+    threads' own comment sections. Both ordered by their own engagement so
+    a cap bites the least-noticed item first, never an arbitrary slice.
+    Comment ids are prefixed "c_" so they can never collide with a bare
+    Reddit thread id -- what every analysis stored before comments were
+    added already cites unprefixed, so old data stays valid unchanged."""
     ordered = sorted(posts, key=_engagement, reverse=True)[:MAX_THREADS_ANALYZED]
     out = []
     for post in ordered:
@@ -222,13 +296,18 @@ def _digest(posts: list[dict]) -> list[dict]:
         body = (post.get("caption") or "").strip()
         out.append({
             "id": post.get("platform_post_id"),
+            "kind": "thread",
             "subreddit": raw.get("subreddit"),
             "title": raw.get("title"),
             "excerpt": body[:700],
             "score": (post.get("metrics") or {}).get("likes"),
             "comments": (post.get("metrics") or {}).get("comments"),
             "posted_at": post.get("posted_at"),
+            "url": post.get("post_url"),
         })
+    ordered_comments = sorted(comments or [], key=lambda c: c.get("score") or 0,
+                              reverse=True)[:MAX_COMMENTS_DIGEST]
+    out.extend(_comment_card(c) for c in ordered_comments)
     return out
 
 
@@ -312,7 +391,7 @@ def _clean_analysis(parsed: dict, valid_ids: set[str]) -> dict:
     }
 
 
-def analyze(full_name: str, posts: list[dict]) -> dict:
+def analyze(full_name: str, posts: list[dict], comments: list[dict] | None = None) -> dict:
     """The judgement half. Never raises -- returns {"error": ...} so a failed
     analysis still leaves the counted aggregates intact and rendered."""
     if not posts:
@@ -320,7 +399,7 @@ def analyze(full_name: str, posts: list[dict]) -> dict:
     client = _anthropic()
     if client is None:
         return {"error": "ANTHROPIC_API_KEY is not configured on this deployment."}
-    digest = _digest(posts)
+    digest = _digest(posts, comments)
     valid_ids = {str(d["id"]) for d in digest if d.get("id")}
     payload = {"person": full_name, "threads": digest}
     try:
@@ -367,6 +446,7 @@ def build_pulse(full_name: str, company_hint: str | None = None) -> dict:
         "collected_at": datetime.now(timezone.utc).isoformat(),
         "queries": build_queries(full_name, company_hint),
         "thread_count": 0,
+        "comment_sample_count": 0,
         "subreddits": [],
         "timeline": [],
         "top_threads": [],
@@ -394,5 +474,12 @@ def build_pulse(full_name: str, company_hint: str | None = None) -> dict:
                           "That is a finding, not an error: this person has no measurable Reddit "
                           "conversation to read.")
         return result
-    result["analysis"] = analyze(full_name, posts)
+
+    try:
+        comments = _collect_thread_comments(posts)
+    except Exception as e:
+        logger.warning("tlpr_reddit_pulse: comment collection failed for %r: %s", full_name, e)
+        comments = []
+    result["comment_sample_count"] = len(comments)
+    result["analysis"] = analyze(full_name, posts, comments)
     return result

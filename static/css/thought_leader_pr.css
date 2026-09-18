@@ -425,7 +425,10 @@ body{font-family:'Space Grotesk',-apple-system,BlinkMacSystemFont,sans-serif;min
 
 /* ---- Reaction section (Phase 2) ---- */
 #tlprReactionSection:not(:empty){margin-top:var(--sp5);}
-.tlpr-reaction-cols{display:grid;grid-template-columns:1fr 1fr;gap:var(--sp5);}
+.tlpr-reaction-cols{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--sp5);}
+@media (max-width:900px){
+  .tlpr-reaction-cols{grid-template-columns:1fr 1fr;}
+}
 .tlpr-reaction-col{min-width:0;}
 .tlpr-reaction-col-head{
   font-size:var(--fs-xs);font-weight:700;color:var(--tx3);text-transform:uppercase;
