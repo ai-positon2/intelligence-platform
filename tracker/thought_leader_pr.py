@@ -39,7 +39,7 @@ from urllib.parse import urlparse
 from datetime import datetime, timedelta, timezone
 
 from tracker import (apify_transport, apify_x_replies, apollo_client, claude_websearch,
-                     sci_source_linkedin_unipile, sci_source_x, sci_youtube_client,
+                     sci_name_match, sci_source_linkedin_unipile, sci_source_x, sci_youtube_client,
                      tlpr_facebook_pulse, tlpr_instagram_pulse, tlpr_linkedin_pulse,
                      tlpr_press, tlpr_reddit_pulse, tlpr_tiktok_pulse, tlpr_x_pulse,
                      unipile_client, unipile_transport)
@@ -727,7 +727,12 @@ _SYSTEM = (
     "or title hint, or a candidate identity you were given to confirm) points "
     "to a specific person, verify THAT person rather than defaulting to the "
     "most famous bearer of the name. Do not silently merge two different "
-    "people who share a name.\n"
+    "people who share a name. A candidate identity you were given is an "
+    "UNVERIFIED lead from a business database, not a conclusion -- if it "
+    "conflicts with the other context you were given (a mismatched company, "
+    "title, or field), or you cannot find independent evidence it is real, "
+    "treat it as unrelated noise and identify the person the search and "
+    "context actually point to instead of defaulting to it.\n"
     "2. VERIFY, do not pattern-match. Confirm this is a real, identifiable "
     "public figure with an actual public platform (LinkedIn, X, YouTube, "
     "press coverage, a book, a company they lead). Set confidence: \"high\" "
@@ -783,6 +788,38 @@ def _handle_from_url(url: str | None) -> str | None:
 MAX_NAME_CANDIDATES = 6
 
 
+def _looks_like_same_person(name: str, candidate_full_name: str) -> bool:
+    """Whether an Apollo row's OWN name plausibly matches the person being
+    searched -- deliberately stricter than sci_name_match.plausible_match,
+    which is right for a company name (a short, distinctive brand name
+    being a SUBSET of a longer account title is expected and fine) but
+    wrong for a person's full name, where a shared surname or given name
+    alone is a weak signal: millions of unrelated people share one. Apollo
+    is a B2B business-contact database with essentially no coverage of
+    non-corporate public figures (politicians, authors, activists with no
+    employer to list), and its free-text `keywords` search returns a
+    "confident" top hit for almost any query regardless of real relevance
+    -- the exact failure sci_name_match.py's own docstring describes
+    against a different vendor. A real incident this caught: searching
+    "Rahul Gandhi" (the Indian politician) returned an unrelated small-
+    business owner named "Gandhi" as Apollo's top keyword hit purely
+    because "Gandhi" appears in both the search and the row's company name
+    ("Rahul Traders") -- handed to the identity-resolution model as "a
+    business database suggests this may be [him]," it anchored on that
+    wrong candidate instead of independently verifying the well-known
+    person actually being searched.
+
+    Requires every significant word of the SEARCHED name to appear in the
+    candidate's own name (so "Rahul Gandhi" matches "Rahul Gandhi" or
+    "Rahul K. Gandhi", but not a candidate whose name is only "Gandhi" or
+    only shares an unrelated "Rahul")."""
+    search_tokens = sci_name_match.name_tokens(name)
+    candidate_tokens = sci_name_match.name_tokens(candidate_full_name)
+    if not search_tokens or not candidate_tokens:
+        return False
+    return search_tokens <= candidate_tokens
+
+
 def search_name_candidates(name: str, company_hint: str | None = None) -> tuple[list[dict], dict | None]:
     """A cheap, Apollo-only candidate list for a typed name, shown BEFORE
     resolve_identity's own websearch grounding call ever runs -- same
@@ -817,6 +854,15 @@ def search_name_candidates(name: str, company_hint: str | None = None) -> tuple[
     for p in people:
         full_name = (p.get("full_name") or "").strip()
         if not full_name:
+            continue
+        # Apollo's `keywords` filter is a fuzzy OR-search across name,
+        # title, AND company/organization text, so a row surfaces here
+        # whenever ANY of those fields loosely matches -- not necessarily
+        # the person's own name. Require the row's own name to actually
+        # match before showing it as a candidate for THIS person, or the
+        # list fills up with unrelated people who merely work at a company
+        # or hold a title that happens to share a word with the search.
+        if not _looks_like_same_person(name, full_name):
             continue
         key = (full_name.lower(), (p.get("organization_name") or "").lower())
         if key in seen:
@@ -853,9 +899,25 @@ def _best_apollo_candidate(name: str, company_hint: str | None,
         return None
     if not candidates:
         return None
+    if linkedin_url:
+        # An exact `linkedin_urls` lookup is authoritative on the URL the
+        # caller themselves supplied -- trust it even if Apollo's own
+        # `full_name` field differs (a nickname, a maiden name, a typo).
+        return candidates[0]
     exact = [c for c in candidates
              if (c.get("full_name") or "").strip().lower() == name.strip().lower()]
-    return (exact or candidates)[0]
+    if exact:
+        return exact[0]
+    # No exact match: only fall back to a keyword-search hit when its OWN
+    # name plausibly matches. Blindly returning candidates[0] here is
+    # exactly what caused a real incident -- see _looks_like_same_person's
+    # docstring for the full story. A missing Apollo hint is recoverable
+    # (the websearch grounding step below still finds a well-known public
+    # figure on its own); a wrong one silently anchors that step onto an
+    # unrelated person.
+    plausible = [c for c in candidates
+                 if _looks_like_same_person(name, (c.get("full_name") or ""))]
+    return plausible[0] if plausible else None
 
 
 def _resolve_linkedin_platform(url: str | None) -> dict:

@@ -1175,3 +1175,95 @@ class TestSearchNameCandidates:
         candidates, error = T.search_name_candidates("Jane Doe")
         assert candidates == []
         assert error["code"] == "error"
+
+    def test_rows_whose_own_name_does_not_match_are_dropped(self, monkeypatch):
+        """Regression test for a real incident: searching "rahul gandhi"
+        returned six Apollo rows, none of them actually named Rahul Gandhi
+        -- Apollo's `keywords` filter matched loosely on a company name
+        ("Rahul Traders"), a title ("Gandhi Fellow"), or an employer
+        ("Indira Gandhi ..."), not the person's own name. Exact rows from
+        that real response, reproduced here."""
+        monkeypatch.setenv("APOLLO_API_KEY", "test-key")
+        rows = [
+            {"full_name": "Gandhi", "title": "Owner", "organization_name": "Rahul Traders"},
+            {"full_name": "Murali Rahul", "title": "Doctor", "organization_name": "Gandhi Hospital"},
+            {"full_name": "Rahul Bharat", "title": "Rahul Gandhi", "organization_name": "Bharat"},
+            {"full_name": "Rahul Kumar", "title": "Gandhi Fellow", "organization_name": "Piramal Foundation"},
+            {"full_name": "Rahul Upadhyay", "title": "PhD Scholar", "organization_name": "Indira Gandhi ..."},
+        ]
+        monkeypatch.setattr(T.apollo_client, "search_people", lambda *a, **kw: rows)
+        candidates, error = T.search_name_candidates("rahul gandhi", company_hint="Congress leader")
+        assert error is None
+        assert candidates == []
+
+    def test_a_row_matching_both_name_words_is_kept(self, monkeypatch):
+        monkeypatch.setenv("APOLLO_API_KEY", "test-key")
+        rows = [{"full_name": "Rahul Gandhi", "title": "Member of Parliament",
+                "organization_name": "Indian National Congress"}]
+        monkeypatch.setattr(T.apollo_client, "search_people", lambda *a, **kw: rows)
+        candidates, error = T.search_name_candidates("rahul gandhi")
+        assert error is None
+        assert len(candidates) == 1
+        assert candidates[0]["full_name"] == "Rahul Gandhi"
+
+
+class TestLooksLikeSamePerson:
+    def test_exact_name_matches(self):
+        assert T._looks_like_same_person("Rahul Gandhi", "Rahul Gandhi") is True
+
+    def test_an_extra_middle_name_still_matches(self):
+        assert T._looks_like_same_person("Elon Musk", "Elon Reeve Musk") is True
+
+    def test_surname_only_does_not_match(self):
+        assert T._looks_like_same_person("Rahul Gandhi", "Gandhi") is False
+
+    def test_shared_given_name_alone_does_not_match(self):
+        assert T._looks_like_same_person("Rahul Gandhi", "Rahul Kumar") is False
+
+    def test_no_overlap_does_not_match(self):
+        assert T._looks_like_same_person("Rahul Gandhi", "Priya Sharma") is False
+
+    def test_blank_candidate_name_does_not_match(self):
+        assert T._looks_like_same_person("Rahul Gandhi", "") is False
+
+
+class TestBestApolloCandidate:
+    def test_an_exact_name_match_is_returned(self, monkeypatch):
+        rows = [{"full_name": "Jane Doe", "title": "CEO", "organization_name": "Acme"}]
+        monkeypatch.setattr(T.apollo_client, "search_people", lambda *a, **kw: rows)
+        cand = T._best_apollo_candidate("Jane Doe", None, None, "test-key")
+        assert cand == rows[0]
+
+    def test_a_given_linkedin_url_is_trusted_even_if_the_name_field_differs(self, monkeypatch):
+        """An exact linkedin_urls lookup is authoritative on the URL the
+        caller themselves supplied -- Apollo's own full_name field (a
+        nickname, maiden name, or a slight mismatch) must not veto it."""
+        rows = [{"full_name": "J. Doe", "linkedin_url": "https://linkedin.com/in/janedoe"}]
+        captured = {}
+        def fake_search(filters, api_key, per_page=None):
+            captured["filters"] = filters
+            return rows
+        monkeypatch.setattr(T.apollo_client, "search_people", fake_search)
+        cand = T._best_apollo_candidate("Jane Doe", None, "https://linkedin.com/in/janedoe", "test-key")
+        assert cand == rows[0]
+        assert captured["filters"]["linkedin_urls"] == ["https://linkedin.com/in/janedoe"]
+
+    def test_no_plausible_candidate_returns_none_not_the_top_junk_hit(self, monkeypatch):
+        """Regression test for the real "Rahul Gandhi" incident: before this
+        fix, _best_apollo_candidate returned candidates[0] unconditionally
+        whenever no EXACT match existed, handing a completely unrelated
+        person to resolve_identity's grounding prompt as "a business
+        database suggests this may be [them]." That candidate then
+        anchored identity resolution onto the wrong person instead of the
+        real, well-known public figure being searched."""
+        rows = [{"full_name": "Gandhi", "title": "Owner", "organization_name": "Rahul Traders"},
+               {"full_name": "Murali Rahul", "title": "Doctor", "organization_name": "Gandhi Hospital"}]
+        monkeypatch.setattr(T.apollo_client, "search_people", lambda *a, **kw: rows)
+        cand = T._best_apollo_candidate("Rahul Gandhi", "Congress leader", None, "test-key")
+        assert cand is None
+
+    def test_a_plausible_non_exact_candidate_is_still_offered(self, monkeypatch):
+        rows = [{"full_name": "Jane R. Doe", "title": "VP", "organization_name": "Acme"}]
+        monkeypatch.setattr(T.apollo_client, "search_people", lambda *a, **kw: rows)
+        cand = T._best_apollo_candidate("Jane Doe", None, None, "test-key")
+        assert cand == rows[0]
