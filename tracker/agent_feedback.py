@@ -1,7 +1,7 @@
 """Postgres-backed storage for the thumbs up/down feedback control on
 Strategic Agents' generated reports (Contact Finder, LinkedIn Strategy
 Researcher, 42 North Dental Slot Checker, Social Media Intelligence, Event &
-Conference Intelligence).
+Conference Intelligence, Thought Leader Intelligence).
 
 One shared table rather than one per agent: every agent's report is a
 different shape (a tabbed drawer, a chat reply, a weekly briefing), but the
@@ -47,6 +47,7 @@ AGENT_LABELS = {
     "42-north-dental-slot-checker": "42 North Dental Slot Checker",
     "social-media-intelligence": "Social Media Intelligence",
     "event-conference-intelligence": "Event & Conference Intelligence",
+    "thought-leader-pr": "Thought Leader Intelligence",
 }
 
 

@@ -2268,7 +2268,7 @@ def _list_agent_run_titles(limit=5000) -> list:
 # ─────────────────────────────────────────────────────────────────────────────
 # AGENT FEEDBACK — thumbs up/down on Strategic Agents' generated reports
 # ─────────────────────────────────────────────────────────────────────────────
-# One shared table/route for all five agents that produce an actual generated
+# One shared table/route for all six agents that produce an actual generated
 # analysis (see tracker/agent_feedback.py's AGENT_LABELS for why the other
 # five agents under Strategic Agents don't get this control at all). The
 # widget itself (static/js/agent_feedback.js) posts here immediately on a tap

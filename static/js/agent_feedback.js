@@ -1,10 +1,10 @@
 /* Shared thumbs up/down control for Strategic Agents' generated reports.
-   One script, wired into every report-rendering function across five very
+   One script, wired into every report-rendering function across six very
    differently-shaped agents (LinkedIn Strategy Researcher, Social Media
    Intelligence, Event & Conference Intelligence, 42 North Dental Slot
-   Checker, Contact Finder's assistant), rather than five copies of the same
-   handful of DOM calls -- POST /api/agent-feedback (app.py) is the one
-   backend contract all five talk to.
+   Checker, Contact Finder's assistant, Thought Leader Intelligence), rather
+   than six copies of the same handful of DOM calls -- POST /api/agent-
+   feedback (app.py) is the one backend contract all six talk to.
 
    A thumbs-down submits IMMEDIATELY (never blocked on typing a reason first,
    so a vote is never lost to someone closing a drawer) and only afterwards

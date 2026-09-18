@@ -12,6 +12,8 @@
   <script src="/static/js/theme.js"></script>
   <link rel="stylesheet" href="/static/css/thought_leader_pr.css?v=1">
   <link rel="stylesheet" href="/static/css/aurora-app.css?v=3">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/agent-feedback.css') }}">
+  <script src="{{ url_for('static', filename='js/agent_feedback.js') }}"></script>
 </head>
 <body>
   <div class="bg-grid"></div>
@@ -50,7 +52,7 @@
     <div class="tlpr-hero">
       <div class="au-eyebrow"><span class="d"></span>Strategic Agents · Reputation &amp; PR Intelligence</div>
       <h1>Know their <em>reputation</em> before you're in the room.</h1>
-      <p>Name a thought leader. Confirm who they are, then see what they post, how the room reacts, and what the press already says.</p>
+      <p>Name a thought leader. Confirm who they are, then see what they post, how the room reacts, what the press already says, and one reputation report that pulls it all together.</p>
     </div>
 
     <div class="tlpr-search-card">
@@ -109,6 +111,20 @@
     }
     function confLabel(c){
       return {high: 'High match', medium: 'Medium match', low: 'Low match', none: 'No match'}[c] || 'Unknown';
+    }
+
+    /* Thumbs up/down for one section of a report, keyed by run + a stable
+       section key -- see static/js/agent_feedback.js and
+       tracker/agent_feedback.py's AGENT_LABELS. Only called at the three
+       sections that carry an actual Claude-written judgment (audience
+       reaction, press coverage, the synthesis report) -- Phase 1's raw post
+       collection has nothing for a thumbs-down to be about, same reasoning
+       event_conference_intelligence.html's own eviFb() exclusions document. */
+    function tlprFb(runId, sectionKey, sectionLabel){
+      return window.agentFeedbackHtml
+        ? window.agentFeedbackHtml({agentSlug: 'thought-leader-pr', runId: runId,
+                                    sectionKey: sectionKey, sectionLabel: sectionLabel})
+        : '';
     }
 
     const ICON_LINKEDIN = '<svg viewBox="0 0 24 24"><path d="M6.94 8.5H3.56V20h3.38V8.5ZM5.25 3a1.94 1.94 0 1 0 0 3.88A1.94 1.94 0 0 0 5.25 3ZM20.44 20h-3.37v-5.6c0-1.34-.03-3.06-1.87-3.06-1.87 0-2.16 1.46-2.16 2.96V20H9.68V8.5h3.24v1.57h.05c.45-.86 1.56-1.77 3.21-1.77 3.43 0 4.26 2.26 4.26 5.2V20Z"/></svg>';
@@ -389,6 +405,7 @@
               ${redditPulseHtml(r.reddit)}
             </div>
           </div>
+          ${tlprFb(run.id, 'reaction', 'How the room reacts')}
         </div>`;
     }
     function reactionIdleHtml(runId){
@@ -516,6 +533,7 @@
               <ul class="tlpr-notable-list">${notable}</ul></div>` : ''}
           ${riskFlags ? `<div class="tlpr-facts tlpr-facts--risk" style="margin-top:14px;">
               <div class="tlpr-facts-label">Risk flags</div><ul>${riskFlags}</ul></div>` : ''}
+          ${tlprFb(run.id, 'press', 'What the press says')}
         </div>`;
     }
     function pressIdleHtml(runId){
@@ -630,6 +648,7 @@
           ${s.alignment ? `<div class="tlpr-synth-alignment">
               <div class="tlpr-synth-alignment-label">Self-presentation vs. perception</div>
               <p>${esc(s.alignment)}</p></div>` : ''}
+          ${tlprFb(run.id, 'synthesis', 'Reputation report')}
         </div>`;
     }
     function synthesisIdleHtml(runId){

@@ -66,7 +66,7 @@ def no_database(monkeypatch):
 
 # ── tracker/agent_feedback.py, direct ────────────────────────────────────────
 
-def test_only_the_five_agents_with_a_real_generated_report_are_allowed():
+def test_only_the_six_agents_with_a_real_generated_report_are_allowed():
     """The other five agents under Strategic Agents (Job Change Alert,
     ad-intelligence, linkedin-intelligence, sentiment-pulse, the hidden
     LinkedIn Social Researcher) show raw data or a third-party surface, not a
@@ -79,6 +79,7 @@ def test_only_the_five_agents_with_a_real_generated_report_are_allowed():
         "42-north-dental-slot-checker",
         "social-media-intelligence",
         "event-conference-intelligence",
+        "thought-leader-pr",
     }
 
 
