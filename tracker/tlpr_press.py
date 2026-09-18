@@ -378,7 +378,8 @@ def build_press(full_name: str, company_hint: str | None = None) -> dict:
         articles, errors = collect_coverage(full_name, company_hint)
     except Exception as e:
         logger.warning("tlpr_press: coverage collection failed for %r: %s", full_name, e)
-        result["note"] = "Press coverage search could not be completed for this person."
+        result["note"] = ("Press coverage search could not be completed for this person (%s)."
+                          % (str(e)[:160] or type(e).__name__))
         return result
 
     result["errors"] = errors

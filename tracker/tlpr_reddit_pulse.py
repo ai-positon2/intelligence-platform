@@ -405,7 +405,7 @@ def analyze(full_name: str, posts: list[dict], comments: list[dict] | None = Non
     try:
         resp = client.messages.create(
             model=os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-5"),
-            max_tokens=8000,
+            max_tokens=16000,
             system=_SYSTEM,
             messages=[{"role": "user", "content": json.dumps(payload, ensure_ascii=False)}],
         )
@@ -463,7 +463,8 @@ def build_pulse(full_name: str, company_hint: str | None = None) -> dict:
         posts = collect_mentions(full_name, company_hint)
     except Exception as e:
         logger.warning("tlpr_reddit_pulse: mention collection failed for %r: %s", full_name, e)
-        result["note"] = "Reddit search could not be completed for this person."
+        result["note"] = ("Reddit search could not be completed for this person (%s)."
+                          % (str(e)[:160] or type(e).__name__))
         return result
 
     result.update(aggregate(posts))

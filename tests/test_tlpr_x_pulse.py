@@ -105,6 +105,25 @@ def test_the_mentions_query_failing_never_blocks_the_search_query(monkeypatch):
     assert "x_mentions" in errors
 
 
+def test_a_normalize_crash_in_one_query_does_not_lose_the_other_or_escape_uncaught(monkeypatch):
+    """Reproduces the real incident: _run_actor succeeded but returned
+    something sci_source_x.normalize() cannot iterate (a bare string, not a
+    list of dicts) -- a different exception type than ApifyTransportError,
+    which the old narrow except let escape all the way out of
+    collect_mentions and get reported as the generic "X search could not be
+    completed" with no diagnosable cause."""
+    monkeypatch.setenv("APIFY_API_TOKEN", "tok")
+    def fake(run_input, token):
+        if "searchTerms" in run_input:
+            return "not a list of tweet dicts"
+        return [_tweet("1")]
+    monkeypatch.setattr(xp, "_run_actor", fake)
+    tweets, errors = xp.collect_mentions("Jane Doe", x_handle="janedoe")
+    assert len(tweets) == 1
+    assert "x_search" in errors
+    assert "x_mentions" not in errors
+
+
 # ── mechanical aggregation ──────────────────────────────────────────────
 
 def test_aggregate_counts_authors_and_engagement():

@@ -93,6 +93,20 @@ def test_a_search_transport_error_is_recorded(monkeypatch):
     assert "facebook_search" in errors
 
 
+def test_a_normalize_crash_is_caught_here_not_left_to_escape(monkeypatch):
+    """normalize() used to run outside the narrow except -- a crash there
+    (a different exception type than ApifyTransportError) escaped
+    collect_mentions entirely and was only ever caught by build_pulse's
+    generic outer catch, reported as an undiagnosable "Facebook search
+    could not be completed". Same gap and fix as tlpr_x_pulse.py."""
+    monkeypatch.setenv("APIFY_API_TOKEN", "tok")
+    monkeypatch.setattr(apify_transport, "run_actor_and_wait",
+                        lambda *a, **kw: "not a list of post dicts")
+    posts, errors = fp.collect_mentions("Jane Doe")
+    assert posts == []
+    assert "facebook_search" in errors
+
+
 def test_a_post_that_does_not_actually_mention_the_name_is_dropped(monkeypatch):
     monkeypatch.setenv("APIFY_API_TOKEN", "tok")
     monkeypatch.setattr(apify_transport, "run_actor_and_wait",

@@ -135,12 +135,26 @@ def collect_mentions(full_name: str, x_handle: str | None = None,
         _add(_run_actor({"searchTerms": [term], "maxItems": limit, "sort": "Latest"}, token))
     except apify_transport.ApifyTransportError as e:
         errors["x_search"] = str(e)
+    except Exception as e:
+        # Deliberately broad, not just the transport's own error type: _add()
+        # calls sci_source_x.normalize() on whatever the actor returned, and a
+        # malformed-data crash in THAT step is a different exception type that
+        # a narrow except here would let escape uncaught (the same gap fixed
+        # in thought_leader_pr.py's _collect_x_posts by ff84a19). Catching it
+        # here keeps it scoped to this one query's error instead of taking
+        # down the whole X pulse -- or, before this fix, surfacing only as
+        # build_pulse's generic "X search could not be completed."
+        logger.exception("tlpr_x_pulse: keyword search crashed for %r", name)
+        errors["x_search"] = "Could not read X's search response (%s)." % type(e).__name__
 
     if handle:
         try:
             _add(_run_actor({"mentioning": handle, "maxItems": limit, "sort": "Latest"}, token))
         except apify_transport.ApifyTransportError as e:
             errors.setdefault("x_mentions", str(e))
+        except Exception as e:
+            logger.exception("tlpr_x_pulse: mentioning search crashed for %r", name)
+            errors.setdefault("x_mentions", "Could not read X's search response (%s)." % type(e).__name__)
 
     return list(seen.values()), errors
 
@@ -337,7 +351,7 @@ def analyze(full_name: str, tweets: list[dict]) -> dict:
     try:
         resp = client.messages.create(
             model=os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-5"),
-            max_tokens=8000,
+            max_tokens=16000,
             system=_SYSTEM,
             messages=[{"role": "user", "content": json.dumps(payload, ensure_ascii=False)}],
         )
@@ -389,7 +403,8 @@ def build_pulse(full_name: str, x_handle: str | None = None) -> dict:
         tweets, errors = collect_mentions(full_name, x_handle)
     except Exception as e:
         logger.warning("tlpr_x_pulse: mention collection failed for %r: %s", full_name, e)
-        result["note"] = "X search could not be completed for this person."
+        result["note"] = ("X search could not be completed for this person (%s)."
+                          % (str(e)[:160] or type(e).__name__))
         return result
 
     result["errors"] = errors

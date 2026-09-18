@@ -114,15 +114,22 @@ def collect_mentions(instagram_handle: str, limit: int = FETCH_LIMIT) -> tuple[l
     try:
         raw_items = apify_transport.run_actor_and_wait(
             sci_source_instagram.actor_id(), run_input, token, strict=True)
+        seen: dict[str, dict] = {}
+        for p in sci_source_instagram.normalize(raw_items):
+            pid = p.get("platform_post_id")
+            if pid and pid not in seen:
+                seen[pid] = p
     except apify_transport.ApifyTransportError as e:
         errors["instagram_mentions"] = str(e)
         return [], errors
-
-    seen: dict[str, dict] = {}
-    for p in sci_source_instagram.normalize(raw_items):
-        pid = p.get("platform_post_id")
-        if pid and pid not in seen:
-            seen[pid] = p
+    except Exception as e:
+        # normalize() is now inside this try deliberately -- see the same
+        # fix in tlpr_x_pulse.collect_mentions and thought_leader_pr.py's
+        # ff84a19 for why a narrow except around only the actor call is not
+        # enough.
+        logger.exception("tlpr_instagram_pulse: mentions fetch crashed for %r", handle)
+        errors["instagram_mentions"] = "Could not read Instagram's response (%s)." % type(e).__name__
+        return [], errors
     return list(seen.values()), errors
 
 
@@ -302,7 +309,7 @@ def analyze(full_name: str, posts: list[dict]) -> dict:
     try:
         resp = client.messages.create(
             model=os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-5"),
-            max_tokens=8000,
+            max_tokens=16000,
             system=_SYSTEM,
             messages=[{"role": "user", "content": json.dumps(payload, ensure_ascii=False)}],
         )
@@ -357,7 +364,8 @@ def build_pulse(full_name: str, instagram_handle: str | None = None) -> dict:
         posts, errors = collect_mentions(instagram_handle)
     except Exception as e:
         logger.warning("tlpr_instagram_pulse: mention collection failed for %r: %s", full_name, e)
-        result["note"] = "Instagram could not be read for this person."
+        result["note"] = ("Instagram could not be read for this person (%s)."
+                          % (str(e)[:160] or type(e).__name__))
         return result
 
     result["errors"] = errors

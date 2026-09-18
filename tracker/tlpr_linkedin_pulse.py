@@ -344,7 +344,7 @@ def analyze(full_name: str, posts: list[dict]) -> dict:
     try:
         resp = client.messages.create(
             model=os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-5"),
-            max_tokens=8000,
+            max_tokens=16000,
             system=_SYSTEM,
             messages=[{"role": "user", "content": json.dumps(payload, ensure_ascii=False)}],
         )
@@ -396,7 +396,8 @@ def build_pulse(full_name: str, provider_id: str | None = None) -> dict:
         posts, errors = collect_mentions(full_name, provider_id)
     except Exception as e:
         logger.warning("tlpr_linkedin_pulse: mention collection failed for %r: %s", full_name, e)
-        result["note"] = "LinkedIn search could not be completed for this person."
+        result["note"] = ("LinkedIn search could not be completed for this person (%s)."
+                          % (str(e)[:160] or type(e).__name__))
         return result
 
     result["errors"] = errors

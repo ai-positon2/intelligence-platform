@@ -1472,7 +1472,13 @@ def analyze_comment_sentiment(comments: list[dict]) -> dict:
         client = Anthropic(api_key=key, timeout=120.0, max_retries=1)
         resp = client.messages.create(
             model=os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-5"),
-            max_tokens=3000, system=_REACTION_SYSTEM,
+            # 16000, not the 3000 this shipped with: MAX_COMMENTS_DIGEST is 80
+            # items, and the prompt requires a sentiment label for every one
+            # of them plus themes/notable_comments -- 3000 was tight enough
+            # that a real run hit stop_reason=max_tokens and came back as an
+            # "unreadable response" with no indication why. Same headroom now
+            # given to every tlpr_*_pulse.analyze() for the same reason.
+            max_tokens=16000, system=_REACTION_SYSTEM,
             messages=[{"role": "user",
                       "content": json.dumps({"comments": digest}, ensure_ascii=False)}],
         )
@@ -1483,6 +1489,13 @@ def analyze_comment_sentiment(comments: list[dict]) -> dict:
     raw = "".join(b.text for b in resp.content if getattr(b, "type", "") == "text")
     parsed = claude_websearch.extract_json(raw, require="verdict")
     if not isinstance(parsed, dict):
+        stop_reason = getattr(resp, "stop_reason", None)
+        logger.warning("thought_leader_pr: unparsable comment sentiment analysis "
+                       "(stop_reason=%s, chars=%d)", stop_reason, len(raw))
+        if stop_reason == "max_tokens":
+            return {"error": "The comment sentiment analysis ran out of output budget before "
+                             "it finished (stop_reason=max_tokens). Raise max_tokens in "
+                             "analyze_comment_sentiment() or reduce MAX_COMMENTS_DIGEST."}
         return {"error": "The comment sentiment analysis returned an unreadable response."}
     return _clean_reaction_analysis(parsed, valid_ids)
 

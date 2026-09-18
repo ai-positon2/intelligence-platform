@@ -65,6 +65,19 @@ def test_a_transport_error_is_recorded_and_returns_no_videos(monkeypatch):
     assert "tiktok_search" in errors
 
 
+def test_a_normalize_crash_is_caught_here_not_left_to_escape(monkeypatch):
+    """normalize() used to run outside the narrow except -- a crash there
+    (a different exception type than ApifyTransportError) escaped
+    collect_mentions entirely and was only ever caught by build_pulse's
+    generic outer catch. Same gap and fix as tlpr_x_pulse.py."""
+    monkeypatch.setenv("APIFY_API_TOKEN", "tok")
+    monkeypatch.setattr(apify_transport, "run_actor_and_wait",
+                        lambda *a, **kw: "not a list of video dicts")
+    videos, errors = tp.collect_mentions("Jane Doe")
+    assert videos == []
+    assert "tiktok_search" in errors
+
+
 def test_duplicate_videos_in_the_search_results_are_deduped(monkeypatch):
     monkeypatch.setenv("APIFY_API_TOKEN", "tok")
     monkeypatch.setattr(apify_transport, "run_actor_and_wait",

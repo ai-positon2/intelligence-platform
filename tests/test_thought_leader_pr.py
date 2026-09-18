@@ -634,6 +634,51 @@ class TestAnalyzeCommentSentiment:
         out = T.analyze_comment_sentiment([{"platform": "x", "comment_id": "1", "text": "hi", "likes": 1}])
         assert "ANTHROPIC_API_KEY" in out["error"]
 
+    class _FakeTextBlock:
+        def __init__(self, text):
+            self.type = "text"
+            self.text = text
+
+    class _FakeResponse:
+        def __init__(self, text, stop_reason):
+            self.content = [TestAnalyzeCommentSentiment._FakeTextBlock(text)]
+            self.stop_reason = stop_reason
+
+    class _FakeMessages:
+        def __init__(self, text, stop_reason):
+            self._text, self._stop_reason = text, stop_reason
+
+        def create(self, **kwargs):
+            return TestAnalyzeCommentSentiment._FakeResponse(self._text, self._stop_reason)
+
+    class _FakeClient:
+        def __init__(self, *a, text="", stop_reason="end_turn", **kw):
+            self.messages = TestAnalyzeCommentSentiment._FakeMessages(text, stop_reason)
+
+    def test_a_truncated_reply_names_max_tokens_distinctly_from_a_generic_unreadable_one(self, monkeypatch):
+        """Reproduces the real incident: MAX_COMMENTS_DIGEST is 80 items and
+        the original max_tokens=3000 was tight enough that a live run's
+        reply was cut off mid-JSON (stop_reason=max_tokens) and reported as
+        a generic "unreadable response" with no clue why. Same diagnostic
+        every tlpr_*_pulse.analyze() already gives."""
+        import anthropic
+        monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+        monkeypatch.setattr(anthropic, "Anthropic",
+                            lambda *a, **kw: self._FakeClient(text='{"verdict": "cut off mid-sen',
+                                                              stop_reason="max_tokens"))
+        out = T.analyze_comment_sentiment([{"platform": "x", "comment_id": "1", "text": "hi", "likes": 1}])
+        assert "max_tokens" in out["error"]
+        assert "unreadable response" not in out["error"]
+
+    def test_a_non_truncated_unparsable_reply_stays_generic(self, monkeypatch):
+        import anthropic
+        monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+        monkeypatch.setattr(anthropic, "Anthropic",
+                            lambda *a, **kw: self._FakeClient(text="Sorry, I can't help with that.",
+                                                              stop_reason="end_turn"))
+        out = T.analyze_comment_sentiment([{"platform": "x", "comment_id": "1", "text": "hi", "likes": 1}])
+        assert out["error"] == "The comment sentiment analysis returned an unreadable response."
+
 
 class TestCollectReactionJob:
     def _identity_run(self, posts=None):
