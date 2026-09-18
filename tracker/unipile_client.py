@@ -363,6 +363,41 @@ def list_comments(post_id: str, account_id: str, cursor: str | None = None,
     return _request("GET", f"{_API}/posts/{post_id}/comments", params=params)
 
 
+def search_posts(account_id: str, keywords: str | None = None,
+                 mentioning_member_ids: list[str] | None = None,
+                 cursor: str | None = None, limit: int = 50) -> tuple[Any, dict | None]:
+    """LinkedIn's own post search ("Classic - POSTS"), fetched through
+    `account_id`'s connected session. Unlike list_posts, this searches
+    ACROSS LinkedIn rather than reading one identifier's own posts -- it is
+    how tracker/tlpr_linkedin_pulse.py finds what OTHER people post that
+    mentions someone, not what that person posts themselves.
+
+    `keywords` is LinkedIn's own native free-text post-search filter.
+    `mentioning_member_ids` narrows to posts that @-mention specific member
+    ids -- the SAME provider_id get_user_profile already returns, reused
+    here rather than a second lookup.
+
+    Confirmed against Unipile's own published API reference
+    (developer.unipile.com/reference/linkedincontroller_search) on
+    2026-09-18, NOT yet against a live response -- like get_user_profile
+    and list_comments, treat the response shape as likely-correct, not
+    verified. In particular, `mentioning` may turn out to need a different
+    id shape than provider_id supplies; callers should never rely on it
+    alone and should always also run a plain keywords search.
+
+    Returns the raw parsed response; normalizing a platform's post shape
+    is each adapter's job, same division as list_posts."""
+    body: dict[str, Any] = {"api": "classic", "category": "posts"}
+    if keywords:
+        body["keywords"] = keywords
+    if mentioning_member_ids:
+        body["mentioning"] = {"member": mentioning_member_ids}
+    params: dict[str, Any] = {"account_id": account_id, "limit": max(1, min(limit, 100))}
+    if cursor:
+        params["cursor"] = cursor
+    return _request("POST", f"{_API}/linkedin/search", json_body=body, params=params)
+
+
 def list_posts(account_id: str, identifier: str, is_company: bool = True,
                cursor: str | None = None, limit: int = 50) -> tuple[dict | None, dict | None]:
     """Recent posts for `identifier`, fetched through `account_id`'s

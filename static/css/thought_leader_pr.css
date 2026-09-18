@@ -425,9 +425,15 @@ body{font-family:'Space Grotesk',-apple-system,BlinkMacSystemFont,sans-serif;min
 
 /* ---- Reaction section (Phase 2) ---- */
 #tlprReactionSection:not(:empty){margin-top:var(--sp5);}
-.tlpr-reaction-cols{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--sp5);}
-@media (max-width:900px){
-  .tlpr-reaction-cols{grid-template-columns:1fr 1fr;}
+/* auto-fit, not a fixed column count: unlike a small set meant to read as
+   one equal-weight choice (see feedback_platform_css_gotchas.md), this grid
+   holds up to 7 independent, optional source cards -- a person with no
+   Instagram handle or no Facebook mentions genuinely has fewer cards, so
+   there is no fixed N to divide evenly, and uneven card heights here are
+   expected (a dashboard of independent widgets, not a comparison table). */
+.tlpr-reaction-cols{
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:var(--sp5);
+  align-items:start;
 }
 .tlpr-reaction-col{min-width:0;}
 .tlpr-reaction-col-head{
@@ -472,10 +478,6 @@ body{font-family:'Space Grotesk',-apple-system,BlinkMacSystemFont,sans-serif;min
 
 .tlpr-facts--risk .tlpr-facts-label svg{stroke:var(--rose);}
 .tlpr-facts--risk li::before{background:var(--rose);}
-
-@media (max-width:760px){
-  .tlpr-reaction-cols{grid-template-columns:1fr;gap:var(--sp6);}
-}
 
 /* ---- Synthesis section (Phase 4) ---- */
 #tlprSynthesisSection:not(:empty){margin-top:var(--sp5);}

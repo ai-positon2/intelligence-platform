@@ -40,7 +40,9 @@ from datetime import datetime, timedelta, timezone
 
 from tracker import (apify_transport, apify_x_replies, apollo_client, claude_websearch,
                      sci_source_linkedin_unipile, sci_source_x, sci_youtube_client,
-                     tlpr_press, tlpr_reddit_pulse, tlpr_x_pulse, unipile_client, unipile_transport)
+                     tlpr_facebook_pulse, tlpr_instagram_pulse, tlpr_linkedin_pulse,
+                     tlpr_press, tlpr_reddit_pulse, tlpr_tiktok_pulse, tlpr_x_pulse,
+                     unipile_client, unipile_transport)
 
 logger = logging.getLogger(__name__)
 
@@ -747,7 +749,7 @@ _SYSTEM = (
     '{"confidence": "high"|"medium"|"low"|"none", "reasoning": str, '
     '"is_public_figure": bool, "full_name": str|null, "headline": str|null, '
     '"current_title": str|null, "current_company": str|null, '
-    '"linkedin_url": str|null, "x_handle": str|null, '
+    '"linkedin_url": str|null, "x_handle": str|null, "instagram_handle": str|null, '
     '"disambiguating_facts": [str]}'
 )
 
@@ -916,6 +918,18 @@ def _resolve_x_platform(handle: str | None) -> dict:
             "resolved": bool(handle)}
 
 
+def _resolve_instagram_platform(handle: str | None) -> dict:
+    """Instagram is never a Phase 1 owned platform (no own-post collection
+    exists for it) -- this handle exists only so Phase 2's
+    tracker/tlpr_instagram_pulse.py can read the person's own Mentions
+    tab. Same soft-fail, no-separate-verification-call shape as
+    _resolve_x_platform: a wrong or unconfirmed handle degrades to an
+    empty mentions read, never a hard failure."""
+    handle = (handle or "").lstrip("@") or None
+    return {"handle": handle, "url": f"https://www.instagram.com/{handle}/" if handle else None,
+            "resolved": bool(handle)}
+
+
 def resolve_identity(name: str, *, company_hint: str | None = None,
                      title_hint: str | None = None, linkedin_url: str | None = None,
                      x_handle: str | None = None) -> dict:
@@ -998,6 +1012,7 @@ def resolve_identity(name: str, *, company_hint: str | None = None,
                              or (parsed.get("linkedin_url") or "").strip() or None)
     resolved_x_handle = (x_handle or _handle_from_url((apollo_candidate or {}).get("twitter_url"))
                          or (parsed.get("x_handle") or "").strip().lstrip("@") or None)
+    resolved_instagram_handle = (parsed.get("instagram_handle") or "").strip().lstrip("@") or None
 
     linkedin_platform = _resolve_linkedin_platform(resolved_linkedin_url)
     identity = {
@@ -1015,6 +1030,7 @@ def resolve_identity(name: str, *, company_hint: str | None = None,
             "linkedin": linkedin_platform,
             "x": _resolve_x_platform(resolved_x_handle),
             "youtube": _resolve_youtube_platform(full_name),
+            "instagram": _resolve_instagram_platform(resolved_instagram_handle),
         },
         "source": {"apollo_matched": bool(apollo_candidate), "websearch_count": res.get("search_count")},
     }
@@ -1131,19 +1147,29 @@ def collect_posts_job(run_id: int, email: str, max_posts: int = MAX_POSTS_PER_PL
 
 # ───────────────────────── Phase 2: audience reaction ─────────────────────────
 #
-# Three independent sources, combined into one read of "how does the room
+# Seven independent sources, combined into one read of "how does the room
 # react": (1) real comments/replies on the person's OWN posts collected in
-# Phase 1 (LinkedIn/X/YouTube), (2) what OTHER people independently post on
-# X about them (tracker/tlpr_x_pulse.py -- a real X-wide search, not replies
-# on their own tweets), and (3) the Reddit conversation ABOUT them anywhere
-# on Reddit, including each mention-thread's own comment section
-# (tracker/tlpr_reddit_pulse.py). Only the first needs Phase 1's posts to
-# already exist (comments are fetched per already-collected post); the
-# other two need only the resolved identity and run independently of
-# whether Phase 1 ever ran.
+# Phase 1 (LinkedIn/X/YouTube), then six sources of what OTHER people
+# independently post ABOUT them, never their own voice: (2) X
+# (tracker/tlpr_x_pulse.py, a real X-wide search), (3) Reddit
+# (tracker/tlpr_reddit_pulse.py, mention-threads plus each thread's own
+# comment section), (4) LinkedIn (tracker/tlpr_linkedin_pulse.py, LinkedIn's
+# own post search via the same Unipile account Phase 1 already uses), (5)
+# TikTok (tracker/tlpr_tiktok_pulse.py, TikTok's own video search -- TikTok
+# is not a Phase 1 owned platform), (6) Instagram
+# (tracker/tlpr_instagram_pulse.py, the person's own Mentions tab -- also
+# not a Phase 1 owned platform, and only readable when Phase 0 found an
+# Instagram handle), and (7) Facebook (tracker/tlpr_facebook_pulse.py,
+# keyword search plus comment-section reading, the one source here built on
+# two vendors NOT already integrated elsewhere in this codebase -- a
+# deliberate, user-confirmed decision, see that module's docstring).
 #
-# Same fault isolation as Phase 1: one platform's comment fetch failing
-# never blocks the others, and a failure here is recorded in `errors`, never
+# Only the first needs Phase 1's posts to already exist (comments are
+# fetched per already-collected post); the other six need only the resolved
+# identity and run independently of whether Phase 1 ever ran.
+#
+# Same fault isolation as Phase 1: one platform's fetch failing never
+# blocks the others, and a failure here is recorded in `errors`, never
 # conflated with the analysis job itself crashing (reaction_status='failed'
 # via save_reaction_failed).
 
@@ -1387,6 +1413,8 @@ def collect_reaction_job(run_id: int, email: str, max_posts: int = MAX_POSTS_FOR
         full_name = identity.get("full_name") or run.get("input_name") or ""
         company_hint = identity.get("current_company") or run.get("company_hint")
         x_handle = (identity.get("platforms") or {}).get("x", {}).get("handle")
+        li_provider_id = (identity.get("platforms") or {}).get("linkedin", {}).get("provider_id")
+        instagram_handle = (identity.get("platforms") or {}).get("instagram", {}).get("handle")
         posts = run.get("posts") or {}
 
         comments: list[dict] = []
@@ -1421,11 +1449,40 @@ def collect_reaction_job(run_id: int, email: str, max_posts: int = MAX_POSTS_FOR
             logger.exception("thought_leader_pr: x pulse crashed for run %s", run_id)
             x_pulse = {"note": "The X conversation read could not be completed.", "tweet_count": 0}
 
+        try:
+            linkedin_pulse = tlpr_linkedin_pulse.build_pulse(full_name, li_provider_id)
+        except Exception:
+            logger.exception("thought_leader_pr: linkedin pulse crashed for run %s", run_id)
+            linkedin_pulse = {"note": "The LinkedIn conversation read could not be completed.", "post_count": 0}
+
+        try:
+            tiktok_pulse = tlpr_tiktok_pulse.build_pulse(full_name)
+        except Exception:
+            logger.exception("thought_leader_pr: tiktok pulse crashed for run %s", run_id)
+            tiktok_pulse = {"note": "The TikTok conversation read could not be completed.", "video_count": 0}
+
+        try:
+            instagram_pulse = tlpr_instagram_pulse.build_pulse(full_name, instagram_handle)
+        except Exception:
+            logger.exception("thought_leader_pr: instagram pulse crashed for run %s", run_id)
+            instagram_pulse = {"note": "The Instagram conversation read could not be completed.",
+                               "mention_count": 0}
+
+        try:
+            facebook_pulse = tlpr_facebook_pulse.build_pulse(full_name)
+        except Exception:
+            logger.exception("thought_leader_pr: facebook pulse crashed for run %s", run_id)
+            facebook_pulse = {"note": "The Facebook conversation read could not be completed.", "post_count": 0}
+
         reaction = {
             "comments_analyzed": len(comments),
             "comment_sentiment": comment_sentiment,
             "reddit": reddit,
             "x_pulse": x_pulse,
+            "linkedin_pulse": linkedin_pulse,
+            "tiktok_pulse": tiktok_pulse,
+            "instagram_pulse": instagram_pulse,
+            "facebook_pulse": facebook_pulse,
         }
         save_reaction(run_id, email, reaction, errors)
     except Exception:

@@ -401,3 +401,38 @@ def test_list_comments_surfaces_a_transport_error(monkeypatch):
                         _request_returning(_FakeResp(422, "")))
     data, err = uc.list_comments("social123", "acct-1")
     assert data is None and err["kind"] == uc.ERR_HTTP
+
+
+def test_search_posts_is_a_post_to_the_linkedin_search_route(monkeypatch):
+    monkeypatch.setenv("UNIPILE_API_KEY", "k")
+    req = _request_returning(_FakeResp(200, json.dumps({"items": []})))
+    monkeypatch.setattr(uc.requests, "request", req)
+    uc.search_posts("acct-1", keywords='"Jane Doe"')
+    assert req.calls[0]["method"] == "POST"
+    assert req.calls[0]["url"].endswith("/api/v1/linkedin/search")
+    assert req.calls[0]["json"] == {"api": "classic", "category": "posts", "keywords": '"Jane Doe"'}
+    assert req.calls[0]["params"]["account_id"] == "acct-1"
+
+
+def test_search_posts_sends_the_mentioning_filter_when_given_member_ids(monkeypatch):
+    monkeypatch.setenv("UNIPILE_API_KEY", "k")
+    req = _request_returning(_FakeResp(200, json.dumps({"items": []})))
+    monkeypatch.setattr(uc.requests, "request", req)
+    uc.search_posts("acct-1", mentioning_member_ids=["12345"])
+    assert req.calls[0]["json"]["mentioning"] == {"member": ["12345"]}
+    assert "keywords" not in req.calls[0]["json"]
+
+
+def test_search_posts_never_asks_for_more_than_the_vendor_s_page_cap(monkeypatch):
+    monkeypatch.setenv("UNIPILE_API_KEY", "k")
+    req = _request_returning(_FakeResp(200, json.dumps({"items": []})))
+    monkeypatch.setattr(uc.requests, "request", req)
+    uc.search_posts("acct-1", keywords="x", limit=5000)
+    assert req.calls[0]["params"]["limit"] == 100
+
+
+def test_search_posts_surfaces_a_transport_error(monkeypatch):
+    monkeypatch.setenv("UNIPILE_API_KEY", "k")
+    monkeypatch.setattr(uc.requests, "request", _request_returning(_FakeResp(422, "")))
+    data, err = uc.search_posts("acct-1", keywords="x")
+    assert data is None and err["kind"] == uc.ERR_HTTP

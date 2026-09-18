@@ -26,7 +26,8 @@ def _no_side_effect_keys(monkeypatch):
     """No test in this file should ever reach a real vendor: clear every key
     resolve_identity() checks so a missing monkeypatch fails loudly (a
     network error) rather than silently hitting a real API."""
-    for key in ("APOLLO_API_KEY", "YOUTUBE_API_KEY", "DATABASE_URL", "APIFY_API_TOKEN"):
+    for key in ("APOLLO_API_KEY", "YOUTUBE_API_KEY", "DATABASE_URL", "APIFY_API_TOKEN",
+               "UNIPILE_API_KEY", "UNIPILE_DSN", "ANTHROPIC_API_KEY"):
         monkeypatch.delenv(key, raising=False)
 
 
@@ -113,6 +114,7 @@ class TestResolveIdentityHappyPath:
             '"is_public_figure":true,"full_name":"Jane Doe","headline":"CSO at Acme",'
             '"current_title":"Chief Strategy Officer","current_company":"Acme Corp",'
             '"linkedin_url":"https://www.linkedin.com/in/janedoe/","x_handle":"janedoe",'
+            '"instagram_handle":"@janedoe",'
             '"disambiguating_facts":["Author of Scaling Go-to-Market","Keynoted SaaStr 2026",'
             '"Extra fact one","Extra fact two","Extra fact three -- should be dropped, only 4 kept"]}'))
 
@@ -133,6 +135,10 @@ class TestResolveIdentityHappyPath:
         assert identity["platforms"]["x"] == {"handle": "janedoe", "url": "https://x.com/janedoe",
                                               "resolved": True}
         assert identity["platforms"]["youtube"]["resolved"] is True
+        # a leading @ on the model's own instagram_handle is stripped, same
+        # as x_handle
+        assert identity["platforms"]["instagram"] == {
+            "handle": "janedoe", "url": "https://www.instagram.com/janedoe/", "resolved": True}
         assert identity["source"]["apollo_matched"] is True
 
     def test_apollo_miss_still_resolves_from_websearch_alone(self, monkeypatch):
@@ -147,6 +153,10 @@ class TestResolveIdentityHappyPath:
         # a leading @ on the model's own x_handle is stripped, same as the
         # user-supplied path
         assert out["identity"]["platforms"]["x"]["handle"] == "janedoe"
+        # no instagram_handle in the model's reply degrades to unresolved,
+        # never a hard failure
+        assert out["identity"]["platforms"]["instagram"] == {
+            "handle": None, "url": None, "resolved": False}
 
 
 class TestLinkedInSlug:
@@ -552,6 +562,17 @@ class TestCollectReactionJob:
                "identity": {"full_name": "Jane Doe", "current_company": "Acme"},
                "posts": posts or {}}
 
+    def _stub_new_pulses(self, monkeypatch):
+        """LinkedIn/TikTok/Instagram/Facebook pulses stubbed to a harmless
+        default so a test about the ORIGINAL three sources isn't also
+        exercising these four new real vendor call chains -- same reasoning
+        as _stub_platforms in TestResolveIdentityHappyPath."""
+        monkeypatch.setattr(T.tlpr_linkedin_pulse, "build_pulse", lambda name, provider_id=None: {"post_count": 0})
+        monkeypatch.setattr(T.tlpr_tiktok_pulse, "build_pulse", lambda name: {"video_count": 0})
+        monkeypatch.setattr(T.tlpr_instagram_pulse, "build_pulse",
+                            lambda name, instagram_handle=None: {"mention_count": 0})
+        monkeypatch.setattr(T.tlpr_facebook_pulse, "build_pulse", lambda name: {"post_count": 0})
+
     def test_no_run_or_identity_saves_a_failed_state(self, monkeypatch):
         monkeypatch.setattr(T, "get_run", lambda run_id, email: None)
         captured = {}
@@ -562,6 +583,7 @@ class TestCollectReactionJob:
         assert captured["run_id"] == 5 and "no confirmed identity" in captured["msg"]
 
     def test_combines_comments_and_reddit_and_x_pulse_and_saves_ready(self, monkeypatch):
+        self._stub_new_pulses(monkeypatch)
         monkeypatch.setattr(T, "get_run", lambda run_id, email: self._identity_run())
         monkeypatch.setattr(T, "_collect_linkedin_comments", lambda p, mp, mc: ([{"platform": "linkedin"}], None))
         monkeypatch.setattr(T, "_collect_x_replies", lambda p, mp, mc: ([], "No X posts to read replies from."))
@@ -585,6 +607,7 @@ class TestCollectReactionJob:
         assert captured_x_call == {"name": "Jane Doe", "handle": None}
 
     def test_x_pulse_is_called_with_the_resolved_handle(self, monkeypatch):
+        self._stub_new_pulses(monkeypatch)
         run = self._identity_run()
         run["identity"]["platforms"] = {"x": {"handle": "janedoe", "resolved": True}}
         monkeypatch.setattr(T, "get_run", lambda run_id, email: run)
@@ -600,6 +623,7 @@ class TestCollectReactionJob:
         assert captured_x_call["handle"] == "janedoe"
 
     def test_a_reddit_pulse_crash_degrades_rather_than_failing_the_whole_run(self, monkeypatch):
+        self._stub_new_pulses(monkeypatch)
         monkeypatch.setattr(T, "get_run", lambda run_id, email: self._identity_run())
         monkeypatch.setattr(T, "_collect_linkedin_comments", lambda p, mp, mc: ([], "x"))
         monkeypatch.setattr(T, "_collect_x_replies", lambda p, mp, mc: ([], "x"))
@@ -616,6 +640,7 @@ class TestCollectReactionJob:
         assert captured["reaction"]["reddit"]["thread_count"] == 0
 
     def test_an_x_pulse_crash_degrades_rather_than_failing_the_whole_run(self, monkeypatch):
+        self._stub_new_pulses(monkeypatch)
         monkeypatch.setattr(T, "get_run", lambda run_id, email: self._identity_run())
         monkeypatch.setattr(T, "_collect_linkedin_comments", lambda p, mp, mc: ([], "x"))
         monkeypatch.setattr(T, "_collect_x_replies", lambda p, mp, mc: ([], "x"))
@@ -630,6 +655,89 @@ class TestCollectReactionJob:
             reaction=reaction) or True)
         T.collect_reaction_job(1, "a@b.com")
         assert captured["reaction"]["x_pulse"]["tweet_count"] == 0
+
+    def test_linkedin_pulse_is_called_with_the_resolved_provider_id(self, monkeypatch):
+        run = self._identity_run()
+        run["identity"]["platforms"] = {"linkedin": {"provider_id": "urn:li:member:123"}}
+        monkeypatch.setattr(T, "get_run", lambda run_id, email: run)
+        monkeypatch.setattr(T, "_collect_linkedin_comments", lambda p, mp, mc: ([], None))
+        monkeypatch.setattr(T, "_collect_x_replies", lambda p, mp, mc: ([], None))
+        monkeypatch.setattr(T, "_collect_youtube_comments", lambda p, mp, mc: ([], None))
+        monkeypatch.setattr(T.tlpr_reddit_pulse, "build_pulse", lambda name, hint: {"thread_count": 0})
+        monkeypatch.setattr(T.tlpr_x_pulse, "build_pulse", lambda name, handle: {"tweet_count": 0})
+        monkeypatch.setattr(T.tlpr_tiktok_pulse, "build_pulse", lambda name: {"video_count": 0})
+        monkeypatch.setattr(T.tlpr_instagram_pulse, "build_pulse",
+                            lambda name, instagram_handle=None: {"mention_count": 0})
+        monkeypatch.setattr(T.tlpr_facebook_pulse, "build_pulse", lambda name: {"post_count": 0})
+        captured_call = {}
+        monkeypatch.setattr(T.tlpr_linkedin_pulse, "build_pulse", lambda name, provider_id=None:
+                            captured_call.update(provider_id=provider_id) or {"post_count": 0})
+        monkeypatch.setattr(T, "save_reaction", lambda *a, **kw: True)
+        T.collect_reaction_job(9, "a@b.com")
+        assert captured_call["provider_id"] == "urn:li:member:123"
+
+    def test_instagram_pulse_is_called_with_the_resolved_handle(self, monkeypatch):
+        run = self._identity_run()
+        run["identity"]["platforms"] = {"instagram": {"handle": "janedoe"}}
+        monkeypatch.setattr(T, "get_run", lambda run_id, email: run)
+        monkeypatch.setattr(T, "_collect_linkedin_comments", lambda p, mp, mc: ([], None))
+        monkeypatch.setattr(T, "_collect_x_replies", lambda p, mp, mc: ([], None))
+        monkeypatch.setattr(T, "_collect_youtube_comments", lambda p, mp, mc: ([], None))
+        monkeypatch.setattr(T.tlpr_reddit_pulse, "build_pulse", lambda name, hint: {"thread_count": 0})
+        monkeypatch.setattr(T.tlpr_x_pulse, "build_pulse", lambda name, handle: {"tweet_count": 0})
+        monkeypatch.setattr(T.tlpr_linkedin_pulse, "build_pulse", lambda name, provider_id=None: {"post_count": 0})
+        monkeypatch.setattr(T.tlpr_tiktok_pulse, "build_pulse", lambda name: {"video_count": 0})
+        monkeypatch.setattr(T.tlpr_facebook_pulse, "build_pulse", lambda name: {"post_count": 0})
+        captured_call = {}
+        monkeypatch.setattr(T.tlpr_instagram_pulse, "build_pulse", lambda name, instagram_handle=None:
+                            captured_call.update(instagram_handle=instagram_handle) or {"mention_count": 0})
+        monkeypatch.setattr(T, "save_reaction", lambda *a, **kw: True)
+        T.collect_reaction_job(9, "a@b.com")
+        assert captured_call["instagram_handle"] == "janedoe"
+
+    def test_all_four_new_pulses_land_in_the_saved_reaction(self, monkeypatch):
+        monkeypatch.setattr(T, "get_run", lambda run_id, email: self._identity_run())
+        monkeypatch.setattr(T, "_collect_linkedin_comments", lambda p, mp, mc: ([], None))
+        monkeypatch.setattr(T, "_collect_x_replies", lambda p, mp, mc: ([], None))
+        monkeypatch.setattr(T, "_collect_youtube_comments", lambda p, mp, mc: ([], None))
+        monkeypatch.setattr(T.tlpr_reddit_pulse, "build_pulse", lambda name, hint: {"thread_count": 0})
+        monkeypatch.setattr(T.tlpr_x_pulse, "build_pulse", lambda name, handle: {"tweet_count": 0})
+        monkeypatch.setattr(T.tlpr_linkedin_pulse, "build_pulse", lambda name, provider_id=None: {"post_count": 1})
+        monkeypatch.setattr(T.tlpr_tiktok_pulse, "build_pulse", lambda name: {"video_count": 2})
+        monkeypatch.setattr(T.tlpr_instagram_pulse, "build_pulse",
+                            lambda name, instagram_handle=None: {"mention_count": 3})
+        monkeypatch.setattr(T.tlpr_facebook_pulse, "build_pulse", lambda name: {"post_count": 4})
+        captured = {}
+        monkeypatch.setattr(T, "save_reaction", lambda run_id, email, reaction, errors: captured.update(
+            reaction=reaction) or True)
+        T.collect_reaction_job(9, "a@b.com")
+        assert captured["reaction"]["linkedin_pulse"] == {"post_count": 1}
+        assert captured["reaction"]["tiktok_pulse"] == {"video_count": 2}
+        assert captured["reaction"]["instagram_pulse"] == {"mention_count": 3}
+        assert captured["reaction"]["facebook_pulse"] == {"post_count": 4}
+
+    def test_each_new_pulse_crashing_degrades_rather_than_failing_the_whole_run(self, monkeypatch):
+        monkeypatch.setattr(T, "get_run", lambda run_id, email: self._identity_run())
+        monkeypatch.setattr(T, "_collect_linkedin_comments", lambda p, mp, mc: ([], None))
+        monkeypatch.setattr(T, "_collect_x_replies", lambda p, mp, mc: ([], None))
+        monkeypatch.setattr(T, "_collect_youtube_comments", lambda p, mp, mc: ([], None))
+        monkeypatch.setattr(T.tlpr_reddit_pulse, "build_pulse", lambda name, hint: {"thread_count": 0})
+        monkeypatch.setattr(T.tlpr_x_pulse, "build_pulse", lambda name, handle: {"tweet_count": 0})
+
+        def boom(*a, **kw):
+            raise RuntimeError("vendor down")
+        monkeypatch.setattr(T.tlpr_linkedin_pulse, "build_pulse", boom)
+        monkeypatch.setattr(T.tlpr_tiktok_pulse, "build_pulse", boom)
+        monkeypatch.setattr(T.tlpr_instagram_pulse, "build_pulse", boom)
+        monkeypatch.setattr(T.tlpr_facebook_pulse, "build_pulse", boom)
+        captured = {}
+        monkeypatch.setattr(T, "save_reaction", lambda run_id, email, reaction, errors: captured.update(
+            reaction=reaction) or True)
+        T.collect_reaction_job(9, "a@b.com")
+        assert captured["reaction"]["linkedin_pulse"]["post_count"] == 0
+        assert captured["reaction"]["tiktok_pulse"]["video_count"] == 0
+        assert captured["reaction"]["instagram_pulse"]["mention_count"] == 0
+        assert captured["reaction"]["facebook_pulse"]["post_count"] == 0
 
     def test_an_unexpected_crash_still_reaches_a_terminal_state(self, monkeypatch):
         def boom(run_id, email):

@@ -10,7 +10,7 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-tokens.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-components.css') }}">
   <script src="/static/js/theme.js"></script>
-  <link rel="stylesheet" href="/static/css/thought_leader_pr.css?v=4">
+  <link rel="stylesheet" href="/static/css/thought_leader_pr.css?v=5">
   <link rel="stylesheet" href="/static/css/aurora-app.css?v=3">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/agent-feedback.css') }}">
   <script src="{{ url_for('static', filename='js/agent_feedback.js') }}"></script>
@@ -498,6 +498,34 @@
         ${riskFlags ? `<div class="tlpr-facts tlpr-facts--risk" style="margin-top:14px;">
             <div class="tlpr-facts-label">Risk flags</div><ul>${riskFlags}</ul></div>` : ''}`;
     }
+    // Shared renderer for the four platforms whose pulse shape all follow
+    // the same {verdict, sentiment, themes, notable_<x>, risk_flags}
+    // contract (tracker/tlpr_linkedin_pulse.py, tlpr_tiktok_pulse.py,
+    // tlpr_instagram_pulse.py, tlpr_facebook_pulse.py) -- unlike xPulseHtml
+    // and redditPulseHtml, which stay their own bespoke functions since
+    // they predate this shared contract and already ship stored data.
+    function genericPulseHtml(p, opts){
+      if (!p) return `<div class="tlpr-reaction-empty">The ${opts.label} read did not complete.</div>`;
+      if (!p[opts.countKey]){
+        return `<div class="tlpr-reaction-empty">${esc(p.note || opts.emptyNote)}</div>`;
+      }
+      const a = p.analysis || {};
+      if (a.error){
+        return `<div class="tlpr-reaction-empty">Found ${p[opts.countKey]} ${opts.noun}, but the analysis
+                  could not be completed: ${esc(a.error)}</div>`;
+      }
+      const s = a.sentiment || {};
+      const notable = notableTweetsHtml(a[opts.notableKey]);
+      const riskFlags = (a.risk_flags || []).map(r => `<li>${esc(r)}</li>`).join('');
+      return `
+        <div class="tlpr-reaction-verdict">${esc(a.verdict || '')}</div>
+        <div class="tlpr-sent-bars">${sentimentBarsHtml(s.counts, s.labelled)}</div>
+        ${themeRowsHtml(a.themes)}
+        ${notable ? `<div class="tlpr-facts" style="margin-top:14px;">
+            <div class="tlpr-facts-label">Notable ${opts.noun}</div><ul class="tlpr-notable-list">${notable}</ul></div>` : ''}
+        ${riskFlags ? `<div class="tlpr-facts tlpr-facts--risk" style="margin-top:14px;">
+            <div class="tlpr-facts-label">Risk flags</div><ul>${riskFlags}</ul></div>` : ''}`;
+    }
     function reactionReadyHtml(run){
       const r = run.reaction || {};
       return `
@@ -519,6 +547,30 @@
               <div class="tlpr-reaction-col-head">Reddit threads &amp; comments about them</div>
               ${redditPulseHtml(r.reddit)}
             </div>
+            <div class="tlpr-reaction-col">
+              <div class="tlpr-reaction-col-head">What LinkedIn is saying about them</div>
+              ${genericPulseHtml(r.linkedin_pulse, {label: 'LinkedIn conversation', countKey: 'post_count',
+                noun: 'posts', notableKey: 'notable_posts',
+                emptyNote: 'No LinkedIn posts about them were found.'})}
+            </div>
+            <div class="tlpr-reaction-col">
+              <div class="tlpr-reaction-col-head">What TikTok is saying about them</div>
+              ${genericPulseHtml(r.tiktok_pulse, {label: 'TikTok conversation', countKey: 'video_count',
+                noun: 'videos', notableKey: 'notable_videos',
+                emptyNote: 'No TikTok videos about them were found.'})}
+            </div>
+            <div class="tlpr-reaction-col">
+              <div class="tlpr-reaction-col-head">Who's tagging them on Instagram</div>
+              ${genericPulseHtml(r.instagram_pulse, {label: 'Instagram mentions', countKey: 'mention_count',
+                noun: 'mentions', notableKey: 'notable_mentions',
+                emptyNote: 'No Instagram mentions of them were found.'})}
+            </div>
+            <div class="tlpr-reaction-col">
+              <div class="tlpr-reaction-col-head">Facebook posts &amp; comments about them</div>
+              ${genericPulseHtml(r.facebook_pulse, {label: 'Facebook conversation', countKey: 'post_count',
+                noun: 'posts', notableKey: 'notable_posts',
+                emptyNote: 'No Facebook posts about them were found.'})}
+            </div>
           </div>
           ${tlprFb(run.id, 'reaction', 'How the room reacts')}
         </div>`;
@@ -528,7 +580,8 @@
         <div class="tlpr-card tlpr-card--posts-cta">
           <div class="tlpr-posts-cta-text">
             <h3>See how the room reacts</h3>
-            <p>Reads comments on their own posts, plus what X and Reddit are saying about them independently.</p>
+            <p>Reads comments on their own posts, plus what X, LinkedIn, TikTok, Instagram, Reddit and
+               Facebook are independently saying about them.</p>
           </div>
           <button type="button" class="tlpr-btn-collect" id="tlprReactBtn" data-run-id="${runId}">
             <svg viewBox="0 0 24 24"><path d="M12 21s-7.2-4.6-9.8-9.1C.6 8.4 1.8 4.5 5.6 4.5c2.1 0 3.6 1.3 4.6 2.6.9-1.3 2.4-2.6 4.6-2.6 3.8 0 5 3.9 3.4 7.4C19.2 16.4 12 21 12 21Z"/></svg>
@@ -539,7 +592,7 @@
       return `
         <div class="tlpr-card tlpr-card--posts-loading">
           <div class="tlpr-posts-loading-spin"></div>
-          <div>Reading comments, X posts and the Reddit conversation…</div>
+          <div>Reading comments and the X, LinkedIn, TikTok, Instagram, Reddit and Facebook conversations…</div>
         </div>`;
     }
     function reactionFailedHtml(runId, message){
