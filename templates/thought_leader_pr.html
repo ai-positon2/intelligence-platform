@@ -382,8 +382,12 @@
       else el.innerHTML = postsIdleHtml(run.id);
       // The reaction step follows posts, once they're actually ready to
       // read -- rendered here (not only from openHistoryRun) so it shows up
-      // the moment a fresh collection finishes too.
-      if (status === 'ready') renderReactionSection(run);
+      // the moment a fresh collection finishes too. Also on 'failed': the
+      // other six reaction sources are independent of Phase 1 ever
+      // succeeding, so a failed collection must not also hide the CTA (or
+      // block the auto-run below) for analyzing reaction.
+      if (status === 'ready' || status === 'failed') renderReactionSection(run);
+      maybeAutoRun(run);
     }
 
     let _pollTimer = null;
@@ -642,6 +646,7 @@
       else if (status === 'collecting') { el.innerHTML = reactionLoadingHtml(); pollReaction(run.id); }
       else if (status === 'failed') el.innerHTML = reactionFailedHtml(run.id, (run.reaction_errors || {})._run);
       else el.innerHTML = reactionIdleHtml(run.id);
+      maybeAutoRun(run);
     }
 
     let _reactionPollTimer = null;
@@ -770,6 +775,7 @@
       else if (status === 'collecting') { el.innerHTML = pressLoadingHtml(); pollPress(run.id); }
       else if (status === 'failed') el.innerHTML = pressFailedHtml(run.id, (run.press_errors || {})._run);
       else el.innerHTML = pressIdleHtml(run.id);
+      maybeAutoRun(run);
     }
 
     let _pressPollTimer = null;
@@ -885,6 +891,46 @@
       else if (status === 'collecting') { el.innerHTML = synthesisLoadingHtml(); pollSynthesis(run.id); }
       else if (status === 'failed') el.innerHTML = synthesisFailedHtml(run.id, (run.synthesis_errors || {})._run);
       else el.innerHTML = synthesisIdleHtml(run.id);
+    }
+
+    // ---- Auto-run ----
+    // A person confirming an identity wants the whole reputation report,
+    // not four separate spend-confirmation prompts -- so every phase now
+    // starts on its own the moment its prerequisite is satisfied, instead
+    // of waiting for "Collect posts", then "Analyze reaction", then "Find
+    // press coverage", then "Generate report" to be clicked one at a time.
+    // Posts and press have no dependency on anything else and start
+    // together; reaction starts once posts reaches ANY terminal state
+    // (ready OR failed -- six of its seven sources don't need posts at
+    // all, so a failed collection must not also block them); synthesis
+    // starts once both reaction and press are terminal.
+    //
+    // The four /collect* routes and their "Try again"/"Refresh" buttons are
+    // unchanged -- this only decides when to make that same call automatically
+    // rather than waiting for a click, and only for a phase still 'idle'
+    // (never attempted). A phase that already failed stays failed until a
+    // person deliberately retries it: an automatic retry loop that re-spends
+    // on every page load would be a worse problem than the click it removes.
+    const _autoStarted = new Set();
+    function _isTerminal(status){ return status === 'ready' || status === 'failed'; }
+    function maybeAutoRun(run){
+      if (!run || run.id == null) return;
+      const id = run.id;
+      const once = (phase, fn) => {
+        const key = id + ':' + phase;
+        if (_autoStarted.has(key)) return;
+        _autoStarted.add(key);
+        fn(id);
+      };
+      if (!run.posts_status || run.posts_status === 'idle') once('posts', startCollecting);
+      if (!run.press_status || run.press_status === 'idle') once('press', startFindingPress);
+      if ((!run.reaction_status || run.reaction_status === 'idle') && _isTerminal(run.posts_status)) {
+        once('reaction', startAnalyzingReaction);
+      }
+      if ((!run.synthesis_status || run.synthesis_status === 'idle')
+          && _isTerminal(run.reaction_status) && _isTerminal(run.press_status)) {
+        once('synthesis', startSynthesizing);
+      }
     }
 
     let _synthesisPollTimer = null;

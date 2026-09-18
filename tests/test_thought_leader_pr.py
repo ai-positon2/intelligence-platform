@@ -229,6 +229,24 @@ class TestCollectLinkedInPosts:
         assert posts[0]["platform_post_id"] == "p1"
         assert posts[0]["caption"] == "hello"
 
+    def test_a_normalize_crash_is_caught_here_not_left_to_escape(self, monkeypatch):
+        """Regression test for the real production failure: fetch_posts()
+        succeeds (raw data came back fine), but normalize() -- which runs
+        AFTER the transport call, outside its UnipileTransportError guard --
+        chokes on the shape of that particular person's data. Before this
+        fix, this exception was not a UnipileTransportError, so it escaped
+        _collect_linkedin_posts entirely and crashed collect_posts_job for
+        ALL THREE platforms with a generic 'unexpected error', reproducing
+        identically on every 'Try again' click."""
+        monkeypatch.setattr(T.unipile_transport, "account_for_platform", lambda p: "acct-1")
+        monkeypatch.setattr(T.unipile_transport, "fetch_posts", lambda *a, **kw: [{"id": "p1"}])
+        def boom(raw):
+            raise AttributeError("'NoneType' object has no attribute 'get'")
+        monkeypatch.setattr(T.sci_source_linkedin_unipile, "normalize", boom)
+        posts, err = T._collect_linkedin_posts({"provider_id": "urn:li:member:1"}, 20)
+        assert posts == []
+        assert "LinkedIn" in err and "AttributeError" in err
+
 
 class TestCollectXPosts:
     def test_no_handle_is_refused(self):
@@ -259,6 +277,19 @@ class TestCollectXPosts:
         assert err is None
         assert posts == [{"platform_post_id": "t1", "caption": "hi"}]
         assert captured == {"handle": "janedoe", "token": "tok", "max_posts": 15}
+
+    def test_a_normalize_crash_inside_collect_is_caught_here_not_left_to_escape(self, monkeypatch):
+        """Same regression class as LinkedIn's: sci_source_x.collect() calls
+        normalize() after its own transport call succeeds, so a malformed
+        item there raises something other than ApifyTransportError and, pre-
+        fix, escaped this function's narrow except entirely."""
+        monkeypatch.setenv("APIFY_API_TOKEN", "tok")
+        def boom(handle, token, max_posts=25, strict=True):
+            raise KeyError("id")
+        monkeypatch.setattr(T.sci_source_x, "collect", boom)
+        posts, err = T._collect_x_posts({"handle": "janedoe"}, 20)
+        assert posts == []
+        assert "X" in err and "KeyError" in err
 
 
 class TestCollectYouTubePosts:
@@ -338,6 +369,34 @@ class TestCollectPostsJob:
         monkeypatch.setattr(T, "save_posts_failed", lambda run_id, email, msg: captured.update(msg=msg) or True)
         T.collect_posts_job(3, "a@b.com")
         assert "unexpected error" in captured["msg"]
+        assert "kaboom" in captured["msg"]
+
+    def test_one_platforms_normalize_crash_no_longer_takes_down_the_whole_run(self, monkeypatch):
+        """The exact production scenario this fix addresses: LinkedIn's raw
+        response normalizes fine for most people but raises for this one
+        (a real, not hypothetical, crash -- see TestCollectLinkedInPosts's
+        own regression test for the same bug one layer down). Before the
+        fix, collect_posts_job had no way to know that exception came from
+        deep inside a single platform's helper -- it looked exactly like
+        collect_posts_job itself crashing, so save_posts_failed wiped out
+        X's and YouTube's already-collected posts too."""
+        monkeypatch.setattr(T, "get_run", lambda run_id, email: self._identity(
+            linkedin={"provider_id": "p1"}, x={"handle": "h1"}, youtube={"channel_id": "c1"}))
+        monkeypatch.setattr(T.unipile_transport, "account_for_platform", lambda p: "acct-1")
+        monkeypatch.setattr(T.unipile_transport, "fetch_posts", lambda *a, **kw: [{"id": "p1"}])
+        monkeypatch.setattr(T.sci_source_linkedin_unipile, "normalize",
+                            lambda raw: (_ for _ in ()).throw(AttributeError("boom")))
+        monkeypatch.setattr(T, "_collect_x_posts", lambda p, n: ([{"platform_post_id": "x1"}], None))
+        monkeypatch.setattr(T, "_collect_youtube_posts", lambda p, n: ([{"platform_post_id": "y1"}], None))
+        captured = {}
+        monkeypatch.setattr(T, "save_posts", lambda run_id, email, posts, errors: captured.update(
+            posts=posts, errors=errors) or True)
+        monkeypatch.setattr(T, "save_posts_failed",
+                            lambda *a, **kw: pytest.fail("must not blank-fail the whole run"))
+        T.collect_posts_job(11, "a@b.com")
+        assert "LinkedIn" in captured["errors"]["linkedin"]
+        assert captured["posts"]["x"] == [{"platform_post_id": "x1"}]
+        assert captured["posts"]["youtube"] == [{"platform_post_id": "y1"}]
 
 
 class TestResolveStalePosts:
@@ -467,6 +526,26 @@ class TestCollectXReplies:
         out, err = T._collect_x_replies(posts, 5, 20)
         assert err is None
         assert calls == ["bad", "good"]
+        assert out == [{"platform": "x", "comment_id": "r1", "text": "nice", "author": "alex",
+                        "posted_at": "2026-09-01", "likes": 3}]
+
+    def test_a_normalize_crash_for_one_post_does_not_block_the_others(self, monkeypatch):
+        """Same regression class as sci_source_x.collect() itself:
+        apify_x_replies.collect() normalizes after its transport call
+        succeeds, so a crash there is not an ApifyTransportError and, pre-
+        fix, escaped this per-post try/except and crashed the whole
+        reaction job over one tweet's malformed replies."""
+        monkeypatch.setenv("APIFY_API_TOKEN", "tok")
+        def fake_collect(tweet_id, token, max_replies=20, strict=True):
+            if tweet_id == "bad":
+                raise TypeError("'NoneType' object is not iterable")
+            return [{"comment_id": "r1", "text": "nice", "author": "alex",
+                    "posted_at": "2026-09-01", "likes": 3}]
+        monkeypatch.setattr(T.apify_x_replies, "collect", fake_collect)
+        posts = [{"platform_post_id": "bad", "metrics": {"likes": 999}},
+                {"platform_post_id": "good", "metrics": {"likes": 1}}]
+        out, err = T._collect_x_replies(posts, 5, 20)
+        assert err is None
         assert out == [{"platform": "x", "comment_id": "r1", "text": "nice", "author": "alex",
                         "posted_at": "2026-09-01", "likes": 3}]
 

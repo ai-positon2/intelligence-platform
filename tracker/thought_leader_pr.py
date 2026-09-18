@@ -1070,9 +1070,21 @@ def _collect_linkedin_posts(platform: dict, max_posts: int) -> tuple[list[dict],
     try:
         raw = unipile_transport.fetch_posts(provider_id, "linkedin", is_company=False,
                                             max_posts=max_posts, strict=True, account_id=account_id)
+        return sci_source_linkedin_unipile.normalize(raw), None
     except unipile_transport.UnipileTransportError as e:
         return [], str(e)
-    return sci_source_linkedin_unipile.normalize(raw), None
+    except Exception as e:
+        # Deliberately as broad as unipile_transport.fetch_posts's own catch
+        # (see its docstring): normalize() runs on whatever shape the vendor
+        # actually sent, and this function's caller (collect_posts_job) must
+        # never let one platform's malformed response take the other two
+        # platforms down with it. Before this, an exception here escaped
+        # past the narrow `except UnipileTransportError` above straight to
+        # collect_posts_job's own catch-all, wiping X's and YouTube's
+        # already-collected posts too and reporting a blanket "unexpected
+        # error" with the real cause visible only in the server log.
+        logger.exception("thought_leader_pr: linkedin posts normalize crashed")
+        return [], "Could not read LinkedIn's response (%s)." % type(e).__name__
 
 
 def _collect_x_posts(platform: dict, max_posts: int) -> tuple[list[dict], str | None]:
@@ -1083,10 +1095,16 @@ def _collect_x_posts(platform: dict, max_posts: int) -> tuple[list[dict], str | 
     if not token:
         return [], "Apify is not configured on this deployment."
     try:
-        posts = sci_source_x.collect(handle, token, max_posts=max_posts, strict=True)
+        return sci_source_x.collect(handle, token, max_posts=max_posts, strict=True), None
     except apify_transport.ApifyTransportError as e:
         return [], str(e)
-    return posts, None
+    except Exception as e:
+        # Same reasoning as _collect_linkedin_posts above: sci_source_x.collect
+        # normalizes AFTER run_actor_and_wait returns, so a malformed item in
+        # an otherwise-successful scrape raised past the narrow
+        # ApifyTransportError catch and crashed the whole run.
+        logger.exception("thought_leader_pr: x posts normalize crashed")
+        return [], "Could not read X's response (%s)." % type(e).__name__
 
 
 def _collect_youtube_posts(platform: dict, max_posts: int) -> tuple[list[dict], str | None]:
@@ -1140,9 +1158,10 @@ def collect_posts_job(run_id: int, email: str, max_posts: int = MAX_POSTS_PER_PL
             errors["youtube"] = yt_err
 
         save_posts(run_id, email, posts, errors)
-    except Exception:
+    except Exception as e:
         logger.exception("thought_leader_pr: collect_posts_job crashed for run %s", run_id)
-        save_posts_failed(run_id, email, "An unexpected error stopped the collection.")
+        save_posts_failed(run_id, email, "An unexpected error stopped the collection (%s)."
+                          % (str(e)[:160] or type(e).__name__))
 
 
 # ───────────────────────── Phase 2: audience reaction ─────────────────────────
@@ -1266,6 +1285,13 @@ def _collect_x_replies(posts: list[dict], max_posts: int,
             replies = apify_x_replies.collect(pid, token, max_replies=max_comments, strict=True)
         except apify_transport.ApifyTransportError as e:
             logger.warning("thought_leader_pr: x replies fetch failed for tweet %s: %s", pid, e)
+            continue
+        except Exception:
+            # apify_x_replies.collect() normalizes AFTER its transport call
+            # returns, same shape as sci_source_x.collect() -- a malformed
+            # reply must skip only THIS post's replies, never crash the
+            # whole reaction job over one tweet.
+            logger.exception("thought_leader_pr: x replies normalize crashed for tweet %s", pid)
             continue
         for r in replies:
             out.append({"platform": "x", "comment_id": r.get("comment_id"), "text": r.get("text") or "",
@@ -1485,9 +1511,10 @@ def collect_reaction_job(run_id: int, email: str, max_posts: int = MAX_POSTS_FOR
             "facebook_pulse": facebook_pulse,
         }
         save_reaction(run_id, email, reaction, errors)
-    except Exception:
+    except Exception as e:
         logger.exception("thought_leader_pr: collect_reaction_job crashed for run %s", run_id)
-        save_reaction_failed(run_id, email, "An unexpected error stopped the analysis.")
+        save_reaction_failed(run_id, email, "An unexpected error stopped the analysis (%s)."
+                             % (str(e)[:160] or type(e).__name__))
 
 
 # ───────────────────────── Phase 3: earned media / press ─────────────────────────
@@ -1514,9 +1541,10 @@ def collect_press_job(run_id: int, email: str) -> None:
         press = tlpr_press.build_press(full_name, company_hint)
         errors = press.pop("errors", {}) or {}
         save_press(run_id, email, press, errors)
-    except Exception:
+    except Exception as e:
         logger.exception("thought_leader_pr: collect_press_job crashed for run %s", run_id)
-        save_press_failed(run_id, email, "An unexpected error stopped the press search.")
+        save_press_failed(run_id, email, "An unexpected error stopped the press search (%s)."
+                          % (str(e)[:160] or type(e).__name__))
 
 
 # ───────────────────────── Phase 4: synthesis report ─────────────────────────
@@ -1748,6 +1776,7 @@ def collect_synthesis_job(run_id: int, email: str) -> None:
             save_synthesis_failed(run_id, email, report["error"])
             return
         save_synthesis(run_id, email, report, {})
-    except Exception:
+    except Exception as e:
         logger.exception("thought_leader_pr: collect_synthesis_job crashed for run %s", run_id)
-        save_synthesis_failed(run_id, email, "An unexpected error stopped the report generation.")
+        save_synthesis_failed(run_id, email, "An unexpected error stopped the report generation (%s)."
+                              % (str(e)[:160] or type(e).__name__))
