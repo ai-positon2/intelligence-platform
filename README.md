@@ -11,7 +11,7 @@ project and still runs on its own schedule (see [below](#abm-signal-tracker-cli)
 
 - [Surfaces and auth](#surfaces-and-auth)
 - [Agents](#agents)
-  - [B2B Intelligence Suite](#b2b-intelligence-suite-p2b2b-agents-staff-only)
+  - [Strategic Agents](#strategic-agents-p2strategic-agents-staff-only)
   - [Signal and visitor intelligence](#signal-and-visitor-intelligence)
   - [SEO / GEO Suite](#seo--geo-suite-p2seo-staff-only)
   - [Client portals](#client-portals)
@@ -40,7 +40,7 @@ into four surfaces:
 
 `ADMIN_EMAILS` (checked in `app.py`) is the single source of truth for admin rights; `admin_required`
 gates every `/p2/admin/*` route off it. Most of the agent catalog below lives on surface 3
-(`/p2/b2b-agents/...`) and is what this README documents in the most detail; a subset is also
+(`/p2/strategic-agents/...`) and is what this README documents in the most detail; a subset is also
 exposed, metered, on surface 2 (`/app/...`) for any signed-in Google account, and a smaller subset
 again is embedded per-client on surface 4.
 
@@ -48,13 +48,13 @@ again is embedded per-client on surface 4.
 
 ## Agents
 
-### B2B Intelligence Suite (`/p2/b2b-agents/*`, staff-only)
+### Strategic Agents (`/p2/strategic-agents/*`, staff-only)
 
-The flagship product: ten purpose-built agents, each with its own `tracker/*.py` domain logic,
+The flagship product: eleven purpose-built agents, each with its own `tracker/*.py` domain logic,
 Postgres or SQLite-backed persistence, and a dedicated report UI.
 
 #### Contact Finder
-`/p2/b2b-agents/company-people-intelligence` · `tracker/apollo_client.py`
+`/p2/strategic-agents/company-people-intelligence` · `tracker/apollo_client.py`
 
 Live Apollo.io company/people search and a grounded chat layer on top of it: point it at a role
 and a company and it finds the person, or ask for a list by title, seniority, or industry.
@@ -66,7 +66,7 @@ of browsing. Person profiles, company-name resolution, and employer firmographic
 depth in this codebase (thirteen recorded audit rounds); planned for external client launch.
 
 #### Job Change Alert
-`/p2/b2b-agents/job-change-alert` · `tracker/job_change_parser.py`, `tracker/job_change_store.py`
+`/p2/strategic-agents/job-change-alert` · `tracker/job_change_parser.py`, `tracker/job_change_store.py`
 
 Tracks two things: newly detected job changes at people you watch, and the full tracked
 people/company roster. Sourced entirely from Apollo's native Slack notification workflow
@@ -74,7 +74,7 @@ people/company roster. Sourced entirely from Apollo's native Slack notification 
 notification only ever carries a person's *new* role, never their prior employer.
 
 #### LinkedIn Strategy Researcher
-`/p2/b2b-agents/linkedin-strategy-researcher` · `tracker/arena_client.py`, `tracker/linkedin_playbook_store.py`
+`/p2/strategic-agents/linkedin-strategy-researcher` · `tracker/arena_client.py`, `tracker/linkedin_playbook_store.py`
 
 Search any company's LinkedIn page, then run a five-agent competitive-strategy analysis on your
 own brand or a named competitor: company profile, posts, strategy (personas/hooks/CTAs/audience),
@@ -85,7 +85,7 @@ Not to be confused with **LinkedIn Social Researcher** below, an unrelated, olde
 that briefly held the same name.
 
 #### 42 North Dental Slot Checker
-`/p2/b2b-agents/42-north-dental-slot-checker` · `tracker/slot_checker.py`
+`/p2/strategic-agents/42-north-dental-slot-checker` · `tracker/slot_checker.py`
 
 A read/visualize layer over a separate weekly scrape of a multi-brand dental chain's real booking
 widgets (82 locations): what a new patient would actually be offered if they tried to book right
@@ -94,7 +94,7 @@ read fails for any reason. Includes an on-demand AI briefing. Not part of the st
 registries; it's a hand-added card.
 
 #### Social Media Intelligence
-`/p2/b2b-agents/social-media-intelligence` · `tracker/sci_*.py` (identify, pipeline, vision, video, audio, classify, synthesize)
+`/p2/strategic-agents/social-media-intelligence` · `tracker/sci_*.py` (identify, pipeline, vision, video, audio, classify, synthesize)
 
 Given a company name or URL, resolves its handles across **Instagram, LinkedIn, X, TikTok,
 YouTube, Facebook** and separately reads **Reddit** brand conversation as a seventh surface, pulls
@@ -107,7 +107,7 @@ scraping) where configured. Genuinely uncommon in this space: it looks at the ac
 competitor's creative, not just engagement metadata.
 
 #### Event & Conference Intelligence
-`/p2/b2b-agents/event-conference-intelligence` · `tracker/event_intel_*.py` (store, rubric, harvest, discover, audit, scorer, report, workroom, pipeline, intake)
+`/p2/strategic-agents/event-conference-intelligence` · `tracker/event_intel_*.py` (store, rubric, harvest, discover, audit, scorer, report, workroom, pipeline, intake)
 
 Three modes over one Postgres store: **recommend** (score a client's whole event calendar against
 its ICP, 0-110 on relevance/decision-maker access/engagement, and return a ranked shortlist plus a
@@ -120,8 +120,21 @@ persistent database to do things a stateless research session structurally can't
 re-ranking from a client's own accept/reject history, and k-anonymity-gated cross-client interest
 ("N other similar clients also kept this event," with no other client's identity in the raw data).
 
+#### Thought Leader Intelligence
+`/p2/strategic-agents/thought-leader-pr` · `tracker/thought_leader_pr.py`, `tracker/tlpr_press.py`,
+`tracker/tlpr_reddit_pulse.py`, `tracker/apify_x_replies.py`
+
+Given a person's name, resolves to one confirmed public figure before any research starts,
+refusing at low confidence the same discipline `event_intel_resolve.resolve_event` applies to an
+ambiguous event, then runs four further explicit phases: pulls their own posts across
+**LinkedIn, X, YouTube**; reads how people react to those posts plus what **Reddit** says about
+them; finds real press coverage via **GDELT/SerpAPI**; and produces a final synthesis that
+recombines those three already-analyzed reads, never re-touching the raw posts, comments, or
+articles, into one reputation verdict. Each phase is its own explicit, billed action, runnable in
+any combination.
+
 #### LinkedIn Intelligence
-`/p2/b2b-agents/linkedin-intelligence` · `static/js/linkedin.js`
+`/p2/strategic-agents/linkedin-intelligence` · `static/js/linkedin.js`
 
 Your own LinkedIn engagement data (people × post engagement) read from a Google Sheet and rendered
 client-side, one sheet per surface (internal, and independently per client portal). Distinct from
@@ -129,7 +142,7 @@ every other LinkedIn-named agent in this repo (see the naming note in the sideba
 docs) - this one is *your own* engagement, not a competitive read.
 
 #### LinkedIn Social Researcher (currently hidden from listings)
-`/p2/b2b-agents/linkedin-social-researcher`
+`/p2/strategic-agents/linkedin-social-researcher`
 
 An older, entirely external agent: an iframe embed of a third-party AI app-builder tool
 (`watchtower-by-position2.vercel.app`), not this repo's code. Reads a year of a company's LinkedIn
@@ -138,7 +151,7 @@ Pulled from listings at the owner's request; nothing underneath was deleted, so 
 still resolves and past runs still show in history.
 
 #### Competitor Ad Intelligence
-`/p2/b2b-agents/ad-intelligence` (also served as a built React/Vite app at `/ppc/ad-intelligence`)
+`/p2/strategic-agents/ad-intelligence` (also served as a built React/Vite app at `/ppc/ad-intelligence`)
 
 Continuously collects competitor ad creative across platforms and surfaces messaging themes,
 formats, and changes over time. Source lives in `apps/ad-intelligence/` (Vite); the built output
