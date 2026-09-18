@@ -10,7 +10,7 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-tokens.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-components.css') }}">
   <script src="/static/js/theme.js"></script>
-  <link rel="stylesheet" href="/static/css/thought_leader_pr.css?v=5">
+  <link rel="stylesheet" href="/static/css/thought_leader_pr.css?v=6">
   <link rel="stylesheet" href="/static/css/aurora-app.css?v=3">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/agent-feedback.css') }}">
   <script src="{{ url_for('static', filename='js/agent_feedback.js') }}"></script>
@@ -50,8 +50,9 @@
 
   <div class="main">
     <div class="tlpr-hero">
+      <div class="tlpr-hero-glow" aria-hidden="true"></div>
       <div class="au-eyebrow"><span class="d"></span>Strategic Agents · Reputation &amp; PR Intelligence</div>
-      <h1>Know their <em>reputation</em> before you're in the room.</h1>
+      <h1>Know their <span class="tlpr-hero-accent">reputation</span> before you're in the room.</h1>
       <p>Name a thought leader. Confirm who they are, then see what they post, how the room reacts, what the press already says, and one reputation report that pulls it all together.</p>
     </div>
 
@@ -209,24 +210,29 @@
     const ICON_LINKEDIN = '<svg viewBox="0 0 24 24"><path d="M6.94 8.5H3.56V20h3.38V8.5ZM5.25 3a1.94 1.94 0 1 0 0 3.88A1.94 1.94 0 0 0 5.25 3ZM20.44 20h-3.37v-5.6c0-1.34-.03-3.06-1.87-3.06-1.87 0-2.16 1.46-2.16 2.96V20H9.68V8.5h3.24v1.57h.05c.45-.86 1.56-1.77 3.21-1.77 3.43 0 4.26 2.26 4.26 5.2V20Z"/></svg>';
     const ICON_X = '<svg viewBox="0 0 24 24"><path d="m14.2 10.24 6.87-7.99h-1.63l-5.97 6.94-4.76-6.94H2.4l7.2 10.49-7.2 8.37h1.63l6.3-7.32 5.03 7.32h6.31l-7.47-10.87Zm-2.23 2.6-.73-1.04L5.4 3.5h2.5l4.7 6.72.73 1.04 6.11 8.74h-2.5l-4.97-7.16Z"/></svg>';
     const ICON_YT = '<svg viewBox="0 0 24 24"><path d="M8 6.5v11l10-5.5-10-5.5Z"/></svg>';
+    const ICON_INSTAGRAM = '<svg viewBox="0 0 24 24"><path fill-rule="evenodd" d="M7 2a5 5 0 0 0-5 5v10a5 5 0 0 0 5 5h10a5 5 0 0 0 5-5V7a5 5 0 0 0-5-5H7Zm0 2h10a3 3 0 0 1 3 3v10a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3V7a3 3 0 0 1 3-3Z"/><path fill-rule="evenodd" d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8Zm0 2a2 2 0 1 1 0 4 2 2 0 0 1 0-4Z"/><circle cx="17.5" cy="6.5" r="1.2"/></svg>';
     const ICON_LIKE = '<svg viewBox="0 0 24 24"><path d="M12 21s-7.2-4.6-9.8-9.1C.6 8.4 1.8 4.5 5.6 4.5c2.1 0 3.6 1.3 4.6 2.6.9-1.3 2.4-2.6 4.6-2.6 3.8 0 5 3.9 3.4 7.4C19.2 16.4 12 21 12 21Z"/></svg>';
     const ICON_COMMENT = '<svg viewBox="0 0 24 24"><path d="M4 4h16v12H8l-4 4V4Z"/></svg>';
     const ICON_SHARE = '<svg viewBox="0 0 24 24"><path d="M7 7h6V3l8 7-8 7v-4H7a4 4 0 0 0-4 4v1a7 7 0 0 1 4-11Z"/></svg>';
     const ICON_VIEW = '<svg viewBox="0 0 24 24"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7Z"/><circle cx="12" cy="12" r="3"/></svg>';
+    const ICON_REDDIT = '<svg viewBox="0 0 24 24"><circle cx="12" cy="14" r="7"/><circle cx="5.3" cy="13.2" r="1.7"/><circle cx="18.7" cy="13.2" r="1.7"/><circle cx="12" cy="5.2" r="1.5"/><path d="M12 6.7V9.5" stroke-width="1.4" stroke="currentColor" fill="none"/></svg>';
+    const ICON_TIKTOK = '<svg viewBox="0 0 24 24"><path d="M14 3v10.5a3.5 3.5 0 1 1-3-3.46V7a6.5 6.5 0 1 0 6 6.48V9.8A6 6 0 0 0 21 11V8a4 4 0 0 1-4-4h-3Z"/></svg>';
+    const ICON_FACEBOOK = '<svg viewBox="0 0 24 24"><path d="M13.5 21v-7h2.4l.4-3H13.5V9c0-.9.3-1.5 1.7-1.5H16V4.8C15.6 4.7 14.5 4.6 13.3 4.6c-2.5 0-4.2 1.5-4.2 4.3V11H6.6v3h2.5v7h4.4Z"/></svg>';
+    const ICON_SPOTLIGHT = '<svg viewBox="0 0 24 24"><path d="M12 3v3M12 18v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1M3 12h3M18 12h3"/><circle cx="12" cy="12" r="4"/></svg>';
     const PLATFORM_LABEL = {linkedin: 'LinkedIn', x: 'X', youtube: 'YouTube'};
     const PLATFORM_ICON = {linkedin: ICON_LINKEDIN, x: ICON_X, youtube: ICON_YT};
     const PLATFORM_ORDER = ['linkedin', 'x', 'youtube'];
 
     function platformChip(kind, label, icon, on, url){
       const inner = `<span class="tlpr-chip-ic">${icon}</span><span>${esc(label)}</span>`;
-      if (on && url) return `<a class="tlpr-chip is-on" href="${esc(url)}" target="_blank" rel="noopener">${inner}</a>`;
-      if (on) return `<span class="tlpr-chip is-on">${inner}</span>`;
-      return `<span class="tlpr-chip is-off">${inner}</span>`;
+      if (on && url) return `<a class="tlpr-chip is-on" data-platform="${esc(kind)}" href="${esc(url)}" target="_blank" rel="noopener">${inner}</a>`;
+      if (on) return `<span class="tlpr-chip is-on" data-platform="${esc(kind)}">${inner}</span>`;
+      return `<span class="tlpr-chip is-off" data-platform="${esc(kind)}">${inner}</span>`;
     }
 
     function identityCardHtml(identity, runId, confirmed){
       const p = identity.platforms || {};
-      const li = p.linkedin || {}, x = p.x || {}, yt = p.youtube || {};
+      const li = p.linkedin || {}, x = p.x || {}, yt = p.youtube || {}, ig = p.instagram || {};
       const avatarInner = identity.photo_url
         ? `<img src="${esc(identity.photo_url)}" alt="">`
         : esc(initials(identity.full_name));
@@ -260,6 +266,7 @@
             ${platformChip('linkedin', li.resolved ? 'LinkedIn · Verified' : 'LinkedIn · Not found', ICON_LINKEDIN, !!li.url, li.url)}
             ${platformChip('x', x.resolved ? ('X · @' + x.handle) : 'X · Not found', ICON_X, !!x.resolved, x.url)}
             ${platformChip('youtube', yt.resolved ? 'YouTube · Found' : 'YouTube · Not found', ICON_YT, !!yt.resolved, yt.url)}
+            ${platformChip('instagram', ig.resolved ? ('Instagram · @' + ig.handle) : 'Instagram · Not found', ICON_INSTAGRAM, !!ig.resolved, ig.url)}
           </div>
           ${factsHtml}
           <div class="tlpr-actions">
@@ -297,7 +304,7 @@
       if (m.views != null) metricParts.push(`<span>${ICON_VIEW}${compactNumber(m.views)}</span>`);
       const caption = (post.caption || '').trim();
       return `
-        <a class="tlpr-post-card" href="${esc(post.post_url || '#')}" target="_blank" rel="noopener">
+        <a class="tlpr-post-card" data-platform="${esc(platform)}" href="${esc(post.post_url || '#')}" target="_blank" rel="noopener">
           <div class="tlpr-post-head">
             <span class="tlpr-post-date">${esc(formatPostDate(post.posted_at))}</span>
             ${post.post_type ? `<span class="tlpr-post-type">${esc(post.post_type)}</span>` : ''}
@@ -309,14 +316,14 @@
     function platformPostsBlockHtml(platform, posts, errorMsg){
       const label = PLATFORM_LABEL[platform];
       if (!posts.length){
-        return `<div class="tlpr-posts-empty-platform">
-                  <span class="tlpr-post-platform-ic">${PLATFORM_ICON[platform]}</span>
+        return `<div class="tlpr-posts-empty-platform" data-platform="${esc(platform)}">
+                  <span class="tlpr-post-platform-ic" data-platform="${esc(platform)}">${PLATFORM_ICON[platform]}</span>
                   <span><b>${label}:</b> ${esc(errorMsg || 'Nothing found.')}</span>
                 </div>`;
       }
-      return `<div class="tlpr-posts-platform-block">
+      return `<div class="tlpr-posts-platform-block" data-platform="${esc(platform)}">
                 <div class="tlpr-posts-platform-head">
-                  <span class="tlpr-post-platform-ic">${PLATFORM_ICON[platform]}</span>${label}
+                  <span class="tlpr-post-platform-ic" data-platform="${esc(platform)}">${PLATFORM_ICON[platform]}</span>${label}
                   <span class="tlpr-posts-count">${posts.length}</span>
                 </div>
                 <div class="tlpr-posts-grid">${posts.map(p => postCardHtml(platform, p)).join('')}</div>
@@ -416,11 +423,30 @@
         const pct = total ? Math.round((counts[k] || 0) / total * 100) : 0;
         return `<div class="tlpr-sent-row">
                   <span class="tlpr-sent-label sent-${k}">${SENTIMENT_LABEL[k]}</span>
-                  <div class="tlpr-sent-track"><div class="tlpr-sent-fill sent-${k}" style="width:${pct}%"></div></div>
+                  <div class="tlpr-sent-track"><div class="tlpr-sent-fill sent-${k}" data-pct="${pct}" style="width:0%"></div></div>
                   <span class="tlpr-sent-pct">${pct}%</span>
                 </div>`;
       }).join('');
     }
+    // Sentiment bars are always written into the DOM already at their final
+    // width (the render functions above build a complete HTML string, there
+    // is no 0->N state change for a CSS transition to observe). A single
+    // MutationObserver on .main -- rather than a call added to every render
+    // function that happens to include a sentiment bar -- catches every bar
+    // from every current and future call site the same way, and animates it
+    // from 0 to its real width exactly once.
+    (function(){
+      const seen = new WeakSet();
+      const mo = new MutationObserver(() => {
+        document.querySelectorAll('.tlpr-sent-fill[data-pct]').forEach(el => {
+          if (seen.has(el)) return;
+          seen.add(el);
+          requestAnimationFrame(() => { el.style.width = el.dataset.pct + '%'; });
+        });
+      });
+      const main = document.querySelector('.main');
+      if (main) mo.observe(main, {childList: true, subtree: true});
+    })();
     function themeRowsHtml(themes){
       return (themes || []).map(t => `
         <div class="tlpr-theme-row">
@@ -526,6 +552,9 @@
         ${riskFlags ? `<div class="tlpr-facts tlpr-facts--risk" style="margin-top:14px;">
             <div class="tlpr-facts-label">Risk flags</div><ul>${riskFlags}</ul></div>` : ''}`;
     }
+    function reactionColHeadHtml(icon, label){
+      return `<div class="tlpr-reaction-col-head"><span class="tlpr-col-ic">${icon}</span>${label}</div>`;
+    }
     function reactionReadyHtml(run){
       const r = run.reaction || {};
       return `
@@ -535,38 +564,38 @@
             <button type="button" class="tlpr-btn-secondary tlpr-btn-reanalyze" data-run-id="${run.id}">Refresh</button>
           </div>
           <div class="tlpr-reaction-cols">
-            <div class="tlpr-reaction-col">
-              <div class="tlpr-reaction-col-head">Comments on their own posts</div>
+            <div class="tlpr-reaction-col" data-platform="own">
+              ${reactionColHeadHtml(ICON_SPOTLIGHT, "Comments on their own posts")}
               ${commentSentimentHtml(r.comment_sentiment, r.comments_analyzed)}
             </div>
-            <div class="tlpr-reaction-col">
-              <div class="tlpr-reaction-col-head">What X is saying about them</div>
+            <div class="tlpr-reaction-col" data-platform="x">
+              ${reactionColHeadHtml(ICON_X, "What X is saying about them")}
               ${xPulseHtml(r.x_pulse)}
             </div>
-            <div class="tlpr-reaction-col">
-              <div class="tlpr-reaction-col-head">Reddit threads &amp; comments about them</div>
+            <div class="tlpr-reaction-col" data-platform="reddit">
+              ${reactionColHeadHtml(ICON_REDDIT, "Reddit threads &amp; comments about them")}
               ${redditPulseHtml(r.reddit)}
             </div>
-            <div class="tlpr-reaction-col">
-              <div class="tlpr-reaction-col-head">What LinkedIn is saying about them</div>
+            <div class="tlpr-reaction-col" data-platform="linkedin">
+              ${reactionColHeadHtml(ICON_LINKEDIN, "What LinkedIn is saying about them")}
               ${genericPulseHtml(r.linkedin_pulse, {label: 'LinkedIn conversation', countKey: 'post_count',
                 noun: 'posts', notableKey: 'notable_posts',
                 emptyNote: 'No LinkedIn posts about them were found.'})}
             </div>
-            <div class="tlpr-reaction-col">
-              <div class="tlpr-reaction-col-head">What TikTok is saying about them</div>
+            <div class="tlpr-reaction-col" data-platform="tiktok">
+              ${reactionColHeadHtml(ICON_TIKTOK, "What TikTok is saying about them")}
               ${genericPulseHtml(r.tiktok_pulse, {label: 'TikTok conversation', countKey: 'video_count',
                 noun: 'videos', notableKey: 'notable_videos',
                 emptyNote: 'No TikTok videos about them were found.'})}
             </div>
-            <div class="tlpr-reaction-col">
-              <div class="tlpr-reaction-col-head">Who's tagging them on Instagram</div>
+            <div class="tlpr-reaction-col" data-platform="instagram">
+              ${reactionColHeadHtml(ICON_INSTAGRAM, "Who&#39;s tagging them on Instagram")}
               ${genericPulseHtml(r.instagram_pulse, {label: 'Instagram mentions', countKey: 'mention_count',
                 noun: 'mentions', notableKey: 'notable_mentions',
                 emptyNote: 'No Instagram mentions of them were found.'})}
             </div>
-            <div class="tlpr-reaction-col">
-              <div class="tlpr-reaction-col-head">Facebook posts &amp; comments about them</div>
+            <div class="tlpr-reaction-col" data-platform="facebook">
+              ${reactionColHeadHtml(ICON_FACEBOOK, "Facebook posts &amp; comments about them")}
               ${genericPulseHtml(r.facebook_pulse, {label: 'Facebook conversation', countKey: 'post_count',
                 noun: 'posts', notableKey: 'notable_posts',
                 emptyNote: 'No Facebook posts about them were found.'})}
