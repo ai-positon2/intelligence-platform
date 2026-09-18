@@ -254,3 +254,40 @@ class TestCollectPressRoute:
         assert resp.get_json() == {"ok": True, "press_status": "collecting"}
         assert started.wait(timeout=2), "background job never ran"
         assert captured == {"run_id": 8, "email": _OWNER}
+
+
+class TestCollectSynthesisRoute:
+    """Phase 4's own billed action -- same discipline as /collect,
+    /collect-reaction, and /collect-press: only its own explicit POST may
+    start it, and it must hand off to a background thread rather than
+    blocking on a live Anthropic call."""
+
+    def test_collect_synthesis_requires_auth(self):
+        c = appmod.app.test_client()
+        resp = c.post("/p2/strategic-agents/thought-leader-pr/runs/1/collect-synthesis")
+        assert resp.status_code in (302, 401, 403)
+
+    def test_not_confirmed_or_missing_is_404_and_never_starts_a_job(self, monkeypatch):
+        monkeypatch.setattr(T, "start_synthesizing", lambda run_id, email: False)
+        monkeypatch.setattr(T, "collect_synthesis_job",
+                            lambda *a, **kw: pytest.fail("must not start synthesizing an unconfirmed run"))
+        resp = _client().post("/p2/strategic-agents/thought-leader-pr/runs/1/collect-synthesis")
+        assert resp.status_code == 404
+
+    def test_confirmed_run_starts_a_background_job(self, monkeypatch):
+        import threading
+        started = threading.Event()
+        captured = {}
+
+        def fake_job(run_id, email):
+            captured.update(run_id=run_id, email=email)
+            started.set()
+
+        monkeypatch.setattr(T, "start_synthesizing", lambda run_id, email: True)
+        monkeypatch.setattr(T, "collect_synthesis_job", fake_job)
+
+        resp = _client().post("/p2/strategic-agents/thought-leader-pr/runs/10/collect-synthesis")
+        assert resp.status_code == 200
+        assert resp.get_json() == {"ok": True, "synthesis_status": "collecting"}
+        assert started.wait(timeout=2), "background job never ran"
+        assert captured == {"run_id": 10, "email": _OWNER}

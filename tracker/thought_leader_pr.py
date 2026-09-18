@@ -58,6 +58,7 @@ POSTS_STATUSES = ("idle", "collecting", "ready", "failed")
 _STALE_POSTS_ERROR = "The collection stalled and did not finish -- try collecting again."
 _STALE_REACTION_ERROR = "The analysis stalled and did not finish -- try again."
 _STALE_PRESS_ERROR = "The press search stalled and did not finish -- try again."
+_STALE_SYNTHESIS_ERROR = "The report generation stalled and did not finish -- try again."
 
 
 # ───────────────────────── Postgres store ─────────────────────────
@@ -111,6 +112,10 @@ def _ensure_tables(conn) -> None:
                 press JSONB,
                 press_errors JSONB,
                 press_updated_at TIMESTAMPTZ,
+                synthesis_status TEXT NOT NULL DEFAULT 'idle',
+                synthesis JSONB,
+                synthesis_errors JSONB,
+                synthesis_updated_at TIMESTAMPTZ,
                 created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
                 updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
             )
@@ -138,6 +143,11 @@ def _ensure_tables(conn) -> None:
         cur.execute("ALTER TABLE thought_leader_pr_runs ADD COLUMN IF NOT EXISTS press JSONB")
         cur.execute("ALTER TABLE thought_leader_pr_runs ADD COLUMN IF NOT EXISTS press_errors JSONB")
         cur.execute("ALTER TABLE thought_leader_pr_runs ADD COLUMN IF NOT EXISTS press_updated_at TIMESTAMPTZ")
+        # Added for Phase 4 (synthesis report), same reasoning.
+        cur.execute("ALTER TABLE thought_leader_pr_runs ADD COLUMN IF NOT EXISTS synthesis_status TEXT NOT NULL DEFAULT 'idle'")
+        cur.execute("ALTER TABLE thought_leader_pr_runs ADD COLUMN IF NOT EXISTS synthesis JSONB")
+        cur.execute("ALTER TABLE thought_leader_pr_runs ADD COLUMN IF NOT EXISTS synthesis_errors JSONB")
+        cur.execute("ALTER TABLE thought_leader_pr_runs ADD COLUMN IF NOT EXISTS synthesis_updated_at TIMESTAMPTZ")
     conn.commit()
     _TABLES_READY = True
 
@@ -234,7 +244,8 @@ _RUN_COLUMNS = ("id, input_name, company_hint, title_hint, status, confidence, "
                "reasoning, identity, error, posts_status, posts, posts_errors, "
                "posts_updated_at, reaction_status, reaction, reaction_errors, "
                "reaction_updated_at, press_status, press, press_errors, "
-               "press_updated_at, created_at, updated_at")
+               "press_updated_at, synthesis_status, synthesis, synthesis_errors, "
+               "synthesis_updated_at, created_at, updated_at")
 
 
 def get_run(run_id: int, email: str) -> dict | None:
@@ -253,7 +264,8 @@ def get_run(run_id: int, email: str) -> dict | None:
                 return None
             run = _resolve_stale_posts(_row_to_dict(row), email)
             run = _resolve_stale_reaction(run, email)
-            return _resolve_stale_press(run, email)
+            run = _resolve_stale_press(run, email)
+            return _resolve_stale_synthesis(run, email)
     except Exception as e:
         logger.warning("thought_leader_pr: get_run failed for run %s: %s", run_id, e)
         return None
@@ -276,7 +288,8 @@ def list_runs(email: str, limit: int = 25) -> list[dict]:
             runs = []
             for row in cur.fetchall():
                 run = _resolve_stale_reaction(_resolve_stale_posts(_row_to_dict(row), email), email)
-                runs.append(_resolve_stale_press(run, email))
+                run = _resolve_stale_press(run, email)
+                runs.append(_resolve_stale_synthesis(run, email))
             return runs
     except Exception as e:
         logger.warning("thought_leader_pr: list_runs failed: %s", e)
@@ -290,6 +303,7 @@ def _row_to_dict(row) -> dict:
      identity, error, posts_status, posts, posts_errors, posts_updated_at,
      reaction_status, reaction, reaction_errors, reaction_updated_at,
      press_status, press, press_errors, press_updated_at,
+     synthesis_status, synthesis, synthesis_errors, synthesis_updated_at,
      created_at, updated_at) = row
     return {
         "id": rid, "input_name": input_name, "company_hint": company_hint,
@@ -302,6 +316,9 @@ def _row_to_dict(row) -> dict:
         "reaction_updated_at": reaction_updated_at.isoformat() if reaction_updated_at else None,
         "press_status": press_status or "idle", "press": press, "press_errors": press_errors,
         "press_updated_at": press_updated_at.isoformat() if press_updated_at else None,
+        "synthesis_status": synthesis_status or "idle", "synthesis": synthesis,
+        "synthesis_errors": synthesis_errors,
+        "synthesis_updated_at": synthesis_updated_at.isoformat() if synthesis_updated_at else None,
         "created_at": created_at.isoformat() if created_at else None,
         "updated_at": updated_at.isoformat() if updated_at else None,
     }
@@ -356,6 +373,23 @@ def _resolve_stale_press(run: dict, email: str) -> dict:
         return run
     if save_press_failed(run["id"], email, _STALE_PRESS_ERROR):
         run = dict(run, press_status="failed", press_errors={"_run": _STALE_PRESS_ERROR})
+    return run
+
+
+def _resolve_stale_synthesis(run: dict, email: str) -> dict:
+    """Same self-heal as the other three, for Phase 4's own 'collecting'
+    status -- a fourth independent column, so a stuck report generation
+    can't strand the posts, reaction, or press polls, or vice versa."""
+    if run.get("synthesis_status") != "collecting":
+        return run
+    updated_at = run.get("updated_at")
+    if not updated_at:
+        return run
+    last = datetime.fromisoformat(updated_at)
+    if last >= datetime.now(timezone.utc) - timedelta(minutes=STALE_RUN_MINUTES):
+        return run
+    if save_synthesis_failed(run["id"], email, _STALE_SYNTHESIS_ERROR):
+        run = dict(run, synthesis_status="failed", synthesis_errors={"_run": _STALE_SYNTHESIS_ERROR})
     return run
 
 
@@ -591,6 +625,87 @@ def save_press_failed(run_id: int, email: str, message: str) -> bool:
         return updated
     except Exception as e:
         logger.warning("thought_leader_pr: save_press_failed failed for run %s: %s", run_id, e)
+        return False
+    finally:
+        conn.close()
+
+
+def start_synthesizing(run_id: int, email: str) -> bool:
+    """Flip synthesis_status to 'collecting' before Phase 4's background
+    thread starts -- same gate as start_reacting/start_press, kept
+    independent so the report can be generated (or regenerated) without
+    depending on posts_status/reaction_status/press_status: synthesize_report
+    reads whatever is already on the run row and writes plainly around
+    whatever is missing, rather than requiring every earlier phase first."""
+    conn = _pg_conn()
+    if not conn:
+        return False
+    try:
+        _ensure_tables(conn)
+        with conn.cursor() as cur:
+            cur.execute("""
+                UPDATE thought_leader_pr_runs
+                SET synthesis_status = 'collecting', synthesis_errors = NULL, updated_at = now()
+                WHERE id = %s AND email = %s AND status = 'confirmed'
+            """, (run_id, email))
+            updated = cur.rowcount > 0
+        conn.commit()
+        return updated
+    except Exception as e:
+        logger.warning("thought_leader_pr: start_synthesizing failed for run %s: %s", run_id, e)
+        return False
+    finally:
+        conn.close()
+
+
+def save_synthesis(run_id: int, email: str, synthesis: dict, errors: dict) -> bool:
+    """synthesis_status becomes 'ready' only once synthesize_report() has
+    produced a real report -- unlike posts/reaction/press, this is a single
+    Claude call with no independent sources to partially succeed, so a
+    failure there goes through save_synthesis_failed instead of arriving
+    here with an empty result."""
+    conn = _pg_conn()
+    if not conn:
+        return False
+    try:
+        _ensure_tables(conn)
+        with conn.cursor() as cur:
+            cur.execute("""
+                UPDATE thought_leader_pr_runs
+                SET synthesis_status = 'ready', synthesis = %s, synthesis_errors = %s,
+                    synthesis_updated_at = now(), updated_at = now()
+                WHERE id = %s AND email = %s
+            """, (json.dumps(synthesis), json.dumps(errors) if errors else None, run_id, email))
+            updated = cur.rowcount > 0
+        conn.commit()
+        return updated
+    except Exception as e:
+        logger.warning("thought_leader_pr: save_synthesis failed for run %s: %s", run_id, e)
+        return False
+    finally:
+        conn.close()
+
+
+def save_synthesis_failed(run_id: int, email: str, message: str) -> bool:
+    """The report generation itself failed or crashed -- distinct from
+    save_synthesis, which always means a real report was produced."""
+    conn = _pg_conn()
+    if not conn:
+        return False
+    try:
+        _ensure_tables(conn)
+        with conn.cursor() as cur:
+            cur.execute("""
+                UPDATE thought_leader_pr_runs
+                SET synthesis_status = 'failed', synthesis_errors = %s, synthesis_updated_at = now(),
+                    updated_at = now()
+                WHERE id = %s AND email = %s
+            """, (json.dumps({"_run": message}), run_id, email))
+            updated = cur.rowcount > 0
+        conn.commit()
+        return updated
+    except Exception as e:
+        logger.warning("thought_leader_pr: save_synthesis_failed failed for run %s: %s", run_id, e)
         return False
     finally:
         conn.close()
@@ -1281,3 +1396,237 @@ def collect_press_job(run_id: int, email: str) -> None:
     except Exception:
         logger.exception("thought_leader_pr: collect_press_job crashed for run %s", run_id)
         save_press_failed(run_id, email, "An unexpected error stopped the press search.")
+
+
+# ───────────────────────── Phase 4: synthesis report ─────────────────────────
+#
+# The "so what": one Claude call that reads the ALREADY-ANALYZED findings
+# from Phases 1-3 (never the raw posts/comments/articles again) and writes
+# a single reputation verdict. This is deliberately kept inline here rather
+# than spun into its own tlpr_*.py sibling module -- unlike Phase 2/3, there
+# is no new vendor integration here, just recombining this run's own
+# already-grounded conclusions, so it belongs with the rest of this run's
+# orchestration rather than as a new "collector."
+#
+# Because every input claim was already grounded and citation-checked in its
+# own phase (comment_ids/thread_ids/article_ids), this step's own output
+# does not re-cite raw ids -- it tags each bullet with which of
+# identity/posts/reaction/press it drew from instead. Mislabeling that tag
+# is a cosmetic badge error, not a fabricated citation that would render as
+# a link to something that doesn't exist, so it does not need the same
+# valid_ids stripping every other Claude-authored citation in this codebase
+# gets.
+
+_SOURCE_TAGS = ("identity", "posts", "reaction", "press")
+
+_SYNTHESIS_SYSTEM = (
+    "You write the final reputation synthesis for a public figure, for a "
+    "PR/reputation research tool used by a marketing agency. You are given "
+    "the person's identity, their posting activity (a count and total "
+    "engagement per platform -- NOT what they post about, that is not "
+    "given to you, so never describe the content, tone, or style of their "
+    "posts), and the ALREADY-ANALYZED findings from two separate reads: how "
+    "people react to their own posts and the Reddit conversation about "
+    "them, and what recent press coverage says. Each of those was already "
+    "grounded in real data and independently verified; your job is to weave "
+    "their conclusions into ONE readable synthesis, not to re-analyze raw "
+    "evidence.\n\n"
+    "Any input marked unavailable has no real data behind it -- write "
+    "around it plainly (e.g. \"no press coverage was found\") rather than "
+    "inventing a reading for it, and never imply a source was checked when "
+    "it was unavailable.\n\n"
+    "Be specific to this person, never generic advice that could apply to "
+    "anyone. If reaction and press genuinely diverge (praised online but "
+    "criticized in the press, or vice versa) or notably agree, say so "
+    "plainly in \"alignment\" -- that tension or consistency is itself the "
+    "most useful thing this report can surface.\n\n"
+    "Respond with ONLY a JSON object, no prose before or after:\n"
+    '{"headline": str, "verdict": str, '
+    '"strengths": [{"text": str, "sources": ["identity"|"posts"|"reaction"|"press", ...]}], '
+    '"risks": [{"text": str, "sources": [...]}], '
+    '"alignment": str}\n\n'
+    "Rules: \"headline\" is a punchy 6-12 word label for their current PR "
+    "position, not a full sentence. \"verdict\" is 2-3 sentences, the read "
+    "a comms lead would actually want. \"strengths\" is 2-5 concrete "
+    "positives, each tagged with which input(s) it genuinely comes from. "
+    "\"risks\" is 0-5 concrete risks or watch items -- empty list if none "
+    "are genuinely present, never invented to fill the field. \"alignment\" "
+    "is 1-2 sentences comparing how they present themselves against how "
+    "the room and the press actually receive them; say plainly if there "
+    "isn't enough data yet to compare."
+)
+
+
+def _platform_post_stats(posts_list: list[dict] | None) -> dict:
+    posts_list = posts_list or []
+    engagement = sum(
+        v for p in posts_list for v in (p.get("metrics") or {}).values()
+        if isinstance(v, (int, float))
+    )
+    return {"count": len(posts_list), "total_engagement": engagement}
+
+
+def _posts_summary(posts: dict | None) -> dict:
+    posts = posts or {}
+    by_platform = {pl: _platform_post_stats(posts.get(pl)) for pl in ("linkedin", "x", "youtube")}
+    return {"available": any(s["count"] for s in by_platform.values()), "by_platform": by_platform}
+
+
+def _reaction_summary(reaction: dict | None) -> dict:
+    if not reaction:
+        return {"available": False}
+    cs = reaction.get("comment_sentiment") or {}
+    reddit = reaction.get("reddit") or {}
+    r_analysis = reddit.get("analysis") or {}
+    out: dict = {"available": bool(reaction.get("comments_analyzed") or reddit.get("thread_count")),
+                "own_post_comments": None, "reddit": None}
+    if cs.get("verdict") and not cs.get("error"):
+        out["own_post_comments"] = {
+            "verdict": cs.get("verdict"),
+            "sentiment_counts": (cs.get("sentiment") or {}).get("counts"),
+            "themes": [t.get("label") for t in (cs.get("themes") or []) if t.get("label")],
+        }
+    if reddit.get("thread_count") and not r_analysis.get("error"):
+        out["reddit"] = {
+            "verdict": r_analysis.get("verdict"),
+            "sentiment_counts": (r_analysis.get("sentiment") or {}).get("counts"),
+            "themes": [t.get("label") for t in (r_analysis.get("themes") or []) if t.get("label")],
+            "risk_flags": r_analysis.get("risk_flags") or [],
+        }
+    return out
+
+
+def _press_summary(press: dict | None) -> dict:
+    if not press or not press.get("article_count"):
+        return {"available": False}
+    a = press.get("analysis") or {}
+    out: dict = {"available": True, "article_count": press.get("article_count"),
+                "source_count": press.get("source_count")}
+    if a.get("verdict") and not a.get("error"):
+        out.update({
+            "verdict": a.get("verdict"),
+            "sentiment_counts": (a.get("sentiment") or {}).get("counts"),
+            "themes": [t.get("label") for t in (a.get("themes") or []) if t.get("label")],
+            "risk_flags": a.get("risk_flags") or [],
+        })
+    return out
+
+
+def _extract_json_object(raw: str) -> str | None:
+    """Same string-aware brace scan as tlpr_press._extract_json_object."""
+    start = raw.find("{")
+    if start < 0:
+        return None
+    depth, in_string, escaped = 0, False, False
+    for i in range(start, len(raw)):
+        ch = raw[i]
+        if in_string:
+            if escaped:
+                escaped = False
+            elif ch == "\\":
+                escaped = True
+            elif ch == '"':
+                in_string = False
+            continue
+        if ch == '"':
+            in_string = True
+        elif ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth == 0:
+                return raw[start:i + 1]
+    return None
+
+
+def _clean_synthesis(parsed: dict) -> dict:
+    """strip_em_dash every free-text field, same discipline as every other
+    Claude-authored field in this codebase since b00d931, and drop any
+    "sources" tag the model invented outside the fixed set -- see the
+    module-level comment above for why this needs no id-level grounding."""
+    _clean = claude_websearch.strip_em_dash
+
+    def _bullets(items, cap):
+        out = []
+        for entry in items if isinstance(items, list) else []:
+            if not isinstance(entry, dict):
+                continue
+            text = _clean(str(entry.get("text") or "").strip())
+            if not text:
+                continue
+            sources = [s for s in (entry.get("sources") or []) if s in _SOURCE_TAGS]
+            out.append({"text": text, "sources": sources})
+        return out[:cap]
+
+    return {
+        "headline": _clean(str(parsed.get("headline") or "").strip())[:140],
+        "verdict": _clean(str(parsed.get("verdict") or "").strip()),
+        "strengths": _bullets(parsed.get("strengths"), 5),
+        "risks": _bullets(parsed.get("risks"), 5),
+        "alignment": _clean(str(parsed.get("alignment") or "").strip()),
+    }
+
+
+def synthesize_report(run: dict) -> dict:
+    """The judgement half for Phase 4. Never raises -- returns
+    {"error": ...} so collect_synthesis_job can tell a real failure apart
+    from a real (however thin) report."""
+    if not run or not run.get("identity"):
+        return {"error": "This run has no confirmed identity to synthesize."}
+    key = os.environ.get("ANTHROPIC_API_KEY", "")
+    if not key:
+        return {"error": "ANTHROPIC_API_KEY is not configured on this deployment."}
+    identity = run["identity"] or {}
+    payload = {
+        "identity": {
+            "full_name": identity.get("full_name"), "headline": identity.get("headline"),
+            "current_title": identity.get("current_title"),
+            "current_company": identity.get("current_company"),
+        },
+        "posts": _posts_summary(run.get("posts")),
+        "reaction": _reaction_summary(run.get("reaction")),
+        "press": _press_summary(run.get("press")),
+    }
+    try:
+        from anthropic import Anthropic
+        client = Anthropic(api_key=key, timeout=120.0, max_retries=1)
+        resp = client.messages.create(
+            model=os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-5"),
+            max_tokens=2500, system=_SYNTHESIS_SYSTEM,
+            messages=[{"role": "user", "content": json.dumps(payload, ensure_ascii=False)}],
+        )
+    except Exception as e:
+        logger.warning("thought_leader_pr: synthesize_report failed: %s", e)
+        return {"error": "The report generation could not be completed (%s)."
+                         % (str(e)[:160] or type(e).__name__)}
+    raw = "".join(b.text for b in resp.content if getattr(b, "type", "") == "text")
+    candidate = _extract_json_object(raw)
+    if candidate is None:
+        return {"error": "The report generation returned an unreadable response."}
+    try:
+        parsed = json.loads(candidate)
+    except (ValueError, json.JSONDecodeError):
+        return {"error": "The report generation returned malformed JSON."}
+    if not isinstance(parsed, dict):
+        return {"error": "The report generation returned an unexpected shape."}
+    return _clean_synthesis(parsed)
+
+
+def collect_synthesis_job(run_id: int, email: str) -> None:
+    """Runs on a background thread started by the /collect-synthesis route,
+    same job-thread convention as the other three collect_*_job functions.
+    Always leaves the run in a terminal synthesis_status ('ready' or
+    'failed')."""
+    try:
+        run = get_run(run_id, email)
+        if not run or not run.get("identity"):
+            save_synthesis_failed(run_id, email, "This run has no confirmed identity to synthesize.")
+            return
+        report = synthesize_report(run)
+        if report.get("error"):
+            save_synthesis_failed(run_id, email, report["error"])
+            return
+        save_synthesis(run_id, email, report, {})
+    except Exception:
+        logger.exception("thought_leader_pr: collect_synthesis_job crashed for run %s", run_id)
+        save_synthesis_failed(run_id, email, "An unexpected error stopped the report generation.")

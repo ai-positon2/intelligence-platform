@@ -9932,6 +9932,26 @@ def thought_leader_pr_collect_press(run_id):
     return jsonify({"ok": True, "press_status": "collecting"})
 
 
+@app.route("/p2/strategic-agents/thought-leader-pr/runs/<int:run_id>/collect-synthesis", methods=["POST"])
+@position2_required
+def thought_leader_pr_collect_synthesis(run_id):
+    # Phase 4 (synthesis report): the "so what" -- one Claude call that
+    # reads Phases 1-3's already-analyzed findings off the run row (never
+    # re-fetching raw posts/comments/articles) and writes one reputation
+    # verdict. Gated only on the confirmed identity, same as /collect-press,
+    # since it writes plainly around whatever earlier phase was skipped
+    # rather than requiring all of them first.
+    from tracker import thought_leader_pr as tlpr
+    user = _get_user() or {}
+    email = (user.get("email") or "").lower()
+    started = tlpr.start_synthesizing(run_id, email)
+    if not started:
+        return jsonify({"ok": False,
+                        "error": "Run not found or its identity isn't confirmed yet."}), 404
+    threading.Thread(target=tlpr.collect_synthesis_job, args=(run_id, email), daemon=True).start()
+    return jsonify({"ok": True, "synthesis_status": "collecting"})
+
+
 # ── Contact Finder ────────────────────────────────────────────────────────────
 # Internal, staff-only Apollo search + chat agent: filter/browse companies and
 # people live against Apollo (search_people is free; search_companies and any

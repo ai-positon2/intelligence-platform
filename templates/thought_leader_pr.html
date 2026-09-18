@@ -175,7 +175,8 @@
         </div>
         <div id="tlprPostsSection"></div>
         <div id="tlprReactionSection"></div>
-        <div id="tlprPressSection"></div>`;
+        <div id="tlprPressSection"></div>
+        <div id="tlprSynthesisSection"></div>`;
     }
 
     function compactNumber(n){
@@ -584,6 +585,120 @@
       }
     }
 
+    // ---- Phase 4: synthesis report ----
+    // The "so what": combines Phases 1-3's own already-analyzed findings
+    // into one reputation verdict. Available as soon as the identity is
+    // confirmed, same as the press section -- it writes plainly around
+    // whatever earlier phase was skipped rather than requiring all of them.
+
+    const SOURCE_TAG_LABEL = {identity: 'Identity', posts: 'Posts', reaction: 'Reaction', press: 'Press'};
+
+    function sourceTagsHtml(sources){
+      if (!sources || !sources.length) return '';
+      return `<span class="tlpr-src-tags">${sources.map(s =>
+        `<span class="tlpr-src-tag">${esc(SOURCE_TAG_LABEL[s] || s)}</span>`).join('')}</span>`;
+    }
+    function synthesisBulletsHtml(items){
+      return (items || []).map(b => `<li>${esc(b.text)}${sourceTagsHtml(b.sources)}</li>`).join('');
+    }
+    function synthesisReadyHtml(run){
+      const s = run.synthesis || {};
+      const strengths = synthesisBulletsHtml(s.strengths);
+      const risks = synthesisBulletsHtml(s.risks);
+      return `
+        <div class="tlpr-card tlpr-card--synthesis">
+          <div class="tlpr-synth-head">
+            <div>
+              <div class="tlpr-synth-eyebrow">Reputation report</div>
+              <h3 class="tlpr-synth-headline">${esc(s.headline || '')}</h3>
+            </div>
+            <button type="button" class="tlpr-btn-secondary tlpr-btn-resynthesize" data-run-id="${run.id}">Regenerate</button>
+          </div>
+          <p class="tlpr-synth-verdict">${esc(s.verdict || '')}</p>
+          <div class="tlpr-synth-cols">
+            <div>
+              <div class="tlpr-synth-col-head">Strengths</div>
+              ${strengths ? `<div class="tlpr-facts tlpr-facts--good"><ul>${strengths}</ul></div>`
+                          : `<div class="tlpr-synth-empty">No clear strengths surfaced yet.</div>`}
+            </div>
+            <div>
+              <div class="tlpr-synth-col-head">Risks &amp; watch items</div>
+              ${risks ? `<div class="tlpr-facts tlpr-facts--risk"><ul>${risks}</ul></div>`
+                      : `<div class="tlpr-synth-empty">No notable risks surfaced.</div>`}
+            </div>
+          </div>
+          ${s.alignment ? `<div class="tlpr-synth-alignment">
+              <div class="tlpr-synth-alignment-label">Self-presentation vs. perception</div>
+              <p>${esc(s.alignment)}</p></div>` : ''}
+        </div>`;
+    }
+    function synthesisIdleHtml(runId){
+      return `
+        <div class="tlpr-card tlpr-card--posts-cta">
+          <div class="tlpr-posts-cta-text">
+            <h3>Generate the full reputation report</h3>
+            <p>Pulls together their posts, how the room reacts, and what the press says into one verdict.</p>
+          </div>
+          <button type="button" class="tlpr-btn-collect" id="tlprSynthesisBtn" data-run-id="${runId}">
+            <svg viewBox="0 0 24 24"><path d="M6 3h9l5 5v13H6z"/><path d="M15 3v5h5M9 12h6M9 16h6"/></svg>
+            Generate report</button>
+        </div>`;
+    }
+    function synthesisLoadingHtml(){
+      return `
+        <div class="tlpr-card tlpr-card--posts-loading">
+          <div class="tlpr-posts-loading-spin"></div>
+          <div>Writing the reputation report…</div>
+        </div>`;
+    }
+    function synthesisFailedHtml(runId, message){
+      return `
+        <div class="tlpr-card tlpr-card--posts-cta">
+          <div class="tlpr-posts-cta-text">
+            <h3>The report didn't generate</h3>
+            <p>${esc(message || 'Something went wrong.')}</p>
+          </div>
+          <button type="button" class="tlpr-btn-collect" id="tlprSynthesisBtn" data-run-id="${runId}">Try again</button>
+        </div>`;
+    }
+    function renderSynthesisSection(run){
+      const el = document.getElementById('tlprSynthesisSection');
+      if (!el || !run) return;
+      const status = run.synthesis_status || 'idle';
+      if (status === 'ready') el.innerHTML = synthesisReadyHtml(run);
+      else if (status === 'collecting') { el.innerHTML = synthesisLoadingHtml(); pollSynthesis(run.id); }
+      else if (status === 'failed') el.innerHTML = synthesisFailedHtml(run.id, (run.synthesis_errors || {})._run);
+      else el.innerHTML = synthesisIdleHtml(run.id);
+    }
+
+    let _synthesisPollTimer = null;
+    function pollSynthesis(runId){
+      clearTimeout(_synthesisPollTimer);
+      _synthesisPollTimer = setTimeout(async () => {
+        try {
+          const res = await fetch(`/p2/strategic-agents/thought-leader-pr/runs/${runId}`);
+          const run = await res.json();
+          if (run.synthesis_status === 'collecting') pollSynthesis(runId);
+          else renderSynthesisSection(run);
+        } catch (e) {
+          pollSynthesis(runId);
+        }
+      }, 2500);
+    }
+
+    async function startSynthesizing(runId){
+      document.getElementById('tlprSynthesisSection').innerHTML = synthesisLoadingHtml();
+      try {
+        const res = await fetch(`/p2/strategic-agents/thought-leader-pr/runs/${runId}/collect-synthesis`, {method: 'POST'});
+        const out = await res.json();
+        if (out.ok) pollSynthesis(runId);
+        else renderSynthesisSection({id: runId, synthesis_status: 'failed', synthesis_errors: {_run: out.error}});
+      } catch (e) {
+        renderSynthesisSection({id: runId, synthesis_status: 'failed',
+                               synthesis_errors: {_run: 'A network error interrupted this.'}});
+      }
+    }
+
     function emptyCardHtml(reasoning, confidence){
       const isLow = confidence === 'low';
       return `
@@ -695,7 +810,7 @@
         if (run.identity){
           document.getElementById('tlprResult').innerHTML =
             identityCardHtml(run.identity, run.id, run.status === 'confirmed');
-          if (run.status === 'confirmed') { renderPostsSection(run); renderPressSection(run); }
+          if (run.status === 'confirmed') { renderPostsSection(run); renderPressSection(run); renderSynthesisSection(run); }
         } else {
           renderResult({ok:false, reasoning: run.reasoning || 'This lookup did not resolve to a person.'});
         }
@@ -731,6 +846,7 @@
             renderHistory();
             renderPostsSection({id: runId, posts_status: 'idle'});
             renderPressSection({id: runId, press_status: 'idle'});
+            renderSynthesisSection({id: runId, synthesis_status: 'idle'});
           } else {
             confirmBtn.disabled = false;
           }
@@ -753,6 +869,12 @@
       if (pressBtn){
         const runId = pressBtn.dataset.runId;
         if (runId) startFindingPress(runId);
+        return;
+      }
+      const synthesisBtn = e.target.closest('#tlprSynthesisBtn, .tlpr-btn-resynthesize');
+      if (synthesisBtn){
+        const runId = synthesisBtn.dataset.runId;
+        if (runId) startSynthesizing(runId);
         return;
       }
       const notThemBtn = e.target.closest('#tlprNotThemBtn');

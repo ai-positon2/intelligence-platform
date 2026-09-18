@@ -682,3 +682,196 @@ class TestCollectPressJob:
         monkeypatch.setattr(T, "save_press_failed", lambda run_id, email, msg: captured.update(msg=msg) or True)
         T.collect_press_job(3, "a@b.com")
         assert "unexpected error" in captured["msg"]
+
+
+class TestPhase4StoreFailSoft:
+    def test_start_synthesizing_returns_false(self):
+        assert T.start_synthesizing(1, "a@b.com") is False
+
+    def test_save_synthesis_returns_false(self):
+        assert T.save_synthesis(1, "a@b.com", {}, {}) is False
+
+    def test_save_synthesis_failed_returns_false(self):
+        assert T.save_synthesis_failed(1, "a@b.com", "boom") is False
+
+
+class TestResolveStaleSynthesis:
+    def test_a_fresh_collecting_run_is_left_alone(self):
+        run = {"id": 1, "synthesis_status": "collecting",
+              "updated_at": T.datetime.now(T.timezone.utc).isoformat()}
+        assert T._resolve_stale_synthesis(run, "a@b.com")["synthesis_status"] == "collecting"
+
+    def test_a_stale_collecting_run_is_flipped_to_failed(self, monkeypatch):
+        stale_time = (T.datetime.now(T.timezone.utc) - T.timedelta(minutes=T.STALE_RUN_MINUTES + 1)).isoformat()
+        run = {"id": 1, "synthesis_status": "collecting", "updated_at": stale_time}
+        monkeypatch.setattr(T, "save_synthesis_failed", lambda *a, **kw: True)
+        out = T._resolve_stale_synthesis(run, "a@b.com")
+        assert out["synthesis_status"] == "failed"
+        assert "_run" in out["synthesis_errors"]
+
+    def test_a_stuck_press_search_never_strands_the_synthesis_poll(self):
+        """The four 'collecting' states are independent columns -- a press
+        search stuck mid-flight must not make _resolve_stale_synthesis
+        think there is a synthesis job to time out."""
+        run = {"id": 1, "press_status": "collecting", "synthesis_status": "idle",
+              "updated_at": "2020-01-01T00:00:00+00:00"}
+        assert T._resolve_stale_synthesis(run, "a@b.com") == run
+
+
+class TestPostsSummary:
+    def test_no_posts_at_all_is_unavailable(self):
+        assert T._posts_summary(None)["available"] is False
+        assert T._posts_summary({})["available"] is False
+
+    def test_an_empty_per_platform_result_is_also_unavailable(self):
+        assert T._posts_summary({"linkedin": [], "x": [], "youtube": []})["available"] is False
+
+    def test_counts_and_engagement_are_computed_per_platform(self):
+        posts = {"linkedin": [{"metrics": {"likes": 5, "comments": 2}},
+                              {"metrics": {"likes": 3}}],
+                "x": [], "youtube": []}
+        out = T._posts_summary(posts)
+        assert out["available"] is True
+        assert out["by_platform"]["linkedin"] == {"count": 2, "total_engagement": 10}
+        assert out["by_platform"]["x"] == {"count": 0, "total_engagement": 0}
+
+
+class TestReactionSummary:
+    def test_no_reaction_is_unavailable(self):
+        assert T._reaction_summary(None) == {"available": False}
+
+    def test_nothing_analyzed_is_unavailable(self):
+        assert T._reaction_summary({"comments_analyzed": 0, "reddit": {"thread_count": 0}}
+                                   )["available"] is False
+
+    def test_an_errored_comment_sentiment_is_omitted_not_faked(self):
+        out = T._reaction_summary({"comments_analyzed": 3,
+                                   "comment_sentiment": {"error": "boom"}, "reddit": {}})
+        assert out["available"] is True
+        assert out["own_post_comments"] is None
+
+    def test_real_findings_are_pulled_through(self):
+        reaction = {
+            "comments_analyzed": 4,
+            "comment_sentiment": {"verdict": "Warm.", "sentiment": {"counts": {"positive": 3}},
+                                  "themes": [{"label": "Praise"}]},
+            "reddit": {"thread_count": 2,
+                      "analysis": {"verdict": "Mixed.", "sentiment": {"counts": {"negative": 1}},
+                                  "themes": [{"label": "Skepticism"}], "risk_flags": ["A gripe."]}},
+        }
+        out = T._reaction_summary(reaction)
+        assert out["own_post_comments"]["verdict"] == "Warm."
+        assert out["own_post_comments"]["themes"] == ["Praise"]
+        assert out["reddit"]["verdict"] == "Mixed."
+        assert out["reddit"]["risk_flags"] == ["A gripe."]
+
+
+class TestPressSummary:
+    def test_no_articles_is_unavailable(self):
+        assert T._press_summary(None) == {"available": False}
+        assert T._press_summary({"article_count": 0}) == {"available": False}
+
+    def test_an_errored_analysis_still_reports_the_raw_counts(self):
+        out = T._press_summary({"article_count": 5, "source_count": 3, "analysis": {"error": "boom"}})
+        assert out == {"available": True, "article_count": 5, "source_count": 3}
+
+    def test_real_findings_are_pulled_through(self):
+        press = {"article_count": 7, "source_count": 4,
+                 "analysis": {"verdict": "Well covered.", "sentiment": {"counts": {"positive": 5}},
+                             "themes": [{"label": "Growth marketing"}], "risk_flags": ["ROI scrutiny."]}}
+        out = T._press_summary(press)
+        assert out["verdict"] == "Well covered."
+        assert out["themes"] == ["Growth marketing"]
+        assert out["risk_flags"] == ["ROI scrutiny."]
+
+
+class TestCleanSynthesis:
+    def test_strengths_and_risks_keep_only_known_source_tags(self):
+        parsed = {"headline": "H", "verdict": "V", "alignment": "A",
+                  "strengths": [{"text": "Widely respected.", "sources": ["press", "made_up"]}],
+                  "risks": []}
+        out = T._clean_synthesis(parsed)
+        assert out["strengths"] == [{"text": "Widely respected.", "sources": ["press"]}]
+
+    def test_a_blank_bullet_text_is_dropped(self):
+        parsed = {"headline": "H", "verdict": "V", "alignment": "A",
+                  "strengths": [{"text": "   ", "sources": ["press"]}], "risks": []}
+        assert T._clean_synthesis(parsed)["strengths"] == []
+
+    def test_em_dashes_are_stripped_from_every_free_text_field(self):
+        parsed = {
+            "headline": "A rising voice — with one open question",
+            "verdict": "Well regarded — though one campaign is under scrutiny.",
+            "alignment": "Self-presentation matches perception — mostly.",
+            "strengths": [{"text": "Cited widely — a real authority.", "sources": ["press"]}],
+            "risks": [{"text": "One unverified claim — worth watching.", "sources": ["press"]}],
+        }
+        out = T._clean_synthesis(parsed)
+        assert "—" not in out["headline"]
+        assert "—" not in out["verdict"]
+        assert "—" not in out["alignment"]
+        assert "—" not in out["strengths"][0]["text"]
+        assert "—" not in out["risks"][0]["text"]
+
+    def test_lists_are_capped_at_five(self):
+        parsed = {"headline": "H", "verdict": "V", "alignment": "A",
+                  "strengths": [{"text": "s%d" % i, "sources": []} for i in range(8)], "risks": []}
+        assert len(T._clean_synthesis(parsed)["strengths"]) == 5
+
+
+class TestExtractJsonObject:
+    def test_the_json_scan_survives_a_brace_inside_a_string(self):
+        raw = 'Here you go:\n```json\n{"verdict": "They said { was odd", "themes": []}\n```'
+        assert T._extract_json_object(raw) == '{"verdict": "They said { was odd", "themes": []}'
+
+
+class TestSynthesizeReport:
+    def test_no_identity_is_refused(self):
+        out = T.synthesize_report({"identity": None})
+        assert "error" in out
+
+    def test_missing_api_key_is_reported(self, monkeypatch):
+        monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+        out = T.synthesize_report({"identity": {"full_name": "Jane Doe"}})
+        assert "ANTHROPIC_API_KEY" in out["error"]
+
+
+class TestCollectSynthesisJob:
+    def test_no_run_or_identity_saves_a_failed_state(self, monkeypatch):
+        monkeypatch.setattr(T, "get_run", lambda run_id, email: None)
+        captured = {}
+        monkeypatch.setattr(T, "save_synthesis_failed", lambda run_id, email, msg: captured.update(
+            run_id=run_id, msg=msg) or True)
+        monkeypatch.setattr(T, "save_synthesis", lambda *a, **kw: pytest.fail("must not save a partial report"))
+        T.collect_synthesis_job(5, "a@b.com")
+        assert captured["run_id"] == 5 and "no confirmed identity" in captured["msg"]
+
+    def test_a_real_report_is_saved_as_ready(self, monkeypatch):
+        run = {"input_name": "Jane Doe", "identity": {"full_name": "Jane Doe"}}
+        monkeypatch.setattr(T, "get_run", lambda run_id, email: run)
+        monkeypatch.setattr(T, "synthesize_report", lambda r: {"headline": "ok", "verdict": "v"})
+        captured = {}
+        monkeypatch.setattr(T, "save_synthesis", lambda run_id, email, report, errors: captured.update(
+            report=report, errors=errors) or True)
+        T.collect_synthesis_job(9, "a@b.com")
+        assert captured["report"] == {"headline": "ok", "verdict": "v"}
+        assert captured["errors"] == {}
+
+    def test_an_error_result_is_saved_as_failed_not_ready(self, monkeypatch):
+        run = {"input_name": "Jane Doe", "identity": {"full_name": "Jane Doe"}}
+        monkeypatch.setattr(T, "get_run", lambda run_id, email: run)
+        monkeypatch.setattr(T, "synthesize_report", lambda r: {"error": "vendor call failed"})
+        captured = {}
+        monkeypatch.setattr(T, "save_synthesis_failed", lambda run_id, email, msg: captured.update(msg=msg) or True)
+        monkeypatch.setattr(T, "save_synthesis", lambda *a, **kw: pytest.fail("an error result must not be saved as ready"))
+        T.collect_synthesis_job(9, "a@b.com")
+        assert captured["msg"] == "vendor call failed"
+
+    def test_an_unexpected_crash_still_reaches_a_terminal_state(self, monkeypatch):
+        def boom(run_id, email):
+            raise RuntimeError("kaboom")
+        monkeypatch.setattr(T, "get_run", boom)
+        captured = {}
+        monkeypatch.setattr(T, "save_synthesis_failed", lambda run_id, email, msg: captured.update(msg=msg) or True)
+        T.collect_synthesis_job(3, "a@b.com")
+        assert "unexpected error" in captured["msg"]
