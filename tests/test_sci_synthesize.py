@@ -177,6 +177,35 @@ def test_synthesize_report_caps_post_ids_at_three(monkeypatch):
     assert len(result["platforms"]["instagram"]["claims"][0]["post_ids"]) == 3
 
 
+def test_synthesize_report_strips_em_dashes_from_every_free_text_field(monkeypatch):
+    """b00d931 unified this fix everywhere in the codebase, but this module
+    predated it and was a live gap until it was backfilled. Every
+    model-authored free-text field the parse returns must come out clean."""
+    from tracker import sci_store
+    reply = json.dumps({
+        "platforms": {"instagram": {
+            "summary": ["Product-forward — mostly studio shots."],
+            "messaging_and_strategy": ["Leans on urgency — always a countdown."],
+            "claims": [{"text": "Frequent close-ups — especially on shoes.", "post_ids": [101]}],
+        }},
+        "cross_platform": {
+            "summary": ["Consistent focus — across every platform."],
+            "messaging_and_strategy": [],
+            "claims": [{"text": "Product-first — even in lifestyle shots.", "post_ids": [101]}],
+        },
+    })
+    monkeypatch.setattr(sci_synthesize, "_anthropic", lambda: _FakeClient(response_text=reply))
+    monkeypatch.setattr(sci_store, "get_posts", lambda run_id: _posts())
+    monkeypatch.setattr(sci_store, "get_platform_runs", lambda run_id: [])
+    result = sci_synthesize.synthesize_report(1, {})
+    ig = result["platforms"]["instagram"]
+    assert "—" not in ig["summary"][0]
+    assert "—" not in ig["messaging_and_strategy"][0]
+    assert "—" not in ig["claims"][0]["text"]
+    assert "—" not in result["cross_platform"]["summary"][0]
+    assert "—" not in result["cross_platform"]["claims"][0]["text"]
+
+
 def test_synthesize_report_degrades_on_unparsable_reply(monkeypatch):
     from tracker import sci_store
     monkeypatch.setattr(sci_synthesize, "_anthropic", lambda: _FakeClient(response_text="not json"))

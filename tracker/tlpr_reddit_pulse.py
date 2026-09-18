@@ -269,8 +269,8 @@ def _clean_analysis(parsed: dict, valid_ids: set[str]) -> dict:
     that does not exist -- and strip_em_dash every free-text field the model
     wrote, the same discipline every other Claude-authored field in this
     codebase follows since b00d931 unified it (this module's parent,
-    sci_reddit_pulse.py, predates that fix and was never backfilled; do not
-    copy its gap forward into a new module)."""
+    sci_reddit_pulse.py, predated that fix and has since been backfilled to
+    match)."""
     _clean = claude_websearch.strip_em_dash
 
     def _cited(entries, *, name_key):

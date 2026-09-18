@@ -21,6 +21,8 @@ import json
 import logging
 import os
 
+from tracker import claude_websearch
+
 logger = logging.getLogger(__name__)
 
 _SYSTEM = (
@@ -200,12 +202,13 @@ def _clean_points(points) -> list[str]:
     """summary/messaging_and_strategy are now bulleted lists, not a single
     paragraph -- but tolerate a bare string too (a model slip, or an older
     stored run's shape) by treating it as one bullet, rather than dropping
-    it or crashing."""
+    it or crashing. strip_em_dash follows the same discipline b00d931 unified
+    across the rest of this codebase's Claude-authored free text."""
     if isinstance(points, str):
         points = [points] if points.strip() else []
     if not isinstance(points, list):
         return []
-    return [text for text in (str(p or "").strip() for p in points) if text]
+    return [text for text in (claude_websearch.strip_em_dash(str(p or "").strip()) for p in points) if text]
 
 
 def _clean_claims(claims, valid_ids: set) -> list:
@@ -213,7 +216,7 @@ def _clean_claims(claims, valid_ids: set) -> list:
     for c in claims or []:
         if not isinstance(c, dict):
             continue
-        text = str(c.get("text") or "").strip()
+        text = claude_websearch.strip_em_dash(str(c.get("text") or "").strip())
         ids = [i for i in (c.get("post_ids") or []) if isinstance(i, int) and i in valid_ids]
         if text and ids:
             out.append({"text": text, "post_ids": ids[:3]})

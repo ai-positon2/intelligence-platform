@@ -37,6 +37,8 @@ import re
 from collections import Counter, defaultdict
 from datetime import datetime, timezone
 
+from tracker import claude_websearch
+
 logger = logging.getLogger(__name__)
 
 # How many threads to pull per query before dedupe. Reddit's search caps a
@@ -285,19 +287,30 @@ def _extract_json_object(raw: str) -> str | None:
 
 
 def _clean_analysis(parsed: dict, valid_ids: set[str]) -> dict:
-    """Strip every thread id the model was not actually given, and drop any
-    theme or competitor left with no real citation. Same discipline as
-    sci_synthesize._clean_claims: an uncheckable citation is worse than none,
-    because it renders as a link to a thread that does not exist."""
+    """Strip every thread id the model was not actually given, drop any
+    theme or competitor left with no real citation -- an uncheckable
+    citation is worse than none, because it renders as a link to a thread
+    that does not exist -- and strip_em_dash every free-text field the model
+    wrote, the same discipline every other Claude-authored field in this
+    codebase follows since b00d931 unified it (this module predated that fix
+    and was backfilled to match; see tracker/tlpr_reddit_pulse.py, the newer
+    sibling that got the fix from the start)."""
+    _clean = claude_websearch.strip_em_dash
+
     def _cited(entries, *, name_key):
         out = []
         for entry in entries if isinstance(entries, list) else []:
             if not isinstance(entry, dict):
                 continue
             ids = [str(i) for i in (entry.get("thread_ids") or []) if str(i) in valid_ids]
-            if not ids or not str(entry.get(name_key) or "").strip():
+            name = _clean(str(entry.get(name_key) or "").strip())
+            if not ids or not name:
                 continue
-            out.append({**entry, "thread_ids": ids[:4]})
+            cleaned = dict(entry, thread_ids=ids[:4], **{name_key: name})
+            for key in ("detail", "context"):
+                if key in cleaned:
+                    cleaned[key] = _clean(str(cleaned[key] or ""))
+            out.append(cleaned)
         return out
 
     sentiment_raw = parsed.get("thread_sentiment")
@@ -309,7 +322,7 @@ def _clean_analysis(parsed: dict, valid_ids: set[str]) -> dict:
     counts = Counter(labels.values())
     total = sum(counts.values())
     return {
-        "verdict": str(parsed.get("verdict") or "").strip(),
+        "verdict": _clean(str(parsed.get("verdict") or "").strip()),
         "sentiment": {
             "counts": {s: counts.get(s, 0) for s in _SENTIMENTS},
             "labelled": total,
@@ -321,8 +334,8 @@ def _clean_analysis(parsed: dict, valid_ids: set[str]) -> dict:
         "thread_sentiment": labels,
         "themes": _cited(parsed.get("themes"), name_key="label")[:6],
         "competitors": _cited(parsed.get("competitors"), name_key="name")[:6],
-        "audience": [str(a).strip() for a in (parsed.get("audience") or []) if str(a).strip()][:4],
-        "opportunities": [str(o).strip() for o in (parsed.get("opportunities") or []) if str(o).strip()][:4],
+        "audience": [_clean(str(a).strip()) for a in (parsed.get("audience") or []) if str(a).strip()][:4],
+        "opportunities": [_clean(str(o).strip()) for o in (parsed.get("opportunities") or []) if str(o).strip()][:4],
     }
 
 

@@ -175,6 +175,29 @@ def test_a_nameless_competitor_is_dropped():
     assert [c["name"] for c in out["competitors"]] == ["Vanta"]
 
 
+def test_an_em_dash_never_survives_cleaning():
+    """b00d931 unified this fix everywhere -- this module predated it and was
+    a live gap until it was backfilled. Every model-authored free-text field
+    _clean_analysis returns must come out clean."""
+    parsed = {
+        "verdict": "Well liked — no real controversy.",
+        "thread_sentiment": {"a": "positive"},
+        "themes": [{"label": "Praise", "stance": "praise",
+                    "detail": "People like the support team — especially response time.",
+                    "thread_ids": ["a"]}],
+        "competitors": [{"name": "Vanta", "context": "Cheaper — but fewer integrations.",
+                          "thread_ids": ["a"]}],
+        "audience": ["IT admins — mostly at mid-market companies."],
+        "opportunities": ["Publish a comparison page — competitors already have one."],
+    }
+    out = pulse._clean_analysis(parsed, {"a"})
+    assert "—" not in out["verdict"]
+    assert "—" not in out["themes"][0]["detail"]
+    assert "—" not in out["competitors"][0]["context"]
+    assert "—" not in out["audience"][0]
+    assert "—" not in out["opportunities"][0]
+
+
 def test_the_json_scan_survives_a_brace_inside_a_string():
     raw = 'Here you go:\n```json\n{"verdict": "They said { was odd", "themes": []}\n```'
     assert pulse._extract_json_object(raw) == '{"verdict": "They said { was odd", "themes": []}'
