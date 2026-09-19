@@ -95,6 +95,25 @@ class TestResolveIdentityGates:
         assert out["error"] is err
 
 
+class TestIdentitySystemPromptContent:
+    """The real live incident this generalizes from: Sundar Pichai and
+    Shashi Tharoor (both "very online" figures whose LinkedIn/X surface
+    naturally in identity-confirming searches) got every platform found,
+    while Falguni Nayar (a business figure confirmed from press/Wikipedia/
+    company-listing sources that never link to her social profiles) came
+    back with LinkedIn, X, YouTube, and Instagram all "Not found" despite
+    a confident, well-evidenced identity match. The prompt let the model
+    treat identity confirmation and handle-finding as the same task,
+    when they need separate search effort."""
+
+    def test_the_prompt_requires_actively_searching_for_handles_after_identity_is_settled(self):
+        assert "actively looking for their LinkedIn profile URL and" in T._SYSTEM
+        assert "do not stop the moment identity itself is settled" in T._SYSTEM
+
+    def test_the_prompt_warns_press_and_wikipedia_sources_do_not_imply_handles_were_found(self):
+        assert "rarely link to them directly" in T._SYSTEM
+
+
 class TestResolveIdentityHappyPath:
     def test_high_confidence_public_figure_assembles_a_full_identity(self, monkeypatch):
         monkeypatch.setenv("APOLLO_API_KEY", "test-key")

@@ -42,32 +42,43 @@ def _media_urls(item: dict) -> list:
     urls = [u for u in (item.get("mediaUrls") or []) if u]
     if urls:
         return urls
-    meta = item.get("videoMeta") or {}
+    meta = item.get("videoMeta")
+    meta = meta if isinstance(meta, dict) else {}
     direct = meta.get("downloadAddr") or item.get("webVideoUrl")
     return [direct] if direct else []
 
 
 def normalize(raw_items: list[dict]) -> list[dict]:
+    """Never lets one malformed row take the whole batch down -- see the
+    identical fix and its live-incident writeup in
+    tracker/sci_source_x.normalize(), the same unguarded-.get() shape."""
     out = []
     for item in raw_items or []:
-        pid = str(item.get("id") or "").strip()
-        if not pid:
+        if not isinstance(item, dict):
+            logger.warning("sci_source_tiktok: skipping a non-dict dataset item (%s)", type(item).__name__)
             continue
-        out.append({
-            "platform_post_id": pid,
-            "post_url": item.get("webVideoUrl"),
-            "post_type": "video",
-            "caption": item.get("text") or "",
-            "posted_at": item.get("createTimeISO"),
-            "media_urls": _media_urls(item),
-            "metrics": {
-                "likes": item.get("diggCount"),
-                "comments": item.get("commentCount"),
-                "shares": item.get("shareCount"),
-                "views": item.get("playCount"),
-            },
-            "raw": item,
-        })
+        try:
+            pid = str(item.get("id") or "").strip()
+            if not pid:
+                continue
+            out.append({
+                "platform_post_id": pid,
+                "post_url": item.get("webVideoUrl"),
+                "post_type": "video",
+                "caption": item.get("text") or "",
+                "posted_at": item.get("createTimeISO"),
+                "media_urls": _media_urls(item),
+                "metrics": {
+                    "likes": item.get("diggCount"),
+                    "comments": item.get("commentCount"),
+                    "shares": item.get("shareCount"),
+                    "views": item.get("playCount"),
+                },
+                "raw": item,
+            })
+        except Exception:
+            logger.exception("sci_source_tiktok: skipping a video that failed to normalize")
+            continue
     return out
 
 

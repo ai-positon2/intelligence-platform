@@ -749,7 +749,17 @@ _SYSTEM = (
     "characterization of the person.\n"
     "4. If this reads as a private individual with no real public platform, "
     "set `is_public_figure` to false and confidence to \"none\" -- say so in "
-    "`reasoning`.\n\n"
+    "`reasoning`.\n"
+    "5. Once you are confident who this person is, spend some of your "
+    "remaining searches actively looking for their LinkedIn profile URL and "
+    "X/Twitter handle specifically (e.g. \"<name> LinkedIn\", \"<name> "
+    "Twitter\"), and their Instagram handle if they plausibly have a public "
+    "one -- do not stop the moment identity itself is settled. A person "
+    "confirmed from press coverage, Wikipedia, or a company listing alone "
+    "can still have all three; those sources rarely link to them directly, "
+    "so finding them takes its own targeted search. Leave a field null only "
+    "after you have actually looked and found nothing, not because "
+    "identity confirmation alone already satisfied you.\n\n"
     "Respond with ONLY a JSON object, no prose before or after:\n"
     '{"confidence": "high"|"medium"|"low"|"none", "reasoning": str, '
     '"is_public_figure": bool, "full_name": str|null, "headline": str|null, '

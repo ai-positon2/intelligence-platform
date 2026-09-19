@@ -145,25 +145,35 @@ def normalize(raw_items: list[dict]) -> list[dict]:
     """scraper_one/facebook-posts-search's own output shape into this
     module's common post-dict shape. Kept local rather than reused from
     tracker/sci_source_facebook.py: that module normalizes a DIFFERENT
-    actor's (apify/facebook-posts-scraper) different field names."""
+    actor's (apify/facebook-posts-scraper) different field names.
+
+    Never lets one malformed row take the whole batch down -- see the
+    identical fix and its live-incident writeup in
+    tracker/sci_source_x.normalize(), the same unguarded-.get() shape."""
     out = []
     for item in raw_items or []:
-        pid = str(item.get("postId") or "").strip()
-        if not pid:
+        if not isinstance(item, dict):
+            logger.warning("tlpr_facebook_pulse: skipping a non-dict dataset item (%s)", type(item).__name__)
             continue
-        author = item.get("author") or {}
-        out.append({
-            "platform_post_id": pid,
-            "post_url": item.get("url"),
-            "caption": item.get("postText") or "",
-            "posted_at": _parse_timestamp(item.get("timestamp")),
-            "metrics": {
-                "likes": _safe_int(item.get("reactionsCount")),
-                "comments": _safe_int(item.get("commentsCount")),
-                "shares": _safe_int(item.get("sharesCount")),
-            },
-            "raw": item,
-        })
+        try:
+            pid = str(item.get("postId") or "").strip()
+            if not pid:
+                continue
+            out.append({
+                "platform_post_id": pid,
+                "post_url": item.get("url"),
+                "caption": item.get("postText") or "",
+                "posted_at": _parse_timestamp(item.get("timestamp")),
+                "metrics": {
+                    "likes": _safe_int(item.get("reactionsCount")),
+                    "comments": _safe_int(item.get("commentsCount")),
+                    "shares": _safe_int(item.get("sharesCount")),
+                },
+                "raw": item,
+            })
+        except Exception:
+            logger.exception("tlpr_facebook_pulse: skipping a post that failed to normalize")
+            continue
     return out
 
 

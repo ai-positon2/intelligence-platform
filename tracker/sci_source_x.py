@@ -33,7 +33,15 @@ def build_input(handle: str, max_posts: int = 25) -> dict:
 
 
 def _media_items(item: dict) -> list:
-    return item.get("media") or (item.get("extendedEntities") or {}).get("media") or []
+    """Only the DICT entries of item["media"]/extendedEntities.media -- this
+    actor's exact output shape has never been confirmed against a live
+    response (see the module docstring), and a real run against Sundar
+    Pichai's and Shashi Tharoor's live tweets crashed here with
+    AttributeError: at least one variant of this actor's output puts a bare
+    media URL string in this list instead of a {"type": ..., ...} dict, and
+    every caller below unconditionally called .get() on each entry."""
+    raw = item.get("media") or (item.get("extendedEntities") or {}).get("media") or []
+    return [m for m in raw if isinstance(m, dict)]
 
 
 def _media_urls(item: dict) -> list:
@@ -42,6 +50,7 @@ def _media_urls(item: dict) -> list:
         kind = (m.get("type") or "").lower()
         if kind in ("video", "animated_gif"):
             variants = (m.get("video_info") or {}).get("variants") or m.get("variants") or []
+            variants = [v for v in variants if isinstance(v, dict)]
             mp4s = [v for v in variants
                     if (v.get("content_type") or v.get("contentType") or "").endswith("mp4")]
             best = max(mp4s, key=lambda v: v.get("bitrate") or 0, default=None)
@@ -66,24 +75,42 @@ def _post_type(item: dict) -> str:
 def normalize(raw_items: list[dict]) -> list[dict]:
     out = []
     for item in raw_items or []:
-        pid = str(item.get("id") or item.get("id_str") or item.get("tweetId") or "").strip()
-        if not pid:
+        if not isinstance(item, dict):
+            # A real run has shown this actor can push a row that isn't a
+            # tweet dict at all (see _media_items above for the sibling gap
+            # inside a well-formed item). One stray row must not cost every
+            # other genuinely-collected tweet in the batch.
+            logger.warning("sci_source_x: skipping a non-dict dataset item (%s)", type(item).__name__)
             continue
-        out.append({
-            "platform_post_id": pid,
-            "post_url": item.get("url") or item.get("twitterUrl"),
-            "post_type": _post_type(item),
-            "caption": item.get("text") or item.get("fullText") or item.get("full_text") or "",
-            "posted_at": item.get("createdAt") or item.get("created_at"),
-            "media_urls": _media_urls(item),
-            "metrics": {
-                "likes": item.get("likeCount") or item.get("favorite_count"),
-                "shares": item.get("retweetCount") or item.get("retweet_count"),
-                "comments": item.get("replyCount") or item.get("reply_count"),
-                "views": item.get("viewCount") or item.get("views"),
-            },
-            "raw": item,
-        })
+        try:
+            pid = str(item.get("id") or item.get("id_str") or item.get("tweetId") or "").strip()
+            if not pid:
+                continue
+            out.append({
+                "platform_post_id": pid,
+                "post_url": item.get("url") or item.get("twitterUrl"),
+                "post_type": _post_type(item),
+                "caption": item.get("text") or item.get("fullText") or item.get("full_text") or "",
+                "posted_at": item.get("createdAt") or item.get("created_at"),
+                "media_urls": _media_urls(item),
+                "metrics": {
+                    "likes": item.get("likeCount") or item.get("favorite_count"),
+                    "shares": item.get("retweetCount") or item.get("retweet_count"),
+                    "comments": item.get("replyCount") or item.get("reply_count"),
+                    "views": item.get("viewCount") or item.get("views"),
+                },
+                "raw": item,
+            })
+        except Exception:
+            # Same reasoning: an unanticipated shape surprise in ONE tweet
+            # must degrade to skipping that tweet, not losing the whole
+            # batch to a crash the caller can only report as an opaque
+            # AttributeError with no further diagnosis possible. Never
+            # re-touch `item` here to describe it -- whatever made the try
+            # block above raise (a hostile/unexpected .get() included) could
+            # just as easily raise again out of this handler.
+            logger.exception("sci_source_x: skipping a tweet that failed to normalize")
+            continue
     return out
 
 

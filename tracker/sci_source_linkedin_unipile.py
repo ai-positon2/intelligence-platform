@@ -166,25 +166,38 @@ def _metrics(item: dict) -> dict:
 
 
 def normalize(raw_items: list[dict]) -> list[dict]:
+    """Never lets one malformed row take the whole batch down -- see the
+    identical fix and its live-incident writeup in
+    tracker/sci_source_x.normalize(), the same unguarded-.get() shape. This
+    module's own _usable_attachments already dict-checks its own entries;
+    the item-level guard here is defense in depth for a surprise elsewhere."""
     out = []
     for item in raw_items or []:
-        pid = str(item.get("id") or item.get("social_id") or item.get("urn") or "").strip()
-        if not pid:
+        if not isinstance(item, dict):
+            logger.warning("sci_source_linkedin_unipile: skipping a non-dict dataset item (%s)",
+                          type(item).__name__)
             continue
-        out.append({
-            "platform_post_id": pid,
-            "post_url": item.get("share_url") or item.get("post_url") or item.get("url"),
-            "post_type": _post_type(item),
-            "caption": _caption(item),
-            # `date` is deliberately NOT a fallback here: it is a relative
-            # string ("3w"), and storing it as posted_at would silently
-            # corrupt every date-ordered chart downstream. A post with no
-            # parsed_datetime has no known date, and says so.
-            "posted_at": item.get("parsed_datetime") or item.get("posted_at"),
-            "media_urls": _media_urls(item),
-            "metrics": _metrics(item),
-            "raw": item,
-        })
+        try:
+            pid = str(item.get("id") or item.get("social_id") or item.get("urn") or "").strip()
+            if not pid:
+                continue
+            out.append({
+                "platform_post_id": pid,
+                "post_url": item.get("share_url") or item.get("post_url") or item.get("url"),
+                "post_type": _post_type(item),
+                "caption": _caption(item),
+                # `date` is deliberately NOT a fallback here: it is a relative
+                # string ("3w"), and storing it as posted_at would silently
+                # corrupt every date-ordered chart downstream. A post with no
+                # parsed_datetime has no known date, and says so.
+                "posted_at": item.get("parsed_datetime") or item.get("posted_at"),
+                "media_urls": _media_urls(item),
+                "metrics": _metrics(item),
+                "raw": item,
+            })
+        except Exception:
+            logger.exception("sci_source_linkedin_unipile: skipping a post that failed to normalize")
+            continue
     return out
 
 

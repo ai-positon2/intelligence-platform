@@ -118,6 +118,7 @@ def collect_coverage(full_name: str, company_hint: str | None = None,
         _add(_gdelt_articles(name, FETCH_POOL, max_age_days), "gdelt")
     except Exception as e:
         logger.warning("tlpr_press: GDELT fetch failed for %r: %s", name, e)
+        errors["gdelt"] = "GDELT could not be reached (%s)." % (str(e)[:160] or type(e).__name__)
 
     serpapi_key = os.environ.get("SERPAPI_KEY", "")
     if not serpapi_key:
@@ -134,16 +135,25 @@ def collect_coverage(full_name: str, company_hint: str | None = None,
         if hint:
             queries.append('"%s" %s' % (name, hint))
         got_any = False
+        any_query_succeeded = False
         for q in queries:
             try:
                 hits = _serpapi_articles(q, serpapi_key, FETCH_POOL, max_age_days)
+                any_query_succeeded = True
                 if hits:
                     got_any = True
                 _add(hits, "serpapi")
             except Exception as e:
                 logger.warning("tlpr_press: SerpAPI fetch failed for %r: %s", q, e)
         if not got_any and "serpapi" not in errors:
-            errors["serpapi"] = "No SerpAPI results were returned for this person."
+            # Distinguish a source that ran and confirmed there is nothing
+            # (a real finding, not worth flagging as a caveat) from one that
+            # never got a fair shot at all (every query raised) -- the
+            # latter must not be reported the same way build_press's
+            # "genuine zero" note would otherwise read it as.
+            errors["serpapi"] = ("No SerpAPI results were returned for this person."
+                                 if any_query_succeeded else
+                                 "SerpAPI could not be reached for this person.")
 
     return list(seen.values()), errors
 
@@ -385,9 +395,20 @@ def build_press(full_name: str, company_hint: str | None = None) -> dict:
     result["errors"] = errors
     result.update(aggregate(articles))
     if not articles:
-        result["note"] = ("No recent press coverage mentioning this person was found. "
-                          "That is a finding, not an error: this person has no measurable "
-                          "earned-media footprint in the last %d days." % MAX_NEWS_AGE_DAYS)
+        note = ("No recent press coverage mentioning this person was found. "
+                "That is a finding, not an error: this person has no measurable "
+                "earned-media footprint in the last %d days." % MAX_NEWS_AGE_DAYS)
+        # A genuine zero across BOTH sources reads very differently from a
+        # zero where one source never actually ran -- surface that instead
+        # of letting a config gap or a transient fetch failure masquerade as
+        # a confident finding. SerpAPI succeeding with zero hits is a real
+        # finding, not a caveat, and is the one message deliberately left
+        # out here.
+        caveats = [msg for msg in errors.values()
+                  if msg != "No SerpAPI results were returned for this person."]
+        if caveats:
+            note += " " + " ".join(caveats)
+        result["note"] = note
         return result
     result["analysis"] = analyze(full_name, articles, company_hint)
     return result

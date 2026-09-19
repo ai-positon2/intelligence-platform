@@ -105,13 +105,16 @@ def test_the_mentions_query_failing_never_blocks_the_search_query(monkeypatch):
     assert "x_mentions" in errors
 
 
-def test_a_normalize_crash_in_one_query_does_not_lose_the_other_or_escape_uncaught(monkeypatch):
+def test_a_bare_non_list_response_no_longer_crashes_normalize(monkeypatch):
     """Reproduces the real incident: _run_actor succeeded but returned
-    something sci_source_x.normalize() cannot iterate (a bare string, not a
-    list of dicts) -- a different exception type than ApifyTransportError,
-    which the old narrow except let escape all the way out of
-    collect_mentions and get reported as the generic "X search could not be
-    completed" with no diagnosable cause."""
+    something that used to crash sci_source_x.normalize() (a bare string,
+    not a list of dicts) -- a different exception type than
+    ApifyTransportError, which the old narrow except let escape all the way
+    out of collect_mentions and get reported as the generic "X search could
+    not be completed" with no diagnosable cause. sci_source_x.normalize()
+    is now per-item defensive (see its own docstring), so this query
+    degrades to a clean empty result with no error at all, and the other
+    query's tweet still comes through."""
     monkeypatch.setenv("APIFY_API_TOKEN", "tok")
     def fake(run_input, token):
         if "searchTerms" in run_input:
@@ -120,8 +123,22 @@ def test_a_normalize_crash_in_one_query_does_not_lose_the_other_or_escape_uncaug
     monkeypatch.setattr(xp, "_run_actor", fake)
     tweets, errors = xp.collect_mentions("Jane Doe", x_handle="janedoe")
     assert len(tweets) == 1
+    assert errors == {}
+
+
+def test_collect_mentions_still_catches_a_crash_normalize_itself_cannot_prevent(monkeypatch):
+    """Defense in depth: even with sci_source_x.normalize() now hardened,
+    collect_mentions keeps its own broad except around each query in case
+    some OTHER, unanticipated step ever raises."""
+    from tracker import sci_source_x
+    monkeypatch.setenv("APIFY_API_TOKEN", "tok")
+    monkeypatch.setattr(xp, "_run_actor", lambda run_input, token: [])
+    monkeypatch.setattr(sci_source_x, "normalize",
+                        lambda raw: (_ for _ in ()).throw(RuntimeError("kaboom")))
+    tweets, errors = xp.collect_mentions("Jane Doe", x_handle="janedoe")
+    assert tweets == []
     assert "x_search" in errors
-    assert "x_mentions" not in errors
+    assert "x_mentions" in errors
 
 
 # ── mechanical aggregation ──────────────────────────────────────────────

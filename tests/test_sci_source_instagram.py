@@ -42,6 +42,20 @@ def test_normalize_skips_items_with_no_id():
     assert src.normalize([{"type": "Image"}]) == []
 
 
+def test_normalize_survives_a_dataset_item_that_is_not_a_dict_at_all():
+    """Same fix and same real live incident as tracker/sci_source_x.
+    normalize() -- see that test's docstring."""
+    items = [{"id": "1", "type": "Image"}, "a stray non-post row", None]
+    out = src.normalize(items)
+    assert [o["platform_post_id"] for o in out] == ["1"]
+
+
+def test_normalize_survives_a_childpost_entry_that_is_not_a_dict():
+    items = [{"id": "1", "type": "Sidecar", "childPosts": ["not-a-dict", {"displayUrl": "https://cdn/c.jpg"}]}]
+    out = src.normalize(items)
+    assert out[0]["media_urls"] == ["https://cdn/c.jpg"]
+
+
 @patch("tracker.sci_source_instagram.apify_transport.run_actor_and_wait")
 def test_collect_passes_strict_through_to_the_transport(mock_run):
     mock_run.return_value = []

@@ -40,6 +40,20 @@ def test_normalize_skips_items_with_no_id():
     assert src.normalize([{"text": "no id"}]) == []
 
 
+def test_normalize_survives_a_dataset_item_that_is_not_a_dict_at_all():
+    """Same fix and same real live incident as tracker/sci_source_x.
+    normalize() -- see that test's docstring."""
+    items = [{"id": "1", "text": "fine"}, "a stray non-video row", None]
+    out = src.normalize(items)
+    assert [o["platform_post_id"] for o in out] == ["1"]
+
+
+def test_normalize_survives_a_non_dict_video_meta():
+    items = [{"id": "1", "webVideoUrl": "https://tiktok.com/@a/video/1", "videoMeta": "not-a-dict"}]
+    out = src.normalize(items)
+    assert out[0]["media_urls"] == ["https://tiktok.com/@a/video/1"]
+
+
 @patch("tracker.sci_source_tiktok.apify_transport.run_actor_and_wait")
 def test_collect_passes_strict_through_to_the_transport(mock_run):
     mock_run.return_value = []

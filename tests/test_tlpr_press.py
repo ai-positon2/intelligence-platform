@@ -98,7 +98,19 @@ def test_a_serpapi_crash_never_blocks_gdelt_results(monkeypatch):
     monkeypatch.setattr(press, "_serpapi_articles", boom)
     articles, errors = press.collect_coverage("Jane Doe")
     assert len(articles) == 1
-    assert "No SerpAPI results" in errors["serpapi"]
+    # Every query raised -- SerpAPI never actually got to confirm anything,
+    # which must read differently from a query that ran and found nothing
+    # (see test_serpapi_genuinely_finding_nothing_is_not_reported_as_a_crash).
+    assert "could not be reached" in errors["serpapi"]
+
+
+def test_serpapi_genuinely_finding_nothing_is_not_reported_as_a_crash(monkeypatch):
+    monkeypatch.setenv("SERPAPI_KEY", "k")
+    monkeypatch.setattr(press, "_gdelt_articles", lambda *a, **kw: [])
+    monkeypatch.setattr(press, "_serpapi_articles", lambda *a, **kw: [])
+    articles, errors = press.collect_coverage("Jane Doe")
+    assert articles == []
+    assert errors["serpapi"] == "No SerpAPI results were returned for this person."
 
 
 # ── mechanical aggregation ────────────────────────────────────────────────
@@ -242,6 +254,37 @@ def test_build_press_calls_a_genuine_zero_a_finding_not_an_error(monkeypatch):
     assert out["article_count"] == 0
     assert "finding, not an error" in out["note"]
     assert out["analysis"] is None
+
+
+def test_a_zero_with_serpapi_unconfigured_says_so_in_the_note(monkeypatch):
+    """The real incident this generalizes from: a live run against two
+    genuinely newsworthy people (a sitting MP, a billionaire founder) both
+    came back "no press coverage found" with zero indication that only
+    GDELT (the free, less comprehensive source) was ever actually queried.
+    A "genuine zero" note must say so when it wasn't actually genuine."""
+    monkeypatch.setattr(press, "collect_coverage",
+                        lambda n, c=None: ([], {"serpapi": "SerpAPI is not configured on this "
+                                                           "deployment (GDELT-only coverage)."}))
+    out = press.build_press("Jane Doe")
+    assert "finding, not an error" in out["note"]
+    assert "SerpAPI is not configured" in out["note"]
+
+
+def test_a_zero_where_serpapi_genuinely_found_nothing_has_no_caveat(monkeypatch):
+    """The opposite case: SerpAPI ran and confirmed zero results. That's
+    part of what makes the zero genuine, not a caveat undermining it."""
+    monkeypatch.setattr(press, "collect_coverage",
+                        lambda n, c=None: ([], {"serpapi": "No SerpAPI results were returned for this person."}))
+    out = press.build_press("Jane Doe")
+    assert "finding, not an error" in out["note"]
+    assert "SerpAPI" not in out["note"]
+
+
+def test_a_zero_with_gdelt_unreachable_says_so_in_the_note(monkeypatch):
+    monkeypatch.setattr(press, "collect_coverage",
+                        lambda n, c=None: ([], {"gdelt": "GDELT could not be reached (Timeout)."}))
+    out = press.build_press("Jane Doe")
+    assert "GDELT could not be reached" in out["note"]
 
 
 def test_build_press_carries_source_errors_through(monkeypatch):

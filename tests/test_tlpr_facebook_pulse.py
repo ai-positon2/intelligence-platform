@@ -55,6 +55,13 @@ def test_normalize_survives_a_missing_timestamp():
     assert posts[0]["posted_at"] is None
 
 
+def test_normalize_survives_a_dataset_item_that_is_not_a_dict_at_all():
+    """Same fix and same real live incident as tracker/sci_source_x.
+    normalize() -- see that test's docstring."""
+    posts = fp.normalize([{"postId": "1", "postText": "fine"}, "a stray non-post row", None])
+    assert [p["platform_post_id"] for p in posts] == ["1"]
+
+
 # ── collection: search then comments, fault-isolated ───────────────────
 
 def test_a_blank_name_collects_nothing_without_any_network_call(monkeypatch):
@@ -93,15 +100,31 @@ def test_a_search_transport_error_is_recorded(monkeypatch):
     assert "facebook_search" in errors
 
 
-def test_a_normalize_crash_is_caught_here_not_left_to_escape(monkeypatch):
-    """normalize() used to run outside the narrow except -- a crash there
-    (a different exception type than ApifyTransportError) escaped
-    collect_mentions entirely and was only ever caught by build_pulse's
-    generic outer catch, reported as an undiagnosable "Facebook search
-    could not be completed". Same gap and fix as tlpr_x_pulse.py."""
+def test_a_bare_non_list_response_no_longer_crashes_normalize(monkeypatch):
+    """normalize() used to run outside collect_mentions's narrow except,
+    AND (since 2cefbe6) iterated raw_items assuming every entry was a dict --
+    a non-list, non-dict response like this (whose characters iterate as a
+    string) used to raise AttributeError there. normalize() is now
+    per-item defensive (see tracker/sci_source_x.normalize()'s docstring
+    for the real live incident this generalizes from), so this degrades to
+    a clean empty result with no error at all, not even a caught one."""
     monkeypatch.setenv("APIFY_API_TOKEN", "tok")
     monkeypatch.setattr(apify_transport, "run_actor_and_wait",
                         lambda *a, **kw: "not a list of post dicts")
+    posts, errors = fp.collect_mentions("Jane Doe")
+    assert posts == []
+    assert errors == {}
+
+
+def test_collect_mentions_still_catches_a_crash_normalize_itself_cannot_prevent(monkeypatch):
+    """Defense in depth: even with normalize() now hardened, collect_mentions
+    keeps its own broad except around the whole query (search actor call +
+    normalize) in case some OTHER, unanticipated step ever raises -- proven
+    here by making normalize() itself blow up in a way no per-item guard
+    could have anticipated."""
+    monkeypatch.setenv("APIFY_API_TOKEN", "tok")
+    monkeypatch.setattr(apify_transport, "run_actor_and_wait", lambda *a, **kw: [])
+    monkeypatch.setattr(fp, "normalize", lambda raw: (_ for _ in ()).throw(RuntimeError("kaboom")))
     posts, errors = fp.collect_mentions("Jane Doe")
     assert posts == []
     assert "facebook_search" in errors

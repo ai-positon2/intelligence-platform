@@ -211,6 +211,14 @@ def test_normalize_skips_items_with_no_id():
     assert src.normalize([{"text": "no id"}]) == []
 
 
+def test_normalize_survives_a_dataset_item_that_is_not_a_dict_at_all():
+    """Same fix and same real live incident as tracker/sci_source_x.
+    normalize() -- see that test's docstring."""
+    items = [{"id": "1", "text": "fine"}, "a stray non-post row", None]
+    out = src.normalize(items)
+    assert [o["platform_post_id"] for o in out] == ["1"]
+
+
 # ── collect() ────────────────────────────────────────────────────────────
 
 @patch("tracker.sci_source_linkedin_unipile.unipile_transport.fetch_posts")

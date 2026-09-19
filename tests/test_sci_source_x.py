@@ -56,6 +56,42 @@ def test_normalize_skips_items_with_no_id():
     assert src.normalize([{"text": "no id"}]) == []
 
 
+def test_normalize_survives_a_media_entry_that_is_a_bare_string():
+    """Reproduces the real incident: a live run against Sundar Pichai's and
+    Shashi Tharoor's actual X data crashed with AttributeError inside
+    normalize() -- at least one variant of this actor's output puts a bare
+    media URL string in item["media"] instead of a dict, and _post_type/
+    _media_urls both called .get() on it unconditionally. This tweet must
+    be skipped, not take the whole batch down with it."""
+    items = [{"id": "1", "text": "fine", "media": "https://cdn/not-a-dict.jpg"},
+            {"id": "2", "text": "also fine", "media": ["https://cdn/still-not-a-dict.jpg"]}]
+    out = src.normalize(items)
+    assert [o["platform_post_id"] for o in out] == ["1", "2"]
+    assert all(o["post_type"] == "text" for o in out)
+    assert all(o["media_urls"] == [] for o in out)
+
+
+def test_normalize_survives_a_dataset_item_that_is_not_a_dict_at_all():
+    items = [{"id": "1", "text": "fine"}, "a stray non-tweet row", None]
+    out = src.normalize(items)
+    assert [o["platform_post_id"] for o in out] == ["1"]
+
+
+def test_normalize_survives_one_item_raising_an_unanticipated_exception():
+    """Defense in depth beyond the specific media-shape fix above: ANY
+    future unanticipated shape surprise in one tweet must degrade to
+    skipping that tweet, never crashing the whole normalize() call the way
+    the pre-fix code let happen."""
+    class _Hostile(dict):
+        def get(self, key, default=None):
+            if key == "id":
+                raise RuntimeError("boom")
+            return super().get(key, default)
+    items = [{"id": "1", "text": "fine"}, _Hostile(text="also fine"), {"id": "3", "text": "fine too"}]
+    out = src.normalize(items)
+    assert [o["platform_post_id"] for o in out] == ["1", "3"]
+
+
 @patch("tracker.sci_source_x.apify_transport.run_actor_and_wait")
 def test_collect_passes_strict_through_to_the_transport(mock_run):
     mock_run.return_value = []

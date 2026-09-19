@@ -68,14 +68,31 @@ def test_a_transport_error_is_recorded_and_returns_no_posts(monkeypatch):
     assert "instagram_mentions" in errors
 
 
-def test_a_normalize_crash_is_caught_here_not_left_to_escape(monkeypatch):
-    """normalize() used to run outside the narrow except -- a crash there
-    (a different exception type than ApifyTransportError) escaped
-    collect_mentions entirely and was only ever caught by build_pulse's
-    generic outer catch. Same gap and fix as tlpr_x_pulse.py."""
+def test_a_bare_non_list_response_no_longer_crashes_normalize(monkeypatch):
+    """normalize() used to run outside collect_mentions's narrow except,
+    AND (since 2cefbe6) iterated raw_items assuming every entry was a dict --
+    a non-list, non-dict response like this used to raise AttributeError
+    there. sci_source_instagram.normalize() is now per-item defensive (see
+    tracker/sci_source_x.normalize()'s docstring for the real live incident
+    this generalizes from), so this degrades to a clean empty result with
+    no error at all, not even a caught one."""
     monkeypatch.setenv("APIFY_API_TOKEN", "tok")
     monkeypatch.setattr(apify_transport, "run_actor_and_wait",
                         lambda *a, **kw: "not a list of post dicts")
+    posts, errors = ip.collect_mentions("janedoe")
+    assert posts == []
+    assert errors == {}
+
+
+def test_collect_mentions_still_catches_a_crash_normalize_itself_cannot_prevent(monkeypatch):
+    """Defense in depth: even with sci_source_instagram.normalize() now
+    hardened, collect_mentions keeps its own broad except around the whole
+    query in case some OTHER, unanticipated step ever raises."""
+    from tracker import sci_source_instagram
+    monkeypatch.setenv("APIFY_API_TOKEN", "tok")
+    monkeypatch.setattr(apify_transport, "run_actor_and_wait", lambda *a, **kw: [])
+    monkeypatch.setattr(sci_source_instagram, "normalize",
+                        lambda raw: (_ for _ in ()).throw(RuntimeError("kaboom")))
     posts, errors = ip.collect_mentions("janedoe")
     assert posts == []
     assert "instagram_mentions" in errors
