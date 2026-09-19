@@ -9835,10 +9835,13 @@ def thought_leader_pr_search():
     tracker/thought_leader_pr.py's search_name_candidates for why this is a
     separate Apollo call from resolve_identity's own candidate lookup."""
     from tracker import thought_leader_pr as tlpr
-    q = (request.args.get("q") or "").strip()
+    email = ((_get_user() or {}).get("email") or "").lower()
+    if _cpi_rate_limited("tli-search", email):
+        return jsonify({"candidates": [], "error": "Too many searches in a row. Wait a moment."}), 429
+    q = (request.args.get("q") or "").strip()[:200]
     if not q:
         return jsonify({"candidates": []})
-    company_hint = (request.args.get("company") or "").strip() or None
+    company_hint = (request.args.get("company") or "").strip()[:200] or None
     candidates, error = tlpr.search_name_candidates(q, company_hint)
     payload = {"candidates": candidates}
     if error:
@@ -9852,15 +9855,23 @@ def thought_leader_pr_resolve():
     from tracker import thought_leader_pr as tlpr
     user = _get_user() or {}
     email = (user.get("email") or "").lower()
+    if _cpi_rate_limited("tli-resolve", email):
+        return jsonify({"ok": False, "error": "Too many lookups in a row. Wait a moment and "
+                                              "try again."}), 429
     body = request.get_json(silent=True) or {}
-    name = (body.get("name") or "").strip()
+    # Every field below reaches a billed call (an Apollo search, a Claude
+    # prompt with web_search) or an unbounded TEXT column -- an audit found
+    # none of them were length-capped, unlike equivalent fields elsewhere in
+    # this app, so a pasted oversized string became an outsized billed input
+    # rather than a request this route rejected outright.
+    name = (body.get("name") or "").strip()[:200]
     if not name:
         return jsonify({"ok": False, "error": "A name is required."}), 400
 
-    company_hint = (body.get("company_hint") or "").strip() or None
-    title_hint = (body.get("title_hint") or "").strip() or None
-    linkedin_url = (body.get("linkedin_url") or "").strip() or None
-    x_handle = (body.get("x_handle") or "").strip().lstrip("@") or None
+    company_hint = (body.get("company_hint") or "").strip()[:200] or None
+    title_hint = (body.get("title_hint") or "").strip()[:200] or None
+    linkedin_url = (body.get("linkedin_url") or "").strip()[:500] or None
+    x_handle = (body.get("x_handle") or "").strip().lstrip("@")[:100] or None
 
     run_id = tlpr.create_run(email=email, input_name=name, company_hint=company_hint,
                              title_hint=title_hint, linkedin_url_hint=linkedin_url,
@@ -9908,6 +9919,9 @@ def thought_leader_pr_collect(run_id):
     from tracker import thought_leader_pr as tlpr
     user = _get_user() or {}
     email = (user.get("email") or "").lower()
+    if _cpi_rate_limited("tli-collect", email):
+        return jsonify({"ok": False, "error": "Too many collection requests in a row. "
+                                              "Wait a moment and try again."}), 429
     started = tlpr.start_collecting(run_id, email)
     if not started:
         return jsonify({"ok": False,
@@ -9927,6 +9941,9 @@ def thought_leader_pr_collect_reaction(run_id):
     from tracker import thought_leader_pr as tlpr
     user = _get_user() or {}
     email = (user.get("email") or "").lower()
+    if _cpi_rate_limited("tli-collect", email):
+        return jsonify({"ok": False, "error": "Too many collection requests in a row. "
+                                              "Wait a moment and try again."}), 429
     started = tlpr.start_reacting(run_id, email)
     if not started:
         return jsonify({"ok": False,
@@ -9946,6 +9963,9 @@ def thought_leader_pr_collect_press(run_id):
     from tracker import thought_leader_pr as tlpr
     user = _get_user() or {}
     email = (user.get("email") or "").lower()
+    if _cpi_rate_limited("tli-collect", email):
+        return jsonify({"ok": False, "error": "Too many collection requests in a row. "
+                                              "Wait a moment and try again."}), 429
     started = tlpr.start_press(run_id, email)
     if not started:
         return jsonify({"ok": False,
@@ -9966,6 +9986,9 @@ def thought_leader_pr_collect_synthesis(run_id):
     from tracker import thought_leader_pr as tlpr
     user = _get_user() or {}
     email = (user.get("email") or "").lower()
+    if _cpi_rate_limited("tli-collect", email):
+        return jsonify({"ok": False, "error": "Too many collection requests in a row. "
+                                              "Wait a moment and try again."}), 429
     started = tlpr.start_synthesizing(run_id, email)
     if not started:
         return jsonify({"ok": False,
@@ -12950,6 +12973,20 @@ _CPI_RATE_LIMITS = {
     # press reads a website with a live web-search call, and because a form
     # someone is filling in once does not need a dozen tries a minute.
     "evi-draft-profile": (6, 60),
+    # Thought Leader Intelligence reuses this bucket too -- an audit found
+    # TLI had NO rate limit anywhere, unlike every sibling agent, and its
+    # auto-run flow (added by a prior fix) now fires four paid phases
+    # (Claude web_search at max_uses=8, an Apify actor run, SerpAPI, GDELT,
+    # Unipile, YouTube quota, plus 3-4 more Claude calls) off a single
+    # /resolve + confirm with no click in between. "tli-search" mirrors
+    # "count"'s debounced-autocomplete budget (Apollo-backed, not free);
+    # "tli-resolve" is a deliberate action but not per-keystroke;
+    # "tli-collect" is shared across all four collect-* phases since a
+    # normal run fires each exactly once -- this bounds a scripted loop,
+    # not a legitimate multi-phase run or a couple of manual retries.
+    "tli-search": (30, 60),
+    "tli-resolve": (10, 60),
+    "tli-collect": (8, 60),
 }
 _CPI_RATE_STATE: dict = {}
 _CPI_RATE_LOCK = threading.Lock()

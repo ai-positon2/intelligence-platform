@@ -182,6 +182,20 @@ def create_run(*, email: str, input_name: str, company_hint: str | None = None,
         conn.close()
 
 
+def _run_status_for(result: dict) -> str:
+    """The run row's `status` for a resolve_identity() result. A refused
+    match (ok=False, confidence too low / not a public figure, no hard
+    `error`) used to fall through to 'needs_review' here, the same status
+    as an actually-confirmable match -- the frontend's own /resolve handler
+    already treats any ok=False as 'failed' (never shows a confirm button
+    for it), so the stored status must match: a page reload otherwise
+    re-reads 'needs_review' with identity=NULL and lists "Awaiting
+    confirmation" for a person the system explicitly could not identify, a
+    stale and misleading state confirm_run's own WHERE status='needs_review'
+    clause would then let a user actually confirm."""
+    return "needs_review" if result.get("ok") else "failed"
+
+
 def save_result(run_id: int, email: str, result: dict) -> bool:
     """Write a resolve_identity() result onto its run row. Ownership-scoped
     in the SQL itself (WHERE id = %s AND email = %s), never fetched-then-
@@ -191,11 +205,7 @@ def save_result(run_id: int, email: str, result: dict) -> bool:
     conn = _pg_conn()
     if not conn:
         return False
-    status = "needs_review"
-    if result.get("ok"):
-        status = "needs_review"  # still awaits the user's explicit confirm
-    elif result.get("error"):
-        status = "failed"
+    status = _run_status_for(result)
     try:
         _ensure_tables(conn)
         with conn.cursor() as cur:
@@ -330,10 +340,19 @@ def _resolve_stale_posts(run: dict, email: str) -> dict:
     """A 'collecting' row gone quiet for STALE_RUN_MINUTES is a daemon thread
     a process restart killed with nothing left to ever mark it 'ready' or
     'failed' -- same fix, same place, as sci_store.resolve_stale_run: on
-    read, not via a sweep this app has no worker infrastructure to run."""
+    read, not via a sweep this app has no worker infrastructure to run.
+
+    Reads posts_updated_at, this phase's OWN timestamp -- not the shared
+    `updated_at` every phase's save_*/start_* bumps. Reading the shared
+    column meant touching ANY other phase (refreshing press, regenerating
+    the report) reset this phase's staleness clock even while it stayed
+    stuck at 'collecting' forever, and since renderReactionSection only
+    ever runs once posts reaches a terminal status, a stuck posts phase
+    left the entire reaction section blank with no way to recover short of
+    starting a brand new run."""
     if run.get("posts_status") != "collecting":
         return run
-    updated_at = run.get("updated_at")
+    updated_at = run.get("posts_updated_at")
     if not updated_at:
         return run
     last = datetime.fromisoformat(updated_at)
@@ -347,10 +366,13 @@ def _resolve_stale_posts(run: dict, email: str) -> dict:
 def _resolve_stale_reaction(run: dict, email: str) -> dict:
     """Same self-heal as _resolve_stale_posts, for Phase 2's own
     'collecting' status -- a separate column, so a stuck posts collection
-    must never be able to also strand the reaction poll (or vice versa)."""
+    must never be able to also strand the reaction poll (or vice versa).
+    Reads reaction_updated_at, this phase's own timestamp -- see
+    _resolve_stale_posts's docstring for why the shared `updated_at`
+    column is wrong here."""
     if run.get("reaction_status") != "collecting":
         return run
-    updated_at = run.get("updated_at")
+    updated_at = run.get("reaction_updated_at")
     if not updated_at:
         return run
     last = datetime.fromisoformat(updated_at)
@@ -364,10 +386,13 @@ def _resolve_stale_reaction(run: dict, email: str) -> dict:
 def _resolve_stale_press(run: dict, email: str) -> dict:
     """Same self-heal as _resolve_stale_posts/_resolve_stale_reaction, for
     Phase 3's own 'collecting' status -- a separate column, so a stuck
-    press search can't strand the posts or reaction polls, or vice versa."""
+    press search can't strand the posts or reaction polls, or vice versa.
+    Reads press_updated_at, this phase's own timestamp -- see
+    _resolve_stale_posts's docstring for why the shared `updated_at`
+    column is wrong here."""
     if run.get("press_status") != "collecting":
         return run
-    updated_at = run.get("updated_at")
+    updated_at = run.get("press_updated_at")
     if not updated_at:
         return run
     last = datetime.fromisoformat(updated_at)
@@ -381,10 +406,13 @@ def _resolve_stale_press(run: dict, email: str) -> dict:
 def _resolve_stale_synthesis(run: dict, email: str) -> dict:
     """Same self-heal as the other three, for Phase 4's own 'collecting'
     status -- a fourth independent column, so a stuck report generation
-    can't strand the posts, reaction, or press polls, or vice versa."""
+    can't strand the posts, reaction, or press polls, or vice versa. Reads
+    synthesis_updated_at, this phase's own timestamp -- see
+    _resolve_stale_posts's docstring for why the shared `updated_at`
+    column is wrong here."""
     if run.get("synthesis_status") != "collecting":
         return run
-    updated_at = run.get("updated_at")
+    updated_at = run.get("synthesis_updated_at")
     if not updated_at:
         return run
     last = datetime.fromisoformat(updated_at)
@@ -398,7 +426,13 @@ def _resolve_stale_synthesis(run: dict, email: str) -> dict:
 def start_collecting(run_id: int, email: str) -> bool:
     """Flip posts_status to 'collecting' before the background thread
     starts, so a poll immediately after the /collect request returns sees
-    the real in-progress state rather than a stale 'idle'."""
+    the real in-progress state rather than a stale 'idle'. The
+    `posts_status <> 'collecting'` guard makes this UPDATE a real claim,
+    not just a status write: two concurrent POSTs on the same run (two
+    tabs open on it, a double-click, the auto-run flow racing a manual
+    click) used to both see rowcount > 0 and both spawn a background
+    thread, paying for the same Apify/vendor calls twice with the second
+    job's result silently overwriting the first's."""
     conn = _pg_conn()
     if not conn:
         return False
@@ -409,6 +443,7 @@ def start_collecting(run_id: int, email: str) -> bool:
                 UPDATE thought_leader_pr_runs
                 SET posts_status = 'collecting', posts_errors = NULL, updated_at = now()
                 WHERE id = %s AND email = %s AND status = 'confirmed'
+                      AND posts_status IS DISTINCT FROM 'collecting'
             """, (run_id, email))
             updated = cur.rowcount > 0
         conn.commit()
@@ -480,7 +515,8 @@ def start_reacting(run_id: int, email: str) -> bool:
     thread starts -- same reason start_collecting exists for posts_status,
     kept as a separate gate so Phase 2 can be re-run without needing
     posts_status to also be 'confirmed'-adjacent (it already requires an
-    actual identity, checked in collect_reaction_job itself, not here)."""
+    actual identity, checked in collect_reaction_job itself, not here).
+    Same concurrent-claim guard as start_collecting -- see its docstring."""
     conn = _pg_conn()
     if not conn:
         return False
@@ -491,6 +527,7 @@ def start_reacting(run_id: int, email: str) -> bool:
                 UPDATE thought_leader_pr_runs
                 SET reaction_status = 'collecting', reaction_errors = NULL, updated_at = now()
                 WHERE id = %s AND email = %s AND status = 'confirmed'
+                      AND reaction_status IS DISTINCT FROM 'collecting'
             """, (run_id, email))
             updated = cur.rowcount > 0
         conn.commit()
@@ -558,7 +595,8 @@ def start_press(run_id: int, email: str) -> bool:
     starts -- same gate as start_reacting, kept independent so press search
     can be run (or re-run) without depending on posts_status or
     reaction_status at all: GDELT/SerpAPI only need the confirmed identity,
-    not Phase 1's collected posts."""
+    not Phase 1's collected posts. Same concurrent-claim guard as
+    start_collecting -- see its docstring."""
     conn = _pg_conn()
     if not conn:
         return False
@@ -569,6 +607,7 @@ def start_press(run_id: int, email: str) -> bool:
                 UPDATE thought_leader_pr_runs
                 SET press_status = 'collecting', press_errors = NULL, updated_at = now()
                 WHERE id = %s AND email = %s AND status = 'confirmed'
+                      AND press_status IS DISTINCT FROM 'collecting'
             """, (run_id, email))
             updated = cur.rowcount > 0
         conn.commit()
@@ -638,7 +677,8 @@ def start_synthesizing(run_id: int, email: str) -> bool:
     independent so the report can be generated (or regenerated) without
     depending on posts_status/reaction_status/press_status: synthesize_report
     reads whatever is already on the run row and writes plainly around
-    whatever is missing, rather than requiring every earlier phase first."""
+    whatever is missing, rather than requiring every earlier phase first.
+    Same concurrent-claim guard as start_collecting -- see its docstring."""
     conn = _pg_conn()
     if not conn:
         return False
@@ -649,6 +689,7 @@ def start_synthesizing(run_id: int, email: str) -> bool:
                 UPDATE thought_leader_pr_runs
                 SET synthesis_status = 'collecting', synthesis_errors = NULL, updated_at = now()
                 WHERE id = %s AND email = %s AND status = 'confirmed'
+                      AND synthesis_status IS DISTINCT FROM 'collecting'
             """, (run_id, email))
             updated = cur.rowcount > 0
         conn.commit()
@@ -773,26 +814,58 @@ _MIN_CONFIDENCE = ("high", "medium")
 
 def _linkedin_slug(url: str | None) -> str | None:
     """The public identifier Unipile's GET /users/{id} wants ("satyanadella"
-    from linkedin.com/in/satyanadella/), not the full URL."""
+    from linkedin.com/in/satyanadella/), not the full URL.
+
+    Deliberately strict: ONLY a linkedin.com/in/<slug> personal-profile URL
+    resolves to a slug. Every other shape returns None rather than a
+    best-effort guess at the last path segment -- an audit found this used
+    to return "3" for a legacy /pub/john-smith/1/2/3 URL, "microsoft" for a
+    /company/microsoft/ page, and the last segment of literally any other
+    URL a source (a user, Apollo, or the model) happened to hand it. Each
+    of those got looked up on Unipile as if it were a real profile, and
+    whatever it returned (a wrong person, a company page) was then treated
+    as "verified" -- a missing slug is recoverable (this platform is simply
+    not resolved), a WRONG one silently attaches someone else's LinkedIn
+    data to this identity."""
     if not url:
         return None
     try:
-        parts = [p for p in urlparse(url).path.split("/") if p]
+        parsed = urlparse(url if "://" in url else "https://" + url)
+        host = (parsed.hostname or "").lower()
+        parts = [p for p in parsed.path.split("/") if p]
     except Exception:
+        return None
+    if not host.endswith("linkedin.com"):
         return None
     if len(parts) >= 2 and parts[0] == "in":
         return parts[1]
-    return parts[-1] if parts else None
+    return None
+
+
+_X_RESERVED_PATHS = frozenset(("i", "intent", "home", "search", "hashtag", "explore",
+                               "notifications", "messages", "settings", "compose", "search-advanced"))
 
 
 def _handle_from_url(url: str | None) -> str | None:
+    """An X/Twitter handle from a bare PROFILE url (x.com/<handle> or
+    twitter.com/<handle>) only. Deliberately strict, same reasoning as
+    _linkedin_slug above: this used to take the LAST path segment of
+    anything, so a tweet's own /status/<id> URL or an /i/user/<id> link
+    returned a numeric id as if it were a handle, silently pointed X
+    scraping at a nonexistent or wrong account."""
     if not url:
         return None
     try:
-        parts = [p for p in urlparse(url).path.split("/") if p]
+        parsed = urlparse(url if "://" in url else "https://" + url)
+        host = (parsed.hostname or "").lower()
+        parts = [p for p in parsed.path.split("/") if p]
     except Exception:
         return None
-    return parts[-1].lstrip("@") if parts else None
+    if not (host.endswith("twitter.com") or host.endswith("x.com")):
+        return None
+    if len(parts) != 1 or parts[0].lower() in _X_RESERVED_PATHS:
+        return None
+    return parts[0].lstrip("@") or None
 
 
 MAX_NAME_CANDIDATES = 6
@@ -930,10 +1003,34 @@ def _best_apollo_candidate(name: str, company_hint: str | None,
     return plausible[0] if plausible else None
 
 
-def _resolve_linkedin_platform(url: str | None) -> dict:
+def _profile_name_disagrees(full_name: str, profile: dict) -> bool:
+    """Whether Unipile's returned profile's OWN name-bearing field clearly
+    names a DIFFERENT person than full_name. Deliberately fail-open on a
+    missing/unrecognized field rather than reject: get_user_profile's own
+    docstring says this endpoint's exact response shape "has not yet been
+    confirmed against a live response", so treating an absent field as
+    disagreement would turn that shape uncertainty into a hard failure on
+    every real resolution. This only ever rejects when a name field IS
+    present and genuinely conflicts -- the accuracy risk it closes is a
+    wrong LinkedIn URL (a stale/mistyped one from the user, an Apollo row
+    that was never itself name-checked against the model's OWN confirmed
+    full_name, or a slug-parsing mistake) being accepted as "verified"
+    purely because Unipile returned *a* profile, without ever checking it
+    was the RIGHT profile."""
+    candidate = (profile.get("name") or
+                (" ".join(p for p in (profile.get("first_name"), profile.get("last_name")) if p)).strip() or
+                profile.get("full_name") or "")
+    if not candidate.strip():
+        return False
+    return not _looks_like_same_person(full_name, candidate)
+
+
+def _resolve_linkedin_platform(url: str | None, full_name: str = "") -> dict:
     """Best-effort verification of a LinkedIn profile via Unipile. Soft-fail
     throughout: no connected account, no match, or an API error all report
-    as 'not verified', never as 'this person has no LinkedIn'."""
+    as 'not verified', never as 'this person has no LinkedIn'. A profile
+    Unipile DID return but whose own name clearly disagrees with full_name
+    is treated the same as no match at all -- see _profile_name_disagrees."""
     out = {"url": url, "resolved": False, "provider_id": None,
            "headline": None, "photo_url": None, "note": None}
     slug = _linkedin_slug(url)
@@ -948,6 +1045,9 @@ def _resolve_linkedin_platform(url: str | None) -> dict:
     if err is not None:
         out["note"] = unipile_client.describe_error(err)
         return out
+    if full_name and _profile_name_disagrees(full_name, profile):
+        out["note"] = "The LinkedIn profile at this URL does not appear to be this person."
+        return out
     out["resolved"] = True
     out["provider_id"] = profile.get("provider_id")
     out["headline"] = profile.get("headline")
@@ -960,7 +1060,23 @@ def _resolve_youtube_platform(name: str) -> dict:
     sci_youtube_client.resolve_company_channel for a person's name: the
     underlying lookup (an authoritative forHandle try, then a
     title-plausibility-checked search) has nothing company-specific about
-    it -- only its docstring does."""
+    it -- only its docstring does.
+
+    Adds ONE extra, TLI-local gate resolve_company_channel itself does not
+    have, using _looks_like_same_person (stricter than the shared module's
+    own sci_name_match.plausible_match) on the channel's own title: an
+    audit found two real gaps in the shared lookup for a PERSON'S name --
+    the forHandle path skips its plausibility check entirely ("the handle
+    IS the identity", true for a company, not for a first-come-first-served
+    person handle a fan or squatter can hold), and the search path's own
+    check is a company-brand subset rule lenient enough to pass "Sam Altman
+    Clips" or a same-surname stranger's channel for a person's name. This
+    check is deliberately NOT added to sci_youtube_client.py itself: that
+    module is shared with Social (Creative/Media) Intelligence for company
+    names, where the existing lenient behavior is correct and already
+    live-verified -- tightening it there would risk regressing a different
+    agent to fix a gap that is specific to resolving PEOPLE, not
+    companies."""
     out = {"url": None, "title": None, "channel_id": None, "resolved": False, "note": None}
     api_key = os.environ.get("YOUTUBE_API_KEY", "")
     if not api_key:
@@ -972,6 +1088,11 @@ def _resolve_youtube_platform(name: str) -> dict:
         logger.exception("thought_leader_pr: youtube lookup failed for %r", name)
         channel = None
     if not channel:
+        out["note"] = "No YouTube channel confidently matched this name."
+        return out
+    if not _looks_like_same_person(name, channel.get("title") or ""):
+        logger.info("thought_leader_pr: rejected YouTube channel %r for %r "
+                   "(title does not plausibly match)", channel.get("title"), name)
         out["note"] = "No YouTube channel confidently matched this name."
         return out
     out["resolved"] = True
@@ -1080,13 +1201,26 @@ def resolve_identity(name: str, *, company_hint: str | None = None,
     facts = [_clean(str(f))[:240] for f in (parsed.get("disambiguating_facts") or [])
              if str(f).strip()][:4]
 
+    # Re-check the Apollo candidate against the MODEL'S OWN confirmed
+    # full_name, not just the original search query _best_apollo_candidate
+    # was called with. The model can refine or correct the name it was
+    # given ("John Smith" -> "Jonathan R. Smith, the Acme CFO"), and a
+    # common name means a DIFFERENT real "John Smith" from Apollo can still
+    # satisfy _looks_like_same_person against the bare search query while
+    # disagreeing with who the model actually verified. Every field below
+    # that falls back to apollo_candidate (LinkedIn/X handle, title,
+    # company, photo) would otherwise attach that other person's data to
+    # this identity with no further check at all.
+    if apollo_candidate and not _looks_like_same_person(full_name, apollo_candidate.get("full_name") or ""):
+        apollo_candidate = None
+
     resolved_linkedin_url = (linkedin_url or (apollo_candidate or {}).get("linkedin_url")
                              or (parsed.get("linkedin_url") or "").strip() or None)
     resolved_x_handle = (x_handle or _handle_from_url((apollo_candidate or {}).get("twitter_url"))
                          or (parsed.get("x_handle") or "").strip().lstrip("@") or None)
     resolved_instagram_handle = (parsed.get("instagram_handle") or "").strip().lstrip("@") or None
 
-    linkedin_platform = _resolve_linkedin_platform(resolved_linkedin_url)
+    linkedin_platform = _resolve_linkedin_platform(resolved_linkedin_url, full_name)
     identity = {
         "full_name": full_name,
         "headline": _clean((parsed.get("headline") or "").strip()) or linkedin_platform.get("headline"),
@@ -1672,7 +1806,14 @@ _SYNTHESIS_SYSTEM = (
     "Any input marked unavailable has no real data behind it -- write "
     "around it plainly (e.g. \"no press coverage was found\") rather than "
     "inventing a reading for it, and never imply a source was checked when "
-    "it was unavailable.\n\n"
+    "it was unavailable. A source can also come back with "
+    "\"analysis_failed\": true and a real \"collected_count\" -- that means "
+    "DATA WAS FOUND (real posts/comments/articles exist) but reading it "
+    "failed for a technical reason. Never treat that the same as "
+    "unavailable: say plainly that N items were found but could not be "
+    "analyzed, since that is a genuine gap in this report's coverage worth "
+    "a reader knowing about, not the same as the person having no presence "
+    "there at all.\n\n"
     "Be specific to this person, never generic advice that could apply to "
     "anyone. If reaction and press genuinely diverge (praised online but "
     "criticized in the press, or vice versa) or notably agree, say so "
@@ -1696,10 +1837,19 @@ _SYNTHESIS_SYSTEM = (
 
 
 def _platform_post_stats(posts_list: list[dict] | None) -> dict:
+    """"engagement" deliberately excludes `views`: it is present in X's and
+    YouTube's own metrics dicts but absent from LinkedIn's (see
+    sci_source_linkedin_unipile._metrics), and view counts run orders of
+    magnitude larger than likes/comments/shares. Summing every numeric
+    metric together (what this used to do) made a platform with view
+    counts look vastly more "engaging" purely from that scale mismatch,
+    not from any real difference in audience reaction -- exactly the kind
+    of cross-platform comparison the synthesis step is asked to make from
+    this field."""
     posts_list = posts_list or []
     engagement = sum(
-        v for p in posts_list for v in (p.get("metrics") or {}).values()
-        if isinstance(v, (int, float))
+        v for p in posts_list for k, v in (p.get("metrics") or {}).items()
+        if k != "views" and isinstance(v, (int, float))
     )
     return {"count": len(posts_list), "total_engagement": engagement}
 
@@ -1722,12 +1872,25 @@ def _pulse_summary(pulse: dict | None, count_key: str) -> dict | None:
     blind spot" while LinkedIn/TikTok/Facebook reaction sat right there in
     the same run with real, substantive findings (an employee petition, a
     pay-package backlash, a campus protest) it never got the chance to
-    weigh in the verdict or risks."""
+    weigh in the verdict or risks.
+
+    Returns None only when NOTHING was collected -- there is genuinely no
+    data behind this source. When something WAS collected but its analysis
+    errored (a truncated reply, a timeout), that is reported as
+    analysis_failed=True with the real collected_count still attached,
+    never silently folded into the same "unavailable" signal as a true
+    zero: an audit found the old code treated "412 tweets collected, the
+    analysis call timed out" identically to "nothing was ever found",
+    which the report itself would then get to assert as fact."""
     pulse = pulse or {}
-    analysis = pulse.get("analysis") or {}
-    if not pulse.get(count_key) or analysis.get("error"):
+    count = pulse.get(count_key) or 0
+    if not count:
         return None
+    analysis = pulse.get("analysis") or {}
+    if analysis.get("error") or not analysis.get("verdict"):
+        return {"collected_count": count, "analysis_failed": True}
     return {
+        "collected_count": count,
         "verdict": analysis.get("verdict"),
         "sentiment_counts": (analysis.get("sentiment") or {}).get("counts"),
         "themes": [t.get("label") for t in (analysis.get("themes") or []) if t.get("label")],
@@ -1746,26 +1909,40 @@ def _reaction_summary(reaction: dict | None) -> dict:
     tiktok = _pulse_summary(reaction.get("tiktok_pulse"), "video_count")
     instagram = _pulse_summary(reaction.get("instagram_pulse"), "mention_count")
     facebook = _pulse_summary(reaction.get("facebook_pulse"), "post_count")
-    out: dict = {
-        "available": bool(reaction.get("comments_analyzed") or reddit.get("thread_count")
-                          or x or linkedin or tiktok or instagram or facebook),
-        "own_post_comments": None, "reddit": None,
+
+    comments_count = reaction.get("comments_analyzed") or 0
+    own_post_comments = None
+    if comments_count:
+        if cs.get("verdict") and not cs.get("error"):
+            own_post_comments = {
+                "collected_count": comments_count,
+                "verdict": cs.get("verdict"),
+                "sentiment_counts": (cs.get("sentiment") or {}).get("counts"),
+                "themes": [t.get("label") for t in (cs.get("themes") or []) if t.get("label")],
+            }
+        else:
+            own_post_comments = {"collected_count": comments_count, "analysis_failed": True}
+
+    thread_count = reddit.get("thread_count") or 0
+    reddit_summary = None
+    if thread_count:
+        if r_analysis.get("verdict") and not r_analysis.get("error"):
+            reddit_summary = {
+                "collected_count": thread_count,
+                "verdict": r_analysis.get("verdict"),
+                "sentiment_counts": (r_analysis.get("sentiment") or {}).get("counts"),
+                "themes": [t.get("label") for t in (r_analysis.get("themes") or []) if t.get("label")],
+                "risk_flags": r_analysis.get("risk_flags") or [],
+            }
+        else:
+            reddit_summary = {"collected_count": thread_count, "analysis_failed": True}
+
+    return {
+        "available": bool(own_post_comments or reddit_summary or x or linkedin
+                          or tiktok or instagram or facebook),
+        "own_post_comments": own_post_comments, "reddit": reddit_summary,
         "x": x, "linkedin": linkedin, "tiktok": tiktok, "instagram": instagram, "facebook": facebook,
     }
-    if cs.get("verdict") and not cs.get("error"):
-        out["own_post_comments"] = {
-            "verdict": cs.get("verdict"),
-            "sentiment_counts": (cs.get("sentiment") or {}).get("counts"),
-            "themes": [t.get("label") for t in (cs.get("themes") or []) if t.get("label")],
-        }
-    if reddit.get("thread_count") and not r_analysis.get("error"):
-        out["reddit"] = {
-            "verdict": r_analysis.get("verdict"),
-            "sentiment_counts": (r_analysis.get("sentiment") or {}).get("counts"),
-            "themes": [t.get("label") for t in (r_analysis.get("themes") or []) if t.get("label")],
-            "risk_flags": r_analysis.get("risk_flags") or [],
-        }
-    return out
 
 
 def _press_summary(press: dict | None) -> dict:

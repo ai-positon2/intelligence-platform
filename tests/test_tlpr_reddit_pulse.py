@@ -68,17 +68,25 @@ def test_collect_mentions_dedupes_across_queries(monkeypatch):
     monkeypatch.setattr(sci_reddit_client, "search_posts",
                         lambda q, **k: [_post("dup", title="Jane Doe rocks"),
                                         _post("b", title="Jane Doe meh")])
-    found = pulse.collect_mentions("Jane Doe")
+    found, errors = pulse.collect_mentions("Jane Doe")
     assert sorted(p["platform_post_id"] for p in found) == ["b", "dup"]
+    assert errors == {}
 
 
 def test_collect_mentions_survives_a_failing_search(monkeypatch):
+    """The real gap this closes: unlike every sibling pulse module, this
+    used to have no error channel at all -- an expired Reddit OAuth token
+    or a rate limit degraded to a bare [] with zero trace anywhere, so
+    build_pulse's "genuine zero, not an error" note was shown even when
+    Reddit was never actually reachable."""
     from tracker import sci_reddit_client
 
     def boom(q, **k):
-        raise RuntimeError("reddit down")
+        raise RuntimeError("token expired")
     monkeypatch.setattr(sci_reddit_client, "search_posts", boom)
-    assert pulse.collect_mentions("Jane Doe") == []
+    found, errors = pulse.collect_mentions("Jane Doe")
+    assert found == []
+    assert "token expired" in errors["reddit_search"]
 
 
 # ── mechanical aggregation ───────────────────────────────────────────────
@@ -199,7 +207,7 @@ def test_build_pulse_collects_and_counts_comments(monkeypatch):
     from tracker import sci_reddit_client
     monkeypatch.setattr(sci_reddit_client, "is_configured", lambda: True)
     posts = [_post("p1")]
-    monkeypatch.setattr(pulse, "collect_mentions", lambda n, c=None: posts)
+    monkeypatch.setattr(pulse, "collect_mentions", lambda n, c=None: (posts, {}))
     monkeypatch.setattr(sci_reddit_client, "get_post_comments",
                         lambda pid, subreddit=None, limit=None: [
                             {"id": "c1", "body": "ok", "score": 1, "permalink": "/x/"}])
@@ -214,7 +222,7 @@ def test_build_pulse_comment_collection_failing_never_blocks_the_analysis(monkey
     from tracker import sci_reddit_client
     monkeypatch.setattr(sci_reddit_client, "is_configured", lambda: True)
     posts = [_post("p1")]
-    monkeypatch.setattr(pulse, "collect_mentions", lambda n, c=None: posts)
+    monkeypatch.setattr(pulse, "collect_mentions", lambda n, c=None: (posts, {}))
     def boom(posts):
         raise RuntimeError("kaboom")
     monkeypatch.setattr(pulse, "_collect_thread_comments", boom)
@@ -355,7 +363,7 @@ def test_analyze_still_reports_a_generic_unreadable_response_when_not_truncated(
 def test_build_pulse_calls_a_genuine_zero_a_finding_not_an_error(monkeypatch):
     from tracker import sci_reddit_client
     monkeypatch.setattr(sci_reddit_client, "is_configured", lambda: True)
-    monkeypatch.setattr(pulse, "collect_mentions", lambda n, c=None: [])
+    monkeypatch.setattr(pulse, "collect_mentions", lambda n, c=None: ([], {}))
     out = pulse.build_pulse("Jane Doe")
     assert out["thread_count"] == 0
     assert "finding, not an error" in out["note"]
@@ -365,7 +373,7 @@ def test_build_pulse_carries_every_analyzed_thread_for_citations(monkeypatch):
     from tracker import sci_reddit_client
     monkeypatch.setattr(sci_reddit_client, "is_configured", lambda: True)
     posts = [_post("p%d" % i, score=i) for i in range(20)]
-    monkeypatch.setattr(pulse, "collect_mentions", lambda n, c=None: posts)
+    monkeypatch.setattr(pulse, "collect_mentions", lambda n, c=None: (posts, {}))
     monkeypatch.setattr(pulse, "analyze", lambda n, p, c=None: {"verdict": "ok"})
     out = pulse.build_pulse("Jane Doe")
     assert len(out["threads"]) == 20
@@ -390,5 +398,5 @@ def test_collect_mentions_actually_applies_the_mention_filter(monkeypatch):
         _post("real", title="Grant Wilson's keynote was great"),
         _post("noise", title="Grant application question", body="unrelated thread"),
     ])
-    found = pulse.collect_mentions("Grant Wilson")
+    found, errors = pulse.collect_mentions("Grant Wilson")
     assert [p["platform_post_id"] for p in found] == ["real"]

@@ -403,8 +403,13 @@ def build_pulse(full_name: str, provider_id: str | None = None) -> dict:
     result["errors"] = errors
     result.update(aggregate(posts))
     if not posts:
-        result["note"] = ("No LinkedIn posts mentioning this person were found. That is a finding, "
-                          "not an error: this person has no measurable LinkedIn conversation to read.")
+        note = ("No LinkedIn posts mentioning this person were found. That is a finding, "
+                "not an error: this person has no measurable LinkedIn conversation to read.")
+        # Same reasoning as tlpr_x_pulse.build_pulse: every entry left in
+        # `errors` here is a real query failure, not a benign empty result.
+        if errors:
+            note += " " + " ".join(errors.values())
+        result["note"] = note
         return result
     result["analysis"] = analyze(full_name, posts)
     return result

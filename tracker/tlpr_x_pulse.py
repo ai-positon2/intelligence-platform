@@ -410,8 +410,16 @@ def build_pulse(full_name: str, x_handle: str | None = None) -> dict:
     result["errors"] = errors
     result.update(aggregate(tweets))
     if not tweets:
-        result["note"] = ("No X posts mentioning this person were found. That is a finding, "
-                          "not an error: this person has no measurable X conversation to read.")
+        note = ("No X posts mentioning this person were found. That is a finding, "
+                "not an error: this person has no measurable X conversation to read.")
+        # A query that actually failed (bad token, transport error) reads
+        # very differently from one that ran clean and confirmed zero --
+        # every entry left in `errors` at this point is a real problem, not
+        # a benign empty result (an audit found this "genuine zero" message
+        # shown identically whether X was actually searched or not).
+        if errors:
+            note += " " + " ".join(errors.values())
+        result["note"] = note
         return result
     result["analysis"] = analyze(full_name, tweets)
     return result

@@ -36,8 +36,8 @@ def _stub_platforms(monkeypatch):
     about the websearch/confidence logic isn't also exercising Unipile/
     YouTube's own network calls."""
     monkeypatch.setattr(T, "_resolve_linkedin_platform",
-                        lambda url: {"url": url, "resolved": False, "provider_id": None,
-                                     "headline": None, "photo_url": None, "note": "stub"})
+                        lambda url, full_name="": {"url": url, "resolved": False, "provider_id": None,
+                                                   "headline": None, "photo_url": None, "note": "stub"})
     monkeypatch.setattr(T, "_resolve_youtube_platform",
                         lambda name: {"url": None, "title": None, "resolved": False, "note": "stub"})
 
@@ -122,7 +122,7 @@ class TestResolveIdentityHappyPath:
             "organization_name": "Acme Corp", "linkedin_url": "https://www.linkedin.com/in/janedoe/",
             "twitter_url": "https://twitter.com/janedoe", "photo_url": "https://img.example/jane.jpg",
         })
-        monkeypatch.setattr(T, "_resolve_linkedin_platform", lambda url: {
+        monkeypatch.setattr(T, "_resolve_linkedin_platform", lambda url, full_name="": {
             "url": url, "resolved": True, "provider_id": "urn:li:member:123",
             "headline": "CSO at Acme -- scaling go-to-market", "photo_url": "https://img.example/jane-li.jpg",
             "note": None})
@@ -183,11 +183,219 @@ class TestLinkedInSlug:
         ("https://www.linkedin.com/in/satyanadella/", "satyanadella"),
         ("https://www.linkedin.com/in/satyanadella", "satyanadella"),
         ("http://linkedin.com/in/satya-nadella-123/", "satya-nadella-123"),
+        ("https://in.linkedin.com/in/shashitharoor", "shashitharoor"),
+        ("https://www.linkedin.com/in/satyanadella/?originalSubdomain=us", "satyanadella"),
         ("", None),
         (None, None),
     ])
     def test_extracts_the_public_identifier(self, url, expected):
         assert T._linkedin_slug(url) == expected
+
+    @pytest.mark.parametrize("url", [
+        "https://www.linkedin.com/pub/john-smith/1/2/3",
+        "https://www.linkedin.com/company/microsoft/",
+        "https://www.linkedin.com/profile/view?id=123",
+        "https://example.com/in/satyanadella",
+        "https://linkedin.com.evil.com/in/satyanadella",
+    ])
+    def test_a_non_profile_url_shape_returns_none_rather_than_a_guess(self, url):
+        """An audit found this used to guess the last path segment for
+        ANY url shape: "3" for a legacy /pub/ url, "microsoft" for a
+        company page, "view" for a query-param profile link, and it never
+        checked the host at all. Each wrong-but-truthy slug got looked up
+        on Unipile as if it were a real profile and whatever came back was
+        treated as verified."""
+        assert T._linkedin_slug(url) is None
+
+
+class TestHandleFromUrl:
+    @pytest.mark.parametrize("url,expected", [
+        ("https://twitter.com/jack", "jack"),
+        ("https://x.com/jack", "jack"),
+        ("https://x.com/jack/", "jack"),
+        ("https://twitter.com/@jack", "jack"),
+        ("", None),
+        (None, None),
+    ])
+    def test_extracts_the_handle_from_a_bare_profile_url(self, url, expected):
+        assert T._handle_from_url(url) == expected
+
+    @pytest.mark.parametrize("url", [
+        "https://twitter.com/jack/status/123456",
+        "https://x.com/i/user/12345",
+        "https://twitter.com/intent/user?screen_name=jack",
+        "https://x.com/search?q=jack",
+        "https://example.com/jack",
+    ])
+    def test_a_non_profile_url_shape_returns_none_rather_than_a_guess(self, url):
+        """An audit found this used to take the LAST path segment of
+        anything: a tweet's own status id, an /i/user/<id> numeric id, or
+        "user" from an /intent/user url, each fed straight into X scraping
+        as if it were the actual handle."""
+        assert T._handle_from_url(url) is None
+
+
+class TestRunStatusFor:
+    """A refused match (ok=False) used to be stored with the SAME status
+    ('needs_review') as an actually-confirmable one whenever it had no hard
+    `error` -- e.g. confidence too low, or not a public figure. The
+    frontend already treats any ok=False as terminal/failed and never
+    shows a confirm button for it; a page reload re-reading the stale
+    'needs_review' status listed "Awaiting confirmation" for a person the
+    system explicitly could not identify, and confirm_run's own WHERE
+    status='needs_review' clause would let a user actually confirm it."""
+
+    def test_a_successful_match_awaits_confirmation(self):
+        assert T._run_status_for({"ok": True, "identity": {"full_name": "Jane Doe"}}) == "needs_review"
+
+    def test_a_low_confidence_refusal_with_no_error_is_failed_not_needs_review(self):
+        assert T._run_status_for({"ok": False, "confidence": "low", "error": None}) == "failed"
+
+    def test_a_not_a_public_figure_refusal_is_failed(self):
+        assert T._run_status_for({"ok": False, "confidence": "none", "error": None}) == "failed"
+
+    def test_a_hard_error_is_still_failed(self):
+        assert T._run_status_for({"ok": False, "error": {"kind": "transport", "detail": "boom"}}) == "failed"
+
+
+class TestProfileNameDisagrees:
+    def test_a_matching_name_does_not_disagree(self):
+        assert T._profile_name_disagrees("Satya Nadella", {"name": "Satya Nadella"}) is False
+
+    def test_first_and_last_name_fields_are_combined(self):
+        assert T._profile_name_disagrees(
+            "Satya Nadella", {"first_name": "Satya", "last_name": "Nadella"}) is False
+
+    def test_a_clearly_different_name_disagrees(self):
+        assert T._profile_name_disagrees("Satya Nadella", {"name": "John Smith"}) is True
+
+    def test_no_name_bearing_field_fails_open_not_disagree(self):
+        """get_user_profile's own docstring says this endpoint's exact
+        response shape has never been confirmed against a live response --
+        treating an absent/unrecognized field as disagreement would turn
+        that shape uncertainty into a hard failure for every real
+        resolution, not just the wrong ones."""
+        assert T._profile_name_disagrees("Satya Nadella", {"headline": "CEO"}) is False
+
+
+class TestResolveLinkedInPlatform:
+    def test_a_profile_whose_own_name_disagrees_is_not_treated_as_resolved(self, monkeypatch):
+        """The real accuracy risk this closes: Unipile returning SOME
+        profile for a wrong/stale/mistyped LinkedIn URL used to be accepted
+        as "verified" purely because a profile came back at all, without
+        ever checking it was the RIGHT profile -- so a wrong person's
+        headline and photo could be attached to this identity."""
+        monkeypatch.setattr(T.unipile_transport, "account_for_platform", lambda platform: "acct-1")
+        monkeypatch.setattr(T.unipile_client, "get_user_profile",
+                            lambda slug, account_id: ({"provider_id": "urn:li:member:999",
+                                                       "name": "A Completely Different Person"}, None))
+        out = T._resolve_linkedin_platform("https://www.linkedin.com/in/satyanadella/", "Satya Nadella")
+        assert out["resolved"] is False
+        assert out["provider_id"] is None
+        assert "does not appear to be this person" in out["note"]
+
+    def test_a_profile_whose_own_name_agrees_is_resolved(self, monkeypatch):
+        monkeypatch.setattr(T.unipile_transport, "account_for_platform", lambda platform: "acct-1")
+        monkeypatch.setattr(T.unipile_client, "get_user_profile",
+                            lambda slug, account_id: ({"provider_id": "urn:li:member:123",
+                                                       "name": "Satya Nadella",
+                                                       "headline": "CEO"}, None))
+        out = T._resolve_linkedin_platform("https://www.linkedin.com/in/satyanadella/", "Satya Nadella")
+        assert out["resolved"] is True
+        assert out["provider_id"] == "urn:li:member:123"
+
+    def test_no_full_name_given_skips_the_check(self, monkeypatch):
+        """The caller can omit full_name (default "") for backward
+        compatibility; when it does, no cross-check is possible or
+        attempted."""
+        monkeypatch.setattr(T.unipile_transport, "account_for_platform", lambda platform: "acct-1")
+        monkeypatch.setattr(T.unipile_client, "get_user_profile",
+                            lambda slug, account_id: ({"provider_id": "urn:li:member:123",
+                                                       "name": "Anyone At All"}, None))
+        out = T._resolve_linkedin_platform("https://www.linkedin.com/in/satyanadella/")
+        assert out["resolved"] is True
+
+
+class TestResolveYouTubePlatform:
+    """resolve_company_channel's own gaps for a PERSON'S name (not the
+    company names it was built for): the forHandle path skips its
+    plausibility check entirely, and the search path's own check is a
+    company-brand-lenient subset rule. This TLI-local gate adds one extra,
+    stricter check on top without touching the shared module other agents
+    also use."""
+
+    def test_a_channel_whose_title_does_not_match_is_rejected(self, monkeypatch):
+        monkeypatch.setenv("YOUTUBE_API_KEY", "test-key")
+        monkeypatch.setattr(T.sci_youtube_client, "resolve_company_channel", lambda name, key: {
+            "channel_id": "UC123", "title": "Totally Unrelated Channel",
+            "handle": "@random", "profile_url": "https://youtube.com/@random"})
+        out = T._resolve_youtube_platform("Satya Nadella")
+        assert out["resolved"] is False
+        assert "No YouTube channel confidently matched" in out["note"]
+
+    def test_a_channel_whose_title_matches_is_resolved(self, monkeypatch):
+        monkeypatch.setenv("YOUTUBE_API_KEY", "test-key")
+        monkeypatch.setattr(T.sci_youtube_client, "resolve_company_channel", lambda name, key: {
+            "channel_id": "UC123", "title": "Satya Nadella",
+            "handle": "@satyanadella", "profile_url": "https://youtube.com/@satyanadella"})
+        out = T._resolve_youtube_platform("Satya Nadella")
+        assert out["resolved"] is True
+        assert out["channel_id"] == "UC123"
+
+    def test_a_title_that_fell_back_to_the_search_name_itself_is_not_rejected(self, monkeypatch):
+        """resolve_company_channel returns "title": title or name when the
+        detail lookup itself failed -- that fallback must not be treated
+        as a mismatch just because it trivially equals the search name."""
+        monkeypatch.setenv("YOUTUBE_API_KEY", "test-key")
+        monkeypatch.setattr(T.sci_youtube_client, "resolve_company_channel", lambda name, key: {
+            "channel_id": "UC123", "title": name,
+            "handle": "UC123", "profile_url": "https://youtube.com/channel/UC123"})
+        out = T._resolve_youtube_platform("Satya Nadella")
+        assert out["resolved"] is True
+
+
+class TestApolloCandidateRecheckedAgainstConfirmedName:
+    def test_an_apollo_row_disagreeing_with_the_models_confirmed_name_is_discarded(self, monkeypatch):
+        """The real accuracy risk: _best_apollo_candidate is filtered
+        against the ORIGINAL SEARCH QUERY, not the name the model actually
+        confirmed -- for a common name, a DIFFERENT real person from Apollo
+        can satisfy that check while disagreeing with who the model
+        verified. Every field that falls back to the Apollo row (LinkedIn/
+        X handle, title, company, photo) must not attach that other
+        person's data to this identity."""
+        _stub_platforms(monkeypatch)
+        monkeypatch.setenv("APOLLO_API_KEY", "test-key")
+        monkeypatch.setattr(T, "_best_apollo_candidate", lambda *a, **kw: {
+            "full_name": "John Q. Smith", "title": "VP Sales at Widgets Inc",
+            "organization_name": "Widgets Inc", "linkedin_url": "https://www.linkedin.com/in/jqsmith/",
+            "twitter_url": "https://twitter.com/jqsmith", "photo_url": "https://img.example/wrong.jpg"})
+        monkeypatch.setattr(claude_websearch, "ask", lambda *a, **kw: _fake_search_result(
+            '{"confidence":"high","reasoning":"Multiple independent sources confirm Jonathan R. Smith '
+            'is the CFO of Acme Corp.","is_public_figure":true,"full_name":"Jonathan R. Smith",'
+            '"current_title":"CFO","current_company":"Acme Corp"}'))
+        out = T.resolve_identity("John Smith")
+        assert out["ok"] is True
+        identity = out["identity"]
+        assert identity["current_company"] == "Acme Corp"
+        assert identity["current_title"] == "CFO"
+        assert identity["photo_url"] is None
+        assert identity["source"]["apollo_matched"] is False
+        assert identity["platforms"]["x"]["resolved"] is False
+
+    def test_an_apollo_row_agreeing_with_the_models_confirmed_name_is_kept(self, monkeypatch):
+        _stub_platforms(monkeypatch)
+        monkeypatch.setenv("APOLLO_API_KEY", "test-key")
+        monkeypatch.setattr(T, "_best_apollo_candidate", lambda *a, **kw: {
+            "full_name": "Jane Doe", "title": "Chief Strategy Officer",
+            "organization_name": "Acme Corp", "linkedin_url": "https://www.linkedin.com/in/janedoe/",
+            "twitter_url": "https://twitter.com/janedoe", "photo_url": "https://img.example/jane.jpg"})
+        monkeypatch.setattr(claude_websearch, "ask", lambda *a, **kw: _fake_search_result(
+            '{"confidence":"high","reasoning":"Confirmed.","is_public_figure":true,'
+            '"full_name":"Jane Doe"}'))
+        out = T.resolve_identity("Jane Doe")
+        identity = out["identity"]
+        assert identity["photo_url"] == "https://img.example/jane.jpg"
+        assert identity["source"]["apollo_matched"] is True
 
 
 class TestStoreFailSoft:
@@ -421,13 +629,13 @@ class TestCollectPostsJob:
 class TestResolveStalePosts:
     def test_a_fresh_collecting_run_is_left_alone(self):
         run = {"id": 1, "posts_status": "collecting",
-              "updated_at": T.datetime.now(T.timezone.utc).isoformat()}
+              "posts_updated_at": T.datetime.now(T.timezone.utc).isoformat()}
         out = T._resolve_stale_posts(run, "a@b.com")
         assert out["posts_status"] == "collecting"
 
     def test_a_stale_collecting_run_is_flipped_to_failed(self, monkeypatch):
         stale_time = (T.datetime.now(T.timezone.utc) - T.timedelta(minutes=T.STALE_RUN_MINUTES + 1)).isoformat()
-        run = {"id": 1, "posts_status": "collecting", "updated_at": stale_time}
+        run = {"id": 1, "posts_status": "collecting", "posts_updated_at": stale_time}
         monkeypatch.setattr(T, "save_posts_failed", lambda *a, **kw: True)
         out = T._resolve_stale_posts(run, "a@b.com")
         assert out["posts_status"] == "failed"
@@ -436,8 +644,24 @@ class TestResolveStalePosts:
     def test_a_non_collecting_run_is_never_touched(self, monkeypatch):
         monkeypatch.setattr(T, "save_posts_failed",
                             lambda *a, **kw: pytest.fail("must not touch a non-collecting run"))
-        run = {"id": 1, "posts_status": "ready", "updated_at": "2020-01-01T00:00:00+00:00"}
+        run = {"id": 1, "posts_status": "ready", "posts_updated_at": "2020-01-01T00:00:00+00:00"}
         assert T._resolve_stale_posts(run, "a@b.com") == run
+
+    def test_touching_a_different_phase_does_not_reset_this_phases_staleness_clock(self, monkeypatch):
+        """The real bug: this used to read the SHARED `updated_at` column,
+        which every phase's save_*/start_* bumps -- so refreshing press or
+        regenerating the report reset posts's own staleness clock even
+        while posts stayed stuck at 'collecting' forever. Because
+        renderReactionSection only ever runs once posts reaches a terminal
+        status, a stuck posts phase left the whole reaction section blank
+        with no way to self-heal. `updated_at` here is fresh (another
+        phase was just touched); `posts_updated_at` is genuinely stale."""
+        stale_time = (T.datetime.now(T.timezone.utc) - T.timedelta(minutes=T.STALE_RUN_MINUTES + 1)).isoformat()
+        run = {"id": 1, "posts_status": "collecting", "posts_updated_at": stale_time,
+              "updated_at": T.datetime.now(T.timezone.utc).isoformat()}
+        monkeypatch.setattr(T, "save_posts_failed", lambda *a, **kw: True)
+        out = T._resolve_stale_posts(run, "a@b.com")
+        assert out["posts_status"] == "failed"
 
 
 class TestPhase2StoreFailSoft:
@@ -454,12 +678,12 @@ class TestPhase2StoreFailSoft:
 class TestResolveStaleReaction:
     def test_a_fresh_collecting_run_is_left_alone(self):
         run = {"id": 1, "reaction_status": "collecting",
-              "updated_at": T.datetime.now(T.timezone.utc).isoformat()}
+              "reaction_updated_at": T.datetime.now(T.timezone.utc).isoformat()}
         assert T._resolve_stale_reaction(run, "a@b.com")["reaction_status"] == "collecting"
 
     def test_a_stale_collecting_run_is_flipped_to_failed(self, monkeypatch):
         stale_time = (T.datetime.now(T.timezone.utc) - T.timedelta(minutes=T.STALE_RUN_MINUTES + 1)).isoformat()
-        run = {"id": 1, "reaction_status": "collecting", "updated_at": stale_time}
+        run = {"id": 1, "reaction_status": "collecting", "reaction_updated_at": stale_time}
         monkeypatch.setattr(T, "save_reaction_failed", lambda *a, **kw: True)
         out = T._resolve_stale_reaction(run, "a@b.com")
         assert out["reaction_status"] == "failed"
@@ -470,8 +694,19 @@ class TestResolveStaleReaction:
         collection stuck mid-flight must not make _resolve_stale_reaction
         think there is a reaction job to time out."""
         run = {"id": 1, "posts_status": "collecting", "reaction_status": "idle",
-              "updated_at": "2020-01-01T00:00:00+00:00"}
+              "reaction_updated_at": "2020-01-01T00:00:00+00:00"}
         assert T._resolve_stale_reaction(run, "a@b.com") == run
+
+    def test_touching_a_different_phase_does_not_reset_this_phases_staleness_clock(self, monkeypatch):
+        """Same real bug as TestResolveStalePosts's own version -- see its
+        docstring. Reading the shared `updated_at` here meant refreshing
+        posts or press reset reaction's own staleness clock forever."""
+        stale_time = (T.datetime.now(T.timezone.utc) - T.timedelta(minutes=T.STALE_RUN_MINUTES + 1)).isoformat()
+        run = {"id": 1, "reaction_status": "collecting", "reaction_updated_at": stale_time,
+              "updated_at": T.datetime.now(T.timezone.utc).isoformat()}
+        monkeypatch.setattr(T, "save_reaction_failed", lambda *a, **kw: True)
+        out = T._resolve_stale_reaction(run, "a@b.com")
+        assert out["reaction_status"] == "failed"
 
 
 class TestTopEngagedPosts:
@@ -906,12 +1141,12 @@ class TestPhase3StoreFailSoft:
 class TestResolveStalePress:
     def test_a_fresh_collecting_run_is_left_alone(self):
         run = {"id": 1, "press_status": "collecting",
-              "updated_at": T.datetime.now(T.timezone.utc).isoformat()}
+              "press_updated_at": T.datetime.now(T.timezone.utc).isoformat()}
         assert T._resolve_stale_press(run, "a@b.com")["press_status"] == "collecting"
 
     def test_a_stale_collecting_run_is_flipped_to_failed(self, monkeypatch):
         stale_time = (T.datetime.now(T.timezone.utc) - T.timedelta(minutes=T.STALE_RUN_MINUTES + 1)).isoformat()
-        run = {"id": 1, "press_status": "collecting", "updated_at": stale_time}
+        run = {"id": 1, "press_status": "collecting", "press_updated_at": stale_time}
         monkeypatch.setattr(T, "save_press_failed", lambda *a, **kw: True)
         out = T._resolve_stale_press(run, "a@b.com")
         assert out["press_status"] == "failed"
@@ -922,8 +1157,18 @@ class TestResolveStalePress:
         reaction analysis stuck mid-flight must not make _resolve_stale_press
         think there is a press job to time out."""
         run = {"id": 1, "reaction_status": "collecting", "press_status": "idle",
-              "updated_at": "2020-01-01T00:00:00+00:00"}
+              "press_updated_at": "2020-01-01T00:00:00+00:00"}
         assert T._resolve_stale_press(run, "a@b.com") == run
+
+    def test_touching_a_different_phase_does_not_reset_this_phases_staleness_clock(self, monkeypatch):
+        """Same real bug as TestResolveStalePosts's own version -- see its
+        docstring."""
+        stale_time = (T.datetime.now(T.timezone.utc) - T.timedelta(minutes=T.STALE_RUN_MINUTES + 1)).isoformat()
+        run = {"id": 1, "press_status": "collecting", "press_updated_at": stale_time,
+              "updated_at": T.datetime.now(T.timezone.utc).isoformat()}
+        monkeypatch.setattr(T, "save_press_failed", lambda *a, **kw: True)
+        out = T._resolve_stale_press(run, "a@b.com")
+        assert out["press_status"] == "failed"
 
 
 class TestCollectPressJob:
@@ -986,12 +1231,12 @@ class TestPhase4StoreFailSoft:
 class TestResolveStaleSynthesis:
     def test_a_fresh_collecting_run_is_left_alone(self):
         run = {"id": 1, "synthesis_status": "collecting",
-              "updated_at": T.datetime.now(T.timezone.utc).isoformat()}
+              "synthesis_updated_at": T.datetime.now(T.timezone.utc).isoformat()}
         assert T._resolve_stale_synthesis(run, "a@b.com")["synthesis_status"] == "collecting"
 
     def test_a_stale_collecting_run_is_flipped_to_failed(self, monkeypatch):
         stale_time = (T.datetime.now(T.timezone.utc) - T.timedelta(minutes=T.STALE_RUN_MINUTES + 1)).isoformat()
-        run = {"id": 1, "synthesis_status": "collecting", "updated_at": stale_time}
+        run = {"id": 1, "synthesis_status": "collecting", "synthesis_updated_at": stale_time}
         monkeypatch.setattr(T, "save_synthesis_failed", lambda *a, **kw: True)
         out = T._resolve_stale_synthesis(run, "a@b.com")
         assert out["synthesis_status"] == "failed"
@@ -1002,8 +1247,18 @@ class TestResolveStaleSynthesis:
         search stuck mid-flight must not make _resolve_stale_synthesis
         think there is a synthesis job to time out."""
         run = {"id": 1, "press_status": "collecting", "synthesis_status": "idle",
-              "updated_at": "2020-01-01T00:00:00+00:00"}
+              "synthesis_updated_at": "2020-01-01T00:00:00+00:00"}
         assert T._resolve_stale_synthesis(run, "a@b.com") == run
+
+    def test_touching_a_different_phase_does_not_reset_this_phases_staleness_clock(self, monkeypatch):
+        """Same real bug as TestResolveStalePosts's own version -- see its
+        docstring."""
+        stale_time = (T.datetime.now(T.timezone.utc) - T.timedelta(minutes=T.STALE_RUN_MINUTES + 1)).isoformat()
+        run = {"id": 1, "synthesis_status": "collecting", "synthesis_updated_at": stale_time,
+              "updated_at": T.datetime.now(T.timezone.utc).isoformat()}
+        monkeypatch.setattr(T, "save_synthesis_failed", lambda *a, **kw: True)
+        out = T._resolve_stale_synthesis(run, "a@b.com")
+        assert out["synthesis_status"] == "failed"
 
 
 class TestPostsSummary:
@@ -1023,6 +1278,20 @@ class TestPostsSummary:
         assert out["by_platform"]["linkedin"] == {"count": 2, "total_engagement": 10}
         assert out["by_platform"]["x"] == {"count": 0, "total_engagement": 0}
 
+    def test_views_are_excluded_from_engagement(self):
+        """The real bug: views is present in X's and YouTube's own metrics
+        (absent from LinkedIn's) and runs orders of magnitude larger than
+        likes/comments/shares -- summing it in made a platform with view
+        counts look vastly more "engaging" than LinkedIn purely from that
+        scale mismatch, exactly the cross-platform comparison the
+        synthesis step is asked to make from this field."""
+        posts = {"linkedin": [{"metrics": {"likes": 5, "comments": 2}}],
+                "x": [{"metrics": {"likes": 3, "shares": 1, "comments": 0, "views": 50000}}],
+                "youtube": []}
+        out = T._posts_summary(posts)
+        assert out["by_platform"]["x"]["total_engagement"] == 4
+        assert out["by_platform"]["linkedin"]["total_engagement"] == 7
+
 
 class TestReactionSummary:
     def test_no_reaction_is_unavailable(self):
@@ -1032,11 +1301,16 @@ class TestReactionSummary:
         assert T._reaction_summary({"comments_analyzed": 0, "reddit": {"thread_count": 0}}
                                    )["available"] is False
 
-    def test_an_errored_comment_sentiment_is_omitted_not_faked(self):
+    def test_an_errored_comment_sentiment_is_flagged_not_treated_as_unavailable(self):
+        """Data WAS collected (3 comments); the sentiment read on it just
+        failed. That must read differently from "nothing was ever found
+        here" -- an audit found the old code collapsed both into the same
+        None, so a real analysis failure silently vanished from the report
+        instead of being named as a coverage gap."""
         out = T._reaction_summary({"comments_analyzed": 3,
                                    "comment_sentiment": {"error": "boom"}, "reddit": {}})
         assert out["available"] is True
-        assert out["own_post_comments"] is None
+        assert out["own_post_comments"] == {"collected_count": 3, "analysis_failed": True}
 
     def test_real_findings_are_pulled_through(self):
         reaction = {
@@ -1087,11 +1361,17 @@ class TestReactionSummary:
         assert out["facebook"]["verdict"] == "Warm human-interest chatter."
         assert out["instagram"] is None
 
-    def test_an_errored_pulse_analysis_is_omitted_not_faked(self):
+    def test_an_errored_pulse_analysis_is_flagged_not_treated_as_unavailable(self):
+        """The real live bug: 412 tweets collected, the Claude analysis
+        call times out -- the old code reported this identically to "no
+        posts were ever found", so the executive report could assert
+        nothing exists on a platform where real (unread) material sat
+        right there. Data WAS collected (10 posts); that must be visible
+        to the synthesis step even though the analysis itself failed."""
         reaction = {"linkedin_pulse": {"post_count": 10, "analysis": {"error": "boom"}}}
         out = T._reaction_summary(reaction)
-        assert out["linkedin"] is None
-        assert out["available"] is False
+        assert out["linkedin"] == {"collected_count": 10, "analysis_failed": True}
+        assert out["available"] is True
 
     def test_availability_is_true_from_a_newer_pulse_alone(self):
         """The exact live scenario: own-post comments and Reddit both had

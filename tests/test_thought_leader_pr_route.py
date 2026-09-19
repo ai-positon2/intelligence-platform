@@ -149,6 +149,39 @@ class TestResolveRoute:
         assert resp.status_code == 200
         assert resp.get_json()["run_id"] is None
 
+    def test_an_oversized_field_is_capped_before_it_reaches_the_resolver(self, monkeypatch):
+        """An audit found none of /resolve's fields were length-capped,
+        unlike equivalent fields elsewhere in this app -- a pasted
+        oversized string became an outsized billed Claude/Apollo input
+        instead of a request this route rejected or trimmed outright."""
+        captured = {}
+        monkeypatch.setattr(T, "create_run", lambda **kw: captured.update(kw) or 1)
+        monkeypatch.setattr(T, "resolve_identity", lambda *a, **kw: captured.update(
+            call_args=a, call_kw=kw) or {
+            "ok": False, "confidence": "none", "reasoning": "x", "identity": None, "spend": {}, "error": None})
+        monkeypatch.setattr(T, "save_result", lambda *a, **kw: True)
+        _client().post("/p2/strategic-agents/thought-leader-pr/resolve",
+                       json={"name": "A" * 5000, "company_hint": "B" * 5000})
+        assert len(captured["input_name"]) == 200
+        assert len(captured["company_hint"]) == 200
+        assert len(captured["call_args"][0]) == 200
+
+    def test_repeated_resolves_are_rate_limited(self, monkeypatch):
+        """An audit found TLI had no rate limit anywhere, unlike every
+        sibling agent -- a script looping /resolve (a real billed Claude
+        web_search call each time) had nothing to stop it."""
+        monkeypatch.setattr(T, "create_run", lambda **kw: 1)
+        monkeypatch.setattr(T, "resolve_identity", lambda *a, **kw: {
+            "ok": False, "confidence": "none", "reasoning": "x", "identity": None, "spend": {}, "error": None})
+        monkeypatch.setattr(T, "save_result", lambda *a, **kw: True)
+        limit, _window = appmod._CPI_RATE_LIMITS["tli-resolve"]
+        c = _client()
+        for _ in range(limit):
+            resp = c.post("/p2/strategic-agents/thought-leader-pr/resolve", json={"name": "Jane Doe"})
+            assert resp.status_code == 200
+        resp = c.post("/p2/strategic-agents/thought-leader-pr/resolve", json={"name": "Jane Doe"})
+        assert resp.status_code == 429
+
 
 class TestConfirmAndRunRoutes:
     def test_confirm_is_scoped_and_reports_failure_as_404(self, monkeypatch):
@@ -214,6 +247,23 @@ class TestCollectRoute:
         assert resp.get_json() == {"ok": True, "posts_status": "collecting"}
         assert started.wait(timeout=2), "background job never ran"
         assert captured == {"run_id": 4, "email": _OWNER}
+
+    def test_repeated_collect_requests_are_rate_limited_and_never_start_a_job(self, monkeypatch):
+        """An audit found none of the four collect-* routes had a rate
+        limit -- each is a real billed vendor call (Apify, Unipile,
+        YouTube quota, GDELT/SerpAPI, or a Claude call), unlike every
+        sibling agent's own billed steps. The shared "tli-collect" bucket
+        covers all four; a normal single run (one call to each) never
+        approaches it."""
+        monkeypatch.setattr(T, "start_collecting", lambda run_id, email: True)
+        monkeypatch.setattr(T, "collect_posts_job", lambda run_id, email: None)
+        limit, _window = appmod._CPI_RATE_LIMITS["tli-collect"]
+        c = _client()
+        for _ in range(limit):
+            resp = c.post("/p2/strategic-agents/thought-leader-pr/runs/4/collect")
+            assert resp.status_code == 200
+        resp = c.post("/p2/strategic-agents/thought-leader-pr/runs/4/collect")
+        assert resp.status_code == 429
 
 
 class TestCollectReactionRoute:

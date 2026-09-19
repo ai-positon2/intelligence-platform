@@ -371,8 +371,13 @@ def build_pulse(full_name: str, instagram_handle: str | None = None) -> dict:
     result["errors"] = errors
     result.update(aggregate(posts))
     if not posts:
-        result["note"] = ("No Instagram posts tagging this person were found. That is a finding, "
-                          "not an error: nobody has tagged them there recently.")
+        note = ("No Instagram posts tagging this person were found. That is a finding, "
+                "not an error: nobody has tagged them there recently.")
+        # Same reasoning as tlpr_x_pulse.build_pulse: every entry left in
+        # `errors` here is a real query failure, not a benign empty result.
+        if errors:
+            note += " " + " ".join(errors.values())
+        result["note"] = note
         return result
     result["analysis"] = analyze(full_name, posts)
     return result

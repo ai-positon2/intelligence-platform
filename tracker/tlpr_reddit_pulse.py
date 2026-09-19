@@ -143,12 +143,19 @@ def _mentions_person(post: dict, full_name: str) -> bool:
 
 
 def collect_mentions(full_name: str, company_hint: str | None = None,
-                     limit: int = PER_QUERY_LIMIT) -> list[dict]:
+                     limit: int = PER_QUERY_LIMIT) -> tuple[list[dict], dict]:
     """Every distinct Reddit thread that really mentions this person,
-    deduped across queries. [] on any failure."""
+    deduped across queries. Returns (posts, errors) -- one query/sort
+    combination failing never blocks the others, same fault isolation as
+    every other pulse's collect_mentions. Every query/sort failing (an
+    expired Reddit OAuth token, a rate limit) used to be swallowed to a
+    bare [] with no trace anywhere -- unlike every sibling pulse, this had
+    no error channel at all, so build_pulse's "genuine zero, not an error"
+    note was shown even when Reddit was never actually reachable."""
     from tracker import sci_reddit_client
 
     seen: dict[str, dict] = {}
+    errors: dict[str, str] = {}
     for query in build_queries(full_name, company_hint):
         for sort in ("relevance", "new"):
             try:
@@ -156,12 +163,14 @@ def collect_mentions(full_name: str, company_hint: str | None = None,
                     query, sort=sort, time_filter="year", limit=limit)
             except Exception as e:
                 logger.warning("tlpr_reddit_pulse: search failed for %r (%s): %s", query, sort, e)
+                errors.setdefault("reddit_search", "Reddit search could not be completed (%s)."
+                                  % (str(e)[:160] or type(e).__name__))
                 continue
             for post in found:
                 pid = post.get("platform_post_id")
                 if pid and pid not in seen and _mentions_person(post, full_name):
                     seen[pid] = post
-    return list(seen.values())
+    return list(seen.values()), errors
 
 
 def _collect_thread_comments(posts: list[dict]) -> list[dict]:
@@ -452,6 +461,7 @@ def build_pulse(full_name: str, company_hint: str | None = None) -> dict:
         "top_threads": [],
         "threads": [],
         "analysis": None,
+        "errors": {},
         "note": "",
     }
     if not sci_reddit_client.is_configured():
@@ -460,20 +470,27 @@ def build_pulse(full_name: str, company_hint: str | None = None) -> dict:
         return result
 
     try:
-        posts = collect_mentions(full_name, company_hint)
+        posts, errors = collect_mentions(full_name, company_hint)
     except Exception as e:
         logger.warning("tlpr_reddit_pulse: mention collection failed for %r: %s", full_name, e)
         result["note"] = ("Reddit search could not be completed for this person (%s)."
                           % (str(e)[:160] or type(e).__name__))
         return result
 
+    result["errors"] = errors
     result.update(aggregate(posts))
     result["threads"] = [_thread_card(p) for p in
                          sorted(posts, key=_engagement, reverse=True)[:MAX_THREADS_ANALYZED]]
     if not posts:
-        result["note"] = ("No Reddit threads mentioning this person were found in the last year. "
-                          "That is a finding, not an error: this person has no measurable Reddit "
-                          "conversation to read.")
+        note = ("No Reddit threads mentioning this person were found in the last year. "
+                "That is a finding, not an error: this person has no measurable Reddit "
+                "conversation to read.")
+        # Same reasoning as every other pulse's build_pulse: every entry
+        # left in `errors` here is a real query failure, not a benign
+        # empty result.
+        if errors:
+            note += " " + " ".join(errors.values())
+        result["note"] = note
         return result
 
     try:

@@ -229,6 +229,36 @@ def test_digest_works_unchanged_with_no_comments_at_all():
     assert digest[0]["kind"] == "post"
 
 
+def test_a_large_post_count_does_not_crowd_out_every_comment():
+    """The real bug: _digest used to append ALL posts first, THEN
+    comments, then slice the COMBINED list to one shared cap -- so 60+
+    posts (well within FETCH_LIMIT=40 x however many queries) left zero
+    room for any comment, even though build_pulse still reported the full
+    collected comment_sample_count as if they'd been read. Posts and
+    comments must each get their own guaranteed share of the digest."""
+    posts = fp.normalize([_raw_post(str(i)) for i in range(50)])
+    comments = [{"id": "c%d" % i, "text": "x", "author": "Fan", "likes": 1, "url": "u",
+                "post_title": "t"} for i in range(50)]
+    digest = fp._digest(posts, comments, max_posts=30, max_comments=30)
+    kinds = [d["kind"] for d in digest]
+    assert kinds.count("post") == 30
+    assert kinds.count("comment") == 30
+
+
+def test_a_digested_comment_is_tagged_with_which_post_it_came_from():
+    """_SYSTEM promises the model each comment is tagged with which post
+    it came from. The dedicated builder for this (_comment_card) existed
+    but was dead code -- _digest built comments inline with text only,
+    dropping post_title entirely."""
+    posts = fp.normalize([_raw_post("1")])
+    comments = [{"id": "c1", "text": "love this", "author": "Fan", "likes": 3, "url": "u",
+                "post_title": "Big announcement"}]
+    digest = fp._digest(posts, comments)
+    comment_entry = next(d for d in digest if d["kind"] == "comment")
+    assert "Big announcement" in comment_entry["text"]
+    assert "love this" in comment_entry["text"]
+
+
 # ── the model's output is never trusted unchecked ──────────────────────────
 
 def test_sentiment_counts_are_computed_from_the_labels_not_from_the_model():

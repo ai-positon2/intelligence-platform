@@ -49,7 +49,15 @@ logger = logging.getLogger(__name__)
 FETCH_LIMIT = 40                  # posts fetched from the keyword search
 MAX_POSTS_FOR_COMMENTS = 12        # only the most-engaged found posts get a comments fetch
 MAX_COMMENTS_PER_POST = 15
-MAX_ITEMS_DIGEST = 60              # what Claude actually reads (posts + comments combined)
+# Split, not combined: a single MAX_ITEMS_DIGEST=60 cap on posts+comments
+# together let up to 40 posts crowd out every comment before the digest
+# ever reached them (_digest appended all posts, then all comments, then
+# sliced the combined list) -- a run with 60+ posts read ZERO comments
+# while build_pulse still reported the full comment_sample_count as if
+# they'd been read. Reddit's own _digest already avoids this by capping
+# threads and comments independently; mirrored here.
+MAX_POSTS_DIGEST = 30              # what Claude actually reads, posts
+MAX_COMMENTS_DIGEST = 30           # what Claude actually reads, comments
 MAX_TOP_POSTS = 12                 # what the UI shows as post cards
 
 _SENTIMENTS = ("positive", "neutral", "negative", "mixed")
@@ -314,25 +322,27 @@ def aggregate(posts: list[dict]) -> dict:
 
 
 def _digest(posts: list[dict], comments: list[dict] | None = None,
-           max_items: int = MAX_ITEMS_DIGEST) -> list[dict]:
+           max_posts: int = MAX_POSTS_DIGEST, max_comments: int = MAX_COMMENTS_DIGEST) -> list[dict]:
     """What Claude actually reads: the top-engaged posts plus, tagged
     "kind": "comment", individual comments pulled from inside those
-    posts' own comment sections. Comment ids are prefixed "c_" so they
-    can never collide with a bare Facebook post id, the same convention
-    tlpr_reddit_pulse._digest uses."""
-    ordered = sorted(posts, key=_engagement, reverse=True)
+    posts' own comment sections -- capped INDEPENDENTLY (see
+    MAX_POSTS_DIGEST/MAX_COMMENTS_DIGEST above) so a large post count can
+    never crowd every comment out of the digest. Comment ids are prefixed
+    "c_" so they can never collide with a bare Facebook post id, the same
+    convention tlpr_reddit_pulse._digest uses. Comments go through
+    _comment_card so each one is tagged with which post it came from, the
+    same as Reddit's own comment cards -- _SYSTEM promises the model this
+    tagging."""
+    ordered = sorted(posts, key=_engagement, reverse=True)[:max_posts]
     out = []
     for p in ordered:
         out.append({"id": p.get("platform_post_id"), "kind": "post",
                    "author": _author(p), "text": (p.get("caption") or "")[:400],
                    "url": p.get("post_url"), "posted_at": p.get("posted_at"),
                    "likes": (p.get("metrics") or {}).get("likes")})
-    ordered_comments = sorted(comments or [], key=lambda c: c.get("likes") or 0, reverse=True)
-    for c in ordered_comments:
-        out.append({"id": "c_" + str(c["id"]), "kind": "comment", "author": c.get("author"),
-                   "text": (c.get("text") or "")[:400], "url": c.get("url"),
-                   "posted_at": None, "likes": c.get("likes")})
-    return out[:max_items]
+    ordered_comments = sorted(comments or [], key=lambda c: c.get("likes") or 0, reverse=True)[:max_comments]
+    out.extend(_comment_card(c) for c in ordered_comments)
+    return out
 
 
 def _extract_json_object(raw: str) -> str | None:
@@ -453,7 +463,8 @@ def analyze(full_name: str, posts: list[dict], comments: list[dict] | None = Non
         if stop_reason == "max_tokens":
             return {"error": "The Facebook conversation analysis ran out of output budget before it "
                              "finished (stop_reason=max_tokens). Raise max_tokens in "
-                             "tracker/tlpr_facebook_pulse.py or reduce MAX_ITEMS_DIGEST."}
+                             "tracker/tlpr_facebook_pulse.py or reduce MAX_POSTS_DIGEST/"
+                             "MAX_COMMENTS_DIGEST."}
         return {"error": "The Facebook conversation analysis returned an unreadable response."}
     try:
         parsed = json.loads(candidate)
