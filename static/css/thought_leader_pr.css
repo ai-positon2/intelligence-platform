@@ -146,7 +146,18 @@ body{font-family:'Space Grotesk',-apple-system,BlinkMacSystemFont,sans-serif;min
 [data-theme="light"] .user-pill{background:var(--s2);}
 [data-theme="light"] .user-avatar{color:#2a1607;}
 
-.main{max-width:980px;margin:0 auto;padding:var(--sp7) var(--margin) 110px;position:relative;}
+/* --margin (ds-tokens.css) is meant for a FULL-BLEED layout, where content
+   width = min(viewport,--maxw) − 2×--margin -- it grows all the way to
+   200px on a wide monitor (>=1920px). This page's .main is a separately
+   max-width'd, centered column, not a full-bleed layout, so reusing
+   --margin as ITS side padding double-constrained it: a 980px column with
+   200px of padding on each side left under 600px for actual content
+   (cards, the posts grid) on an ordinary wide desktop -- the exact "looks
+   very thin, huge dead margins" complaint, confirmed by rendering a static
+   harness at 1920px before touching this rule, not by reading the CSS
+   alone. clamp() gives a real gutter on mobile without adopting the
+   full-bleed token's own scale. */
+.main{max-width:1320px;margin:0 auto;padding:var(--sp7) clamp(20px,4vw,56px) 110px;position:relative;}
 
 /* ═══════════════════════════════ Hero ═══════════════════════════════ */
 .tlpr-hero{position:relative;text-align:center;margin-bottom:var(--sp6);isolation:isolate;}
@@ -523,7 +534,7 @@ body{font-family:'Space Grotesk',-apple-system,BlinkMacSystemFont,sans-serif;min
 }
 .tlpr-posts-empty-platform b{color:var(--tx2);}
 
-.tlpr-posts-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:var(--sp3);}
+.tlpr-posts-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(268px,1fr));gap:var(--sp4);}
 .tlpr-post-card{
   display:block;padding:16px;border-radius:var(--radius-lg);border:1px solid var(--b1);
   border-top:2px solid color-mix(in srgb,var(--pf,var(--sp-gold)) 55%,var(--b1));
