@@ -1053,6 +1053,55 @@ class TestReactionSummary:
         assert out["reddit"]["verdict"] == "Mixed."
         assert out["reddit"]["risk_flags"] == ["A gripe."]
 
+    def test_the_five_newer_pulses_reach_the_synthesis_payload(self):
+        """The real live bug this generalizes from: b051523/a4cb57f added
+        X/LinkedIn/TikTok/Instagram/Facebook audience-reaction reads, but
+        _reaction_summary was never updated past comment_sentiment/reddit --
+        so the final report's own synthesis call never saw any of the other
+        five sources' findings, even though they were collected, analyzed,
+        shown on the page, and paid for. A live run's synthesis called this
+        "a real blind spot" while the very same run's LinkedIn/TikTok/
+        Facebook pulses held real, substantive findings (a pay-package
+        backlash, an employee petition, a campus protest) that never
+        reached the model writing the verdict."""
+        reaction = {
+            "x_pulse": {"tweet_count": 5, "analysis": {
+                "verdict": "Mostly quiet.", "sentiment": {"counts": {"neutral": 4}},
+                "themes": [{"label": "Low engagement"}], "risk_flags": []}},
+            "linkedin_pulse": {"post_count": 12, "analysis": {
+                "verdict": "Admiring with pay scrutiny.", "sentiment": {"counts": {"positive": 8}},
+                "themes": [{"label": "Compensation debate"}], "risk_flags": ["Petition over layoffs."]}},
+            "tiktok_pulse": {"video_count": 9, "analysis": {
+                "verdict": "Viral protest coverage.", "sentiment": {"counts": {"negative": 2}},
+                "themes": [{"label": "Campus walkout"}], "risk_flags": ["Protest tied to contracts."]}},
+            "instagram_pulse": {"mention_count": 0, "analysis": None},
+            "facebook_pulse": {"post_count": 6, "analysis": {
+                "verdict": "Warm human-interest chatter.", "sentiment": {"counts": {"positive": 5}},
+                "themes": [{"label": "Origin story"}], "risk_flags": []}},
+        }
+        out = T._reaction_summary(reaction)
+        assert out["available"] is True
+        assert out["x"]["verdict"] == "Mostly quiet."
+        assert out["linkedin"]["risk_flags"] == ["Petition over layoffs."]
+        assert out["tiktok"]["themes"] == ["Campus walkout"]
+        assert out["facebook"]["verdict"] == "Warm human-interest chatter."
+        assert out["instagram"] is None
+
+    def test_an_errored_pulse_analysis_is_omitted_not_faked(self):
+        reaction = {"linkedin_pulse": {"post_count": 10, "analysis": {"error": "boom"}}}
+        out = T._reaction_summary(reaction)
+        assert out["linkedin"] is None
+        assert out["available"] is False
+
+    def test_availability_is_true_from_a_newer_pulse_alone(self):
+        """The exact live scenario: own-post comments and Reddit both had
+        no data, but LinkedIn reaction did -- the run as a whole must still
+        be reported as having reaction data available."""
+        reaction = {"comments_analyzed": 0, "reddit": {"thread_count": 0},
+                   "linkedin_pulse": {"post_count": 3, "analysis": {"verdict": "Fine.", "sentiment": {}}}}
+        out = T._reaction_summary(reaction)
+        assert out["available"] is True
+
 
 class TestPressSummary:
     def test_no_articles_is_unavailable(self):
@@ -1122,6 +1171,46 @@ class TestSynthesizeReport:
         monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
         out = T.synthesize_report({"identity": {"full_name": "Jane Doe"}})
         assert "ANTHROPIC_API_KEY" in out["error"]
+
+    class _FakeTextBlock:
+        def __init__(self, text):
+            self.type = "text"
+            self.text = text
+
+    class _FakeResponse:
+        def __init__(self, text, stop_reason):
+            self.content = [TestSynthesizeReport._FakeTextBlock(text)]
+            self.stop_reason = stop_reason
+
+    class _FakeMessages:
+        def __init__(self, text, stop_reason):
+            self._text, self._stop_reason = text, stop_reason
+
+        def create(self, **kwargs):
+            return TestSynthesizeReport._FakeResponse(self._text, self._stop_reason)
+
+    class _FakeClient:
+        def __init__(self, *a, text="", stop_reason="end_turn", **kw):
+            self.messages = TestSynthesizeReport._FakeMessages(text, stop_reason)
+
+    def test_a_truncated_reply_names_max_tokens_distinctly_from_a_generic_unreadable_one(self, monkeypatch):
+        import anthropic
+        monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+        monkeypatch.setattr(anthropic, "Anthropic",
+                            lambda *a, **kw: self._FakeClient(text='{"headline": "cut off mid-sen',
+                                                              stop_reason="max_tokens"))
+        out = T.synthesize_report({"identity": {"full_name": "Jane Doe"}})
+        assert "max_tokens" in out["error"]
+        assert "unreadable response" not in out["error"]
+
+    def test_a_non_truncated_unparsable_reply_stays_generic(self, monkeypatch):
+        import anthropic
+        monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+        monkeypatch.setattr(anthropic, "Anthropic",
+                            lambda *a, **kw: self._FakeClient(text="Sorry, I can't help with that.",
+                                                              stop_reason="end_turn"))
+        out = T.synthesize_report({"identity": {"full_name": "Jane Doe"}})
+        assert out["error"] == "The report generation returned an unreadable response."
 
 
 class TestCollectSynthesisJob:

@@ -1659,11 +1659,15 @@ _SYNTHESIS_SYSTEM = (
     "the person's identity, their posting activity (a count and total "
     "engagement per platform -- NOT what they post about, that is not "
     "given to you, so never describe the content, tone, or style of their "
-    "posts), and the ALREADY-ANALYZED findings from two separate reads: how "
-    "people react to their own posts and the Reddit conversation about "
-    "them, and what recent press coverage says. Each of those was already "
-    "grounded in real data and independently verified; your job is to weave "
-    "their conclusions into ONE readable synthesis, not to re-analyze raw "
+    "posts), and the ALREADY-ANALYZED findings from up to seven separate "
+    "audience-reaction reads (comments on their own posts, and what X, "
+    "LinkedIn, TikTok, Instagram, Facebook, and Reddit are independently "
+    "saying about them elsewhere), plus what recent press coverage says. "
+    "Not every source will have data for every person -- read only the "
+    "ones marked available, and treat every one that IS available as worth "
+    "weighing, not just the first you see. Each was already grounded in "
+    "real data and independently verified; your job is to weave their "
+    "conclusions into ONE readable synthesis, not to re-analyze raw "
     "evidence.\n\n"
     "Any input marked unavailable has no real data behind it -- write "
     "around it plainly (e.g. \"no press coverage was found\") rather than "
@@ -1706,14 +1710,48 @@ def _posts_summary(posts: dict | None) -> dict:
     return {"available": any(s["count"] for s in by_platform.values()), "by_platform": by_platform}
 
 
+def _pulse_summary(pulse: dict | None, count_key: str) -> dict | None:
+    """Same shape/omission discipline as reddit's own block below, reused
+    for the five newer audience-reaction pulses (X, LinkedIn, TikTok,
+    Instagram, Facebook -- b051523/a4cb57f) so the synthesis step actually
+    reads them. Before this, _reaction_summary only ever read
+    comment_sentiment and reddit: the other five sources were collected,
+    analyzed, shown on the page, and paid for, but silently never reached
+    the one Claude call that writes the final "so what" a reader actually
+    acts on -- a live run's synthesis called X/Reddit sentiment "a real
+    blind spot" while LinkedIn/TikTok/Facebook reaction sat right there in
+    the same run with real, substantive findings (an employee petition, a
+    pay-package backlash, a campus protest) it never got the chance to
+    weigh in the verdict or risks."""
+    pulse = pulse or {}
+    analysis = pulse.get("analysis") or {}
+    if not pulse.get(count_key) or analysis.get("error"):
+        return None
+    return {
+        "verdict": analysis.get("verdict"),
+        "sentiment_counts": (analysis.get("sentiment") or {}).get("counts"),
+        "themes": [t.get("label") for t in (analysis.get("themes") or []) if t.get("label")],
+        "risk_flags": analysis.get("risk_flags") or [],
+    }
+
+
 def _reaction_summary(reaction: dict | None) -> dict:
     if not reaction:
         return {"available": False}
     cs = reaction.get("comment_sentiment") or {}
     reddit = reaction.get("reddit") or {}
     r_analysis = reddit.get("analysis") or {}
-    out: dict = {"available": bool(reaction.get("comments_analyzed") or reddit.get("thread_count")),
-                "own_post_comments": None, "reddit": None}
+    x = _pulse_summary(reaction.get("x_pulse"), "tweet_count")
+    linkedin = _pulse_summary(reaction.get("linkedin_pulse"), "post_count")
+    tiktok = _pulse_summary(reaction.get("tiktok_pulse"), "video_count")
+    instagram = _pulse_summary(reaction.get("instagram_pulse"), "mention_count")
+    facebook = _pulse_summary(reaction.get("facebook_pulse"), "post_count")
+    out: dict = {
+        "available": bool(reaction.get("comments_analyzed") or reddit.get("thread_count")
+                          or x or linkedin or tiktok or instagram or facebook),
+        "own_post_comments": None, "reddit": None,
+        "x": x, "linkedin": linkedin, "tiktok": tiktok, "instagram": instagram, "facebook": facebook,
+    }
     if cs.get("verdict") and not cs.get("error"):
         out["own_post_comments"] = {
             "verdict": cs.get("verdict"),
@@ -1826,7 +1864,11 @@ def synthesize_report(run: dict) -> dict:
         client = Anthropic(api_key=key, timeout=120.0, max_retries=1)
         resp = client.messages.create(
             model=os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-5"),
-            max_tokens=2500, system=_SYNTHESIS_SYSTEM,
+            # 4000, not the 2500 this shipped with: the payload now carries
+            # up to seven reaction sources (fixed above, see _reaction_
+            # summary) instead of two, and the verdict/alignment fields
+            # reasonably need more room to actually weigh all of them.
+            max_tokens=4000, system=_SYNTHESIS_SYSTEM,
             messages=[{"role": "user", "content": json.dumps(payload, ensure_ascii=False)}],
         )
     except Exception as e:
@@ -1836,6 +1878,12 @@ def synthesize_report(run: dict) -> dict:
     raw = "".join(b.text for b in resp.content if getattr(b, "type", "") == "text")
     candidate = _extract_json_object(raw)
     if candidate is None:
+        stop_reason = getattr(resp, "stop_reason", None)
+        logger.warning("thought_leader_pr: unparsable synthesis reply (stop_reason=%s, chars=%d)",
+                       stop_reason, len(raw))
+        if stop_reason == "max_tokens":
+            return {"error": "The report generation ran out of output budget before it finished "
+                             "(stop_reason=max_tokens). Raise max_tokens in synthesize_report()."}
         return {"error": "The report generation returned an unreadable response."}
     try:
         parsed = json.loads(candidate)
