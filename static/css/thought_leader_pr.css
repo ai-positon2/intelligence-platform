@@ -47,6 +47,20 @@ html:root[data-theme="light"]{
 }
 
 *, *::before, *::after{box-sizing:border-box;}
+/* .tlpr-hero-glow (below) is a deliberately oversized decorative bleed --
+   inset:-80px -20% -40px means it extends 20% of .tlpr-hero's own width
+   past each edge on purpose, for a soft atmospheric look, not clipped
+   tight to the hero box. This page never had a horizontal-scroll guard for
+   that (several sibling agent pages already do: company_people_
+   intelligence.css and linkedin.css both set overflow-x:hidden here),
+   so on any viewport where the page's own side margin is smaller than the
+   glow's bleed, the glow itself pushed the document wider than the
+   viewport and produced a real horizontal scrollbar. Confirmed by
+   measuring document.documentElement.scrollWidth vs window.innerWidth in
+   a rendered harness (125px of overflow at 1440px) before touching this
+   rule, not by reading the CSS alone. html too, not just body, since a
+   wide absolutely-positioned descendant can still widen the root box. */
+html,body{overflow-x:hidden;}
 body{font-family:'Space Grotesk',-apple-system,BlinkMacSystemFont,sans-serif;min-height:100vh;-webkit-font-smoothing:antialiased;}
 
 /* ---- page-local design tokens ---- */
