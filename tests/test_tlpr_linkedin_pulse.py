@@ -98,6 +98,30 @@ def test_the_subjects_own_posts_are_filtered_out_by_author_id(monkeypatch):
     assert [p["platform_post_id"] for p in posts] == ["2"]
 
 
+def test_without_a_provider_id_the_subjects_own_posts_are_still_filtered_by_name(monkeypatch):
+    """Regression: when Phase 0 never resolved a provider_id, the author-id
+    check used to fail OPEN and let the subject's own posts straight through
+    a LinkedIn-wide keyword search for their own name -- their own words
+    would render as if they were someone else's reaction to them."""
+    monkeypatch.setattr(lp.unipile_transport, "account_for_platform", lambda p: "acc1")
+    monkeypatch.setattr(lp.unipile_client, "search_posts",
+                        lambda *a, **kw: (_envelope([_raw_post("1", author_name="Jane Doe"),
+                                                     _raw_post("2", author_name="Someone Else")]), None))
+    posts, errors = lp.collect_mentions("Jane Doe")
+    assert [p["platform_post_id"] for p in posts] == ["2"]
+
+
+def test_without_a_provider_id_a_mere_surname_match_is_not_filtered_out(monkeypatch):
+    """The name-based fallback must stay strict: sharing only a surname is
+    not enough to call a post 'the subject's own', or genuine reaction from
+    an unrelated same-surname author would be silently dropped."""
+    monkeypatch.setattr(lp.unipile_transport, "account_for_platform", lambda p: "acc1")
+    monkeypatch.setattr(lp.unipile_client, "search_posts",
+                        lambda *a, **kw: (_envelope([_raw_post("1", author_name="John Doe")]), None))
+    posts, errors = lp.collect_mentions("Jane Doe")
+    assert [p["platform_post_id"] for p in posts] == ["1"]
+
+
 def test_the_keyword_query_failing_never_blocks_the_mentioning_query(monkeypatch):
     monkeypatch.setattr(lp.unipile_transport, "account_for_platform", lambda p: "acc1")
     def fake_search(account_id, keywords=None, mentioning_member_ids=None, cursor=None, limit=50):

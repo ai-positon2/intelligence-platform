@@ -9,6 +9,7 @@ raised exception).
 
 from __future__ import annotations
 
+import json
 import os
 
 import pytest
@@ -878,6 +879,34 @@ class TestCleanReactionAnalysis:
         assert "—" not in out["themes"][0]["detail"]
         assert "—" not in out["notable_comments"][0]["why"]
 
+    def test_notable_comments_are_enriched_with_the_real_text(self):
+        """Regression: the comment digest sent to Claude is never itself
+        persisted, only this analysis result -- so a stored notable_comments
+        entry with only {comment_id, why} rendered a "why" a reader was
+        told to trust with nothing they could actually go read. Enriched
+        from digest_by_id, never trusted from the model's own reply, same
+        discipline tlpr_x_pulse._clean_analysis already uses for
+        notable_tweets."""
+        parsed = {
+            "comment_sentiment": {"linkedin:1": "positive"},
+            "notable_comments": [{"comment_id": "linkedin:1", "why": "A detailed, specific compliment."}],
+        }
+        digest_by_id = {"linkedin:1": {"id": "linkedin:1", "platform": "linkedin",
+                                       "text": "This is exactly the leadership our industry needs.",
+                                       "likes": 40}}
+        out = T._clean_reaction_analysis(parsed, {"linkedin:1"}, digest_by_id)
+        entry = out["notable_comments"][0]
+        assert entry["text"] == "This is exactly the leadership our industry needs."
+        assert entry["platform"] == "linkedin"
+
+    def test_notable_comments_enrichment_is_optional_and_omitted_when_no_digest_is_given(self):
+        parsed = {
+            "comment_sentiment": {"x:1": "positive"},
+            "notable_comments": [{"comment_id": "x:1", "why": "Widely liked."}],
+        }
+        out = T._clean_reaction_analysis(parsed, {"x:1"})
+        assert out["notable_comments"][0]["text"] is None
+
 
 class TestAnalyzeCommentSentiment:
     def test_no_comments_is_refused(self):
@@ -932,6 +961,25 @@ class TestAnalyzeCommentSentiment:
                                                               stop_reason="end_turn"))
         out = T.analyze_comment_sentiment([{"platform": "x", "comment_id": "1", "text": "hi", "likes": 1}])
         assert out["error"] == "The comment sentiment analysis returned an unreadable response."
+
+    def test_notable_comments_carry_their_real_text_end_to_end(self, monkeypatch):
+        """End-to-end version of TestCleanReactionAnalysis's enrichment
+        test: proves analyze_comment_sentiment itself builds digest_by_id
+        from the SAME digest it sends to Claude and threads it through, not
+        just that _clean_reaction_analysis can accept one in isolation."""
+        import anthropic
+        monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+        reply = json.dumps({
+            "verdict": "ok",
+            "comment_sentiment": {"x:1": "positive"},
+            "notable_comments": [{"comment_id": "x:1", "why": "A specific, well-argued compliment."}],
+        })
+        monkeypatch.setattr(anthropic, "Anthropic",
+                            lambda *a, **kw: self._FakeClient(text=reply, stop_reason="end_turn"))
+        out = T.analyze_comment_sentiment([{"platform": "x", "comment_id": "1",
+                                            "text": "Real comment text nobody else stores.", "likes": 9}])
+        assert out["notable_comments"][0]["text"] == "Real comment text nobody else stores."
+        assert out["notable_comments"][0]["platform"] == "x"
 
 
 class TestCollectReactionJob:

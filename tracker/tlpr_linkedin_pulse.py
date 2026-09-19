@@ -38,7 +38,7 @@ import os
 from collections import Counter
 from datetime import datetime, timezone
 
-from tracker import claude_websearch, sci_source_linkedin_unipile, unipile_client, unipile_transport
+from tracker import claude_websearch, sci_name_match, sci_source_linkedin_unipile, unipile_client, unipile_transport
 
 logger = logging.getLogger(__name__)
 
@@ -116,6 +116,35 @@ def _author_id(post: dict) -> str | None:
     return None
 
 
+def _author_name(post: dict) -> str:
+    author = (post.get("raw") or {}).get("author") or {}
+    if isinstance(author, dict):
+        return str(author.get("name") or "")
+    return ""
+
+
+def _is_own_post(post: dict, provider_id: str | None, full_name: str) -> bool:
+    """Whether this post's author is the subject themselves, so it gets
+    filtered out of 'what LinkedIn is saying about them'. provider_id is
+    authoritative when known. When it is NOT known (Phase 0 never resolved
+    it, or the search ran before identity confirmation), this used to fail
+    OPEN -- every post, including the subject's own, was kept -- so a
+    LinkedIn-wide keyword search for someone's own name would show their
+    own posts back to them as if they were audience reaction. Falls back to
+    a strict name match on the post's own author field (every significant
+    word of the searched name must appear in the author's name, the same
+    rule thought_leader_pr._looks_like_same_person uses for Apollo/YouTube,
+    reimplemented here to avoid importing thought_leader_pr, which already
+    imports this module)."""
+    if provider_id:
+        return _author_id(post) == str(provider_id)
+    search_tokens = sci_name_match.name_tokens(full_name)
+    author_tokens = sci_name_match.name_tokens(_author_name(post))
+    if not search_tokens or not author_tokens:
+        return False
+    return search_tokens <= author_tokens
+
+
 def collect_mentions(full_name: str, provider_id: str | None = None,
                      limit: int = FETCH_LIMIT) -> tuple[list[dict], dict]:
     """Every distinct LinkedIn post that genuinely mentions this person,
@@ -139,7 +168,7 @@ def collect_mentions(full_name: str, provider_id: str | None = None,
             pid = p.get("platform_post_id")
             if not pid or pid in seen:
                 continue
-            if provider_id and _author_id(p) == str(provider_id):
+            if _is_own_post(p, provider_id, name):
                 continue
             seen[pid] = p
 

@@ -10,7 +10,7 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-tokens.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-components.css') }}">
   <script src="/static/js/theme.js"></script>
-  <link rel="stylesheet" href="/static/css/thought_leader_pr.css?v=6">
+  <link rel="stylesheet" href="/static/css/thought_leader_pr.css?v=7">
   <link rel="stylesheet" href="/static/css/aurora-app.css?v=3">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/agent-feedback.css') }}">
   <script src="{{ url_for('static', filename='js/agent_feedback.js') }}"></script>
@@ -423,14 +423,23 @@
 
     function sentimentBarsHtml(counts, total){
       counts = counts || {};
-      return ['positive', 'neutral', 'negative', 'mixed'].map(k => {
-        const pct = total ? Math.round((counts[k] || 0) / total * 100) : 0;
+      // A bare percentage hides its own denominator: "8% negative" reads
+      // identically whether that's 1 of 12 items or 40 of 400. Show the
+      // labelled total once up front, and the raw count behind every bar's
+      // percentage, so a reader can tell a thin read from a deep one.
+      const base = total
+        ? `<div class="tlpr-sent-base">Based on ${total} item${total === 1 ? '' : 's'} Claude was able to label</div>`
+        : '';
+      const bars = ['positive', 'neutral', 'negative', 'mixed'].map(k => {
+        const n = counts[k] || 0;
+        const pct = total ? Math.round(n / total * 100) : 0;
         return `<div class="tlpr-sent-row">
                   <span class="tlpr-sent-label sent-${k}">${SENTIMENT_LABEL[k]}</span>
                   <div class="tlpr-sent-track"><div class="tlpr-sent-fill sent-${k}" data-pct="${pct}" style="width:0%"></div></div>
-                  <span class="tlpr-sent-pct">${pct}%</span>
+                  <span class="tlpr-sent-pct">${pct}% <span class="tlpr-sent-n">(${n})</span></span>
                 </div>`;
       }).join('');
+      return base + bars;
     }
     // Sentiment bars are always written into the DOM already at their final
     // width (the render functions above build a complete HTML string, there
@@ -458,6 +467,18 @@
           <div class="tlpr-theme-body"><b>${esc(t.label)}</b><p>${esc(t.detail)}</p></div>
         </div>`).join('');
     }
+    // A notable comment's own text, quoted -- not just Claude's "why" about
+    // it. The digest sent to Claude for this read is never itself stored
+    // anywhere, only this analysis result, so without the real quoted text
+    // here a reader was being asked to trust a "why" pointing at a comment
+    // they had no way to actually go read.
+    function notableCommentsHtml(items){
+      return (items || []).map(n => {
+        const text = esc(n.text || 'The original comment text was not retained.');
+        const platform = n.platform ? ` <span class="tlpr-notable-source">· ${esc(n.platform)}</span>` : '';
+        return `<li class="tlpr-notable-item"><b>${text}</b>${platform}<p>${esc(n.why)}</p></li>`;
+      }).join('');
+    }
     function commentSentimentHtml(cs, commentsAnalyzed){
       if (!commentsAnalyzed){
         return `<div class="tlpr-reaction-empty">No comments were available from their recent posts to analyze.</div>`;
@@ -466,13 +487,13 @@
         return `<div class="tlpr-reaction-empty">${esc((cs && cs.error) || 'The comment analysis did not complete.')}</div>`;
       }
       const s = cs.sentiment || {};
-      const notable = (cs.notable_comments || []).map(n => `<li>${esc(n.why)}</li>`).join('');
+      const notable = notableCommentsHtml(cs.notable_comments);
       return `
         <div class="tlpr-reaction-verdict">${esc(cs.verdict || '')}</div>
         <div class="tlpr-sent-bars">${sentimentBarsHtml(s.counts, s.labelled)}</div>
         ${themeRowsHtml(cs.themes)}
         ${notable ? `<div class="tlpr-facts" style="margin-top:14px;">
-            <div class="tlpr-facts-label">Notable comments</div><ul>${notable}</ul></div>` : ''}`;
+            <div class="tlpr-facts-label">Notable comments</div><ul class="tlpr-notable-list">${notable}</ul></div>` : ''}`;
     }
     function redditPulseHtml(rp){
       if (!rp) return '<div class="tlpr-reaction-empty">The Reddit conversation read did not complete.</div>';
@@ -920,6 +941,18 @@
         const key = id + ':' + phase;
         if (_autoStarted.has(key)) return;
         _autoStarted.add(key);
+        // Optimistically mark this phase 'collecting' on the SAME run
+        // object the caller is holding, not just in _autoStarted. A page
+        // load renders several sections back to back from one shared run
+        // snapshot (e.g. openHistoryRun's posts/press/synthesis calls) --
+        // without this, starting (say) press here paints its spinner, but
+        // the very next renderPressSection(run) call in that same sequence
+        // still sees the snapshot's stale 'idle' and repaints the idle
+        // "Find press coverage" CTA right over the spinner that just
+        // started, even though the collection is genuinely running in the
+        // background. This mutation is what the next render call in the
+        // chain actually sees.
+        run[phase + '_status'] = 'collecting';
         fn(id);
       };
       if (!run.posts_status || run.posts_status === 'idle') once('posts', startCollecting);
@@ -1109,9 +1142,15 @@
             const row = RUNS.find(r => String(r.id) === String(runId));
             if (row) row.status = 'confirmed';
             renderHistory();
-            renderPostsSection({id: runId, posts_status: 'idle'});
-            renderPressSection({id: runId, press_status: 'idle'});
-            renderSynthesisSection({id: runId, synthesis_status: 'idle'});
+            // One shared object across all three calls, not three separate
+            // throwaway literals: maybeAutoRun (called from inside each of
+            // these) mutates the phase it just auto-started to 'collecting'
+            // on this SAME object, so the next call in this sequence sees
+            // that and doesn't repaint a stale idle CTA over its spinner.
+            const freshRun = {id: runId, posts_status: 'idle', press_status: 'idle', synthesis_status: 'idle'};
+            renderPostsSection(freshRun);
+            renderPressSection(freshRun);
+            renderSynthesisSection(freshRun);
           } else {
             confirmBtn.disabled = false;
           }

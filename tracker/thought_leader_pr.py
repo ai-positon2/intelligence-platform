@@ -1544,15 +1544,23 @@ def _digest_comments(comments: list[dict], max_items: int = MAX_COMMENTS_DIGEST)
     return out
 
 
-def _clean_reaction_analysis(parsed: dict, valid_ids: set[str]) -> dict:
+def _clean_reaction_analysis(parsed: dict, valid_ids: set[str], digest_by_id: dict | None = None) -> dict:
     """Same discipline as tlpr_reddit_pulse._clean_analysis: strip every
     comment id the model was not actually given, drop any theme left with
     no real citation, compute sentiment counts from the labels rather than
     trust a self-reported tally, and strip_em_dash every free-text field the
     model wrote -- this dict's "detail"/"why"/"verdict" strings are exactly
     the kind of model-authored prose that shipped a dash to a live report
-    before b00d931 unified this fix."""
+    before b00d931 unified this fix.
+
+    notable_comments is enriched from digest_by_id (never trusted from the
+    model's own reply) the same way tlpr_x_pulse._clean_analysis enriches
+    notable_tweets -- this comment digest was never itself persisted
+    anywhere, only this analysis result, so without this a stored
+    notable_comments entry citing comment_id "linkedin:abc" would render a
+    "why" a reader is told to trust with nothing they can actually read."""
     _clean = claude_websearch.strip_em_dash
+    digest_by_id = digest_by_id or {}
 
     def _cited(entries, *, name_key):
         out = []
@@ -1586,7 +1594,9 @@ def _clean_reaction_analysis(parsed: dict, valid_ids: set[str]) -> dict:
         cid = str(entry.get("comment_id") or "")
         why = _clean(str(entry.get("why") or "").strip())
         if cid in valid_ids and why:
-            notable.append({"comment_id": cid, "why": why[:300]})
+            src = digest_by_id.get(cid) or {}
+            notable.append({"comment_id": cid, "why": why[:300],
+                            "text": src.get("text"), "platform": src.get("platform")})
 
     return {
         "verdict": _clean(str(parsed.get("verdict") or "").strip()),
@@ -1611,6 +1621,7 @@ def analyze_comment_sentiment(comments: list[dict]) -> dict:
         return {"error": "ANTHROPIC_API_KEY is not configured on this deployment."}
     digest = _digest_comments(comments)
     valid_ids = {d["id"] for d in digest}
+    digest_by_id = {d["id"]: d for d in digest}
     try:
         from anthropic import Anthropic
         client = Anthropic(api_key=key, timeout=120.0, max_retries=1)
@@ -1641,7 +1652,7 @@ def analyze_comment_sentiment(comments: list[dict]) -> dict:
                              "it finished (stop_reason=max_tokens). Raise max_tokens in "
                              "analyze_comment_sentiment() or reduce MAX_COMMENTS_DIGEST."}
         return {"error": "The comment sentiment analysis returned an unreadable response."}
-    return _clean_reaction_analysis(parsed, valid_ids)
+    return _clean_reaction_analysis(parsed, valid_ids, digest_by_id)
 
 
 def collect_reaction_job(run_id: int, email: str, max_posts: int = MAX_POSTS_FOR_REACTION,
