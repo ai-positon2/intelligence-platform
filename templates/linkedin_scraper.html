@@ -10,6 +10,7 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-tokens.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-components.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/linkedin.css') }}?v=6">
+  <link rel="stylesheet" href="/static/css/thinking-orb.css">
   <script src="/static/js/theme.js"></script>
   <link rel="stylesheet" href="/static/css/aurora-app.css?v=3">
   <script src="/static/js/aurora.js?v=1" defer></script>
@@ -65,7 +66,7 @@
     <div class="page-hdr-sub">Signal tracking: people, companies &amp; post engagement</div>
   </div>
   <div class="li-toolbar">
-    <div class="li-sync" id="liSync"><span class="li-sync-dot" id="liSyncDot"></span><span id="liSyncLabel">Loading…</span></div>
+    <div class="li-sync" id="liSync"><span class="li-sync-dot" id="liSyncDot" hidden></span><span id="liSyncOrb"></span><span id="liSyncLabel">Loading…</span></div>
     <button class="li-refresh-btn" id="liRefreshBtn" onclick="refreshLI()" title="Re-pull the latest rows from the Google Sheet">
       <span class="li-refresh-ic" id="liRefreshIc">↻</span> Refresh
     </button>

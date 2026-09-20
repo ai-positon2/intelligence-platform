@@ -508,12 +508,7 @@ body{font-family:'Space Grotesk',-apple-system,BlinkMacSystemFont,sans-serif;min
 .tlpr-btn-collect:hover{background-position:100% 50%;transform:translateY(-2px);}
 .tlpr-btn-collect svg{width:15px;height:15px;stroke:#241305;fill:none;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round;}
 
-.tlpr-card--posts-loading{display:flex;align-items:center;gap:14px;color:var(--tx2);font-size:var(--fs-sm);}
-.tlpr-posts-loading-spin{
-  width:22px;height:22px;border-radius:50%;flex-shrink:0;
-  border:2.5px solid var(--b2);border-top-color:var(--sp-gold);
-  animation:tlpr-spin .8s linear infinite;
-}
+.tlpr-card--posts-loading{display:flex;align-items:center;justify-content:center;gap:14px;color:var(--tx2);font-size:var(--fs-sm);padding:var(--sp3) 0;}
 
 .tlpr-posts-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:var(--sp4);}
 .tlpr-posts-head h3{font-family:var(--tlpr-display);font-size:var(--fs-xl);font-weight:800;color:var(--tx);margin:0;}
@@ -815,7 +810,7 @@ body{font-family:'Space Grotesk',-apple-system,BlinkMacSystemFont,sans-serif;min
 @media (prefers-reduced-motion:reduce){
   .tlpr-search-card,.tlpr-loading,.tlpr-card,.tlpr-refine-row,
   .tlpr-skel-avatar,.tlpr-skel-line,.tlpr-resolve-btn .tlpr-spin,
-  .tlpr-posts-loading-spin,.tlpr-hero-glow,.tlpr-avatar::before{animation:none!important;}
+  .tlpr-hero-glow,.tlpr-avatar::before{animation:none!important;}
   .tlpr-sent-fill{transition:none!important;}
 }
 

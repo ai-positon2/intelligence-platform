@@ -11,6 +11,7 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-tokens.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-components.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/job_change_alert.css') }}?v=8">
+  <link rel="stylesheet" href="/static/css/thinking-orb.css">
   <script src="/static/js/theme.js"></script>
   <link rel="stylesheet" href="/static/css/aurora-app.css?v=3">
   <link rel="stylesheet" href="/static/css/grid-tokens.css">
@@ -59,7 +60,7 @@
         <p>Key people at target accounts who recently started a new role — the best time to reach out is within days of a job change — plus the full roster of people and companies being watched for the next one.</p>
       </div>
       {% if is_admin %}
-      <button class="sync-btn" id="syncBtn" onclick="runSync()"><span class="sync-icon">↻</span> Sync now</button>
+      <button class="sync-btn" id="syncBtn" onclick="runSync()"><span class="sync-icon" id="syncIcon">↻</span> Sync now</button>
       {% endif %}
     </div>
 
@@ -142,13 +143,13 @@
       <div class="jc-chip-row" id="chipRow"></div>
 
       <div id="pane-events" class="tab-pane active">
-        <div class="tbl-wrap"><div id="tableWrap-events"><div class="jc-loading">Loading…</div></div></div>
+        <div class="tbl-wrap"><div id="tableWrap-events"><div class="jc-loading" data-orb-state="listening" data-orb-size="64">Loading…</div></div></div>
       </div>
       <div id="pane-people" class="tab-pane">
-        <div class="tbl-wrap"><div id="tableWrap-people"><div class="jc-loading">Loading the tracked-contacts roster…</div></div></div>
+        <div class="tbl-wrap"><div id="tableWrap-people"><div class="jc-loading" data-orb-state="listening" data-orb-size="64">Loading the tracked-contacts roster…</div></div></div>
       </div>
       <div id="pane-companies" class="tab-pane">
-        <div class="tbl-wrap"><div id="tableWrap-companies"><div class="jc-loading">Loading the tracked-companies roster…</div></div></div>
+        <div class="tbl-wrap"><div id="tableWrap-companies"><div class="jc-loading" data-orb-state="listening" data-orb-size="64">Loading the tracked-companies roster…</div></div></div>
       </div>
     </div>
   </div>
@@ -696,9 +697,10 @@
 
     function render(){
       renderChips();
-      if(TAB==='events')return renderEvents();
-      if(TAB==='people')return renderPeople();
-      return renderCompanies();
+      if(TAB==='events') renderEvents();
+      else if(TAB==='people') renderPeople();
+      else renderCompanies();
+      import('/static/js/thinking-orb.js').then(function(m){ m.autoMountOrbPlaceholders(); }).catch(function(){});
     }
 
     function renderEvents(){
@@ -757,7 +759,7 @@
     }
 
     function renderPeople(){
-      if(!TRACKED){document.getElementById('tableWrap-people').innerHTML='<div class="jc-loading">Loading the tracked-contacts roster…</div>';return;}
+      if(!TRACKED){document.getElementById('tableWrap-people').innerHTML='<div class="jc-loading" data-orb-state="listening" data-orb-size="64">Loading the tracked-contacts roster…</div>';return;}
       var q=(document.getElementById('searchInput').value||'').toLowerCase().trim();
       var f=FILTERS.people;
       var rows=TRACKED.contacts.filter(function(c){
@@ -806,7 +808,7 @@
     }
 
     function renderCompanies(){
-      if(!TRACKED){document.getElementById('tableWrap-companies').innerHTML='<div class="jc-loading">Loading the tracked-companies roster…</div>';return;}
+      if(!TRACKED){document.getElementById('tableWrap-companies').innerHTML='<div class="jc-loading" data-orb-state="listening" data-orb-size="64">Loading the tracked-companies roster…</div>';return;}
       var q=(document.getElementById('searchInput').value||'').toLowerCase().trim();
       var f=FILTERS.companies;
       var rows=TRACKED.companies.filter(function(c){
@@ -856,11 +858,24 @@
       renderTableProgressive('tableWrap-companies', head, rows, companiesRow);
     }
 
+    var _jcSyncOrb=null;
+    function _jcSyncIconStart(){
+      var ic=document.getElementById('syncIcon');
+      import('/static/js/thinking-orb.js').then(function(m){
+        if(!ic.querySelector('canvas')){ ic.innerHTML=''; _jcSyncOrb=m.mountThinkingOrb(ic, {state:'working', size:20}); }
+      }).catch(function(){});
+    }
+    function _jcSyncIconStop(){
+      if(_jcSyncOrb){ _jcSyncOrb.destroy(); _jcSyncOrb=null; }
+      document.getElementById('syncIcon').innerHTML='↻';
+    }
     function runSync(){
       var btn=document.getElementById('syncBtn'), msg=document.getElementById('syncMsg');
       btn.disabled=true; btn.classList.add('spinning'); msg.className='sync-msg'; msg.textContent='Syncing…';
+      _jcSyncIconStart();
       fetch('/p2/strategic-agents/job-change-alert/sync',{method:'POST'}).then(function(r){return r.json();}).then(function(data){
         btn.disabled=false; btn.classList.remove('spinning');
+        _jcSyncIconStop();
         if(data.ok){
           msg.className='sync-msg ok'; msg.textContent='Synced — '+(data.added||0)+' new event(s).';
           loadEvents();
@@ -869,12 +884,14 @@
         }
       }).catch(function(){
         btn.disabled=false; btn.classList.remove('spinning');
+        _jcSyncIconStop();
         msg.className='sync-msg err'; msg.textContent='Sync failed.';
       });
     }
 
     revealCards();
     populateFilters();
+    import('/static/js/thinking-orb.js').then(function(m){ m.autoMountOrbPlaceholders(); }).catch(function(){});
     loadEvents();
     loadTracked();
   </script>

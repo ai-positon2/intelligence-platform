@@ -79,8 +79,6 @@ body {
 .sync-btn:hover { background: rgba(245,166,35,.2); }
 .sync-btn:disabled { opacity: .5; cursor: default; }
 .sync-icon { display: inline-block; transition: transform .5s; }
-.sync-btn.spinning .sync-icon { animation: spin 1s linear infinite; }
-@keyframes spin { to{transform:rotate(360deg)} }
 
 /* Stats */
 .stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--gutter); margin-bottom: 24px; }

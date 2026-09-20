@@ -566,7 +566,6 @@ table.gd-tbl td:last-child { padding-right: 22px; }
 .gd-ai-col.ai-risk li::before { color: #fda4af; }
 .gd-ai-coverage { margin-top: 16px; padding-top: 14px; border-top: 1px solid rgba(255,255,255,.06); font-size: 11px; color: #6c7f78; font-style: italic; }
 .gd-ai-loading { display: flex; align-items: center; gap: 12px; color: #6c7f78; font-size: 12.5px; padding: 6px 0 2px; }
-.gd-ai-pulse { width: 16px; height: 16px; border-radius: 50%; border: 2px solid rgba(74,222,128,.25); border-top-color: #4ade80; animation: gdAiSpin .8s linear infinite; flex-shrink: 0; }
 .gd-ai-empty { color: #6c7f78; font-size: 12.5px; line-height: var(--lh-body); }
 .gd-ai-empty b { display: block; color: #c2d4cc; font-size: 13px; margin-bottom: 4px; }
 .gd-ai-retry { display: inline-block; margin-top: 10px; background: rgba(74,222,128,.12); border: 1px solid rgba(74,222,128,.32); color: #a7f3c4; border-radius: var(--radius-pill); padding: 6px 15px; font-size: 11.5px; font-weight: 600; cursor: pointer; font-family: inherit; transition: background .15s; }

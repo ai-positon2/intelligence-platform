@@ -10,7 +10,8 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-tokens.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-components.css') }}">
   <script src="/static/js/theme.js"></script>
-  <link rel="stylesheet" href="/static/css/thought_leader_pr.css?v=9">
+  <link rel="stylesheet" href="/static/css/thought_leader_pr.css?v=10">
+  <link rel="stylesheet" href="/static/css/thinking-orb.css">
   <link rel="stylesheet" href="/static/css/aurora-app.css?v=3">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/agent-feedback.css') }}">
   <script src="{{ url_for('static', filename='js/agent_feedback.js') }}"></script>
@@ -105,6 +106,15 @@
     function esc(s){
       return String(s == null ? '' : s).replace(/[&<>"']/g, c => (
         {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    }
+    // Mounts a thinking-orb into every [data-orb-state] placeholder just
+    // written into `root` (a *LoadingHtml() card). Fire-and-forget: the
+    // dynamic import keeps this callable from anywhere in this classic
+    // script with no module-vs-script load-order dependency, and a failed
+    // import just leaves the plain loading text in place (see
+    // static/js/thinking-orb.js's own header for why).
+    function mountOrbsIn(root){
+      import('/static/js/thinking-orb.js').then(function(m){ m.autoMountOrbPlaceholders(root); }).catch(function(){});
     }
     function initials(name){
       const parts = (name || '').trim().split(/\s+/).filter(Boolean);
@@ -358,8 +368,7 @@
     function postsLoadingHtml(){
       return `
         <div class="tlpr-card tlpr-card--posts-loading">
-          <div class="tlpr-posts-loading-spin"></div>
-          <div>Collecting their recent posts across LinkedIn, X and YouTube…</div>
+          <div class="thinking-orb-slot" data-orb-state="searching" data-orb-size="64">Collecting their recent posts across LinkedIn, X and YouTube…</div>
         </div>`;
     }
     function postsFailedHtml(runId, message){
@@ -377,7 +386,7 @@
       if (!el || !run) return;
       const status = run.posts_status || 'idle';
       if (status === 'ready') el.innerHTML = postsReadyHtml(run);
-      else if (status === 'collecting') { el.innerHTML = postsLoadingHtml(); pollPosts(run.id); }
+      else if (status === 'collecting') { el.innerHTML = postsLoadingHtml(); mountOrbsIn(el); pollPosts(run.id); }
       else if (status === 'failed') el.innerHTML = postsFailedHtml(run.id, (run.posts_errors || {})._run);
       else el.innerHTML = postsIdleHtml(run.id);
       // The reaction step follows posts, once they're actually ready to
@@ -406,7 +415,8 @@
     }
 
     async function startCollecting(runId){
-      document.getElementById('tlprPostsSection').innerHTML = postsLoadingHtml();
+      const _el = document.getElementById('tlprPostsSection');
+      _el.innerHTML = postsLoadingHtml(); mountOrbsIn(_el);
       try {
         const res = await fetch(`/p2/strategic-agents/thought-leader-pr/runs/${runId}/collect`, {method: 'POST'});
         const out = await res.json();
@@ -645,8 +655,7 @@
     function reactionLoadingHtml(){
       return `
         <div class="tlpr-card tlpr-card--posts-loading">
-          <div class="tlpr-posts-loading-spin"></div>
-          <div>Reading comments and the X, LinkedIn, TikTok, Instagram, Reddit and Facebook conversations…</div>
+          <div class="thinking-orb-slot" data-orb-state="listening" data-orb-size="64">Reading comments and the X, LinkedIn, TikTok, Instagram, Reddit and Facebook conversations…</div>
         </div>`;
     }
     function reactionFailedHtml(runId, message){
@@ -664,7 +673,7 @@
       if (!el || !run) return;
       const status = run.reaction_status || 'idle';
       if (status === 'ready') el.innerHTML = reactionReadyHtml(run);
-      else if (status === 'collecting') { el.innerHTML = reactionLoadingHtml(); pollReaction(run.id); }
+      else if (status === 'collecting') { el.innerHTML = reactionLoadingHtml(); mountOrbsIn(el); pollReaction(run.id); }
       else if (status === 'failed') el.innerHTML = reactionFailedHtml(run.id, (run.reaction_errors || {})._run);
       else el.innerHTML = reactionIdleHtml(run.id);
       maybeAutoRun(run);
@@ -686,7 +695,8 @@
     }
 
     async function startAnalyzingReaction(runId){
-      document.getElementById('tlprReactionSection').innerHTML = reactionLoadingHtml();
+      const _el = document.getElementById('tlprReactionSection');
+      _el.innerHTML = reactionLoadingHtml(); mountOrbsIn(_el);
       try {
         const res = await fetch(`/p2/strategic-agents/thought-leader-pr/runs/${runId}/collect-reaction`, {method: 'POST'});
         const out = await res.json();
@@ -774,8 +784,7 @@
     function pressLoadingHtml(){
       return `
         <div class="tlpr-card tlpr-card--posts-loading">
-          <div class="tlpr-posts-loading-spin"></div>
-          <div>Searching for press coverage…</div>
+          <div class="thinking-orb-slot" data-orb-state="searching" data-orb-size="64">Searching for press coverage…</div>
         </div>`;
     }
     function pressFailedHtml(runId, message){
@@ -793,7 +802,7 @@
       if (!el || !run) return;
       const status = run.press_status || 'idle';
       if (status === 'ready') el.innerHTML = pressReadyHtml(run);
-      else if (status === 'collecting') { el.innerHTML = pressLoadingHtml(); pollPress(run.id); }
+      else if (status === 'collecting') { el.innerHTML = pressLoadingHtml(); mountOrbsIn(el); pollPress(run.id); }
       else if (status === 'failed') el.innerHTML = pressFailedHtml(run.id, (run.press_errors || {})._run);
       else el.innerHTML = pressIdleHtml(run.id);
       maybeAutoRun(run);
@@ -815,7 +824,8 @@
     }
 
     async function startFindingPress(runId){
-      document.getElementById('tlprPressSection').innerHTML = pressLoadingHtml();
+      const _el = document.getElementById('tlprPressSection');
+      _el.innerHTML = pressLoadingHtml(); mountOrbsIn(_el);
       try {
         const res = await fetch(`/p2/strategic-agents/thought-leader-pr/runs/${runId}/collect-press`, {method: 'POST'});
         const out = await res.json();
@@ -890,8 +900,7 @@
     function synthesisLoadingHtml(){
       return `
         <div class="tlpr-card tlpr-card--posts-loading">
-          <div class="tlpr-posts-loading-spin"></div>
-          <div>Writing the reputation report…</div>
+          <div class="thinking-orb-slot" data-orb-state="composing" data-orb-size="64">Writing the reputation report…</div>
         </div>`;
     }
     function synthesisFailedHtml(runId, message){
@@ -909,7 +918,7 @@
       if (!el || !run) return;
       const status = run.synthesis_status || 'idle';
       if (status === 'ready') el.innerHTML = synthesisReadyHtml(run);
-      else if (status === 'collecting') { el.innerHTML = synthesisLoadingHtml(); pollSynthesis(run.id); }
+      else if (status === 'collecting') { el.innerHTML = synthesisLoadingHtml(); mountOrbsIn(el); pollSynthesis(run.id); }
       else if (status === 'failed') el.innerHTML = synthesisFailedHtml(run.id, (run.synthesis_errors || {})._run);
       else el.innerHTML = synthesisIdleHtml(run.id);
     }
@@ -982,7 +991,8 @@
     }
 
     async function startSynthesizing(runId){
-      document.getElementById('tlprSynthesisSection').innerHTML = synthesisLoadingHtml();
+      const _el = document.getElementById('tlprSynthesisSection');
+      _el.innerHTML = synthesisLoadingHtml(); mountOrbsIn(_el);
       try {
         const res = await fetch(`/p2/strategic-agents/thought-leader-pr/runs/${runId}/collect-synthesis`, {method: 'POST'});
         const out = await res.json();
