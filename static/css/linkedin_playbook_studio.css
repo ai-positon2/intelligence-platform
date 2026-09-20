@@ -183,8 +183,6 @@ body {
 .lps-mode-cancel:hover { color: #f87171; }
 
 .lps-running { display: flex; flex-direction: column; align-items: center; gap: 16px; padding: 48px 22px; text-align: center; }
-.lps-spinner { width: 40px; height: 40px; border-radius: 50%; border: 3px solid rgba(244,114,182,.15); border-top-color: #f472b6; animation: lpsSpin .8s linear infinite; }
-@keyframes lpsSpin { to{transform:rotate(360deg)} }
 .lps-running-text { font-size: 13px; color: #9a94ab; max-width: 420px; line-height: var(--lh-body); }
 
 /* Table */
