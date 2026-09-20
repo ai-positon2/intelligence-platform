@@ -11,7 +11,8 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-components.css') }}">
   <script src="/static/js/theme.js"></script>
   <link rel="stylesheet" href="/static/css/grid-tokens.css">
-  <link rel="stylesheet" href="/static/css/event_conference_intelligence.css?v=2">
+  <link rel="stylesheet" href="/static/css/event_conference_intelligence.css?v=3">
+  <link rel="stylesheet" href="/static/css/thinking-orb.css">
   <link rel="stylesheet" href="/static/css/aurora-app.css?v=3">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/agent-feedback.css') }}">
   <script src="{{ url_for('static', filename='js/agent_feedback.js') }}"></script>
@@ -494,7 +495,7 @@
 
           <div id="runningWrap" style="display:none">
             <div class="evi-running">
-              <span class="evi-spinner"></span>
+              <span class="thinking-orb-slot" data-orb-state="working" data-orb-size="20"></span>
               <span id="runningText">Working. This runs in the background, so you can leave
                 this page and find the result in History when it is done.</span>
             </div>
@@ -583,6 +584,13 @@
       return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){
         return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
       });
+    }
+    // Mounts a thinking-orb into every [data-orb-state] placeholder just
+    // written into `root`. Dynamic import so this is callable from anywhere
+    // in this classic inline script with no load-order dependency; a
+    // failed import just leaves the plain loading text in place.
+    function mountOrbsIn(root){
+      import('/static/js/thinking-orb.js').then(function(m){ m.autoMountOrbPlaceholders(root); }).catch(function(){});
     }
 
     /* Thumbs up/down for one section of a report, keyed by run + a stable
@@ -1084,7 +1092,8 @@
         return Promise.resolve();
       }
       panel.style.display = 'block';
-      panel.innerHTML = '<div class="evi-suggest-loading">Searching…</div>';
+      panel.innerHTML = '<div class="evi-suggest-loading"><div class="thinking-orb-slot" data-orb-state="searching" data-orb-size="20">Searching…</div></div>';
+      mountOrbsIn(panel);
       // Returned, same as draftProfile(), so a test can wait for it. Nothing
       // in the page uses the return value itself.
       return fetch(BASE + '/search?q=' + encodeURIComponent(q))
@@ -1296,6 +1305,7 @@
       var btn = document.getElementById('runBtn');
       btn.disabled = true;
       document.getElementById('runningWrap').style.display = '';
+      mountOrbsIn(document.getElementById('runningWrap'));
       document.getElementById('runningText').textContent =
         mode === 'recommend'
           ? 'Searching all six event categories. This takes a few minutes and runs in the background, so you can leave this page.'
@@ -1490,11 +1500,13 @@
       document.getElementById('drawerTitle').textContent = 'Loading';
       document.getElementById('eventExportLink').hidden = true;
       document.getElementById('drawerSub').textContent = '';
-      document.getElementById('drawerBody').innerHTML =
-        '<div class="evi-empty"><span class="ic"><span class="evi-spinner"></span></span>' +
+      var _drawerBody = document.getElementById('drawerBody');
+      _drawerBody.innerHTML =
+        '<div class="evi-empty"><span class="thinking-orb-slot" data-orb-state="listening" data-orb-size="64"></span>' +
         '<b>Loading this run</b>' +
         '<span id="drawerLive" role="status" aria-live="polite">Reading what it ' +
         'stored.</span></div>';
+      mountOrbsIn(_drawerBody);
       activeRoles = null;
       /* Per-run state, not per-session: a reader who sorted one roster by
          date should not find the next run they open already sorted. */
@@ -4012,12 +4024,13 @@
       if (run.status === 'failed') {
         html += '<div class="evi-err">' + esc(run.error || 'This run failed.') + '</div>';
       } else if (run.status === 'running') {
-        html += '<div class="evi-running"><span class="evi-spinner"></span><span>' +
+        html += '<div class="evi-running"><span class="thinking-orb-slot" data-orb-state="working" data-orb-size="20"></span><span>' +
           esc(STAGES[run.stage] || 'Working.') + '</span></div>';
       } else {
         html += recommendHtml(run);
       }
       document.getElementById('drawerBody').innerHTML = html;
+      mountOrbsIn(document.getElementById('drawerBody'));
       armAnim('recommend:' + run.id + ':' + run.status);
     }
 
@@ -4186,16 +4199,18 @@
       if (run.status === 'failed') {
         html += '<div class="evi-err">' + esc(run.error || 'This run failed.') + '</div>';
         document.getElementById('drawerBody').innerHTML = html;
+        mountOrbsIn(document.getElementById('drawerBody'));
         return;
       }
       if (run.status === 'running') {
-        html += '<div class="evi-running"><span class="evi-spinner"></span><span>' +
+        html += '<div class="evi-running"><span class="thinking-orb-slot" data-orb-state="working" data-orb-size="20"></span><span>' +
           esc(STAGES[run.stage] || 'Working.') + '</span></div>';
       }
       if (s.no_roster) {
         html += '<div class="evi-coverage"><span class="ic">i</span><span class="tx">' +
           esc(s.note) + '</span></div>';
         document.getElementById('drawerBody').innerHTML = html;
+        mountOrbsIn(document.getElementById('drawerBody'));
         return;
       }
 
@@ -4308,6 +4323,7 @@
           '</div></div>';
       }
       document.getElementById('drawerBody').innerHTML = html;
+      mountOrbsIn(document.getElementById('drawerBody'));
       armAnim('workroom:' + run.id + ':' + run.status);
     }
 
@@ -4347,7 +4363,7 @@
         html += '<div class="evi-err">' + esc(run.error || 'This run failed.') + '</div>';
       }
       if (run.status === 'running') {
-        html += '<div class="evi-running"><span class="evi-spinner"></span>' +
+        html += '<div class="evi-running"><span class="thinking-orb-slot" data-orb-state="working" data-orb-size="20"></span>' +
           '<span id="drawerLive" role="status" aria-live="polite">' +
           esc(STAGES[run.stage] || 'Working.') + '</span></div>';
       }
@@ -4388,6 +4404,7 @@
         '<b>No events matched</b><span>' +
         esc(s.note || s.discover_note ||
             'Nothing to show for this run.') + '</span></div>';
+      mountOrbsIn(document.getElementById('drawerBody'));
       armAnim(run.mode + ':' + run.id + ':' + run.status);
     }
 

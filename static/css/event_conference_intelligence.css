@@ -1882,14 +1882,7 @@ table.evi-table { width: 100%; border-collapse: separate; border-spacing: 0;
 }
 @media (prefers-reduced-motion: reduce) {
   .evi-steps li.now .dot { animation: none; }
-  .evi-spinner { animation-duration: 2s; }
 }
-.evi-spinner {
-  width: 13px; height: 13px; border: 2px solid rgba(99,102,241,.25);
-  border-top-color: var(--evi-a2); border-radius: 50%; display: inline-block;
-  animation: evi-spin .7s linear infinite; flex-shrink: 0;
-}
-@keyframes evi-spin { to { transform: rotate(360deg); } }
 .evi-running {
   display: flex; align-items: center; gap: 11px; padding: 13px 15px;
   border-radius: var(--radius-md, 10px); background: var(--evi-panel-2);
