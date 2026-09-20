@@ -10,7 +10,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet"/>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-tokens.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-components.css') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/job_change_alert.css') }}?v=8">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/job_change_alert.css') }}?v=9">
   <link rel="stylesheet" href="/static/css/thinking-orb.css">
   <script src="/static/js/theme.js"></script>
   <link rel="stylesheet" href="/static/css/aurora-app.css?v=3">
@@ -255,9 +255,10 @@
       requestAnimationFrame(step);
     }
     function revealCards(){
-      document.querySelectorAll('.stat-card,.card').forEach(function(el,i){
-        setTimeout(function(){el.classList.add('visible');},i*55);
-      });
+      var cards = document.querySelectorAll('.stat-card,.card');
+      import('/static/js/cube-motion.js').then(function(m){
+        m.rise(cards, { stagger: 55 });
+      }).catch(function(){});
     }
 
     function distinct(arr,key){
