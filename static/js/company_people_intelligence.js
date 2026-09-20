@@ -2,6 +2,16 @@
 (function(){
 "use strict";
 
+/* Mounts a thinking-orb into every [data-orb-state] placeholder just
+   written into `root`. Dynamic import (not a <script type="module">) so
+   this is callable from anywhere in this classic, deferred script with no
+   load-order dependency; a failed import just leaves the plain loading
+   text in place. See static/js/thinking-orb.js's own header for why the
+   engine itself is vendored rather than pulled from a CDN. */
+function mountOrbsIn(root){
+  import('/static/js/thinking-orb.js').then(function(m){ m.autoMountOrbPlaceholders(root); }).catch(function(){});
+}
+
 var SEARCH_URL = window.__CPI_SEARCH_URL__;
 var ENRICH_URL = window.__CPI_ENRICH_URL__;
 var CHAT_URL   = window.__CPI_CHAT_URL__;
@@ -1722,7 +1732,8 @@ window.cpiOpenHistory = function(){
   document.getElementById("cpiDrawerOvl").classList.add("on");
   document.getElementById("cpiDrawer").classList.add("on");
   var body=document.getElementById("cpiDrawerBody");
-  body.innerHTML='<div class="cpi-loading"><div class="sp"></div><span>Loading history…</span></div>';
+  body.innerHTML='<div class="cpi-loading"><div class="thinking-orb-slot" data-orb-state="listening" data-orb-size="64">Loading history…</div></div>';
+  mountOrbsIn(body);
   fetch(window.__CPI_HISTORY_URL__).then(function(r){ return r.json(); }).then(function(d){
     if(!d || d.available===false){
       body.innerHTML='<div class="cpi-empty"><span>History needs a database on this environment, so nothing is being stored yet.</span></div>';
@@ -2315,7 +2326,8 @@ function addUserMsg(text){
 }
 function addTyping(){
   var b=document.getElementById("cpiChatBody");
-  b.insertAdjacentHTML("beforeend", '<div class="cpi-msg assistant" id="cpiTyping"><div class="cpi-msg-av">'+ARENA_AV+'</div><div class="cpi-bub"><div class="cpi-typing"><i></i><i></i><i></i></div></div></div>');
+  b.insertAdjacentHTML("beforeend", '<div class="cpi-msg assistant" id="cpiTyping"><div class="cpi-msg-av">'+ARENA_AV+'</div><div class="cpi-bub"><div class="thinking-orb-slot" data-orb-state="breathing" data-orb-size="20"></div></div></div>');
+  mountOrbsIn(document.getElementById("cpiTyping"));
   chatScroll();
 }
 function removeTyping(){ var t=document.getElementById("cpiTyping"); if(t) t.remove(); }
@@ -2918,7 +2930,10 @@ window.cpiOpenList = function(){
   if(dw) dw.classList.add("on");
   if(ov) ov.classList.add("on");
   var body=document.getElementById("cpiListBody");
-  if(body) body.innerHTML='<div class="cpi-empty"><span>Loading…</span></div>';
+  if(body){
+    body.innerHTML='<div class="cpi-loading"><div class="thinking-orb-slot" data-orb-state="listening" data-orb-size="64">Loading…</div></div>';
+    mountOrbsIn(body);
+  }
   loadList().then(function(){ renderList(); })
     .catch(function(){
       if(body) body.innerHTML='<div class="cpi-empty"><span>Could not load the list.</span></div>';
