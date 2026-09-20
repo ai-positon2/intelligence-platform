@@ -10,7 +10,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet"/>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-tokens.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-components.css') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/linkedin_playbook_studio.css') }}?v=3">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/linkedin_playbook_studio.css') }}?v=4">
   <link rel="stylesheet" href="/static/css/thinking-orb.css">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/agent-feedback.css') }}">
   <script src="/static/js/theme.js"></script>
@@ -244,9 +244,10 @@
       requestAnimationFrame(step);
     }
     function revealCards(){
-      document.querySelectorAll('.stat-card,.card').forEach(function(el,i){
-        setTimeout(function(){el.classList.add('visible');},i*55);
-      });
+      var cards = document.querySelectorAll('.stat-card,.card');
+      import('/static/js/cube-motion.js').then(function(m){
+        m.rise(cards, { stagger: 55 });
+      }).catch(function(){});
     }
     function debounce(fn,ms){
       var t=null;

@@ -79,8 +79,7 @@ body {
 
 /* Stats */
 .stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--gutter); margin-bottom: 24px; }
-.stat-card { background: rgba(16,13,16,.9); border: 1px solid rgba(255,255,255,.08); border-radius: var(--radius-lg); padding: 20px 22px; position: relative; overflow: hidden; opacity: 0; transform: translateY(16px); transition: opacity .4s ease, transform .4s ease, border-color .2s, box-shadow .2s; cursor: pointer; will-change: transform; }
-.stat-card.visible { opacity: 1; transform: translateY(0); }
+.stat-card { background: rgba(16,13,16,.9); border: 1px solid rgba(255,255,255,.08); border-radius: var(--radius-lg); padding: 20px 22px; position: relative; overflow: hidden; transition: border-color .2s, box-shadow .2s; cursor: pointer; will-change: transform; }
 .stat-card:hover { transform: translateY(-5px); }
 .stat-card::before { content:''; position: absolute; top:0; left:0; right:0; height:2px; border-radius: var(--radius-lg) var(--radius-lg) 0 0; }
 .stat-card::after { content:''; position: absolute; top:0; left:-65%; width:45%; height:100%; background: linear-gradient(105deg,transparent,rgba(255,255,255,.07),transparent); transform: skewX(-18deg); transition: left .7s ease; pointer-events: none; z-index: 1; }
@@ -108,8 +107,7 @@ body {
 .sc-playbooks .stat-hint { color: #fcd34d; }
 
 /* Card + tabs */
-.card { background: rgba(16,13,16,.9); border: 1px solid rgba(255,255,255,.08); border-radius: var(--radius-lg); overflow: hidden; opacity: 0; transform: translateY(16px); transition: opacity .4s ease, transform .4s ease; }
-.card.visible { opacity: 1; transform: translateY(0); }
+.card { background: rgba(16,13,16,.9); border: 1px solid rgba(255,255,255,.08); border-radius: var(--radius-lg); overflow: hidden; }
 .tabs { display: flex; position: relative; background: rgba(255,255,255,.025); border-bottom: 1px solid rgba(255,255,255,.07); padding: 7px; }
 .tab-indicator {
   position: absolute; top: 7px; bottom: 7px; left: 7px;
