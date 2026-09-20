@@ -168,8 +168,29 @@ export function mountThinkingOrb(container, opts = {}) {
   paintNow();
 
   let visible = true;
+  function cleanup() {
+    stop();
+    clearInterval(labelTimer);
+    io && io.disconnect();
+    themeObserver && themeObserver.disconnect();
+    mq && mq.removeEventListener('change', onMq);
+    reducedMq && reducedMq.removeEventListener('change', onReducedChange);
+    document.removeEventListener('visibilitychange', onVisChange);
+  }
   const io = typeof IntersectionObserver !== 'undefined'
     ? new IntersectionObserver(([entry]) => {
+        // Most call sites in this codebase mount into a placeholder that
+        // later gets REPLACED wholesale (a parent's innerHTML reassigned
+        // once the real content/next phase is ready) rather than calling
+        // destroy() explicitly. A removed element still intersects nothing,
+        // so this callback fires for that case too -- distinguish "still in
+        // the document, just scrolled offscreen" (pause only) from "no
+        // longer in the document at all" (fully clean up: without this, the
+        // rAF loop does stop, since nothing keeps re-scheduling it once
+        // paused, but the theme MutationObserver/matchMedia/visibilitychange
+        // listeners registered on long-lived globals would otherwise hold
+        // this whole closure -- detached canvas included -- alive forever).
+        if (!canvas.isConnected) { cleanup(); return; }
         visible = entry.isIntersecting;
         if (visible && document.visibilityState !== 'hidden') start();
         else stop();
@@ -230,14 +251,37 @@ export function mountThinkingOrb(container, opts = {}) {
       labels = Array.isArray(newLabelOrLabels) ? newLabelOrLabels.slice() : [newLabelOrLabels];
       startLabelCycle();
     },
-    destroy() {
-      stop();
-      clearInterval(labelTimer);
-      io && io.disconnect();
-      themeObserver && themeObserver.disconnect();
-      mq && mq.removeEventListener('change', onMq);
-      reducedMq && reducedMq.removeEventListener('change', onReducedChange);
-      document.removeEventListener('visibilitychange', onVisChange);
-    }
+    destroy: cleanup
   };
+}
+
+/**
+ * Convenience for the common case: a page's classic (non-module) inline
+ * script has ALREADY rendered one or more static "Loading…" placeholders
+ * before this module (loaded via a fire-and-forget dynamic import() from
+ * that classic script, so there is no script-type-vs-load-order puzzle to
+ * solve at each call site) has had a chance to run. Marking each
+ * placeholder `data-orb-state="<state>"` and calling this once mounts an
+ * orb into every one found, using the element's own existing text as the
+ * label (so a no-JS/failed-import fallback still shows something
+ * sensible) -- size defaults to 20 (inline-with-text scale) since that's
+ * what a text-swap placeholder almost always wants; pass
+ * data-orb-size="64" on an element to opt into the card scale instead.
+ * Elements already removed from the document by the time this runs (a
+ * fast-resolving fetch beat the dynamic import) are skipped, not an
+ * error -- this is a race this helper is explicitly designed to lose
+ * gracefully.
+ */
+export function autoMountOrbPlaceholders(root) {
+  const scope = root || document;
+  const found = scope.querySelectorAll('[data-orb-state]');
+  const mounted = [];
+  found.forEach((el) => {
+    if (!el.isConnected) return;
+    const state = el.getAttribute('data-orb-state');
+    const size = el.getAttribute('data-orb-size') === '64' ? 64 : 20;
+    const label = (el.textContent || '').trim();
+    mounted.push(mountThinkingOrb(el, { state, size, label, layout: size === 64 ? 'column' : 'row' }));
+  });
+  return mounted;
 }

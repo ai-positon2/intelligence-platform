@@ -20,6 +20,10 @@
   min-height:1.35em; /* holds layout steady across label swaps of different lengths */
 }
 .thinking-orb-label.is-changing{opacity:0;}
+/* An icon-only mount (no label/labels passed in) still gets a label
+   element from the JS -- empty, so it takes no visible space here rather
+   than reserving a line for text that will never come. */
+.thinking-orb-label:empty{display:none;}
 
 @media (prefers-reduced-motion:reduce){
   .thinking-orb-label{transition:none;}
