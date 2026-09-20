@@ -1,0 +1,26 @@
+/* Shared "thinking orb" loading indicator -- the canvas + label markup
+   static/js/thinking-orb.js builds. Loaded on every Strategic Agent page
+   that uses it, styled with ds-tokens.css's shared --tx2/--fs-* tokens
+   (already loaded on every such page) so it drops into each page's own
+   dark/light theme with no per-page CSS of its own required. A page MAY
+   still override --to-label-color/--to-label-font locally for a closer
+   match to its own type system (see thought_leader_pr.css for an example
+   using its dossier monospace). */
+
+.thinking-orb-wrap{display:flex;align-items:center;gap:14px;}
+.thinking-orb-wrap--column{flex-direction:column;text-align:center;gap:10px;}
+.thinking-orb-wrap--row{flex-direction:row;}
+.thinking-orb-canvas{display:block;flex-shrink:0;}
+.thinking-orb-label{
+  font-size:var(--to-label-size, var(--fs-sm, 13px));
+  color:var(--to-label-color, var(--tx2, #8b94be));
+  font-family:var(--to-label-font, inherit);
+  line-height:var(--lh-snug, 1.35);
+  transition:opacity .18s ease;
+  min-height:1.35em; /* holds layout steady across label swaps of different lengths */
+}
+.thinking-orb-label.is-changing{opacity:0;}
+
+@media (prefers-reduced-motion:reduce){
+  .thinking-orb-label{transition:none;}
+}
