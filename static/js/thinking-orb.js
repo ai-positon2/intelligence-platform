@@ -81,8 +81,14 @@ export function mountThinkingOrb(container, opts = {}) {
   const theme = opts.theme || 'auto';
   const speed = opts.speed || 1;
   let state = opts.state || 'working';
+  // An explicit '' means icon-only (the caller has its own text elsewhere,
+  // e.g. a sibling .running-text element) -- only fall back to the state's
+  // default label when no label/labels option was passed AT ALL, not when
+  // one was passed and happens to be empty.
   let labels = opts.labels && opts.labels.length ? opts.labels.slice()
-    : [opts.label || DEFAULT_LABELS[state] || DEFAULT_LABELS.working];
+    : opts.label != null ? [opts.label]
+    : opts.labels != null ? []
+    : [DEFAULT_LABELS[state] || DEFAULT_LABELS.working];
   const labelIntervalMs = opts.labelIntervalMs || DEFAULT_LABEL_INTERVAL_MS;
   const layout = opts.layout || (size === 20 ? 'row' : 'column');
 
