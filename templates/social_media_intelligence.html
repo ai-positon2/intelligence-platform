@@ -12,6 +12,7 @@
   <script src="/static/js/theme.js"></script>
   <link rel="stylesheet" href="/static/css/grid-tokens.css">
   <link rel="stylesheet" href="/static/css/social_media_intelligence.css?v=10">
+  <link rel="stylesheet" href="/static/css/thinking-orb.css">
   <link rel="stylesheet" href="/static/css/aurora-app.css?v=3">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/agent-feedback.css') }}">
   <script src="{{ url_for('static', filename='js/agent_feedback.js') }}"></script>
@@ -85,7 +86,7 @@
         <div class="sci-suggest-panel" id="sciSuggestPanel" style="display:none"></div>
 
         <div id="runningWrap" style="display:none;margin-top:20px">
-          <div class="sci-running-note"><span class="sci-spinner"></span><span>Identifying platforms and collecting posts. This runs in the background and can take a few minutes. You can leave this page; your run will be here in History when it's done.</span></div>
+          <div class="sci-running-note"><span class="thinking-orb-slot" data-orb-state="working" data-orb-size="20"></span><span>Identifying platforms and collecting posts. This runs in the background and can take a few minutes. You can leave this page; your run will be here in History when it's done.</span></div>
           <div class="sci-platform-grid" id="platformGrid"></div>
         </div>
       </div>
@@ -189,6 +190,13 @@
       return PLATFORM_LABEL[s] || (s.charAt(0).toUpperCase() + s.slice(1));
     }
     function esc(s){return String(s == null ? '' : s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
+    // Mounts a thinking-orb into every [data-orb-state] placeholder just
+    // written into `root`. Dynamic import so this is callable from anywhere
+    // in this classic inline script with no load-order dependency; a
+    // failed import just leaves the plain loading text in place.
+    function mountOrbsIn(root){
+      import('/static/js/thinking-orb.js').then(function(m){ m.autoMountOrbPlaceholders(root); }).catch(function(){});
+    }
     function monogram(name){ var s = String(name||'?').trim(); return (s[0]||'?').toUpperCase(); }
 
     // ── Company disambiguation -- shown as the user types, so an ambiguous
@@ -543,7 +551,8 @@ function dsApifyRow(platform, entry){
       var panel = document.getElementById('sciSuggestPanel');
       if(q.length < 2){ panel.style.display = 'none'; panel.innerHTML = ''; return; }
       panel.style.display = 'block';
-      panel.innerHTML = '<div class="sci-suggest-loading"><span class="sci-spinner" style="width:14px;height:14px;border-width:2px"></span>Searching…</div>';
+      panel.innerHTML = '<div class="sci-suggest-loading"><span class="thinking-orb-slot" data-orb-state="searching" data-orb-size="20">Searching…</span></div>';
+      mountOrbsIn(panel);
       fetch(BASE + '/search?q=' + encodeURIComponent(q))
         .then(function(r){ return r.json(); })
         .then(function(data){ renderCompanySuggestions(data.companies || [], data.error || null, q); })
@@ -580,6 +589,7 @@ function dsApifyRow(platform, entry){
           return;
         }
         document.getElementById('runningWrap').style.display = 'block';
+        mountOrbsIn(document.getElementById('runningWrap'));
         pollRun(data.run_id);
       }).catch(function(){
         document.getElementById('analyzeBtn').disabled = false;
@@ -3107,10 +3117,18 @@ function dsApifyRow(platform, entry){
     }
 
     function viewRun(runId){
+      // Previously opened the drawer only once the fetch resolved -- for a
+      // slow load, clicking a history row produced no visible response at
+      // all until the report suddenly appeared. Now opens immediately with
+      // a loading state, same as every other drawer/panel load on this page.
+      var panel = document.getElementById('drawerPanel');
+      panel.innerHTML = '<div style="padding:60px;text-align:center"><div class="thinking-orb-slot" data-orb-state="listening" data-orb-size="64">Loading report…</div></div>';
+      mountOrbsIn(panel);
+      document.getElementById('drawerOverlay').classList.add('open');
       fetch(BASE + '/runs/' + runId)
         .then(function(r){ return r.json(); })
         .then(renderReport)
-        .catch(function(){ alert('Could not load this run.'); });
+        .catch(function(){ alert('Could not load this run.'); closeReport(); });
     }
 
     document.addEventListener('keydown', function(e){
