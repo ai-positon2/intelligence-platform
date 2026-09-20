@@ -10,7 +10,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet"/>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-tokens.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-components.css') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/42_north_dental_slot_checker.css') }}?v=7">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/42_north_dental_slot_checker.css') }}?v=8">
   <link rel="stylesheet" href="/static/css/thinking-orb.css">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/agent-feedback.css') }}">
   <script src="/static/js/theme.js"></script>
@@ -304,7 +304,9 @@
     function reveal(){
       var els=[].concat([].slice.call(document.querySelectorAll('.gd-stat')),
                         [].slice.call(document.querySelectorAll('.card')));
-      els.forEach(function(el,i){ setTimeout(function(){ el.classList.add('visible'); }, i*55); });
+      import('/static/js/cube-motion.js').then(function(m){
+        m.rise(els, { stagger: 55 });
+      }).catch(function(){});
     }
 
     function renderHeader(){

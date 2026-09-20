@@ -129,8 +129,7 @@ html::-webkit-scrollbar-thumb:hover { background-color: rgba(74,222,128,.55); ba
 
 /* KPI tiles */
 .gd-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--gutter); margin-bottom: 24px; }
-.gd-stat { background: rgba(9,16,14,.9); border: 1px solid rgba(255,255,255,.08); border-radius: var(--radius-lg); padding: 20px 22px; position: relative; overflow: hidden; opacity: 0; transform: translateY(16px); transition: opacity .4s ease, transform .4s ease, border-color .2s, box-shadow .2s; cursor: pointer; will-change: transform; }
-.gd-stat.visible { opacity: 1; transform: translateY(0); }
+.gd-stat { background: rgba(9,16,14,.9); border: 1px solid rgba(255,255,255,.08); border-radius: var(--radius-lg); padding: 20px 22px; position: relative; overflow: hidden; transition: border-color .2s, box-shadow .2s; cursor: pointer; will-change: transform; }
 .gd-stat:hover { transform: translateY(-5px); border-color: rgba(255,255,255,.14); box-shadow: 0 22px 50px -24px rgba(0,0,0,.8); }
 .gd-stat::before { content:''; position: absolute; top:0; left:0; right:0; height:2px; border-radius: var(--radius-lg) var(--radius-lg) 0 0; }
 .gd-stat::after { content:''; position: absolute; top:0; left:-65%; width:45%; height:100%; background: linear-gradient(105deg,transparent,rgba(255,255,255,.06),transparent); transform: skewX(-18deg); transition: left .7s ease; pointer-events: none; z-index: 1; }
@@ -163,7 +162,7 @@ html::-webkit-scrollbar-thumb:hover { background-color: rgba(74,222,128,.55); ba
 .gd-grid-3 > :nth-child(3) { grid-column: 1 / -1; }
 .gd-grid-3 > .card { display: flex; flex-direction: column; }
 .gd-grid-3 > .card > .card-body { flex: 1; display: flex; flex-direction: column; justify-content: space-between; gap: 14px; }
-.card { background: rgba(9,16,14,.9); border: 1px solid rgba(255,255,255,.08); border-radius: var(--radius-lg); overflow: hidden; opacity: 0; transform: translateY(16px); transition: opacity .4s ease, transform .4s ease; position: relative; }
+.card { background: rgba(9,16,14,.9); border: 1px solid rgba(255,255,255,.08); border-radius: var(--radius-lg); overflow: hidden; position: relative; }
 /* Every major section on this page carries its own margin-bottom to the next
    one -- .ph, .gd-stats, .gd-grid-3 all do -- except the table card, which had
    none. It sat flush against the AI briefing card below it with zero gap. This
@@ -173,7 +172,6 @@ html::-webkit-scrollbar-thumb:hover { background-color: rgba(74,222,128,.55); ba
    with it and double the gap after brand mix. */
 #mainCard { margin-bottom: 24px; }
 .card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: linear-gradient(90deg,rgba(163,230,53,.55),rgba(20,184,166,.55)); opacity: .7; }
-.card.visible { opacity: 1; transform: translateY(0); }
 .card-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 16px 20px 0; flex-wrap: wrap; }
 .card-title { font-size: 14px; font-weight: 600; color: #e6f0ea; }
 .card-meta { font-size: 11.5px; color: #6c7f78; }
