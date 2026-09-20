@@ -11,7 +11,7 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-components.css') }}">
   <script src="/static/js/theme.js"></script>
   <link rel="stylesheet" href="/static/css/grid-tokens.css">
-  <link rel="stylesheet" href="/static/css/social_media_intelligence.css?v=10">
+  <link rel="stylesheet" href="/static/css/social_media_intelligence.css?v=11">
   <link rel="stylesheet" href="/static/css/thinking-orb.css">
   <link rel="stylesheet" href="/static/css/aurora-app.css?v=3">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/agent-feedback.css') }}">
@@ -2397,7 +2397,14 @@ function dsApifyRow(platform, entry){
       var band = root.querySelector('.sci-rep-band');
       var tiles = [].slice.call(scope.querySelectorAll('.sci-tile:not(.visible)'));
       if(band) tiles = [].slice.call(band.querySelectorAll('.sci-tile:not(.visible)')).concat(tiles);
-      tiles.forEach(function(el, i){ setTimeout(function(){ el.classList.add('visible'); }, i * 55); });
+      if(!tiles.length) return;
+      // .visible is now just the "already risen" bookkeeping mark -- it no
+      // longer carries the animation itself, so it's safe to add immediately
+      // rather than staggered, before cube-motion runs the actual reveal.
+      tiles.forEach(function(el){ el.classList.add('visible'); });
+      import('/static/js/cube-motion.js').then(function(m){
+        m.rise(tiles, { stagger: 55 });
+      }).catch(function(){});
     }
 
     // Charts draw themselves in the same way, and for the same reason: only
