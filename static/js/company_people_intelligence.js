@@ -3076,4 +3076,9 @@ window.cpiToggleChat((function(){
   try{ return localStorage.getItem("cpi-chat-tucked")==="1"; }catch(e){ return false; }
 })());
 
+import('/static/js/border-beam.js').then(function(m){
+  var el = document.getElementById('cpiAskInput');
+  m.mountBorderBeamOn(el.closest('.cpi-ask'), el, { color: '#7c83f5', color2: '#22d3ee' });
+}).catch(function(){});
+
 })();
