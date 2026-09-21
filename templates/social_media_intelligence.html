@@ -13,6 +13,7 @@
   <link rel="stylesheet" href="/static/css/grid-tokens.css">
   <link rel="stylesheet" href="/static/css/social_media_intelligence.css?v=11">
   <link rel="stylesheet" href="/static/css/thinking-orb.css">
+  <link rel="stylesheet" href="/static/css/border-beam.css">
   <link rel="stylesheet" href="/static/css/aurora-app.css?v=3">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/agent-feedback.css') }}">
   <script src="{{ url_for('static', filename='js/agent_feedback.js') }}"></script>
@@ -3146,6 +3147,9 @@ function dsApifyRow(platform, entry){
     });
 
     renderDataSourcesPanel();
+    import('/static/js/border-beam.js').then(function(m){
+      m.mountBorderBeam(document.getElementById('companyName'), { color: '#fb923c', color2: '#c2410c' });
+    }).catch(function(){});
   </script>
   <script>
   (function(){
