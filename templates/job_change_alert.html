@@ -12,6 +12,7 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-components.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/job_change_alert.css') }}?v=9">
   <link rel="stylesheet" href="/static/css/thinking-orb.css">
+  <link rel="stylesheet" href="/static/css/border-beam.css">
   <script src="/static/js/theme.js"></script>
   <link rel="stylesheet" href="/static/css/aurora-app.css?v=3">
   <link rel="stylesheet" href="/static/css/grid-tokens.css">
@@ -891,6 +892,10 @@
     }
 
     revealCards();
+    import('/static/js/border-beam.js').then(function(m){
+      var el = document.getElementById('searchInput');
+      m.mountBorderBeamOn(el.closest('.search-box'), el, { color: '#f5a623', color2: '#fb7185' });
+    }).catch(function(){});
     populateFilters();
     import('/static/js/thinking-orb.js').then(function(m){ m.autoMountOrbPlaceholders(); }).catch(function(){});
     loadEvents();
