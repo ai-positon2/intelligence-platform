@@ -12,6 +12,7 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-components.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/42_north_dental_slot_checker.css') }}?v=8">
   <link rel="stylesheet" href="/static/css/thinking-orb.css">
+  <link rel="stylesheet" href="/static/css/border-beam.css">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/agent-feedback.css') }}">
   <script src="/static/js/theme.js"></script>
   <link rel="stylesheet" href="/static/css/aurora-app.css?v=3">
@@ -1141,6 +1142,10 @@
     function hideTip(){ document.getElementById('tip').classList.remove('show'); }
 
     boot();
+    import('/static/js/border-beam.js').then(function(m){
+      var el = document.getElementById('q');
+      m.mountBorderBeamOn(el.closest('.gd-search'), el, { color: '#4ade80', color2: '#14b8a6' });
+    }).catch(function(){});
   </script>
 
   {% if not client_mode %}
