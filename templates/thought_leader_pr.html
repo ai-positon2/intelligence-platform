@@ -12,6 +12,7 @@
   <script src="/static/js/theme.js"></script>
   <link rel="stylesheet" href="/static/css/thought_leader_pr.css?v=10">
   <link rel="stylesheet" href="/static/css/thinking-orb.css">
+  <link rel="stylesheet" href="/static/css/border-beam.css">
   <link rel="stylesheet" href="/static/css/aurora-app.css?v=3">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/agent-feedback.css') }}">
   <script src="{{ url_for('static', filename='js/agent_feedback.js') }}"></script>
@@ -1240,6 +1241,10 @@
         panel.innerHTML = '';
       }
     });
+    import('/static/js/border-beam.js').then(function(m){
+      var el = document.getElementById('tlprName');
+      m.mountBorderBeamOn(el.closest('.tlpr-input-wrap'), el, { color: '#ffb74d', color2: '#b78bfa' });
+    }).catch(function(){});
   </script>
 
   <script>(function(){if(window.__trk)return;window.__trk=1;var _s=Date.now(),_d=false;function f(){if(_d)return;_d=true;var s=Math.round((Date.now()-_s)/1000);fetch('/api/track',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({page:location.pathname,title:'Thought Leader Intelligence',seconds:s,email:{{ (user.email if user else "")|tojson }}}),keepalive:true}).catch(function(){});}document.addEventListener('visibilitychange',function(){if(document.visibilityState==='hidden')f();});window.addEventListener('beforeunload',f);})();</script>
