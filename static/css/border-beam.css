@@ -1,0 +1,82 @@
+/*
+ * Border beam -- an animated glow that rides the border of an element while
+ * it's active (focused, in our usage).
+ *
+ * NOT a vendored copy of border-beam (libraries.dev/beam, npm "border-beam",
+ * MIT, Jakub Antalik). That package is React-only (no framework-agnostic
+ * engine export, unlike thinking-orbs) and its real implementation is ~76KB
+ * of hand-tuned per-variant CSS generated per component instance. This is a
+ * hand-authored, much smaller version of the SAME underlying technique --
+ * an animatable `@property` angle driving a conic-gradient, masked down to a
+ * hollow ring via the padding + content-box + exclude trick -- adapted for
+ * one shared use case (a search input's focus ring) instead of that
+ * library's many card/button variants. Colors are tintable per page via
+ * --beam-color/--beam-color-2 instead of the original's fixed rainbow.
+ */
+
+@property --beam-angle {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: true;
+}
+@property --beam-opacity {
+  syntax: "<number>";
+  initial-value: 0;
+  inherits: true;
+}
+
+.border-beam {
+  position: relative;
+  display: block;
+  width: 100%;
+  flex: 1;
+  min-width: 0;
+  border-radius: var(--beam-radius, 10px);
+  isolation: isolate;
+}
+
+.border-beam[data-beam-active] {
+  animation: beam-spin var(--beam-duration, 2.4s) linear infinite,
+             beam-fade-in .35s ease forwards;
+}
+.border-beam[data-beam-fading] {
+  animation: beam-spin var(--beam-duration, 2.4s) linear infinite,
+             beam-fade-out .4s ease forwards;
+}
+
+.border-beam[data-beam-active]::after,
+.border-beam[data-beam-fading]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  clip-path: inset(0 round var(--beam-radius, 10px));
+  padding: var(--beam-width, 1.5px);
+  background: conic-gradient(
+    from var(--beam-angle),
+    transparent 0%, transparent 74%,
+    color-mix(in srgb, var(--beam-color, #7c83f5) 40%, transparent) 84%,
+    var(--beam-color-2, var(--beam-color, #7c83f5)) 90%,
+    color-mix(in srgb, var(--beam-color, #7c83f5) 40%, transparent) 96%,
+    transparent 100%
+  );
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  pointer-events: none;
+  z-index: 1;
+  opacity: var(--beam-opacity);
+  filter: drop-shadow(0 0 4px var(--beam-color, #7c83f5));
+}
+
+@keyframes beam-spin { to { --beam-angle: 360deg; } }
+@keyframes beam-fade-in { to { --beam-opacity: 1; } }
+@keyframes beam-fade-out { from { --beam-opacity: 1; } to { --beam-opacity: 0; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .border-beam[data-beam-active],
+  .border-beam[data-beam-fading] { animation: none !important; }
+  .border-beam[data-beam-active]::after { opacity: .7; animation: none !important; }
+  .border-beam[data-beam-fading]::after { opacity: 0; animation: none !important; }
+}
