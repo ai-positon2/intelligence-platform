@@ -1,201 +1,201 @@
 rank,company,domain,industry,total_score,signal_types,top_signal,top_signal_date
 1,Partners Health Management,http://www.partnersbhm.org,hospital & health care,1230.0,C-Suite Join,Libby McCraw — Role change as Senior Deputy Chief Executive Officer,2026-10-01
 2,Thyme Care,http://www.thymecare.com,hospital & health care,960.0,C-Suite Join,"Brad Diephuis, M.D. — Appointed as Chief Executive Officer",2026-09-01
-3,Doctors Hospital of Laredo,http://www.doctorshosplaredo.com,hospital & health care,699.0,C-Suite Exit + C-Suite Join,"Oliver Ostorga, FACHE — Appointed as Chief Executive Officer",2026-07-27
-4,GoodRx,http://www.goodrx.com,hospital & health care,639.0,C-Suite Exit + C-Suite Join,Justin Fengler — Appointed as Chief Financial Officer and Treasurer,2026-08-06
+3,GoodRx,http://www.goodrx.com,hospital & health care,723.0,C-Suite Exit + C-Suite Join + Product Launch,Justin Fengler — Appointed as Chief Financial Officer and Treasurer,2026-08-06
+4,Doctors Hospital of Laredo,http://www.doctorshosplaredo.com,hospital & health care,699.0,C-Suite Exit + C-Suite Join,"Oliver Ostorga, FACHE — Appointed as Chief Executive Officer",2026-07-27
 5,Lane Regional Medical Center,http://www.lanermc.org,hospital & health care,600.0,C-Suite Exit + C-Suite Join,Allyson Bennett — Promoted as Chief Nursing Officer,Unknown
-6,Presbyterian St Lukes,http://www.pslmc.com,hospital & health care,546.0,C-Suite Join,Casey Guber — Appointed as President and Chief Executive Officer,2026-07-20
+6,Presbyterian St Lukes,http://www.pslmc.com,hospital & health care,561.0,C-Suite Join,Casey Guber — Appointed as President and Chief Executive Officer,2026-07-20
 7,Esperanza Health Centers,http://www.esperanzachicago.org,hospital & health care,505.5,C-Suite Exit + C-Suite Join,Dr. Nicole Kazee — Appointed as President and Chief Executive Officer,2026-07-01
 8,"Grady Memorial Hospital, Oklahoma",http://www.gradymem.org,hospital & health care,420.0,C-Suite Join,Anthony Saul — Appointed as President and Chief Executive Officer,2027-01-01
-9,Vista Health System,http://www.vistahealth.com,hospital & health care,390.0,C-Suite Exit + C-Suite Join,Unknown — Appointed as Chief Executive Officer,2026-08-06
+9,Vista Health System,http://www.vistahealth.com,hospital & health care,399.0,C-Suite Exit + C-Suite Join,Unknown — Appointed as Chief Executive Officer,2026-08-06
 10,PillPack,http://www.pillpack.com,hospital & health care,364.5,C-Suite Exit + C-Suite Join,"Roy Schoenberg — Appointed as Senior Vice President, Amazon Health Services",2026-07-01
 11,Harbor Regional Health,http://www.ghcares.org,hospital & health care,363.0,C-Suite Exit + C-Suite Join,Tom Jensen — Retired as Chief Executive Officer,2026-08-07
-12,Strive Health,http://www.strivehealth.com,hospital & health care,354.0,C-Suite Join,"Jamie Sharp, M.D. — Appointed as Chief Medical Officer",2026-06-16
-13,Mary Rutan Health,http://www.maryrutan.org,hospital & health care,351.0,C-Suite Join,Norm Mitry — Retired as President and Chief Executive Officer,2026-12-31
-14,Mammoth Hospital,http://www.mammothhospital.org,hospital & health care,336.0,C-Suite Exit + C-Suite Join,Tom Parker — Retired as Chief Executive Officer,2026-10-02
-15,Sunshine Health,http://www.sunshinehealth.com,hospital & health care,328.5,C-Suite Exit + C-Suite Join,Chris Neczypor — Appointed as Chief Financial Officer,2027-01-01
-16,ClearSky Health,http://www.clearskyhealth.com,hospital & health care,315.0,C-Suite Join,Raun Craven — Appointed as Chief Executive Officer,2026-06-18
-17,"ProgenyHealth, LLC",http://www.progenyhealth.com,hospital & health care,300.0,C-Suite Join,"Mark Sprague, FSA — Appointed as Chief Financial Officer",Unknown
-18,Cass Health,http://www.casshealth.org,hospital & health care,300.0,C-Suite Join,Jonathan Moe — Appointed as Chief Executive Officer,2026-09-21
-19,Hippocratic AI,http://www.hippocraticai.com,hospital & health care,297.0,C-Suite Join + Funding Round,"Greg Cioffi — Appointed as Chief Growth Officer, Public Sector",2026-08-04
-20,North Okaloosa Medical Center,http://www.northokaloosa.com,hospital & health care,294.0,C-Suite Join,David Whalen — Retired as Chief Executive Officer,2026-06-24
-21,The CORE Institute,http://www.thecoreinstitute.com,medical practice,285.0,C-Suite Join,"Ashley Vertuno — Appointed as Chief Executive Officer, Arizona Market",2026-06-30
-22,Lakewood Ranch Medical Center,http://www.lakewoodranchmedicalcenter.com,hospital & health care,276.0,C-Suite Exit + C-Suite Join,Jason Madsen — Appointed as Chief Executive Officer,2026-07-01
-23,"St. Joseph Regional Medical Center, Inc.",http://www.sjrmc.org,hospital & health care,271.5,C-Suite Exit + C-Suite Join,Angela Green — Appointed as Chief Operating Officer and Chief Nursing Officer,2026-06-21
-24,Raleigh General Hospital,http://www.raleighgeneral.com,hospital & health care,270.0,C-Suite Join,Eric Flynn — Appointed as Chief Nursing Officer,2026-06-21
-25,Onvida Health,http://www.onvidahealth.org,hospital & health care,258.0,C-Suite Exit + C-Suite Join,Carol Schwalke — Promoted as Chief Executive Officer,2026-07-13
-26,UNC Physicians Network,http://www.uncpn.com,hospital & health care,225.0,C-Suite Join,"Min Lee — Appointed as President, UNC Hospitals",2026-07-20
-27,Cape Fear Valley Harnett Health,http://www.harnetthealth.org,hospital & health care,219.0,C-Suite Join,Michael Nagowski — Retired as Chief Executive Officer,2026-07-01
-28,West Calcasieu Cameron Hospital,http://www.wcch.com,hospital & health care,210.0,C-Suite Join,Tori Romo — Appointed as Chief Executive Officer,Unknown
-29,"Healix, LLC",http://www.healix.net,hospital & health care,205.5,Acquisition / M&A + C-Suite Join,Alan Channing — Appointed as Chief Executive Officer,2026-06-16
-30,American Hospital Association,http://www.aha.org,hospital & health care,196.5,C-Suite Exit + C-Suite Join,Steve Walsh — Appointed as President and CEO,2026-06-30
-31,Saline Memorial Hospital,http://www.salinememorial.org,hospital & health care,195.0,C-Suite Join,Josh Orzel — Appointed as Chief Nursing Officer,2026-07-09
-32,Nexus Health Systems,http://www.nexushealthsystems.com,hospital & health care,195.0,C-Suite Join,"Akram Boutros, MD, FACHE — Role change as Chief Executive Officer",2026-07-28
-33,Los Alamos Medical Center,http://www.losalamosmedicalcenter.com,hospital & health care,192.0,C-Suite Exit + C-Suite Join,Chris Emond — Appointed as Chief Financial Officer,2026-08-10
-34,Bicycle Health Inc,http://www.bicyclehealth.com,hospital & health care,192.0,C-Suite Join,Dr. Travis Schamber — Promoted as Chief Medical Officer,Unknown
-35,CENTRAL MONTANA MEDICAL CENTER,http://www.cmmc.health,hospital & health care,190.5,C-Suite Exit + C-Suite Join,Unknown — exited as Chief Executive Officer,2026-06-16
-36,Mary Bridge Children's Hospital,http://www.marybridge.org,hospital & health care,180.0,C-Suite Join,William (Bill) Robertson — Retired as Chief Executive Officer,2026-12-31
-37,Cass Regional Medical Center,http://www.cassregional.org,hospital & health care,180.0,C-Suite Join,Jonathan Moe — Appointed as Chief Executive Officer,2026-09-21
-38,Rehoboth McKinley Christian Health Care Services,http://www.rmch.org,hospital & health care,177.0,C-Suite Exit + C-Suite Join,Brian Dietz — Interim appointment as Interim Chief Executive Officer,2026-09-10
-39,ST ALPHONSUS REGIONAL MEDICAL CENTER INC,http://www.saintalphonsus.com,hospital & health care,174.7,C-Suite Exit + C-Suite Join + Funding Round,Megan Boyle — Role change as Vice President of Operations,2026-08-31
-40,San Ramon Regional Medical Center,http://www.sanramonmedctr.com,hospital & health care,174.0,C-Suite Join,Rob J. Anderson — Appointed as Chief Executive Officer,2026-06-22
-41,PRCS,http://www.prcshealthcare.com,hospital & health care,172.5,C-Suite Exit + C-Suite Join,Brian Dietz — Interim appointment as Interim Hospital Chief Executive,2026-09-10
-42,Aspire Indiana Health,http://www.aspireindiana.org,hospital & health care,168.0,C-Suite Join,Barbara Scott — Retired as Chief Executive Officer,Unknown
-43,Huntsville Memorial Hospital,http://www.huntsvillememorial.com,hospital & health care,168.0,C-Suite Exit + C-Suite Join,Mary Bevier — Appointed as Chief Financial Officer,2026-08-08
-44,Community Health Center of Branch County,http://www.chcbc.com,hospital & health care,162.0,C-Suite Join,Justin Doss — Promoted as Chief Operating Officer,2026-07-05
-45,Gifford,http://www.giffordhealthcare.org,hospital & health care,156.0,C-Suite Join,Chris Frauenhofer — Appointed as Chief Financial Officer,2026-08-06
-46,LifeLink Foundation,http://www.lifelinkfoundation.org,hospital & health care,150.0,C-Suite Join,"Kelly Cullen, RN, MBA — Appointed as Chief Operating Officer",Unknown
-47,MedReview Inc.,http://www.medreview.us,hospital & health care,150.0,C-Suite Join,Caryn Van Buskirk — Appointed as Chief Human Resources Officer,2026-06-30
-48,Amphibious Medics,http://www.amphibiousmedics.com,hospital & health care,150.0,C-Suite Join,"Matthew Jones — Promoted as Senior Regional Operations Manager, West Coast",2026-06-24
-49,Lakeland Regional Health,http://www.spectrumhealthlakeland.org,hospital & health care,144.0,C-Suite Join,Cheryl Kennison — Appointed as Senior Vice President and Chief Marketing Officer,Unknown
-50,Littleton Regional Healthcare,http://www.littletonhealthcare.org,hospital & health care,144.0,C-Suite Join,Dr. Richard McKenzie — Promoted as Chief Medical Officer,Unknown
-51,Orange City Area Health System,http://www.ochealthsystem.org,hospital & health care,144.0,C-Suite Join,Chris Sietstra — Appointed as Chief Executive Officer,2026-07-06
-52,Royal Health Group,http://www.royalhealthgroup.com,hospital & health care,144.0,C-Suite Join,"Alex Roe, CFA — Appointed as Chief Financial Officer",2026-08-06
-53,Sharon Hospital,http://www.sharonhospital.com,hospital & health care,144.0,C-Suite Join,H. Janelle Carr — Appointed as Chief Nursing Officer,2026-07-15
-54,Permian Regional Medical Center,http://www.permianregional.com,hospital & health care,141.0,C-Suite Exit + C-Suite Join,Adiel Alvarado — Interim appointment as Interim Chief Executive Officer,Unknown
-55,Mesa View Regional Hospital,http://www.mesaviewhospital.com,hospital & health care,141.0,C-Suite Join,Michelle Beverly — Promoted as Chief Executive Officer,2026-07-13
-56,TriStar StoneCrest Medical Center,http://www.tristarstonecrest.com,hospital & health care,136.5,C-Suite Join,"Lori Feltner, MSN — Appointed as Chief Nursing Officer",2026-08-29
-57,NMS Labs,http://www.nmslabs.com,hospital & health care,135.0,C-Suite Join,Gregory Schuh — Promoted as Chief Financial Officer,2026-07-22
-58,TurningPoint Healthcare Solutions,http://www.tpshealth.com,hospital & health care,135.0,C-Suite Join,Sue Schick — Appointed as Chief Executive Officer,2026-08-11
-59,Consensus Health,http://www.consensushealth.com,hospital & health care,132.0,C-Suite Join,Doug Sechrist — Appointed as Chief Marketing Officer,2026-06-25
-60,EnableComp,http://www.enablecomp.com,hospital & health care,130.8,C-Suite Join + News Mention,Maureen Ladouceur — Appointed as Chief Commercial Officer,2026-06-30
-61,TriStar Horizon Medical Center,http://www.tristarhorizon.com,hospital & health care,129.0,C-Suite Join,Bianca Cherry — Appointed as Chief Nursing Officer,2026-06-29
-62,Touchette Regional Hospital,http://www.touchette.org,hospital & health care,126.0,C-Suite Join,Unknown — Appointed as Chief Executive Officer,Unknown
-63,TRIA Orthopedics,http://www.tria.com,medical practice,126.0,C-Suite Join,Blake Berquist — Appointed as Executive Vice President and Chief Financial Officer,Unknown
-64,Foundation Laboratory,http://www.foundationlaboratory.com,"health, wellness & fitness",121.5,C-Suite Exit + C-Suite Join,Vera Grossmann — Interim appointment as Interim Chief Executive Officer,2026-08-01
-65,"Tucson Orthopaedic Institute, P.C",http://www.tucsonortho.com,medical practice,120.0,C-Suite Join,Ashley Vertuno — Appointed as Chief Executive Officer,2026-06-30
+12,Mammoth Hospital,http://www.mammothhospital.org,hospital & health care,336.0,C-Suite Exit + C-Suite Join,Tom Parker — Retired as Chief Executive Officer,2026-10-02
+13,Mary Rutan Health,http://www.maryrutan.org,hospital & health care,336.0,C-Suite Join,Norm Mitry — Retired as President and Chief Executive Officer,2026-12-31
+14,Sunshine Health,http://www.sunshinehealth.com,hospital & health care,328.5,C-Suite Exit + C-Suite Join,Chris Neczypor — Appointed as Chief Financial Officer,2027-01-01
+15,"ProgenyHealth, LLC",http://www.progenyhealth.com,hospital & health care,300.0,C-Suite Join,"Mark Sprague, FSA — Appointed as Chief Financial Officer",Unknown
+16,Cass Health,http://www.casshealth.org,hospital & health care,300.0,C-Suite Join,Jonathan Moe — Appointed as Chief Executive Officer,2026-09-21
+17,Hippocratic AI,http://www.hippocraticai.com,hospital & health care,297.0,C-Suite Join + Funding Round,"Greg Cioffi — Appointed as Chief Growth Officer, Public Sector",2026-08-04
+18,North Okaloosa Medical Center,http://www.northokaloosa.com,hospital & health care,294.0,C-Suite Join,David Whalen — Retired as Chief Executive Officer,2026-06-24
+19,The CORE Institute,http://www.thecoreinstitute.com,medical practice,285.0,C-Suite Join,"Ashley Vertuno — Appointed as Chief Executive Officer, Arizona Market",2026-06-30
+20,Lakewood Ranch Medical Center,http://www.lakewoodranchmedicalcenter.com,hospital & health care,276.0,C-Suite Exit + C-Suite Join,Jason Madsen — Appointed as Chief Executive Officer,2026-07-01
+21,Onvida Health,http://www.onvidahealth.org,hospital & health care,258.0,C-Suite Exit + C-Suite Join,Carol Schwalke — Promoted as Chief Executive Officer,2026-07-13
+22,UNC Physicians Network,http://www.uncpn.com,hospital & health care,253.5,C-Suite Join,"Rodney G. Richmond, PharmD — Appointed as Chief Medical Growth Officer",2026-08-24
+23,Cape Fear Valley Harnett Health,http://www.harnetthealth.org,hospital & health care,219.0,C-Suite Join,Michael Nagowski — Retired as Chief Executive Officer,2026-07-01
+24,West Calcasieu Cameron Hospital,http://www.wcch.com,hospital & health care,210.0,C-Suite Join,Tori Romo — Appointed as Chief Executive Officer,Unknown
+25,American Hospital Association,http://www.aha.org,hospital & health care,196.5,C-Suite Exit + C-Suite Join,Steve Walsh — Appointed as President and CEO,2026-06-30
+26,Saline Memorial Hospital,http://www.salinememorial.org,hospital & health care,195.0,C-Suite Join,Josh Orzel — Appointed as Chief Nursing Officer,2026-07-09
+27,Nexus Health Systems,http://www.nexushealthsystems.com,hospital & health care,195.0,C-Suite Join,"Akram Boutros, MD, FACHE — Role change as Chief Executive Officer",2026-07-28
+28,Los Alamos Medical Center,http://www.losalamosmedicalcenter.com,hospital & health care,192.0,C-Suite Exit + C-Suite Join,Chris Emond — Appointed as Chief Financial Officer,2026-08-10
+29,Bicycle Health Inc,http://www.bicyclehealth.com,hospital & health care,192.0,C-Suite Join,Dr. Travis Schamber — Promoted as Chief Medical Officer,Unknown
+30,ST ALPHONSUS REGIONAL MEDICAL CENTER INC,http://www.saintalphonsus.com,hospital & health care,180.7,C-Suite Exit + C-Suite Join + Funding Round,Megan Boyle — Role change as Vice President of Operations,2026-08-31
+31,Mary Bridge Children's Hospital,http://www.marybridge.org,hospital & health care,180.0,C-Suite Join,William (Bill) Robertson — Retired as Chief Executive Officer,2026-12-31
+32,Cass Regional Medical Center,http://www.cassregional.org,hospital & health care,180.0,C-Suite Join,Jonathan Moe — Appointed as Chief Executive Officer,2026-09-21
+33,Ohana Health Plan,http://www.ohanahealthplan.com,hospital & health care,175.5,C-Suite Exit + C-Suite Join,Chris Neczypor — Appointed as Executive Vice President and Chief Financial Officer,2027-01-01
+34,Strive Health,http://www.strivehealth.com,hospital & health care,174.0,C-Suite Join,Michele Paige — Appointed as Chief Growth Officer,Unknown
+35,Aspire Indiana Health,http://www.aspireindiana.org,hospital & health care,168.0,C-Suite Join,Barbara Scott — Retired as Chief Executive Officer,Unknown
+36,"St. Joseph Regional Medical Center, Inc.",http://www.sjrmc.org,hospital & health care,168.0,C-Suite Join,Angela Green — Appointed as Chief Nursing Officer / Chief Operating Officer,Unknown
+37,Huntsville Memorial Hospital,http://www.huntsvillememorial.com,hospital & health care,168.0,C-Suite Exit + C-Suite Join,Mary Bevier — Appointed as Chief Financial Officer,2026-08-08
+38,Rehoboth McKinley Christian Health Care Services,http://www.rmch.org,hospital & health care,165.7,C-Suite Exit + C-Suite Join,Brian Dietz — Interim appointment as Interim Chief Executive Officer,2026-09-10
+39,Community Health Center of Branch County,http://www.chcbc.com,hospital & health care,162.0,C-Suite Join,Justin Doss — Promoted as Chief Operating Officer,2026-07-05
+40,PRCS,http://www.prcshealthcare.com,hospital & health care,161.2,C-Suite Exit + C-Suite Join,Brian Dietz — Interim appointment as Interim Hospital Chief Executive,2026-09-10
+41,Gifford,http://www.giffordhealthcare.org,hospital & health care,156.0,C-Suite Join,Chris Frauenhofer — Appointed as Chief Financial Officer,2026-08-06
+42,LifeLink Foundation,http://www.lifelinkfoundation.org,hospital & health care,150.0,C-Suite Join,"Kelly Cullen, RN, MBA — Appointed as Chief Operating Officer",Unknown
+43,ClearSky Health,http://www.clearskyhealth.com,hospital & health care,150.0,C-Suite Join,Brittani Coffey — Appointed as Chief Executive Officer,2026-06-25
+44,MedReview Inc.,http://www.medreview.us,hospital & health care,150.0,C-Suite Join,Caryn Van Buskirk — Appointed as Chief Human Resources Officer,2026-06-30
+45,Amphibious Medics,http://www.amphibiousmedics.com,hospital & health care,150.0,C-Suite Join,"Matthew Jones — Promoted as Senior Regional Operations Manager, West Coast",2026-06-24
+46,HCA Florida Lehigh Hospital,http://www.lehighregional.com,hospital & health care,148.5,C-Suite Join,Luke Henry — Appointed as Chief Nursing Officer and Chief Operating Officer,2026-08-24
+47,Lakeland Regional Health,http://www.spectrumhealthlakeland.org,hospital & health care,144.0,C-Suite Join,Cheryl Kennison — Appointed as Senior Vice President and Chief Marketing Officer,Unknown
+48,Littleton Regional Healthcare,http://www.littletonhealthcare.org,hospital & health care,144.0,C-Suite Join,Dr. Richard McKenzie — Promoted as Chief Medical Officer,Unknown
+49,Orange City Area Health System,http://www.ochealthsystem.org,hospital & health care,144.0,C-Suite Join,Chris Sietstra — Appointed as Chief Executive Officer,2026-07-06
+50,Royal Health Group,http://www.royalhealthgroup.com,hospital & health care,144.0,C-Suite Join,"Alex Roe, CFA — Appointed as Chief Financial Officer",2026-08-06
+51,Sharon Hospital,http://www.sharonhospital.com,hospital & health care,144.0,C-Suite Join,H. Janelle Carr — Appointed as Chief Nursing Officer,2026-07-15
+52,Permian Regional Medical Center,http://www.permianregional.com,hospital & health care,141.0,C-Suite Exit + C-Suite Join,Adiel Alvarado — Interim appointment as Interim Chief Executive Officer,Unknown
+53,NMS Labs,http://www.nmslabs.com,hospital & health care,141.0,C-Suite Join,Gregory Schuh — Promoted as Chief Financial Officer,2026-07-22
+54,Mesa View Regional Hospital,http://www.mesaviewhospital.com,hospital & health care,141.0,C-Suite Join,Michelle Beverly — Promoted as Chief Executive Officer,2026-07-13
+55,TriStar StoneCrest Medical Center,http://www.tristarstonecrest.com,hospital & health care,136.5,C-Suite Join,"Lori Feltner, MSN — Appointed as Chief Nursing Officer",2026-08-29
+56,TurningPoint Healthcare Solutions,http://www.tpshealth.com,hospital & health care,135.0,C-Suite Join,Sue Schick — Appointed as Chief Executive Officer,2026-08-11
+57,Consensus Health,http://www.consensushealth.com,hospital & health care,132.0,C-Suite Join,Doug Sechrist — Appointed as Chief Marketing Officer,2026-06-25
+58,EnableComp,http://www.enablecomp.com,hospital & health care,130.8,C-Suite Join + News Mention,Maureen Ladouceur — Appointed as Chief Commercial Officer,2026-06-30
+59,TriStar Horizon Medical Center,http://www.tristarhorizon.com,hospital & health care,129.0,C-Suite Join,Bianca Cherry — Appointed as Chief Nursing Officer,2026-06-29
+60,Touchette Regional Hospital,http://www.touchette.org,hospital & health care,126.0,C-Suite Join,Unknown — Appointed as Chief Executive Officer,Unknown
+61,Whitman Hospital and Medical Clinics,http://www.whmc.org,hospital & health care,126.0,C-Suite Join,Holly Shelden — Appointed as Chief Executive Officer,2026-09-17
+62,TRIA Orthopedics,http://www.tria.com,medical practice,126.0,C-Suite Join,Blake Berquist — Appointed as Executive Vice President and Chief Financial Officer,Unknown
+63,Foundation Laboratory,http://www.foundationlaboratory.com,"health, wellness & fitness",121.5,C-Suite Exit + C-Suite Join,Vera Grossmann — Interim appointment as Interim Chief Executive Officer,2026-08-01
+64,"Tucson Orthopaedic Institute, P.C",http://www.tucsonortho.com,medical practice,120.0,C-Suite Join,Ashley Vertuno — Appointed as Chief Executive Officer,2026-06-30
+65,Duke Cancer Institute,http://www.dukecancerinstitute.org,hospital & health care,120.0,C-Suite Join,"David Tuveson, MD, PhD — Appointed as Executive Director, Duke Cancer Institute",2026-10-31
 66,eHealth Technologies,http://www.ehealthtechnologies.com,hospital & health care,120.0,C-Suite Join,Doug Dietzman — Appointed as President and Executive Director,2026-07-06
-67,Freedom Fertility | VFP Pharmacy Group by Evernorth,http://www.freedomfertility.com,hospital & health care,114.0,C-Suite Join,"Heather Dlugolenski — Role change as President, Accredo and Evernorth Fertility at Evernorth Health Services",2026-07-27
-68,Minnesota Masonic Home,http://www.mnmasonichomes.org,hospital & health care,114.0,C-Suite Join,Unknown — Promoted as Chief Executive Officer,Unknown
-69,CortiCare,http://www.corticare.com,hospital & health care,114.0,C-Suite Exit + C-Suite Join,Charles Martin — Promoted as Chief Executive Officer,2026-07-01
-70,MedCorp,http://www.medcorpinc.com,hospital & health care,114.0,C-Suite Exit + C-Suite Join,James Kinley — Interim appointment as Interim Chief Financial Officer,2026-07-24
-71,Ohana Health Plan,http://www.ohanahealthplan.com,hospital & health care,112.5,C-Suite Join,Chris Neczypor — Appointed as Executive Vice President and Chief Financial Officer,2027-01-01
-72,Northwest Healthcare Tucson,http://www.healthiertucson.com,hospital & health care,112.4,C-Suite Exit + C-Suite Join,Andrew “Drew” Emery — Appointed as Market CEO,2026-09-08
-73,Navarro Regional Hospital,http://www.navarrohospital.com,hospital & health care,108.0,C-Suite Join,Fallon Phillips — Role change as Assistant Chief Executive Officer,Unknown
-74,Mad River Community Hospital,http://www.madriverhospital.com,hospital & health care,108.0,C-Suite Join, — Retired,Unknown
-75,RefleXion Medical,http://www.reflexion.com,medical devices,108.0,C-Suite Join,Todd Powell — Appointed as President and Chief Executive Officer,Unknown
-76,Redington-Fairview General Hospital,http://www.rfgh.net,hospital & health care,105.0,C-Suite Exit + C-Suite Join,Tiffany Comis — Appointed as Chief Executive Officer,Unknown
-77,Kearney Regional Medical Center,http://www.kearneyregional.com,hospital & health care,105.0,C-Suite Exit + C-Suite Join,"Scott Smith, MD — Interim appointment as Interim President and Chief Executive Officer",Unknown
-78,Laurel Ridge Treatment Center,http://www.laurelridgetc.com,mental health care,105.0,C-Suite Exit + C-Suite Join,Chris Barela — Interim appointment as Acting Chief Executive Officer,Unknown
-79,Clinton Memorial Hospital,http://www.cmhregional.com,hospital & health care,105.0,C-Suite Join,Mark Clement — Retired as President and Chief Executive Officer,2026-06-30
-80,MCKENZIE-WILLAMETTE MEDICAL CENTER,http://www.mckweb.com,hospital & health care,105.0,C-Suite Join,Mark Robinson — Appointed as Chief Executive Officer,2026-07-20
-81,UAB Callahan Eye,http://www.uabcallahaneye.org,hospital & health care,105.0,C-Suite Join,Dustin Diggs — Promoted as Chief Nursing Officer,2026-06-17
-82,Children's Healthcare of Atlanta Cardiology,http://www.kidsheart.com,hospital & health care,105.0,C-Suite Exit + C-Suite Join,"William Mahle, MD — Appointed as Chief of Cardiology",Unknown
-83,Montefiore,http://www.menorahpark.org,hospital & health care,105.0,Funding Round,Funding: Capital Grant — $41 million (state grant portion; ~$45M total project),2026-06-26
-84,McKenzie Health,http://www.mckenziehealth.com,hospital & health care,105.0,Funding Round,"Funding: Municipal Grant — $1,000,000",2026-06-25
-85,Aspen Valley Health,http://www.aspenvalleyhealth.org,hospital & health care,102.0,C-Suite Join,Michelle Gelroth — Role change as Chief Information Officer,Unknown
+67,Harmony Home Health & Hospice,http://www.harmonyhomehealth.com,hospital & health care,120.0,C-Suite Join,Tom Xu — Appointed as Chief Operating Officer,2026-08-10
+68,Freedom Fertility | VFP Pharmacy Group by Evernorth,http://www.freedomfertility.com,hospital & health care,114.0,C-Suite Join,"Heather Dlugolenski — Role change as President, Accredo and Evernorth Fertility at Evernorth Health Services",2026-07-27
+69,Minnesota Masonic Home,http://www.mnmasonichomes.org,hospital & health care,114.0,C-Suite Join,Unknown — Promoted as Chief Executive Officer,Unknown
+70,San Ramon Regional Medical Center,http://www.sanramonmedctr.com,hospital & health care,114.0,C-Suite Join,Beenu Chadha — Retired as Chief Financial Officer,2026-06-28
+71,CortiCare,http://www.corticare.com,hospital & health care,114.0,C-Suite Exit + C-Suite Join,Charles Martin — Promoted as Chief Executive Officer,2026-07-01
+72,MedCorp,http://www.medcorpinc.com,hospital & health care,114.0,C-Suite Exit + C-Suite Join,James Kinley — Interim appointment as Interim Chief Financial Officer,2026-07-24
+73,Health Management Associates,http://www.healthmanagement.com,hospital & health care,109.5,C-Suite Exit + C-Suite Join,Arda Ural — Appointed as Chief Operating Officer,2026-07-06
+74,Navarro Regional Hospital,http://www.navarrohospital.com,hospital & health care,108.0,C-Suite Join,Fallon Phillips — Role change as Assistant Chief Executive Officer,Unknown
+75,Aspen Valley Health,http://www.aspenvalleyhealth.org,hospital & health care,108.0,C-Suite Join,Michelle Gelroth — Role change as Chief Information Officer,Unknown
+76,Mad River Community Hospital,http://www.madriverhospital.com,hospital & health care,108.0,C-Suite Join, — Retired,Unknown
+77,RefleXion Medical,http://www.reflexion.com,medical devices,108.0,C-Suite Join,Todd Powell — Appointed as President and Chief Executive Officer,Unknown
+78,Redington-Fairview General Hospital,http://www.rfgh.net,hospital & health care,105.0,C-Suite Exit + C-Suite Join,Tiffany Comis — Appointed as Chief Executive Officer,Unknown
+79,Kearney Regional Medical Center,http://www.kearneyregional.com,hospital & health care,105.0,C-Suite Exit + C-Suite Join,"Scott Smith, MD — Interim appointment as Interim President and Chief Executive Officer",Unknown
+80,Laurel Ridge Treatment Center,http://www.laurelridgetc.com,mental health care,105.0,C-Suite Exit + C-Suite Join,Chris Barela — Interim appointment as Acting Chief Executive Officer,Unknown
+81,Clinton Memorial Hospital,http://www.cmhregional.com,hospital & health care,105.0,C-Suite Join,Mark Clement — Retired as President and Chief Executive Officer,2026-06-30
+82,MCKENZIE-WILLAMETTE MEDICAL CENTER,http://www.mckweb.com,hospital & health care,105.0,C-Suite Join,Mark Robinson — Appointed as Chief Executive Officer,2026-07-20
+83,Children's Healthcare of Atlanta Cardiology,http://www.kidsheart.com,hospital & health care,105.0,C-Suite Exit + C-Suite Join,"William Mahle, MD — Appointed as Chief of Cardiology",Unknown
+84,Montefiore,http://www.menorahpark.org,hospital & health care,105.0,Funding Round,Funding: Capital Grant — $41 million (state grant portion; ~$45M total project),2026-06-26
+85,McKenzie Health,http://www.mckenziehealth.com,hospital & health care,105.0,Funding Round,"Funding: Municipal Grant — $1,000,000",2026-06-25
 86,Nevada Regional Medical Center,http://www.nrmchealth.com,hospital & health care,99.0,C-Suite Join,Michelle Beverly — Promoted as Chief Executive Officer,2026-07-13
-87,HCA Florida Lehigh Hospital,http://www.lehighregional.com,hospital & health care,97.5,C-Suite Join,Luke Henry — Appointed as Chief Nursing Officer and Chief Operating Officer,2026-08-24
+87,CENTRAL MONTANA MEDICAL CENTER,http://www.cmmc.health,hospital & health care,96.0,C-Suite Exit + C-Suite Join,Shawn Barnett — Appointed as Chief Executive Officer,Unknown
 88,Memorial Hospital and Manor,http://www.mh-m.org,hospital & health care,96.0,C-Suite Join,Landon Chavis — Appointed as Assistant Administrator and Vice President of Clinical and Support Services,Unknown
 89,CADUCEUSHEALTH®,http://www.caduceushealth.com,hospital & health care,94.5,Acquisition / M&A,M&A: Innovaccer announced the acquisition of CaduceusHealth to strengthen its revenue,2026-06-25
 90,HealthSource Saginaw,http://www.healthsourcesaginaw.org,hospital & health care,93.0,C-Suite Exit + C-Suite Join,Joel Kincaid — exited as Chief Executive Officer,2026-09-18
 91,North Florida Surgeons,http://www.nflsurgeons.com,hospital & health care,90.0,C-Suite Join,Perry Clark — Interim appointment as Interim Chief Executive Officer,2026-07-06
 92,University Orthopedics,http://www.universityorthopedics.com,hospital & health care,90.0,C-Suite Join,"Julia A. Katarincic, MD — Appointed as President",2026-07-09
-93,Mason Health,http://www.masonhealth.com,hospital & health care,90.0,C-Suite Join,David Nosacka — Appointed as Executive Vice President and Chief Financial Officer,2026-08-17
-94,Harmony Home Health & Hospice,http://www.harmonyhomehealth.com,hospital & health care,90.0,C-Suite Join,Tom Xu — Appointed as Chief Operating Officer,2026-08-10
-95,Dental Associates,http://www.dentalassociates.com,medical practice,90.0,C-Suite Join,Alexa Manos — Appointed as Chief Executive Officer,2026-07-02
-96,CenTrak,http://www.centrak.com,hospital & health care,90.0,C-Suite Join,Jack Darby — Appointed as Chief Executive Officer,2026-07-24
-97,VIVAGE,http://www.vivage.com,hospital & health care,90.0,C-Suite Join,"Craig Gibbs, PhD, MBA — Appointed as President and Chief Executive Officer",2026-08-26
-98,Providence Medical Center,http://www.providencekc.com,hospital & health care,84.0,C-Suite Join,"Elizabeth ""Beth"" Harden — Appointed as Chief Nursing Officer",Unknown
-99,Kittitas Valley Healthcare,http://www.kvhealthcare.org,hospital & health care,84.0,C-Suite Join,Unknown — Retired as Chief Executive Officer,Unknown
-100,Ottumwa Regional Health Center,http://www.ottumwaregionalhealth.com,hospital & health care,84.0,C-Suite Join,Unknown — Appointed as Chief Executive Officer,Unknown
-101,Monarch Healthcare Management,http://www.monarchmn.com,hospital & health care,84.0,C-Suite Join,Anna Lohrfink — Appointed as Chief Executive Officer,Unknown
-102,"Orthopedic Associates of Lancaster, LTD.",http://www.fixbones.com,hospital & health care,84.0,C-Suite Join,Ryan Albrecht — Appointed as Chief Executive Officer,Unknown
-103,Sonoma Valley Hospital,http://www.sonomavalleyhospital.org,hospital & health care,78.0,C-Suite Join,Benjamin J. Armfield — Interim appointment as Interim Chief Executive Officer,Unknown
-104,Twin County Regional Healthcare - Duke LifePoint Healthcare,http://www.tcrh.org,hospital & health care,78.0,C-Suite Exit + C-Suite Join,Cortney Clark — Interim appointment as Interim Chief Executive Officer,2026-07-06
-105,Barstow Community Hospital,http://www.barstowhospital.com,hospital & health care,78.0,C-Suite Join, — Appointed,Unknown
-106,Nathan Littauer Hospital & Nursing Home,http://www.nlh.org,hospital & health care,78.0,C-Suite Exit + C-Suite Join,"Ashley Delaney, SPHR — Appointed as Vice President of Human Resources",2026-07-06
-107,Timpanogos Regional Hospital,http://www.timpanogosregionalhospital.com,hospital & health care,78.0,C-Suite Join,Michelle Beverly — Promoted as Chief Executive Officer,2026-07-13
-108,Titus Regional Medical Center,http://www.titusregional.com,hospital & health care,75.0,C-Suite Join,Unknown — Appointed as Chief Executive Officer,2026-06-30
-109,IHI,http://www.ihi.org,hospital & health care,75.0,C-Suite Join,"Ronald Wyatt, MD, MHA — Appointed as Chief Medical Officer",2026-07-20
-110,Health Management Associates,http://www.healthmanagement.com,hospital & health care,75.0,C-Suite Join,Arda Ural — Appointed as Chief Operating Officer,2026-07-06
-111,Seton Medical Center Harker Heights,http://www.setonharkerheights.net,hospital & health care,75.0,C-Suite Join,"Mandy Shaiffer, MSN, RN — Appointed as Chief Executive Officer",2026-08-22
-112,Arizona Community Physicians,http://www.azacp.com,medical practice,75.0,C-Suite Join,Michelle Beverly — Promoted as Chief Executive Officer,2026-07-13
-113,Cancer Care Northwest,http://www.cancercarenorthwest.com,medical practice,72.0,C-Suite Join,"Elizabeth ""Beth"" Passmore — Appointed as Executive Director",Unknown
-114,CenterPointe Hospital,http://www.centerpointehospital.com,hospital & health care,72.0,C-Suite Join,Mary Williamson — Appointed as Chief Financial Officer,Unknown
-115,ComplexCare Solutions,http://www.complexcaresolutions.com,hospital & health care,72.0,C-Suite Join,Virgil Wong — Appointed as Chief Product Officer,Unknown
-116,UMass Memorial Health - Harrington,http://www.harringtonhospital.org,hospital & health care,67.5,C-Suite Join,Robin Sodano — Retired as Senior Vice President of Information Services and Chief Information Officer,2026-09-01
-117,Whitman Hospital and Medical Clinics,http://www.whmc.org,hospital & health care,66.0,C-Suite Join,Bill Bryant — Appointed as Chief Executive Officer,Unknown
-118,Tennessee Oncology,http://www.tnoncology.com,hospital & health care,66.0,C-Suite Join,Dr. Johnetta Blakely — Appointed as Chief Medical Officer,Unknown
-119,Saint Francis Healthcare Memphis-Bartlett,http://www.saintfrancishosp.com,hospital & health care,66.0,C-Suite Join, — Appointed,Unknown
-120,EPOCH Senior Living,http://www.epochsl.com,hospital & health care,64.0,C-Suite Join + Product Launch,"In the news: Epoch Senior Living Launches New High - End Brand , Expands Memory Care",2026-08-14T01:00:00Z
-121,"Integrated Home Care Services, Inc.",http://www.ihcscorp.com,hospital & health care,60.0,C-Suite Join,Ashish V. Shah — Promoted as Chief Product & Technology Officer,Unknown
-122,YAKIMA NEIGHBORHOOD HEALTH SERVICES,http://www.ynhs.org,hospital & health care,60.0,C-Suite Join,Dr. Daniel Dunbar — Appointed as Chief Medical Officer,Unknown
-123,Spring Valley Hospital,http://www.springvalleyhospital.com,hospital & health care,60.0,C-Suite Join,Matt Wheelus — Role change as Chief Executive Officer,2026-06-17
+93,Dental Associates,http://www.dentalassociates.com,medical practice,90.0,C-Suite Join,Alexa Manos — Appointed as Chief Executive Officer,2026-07-02
+94,CenTrak,http://www.centrak.com,hospital & health care,90.0,C-Suite Join,Jack Darby — Appointed as Chief Executive Officer,2026-07-24
+95,VIVAGE,http://www.vivage.com,hospital & health care,90.0,C-Suite Join,"Craig Gibbs, PhD, MBA — Appointed as President and Chief Executive Officer",2026-08-26
+96,UMass Memorial Health - Harrington,http://www.harringtonhospital.org,hospital & health care,90.0,C-Suite Join,Robin Sodano — Retired as Senior Vice President of Information Services and Chief Information Officer,2026-09-01
+97,Providence Medical Center,http://www.providencekc.com,hospital & health care,84.0,C-Suite Join,"Elizabeth ""Beth"" Harden — Appointed as Chief Nursing Officer",Unknown
+98,Kittitas Valley Healthcare,http://www.kvhealthcare.org,hospital & health care,84.0,C-Suite Join,Unknown — Retired as Chief Executive Officer,Unknown
+99,Ottumwa Regional Health Center,http://www.ottumwaregionalhealth.com,hospital & health care,84.0,C-Suite Join,Unknown — Appointed as Chief Executive Officer,Unknown
+100,Monarch Healthcare Management,http://www.monarchmn.com,hospital & health care,84.0,C-Suite Join,Anna Lohrfink — Appointed as Chief Executive Officer,Unknown
+101,"Orthopedic Associates of Lancaster, LTD.",http://www.fixbones.com,hospital & health care,84.0,C-Suite Join,Ryan Albrecht — Appointed as Chief Executive Officer,Unknown
+102,Stephens County Hospital,http://www.stephenscountyhospital.com,hospital & health care,82.5,C-Suite Exit + C-Suite Join,Kathy Schardt — Interim appointment as Interim Chief Executive Officer,2026-07-06
+103,Northwest Healthcare Tucson,http://www.healthiertucson.com,hospital & health care,82.5,C-Suite Exit + C-Suite Join,Andrew “Drew” Emery — Appointed as Market CEO,2026-09-08
+104,Titus Regional Medical Center,http://www.titusregional.com,hospital & health care,81.0,C-Suite Join,Unknown — Appointed as Chief Executive Officer,2026-06-30
+105,Sonoma Valley Hospital,http://www.sonomavalleyhospital.org,hospital & health care,78.0,C-Suite Join,Benjamin J. Armfield — Interim appointment as Interim Chief Executive Officer,Unknown
+106,Twin County Regional Healthcare - Duke LifePoint Healthcare,http://www.tcrh.org,hospital & health care,78.0,C-Suite Exit + C-Suite Join,Cortney Clark — Interim appointment as Interim Chief Executive Officer,2026-07-06
+107,Barstow Community Hospital,http://www.barstowhospital.com,hospital & health care,78.0,C-Suite Join, — Appointed,Unknown
+108,Nathan Littauer Hospital & Nursing Home,http://www.nlh.org,hospital & health care,78.0,C-Suite Exit + C-Suite Join,"Ashley Delaney, SPHR — Appointed as Vice President of Human Resources",2026-07-06
+109,Timpanogos Regional Hospital,http://www.timpanogosregionalhospital.com,hospital & health care,78.0,C-Suite Join,Michelle Beverly — Promoted as Chief Executive Officer,2026-07-13
+110,Special Tree Rehabilitation System,http://www.specialtree.com,hospital & health care,76.5,C-Suite Join,Seth Buckman — Appointed as NeuroCare Center Administrator,2026-08-24
+111,IHI,http://www.ihi.org,hospital & health care,75.0,C-Suite Join,"Ronald Wyatt, MD, MHA — Appointed as Chief Medical Officer",2026-07-20
+112,Seton Medical Center Harker Heights,http://www.setonharkerheights.net,hospital & health care,75.0,C-Suite Join,"Mandy Shaiffer, MSN, RN — Appointed as Chief Executive Officer",2026-08-22
+113,Arizona Community Physicians,http://www.azacp.com,medical practice,75.0,C-Suite Join,Michelle Beverly — Promoted as Chief Executive Officer,2026-07-13
+114,Cancer Care Northwest,http://www.cancercarenorthwest.com,medical practice,72.0,C-Suite Join,"Elizabeth ""Beth"" Passmore — Appointed as Executive Director",Unknown
+115,CenterPointe Hospital,http://www.centerpointehospital.com,hospital & health care,72.0,C-Suite Join,Mary Williamson — Appointed as Chief Financial Officer,Unknown
+116,ComplexCare Solutions,http://www.complexcaresolutions.com,hospital & health care,72.0,C-Suite Join,Virgil Wong — Appointed as Chief Product Officer,Unknown
+117,Tennessee Oncology,http://www.tnoncology.com,hospital & health care,66.0,C-Suite Join,Dr. Johnetta Blakely — Appointed as Chief Medical Officer,Unknown
+118,Saint Francis Healthcare Memphis-Bartlett,http://www.saintfrancishosp.com,hospital & health care,66.0,C-Suite Join, — Appointed,Unknown
+119,Methodist McKinney Hospital,http://www.methodistmckinneyhospital.com,hospital & health care,66.0,C-Suite Join,Pam Stoyanoff — Retired as President and Chief Operating Officer,2026-12-31
+120,Chesapeake Urology Associates,http://www.unitedurology.com,hospital & health care,64.5,C-Suite Join,Megan Rood — Appointed as Chief Executive Officer,2026-08-31
+121,EPOCH Senior Living,http://www.epochsl.com,hospital & health care,64.0,C-Suite Join + Product Launch,"In the news: Epoch Senior Living Launches New High - End Brand , Expands Memory Care",2026-08-14T01:00:00Z
+122,"Integrated Home Care Services, Inc.",http://www.ihcscorp.com,hospital & health care,60.0,C-Suite Join,Ashish V. Shah — Promoted as Chief Product & Technology Officer,Unknown
+123,YAKIMA NEIGHBORHOOD HEALTH SERVICES,http://www.ynhs.org,hospital & health care,60.0,C-Suite Join,Dr. Daniel Dunbar — Appointed as Chief Medical Officer,Unknown
 124,TOC | Experts in Orthopedic Care,http://www.teamtoc.com,hospital & health care,60.0,C-Suite Join,Shawn Cash — Appointed as Chief Executive Officer,2026-07-09
 125,Lakeview Medical Center,http://www.lakeviewmed.org,hospital & health care,60.0,C-Suite Join,Michelle Beverly — Promoted as Chief Executive Officer,2026-07-13
 126,Barnes-Jewish West County Hospital,http://www.barnesjewishwestcounty.org,hospital & health care,60.0,C-Suite Join,"Jason Gillihan, MD, MBA — Promoted as Chief Medical Officer",2026-07-17
 127,Saban Community Clinic,http://www.sabancommunityclinic.org,hospital & health care,60.0,C-Suite Join,Muriel Nouwezem — Appointed as Chief Executive Officer,2026-07-01
 128,"East Georgia Regional Medical Center, LLC",http://www.eastgeorgiaregional.com,hospital & health care,60.0,C-Suite Join,Terri O'Neal — Interim appointment as Interim Chief Executive Officer,2026-07-06
-129,"Warren General Hospital, Warren, PA",http://www.wgh.org,hospital & health care,60.0,C-Suite Join,Dan Grolemund — Appointed as Chief Executive Officer,2026-07-01
-130,Acuity Healthcare,http://www.acuityhealthcare.net,hospital & health care,60.0,C-Suite Join,Gary Basra — Appointed as Chief Technology Officer,2026-06-25
-131,FPA Women's Health,http://www.fpawomenshealth.com,hospital & health care,60.0,C-Suite Join,Rupa Bahri — Appointed as Chief Executive Officer,2026-08-04
-132,Evergreen Health,http://www.evergreenhs.org,hospital & health care,60.0,C-Suite Join,Dr. Shyamal Majithia — Role change as Primary & Specialty Care Medical Director,2026-08-05
-133,Accessible Home Health Care,http://www.accessiblehomehealthcare.com,hospital & health care,60.0,C-Suite Join,Tom Xu — Appointed as Chief Operating Officer,2026-08-10
-134,"Independent Living Systems, LLC",http://www.ilshealth.com,hospital & health care,58.5,C-Suite Join,Tatiana Pita — Promoted as Senior Vice President of Care Management,2026-08-24
-135,Center for Family Health,http://www.centerforfamilyhealth.org,hospital & health care,54.0,C-Suite Join,Sara Benedetto — Appointed as Chief Executive Officer,Unknown
-136,Special Tree Rehabilitation System,http://www.specialtree.com,hospital & health care,54.0,C-Suite Join,Joseph J. Richert II — Appointed as Chief Executive Officer,Unknown
-137,Sutter Shared Services,http://www.sutterphysicianservices.org,hospital & health care,52.5,C-Suite Join,Rick Moreland — Appointed as Chief Executive Officer,2026-08-24
-138,Portsmouth Regional Hospital - New Hampshire,http://www.portsmouthhospital.com,hospital & health care,48.7,C-Suite Exit + C-Suite Join,Michelle Dodd — Interim appointment as Interim Chief Executive Officer,2026-09-03
-139,"Private Home Care Services, LLC",http://www.privatehomecareservices.com,hospital & health care,48.0,C-Suite Join,Nick Evans — Appointed as Chief Financial Officer,Unknown
-140,Halifax Regional,http://www.halifaxregional.org,hospital & health care,48.0,C-Suite Join,Nicole Dockery — Promoted as President,Unknown
-141,"The Resource Group, Spend Management Solutions",http://www.theresourcegroup.com,hospital & health care,45.0,C-Suite Join,"Joshua Keeter — Promoted as Chief Sourcing Officer - Capital, Laboratory, Pharmaceuticals, Products",2026-07-01
-142,Dominion Diagnostics,http://www.domdiag.com,hospital & health care,45.0,C-Suite Join,Trevor Brown — Appointed as Chief Revenue Officer,2026-07-21
-143,Stephens County Hospital,http://www.stephenscountyhospital.com,hospital & health care,45.0,C-Suite Join,Kathy Schardt — Interim appointment as Interim Chief Executive Officer,2026-07-06
-144,CLS Health,http://www.cls.health,hospital & health care,45.0,C-Suite Join,Dan Romary — Appointed as Chief Operating Officer,2026-06-24
-145,AbsoluteCare,http://www.absolutecare.com,hospital & health care,45.0,C-Suite Join,"Aderonke Omotade, MD — Appointed as Medical Director for Integrated Psychiatry",2026-08-19
-146,Liberty Healthcare Corporation,http://www.libertyhealthcare.com,hospital & health care,45.0,C-Suite Join,Adam Baillie — Appointed as President,2026-07-15
-147,"White-Wilson Medical Center, P.A.",http://www.white-wilson.com,medical practice,42.0,C-Suite Join,Brad Logan — Appointed as Chief Executive Officer,Unknown
-148,Perry County Memorial Hospital,http://www.pchospital.org,hospital & health care,42.0,C-Suite Join,Nick Harley — Appointed as Chief Executive Officer,Unknown
-149,Chicago Family Health Center,http://www.chicagofamilyhealth.org,hospital & health care,42.0,C-Suite Join,"Jared M. Williams, DBA — Appointed as Chief Financial Officer",Unknown
-150,TransCare,http://www.trans-care.com,hospital & health care,42.0,C-Suite Join,Anjali Jameson — Appointed as Chief Product Officer,Unknown
-151,New Jersey Urology,http://www.njurology.com,hospital & health care,42.0,C-Suite Join,"Chidebelu Ufodike, MD — Appointed as Chief Operating Officer",Unknown
-152,Marianjoy Rehabilitation Hospital,http://www.marianjoy.org,hospital & health care,42.0,C-Suite Join,Jennifer K. Webster — Appointed as Chief Executive Officer,Unknown
-153,Gila Regional Medical Center,http://www.grmc.org,hospital & health care,42.0,C-Suite Join,Drew H. Dostal — Appointed as Chief Executive Officer,Unknown
-154,Olympia Medical Center,http://www.olympiamc.com,hospital & health care,42.0,C-Suite Join,Robert Allen — Retired as Chief Executive Officer,Unknown
-155,Chesapeake Urology Associates,http://www.unitedurology.com,hospital & health care,42.0,C-Suite Join,Russ Adkins — Appointed as Chief Legal Officer,Unknown
-156,eventuswh.com,http://www.eventuswholehealth.com,hospital & health care,42.0,C-Suite Join,Cameron Routh — Appointed as Chief Executive Officer,Unknown
-157,Civitas Senior Living,http://www.civitasseniorliving.com,hospital & health care,42.0,C-Suite Join,Unknown — Appointed as Chief Executive Officer,Unknown
-158,Shenandoah Medical Center,http://www.smchospital.com,hospital & health care,42.0,C-Suite Join,Unknown — Appointed as Chief Executive Officer,Unknown
-159,Our Lady of Lourdes RMC,http://www.lourdes.net,hospital & health care,42.0,C-Suite Join,Unknown — Appointed as Chief Executive Officer,Unknown
-160,Central Carolina Hospital,http://www.centralcarolinahosp.com,hospital & health care,42.0,C-Suite Join,Unknown — Appointed as Chief Executive Officer,Unknown
-161,Athens Orthopedic Clinic,http://www.athensorthopedicclinic.com,hospital & health care,42.0,C-Suite Join,Michael Boblitz — Appointed as Chief Executive Officer,Unknown
-162,Powell Valley Healthcare,http://www.pvhc.org,hospital & health care,42.0,C-Suite Join,Lisa Wooten — Promoted as Chief Financial Officer,Unknown
-163,Guidehealth,http://www.guidehealth.com,hospital & health care,42.0,C-Suite Join,Doug Wenners — Appointed as Chief Executive Officer,Unknown
-164,LifeCare Medical Center,http://www.lifecaremedicalcenter.org,hospital & health care,42.0,C-Suite Exit + C-Suite Join,Unknown — Retired as President and Chief Executive Officer,2026-07-01
-165,UP Health System – Bell,http://www.bellhospital.org,hospital & health care,41.7,C-Suite Exit + News Mention,Tonya Darner — exited as Market Chief Executive Officer,2026-09-18
-166,"Methodist Hospital of Henderson, Kentucky",http://www.methodisthospital.net,hospital & health care,36.0,C-Suite Join,Unknown — Appointed as Chief Financial Officer,Unknown
-167,Midwest Orthopaedics at RUSH,http://www.rushortho.com,hospital & health care,36.0,C-Suite Join,Dr. Omar Lateef — Retired as Chief Executive Officer,Unknown
-168,Karyopharm Therapeutics Inc.,http://www.karyopharm.com,pharmaceuticals,36.0,C-Suite Join, — Appointed,Unknown
-169,MGMA,http://www.mgma.com,hospital & health care,36.0,C-Suite Join, — Appointed,Unknown
-170,Wilson Senior Care,http://www.wilsonseniorcare.com,hospital & health care,36.0,C-Suite Join,Unknown — Appointed as Chief Financial Officer,Unknown
-171,Collective Health Inc,http://www.collectivehealth.com,hospital & health care,36.0,C-Suite Join,"Kaushik Bhaumik, PhD — Appointed as Chief Revenue Officer",Unknown
-172,Lakeside Behavioral Health System,http://www.lakesidebhs.com,hospital & health care,36.0,C-Suite Join,Danny Milam — Appointed as Chief Financial Officer,Unknown
-173,Intellivo,http://www.intellivo.com,hospital & health care,36.0,C-Suite Join,J.P. Fingado — Appointed as Chief Executive Officer,Unknown
-174,Home Care Delivered Inc,http://www.hcd.com,hospital & health care,36.0,C-Suite Join,Christian Richards — Appointed as Chief Financial Officer,Unknown
-175,Taiho Oncology Inc,http://www.taihooncology.com,pharmaceuticals,36.0,C-Suite Join, — Appointed,Unknown
-176,Mile Bluff Medical Center,http://www.milebluff.com,hospital & health care,30.0,C-Suite Join,Dara Bartels — Promoted as Chief Executive Officer,Unknown
-177,Genova Diagnostics,http://www.gdx.net,hospital & health care,30.0,C-Suite Join,Keith Meadors — Appointed as Chief Commercial Officer,Unknown
-178,Vivant Health,http://www.vivanthealth.com,hospital & health care,30.0,C-Suite Join, — Appointed,Unknown
-179,Arkansas Valley Regional Medical Center,http://www.avrmc.org,hospital & health care,30.0,C-Suite Join, — Promoted as Chief Operating Officer,Unknown
-180,Duke Cancer Institute,http://www.dukecancerinstitute.org,hospital & health care,30.0,C-Suite Join,Jeff Chitester — Appointed as Chief Human Resources Officer,Unknown
-181,El Paso Children's Hospital,http://www.elpasochildrens.org,hospital & health care,30.0,C-Suite Join,Maria Zampini — Appointed as Chief Executive Officer,Unknown
-182,Baptist Memorial Hospital-Oktibbeha County,http://www.och.org,hospital & health care,30.0,C-Suite Join, — Appointed as Chief Operating Officer,Unknown
-183,Dallas Regional Medical Center,http://www.dallasregionalmedicalcenter.com,hospital & health care,30.0,C-Suite Join,Josiah De La Garza — Appointed as Chief Executive Officer,Unknown
-184,Vitality,http://www.vitalitygroup.com,hospital & health care,30.0,C-Suite Exit,Nick Padula — exited as Chief Revenue Officer,2026-07-02
-185,Cody Regional Health,http://www.codyregionalhealth.org,hospital & health care,30.0,C-Suite Join,Coby La Blue — Appointed as Chief Financial Officer,Unknown
-186,DMC Huron Valley-Sinai Hospital,http://www.hvsh.org,hospital & health care,30.0,C-Suite Join,Deborah Wing — Appointed as Chief Executive Officer,Unknown
-187,"Outset Medical, Inc.",http://www.outsetmedical.com,medical devices,30.0,C-Suite Exit,John Brottem — exited as General Counsel,2026-09-11
-188,"P.T. Services Rehabilitation, Inc.",http://www.ptsrehab.com,hospital & health care,30.0,C-Suite Join,Stef Bloom — Appointed as Chief People Officer,2026-07-22
-189,"Saint Mary's Regional Medical Center, Inc.",http://www.saintmarysregional.com,hospital & health care,30.0,C-Suite Join,Michelle Beverly — Promoted as Chief Executive Officer,2026-07-13
-190,Aurora Behavioral Health System,http://www.auroraarizona.com,hospital & health care,30.0,C-Suite Join,Michelle Beverly — Promoted as Chief Executive Officer,2026-07-13
-191,Greystone Health Network,http://www.greystonehealthcareers.com,hospital & health care,28.5,C-Suite Exit + C-Suite Join,Eric R. Nielsen — Interim appointment as Interim Chief Financial Officer,2026-07-01
-192,Concerto Renal Services,http://www.concertors.com,hospital & health care,24.0,C-Suite Join,Darem Dughri — Appointed as Chief Operating Officer,Unknown
-193,Carrum Health Inc,http://www.carrumhealth.com,hospital & health care,24.0,C-Suite Join,Kulesh Shanmugasundaram — Appointed as Chief Product & Technology Officer,Unknown
-194,HealthHelp,http://www.healthhelp.com,hospital & health care,24.0,C-Suite Join,"Katherine Dallow, MD, MPH, CPE — Appointed as Chief Medical Officer",Unknown
-195,Accuray,http://www.accuray.com,medical devices,24.0,C-Suite Join,Paul Miele — Appointed as Chief Commercial Officer,Unknown
-196,Legent Health,http://www.legenthealth.com,hospital & health care,24.0,C-Suite Join,Brad Stoltz — Appointed as Chief Operating Officer,Unknown
-197,Valley Regional Hospital,http://www.vrh.org,hospital & health care,24.0,C-Suite Join,Carl Cameron — Promoted as Executive Vice President and Chief Operating Officer,Unknown
-198,Moberly Regional Medical Center,http://www.moberlyregionalmedicalcenter.com,hospital & health care,24.0,C-Suite Join,Tina Miller — Appointed as Chief Nursing Officer,Unknown
-199,Clay County Hospital and Clinics,http://www.claycountyhospital.org,hospital & health care,24.0,C-Suite Join,Joseph Francis — Appointed as Chief Financial Officer,Unknown
-200,LetsGetChecked,http://www.letsgetchecked.com,hospital & health care,24.0,C-Suite Join, — Appointed,Unknown
+129,Mason Health,http://www.masonhealth.com,hospital & health care,60.0,C-Suite Join,David Nosacka — Appointed as Executive Vice President and Chief Financial Officer,2026-08-17
+130,"Warren General Hospital, Warren, PA",http://www.wgh.org,hospital & health care,60.0,C-Suite Join,Dan Grolemund — Appointed as Chief Executive Officer,2026-07-01
+131,Acuity Healthcare,http://www.acuityhealthcare.net,hospital & health care,60.0,C-Suite Join,Gary Basra — Appointed as Chief Technology Officer,2026-06-25
+132,FPA Women's Health,http://www.fpawomenshealth.com,hospital & health care,60.0,C-Suite Join,Rupa Bahri — Appointed as Chief Executive Officer,2026-08-04
+133,Evergreen Health,http://www.evergreenhs.org,hospital & health care,60.0,C-Suite Join,Dr. Shyamal Majithia — Role change as Primary & Specialty Care Medical Director,2026-08-05
+134,Accessible Home Health Care,http://www.accessiblehomehealthcare.com,hospital & health care,60.0,C-Suite Join,Tom Xu — Appointed as Chief Operating Officer,2026-08-10
+135,"Community Health Care, Inc.",http://www.chcqca.org,hospital & health care,60.0,C-Suite Exit + C-Suite Join,Nikki Hendren — Interim appointment as Interim Chief Executive Officer,2026-10-03
+136,UP Health System – Bell,http://www.bellhospital.org,hospital & health care,59.7,C-Suite Exit + News Mention,Tonya Darner — exited as Market Chief Executive Officer,2026-09-18
+137,"Independent Living Systems, LLC",http://www.ilshealth.com,hospital & health care,58.5,C-Suite Join,Tatiana Pita — Promoted as Senior Vice President of Care Management,2026-08-24
+138,Kline Galland,http://www.klinegalland.org,hospital & health care,55.5,C-Suite Exit + C-Suite Join,"Dr. Megan Gillum — Appointed as Medical Director, Kline Galland Hospice",2026-07-21
+139,Center for Family Health,http://www.centerforfamilyhealth.org,hospital & health care,54.0,C-Suite Join,Sara Benedetto — Appointed as Chief Executive Officer,Unknown
+140,Halifax Regional,http://www.halifaxregional.org,hospital & health care,54.0,C-Suite Join,Nicole Dockery — Promoted as President,Unknown
+141,Sutter Shared Services,http://www.sutterphysicianservices.org,hospital & health care,52.5,C-Suite Join,Rick Moreland — Appointed as Chief Executive Officer,2026-08-24
+142,DMC Huron Valley-Sinai Hospital,http://www.hvsh.org,hospital & health care,52.5,C-Suite Join,Daniel Lee — Appointed as Chief Executive Officer,2026-09-09
+143,Portsmouth Regional Hospital - New Hampshire,http://www.portsmouthhospital.com,hospital & health care,48.7,C-Suite Exit + C-Suite Join,Michelle Dodd — Interim appointment as Interim Chief Executive Officer,2026-09-03
+144,"Private Home Care Services, LLC",http://www.privatehomecareservices.com,hospital & health care,48.0,C-Suite Join,Nick Evans — Appointed as Chief Financial Officer,Unknown
+145,"Outset Medical, Inc.",http://www.outsetmedical.com,medical devices,46.4,C-Suite Exit + C-Suite Join,Derick Elliott — Appointed as Executive Vice President of Commercial,2026-07-02
+146,"The Resource Group, Spend Management Solutions",http://www.theresourcegroup.com,hospital & health care,45.0,C-Suite Join,"Joshua Keeter — Promoted as Chief Sourcing Officer - Capital, Laboratory, Pharmaceuticals, Products",2026-07-01
+147,Dominion Diagnostics,http://www.domdiag.com,hospital & health care,45.0,C-Suite Join,Trevor Brown — Appointed as Chief Revenue Officer,2026-07-21
+148,CLS Health,http://www.cls.health,hospital & health care,45.0,C-Suite Join,Dan Romary — Appointed as Chief Operating Officer,2026-06-24
+149,Liberty Healthcare Corporation,http://www.libertyhealthcare.com,hospital & health care,45.0,C-Suite Join,Adam Baillie — Appointed as President,2026-07-15
+150,DeliverHealth,http://www.deliverhealth.com,hospital & health care,45.0,C-Suite Join,Kathryn JohnBull — Appointed as Chief Executive Officer and President,2026-06-30
+151,"White-Wilson Medical Center, P.A.",http://www.white-wilson.com,medical practice,42.0,C-Suite Join,Brad Logan — Appointed as Chief Executive Officer,Unknown
+152,Perry County Memorial Hospital,http://www.pchospital.org,hospital & health care,42.0,C-Suite Join,Nick Harley — Appointed as Chief Executive Officer,Unknown
+153,Chicago Family Health Center,http://www.chicagofamilyhealth.org,hospital & health care,42.0,C-Suite Join,"Jared M. Williams, DBA — Appointed as Chief Financial Officer",Unknown
+154,TransCare,http://www.trans-care.com,hospital & health care,42.0,C-Suite Join,Anjali Jameson — Appointed as Chief Product Officer,Unknown
+155,New Jersey Urology,http://www.njurology.com,hospital & health care,42.0,C-Suite Join,"Chidebelu Ufodike, MD — Appointed as Chief Operating Officer",Unknown
+156,Marianjoy Rehabilitation Hospital,http://www.marianjoy.org,hospital & health care,42.0,C-Suite Join,Jennifer K. Webster — Appointed as Chief Executive Officer,Unknown
+157,Gila Regional Medical Center,http://www.grmc.org,hospital & health care,42.0,C-Suite Join,Drew H. Dostal — Appointed as Chief Executive Officer,Unknown
+158,Olympia Medical Center,http://www.olympiamc.com,hospital & health care,42.0,C-Suite Join,Robert Allen — Retired as Chief Executive Officer,Unknown
+159,eventuswh.com,http://www.eventuswholehealth.com,hospital & health care,42.0,C-Suite Join,Cameron Routh — Appointed as Chief Executive Officer,Unknown
+160,Civitas Senior Living,http://www.civitasseniorliving.com,hospital & health care,42.0,C-Suite Join,Unknown — Appointed as Chief Executive Officer,Unknown
+161,Shenandoah Medical Center,http://www.smchospital.com,hospital & health care,42.0,C-Suite Join,Unknown — Appointed as Chief Executive Officer,Unknown
+162,Our Lady of Lourdes RMC,http://www.lourdes.net,hospital & health care,42.0,C-Suite Join,Unknown — Appointed as Chief Executive Officer,Unknown
+163,Central Carolina Hospital,http://www.centralcarolinahosp.com,hospital & health care,42.0,C-Suite Join,Unknown — Appointed as Chief Executive Officer,Unknown
+164,Athens Orthopedic Clinic,http://www.athensorthopedicclinic.com,hospital & health care,42.0,C-Suite Join,Michael Boblitz — Appointed as Chief Executive Officer,Unknown
+165,Powell Valley Healthcare,http://www.pvhc.org,hospital & health care,42.0,C-Suite Join,Lisa Wooten — Promoted as Chief Financial Officer,Unknown
+166,Guidehealth,http://www.guidehealth.com,hospital & health care,42.0,C-Suite Join,Doug Wenners — Appointed as Chief Executive Officer,Unknown
+167,"Methodist Hospital of Henderson, Kentucky",http://www.methodisthospital.net,hospital & health care,42.0,C-Suite Join,Unknown — Appointed as Chief Financial Officer,Unknown
+168,LifeCare Medical Center,http://www.lifecaremedicalcenter.org,hospital & health care,42.0,C-Suite Exit + C-Suite Join,Unknown — Retired as President and Chief Executive Officer,2026-07-01
+169,Philips Capsule,http://www.capsuletech.com,hospital & health care,39.0,C-Suite Join,Carla Goulart Peron — Appointed as Chief Medical Officer,2026-07-08
+170,Midwest Orthopaedics at RUSH,http://www.rushortho.com,hospital & health care,36.0,C-Suite Join,Dr. Omar Lateef — Retired as Chief Executive Officer,Unknown
+171,Karyopharm Therapeutics Inc.,http://www.karyopharm.com,pharmaceuticals,36.0,C-Suite Join, — Appointed,Unknown
+172,MGMA,http://www.mgma.com,hospital & health care,36.0,C-Suite Join, — Appointed,Unknown
+173,Wilson Senior Care,http://www.wilsonseniorcare.com,hospital & health care,36.0,C-Suite Join,Unknown — Appointed as Chief Financial Officer,Unknown
+174,Collective Health Inc,http://www.collectivehealth.com,hospital & health care,36.0,C-Suite Join,"Kaushik Bhaumik, PhD — Appointed as Chief Revenue Officer",Unknown
+175,Lakeside Behavioral Health System,http://www.lakesidebhs.com,hospital & health care,36.0,C-Suite Join,Danny Milam — Appointed as Chief Financial Officer,Unknown
+176,Intellivo,http://www.intellivo.com,hospital & health care,36.0,C-Suite Join,J.P. Fingado — Appointed as Chief Executive Officer,Unknown
+177,Home Care Delivered Inc,http://www.hcd.com,hospital & health care,36.0,C-Suite Join,Christian Richards — Appointed as Chief Financial Officer,Unknown
+178,Taiho Oncology Inc,http://www.taihooncology.com,pharmaceuticals,36.0,C-Suite Join, — Appointed,Unknown
+179,WinnMed,http://www.winnmed.org,hospital & health care,36.0,C-Suite Join,Kathy Moritz — Retired as Chief Nursing Officer,2026-11-25
+180,West Valley Medical Center,http://www.westvalleymedctr.com,hospital & health care,34.5,C-Suite Join,Wendy McClain — Appointed as Chief Executive Officer,2026-09-07
+181,Weiss Memorial Hospital,http://www.weisshospital.com,hospital & health care,33.0,C-Suite Exit + C-Suite Join,"Manoj Prasad, MD, PhD — Role change as Chief Executive Officer",Unknown
+182,Mile Bluff Medical Center,http://www.milebluff.com,hospital & health care,30.0,C-Suite Join,Dara Bartels — Promoted as Chief Executive Officer,Unknown
+183,Genova Diagnostics,http://www.gdx.net,hospital & health care,30.0,C-Suite Join,Keith Meadors — Appointed as Chief Commercial Officer,Unknown
+184,Vivant Health,http://www.vivanthealth.com,hospital & health care,30.0,C-Suite Join, — Appointed,Unknown
+185,Arkansas Valley Regional Medical Center,http://www.avrmc.org,hospital & health care,30.0,C-Suite Join, — Promoted as Chief Operating Officer,Unknown
+186,El Paso Children's Hospital,http://www.elpasochildrens.org,hospital & health care,30.0,C-Suite Join,Maria Zampini — Appointed as Chief Executive Officer,Unknown
+187,Baptist Memorial Hospital-Oktibbeha County,http://www.och.org,hospital & health care,30.0,C-Suite Join, — Appointed as Chief Operating Officer,Unknown
+188,Dallas Regional Medical Center,http://www.dallasregionalmedicalcenter.com,hospital & health care,30.0,C-Suite Join,Josiah De La Garza — Appointed as Chief Executive Officer,Unknown
+189,Vitality,http://www.vitalitygroup.com,hospital & health care,30.0,C-Suite Exit,Nick Padula — exited as Chief Revenue Officer,2026-07-02
+190,Cody Regional Health,http://www.codyregionalhealth.org,hospital & health care,30.0,C-Suite Join,Coby La Blue — Appointed as Chief Financial Officer,Unknown
+191,AbsoluteCare,http://www.absolutecare.com,hospital & health care,30.0,C-Suite Join,"Aderonke Omotade, MD — Appointed as Medical Director for Integrated Psychiatry",2026-08-19
+192,"P.T. Services Rehabilitation, Inc.",http://www.ptsrehab.com,hospital & health care,30.0,C-Suite Join,Stef Bloom — Appointed as Chief People Officer,2026-07-22
+193,"Saint Mary's Regional Medical Center, Inc.",http://www.saintmarysregional.com,hospital & health care,30.0,C-Suite Join,Michelle Beverly — Promoted as Chief Executive Officer,2026-07-13
+194,Aurora Behavioral Health System,http://www.auroraarizona.com,hospital & health care,30.0,C-Suite Join,Michelle Beverly — Promoted as Chief Executive Officer,2026-07-13
+195,Klickitat Valley Health,http://www.kvhealth.net,hospital & health care,30.0,C-Suite Join,Holly Shelden — Appointed as Chief Executive Officer,2026-09-17
+196,Greystone Health Network,http://www.greystonehealthcareers.com,hospital & health care,28.5,C-Suite Exit + C-Suite Join,Eric R. Nielsen — Interim appointment as Interim Chief Financial Officer,2026-07-01
+197,Concerto Renal Services,http://www.concertors.com,hospital & health care,24.0,C-Suite Join,Darem Dughri — Appointed as Chief Operating Officer,Unknown
+198,Carrum Health Inc,http://www.carrumhealth.com,hospital & health care,24.0,C-Suite Join,Kulesh Shanmugasundaram — Appointed as Chief Product & Technology Officer,Unknown
+199,HealthHelp,http://www.healthhelp.com,hospital & health care,24.0,C-Suite Join,"Katherine Dallow, MD, MPH, CPE — Appointed as Chief Medical Officer",Unknown
+200,Accuray,http://www.accuray.com,medical devices,24.0,C-Suite Join,Paul Miele — Appointed as Chief Commercial Officer,Unknown

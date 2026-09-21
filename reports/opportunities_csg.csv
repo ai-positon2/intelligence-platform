@@ -1,49 +1,26 @@
 rank,company,domain,industry,total_score,signal_types,top_signal,top_signal_date
-1,Fujitsu,fujitsu.com,Technology,64.0,Partnership + Product Launch,Fujitsu & DigiCert team up on certificate management,2026-08-18
-2,"Samsung Electronics Co., Ltd.",samsung.com,Technology,49.0,Product Launch,"Samsung unveils next - gen 3D - memory vision at FMS 2026 , charting AI infrastructure future",2026-08-20
-3,Sony Group Corporation,sony.com,Technology,43.5,Partnership + Product Launch,Sony India Sets October Launch for New Tamil Channel Vizha,2026-08-15
-4,Kontron,kontron.com,Technology,40.0,Partnership + Product Launch,Kontron launches CERES-TSN Networking Switch for defense systems - eeNews Europe,2026-06-17
-5,Corsair,corsair.com,Technology,35.0,Product Launch,Corsair Launches TC80 Gaming Chair for $199 . 99 After Passing Over 30 Durability Tests,2026-09-09
-6,Dell Technologies,dell.com,Technology,34.8,News Mention + Partnership + Product Launch,Dell Technologies introduces Dell PowerEdge XE8812 server - TipRanks,2026-06-22
-7,Xiaomi Technology,mi.com,Technology,34.8,News Mention + Product Launch,A New chapter for Xiaomi EV : Xiaomi unveils Xiaomi Kunlun Technical Architecture and Debuts Xiaomi SkyNomad Series,2026-08-03
-8,"LG Electronics, Inc.",lge.com,Technology,33.5,Partnership + Product Launch,LG ELECTRONICS ACCELERATES ROBOTICS COLLABORATION WITH NVIDIA,2026-08-18
-9,Epson,epson.com,Technology,24.8,News Mention + Partnership + Product Launch,"Epson Robots to Showcase SafeSense Technology, High-Performance, Compact SCARA and 6-Axis Solutions and First Look at Ep",2026-06-18
-10,HPE,hpe.com,Technology,21.0,Partnership,IQM Named Among Quantum Collaborators in HPE's New Hybrid Quantum-HPC Platform - PA Media,2026-06-22
-11,Emdoor,emdoor.com,Technology,21.0,Product Launch,Emdoor Launches  Ailyn  AI Hub at WAIC 2026 : Unifying Intelligence Across Every Device,2026-07-19
-12,Sony Electronics,sony.com,Technology,21.0,Product Launch,"Sony Electronics Launches the FX5 , a Cinema Line Camera with a Newly Developed Image Sensor , Open Gate Recording , Int",2026-07-25
-13,Basler AG,baslerweb.com,Technology,20.0,Partnership + Product Launch,Orbbec. Basler Launch Industrial 3D Vision Partnership - Photonics Spectra,2026-06-16
-14,Supermicro,supermicro.com,Technology,15.7,News Mention + Product Launch,Supermicro launches data center blueprint for HPC and AI systems - Investing.com,2026-06-22
-15,Brother Industries,brother.com,Technology,14.8,News Mention + Product Launch,BROTHER INTRODUCES GTX300 DIRECT - TO - GARMENT AND DIRECT - TO - FILM HYBRID PRINTER FOR APPAREL DECORATORS,2026-07-17
-16,DFI,dfi.com,Technology,14.0,Product Launch,"DFI, DPI Launch Grant Initiative to Strengthen Financial Literacy Education - KFIZ",2026-06-18
-17,HCLTech,hcltech.com,Technology,14.0,Partnership,"Circles, Greyskies, and HCLTech Collaborate in TM Forum Catalyst Program to Accelerate AI-led Autonomous Network Operati",2026-06-22
-18,Realme,realme.com,Technology,14.0,Product Launch,Budget smartphone realme C100 Series launches - GadgetMatch,2026-06-19
-19,Lava International,lavamobiles.com,Technology,14.0,Product Launch,"Lava Smart 4 with 6 . 56 ″ display , 5000mAh battery launched",2026-08-10
-20,CyberPowerPC,cyberpowerpc.com,Technology,10.5,Partnership,CyberPowerPC to power Fnatic events and bootcamps throughout 2026,2026-09-04
-21,zSpace,zspace.com,Technology,7.2,News Mention,"2026-06-21 | ZSPC DEADLINE REMINDER: Bronstein, Gewirtz & Grossman LLC Reminds zSpace, Inc. Investors to Join the Class ",2026-06-21
-22,"AVer Information, Inc.",aver.com,Technology,7.0,Partnership,AVer Information Inc. to Showcase Range of Communication and Collaboration Technologies at InfoComm 2026 - rAVe [PUBS],2026-06-16
-23,Casper,casper.com.tr,Technology,7.0,Product Launch,Casper father shares love of trades with next generation as Hedlund Electric celebrates 20 years of service - Oil City N,2026-06-21
-24,Gigabyte,gigabyte.com,Technology,7.0,Product Launch,"GIGABYTE Launches RTX 5080 AORUS Infinity Wood, RTX 5080 and RTX 5070 Ti AORUS Infinity Graphics Cards - TechPowerUp",2026-06-22
-25,HP Inc,hp.com,Technology,7.0,Partnership,HP Debuts AI-Powered Unified Collaboration Ecosystem at InfoComm 2026 - HP,2026-06-19
-26,Huawei,huawei.com,Technology,7.0,Product Launch,Huawei-backed Aistaland to launch first model GT7 shooting-brake on June 26 - CnEVPost,2026-06-22
-27,Indel B S.p.A.,indelbgroup.com,Technology,7.0,Product Launch,Indel B Renews Governance and Launches €2.6 Million Share Buyback Plan - TipRanks,2026-06-16
-28,Micro Center,microcenter.com,Technology,7.0,Product Launch,Limited Gigabyte The RTX 5090 AORUS INFINITY is now available at Micro Center for $5300. - GameGPU,2026-06-17
-29,Moto,motorola.com,Technology,7.0,Product Launch,FRP Moto Launches Summer Campaign to Encourage Outdoor Family Riding - The National Law Review,2026-06-22
-30,Puget Systems,pugetsystems.com,Technology,7.0,Product Launch,Puget Systems and SOKRISPYMEDIA debut video game at Unreal Fest by Jose Antunes - ProVideo Coalition - ProVideo Coalitio,2026-06-18
-31,RCA,rca.com,Technology,7.0,Partnership,"PARTNERSHIP FOR SECURITY – Strong command and planning are vital to effective leadership and operations. In this video, ",2026-06-22
-32,Sharp Corp,sharp.com,Technology,7.0,Product Launch,Sharp enters wearables with health watch and smart ring debut - Nation Thailand,2026-06-16
-33,Walton,waltonbd.com,Technology,7.0,Product Launch,‘Bill Walton Way’ honorary street sign unveiled in front of Helix High School - fox5sandiego.com,2026-06-21
-34,Xiaomi,mi.com,Technology,7.0,Product Launch,Xiaomi Redmi Buds 8 launch globally as budget earbuds with ANC and LHDC - Notebookcheck,2026-06-21
-35,Valve Corporation,valvesoftware.com,Technology,7.0,Product Launch,Valve launches Steam Machine and Steam Frame in summer 2026,2026-06-18
-36,Foxconn,foxconn.com,Technology,7.0,Product Launch,"Mitsubishi ASX VR - e revealed – Foxconn - made EV with 407 PS , 516 km NEDC launching in Australia Q4 2026",2026-08-10
-37,Sapphire Technology,sapphiretech.com,Technology,7.0,Product Launch,SAPPHIRE Technology Unveils EDGE+ RAVE2 MAX to Scale Physical AI Compute Portfolio – Hartware,2026-07-28
-38,Compal Electronics,compal.com,Technology,7.0,Product Launch,"Compal Electronics : Compal Unveils Daxi AI Server Manufacturing Center to Boost Global Production Capacity , ETTelecom",2026-08-12
-39,Hamilton Beach Brands Holding Company,hamiltonbeach.com,Technology,7.0,Product Launch,"Hamilton Beach Brands ( NYSE : HBB ) Releases Earnings Results , Beats Estimates By $2 . 33 EPS",2026-08-06
-40,Apple Inc.,apple.com,Technology,5.4,News Mention,"Ross Gerber Says SpaceX Could Build A 'Great AI Phone’ Through Starlink To Challenge Apple, Gets Told Goo - Benzinga",2026-06-22
-41,Clevo,clevo.com.tw,Technology,2.7,News Mention,Clevo Books to Rebrand as a Maker Marketplace,2026-08-20
-42,LG,lg.com,Technology,1.8,News Mention,LG Chem spins off aesthetics business in 3-way merger - koreabiomed.com,2026-06-22
-43,Lite-On,liteon.com,Technology,1.8,News Mention,Lite-On Technology Acquires Business Equipment For T$1.15 Bln - TradingView,2026-06-17
-44,OverPowered,walmart.com,Technology,1.8,News Mention,KARL-ANTHONY TOWNS BUILD + DEEP BOMBER TAKEOVER Is OVERPOWERED (NBA 2K26) Europa League (XrzX9L3WMA) - Fathom Journal,2026-06-19
-45,VIT,vitvietnam.com,Technology,1.8,News Mention,Vitality’s IEM Cologne upset raises questions for VIT fan token holders - Crypto Briefing,2026-06-20
-46,Xolo,xolo.in,Technology,1.8,News Mention,"Xolo Maridueña praises 'Practical Magic 2' costars Nicole Kidman, Sandra Bullock: 'Legends that totally lead by example'",2026-06-16
-47,Nokia,nokia.com,Technology,1.8,News Mention,Will Nokia Hit An All-Time High Within Years And Takeover its Legacy Since Dot-Com Crash ? - Moomoo,2026-06-22
-48,Quanta Computer,quantatw.com,Technology,1.8,News Mention,Quanta raises 2026 capex to NT$40B as AI visibility runs to 2028,2026-08-13
+1,Fujitsu,fujitsu.com,Technology,63.5,Partnership + Product Launch,"Palantir and Fujitsu Deepen Partnership to Advance Enterprise AI Transformation , with Fujitsu Strengthening as a Global",2026-09-10
+2,Apple Inc.,apple.com,Technology,43.2,News Mention + Product Launch,Apple unveils first foldable iPhone at first Ternus keynote,2026-09-12
+3,"Samsung Electronics Co., Ltd.",samsung.com,Technology,42.0,Product Launch,Samsung launches its first credit card in the U . S . -- A mobile wallet experience that turns everyday spending into ca,2026-07-20
+4,Xiaomi Technology,mi.com,Technology,34.8,News Mention + Product Launch,A New chapter for Xiaomi EV : Xiaomi unveils Xiaomi Kunlun Technical Architecture and Debuts Xiaomi SkyNomad Series,2026-08-03
+5,"LG Electronics, Inc.",lge.com,Technology,30.0,Partnership + Product Launch,LG ELECTRONICS ACCELERATES ROBOTICS COLLABORATION WITH NVIDIA,2026-08-18
+6,Corsair,corsair.com,Technology,28.0,Product Launch,Corsair Launches TC80 Gaming Chair for $199 . 99 After Passing Over 30 Durability Tests,2026-09-09
+7,Emdoor,emdoor.com,Technology,21.0,Product Launch,Emdoor Launches  Ailyn  AI Hub at WAIC 2026 : Unifying Intelligence Across Every Device,2026-07-19
+8,Sony Electronics,sony.com,Technology,21.0,Product Launch,"Sony Electronics Launches the FX5 , a Cinema Line Camera with a Newly Developed Image Sensor , Open Gate Recording , Int",2026-07-25
+9,Dell Technologies,dell.com,Technology,20.5,News Mention + Partnership,2026 - 07 - 24 | Texas A & M Engineering Experiment Station Selects Dell Technologies to Build a Secure AI Platform for ,2026-07-24
+10,Sony Group Corporation,sony.com,Technology,20.0,Partnership + Product Launch,Anaqua Renews Partnership with Sony to Advance IP Innovation,2026-07-08
+11,Lava International,lavamobiles.com,Technology,14.0,Product Launch,"Lava Smart 4 with 6 . 56 ″ display , 5000mAh battery launched",2026-08-10
+12,CyberPowerPC,cyberpowerpc.com,Technology,10.5,Partnership,CyberPowerPC to power Fnatic events and bootcamps throughout 2026,2026-09-04
+13,ASRock,asrock.com,Technology,10.5,Product Launch,ASRock Continues Expanding AM4 Lineup By Launching Budget B550M Pro - A WiFi 6E Motherboard,2026-08-30
+14,Grundig,grundig.com,Technology,10.5,Partnership,"Grundig Unveils New Product Lineup at IFA 2026 , Marking a New Phase in Strategic Partnership",2026-09-04
+15,Foxconn,foxconn.com,Technology,7.0,Product Launch,"Mitsubishi ASX VR - e revealed – Foxconn - made EV with 407 PS , 516 km NEDC launching in Australia Q4 2026",2026-08-10
+16,Sapphire Technology,sapphiretech.com,Technology,7.0,Product Launch,SAPPHIRE Technology Unveils EDGE+ RAVE2 MAX to Scale Physical AI Compute Portfolio – Hartware,2026-07-28
+17,Basler AG,baslerweb.com,Technology,7.0,Product Launch,Basler Introduces Compact 3D Stereo Camera System for Robotics and Logistics,2026-07-29
+18,Compal Electronics,compal.com,Technology,7.0,Product Launch,"Compal Electronics : Compal Unveils Daxi AI Server Manufacturing Center to Boost Global Production Capacity , ETTelecom",2026-08-12
+19,Kontron,kontron.com,Technology,7.0,Product Launch,Kontron Launches Production of 5G Modules in Düsseldorf - Telecom / Wireless / VoIP / IPTV - Kontron – Member of the S &,2026-07-14
+20,Brother Industries,brother.com,Technology,7.0,Product Launch,BROTHER INTRODUCES GTX300 DIRECT - TO - GARMENT AND DIRECT - TO - FILM HYBRID PRINTER FOR APPAREL DECORATORS,2026-07-17
+21,Hamilton Beach Brands Holding Company,hamiltonbeach.com,Technology,7.0,Product Launch,"Hamilton Beach Brands ( NYSE : HBB ) Releases Earnings Results , Beats Estimates By $2 . 33 EPS",2026-08-06
+22,zSpace,zspace.com,Technology,3.6,News Mention,zSpace Expands Immersive Learning with New Studio Capabilities and ScholarLab Biology Simulations Ahead of ISTELive 2026,2026-06-25
+23,Clevo,clevo.com.tw,Technology,1.8,News Mention,Clevo Books to Rebrand as a Maker Marketplace,2026-08-20
+24,Quanta Computer,quantatw.com,Technology,1.8,News Mention,Quanta raises 2026 capex to NT$40B as AI visibility runs to 2028,2026-08-13
+25,Supermicro,supermicro.com,Technology,1.8,News Mention,"Fortune Tech : Anthropic IPO , Trump digs data centers , SuperMicro investigation",2026-08-21
