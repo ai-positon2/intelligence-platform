@@ -236,7 +236,7 @@ function buildOverviewTab(){
   <div class="lbcard ov-card ov-card-lb" style="--kc:#7c83f5">
     ${(D.company_lb||[]).length?D.company_lb.map(([name,cnt],i)=>{
       const maxLb=D.company_lb[0][1]||1;
-      return`<div class="lbitem" onclick="switchTab('companies');setTimeout(()=>openCompanyDrawerByName('${esc(name)}'),120)">
+      return`<div class="lbitem" onclick="switchTab('companies');setTimeout(()=>openCompanyDrawerByName('${esc(jsstr(name))}'),120)">
         <div class="lbrank ${i===0?'rank-g':i===1?'rank-s':i===2?'rank-b':''}">${i+1}</div>
         <div class="lbname">${esc(name)}</div>
         <div class="lbtrack"><div class="lbfill" style="width:${Math.round(cnt/maxLb*100)}%"></div></div>
@@ -458,7 +458,7 @@ function buildPeopleTab(){
       <div class="lbcard">
         <div class="lbtitle">🏆 Company Leaderboard</div>
         ${company_lb.map(([name,cnt],i)=>`
-        <div class="lbitem" onclick="openCompanyDrawerByName('${esc(name)}')">
+        <div class="lbitem" onclick="openCompanyDrawerByName('${esc(jsstr(name))}')">
           <div class="lbrank ${i===0?'rank-g':i===1?'rank-s':i===2?'rank-b':''}">${i+1}</div>
           <div class="lbname">${esc(name)}</div>
           <div class="lbtrack"><div class="lbfill" style="width:${Math.round(cnt/maxLb*100)}%"></div></div>
