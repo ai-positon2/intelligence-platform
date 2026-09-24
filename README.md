@@ -329,7 +329,7 @@ which Railway then deploys. To do this locally instead: `bash scripts/build-fron
 ## Known gaps / open items
 
 Kept short on purpose; the full, current, line-item list (with commit references) lives in
-`docs/CONTEXT_FOR_NEW_CHAT_V29.md`; this is the subset worth knowing before touching the code.
+`docs/CONTEXT_FOR_NEW_CHAT_V31.md`; this is the subset worth knowing before touching the code.
 
 - **No CSRF token and no explicit `SESSION_COOKIE_SECURE`/`SESSION_COOKIE_SAMESITE`.** Session
   cookies rely on Flask/browser defaults rather than an explicit, hardened configuration. Several
