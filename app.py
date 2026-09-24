@@ -9847,20 +9847,33 @@ def thought_leader_pr_resolve():
     if _cpi_rate_limited("tli-resolve", email):
         return jsonify({"ok": False, "error": "Too many lookups in a row. Wait a moment and "
                                               "try again."}), 429
-    body = request.get_json(silent=True) or {}
+    body = request.get_json(silent=True)
+    # silent=True only covers a body that is not JSON at all. Valid JSON of
+    # the wrong SHAPE (a bare list, a bare string, a number where a string
+    # belongs) still arrived here and was .get()/.strip()ed, which is a 500
+    # on an authenticated route that any caller can trigger by hand. A field
+    # that is not a string is treated as absent, so a bad `name` falls
+    # through to the 400 below rather than a stack trace.
+    if not isinstance(body, dict):
+        body = {}
+
+    def _text(key, cap):
+        value = body.get(key)
+        return (value if isinstance(value, str) else "").strip()[:cap]
+
     # Every field below reaches a billed call (an Apollo search, a Claude
     # prompt with web_search) or an unbounded TEXT column -- an audit found
     # none of them were length-capped, unlike equivalent fields elsewhere in
     # this app, so a pasted oversized string became an outsized billed input
     # rather than a request this route rejected outright.
-    name = (body.get("name") or "").strip()[:200]
+    name = _text("name", 200)
     if not name:
         return jsonify({"ok": False, "error": "A name is required."}), 400
 
-    company_hint = (body.get("company_hint") or "").strip()[:200] or None
-    title_hint = (body.get("title_hint") or "").strip()[:200] or None
-    linkedin_url = (body.get("linkedin_url") or "").strip()[:500] or None
-    x_handle = (body.get("x_handle") or "").strip().lstrip("@")[:100] or None
+    company_hint = _text("company_hint", 200) or None
+    title_hint = _text("title_hint", 200) or None
+    linkedin_url = _text("linkedin_url", 500) or None
+    x_handle = _text("x_handle", 100).lstrip("@") or None
 
     run_id = tlpr.create_run(email=email, input_name=name, company_hint=company_hint,
                              title_hint=title_hint, linkedin_url_hint=linkedin_url,

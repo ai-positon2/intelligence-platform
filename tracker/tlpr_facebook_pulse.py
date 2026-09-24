@@ -503,9 +503,18 @@ def build_pulse(full_name: str) -> dict:
     result["errors"] = errors
     result.update(aggregate(posts))
     if not posts:
-        result["note"] = ("No Facebook posts mentioning this person were found. That is a "
-                          "finding, not an error: this person has no measurable Facebook "
-                          "conversation to read.")
+        note = ("No Facebook posts mentioning this person were found. That is a "
+                "finding, not an error: this person has no measurable Facebook "
+                "conversation to read.")
+        # Same reasoning as every sibling pulse's build_pulse, which this one
+        # alone was missing: every entry left in `errors` here is a real
+        # query failure (an unconfigured Apify token, a transport error, a
+        # response this module could not read), not a benign empty result.
+        # Without it, Facebook never being searched at all was reported to
+        # the reader in the exact words of a confident genuine zero.
+        if errors:
+            note += " " + " ".join(errors.values())
+        result["note"] = note
         return result
 
     token = os.environ.get("APIFY_API_TOKEN", "")

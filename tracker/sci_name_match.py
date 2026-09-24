@@ -17,6 +17,7 @@ next bug is reported against leaves the other one still wrong.
 from __future__ import annotations
 
 import re
+import unicodedata
 
 # Corporate boilerplate carries no identifying signal, so it must not be
 # what makes a company name "match" an account title -- otherwise "Acme
@@ -36,6 +37,46 @@ def name_tokens(value: str) -> set[str]:
     tokens = re.findall(r"[a-z0-9]+", (value or "").lower())
     significant = [t for t in tokens if t not in _CORP_NOISE]
     return set(significant or tokens)
+
+
+# NFKD decomposes a letter into "base + combining mark" only where such a
+# decomposition exists. These Latin letters have none -- the stroke or the
+# ligature IS the letter -- so a Scandinavian, Polish, German or Icelandic
+# name typed on an ASCII keyboard (Soren for Søren, Lech Walesa for Wałęsa)
+# would still never match its real spelling without this map.
+_LATIN_FOLD = str.maketrans({
+    "ø": "o", "Ø": "O", "æ": "ae", "Æ": "AE", "œ": "oe", "Œ": "OE",
+    "ß": "ss", "ł": "l", "Ł": "L", "đ": "d", "Đ": "D", "ð": "d", "Ð": "D",
+    "þ": "th", "Þ": "TH", "ı": "i", "ŋ": "n", "Ŋ": "N",
+})
+
+
+def person_name_tokens(value: str) -> set[str]:
+    """name_tokens for a PERSON's name, which is not always written in
+    ASCII the way a B2B company's registered name effectively always is.
+
+    name_tokens' own pattern is [a-z0-9]+, so it splits an accented name
+    mid-word ("Jose Angel" and "Jose Angel" with its real accents produce
+    different tokens and never match each other) and returns the EMPTY SET
+    for a name written entirely in a non-Latin script. An empty set is the
+    dangerous case: every caller that asks "is this the same person" reads
+    it as "no", so a Cyrillic/CJK/Arabic/Devanagari name never matches even
+    a character-for-character identical one -- Thought Leader Intelligence
+    was rejecting the person's OWN LinkedIn profile as "not this person" on
+    exactly that basis, and its LinkedIn pulse was failing open and
+    counting the subject's own posts as other people's reaction to them.
+
+    Accents are folded away rather than kept so a name typed without them
+    still matches the same person written with them. Kept additive: nothing
+    that already calls name_tokens/plausible_match changes behavior, since
+    for a name that is already plain ASCII this returns exactly what
+    name_tokens does."""
+    folded = "".join(ch for ch in unicodedata.normalize("NFKD", (value or "").translate(_LATIN_FOLD))
+                     if not unicodedata.combining(ch))
+    tokens = name_tokens(folded)
+    if tokens:
+        return tokens
+    return set(re.findall(r"[^\W_]+", (value or "").lower()))
 
 
 def plausible_match(company_name: str, account_title: str) -> bool:

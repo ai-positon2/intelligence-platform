@@ -32,8 +32,19 @@ def build_input(handle: str, max_posts: int = 25) -> dict:
     }
 
 
+def _media_items(item: dict) -> list:
+    """Only the DICT entries of item["media"] -- the same guard
+    tracker/sci_source_x._media_items exists for, and for the same reason: a
+    real run there showed this family of actors can put a bare media URL
+    string in that list instead of a {"type": ..., ...} dict, and every
+    reader below unconditionally called .get() on each entry. Unlike its
+    four sibling adapters, this one had no per-item guard at any level, so
+    one bare string cost the whole batch, not one post."""
+    return [m for m in (item.get("media") or []) if isinstance(m, dict)]
+
+
 def _post_type(item: dict) -> str:
-    media = item.get("media") or []
+    media = _media_items(item)
     if len(media) > 1:
         return "carousel"
     if media:
@@ -48,7 +59,7 @@ def _post_type(item: dict) -> str:
 
 def _media_urls(item: dict) -> list:
     urls = []
-    for m in item.get("media") or []:
+    for m in _media_items(item):
         photo = m.get("photo_image")
         u = (photo.get("uri") if isinstance(photo, dict) else None) or m.get("url") \
             or m.get("videoUrl") or m.get("thumbnail")
@@ -65,25 +76,36 @@ def _media_urls(item: dict) -> list:
 
 
 def normalize(raw_items: list[dict]) -> list[dict]:
+    """Never lets one malformed row take the whole batch down -- see the
+    identical fix and its live-incident writeup in
+    tracker/sci_source_x.normalize(), the same unguarded-.get() shape."""
     out = []
     for item in raw_items or []:
-        pid = str(item.get("postId") or item.get("post_id") or item.get("id") or "").strip()
-        if not pid:
+        if not isinstance(item, dict):
+            logger.warning("sci_source_facebook: skipping a non-dict dataset item (%s)",
+                          type(item).__name__)
             continue
-        out.append({
-            "platform_post_id": pid,
-            "post_url": item.get("url") or item.get("postUrl"),
-            "post_type": _post_type(item),
-            "caption": item.get("text") or item.get("message") or "",
-            "posted_at": item.get("time") or item.get("timestamp") or item.get("date"),
-            "media_urls": _media_urls(item),
-            "metrics": {
-                "likes": item.get("likes"),
-                "comments": item.get("comments"),
-                "shares": item.get("shares"),
-            },
-            "raw": item,
-        })
+        try:
+            pid = str(item.get("postId") or item.get("post_id") or item.get("id") or "").strip()
+            if not pid:
+                continue
+            out.append({
+                "platform_post_id": pid,
+                "post_url": item.get("url") or item.get("postUrl"),
+                "post_type": _post_type(item),
+                "caption": item.get("text") or item.get("message") or "",
+                "posted_at": item.get("time") or item.get("timestamp") or item.get("date"),
+                "media_urls": _media_urls(item),
+                "metrics": {
+                    "likes": item.get("likes"),
+                    "comments": item.get("comments"),
+                    "shares": item.get("shares"),
+                },
+                "raw": item,
+            })
+        except Exception:
+            logger.exception("sci_source_facebook: skipping a post that failed to normalize")
+            continue
     return out
 
 

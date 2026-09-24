@@ -138,8 +138,8 @@ def _is_own_post(post: dict, provider_id: str | None, full_name: str) -> bool:
     imports this module)."""
     if provider_id:
         return _author_id(post) == str(provider_id)
-    search_tokens = sci_name_match.name_tokens(full_name)
-    author_tokens = sci_name_match.name_tokens(_author_name(post))
+    search_tokens = sci_name_match.person_name_tokens(full_name)
+    author_tokens = sci_name_match.person_name_tokens(_author_name(post))
     if not search_tokens or not author_tokens:
         return False
     return search_tokens <= author_tokens
@@ -212,9 +212,26 @@ def _month(post: dict) -> str | None:
     return dt.strftime("%Y-%m") if dt else None
 
 
+def _as_int(value) -> int:
+    """A metric as a number, or 0. Nothing upstream of here coerces the
+    vendor's own metric values -- sci_source_linkedin_unipile.normalize passes them through
+    exactly as the actor sent them -- so a count that arrives as a
+    display string ("1.2K") or any other non-numeric value reaches
+    _engagement untouched. aggregate() runs OUTSIDE build_pulse's own
+    try/except, so one such value on one item used to raise straight out
+    of a function whose docstring promises it never does, costing this
+    whole source's read instead of that one item's engagement number.
+    Mirrors tlpr_facebook_pulse._safe_int, which this family already keeps
+    per module."""
+    try:
+        return int(value or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
 def _engagement(post: dict) -> int:
     m = post.get("metrics") or {}
-    return int(m.get("likes") or 0) + int(m.get("shares") or 0) + int(m.get("comments") or 0)
+    return _as_int(m.get("likes")) + _as_int(m.get("shares")) + _as_int(m.get("comments"))
 
 
 def _author(post: dict) -> str | None:

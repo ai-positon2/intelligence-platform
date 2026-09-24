@@ -34,28 +34,44 @@ def build_input(tweet_id: str, max_replies: int = 20) -> dict:
 
 
 def normalize(tweet_id: str, raw_items: list[dict]) -> list[dict]:
+    """Never lets one malformed row take the whole batch down -- see the
+    identical fix and its live-incident writeup in
+    tracker/sci_source_x.normalize(), the same unguarded-.get() shape. This
+    normalizer was the last one in the family still without it: a bare
+    string pushed into the dataset (or a bare string where `author` should
+    be a dict) raised AttributeError here, and its caller
+    (thought_leader_pr._collect_x_replies) can only respond by dropping
+    every reply on that tweet, not just the one bad row."""
     out = []
     tweet_id = str(tweet_id)
     for item in raw_items or []:
-        # Keep only items that are actually replies TO this tweet: the
-        # actor's own docs describe a conversation-search fallback mode that
-        # can surface other tweets from the same thread, not just direct
-        # replies, and a reply to someone else's comment is not "how people
-        # reacted to this post."
-        in_reply_to = str(item.get("inReplyToId") or "").strip()
-        if in_reply_to and in_reply_to != tweet_id:
+        if not isinstance(item, dict):
+            logger.warning("apify_x_replies: skipping a non-dict dataset item (%s)", type(item).__name__)
             continue
-        cid = str(item.get("id") or "").strip()
-        if not cid:
+        try:
+            # Keep only items that are actually replies TO this tweet: the
+            # actor's own docs describe a conversation-search fallback mode that
+            # can surface other tweets from the same thread, not just direct
+            # replies, and a reply to someone else's comment is not "how people
+            # reacted to this post."
+            in_reply_to = str(item.get("inReplyToId") or "").strip()
+            if in_reply_to and in_reply_to != tweet_id:
+                continue
+            cid = str(item.get("id") or "").strip()
+            if not cid:
+                continue
+            author = item.get("author")
+            author = author if isinstance(author, dict) else {}
+            out.append({
+                "comment_id": cid,
+                "text": item.get("text") or item.get("fullText") or "",
+                "author": author.get("userName") or author.get("name"),
+                "posted_at": item.get("createdAt"),
+                "likes": item.get("likeCount"),
+            })
+        except Exception:
+            logger.exception("apify_x_replies: skipping a reply that failed to normalize")
             continue
-        author = item.get("author") or {}
-        out.append({
-            "comment_id": cid,
-            "text": item.get("text") or item.get("fullText") or "",
-            "author": author.get("userName") or author.get("name"),
-            "posted_at": item.get("createdAt"),
-            "likes": item.get("likeCount"),
-        })
     return out
 
 

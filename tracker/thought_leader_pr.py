@@ -835,7 +835,12 @@ def _linkedin_slug(url: str | None) -> str | None:
         parts = [p for p in parsed.path.split("/") if p]
     except Exception:
         return None
-    if not host.endswith("linkedin.com"):
+    # host == / endswith("." + domain), never a bare endswith: "linkedin.com"
+    # is a suffix of "notlinkedin.com" and of any other lookalike domain
+    # somebody can register, so the bare check accepted a URL on a domain
+    # this app has no relationship with and looked its last-but-one path
+    # segment up on the real LinkedIn as if it were a profile slug.
+    if not (host == "linkedin.com" or host.endswith(".linkedin.com")):
         return None
     if len(parts) >= 2 and parts[0] == "in":
         return parts[1]
@@ -861,7 +866,10 @@ def _handle_from_url(url: str | None) -> str | None:
         parts = [p for p in parsed.path.split("/") if p]
     except Exception:
         return None
-    if not (host.endswith("twitter.com") or host.endswith("x.com")):
+    # Exact host or a real subdomain only -- see _linkedin_slug above for
+    # why a bare endswith accepts "notx.com" and "faketwitter.com" too.
+    if host not in ("twitter.com", "x.com") and not (
+            host.endswith(".twitter.com") or host.endswith(".x.com")):
         return None
     if len(parts) != 1 or parts[0].lower() in _X_RESERVED_PATHS:
         return None
@@ -895,9 +903,14 @@ def _looks_like_same_person(name: str, candidate_full_name: str) -> bool:
     Requires every significant word of the SEARCHED name to appear in the
     candidate's own name (so "Rahul Gandhi" matches "Rahul Gandhi" or
     "Rahul K. Gandhi", but not a candidate whose name is only "Gandhi" or
-    only shares an unrelated "Rahul")."""
-    search_tokens = sci_name_match.name_tokens(name)
-    candidate_tokens = sci_name_match.name_tokens(candidate_full_name)
+    only shares an unrelated "Rahul").
+
+    Tokenized with person_name_tokens, not name_tokens: the latter is
+    ASCII-only, so a public figure whose name is written in a non-Latin
+    script tokenized to nothing and was reported as matching NOBODY,
+    including their own verified LinkedIn profile."""
+    search_tokens = sci_name_match.person_name_tokens(name)
+    candidate_tokens = sci_name_match.person_name_tokens(candidate_full_name)
     if not search_tokens or not candidate_tokens:
         return False
     return search_tokens <= candidate_tokens
@@ -934,7 +947,19 @@ def search_name_candidates(name: str, company_hint: str | None = None) -> tuple[
 
     seen = set()
     candidates = []
+    # Apollo's own response shape is only ever read here, never validated by
+    # apollo_client itself, so a non-list payload (a 200 with an error
+    # object, a null `people`) or a row that is not a dict used to raise
+    # straight out of a function whose whole contract is that it never does
+    # -- and out of the /search route, as a 500, in the middle of someone
+    # typing a name.
+    if not isinstance(people, list):
+        logger.warning("thought_leader_pr: Apollo returned %s, not a list of people",
+                       type(people).__name__)
+        return [], {"code": "error", "message": "The candidate search could not be completed."}
     for p in people:
+        if not isinstance(p, dict):
+            continue
         full_name = (p.get("full_name") or "").strip()
         if not full_name:
             continue
@@ -980,6 +1005,10 @@ def _best_apollo_candidate(name: str, company_hint: str | None,
     except Exception:
         logger.exception("thought_leader_pr: apollo search_people failed for %r", name)
         return None
+    # Same shape guard as search_name_candidates: resolve_identity's own
+    # docstring promises it never raises, and every field it later reads off
+    # this candidate assumes a dict.
+    candidates = [c for c in candidates if isinstance(c, dict)] if isinstance(candidates, list) else []
     if not candidates:
         return None
     if linkedin_url:
@@ -1105,8 +1134,12 @@ def _resolve_youtube_platform(name: str) -> dict:
 def _resolve_x_platform(handle: str | None) -> dict:
     """X/Twitter is Apify-collected (tracker/sci_source_x.py) starting in
     Phase 1 -- Phase 0 only records the handle if one was found, since
-    scraping posts is Phase 1's job, not identity resolution's."""
-    handle = (handle or "").lstrip("@") or None
+    scraping posts is Phase 1's job, not identity resolution's.
+
+    Stripped on both sides of the @, not just lstripped: a handle that
+    arrives with surrounding whitespace (a paste, a model reply) otherwise
+    keeps it, and a space inside a profile URL is not a profile URL."""
+    handle = (handle or "").strip().lstrip("@").strip() or None
     return {"handle": handle, "url": f"https://x.com/{handle}" if handle else None,
             "resolved": bool(handle)}
 
@@ -1117,8 +1150,9 @@ def _resolve_instagram_platform(handle: str | None) -> dict:
     tracker/tlpr_instagram_pulse.py can read the person's own Mentions
     tab. Same soft-fail, no-separate-verification-call shape as
     _resolve_x_platform: a wrong or unconfirmed handle degrades to an
-    empty mentions read, never a hard failure."""
-    handle = (handle or "").lstrip("@") or None
+    empty mentions read, never a hard failure. Whitespace is stripped on
+    both sides of the @, same reason as _resolve_x_platform."""
+    handle = (handle or "").strip().lstrip("@").strip() or None
     return {"handle": handle, "url": f"https://www.instagram.com/{handle}/" if handle else None,
             "resolved": bool(handle)}
 
@@ -1433,10 +1467,26 @@ _REACTION_SYSTEM = (
 _COMMENT_SENTIMENTS = ("positive", "neutral", "negative", "mixed")
 
 
+def _as_int(value) -> int:
+    """A metric as a number, or 0. No sci_source_*.normalize() coerces the
+    vendor's own metric values -- they are passed through exactly as the
+    actor sent them -- so a metric that arrives as a non-numeric string
+    ("1.2K", "") or an unexpected object reaches the two sort keys below
+    untouched. Both run OUTSIDE any try/except on the reaction path, so one
+    such value on one post used to raise past _collect_linkedin_comments/
+    analyze_comment_sentiment into collect_reaction_job's catch-all and
+    fail the ENTIRE seven-source reaction job, including the six pulses
+    that have nothing to do with this post's metrics."""
+    try:
+        return int(value or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
 def _top_engaged_posts(posts: list[dict], n: int) -> list[dict]:
     def _engagement(p):
         m = p.get("metrics") or {}
-        return sum(int(m.get(k) or 0) for k in ("likes", "comments", "shares", "views"))
+        return sum(_as_int(m.get(k)) for k in ("likes", "comments", "shares", "views"))
     return sorted(posts or [], key=_engagement, reverse=True)[:n]
 
 
@@ -1529,13 +1579,36 @@ def _collect_youtube_comments(posts: list[dict], max_posts: int,
     return out, None
 
 
+def _dedupe_comments(comments: list[dict]) -> list[dict]:
+    """One entry per (platform, comment_id). The same post arriving twice in
+    a phase-1 platform list (Unipile's own pagination can overlap) means its
+    whole comment section is fetched and appended twice, which inflates the
+    "N comments analyzed" a reader is shown and hands the model the same
+    comment twice under one id. A comment with no id at all is never
+    collapsed -- two different comments both missing an id are not the same
+    comment."""
+    seen = set()
+    out = []
+    for c in comments or []:
+        cid = c.get("comment_id")
+        if not cid:
+            out.append(c)
+            continue
+        key = (c.get("platform"), str(cid))
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(c)
+    return out
+
+
 def _digest_comments(comments: list[dict], max_items: int = MAX_COMMENTS_DIGEST) -> list[dict]:
     """What Claude actually reads. Ordered by likes so a cap drops the
     comments nobody engaged with rather than an arbitrary slice. The id
     given to the model is platform-prefixed (never just the raw vendor id)
     because a LinkedIn comment id and an X comment id share no namespace and
     could otherwise collide."""
-    ordered = sorted(comments, key=lambda c: int(c.get("likes") or 0), reverse=True)[:max_items]
+    ordered = sorted(comments, key=lambda c: _as_int(c.get("likes")), reverse=True)[:max_items]
     out = []
     for i, c in enumerate(ordered):
         raw_id = c.get("comment_id") or str(i)
@@ -1691,44 +1764,56 @@ def collect_reaction_job(run_id: int, email: str, max_posts: int = MAX_POSTS_FOR
         if yt_err:
             errors["youtube"] = yt_err
 
+        comments = _dedupe_comments(comments)
         comment_sentiment = analyze_comment_sentiment(comments) if comments else None
 
+        # Every fallback below carries its own `errors` entry, not just a
+        # `note`: _pulse_summary reads `errors` to tell a source that was
+        # never successfully searched apart from one that ran and confirmed
+        # a real zero, and a crashed pulse is the former. Without it the
+        # synthesis report got to state "no TikTok conversation was found"
+        # as a fact about the person after the TikTok read crashed.
         try:
             reddit = tlpr_reddit_pulse.build_pulse(full_name, company_hint)
         except Exception:
             logger.exception("thought_leader_pr: reddit pulse crashed for run %s", run_id)
-            reddit = {"note": "The Reddit conversation read could not be completed.", "thread_count": 0}
+            note = "The Reddit conversation read could not be completed."
+            reddit = {"note": note, "thread_count": 0, "errors": {"_run": note}}
 
         try:
             x_pulse = tlpr_x_pulse.build_pulse(full_name, x_handle)
         except Exception:
             logger.exception("thought_leader_pr: x pulse crashed for run %s", run_id)
-            x_pulse = {"note": "The X conversation read could not be completed.", "tweet_count": 0}
+            note = "The X conversation read could not be completed."
+            x_pulse = {"note": note, "tweet_count": 0, "errors": {"_run": note}}
 
         try:
             linkedin_pulse = tlpr_linkedin_pulse.build_pulse(full_name, li_provider_id)
         except Exception:
             logger.exception("thought_leader_pr: linkedin pulse crashed for run %s", run_id)
-            linkedin_pulse = {"note": "The LinkedIn conversation read could not be completed.", "post_count": 0}
+            note = "The LinkedIn conversation read could not be completed."
+            linkedin_pulse = {"note": note, "post_count": 0, "errors": {"_run": note}}
 
         try:
             tiktok_pulse = tlpr_tiktok_pulse.build_pulse(full_name)
         except Exception:
             logger.exception("thought_leader_pr: tiktok pulse crashed for run %s", run_id)
-            tiktok_pulse = {"note": "The TikTok conversation read could not be completed.", "video_count": 0}
+            note = "The TikTok conversation read could not be completed."
+            tiktok_pulse = {"note": note, "video_count": 0, "errors": {"_run": note}}
 
         try:
             instagram_pulse = tlpr_instagram_pulse.build_pulse(full_name, instagram_handle)
         except Exception:
             logger.exception("thought_leader_pr: instagram pulse crashed for run %s", run_id)
-            instagram_pulse = {"note": "The Instagram conversation read could not be completed.",
-                               "mention_count": 0}
+            note = "The Instagram conversation read could not be completed."
+            instagram_pulse = {"note": note, "mention_count": 0, "errors": {"_run": note}}
 
         try:
             facebook_pulse = tlpr_facebook_pulse.build_pulse(full_name)
         except Exception:
             logger.exception("thought_leader_pr: facebook pulse crashed for run %s", run_id)
-            facebook_pulse = {"note": "The Facebook conversation read could not be completed.", "post_count": 0}
+            note = "The Facebook conversation read could not be completed."
+            facebook_pulse = {"note": note, "post_count": 0, "errors": {"_run": note}}
 
         reaction = {
             "comments_analyzed": len(comments),
@@ -1825,6 +1910,12 @@ _SYNTHESIS_SYSTEM = (
     "analyzed, since that is a genuine gap in this report's coverage worth "
     "a reader knowing about, not the same as the person having no presence "
     "there at all.\n\n"
+    "A source can also come back with \"search_failed\": true. That means "
+    "the search itself never ran or could not be read (an unconfigured "
+    "vendor, a network failure), so NOTHING is known about this person "
+    "there either way. Say the check could not be completed and name the "
+    "source; never write that nothing was found there, and never let it "
+    "weigh on the verdict as evidence of a quiet or absent presence.\n\n"
     "Be specific to this person, never generic advice that could apply to "
     "anyone. If reaction and press genuinely diverge (praised online but "
     "criticized in the press, or vice versa) or notably agree, say so "
@@ -1885,17 +1976,30 @@ def _pulse_summary(pulse: dict | None, count_key: str) -> dict | None:
     pay-package backlash, a campus protest) it never got the chance to
     weigh in the verdict or risks.
 
-    Returns None only when NOTHING was collected -- there is genuinely no
-    data behind this source. When something WAS collected but its analysis
-    errored (a truncated reply, a timeout), that is reported as
-    analysis_failed=True with the real collected_count still attached,
-    never silently folded into the same "unavailable" signal as a true
-    zero: an audit found the old code treated "412 tweets collected, the
-    analysis call timed out" identically to "nothing was ever found",
-    which the report itself would then get to assert as fact."""
+    Returns None only when NOTHING was collected AND the search that looked
+    for it actually ran -- there is genuinely no data behind this source.
+    When something WAS collected but its analysis errored (a truncated
+    reply, a timeout), that is reported as analysis_failed=True with the
+    real collected_count still attached, never silently folded into the
+    same "unavailable" signal as a true zero: an audit found the old code
+    treated "412 tweets collected, the analysis call timed out" identically
+    to "nothing was ever found", which the report itself would then get to
+    assert as fact.
+
+    A zero that came back with real `errors` on it is reported as
+    search_failed=True for the same reason one step earlier in the chain:
+    an unconfigured Apify token, a transport failure, or a response this
+    codebase could not read means the source was never searched at all.
+    Each pulse's own `note` already tells a reader that apart from a
+    confident zero, but the synthesis payload did not, and
+    _SYNTHESIS_SYSTEM tells the model to write plainly around anything
+    unavailable -- so the final report stated "no X conversation was found"
+    as a fact about the person in exactly the case nobody had looked."""
     pulse = pulse or {}
     count = pulse.get(count_key) or 0
     if not count:
+        if pulse.get("errors"):
+            return {"collected_count": 0, "search_failed": True}
         return None
     analysis = pulse.get("analysis") or {}
     if analysis.get("error") or not analysis.get("verdict"):
@@ -1913,8 +2017,6 @@ def _reaction_summary(reaction: dict | None) -> dict:
     if not reaction:
         return {"available": False}
     cs = reaction.get("comment_sentiment") or {}
-    reddit = reaction.get("reddit") or {}
-    r_analysis = reddit.get("analysis") or {}
     x = _pulse_summary(reaction.get("x_pulse"), "tweet_count")
     linkedin = _pulse_summary(reaction.get("linkedin_pulse"), "post_count")
     tiktok = _pulse_summary(reaction.get("tiktok_pulse"), "video_count")
@@ -1934,19 +2036,13 @@ def _reaction_summary(reaction: dict | None) -> dict:
         else:
             own_post_comments = {"collected_count": comments_count, "analysis_failed": True}
 
-    thread_count = reddit.get("thread_count") or 0
-    reddit_summary = None
-    if thread_count:
-        if r_analysis.get("verdict") and not r_analysis.get("error"):
-            reddit_summary = {
-                "collected_count": thread_count,
-                "verdict": r_analysis.get("verdict"),
-                "sentiment_counts": (r_analysis.get("sentiment") or {}).get("counts"),
-                "themes": [t.get("label") for t in (r_analysis.get("themes") or []) if t.get("label")],
-                "risk_flags": r_analysis.get("risk_flags") or [],
-            }
-        else:
-            reddit_summary = {"collected_count": thread_count, "analysis_failed": True}
+    # Reddit goes through the same _pulse_summary as its six siblings, which
+    # produces the identical shape this block used to build by hand. Keeping
+    # its own copy meant Reddit alone never learned the search_failed rule
+    # the shared function has: a Reddit read that came back with an expired
+    # OAuth token was handed to the report as a confident "no Reddit
+    # conversation exists about this person".
+    reddit_summary = _pulse_summary(reaction.get("reddit"), "thread_count")
 
     return {
         "available": bool(own_post_comments or reddit_summary or x or linkedin
@@ -1956,8 +2052,22 @@ def _reaction_summary(reaction: dict | None) -> dict:
     }
 
 
-def _press_summary(press: dict | None) -> dict:
+def _press_summary(press: dict | None, errors: dict | None = None) -> dict:
+    """`errors` is the run row's own press_errors column: collect_press_job
+    pops build_press's errors dict off the stored press blob, so zero
+    articles plus a real fetch failure is otherwise indistinguishable here
+    from zero articles after both sources ran clean. Reported as
+    search_failed=True for the same reason _pulse_summary does it -- see
+    that function's docstring. SerpAPI running and genuinely returning
+    nothing is a real finding, not a failure, and is the one message
+    deliberately not counted as a caveat, the same exclusion
+    tlpr_press.build_press's own note applies."""
+    errors = errors or {}
+    caveats = [msg for key, msg in errors.items()
+               if msg != "No SerpAPI results were returned for this person."]
     if not press or not press.get("article_count"):
+        if caveats:
+            return {"available": False, "search_failed": True}
         return {"available": False}
     a = press.get("analysis") or {}
     out: dict = {"available": True, "article_count": press.get("article_count"),
@@ -2045,7 +2155,7 @@ def synthesize_report(run: dict) -> dict:
         },
         "posts": _posts_summary(run.get("posts")),
         "reaction": _reaction_summary(run.get("reaction")),
-        "press": _press_summary(run.get("press")),
+        "press": _press_summary(run.get("press"), run.get("press_errors")),
     }
     try:
         from anthropic import Anthropic
