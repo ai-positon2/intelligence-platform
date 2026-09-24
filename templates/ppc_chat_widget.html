@@ -632,7 +632,7 @@ table.k-table{ border-collapse:collapse; width:100%; font-size:11.5px; }
     av.innerHTML = role==='assistant' ? orbSvg(19) : 'You';
     var col=document.createElement('div'); col.className='k-bcol';
     var bub=document.createElement('div'); bub.className='k-bub';
-    bub.innerHTML = role==='assistant' ? fmt(citeify(text)) : fmt(text);
+    bub.innerHTML = role==='assistant' ? fmt(citeify(esc(text))) : fmt(esc(text));
     col.appendChild(bub);
     if(!opt.streaming){ decorate(row,bub,role,text); }
     var ts=document.createElement('div'); ts.className='k-ts'; ts.textContent=now();
@@ -736,13 +736,13 @@ table.k-table{ border-collapse:collapse; width:100%; font-size:11.5px; }
       if(_abort){ finishStream(m,acc||text); return; }
       if(i>=tokens.length){ finishStream(m,text); return; }
       acc+=tokens[i]; i++;
-      m.bub.innerHTML=fmt(citeify(acc))+'<span class="k-cursor"></span>';
+      m.bub.innerHTML=fmt(citeify(esc(acc)))+'<span class="k-cursor"></span>';
       scroll();
       setTimeout(step, 14);
     })();
   }
   function finishStream(m,text){
-    m.bub.innerHTML=fmt(citeify(text));
+    m.bub.innerHTML=fmt(citeify(esc(text)));
     decorate(m.row,m.bub,'assistant',text);
     _hist.push({role:'assistant',content:text.length>1200?text.slice(0,1200)+'…':text});
     persistSession();
