@@ -86,12 +86,14 @@ owner can answer. This file covers everything from that round fixable in code.
 
 6. Flagged, not silently changed here -- these need the app owner's decision,
    or genuinely cannot be verified from this sandbox:
-   - SECRET_KEY falls back to a hardcoded, checked-in dev secret if unset,
-     and GOOGLE_CLIENT_ID being unset makes /auth/google accept UNVERIFIED
-     sign-ins. Both now log a loud, specific error if it ever happens instead
-     of degrading silently, but confirming SECRET_KEY is actually set to a
-     strong value in the real Railway environment needs someone with access
-     to Railway, not this sandbox.
+   - SECRET_KEY falling back to a hardcoded, checked-in dev secret, and
+     GOOGLE_CLIENT_ID unset making /auth/google accept UNVERIFIED sign-ins,
+     were both fixed in a later claude-security scan (2026-09-24): the app
+     now refuses to start at all without SECRET_KEY (or FLASK_SECRET_KEY),
+     and /auth/google returns 503 instead of decoding an unverified
+     credential when GOOGLE_CLIENT_ID is unset. Confirming SECRET_KEY is
+     actually set to a strong value in the real Railway environment still
+     needs someone with access to Railway, not this sandbox.
    - The Apollo/OpenAI credit pool is fully shared with no per-client
      isolation or quota, and /credits reports an aggregate across ALL users
      to any signed-in caller -- fine for internal staff today, a cross-tenant
@@ -482,22 +484,22 @@ def test_count_returns_429_once_the_budget_is_spent(client, monkeypatch, apollo_
     assert r.status_code == 429
 
 
-# ── Google auth dev-mode fallback now logs loudly instead of silently ──────
+# ── Google auth now fails closed instead of accepting unverified logins ────
 
-def test_unverified_google_login_logs_a_security_warning(monkeypatch, caplog):
+def test_unverified_google_login_is_refused_when_client_id_unset(monkeypatch, caplog):
     monkeypatch.setattr(appmod, "GOOGLE_CLIENT_ID", "")
     import base64
     payload = base64.urlsafe_b64encode(json.dumps({"email": "x@y.com"}).encode()).decode().rstrip("=")
     credential = "h." + payload + ".s"
     with caplog.at_level("ERROR"):
         r = appmod.app.test_client().post("/auth/google", json={"credential": credential})
-    assert r.status_code == 200
+    assert r.status_code == 503
     assert any("GOOGLE_CLIENT_ID is not set" in rec.message for rec in caplog.records)
 
 
-# ── SECRET_KEY fallback logs loudly at import time, checked in isolation ──
+# ── SECRET_KEY: app refuses to start rather than falling back, checked in isolation ──
 
-def test_secret_key_fallback_logs_a_security_warning_when_unset():
+def test_app_refuses_to_start_when_secret_key_unset():
     """Run in a fresh subprocess rather than re-importing app.py in-process:
     a second import here would re-register every Flask route and corrupt
     every other test in this suite. A clean process is the only safe way to
@@ -505,15 +507,18 @@ def test_secret_key_fallback_logs_a_security_warning_when_unset():
     environments."""
     env_missing = dict(os.environ, GOOGLE_CLIENT_ID="test", GOOGLE_CLIENT_SECRET="test")
     env_missing.pop("SECRET_KEY", None)
+    env_missing.pop("FLASK_SECRET_KEY", None)
     proc = subprocess.run(
         [sys.executable, "-c", "import logging; logging.basicConfig(level=logging.ERROR); import app"],
         cwd=_ROOT, env=env_missing, capture_output=True, text=True, timeout=30)
+    assert proc.returncode != 0
     assert "SECRET_KEY is not set" in proc.stderr
 
     env_set = dict(env_missing, SECRET_KEY="a-real-long-random-value")
     proc2 = subprocess.run(
         [sys.executable, "-c", "import logging; logging.basicConfig(level=logging.ERROR); import app"],
         cwd=_ROOT, env=env_set, capture_output=True, text=True, timeout=30)
+    assert proc2.returncode == 0
     assert "SECRET_KEY is not set" not in proc2.stderr
 
 

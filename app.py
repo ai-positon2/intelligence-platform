@@ -29,24 +29,23 @@ log = logging.getLogger(__name__)
 IST = timezone(timedelta(hours=5, minutes=30))
 
 app = Flask(__name__)
-_SECRET_KEY_ENV = os.environ.get("SECRET_KEY", "")
-app.secret_key = _SECRET_KEY_ENV or "cst-dev-secret-do-not-use-in-prod-abc123xyz"
+_SECRET_KEY_ENV = os.environ.get("SECRET_KEY", "") or os.environ.get("FLASK_SECRET_KEY", "")
 if not _SECRET_KEY_ENV:
-    # This fallback signs every session cookie on the platform -- every
+    # SECRET_KEY signs every session cookie on the platform -- every
     # position2_required / admin_required check and every per-email database
     # scope (Contact Finder's history/list, saved searches, ...) ultimately
     # trusts session["google_user"]["email"], which is only as trustworthy as
-    # the key that signed it. If this is ever what's actually running in
-    # production, ANYONE can mint a cookie for any email, including another
-    # user's, with a value that is checked into this very repo. Loud rather
-    # than silent on purpose: previously nothing here would have told anyone
-    # this was happening. Set SECRET_KEY in the real environment (Railway ->
-    # Variables) to a long random value and this stops firing.
-    log.error("SECURITY: SECRET_KEY is not set -- falling back to a hardcoded, "
-              "publicly-known dev secret. Every signed-in session on this "
-              "deployment can be forged by anyone who has read this source file. "
-              "Set SECRET_KEY in the environment before this is reachable by "
-              "anyone outside the team that already has this code.")
+    # the key that signed it. A hardcoded fallback here would mean ANYONE who
+    # has read this source file could mint a cookie for any email, including
+    # another user's -- so this fails startup instead of silently degrading.
+    # Set SECRET_KEY in the real environment (Railway -> Variables) to a long
+    # random value; for local dev, any non-empty value works.
+    raise RuntimeError(
+        "SECRET_KEY is not set. Every signed-in session on this deployment "
+        "would be forgeable by anyone who has read this source file, so the "
+        "app refuses to start. Set SECRET_KEY in the environment."
+    )
+app.secret_key = _SECRET_KEY_ENV
 app.permanent_session_lifetime = timedelta(days=7)
 # Flask's own default (no max_age configured) sends every static file with an
 # explicit "Cache-Control: no-cache" -- not merely no header -- so browsers were
@@ -1327,33 +1326,23 @@ def auth_google():
         return jsonify({"success": False, "error": "No credential"}), 400
 
     if not GOOGLE_CLIENT_ID:
-        # Dev mode: decode without verification (localhost only). This is only
-        # safe because it requires GOOGLE_CLIENT_ID to be unset, which it must
-        # never be once this is reachable by anyone outside local development --
-        # unverified means the "credential" is trusted as-is, so any caller can
-        # log in as any email (including a real @position2.com address) just by
-        # POSTing a self-made, unsigned JWT-shaped payload. Loud rather than
-        # silent: a redeploy or a dropped environment variable that lands here
-        # in production would otherwise degrade authentication with nothing in
-        # the logs saying so.
-        log.error("SECURITY: GOOGLE_CLIENT_ID is not set -- /auth/google is accepting "
-                  "UNVERIFIED sign-ins. Anyone can log in as any email this way. Set "
-                  "GOOGLE_CLIENT_ID in the environment before this is reachable by "
-                  "anyone outside local development.")
-        import base64, json as _j
-        try:
-            pad = credential.split(".")[1]
-            pad += "=" * (-len(pad) % 4)
-            idinfo = _j.loads(base64.urlsafe_b64decode(pad))
-        except Exception as e:
-            return jsonify({"success": False, "error": str(e)}), 401
-    else:
-        try:
-            from google.oauth2 import id_token
-            from google.auth.transport import requests as greq
-            idinfo = id_token.verify_oauth2_token(credential, greq.Request(), GOOGLE_CLIENT_ID)
-        except Exception as e:
-            return jsonify({"success": False, "error": str(e)}), 401
+        # Without GOOGLE_CLIENT_ID there is no key to verify a credential's
+        # signature against, so a "credential" is just a client-supplied
+        # claim -- accepting it would let anyone log in as any email,
+        # including a real @position2.com admin, just by POSTing a self-made,
+        # unsigned JWT-shaped payload. Fail closed rather than silently
+        # decoding it unverified.
+        log.error("SECURITY: GOOGLE_CLIENT_ID is not set -- /auth/google is refusing "
+                  "all sign-ins until it is configured. Set GOOGLE_CLIENT_ID in the "
+                  "environment.")
+        return jsonify({"success": False, "error": "Sign-in is not configured"}), 503
+
+    try:
+        from google.oauth2 import id_token
+        from google.auth.transport import requests as greq
+        idinfo = id_token.verify_oauth2_token(credential, greq.Request(), GOOGLE_CLIENT_ID)
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 401
 
     email = idinfo.get("email", "")
     # v17: sign-in is open to ANY Google account. Area-level access control is enforced
