@@ -52,12 +52,34 @@ _NEG_TTL = 3600  # a fetch failure (dead site, transient network blip, DNS hiccu
 _CACHE: Dict[str, tuple] = {}
 
 
+_MAX_FETCH_BYTES = 2 * 1024 * 1024  # a company homepage/about page, not a download
+
+
 def _fetch(url: str, timeout: float = 6.0, user_agent: Optional[str] = None) -> Optional[str]:
+    """SSRF-guarded fetch. `url`'s host is not always a fixed, trusted value --
+    the caller in this module resolves it from a visitor's reverse-DNS-derived
+    "company domain", which an attacker can point at a private/link-local/
+    cloud-metadata address. Goes through event_intel_http.public_get, which
+    resolves and validates the IP as public before connecting (and again on
+    every redirect) instead of trusting DNS at request time, the same guard
+    already used for other attacker-influenceable fetches in this codebase."""
     try:
-        req = urllib.request.Request(url, headers={"User-Agent": user_agent or _UA})
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            return resp.read().decode("utf-8", errors="ignore")
-    except (urllib.error.URLError, urllib.error.HTTPError, OSError, ValueError):
+        from tracker.event_intel_http import public_get
+        resp = public_get(url, timeout=timeout, stream=True,
+                          headers={"User-Agent": user_agent or _UA})
+        try:
+            if resp.status_code != 200:
+                return None
+            chunks, total = [], 0
+            for chunk in resp.iter_content(65536):
+                chunks.append(chunk)
+                total += len(chunk)
+                if total >= _MAX_FETCH_BYTES:
+                    break
+            return b"".join(chunks).decode(resp.encoding or "utf-8", errors="ignore")
+        finally:
+            resp.close()
+    except Exception:
         return None
 
 
