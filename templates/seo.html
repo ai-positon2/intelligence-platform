@@ -96,19 +96,9 @@
     }
     document.addEventListener('click',function(e){ var m=document.getElementById('userMenu'); if(m&&!m.contains(e.target)){document.getElementById('userPill').classList.remove('open');document.getElementById('userDropdown').classList.remove('open');} });
     document.addEventListener('keydown',function(e){ if(e.key==='Escape'){document.getElementById('userPill').classList.remove('open');document.getElementById('userDropdown').classList.remove('open');} });
-    (function(){
-      var _start = Date.now(), _sent = false;
-      function _send(){
-        if(_sent) return; _sent = true;
-        fetch('/api/track', {method:'POST', headers:{'Content-Type':'application/json'},
-          body: JSON.stringify({page: window.location.pathname, title: 'SEO + AEO Dashboards',
-          seconds: Math.round((Date.now()-_start)/1000),
-          email: '{{ user.email if user else "" }}'}), keepalive: true}).catch(function(){});
-      }
-      document.addEventListener('visibilitychange', function(){ if(document.visibilityState==='hidden') _send(); });
-      window.addEventListener('beforeunload', _send);
-    })();
+    
   </script>
+<script src="{{ url_for('static', filename='js/page_track.js') }}?v=1" data-title="SEO + AEO Dashboards" data-email="{{ user.email if user else '' }}"></script>
 <script>
 /* ════ Platform command palette — Ctrl/Cmd+K ════ */
 (function(){

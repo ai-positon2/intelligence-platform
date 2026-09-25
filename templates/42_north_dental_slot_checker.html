@@ -1245,6 +1245,6 @@
   })();
   </script>
   {% endif %}
-  <script>(function(){if(window.__trk)return;window.__trk=1;var _s=Date.now(),_d=false;function f(){if(_d)return;_d=true;var s=Math.round((Date.now()-_s)/1000);fetch('/api/track',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({page:location.pathname,title:'42 North Dental Slot Checker',seconds:s,email:'{{ user.email if user else "" }}'}),keepalive:true}).catch(function(){});}document.addEventListener('visibilitychange',function(){if(document.visibilityState==='hidden')f();});window.addEventListener('beforeunload',f);})();</script>
+  <script src="{{ url_for('static', filename='js/page_track.js') }}?v=1" data-title="42 North Dental Slot Checker" data-email="{{ user.email if user else '' }}"></script>
 </body>
 </html>

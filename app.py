@@ -4725,7 +4725,7 @@ def track_page():
                 data = {}
         data    = data or {}
         page    = data.get("page", "unknown")
-        seconds = int(data.get("seconds", 0))
+        seconds = int(data.get("seconds")) if str(data.get("seconds", "")).isdigit() else 0
         email   = data.get("email", "") or (session.get("google_user") or {}).get("email", "")
         title   = data.get("title", page)
         if seconds < 1:
@@ -4753,6 +4753,8 @@ def track_page():
             vid,   # Visitor ID (p2_vid) -- links this post-login page view back to the
                    # visitor's pre-login Visitor Analytics journey, same key used by
                    # Member Signins / internal login log.
+            str(data.get("pvid") or "") if _PVID_RE.match(str(data.get("pvid") or "")) else "",
+            max(0, min(int(data.get("seq")) if str(data.get("seq", "")).isdigit() else 0, 10000)),
         ]
 
         if not LOGIN_LOG_SHEET_ID:
@@ -4771,9 +4773,11 @@ def track_page():
             sa_info, scopes=["https://www.googleapis.com/auth/spreadsheets"])
         svc = build("sheets", "v4", credentials=creds, cache_discovery=False, static_discovery=True)
 
-        _ensure_tab_header(svc, LOGIN_LOG_SHEET_ID, "Page Views",
-            ["Timestamp (IST)","Date","Time (IST)","Day","Email","Page Title",
-             "Page URL","Seconds","Duration","IP","Browser","OS","Device","Visitor ID"])
+        hdr = _ensure_tab_header(svc, LOGIN_LOG_SHEET_ID, "Page Views", _PV_HEADER, "A1:P1")
+        if hdr is not None and len(hdr) < len(_PV_HEADER):
+            # Label the columns added after this tab was created.
+            svc.spreadsheets().values().update(spreadsheetId=LOGIN_LOG_SHEET_ID,
+                range="Page Views!A1", valueInputOption="RAW", body={"values": [_PV_HEADER]}).execute()
 
         svc.spreadsheets().values().append(
             spreadsheetId=LOGIN_LOG_SHEET_ID, range="Page Views!A1",
@@ -4799,15 +4803,27 @@ _PVID_RE = re.compile(r"^[A-Za-z0-9-]{8,64}$")
 
 
 def _va_latest_snapshots(rows):
-    """Collapse Visitor Analytics rows to one per page view.
+    return _latest_snapshots(rows, _VA_HEADER.index("Page View ID"), _VA_HEADER.index("Beacon Seq"))
 
-    The tracker sends a cumulative snapshot each time a page is hidden, so one
+
+_PV_HEADER = ["Timestamp (IST)","Date","Time (IST)","Day","Email","Page Title",
+              "Page URL","Seconds","Duration","IP","Browser","OS","Device","Visitor ID",
+              "Page View ID","Beacon Seq"]
+
+
+def _pv_latest_snapshots(rows):
+    return _latest_snapshots(rows, _PV_HEADER.index("Page View ID"), _PV_HEADER.index("Beacon Seq"))
+
+
+def _latest_snapshots(rows, pi, si):
+    """Collapse tracker rows to one per page view.
+
+    Both trackers send a cumulative snapshot each time a page is hidden, so one
     page view can have several rows sharing a Page View ID; the highest Beacon
     Seq (last on a tie) is the complete one. Rows written before page view ids
     existed have none and are kept as-is. Keeps header row and sheet order."""
     if len(rows) < 2:
         return rows
-    pi, si = _VA_HEADER.index("Page View ID"), _VA_HEADER.index("Beacon Seq")
     best = {}
     for n, r in enumerate(rows[1:], 1):
         pv = r[pi] if len(r) > pi else ""
@@ -5408,12 +5424,13 @@ def _fetch_visitor_analytics_uncached() -> dict:
             return []
 
     _RANGES = ["Visitor Analytics!A:AO", "%s!A:T" % _MEMBER_TAB, "A:U",
-               "Visitor Identities!A:G", "Page Views!A:N"]
+               "Visitor Identities!A:G", "Page Views!A:P"]
     if svc:
         with ThreadPoolExecutor(max_workers=len(_RANGES) + 1) as _ex:
             _access_future = _ex.submit(_read_access_requests, 2000)
             rows, ms_rows, login_rows, vi_rows, pv_rows = list(_ex.map(_read, _RANGES))
             rows = _va_latest_snapshots(rows)
+            pv_rows = _pv_latest_snapshots(pv_rows)
             access_requests = _access_future.result()
     else:
         rows = ms_rows = login_rows = vi_rows = pv_rows = []
@@ -5904,13 +5921,14 @@ def _fetch_member_analytics_uncached() -> dict:
             log.warning("member analytics read failed (%s): %s", rng, e)
             return []
 
-    _RANGES = ["%s!A:T" % _MEMBER_TAB, "Visitor Analytics!A:AO", "Page Views!A:M",
+    _RANGES = ["%s!A:T" % _MEMBER_TAB, "Visitor Analytics!A:AO", "Page Views!A:P",
                "A:U",                  # internal login log -- real names + p2_vid for @position2.com
                "Visitor Identities!A:G"]
     if svc:
         with ThreadPoolExecutor(max_workers=len(_RANGES)) as _ex:
             ms_rows, va_rows, pv_rows, login_rows, vi_rows = list(_ex.map(_read, _RANGES))
             va_rows = _va_latest_snapshots(va_rows)
+            pv_rows = _pv_latest_snapshots(pv_rows)
     else:
         ms_rows = va_rows = pv_rows = login_rows = vi_rows = []
     ms = ms_rows[1:] if len(ms_rows) > 1 else []
@@ -6256,10 +6274,10 @@ def _fetch_usage_data(internal: bool = True) -> dict:
     from concurrent.futures import ThreadPoolExecutor
     with ThreadPoolExecutor(max_workers=3) as ex:
         login_fut = ex.submit(_fetch, login_range)
-        page_fut = ex.submit(_fetch, "Page Views!A:N")
+        page_fut = ex.submit(_fetch, "Page Views!A:P")
         va_fut = ex.submit(_fetch, "Visitor Analytics!A:AO")
         login_rows = login_fut.result()
-        page_rows = page_fut.result()
+        page_rows = _pv_latest_snapshots(page_fut.result())
         va_rows = _va_latest_snapshots(va_fut.result())
     login_data = login_rows[1:] if len(login_rows) > 1 else []
     page_data  = page_rows[1:]  if len(page_rows)  > 1 else []
@@ -7399,10 +7417,10 @@ def _fetch_client_usage(slug, force=False):
     ar_range = "%s!A:F" % _AR_TAB
     with ThreadPoolExecutor(max_workers=4) as ex:
         signin_futs = [ex.submit(_cu_read_tab, rng) for rng in _CU_SIGNIN_TABS]
-        pv_fut = ex.submit(_cu_read_tab, "Page Views!A:N")
+        pv_fut = ex.submit(_cu_read_tab, "Page Views!A:P")
         ar_fut = ex.submit(_cu_read_tab, ar_range)
         signin_row_sets = [f.result() for f in signin_futs]
-        pv = pv_fut.result()
+        pv = _pv_latest_snapshots(pv_fut.result())
         ar_rows = ar_fut.result()
     name_map = _cu_name_map_from_rows(signin_row_sets)
     rows = pv[1:] if len(pv) > 1 else []
@@ -7645,7 +7663,7 @@ def _fetch_all_client_summaries(force=False):
     now = time.time()
     if not force and _CU_ALL_CACHE["data"] is not None and (now - _CU_ALL_CACHE["ts"]) < _CU_TTL:
         return _CU_ALL_CACHE["data"]
-    pv = _cu_read_tab("Page Views!A:N")
+    pv = _pv_latest_snapshots(_cu_read_tab("Page Views!A:P"))
     rows = pv[1:] if len(pv) > 1 else []
     summ = {s: {"views": 0, "people": set(), "last": ""} for s in CLIENTS}
     for r in rows:

@@ -64,7 +64,7 @@ def test_each_of_the_four_distinct_tabs_is_read_exactly_once(monkeypatch):
 
     assert sorted(calls) == sorted([
         "A:U", "%s!A:T" % appmod._MEMBER_TAB,
-        "Page Views!A:N", "%s!A:F" % appmod._AR_TAB,
+        "Page Views!A:P", "%s!A:F" % appmod._AR_TAB,
     ]), "expected exactly one read per distinct tab, no duplicates: %r" % calls
 
 

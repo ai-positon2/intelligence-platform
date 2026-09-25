@@ -225,18 +225,7 @@ html::-webkit-scrollbar,body::-webkit-scrollbar{width:0;height:0;display:none;}
       }, 1000);
     });
 
-    (function(){
-      var _start = Date.now(), _sent = false;
-      function _send(){
-        if(_sent) return; _sent = true;
-        fetch('/api/track', {method:'POST', headers:{'Content-Type':'application/json'},
-          body: JSON.stringify({page: window.location.pathname, title: '{{ title }}',
-          seconds: Math.round((Date.now()-_start)/1000),
-          email: '{{ user.email if user else "" }}'}), keepalive: true}).catch(function(){});
-      }
-      document.addEventListener('visibilitychange', function(){ if(document.visibilityState==='hidden') _send(); });
-      window.addEventListener('beforeunload', _send);
-    })();
+    
 
     /* Keep the address bar + breadcrumb in sync with the embedded tool.
        The tool lives in a cross-origin iframe, so we can't read its URL — the
@@ -267,6 +256,7 @@ html::-webkit-scrollbar,body::-webkit-scrollbar{width:0;height:0;display:none;}
       });
     })();
   </script>
+<script src="{{ url_for('static', filename='js/page_track.js') }}?v=1" data-title="{{ title }}" data-email="{{ user.email if user else '' }}"></script>
 <script>(function(){try{var p=location.pathname;document.querySelectorAll('a.dd-item[href],a.tb-dd-item[href]').forEach(function(a){if(a.getAttribute('href')===p){a.classList.add('active');a.style.background='rgba(124,92,255,.18)';a.style.color='#fff';}});}catch(e){}})();</script>
 </body>
 </html>

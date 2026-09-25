@@ -99,7 +99,7 @@ def test_the_page_names_itself_the_new_way_in_all_four_places():
     page = _read("templates", "social_media_intelligence.html")
     assert "<title>%s, Platform</title>" % _NEW in page          # browser tab
     assert '<span class="bc-cur">%s</span>' % _NEW in page       # breadcrumb
-    assert "title:'%s'" % _NEW in page                           # /api/track
+    assert 'data-title="%s"' % _NEW in page                      # /api/track (page_track.js)
     assert "{t:'%s'" % _NEW in page                              # command palette
 
 
