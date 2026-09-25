@@ -136,8 +136,13 @@
     });
   });
 
-  document.addEventListener("focusin", function (e) {
-    if (e.target.closest("#nvfov, form, [data-demo-form]")) stage("started");
+  // Focus alone is not a start: the lead form auto-focuses its Name field the
+  // moment it opens, so a focusin trigger made "started" equal "opened".
+  ["input", "change"].forEach(function (ev) {
+    document.addEventListener(ev, function (e) {
+      var t = e.target;
+      if (t && t.closest && t.closest("#nvfov, form, [data-demo-form]")) stage("started");
+    }, true);
   });
   document.addEventListener("p2:lead_submit", function () { stage("submitted"); logEvent("conversion", "lead_submit"); });
 
