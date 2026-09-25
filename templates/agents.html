@@ -1368,7 +1368,7 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
       </a>
       {% endfor %}
     </div>
-    <div class="noresults" id="dirNo">No agents match that search. Try another term, or <a href="#" data-demo style="color:#a5b4fc;font-weight:600">ask us to build one</a>.</div>
+    <div class="noresults" id="dirNo">No agents match that search. Try another term, or <a href="#" data-demo data-interest="Agent not in directory" style="color:#a5b4fc;font-weight:600">ask us to build one</a>.</div>
     <div class="band reveal">
       <h3>Don’t see the agent you need?</h3>
       <p>We build bespoke agents around your signals, your data and your workflow, usually live within weeks.</p>
@@ -1451,7 +1451,7 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
     <div class="feat">
       <a class="fcard glass tilt reveal" href="/signals" data-cursor><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l3 8 4-16 3 8h4"/></svg></div><h4>Real-time signals</h4><p>Funding, leadership moves, M&amp;A, launches and more, detected across the open web as they happen.</p><span class="more">See signals →</span></a>
       <a class="fcard glass tilt reveal" href="/signals" data-cursor style="transition-delay:90ms"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/><circle cx="12" cy="12" r="4"/></svg></div><h4>Intent scoring</h4><p>Every account ranked by importance, severity, recency and multi-intent stacking decide who to call first.</p><span class="more">How it scores →</span></a>
-      <a class="fcard glass tilt reveal" href="#" data-demo data-cursor style="transition-delay:180ms"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a9 9 0 1 0 9 9"/><path d="M12 7v5l3 2"/></svg></div><h4>Vimi, your analyst</h4><p>An embedded AI assistant that researches accounts, drafts outreach and explains why each one is hot.</p><span class="more">See Vimi in a demo →</span></a>
+      <a class="fcard glass tilt reveal" href="#" data-demo data-interest="Vimi analyst" data-cursor style="transition-delay:180ms"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a9 9 0 1 0 9 9"/><path d="M12 7v5l3 2"/></svg></div><h4>Vimi, your analyst</h4><p>An embedded AI assistant that researches accounts, drafts outreach and explains why each one is hot.</p><span class="more">See Vimi in a demo →</span></a>
     </div>
     <section class="spot-sec reveal" style="margin-top:70px">
       <div class="sec-head"><span class="pill-eye"><span class="dt"></span> Under the hood</span><h2 class="h-sec">One number you can <span class="ital grad">actually trust.</span></h2></div>
@@ -1835,7 +1835,7 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
                 <div class="svc-num"><b id="svScore">9.4</b><span>intent score</span></div>
               </div>
               <div class="svc-badge">▲ Top account today</div>
-              <div class="svc-vimi"><div class="svc-vimi-h"><span class="mv-orb"></span><b>Vimi</b></div><p>“Acme just raised a Series B, here’s a 3-line intro to their new VP Marketing.”</p><button type="button" class="svc-draft" data-demo data-cursor>Open draft →</button></div>
+              <div class="svc-vimi"><div class="svc-vimi-h"><span class="mv-orb"></span><b>Vimi</b></div><p>“Acme just raised a Series B, here’s a 3-line intro to their new VP Marketing.”</p><button type="button" class="svc-draft" data-demo data-interest="Vimi intro draft" data-cursor>Open draft →</button></div>
             </div>
           </div>
         </div>
@@ -2140,7 +2140,7 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
       <h2>Contact</h2>
       <p>All feedback, comments, requests for technical support and other communications relating to the Sites or the Position2 Services should be directed to <a href="mailto:info@position2.com">info@position2.com</a>.</p>
     </div>
-    <div class="band reveal"><h3>Questions about these terms?</h3><p>Our team is happy to walk through the specifics with you.</p><button class="btn-grad mag" data-demo data-cursor>Get in touch</button></div>
+    <div class="band reveal"><h3>Questions about these terms?</h3><p>Our team is happy to walk through the specifics with you.</p><button class="btn-grad mag" data-demo data-interest="Terms questions" data-cursor>Get in touch</button></div>
   </div>
 
 {% elif page == 'integrations' %}
@@ -2749,7 +2749,7 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
   function openForm(o){ o=o||{};
     document.getElementById('nvFormBody').style.display=''; document.getElementById('nvSuccess').classList.remove('on');
     ['f-name','f-email'].forEach(function(id){ var x=document.getElementById(id); if(x) x.classList.remove('ok','bad'); });
-    if(o.interest) setPill(o.interest);
+    setPill(o.interest||'Talk to us');
     if(o.prefill){ var m=document.getElementById('nvM'); if(m && !m.value) m.value=o.prefill; }
     fov.classList.add('on'); document.documentElement.style.overflow='hidden';
     setTimeout(function(){ var n=document.getElementById('nvN'); if(n) n.focus(); },360);

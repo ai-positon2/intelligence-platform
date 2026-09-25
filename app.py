@@ -238,6 +238,45 @@ _MS_HEADER = ["Timestamp (IST)","Date","Time (IST)","Day","Hour (IST)","Email","
     "First Name","Profile Picture","Visitor ID","IP","Browser","Browser Version","OS","Device",
     "User Agent","Referrer","Landing Page","Session ID","Platform"]
 
+def _ensure_tab_header(svc, sheet_id, tab, header, header_range="A1:A1"):
+    """Write `header` to `tab` only if the tab is new or empty, and return the
+    header row the tab has (None if the check itself could not run).
+
+    A failed read is almost always a transient Sheets error on a tab that
+    already exists. Appending the header on ANY read failure is what planted
+    stray header rows in the middle of these logs (9 in Visitor Analytics),
+    each one then counted as a real row by every dashboard. So only a tab this
+    call actually creates gets a header on the error path."""
+    try:
+        got = svc.spreadsheets().values().get(
+            spreadsheetId=sheet_id, range="%s!%s" % (tab, header_range)).execute()
+    except Exception:
+        try:
+            svc.spreadsheets().batchUpdate(spreadsheetId=sheet_id,
+                body={"requests": [{"addSheet": {"properties": {"title": tab}}}]}).execute()
+        except Exception:
+            return None
+        got = {}
+    rows = got.get("values") or []
+    if rows and rows[0]:
+        return rows[0]
+    svc.spreadsheets().values().append(spreadsheetId=sheet_id, range="%s!A1" % tab,
+        valueInputOption="RAW", body={"values": [list(header)]}).execute()
+    return list(header)
+
+
+def _strip_repeated_headers(rows):
+    """Drop any row after the first that repeats the header's first cell.
+
+    Every log tab here starts with a "Timestamp (IST)" label column and a real
+    row always holds a timestamp there, so a later row carrying the label is a
+    stray header (see _ensure_tab_header), not data."""
+    if len(rows) < 2 or not rows[0]:
+        return rows
+    label = rows[0][0]
+    return [rows[0]] + [r for r in rows[1:] if not (r and r[0] == label)]
+
+
 def _log_member_signin(user: dict) -> None:
     """Append one PUBLIC (non-Position2) Google sign-in to the 'Member Signins' tab.
     Records the anonymous visitor id (p2_vid cookie) so the member can be joined to
@@ -266,19 +305,7 @@ def _log_member_signin(user: dict) -> None:
                ua_raw[:200], request.referrer or "direct", "/app", "Google OAuth",
                "intelligence.position2.com"]
         tab = _MEMBER_TAB
-        try:
-            existing = svc.spreadsheets().values().get(
-                spreadsheetId=LOGIN_LOG_SHEET_ID, range="%s!A1:A1" % tab).execute()
-            if not existing.get("values"):
-                raise Exception("empty")
-        except Exception:
-            try:
-                svc.spreadsheets().batchUpdate(spreadsheetId=LOGIN_LOG_SHEET_ID,
-                    body={"requests": [{"addSheet": {"properties": {"title": tab}}}]}).execute()
-            except Exception:
-                pass
-            svc.spreadsheets().values().append(spreadsheetId=LOGIN_LOG_SHEET_ID,
-                range="%s!A1" % tab, valueInputOption="RAW", body={"values": [_MS_HEADER]}).execute()
+        _ensure_tab_header(svc, LOGIN_LOG_SHEET_ID, tab, _MS_HEADER)
         svc.spreadsheets().values().append(spreadsheetId=LOGIN_LOG_SHEET_ID, range="%s!A1" % tab,
             valueInputOption="RAW", insertDataOption="INSERT_ROWS", body={"values": [row]}).execute()
         # Retro-stitch this member's prior anonymous sessions to their identity.
@@ -1783,19 +1810,7 @@ def _log_agent_run(user: dict, agent: dict) -> None:
         row = [now.strftime("%Y-%m-%d %H:%M:%S IST"), now.strftime("%Y-%m-%d"),
                user.get("email", ""), user.get("name", ""), agent.get("slug", ""), agent.get("name", "")]
         tab = _AR_TAB
-        try:
-            existing = svc.spreadsheets().values().get(
-                spreadsheetId=LOGIN_LOG_SHEET_ID, range="%s!A1:A1" % tab).execute()
-            if not existing.get("values"):
-                raise Exception("empty")
-        except Exception:
-            try:
-                svc.spreadsheets().batchUpdate(spreadsheetId=LOGIN_LOG_SHEET_ID,
-                    body={"requests": [{"addSheet": {"properties": {"title": tab}}}]}).execute()
-            except Exception:
-                pass
-            svc.spreadsheets().values().append(spreadsheetId=LOGIN_LOG_SHEET_ID,
-                range="%s!A1" % tab, valueInputOption="RAW", body={"values": [_AR_HEADER]}).execute()
+        _ensure_tab_header(svc, LOGIN_LOG_SHEET_ID, tab, _AR_HEADER)
         svc.spreadsheets().values().append(spreadsheetId=LOGIN_LOG_SHEET_ID, range="%s!A1" % tab,
             valueInputOption="RAW", insertDataOption="INSERT_ROWS", body={"values": [row]}).execute()
         # Keep the read-side cache (below) consistent immediately, so the run this
@@ -1957,24 +1972,11 @@ def _log_agent_access_request(user: dict, agent: dict, message: str = "") -> boo
                user.get("email", ""), user.get("name", ""), agent.get("slug", ""), agent.get("name", ""),
                message]
         tab = _AAR_TAB
-        try:
-            existing = svc.spreadsheets().values().get(
-                spreadsheetId=LOGIN_LOG_SHEET_ID, range="%s!A1:G1" % tab).execute()
-            header_row = (existing.get("values") or [[]])[0]
-            if not header_row:
-                raise Exception("empty")
-            # Migrate a tab created before the "Message" column existed (older
-            # header row only spans A:F) so appended rows line up with a label.
-            if len(header_row) < len(_AAR_HEADER):
-                svc.spreadsheets().values().update(spreadsheetId=LOGIN_LOG_SHEET_ID,
-                    range="%s!A1" % tab, valueInputOption="RAW", body={"values": [_AAR_HEADER]}).execute()
-        except Exception:
-            try:
-                svc.spreadsheets().batchUpdate(spreadsheetId=LOGIN_LOG_SHEET_ID,
-                    body={"requests": [{"addSheet": {"properties": {"title": tab}}}]}).execute()
-            except Exception:
-                pass
-            svc.spreadsheets().values().append(spreadsheetId=LOGIN_LOG_SHEET_ID,
+        header_row = _ensure_tab_header(svc, LOGIN_LOG_SHEET_ID, tab, _AAR_HEADER, "A1:G1")
+        # Migrate a tab created before the "Message" column existed (older
+        # header row only spans A:F) so appended rows line up with a label.
+        if header_row is not None and len(header_row) < len(_AAR_HEADER):
+            svc.spreadsheets().values().update(spreadsheetId=LOGIN_LOG_SHEET_ID,
                 range="%s!A1" % tab, valueInputOption="RAW", body={"values": [_AAR_HEADER]}).execute()
         svc.spreadsheets().values().append(spreadsheetId=LOGIN_LOG_SHEET_ID, range="%s!A1" % tab,
             valueInputOption="RAW", insertDataOption="INSERT_ROWS", body={"values": [row]}).execute()
@@ -4749,25 +4751,9 @@ def track_page():
             sa_info, scopes=["https://www.googleapis.com/auth/spreadsheets"])
         svc = build("sheets", "v4", credentials=creds, cache_discovery=False, static_discovery=True)
 
-        # Auto-create header on first write to Page Views tab
-        try:
-            existing = svc.spreadsheets().values().get(
-                spreadsheetId=LOGIN_LOG_SHEET_ID, range="Page Views!A1:A1").execute()
-            if not existing.get("values"):
-                raise Exception("empty")
-        except Exception:
-            header = [["Timestamp (IST)","Date","Time (IST)","Day","Email","Page Title",
-                       "Page URL","Seconds","Duration","IP","Browser","OS","Device","Visitor ID"]]
-            try:
-                svc.spreadsheets().batchUpdate(
-                    spreadsheetId=LOGIN_LOG_SHEET_ID,
-                    body={"requests":[{"addSheet":{"properties":{"title":"Page Views"}}}]}
-                ).execute()
-            except Exception:
-                pass
-            svc.spreadsheets().values().append(
-                spreadsheetId=LOGIN_LOG_SHEET_ID, range="Page Views!A1",
-                valueInputOption="RAW", body={"values": header}).execute()
+        _ensure_tab_header(svc, LOGIN_LOG_SHEET_ID, "Page Views",
+            ["Timestamp (IST)","Date","Time (IST)","Day","Email","Page Title",
+             "Page URL","Seconds","Duration","IP","Browser","OS","Device","Visitor ID"])
 
         svc.spreadsheets().values().append(
             spreadsheetId=LOGIN_LOG_SHEET_ID, range="Page Views!A1",
@@ -5089,8 +5075,8 @@ def _login_events_by_vid(ms_rows=None, login_rows=None) -> dict:
         if not svc:
             return []
         try:
-            return svc.spreadsheets().values().get(
-                spreadsheetId=LOGIN_LOG_SHEET_ID, range=rng).execute().get("values", [])
+            return _strip_repeated_headers(svc.spreadsheets().values().get(
+                spreadsheetId=LOGIN_LOG_SHEET_ID, range=rng).execute().get("values", []))
         except Exception as e:
             log.warning("login events by vid read failed (%s): %s", rng, e)
             return []
@@ -5150,20 +5136,8 @@ def api_identify():
         if not svc:
             return jsonify({"ok": False, "error": "sheets not configured"}), 500
         tab = "Visitor Identities"
-        try:
-            existing = svc.spreadsheets().values().get(
-                spreadsheetId=LOGIN_LOG_SHEET_ID, range="%s!A1:A1" % tab).execute()
-            if not existing.get("values"):
-                raise Exception("empty")
-        except Exception:
-            try:
-                svc.spreadsheets().batchUpdate(spreadsheetId=LOGIN_LOG_SHEET_ID,
-                    body={"requests": [{"addSheet": {"properties": {"title": tab}}}]}).execute()
-            except Exception:
-                pass
-            hdr = [["Timestamp (IST)", "Visitor ID", "Name", "Email", "Company", "Title", "Source"]]
-            svc.spreadsheets().values().append(spreadsheetId=LOGIN_LOG_SHEET_ID, range="%s!A1" % tab,
-                valueInputOption="RAW", body={"values": hdr}).execute()
+        _ensure_tab_header(svc, LOGIN_LOG_SHEET_ID, tab,
+            ["Timestamp (IST)", "Visitor ID", "Name", "Email", "Company", "Title", "Source"])
         svc.spreadsheets().values().append(spreadsheetId=LOGIN_LOG_SHEET_ID, range="%s!A1" % tab,
             valueInputOption="RAW", insertDataOption="INSERT_ROWS", body={"values": [row]}).execute()
     except Exception as e:
@@ -5231,21 +5205,7 @@ def atrack():
         if not svc:
             return jsonify({"ok": True})
         tab = "Visitor Analytics"
-        try:
-            existing = svc.spreadsheets().values().get(
-                spreadsheetId=LOGIN_LOG_SHEET_ID, range="%s!A1:A1" % tab).execute()
-            if not existing.get("values"):
-                raise Exception("empty")
-        except Exception:
-            try:
-                svc.spreadsheets().batchUpdate(
-                    spreadsheetId=LOGIN_LOG_SHEET_ID,
-                    body={"requests":[{"addSheet":{"properties":{"title":tab}}}]}).execute()
-            except Exception:
-                pass
-            svc.spreadsheets().values().append(
-                spreadsheetId=LOGIN_LOG_SHEET_ID, range="%s!A1" % tab,
-                valueInputOption="RAW", body={"values":[_VA_HEADER]}).execute()
+        _ensure_tab_header(svc, LOGIN_LOG_SHEET_ID, tab, _VA_HEADER)
         svc.spreadsheets().values().append(
             spreadsheetId=LOGIN_LOG_SHEET_ID, range="%s!A1" % tab,
             valueInputOption="RAW", insertDataOption="INSERT_ROWS",
@@ -5345,6 +5305,9 @@ def _fetch_visitor_analytics(force: bool = False) -> dict:
     _VISITOR_ANALYTICS_CACHE["ts"] = now
     return data
 
+_RETIRED_REQUEST_ACCESS = "Request access (retired button)"
+
+
 def _fetch_visitor_analytics_uncached() -> dict:
     """Aggregate the 'Visitor Analytics' tab for the admin dashboard."""
     from collections import Counter, defaultdict
@@ -5365,8 +5328,8 @@ def _fetch_visitor_analytics_uncached() -> dict:
         if not s:
             return []
         try:
-            return s.spreadsheets().values().get(
-                spreadsheetId=LOGIN_LOG_SHEET_ID, range=rng).execute().get("values", [])
+            return _strip_repeated_headers(s.spreadsheets().values().get(
+                spreadsheetId=LOGIN_LOG_SHEET_ID, range=rng).execute().get("values", []))
         except Exception as e:
             log.warning("visitor analytics read failed (%s): %s", rng, e)
             return []
@@ -5463,9 +5426,13 @@ def _fetch_visitor_analytics_uncached() -> dict:
     for lbl, n in cta_counts.items():
         if lbl.startswith("lead:"):
             lead_interest_counts[lbl.split(":", 1)[1] or "Talk to us"] += n
-        elif lbl.startswith("request_access:"):            # legacy → lead
-            it = lbl.split(":", 1)[1] or "Talk to us"
-            lead_interest_counts["Talk to us" if it == "Request access" else it] += n
+        elif lbl.startswith("request_access:"):
+            # Pre-rework tracker labels. "Request access" (or blank) was the old
+            # primary button, which no longer exists; folding it into "Talk to
+            # us" made that row mostly clicks on a button nobody can find.
+            it = lbl.split(":", 1)[1]
+            lead_interest_counts[it if it and it != "Request access"
+                                 else _RETIRED_REQUEST_ACCESS] += n
         elif lbl.startswith("agent_card:"):
             agentcard_clicks += n
         elif lbl.startswith("outbound:"):
@@ -5829,8 +5796,8 @@ def _fetch_member_analytics_uncached() -> dict:
         if not s:
             return []
         try:
-            return s.spreadsheets().values().get(
-                spreadsheetId=LOGIN_LOG_SHEET_ID, range=rng).execute().get("values", [])
+            return _strip_repeated_headers(s.spreadsheets().values().get(
+                spreadsheetId=LOGIN_LOG_SHEET_ID, range=rng).execute().get("values", []))
         except Exception as e:
             log.warning("member analytics read failed (%s): %s", rng, e)
             return []
@@ -6150,7 +6117,7 @@ def _fetch_usage_data(internal: bool = True) -> dict:
             svc = build("sheets", "v4", credentials=creds, cache_discovery=False, static_discovery=True)
             r = svc.spreadsheets().values().get(
                 spreadsheetId=LOGIN_LOG_SHEET_ID, range=tab_range).execute()
-            return r.get("values", [])
+            return _strip_repeated_headers(r.get("values", []))
         except Exception as e:
             log.warning("admin_usage sheet read failed: %s", e)
             return []
