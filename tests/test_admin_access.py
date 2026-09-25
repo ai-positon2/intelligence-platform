@@ -31,9 +31,10 @@ import app as appmod  # noqa: E402
 # Accounts whose admin access was granted by name, pinned here so each grant
 # stays a fact this file checks rather than a line someone edited once and
 # nothing ever confirmed. sangeeta@ was the first; pushpendra.k@ and
-# nikhil.ashok@ were confirmed/granted together on 2026-09-07.
+# nikhil.ashok@ were confirmed/granted together on 2026-09-07; sajjan@ was
+# granted on 2026-09-25.
 _GRANTED_ADMINS = ("sangeeta@position2.com", "pushpendra.k@position2.com",
-                   "nikhil.ashok@position2.com")
+                   "nikhil.ashok@position2.com", "sajjan@position2.com")
 _STAFF = "not-an-admin@position2.com"          # real Position2 login, no admin rights
 _EXTERNAL = "someone@example.com"              # a public /app member
 _APP_PY = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "app.py")
@@ -267,3 +268,35 @@ def test_the_template_wide_is_admin_flag_follows_the_same_set(email):
         # Sangeeta@... is the same person and must get the same flag.
         session["google_user"] = {"email": email.capitalize(), "name": "T"}
         assert appmod._inject_app_agents()["is_admin"] is True
+
+
+_REPO = os.path.dirname(_APP_PY)
+_CLIENT_RENDERED_DIRS = ("templates", "static", "ad_intelligence")
+
+
+def test_no_client_rendered_surface_hardcodes_an_admin_email():
+    # Ad Intelligence's bundle once showed its "Usage Dashboard" link only to
+    # two literal addresses, so every admin granted after them was silently
+    # missing it. Client-rendered code must read is_admin from /api/whoami.
+    offenders = []
+    for top in _CLIENT_RENDERED_DIRS:
+        for root, _dirs, files in os.walk(os.path.join(_REPO, top)):
+            for name in files:
+                if not name.endswith((".html", ".js", ".jsx", ".ts", ".tsx")):
+                    continue
+                path = os.path.join(root, name)
+                text = open(path, encoding="utf-8", errors="ignore").read().lower()
+                for email in appmod.ADMIN_EMAILS:
+                    if email in text:
+                        offenders.append(f"{os.path.relpath(path, _REPO)}: {email}")
+    assert not offenders, offenders
+
+
+def test_ad_intelligence_admin_link_reads_whoami_is_admin():
+    assets = os.path.join(_REPO, "ad_intelligence", "assets")
+    bundle = "".join(open(os.path.join(assets, f), encoding="utf-8").read()
+                     for f in os.listdir(assets) if f.endswith(".js"))
+    assert "fetch(`/api/whoami`)" in bundle
+    assert "o=e?.is_admin===!0" in bundle
+    assert "href:`/p2/admin/usage`" in bundle
+
