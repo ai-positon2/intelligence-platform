@@ -1852,8 +1852,8 @@ def _agent_run_rows(force: bool = False) -> list:
         try:
             svc = _va_sheets_service_st()
             if svc:
-                rows = svc.spreadsheets().values().get(
-                    spreadsheetId=LOGIN_LOG_SHEET_ID, range="%s!A:F" % _AR_TAB).execute().get("values", [])
+                rows = _strip_repeated_headers(svc.spreadsheets().values().get(
+                    spreadsheetId=LOGIN_LOG_SHEET_ID, range="%s!A:F" % _AR_TAB).execute().get("values", []))
         except Exception as ex:
             log.warning("agent run rows read failed: %s", ex)
             return _AGENT_RUN_ROWS_CACHE["rows"] or []
@@ -2008,8 +2008,8 @@ def _agent_access_request_rows(force: bool = False) -> list:
         try:
             svc = _va_sheets_service_st()
             if svc:
-                rows = svc.spreadsheets().values().get(
-                    spreadsheetId=LOGIN_LOG_SHEET_ID, range="%s!A:G" % _AAR_TAB).execute().get("values", [])
+                rows = _strip_repeated_headers(svc.spreadsheets().values().get(
+                    spreadsheetId=LOGIN_LOG_SHEET_ID, range="%s!A:G" % _AAR_TAB).execute().get("values", []))
         except Exception as ex:
             log.warning("agent access request rows read failed: %s", ex)
             return _AGENT_ACCESS_REQUEST_ROWS_CACHE["rows"] or []
@@ -5045,8 +5045,8 @@ def _va_identity_map(vi_rows=None, access_requests=None) -> dict:
         svc = _va_sheets_service()
         if svc:
             try:
-                vi_rows = svc.spreadsheets().values().get(
-                    spreadsheetId=LOGIN_LOG_SHEET_ID, range="Visitor Identities!A1:G5000").execute().get("values", [])
+                vi_rows = _strip_repeated_headers(svc.spreadsheets().values().get(
+                    spreadsheetId=LOGIN_LOG_SHEET_ID, range="Visitor Identities!A1:G5000").execute().get("values", []))
             except Exception:
                 vi_rows = []
     for x in ((vi_rows or [])[1:] or []):
@@ -7187,7 +7187,7 @@ def _cu_read_tab(tab_range):
         svc = build("sheets", "v4", credentials=creds, cache_discovery=False, static_discovery=True)
         r = svc.spreadsheets().values().get(
             spreadsheetId=LOGIN_LOG_SHEET_ID, range=tab_range).execute()
-        return r.get("values", [])
+        return _strip_repeated_headers(r.get("values", []))
     except Exception as e:
         log.warning("client-usage sheet read failed (%s): %s", tab_range, e)
         return []

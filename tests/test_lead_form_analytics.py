@@ -188,3 +188,20 @@ def test_every_lead_form_trigger_declares_its_interest():
     assert len(tags) >= 12
     missing = [t[:80] for t in tags if not re.search(r'data-interest="[^"]+"', t)]
     assert not missing, missing
+
+
+def test_every_read_of_the_log_spreadsheet_drops_stray_headers():
+    # Stray headers are already sitting in these tabs, so a reader that forgets
+    # the helper counts each one as a real row. The only exempt reads are the
+    # writers' own one-cell header probes.
+    import re as _re
+    src = open(os.path.join(_ROOT, "app.py"), encoding="utf-8").read()
+    unwrapped = []
+    for m in _re.finditer(r"values\(\)\.get\(\s*spreadsheetId=LOGIN_LOG_SHEET_ID,\s*range=([^)]*)\)", src):
+        rng = m.group(1)
+        if "A1:A1" in rng or "A1:G1" in rng:
+            continue
+        window = src[m.start() - 160:m.end() + 160]
+        if "_strip_repeated_headers(" not in window:
+            unwrapped.append("app.py:%d range=%s" % (src[:m.start()].count("\n") + 1, rng.strip()))
+    assert not unwrapped, unwrapped
