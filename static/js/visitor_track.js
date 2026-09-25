@@ -56,6 +56,8 @@
   var utm = {}; try { utm = JSON.parse(ss("p2_utm") || "{}"); } catch (e) {}
 
   var t0 = Date.now();
+  var pvid = uuid();   // one id per page view; every snapshot of it carries this
+  var seq = 0;
   var engaged = 0, lastActive = Date.now(), maxScroll = 0, clicks = 0, rage = 0;
   var lastClick = { t: 0, x: 0, y: 0 };
   var events = [];
@@ -164,9 +166,14 @@
     }).observe({ type: "event", buffered: true, durationThreshold: 40 });
   } catch (e) {}
 
-  var sent = false;
+  // A snapshot is sent EVERY time the page is hidden, not only the first time:
+  // someone who tabs away to copy their email and comes back to submit used to
+  // be recorded as "started", with everything after their first tab-away lost.
+  // Payloads are cumulative, and the dashboards keep each pvid's latest seq.
+  var lastSig = "", lastSentAt = 0;
   function payload() {
     return {
+      pvid: pvid, seq: seq,
       vid: vid, sid: sid, isNew: isNew,
       page: location.pathname, title: document.title, ref: ss("p2_ref") || "",
       utm: utm, landing: ss("p2_landing") || location.pathname, pagesInSession: pages,
@@ -179,8 +186,14 @@
     };
   }
   function send() {
-    if (sent || window.__P2VT_KILL) return; sent = true;
-    var body = JSON.stringify(payload());
+    if (window.__P2VT_KILL) return;
+    var p = payload();
+    // "hidden" then "pagehide" fire back to back on navigation; skip the repeat.
+    var sig = JSON.stringify([p.clicks, p.cta, p.form, p.video, p.search, p.scroll, p.rage, p.events.length]);
+    if (sig === lastSig && Date.now() - lastSentAt < 2000) return;
+    lastSig = sig; lastSentAt = Date.now();
+    seq += 1; p.seq = seq;
+    var body = JSON.stringify(p);
     try {
       if (navigator.sendBeacon) {
         navigator.sendBeacon(ENDPOINT, new Blob([body], { type: "text/plain;charset=UTF-8" }));

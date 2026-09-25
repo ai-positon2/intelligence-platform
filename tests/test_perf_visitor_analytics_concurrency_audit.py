@@ -184,7 +184,7 @@ def test_conversions_and_identity_map_both_reflect_the_one_shared_fetch(monkeypa
             return self
 
         def execute(self):
-            if self._range == "Visitor Analytics!A:AM":
+            if self._range == "Visitor Analytics!A:AO":
                 return {"values": va_rows}
             return {"values": []}
 

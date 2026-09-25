@@ -205,3 +205,71 @@ def test_every_read_of_the_log_spreadsheet_drops_stray_headers():
         if "_strip_repeated_headers(" not in window:
             unwrapped.append("app.py:%d range=%s" % (src[:m.start()].count("\n") + 1, rng.strip()))
     assert not unwrapped, unwrapped
+
+
+# ── one row per page view ───────────────────────────────────────────────────
+
+def _snap(pvid, seq, **kw):
+    r = _va_row(kw.pop("ts", "2026-09-25 10:00:00 IST"), kw.pop("vid", "v1"), kw.pop("sid", "s1"),
+                kw.pop("cta", ""), kw.pop("form", ""))
+    ix = {n: i for i, n in enumerate(appmod._VA_HEADER)}
+    r[ix["Page View ID"]] = pvid
+    r[ix["Beacon Seq"]] = str(seq)
+    return r
+
+
+def test_only_the_latest_snapshot_of_each_page_view_is_counted(monkeypatch):
+    hdr = list(appmod._VA_HEADER)
+    legacy = _va_row("2026-09-01 10:00:00 IST", "v0", "s0", "lead:Talk to us×1", "open")
+    d = _dashboard(monkeypatch, [
+        hdr, legacy,
+        _snap("pv-aaaaaaaa", 1, cta="lead:Build a custom agent×1", form="started"),
+        _snap("pv-aaaaaaaa", 2, ts="2026-09-25 10:05:00 IST", cta="lead:Build a custom agent×1",
+              form="submitted"),
+    ])
+    assert d["kpis"]["pageviews"] == 2
+    assert d["form_funnel"] == {"opened": 2, "started": 1, "submitted": 1}
+    assert dict(d["lead_interests"]) == {"Talk to us": 1, "Build a custom agent": 1}
+
+
+def test_an_out_of_order_snapshot_does_not_replace_a_later_one():
+    hdr = list(appmod._VA_HEADER)
+    rows = [hdr, _snap("pv-bbbbbbbb", 2, form="submitted"), _snap("pv-bbbbbbbb", 1, form="started")]
+    kept = appmod._va_latest_snapshots(rows)
+    assert len(kept) == 2 and kept[1][hdr.index("Form Stage")] == "submitted"
+
+
+def test_atrack_stores_the_page_view_id_and_labels_the_new_columns(monkeypatch):
+    old_header = list(appmod._VA_HEADER[:-2])
+    svc = _FakeSheets(tabs={"Visitor Analytics": [old_header]})
+    updates = []
+    svc.update = lambda **kw: (updates.append(kw), _Exec(lambda: {}))[1]
+    monkeypatch.setattr(appmod, "_va_sheets_service", lambda: svc)
+    body = json.dumps({"vid": "v1", "sid": "s1", "page": "/", "pvid": "0f3c2a9e-1111-4222-8333-444455556666",
+                       "seq": 3})
+    appmod.app.test_client().post("/api/atrack", data=body, content_type="text/plain",
+                                  headers={"User-Agent": "Mozilla/5.0 Chrome/120"})
+    row = svc.appends[-1][1]
+    assert row[appmod._VA_HEADER.index("Page View ID")] == "0f3c2a9e-1111-4222-8333-444455556666"
+    assert row[appmod._VA_HEADER.index("Beacon Seq")] == 3
+    assert updates and updates[0]["body"]["values"][0] == appmod._VA_HEADER
+
+
+def test_atrack_drops_a_malformed_page_view_id(monkeypatch):
+    svc = _FakeSheets(tabs={"Visitor Analytics": [list(appmod._VA_HEADER)]})
+    monkeypatch.setattr(appmod, "_va_sheets_service", lambda: svc)
+    body = json.dumps({"vid": "v1", "pvid": "=HYPERLINK(\"x\")", "seq": "nope"})
+    appmod.app.test_client().post("/api/atrack", data=body, content_type="text/plain",
+                                  headers={"User-Agent": "Mozilla/5.0 Chrome/120"})
+    row = svc.appends[-1][1]
+    assert row[appmod._VA_HEADER.index("Page View ID")] == ""
+
+
+def test_every_visitor_analytics_reader_keeps_one_row_per_page_view():
+    # A reader that skips _va_latest_snapshots counts every snapshot of a page
+    # view as its own page view.
+    src = open(os.path.join(_ROOT, "app.py"), encoding="utf-8").read()
+    reads = [m.start() for m in re.finditer(r'"Visitor Analytics!A:AO"', src)]
+    assert len(reads) == 3
+    for pos in reads:
+        assert "_va_latest_snapshots(" in src[pos:pos + 900], src[pos - 200:pos + 900]

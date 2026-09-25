@@ -4792,7 +4792,36 @@ _VA_HEADER = ["Timestamp (IST)","Date","Time (IST)","Day","Visitor ID","Session 
     "UTM Medium","UTM Campaign","UTM Term","UTM Content","Landing Page","Pages In Session",
     "Time On Page (s)","Engaged Time (s)","Max Scroll %","Total Clicks","CTA Clicks",
     "Video","Form Stage","Search Terms","Rage Clicks","LCP (ms)","CLS","INP (ms)",
-    "Viewport","Screen","Language","Browser","OS","Device","Bot","IP","Events (JSON)"]
+    "Viewport","Screen","Language","Browser","OS","Device","Bot","IP","Events (JSON)",
+    "Page View ID","Beacon Seq"]
+
+_PVID_RE = re.compile(r"^[A-Za-z0-9-]{8,64}$")
+
+
+def _va_latest_snapshots(rows):
+    """Collapse Visitor Analytics rows to one per page view.
+
+    The tracker sends a cumulative snapshot each time a page is hidden, so one
+    page view can have several rows sharing a Page View ID; the highest Beacon
+    Seq (last on a tie) is the complete one. Rows written before page view ids
+    existed have none and are kept as-is. Keeps header row and sheet order."""
+    if len(rows) < 2:
+        return rows
+    pi, si = _VA_HEADER.index("Page View ID"), _VA_HEADER.index("Beacon Seq")
+    best = {}
+    for n, r in enumerate(rows[1:], 1):
+        pv = r[pi] if len(r) > pi else ""
+        if not pv:
+            continue
+        try:
+            sq = int(float(r[si])) if len(r) > si and r[si] != "" else 0
+        except (ValueError, TypeError):
+            sq = 0
+        if pv not in best or sq >= best[pv][0]:
+            best[pv] = (sq, n)
+    keep = {n for _, n in best.values()}
+    return [rows[0]] + [r for n, r in enumerate(rows[1:], 1)
+                        if not (len(r) > pi and r[pi]) or n in keep]
 
 _BOT_RE = re.compile(r"bot|crawl|spider|slurp|bingpreview|facebookexternalhit|embedly|"
                      r"monitor|headless|lighthouse|gtmetrix|preview|curl|wget|"
@@ -5219,13 +5248,19 @@ def atrack():
             "%sx%s" % (g("vw",""), g("vh","")), "%sx%s" % (g("sw",""), g("sh","")),
             str(g("lang")), br, osn, dev, is_bot, ip,
             json.dumps(data.get("events") or [], separators=(",",":"))[:9000],
+            str(g("pvid")) if _PVID_RE.match(str(g("pvid"))) else "",
+            max(0, min(int(g("seq")) if str(g("seq")).isdigit() else 0, 10000)),
         ]
 
         svc = _va_sheets_service()
         if not svc:
             return jsonify({"ok": True})
         tab = "Visitor Analytics"
-        _ensure_tab_header(svc, LOGIN_LOG_SHEET_ID, tab, _VA_HEADER)
+        hdr = _ensure_tab_header(svc, LOGIN_LOG_SHEET_ID, tab, _VA_HEADER, "A1:AO1")
+        if hdr is not None and len(hdr) < len(_VA_HEADER):
+            # Label the columns added after this tab was created.
+            svc.spreadsheets().values().update(spreadsheetId=LOGIN_LOG_SHEET_ID,
+                range="%s!A1" % tab, valueInputOption="RAW", body={"values": [_VA_HEADER]}).execute()
         svc.spreadsheets().values().append(
             spreadsheetId=LOGIN_LOG_SHEET_ID, range="%s!A1" % tab,
             valueInputOption="RAW", insertDataOption="INSERT_ROWS",
@@ -5372,12 +5407,13 @@ def _fetch_visitor_analytics_uncached() -> dict:
             log.warning("visitor analytics read failed (%s): %s", rng, e)
             return []
 
-    _RANGES = ["Visitor Analytics!A:AM", "%s!A:T" % _MEMBER_TAB, "A:U",
+    _RANGES = ["Visitor Analytics!A:AO", "%s!A:T" % _MEMBER_TAB, "A:U",
                "Visitor Identities!A:G", "Page Views!A:N"]
     if svc:
         with ThreadPoolExecutor(max_workers=len(_RANGES) + 1) as _ex:
             _access_future = _ex.submit(_read_access_requests, 2000)
             rows, ms_rows, login_rows, vi_rows, pv_rows = list(_ex.map(_read, _RANGES))
+            rows = _va_latest_snapshots(rows)
             access_requests = _access_future.result()
     else:
         rows = ms_rows = login_rows = vi_rows = pv_rows = []
@@ -5868,12 +5904,13 @@ def _fetch_member_analytics_uncached() -> dict:
             log.warning("member analytics read failed (%s): %s", rng, e)
             return []
 
-    _RANGES = ["%s!A:T" % _MEMBER_TAB, "Visitor Analytics!A:AM", "Page Views!A:M",
+    _RANGES = ["%s!A:T" % _MEMBER_TAB, "Visitor Analytics!A:AO", "Page Views!A:M",
                "A:U",                  # internal login log -- real names + p2_vid for @position2.com
                "Visitor Identities!A:G"]
     if svc:
         with ThreadPoolExecutor(max_workers=len(_RANGES)) as _ex:
             ms_rows, va_rows, pv_rows, login_rows, vi_rows = list(_ex.map(_read, _RANGES))
+            va_rows = _va_latest_snapshots(va_rows)
     else:
         ms_rows = va_rows = pv_rows = login_rows = vi_rows = []
     ms = ms_rows[1:] if len(ms_rows) > 1 else []
@@ -6220,10 +6257,10 @@ def _fetch_usage_data(internal: bool = True) -> dict:
     with ThreadPoolExecutor(max_workers=3) as ex:
         login_fut = ex.submit(_fetch, login_range)
         page_fut = ex.submit(_fetch, "Page Views!A:N")
-        va_fut = ex.submit(_fetch, "Visitor Analytics!A:AM")
+        va_fut = ex.submit(_fetch, "Visitor Analytics!A:AO")
         login_rows = login_fut.result()
         page_rows = page_fut.result()
-        va_rows = va_fut.result()
+        va_rows = _va_latest_snapshots(va_fut.result())
     login_data = login_rows[1:] if len(login_rows) > 1 else []
     page_data  = page_rows[1:]  if len(page_rows)  > 1 else []
     va_data    = va_rows[1:]    if len(va_rows)    > 1 else []

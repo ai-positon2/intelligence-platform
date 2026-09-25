@@ -59,7 +59,7 @@ const on = (bag) => (type, fn) => { (bag[type] = bag[type] || []).push(fn); };
 const store = () => { const m = {}; return {
   getItem: (k) => (k in m ? m[k] : null), setItem: (k, v) => { m[k] = String(v); },
   removeItem: (k) => { delete m[k]; }, clear: () => { for (const k in m) delete m[k]; } }; };
-let beacon = null;
+const beacons = [];
 const document = {
   addEventListener: on(docL), cookie: "", referrer: "", title: "Test",
   visibilityState: "visible", readyState: "complete",
@@ -72,7 +72,7 @@ const sandbox = {
   localStorage: store(), sessionStorage: store(), screen: { width: 1, height: 1 },
   innerWidth: 1, innerHeight: 1, scrollY: 0, URL, URLSearchParams, crypto,
   setInterval: () => 0, setTimeout: () => 0, clearTimeout: () => {},
-  fetch: (url, opts) => { beacon = JSON.parse(opts.body); return Promise.resolve(); },
+  fetch: (url, opts) => { beacons.push(JSON.parse(opts.body)); return Promise.resolve(); },
   addEventListener: on(winL),
 };
 sandbox.window = sandbox;
@@ -83,17 +83,26 @@ function fire(type, target, extra) {
   (winL[type] || []).forEach((f) => f(ev));
   (docL[type] || []).forEach((f) => f(ev));
 }
-for (const [type, key] of steps) fire(type, key ? dom[key] : document);
+for (const [type, key] of steps) {
+  if (type === "hide" || type === "show") {
+    document.visibilityState = type === "hide" ? "hidden" : "visible";
+    fire("visibilitychange", document);
+  } else fire(type, key ? dom[key] : document);
+}
 fire("pagehide", document);
-process.stdout.write(JSON.stringify(beacon));
+process.stdout.write(JSON.stringify(beacons));
 """
 
 
-def _run(steps):
+def _beacons(steps):
     out = subprocess.run(["node", "-e", _HARNESS, _TRACKER, json.dumps(steps)],
                          capture_output=True, text=True, timeout=30)
     assert out.returncode == 0, out.stderr
     return json.loads(out.stdout)
+
+
+def _run(steps):
+    return _beacons(steps)[-1]
 
 
 def test_opening_the_form_is_only_open_even_though_its_first_field_gets_focus():
@@ -143,4 +152,22 @@ def test_the_lead_form_still_autofocuses_so_the_focus_trap_stays_relevant():
 
 def test_the_tracker_script_is_cache_busted_past_the_focusin_version():
     html = open(_AGENTS, encoding="utf-8").read()
-    assert "filename='js/visitor_track.js') }}?v=6" in html
+    assert "filename='js/visitor_track.js') }}?v=7" in html
+
+
+def test_a_visitor_who_tabs_away_mid_form_and_comes_back_is_recorded_as_submitted():
+    sent = _beacons([["click", "demo"], ["input", "name"], ["hide", None], ["show", None],
+                     ["input", "name"], ["p2:lead_submit", None]])
+    assert [b["form"] for b in sent] == ["started", "submitted"]
+    assert len({b["pvid"] for b in sent}) == 1
+    assert [b["seq"] for b in sent] == [1, 2]
+    assert sent[-1]["clicks"] == 1 and sent[-1]["cta"] == {"lead:Build a custom agent": 1}
+
+
+def test_hidden_then_pagehide_with_nothing_new_sends_one_snapshot():
+    assert len(_beacons([["click", "demo"], ["hide", None]])) == 1
+
+
+def test_each_page_load_gets_its_own_page_view_id():
+    a, b = _run([["click", "demo"]]), _run([["click", "demo"]])
+    assert a["pvid"] and b["pvid"] and a["pvid"] != b["pvid"]
