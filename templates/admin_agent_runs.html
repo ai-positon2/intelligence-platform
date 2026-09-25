@@ -125,7 +125,7 @@ tr:hover td{background:rgba(255,255,255,.02);color:var(--ink)}
 <div class="wrap">
   <div class="hero">
     <h1>Public Agent <em>usage</em></h1>
-    <p>Every run of a public <b>/app</b> agent, per user, against the per-agent, per-account run cap we enforce (<b>10</b> for external users, <b>100</b> for @position2.com staff). A "run" is one open of the live tool (we can't see what happens inside the embedded tool itself, since it's a separate app).</p>
+    <p>Every run of a public <b>/app</b> agent, per user, against the per-agent, per-account run cap we enforce (<b>10</b> for external users, <b>100</b> for @position2.com staff). A "run" is one run the live tool reports back to us (we can't see what happens inside the embedded tool itself, since it's a separate app). Totals include staff; External Usage counts external users only.</p>
   </div>
 
   <div id="emptyNote" class="note" style="display:none"></div>
@@ -172,11 +172,15 @@ var LAST_DATA=null;
 var KPI_INFO={
   total_runs:{
     title:'Total runs',
-    desc:'Every load of an agent\'s "use" page, across every user and every agent, since tracking began. Each one counts against that user\'s per-agent cap.',
+    desc:'Every run an agent\'s live tool reported back, across every user (staff included) and every agent, since tracking began. Each one counts against that user\'s per-agent cap.',
     render:function(d){
       return '<div class="kstats">'+
           '<div class="kstat"><b>'+(d.total_runs||0)+'</b><span>Total runs</span></div>'+
           '<div class="kstat"><b>'+(d.total_users||0)+'</b><span>Distinct users</span></div>'+
+        '</div>'+
+        '<div class="kstats">'+
+          '<div class="kstat"><b>'+(d.external_runs||0)+'</b><span>External runs ('+(d.external_users||0)+' users)</span></div>'+
+          '<div class="kstat"><b>'+(d.staff_runs||0)+'</b><span>Staff runs ('+(d.staff_users||0)+' users)</span></div>'+
         '</div>'+
         '<div class="ksect"><h4>Runs by agent</h4><div class="bars">'+
           (d.agents||[]).map(function(a){return '<div class="bar"><div class="lab">'+esc(a.name)+'</div><div class="n">'+a.runs+'</div><div class="track"><div class="fill" style="width:'+(d.total_runs?Math.round(a.runs/Math.max.apply(null,(d.agents||[]).map(function(x){return x.runs;})||[1])*100):0)+'%"></div></div></div>';}).join('')+
@@ -243,8 +247,8 @@ function load(force){
     else if(!d.total_runs){note.style.display='block';note.textContent='No agent runs yet. When someone opens the live tool for an agent under /app, it appears here (data lands in the “Agent Runs” sheet tab).';}
     else{note.style.display='none';}
     document.getElementById('kpis').innerHTML=
-      kcard('total_runs',d.total_runs||0,'Total runs')+
-      kcard('total_users',d.total_users||0,'Distinct users')+
+      kcard('total_runs',d.total_runs||0,'Total runs',(d.external_runs||0)+' external · '+(d.staff_runs||0)+' staff')+
+      kcard('total_users',d.total_users||0,'Distinct users',(d.external_users||0)+' external · '+(d.staff_users||0)+' staff')+
       kcard('users_at_cap',d.users_at_cap||0,'Users at cap')+
       kcard('cap',d.cap||10,'Run cap','per agent, per account');
     bars('agentBars',(d.agents||[]).map(function(a){return [a.name,a.runs];}),{suffix:' runs'});

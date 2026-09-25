@@ -1936,13 +1936,27 @@ def _fetch_agent_run_stats() -> dict:
     agents_out = [{"slug": a["slug"], "name": a["name"], "runs": agent_totals.get(a["slug"], 0),
                    "cap": AGENT_RUN_CAP, "ac": a["ac"], "ac2": a["ac2"], "icon": a["icon"]}
                   for a in APP_AGENTS if a.get("seo_slug")]
+    # Runs logged for an agent with no live-tool bar (e.g. a client portal's
+    # external tool) still count in total_runs, so list them too or the bars
+    # add up to less than the total they sit under.
+    listed = {a["slug"] for a in agents_out}
+    for slug, cnt in sorted(agent_totals.items(), key=lambda x: -x[1]):
+        if slug not in listed:
+            meta = agent_meta.get(slug, {})
+            agents_out.append({"slug": slug, "name": meta.get("name", slug), "runs": cnt,
+                               "cap": AGENT_RUN_CAP, "ac": meta.get("ac", "#8b5cf6"),
+                               "ac2": meta.get("ac2", "#22d3ee"), "icon": meta.get("icon", "")})
     users_at_cap = sum(1 for u in users_out if any(a["at_cap"] for a in u["agents"]))
+    staff = [u for u in users_out if u["email"].endswith("@position2.com")]
 
     return {
         "configured": bool(svc),
         "cap": AGENT_RUN_CAP,
         "total_runs": sum(agent_totals.values()),
         "total_users": len(users_out),
+        "staff_runs": sum(u["total"] for u in staff), "staff_users": len(staff),
+        "external_runs": sum(u["total"] for u in users_out) - sum(u["total"] for u in staff),
+        "external_users": len(users_out) - len(staff),
         "users_at_cap": users_at_cap,
         "agents": agents_out,
         "users": users_out,
@@ -2244,9 +2258,15 @@ def _list_agent_run_titles(limit=5000) -> list:
         with conn.cursor() as cur:
             cur.execute(
                 "SELECT email, agent_slug, title, created_at FROM agent_run_history "
-                "ORDER BY created_at ASC LIMIT %s", (limit,))
+                "ORDER BY created_at DESC LIMIT %s", (limit,))
             rows = cur.fetchall()
-        return [{"email": r[0], "slug": r[1], "title": r[2]} for r in rows]
+        rows.reverse()   # newest `limit` rows, oldest first; ASC LIMIT dropped the newest
+        def _ist(t):
+            try:
+                return t.astimezone(IST).strftime("%Y-%m-%d %H:%M:%S")
+            except Exception:
+                return ""
+        return [{"email": r[0], "slug": r[1], "title": r[2], "at": _ist(r[3])} for r in rows]
     except Exception as e:
         log.warning("list agent run titles failed: %s", e)
         return []
@@ -5046,7 +5066,7 @@ def _va_identity_map(vi_rows=None, access_requests=None) -> dict:
         if svc:
             try:
                 vi_rows = _strip_repeated_headers(svc.spreadsheets().values().get(
-                    spreadsheetId=LOGIN_LOG_SHEET_ID, range="Visitor Identities!A1:G5000").execute().get("values", []))
+                    spreadsheetId=LOGIN_LOG_SHEET_ID, range="Visitor Identities!A:G").execute().get("values", []))
             except Exception:
                 vi_rows = []
     for x in ((vi_rows or [])[1:] or []):
@@ -5098,7 +5118,7 @@ def _login_events_by_vid(ms_rows=None, login_rows=None) -> dict:
         add(mc(9), mc(5), mc(6), mc(8), mc(0), "member")
 
     if login_rows is None:
-        login_rows = read("A1:U5000")
+        login_rows = read("A:U")
     for r in (login_rows[1:] if len(login_rows) > 1 else []):
         def lc(i, d=""): return r[i] if i < len(r) else d
         add(lc(20), lc(5), lc(6), lc(8), lc(0), "staff")
@@ -5307,6 +5327,24 @@ def _fetch_visitor_analytics(force: bool = False) -> dict:
 
 _RETIRED_REQUEST_ACCESS = "Request access (retired button)"
 
+# Longest single page view the average-time KPI will count; a tab left open
+# overnight otherwise dominates the mean (one 2-day row outweighs ~6,000 real ones).
+_VA_MAX_PAGE_SECONDS = 1800
+
+
+def _va_row_start(ts: str, seconds_on_page) -> str:
+    """'YYYY-MM-DD HH:MM:SS' when a Visitor Analytics page view began. Rows are
+    written when the visitor LEAVES the page, so a page that ends in a Google
+    sign-in redirect is logged seconds after the sign-in it caused; comparing
+    sign-ins against the row time would miss every such conversion."""
+    base = (ts or "")[:19]
+    try:
+        secs = int(float(seconds_on_page or 0))
+        return (datetime.strptime(base, "%Y-%m-%d %H:%M:%S")
+                - timedelta(seconds=max(0, secs))).strftime("%Y-%m-%d %H:%M:%S")
+    except (ValueError, TypeError):
+        return base
+
 
 def _fetch_visitor_analytics_uncached() -> dict:
     """Aggregate the 'Visitor Analytics' tab for the admin dashboard."""
@@ -5334,8 +5372,8 @@ def _fetch_visitor_analytics_uncached() -> dict:
             log.warning("visitor analytics read failed (%s): %s", rng, e)
             return []
 
-    _RANGES = ["Visitor Analytics!A:AM", "%s!A:T" % _MEMBER_TAB, "A1:U5000",
-               "Visitor Identities!A1:G5000", "Page Views!A:N"]
+    _RANGES = ["Visitor Analytics!A:AM", "%s!A:T" % _MEMBER_TAB, "A:U",
+               "Visitor Identities!A:G", "Page Views!A:N"]
     if svc:
         with ThreadPoolExecutor(max_workers=len(_RANGES) + 1) as _ex:
             _access_future = _ex.submit(_read_access_requests, 2000)
@@ -5378,7 +5416,7 @@ def _fetch_visitor_analytics_uncached() -> dict:
 
     eng = [to_int(c(r,"Engaged Time (s)")) for r in human]
     avg_engaged = round(sum(eng)/len(eng)) if eng else 0
-    tops = [to_int(c(r,"Time On Page (s)")) for r in human]
+    tops = [min(to_int(c(r,"Time On Page (s)")), _VA_MAX_PAGE_SECONDS) for r in human]
     avg_time = round(sum(tops)/len(tops)) if tops else 0
 
     by_day = Counter(c(r,"Date") for r in human if c(r,"Date"))
@@ -5513,11 +5551,15 @@ def _fetch_visitor_analytics_uncached() -> dict:
     # minute load: same IPs, same caps, just fetched in parallel.
     visitor_ids_ranked = sorted(visitors, key=lambda v: vid_pages.get(v,0), reverse=True)[:500]
     _ip_pool = {vid_ip[v] for v in visitor_ids_ranked if vid_ip.get(v)}
-    _ip_pool.update(ipv for _, ipv in list(vid_ip.items())[:150])
     if _VI_OK:
         _resolve_ips_bulk(_ip_pool)
     vid_company = {}; _ipc = {}
-    for v, ipv in list(vid_ip.items())[:150]:
+    # Rows run oldest -> newest, so the old `list(vid_ip.items())[:150]` looked
+    # up only the 150 OLDEST visitors and left everyone after them company-less.
+    for v in visitor_ids_ranked:
+        ipv = vid_ip.get(v)
+        if not ipv:
+            continue
         co = _ipc.get(ipv)
         if co is None:
             co = _ip_company(ipv); _ipc[ipv] = co
@@ -5530,13 +5572,35 @@ def _fetch_visitor_analytics_uncached() -> dict:
 
     # ---- did this anonymous visitor go on to sign in? (member or staff) ----
     login_map = _login_events_by_vid(ms_rows=ms_rows, login_rows=login_rows)
-    signed_in = sum(1 for v in visitors if v in login_map)
+    vid_first_seen = {}
+    signup_first = {}   # visitor -> start of the first page view where they clicked Sign up
+    for r in human:
+        v = c(r,"Visitor ID")
+        if not v:
+            continue
+        start = _va_row_start(c(r,"Timestamp (IST)"), c(r,"Time On Page (s)"))
+        if start and (v not in vid_first_seen or start < vid_first_seen[v]):
+            vid_first_seen[v] = start
+        clicked = any(part.strip().rpartition("×")[0] == "signup"
+                      for part in (c(r,"CTA Clicks") or "").split(" · "))
+        if clicked and (v not in signup_first or start < signup_first[v]):
+            signup_first[v] = start
+
+    def _signs_in_after(v, since):
+        return any((e.get("ts") or "")[:19] >= since
+                   for e in (login_map.get(v) or {}).get("events", []))
+
+    # "Signed in later" must mean later: a sign-in recorded before the
+    # visitor's first tracked page view did not come from that visit.
+    signed_in = sum(1 for v in visitors if _signs_in_after(v, vid_first_seen.get(v, "")))
     signed_in_rate = round(signed_in/unique_visitors*100, 1) if unique_visitors else 0
 
-    # Sign-up funnel: the "Sign up" pop-up hands off to Google, so its bottom is
-    # the same signed-in signal we already stitch server-side (no form submit).
-    signup_funnel = {"clicked": signup_clicks, "signed_in": signed_in}
-    signup_cvr = round(signed_in/signup_clicks*100, 1) if signup_clicks else 0
+    # Sign-up funnel, per VISITOR: people who clicked Sign up, and how many of
+    # those same people signed in after that click. Dividing every sign-in by
+    # the click count is how this read 283%.
+    signup_converted = sum(1 for v, t in signup_first.items() if _signs_in_after(v, t))
+    signup_funnel = {"clicked": len(signup_first), "signed_in": signup_converted}
+    signup_cvr = round(signup_converted/len(signup_first)*100, 1) if signup_first else 0
 
     # pv_rows was already fetched concurrently with the other reads above.
     pv_by_vid = defaultdict(list)
@@ -5596,7 +5660,8 @@ def _fetch_visitor_analytics_uncached() -> dict:
             "company": co, "source": source, "pages": vid_pages.get(v,0),
             "device": c(rs_sorted[0],"Device") if rs_sorted else "",
             "first_ts": tl[0]["t"] if tl else "", "last_ts": tl[-1]["t"] if tl else "",
-            "status": (lg or {}).get("type", ""), "converted": bool(lg),
+            "status": (lg or {}).get("type", ""),
+            "converted": bool(lg) and _signs_in_after(v, vid_first_seen.get(v, "")),
             # person-level identity graph fields
             "person_confidence": person_conf, "person_method": person_method,
             # de-anonymization engine fields
@@ -5615,6 +5680,7 @@ def _fetch_visitor_analytics_uncached() -> dict:
     all_visitors.sort(key=lambda x: (x["last_ts"] or x["first_ts"] or ""), reverse=True)
 
     identified = [x for x in all_visitors if x["source"] or x["company"] or x["converted"] or x["name"]]
+    identified_total = len(identified)
     identified.sort(key=lambda x: (not x["converted"], -x["pages"])); identified = identified[:60]
     all_visitors = all_visitors[:300]
 
@@ -5641,7 +5707,7 @@ def _fetch_visitor_analytics_uncached() -> dict:
             "avg_engaged": fmt(avg_engaged), "avg_time": fmt(avg_time),
             "conversions": conversions, "conv_rate": conv_rate,
             "video_sessions": video_sessions, "total_rage": total_rage,
-            "identified": len(identified), "companies": len(companies),
+            "identified": identified_total, "companies": len(companies),
             "signed_in": signed_in, "signed_in_rate": signed_in_rate,
             "signup_clicks": signup_clicks, "login_clicks": login_clicks,
             "watch_clicks": watch_clicks, "lead_clicks": lead_clicks,
@@ -5803,8 +5869,8 @@ def _fetch_member_analytics_uncached() -> dict:
             return []
 
     _RANGES = ["%s!A:T" % _MEMBER_TAB, "Visitor Analytics!A:AM", "Page Views!A:M",
-               "A1:U5000",             # internal login log -- real names + p2_vid for @position2.com
-               "Visitor Identities!A1:G5000"]
+               "A:U",                  # internal login log -- real names + p2_vid for @position2.com
+               "Visitor Identities!A:G"]
     if svc:
         with ThreadPoolExecutor(max_workers=len(_RANGES)) as _ex:
             ms_rows, va_rows, pv_rows, login_rows, vi_rows = list(_ex.map(_read, _RANGES))
@@ -5892,8 +5958,10 @@ def _fetch_member_analytics_uncached() -> dict:
         last_row = rows[-1]
         prof = profile_by_email.get(e, {})
         vids = {prof["vid"]} if prof.get("vid") else set()
+        # signins 0 + pv_only: their sign-in predates Member Signins logging, so
+        # it is not counted, not dated, and not shown as a "Signed in" event.
         members[e] = {"email": e, "name": prof.get("name") or "—", "picture": prof.get("picture") or "",
-            "vids": vids, "signins": 1,
+            "vids": vids, "signins": 0, "pv_only": True,
             "first_signin": pc(rows[0], 0), "last_signin": pc(last_row, 0),
             "device": pc(last_row, 12), "browser": pc(last_row, 10),
             "os": pc(last_row, 11), "ip": pc(last_row, 9)}
@@ -5925,6 +5993,11 @@ def _fetch_member_analytics_uncached() -> dict:
         pre = []
         for vid in mem["vids"]:
             pre.extend(va_by_vid.get(vid, []))
+        # Pre-login means before their first sign-in; the same visitor id keeps
+        # logging public-page views after they sign in.
+        if mem["first_signin"]:
+            pre = [r for r in pre
+                   if _va_row_start(vc(r, "Timestamp (IST)"), vc(r, "Time On Page (s)")) < mem["first_signin"][:19]]
         pre.sort(key=lambda r: vc(r, "Timestamp (IST)"))
         prelogin_pages = len(pre)
         first_seen = vc(pre[0], "Timestamp (IST)") if pre else mem["first_signin"]
@@ -5944,7 +6017,7 @@ def _fetch_member_analytics_uncached() -> dict:
             if domain and domain not in _FREE_EMAIL_DOMAINS:
                 company = domain
         posts = pv_by_email.get(e, [])
-        status = "returning" if mem["signins"] > 1 else "new"
+        status = "returning" if (mem["signins"] > 1 or mem.get("pv_only")) else "new"
         last_active = mem["last_signin"]
         if posts:
             lp = max(pc(r, 0) for r in posts)
@@ -5958,7 +6031,8 @@ def _fetch_member_analytics_uncached() -> dict:
             tl.append({"t": vc(r, "Timestamp (IST)"), "kind": "view",
                        "label": vc(r, "Page Title") or vc(r, "Page URL") or "Page view",
                        "meta": (vc(r, "Referrer Host") or "")})
-        tl.append({"t": mem["first_signin"], "kind": "signin", "label": "Signed in with Google", "meta": ""})
+        if not mem.get("pv_only"):
+            tl.append({"t": mem["first_signin"], "kind": "signin", "label": "Signed in with Google", "meta": ""})
         if mem["signins"] > 1:
             tl.append({"t": mem["last_signin"], "kind": "signin",
                        "label": "Returned (%d total sign-ins)" % mem["signins"], "meta": ""})
@@ -5968,7 +6042,8 @@ def _fetch_member_analytics_uncached() -> dict:
         tl.sort(key=lambda x: x["t"] or "")
         tl = tl[:60]
 
-        signup_by_day[(mem["first_signin"] or "")[:10]] += 1
+        if not mem.get("pv_only"):
+            signup_by_day[(mem["first_signin"] or "")[:10]] += 1
         src_counter[source or "direct"] += 1
         if pre and vc(pre[0], "UTM Source"): utm_counter[vc(pre[0], "UTM Source")] += 1
         dev_counter[mem["device"] or "—"] += 1
@@ -5978,7 +6053,7 @@ def _fetch_member_analytics_uncached() -> dict:
             prelogin_pages_counter[vc(r, "Page Title") or vc(r, "Page URL")] += 1
         if company: company_counter[company] += 1
         total_pre += prelogin_pages
-        if mem["vids"]: linked += 1
+        if pre: linked += 1
         if engaged: pre_eng_total += engaged; pre_eng_n += 1
 
         out_members.append({
@@ -5988,7 +6063,7 @@ def _fetch_member_analytics_uncached() -> dict:
             "first_seen": first_seen, "joined": mem["first_signin"], "last_active": last_active,
             "source": source, "landing": landing, "engaged": fmt(engaged), "time_on_site": time_on_site,
             "device": mem["device"] or "—", "browser": mem["browser"] or "—", "os": mem["os"] or "—",
-            "status": status, "linked": bool(mem["vids"]), "timeline": tl,
+            "status": status, "linked": bool(pre), "timeline": tl,
         })
 
     out_members.sort(key=lambda x: x["last_active"] or "", reverse=True)
@@ -6199,9 +6274,13 @@ def _fetch_usage_data(internal: bool = True) -> dict:
             page_counts[t] = page_counts.get(t, 0) + 1
     top_pages = sorted(page_counts.items(), key=lambda x: x[1], reverse=True)[:15]
 
-    # Logins per day (last 14 days)
+    # Logins per day: the last 14 CALENDAR days, zero-filled. The old
+    # sorted(...)[-14:] took the last 14 days that HAD a login, which at
+    # External Usage's volume can span months under a "last 14 days" label.
     login_days = Counter(col(r, 1) for r in login_data if col(r, 1))
-    sorted_days = sorted(login_days.items())[-14:]
+    _today = datetime.now(IST).date()
+    sorted_days = [(d, login_days.get(d, 0)) for d in
+                   ((_today - timedelta(days=i)).isoformat() for i in range(13, -1, -1))]
 
     # Browser breakdown (from logins)
     browser_counts = Counter(col(r, LC["br"]) for r in login_data if col(r, LC["br"]))
@@ -6317,7 +6396,31 @@ def _fetch_usage_data(internal: bool = True) -> dict:
         for h in _list_agent_run_titles():
             he = (h["email"] or "").lower()
             if keep(he):
-                title_queue[(he, _canonical_agent_slug(h["slug"] or ""))].append(h["title"] or "")
+                title_queue[(he, _canonical_agent_slug(h["slug"] or ""))].append(
+                    (h.get("at") or "", h["title"] or ""))
+        # A run's title is saved while that run is on screen, so it belongs to the
+        # last run that started before it. Pairing strictly in order (the old
+        # FIFO) let one run with no saved title shift every later title by one.
+        run_times: dict = defaultdict(list)
+        for r in ar_rows:
+            e = col(r, 2)
+            if keep(e):
+                run_times[(e.lower(), _canonical_agent_slug(col(r, 4) or "?"))].append((col(r, 0) or "")[:19])
+        title_for: dict = {}
+        _SKEW = 120   # seconds of clock drift allowed between the two logs
+        for key, titles in title_queue.items():
+            starts = sorted(run_times.get(key, []))
+            for at, title in titles:
+                if not at:
+                    continue
+                try:
+                    at_s = (datetime.strptime(at, "%Y-%m-%d %H:%M:%S")
+                            + timedelta(seconds=_SKEW)).strftime("%Y-%m-%d %H:%M:%S")
+                except ValueError:
+                    continue
+                owner = [t for t in starts if t <= at_s]
+                if owner and (key, owner[-1]) not in title_for:
+                    title_for[(key, owner[-1])] = title
         for r in ar_rows:
             e = col(r, 2)
             if not keep(e):        # external only, non-empty
@@ -6326,8 +6429,7 @@ def _fetch_usage_data(internal: bool = True) -> dict:
             slug = _canonical_agent_slug(col(r, 4) or "?")
             ts = col(r, 0)
             aname = col(r, 5) or agent_meta.get(slug, {}).get("name", slug)
-            q = title_queue.get((el, slug))
-            detail = q.pop(0) if q else ""
+            detail = title_for.get(((el, slug), (ts or "")[:19]), "")
             d = ar_by_email.setdefault(el, {"email": e, "name": col(r, 3),
                                             "total": 0, "agents": {}, "last_run": "", "events": []})
             d["total"] += 1
@@ -6381,6 +6483,7 @@ def _fetch_usage_data(internal: bool = True) -> dict:
         user_activity = sorted(user_map.values(), key=lambda x: x["logins"], reverse=True)
 
     unique_users = len(user_map)   # external adds run-only users → recount
+    views_per_user = round(total_page_views/unique_users, 1) if unique_users else 0
 
     # Full tables, newest first — no cap (return every login and page view).
     login_table = [{"ts": col(r,0), "email": col(r,5), "name": col(r,6),
@@ -7312,9 +7415,11 @@ def _fetch_client_usage(slug, force=False):
         if date:
             t = timeline.setdefault(date, {"p2": 0, "client": 0, "other": 0})
             t[seg] += 1
-        pg = pages.setdefault(url, {"title": title, "url": url, "views": 0, "seconds": 0})
+        pg = pages.setdefault(url, {"title": title, "url": url, "views": 0, "seconds": 0,
+                                    "_viewers": set()})
         pg["views"] += 1
         pg["seconds"] += secs
+        pg["_viewers"].add(email.lower())
         if ts:
             first_activity = min(first_activity, ts) if first_activity else ts
             last_activity = max(last_activity, ts)
@@ -7355,6 +7460,20 @@ def _fetch_client_usage(slug, force=False):
             t = (r[0].strip() if len(r) > 0 else "")
             if e and t and t[:10] in portal_days_by_email.get(e, ()):
                 login_map.setdefault(e, []).append(t)
+    # A staff sign-in that lands on /app or a portal is written to BOTH tabs
+    # read above (see the OAuth callback), a second or two apart; count it once.
+    for e, ts_list in login_map.items():
+        kept = []
+        for t in sorted(ts_list):
+            try:
+                cur = datetime.strptime(t[:19], "%Y-%m-%d %H:%M:%S")
+                if kept and (cur - datetime.strptime(kept[-1][:19], "%Y-%m-%d %H:%M:%S")).total_seconds() <= 60:
+                    continue
+            except ValueError:
+                if t in kept:
+                    continue
+            kept.append(t)
+        login_map[e] = kept
 
     # Agent runs by this portal's users. The 'Agent Runs' tab is global (email +
     # agent slug, no client column), so we scope to the agents configured for THIS
@@ -7438,7 +7557,7 @@ def _fetch_client_usage(slug, force=False):
     top_pages = sorted(pages.values(), key=lambda x: -x["views"])[:12]
     for pg in top_pages:
         pg["duration"] = _fmt_secs(pg["seconds"])
-        pg["viewers"] = len({e["email"] for e in recent if e["kind"] == "view" and e["url"] == pg["url"]})
+        pg["viewers"] = len(pg.pop("_viewers"))
     tl = [{"date": d, "p2": v["p2"], "client": v["client"], "other": v["other"]}
           for d, v in sorted(timeline.items())]
 

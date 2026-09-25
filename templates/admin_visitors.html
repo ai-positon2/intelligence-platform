@@ -304,7 +304,7 @@ var KPI_INFO={
   },
   avg_engaged:{
     title:'Avg engaged time',
-    desc:'Average active (not idle) time per session, vs. average raw time on page — engaged time discounts tabs left open in the background.',
+    desc:'Average active (not idle) time per page view, vs. average raw time on page (each page view capped at 30 minutes, so a tab left open overnight cannot swamp the average).',
     render:function(d){
       var k=d.kpis||{};
       return '<div class="kstats">'+
@@ -321,15 +321,15 @@ var KPI_INFO={
       var sf=d.signup_funnel||{};var k=d.kpis||{};
       return '<div class="kstats"><div class="kstat"><b>'+(k.signup_cvr||0)+'%</b><span>Click → sign-in</span></div></div>'+
         '<div class="ksect"><h4>Sign-up funnel</h4><div class="funnel" style="margin-top:2px">'+
-          '<div class="step"><b>'+(sf.clicked||0)+'</b><span>Clicked Sign up</span></div>'+
-          '<div class="step win"><b>'+(sf.signed_in||0)+'</b><span>Signed in</span></div>'+
+          '<div class="step"><b>'+(sf.clicked||0)+'</b><span>Visitors who clicked Sign up</span></div>'+
+          '<div class="step win"><b>'+(sf.signed_in||0)+'</b><span>Then signed in</span></div>'+
         '</div></div>'+
         '<div class="ksect"><h4>All CTA clicks by type</h4>'+miniBars(d.cta_groups)+'</div>';
     }
   },
   conversions:{
     title:'Lead requests',
-    desc:'Visitors who submitted the contact / lead form — the contextual "Talk to us", custom-agent, report and DPA requests — as a share of all visitors. The funnel below shows where people drop off before submitting.',
+    desc:'Contact-form requests received (every row in Demo Requests, including ones from browsers this tracker cannot see), as a share of tracked visitors. The funnel below counts only tracked sessions, so its Submitted figure can be lower.',
     render:function(d){
       var f=d.form_funnel||{};
       return '<div class="ksect"><h4>Lead-form funnel</h4><div class="funnel" style="margin-top:2px">'+
@@ -364,7 +364,7 @@ var KPI_INFO={
   },
   companies:{
     title:'Companies seen',
-    desc:'Distinct companies detected across all visitors via reverse-IP lookup on their network address — broader than "Identified visitors", which requires a name too.',
+    desc:'Distinct companies detected via reverse-IP lookup across the 500 most active visitors (plus any named identity). Broader than "Identified visitors", which requires a name too.',
     render:function(d){return '<div class="ksect"><h4>All companies</h4>'+miniBars(d.top_companies)+'</div>';}
   }
 };
@@ -525,8 +525,8 @@ function load(force){
     // sign-up funnel (primary CTA → Google sign-in)
     var sf=d.signup_funnel||{};
     document.getElementById('signupFunnel').innerHTML=
-      '<div class="step"><b>'+(sf.clicked||0)+'</b><span>Clicked Sign up</span></div>'+
-      '<div class="step win"><b>'+(sf.signed_in||0)+'</b><span>Signed in</span></div>';
+      '<div class="step"><b>'+(sf.clicked||0)+'</b><span>Visitors who clicked Sign up</span></div>'+
+      '<div class="step win"><b>'+(sf.signed_in||0)+'</b><span>Then signed in</span></div>';
     document.getElementById('signupNote').innerHTML=
       'Primary CTA across the marketing pages. <b>'+(k.signup_cvr||0)+'%</b> of Sign-up clickers went on to sign in with Google.';
     // cwv

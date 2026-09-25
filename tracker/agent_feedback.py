@@ -232,13 +232,22 @@ def summary(days: int = 30, agent_slug: str | None = None) -> list[dict[str, Any
             where += " AND agent_slug = %s"
             params.append(agent_slug)
         with conn.cursor() as cur:
+            # Every tap inserts a row, so counting rows counted a changed mind
+            # (up, then down) as one of each and a double-tap twice. Count each
+            # person's LATEST vote per section of a run instead.
             cur.execute("""
                 SELECT agent_slug, section_key,
                        MAX(section_label) FILTER (WHERE section_label IS NOT NULL) AS section_label,
                        COUNT(*) FILTER (WHERE rating = 'up') AS up,
                        COUNT(*) FILTER (WHERE rating = 'down') AS down
-                FROM agent_feedback
-                """ + where + """
+                FROM (
+                    SELECT DISTINCT ON (email, agent_slug, COALESCE(run_id, ''), section_key)
+                           agent_slug, section_key, section_label, rating
+                    FROM agent_feedback
+                    """ + where + """
+                    ORDER BY email, agent_slug, COALESCE(run_id, ''), section_key,
+                             created_at DESC, id DESC
+                ) latest
                 GROUP BY agent_slug, section_key
                 ORDER BY down DESC, up DESC
             """, params)
