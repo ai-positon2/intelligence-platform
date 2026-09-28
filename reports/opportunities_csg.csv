@@ -1,26 +1,33 @@
 rank,company,domain,industry,total_score,signal_types,top_signal,top_signal_date
-1,Fujitsu,fujitsu.com,Technology,63.5,Partnership + Product Launch,"Palantir and Fujitsu Deepen Partnership to Advance Enterprise AI Transformation , with Fujitsu Strengthening as a Global",2026-09-10
-2,Apple Inc.,apple.com,Technology,43.2,News Mention + Product Launch,Apple unveils first foldable iPhone at first Ternus keynote,2026-09-12
-3,"Samsung Electronics Co., Ltd.",samsung.com,Technology,42.0,Product Launch,Samsung launches its first credit card in the U . S . -- A mobile wallet experience that turns everyday spending into ca,2026-07-20
-4,Xiaomi Technology,mi.com,Technology,34.8,News Mention + Product Launch,A New chapter for Xiaomi EV : Xiaomi unveils Xiaomi Kunlun Technical Architecture and Debuts Xiaomi SkyNomad Series,2026-08-03
-5,"LG Electronics, Inc.",lge.com,Technology,30.0,Partnership + Product Launch,LG ELECTRONICS ACCELERATES ROBOTICS COLLABORATION WITH NVIDIA,2026-08-18
-6,Corsair,corsair.com,Technology,28.0,Product Launch,Corsair Launches TC80 Gaming Chair for $199 . 99 After Passing Over 30 Durability Tests,2026-09-09
-7,Emdoor,emdoor.com,Technology,21.0,Product Launch,Emdoor Launches  Ailyn  AI Hub at WAIC 2026 : Unifying Intelligence Across Every Device,2026-07-19
-8,Sony Electronics,sony.com,Technology,21.0,Product Launch,"Sony Electronics Launches the FX5 , a Cinema Line Camera with a Newly Developed Image Sensor , Open Gate Recording , Int",2026-07-25
-9,Dell Technologies,dell.com,Technology,20.5,News Mention + Partnership,2026 - 07 - 24 | Texas A & M Engineering Experiment Station Selects Dell Technologies to Build a Secure AI Platform for ,2026-07-24
-10,Sony Group Corporation,sony.com,Technology,20.0,Partnership + Product Launch,Anaqua Renews Partnership with Sony to Advance IP Innovation,2026-07-08
-11,Lava International,lavamobiles.com,Technology,14.0,Product Launch,"Lava Smart 4 with 6 . 56 ″ display , 5000mAh battery launched",2026-08-10
-12,CyberPowerPC,cyberpowerpc.com,Technology,10.5,Partnership,CyberPowerPC to power Fnatic events and bootcamps throughout 2026,2026-09-04
-13,ASRock,asrock.com,Technology,10.5,Product Launch,ASRock Continues Expanding AM4 Lineup By Launching Budget B550M Pro - A WiFi 6E Motherboard,2026-08-30
-14,Grundig,grundig.com,Technology,10.5,Partnership,"Grundig Unveils New Product Lineup at IFA 2026 , Marking a New Phase in Strategic Partnership",2026-09-04
-15,Foxconn,foxconn.com,Technology,7.0,Product Launch,"Mitsubishi ASX VR - e revealed – Foxconn - made EV with 407 PS , 516 km NEDC launching in Australia Q4 2026",2026-08-10
-16,Sapphire Technology,sapphiretech.com,Technology,7.0,Product Launch,SAPPHIRE Technology Unveils EDGE+ RAVE2 MAX to Scale Physical AI Compute Portfolio – Hartware,2026-07-28
-17,Basler AG,baslerweb.com,Technology,7.0,Product Launch,Basler Introduces Compact 3D Stereo Camera System for Robotics and Logistics,2026-07-29
-18,Compal Electronics,compal.com,Technology,7.0,Product Launch,"Compal Electronics : Compal Unveils Daxi AI Server Manufacturing Center to Boost Global Production Capacity , ETTelecom",2026-08-12
-19,Kontron,kontron.com,Technology,7.0,Product Launch,Kontron Launches Production of 5G Modules in Düsseldorf - Telecom / Wireless / VoIP / IPTV - Kontron – Member of the S &,2026-07-14
-20,Brother Industries,brother.com,Technology,7.0,Product Launch,BROTHER INTRODUCES GTX300 DIRECT - TO - GARMENT AND DIRECT - TO - FILM HYBRID PRINTER FOR APPAREL DECORATORS,2026-07-17
-21,Hamilton Beach Brands Holding Company,hamiltonbeach.com,Technology,7.0,Product Launch,"Hamilton Beach Brands ( NYSE : HBB ) Releases Earnings Results , Beats Estimates By $2 . 33 EPS",2026-08-06
-22,zSpace,zspace.com,Technology,3.6,News Mention,zSpace Expands Immersive Learning with New Studio Capabilities and ScholarLab Biology Simulations Ahead of ISTELive 2026,2026-06-25
-23,Clevo,clevo.com.tw,Technology,1.8,News Mention,Clevo Books to Rebrand as a Maker Marketplace,2026-08-20
-24,Quanta Computer,quantatw.com,Technology,1.8,News Mention,Quanta raises 2026 capex to NT$40B as AI visibility runs to 2028,2026-08-13
-25,Supermicro,supermicro.com,Technology,1.8,News Mention,"Fortune Tech : Anthropic IPO , Trump digs data centers , SuperMicro investigation",2026-08-21
+1,Lava International,lavamobiles.com,Technology,94.5,Product Launch,"Lava launches Virat Curve 5G at ₹23 , 999 , launch price ₹19 , 999",2026-09-21
+2,Fujitsu,fujitsu.com,Technology,63.5,Partnership + Product Launch,"Palantir and Fujitsu Deepen Partnership to Advance Enterprise AI Transformation , with Fujitsu Strengthening as a Global",2026-09-10
+3,Sony Group Corporation,sony.com,Technology,60.5,Partnership + Product Launch,Sony Electronics Introduces Its First Fisheye Zoom G Lens,2026-09-08
+4,Apple Inc.,apple.com,Technology,60.2,News Mention + Product Launch,"Meta launches $1 , 299 VR glasses - style headset to take on Apple Vision Pro",2026-09-24
+5,Realme,realme.com,Technology,44.0,Partnership + Product Launch,"Realme 16 Pro Harry Potter Edition launches in Malaysia for RM2 , 699",2026-09-24
+6,"Samsung Electronics Co., Ltd.",samsung.com,Technology,42.0,Product Launch,Samsung launches its first credit card in the U . S . -- A mobile wallet experience that turns everyday spending into ca,2026-07-20
+7,Xiaomi Technology,mi.com,Technology,34.8,News Mention + Product Launch,A New chapter for Xiaomi EV : Xiaomi unveils Xiaomi Kunlun Technical Architecture and Debuts Xiaomi SkyNomad Series,2026-08-03
+8,"LG Electronics, Inc.",lge.com,Technology,30.0,Partnership + Product Launch,LG ELECTRONICS ACCELERATES ROBOTICS COLLABORATION WITH NVIDIA,2026-08-18
+9,Corsair,corsair.com,Technology,28.0,Product Launch,Corsair Launches TC80 Gaming Chair for $199 . 99 After Passing Over 30 Durability Tests,2026-09-09
+10,Logitech,logitech.com,Technology,28.0,Product Launch,Logitech G unveils new Pro X3 Superstrike mouse and more,2026-09-24
+11,Samsung Electronics,samsung.com,Technology,28.0,Product Launch,Samsung Galaxy S26 FE Launch : The  Fan Edition  – Capital FM Kenya,2026-09-28
+12,Dell Technologies,dell.com,Technology,20.5,News Mention + Partnership,2026 - 07 - 24 | Texas A & M Engineering Experiment Station Selects Dell Technologies to Build a Secure AI Platform for ,2026-07-24
+13,Emdoor,emdoor.com,Technology,14.0,Product Launch,Emdoor Launches  Ailyn  AI Hub at WAIC 2026 : Unifying Intelligence Across Every Device,2026-07-19
+14,Sony Electronics,sony.com,Technology,14.0,Product Launch,"Sony Electronics Launches the FX5 , a Cinema Line Camera with a Newly Developed Image Sensor , Open Gate Recording , Int",2026-07-25
+15,Durabook,durabook.com,Technology,14.0,Product Launch,Durabook launches a workstation laptop with three real screens - Z14I - DX3 is a rugged mobile device featuring a trio o,2026-09-25
+16,Gradiente,gradiente.com.br,Technology,14.0,Product Launch,"Major Push for the Orange Economy : Gradiente Infotainment Unveils ₹5 , 000 Crore Mega Investment Roadmap",2026-08-05
+17,Samsung,samsung.com,Technology,14.0,Product Launch,Samsung Galaxy S26 FE Launch : The  Fan Edition  – Capital FM Kenya,2026-09-28
+18,CyberPowerPC,cyberpowerpc.com,Technology,10.5,Partnership,CyberPowerPC to power Fnatic events and bootcamps throughout 2026,2026-09-04
+19,ASRock,asrock.com,Technology,10.5,Product Launch,ASRock Continues Expanding AM4 Lineup By Launching Budget B550M Pro - A WiFi 6E Motherboard,2026-08-30
+20,Grundig,grundig.com,Technology,10.5,Partnership,"Grundig Unveils New Product Lineup at IFA 2026 , Marking a New Phase in Strategic Partnership",2026-09-04
+21,Hyundai Technology,hyundaitechnology.com,Technology,10.5,Partnership,Hyundai Rotem partnership drives rail upgrade,2026-08-29
+22,Foxconn,foxconn.com,Technology,7.0,Product Launch,"Mitsubishi ASX VR - e revealed – Foxconn - made EV with 407 PS , 516 km NEDC launching in Australia Q4 2026",2026-08-10
+23,Sapphire Technology,sapphiretech.com,Technology,7.0,Product Launch,SAPPHIRE Technology Unveils EDGE+ RAVE2 MAX to Scale Physical AI Compute Portfolio – Hartware,2026-07-28
+24,Basler AG,baslerweb.com,Technology,7.0,Product Launch,Basler Introduces Compact 3D Stereo Camera System for Robotics and Logistics,2026-07-29
+25,Compal Electronics,compal.com,Technology,7.0,Product Launch,"Compal Electronics : Compal Unveils Daxi AI Server Manufacturing Center to Boost Global Production Capacity , ETTelecom",2026-08-12
+26,Kontron,kontron.com,Technology,7.0,Product Launch,Kontron Launches Production of 5G Modules in Düsseldorf - Telecom / Wireless / VoIP / IPTV - Kontron – Member of the S &,2026-07-14
+27,Brother Industries,brother.com,Technology,7.0,Product Launch,BROTHER INTRODUCES GTX300 DIRECT - TO - GARMENT AND DIRECT - TO - FILM HYBRID PRINTER FOR APPAREL DECORATORS,2026-07-17
+28,Hamilton Beach Brands Holding Company,hamiltonbeach.com,Technology,7.0,Product Launch,"Hamilton Beach Brands ( NYSE : HBB ) Releases Earnings Results , Beats Estimates By $2 . 33 EPS",2026-08-06
+29,Optima,optima.es,Technology,3.6,News Mention,Greece Optima Bank plans capital raise following regulator pressure,2026-09-25
+30,Clevo,clevo.com.tw,Technology,1.8,News Mention,Clevo Books to Rebrand as a Maker Marketplace,2026-08-20
+31,Quanta Computer,quantatw.com,Technology,1.8,News Mention,Quanta raises 2026 capex to NT$40B as AI visibility runs to 2028,2026-08-13
+32,Supermicro,supermicro.com,Technology,1.8,News Mention,"Fortune Tech : Anthropic IPO , Trump digs data centers , SuperMicro investigation",2026-08-21
