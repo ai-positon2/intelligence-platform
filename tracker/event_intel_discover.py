@@ -1055,10 +1055,10 @@ def propose_category(category: str, profile: dict) -> dict:
 
     budget = bool(res.get("budget_spent"))
 
-    def _out(status, proposals, note, detail):
+    def _out(status, proposals, note, detail, error_kind=None):
         return {"category": category, "status": status, "proposals": proposals,
                 "note": note, "detail": detail, "budget_spent": budget,
-                "spend": spend}
+                "spend": spend, "error_kind": error_kind}
 
     if res.get("error"):
         err = res["error"]
@@ -1076,7 +1076,7 @@ def propose_category(category: str, profile: dict) -> dict:
                        "(%s: %s)", category, err["kind"], err["detail"])
         return _out(STATUS_ERROR, [], "",
                     "The search for this category could not be completed: %s."
-                    % claude_websearch.reader_reason(err))
+                    % claude_websearch.reader_reason(err), err["kind"])
 
     # The same refusal event_intel_recover applies to a recovered roster, for
     # the same reason and with more at stake: a reply that ran no search is a
@@ -1400,6 +1400,7 @@ def search_category(category: str, profile: dict) -> dict:
     found = propose_category(category, profile)
     proposals = found["proposals"]
     base = {"category": category, "note": found["note"],
+            "error_kind": found.get("error_kind"),
             "proposed": len(proposals), "rejected": [],
             "budget_spent": found.get("budget_spent", False),
             "spend": found.get("spend") or claude_websearch.spend_sum()}
@@ -1508,6 +1509,7 @@ def discover(profile: dict) -> dict:
             by_category[cat] = r["events"]
             statuses[cat] = {"status": r["status"], "note": r["note"],
                              "detail": r["detail"],
+                             "error_kind": r.get("error_kind"),
                              "label": rubric.CATEGORY_LABELS[cat],
                              "found": len(r["events"]),
                              # Whether the finder ran out of the searches it

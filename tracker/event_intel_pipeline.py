@@ -269,9 +269,19 @@ def _run_recommend(run_id: int, email: str, profile: dict) -> None:
     checkpoint('discover', found.get('spend'))
 
     if not found["candidates"]:
+        failed_kinds = {s.get('error_kind') for s in found['statuses'].values()
+                        if s.get('status') == event_intel_discover.STATUS_ERROR}
+        error = None
+        if found['categories_failed']:
+            error = ("This account had used its event research allowance for "
+                     "the last 24 hours, so the search did not run. The "
+                     "allowance frees up as earlier runs' calls pass 24 hours "
+                     "old; start the run again then."
+                     if failed_kinds == {event_intel_discover.claude_websearch.ERR_ACCOUNT_BUDGET}
+                     else "Event research could not be completed.")
         store.update_run(
             run_id, status="failed" if found['categories_failed'] else "complete", stage="done",
-            error="Event research could not be completed." if found['categories_failed'] else None,
+            error=error,
             summary={"mode": "recommend",
                      "completion_state": ("failed" if found['categories_failed'] else
                                           "partial" if any(s.get('status') == 'partial' for s in found['statuses'].values()) else "complete"),

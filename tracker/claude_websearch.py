@@ -59,6 +59,12 @@ ERR_UNPARSABLE = "unparsable"
 # is the tool failing, and it must never be reported as "we looked and found
 # nothing".
 ERR_SEARCH_LIMIT = "search_limit"
+# The worker's own guards refusing a call before it was made (see
+# event_intel_jobs.reserve_call). Three different things, and a reader needs
+# to know which: a spent allowance is fixed by waiting, the other two are not.
+ERR_ACCOUNT_BUDGET = "account_budget"
+ERR_RUN_STOPPED = "run_stopped"
+ERR_UNRECONCILED = "unreconciled_call"
 
 # Error codes that mean the search DID NOT RUN, as opposed to running and
 # matching nothing. `too_many_requests` is rate limiting and `unavailable` is
@@ -248,6 +254,11 @@ READER_REASON = {
     ERR_UNPARSABLE: "the answer came back in a shape that could not be read",
     ERR_SEARCH_LIMIT: "the search tool stopped returning results part-way "
                       "through",
+    ERR_ACCOUNT_BUDGET: "this account had used its research allowance for "
+                        "the last 24 hours, so the search was not run",
+    ERR_RUN_STOPPED: "the run was cancelled or stopped before this search ran",
+    ERR_UNRECONCILED: "an earlier attempt at this search has no recorded "
+                      "outcome and must be checked before it is repeated",
 }
 
 _READER_FALLBACK = "the search could not be completed"
@@ -622,6 +633,16 @@ def extract_json(raw: str, require: str | None = None):
     return None
 
 
+def _limit_kind(message: str) -> str:
+    """Which of reserve_call's refusals this is, from its own fixed wording."""
+    low = message.lower()
+    if 'budget has been reached' in low:
+        return ERR_ACCOUNT_BUDGET
+    if 'unknown outcome' in low:
+        return ERR_UNRECONCILED
+    return ERR_RUN_STOPPED
+
+
 def ask(system: str, user: str, *, max_uses: int = 8, max_tokens: int = 8000,
         timeout: float = 280.0, model: str | None = None):
     """Record and bound event-worker calls; other platform callers are unchanged."""
@@ -635,7 +656,7 @@ def ask(system: str, user: str, *, max_uses: int = 8, max_tokens: int = 8000,
         if reservation['cached'] is not None:
             return reservation['cached']
     except RuntimeError as exc:
-        return {'text':'', 'error':{'kind':'operational_limit','detail':str(exc)}, 'usage':{}}
+        return {'text':'', 'error':{'kind':_limit_kind(str(exc)),'detail':str(exc)}, 'usage':{}}
     result = _ask(system,user,max_uses=max_uses,max_tokens=max_tokens,timeout=timeout,model=model)
     finish_call(reservation['id'],result,int((time.monotonic()-began)*1000))
     return result

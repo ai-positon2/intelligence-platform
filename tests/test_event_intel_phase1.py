@@ -233,3 +233,72 @@ def test_failed_save_rows_are_visible_as_incomplete_not_recommendations():
     assert shown['summary']['selection']['kept'] == []
     assert shown['summary']['selection']['incomplete'][0]['name'] == row['name']
     assert shown['summary']['top_five'] == []
+
+
+# ── a run the account's own research allowance stopped ─────────────────────
+#
+# 2026-09-29, run 14: two earlier runs that day had reserved 4.8M of the
+# account's 5M rolling-24-hour allowance, so the third call of the next run
+# was refused. Every category then read "the search could not be completed",
+# which says a search broke. Nothing broke; the account needed to wait.
+
+def _statuses(kinds):
+    return {'c%d' % i: {'status': 'error', 'error_kind': k, 'detail': 'x'}
+            for i, k in enumerate(kinds)}
+
+
+def _failed_run(monkeypatch, kinds):
+    updates=[]
+    monkeypatch.setattr(P.store,'update_run',lambda rid,**fields:updates.append(fields))
+    monkeypatch.setattr(P.event_intel_discover,'discover',lambda p:dict(
+        candidates=[],shortfall=[],statuses=_statuses(kinds),
+        categories_failed=len(kinds),spend={'calls':2}))
+    P._run_recommend(1,'audit@position2.com',PROFILE)
+    return updates[-1]
+
+
+def test_a_run_stopped_by_the_account_allowance_says_so(monkeypatch):
+    last = _failed_run(monkeypatch, ['account_budget'] * 6)
+    assert last['status'] == 'failed'
+    assert 'research allowance' in last['error'] and '24 hours' in last['error']
+
+
+@pytest.mark.parametrize('kinds', [
+    ['account_budget'] * 5 + ['transport'],
+    ['transport'] * 6,
+    [None] * 6,
+])
+def test_a_run_that_also_failed_for_another_reason_does_not_blame_the_allowance(monkeypatch, kinds):
+    last = _failed_run(monkeypatch, kinds)
+    assert last['error'] == 'Event research could not be completed.'
+
+
+@pytest.mark.parametrize('message,kind,clause', [
+    ('The account event research budget has been reached', 'account_budget', 'research allowance'),
+    ('Event run cancelled or lease lost', 'run_stopped', 'cancelled or stopped'),
+    ('A previous provider call has an unknown outcome; manual reconciliation is required before retry',
+     'unreconciled_call', 'no recorded outcome'),
+])
+def test_each_worker_refusal_reaches_the_reader_as_itself(monkeypatch, message, kind, clause):
+    from tracker import claude_websearch as CW, event_intel_jobs as J
+
+    def refuse(*a, **k):
+        raise RuntimeError(message)
+    monkeypatch.setattr(J, 'reserve_call', refuse)
+    token = J.CURRENT.set({'run_id': 1, 'email': 'a@position2.com', 'token': 't'})
+    try:
+        res = CW.ask('system', 'user', max_uses=1)
+    finally:
+        J.CURRENT.reset(token)
+    assert res['error']['kind'] == kind
+    assert clause in CW.reader_reason(res['error'])
+
+
+def test_the_category_carries_the_refusal_kind_to_the_run(monkeypatch):
+    from tracker import claude_websearch as CW, event_intel_discover as D
+    monkeypatch.setattr(CW, 'ask', lambda *a, **k: {
+        'text': '', 'usage': {}, 'error': {'kind': 'account_budget', 'detail': 'budget'}})
+    found = D.discover(PROFILE)
+    assert found['categories_failed'] == len(R.CATEGORIES)
+    assert {s['error_kind'] for s in found['statuses'].values()} == {'account_budget'}
+    assert all('research allowance' in s['detail'] for s in found['statuses'].values())
