@@ -520,6 +520,15 @@ def strip_citation_markup(text: str) -> str:
     return _CITE_ANY.sub("", _CITE_PAIR.sub(_one, text))
 
 
+def remove_citation_tags(text: str) -> str:
+    """Cite markup deleted outright, with no quotation marks put in its place.
+
+    Only for a second parse attempt on a reply strip_citation_markup could not
+    make into JSON. Where a cite wraps a whole quoted JSON value the curly
+    quotes that function adds replace the straight ones JSON needs."""
+    return _CITE_ANY.sub("", text or "")
+
+
 _EM_EN_DASH = re.compile(r"\s*[\u2013\u2014]\s*")
 
 

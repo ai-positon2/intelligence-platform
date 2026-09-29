@@ -170,6 +170,79 @@ def _structured_support(rows, names, start, end):
     return matches, restrictions
 
 
+# ── the page title as organizer copy ──────────────────────────────────────
+#
+# Real organizer pages often say their dates in a sentence that does not
+# repeat the event's name: us.money2020.com reads "fintech's #1 event in Las
+# Vegas October 18-21, 2026", with "Money20/20 USA" only in the heading. The
+# body rule above correctly refuses that sentence, and Money20/20 USA, the
+# most relevant event a 2026-09-29 Stripe run found, was withheld from
+# scoring for it. The same page's <title> is "Money20/20 USA in Las Vegas |
+# October 18-21, 2026": the organizer naming this page's event and its dates
+# in one line it wrote for exactly that purpose.
+#
+# A title is trusted only in the shape that cannot carry somebody else's
+# dates. The event's name must lead the FIRST segment (nothing before it but
+# a call to action), and the dates must either follow it in that segment
+# with nothing between that introduces another event, or BE the whole
+# second segment. So "CMO Summit at SaaStr Annual | Sept 9-11" admits
+# neither event, and "SaaStr Annual | CMO Summit | Sept 9-11" admits
+# neither, because a title naming two events does not say whose dates
+# those are. Headings are deliberately not used: a summit's own page headed
+# with its name routinely carries only its parent conference's dates.
+
+# A dash between two numbers is a date range ("8 - 10 June 2027"), not a separator.
+_TITLE_SEGMENTS = re.compile(r'\s+[|\u00b7\u2022]\s+|:\s+|(?<!\d)\s+[\u2013\u2014-]\s+|\s+[\u2013\u2014-]\s+(?!\d)')
+_TITLE_LEAD = {'attend', 'join', 'register', 'for', 'welcome', 'to', 'the',
+               'official', 'home', 'us'}
+_TITLE_NEXT = {'in', 'on', 'is', 'returns', 'from', 'will', 'takes', 'taking'}
+_TITLE_FOREIGN = {'at', 'during', 'with', 'alongside', 'within', 'part',
+                  'powered', 'presented', 'by', 'and', 'x'}
+
+
+def _title_owns(segment, names):
+    """The words after the name, if this segment is led by the name."""
+    folded = _fold(segment)
+    for name in names:
+        m = re.search(r'(?<!\w)'+re.escape(name)+r'(?!\w)', folded)
+        if m and set(folded[:m.start()].split()) <= _TITLE_LEAD:
+            return folded[m.end():].split()
+    return None
+
+
+def _title_support(titles, names, start, end):
+    for title in titles or []:
+        segments = [x for x in _TITLE_SEGMENTS.split(title) if x.strip()]
+        if not segments:
+            continue
+        tail = _title_owns(segments[0], names)
+        if tail is None:
+            continue
+        if tail and re.fullmatch(r'20\d{2}', tail[0]):
+            if tail[0] != str(start.year):
+                continue  # "Money20/20 USA 2025" is another edition.
+            tail = tail[1:]
+        months = {m.casefold() for m in list(calendar.month_name) + list(calendar.month_abbr) if m}
+        if tail and not (tail[0] in _TITLE_NEXT or tail[0] in months or tail[0].isdigit()):
+            continue
+        # Between the name and the dates, nothing that introduces another event.
+        head = []
+        for w in tail:
+            if w in months or w.isdigit():
+                break
+            head.append(w)
+        if set(head) & _TITLE_FOREIGN or any(y != str(start.year) for y in re.findall(r'\b20\d{2}\b', ' '.join(head))):
+            continue
+        for pattern in _date_patterns(start, end, title):
+            if pattern.search(segments[0]):
+                return title
+            if len(segments) > 1:
+                rest = pattern.sub('', segments[1])
+                if pattern.search(segments[1]) and not re.search(r'\w', rest):
+                    return title
+    return None
+
+
 def inspect(event, fetcher=None):
     from .event_intel_harvest import fetch_page
     fetcher = fetcher or fetch_page
@@ -247,12 +320,22 @@ def inspect(event, fetcher=None):
                     break
             if check.get('date_excerpt'):
                 break
+        if not check.get('date_excerpt') and not structured:
+            title = _title_support(fetched.get('titles'), names, start, end)
+            if title:
+                supported = True
+                check['title_excerpt'] = title
+                check['title_snapshot'] = source_snapshot(final, title)
+                check['support'] = 'organizer_title_name_and_dates'
     if not supported:
         result['reasons'].append('The named event and its date range could not be found together in readable organizer text; parent-event dates or model claims alone are insufficient.')
     result['reasons'].extend(sorted(set(restrictions)))
     if supported and not result['reasons']:
-        result['support'] = ('organizer_structured_name_and_dates' if any(
-            c.get('structured_event_evidence') for c in result['checks']) else 'literal_name_and_dates_only')
+        # The strongest evidence any page gave, in this order.
+        kinds = {c.get('support') for c in result['checks']}
+        result['support'] = next(k for k in ('organizer_structured_name_and_dates',
+                                             'literal_name_and_dates_only',
+                                             'organizer_title_name_and_dates') if k in kinds)
     result['not_read'] = max(0,len(urls)-MAX_PAGES)
     return result
 

@@ -242,8 +242,9 @@ def fetch_page(url: str) -> dict:
         r.close()
 
     # Relative links resolve against where the document actually came from.
-    from .event_intel_structured import events as structured_events
+    from .event_intel_structured import events as structured_events, titles
     out["structured_events"] = structured_events(markup)
+    out["titles"] = titles(markup)
     text = html_to_linked_text(markup, out["final_url"])
     out["spa"] = client_render_marker(markup)
     if len(text) < _MIN_USEFUL_CHARS:

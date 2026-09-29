@@ -265,3 +265,98 @@ def test_structured_metadata_cannot_clear_visible_access_restriction():
         text='CMO Summit is invite-only.',
         structured_events=[{'name':'CMO Summit','startDate':'2027-05-11','endDate':'2027-05-12'}])
     assert A.inspect(EVENT, lambda _: fetched)['reasons']
+
+
+# ── the organizer's page title ────────────────────────────────────────────
+#
+# Money20/20 USA, 2026-09-29: the body says "fintech's #1 event in Las Vegas
+# October 18-21, 2026" without the name; the title names both.
+
+M2020 = dict(name='Money20/20 USA', website='https://us.money2020.com/',
+             sources=['https://us.money2020.com/'], starts_on='2026-10-18',
+             ends_on='2026-10-21')
+M2020_BODY = "Join 1 in 3 C-Suite leaders at fintech's #1 event in Las Vegas October 18-21, 2026."
+
+
+def test_the_money2020_body_alone_is_still_refused():
+    assert A.inspect(M2020, lambda url: page(M2020_BODY))['reasons']
+
+
+@pytest.mark.parametrize('title', [
+    'Money20/20 USA in Las Vegas | October 18-21, 2026',
+    'Money20/20 USA | October 18-21, 2026',
+    'Money20/20 USA 2026 | Oct 18-21, 2026',
+    'Money20/20 USA, October 18-21, 2026, Las Vegas',
+    'Attend Money20/20 USA - October 18-21, 2026',
+])
+def test_a_title_led_by_the_event_with_its_dates_admits_it(title):
+    result = A.inspect(M2020, lambda url: page(M2020_BODY, titles=[title]))
+    assert result['reasons'] == []
+    assert result['support'] == 'organizer_title_name_and_dates'
+    assert result['checks'][0]['title_excerpt'] == title
+    assert result['checks'][0]['title_snapshot']['text_sha256']
+
+
+@pytest.mark.parametrize('title', [
+    # The parent/summit trap, in every shape a title can take it.
+    'CMO Summit at Money20/20 USA | October 18-21, 2026',
+    'Money20/20 USA | CMO Summit | October 18-21, 2026',
+    'CMO Summit | Money20/20 USA | October 18-21, 2026',
+    'Money20/20 USA at SaaStr Annual | October 18-21, 2026',
+    'Money20/20 USA Women’s Forum | October 18-21, 2026',
+    'Money20/20 USA and Money20/20 Europe | October 18-21, 2026',
+    'Money20/20 USA in Las Vegas with SaaStr Annual October 18-21, 2026',
+    'Money20/20 USA returns alongside Foo Expo | October 18-21, 2026',
+    # Wrong or incomplete dates.
+    'Money20/20 USA | October 18-20, 2026',
+    'Money20/20 USA | October 18-21, 2025',
+    'Money20/20 USA 2025 | October 18-21, 2026',
+    'Money20/20 USA',
+    # Dates that share a segment with something else.
+    'Money20/20 USA | Europe October 18-21, 2026',
+    'Money20/20 Global | October 18-21, 2026',
+])
+def test_a_title_that_could_be_another_events_dates_is_refused(title):
+    result = A.inspect(M2020, lambda url: page(M2020_BODY, titles=[title]))
+    assert result['reasons'], title
+    assert result['support'] == 'unverified'
+
+
+def test_a_title_cannot_rescue_an_unreadable_page():
+    for over in (dict(spa='react', text='Money20/20 USA. JavaScript is disabled.'),
+                 dict(truncated=True), dict(final_url='https://foreign.example/')):
+        fetched = page(over.pop('text', M2020_BODY),
+                       titles=['Money20/20 USA | October 18-21, 2026'], **over)
+        assert A.inspect(M2020, lambda url: fetched)['reasons'], over
+
+
+def test_a_title_does_not_clear_a_restricted_access_page():
+    text = M2020_BODY + ' Registration is closed.'
+    result = A.inspect(M2020, lambda url: page(
+        text, titles=['Money20/20 USA | October 18-21, 2026']))
+    assert result['support'] == 'unverified' and result['reasons']
+
+
+def test_body_evidence_outranks_title_evidence_in_the_label():
+    body = 'Money20/20 USA takes place October 18-21, 2026 in Las Vegas.'
+    result = A.inspect(M2020, lambda url: page(
+        body, titles=['Money20/20 USA | October 18-21, 2026']))
+    assert result['support'] == 'literal_name_and_dates_only'
+
+
+def test_the_fetcher_reads_titles_from_markup():
+    from tracker.event_intel_structured import titles
+    markup = ('<html><head><title>Money20/20 USA in Las Vegas | October 18-21, 2026</title>'
+              '<meta property="og:title" content="Attend Money20/20 in Las Vegas October 18-21, 2026">'
+              '<meta name="twitter:title" content="Money20/20 USA in Las Vegas | October 18-21, 2026">'
+              '</head><body><h1>USA&#39;s #1 Fintech Event</h1></body></html>')
+    assert titles(markup) == ['Money20/20 USA in Las Vegas | October 18-21, 2026',
+                              'Attend Money20/20 in Las Vegas October 18-21, 2026']
+
+
+def test_a_spaced_day_range_in_a_title_is_a_date_not_a_separator():
+    europe = dict(M2020, name='Money20/20 Europe', website='https://europe.money2020.com/',
+                  sources=['https://europe.money2020.com/'], starts_on='2027-06-08', ends_on='2027-06-10')
+    result = A.inspect(europe, lambda url: page('See who attended in 2026.',
+                       titles=['Money20/20 Europe in Amsterdam | 8 - 10 June 2027']))
+    assert result['support'] == 'organizer_title_name_and_dates'

@@ -318,6 +318,21 @@ search I needed did not work", which is a completely different statement."""
 # events, for exactly this reason. Confirmation is the same principle applied
 # one step earlier, and it is allowed to say no.
 
+# The confirm reply's shape. One copy, read by the confirm prompt and by the
+# reformatter below, so the two can never ask for different envelopes.
+_CONFIRM_SCHEMA = """{"confirmed": true|false, "reject_reason": str|null, "facts_complete": \
+true|false, "event": {"name": str, "edition": str|null, "website": str|null, \
+"organizer": str|null, "starts_on": "YYYY-MM-DD"|null, \
+"ends_on": "YYYY-MM-DD"|null, "country": str|null, "city": str|null, \
+"days": int|null, "industry": str|null, "attendees": str|null, \
+"booths": str|null, "audience_note": str|null, "format": \
+"in_person"|"virtual"|"hybrid"|null, "cost_note": str|null, \
+"availability": "open"|"sold_out"|"cancelled"|"unknown", "availability_source": str|null, \
+"organizer_run": true|false, "matchmaking_evidence": str|null, \
+"famous": true|false, "category_fit": str, "confidence": \
+"high"|"medium"|"low", "sources": [str]}}"""
+
+
 _CONFIRM_SYSTEM = """You confirm whether ONE named business event is real, \
 upcoming and worth putting in front of a specific company, and you report \
 what that event publishes about itself.
@@ -383,17 +398,7 @@ is never used to score anything, so do not soften or inflate it.
 `category_fit`. Miscategorised is not the same as useless.
 
 Respond with ONLY a JSON object, no prose before or after:
-{{"confirmed": true|false, "reject_reason": str|null, "facts_complete": \
-true|false, "event": {{"name": str, "edition": str|null, "website": str|null, \
-"organizer": str|null, "starts_on": "YYYY-MM-DD"|null, \
-"ends_on": "YYYY-MM-DD"|null, "country": str|null, "city": str|null, \
-"days": int|null, "industry": str|null, "attendees": str|null, \
-"booths": str|null, "audience_note": str|null, "format": \
-"in_person"|"virtual"|"hybrid"|null, "cost_note": str|null, \
-"availability": "open"|"sold_out"|"cancelled"|"unknown", "availability_source": str|null, \
-"organizer_run": true|false, "matchmaking_evidence": str|null, \
-"famous": true|false, "category_fit": str, "confidence": \
-"high"|"medium"|"low", "sources": [str]}}}}
+{schema}
 
 `availability` must describe this edition, using an organizer URL in `availability_source`. Never assume tickets are available because the event exists.
 
@@ -762,7 +767,7 @@ def confirm_system(proposal: dict, category: str, profile: dict) -> str:
         category_brief=rubric.CATEGORY_BRIEF[category],
         why=(proposal or {}).get("why") or "no reason given",
         website_line=("Their link for it: %s\n" % site) if site else "",
-        max_uses=CONFIRM_MAX_USES,
+        max_uses=CONFIRM_MAX_USES, schema=_CONFIRM_SCHEMA,
         **_prompt_common(profile))
 
 
@@ -1167,6 +1172,102 @@ def _unchecked(name: str, reason: str) -> dict:
             "reason": reason, "facts_complete": False}
 
 
+# ── an answer that was found but not written as JSON ──────────────────────
+#
+# Two of seventeen candidates in the 2026-09-29 run were lost here: six
+# searches run, a normal end_turn, no truncation, and a reply this module
+# could not parse. That is the most expensive way to lose an event, because
+# every search was already paid for and the finding was in the reply.
+#
+# Two recoveries, cheapest first. The inline cite markup is turned into
+# quotation marks before parsing, which is right for prose inside a JSON
+# string and wrong when a cite wraps a whole quoted VALUE: `"attendees":
+# <cite ...>"5,000+"</cite>` becomes `"attendees": “5,000+”`, which is not
+# JSON. So the raw reply is tried again with the tags simply removed.
+#
+# Then one call with NO search asks for the same reply to be restated in
+# the envelope. It cannot add knowledge the searches did not find, and it is
+# not trusted to: every URL it returns must already appear in the reply,
+# and a website it did not get from the reply is dropped, so an event cannot
+# arrive at source admission with a host the searches never saw.
+
+REFORMAT_MAX_TOKENS = 4000
+REFORMAT_INPUT_CHARS = 40000
+
+_REFORMAT_SYSTEM = """You restate ONE research reply about a business event \
+in an exact JSON format. The reply was written by someone who searched the \
+web and read the event's pages. You have no search and no other source.
+
+RULES.
+1. Use only what the reply states. Never add a fact, date, number, name or \
+URL from your own knowledge. A field the reply does not state is null.
+2. `sources`, `website` and `availability_source` may only contain URLs that \
+appear in the reply, copied exactly.
+3. `confirmed` is true only if the reply itself concludes the event is real \
+and has an edition starting in the future. If it concludes otherwise, set \
+`confirmed` false and restate its reason in `reject_reason`. If the reply \
+reaches no conclusion, set `confirmed` false and `facts_complete` false.
+4. Keep quotations the reply attributes to the event's own pages as quotations.
+
+Respond with ONLY a JSON object, no prose before or after:
+""" + _CONFIRM_SCHEMA
+
+
+def _read_confirm(res: dict):
+    """The confirm envelope as written, else as written minus cite tags."""
+    parsed = claude_websearch.extract_json(res.get("text") or "",
+                                           require="confirmed")
+    if isinstance(parsed, dict):
+        return parsed
+    raw = res.get("raw") or ""
+    if raw and raw != res.get("text"):
+        parsed = claude_websearch.extract_json(
+            claude_websearch.remove_citation_tags(raw), require="confirmed")
+        if isinstance(parsed, dict):
+            return parsed
+    return None
+
+
+_URL = re.compile(r"https?://[^\s\"'<>\]\)]+", re.I)
+
+
+def _url_key(url) -> str:
+    return str(url or "").strip().rstrip(".,;:").rstrip("/").lower()
+
+
+def _reformat_confirm(reply: str):
+    """(parsed envelope or None, the reformat call's result or None)."""
+    if not reply.strip():
+        return None, None
+    fixed = _ask(_REFORMAT_SYSTEM,
+                 "THE REPLY:\n" + reply[:REFORMAT_INPUT_CHARS],
+                 max_uses=0, max_tokens=REFORMAT_MAX_TOKENS)
+    if fixed.get("error"):
+        logger.warning("event_intel_discover: confirm reformat failed (%s)",
+                       fixed["error"].get("kind"))
+        return None, fixed
+    parsed = claude_websearch.extract_json(fixed.get("text") or "",
+                                           require="confirmed")
+    if not isinstance(parsed, dict):
+        return None, fixed
+    found = _URL.findall(reply)
+    seen = {_url_key(u) for u in found}
+    hosts = {host_key(u) for u in found} - {""}
+    event = parsed.get("event")
+    if isinstance(event, dict):
+        event["sources"] = [u for u in (event.get("sources") or [])
+                            if isinstance(u, str) and _url_key(u) in seen]
+        if _url_key(event.get("availability_source")) not in seen:
+            event["availability_source"] = None
+        # The website is an identity, not a citation: its HOST is what source
+        # admission reads, so that is what must have come from the searches.
+        if host_key(event.get("website")) not in hosts:
+            event["website"] = None
+    logger.info("event_intel_discover: confirm reply recovered by reformat "
+                "(confirmed=%s)", parsed.get("confirmed"))
+    return parsed, fixed
+
+
 def confirm_event(proposal: dict, category: str, profile: dict) -> dict:
     """Stage two, plus what it cost.
 
@@ -1226,13 +1327,23 @@ def _confirm_event(proposal: dict, category: str, profile: dict,
                                 "search being run, so this event was recalled "
                                 "rather than confirmed.")
 
-    parsed = claude_websearch.extract_json(res.get("text") or "",
-                                           require="confirmed")
+    parsed = _read_confirm(res)
     if not isinstance(parsed, dict):
+        # Logged, never returned: the reply is the model's own prose. Head and
+        # tail both, because the two live failures (2026-09-29, run 12) ended
+        # normally with no truncation and the reply itself was the only
+        # evidence of why, and it was not being kept anywhere readable.
+        reply = res.get("raw") or res.get("text") or ""
         logger.warning("event_intel_discover: unparsable confirm reply for %r "
-                       "(blocks=%s, stop=%s)", name[:80],
-                       res.get("text_block_count"), res.get("stop_reason"))
-        return _unchecked(name, "The check ran but its answer could not be read.")
+                       "(blocks=%s, stop=%s, chars=%s, head=%r, tail=%r)",
+                       name[:80], res.get("text_block_count"),
+                       res.get("stop_reason"), len(reply), reply[:600],
+                       reply[-600:])
+        parsed, fixed = _reformat_confirm(reply)
+        box["spend"] = claude_websearch.spend_sum(
+            box["spend"], claude_websearch.spend_of(fixed))
+        if not isinstance(parsed, dict):
+            return _unchecked(name, "The check ran but its answer could not be read.")
 
     facts_complete = parsed.get("facts_complete") is True
 

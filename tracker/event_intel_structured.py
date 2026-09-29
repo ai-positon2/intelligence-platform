@@ -51,3 +51,46 @@ def events(markup):
                 if key in node:
                     pending.append(node[key])
     return found[:50]
+
+
+class _Titles(HTMLParser):
+    """The document <title> and its og:/twitter: title twins, nothing else."""
+    META = ('og:title', 'twitter:title')
+
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.in_title = False
+        self.parts = []
+        self.found = []
+
+    def handle_starttag(self, tag, attrs):
+        a = dict(attrs)
+        if tag == 'title' and not self.parts:
+            self.in_title = True
+        elif tag == 'meta' and (a.get('property') or a.get('name') or '').lower() in self.META:
+            self.found.append(a.get('content') or '')
+
+    def handle_data(self, data):
+        if self.in_title:
+            self.parts.append(data)
+
+    def handle_endtag(self, tag):
+        if tag == 'title' and self.in_title:
+            self.in_title = False
+            self.found.insert(0, ''.join(self.parts))
+
+
+def titles(markup):
+    """Up to three distinct page titles as the organizer wrote them."""
+    parser = _Titles()
+    try:
+        parser.feed(markup)
+        parser.close()
+    except Exception:
+        pass
+    out = []
+    for t in parser.found:
+        t = ' '.join(str(t).split())[:300]
+        if t and t not in out:
+            out.append(t)
+    return out[:3]

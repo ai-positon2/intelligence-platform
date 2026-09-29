@@ -1449,3 +1449,144 @@ def test_both_prompts_that_are_sent_carry_todays_date(monkeypatch):
     assert len(sent) == 2
     for system in sent:
         assert today in system
+
+
+# ── a confirm reply that found the event but was not written as JSON ─────
+#
+# 2026-09-29, run 12: two of seventeen candidates were lost after six paid
+# searches each, with a normal end_turn and no truncation, because the reply
+# could not be parsed.
+
+def _confirm_calls(monkeypatch, confirm_raw, confirm_text=None, reformat=None,
+                   reformat_error=None):
+    calls = []
+
+    def fake_ask(system, user, **kw):
+        if "You restate ONE research reply" in system:
+            calls.append(("reformat", kw, user))
+            return {"text": reformat or "", "raw": reformat or "",
+                    "error": reformat_error, "stop_reason": "end_turn",
+                    "text_block_count": 1, "tool_version": None,
+                    "tool_errors": [], "search_count": 0, "budget_spent": False,
+                    "usage": {"input_tokens": 700, "output_tokens": 300}}
+        calls.append(("confirm", kw, user))
+        return {"text": confirm_text if confirm_text is not None else confirm_raw,
+                "raw": confirm_raw, "error": None, "stop_reason": "end_turn",
+                "text_block_count": 3, "tool_version": "v", "tool_errors": [],
+                "search_count": 6, "budget_spent": False,
+                "usage": {"input_tokens": 50000, "output_tokens": 4000}}
+
+    monkeypatch.setattr(claude_websearch, "ask", fake_ask)
+    return calls
+
+
+def _proposal():
+    return {"name": "Real Event", "website": "https://example.com", "why": "w"}
+
+
+def test_a_cite_wrapping_a_quoted_value_is_parsed_without_another_call(monkeypatch):
+    ev = _named()
+    body = _confirm_reply(ev).replace('"confidence": "high"',
+                                      '"confidence": <cite index="1-2">"high"</cite>')
+    calls = _confirm_calls(monkeypatch, body,
+                           confirm_text=claude_websearch.strip_citation_markup(body))
+    out = D.confirm_event(_proposal(), R.CAT_VERTICAL_SUMMIT, PROFILE)
+    assert out["kind"] == D.CONFIRM_OK, out
+    assert [c[0] for c in calls] == ["confirm"]
+
+
+def test_a_prose_reply_is_restated_by_a_call_that_cannot_search(monkeypatch):
+    ev = _named()
+    prose = ("I confirmed Real Event. Its site https://example.com/e says it runs %s to %s "
+             "in the USA. Registration: https://example.com/register." % (ev["starts_on"], ev["ends_on"]))
+    restated = dict(ev, sources=["https://example.com/e", "https://invented.example/x"],
+                    availability="open", availability_source="https://example.com/register")
+    calls = _confirm_calls(monkeypatch, prose, reformat=_confirm_reply(restated))
+    out = D.confirm_event(_proposal(), R.CAT_VERTICAL_SUMMIT, PROFILE)
+    assert out["kind"] == D.CONFIRM_OK, out
+    assert [c[0] for c in calls] == ["confirm", "reformat"]
+    assert calls[1][1]["max_uses"] == 0
+    assert prose in calls[1][2]
+    # A URL the searched reply never contained cannot arrive via the restatement.
+    assert out["event"]["sources"] == ["https://example.com/e"]
+    assert out["event"]["availability_source"] == "https://example.com/register"
+    # Both calls are paid for, so both are counted.
+    assert out["spend"]["calls"] == 2
+    assert out["spend"]["output_tokens"] == 4300
+
+
+def test_a_restatement_cannot_supply_a_website_the_reply_never_named(monkeypatch):
+    ev = _named(website="https://elsewhere.example")
+    prose = "Real Event is confirmed, see https://example.com/e for its dates."
+    _confirm_calls(monkeypatch, prose, reformat=_confirm_reply(ev))
+    out = D.confirm_event(_proposal(), R.CAT_VERTICAL_SUMMIT, PROFILE)
+    # With its website gone the event has no organizer host to be read from,
+    # so the shared eligibility check holds it back rather than scoring it.
+    assert out["kind"] == D.CONFIRM_UNCHECKED
+    assert out["event"] is None
+
+
+def test_a_restatement_keeps_a_website_on_a_host_the_reply_read(monkeypatch):
+    ev = _named(website="https://example.com")
+    prose = "Real Event is confirmed, see https://example.com/e for its dates."
+    _confirm_calls(monkeypatch, prose, reformat=_confirm_reply(ev))
+    out = D.confirm_event(_proposal(), R.CAT_VERTICAL_SUMMIT, PROFILE)
+    assert out["kind"] == D.CONFIRM_OK, out
+    assert out["event"]["website"] == "https://example.com"
+
+
+def test_a_restatement_whose_every_source_was_invented_is_not_a_confirmation(monkeypatch):
+    ev = _named(sources=["https://invented.example/x"])
+    _confirm_calls(monkeypatch, "Real Event looks real to me.", reformat=_confirm_reply(ev))
+    out = D.confirm_event(_proposal(), R.CAT_VERTICAL_SUMMIT, PROFILE)
+    assert out["kind"] == D.CONFIRM_UNCHECKED
+    assert "without citing a single page" in out["reason"]
+
+
+def test_a_restatement_keeps_a_rejection_a_rejection(monkeypatch):
+    _confirm_calls(monkeypatch, "It was discontinued in 2024.",
+                   reformat=_confirm_reply(None, confirmed=False,
+                                           reject_reason="It has been discontinued."))
+    out = D.confirm_event(_proposal(), R.CAT_VERTICAL_SUMMIT, PROFILE)
+    assert out["kind"] == D.CONFIRM_REJECTED
+    assert out["reason"] == "It has been discontinued."
+
+
+@pytest.mark.parametrize("reformat,error", [
+    ("still not json", None),
+    ("", {"kind": "transport", "detail": "reset"}),
+])
+def test_when_the_restatement_also_fails_the_event_is_reported_unreadable(monkeypatch, reformat, error):
+    calls = _confirm_calls(monkeypatch, "Some prose.", reformat=reformat, reformat_error=error)
+    out = D.confirm_event(_proposal(), R.CAT_VERTICAL_SUMMIT, PROFILE)
+    assert out["kind"] == D.CONFIRM_UNCHECKED
+    assert out["reason"] == "The check ran but its answer could not be read."
+    assert [c[0] for c in calls] == ["confirm", "reformat"]
+    assert out["spend"]["calls"] == 2
+
+
+def test_an_empty_reply_is_not_sent_to_be_restated(monkeypatch):
+    calls = _confirm_calls(monkeypatch, "   ")
+    out = D.confirm_event(_proposal(), R.CAT_VERTICAL_SUMMIT, PROFILE)
+    assert out["kind"] == D.CONFIRM_UNCHECKED
+    assert [c[0] for c in calls] == ["confirm"]
+
+
+def test_the_restatement_asks_for_the_same_envelope_as_the_confirm_prompt():
+    assert D._CONFIRM_SCHEMA in D._REFORMAT_SYSTEM
+    assert D._CONFIRM_SCHEMA in D.confirm_system(_proposal(), R.CAT_EMERGING, PROFILE)
+
+
+def test_the_restatement_filter_itself_drops_every_url_the_reply_never_had(monkeypatch):
+    """Tested at the source rather than through eligibility, which would hide
+    a missing filter behind its own refusal."""
+    reply = "Real Event runs in March; see https://example.com/e and https://example.com/tickets."
+    restated = _confirm_reply(dict(_named(), website="https://elsewhere.example",
+                                   sources=["https://example.com/e", "https://made-up.example/"],
+                                   availability_source="https://elsewhere.example/tickets"))
+    _confirm_calls(monkeypatch, reply, reformat=restated)
+    parsed, fixed = D._reformat_confirm(reply)
+    assert parsed["event"]["website"] is None
+    assert parsed["event"]["availability_source"] is None
+    assert parsed["event"]["sources"] == ["https://example.com/e"]
+    assert fixed["search_count"] == 0
