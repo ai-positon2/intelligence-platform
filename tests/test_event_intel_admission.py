@@ -360,3 +360,100 @@ def test_a_spaced_day_range_in_a_title_is_a_date_not_a_separator():
     result = A.inspect(europe, lambda url: page('See who attended in 2026.',
                        titles=['Money20/20 Europe in Amsterdam | 8 - 10 June 2027']))
     assert result['support'] == 'organizer_title_name_and_dates'
+
+
+# ── the eight held back on 2026-09-29 (run 13) ────────────────────────────
+
+SFF = dict(name='Singapore FinTech Festival', website='https://www.fintechfestival.sg',
+           sources=['https://www.fintechfestival.sg'], starts_on='2026-11-18', ends_on='2026-11-20')
+SFF_ROW = {'name': 'Singapore FinTech Festival 2026', 'startDate': '2026-11-18', 'endDate': '2026-11-20'}
+
+
+@pytest.mark.parametrize('copy', [
+    'The year leads into the invitation-only Insights2040 Annual Meetings, held under Chatham House rules.',
+    'Calendar Tuesday 17th November time 19:00 - 22:00 Marker Jiak Kim House *By invite-only',
+    'Tuesday 17th November 7:00 PM - 10:00 PM Jiak Kim House *By invite-only',
+    # As the real page lays it out: time, venue and note on separate lines.
+    'Tuesday 17th November\n7:00 PM - 10:00 PM\nJiak Kim House\n*By invite-only\nCheck Out the Full Agenda',
+])
+def test_a_restriction_on_a_side_programme_does_not_close_the_festival(copy):
+    result = A.inspect(SFF, lambda url: page(copy, http_status=200, structured_events=[SFF_ROW]))
+    assert result['reasons'] == [], result['reasons']
+    assert result['support'] == 'organizer_structured_name_and_dates'
+    obs = result['checks'][0]['access_observations']
+    assert obs and obs[0]['scope'] in ('named_other_programme', 'timed_session')
+
+
+@pytest.mark.parametrize('copy', [
+    'Singapore FinTech Festival is an invitation-only Executive Summit.',
+    'Singapore FinTech Festival is invitation-only this year.',
+    'The invitation-only Singapore FinTech Festival returns.',
+    'Admission is invitation-only.',
+    'This is an invitation-only gathering of regulators.',
+    'Tuesday 17th November 7:00 PM - 10:00 PM. Registration closed.',
+    'Tuesday 17th November 7:00 PM - 10:00 PM Sold out.',
+    'The festival is sold out.',
+    'Doors open 9:00 - 18:00. Singapore FinTech Festival is invite-only.',
+    'Singapore FinTech Festival 9:00 - 18:00\n*By invite-only',
+    'Registration\n*By invite-only\nCheck Out the Full Agenda',
+    # A pass is the festival's own inventory, not another programme.
+    'Entry is by the invitation-only Delegate Pass.',
+    # The next LINE is a different item, not what the restriction modifies.
+    'Registration\n*By invite-only\nFounders Dinner',
+])
+def test_a_restriction_that_could_be_the_festivals_own_still_blocks(copy):
+    result = A.inspect(SFF, lambda url: page(copy, http_status=200, structured_events=[SFF_ROW]))
+    assert result['reasons'], copy
+
+
+@pytest.mark.parametrize('row_name', [
+    'Fintech Meetup | Leading Fintech Event | Networking & Innovation',
+    'Fintech Meetup, Las Vegas',
+    'Fintech Meetup 2027',
+])
+def test_structured_data_named_with_a_tagline_or_city_is_this_event(row_name):
+    ev = dict(name='Fintech Meetup', website='https://www.fintechmeetup.com/',
+              sources=['https://www.fintechmeetup.com/'], starts_on='2027-02-22', ends_on='2027-02-24')
+    row = {'name': row_name, 'startDate': '2027-02-22', 'endDate': '2027-02-24'}
+    result = A.inspect(ev, lambda url: page('Home', http_status=200, structured_events=[row]))
+    assert result['support'] == 'organizer_structured_name_and_dates', row_name
+
+
+@pytest.mark.parametrize('row_name', [
+    'Fintech Meetup | CMO Summit',
+    'Fintech Meetup: Founders Dinner',
+    'Fintech Meetup at Money20/20',
+    'Fintech Meetup, powered by Foo',
+    'Fintech Meetup | 2026 recap',
+    'Welcome to Fintech Meetup | Leading events',
+    'CMO Summit | Fintech Meetup',
+])
+def test_structured_data_naming_another_gathering_is_not_this_event(row_name):
+    ev = dict(name='Fintech Meetup', website='https://www.fintechmeetup.com/',
+              sources=['https://www.fintechmeetup.com/'], starts_on='2027-02-22', ends_on='2027-02-24')
+    row = {'name': row_name, 'startDate': '2027-02-22', 'endDate': '2027-02-24'}
+    result = A.inspect(ev, lambda url: page('Home', http_status=200, structured_events=[row]))
+    assert result['support'] == 'unverified', row_name
+
+
+NRF = dict(name="NRF 2027: Retail's Big Show", website='https://nrfbigshow.nrf.com',
+           sources=['https://nrfbigshow.nrf.com'], starts_on='2027-01-10', ends_on='2027-01-12')
+
+
+@pytest.mark.parametrize('text', [
+    "Join your retail peers at NRF 2027: Retail’s Big Show in New York City, January 10 – 12, 2027.",
+    "NRF 2027: Retail's Big Show in New York, January 10-12, 2027.",
+])
+def test_a_short_place_between_the_name_and_the_dates_is_allowed(text):
+    result = A.inspect(NRF, lambda url: page(text))
+    assert result['support'] == 'literal_name_and_dates_only', text
+
+
+@pytest.mark.parametrize('text', [
+    "NRF 2027: Retail's Big Show in partnership with Foo Expo, January 10-12, 2027.",
+    "NRF 2027: Retail's Big Show in New York at Foo Week, January 10-12, 2027.",
+    "NRF 2027: Retail's Big Show in the Innovation Conference hall, January 10-12, 2027.",
+    "NRF 2027: Retail's Big Show in a very long list of many words, January 10-12, 2027.",
+])
+def test_anything_more_than_a_place_between_name_and_dates_is_refused(text):
+    assert A.inspect(NRF, lambda url: page(text))['support'] == 'unverified', text

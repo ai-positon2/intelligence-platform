@@ -20,6 +20,16 @@ _RESTRICTED = re.compile(r'\b(?:invite[- ]only|invitation[- ]only|members[- ]onl
                          r'registration (?:is )?closed|cancelled|canceled)\b', re.I)
 
 
+# Words that name a different gathering, or tie this one to another. Either,
+# sitting between an event's name and a date, can hand it someone else's dates.
+_EVENT_WORDS = {'summit', 'conference', 'forum', 'dinner', 'expo', 'festival',
+                'meetup', 'workshop', 'awards', 'show', 'bootcamp', 'breakfast',
+                'lunch', 'reception', 'roundtable', 'retreat', 'meetings',
+                'congress', 'symposium', 'week', 'tour', 'day', 'days'}
+_TIE_WORDS = {'at', 'during', 'with', 'alongside', 'within', 'part', 'powered',
+              'presented', 'by', 'and', 'x', 'partnership', 'association'}
+
+
 def _fold(text):
     text = unicodedata.normalize('NFKC',text).casefold().replace('&',' and ')
     return ' '.join(re.findall(r'\w+',text))
@@ -64,7 +74,60 @@ def _owns_date(prefix, names, year):
         allowed.update(m.casefold() for m in calendar.month_abbr if m)
         if not first or first in allowed or first.isdigit():
             return True
+        # "NRF 2027: Retail's Big Show in New York City, January 10 - 12, 2027".
+        # A short place is all that may stand between name and dates: nothing
+        # naming another gathering, nothing tying this one to it.
+        words = tail.split()
+        if first == 'in' and len(words) <= 5 and not set(words) & (_EVENT_WORDS | _TIE_WORDS):
+            return True
     return False
+
+
+# Spaces only: the words a restriction modifies are on its own line, and the
+# next line's "Check Out the Full Agenda" is not a programme name.
+_MODIFIER = re.compile(r'(?:invite|invitation|members|application)[- ]only[ \t]+'
+                       r'((?:[A-Z0-9][\w\u2019\'-]*[ \t]+){0,5}[A-Z0-9][\w\u2019\'-]*)')
+_CLOCK = re.compile(r'\b\d{1,2}[:.]\d{2}\s*(?:[ap]\.?m\.?)?\s*(?:-|\u2013|\u2014|to)\s*\d{1,2}[:.]\d{2}|'
+                    r'\b\d{1,2}(?::\d{2})?\s*[ap]\.?m\.?\s*(?:-|\u2013|\u2014|to)\s*\d{1,2}(?::\d{2})?\s*[ap]\.?m\b', re.I)
+
+
+def _other_programme(text, match, clause, event_name):
+    """A restriction that plainly belongs to something other than the event.
+
+    Singapore FinTech Festival's own overview page, 2026-09-29: "the
+    invitation-only Insights2040 Annual Meetings" and a 19:00 - 22:00 evening
+    session "*By invite-only", on a site selling general passes. Both were
+    read as the whole festival being closed. Only two shapes are scoped, and
+    anything else stays unresolved for a reviewer:
+
+      * the restriction is a modifier and the named thing it modifies is not
+        this event ("invitation-only Insights2040 Annual Meetings");
+      * the restriction sits in a calendar entry with a clock-time range,
+        which is a session on the agenda, not admission to the event.
+
+    Neither can clear "sold out", "cancelled", "registration closed" or a
+    waitlist: those are about inventory the event itself runs out of."""
+    word = match.group(0).lower()
+    if not re.search(r'only|invitation', word):
+        return None
+    own = _fold(re.sub(r'\s+20\d{2}$', '', event_name or ''))
+    # A sentence that names this event is about this event: "CMO Summit is
+    # an invitation-only Executive Gathering" is the summit being closed.
+    if not own or re.search(r'(?<!\w)'+re.escape(own)+r'(?!\w)', _fold(clause)):
+        return None
+    modified = _MODIFIER.match(text, match.start())
+    if modified:
+        target = _fold(modified.group(1))
+        if (own not in target and target not in own
+                and set(target.split()) & _EVENT_WORDS):
+            return 'named_other_programme'
+    # An agenda entry spans lines (day, time, venue, then the note), so the
+    # session window reads back across line breaks but never past a sentence.
+    entry = re.split(r'[.;!?]', text[max(0, match.start()-120):match.start()])[-1]
+    if _CLOCK.search(entry) and not re.search(
+            r'(?<!\w)'+re.escape(own)+r'(?!\w)', _fold(entry)):
+        return 'timed_session'
+    return None
 
 
 def _access(text, event_name=''):
@@ -89,8 +152,10 @@ def _access(text, event_name=''):
             event_name,re.I))
         scoped = other and general_open and not named_inventory
         excerpt=text[max(0,match.start()-80):match.end()+120]
-        observations.append({'text':excerpt,'scope':'other_inventory' if scoped else 'unresolved_event_access'})
-        if not scoped:
+        scope = 'other_inventory' if scoped else _other_programme(
+            text, match, clause, event_name)
+        observations.append({'text':excerpt,'scope':scope or 'unresolved_event_access'})
+        if not scope:
             blocking.append(excerpt)
     return observations, blocking
 
@@ -144,12 +209,38 @@ def _structured_date(value):
     raise ValueError("Invalid structured date")
 
 
+_STRUCTURED_SEGMENTS = re.compile(r'\s+[|\u2013\u2014\u00b7\u2022-]\s+|:\s+|,\s+')
+
+
+def _structured_name_matches(row_name, names, year):
+    """Is this schema.org Event node THIS event?
+
+    Organizers routinely write the node's name the way they write a page
+    title: "Fintech Meetup | Leading Fintech Event | Networking & Innovation",
+    "Web Summit, Lisbon". The dates on that node are the organizer's own, so
+    the name only has to lead it, and nothing after it may name another
+    gathering ("SaaStr Annual | CMO Summit" is not SaaStr Annual's node) or
+    tie it to one."""
+    if set(_names({'name': row_name}, year)).intersection(names):
+        return True
+    segments = [x for x in _STRUCTURED_SEGMENTS.split(row_name) if x.strip()]
+    if len(segments) < 2 or not set(_names({'name': segments[0]}, year)).intersection(names):
+        return False
+    rest = set(_fold(' '.join(segments[1:])).split())
+    # "and" alone joins words in a tagline ("Networking & Innovation"); it only
+    # ties two gatherings together when one of them is named, which the event
+    # words already catch.
+    if rest & (_EVENT_WORDS | (_TIE_WORDS - {'and'})):
+        return False
+    return not any(y != str(year) for y in re.findall(r'\b20\d{2}\b', ' '.join(segments[1:])))
+
+
 def _structured_support(rows, names, start, end):
     matches, restrictions = [], []
     for row in rows or []:
         if not isinstance(row, dict) or not isinstance(row.get('name'), str):
             continue
-        if not set(_names({'name': row['name']}, start.year)).intersection(names):
+        if not _structured_name_matches(row['name'], names, start.year):
             continue
         try:
             actual_start = _structured_date(row.get('startDate'))
