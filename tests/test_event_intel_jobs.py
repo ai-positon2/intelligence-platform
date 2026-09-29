@@ -74,3 +74,37 @@ def test_a_heartbeat_exception_ends_the_loop_without_raising(monkeypatch):
     thread.start()
     thread.join(timeout=2)
     assert not thread.is_alive()
+
+
+def test_the_worker_closes_orphaned_runs_before_it_starts_claiming(monkeypatch):
+    import sys
+    import pytest
+    order = []
+
+    def stop_loop():
+        order.append("run_once")
+        raise KeyboardInterrupt  # not an Exception, so main()'s loop lets it out
+
+    monkeypatch.setattr(sys, "argv", ["event_intel_jobs"])
+    monkeypatch.setattr(J, "close_orphaned_runs", lambda: order.append("sweep") or [])
+    monkeypatch.setattr(J, "run_once", stop_loop)
+    with pytest.raises(KeyboardInterrupt):
+        J.main()
+    assert order == ["sweep", "run_once"]
+
+
+def test_a_failed_orphan_sweep_does_not_stop_the_worker(monkeypatch):
+    import sys
+    import pytest
+
+    def broken_sweep():
+        raise RuntimeError("database unavailable")
+
+    def stop_loop():
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(sys, "argv", ["event_intel_jobs"])
+    monkeypatch.setattr(J, "close_orphaned_runs", broken_sweep)
+    monkeypatch.setattr(J, "run_once", stop_loop)
+    with pytest.raises(KeyboardInterrupt):
+        J.main()

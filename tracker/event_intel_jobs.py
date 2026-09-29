@@ -222,6 +222,27 @@ def _renew_loop(job, stop):
             return  # The database fences later writes after lease expiry.
 
 
+ORPHAN_ERROR = ('Interrupted. This run started before runs were queued, and the '
+                'process running it stopped before it finished. Start a new run.')
+
+
+def close_orphaned_runs():
+    """Fail runs left 'running' with no queue row, so none spins forever.
+
+    Before the queue, a run lived only in the web process's thread; a deploy
+    or restart killed it mid-flight and nothing ever marked it finished. Every
+    run is now created together with its evi_jobs row in one transaction
+    (start()), so a 'running' run without one can only be one of those. The
+    hour's margin is not needed for that argument; it is there so a future
+    job-less writer cannot have its fresh run closed from under it."""
+    with db() as conn, conn.cursor() as cur:
+        cur.execute("""UPDATE evi_runs r SET status='failed',stage='interrupted',error=%s
+            WHERE r.status='running' AND r.created_at < now() - interval '1 hour'
+            AND NOT EXISTS (SELECT 1 FROM evi_jobs j WHERE j.run_id=r.id) RETURNING r.id""",
+                    (ORPHAN_ERROR,))
+        return [row[0] for row in cur.fetchall()]
+
+
 def run_once():
     """Claim one job; daemon heartbeat never performs the research itself."""
     import threading
@@ -312,7 +333,13 @@ def main():
     if args.migrate:
         with db():
             pass
+        close_orphaned_runs()
         return
+    try:
+        close_orphaned_runs()
+    except Exception:
+        import logging
+        logging.exception('Closing orphaned event runs failed')
     if args.once:
         run_once()
         return

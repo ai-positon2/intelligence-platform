@@ -834,3 +834,43 @@ def test_the_recorded_cost_counts_the_calls_that_were_refused(monkeypatch):
     assert rec["input_tokens"] == 50000 and rec["searches"] == 6
     assert CW.spend_usd(rec) > 0, (
         "a call that failed after six live searches was costed at zero")
+
+
+def test_a_running_run_with_no_queue_row_is_closed_and_nothing_else_is():
+    # Run 2 in production: a thread-era run killed by a deploy on 2026-09-02
+    # still said "running" four weeks later, because nothing but its own dead
+    # thread could ever finish it.
+    from tracker import event_intel_jobs as J
+    email = 'orphan-sweep@position2.com'
+    old_orphan = S.save_run(email, 'discover', 'Thread-era run')
+    fresh_orphan = S.save_run(email, 'lookup', 'Just created')
+    done = S.save_run(email, 'lookup', 'Finished long ago')
+    S.update_run(done, status='complete')
+    queued = J.start(email, 'lookup', 'Queued run', {}, 'orphan-sweep-key')
+    try:
+        _check_orphan_sweep(J, email, old_orphan, fresh_orphan, done, queued)
+    finally:
+        # Left queued, this job is what the next test's worker would claim.
+        J.cancel(queued, email)
+
+
+def _check_orphan_sweep(J, email, old_orphan, fresh_orphan, done, queued):
+    conn = S._pg_conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("UPDATE evi_runs SET created_at = now() - interval '27 days' "
+                        "WHERE id = ANY(%s)", ([old_orphan, done, queued],))
+        conn.commit()
+    finally:
+        conn.close()
+
+    closed = J.close_orphaned_runs()
+
+    assert old_orphan in closed
+    assert not {fresh_orphan, done, queued} & set(closed)
+    old = S.get_run(old_orphan, email)
+    assert (old['status'], old['stage'], old['error']) == ('failed', 'interrupted', J.ORPHAN_ERROR)
+    assert S.get_run(fresh_orphan, email)['status'] == 'running'
+    assert S.get_run(done, email)['status'] == 'complete'
+    assert S.get_run(queued, email)['status'] == 'running'
+    assert old_orphan not in J.close_orphaned_runs()
