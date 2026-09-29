@@ -108,3 +108,18 @@ def test_a_failed_orphan_sweep_does_not_stop_the_worker(monkeypatch):
     monkeypatch.setattr(J, "run_once", stop_loop)
     with pytest.raises(KeyboardInterrupt):
         J.main()
+
+
+
+import pytest
+
+
+@pytest.mark.parametrize('value,expected', [
+    (None, 0), ('', 0), ('0', 0), ('-5', 0), ('lots', 0), ('100', 100), ('5000000', 5000000),
+])
+def test_a_daily_cap_exists_only_when_set_to_a_positive_number(monkeypatch, value, expected):
+    if value is None:
+        monkeypatch.delenv('EVI_DAILY_CALL_LIMIT', raising=False)
+    else:
+        monkeypatch.setenv('EVI_DAILY_CALL_LIMIT', value)
+    assert J._daily_limit('EVI_DAILY_CALL_LIMIT') == expected

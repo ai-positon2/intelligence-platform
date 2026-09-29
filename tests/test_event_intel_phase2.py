@@ -186,6 +186,40 @@ def test_daily_account_budget_blocks_before_another_provider_call(monkeypatch):
 
 
 @sql
+def test_with_no_limit_configured_nothing_caps_an_account(monkeypatch):
+    # 2026-09-29: two full runs (68 calls, 4.8M reserved) used to exhaust the
+    # built-in 100-call / 5M-token defaults. Unset now means no cap at all.
+    monkeypatch.delenv('EVI_DAILY_CALL_LIMIT', raising=False)
+    monkeypatch.delenv('EVI_DAILY_TOKEN_ALLOWANCE', raising=False)
+    rid,email=new_job('unlimited')
+    job=J.claim()
+    token=J.CURRENT.set(job)
+    try:
+        for i in range(101):
+            J.reserve_call('system','call %d' % i,'test-model',100,0)
+        J.reserve_call('system','one huge call','test-model',6000000,0)
+    finally:
+        J.CURRENT.reset(token)
+    J.cancel(rid,email)
+
+
+@sql
+def test_a_configured_token_allowance_is_still_enforced(monkeypatch):
+    monkeypatch.delenv('EVI_DAILY_CALL_LIMIT', raising=False)
+    monkeypatch.setenv('EVI_DAILY_TOKEN_ALLOWANCE','5000')
+    rid,email=new_job('allowance')
+    job=J.claim()
+    token=J.CURRENT.set(job)
+    try:
+        J.reserve_call('system','small','test-model',100,0)
+        with pytest.raises(RuntimeError,match='budget'):
+            J.reserve_call('system','too big','test-model',6000,0)
+    finally:
+        J.CURRENT.reset(token)
+    J.cancel(rid,email)
+
+
+@sql
 def test_catalog_observations_remain_run_owned_and_unverified():
     rid,email=new_job('catalog')
     event={'name':'Forum 2027','starts_on':'2027-04-01','website':'https://forum.example','country':'USA','city':'Boston'}

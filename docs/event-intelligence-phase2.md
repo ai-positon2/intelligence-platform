@@ -46,10 +46,10 @@ The isolated event validation constraints require Python 3.12 or newer. The even
 | `ANTHROPIC_API_KEY` | Required for live research | Configure through the deployment's secret manager. |
 | `ANTHROPIC_MODEL` | Existing platform default retained | Logged on each worker call; validate the chosen model live. |
 | `EVI_MAX_ACTIVE_PER_ACCOUNT` | `2` | Queued plus running jobs per signed-in account. |
-| `EVI_DAILY_CALL_LIMIT` | `100` | Maximum worker model-call reservations in a rolling 24 hours. |
-| `EVI_DAILY_TOKEN_ALLOWANCE` | `5000000` | Operational allowance for input bytes, requested output and a tool-result allowance. |
+| `EVI_DAILY_CALL_LIMIT` | unset (no limit) | Optional. When set to a positive number, the maximum worker model-call reservations per account in a rolling 24 hours. |
+| `EVI_DAILY_TOKEN_ALLOWANCE` | unset (no limit) | Optional. When set to a positive number, the per-account rolling-24-hour allowance for input bytes, requested output and a tool-result allowance. |
 
-These caps may cause a partial result on a broad search. They should be tuned against measured Position2 runs. The allowance is not measured billable tokens; the ledger preserves the provider's actual usage separately. SDK automatic retries are disabled for worker-managed event calls; the rest of the platform retains its previous behavior.
+The two daily caps are off unless set (removed as defaults 2026-09-29: at 5M tokens they allowed about two full recommend runs per account per day). When set, they may cause a partial result on a broad search. The active-run cap stays on by default. The allowance is not measured billable tokens; the ledger preserves the provider's actual usage separately. SDK automatic retries are disabled for worker-managed event calls; the rest of the platform retains its previous behavior.
 
 The ledger accounts for queued event research, including resolution, extraction, recovery, recommendation and qualification calls. Profile-draft requests and separately triggered Apollo enrichment are outside this worker ledger and retain their existing accounting. Account scope is the existing signed-in email, not a newly invented organization/tenant identity.
 

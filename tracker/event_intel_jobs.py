@@ -160,6 +160,21 @@ def stage(name, fn, *args, **kwargs):
         STAGE.reset(marker)
 
 
+def _daily_limit(name):
+    """A rolling-24-hour cap, only when an operator has set one.
+
+    There is no default. The built-in 100 calls / 5M tokens used to apply
+    whenever the variable was absent, which on Railway was always, so two
+    full recommend runs (2026-09-29: 30 + 38 calls, 4.8M reserved) stopped
+    an account's third run after three calls. Unset, empty, zero or
+    unreadable all mean no cap."""
+    try:
+        value = int(os.getenv(name) or 0)
+    except ValueError:
+        return 0
+    return value if value > 0 else 0
+
+
 def reserve_call(system,user,model,max_tokens,max_uses):
     job = CURRENT.get()
     if not job:
@@ -179,10 +194,12 @@ def reserve_call(system,user,model,max_tokens,max_uses):
             if previous[1] is None:
                 raise RuntimeError('A previous provider call has an unknown outcome; manual reconciliation is required before retry')
             return {'id': previous[0], 'cached': previous[1]}
-        cur.execute("SELECT count(*),COALESCE(sum(reserved_tokens),0) FROM evi_provider_calls WHERE email=%s AND created_at>=now()-interval '24 hours'", (job['email'],))
-        calls,tokens = cur.fetchone()
-        if int(calls) >= int(os.getenv('EVI_DAILY_CALL_LIMIT','100')) or int(tokens)+allowance > int(os.getenv('EVI_DAILY_TOKEN_ALLOWANCE','5000000')):
-            raise RuntimeError('The account event research budget has been reached')
+        call_limit, token_limit = _daily_limit('EVI_DAILY_CALL_LIMIT'), _daily_limit('EVI_DAILY_TOKEN_ALLOWANCE')
+        if call_limit or token_limit:
+            cur.execute("SELECT count(*),COALESCE(sum(reserved_tokens),0) FROM evi_provider_calls WHERE email=%s AND created_at>=now()-interval '24 hours'", (job['email'],))
+            calls,tokens = cur.fetchone()
+            if (call_limit and int(calls) >= call_limit) or (token_limit and int(tokens)+allowance > token_limit):
+                raise RuntimeError('The account event research budget has been reached')
         cur.execute('INSERT INTO evi_provider_calls(run_id,email,stage,model,prompt_hash,reserved_tokens,reserved_searches) VALUES (%s,%s,%s,%s,%s,%s,%s) RETURNING id',
                     (job['run_id'],job['email'],STAGE.get(),model,call_hash,allowance,max(0,max_uses)))
         return {'id': cur.fetchone()[0], 'cached': None}
