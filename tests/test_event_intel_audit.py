@@ -178,7 +178,9 @@ def test_the_whole_audit_failing_is_one_error_and_cuts_nobody(monkeypatch):
         for n in ("Dreamforce", "CES")})
     famous = [_c("Dreamforce", True), _c("CES", True)]
     out = A.audit_famous(famous, PROFILE)
-    assert out["error"] and "503" in out["error"]
+    # Reader English now: the transport detail goes to the log, not the report.
+    assert out["error"] and claude_websearch.reader_reason("transport") in out["error"]
+    assert "503" not in out["error"]
     assert out["verdicts"] == {} and len(out["failed"]) == 2
     assert [c["name"] for c in A.apply_audit(famous, out)] == ["Dreamforce", "CES"]
 
@@ -266,7 +268,8 @@ def test_a_non_http_alternative_website_is_dropped(monkeypatch):
 def test_a_failed_audit_is_recorded_rather_than_passed_over(monkeypatch):
     _stub(monkeypatch, error={"kind": "transport", "detail": "HTTP 503"})
     out = A.audit_famous([_c("Dreamforce", famous=True)], PROFILE)
-    assert out["error"] and "503" in out["error"]
+    assert out["error"] and "503" not in out["error"]
+    assert claude_websearch.reader_reason("transport") in out["error"]
     assert out["verdicts"] == {}
 
 
@@ -615,7 +618,8 @@ def test_a_resolver_that_raises_is_reported_rather_than_killing_the_run():
     out = A.promote_alternatives(audit, profile=dict(PROFILE, geo_scope="Global"), candidates= [_c("MarTech Conference", famous=True)],
                                  resolver=_boom)
     assert out["promoted"] == []
-    assert "503" in out["unconfirmed"][0]["why"]
+    assert "lookup failed" in out["unconfirmed"][0]["why"]
+    assert "503" not in out["unconfirmed"][0]["why"]
 
 
 def test_a_cut_with_no_named_alternative_promotes_nothing():
