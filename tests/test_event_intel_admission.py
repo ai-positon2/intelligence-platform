@@ -648,3 +648,35 @@ def test_a_concession_pass_or_a_conditional_question_does_not_close_the_event(te
 def test_anything_else_is_still_a_restriction(text):
     result = A.inspect(HKFW, lambda url: page(text, titles=HKFW_TITLE))
     assert any('restricted' in r for r in result['reasons']), text
+
+
+# ── a header's bare "City, ST" (fintechdevcon.io, 2026-09-30) ──
+
+DEVCON = dict(name='fintech_devcon', website='https://fintechdevcon.io/', sources=[],
+              starts_on='2027-08-02', ends_on='2027-08-04')
+
+
+@pytest.mark.parametrize('text', [
+    'Get your ticket Book your hotel fintech_devcon Boulder, CO August 2-4, 2027 The premier conference',
+    'fintech_devcon 2027 Las Vegas, NV August 2-4, 2027',
+    'fintech_devcon London, UK 2-4 August 2027',
+    'fintech_devcon Salt Lake City, UT August 2-4, 2027',
+    'fintech_devcon Lisbon, Portugal August 2-4, 2027',
+    'Past hosts Denver, CO and Austin, TX fintech_devcon Boulder, CO August 2-4, 2027',
+])
+def test_a_bare_city_and_state_between_name_and_dates_is_allowed(text):
+    assert A.inspect(DEVCON, lambda url: page(text))['support'] == 'literal_name_and_dates_only', text
+
+
+@pytest.mark.parametrize('text', [
+    'fintech_devcon Fall Chicago, IL August 2-4, 2027',           # a season names an edition
+    'fintech_devcon Europe Amsterdam, NL August 2-4, 2027',       # so does a region
+    'fintech_devcon Summit Boulder, CO August 2-4, 2027',         # another gathering
+    'fintech_devcon Money20/20 Las Vegas, NV August 2-4, 2027',   # more than a place
+    'fintech_devcon Presented By Acme, NY August 2-4, 2027',      # a sponsor, not a place
+    'fintech_devcon Boulder Colorado August 2-4, 2027',           # no "City, ST" shape
+    'fintech_devcon Boulder, CO, the dinner August 2-4, 2027',
+    'fintech_devcon Boulder, CO August 3-4, 2027',                # other dates
+])
+def test_anything_but_a_bare_place_is_refused(text):
+    assert A.inspect(DEVCON, lambda url: page(text))['support'] == 'unverified', text

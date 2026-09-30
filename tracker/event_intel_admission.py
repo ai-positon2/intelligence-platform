@@ -30,6 +30,15 @@ _TIE_WORDS = {'at', 'during', 'with', 'alongside', 'within', 'part', 'powered',
               'presented', 'by', 'and', 'x', 'partnership', 'association'}
 
 
+_BARE_PLACE = re.compile(r'([A-Z][a-z]+(?:[ -][A-Z][a-z]+){0,2}),[ \t]*'
+                         r'(?:[A-Z]{2}|[A-Z][a-z]+(?:[ ][A-Z][a-z]+)?)\.?[ \t]*$')
+_EDITION_WORDS = {'spring', 'summer', 'fall', 'autumn', 'winter', 'europe', 'asia',
+                  'africa', 'america', 'americas', 'usa', 'emea', 'apac', 'latam',
+                  'mena', 'middle', 'east', 'west', 'north', 'south', 'central',
+                  'global', 'virtual', 'online', 'digital', 'live', 'world',
+                  'international', 'regional'}
+
+
 def _fold(text):
     text = unicodedata.normalize('NFKC',text).casefold().replace('&',' and ')
     return ' '.join(re.findall(r'\w+',text))
@@ -84,6 +93,13 @@ def _owns_date(prefix, names, year):
         # naming another gathering, nothing tying this one to it.
         words = tail.split()
         if first == 'in' and len(words) <= 5 and not set(words) & (_EVENT_WORDS | _TIE_WORDS):
+            return True
+        # "fintech_devcon Boulder, CO August 2-4, 2027" (fintechdevcon.io,
+        # 2026-09-30): a header's "City, ST" and nothing else. Never a season
+        # or region, which name an edition: "Shoptalk Fall Chicago, IL".
+        place = _BARE_PLACE.search(prefix)
+        if (place and _fold(place.group(0)) == tail
+                and not set(_fold(place.group(1)).split()) & (_EDITION_WORDS | _EVENT_WORDS | _TIE_WORDS)):
             return True
     return False
 
