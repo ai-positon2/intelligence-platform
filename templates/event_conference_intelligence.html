@@ -3333,14 +3333,17 @@
       if (unchecked) {
         html += '<div class="evi-coverage warn"><span class="ic">!</span><span class="tx">' +
           '<b>' + esc(plural(unchecked, 'candidate')) + ' could not be checked ' +
-          'to a conclusion.</b> They remain unverified, not because they were found wanting.</span></div>';
+          'to a conclusion.</b> ' + (unchecked === 1 ? 'It remains' : 'They remain') +
+          ' unverified, not because ' + (unchecked === 1 ? 'it was' : 'they were') +
+          ' found wanting.</span></div>';
       }
       if (unverified.length) {
         html += '<div class="evi-unverified"><h4>Verification unresolved</h4>' +
           unverified.map(function(r){
             return '<div class="rr"><span class="rn">' + esc(r.name) + '</span>' +
               '<span class="rc">' + esc(r.label) + '</span>' +
-              '<span class="rw">' + esc(r.reason) + '</span></div>';
+              '<span class="rw">' + esc(readerText(r.reason,
+                'The check stopped before it reached a conclusion.')) + '</span></div>';
           }).join('') + '</div>';
       }
       if (ruled.length) {
@@ -3418,23 +3421,65 @@
              !REASON_PLUMBING.test(text);
     }
 
-    /* A search that did not finish, whichever way it stopped. `error` is a
-       search that never produced anything usable and `partial` is one that
-       was cut off part-way, and neither is a fact about the client's market.
-       Reading only `error` as a hole put "Nothing here for this client"
-       under a category whose own stored reason said, in our words, that it
-       could not finish searching. */
+    /* One reading of a category's stored result, and every surface reads it:
+       the ring, the bars, the reasons under them, the verdict and the
+       qualifier under the answer. The report used to describe one partial
+       category as "came up short" in its ring and "did not finish" two
+       sections further down, because the ring had its own reading.
+
+       The pipeline writes this as `gap_kind` since it learned to, and the
+       same rules are applied here to runs stored before that (see
+       event_intel_pipeline.category_gap_kind; change both together).
+
+         failed      the search returned nothing usable        a hole
+         unfinished  the search was cut off part-way           a hole
+         budget      searched to the limit it was given        thin
+         unresolved  finished, but some candidates unsettled   thin
+         short       finished, and the market is thin          a finding
+
+       `partial` is two different things. A search that was cut off is a
+       hole. A search that finished and found candidates the confirmation
+       could not settle, or a confirmed event whose attendance figure could
+       not be read, has searched the market to the end, and calling that "did
+       not finish" is what made every production run read as incomplete. */
+    var VERIFICATION_BITS = '\\d+ of the \\d+ candidates? found here could not be ' +
+      'checked to a conclusion \\(.*\\)\\.|\\d+ confirmed events? had published ' +
+      'numbers we could not finish reading\\.';
+    var BUDGET_TAIL = /It also used every one of the \d+ searches allowed for finding events here, so there may be more to find than this search could reach\./g;
+    var GAP_LEVEL = {failed: 'gap', unfinished: 'gap', budget: 'thin',
+                     unresolved: 'thin', short: 'thin', met: 'ok'};
+
+    function gapKind(sf){
+      sf = sf || {};
+      if (GAP_LEVEL[sf.gap_kind]) return sf.gap_kind;
+      var text = String(sf.why || sf.detail || '');
+      if (sf.status !== 'error' && sf.status !== 'partial') {
+        return (sf.short_by != null || sf.quota != null) ? 'short' : 'met';
+      }
+      if (/max_uses_exceeded/i.test(text)) return 'budget';
+      if (sf.status === 'error') return 'failed';
+      var rest = text.replace(BUDGET_TAIL, '');
+      if (new RegExp(VERIFICATION_BITS).test(rest) &&
+          !rest.replace(new RegExp(VERIFICATION_BITS, 'g'), '').replace(/[\s.]+/g, '')) {
+        return 'unresolved';
+      }
+      return 'unfinished';
+    }
+
     function reasonIsGap(sf){
-      return sf.status === 'error' || sf.status === 'partial';
+      return GAP_LEVEL[gapKind(sf)] === 'gap';
     }
 
     function coverageReason(sf){
       var full = cleanReason(sf.why);
       var found = Number(sf.found) || 0;
       var quota = Number(sf.quota) || 0;
-      var level = reasonIsGap(sf) ? 'gap' : 'thin';
+      var kind = gapKind(sf);
+      var level = GAP_LEVEL[kind] === 'gap' ? 'gap' : 'thin';
       var head;
-      if (reasonIsGap(sf)) {
+      if (kind === 'unresolved') {
+        head = 'Searched to the end, but part of what it found could not be checked';
+      } else if (sf.status === 'error' || sf.status === 'partial') {
         head = 'The search did not finish';
         /* A stored reason naming max_uses_exceeded is describing this run's
            own search budget being enforced, which is a complete piece of
@@ -3583,6 +3628,27 @@
         return coverageReason(r).level === 'gap'; })
         .map(function(r){ return r.label || catLabel(r.category); });
       var short = rows.length - failed;
+      /* A short category is a finding only when its search FINISHED. One
+         that spent every search it was allowed, or left candidates nobody
+         could check, is under-searched rather than settled, and the verdict
+         said "an empty category is a fact about this client's market" over
+         both, beside a banner saying the opposite. */
+      var unsettled = rows.filter(function(r){
+        var k = gapKind(r); return k === 'budget' || k === 'unresolved'; })
+        .map(function(r){ return r.label || catLabel(r.category); });
+      var settledNote = !unsettled.length
+        ? ' after a search that finished. A category searched to the end and ' +
+          'still short is a fact about this client&rsquo;s market.'
+        : (unsettled.length === short
+            ? ' after searching, but ' + (short === 1 ? 'its search' : 'each search') +
+              ' either used every search it was allowed or left candidates ' +
+              'unchecked, so ' + (short === 1 ? 'it is' : 'they are') +
+              ' under-searched rather than settled.'
+            : ' after searching. ' + esc(unsettled.join(', ')) + ' used every ' +
+              'search allowed or left candidates unchecked, so ' +
+              (unsettled.length === 1 ? 'it is' : 'those are') + ' not settled; ' +
+              'the rest searched to the end, which makes them a fact about this ' +
+              'client&rsquo;s market.');
       var verdict = failed
         /* "1 search did not run" reads as one query out of dozens. What did
            not run is a whole kind of event, and the count is of categories. */
@@ -3594,8 +3660,7 @@
           'the market.'
         : (short
             ? esc(plural(short, 'category', 'categories')) +
-              ' came back under quota after ' +
-              'searching. An empty category is a fact about this client&rsquo;s market.'
+              ' came back under quota' + settledNote
             : 'Every category returned what was asked of it, so no kind of event ' +
               'is missing from this list.');
 
@@ -3624,12 +3689,90 @@
       var rows = s.shortfall || [];
       var known = Object.keys(CATEGORY_LABELS).length ||
                   Object.keys(s.statuses || {}).length;
+      /* Read through coverageReason, the reading the bars and the reasons
+         under them use. Counting only `error` as a hole put a partial
+         category under "came up short" here while the section below said it
+         did not finish, and skipped the re-reading of a stored
+         max_uses_exceeded as a spent budget rather than a broken search. */
       var failed = 0, short = 0;
       rows.forEach(function(r){
-        if (r.status === 'error') failed += 1; else short += 1;
+        if (coverageReason(r).level === 'gap') failed += 1; else short += 1;
       });
       return {total: known, failed: failed, short: short,
               met: Math.max(0, known - failed - short)};
+    }
+
+    /* Why an event is unscored decides whether it makes the report
+       provisional. A RULE keeping it out (sold out, outside the window, on
+       the client's own exclusion list) is a finished judgement; missing
+       evidence is a hole. Stored runs carry the reason as prose, so it is
+       read sentence by sentence, the same list the pipeline uses
+       (event_intel_pipeline._POLICY_REASONS). */
+    var POLICY_REASONS = [
+      'the organizer reports this edition is cancelled',
+      'this edition is sold out',
+      'this event is on the client exclusion list',
+      'the edition is outside the requested date window',
+      'the location could not be verified against the client geography',
+      'the organizer page describes restricted or unavailable access'];
+
+    function unscoredKind(u){
+      if (u && (u.kind === 'policy' || u.kind === 'evidence' || u.kind === 'scoring')) {
+        return u.kind;
+      }
+      var note = String((u && (u.note || u.scoring_note)) || '').trim();
+      if (!note) return 'evidence';
+      if (/scoring pass returned no result/i.test(note)) return 'scoring';
+      var sentences = note.match(/[^.!?]+(?:[.!?]+|$)/g) || [];
+      var policy = sentences.every(function(x){
+        var low = x.trim().toLowerCase();
+        return !low || POLICY_REASONS.some(function(p){ return low.indexOf(p) === 0; });
+      });
+      return policy ? 'policy' : 'evidence';
+    }
+
+    function joinClauses(list){
+      if (list.length < 2) return list.join('');
+      return list.slice(0, -1).join(', ') + ' and ' + list[list.length - 1];
+    }
+
+    /* The one sentence under the answer, or nothing. A run written since
+       the pipeline learned to say this carries it, built from the same
+       reading as its `completion_state`; an older run gets the same rules
+       applied to what it stored. */
+    function completionQualifier(s){
+      var c = s.completion;
+      if (c && typeof c.qualifier === 'string') return c.qualifier;
+      var gaps = [];
+      var holes = (s.shortfall || []).filter(function(r){
+        return coverageReason(r).level === 'gap'; })
+        .map(function(r){ return r.label || catLabel(r.category); });
+      if (holes.length) {
+        gaps.push('the search for ' +
+          plural(holes.length, 'kind of event', 'kinds of event') +
+          ' did not finish (' + holes.join(', ') + ')');
+      }
+      (s.notes || []).forEach(function(n){
+        var m = /^Scoring reported (\d+ errors?)/.exec(n.head || '');
+        if (m) gaps.push('scoring reported ' + m[1]);
+      });
+      var a = s.audit || {};
+      var aFailed = Object.keys(a.failed || {}).length;
+      if (a.error) gaps.push('the marquee-event audit produced no usable result');
+      else if (aFailed) {
+        gaps.push('the marquee-event audit could not be completed for ' +
+                  plural(aFailed, 'event'));
+      }
+      var ev = 0, sc = 0;
+      (s.unscored || []).forEach(function(u){
+        var k = unscoredKind(u);
+        if (k === 'evidence') ev += 1; else if (k === 'scoring') sc += 1;
+      });
+      if (ev) gaps.push(plural(ev, 'event') + ' could not be scored for lack of evidence');
+      if (sc) gaps.push('the scoring pass returned no result for ' + plural(sc, 'event'));
+      if (!gaps.length) return '';
+      return 'Treat this as provisional: ' + joinClauses(gaps) +
+             '. What was not measured, below, has the detail.';
     }
 
     function answerHtml(s, counts, kept){
@@ -3646,11 +3789,12 @@
                      : (look ? 'Nothing unmissable, ' + plural(look, 'event') +
                                ' worth a look'
                              : 'Nothing cleared the bar of ' + RANK_FLOOR));
-      var provisional = s.completion_state && s.completion_state !== 'complete';
-      provisional = provisional || (s.shortfall || []).some(function(r){
-        return r.status === 'error' || r.status === 'partial';
-      }) || (s.unscored || []).length > 0;
-      if (provisional) line = 'Research incomplete — shortlist needs verification';
+      /* The answer line is always the answer. It used to be replaced
+         outright by a warning whenever anything at all was imperfect, which
+         was every production run, so the one line a reader came for said
+         nothing. What is missing now goes UNDER it, and only when it is
+         something that changes what the list is worth. */
+      var qualifier = completionQualifier(s);
       /* A ring, not a donut. The glance wants one number against a stated
          maximum, and a donut's centre has to be the sum of its own segments,
          which here would be the constant 6 on every run. */
@@ -3659,12 +3803,14 @@
         cv.failed ? 'f-bad' : (cv.short ? 'f-mid' : 'f-hi'),
         (cv.short ? cv.short + ' came up short' : '') +
         (cv.short && cv.failed ? ', ' : '') +
-        (cv.failed ? cv.failed + ' returned no usable result' : '')) : '';
+        (cv.failed ? cv.failed + ' did not finish' : '')) : '';
 
       return '<div class="evi-answer">' +
         '<div class="aw">' +
           '<div class="ae">The answer</div>' +
           '<div class="al">' + esc(line) + '</div>' +
+          (qualifier ? '<div class="az aq" style="margin:-4px 0 12px">' +
+            esc(qualifier) + '</div>' : '') +
           (top
             ? '<button type="button" class="at ' + tierClass(top.tier) + '" ' +
               'onclick="eviReveal(\'' + esc(candAnchor(0)) + '\')">' +
@@ -3732,6 +3878,47 @@
       return kept.join(' ').replace(/\s+([.,;:])/g, '$1').trim();
     }
 
+    /* Any stored sentence a client is about to read, cleaned on the way out.
+
+       scrubStored above is deliberately conservative, and it guards the
+       category reasons. This is for the places that had no guard at all and
+       printed what was stored: the notes under "What was not measured", the
+       note on every page in a roster's source ledger, the qualification
+       pass's errors, and a candidate's unverified reason. Stored runs carry
+       "max_tokens: Ran out of output budget ... Raise max_tokens or lower
+       max_uses", the text of a Python exception, and a model's note written
+       in its own schema ("so org_domain is null for all").
+
+       Four passes: citation tags go (their words stay), a dash becomes a
+       comma (house style), a parenthetical that is entirely about our
+       tooling or a field name goes, and then any sentence that is. When
+       nothing survives, the caller's own plain sentence stands in: a reader
+       is better served by "This page could not be read." than by a stack
+       of our diagnostics, and far better than by an empty line. */
+    var DEV_DETAIL = /web_search|max_uses|max_tokens|stop_reason|search_limit|server tool|output budget|ConnectionPool|Errno|Traceback|\b[A-Z]\w*(?:Error|Exception)\b|\w=\w|Unexpected failure|unparsable|tool errors/i;
+    var SCHEMA_WORDS = /\bnull\b|\bjson\b|\bschema\b|\b[a-z]+_[a-z0-9]+(?:_[a-z0-9]+)*\b/i;
+    function devSpeak(t){ return DEV_DETAIL.test(t) || SCHEMA_WORDS.test(t); }
+
+    function readerText(text, fallback, asHead){
+      var t = reworded(text)
+        .replace(/<\/?cite\b[^>]*>/gi, '')
+        .replace(/\s*[\u2013\u2014]\s*/g, ', ')
+        .replace(/\s+/g, ' ').trim().replace(REASON_KIND, '');
+      if (t && devSpeak(t)) {
+        t = t.replace(/\s*\(([^()]*(?:\([^()]*\)[^()]*)*)\)/g,
+          function(whole, inner){ return devSpeak(inner) ? '' : whole; });
+        t = (t.match(/[^.!?]+(?:[.!?]+|$)/g) || [])
+          .map(function(x){ return x.trim(); })
+          .filter(function(x){ return x && !devSpeak(x); })
+          .join(' ').replace(/\s+([.,;:])/g, '$1').replace(/:\s*$/, '.').trim();
+      }
+      if (!t || !/[A-Za-z]{3}/.test(t)) return fallback || '';
+      /* A head is a line, not a sentence, so it gets no full stop added. */
+      if (asHead) t = t.replace(/[.]$/, '');
+      else if (!/[.!?\u2026]$/.test(t)) t += '.';
+      return t[0].toUpperCase() + t.slice(1);
+    }
+
     /* A head for a paragraph of stored prose, and only when the paragraph
        offers one.
        A head is the FIRST SENTENCE, whole, and short enough to scan. Nothing
@@ -3765,7 +3952,10 @@
         return '<div class="ex-notes"><div class="nh">' +
           '<h4>What was not measured</h4></div><div class="nl">' +
           old.map(function(a, i){
-            var full = scrubStored(a);
+            /* scrubStored's conservative rule stands here: a legacy
+               paragraph is the whole of a fact, so it is never emptied.
+               Only the house-style dash is changed. */
+            var full = scrubStored(a).replace(/\s*[\u2013\u2014]\s*/g, ', ');
             if (!full) return '';
             var head = foldHead(full);
             if (!head) {
@@ -3792,6 +3982,23 @@
               '<p>' + esc(full) + '</p></details>';
           }).join('') + '</div></div>';
       }
+      /* The provisional line is rebuilt from the same reading as the
+         qualifier under the answer rather than trusted as stored. Runs made
+         before the pipeline learned what "incomplete" means carry a
+         "Research is incomplete" line on every run, including ones with
+         nothing incomplete, and it told the reader to "review the coverage
+         and unscored events" on a run that had none. Drawn in the hole
+         colour and first, because it summarises the rest. */
+      var q = completionQualifier(s);
+      ns = ns.filter(function(n){ return n.level !== 'warn'; });
+      if (q) ns = [{level: 'warn', head: 'This shortlist is provisional', detail: q}].concat(ns);
+      /* Every note is written for a reader, but some of what a note quotes
+         was not: a scoring error arrives as the call's own diagnostic. */
+      ns = ns.map(function(n){
+        return {level: n.level, head: readerText(n.head, n.head, true),
+                detail: n.detail ? readerText(n.detail,
+                  'One of the research calls behind this stopped before it finished.') : ''};
+      });
       var counts = {};
       ns.forEach(function(n){ counts[n.level] = (counts[n.level] || 0) + 1; });
       var tally = ['gap', 'thin', 'note'].filter(function(k){ return counts[k]; })
@@ -3803,17 +4010,42 @@
         '<div class="nh"><h4>What was not measured</h4>' +
           (tally ? '<div class="ntally">' + tally + '</div>' : '') + '</div>' +
         '<div class="nl">' + ns.map(function(n, i){
-          var head = '<span class="nd n-' + esc(n.level || 'note') + '"></span>' +
+          /* A provisional line is drawn as a hole: it is one. */
+          var lv = n.level === 'warn' ? 'gap' : (n.level || 'note');
+          var head = '<span class="nd n-' + esc(lv) + '"></span>' +
             '<span class="nx">' + esc(n.head) + '</span>';
           if (!n.detail) {
-            return '<div class="nr n-' + esc(n.level || 'note') +
+            return '<div class="nr n-' + esc(lv) +
                    '" style="--i:' + i + '">' + head + '</div>';
           }
-          return '<details class="nr n-' + esc(n.level || 'note') +
+          return '<details class="nr n-' + esc(lv) +
             '" style="--i:' + i + '"><summary>' + head +
             '<span class="nmore" aria-hidden="true">Why</span></summary>' +
             '<p>' + esc(n.detail) + '</p></details>';
         }).join('') + '</div></div>';
+    }
+
+    /* The banner over a run that kept nothing. Runs stored before the
+       pipeline wrote a status-aware one carry the same hedge on every run,
+       "incomplete searches or verification do not establish that the market
+       has no suitable events", which sat directly above a coverage verdict
+       calling the same empty categories a fact about the market. Both now
+       come from the one classification. */
+    var LEGACY_EMPTY_NOTE = /incomplete searches or verification do not establish/i;
+    function emptyRunNote(s){
+      if (s.note && !LEGACY_EMPTY_NOTE.test(s.note)) return s.note;
+      var holes = (s.shortfall || []).filter(function(r){
+        return coverageReason(r).level === 'gap'; }).length;
+      if (!(s.shortfall || []).length) return s.note || '';
+      return holes
+        ? 'No verified candidates survived this run, and ' +
+          plural(holes, 'category search', 'category searches') + ' did not ' +
+          'finish, so these results do not establish that the market has no ' +
+          'suitable events. The category results below say which.'
+        : 'No verified candidates survived this run. Every category search ' +
+          'finished, so this is a finding about this client\'s market for the ' +
+          'window searched rather than a gap in the search. The category ' +
+          'results below say what each found.';
     }
 
     function recommendHtml(run){
@@ -3821,7 +4053,7 @@
       var cands = run.candidates || [];
       if (s.no_candidates) {
         return '<div class="evi-coverage"><span class="ic">i</span><span class="tx">' +
-          esc(s.note) + '</span></div>' + coverageHtml(s);
+          esc(emptyRunNote(s)) + '</span></div>' + coverageHtml(s);
       }
       var counts0 = s.counts || {};
       // One authority for how long the list is. The summary's count comes from
@@ -3987,7 +4219,8 @@
           'Left out of the ranking rather than ranked low.</div><div class="evi-cut">' +
           s.unscored.map(function(e){
             return '<span class="cutp">' + esc(e.name) + '<b>' +
-              esc(e.note || e.scoring_note || 'The research did not establish enough evidence to score this event.') +
+              esc(readerText(e.note || e.scoring_note,
+                'The research did not establish enough evidence to score this event.')) +
               '</b></span>'; }).join('') +
           '</div></div>';
       }

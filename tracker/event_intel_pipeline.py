@@ -31,6 +31,7 @@ complete one.
 from __future__ import annotations
 
 import logging
+import re
 from .event_intel_jobs import stage as durable_stage
 from urllib.parse import urlparse
 
@@ -60,6 +61,154 @@ ROSTER_NOTE = (
     "is not one. Every row says which page it came from and how that page "
     "described them."
 )
+
+
+# ── what "incomplete" means ──────────────────────────────────────────────
+#
+# `completion_state` used to be 'partial' whenever anything at all was less
+# than perfect, and that was every run: one candidate the confirmation could
+# not settle, one confirmed event whose attendance figure could not be read,
+# or one event kept out because it is sold out. The report then replaced its
+# own answer with "Research incomplete" on ten runs out of ten, which is the
+# same as saying nothing. A reader stops believing a warning that is always
+# on.
+#
+# So 'partial' now means one of the things that changes what the list is
+# worth: a kind of event whose SEARCH did not finish, a scoring or audit call
+# that broke, or an event left unscored because the evidence to score it was
+# missing. Everything else is still reported where it belongs, and none of it
+# is hidden; it just does not make the whole report provisional.
+
+# The sentences the policy and admission checks write when a RULE kept an
+# event out. Each is a finished judgement about a real event (sold out,
+# outside the window, on the client's own exclusion list), not a hole in the
+# research, so an event unscored for one of these alone is not incompleteness.
+_POLICY_REASONS = (
+    "the organizer reports this edition is cancelled",
+    "this edition is sold out",
+    "this event is on the client exclusion list",
+    "the edition is outside the requested date window",
+    "the location could not be verified against the client geography",
+    "the organizer page describes restricted or unavailable access",
+)
+
+# The two sentences search_category appends to a category's detail when the
+# search itself finished but part of what it found could not be settled: a
+# candidate the confirmation could not conclude on, or a confirmed event whose
+# published numbers could not be read. The page reads the same two shapes out
+# of runs stored before `gap_kind` existed, so change both together.
+_VERIFICATION_BITS = re.compile(
+    r"\d+ of the \d+ candidates? found here could not be checked to a "
+    r"conclusion \(.*\)\.|\d+ confirmed events? had published numbers we "
+    r"could not finish reading\.")
+_BUDGET_TAIL = re.compile(
+    r"It also used every one of the \d+ searches allowed for finding events "
+    r"here, so there may be more to find than this search could reach\.")
+
+GAP_FAILED = "failed"          # the search returned nothing usable
+GAP_UNFINISHED = "unfinished"  # the search was cut off part-way
+GAP_BUDGET = "budget"          # searched to the limit it was given
+GAP_UNRESOLVED = "unresolved"  # finished, but some candidates unsettled
+GAP_SHORT = "short"            # finished, and the market is thin
+GAP_MET = "met"
+MATERIAL_GAPS = (GAP_FAILED, GAP_UNFINISHED)
+
+
+def category_gap_kind(st: dict) -> str:
+    """One reading of a category's stored result, for every surface.
+
+    Takes a `statuses` entry (`detail`) or a `shortfall` entry (`why`). The
+    ring, the bars, the reasons under them, the headline qualifier and
+    `completion_state` all read this one classification, because the report
+    used to describe one partial category as "came up short" in its ring and
+    "did not finish" two sections further down.
+    """
+    status = (st or {}).get("status")
+    text = str((st or {}).get("why") or (st or {}).get("detail") or "")
+    if status not in ("error", "partial"):
+        if "short_by" in st:  # a shortfall row is short by construction
+            return GAP_SHORT
+        kept = st.get("kept", st.get("found"))
+        return (GAP_SHORT if kept is not None
+                and int(kept or 0) < event_intel_rubric.CATEGORY_QUOTA else GAP_MET)
+    # A stored error naming max_uses_exceeded is this run's own search budget
+    # being enforced, a complete piece of work and not a broken one.
+    if re.search(r"max_uses_exceeded", text, re.I):
+        return GAP_BUDGET
+    if status == "error":
+        return GAP_FAILED
+    rest = _BUDGET_TAIL.sub("", text)
+    if _VERIFICATION_BITS.search(rest) and not _VERIFICATION_BITS.sub("", rest).strip(" ."):
+        return GAP_UNRESOLVED
+    return GAP_UNFINISHED
+
+
+def unscored_kind(reasons: list[str]) -> str:
+    """'policy' when a rule alone kept the event out, else 'evidence'."""
+    for r in reasons or []:
+        low = str(r).strip().lower()
+        if not any(low.startswith(p) for p in _POLICY_REASONS):
+            return "evidence"
+    return "policy"
+
+
+def _n(count: int, one: str, many: str) -> str:
+    return "%d %s" % (count, one if count == 1 else many)
+
+
+def completion(statuses: dict, *, scoring_errors=(), audit=None,
+               unscored=()) -> dict:
+    """{'state', 'gaps', 'qualifier'}: the material gaps, as reader clauses.
+
+    `qualifier` is the one sentence the report prints under its answer, and
+    the detail of the 'warn' note, so the two cannot say different things.
+    It is empty on a run with nothing material missing.
+    """
+    quota = event_intel_rubric.CATEGORY_QUOTA
+    holes = []
+    for cat, st in (statuses or {}).items():
+        kind = st.get("gap_kind") or category_gap_kind(st)
+        kept = st.get("kept", st.get("found"))
+        # A category that delivered its quota delivered it, whatever else
+        # its search said: the ring counts it as met, and so does this.
+        if kind in MATERIAL_GAPS and int(kept or 0) < quota:
+            holes.append(st.get("label") or event_intel_rubric.CATEGORY_LABELS.get(cat) or "")
+    gaps = []
+    if holes:
+        gaps.append("the search for %s did not finish (%s)"
+                    % (_n(len(holes), "kind of event", "kinds of event"),
+                       ", ".join(h for h in holes if h)))
+    if scoring_errors:
+        gaps.append("scoring reported %s" % _n(len(scoring_errors), "error", "errors"))
+    audit = audit or {}
+    if audit.get("error"):
+        gaps.append("the marquee-event audit produced no usable result")
+    elif audit.get("failed"):
+        gaps.append("the marquee-event audit could not be completed for %s"
+                    % _n(len(audit["failed"]), "event", "events"))
+    evidence = [u for u in unscored or () if u.get("kind") == "evidence"]
+    scoring = [u for u in unscored or () if u.get("kind") == "scoring"]
+    if evidence:
+        gaps.append("%s could not be scored for lack of evidence"
+                    % _n(len(evidence), "event", "events"))
+    if scoring:
+        gaps.append("the scoring pass returned no result for %s"
+                    % _n(len(scoring), "event", "events"))
+    qualifier = ""
+    if gaps:
+        joined = gaps[0] if len(gaps) == 1 else "%s and %s" % (", ".join(gaps[:-1]), gaps[-1])
+        qualifier = ("Treat this as provisional: %s. What was not measured, "
+                     "below, has the detail." % joined)
+    return {"state": "partial" if gaps else "complete", "gaps": gaps,
+            "qualifier": qualifier}
+
+
+def _stamp_gap_kinds(found: dict) -> None:
+    """Write the one classification onto the stored rows it describes."""
+    for st in (found.get("statuses") or {}).values():
+        st["gap_kind"] = category_gap_kind(st)
+    for s in found.get("shortfall") or []:
+        s["gap_kind"] = category_gap_kind(s)
 
 
 def _host(url: str | None) -> str:
@@ -267,34 +416,59 @@ def _run_recommend(run_id: int, email: str, profile: dict) -> None:
         store.update_run(run_id, summary={'mode':'recommend','completion_state':'running','spend':spend})
     found = durable_stage("discover", event_intel_discover.discover, profile)
     checkpoint('discover', found.get('spend'))
+    _stamp_gap_kinds(found)
 
     if not found["candidates"]:
-        failed_kinds = {s.get('error_kind') for s in found['statuses'].values()
+        statuses = found.get('statuses') or {}
+        failed_kinds = {s.get('error_kind') for s in statuses.values()
                         if s.get('status') == event_intel_discover.STATUS_ERROR}
+        # Failed only when no category search ran at all. One broken search
+        # beside five that finished empty used to fail the whole run with
+        # "Event research could not be completed." and nothing else, which
+        # threw away five real findings about this client's market to report
+        # one hole. Those runs now finish, show every category's result, and
+        # carry the hole in their own qualifier.
+        total = len(event_intel_rubric.CATEGORIES)
+        none_ran = bool(found.get('categories_failed')) and (
+            found['categories_failed'] >= total or
+            (statuses and all(s.get('status') == event_intel_discover.STATUS_ERROR
+                              for s in statuses.values())))
         error = None
-        if found['categories_failed']:
+        if none_ran:
             error = ("This account had used its event research allowance for "
                      "the last 24 hours, so the search did not run. The "
                      "allowance frees up as earlier runs' calls pass 24 hours "
                      "old; start the run again then."
                      if failed_kinds == {event_intel_discover.claude_websearch.ERR_ACCOUNT_BUDGET}
                      else "Event research could not be completed.")
-        store.update_run(
-            run_id, status="failed" if found['categories_failed'] else "complete", stage="done",
-            error=error,
-            summary={"mode": "recommend",
-                     "completion_state": ("failed" if found['categories_failed'] else
-                                          "partial" if any(s.get('status') == 'partial' for s in found['statuses'].values()) else "complete"),
-                     "spend": dict(found.get('spend') or {}, usd=event_intel_discover.claude_websearch.spend_usd(found.get('spend') or {})),
-                     "no_candidates": True,
-                     "shortfall": found["shortfall"],
-                     "statuses": found["statuses"],
-                     "categories_failed": found["categories_failed"],
-                     "note": (
-                         "No verified candidates survived this run. Review the "
-                         "category results below: incomplete searches or "
-                         "verification do not establish that the market has "
-                         "no suitable events.")})
+        done = completion(statuses)
+        holes = [s for s in statuses.values()
+                 if (s.get('gap_kind') or category_gap_kind(s)) in MATERIAL_GAPS]
+        # The banner and the coverage verdict under it read the same
+        # classification. An empty result after a search that FINISHED is a
+        # finding about the market; one after a search that did not is a hole,
+        # and the banner must never hedge the first or assert the second.
+        if holes:
+            note = ("No verified candidates survived this run, and %s did not "
+                    "finish, so these results do not establish that the market has "
+                    "no suitable events. The category results below say which."
+                    % _n(len(holes), "category search", "category searches"))
+        else:
+            note = ("No verified candidates survived this run. Every category "
+                    "search finished, so this is a finding about this client's "
+                    "market for the window searched rather than a gap in the "
+                    "search. The category results below say what each found.")
+        summary = {"mode": "recommend",
+                   "completion_state": "failed" if none_ran else done["state"],
+                   "completion": done,
+                   "spend": dict(found.get('spend') or {}, usd=event_intel_discover.claude_websearch.spend_usd(found.get('spend') or {})),
+                   "no_candidates": True,
+                   "shortfall": found["shortfall"],
+                   "statuses": found["statuses"],
+                   "categories_failed": found["categories_failed"],
+                   "note": note}
+        store.update_run(run_id, status="failed" if none_ran else "complete",
+                         stage="done", error=error, summary=summary)
         return
 
     # Comparisons propose alternatives; admission and scoring determine inclusion.
@@ -320,7 +494,8 @@ def _run_recommend(run_id: int, email: str, profile: dict) -> None:
         reasons = eligibility(candidate, profile)
         reasons.extend(source_check['reasons'])
         if reasons:
-            policy_unconfirmed.append(dict(candidate, scoring_note=' '.join(reasons)))
+            policy_unconfirmed.append(dict(candidate, scoring_note=' '.join(reasons),
+                                           unscored_kind=unscored_kind(reasons)))
         else:
             eligible.append(candidate)
     survivors = eligible
@@ -449,7 +624,12 @@ def _run_recommend(run_id: int, email: str, profile: dict) -> None:
         "excluded": ranked["excluded"],
         "over_cap": ranked["over_cap"],
         "finished": ranked["finished"],
-        "unscored": [{"name": c.get("name"), "note": c.get("scoring_note")}
+        # `kind` says why each one is unscored, because only some of those
+        # reasons make the report provisional: a sold-out edition was checked
+        # and ruled on, an event with no readable organizer dates was not.
+        # Anything the scorer itself returned nothing for is a scoring gap.
+        "unscored": [{"name": c.get("name"), "note": c.get("scoring_note"),
+                      "kind": c.get("unscored_kind") or "scoring"}
                      for c in scored["unscored"]],
         "orientation": profile.get("orientation"),
         "committed_below_bar": ranked["committed_below_bar"],
@@ -459,11 +639,23 @@ def _run_recommend(run_id: int, email: str, profile: dict) -> None:
                      "by_identity": outcomes["by_identity"],
                      "labels": store.DECISION_LABELS},
     })
-    partial = bool(found['categories_failed'] or scored['unscored'] or scored['errors'] or audit.get('error') or audit.get('failed') or promoted['unconfirmed'] or any(s.get('status') == 'partial' for s in found['statuses'].values()))
-    summary['completion_state'] = 'partial' if partial else 'complete'
-    if partial:
-        summary.setdefault('notes', []).append({'level':'warn','head':'Research is incomplete', 'detail':'Some events or checks remain unverified. Review the coverage and unscored events before acting.'})
-    failed = not rows and bool(scored['unscored'] or scored['errors'])
+    done = completion(found.get("statuses") or {}, scoring_errors=scored["errors"],
+                      audit=audit, unscored=summary["unscored"])
+    summary['completion_state'] = done['state']
+    summary['completion'] = done
+    if done['gaps']:
+        # Added to `notes` and then flattened again, so `assumptions` (what
+        # the CSV and older readers use) carries the same line. Appending it
+        # after executive_summary had flattened left the two disagreeing.
+        summary['notes'] = list(summary.get('notes') or []) + [
+            {'level': 'warn', 'head': 'This shortlist is provisional',
+             'detail': done['qualifier']}]
+        summary['assumptions'] = event_intel_report.flatten(summary['notes'])
+    # Failed only when the scorer itself produced nothing. A run whose every
+    # event was kept out by policy or evidence has a complete answer (nothing
+    # eligible) and a Not scored list saying why, and failing it hid both.
+    failed = not rows and bool(scored['errors'] or any(
+        u.get('kind') == 'scoring' for u in summary['unscored']))
     store.update_run(run_id, status='failed' if failed else 'complete', stage='done', summary=summary,
                      error='No event could be verified and scored.' if failed else None)
 
