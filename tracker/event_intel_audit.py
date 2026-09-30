@@ -199,9 +199,15 @@ def _audit_one(cand: dict, system: str) -> dict:
     raises: a failure here must cost its own event's verdict and nothing
     else, which is the whole point of splitting the call up.
     """
+    # The website is labelled as the website. It was labelled "Organizer:",
+    # which told the model the organiser of every audited event was a URL.
+    lines = ["Audit this famous event:", "- %s" % _event_label(cand),
+             "Edition: %s to %s" % (cand.get("starts_on"), cand.get("ends_on")),
+             "Official site: %s" % cand.get("website")]
+    if cand.get("organizer"):
+        lines.append("Organiser: %s" % cand["organizer"])
     res = claude_websearch.ask(
-        system, "Audit this famous event:\n- %s\nEdition: %s to %s\nOrganizer: %s" % (
-            _event_label(cand), cand.get("starts_on"), cand.get("ends_on"), cand.get("website")),
+        system, "\n".join(lines),
         max_uses=AUDIT_MAX_USES, max_tokens=AUDIT_MAX_TOKENS)
     # Counted before any of the ways this reply can be refused below. The
     # search is billed whether or not its answer turns out to be usable, and
@@ -209,7 +215,14 @@ def _audit_one(cand: dict, system: str) -> dict:
     box = {"rec": None, "error": None, "spend": claude_websearch.spend_of(res)}
 
     if res.get("error"):
-        box["error"] = "%s: %s" % (res["error"]["kind"], res["error"]["detail"])
+        # Reader English. This clause is printed in the client's report as
+        # "for the one it was given, <this>", and the developer detail read
+        # "max_tokens: Ran out of output budget ... Raise max_tokens or lower
+        # max_uses." there. The detail goes to the log.
+        logger.warning("event_intel_audit: audit of %r failed (%s): %s",
+                       cand.get("name"), res["error"].get("kind"),
+                       res["error"].get("detail"))
+        box["error"] = claude_websearch.reader_reason(res["error"])
         return box
 
     # The same refusal event_intel_discover applies to a category search and
@@ -305,7 +318,8 @@ def audit_famous(candidates: list[dict], profile: dict) -> dict:
                 logger.warning("event_intel_audit: auditing %r raised: %s",
                                famous[i].get("name"), e)
                 boxes[i] = {"rec": None, "spend": None,
-                            "error": "the audit call failed: %s" % str(e)[:200]}
+                            "error": "the audit call failed before it returned "
+                                     "anything"}
 
     # Walked in LIST order, not completion order, so the cut and kept lists
     # read in the order the client's own shortlist is in.
@@ -583,7 +597,9 @@ def promote_alternatives(audit: dict, candidates: list[dict],
     this function exists to close.
 
     Returns {"promoted": [...], "unconfirmed": [...], "considered": int,
-             "not_attempted": [...]}.
+             "not_attempted": [...], "duplicates": [...]}. `duplicates` are
+    lookups that confirmed an event already in the pool or already promoted
+    under another name; they are named, never added a second time.
     """
     from . import event_intel_rubric as rubric
     if resolver is None:
@@ -591,7 +607,8 @@ def promote_alternatives(audit: dict, candidates: list[dict],
 
     wanted = alternatives_to_promote(audit, candidates)
     out: dict = {"promoted": [], "unconfirmed": [], "considered": len(wanted),
-                 "not_attempted": [], "spend": claude_websearch.spend_sum()}
+                 "not_attempted": [], "duplicates": [],
+                 "spend": claude_websearch.spend_sum()}
     if not wanted:
         return out
 
@@ -621,7 +638,10 @@ def promote_alternatives(audit: dict, candidates: list[dict],
         except Exception as e:                       # never raises upward
             logger.warning("event_intel_audit: resolving alternative %r failed: %s",
                            alt["name"], e)
-            res = {"ok": False, "reasoning": "The lookup failed: %s" % str(e)[:200]}
+            # The exception text is logged above; `why` is printed to the
+            # client, so it says what happened in words.
+            res = {"ok": False, "reasoning": ("The lookup failed before it "
+                                              "returned anything.")}
         # Every lookup is billed at about $0.50, including the ones whose
         # answer is refused two lines below.
         spends.append((res or {}).get("spend"))
@@ -672,6 +692,22 @@ def promote_alternatives(audit: dict, candidates: list[dict],
         if reasons:
             out['unconfirmed'].append({'name':alt['name'],'replaces':alt['replaces'],'why':' '.join(reasons)})
             continue
+        # Deduped on what the LOOKUP found, not on what the audit called it.
+        # alternatives_to_promote can only compare the audit's own wording,
+        # and two wordings of one event are routine: "The Payments
+        # Association PAY360" and "PAY360 Awards and Conference" both
+        # resolved to PAY360 and were promoted twice, and "Canada's payments
+        # summit" resolved to an event already in the pool and was promoted
+        # as a second copy. rank() then kept it twice under two categories,
+        # save_outcome refused the client's decision on it ("Choose an
+        # unambiguous event edition") and the benchmark gate blocked the run.
+        same = next((c for c in list(candidates or []) + out["promoted"]
+                     if same_event(candidate, c)), None)
+        if same is not None:
+            out["duplicates"].append({"name": alt["name"],
+                                      "replaces": alt["replaces"],
+                                      "same_as": same.get("name")})
+            continue
         out["promoted"].append(candidate)
 
     # Named, never looked at, because the list was full or the lookup budget
@@ -681,6 +717,27 @@ def promote_alternatives(audit: dict, candidates: list[dict],
         out["not_attempted"].append({"name": alt["name"],
                                      "replaces": alt["replaces"]})
     return out
+
+
+def same_event(a: dict, b: dict) -> bool:
+    """Whether two rows are one edition of one event.
+
+    The edition identity (name, start date, place) where both are dated; the
+    same page on the same date; or names that match with dates that do not
+    contradict. A missing date on either side is compatible, because a pool
+    row found without dates and a lookup that found them are still one
+    event, and a second copy costs more than a missed merge.
+    """
+    from .event_intel_discover import site_key
+    da = str(a.get("starts_on") or "")[:10]
+    db = str(b.get("starts_on") or "")[:10]
+    dates_ok = not da or not db or da == db
+    if da and db and event_key(a) == event_key(b):
+        return True
+    sa, sb = site_key(a.get("website") or ""), site_key(b.get("website") or "")
+    if sa and sa == sb and dates_ok:
+        return True
+    return dates_ok and names_match(a.get("name") or "", b.get("name") or "")
 
 
 def _candidate_from_alternative(res: dict, alt: dict,
@@ -706,6 +763,13 @@ def _candidate_from_alternative(res: dict, alt: dict,
             % (replaces or "a marquee event"))
     if alt.get("note"):
         note = "%s The audit's reason: %s" % (note, alt["note"])
+    # What the scorer is told, which is only how the event was found. The
+    # note above is a verdict on the event ("the more targeted
+    # alternative") and handing it to the grader primed the one judgement
+    # the rubric exists to make independently; it stays in audit_note, which
+    # the report shows and the scorer never sees.
+    found_as = ("Named as an alternative to %s and then confirmed by its own "
+                "lookup, not by a category search." % (replaces or "a marquee event"))
 
     return {
         "name": ev.get("name") or alt["name"],
@@ -725,14 +789,20 @@ def _candidate_from_alternative(res: dict, alt: dict,
         "cost_note": None,
         "availability": ev.get("availability") or "unknown",
         "availability_source": ev.get("availability_source"),
-        "organizer_run": False,
-        # Not carried over from the audit's prose. The bonus needs evidence
-        # the rubric has read, and a sentence about why one event beats
-        # another is not that.
-        "matchmaking_evidence": None,
+        # Carried through from the LOOKUP, the same way a discovered event
+        # carries it from discovery. It was forced False, so a promoted event
+        # could never earn the +10 the marquee event it replaced kept, and
+        # the comparison it had just won was then scored on a handicap.
+        # rubric.matchmaking_bonus still demands both the flag and evidence
+        # it can read, so carrying the claim through cannot award the bonus
+        # on its own. Never taken from the audit's prose: a sentence about
+        # why one event beats another is not evidence of a programme.
+        "organizer_run": bool(ev.get("organizer_run")),
+        "matchmaking_evidence": (str(ev.get("matchmaking_evidence") or "")
+                                 .strip()[:800] or None),
         "famous": False,
         "category": (replaced or {}).get("category"),
-        "category_fit": note[:500],
+        "category_fit": found_as[:500],
         "confidence": ev.get("confidence") or "medium",
         "sources": sources,
         "audit_verdict": VERDICT_PROMOTED,

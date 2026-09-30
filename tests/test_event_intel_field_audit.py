@@ -195,7 +195,10 @@ def test_singular_and_plural_are_correct_in_the_audit_line(monkeypatch):
 def test_events_dropped_only_for_list_length_are_named(monkeypatch):
     """rank() computes over_cap precisely so this can be said. Truncating in
     silence reads as "nothing else qualified"."""
-    rows = [{"name": "E%02d" % i, "total": 100 - i, "tier": "P1"} for i in range(20)]
+    # Relevance at the gate: since the relevance-cut policy a row with no
+    # relevance is never recommended, so it never reaches the cap at all.
+    rows = [{"name": "E%02d" % i, "total": 100 - i, "tier": "P1",
+             "relevance": R.RELEVANCE_GATE} for i in range(20)]
     ranked = R.rank(rows, cap=15)
     assert len(ranked["over_cap"]) == 5
     s = RP.executive_summary(profile=PROF, ranked=ranked, shortfall=[],
@@ -240,7 +243,7 @@ def test_a_committed_event_below_the_bar_is_kept_and_marked():
     actionable thing this analysis produces. Cutting it hides exactly that."""
     ranked = R.rank([{"name": "PaidFor", "total": 45, "tier": "P3", "committed": True},
                      {"name": "Junk", "total": 45, "tier": "P3"},
-                     {"name": "Good", "total": 88, "tier": "P1"}])
+                     {"name": "Good", "total": 88, "tier": "P1", "relevance": 34}])
     assert [c["name"] for c in ranked["kept"]] == ["Good", "PaidFor"]
     assert [e["name"] for e in ranked["excluded"]] == ["Junk"]
     assert ranked["committed_below_bar"] == [{"name": "PaidFor", "total": 45}]

@@ -70,6 +70,27 @@ MAX_CONCURRENCY = 3
 # the room: max_tokens is a ceiling, not a charge.
 SCORE_MAX_TOKENS = 32000
 
+# Searches per event, and the ceiling per call. The budget was a flat
+# max_uses=6 per batch whatever its size, so an event scored in a batch of
+# one had six searches to itself and the same event in a full batch had one.
+# That is two different depths of evidence behind two numbers presented as
+# comparable, and it is the variance the borderline re-score below exists to
+# damp: a lone re-scored event would be graded on six times the evidence of
+# its first reading. One per event, capped at the old ceiling, keeps a full
+# batch exactly as it was and stops a small batch paying for searches that
+# only make its grade less comparable.
+SCORE_SEARCHES_PER_EVENT = 1
+SCORE_MAX_USES = 6
+
+# The borderline re-score. An event within rubric.BORDERLINE_MARGIN of a
+# cut-off is graded RESCORE_PASSES more times and keeps the per-dimension
+# median, because relevance swings by up to three points between runs and a
+# verdict decided by which side of 24 or 70 one reading fell on is noise.
+# Capped at RESCORE_MAX_BATCHES extra calls per run (one batch per pass, so
+# at most BATCH events get the treatment): the closest to a line go first.
+RESCORE_PASSES = 2
+RESCORE_MAX_BATCHES = 2
+
 _SYSTEM = """You score business events against one client's ICP using a fixed \
 rubric, and you write each event's description. You are grading events you did \
 not choose, against one standard, for one client.
@@ -82,14 +103,36 @@ Score density and reach on THAT side of the event. For a booth-driven client, \
 a hall full of the right vendors is the buying audience; the ticket-holders \
 are not. For an audience-driven client, the reverse.
 
-THE RUBRIC
+THE RUBRIC. Each band is a fixed description. Place the event in the band \
+its evidence supports, then within the band by how strongly.
 - relevance, 0 to 40: how closely the composition of this event matches the \
 client's ICP above.
+  30-40: at least three quarters of the relevant side of the event are the \
+client's buyer roles in the client's verticals.
+  20-29: roughly half to three quarters are; the rest are adjacent roles or \
+verticals.
+  10-19: a quarter to a half are; the client's buyers attend but are a \
+minority.
+  0-9: under a quarter, or the event serves a different market.
 - dm_access, 0 to 40: density of actual decision-makers AND the structural \
 reach to them. Floor layout, meeting infrastructure, side events, whether you \
 can physically get to the people who sign.
+  30-40: the people who sign attend in numbers and the format gives a \
+structured way to reach them (hosted meetings, a floor they work, small \
+formats).
+  20-29: they attend and can be reached, but it takes effort (a large open \
+floor, general networking).
+  10-19: few of them attend, or they attend but the format keeps them out of \
+reach (keynote halls, no floor, no meeting space).
+  0-9: the people who sign are essentially absent or unreachable.
 - engagement, 0 to 20: are these people in a vendor-buying mindset, or is this \
 a learning and keynote crowd who will not take a meeting?
+  15-20: they come to evaluate and buy; vendor meetings are part of why they \
+attend.
+  10-14: a mix of learning and evaluating; vendors are part of the draw.
+  5-9: mainly learning and keynotes; vendor conversations happen at the \
+margins.
+  0-4: no buying mindset at all.
 
 Each sub-score needs a one-or-two-sentence `_note` giving the reasoning. The \
 notes are the audit trail; a score without one cannot be checked.
@@ -99,8 +142,9 @@ HARD CONSTRAINTS.
 separately and adding it here would double-count it.
 2. You have not been told what any of this costs, and you must not speculate. \
 Cost never moves a score.
-3. Do not inflate. Most events are mediocre for most clients. A rubric where \
-everything lands between 75 and 85 has measured nothing.
+3. Score each event against the bands on its own evidence, never against the \
+other events listed with it. The same event must get the same score whichever \
+events it is graded beside.
 4. Use only the facts given plus what you can verify by searching. Never \
 invent an attendance figure.
 
@@ -118,11 +162,15 @@ BANNED in both: "premier", "world-class", "leading", "must-attend", \
 "unparalleled", and any sentence that would fit any other event.
 
 Respond with ONLY a JSON object:
-{{"scores": [{{"name": str, "relevance": int, "relevance_note": str, \
-"dm_access": int, "dm_access_note": str, "engagement": int, \
-"engagement_note": str, "description": str, "client_line": str}}]}}
+{{"scores": [{{"name": str, "starts_on": str|null, "relevance": int, \
+"relevance_note": str, "dm_access": int, "dm_access_note": str, \
+"engagement": int, "engagement_note": str, "description": str, \
+"client_line": str}}]}}
 
-`name` must exactly match the name you were given."""
+`name` must exactly match the name you were given, and `starts_on` must be \
+exactly the date on that event's `dates` line (null if it had none). Two \
+editions of one series can share a name; the date is how your answer is \
+matched to the edition you graded."""
 
 # Whole words, not substrings. "leading" was missing entirely, which is the
 # most common superlative of the set and one the prompt explicitly bans, so
@@ -137,7 +185,15 @@ _BANNED = tuple(re.compile(r"\b%s\b" % p, re.I) for p in (
 
 
 def _candidate_brief(c: dict) -> str:
-    """One candidate, as the scorer sees it. cost_note is not included."""
+    """One candidate, as the scorer sees it. cost_note is not included.
+
+    Nor, for an event the famous-event audit promoted, is the note saying so.
+    That note tells the grader the audit "named this as the more targeted
+    alternative", which is a verdict on the very question it is about to
+    grade, handed to it before it looks. Every other candidate is graded
+    without being told what anybody thought of it, and this one must be too.
+    """
+    promoted = c.get("audit_verdict") == "promoted"
     bits = ["- %s" % c.get("name")]
     for label, key in (("edition", "edition"), ("where", "city"),
                        ("country", "country"), ("dates", "starts_on"),
@@ -147,9 +203,24 @@ def _candidate_brief(c: dict) -> str:
                        ("who it says it is for", "audience_note"),
                        ("found as", "category_fit"),
                        ("organiser", "organizer"), ("site", "website")):
+        if promoted and key == "category_fit":
+            continue
         if c.get(key):
-            bits.append("  %s: %s" % (label, c[key]))
+            value = c[key]
+            if key == "starts_on":
+                value = _edition(value) or value
+            bits.append("  %s: %s" % (label, value))
     return "\n".join(bits)
+
+
+def _edition(value) -> str:
+    """The ISO start date that tells one edition from another, or ""."""
+    import datetime
+    text = str(value or "").strip()[:10]
+    try:
+        return datetime.date.fromisoformat(text).isoformat()
+    except ValueError:
+        return ""
 
 
 def _clean(raw: dict) -> dict | None:
@@ -180,11 +251,28 @@ def _clean(raw: dict) -> dict | None:
         str(raw.get("description") or "").strip())[:900] or None
     out["client_line"] = claude_websearch.strip_em_dash(
         str(raw.get("client_line") or "").strip())[:600] or None
+    # The edition the grader says it graded. Echoed back so two editions of
+    # one series in one batch cannot be told apart only by a region word the
+    # name may not carry ("Money20/20 Europe" 2026 and 2027).
+    out["starts_on"] = _edition(raw.get("starts_on")) or None
     return out
 
 
-def score_batch(batch: list[dict], profile: dict) -> dict:
-    """Score up to BATCH candidates in one call. Never raises."""
+def max_uses_for(batch: list) -> int:
+    """This batch's search budget: SCORE_SEARCHES_PER_EVENT each, capped."""
+    return max(1, min(SCORE_MAX_USES, len(batch or []) * SCORE_SEARCHES_PER_EVENT))
+
+
+def score_batch(batch: list[dict], profile: dict, rescore_pass: int = 0) -> dict:
+    """Score up to BATCH candidates in one call. Never raises.
+
+    `rescore_pass` marks an independent re-grade of borderline events. It
+    changes the request text on purpose: event_intel_jobs.reserve_call
+    returns the stored reply for a byte-identical request in the same run and
+    stage, so a second pass sent with the first pass's exact wording would
+    come back as a copy of it and the "median of three" would be one reading
+    counted three times.
+    """
     from .event_intel_discover import profile_brief
     system = _SYSTEM.format(
         profile=profile_brief(profile),
@@ -192,14 +280,28 @@ def score_batch(batch: list[dict], profile: dict) -> dict:
             profile.get("classification"), "Confirm with the client."))
     user = ("Score these %d events and write each description:\n\n%s"
             % (len(batch), "\n".join(_candidate_brief(c) for c in batch)))
-    res = claude_websearch.ask(system, user, max_uses=6, max_tokens=SCORE_MAX_TOKENS)
+    if rescore_pass:
+        user = ("Independent re-grade, pass %d of %d. Grade each event on its "
+                "own evidence against the bands, exactly as a first reading "
+                "would.\n\n%s" % (rescore_pass + 1, RESCORE_PASSES + 1, user))
+    res = claude_websearch.ask(system, user, max_uses=max_uses_for(batch),
+                               max_tokens=SCORE_MAX_TOKENS)
     # Counted on every path out of here, including the two refusals below: a
     # scoring pass whose answer could not be read cost exactly what a
     # readable one cost.
     spend = claude_websearch.spend_of(res)
     if res.get("error"):
+        # Reader English only. This string is printed under "Scoring
+        # reported an error" in a client's report, and the developer detail
+        # it used to carry read "Max_tokens: Ran out of output budget before
+        # finishing (stop_reason=max_tokens). Raise max_tokens or lower
+        # max_uses.." there. The detail goes to the log, where it is useful.
+        logger.warning("event_intel_scorer: scoring call failed (%s): %s",
+                       res["error"].get("kind"), res["error"].get("detail"))
         return {"scores": {}, "spend": spend,
-                "error": "%s: %s" % (res["error"]["kind"], res["error"]["detail"])}
+                "error": "A scoring pass for %d %s failed: %s." % (
+                    len(batch), "event" if len(batch) == 1 else "events",
+                    claude_websearch.reader_reason(res["error"]))}
     parsed = claude_websearch.extract_json(res.get("text") or "", require="scores")
     if not isinstance(parsed, dict):
         return {"scores": {}, "spend": spend,
@@ -208,7 +310,7 @@ def score_batch(batch: list[dict], profile: dict) -> dict:
     for s in (parsed.get("scores") or []):
         clean = _clean(s)
         if clean:
-            out[score_key(clean["name"])] = clean
+            out[score_key(clean["name"], clean.get("starts_on"))] = clean
     return {"scores": out, "error": None, "spend": spend}
 
 
@@ -241,8 +343,9 @@ def deal(candidates: list[dict], size: int = BATCH) -> list[list[dict]]:
     return out
 
 
-def score_key(name: str) -> tuple:
-    """The key `merge` would agree with: the stripped name AND its region.
+def score_key(name: str, starts_on=None) -> tuple:
+    """The key `merge` would agree with: the stripped name, its region, and
+    the edition's start date.
 
     name_key alone strips region words, which is right for deciding that
     "MarTech Summit" and "MarTech Summit Europe" are one event and wrong for
@@ -251,12 +354,24 @@ def score_key(name: str) -> tuple:
     editions shared one slot and the second one graded overwrote the first.
     Both rows were then stored with one edition's scores, notes and
     description, which reads as a confident grade of the wrong continent.
+
+    The date is the same defect one level down. "Money20/20 Europe" starting
+    2026-06-02 and the one starting 2027-06-08 have the same name AND the
+    same region, and both were stored with the 2027 edition's scores; across
+    batches the winner was whichever batch finished last. An undated reply
+    keys with "" and is matched to an edition only when that is unambiguous.
     """
     from .event_intel_discover import name_key, region_key
-    return (name_key(name), region_key(name))
+    return (name_key(name), region_key(name), _edition(starts_on))
 
 
-def _lookup(scores: dict, name: str) -> dict | None:
+def _compatible(a: str, b: str) -> bool:
+    """Two editions that could be one: equal, or either undated."""
+    return not a or not b or a == b
+
+
+def _lookup(scores: dict, name: str, starts_on=None,
+            others: list | None = None) -> dict | None:
     """This candidate's scores, tolerating a name the grader reworded.
 
     The prompt asks for the name it was given, back verbatim. Asking is not
@@ -266,24 +381,150 @@ def _lookup(scores: dict, name: str) -> dict | None:
     one event, so the strict comparison here disagreed with the rest of the
     module about what the same event is.
 
-    Loose matching is accepted ONLY when exactly one candidate matches, the
-    same guard event_intel_audit._verdict_for uses: one event wearing
-    another's sub-scores is a worse outcome than the miss.
+    Loose matching is accepted ONLY when it is unambiguous: one event wearing
+    another's sub-scores is a worse outcome than the miss. `others` is the
+    rest of the batch, as (name, starts_on) pairs, and it is what makes
+    "unambiguous" checkable. Checking only the returned names was not enough:
+    with "Fintech Meetup" and "Fintech Meetup Asia" both in a batch and only
+    the Asia edition graded, "Fintech Meetup" loosely matched the one reply
+    there was and was stored with Asia's 38. A reply is never borrowed when
+    it is an exact answer for another candidate, or when another candidate
+    matches it just as loosely.
     """
     from .event_intel_discover import names_match
-    key = score_key(name or "")
+    key = score_key(name or "", starts_on)
     if not key[0]:
         return None
     exact = scores.get(key)
     if exact is not None:
         return exact
+    rivals = [(n, score_key(n or "", d)) for n, d in (others or [])]
+    rivals = [(n, k) for n, k in rivals if k != key and k[0]]
+
+    # Same name and region, one side undated: the grader dropped or
+    # reformatted the date. Taken only when no other edition in the batch
+    # could be the one it meant.
+    direct = [v for k, v in scores.items()
+              if k[:2] == key[:2] and _compatible(k[2], key[2])]
+    if direct:
+        if len(direct) == 1 and not any(rk[:2] == key[:2] for _, rk in rivals):
+            return direct[0]
+        return None
+
     # names_match compares regions as well as names, so a reply that dropped
     # the region cannot be matched to one edition while another edition of the
     # same series is also in the dict: that comes back ambiguous and the event
     # is reported unscored, which is the honest answer.
-    hits = [v for k, v in scores.items()
-            if k != key and names_match(name or "", v.get("name") or k[0])]
+    hits = []
+    for k, v in scores.items():
+        if not _compatible(k[2], key[2]):
+            continue
+        replied = v.get("name") or k[0]
+        if not names_match(name or "", replied):
+            continue
+        # Another candidate in the batch matches this reply at least as
+        # well. That covers the reply being that candidate's own exact
+        # answer (the Fintech Meetup Asia case) and the reply fitting two
+        # candidates equally loosely; either way it is not this one's.
+        if any(names_match(n or "", replied) and _compatible(rk[2], k[2])
+               for n, rk in rivals):
+            continue
+        hits.append(v)
     return hits[0] if len(hits) == 1 else None
+
+
+def _resolve(batch: list[dict], scores: dict) -> list:
+    """Each candidate in `batch` matched to its own reply, or None.
+
+    Replies are resolved against the batch that produced them and nothing
+    else. A grader can only have graded what it was shown, and merging every
+    batch's replies into one dict first is what let the last batch to finish
+    overwrite another batch's edition of the same series.
+    """
+    out = []
+    for i, c in enumerate(batch):
+        others = [(o.get("name"), o.get("starts_on"))
+                  for j, o in enumerate(batch) if j != i]
+        out.append(_lookup(scores or {}, c.get("name") or "",
+                           c.get("starts_on"), others))
+    return out
+
+
+def _total_of(s: dict, c: dict) -> int:
+    """The total rubric.score would give these readings, bonus included.
+
+    Only used to decide what is borderline; the stored total is still derived
+    downstream in event_intel_store.normalise_candidate.
+    """
+    return rubric.score(s[rubric.DIM_RELEVANCE], s[rubric.DIM_DM_ACCESS],
+                        s[rubric.DIM_ENGAGEMENT],
+                        organizer_run=bool(c.get("organizer_run")),
+                        matchmaking_evidence=str(c.get("matchmaking_evidence")
+                                                 or ""))["total"]
+
+
+def borderline_distance(s: dict, c: dict) -> int | None:
+    """How far this reading sits from the nearest cut-off, when it is within
+    rubric.BORDERLINE_MARGIN of one; None when it is clear of every line."""
+    if any(s.get(d) is None for d in rubric.DIMENSIONS):
+        return None
+    total = _total_of(s, c)
+    gaps = [abs(s[rubric.DIM_RELEVANCE] - rubric.RELEVANCE_GATE)]
+    gaps += [abs(total - line) for line in rubric.BORDERLINE_TOTALS]
+    nearest = min(gaps)
+    return nearest if nearest <= rubric.BORDERLINE_MARGIN else None
+
+
+def _median_reading(readings: list[dict]) -> dict:
+    """Per-dimension median of full readings, with the note that goes with
+    each chosen value. The lower middle on an even count, so a missing third
+    reading can never round a near miss up."""
+    import statistics
+    out = dict(readings[0])
+    for dim in rubric.DIMENSIONS:
+        value = statistics.median_low([r[dim] for r in readings])
+        chosen = next(r for r in readings if r[dim] == value)
+        out[dim] = value
+        out[dim + "_note"] = chosen.get(dim + "_note")
+    return out
+
+
+def _rescore_note(readings: list[dict]) -> str:
+    spread = max(max(r[d] for r in readings) - min(r[d] for r in readings)
+                 for d in rubric.DIMENSIONS)
+    times = {2: "twice", 3: "three times"}.get(len(readings),
+                                               "%d times" % len(readings))
+    shown = ("the median is shown" if len(readings) % 2
+             else "the lower of the middle readings is shown")
+    return ("%s %d points of a cut-off, so it was scored %s and %s. The "
+            "readings differed by up to %d %s on a single dimension."
+            % (rubric.RESCORE_NOTE_PREFIX, rubric.BORDERLINE_MARGIN, times,
+               shown, spread, "point" if spread == 1 else "points"))
+
+
+def _run(jobs: list, profile: dict, errors: list, spends: list) -> list:
+    """Run score_batch jobs concurrently; results in job order."""
+    results = [None] * len(jobs)
+    if not jobs:
+        return results
+    with ContextExecutor(max_workers=min(MAX_CONCURRENCY, len(jobs))) as pool:
+        futures = {pool.submit(score_batch, b, profile, **kw): i
+                   for i, (b, kw) in enumerate(jobs)}
+        for fut in concurrent.futures.as_completed(futures):
+            try:
+                r = fut.result()
+            except Exception:
+                # The exception text is a developer's, and `errors` is
+                # printed to the client. It goes to the log.
+                logger.exception("event_intel_scorer: batch crashed")
+                errors.append("A scoring pass failed before it returned "
+                              "anything.")
+                continue
+            spends.append(r.get("spend"))
+            if r.get("error"):
+                errors.append(r["error"])
+            results[futures[fut]] = r
+    return results
 
 
 def score_all(candidates: list[dict], profile: dict) -> dict:
@@ -293,31 +534,53 @@ def score_all(candidates: list[dict], profile: dict) -> dict:
     than dropped or defaulted to zero. Zero would rank it last, which reads as
     "we judged this and it is bad"; dropping it reads as "this does not
     exist". Neither is what happened.
+
+    Then the borderline re-score: anything whose first reading sits within
+    rubric.BORDERLINE_MARGIN of a cut-off is graded RESCORE_PASSES more times
+    (one extra batch per pass, at most RESCORE_MAX_BATCHES extra calls) and
+    keeps the per-dimension median. The spend of those calls is in `spend`
+    like every other call's, and `rescore` says what was re-scored.
     """
-    batches = deal(candidates, BATCH)
-    merged: dict = {}
+    candidates = list(candidates or [])
+    index_batches = deal(list(range(len(candidates))), BATCH)
     errors: list[str] = []
     spends: list = []
-    if batches:
-        with ContextExecutor(
-                max_workers=min(MAX_CONCURRENCY, len(batches))) as pool:
-            futures = [pool.submit(score_batch, b, profile) for b in batches]
-            for fut in concurrent.futures.as_completed(futures):
-                try:
-                    r = fut.result()
-                except Exception as e:
-                    logger.exception("event_intel_scorer: batch crashed")
-                    errors.append("A scoring batch failed: %s" % str(e)[:200])
-                    continue
-                spends.append(r.get("spend"))
-                if r.get("error"):
-                    errors.append(r["error"])
-                merged.update(r.get("scores") or {})
+    results = _run([([candidates[i] for i in idx], {}) for idx in index_batches],
+                   profile, errors, spends)
 
-    scored, unscored = [], []
-    for c in candidates:
+    readings: dict = {}
+    for idx, r in zip(index_batches, results):
+        batch = [candidates[i] for i in idx]
+        for i, s in zip(idx, _resolve(batch, (r or {}).get("scores") or {})):
+            if s:
+                readings[i] = [s]
+
+    # Which first readings sit on a line, closest first.
+    near = sorted(((d, (candidates[i].get("name") or "").lower(), i)
+                   for i, rs in readings.items()
+                   if not rubric.has_finished(candidates[i])
+                   for d in [borderline_distance(rs[0], candidates[i])]
+                   if d is not None))
+    room = BATCH * RESCORE_MAX_BATCHES // max(1, RESCORE_PASSES)
+    chosen = [i for _, _, i in near[:min(BATCH, room)]]
+    skipped = [candidates[i].get("name") for _, _, i in near[len(chosen):]]
+    rescore_spends: list = []
+    if chosen:
+        batch = [candidates[i] for i in chosen]
+        passes = min(RESCORE_PASSES, RESCORE_MAX_BATCHES)
+        again = _run([(batch, {"rescore_pass": p + 1}) for p in range(passes)],
+                     profile, errors, rescore_spends)
+        for r in again:
+            for i, s in zip(chosen, _resolve(batch, (r or {}).get("scores") or {})):
+                if s and all(s.get(d) is not None for d in rubric.DIMENSIONS):
+                    readings[i].append(s)
+    spends.extend(rescore_spends)
+
+    scored, unscored, rescored = [], [], []
+    for i, c in enumerate(candidates):
         c = dict(c)
-        s = _lookup(merged, c.get("name") or "")
+        rs = readings.get(i)
+        s = rs[0] if rs else None
         if not s:
             c["unscored"] = True
             c["scoring_note"] = ("The scoring pass returned no result for this "
@@ -342,6 +605,15 @@ def score_all(candidates: list[dict], profile: dict) -> dict:
                    sum(rubric.DIMENSION_MAX[d] for d in missing)))
             unscored.append(c)
             continue
+        if len(rs) > 1:
+            s = _median_reading(rs)
+            c["rescored"] = True
+            c["score_readings"] = [{d: r[d] for d in rubric.DIMENSIONS}
+                                   for r in rs]
+            c["score_spread"] = {d: max(r[d] for r in rs) - min(r[d] for r in rs)
+                                 for d in rubric.DIMENSIONS}
+            c["rescore_note"] = _rescore_note(rs)
+            rescored.append(c.get("name"))
         for dim in rubric.DIMENSIONS:
             c[dim] = s[dim]
             c[dim + "_note"] = s[dim + "_note"]
@@ -349,7 +621,11 @@ def score_all(candidates: list[dict], profile: dict) -> dict:
         c["client_line"] = s["client_line"]
         scored.append(c)
     return {"scored": scored, "unscored": unscored,
-            "errors": errors, "batches": len(batches),
+            "errors": errors, "batches": len(index_batches),
+            "rescore": {"events": rescored,
+                        "calls": len(rescore_spends),
+                        "not_rescored": skipped,
+                        "spend": claude_websearch.spend_sum(*rescore_spends)},
             "spend": claude_websearch.spend_sum(*spends)}
 
 

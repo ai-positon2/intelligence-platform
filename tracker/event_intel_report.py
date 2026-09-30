@@ -26,6 +26,9 @@ attendance figures are the event's own unverified claims.
 
 from __future__ import annotations
 
+import re as _re
+
+from . import claude_websearch
 from . import event_intel_rubric as rubric
 
 MAX_TOP = 5
@@ -156,6 +159,59 @@ _SENTENCE = __import__("re").compile(
     r"[\s\S]+?(?:[.!?](?=\s+[A-Z(\"\u201c])|[.!?]$|$)")
 
 
+# ── Developer detail, kept out of a client's report ──────────────────────
+#
+# The writers now store claude_websearch.reader_reason(err). Runs stored
+# before that carry the developer detail, and they are still opened and
+# printed, so every renderer here reads a stored string through reader_text.
+# Two live examples, both printed to a client:
+#
+#   Scoring: "Max_tokens: Ran out of output budget before finishing
+#             (stop_reason=max_tokens). Raise max_tokens or lower max_uses.."
+#   Audit:   "...for the one it was given, max_tokens: Ran out of output
+#             budget before finishing (stop_reason=max_tokens). Raise
+#             max_tokens or lower max_uses."
+
+_KIND_PREFIX = _re.compile(
+    r"\b(%s)\s*:\s*" % "|".join(sorted(
+        (_re.escape(k) for k in claude_websearch.READER_REASON),
+        key=len, reverse=True)), _re.I)
+_PLUMBING = _re.compile(
+    r"max_tokens|max_uses|stop_reason|web_search|server_tool|"
+    r"\b(raise|lower)\s+max|output budget|tool_use|\bHTTP\s*\d{3}\b|"
+    r"Traceback|Exception|Error\(", _re.I)
+_PAREN = _re.compile(r"\s*\(([^()]*(?:\([^()]*\)[^()]*)*)\)")
+_SENTENCE_SPLIT = _re.compile(r"(?<=[.!?])\s+(?=[A-Z(\"\u201c])")
+
+
+def reader_text(text) -> str:
+    """A stored string with our plumbing taken out, safe to print.
+
+    Known error kinds at the head of a clause ("max_tokens: ...") become the
+    reader clause for that kind; a parenthetical or sentence that talks about
+    the tooling is dropped; doubled full stops collapse; em and en dashes
+    become commas. If nothing readable is left, the generic reader clause is
+    returned rather than the original: printing the plumbing is the defect.
+    """
+    t = " ".join(str(text or "").split())
+    if not t:
+        return ""
+    t = claude_websearch.strip_em_dash(t)
+    t = _KIND_PREFIX.sub(
+        lambda m: claude_websearch.reader_reason(m.group(1).lower()) + ". ", t)
+    if _PLUMBING.search(t):
+        t = _PAREN.sub(lambda m: "" if _PLUMBING.search(m.group(1)) else m.group(0), t)
+        kept = [x for x in _SENTENCE_SPLIT.split(t)
+                if x.strip() and not _PLUMBING.search(x)]
+        t = " ".join(kept).strip()
+    t = _re.sub(r"\.(\s*\.)+", ".", t)
+    t = _re.sub(r"\s+([.,;:])", r"\1", t).strip()
+    t = _re.sub(r",\s*\.", ".", t)
+    if not t:
+        t = claude_websearch.reader_reason(None) + "."
+    return t[0].upper() + t[1:]
+
+
 def _fmt_where(c: dict) -> str:
     return ", ".join([x for x in (c.get("city"), c.get("country")) if x]) or "location unconfirmed"
 
@@ -207,7 +263,8 @@ def notes(*, shortfall: list, audit: dict, generic: dict,
           finished: list | None = None,
           promoted: dict | None = None,
           scoring_batches: int = 0,
-          graded: int | None = None) -> list[dict]:
+          graded: int | None = None,
+          rescored: list | None = None) -> list[dict]:
     """Everything this run could not establish, as {level, head, detail}.
 
     Ordered by how much it should change a reader's confidence, not by the
@@ -279,7 +336,7 @@ def notes(*, shortfall: list, audit: dict, generic: dict,
         add(LEVEL_GAP, "The famous-event audit produced no usable result",
             "Any marquee event below has not been weighed against a more "
             "targeted alternative and may be there out of habit. %s"
-            % audit["error"])
+            % reader_text(audit["error"]))
     elif audit and audit.get('comparison_only') and audit.get('checked'):
         failed = audit.get('failed') or {}
         add(LEVEL_GAP if failed else LEVEL_NOTE,
@@ -337,13 +394,22 @@ def notes(*, shortfall: list, audit: dict, generic: dict,
     pr = promoted or {}
     added, unconfirmed = pr.get("promoted") or [], pr.get("unconfirmed") or []
     not_attempted = pr.get("not_attempted") or []
-    if (added or unconfirmed or not_attempted) and (audit or {}).get('comparison_only'):
+    dups = pr.get("duplicates") or []
+    dup_line = ("%s turned out to be %s already on this list, so %s not added "
+                "twice: %s. " % (
+                    _n(len(dups), "named alternative", "named alternatives"),
+                    "an event" if len(dups) == 1 else "events",
+                    "it was" if len(dups) == 1 else "they were",
+                    "; ".join("%s is %s" % (d.get("name"), d.get("same_as"))
+                              for d in dups[:6]))) if dups else ""
+    if (added or unconfirmed or not_attempted or dups) and (audit or {}).get('comparison_only'):
         add(LEVEL_THIN if unconfirmed or not_attempted else LEVEL_NOTE,
             'Alternatives researched: %d confirmed, %d unresolved, %d not attempted' %
             (len(added), len(unconfirmed), len(not_attempted)),
             'Confirmed alternatives proceed to source checks and scoring. An unavailable replacement '
-            'does not remove the original event. %s' % _names(added + unconfirmed + not_attempted))
-    elif added or unconfirmed or not_attempted:
+            'does not remove the original event. %s%s' % (
+                dup_line, _names(added + unconfirmed + not_attempted)))
+    elif added or unconfirmed or not_attempted or dups:
         bits = []
         if added:
             bits.append("%s %s named by the audit as a better fit than a "
@@ -364,10 +430,10 @@ def notes(*, shortfall: list, audit: dict, generic: dict,
                         % (_names(not_attempted),
                            "was" if len(not_attempted) == 1 else "were",
                            len(added) + len(unconfirmed)))
-        add(LEVEL_NOTE if added and not unconfirmed else LEVEL_THIN,
+        add(LEVEL_NOTE if (added or dups) and not unconfirmed else LEVEL_THIN,
             "Replacements for cut marquee events: %d in, %d unconfirmed"
             % (len(added), len(unconfirmed)),
-            "%s." % "; ".join(bits))
+            (dup_line + ("%s." % "; ".join(bits) if bits else "")).strip())
 
     if generic:
         if not generic.get("measured"):
@@ -407,12 +473,38 @@ def notes(*, shortfall: list, audit: dict, generic: dict,
             "below publish one at all."
             % (len(claimed), len(candidates or [])))
 
-    if unscored:
+    # Two different facts share `unscored`. The pipeline appends the events
+    # its own rules set aside (sold out, outside the window, on the
+    # exclusion list, a failed source check) to the scorer's unscored list,
+    # and the report called all of them "could not be scored", which reads
+    # as a hole in the analysis when the analysis did exactly what the client
+    # asked. The scorer marks its own with `unscored`; a row the pipeline set
+    # aside carries its reasons in `scoring_note` and no such mark (or an
+    # explicit `set_aside`). A bare row with neither is treated as the gap,
+    # which is the safe reading for a caller that predates the split.
+    set_aside = [u for u in (unscored or [])
+                 if u.get("set_aside") or (not u.get("unscored")
+                                           and u.get("scoring_note"))]
+    missing = [u for u in (unscored or []) if u not in set_aside]
+    if missing:
         add(LEVEL_GAP,
             "%s could not be scored"
-            % _n(len(unscored), "event", "events"),
+            % _n(len(missing), "event", "events"),
             "Left out of the ranking rather than ranked low: %s."
-            % _names(unscored, cap=6))
+            % _names(missing, cap=6))
+    if set_aside:
+        add(LEVEL_NOTE,
+            "%s set aside by your rules or source checks"
+            % _n(len(set_aside), "event was", "events were"),
+            "Not scored, because %s: %s."
+            % ("it fails a rule on your profile or a check on its sources"
+               if len(set_aside) == 1 else
+               "each fails a rule on your profile or a check on its sources",
+               "; ".join("%s (%s)" % (u.get("name"),
+                                      reader_text(u.get("scoring_note")).rstrip("."))
+                         for u in set_aside[:6] if u.get("name"))
+               + ("; and %d more" % (len(set_aside) - 6)
+                  if len(set_aside) > 6 else "")))
 
     # More than one grading pass means more than one grader, and totals from
     # different passes were never compared side by side. The candidates are
@@ -437,10 +529,25 @@ def notes(*, shortfall: list, audit: dict, generic: dict,
             "the rubric, but two events one point apart may have been graded "
             "in different passes, so treat small gaps near the top as a tie.")
 
+    if rescored:
+        add(LEVEL_NOTE,
+            "%s near a cut-off %s scored again"
+            % (_n(len(rescored), "event", "events"),
+               "was" if len(rescored) == 1 else "were"),
+            "A score moves by a few points between readings, so an event "
+            "within %d points of a line was graded up to three times and the "
+            "median kept: %s."
+            % (rubric.BORDERLINE_MARGIN, _names(rescored, cap=8)))
+
     if scoring_errors:
+        # Scrubbed, because a stored run from before the writers were fixed
+        # carries "Max_tokens: Ran out of output budget ... Raise max_tokens
+        # or lower max_uses.." and this is printed to the client.
+        said = [reader_text(e) for e in scoring_errors[:3]]
         add(LEVEL_GAP,
             "Scoring reported %s" % _n(len(scoring_errors), "error", "errors"),
-            "; ".join(scoring_errors[:3]) + ".")
+            " ".join(x if x.endswith((".", "!", "?")) else x + "."
+                     for x in said if x))
 
     if interchangeable:
         add(LEVEL_THIN,
@@ -476,7 +583,9 @@ def notes(*, shortfall: list, audit: dict, generic: dict,
             % ", ".join("%s (ended %s)" % (f.get("name"), f.get("ends_on") or "?")
                         for f in finished[:6]))
 
-    gapped = [c for c in (candidates or []) if c.get("gaps")]
+    # A re-score caveat is not an unmeasured field, so it does not count here.
+    gapped = [c for c in (candidates or [])
+              if [g for g in (c.get("gaps") or []) if not rubric.is_rescore_note(g)]]
     if gapped:
         add(LEVEL_THIN,
             "%s an unmeasured field"
@@ -488,15 +597,30 @@ def notes(*, shortfall: list, audit: dict, generic: dict,
     # maximum length. rank() computes this precisely so it can be said; a list
     # truncated in silence reads as "nothing else qualified", which is a
     # different and false claim.
-    if over_cap:
+    #
+    # rank() puts BOTH overflows in over_cap: recommended events past the cap,
+    # and worth-a-look options past the cap (marked cap_bucket=worth_a_look).
+    # Naming them together said "2 further events cleared the bar: Gamma
+    # Summit, Zeta Fair" when Zeta Fair scored 58 and cleared nothing.
+    cleared = [c for c in (over_cap or []) if c.get("cap_bucket") != "worth_a_look"]
+    options = [c for c in (over_cap or []) if c.get("cap_bucket") == "worth_a_look"]
+    if cleared:
         add(LEVEL_THIN,
             "%s cleared the bar but fell outside the maximum list length"
-            % _n(len(over_cap), "further event", "further events"),
+            % _n(len(cleared), "further event", "further events"),
             "So %s not shown: %s. Raise the maximum on the client profile to "
             "see %s."
-            % ("it is" if len(over_cap) == 1 else "they are",
-               _names(over_cap),
-               "it" if len(over_cap) == 1 else "them"))
+            % ("it is" if len(cleared) == 1 else "they are",
+               _names(cleared),
+               "it" if len(cleared) == 1 else "them"))
+    if options:
+        add(LEVEL_THIN,
+            "%s worth a look fell outside the maximum list length"
+            % _n(len(options), "further option", "further options"),
+            "Below the bar but aimed at your buyers, and not shown only "
+            "because of the list length: %s. Raise the maximum on the client "
+            "profile to see %s."
+            % (_names(options), "it" if len(options) == 1 else "them"))
 
     if not out:
         add(LEVEL_OK, "Nothing material was left unmeasured on this run")
@@ -606,6 +730,12 @@ def status_labels(rows: list[dict], cap: int = rubric.DEFAULT_CAP,
     # win over the finished/excluded default a row would otherwise get if it
     # somehow appeared in more than one bucket.
     _set(ranked["excluded"], "Excluded, below the bar")
+    # Excluded for the audience, not the total: said as such, because "below
+    # the bar" beside a 72 reads as an arithmetic error.
+    for c in ranked["excluded"]:
+        label = _excluded_label(c)
+        if label:
+            _set([c], label)
     _set(ranked["finished"], "Edition already finished")
     _set(ranked["over_cap"], "Cleared the bar, cut only by list length")
     _set(ranked["worth_a_look"],
@@ -613,9 +743,33 @@ def status_labels(rows: list[dict], cap: int = rubric.DEFAULT_CAP,
         "client's")
     _set(ranked["kept"], "Recommended")
     for key in committed & set(out):
-        out[key] = ("Recommended: already committed, did not clear the bar "
-                    "on its own merits")
+        out[key] = COMMITTED_BELOW_LABEL
+    off = {name_key(c.get("name") or "")
+           for c in ranked.get("committed_off_audience") or []}
+    for key in off & set(out):
+        out[key] = COMMITTED_OFF_AUDIENCE_LABEL
     return out
+
+
+OFF_AUDIENCE_LABEL = "Excluded: the audience is not mainly this client's buyers"
+COMMITTED_BELOW_LABEL = ("Recommended: already committed, did not clear the "
+                         "bar on its own merits")
+COMMITTED_OFF_AUDIENCE_LABEL = ("Recommended: already committed, but the "
+                                "audience is not mainly this client's buyers")
+
+
+UNMEASURED_AUDIENCE_LABEL = ("Excluded: the audience was never measured "
+                             "against this client's buyers")
+
+
+def _excluded_label(row: dict) -> str | None:
+    """The label for a row the relevance gate excluded, or None when it was
+    the total that excluded it and "below the bar" is the true statement."""
+    if rubric.relevance_clears(row):
+        return None
+    _, readable = rubric.read_subscore(rubric.DIM_RELEVANCE,
+                                       row.get(rubric.DIM_RELEVANCE))
+    return OFF_AUDIENCE_LABEL if readable else UNMEASURED_AUDIENCE_LABEL
 
 
 def selection_snapshot(ranked, profile):
@@ -635,13 +789,38 @@ def selection_snapshot(ranked, profile):
             row['event_identity'] = event_key(row)
             row['disposition'] = bucket
             row['status_label'] = label
-            if bucket == 'kept' and row.get('committed') and (row.get('total') or 0) < 70:
-                row['status_label'] = 'Recommended: already committed, did not clear the bar on its own merits'
+            # RANK_FLOOR, not a typed 70: a second copy of the bar drifts
+            # from the one rank() applies the moment anybody moves it.
+            if bucket == 'kept' and row.get('committed'):
+                if (row.get('total') or 0) < rubric.RANK_FLOOR:
+                    row['status_label'] = COMMITTED_BELOW_LABEL
+                elif not rubric.relevance_clears(row):
+                    row['status_label'] = COMMITTED_OFF_AUDIENCE_LABEL
+            if bucket == 'excluded' and _excluded_label(row):
+                row['status_label'] = _excluded_label(row)
             if bucket == 'over_cap' and row.get('cap_bucket') == 'worth_a_look':
                 row['status_label'] = 'Worth a look, omitted only by list length'
             groups[bucket].append(row)
     return dict(groups, version=1, as_of=date.today().isoformat(),
                 profile=deepcopy(profile), counts=deepcopy(ranked['counts']))
+
+
+# The levels the page has a label for. The pipeline appends a note at level
+# 'warn' ("Research is incomplete") that no renderer knows, so the page
+# printed it with no tally label; it means a hole, so it reads as one.
+_LEVEL_ALIASES = {"warn": LEVEL_GAP, "warning": LEVEL_GAP, "error": LEVEL_GAP}
+KNOWN_LEVELS = (LEVEL_GAP, LEVEL_THIN, LEVEL_NOTE, LEVEL_OK)
+
+
+def present_note(n):
+    """One stored note, as the page may render it: a known level, and no
+    developer detail in the head or the detail."""
+    if not isinstance(n, dict):
+        return reader_text(n)
+    level = str(n.get("level") or LEVEL_NOTE).lower()
+    level = level if level in KNOWN_LEVELS else _LEVEL_ALIASES.get(level, LEVEL_NOTE)
+    return dict(n, level=level, head=reader_text(n.get("head")),
+                detail=reader_text(n.get("detail")) if n.get("detail") else "")
 
 
 def disabled_cross_client_check():
@@ -687,12 +866,15 @@ def present_run(run, profile, rows, decisions):
             return [strip_cross(v) for v in value]
         return value
     summary = strip_cross(summary)
-    summary['notes'] = [n for n in summary.get('notes', [])
+    summary['notes'] = [present_note(n) for n in summary.get('notes', [])
                         if 'watched by other clients' not in str(n).lower()
                         and 'cross-client check' not in str(n).lower()]
-    summary['assumptions'] = [n for n in summary.get('assumptions', [])
+    summary['assumptions'] = [reader_text(n) for n in summary.get('assumptions', [])
                               if 'watched by other clients' not in str(n).lower()
                         and 'cross-client check' not in str(n).lower()]
+    summary['unscored'] = [dict(u, note=reader_text(u.get('note')) or None)
+                           if isinstance(u, dict) else u
+                           for u in summary.get('unscored') or []]
     summary['generic'] = disabled_cross_client_check()
     selection = strip_cross(selection)
     all_rows = []
@@ -726,6 +908,13 @@ def executive_summary(*, profile: dict, ranked: dict, **kw) -> dict:
     client = p.get("client_name") or "Client"
     counts = (ranked or {}).get("counts") or {}
     r = ranked or {}
+    # Every re-scored row, whichever bucket it landed in: a re-score is most
+    # interesting precisely for the event it moved off the list.
+    rescored = [c for bucket in ("kept", "worth_a_look", "excluded", "over_cap")
+                for c in (r.get(bucket) or [])
+                if c.get("rescored") or any(rubric.is_rescore_note(g)
+                                            for g in (c.get("gaps") or []))]
+    kw.setdefault("rescored", rescored)
     facts = notes(candidates=r.get("kept") or [],
                   over_cap=r.get("over_cap") or [],
                   finished=r.get("finished") or [],
@@ -824,6 +1013,12 @@ def apply_outcome_pattern(candidates: list[dict], pattern: dict) -> list[dict]:
     rank() has already put in the SAME bucket; it must never be given the
     unbucketed, uncapped list to sort (call it separately on `kept` and on
     `worth_a_look`, after rank() has already decided both).
+
+    Sorted by TIER first and only then by the nudged total, so the nudge
+    reorders within a tier and never across one. Sorting on total plus
+    adjustment alone moved a P2 at 76+5 above a P1 at 82-5, and the P1 then
+    fell out of "Top five must-attend", which is the first five rows of
+    `kept`: a five-point preference was overruling the rubric's own tiers.
     """
     from . import event_intel_rubric as rubric
     by_cat = (pattern or {}).get("by_category") or {}
@@ -838,8 +1033,11 @@ def apply_outcome_pattern(candidates: list[dict], pattern: dict) -> list[dict]:
         c["outcome_adjustment_basis"] = verdict["basis"]
         c["outcome_adjustment_reason"] = verdict["reason"]
         out.append(c)
-    out.sort(key=lambda c: (-((c.get("total") or 0) + (c.get("outcome_adjustment") or 0)),
-                            (c.get("name") or "").lower()))
+    order = {rubric.TIER_P1: 0, rubric.TIER_P2: 1, rubric.TIER_P3: 2}
+    out.sort(key=lambda c: (
+        order.get(c.get("tier") or rubric.tier_for(c.get("total") or 0), 2),
+        -((c.get("total") or 0) + (c.get("outcome_adjustment") or 0)),
+        (c.get("name") or "").lower()))
     return out
 
 
