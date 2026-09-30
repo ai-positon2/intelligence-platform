@@ -51,6 +51,9 @@ _EDITION_WORDS = {'spring', 'summer', 'fall', 'autumn', 'winter', 'europe', 'asi
 
 
 def _fold(text):
+    # Accents are dropped: an organizer writes "Salon" in its nav and
+    # "Salón" in its hero, and a model echoes either (audit, 2026-09-30).
+    text = ''.join(c for c in unicodedata.normalize('NFKD', text) if not unicodedata.combining(c))
     text = unicodedata.normalize('NFKC',text).casefold().replace('&',' and ')
     return ' '.join(re.findall(r'\w+',text))
 
@@ -244,8 +247,8 @@ _CLOCK = re.compile(r'\b\d{1,2}[:.]\d{2}\s*(?:[ap]\.?m\.?)?\s*(?:-|\u2013|\u2014
 
 
 _MONTH = (r'(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)[a-z]*\.?')
-_DAY_RANGE = re.compile(r'\b(\d{1,2})(?:st|nd|rd|th)?\s*[-\u2013\u2014]\s*\d{1,2}(?:st|nd|rd|th)?\s+'+_MONTH+
-                        r'(?:,?\s+(20\d{2}))?|\b'+_MONTH+r'\s+(\d{1,2})(?:st|nd|rd|th)?\s*[-\u2013\u2014]\s*'
+_DAY_RANGE = re.compile(r'\b(\d{1,2})(?:st|nd|rd|th)?\s*[-\u2010-\u2014\u2212]\s*\d{1,2}(?:st|nd|rd|th)?\s+'+_MONTH+
+                        r'(?:,?\s+(20\d{2}))?|\b'+_MONTH+r'\s+(\d{1,2})(?:st|nd|rd|th)?\s*[-\u2010-\u2014\u2212]\s*'
                         r'\d{1,2}(?:st|nd|rd|th)?(?:,?\s+(20\d{2}))?', re.I)
 
 
@@ -504,13 +507,78 @@ def _access(text, event_name, dates):
     return observations, blocking
 
 
+# Range separators as organizers type them: hyphen, the Unicode hyphens,
+# figure dash, en and em dash, minus sign (U+2012 and U+2212 both occur in
+# CMS output), and words.
+_RANGE_SEP = r'(?:[-\u2010-\u2014\u2212]|to|through|thru|until|till)'
+
+
+def _month_rx(m):
+    """A month as organizers write it: "September", "Sep", "Sep." and the
+    most common US form, "Sept"/"Sept." (audit, 2026-09-30: "Sept 9-11,
+    2026" was held for want of it)."""
+    forms = [calendar.month_name[m], calendar.month_abbr[m] + r'\.?']
+    if m == 9:
+        forms.insert(1, r'Sept\.?')
+    return '(?:' + '|'.join(forms) + ')'
+
+
+def _weekday_rx(d):
+    """An optional weekday before a date, and only the right one: a wrong
+    weekday is another year's edition."""
+    return r'(?:(?:' + calendar.day_name[d.weekday()] + '|' + calendar.day_abbr[d.weekday()] + r'\.?),?\s+)?'
+
+
+def _day_rx(d):
+    return str(d.day) + r'(?:st|nd|rd|th)?'
+
+
+class _DatePattern:
+    """A compiled date pattern that refuses two kinds of near miss.
+
+    A one-day pattern refuses a match inside a range. Audit, 2026-09-30: a
+    one-day candidate dated 11 September was admitted from "TechConf 9-11
+    September 2026", because "11 September 2026" is in it. A date with a
+    day or month and a range separator right before it, or a separator and
+    a day or month right after it, is the end or start of a range.
+
+    Any pattern refuses a match right after a weekday: the right weekday is
+    part of the pattern and would have been matched with it, so "Tuesday,
+    21 and Thursday, 22 April 2027" is another year's calendar."""
+    _MONTHS = '|'.join(sorted(_MONTH_NAMES, key=len, reverse=True))
+    _BEFORE = re.compile(r'(?:\d(?:st|nd|rd|th)?|\b(?:' + _MONTHS + r')\.?)\s*(?:' + _RANGE_SEP + r'|&|and)\s*$', re.I)
+    _AFTER = re.compile(r'\s*(?:' + _RANGE_SEP + r'|&|and)\s*(?:\d|(?:' + _MONTHS + r')\b)', re.I)
+    _WEEKDAY = re.compile(r'\b(?:' + '|'.join(sorted(_WEEKDAYS, key=len, reverse=True)) + r')\.?,?\s*$', re.I)
+
+    def __init__(self, rx, single):
+        self.rx, self.single = rx, single
+
+    def finditer(self, text, pos=0):
+        for m in self.rx.finditer(text, pos):
+            before = text[max(0, m.start()-24):m.start()]
+            if self._WEEKDAY.search(before):
+                continue
+            if self.single and (self._BEFORE.search(before) or self._AFTER.match(text, m.end())):
+                continue
+            yield m
+
+    def search(self, text, pos=0):
+        return next(self.finditer(text, pos), None)
+
+    def sub(self, repl, text):
+        out, last = [], 0
+        for m in self.finditer(text):
+            out += [text[last:m.start()], repl]
+            last = m.end()
+        return ''.join(out + [text[last:]])
+
+
 def _date_patterns(start, end, text=""):
     """Explicit ISO or English dates/ranges; unsupported formats stay unknown."""
     def single(d):
-        month = '(?:' + calendar.month_name[d.month] + '|' + calendar.month_abbr[d.month] + r'\.?)'
-        day = str(d.day) + r'(?:st|nd|rd|th)?'
-        out = [re.escape(d.isoformat()), month + r'\s+' + day + r',?\s+' + str(d.year),
-               day + r'\s+' + month + r',?\s+' + str(d.year)]
+        month, day, wd = _month_rx(d.month), _day_rx(d), _weekday_rx(d)
+        out = [re.escape(d.isoformat()), wd + month + r'\s+' + day + r',?\s+' + str(d.year),
+               wd + day + r'\s+(?:of\s+)?' + month + r',?\s+' + str(d.year)]
         # Numeric ordering must be explicit or unambiguous.
         formats = re.findall(r"\b(?:DD[/.-]MM|MM[/.-]DD)[/.-](?:YYYY|YY)\b", text, re.I)
         orders = {f[:2].upper() for f in formats}
@@ -527,20 +595,35 @@ def _date_patterns(start, end, text=""):
                         for yy in (str(d.year), str(d.year)[2:]):
                             out.append(re.escape(aa + sep + bb + sep + yy))
         return out
+    wrap = lambda p: _DatePattern(re.compile(r'(?<!\w)' + p + r'(?!\w)', re.I), start == end)
+    if start == end:
+        return [wrap(p) for p in single(start)]
     patterns = []
     for a in single(start):
         for b in single(end):
-            patterns.append(a if start == end else a + r'.{0,35}?' + b)
-    if start.year == end.year and start.month == end.month and start != end:
-        month = '(?:' + calendar.month_name[start.month] + '|' + calendar.month_abbr[start.month] + r'\.?)'
-        days = str(start.day) + r'(?:st|nd|rd|th)?\s*(?:-|–|—|to|through)\s*' + str(end.day) + r'(?:st|nd|rd|th)?'
-        patterns += [month + r'\s+' + days + r',?\s+' + str(start.year),
-                     days + r'\s+' + month + r',?\s+' + str(start.year)]
-    if start.year == end.year and start.month != end.month:
-        left = '(?:'+calendar.month_name[start.month]+'|'+calendar.month_abbr[start.month]+r'\.?)'
-        right = '(?:'+calendar.month_name[end.month]+'|'+calendar.month_abbr[end.month]+r'\.?)'
-        patterns.append(left+r'\s+'+str(start.day)+r'\s*(?:-|–|—|to)\s*'+right+r'\s+'+str(end.day)+r',?\s+'+str(end.year))
-    return [re.compile(r'(?<!\w)' + p + r'(?!\w)', re.I) for p in patterns]
+            patterns.append(a + r'.{0,35}?' + b)
+    sep = r'\s*' + _RANGE_SEP + r'\s*'
+    ws, we = _weekday_rx(start), _weekday_rx(end)
+    ms, me = _month_rx(start.month), _month_rx(end.month)
+    ds, de = _day_rx(start), _day_rx(end)
+    if start.year == end.year and start.month == end.month:
+        # "21 & 22 April 2027", "Wednesday, 21 and Thursday, 22 April 2027":
+        # a joining word covers the whole range only when the days touch.
+        seps = [sep] + ([r'\s*(?:&|and)\s*'] if (end - start).days == 1 else [])
+        for j in seps:
+            patterns += [ws + ms + r'\s+' + ds + j + we + de + r',?\s+' + str(start.year),
+                         ws + ds + j + we + de + r'\s+' + ms + r',?\s+' + str(start.year)]
+    if start.year == end.year:
+        # "November 2 - November 6, 2026", "30 October - 2 November 2026",
+        # "Monday 2 November - Friday 6 November 2026".
+        patterns += [ws + ms + r'\s+' + ds + sep + we + me + r'\s+' + de + r',?\s+' + str(end.year),
+                     ws + ds + r'\s+' + ms + sep + we + de + r'\s+' + me + r',?\s+' + str(end.year)]
+    elif end.year == start.year + 1 and end.month < start.month:
+        # "December 30 - January 2, 2027": the year is written once, on the
+        # end, and the start is the December before it.
+        patterns += [ws + ms + r'\s+' + ds + sep + we + me + r'\s+' + de + r',?\s+' + str(end.year),
+                     ws + ds + r'\s+' + ms + sep + we + de + r'\s+' + me + r',?\s+' + str(end.year)]
+    return [wrap(p) for p in patterns]
 
 
 def _structured_date(value):
@@ -639,7 +722,29 @@ def _structured_support(rows, names, start, end):
 # with its name routinely carries only its parent conference's dates.
 
 # A dash between two numbers is a date range ("8 - 10 June 2027"), not a separator.
-_TITLE_SEGMENTS = re.compile(r'\s+[|\u00b7\u2022]\s+|:\s+|(?<!\d)\s+[\u2013\u2014-]\s+|\s+[\u2013\u2014-]\s+(?!\d)')
+_TITLE_SEGMENTS = re.compile(r'\s+[|\u00b7\u2022]\s+|:\s+|\s+[-\u2010-\u2014\u2212]\s+')
+_RANGE_LEFT = re.compile(r'(?:\b\d{1,2}(?:st|nd|rd|th)?|\b(?:' + '|'.join(sorted(_MONTH_NAMES, key=len, reverse=True)) + r')\.?)$', re.I)
+_RANGE_RIGHT = re.compile(r'(?:\d|(?:' + '|'.join(sorted(_MONTH_NAMES | _WEEKDAYS, key=len, reverse=True)) + r')\b)', re.I)
+_SEPARATOR_MARKS = ('|', ':', '\u00b7', '\u2022')
+
+
+class _TitleSplit:
+    # A spaced dash between two parts of a date is a range, not a
+    # separator: "8 - 10 June 2027", and since the 2026-09-30 audit also
+    # "30 October - 2 November 2026" and "December 30 - January 2, 2027",
+    # which the old digit-only rule cut in two. A year before the dash is
+    # not a day: "The Phocuswright Conference 2026 - November 17-19".
+    @staticmethod
+    def split(title):
+        out, last = [], 0
+        for m in _TITLE_SEGMENTS.finditer(title):
+            if (m.group(0).strip() not in _SEPARATOR_MARKS
+                    and _RANGE_LEFT.search(title[last:m.start()])
+                    and _RANGE_RIGHT.match(title, m.end())):
+                continue
+            out.append(title[last:m.start()])
+            last = m.end()
+        return out + [title[last:]]
 _TITLE_LEAD = {'attend', 'join', 'register', 'for', 'welcome', 'to', 'the',
                'official', 'home', 'us'}
 _TITLE_NEXT = {'in', 'on', 'is', 'returns', 'from', 'will', 'takes', 'taking'}
@@ -686,7 +791,7 @@ def _foreign_segment(segment, names):
 
 def _title_support(titles, names, start, end):
     for title in titles or []:
-        segments = [x for x in _TITLE_SEGMENTS.split(title) if x.strip()]
+        segments = [x for x in _TitleSplit.split(title) if x.strip()]
         if not segments:
             continue
         tail = _title_owns(segments[0], names)
@@ -788,7 +893,7 @@ def _title_identifies(titles, names, year):
     for title in titles or []:
         if any(y != str(year) for y in re.findall(r'\b20\d{2}\b', title)):
             continue
-        segments = [x for x in _TITLE_SEGMENTS.split(title) if x.strip()]
+        segments = [x for x in _TitleSplit.split(title) if x.strip()]
         tail = _title_owns(segments[0], names) if segments else None
         if tail and tail[0] == str(year):
             tail = tail[1:]  # "MRC Vegas 2027" is the plainest title there is.
@@ -804,7 +909,7 @@ def _title_identifies(titles, names, year):
 def _title_noun(title, names, year):
     """The generic noun the title gives the event, if any: "Conference" in
     "Smarter Faster Payments Conference", "summit" in "CMO Summit"."""
-    tail = [w for w in (_title_owns(_TITLE_SEGMENTS.split(title)[0], names) or []) if w != str(year)]
+    tail = [w for w in (_title_owns(_TitleSplit.split(title)[0], names) or []) if w != str(year)]
     if tail and tail[0] in _OWN_NOUNS:
         return tail[0]
     last = names[0].split()[-1] if names and names[0].split() else ''
