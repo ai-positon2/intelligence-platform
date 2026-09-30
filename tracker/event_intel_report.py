@@ -394,13 +394,22 @@ def notes(*, shortfall: list, audit: dict, generic: dict,
     pr = promoted or {}
     added, unconfirmed = pr.get("promoted") or [], pr.get("unconfirmed") or []
     not_attempted = pr.get("not_attempted") or []
-    if (added or unconfirmed or not_attempted) and (audit or {}).get('comparison_only'):
+    dups = pr.get("duplicates") or []
+    dup_line = ("%s turned out to be %s already on this list, so %s not added "
+                "twice: %s. " % (
+                    _n(len(dups), "named alternative", "named alternatives"),
+                    "an event" if len(dups) == 1 else "events",
+                    "it was" if len(dups) == 1 else "they were",
+                    "; ".join("%s is %s" % (d.get("name"), d.get("same_as"))
+                              for d in dups[:6]))) if dups else ""
+    if (added or unconfirmed or not_attempted or dups) and (audit or {}).get('comparison_only'):
         add(LEVEL_THIN if unconfirmed or not_attempted else LEVEL_NOTE,
             'Alternatives researched: %d confirmed, %d unresolved, %d not attempted' %
             (len(added), len(unconfirmed), len(not_attempted)),
             'Confirmed alternatives proceed to source checks and scoring. An unavailable replacement '
-            'does not remove the original event. %s' % _names(added + unconfirmed + not_attempted))
-    elif added or unconfirmed or not_attempted:
+            'does not remove the original event. %s%s' % (
+                dup_line, _names(added + unconfirmed + not_attempted)))
+    elif added or unconfirmed or not_attempted or dups:
         bits = []
         if added:
             bits.append("%s %s named by the audit as a better fit than a "
@@ -421,10 +430,10 @@ def notes(*, shortfall: list, audit: dict, generic: dict,
                         % (_names(not_attempted),
                            "was" if len(not_attempted) == 1 else "were",
                            len(added) + len(unconfirmed)))
-        add(LEVEL_NOTE if added and not unconfirmed else LEVEL_THIN,
+        add(LEVEL_NOTE if (added or dups) and not unconfirmed else LEVEL_THIN,
             "Replacements for cut marquee events: %d in, %d unconfirmed"
             % (len(added), len(unconfirmed)),
-            "%s." % "; ".join(bits))
+            (dup_line + ("%s." % "; ".join(bits) if bits else "")).strip())
 
     if generic:
         if not generic.get("measured"):
@@ -464,12 +473,38 @@ def notes(*, shortfall: list, audit: dict, generic: dict,
             "below publish one at all."
             % (len(claimed), len(candidates or [])))
 
-    if unscored:
+    # Two different facts share `unscored`. The pipeline appends the events
+    # its own rules set aside (sold out, outside the window, on the
+    # exclusion list, a failed source check) to the scorer's unscored list,
+    # and the report called all of them "could not be scored", which reads
+    # as a hole in the analysis when the analysis did exactly what the client
+    # asked. The scorer marks its own with `unscored`; a row the pipeline set
+    # aside carries its reasons in `scoring_note` and no such mark (or an
+    # explicit `set_aside`). A bare row with neither is treated as the gap,
+    # which is the safe reading for a caller that predates the split.
+    set_aside = [u for u in (unscored or [])
+                 if u.get("set_aside") or (not u.get("unscored")
+                                           and u.get("scoring_note"))]
+    missing = [u for u in (unscored or []) if u not in set_aside]
+    if missing:
         add(LEVEL_GAP,
             "%s could not be scored"
-            % _n(len(unscored), "event", "events"),
+            % _n(len(missing), "event", "events"),
             "Left out of the ranking rather than ranked low: %s."
-            % _names(unscored, cap=6))
+            % _names(missing, cap=6))
+    if set_aside:
+        add(LEVEL_NOTE,
+            "%s set aside by your rules or source checks"
+            % _n(len(set_aside), "event was", "events were"),
+            "Not scored, because %s: %s."
+            % ("it fails a rule on your profile or a check on its sources"
+               if len(set_aside) == 1 else
+               "each fails a rule on your profile or a check on its sources",
+               "; ".join("%s (%s)" % (u.get("name"),
+                                      reader_text(u.get("scoring_note")).rstrip("."))
+                         for u in set_aside[:6] if u.get("name"))
+               + ("; and %d more" % (len(set_aside) - 6)
+                  if len(set_aside) > 6 else "")))
 
     # More than one grading pass means more than one grader, and totals from
     # different passes were never compared side by side. The candidates are
@@ -562,15 +597,30 @@ def notes(*, shortfall: list, audit: dict, generic: dict,
     # maximum length. rank() computes this precisely so it can be said; a list
     # truncated in silence reads as "nothing else qualified", which is a
     # different and false claim.
-    if over_cap:
+    #
+    # rank() puts BOTH overflows in over_cap: recommended events past the cap,
+    # and worth-a-look options past the cap (marked cap_bucket=worth_a_look).
+    # Naming them together said "2 further events cleared the bar: Gamma
+    # Summit, Zeta Fair" when Zeta Fair scored 58 and cleared nothing.
+    cleared = [c for c in (over_cap or []) if c.get("cap_bucket") != "worth_a_look"]
+    options = [c for c in (over_cap or []) if c.get("cap_bucket") == "worth_a_look"]
+    if cleared:
         add(LEVEL_THIN,
             "%s cleared the bar but fell outside the maximum list length"
-            % _n(len(over_cap), "further event", "further events"),
+            % _n(len(cleared), "further event", "further events"),
             "So %s not shown: %s. Raise the maximum on the client profile to "
             "see %s."
-            % ("it is" if len(over_cap) == 1 else "they are",
-               _names(over_cap),
-               "it" if len(over_cap) == 1 else "them"))
+            % ("it is" if len(cleared) == 1 else "they are",
+               _names(cleared),
+               "it" if len(cleared) == 1 else "them"))
+    if options:
+        add(LEVEL_THIN,
+            "%s worth a look fell outside the maximum list length"
+            % _n(len(options), "further option", "further options"),
+            "Below the bar but aimed at your buyers, and not shown only "
+            "because of the list length: %s. Raise the maximum on the client "
+            "profile to see %s."
+            % (_names(options), "it" if len(options) == 1 else "them"))
 
     if not out:
         add(LEVEL_OK, "Nothing material was left unmeasured on this run")
