@@ -413,6 +413,36 @@ def _ensure_tables(conn) -> None:
                 UNIQUE (profile_id, event_identity)
             )
         """)
+        # One row per run: the last Apollo company match and what it spent.
+        # The resolve route is the only billed route in this agent, and
+        # without a record of a finished match every repeat press (or a
+        # cross-site replay) billed the whole roster again.
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS evi_resolutions (
+                run_id INTEGER PRIMARY KEY REFERENCES evi_runs(id),
+                email TEXT NOT NULL,
+                titles_key TEXT NOT NULL DEFAULT '',
+                state VARCHAR(16) NOT NULL,
+                result JSONB,
+                started_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+                finished_at TIMESTAMPTZ
+            )
+        """)
+        # Paid work this agent does outside any run: the typeahead company
+        # search (Apollo credits) and profile drafting (Claude calls). Neither
+        # has a run to hang a ledger row on, and both used to be unrecorded.
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS evi_account_usage (
+                id BIGSERIAL PRIMARY KEY,
+                email TEXT NOT NULL,
+                kind VARCHAR(32) NOT NULL,
+                calls INTEGER NOT NULL DEFAULT 0,
+                credits INTEGER NOT NULL DEFAULT 0,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+            )
+        """)
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_evi_account_usage "
+                    "ON evi_account_usage (email, created_at)")
         from .event_intel_evidence import schema
         schema(cur)
         from .event_intel_jobs import schema as jobs_schema
@@ -728,6 +758,122 @@ def update_participant_resolution(participant_ids: list[int], domain: str | None
         conn.commit()
     except Exception as e:
         logger.warning("event_intel_store.update_participant_resolution failed: %s", e)
+    finally:
+        conn.close()
+
+
+# ── company resolution record, and account-level usage ───────────────────
+
+RESOLVE_STALE_MINUTES = 10
+
+
+def begin_resolution(run_id: int, email: str, titles_key: str):
+    """Decide whether a company match may spend credits, atomically.
+
+    Returns ("cached", result) when this run was already matched with the
+    same titles, ("busy", None) when a match is in progress (one younger than
+    RESOLVE_STALE_MINUTES, which is far past gunicorn's request timeout), or
+    ("go", None) after taking the run's slot. (None, None) if storage is
+    unavailable. The row lock makes two simultaneous presses one match."""
+    conn = _pg_conn()
+    if conn is None:
+        return None, None
+    try:
+        _ensure_tables(conn)
+        with conn.cursor() as cur:
+            cur.execute("INSERT INTO evi_resolutions (run_id, email, titles_key, state) "
+                        "VALUES (%s, %s, %s, 'new') ON CONFLICT (run_id) DO NOTHING",
+                        (run_id, email, titles_key))
+            cur.execute("SELECT state, titles_key, result, "
+                        "started_at < now() - %s * interval '1 minute' "
+                        "FROM evi_resolutions WHERE run_id = %s AND email = %s FOR UPDATE",
+                        (RESOLVE_STALE_MINUTES, run_id, email))
+            row = cur.fetchone()
+            if row is None:
+                conn.rollback()
+                return None, None
+            state, key, result, stale = row
+            if state == "done" and key == titles_key:
+                conn.commit()
+                return "cached", result
+            if state == "running" and not stale:
+                conn.commit()
+                return "busy", None
+            cur.execute("UPDATE evi_resolutions SET state = 'running', titles_key = %s, "
+                        "started_at = now(), finished_at = NULL WHERE run_id = %s",
+                        (titles_key, run_id))
+        conn.commit()
+        return "go", None
+    except Exception as e:
+        logger.warning("event_intel_store.begin_resolution failed: %s", e)
+        return None, None
+    finally:
+        conn.close()
+
+
+def finish_resolution(run_id: int, state: str, result: dict | None,
+                      titles_key: str | None = None) -> None:
+    """Record how a match ended. `done` makes a repeat request free; `failed`
+    lets the next request try again."""
+    conn = _pg_conn()
+    if conn is None:
+        return
+    try:
+        _ensure_tables(conn)
+        with conn.cursor() as cur:
+            cur.execute("UPDATE evi_resolutions SET state = %s, result = %s, "
+                        "titles_key = COALESCE(%s, titles_key), finished_at = now() "
+                        "WHERE run_id = %s",
+                        (state, json.dumps(result) if result is not None else None,
+                         titles_key, run_id))
+        conn.commit()
+    except Exception as e:
+        logger.warning("event_intel_store.finish_resolution failed: %s", e)
+    finally:
+        conn.close()
+
+
+def record_account_usage(email: str, kind: str, calls: int = 0, credits: int = 0) -> None:
+    if not (calls or credits):
+        return
+    conn = _pg_conn()
+    if conn is None:
+        return
+    try:
+        _ensure_tables(conn)
+        with conn.cursor() as cur:
+            cur.execute("INSERT INTO evi_account_usage (email, kind, calls, credits) "
+                        "VALUES (%s, %s, %s, %s)", (email, kind, int(calls), int(credits)))
+        conn.commit()
+    except Exception as e:
+        logger.warning("event_intel_store.record_account_usage failed: %s", e)
+    finally:
+        conn.close()
+
+
+def account_usage(email: str, hours: int = 24) -> dict:
+    """{kind: {"calls": n, "credits": n}} over the last `hours`, plus the
+    run ledger's provider calls under "run_calls"."""
+    conn = _pg_conn()
+    if conn is None:
+        return {}
+    try:
+        _ensure_tables(conn)
+        out = {}
+        with conn.cursor() as cur:
+            cur.execute("SELECT kind, COALESCE(sum(calls), 0), COALESCE(sum(credits), 0) "
+                        "FROM evi_account_usage WHERE email = %s "
+                        "AND created_at >= now() - %s * interval '1 hour' GROUP BY kind",
+                        (email, hours))
+            for kind, calls, credits in cur.fetchall():
+                out[kind] = {"calls": int(calls), "credits": int(credits)}
+            cur.execute("SELECT count(*) FROM evi_provider_calls WHERE email = %s "
+                        "AND created_at >= now() - %s * interval '1 hour'", (email, hours))
+            out["run_calls"] = {"calls": int(cur.fetchone()[0]), "credits": 0}
+        return out
+    except Exception as e:
+        logger.warning("event_intel_store.account_usage failed: %s", e)
+        return {}
     finally:
         conn.close()
 

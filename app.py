@@ -47,6 +47,20 @@ if not _SECRET_KEY_ENV:
     )
 app.secret_key = _SECRET_KEY_ENV
 app.permanent_session_lifetime = timedelta(days=7)
+# SameSite=Lax: the session cookie is not sent on a cross-site POST, fetch or
+# iframe load, so another site cannot drive a signed-in user's state-changing
+# routes (an audit replayed Event & Conference Intelligence's billed resolve
+# route from a form on another origin). Checked before setting it app-wide:
+# sign-in is Google Identity Services with a JS callback that POSTs to
+# /auth/google from this origin; no route uses an OAuth redirect or
+# form_post callback; no route sends CORS headers or is called with
+# credentials from another site; every iframe on the platform either embeds
+# another site (whose own cookies are unaffected) or embeds a same-origin
+# path (client portal dashboards). Links from email and Slack are top-level
+# GET navigations, which Lax still sends the cookie on. Chrome already treats
+# a cookie with no SameSite attribute as Lax, so this mainly brings Safari
+# and Firefox users into line with what most users already had.
+app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 # Flask's own default (no max_age configured) sends every static file with an
 # explicit "Cache-Control: no-cache" -- not merely no header -- so browsers were
 # re-validating JS/CSS/images/fonts on every navigation instead of serving them
@@ -9269,6 +9283,66 @@ def social_media_intelligence_run(run_id):
 # per call). Same rule Contact Finder arrived at over thirteen audit rounds:
 # only an explicit user action reaches a billed endpoint.
 
+_EVI_PREFIX = "/p2/strategic-agents/event-conference-intelligence"
+
+
+def _evi_same_origin() -> bool:
+    """True unless the browser says this request came from another site.
+
+    Browsers send Origin on every cross-origin POST (a form, or fetch in any
+    mode), and "null" from sandboxed frames and no-referrer pages, so a
+    present Origin must name this host exactly. With no Origin, a present
+    Referer must. With neither, the caller is not a browser acting on a
+    user's behalf (a test client, curl with a copied cookie), which is not a
+    cross-site request forgery. Hosts are compared without the scheme: behind
+    Railway's proxy the app sees http while the browser says https."""
+    from urllib.parse import urlsplit
+    host = (request.host or "").lower()
+    origin = request.headers.get("Origin")
+    if origin is not None:
+        return origin != "null" and urlsplit(origin).netloc.lower() == host
+    referer = request.headers.get("Referer")
+    if referer:
+        return urlsplit(referer).netloc.lower() == host
+    return True
+
+
+@app.before_request
+def _evi_state_change_guard():
+    """Every POST under Event & Conference Intelligence: same origin, JSON.
+
+    The routes read `get_json(silent=True) or {}`, so a form-encoded POST from
+    another site reached them as an empty body and succeeded: an audit billed
+    Apollo twice with one form on another origin, and cancelled a run with
+    another. A form can only send urlencoded, multipart or text/plain, and a
+    cross-site fetch cannot send application/json without a CORS preflight
+    this app never answers, so requiring JSON closes that on its own; the
+    Origin/Referer check closes it again for any browser that sends them.
+
+    The single exception is a POST with no body and no Content-Type at all,
+    which is what the page's own cancel button sends (fetch with no body).
+    No HTML form can produce one: a form always sends a Content-Type.
+
+    Scoped to this agent's prefix, and only for a signed-in Position2 user:
+    anyone else falls through to the route's own position2_required, so a
+    logged-out visitor is still redirected to sign in, never told 415."""
+    if request.method != "POST" or not (
+            request.path == _EVI_PREFIX or request.path.startswith(_EVI_PREFIX + "/")):
+        return None
+    user = _get_user() or {}
+    if not (user.get("email") or "").lower().endswith("@position2.com"):
+        return None
+    if not _evi_same_origin():
+        app.logger.warning("event conference intelligence: refused cross-site POST to %s "
+                           "(Origin=%r Referer=%r)", request.path,
+                           request.headers.get("Origin"), request.headers.get("Referer"))
+        return jsonify(error="This request came from another site and was refused."), 403
+    bodiless = not request.content_length and not request.headers.get("Content-Type")
+    if not request.is_json and not bodiless:
+        return jsonify(error="This action needs a JSON request."), 415
+    return None
+
+
 @app.route("/p2/strategic-agents/event-conference-intelligence")
 @position2_required
 def event_conference_intelligence():
@@ -9380,10 +9454,24 @@ def event_conference_intelligence_search():
     SCI's run history, since that is the equivalent "something to show while
     the vendor is down" for this agent."""
     from tracker import sci_company_search, event_intel_store
-    q = (request.args.get("q") or "").strip()
-    if not q:
+    q = " ".join((request.args.get("q") or "").split())
+    # Apollo bills ~1 credit for every search that returns a company, and the
+    # page searches on each debounced keystroke. So: nothing under two
+    # characters (the page's own minimum), one answer per normalised query
+    # for ten minutes, a per-account budget, and every billed call recorded.
+    if len(q) < _EVI_SEARCH_MIN_CHARS:
         return jsonify({"companies": []})
-    email = (_get_user() or {}).get("email") or ""
+    email = ((_get_user() or {}).get("email") or "").lower()
+    key = q.lower()
+    hit = _evi_search_cache_get(key)
+    if hit is not None:
+        return jsonify({"companies": hit, "cached": True})
+    if _cpi_rate_limited("evi-search", email):
+        return jsonify({"companies": event_intel_store.search_known_profiles(email, q),
+                        "error": {"code": "rate_limited", "retryable": True,
+                                  "message": "Searching paused for a moment after a lot "
+                                             "of lookups. Keep typing, or pick one of "
+                                             "your saved clients."}}), 429
     result = sci_company_search.search_companies_result(q)
     companies = result.get("companies") or []
     err = result.get("error")
@@ -9396,13 +9484,49 @@ def event_conference_intelligence_search():
             "message": sci_company_search.describe_error(err),
             "retryable": sci_company_search.is_retryable(err),
         }
-        if email.lower() in ADMIN_EMAILS:
+        if email in ADMIN_EMAILS:
             payload["error"]["detail"] = err.get("detail") or ""
             payload["error"]["status"] = err.get("status")
             payload["error"]["attempts"] = err.get("attempts")
         app.logger.warning("event conference intelligence search failed for "
                           "%r: %s (%s)", q, err.get("kind"), err.get("detail"))
+    else:
+        _evi_search_cache_put(key, companies)
+        # Apollo bills a search that returned at least one organisation.
+        event_intel_store.record_account_usage(email, "company_search", calls=1,
+                                               credits=1 if companies else 0)
     return jsonify(payload)
+
+
+_EVI_SEARCH_MIN_CHARS = 2
+_EVI_SEARCH_TTL = 600
+_EVI_SEARCH_MAX_ENTRIES = 500
+_EVI_SEARCH_CACHE: dict = {}
+_EVI_SEARCH_LOCK = threading.Lock()
+
+
+def _evi_search_cache_get(key):
+    """Per-process and deliberately short. A company search result is the
+    same for every user (it is Apollo's directory, not anyone's data), so
+    the cache is not per account."""
+    now = time.time()
+    with _EVI_SEARCH_LOCK:
+        entry = _EVI_SEARCH_CACHE.get(key)
+        if entry and now - entry[0] < _EVI_SEARCH_TTL:
+            return entry[1]
+        _EVI_SEARCH_CACHE.pop(key, None)
+        return None
+
+
+def _evi_search_cache_put(key, companies):
+    now = time.time()
+    with _EVI_SEARCH_LOCK:
+        if len(_EVI_SEARCH_CACHE) >= _EVI_SEARCH_MAX_ENTRIES:
+            for k in [k for k, v in _EVI_SEARCH_CACHE.items() if now - v[0] >= _EVI_SEARCH_TTL]:
+                _EVI_SEARCH_CACHE.pop(k, None)
+            while len(_EVI_SEARCH_CACHE) >= _EVI_SEARCH_MAX_ENTRIES:
+                _EVI_SEARCH_CACHE.pop(min(_EVI_SEARCH_CACHE, key=lambda k: _EVI_SEARCH_CACHE[k][0]))
+        _EVI_SEARCH_CACHE[key] = (now, companies)
 
 
 @app.route("/p2/strategic-agents/event-conference-intelligence/profiles/draft",
@@ -9433,15 +9557,49 @@ def event_conference_intelligence_profile_draft():
     if _cpi_rate_limited("evi-draft-profile", email):
         return jsonify({"error": "Too many drafts in a row. Wait a moment and "
                                  "try again."}), 429
+    from tracker import event_intel_store
+    from tracker.event_intel_jobs import _daily_limit
+    # The same rolling-24-hour call cap the research runs obey, when an
+    # operator has set one. Drafts make Claude calls outside any run, so they
+    # were under no daily cap at all.
+    call_limit = _daily_limit("EVI_DAILY_CALL_LIMIT")
+    if call_limit:
+        usage = event_intel_store.account_usage(email)
+        used = sum(v.get("calls", 0) for k, v in usage.items()
+                   if k in ("run_calls", "profile_draft"))
+        if used >= call_limit:
+            return jsonify({"error": "This account has used its research allowance "
+                                     "for the last 24 hours. Fill the form in by hand, "
+                                     "or try again later."}), 429
     body = request.get_json(silent=True) or {}
     out = event_intel_intake.draft_profile(body.get("client_name") or "",
                                            body.get("website") or "")
+    kind = (out.get("error") or {}).get("kind")
+    if kind != "bad_request":
+        # One Claude call per draft: the direct read, or the search fallback
+        # when the site could not be read. Only a refused request makes none.
+        event_intel_store.record_account_usage(email, "profile_draft", calls=1)
     if out.get("error"):
-        kind = out["error"]["kind"]
         code = 400 if kind in ("bad_request", "wrong_company") else 502
-        return jsonify({"error": out["error"]["detail"], "kind": kind,
+        return jsonify({"error": _evi_draft_error_message(out["error"]), "kind": kind,
                         "sources": out.get("sources") or []}), code
     return jsonify(out)
+
+
+# Intake writes these details itself, for the person filling the form in. Any
+# other kind came up from claude_websearch, whose `detail` is written for the
+# log ("Raise max_tokens or lower max_uses") and must never reach the page.
+_EVI_DRAFT_READER_KINDS = ("bad_request", "wrong_company", "unreadable")
+
+
+def _evi_draft_error_message(err):
+    from tracker.claude_websearch import reader_reason
+    if err.get("kind") in _EVI_DRAFT_READER_KINDS and err.get("detail"):
+        return err["detail"]
+    app.logger.warning("event conference intelligence draft failed: %s (%s)",
+                       err.get("kind"), err.get("detail"))
+    return ("The draft could not be written because %s. Try again, or fill the "
+            "form in by hand." % reader_reason(err))
 
 
 @app.route("/p2/strategic-agents/event-conference-intelligence/profiles/<int:profile_id>",
@@ -9576,6 +9734,16 @@ def event_conference_intelligence_status(run_id):
     run = event_intel_store.get_run(run_id, email)
     if not run:
         abort(404)
+    if run.get("status") == "running" and os.environ.get("DATABASE_URL"):
+        # A run nobody can pick up (the worker is down, or was replaced by a
+        # build that cannot run it) is failed here, where the page is
+        # watching, since a worker that is down cannot sweep its own queue.
+        try:
+            from tracker import event_intel_jobs
+            if event_intel_jobs.expire_stale(run_id=run_id):
+                run = event_intel_store.get_run(run_id, email) or run
+        except Exception:
+            app.logger.exception("event conference intelligence: stale-job sweep failed")
     return jsonify({"run_id": run_id, "status": run["status"],
                     "stage": run.get("stage"), "error": run.get("error"),
                     "credits_spent": run.get("credits_spent", 0)})
@@ -9601,8 +9769,12 @@ def event_conference_intelligence_run_detail(run_id):
             run['summary'] = run.get('summary') or {}
             spend = run['summary']['spend'] = run['summary'].get('spend') or {}
             spend['legacy_fixed_rate_usd'] = spend.get('usd')
-            spend['usd'] = run['execution_ledger']['cost_estimate']['estimated_usd']
-            spend['pricing_basis'] = 'Execution ledger model-specific list-rate estimate; not invoice reconciled.'
+            estimate = run['execution_ledger']['cost_estimate']
+            spend['usd'] = estimate['estimated_usd']
+            spend['usd_partial'] = bool(estimate.get('partial'))
+            spend['pricing_basis'] = 'Execution ledger model-specific list-rate estimate; not invoice reconciled.' + (
+                ' Partial: calls without reported usage are counted at their reserved allowance.'
+                if estimate.get('partial') else '')
     run["events"] = event_intel_store.get_events(run_id)
     run["participants"] = event_intel_store.get_participants(run_id)
     # Always sent, never conditionally. The list of pages that could NOT be
@@ -9635,13 +9807,55 @@ def event_conference_intelligence_run_detail(run_id):
 def event_conference_intelligence_resolve(run_id):
     """The only billed route in this agent. Spends Apollo credits, so it is
     never reached by the background pipeline and never by page load."""
-    from tracker import event_intel_pipeline
+    from tracker import event_intel_pipeline, event_intel_store
     email = (_get_user() or {}).get("email", "").lower()
-    payload = request.get_json(silent=True) or {}
-    titles = [t.strip() for t in (payload.get("titles") or []) if str(t).strip()][:20]
-    result = event_intel_pipeline.resolve_run_companies(run_id, email, titles or None)
-    if result.get("error") == "not_found":
+    run = event_intel_store.get_run(run_id, email)
+    if not run:
         abort(404)
+    payload = request.get_json(silent=True) or {}
+    raw_titles = payload.get("titles") or []
+    if not isinstance(raw_titles, list):
+        return jsonify(error="Titles must be a list."), 400
+    titles = [str(t).strip()[:120] for t in raw_titles if str(t).strip()][:20]
+    if run.get("status") != "complete":
+        # Resolution rewrites the run's stage and its roster rows, so it only
+        # runs on a finished roster, never under a run still being written.
+        return jsonify(error="This run is still in progress. Match companies "
+                             "once it has finished."), 409
+    if _cpi_rate_limited("evi-resolve", email):
+        return jsonify(error="Too many company matches in a row. Wait a moment "
+                             "and try again."), 429
+    # Order and case do not change what Apollo is asked for.
+    titles_key = json.dumps(sorted({t.lower() for t in titles}))
+    state, stored = event_intel_store.begin_resolution(run_id, email, titles_key)
+    if state is None:
+        return jsonify(error="Could not match companies. Storage is unavailable."), 500
+    if state == "cached":
+        return jsonify(dict(stored or {}, already_resolved=True, credits=0,
+                            credits_previously_spent=(stored or {}).get("credits", 0)))
+    if state == "busy":
+        return jsonify(error="Companies for this run are already being matched. "
+                             "The results will appear when that finishes."), 409
+    if not titles and any(p.get("resolution") in ("matched", "no_match")
+                          for p in event_intel_store.get_participants(run_id)):
+        # Matched before this record existed. Never billed again by default.
+        legacy = {"resolved": None, "credits": 0, "already_resolved": True,
+                  "credits_previously_spent": run.get("credits_spent", 0),
+                  "note": "Companies were already matched for this run."}
+        event_intel_store.finish_resolution(run_id, "done", legacy)
+        return jsonify(legacy)
+    try:
+        result = event_intel_pipeline.resolve_run_companies(run_id, email, titles or None)
+    except Exception:
+        event_intel_store.finish_resolution(run_id, "failed", None)
+        raise
+    if result.get("error") == "not_found":
+        event_intel_store.finish_resolution(run_id, "failed", None)
+        abort(404)
+    # A match that hit an error left some domains unattempted; a later press
+    # may try again. A clean one is final for these titles.
+    event_intel_store.finish_resolution(run_id, "failed" if result.get("error") else "done",
+                                        result)
     return jsonify(result)
 
 
@@ -13130,6 +13344,13 @@ _CPI_RATE_LIMITS = {
     # "tli-collect" is shared across all four collect-* phases since a
     # normal run fires each exactly once -- this bounds a scripted loop,
     # not a legitimate multi-phase run or a couple of manual retries.
+    # Event & Conference Intelligence's typeahead company search is Apollo
+    # (~1 credit per search that returns a company), fired per debounced
+    # keystroke and cached for ten minutes per query, same budget as the
+    # TLI typeahead below. Its company match is the agent's one billed
+    # action and a deliberate click, so a handful a minute is plenty.
+    "evi-search": (30, 60),
+    "evi-resolve": (5, 60),
     "tli-search": (30, 60),
     "tli-resolve": (10, 60),
     "tli-collect": (8, 60),

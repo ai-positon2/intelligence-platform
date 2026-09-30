@@ -57,6 +57,13 @@ def schema(cur):
         stage TEXT NOT NULL, model TEXT NOT NULL, prompt_hash TEXT NOT NULL,
         reserved_tokens BIGINT NOT NULL, reserved_searches INTEGER NOT NULL,
         result JSONB, response JSONB, elapsed_ms INTEGER, created_at TIMESTAMPTZ NOT NULL DEFAULT now())''')
+    # Which worker builds are alive. claim() only takes a job whose payload
+    # names this worker's own code and runtime, so a job waiting on a build
+    # that no longer runs anywhere has to be recognised as stranded rather
+    # than left queued forever; this table is how (see expire_stale).
+    cur.execute('''CREATE TABLE IF NOT EXISTS evi_workers (
+        worker_id TEXT PRIMARY KEY, code_version TEXT NOT NULL,
+        runtime_versions JSONB NOT NULL, seen_at TIMESTAMPTZ NOT NULL DEFAULT now())''')
     cur.execute('CREATE INDEX IF NOT EXISTS idx_evi_jobs_queue ON evi_jobs(state,lease_until,created_at)')
     cur.execute('CREATE INDEX IF NOT EXISTS idx_evi_calls_account ON evi_provider_calls(email,created_at)')
     cur.execute('''CREATE OR REPLACE FUNCTION evi_fence_worker() RETURNS trigger AS $$
@@ -95,6 +102,9 @@ def start(email, mode, query, kwargs, request_key):
             if {k:existing[1].get(k) for k in request_payload} != request_payload:
                 raise ValueError('This request key already belongs to different inputs')
             return existing[0]
+        # A job nobody can ever run (its worker build is gone, or no worker
+        # is up at all) must not hold one of this account's active slots.
+        _expire_stale(cur, email=email)
         cur.execute("SELECT count(*) FROM evi_jobs WHERE email=%s AND state IN ('queued','running')", (email,))
         if cur.fetchone()[0] >= int(os.getenv('EVI_MAX_ACTIVE_PER_ACCOUNT','2')):
             raise ValueError('This account already has the maximum number of active event runs')
@@ -107,27 +117,140 @@ def start(email, mode, query, kwargs, request_key):
         return run_id
 
 
+WORKER_ID = '%s-%d-%s' % (os.uname().nodename if hasattr(os, 'uname') else 'host', os.getpid(), uuid.uuid4().hex[:8])
+# A worker counts as alive for this long after it last claimed, polled or
+# renewed a lease. The idle loop polls every 2 seconds and a busy worker's
+# renewal thread every 20, so two minutes is several missed beats.
+WORKER_ALIVE_SECONDS = 120
+
+ABANDONED_REASON = ('The worker running this call stopped before its outcome was recorded. '
+                    'The call may still have been billed; it is counted at its reservation.')
+
+
+def _touch_worker(cur):
+    cur.execute("""INSERT INTO evi_workers(worker_id,code_version,runtime_versions,seen_at)
+        VALUES (%s,%s,%s::jsonb,now()) ON CONFLICT(worker_id) DO UPDATE
+        SET code_version=EXCLUDED.code_version,runtime_versions=EXCLUDED.runtime_versions,seen_at=now()""",
+                (WORKER_ID, code_version(), json.dumps(runtime_versions())))
+
+
 def claim():
+    """Take the oldest runnable job built for THIS worker's code and runtime.
+
+    A job whose payload names another build is left exactly where it is.
+    During a deploy the web and the worker change about twenty minutes
+    apart, and failing every run submitted, queued or in flight in that
+    window was the old behaviour. Now a new-build job waits for the new
+    worker, an old-build job is finished by an old worker if one is still
+    up, and expire_stale() fails whatever no live worker can ever run once it
+    has waited QUEUE_WAIT_LIMIT_MINUTES.
+
+    Re-claiming a job whose previous lease expired also reconciles that
+    lease's provider calls: a call with no recorded outcome can only belong
+    to the dead lease, so it is marked abandoned (priced at its reservation
+    by event_intel_costs) and reserve_call() lets the retry issue it again.
+    """
     token = str(uuid.uuid4())
     with db() as conn, conn.cursor() as cur:
-        cur.execute("""SELECT run_id,email,payload FROM evi_jobs WHERE NOT cancel_requested
+        _touch_worker(cur)
+        cur.execute("""SELECT run_id,email,payload,state FROM evi_jobs WHERE NOT cancel_requested
             AND (state='queued' OR (state='running' AND lease_until < now())) AND attempts < 3
-            ORDER BY created_at FOR UPDATE SKIP LOCKED LIMIT 1""")
+            AND payload->>'code_version' = %s AND payload->'runtime_versions' = %s::jsonb
+            ORDER BY created_at FOR UPDATE SKIP LOCKED LIMIT 1""",
+                    (code_version(), json.dumps(runtime_versions())))
         row = cur.fetchone()
         if not row:
             return None
+        if row[3] == 'running':
+            cur.execute("""UPDATE evi_provider_calls SET result=jsonb_build_object(
+                    'abandoned',true,'reason',%s::text,'abandoned_at',now()::text,'usage',NULL)
+                WHERE run_id=%s AND result IS NULL""", (ABANDONED_REASON, row[0]))
         cur.execute("UPDATE evi_jobs SET state='running',token=%s,lease_until=now()+interval '90 seconds', attempts=attempts+1,updated_at=now() WHERE run_id=%s", (token,row[0]))
         return dict(run_id=row[0],email=row[1],payload=row[2],token=token)
 
 
 def heartbeat(job):
     with db() as conn, conn.cursor() as cur:
+        _touch_worker(cur)
         cur.execute("UPDATE evi_jobs SET lease_until=now()+interval '90 seconds',updated_at=now() WHERE run_id=%s AND token=%s AND state='running' AND NOT cancel_requested RETURNING run_id", (job['run_id'],job['token']))
         return bool(cur.fetchone())
 
 
-def cancel(run_id,email):
+def _queue_wait_limit_minutes():
+    try:
+        value = int(os.getenv('EVI_QUEUE_WAIT_LIMIT_MINUTES') or 45)
+    except ValueError:
+        return 45
+    return value if value > 0 else 45
+
+
+STRANDED_BY_UPDATE = ('The research service was updated while this run was waiting, so it could '
+                      'not be finished. Nothing more will be spent on it. Start it again.')
+STRANDED_NO_WORKER = ('The research service did not pick this run up in time, so it was stopped '
+                      'before anything was spent on it. Start it again, and tell an admin if this '
+                      'keeps happening.')
+
+
+def _expire_stale(cur, email=None, run_id=None):
+    """Fail jobs no live worker can run once they have waited long enough.
+
+    A job is stranded when it has waited (queued since submission, or
+    orphaned since its lease ran out) longer than the limit, counted from
+    whichever is later: when it started waiting, or when a worker built from
+    its payload's code and runtime was last seen. So a queued job with a
+    matching worker alive is never expired here, however long it has waited:
+    it is behind other work, not stranded. Runs from the web (start, status) as well as the
+    worker, because a worker that is down cannot sweep its own queue."""
+    limit = _queue_wait_limit_minutes()
+    where, args = '', [limit]
+    if email is not None:
+        where += ' AND j.email=%s'
+        args.append(email)
+    if run_id is not None:
+        where += ' AND j.run_id=%s'
+        args.append(run_id)
+    cur.execute("""WITH stranded AS (
+            SELECT j.run_id FROM evi_jobs j
+            WHERE NOT j.cancel_requested
+            AND (j.state='queued' OR (j.state='running' AND j.lease_until < now()))
+            AND GREATEST(CASE WHEN j.state='queued' THEN j.created_at ELSE j.lease_until END,
+                (SELECT max(w.seen_at) FROM evi_workers w WHERE w.code_version=j.payload->>'code_version'
+                    AND w.runtime_versions=j.payload->'runtime_versions'))
+                < now() - %s * interval '1 minute'""" + where + """
+            FOR UPDATE OF j SKIP LOCKED)
+        UPDATE evi_jobs SET state='failed',token=NULL,lease_until=NULL,updated_at=now()
+        WHERE run_id IN (SELECT run_id FROM stranded) RETURNING run_id""", args)
+    expired = [r[0] for r in cur.fetchall()]
+    if expired:
+        cur.execute("SELECT EXISTS (SELECT 1 FROM evi_workers WHERE seen_at > now() - %s * interval '1 second')",
+                    (WORKER_ALIVE_SECONDS,))
+        message = STRANDED_BY_UPDATE if cur.fetchone()[0] else STRANDED_NO_WORKER
+        cur.execute("""UPDATE evi_runs SET status='failed',stage='interrupted',error=%s,updated_at=now()
+            WHERE id = ANY(%s) AND status='running'""", (message, expired))
+    return expired
+
+
+def expire_stale(email=None, run_id=None):
     with db() as conn, conn.cursor() as cur:
+        return _expire_stale(cur, email=email, run_id=run_id)
+
+
+def cancel(run_id,email):
+    """Cancel a queued or running job. A no-op on a run that already ended.
+
+    The pipeline marks a run complete a moment before run_once() marks its
+    job complete. A cancel landing in that gap used to overwrite a finished,
+    paid-for run with "Cancelled by the user". The job row is locked first,
+    so a pipeline write holding it (the fence trigger takes it FOR SHARE)
+    commits before the run's status is read in a fresh statement."""
+    with db() as conn, conn.cursor() as cur:
+        cur.execute("SELECT state FROM evi_jobs WHERE run_id=%s AND email=%s AND state IN ('queued','running') FOR UPDATE", (run_id,email))
+        if not cur.fetchone():
+            return False
+        cur.execute("SELECT status FROM evi_runs WHERE id=%s", (run_id,))
+        status = (cur.fetchone() or [None])[0]
+        if status != 'running':
+            return False
         cur.execute("UPDATE evi_jobs SET cancel_requested=TRUE,state='cancelled',token=NULL,updated_at=now() WHERE run_id=%s AND email=%s AND state IN ('queued','running') RETURNING run_id", (run_id,email))
         changed = bool(cur.fetchone())
         if changed:
@@ -188,12 +311,21 @@ def reserve_call(system,user,model,max_tokens,max_uses):
         cur.execute("SELECT 1 FROM evi_jobs WHERE run_id=%s AND token=%s AND state='running' AND NOT cancel_requested AND lease_until>now()", (job['run_id'],job['token']))
         if not cur.fetchone():
             raise RuntimeError('Event run cancelled or lease lost')
-        cur.execute('SELECT id,response FROM evi_provider_calls WHERE run_id=%s AND stage=%s AND prompt_hash=%s', (job['run_id'],STAGE.get(),call_hash))
-        previous = cur.fetchone()
-        if previous:
-            if previous[1] is None:
+        # Abandoned rows (a dead lease's in-flight calls, see claim()) are
+        # history, not answers. A recorded reply wins over a newer row still
+        # in flight, and a reply that failed for a reason a retry can fix is
+        # re-issued rather than replayed: replaying a cached transport error
+        # to every later attempt made that failure permanent.
+        cur.execute('''SELECT id,response FROM evi_provider_calls WHERE run_id=%s AND stage=%s AND prompt_hash=%s
+            AND NOT COALESCE((result->>'abandoned')::boolean, false)
+            ORDER BY (response IS NOT NULL) DESC, id DESC''', (job['run_id'],STAGE.get(),call_hash))
+        for previous_id, previous in cur.fetchall():
+            if previous is None:
                 raise RuntimeError('A previous provider call has an unknown outcome; manual reconciliation is required before retry')
-            return {'id': previous[0], 'cached': previous[1]}
+            if ((previous.get('error') or {}).get('kind') in RETRYABLE_ERROR_KINDS
+                    or previous.get('pruned_at')):
+                break
+            return {'id': previous_id, 'cached': _rehydrate(previous)}
         call_limit, token_limit = _daily_limit('EVI_DAILY_CALL_LIMIT'), _daily_limit('EVI_DAILY_TOKEN_ALLOWANCE')
         if call_limit or token_limit:
             cur.execute("SELECT count(*),COALESCE(sum(reserved_tokens),0) FROM evi_provider_calls WHERE email=%s AND created_at>=now()-interval '24 hours'", (job['email'],))
@@ -205,13 +337,78 @@ def reserve_call(system,user,model,max_tokens,max_uses):
         return {'id': cur.fetchone()[0], 'cached': None}
 
 
+# Error kinds from claude_websearch that say nothing about the question and
+# everything about the moment it was asked. Their stored reply is kept for the
+# ledger but never replayed as the answer to a retry.
+RETRYABLE_ERROR_KINDS = ('transport', 'empty_response', 'search_limit',
+                         'not_configured', 'no_tool_version')
+
+
+def _stored_response(result):
+    """The reply as stored: one copy of its text, not two.
+
+    claude_websearch returns `text` (citation markup rewritten) and `raw`
+    (exactly as sent). For most replies they are identical, and otherwise
+    `text` is a pure function of `raw`, so every reply used to be stored
+    twice. Only the copy that cannot be rebuilt is kept, with a flag saying
+    how to rebuild the other; _rehydrate() reverses it."""
+    stored = dict(result)
+    text, raw = stored.get('text'), stored.get('raw')
+    if not isinstance(text, str) or not isinstance(raw, str) or not raw:
+        return stored
+    if raw == text:
+        stored.pop('raw')
+        stored['_raw_is_text'] = True
+    else:
+        from .claude_websearch import strip_citation_markup
+        if strip_citation_markup(raw) == text:
+            stored.pop('text')
+            stored['_text_from_raw'] = True
+    return stored
+
+
+def _rehydrate(stored):
+    if not isinstance(stored, dict):
+        return stored
+    out = dict(stored)
+    if out.pop('_raw_is_text', False):
+        out['raw'] = out.get('text')
+    if out.pop('_text_from_raw', False):
+        from .claude_websearch import strip_citation_markup
+        out['text'] = strip_citation_markup(out.get('raw') or '')
+    return out
+
+
 def finish_call(call_id,result,elapsed_ms):
     if call_id is None:
         return
-    # Usage may arrive after cancellation. Keep it for reconciliation.
+    # Usage may arrive after cancellation, or after the lease was lost and
+    # claim() marked the call abandoned. Either way it overwrites the
+    # placeholder: a measured outcome beats a reservation estimate.
     metadata = {k: result.get(k) for k in ('usage','tool_version','search_count','error','stop_reason')}
     with db() as conn, conn.cursor() as cur:
-        cur.execute('UPDATE evi_provider_calls SET result=%s::jsonb,response=%s::jsonb,elapsed_ms=%s WHERE id=%s', (json.dumps(metadata),json.dumps(result),elapsed_ms,call_id))
+        cur.execute('UPDATE evi_provider_calls SET result=%s::jsonb,response=%s::jsonb,elapsed_ms=%s WHERE id=%s',
+                    (json.dumps(metadata),json.dumps(_stored_response(result)),elapsed_ms,call_id))
+
+
+REPLY_RETENTION_DAYS = 30
+
+
+def prune_provider_replies(days=None):
+    """Drop stored reply text older than the retention window.
+
+    Only for jobs that have ended (complete, failed, cancelled): those are
+    never claimed again, so nothing can ask to replay the reply. The row, its
+    reservation and its usage stay; `response` becomes a small non-NULL
+    marker, because NULL means "outcome unknown" to reserve_call()."""
+    days = int(days or os.getenv('EVI_REPLY_RETENTION_DAYS') or REPLY_RETENTION_DAYS)
+    with db() as conn, conn.cursor() as cur:
+        cur.execute("""UPDATE evi_provider_calls c SET response=jsonb_build_object('pruned_at',now()::text,
+                'error',c.response->'error','stop_reason',c.response->'stop_reason')
+            FROM evi_jobs j WHERE j.run_id=c.run_id AND j.state IN ('complete','failed','cancelled')
+            AND c.response IS NOT NULL AND c.response->>'pruned_at' IS NULL
+            AND c.created_at < now() - %s * interval '1 day'""", (days,))
+        return cur.rowcount
 
 
 def _renew_loop(job, stop):
@@ -231,12 +428,29 @@ def _renew_loop(job, stop):
     here would be silently fenced by the trigger despite a valid lease.
     """
     CURRENT.set(job)
-    while not stop.wait(20):
+    delay, failures = RENEW_SECONDS, 0
+    while not stop.wait(delay):
         try:
-            if not heartbeat(job):
-                return
+            renewed = heartbeat(job)
         except Exception:
-            return  # The database fences later writes after lease expiry.
+            # One database blip used to end renewal for good, so the lease
+            # ran out 90 seconds later under a healthy worker and the run was
+            # re-claimed mid-flight. Retry sooner, backing off (2, 4, 8, 16,
+            # 16... seconds, all well inside the 90-second lease), and let
+            # only a definite "this lease is no longer yours" end the loop.
+            import logging
+            logging.warning('Event lease renewal for run %s failed; retrying', job.get('run_id'), exc_info=True)
+            delay = min(RENEW_RETRY_SECONDS * 2 ** failures, RENEW_RETRY_CAP_SECONDS)
+            failures += 1
+            continue
+        if not renewed:
+            return
+        delay, failures = RENEW_SECONDS, 0
+
+
+RENEW_SECONDS = 20
+RENEW_RETRY_SECONDS = 2
+RENEW_RETRY_CAP_SECONDS = 16
 
 
 ORPHAN_ERROR = ('Interrupted. This run started before runs were queued, and the '
@@ -271,6 +485,8 @@ def run_once():
             cur.execute("UPDATE evi_jobs SET state='failed',token=NULL WHERE state='running' AND lease_until<now() AND attempts>=3 RETURNING run_id")
             for (run_id,) in cur.fetchall():
                 cur.execute("UPDATE evi_runs SET status='failed',stage='interrupted',error='Worker recovery attempts exhausted.' WHERE id=%s", (run_id,))
+            # Nor may a job no live worker can run stay queued forever.
+            _expire_stale(cur)
         return False
     stop = threading.Event()
     thread = threading.Thread(target=_renew_loop, args=(job, stop), daemon=True)
@@ -342,10 +558,13 @@ def ledger(run_id,email,replies=False):
         if replies:
             n = REPLY_EXCERPT_CHARS
             for call in job['calls']:
-                text = str((call.pop('response') or {}).get('text') or '')
+                text = str((_rehydrate(call.pop('response')) or {}).get('text') or '')
                 call['reply'] = text if len(text) <= 2 * n else text[:n] + ' [...] ' + text[-n:]
         job['unknown_provider_outcomes'] = sum(c['result'] is None for c in job['calls'])
         job['calls_without_usage'] = sum(not (c['result'] or {}).get('usage') for c in job['calls'])
+        # Calls a dead lease left in flight (see claim()). Their outcome is
+        # still unknown to us; they are counted at their reservation.
+        job['abandoned_calls'] = sum(bool((c['result'] or {}).get('abandoned')) for c in job['calls'])
         job['runtime_versions'] = job['payload'].get('runtime_versions')
         job['code_version'] = job.pop('payload').get('code_version')
         job['billing_status'] = 'usage reported where available; not reconciled to provider invoice'
@@ -364,6 +583,7 @@ def main():
         with db():
             pass
         close_orphaned_runs()
+        prune_provider_replies()
         return
     try:
         close_orphaned_runs()
@@ -373,8 +593,12 @@ def main():
     if args.once:
         run_once()
         return
+    last_prune = 0.0
     while True:
         try:
+            if time.monotonic() - last_prune > 3600:
+                last_prune = time.monotonic()
+                prune_provider_replies()
             if not run_once():
                 time.sleep(2)
         except Exception:
