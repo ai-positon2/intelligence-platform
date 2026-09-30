@@ -174,6 +174,21 @@ FIND_MAX_TOKENS = 9000
 # What the retry asks for, when the first attempt spent its whole search
 # budget and still returned nothing. See `propose_category`.
 RETRY_PER_CATEGORY = 2
+
+# A second, different search per category.
+#
+# What a category finds depends on which pages its six searches happen to
+# land on, so one search is one sample of the category. The same Stripe
+# profile proposed 17, 12 and 10 events in runs 13, 16 and 17 (2026-09-29/30)
+# and recommended 3, 2 and 2, with real events like FTT Embedded Finance and
+# Fintech Meetup found by one run and missed by the next. Repeating the same
+# question mostly returns the same names, so the second search is told what
+# the first found and asked for OTHER events in the category. It runs only
+# when the first search worked and found something (an empty category that
+# searched properly has already answered, and a broken one had its retry),
+# and it may add at most SECOND_PASS_WANT new names, which caps the extra
+# confirmation calls it can cause.
+SECOND_PASS_WANT = 4
 CONFIRM_MAX_USES = 6
 
 # Raised 4000 -> 9000, for the same reason as FIND_MAX_TOKENS above and on
@@ -963,6 +978,21 @@ def _find_user(category: str, want: int, narrowed: bool = False) -> str:
             % (want, label))
 
 
+def _find_more_user(category: str, want: int, already: list) -> str:
+    """The second search's request: the same category, different events."""
+    label = rubric.CATEGORY_LABELS[category]
+    return ("A first search of the \"%s\" category for this client already "
+            "found these events: %s. Do not name any of them again, and do not "
+            "name another edition, regional version or sub-event of them. "
+            "Search for DIFFERENT events that genuinely belong in this "
+            "category and name up to %d. Look where the first search may not "
+            "have: other regions the client covers, trade associations, "
+            "regulators and industry bodies, and vendor or community "
+            "programmes. If there are genuinely no others, return an empty "
+            "array and set search_complete true."
+            % (label, "; ".join(already), want))
+
+
 def _find_reply_is_broken_and_empty(res: dict) -> bool:
     """Whether a find-stage reply is the case FIND_RETRY_BACKOFF_SECONDS
     exists to retry once: nothing found, and not because the model chose to
@@ -989,7 +1019,7 @@ def _find_reply_is_broken_and_empty(res: dict) -> bool:
     return parsed.get("search_complete") is False
 
 
-def propose_category(category: str, profile: dict) -> dict:
+def propose_category(category: str, profile: dict, avoid: list | None = None) -> dict:
     """Stage one: name the candidates in one category. Never raises.
 
     Returns {"category", "status", "proposals", "note", "detail",
@@ -1005,8 +1035,9 @@ def propose_category(category: str, profile: dict) -> dict:
     conclude, which is on a category that came up short.
     """
     system = find_system(category, profile)
-    res = _ask(system, _find_user(category, PER_CATEGORY),
-               max_uses=FIND_MAX_USES, max_tokens=FIND_MAX_TOKENS)
+    want = SECOND_PASS_WANT if avoid else PER_CATEGORY
+    user = _find_more_user(category, want, avoid) if avoid else _find_user(category, want)
+    res = _ask(system, user, max_uses=FIND_MAX_USES, max_tokens=FIND_MAX_TOKENS)
     spend = claude_websearch.spend_of(res)
 
     # A category that came back broken and empty gets one retry, after the
@@ -1014,7 +1045,9 @@ def propose_category(category: str, profile: dict) -> dict:
     # See FIND_RETRY_BACKOFF_SECONDS for why this exists and what it does not
     # cover: a category that found anything, or that ran out of its own
     # search budget, is never retried.
-    if _find_reply_is_broken_and_empty(res):
+    # The second search is extra coverage on top of a search that worked, so
+    # it gets no retry of its own.
+    if not avoid and _find_reply_is_broken_and_empty(res):
         logger.warning("event_intel_discover: category %s came back broken "
                        "with nothing found (error=%s, search_count=%s), "
                        "retrying for %d instead of %d", category,
@@ -1104,7 +1137,7 @@ def propose_category(category: str, profile: dict) -> dict:
         clean = _clean_proposal(c)
         if clean:
             proposals.append(clean)
-    proposals = _dedupe_proposals(proposals)[:PER_CATEGORY]
+    proposals = _dedupe_proposals(proposals)[:want]
     note = _reader_note(parsed.get("note"))
 
     # A search that was cut off is not a category that is empty. The model is
@@ -1474,12 +1507,27 @@ def search_category(category: str, profile: dict) -> dict:
     proposed an event also decided whether to keep it.
     """
     found = propose_category(category, profile)
-    proposals = found["proposals"]
+    proposals = list(found["proposals"])
+    second = None
+    if proposals and found["status"] in (STATUS_OK, STATUS_PARTIAL):
+        second = propose_category(category, profile,
+                                  avoid=[p["name"] for p in proposals])
+        seen = {name_key(p["name"]) for p in proposals}
+        added = [p for p in second["proposals"] if name_key(p["name"]) not in seen]
+        proposals.extend(added)  # propose_category already capped it at SECOND_PASS_WANT
     base = {"category": category, "note": found["note"],
             "error_kind": found.get("error_kind"),
             "proposed": len(proposals), "rejected": [],
             "budget_spent": found.get("budget_spent", False),
-            "spend": found.get("spend") or claude_websearch.spend_sum()}
+            "spend": claude_websearch.spend_sum(
+                found.get("spend"), (second or {}).get("spend"))}
+    if second is not None:
+        # Reported, never folded into the category's status: the first search
+        # already answered for the category, and a second one that failed
+        # means only that there was no extra coverage this time.
+        base["second_search"] = {
+            "status": second["status"],
+            "added": len(proposals) - len(found["proposals"])}
 
     if not proposals:
         return dict(base, status=found["status"], events=[],
@@ -1588,6 +1636,7 @@ def discover(profile: dict) -> dict:
             statuses[cat] = {"status": r["status"], "note": r["note"],
                              "detail": r["detail"],
                              "error_kind": r.get("error_kind"),
+                             "second_search": r.get("second_search"),
                              "label": rubric.CATEGORY_LABELS[cat],
                              "found": len(r["events"]),
                              # Whether the finder ran out of the searches it

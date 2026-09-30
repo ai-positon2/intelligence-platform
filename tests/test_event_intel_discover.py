@@ -471,7 +471,8 @@ def test_a_category_broken_and_empty_on_the_first_try_gets_one_retry(monkeypatch
 
     def fake_ask(system, user, **kw):
         if "YOUR ONLY JOB IS TO NAME CANDIDATES" in system:
-            finds.append(1)
+            if "already found these events" not in user:  # not the second search
+                finds.append(1)
             if len(finds) == 1:
                 return _find_call(_find_reply([], complete=False), budget=False)
             return _find_call(_find_reply(_ONE, complete=True))
@@ -508,7 +509,8 @@ def test_a_category_that_found_anything_despite_being_broken_is_not_retried(monk
 
     def fake_ask(system, user, **kw):
         if "YOUR ONLY JOB IS TO NAME CANDIDATES" in system:
-            finds.append(1)
+            if "already found these events" not in user:  # not the second search
+                finds.append(1)
             return _find_call(_find_reply(_ONE, complete=False), budget=False)
         return _find_call(_confirm_reply(_EVENT))
 
@@ -1147,9 +1149,10 @@ def test_finding_and_confirming_are_separate_calls(monkeypatch):
                      find=_find_reply(_ONE, complete=True),
                      confirm=_confirm_reply(_EVENT))
     D.search_category(R.CAT_EMERGING, PROFILE)
-    assert [c["find"] for c in calls] == [True, False]
-    assert calls[0]["max_uses"] == D.FIND_MAX_USES
-    assert calls[1]["max_uses"] == D.CONFIRM_MAX_USES
+    # The first search, the second (different-events) search, then one confirm.
+    assert [c["find"] for c in calls] == [True, True, False]
+    assert calls[0]["max_uses"] == calls[1]["max_uses"] == D.FIND_MAX_USES
+    assert calls[2]["max_uses"] == D.CONFIRM_MAX_USES
 
 
 def test_a_confirmation_never_sees_the_other_candidates(monkeypatch):
@@ -1419,7 +1422,7 @@ def test_the_budget_never_reaches_either_prompt_that_is_actually_sent(monkeypatc
     monkeypatch.setattr(claude_websearch, "ask", spy)
     D.search_category(R.CAT_EMERGING, PROFILE)
 
-    assert len(sent) == 2, "expected one find and one confirm"
+    assert len(sent) == 3, "expected two finds and one confirm"
     # The value, not the word. The find prompt legitimately says a fake
     # conference "costs somebody a travel budget", and a test that banned the
     # word would have to be weakened until it stopped testing anything.
@@ -1446,7 +1449,7 @@ def test_both_prompts_that_are_sent_carry_todays_date(monkeypatch):
     D.search_category(R.CAT_EMERGING, PROFILE)
 
     today = datetime.date.today().isoformat()
-    assert len(sent) == 2
+    assert len(sent) == 3
     for system in sent:
         assert today in system
 
@@ -1718,3 +1721,96 @@ def test_the_category_report_lists_a_held_back_event_with_its_website(monkeypatc
     assert r["unverified"] == [{"name": "Real Event",
                                 "reason": r["unverified"][0]["reason"],
                                 "website": "https://example.com"}]
+
+
+
+# ── the second, different search ─────────────────────────────────────────
+
+def _two_searches(monkeypatch, first, second, second_error=None, confirm=None):
+    users = []
+
+    def fake_ask(system, user, **kw):
+        if "YOUR ONLY JOB IS TO NAME CANDIDATES" in system:
+            users.append(user)
+            if "already found these events" in user:
+                if second_error:
+                    return {"text": "", "raw": "", "error": second_error, "usage": {},
+                            "search_count": 0, "budget_spent": False, "stop_reason": None}
+                return _find_call(second)
+            return _find_call(first)
+        m = _CONFIRM_TARGET.search(system)
+        name = m.group(1).strip() if m else ""
+        return _find_call(confirm(name) if confirm else _confirm_reply(_named(name=name)))
+
+    monkeypatch.setattr(claude_websearch, "ask", fake_ask)
+    return users
+
+
+def _cand(name):
+    return {"name": name, "website": "https://%s.example/" % name.split()[0].lower(), "why": "w"}
+
+
+def test_the_second_search_is_told_what_the_first_found_and_adds_only_new_events(monkeypatch):
+    users = _two_searches(
+        monkeypatch,
+        _find_reply([_cand("Alpha Summit"), _cand("Beta Forum")], complete=True),
+        _find_reply([_cand("Beta Forum 2027"), _cand("Gamma Expo"), _cand("Delta Congress")], complete=True))
+    r = D.search_category(R.CAT_VERTICAL_SUMMIT, PROFILE)
+    assert len(users) == 2
+    assert "Alpha Summit; Beta Forum" in users[1]
+    assert "up to %d" % D.SECOND_PASS_WANT in users[1]
+    assert sorted(e["name"] for e in r["events"]) == ["Alpha Summit", "Beta Forum", "Delta Congress", "Gamma Expo"]
+    assert r["proposed"] == 4
+    assert r["second_search"] == {"status": D.STATUS_OK, "added": 2}
+
+
+def test_the_second_search_adds_at_most_its_cap(monkeypatch):
+    many = [_cand("Event%d Summit" % i) for i in range(D.SECOND_PASS_WANT + 3)]
+    _two_searches(monkeypatch, _find_reply([_cand("Alpha Summit")], complete=True),
+                  _find_reply(many, complete=True))
+    r = D.search_category(R.CAT_VERTICAL_SUMMIT, PROFILE)
+    assert r["proposed"] == 1 + D.SECOND_PASS_WANT
+
+
+@pytest.mark.parametrize("first", [
+    _find_reply([], complete=True),        # searched properly, nothing there
+    _find_reply([], complete=False),       # broken (it has its own retry)
+])
+def test_no_second_search_when_the_first_found_nothing(monkeypatch, first):
+    monkeypatch.setattr(D, "FIND_RETRY_BACKOFF_SECONDS", 0)
+    users = _two_searches(monkeypatch, first, _find_reply([_cand("Gamma Expo")], complete=True))
+    r = D.search_category(R.CAT_VERTICAL_SUMMIT, PROFILE)
+    assert not any("already found these events" in u for u in users)
+    assert "second_search" not in r
+
+
+def test_a_failed_second_search_costs_the_category_nothing(monkeypatch):
+    _two_searches(monkeypatch, _find_reply([_cand("Alpha Summit")], complete=True), None,
+                  second_error={"kind": "transport", "detail": "reset"})
+    r = D.search_category(R.CAT_VERTICAL_SUMMIT, PROFILE)
+    assert r["status"] == D.STATUS_OK
+    assert [e["name"] for e in r["events"]] == ["Alpha Summit"]
+    assert r["second_search"] == {"status": D.STATUS_ERROR, "added": 0}
+
+
+def test_a_broken_second_search_is_not_retried(monkeypatch):
+    monkeypatch.setattr(D, "FIND_RETRY_BACKOFF_SECONDS", 0)
+    users = _two_searches(monkeypatch, _find_reply([_cand("Alpha Summit")], complete=True),
+                          _find_reply([], complete=False))
+    D.search_category(R.CAT_VERTICAL_SUMMIT, PROFILE)
+    assert sum("already found these events" in u for u in users) == 1
+
+
+def test_the_second_searchs_spend_is_counted(monkeypatch):
+    _two_searches(monkeypatch, _find_reply([_cand("Alpha Summit")], complete=True),
+                  _find_reply([_cand("Gamma Expo")], complete=True))
+    r = D.search_category(R.CAT_VERTICAL_SUMMIT, PROFILE)
+    assert r["spend"]["calls"] == 4   # two searches and two confirms
+
+
+def test_the_run_report_carries_what_each_second_search_added(monkeypatch):
+    _two_searches(monkeypatch, _find_reply([_cand("Alpha Summit")], complete=True),
+                  _find_reply([_cand("Gamma Expo")], complete=True))
+    out = D.discover(PROFILE)
+    assert all(s["second_search"] == {"status": D.STATUS_OK, "added": 1}
+               for s in out["statuses"].values())
