@@ -241,7 +241,8 @@ def test_access_checks_show_failures_and_escape_quoted_terms(fixture):
         session['google_user']={'email':email}
     html=http.get('/p2/strategic-agents/event-conference-intelligence/runs/'+str(rid)+'/plan',
                   query_string={'profile_id':profile,'event_identity':event_key(row)}).get_data(as_text=True)
-    assert '&lt;script&gt;' in html and 'Registration · blocked' in html
+    assert '&lt;script&gt;' in html and 'Registration page · Could not be read' in html
+    assert 'Registration · blocked' not in html
     assert '<script>alert(1)</script>' not in html
 
 

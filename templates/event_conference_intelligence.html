@@ -1627,6 +1627,28 @@
       return String(text).replace(ISO_IN_TEXT, function(m){ return fmtDate(m); });
     }
 
+    /* Element 5 stores its dates as finished text, "May 4, 2027 to May 6,
+       2027" (or ISO on older runs). Read back into a range and written the
+       one way the rest of the page writes a range; text that is not a date
+       range is left as it was, with any ISO date in it rewritten. */
+    var MONTH_IX = {jan:1, feb:2, mar:3, apr:4, may:5, jun:6, jul:7, aug:8,
+                    sep:9, sept:9, oct:10, nov:11, dec:12};
+    var DATE_IN_TEXT = /(\d{4})-(\d{2})-(\d{2})|\b([A-Z][a-z]{2,8})\.? (\d{1,2}), (\d{4})\b/g;
+    function whenText(text){
+      var found = [], m, re = new RegExp(DATE_IN_TEXT.source, 'g');
+      while ((m = re.exec(String(text || '')))) {
+        if (m[1]) { found.push(m[1] + '-' + m[2] + '-' + m[3]); continue; }
+        var mi = MONTH_IX[m[4].slice(0, m[4].toLowerCase() === 'sept' ? 4 : 3).toLowerCase()];
+        if (!mi) continue;
+        found.push(m[6] + '-' + ('0' + mi).slice(-2) + '-' + ('0' + m[5]).slice(-2));
+      }
+      if (found.length === 1 || found.length === 2) {
+        var r = dateRangeText({starts_on: found[0], ends_on: found[1] || found[0]});
+        if (r) return r;
+      }
+      return fmtDatesIn(text);
+    }
+
     /* Attendance is the event's own claim and is labelled as one. The label
        was appended unconditionally, so a figure that already carried it came
        out as "600 attendees (their claim) (their claim)". And a value with no
@@ -1642,8 +1664,8 @@
     function eventLine(ev){
       var bits = [];
       if (ev.edition) bits.push(esc(ev.edition));
-      var when = ev.starts_on ? fmtDate(ev.starts_on) +
-        (ev.ends_on && ev.ends_on !== ev.starts_on ? ' to ' + fmtDate(ev.ends_on) : '') : '';
+      /* One date format for one event everywhere on the page. */
+      var when = dateRangeText(ev) || (ev.starts_on ? fmtDate(ev.starts_on) : '');
       if (when) bits.push(esc(when));
       if (ev.location) bits.push(esc(ev.location));
       if (ev.format) bits.push(esc(ev.format.replace('_', ' ')));
@@ -2978,9 +3000,11 @@
     function candidateRow(c, prior, labels, idx, shortfallLine){
       prior = prior || null; labels = labels || {};
       var site = safeUrl(c.website);
+      /* The same format the answer button and the calendar use for this
+         event. The card said "May 4, 2027 to May 6, 2027" while the button
+         at the top said "May 4 to 6, 2027" for the same event. */
       var when = c.starts_on
-        ? fmtDate(c.starts_on) + (c.ends_on && c.ends_on !== c.starts_on
-            ? ' to ' + fmtDate(c.ends_on) : '')
+        ? (dateRangeText(c) || fmtDate(c.starts_on))
         : 'dates not announced';
       var where = [c.city, c.country].filter(Boolean).join(', ') || 'location unconfirmed';
       var gaps = c.gaps || [];
@@ -3196,11 +3220,26 @@
        descending order. The gap between found and scored is accounted for in
        words rather than in a fourth bar, because the pieces of it are
        reported separately below and a bar would imply they add up to it. */
-    function verdictHtml(s, counts) {
+    /* How many on the recommended list actually cleared the bar. `kept`
+       also carries an event the client is already committed to, which stays
+       on the list whatever it scored, so counting `kept` printed "Cleared
+       the bar of 70: 5" over a list whose own committed note said one of
+       the five scored 43. */
+    function clearedCount(kept, counts){
+      if (kept) {
+        return kept.filter(function(c){
+          return (Number(c.total) || 0) >= RANK_FLOOR; }).length;
+      }
+      return Math.max(0, (Number(counts.kept) || 0) -
+                         (Number(counts.committed_below_bar) || 0));
+    }
+
+    function verdictHtml(s, counts, kept) {
       var found = Number(s.discovered) || 0;
       var scored = (Number(counts.kept) || 0) + (Number(counts.worth_a_look) || 0) +
                    (Number(counts.excluded) || 0);
-      var cleared = Number(counts.kept) || 0;
+      var cleared = clearedCount(kept, counts);
+      var carried = Math.max(0, (kept ? kept.length : Number(counts.kept) || 0) - cleared);
       if (!found && !scored) return '';
       var gaps = [];
       if (counts.finished) gaps.push(plural(counts.finished, 'edition') + ' already over');
@@ -3237,13 +3276,22 @@
            var tail = l ? ' ' + plural(l, 'more event') + ' cleared both ' +
                           'relevance gates and ' + (l === 1 ? 'is' : 'are') +
                           ' under Worth a look.' : '';
+           /* Said, because the ranked list below is longer than this bar by
+              exactly these, and a reader counting would otherwise find one
+              too many. */
+           if (carried) {
+             tail += ' The ranked list also carries ' +
+               plural(carried, 'event') + ' you are already committed to, ' +
+               'which scored below the bar.';
+           }
            if (!cleared) {
              return (l ? 'None, and that is the honest answer to the bar.'
                        : 'None. The list is not padded to a target count.') + tail;
            }
-           return (cleared === 1 ? 'The one below is what it is.'
-                                 : 'Everything below is what these ' + cleared +
-                                   ' are.') + tail;
+           return (carried ? ''
+                   : (cleared === 1 ? 'The one below is what it is.'
+                                    : 'Everything below is what these ' + cleared +
+                                      ' are.')) + tail.replace(/^ /, carried ? '' : ' ');
          })()}
       ]);
     }
@@ -4167,7 +4215,7 @@
           '<span class="c-cut"><b>' + (counts.excluded || 0) + '</b>scored and cut' +
             '<i>below ' + RANK_FLOOR + '</i></span>' +
         '</div>' +
-        verdictHtml(s, counts) +
+        verdictHtml(s, counts, kept) +
         '<details class="ex-method"><summary>How these were scored</summary><p>' +
           esc(s.methodology || '') + '</p></details>' +
         notesHtml(s) +
@@ -4204,7 +4252,9 @@
             var body = '<div class="tn">' + esc(t.name) +
               '<span class="ts">' + esc(t.total) + '<i>/110</i></span></div>' +
               '<div class="tb"><span style="width:' + pct.toFixed(1) + '%"></span></div>' +
-              '<div class="tm">' + esc(t.where) + ' &middot; ' + esc(fmtDatesIn(t.when)) + '</div>' +
+              '<div class="tm">' + esc(t.where) + ' &middot; ' +
+                esc(at != null && kept[at].starts_on ? dateRangeText(kept[at])
+                                                     : whenText(t.when)) + '</div>' +
               '<div class="tc">' + esc(t.case) + '</div>';
             return '<li class="' + tierClass(t.tier) + (at == null ? '' : ' go') + '">' +
               (at == null ? body
@@ -4307,7 +4357,7 @@
       document.getElementById('drawerSub').textContent =
         run.status === 'complete'
           ? (function(){
-              var k = (s.counts || {}).kept || 0;
+              var k = clearedCount(s.selection ? s.selection.kept : null, s.counts || {});
               var l = (s.counts || {}).worth_a_look || 0;
               /* The one-tier wording is left exactly as it was. Only a run
                  that actually has a second tier says anything new, so a run
@@ -4650,7 +4700,13 @@
       }
       var planLink = document.getElementById('eventPlanLink');
       if (planLink) {
-        planLink.hidden = run.status !== 'complete' || !['lookup', 'recommend'].includes(run.mode);
+        /* Only when there is something to plan. A complete report that kept
+           no event still offered the link, and it opened on a bare "Choose
+           an event from this report." with nothing to choose. */
+        var plannable = run.mode === 'recommend' ? (run.candidates || []).length
+                      : (run.events || []).length;
+        planLink.hidden = run.status !== 'complete' ||
+          !['lookup', 'recommend'].includes(run.mode) || !plannable;
         planLink.href = BASE + '/runs/' + run.id + '/plan';
       }
       if (run.mode === 'recommend') { return renderRecommend(run); }

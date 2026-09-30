@@ -9811,9 +9811,15 @@ def event_conference_intelligence_plan(run_id):
     except LookupError:
         abort(404)
     except ValueError as exc:
-        return str(exc), 400
+        # A page, not a bare line of text: the reader arrived from a link and
+        # needs the way back as well as the reason.
+        return render_template('event_intel_plan.html',
+                               view=dict(profiles=[], events=[], profile=None,
+                                         event=None, empty=str(exc)),
+                               actions=planning.ACTIONS, currencies=planning.CURRENCIES,
+                               lbl=planning.label), 400
     return render_template('event_intel_plan.html', view=view, actions=planning.ACTIONS,
-                           currencies=planning.CURRENCIES)
+                           currencies=planning.CURRENCIES, lbl=planning.label)
 
 
 @app.route("/p2/strategic-agents/event-conference-intelligence/runs/<int:run_id>/plan", methods=['POST'])

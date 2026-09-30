@@ -26,6 +26,64 @@ class Conflict(ValueError):
     pass
 
 
+# Every stored token the plan page shows, in the reader's words. The page
+# printed check.kind, check.status and a match's support level as stored
+# ("registration · blocked", "literal support only"), which is this module's
+# vocabulary rather than the client's. A token not listed here is shown as the
+# group's generic phrase, never as itself.
+LABELS = {
+    'access_kind': {'registration': 'Registration page', 'exhibit': 'Exhibitor page',
+                    'sponsor': 'Sponsorship page', 'meetings': 'Meetings page',
+                    'agenda': 'Agenda page', '': 'Organizer page'},
+    'access_status': {'ok': 'Read', 'blocked': 'Could not be read',
+                      'error': 'Could not be read', 'not_found': 'Not found',
+                      '': 'Checked'},
+    'assessment': {'choose_action': 'Choose an action',
+                   'manual_follow_up': 'Follow up yourself',
+                   'needs_review': 'Needs review',
+                   'blocked_for_review': 'Blocked until reviewed', '': 'Needs review'},
+    'timing': {'announced': 'Announced for this edition',
+               'historical': 'Listed for a past edition',
+               'edition_not_established': 'Edition not established', '': 'Edition not established'},
+    'support': {'literal_support_only': 'Named on the published page',
+                'agenda_page_excerpt': 'Quoted from the agenda page',
+                'user_reported': 'Reported by you',
+                'unverified': 'Not verified', '': 'Not verified'},
+    'role': dict(S.ROLE_LABELS, **{'': 'Listed'}),
+}
+
+
+def label(group, key):
+    table = LABELS.get(group) or {}
+    return table.get(str(key or ''), table.get('', ''))
+
+
+_MONTHS = ('Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep',
+           'Oct', 'Nov', 'Dec')
+
+
+def date_range_text(starts_on, ends_on=None) -> str:
+    """"May 4 to 6, 2027": the one format the report page writes a range in,
+    so the plan page does not show the same event as 2027-05-04."""
+    try:
+        s = date.fromisoformat(str(starts_on or '')[:10])
+    except ValueError:
+        return ''
+    try:
+        e = date.fromisoformat(str(ends_on or '')[:10])
+    except ValueError:
+        e = s
+    one = '%s %d, %d' % (_MONTHS[s.month - 1], s.day, s.year)
+    if e <= s:
+        return one
+    if e.year != s.year:
+        return '%s to %s %d, %d' % (one, _MONTHS[e.month - 1], e.day, e.year)
+    if e.month != s.month:
+        return '%s %d to %s %d, %d' % (_MONTHS[s.month - 1], s.day,
+                                       _MONTHS[e.month - 1], e.day, s.year)
+    return '%s %d to %d, %d' % (_MONTHS[s.month - 1], s.day, e.day, s.year)
+
+
 def schema(cur):
     cur.execute('''CREATE TABLE IF NOT EXISTS evi_execution_plans (
         profile_id INTEGER NOT NULL REFERENCES evi_profiles(id),
@@ -129,10 +187,21 @@ def context(run_id, email, profile_id=None, identity=None):
     if fixed_profile:
         profiles = [profile]
     events = S.get_candidates(run_id) if run.get('mode') == 'recommend' else S.get_events(run_id)
-    events = [dict(event, event_identity=event_key(event)) for event in events]
-    selected = next((event for event in events if event['event_identity'] == identity), None) if identity else (events[0] if events else None)
+    events = [dict(event, event_identity=event_key(event),
+                   when=date_range_text(event.get('starts_on'), event.get('ends_on')))
+              for event in events]
+    if not events:
+        # A report that kept no event has nothing to plan. That used to be a
+        # bare 400 reading "Choose an event from this report." on a report
+        # with nothing to choose; it is a page state now, said plainly.
+        return dict(run_id=run_id, profile=profile, profiles=profiles, events=[],
+                    event=None, plan=None, empty=(
+                        'This report has no events to plan. It did not find an '
+                        'event that could be verified and scored, so there is '
+                        'nothing to choose here yet.'))
+    selected = next((event for event in events if event['event_identity'] == identity), None) if identity else events[0]
     if not selected:
-        raise ValueError('Choose an event from this report.')
+        raise ValueError('That event is not in this report. Choose one from the list.')
     plan = None
     if profile:
         with db() as conn, conn.cursor() as cur:
@@ -220,6 +289,8 @@ def save(run_id, email, payload):
     if not profile_id or expected < 0 or not isinstance(payload.get('event_identity'), str) or not payload['event_identity']:
         raise ValueError('Choose a client and event from this report.')
     view = context(run_id, email, profile_id, payload['event_identity'])
+    if not view.get('event'):
+        raise ValueError('Choose a client and event from this report.')
     body = validate(payload)
     if view.get('plan') and view['plan'].get('action') != body['action']:
         body['access_status'] = 'unknown'

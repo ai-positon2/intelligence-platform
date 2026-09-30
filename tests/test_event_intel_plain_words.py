@@ -333,6 +333,7 @@ def test_no_iso_date_is_printed_anywhere_in_the_report(page_script):
     """Both remaining sites at once: the stored Top five line, and the ended
     date on an event kept out of the ranking."""
     run = _report(
+        cand={"starts_on": "2027-05-12", "ends_on": "2027-05-14"},
         top_five=[{"name": "SaaStr Annual", "total": 87, "tier": "P1",
                    "where": "San Mateo, CA, United States",
                    "when": "2027-05-12 to 2027-05-14",
@@ -345,7 +346,8 @@ def test_no_iso_date_is_printed_anywhere_in_the_report(page_script):
     html = _render(page_script, run)
     found = ISO.findall(html)
     assert not found, "ISO dates printed to a reader: %s" % found
-    assert "May 12, 2027 to May 14, 2027" in html
+    # Written the one way the rest of the page writes a range.
+    assert "May 12 to 14, 2027" in html
     assert "ended Feb 26, 2026" in html
 
 
