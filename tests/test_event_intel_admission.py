@@ -588,3 +588,63 @@ def test_structured_support_also_scopes_a_note_on_another_dated_event():
     result = A.inspect(MRC, lambda url: page(text, http_status=200, structured_events=[row]))
     assert result['reasons'] == []
     assert result['support'] == 'organizer_structured_name_and_dates'
+
+
+# ── Hong Kong FinTech Week (fintechweek.hk, 2026-09-30) ──
+
+HKFW = dict(name='Hong Kong FinTech Week x StartmeupHK', website='https://www.fintechweek.hk/',
+            sources=[], starts_on='2026-11-02', ends_on='2026-11-06')
+HKFW_TITLE = ['Hong Kong FinTech Week x StartmeupHK 2026 | Nov 2-6']
+
+
+def test_a_title_giving_the_year_by_the_name_and_the_days_after_it_is_admitted():
+    result = A.inspect(HKFW, lambda url: page('Welcome to the festival.', titles=HKFW_TITLE))
+    assert result['reasons'] == []
+    assert result['support'] == 'organizer_title_name_and_dates'
+
+
+@pytest.mark.parametrize('titles', [
+    ['Hong Kong FinTech Week x StartmeupHK | Nov 2-6'],           # no year anywhere
+    ['Hong Kong FinTech Week x StartmeupHK 2026 | Nov 2-5'],      # other days
+    ['Hong Kong FinTech Week x StartmeupHK 2026 | Nov 2-6, 2025'],  # its own, other year
+    ['Hong Kong FinTech Week x StartmeupHK 2026 | Nov 2-6 Summit'],  # more than dates
+    ['Hong Kong FinTech Week x StartmeupHK 2025 | Nov 2-6'],      # another edition
+    ['HKFW Summit 2026 | Nov 2-6'],                              # not led by the name
+])
+def test_a_year_is_lent_to_nothing_but_the_days(titles):
+    assert A.inspect(HKFW, lambda url: page('Welcome to the festival.', titles=titles))['support'] == 'unverified', titles
+
+
+@pytest.mark.parametrize('text,scope', [
+    ('Government and Media Passes: complimentary and subject to approval, so no refund applies.', 'concession_pass'),
+    ('Please note that student passes are subject to approval.', 'concession_pass'),
+    ('Press passes are subject to approval.', 'concession_pass'),
+    ('Non-profit passes: application required.', 'concession_pass'),
+    ('What happens if the Event is canceled or postponed? We will tell you.', 'hypothetical_question'),
+    ('Should the conference be cancelled? Refunds are issued in full.', 'hypothetical_question'),
+    ('What happens if the conference is sold out? Contact us.', 'hypothetical_question'),
+])
+def test_a_concession_pass_or_a_conditional_question_does_not_close_the_event(text, scope):
+    result = A.inspect(HKFW, lambda url: page(text, titles=HKFW_TITLE))
+    assert result['reasons'] == [], text
+    scopes = {o['scope'] for c in result['checks'] for o in c['access_observations']}
+    assert scope in scopes and 'unresolved_event_access' not in scopes, (text, scopes)
+
+
+@pytest.mark.parametrize('text', [
+    'Delegate and media passes are subject to approval.',
+    'All-access and media passes are subject to approval.',
+    'Conference passes are subject to approval.',
+    'Passes are subject to approval.',
+    'Media and passes are subject to approval.',
+    'Premium and media passes are subject to approval.',
+    'In case you missed it, registration is closed.',
+    'Is the conference sold out? Yes.',
+    'The event is cancelled. What happens if I bought a ticket?',
+    'Registration is closed. Questions?',
+    'What if registration is closed? Join the waitlist.',  # the waitlist is stated
+    'Media passes are sold out and registration is closed.',
+])
+def test_anything_else_is_still_a_restriction(text):
+    result = A.inspect(HKFW, lambda url: page(text, titles=HKFW_TITLE))
+    assert any('restricted' in r for r in result['reasons']), text

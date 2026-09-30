@@ -179,6 +179,47 @@ def _other_programme(text, match, clause, event_name, dates):
     return None
 
 
+# Passes a festival hands out to a category of guest, not to the paying
+# audience: "Government and Media Passes: complimentary and subject to
+# approval" (fintechweek.hk FAQ, 2026-09-30) says nothing about buying a
+# delegate pass.
+_CONCESSION = {'government', 'media', 'press', 'journalist', 'student', 'academic',
+               'startup', 'investor', 'volunteer', 'nonprofit', 'non', 'profit'}
+_PASS_JOIN = {'and', 'or'}
+
+
+def _concession_pass(clause, match):
+    """Approval required for one guest category's pass, not the event's.
+
+    The words just before "pass" must name concession categories only, and
+    a phrase joining one to anything else is not one: "Delegate and media
+    passes are subject to approval" covers the paying audience too."""
+    if not re.search(r'approval|application|invit', match.group(0), re.I):
+        return None
+    for named in re.finditer(r'\bpass(?:es)?\b', clause, re.I):
+        words = _fold(clause[:named.start()]).split()
+        kinds = []
+        while words and (words[-1] in _PASS_JOIN or words[-1] in _CONCESSION):
+            kinds.append(words.pop())
+        if kinds and kinds[-1] not in _PASS_JOIN and kinds[0] not in _PASS_JOIN:
+            return 'concession_pass'
+    return None
+
+
+def _hypothetical(text, match):
+    """A restriction asked about, not stated: "What happens if the Event is
+    canceled or postponed?" is on every FAQ page. Only a question that is
+    itself conditional counts; "Is the conference sold out?" is left for a
+    reviewer, because the next line may answer yes."""
+    after = re.match(r'[^.!?\n]*([.!?\n]|$)', text[match.end():])
+    if not after or after.group(1) != '?':
+        return None
+    question = re.split(r'[.!?\n]', text[max(0, match.start()-160):match.start()])[-1]
+    if re.search(r'\b(?:if|in case|in the event|should|what happens)\b', question, re.I):
+        return 'hypothetical_question'
+    return None
+
+
 def _access(text, event_name, dates):
     observations, blocking = [], []
     general_open = bool(re.search(r'\b(?:general admission|event registration) (?:is |remains )?open\b',text,re.I))
@@ -201,8 +242,9 @@ def _access(text, event_name, dates):
             event_name,re.I))
         scoped = other and general_open and not named_inventory
         excerpt=text[max(0,match.start()-80):match.end()+120]
-        scope = 'other_inventory' if scoped else _other_programme(
-            text, match, clause, event_name, dates)
+        scope = ('other_inventory' if scoped else _concession_pass(clause, match)
+                 or _hypothetical(text, match) or _other_programme(
+                     text, match, clause, event_name, dates))
         observations.append({'text':excerpt,'scope':scope or 'unresolved_event_access'})
         if not scope:
             blocking.append(excerpt)
@@ -358,10 +400,12 @@ def _title_support(titles, names, start, end):
         tail = _title_owns(segments[0], names)
         if tail is None:
             continue
+        pinned = False
         if tail and re.fullmatch(r'20\d{2}', tail[0]):
             if tail[0] != str(start.year):
                 continue  # "Money20/20 USA 2025" is another edition.
             tail = tail[1:]
+            pinned = True
         months = {m.casefold() for m in list(calendar.month_name) + list(calendar.month_abbr) if m}
         if tail and not (tail[0] in _TITLE_NEXT or tail[0] in months or tail[0].isdigit()):
             continue
@@ -377,8 +421,15 @@ def _title_support(titles, names, start, end):
             if pattern.search(segments[0]):
                 return title
             if len(segments) > 1:
-                rest = pattern.sub('', segments[1])
-                if pattern.search(segments[1]) and not re.search(r'\w', rest):
+                second = segments[1]
+                # "Hong Kong FinTech Week x StartmeupHK 2026 | Nov 2-6"
+                # (fintechweek.hk, 2026-09-30): the name segment gives the
+                # edition's year, the next one only the days. The year is
+                # lent only to a segment that has none of its own.
+                if pinned and not re.search(r'\b20\d{2}\b', second):
+                    second = second + ' ' + str(start.year)
+                rest = pattern.sub('', second)
+                if pattern.search(second) and not re.search(r'\w', rest):
                     return title
     return None
 
