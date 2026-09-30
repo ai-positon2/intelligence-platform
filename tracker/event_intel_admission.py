@@ -75,52 +75,162 @@ def _names(event, year):
     return [_fold(name)] if _fold(name) else []
 
 
-def _owns_date(prefix, names, year):
+# Cities that big brands use to NAME a regional spin-off ("Web Summit Rio",
+# "Web Summit Vancouver", "MWC Shanghai", "Money20/20 Middle East" in
+# Riyadh). An audit on 2026-09-30 found "Web Summit in Rio, ..." and a
+# JSON-LD node "Web Summit | Vancouver" both admitting plain "Web Summit".
+# A city a name does not carry, from this list, is another edition. It is
+# a short list on purpose: a flagship's own city ("Web Summit, Lisbon",
+# "Money20/20 Europe in Amsterdam", "Fintech Meetup, Las Vegas") must stay
+# a place, and a city missing here falls back to the other checks.
+_EDITION_CITIES = ('rio', 'rio de janeiro', 'vancouver', 'qatar', 'doha', 'tokyo',
+                   'shanghai', 'riyadh', 'toronto', 'sao paulo', 'mexico city',
+                   'abu dhabi', 'jakarta', 'bangalore', 'bengaluru', 'mumbai',
+                   'cape town', 'nairobi', 'lagos', 'seoul', 'manila', 'bangkok',
+                   'kuala lumpur')
+# Words that make the thing after "to"/"in" a gathering, not a place:
+# "returns to SaaStr Annual".
+_EVENTISH = _EVENT_WORDS | {'annual', 'edition', 'series', 'track', 'stage',
+                            'programme', 'program', 'session', 'sessions'}
+_VENUE_NOUNS = {'center', 'centre', 'hall', 'halls', 'room', 'venue', 'hotel',
+                'resort', 'campus', 'complex', 'park', 'arena', 'stadium',
+                'pavilion', 'club', 'house', 'museum', 'theatre', 'theater',
+                'palace', 'fairgrounds', 'casino', 'auditorium', 'plaza'}
+_MONTH_NAMES = {m.casefold() for m in list(calendar.month_name) + list(calendar.month_abbr) if m} | {'sept'}
+_WEEKDAYS = {d.casefold() for d in list(calendar.day_name) + list(calendar.day_abbr)}
+# Real organizer copy between an event's name and its date ("TechConf 2026,
+# taking place March 3-5", "will be held", "convenes", "returns to Las
+# Vegas", "Join us"). Every word of that stretch must be one of these, or
+# sit in a place phrase: an audit on 2026-09-30 found only the FIRST word
+# was checked, and "CMO Summit is part of SaaStr Annual, September 9-11"
+# and "CMO Summit from the SaaStr Annual team, ..." were admitted with
+# SaaStr Annual's dates.
+_CONNECT = {'on', 'runs', 'run', 'returns', 'return', 'returning', 'takes', 'taking',
+            'take', 'place', 'starts', 'start', 'starting', 'begins', 'is', 'are',
+            'will', 'be', 'being', 'held', 'convenes', 'convening', 'occurs',
+            'happens', 'happening', 'scheduled', 'set', 'coming', 'comes', 'back',
+            'again', 'this', 'year', 'dates', 'date', 'join', 'us', 'get', 'choose',
+            'register', 'book', 'your', 'now', 'today', 'ticket', 'tickets', 'pass',
+            'passes', 'officially'}
+_PLACE_INTRO = {'in', 'to', 'at'}
+# A call to action that may carry the previous sentence's name to a date:
+# "CMO Summit 2027. Choose your pass to join us May 11-12, 2027." Nothing
+# else may be in it: "Join us for the Women in SaaS Breakfast on ..." and
+# "Register for SaaStr Europa, ..." name other events (audit, 2026-09-30).
+_CTA = {'get', 'choose', 'join', 'register', 'book'}
+_CTA_CLAUSE = _CTA | {'us', 'your', 'a', 'the', 'pass', 'passes', 'ticket', 'tickets',
+                      'seat', 'spot', 'now', 'today', 'to', 'and', 'on'}
+# One of the event's own nouns alone is the event naming itself ("MRC Vegas
+# 2027 Conference"). Expo, forum and show are not: they are routinely a
+# separately dated part of the event ("RSAC Expo" runs fewer days than
+# RSAC), so "RSAC Expo September 9-11" does not date RSAC (audit, 2026-09-30).
+_SELF_NOUNS = {'conference', 'summit', 'event', 'convention', 'congress',
+               'festival', 'exhibition'}
+
+
+def _edition_place(words, names):
+    """The words name a regional edition this event's name does not carry."""
+    own = set(' '.join(names).split())
+    if set(words) & (_EDITION_WORDS - own):
+        return True
+    folded, owned = ' '.join(words), ' '.join(names)
+    return any(re.search(r'(?<!\w)'+c+r'(?!\w)', folded) and not re.search(r'(?<!\w)'+c+r'(?!\w)', owned)
+               for c in _EDITION_CITIES)
+
+
+def _place_ok(intro, words, names):
+    """A place after "in"/"to"/"at", and nothing that is another gathering."""
+    if not words:
+        return True
+    if _edition_place(words, names):
+        return False
+    if intro in ('in', 'to'):
+        # "NRF 2027: Retail's Big Show in New York City, January 10 - 12".
+        return len(words) <= 5 and not set(words) & (_EVENTISH | _TIE_WORDS)
+    # "at" introduces a venue ("at Moscone Center") or another event ("at
+    # SaaStr Annual"). Only a venue noun makes it a venue; an event word is
+    # allowed only as part of one ("Convention Center", "Expo Hall").
+    if len(words) > 8 or not set(words) & _VENUE_NOUNS:
+        return False
+    return not any((w in _EVENTISH and not (i + 1 < len(words) and words[i + 1] in _VENUE_NOUNS))
+                   or w in (_TIE_WORDS - {'and'}) for i, w in enumerate(words))
+
+
+def _connecting(words, names, year):
+    """Is this stretch between an event's name and a date only connecting
+    copy and at most a place, so the date is the event's own?"""
+    i = 0
+    while i < len(words):
+        w = words[i]
+        if w in _PLACE_INTRO:
+            j = i + 1
+            while j < len(words) and words[j] not in _CONNECT and words[j] not in _PLACE_INTRO:
+                j += 1
+            if not _place_ok(w, words[i+1:j], names):
+                return False
+            i = j
+            continue
+        # "runs from September 9", never "from the SaaStr Annual team".
+        if w == 'from' and i == len(words) - 1:
+            i += 1
+            continue
+        if w in _CONNECT or w in _MONTH_NAMES or w in _WEEKDAYS or w == str(year):
+            i += 1
+            continue
+        return False
+    return True
+
+
+def _bare_place(prefix, tail, names, year, titles):
+    """ "fintech_devcon Boulder, CO August 2-4, 2027" (fintechdevcon.io,
+    2026-09-30): a header's "City, ST" and nothing else. Never a season or
+    region, which name an edition: "Shoptalk Fall Chicago, IL".
+
+    That shape is also exactly how a regional edition is written: "MWC
+    Shanghai, China June 1-5" and "SXSW London, UK June 1-5" admitted MWC and
+    SXSW (audit, 2026-09-30), and nothing in the words tells "London, UK"
+    after fintech_devcon from "London, UK" after SXSW. What does is whose
+    page it is, so the place is accepted only when a page title names this
+    event plainly (fintechdevcon.io's title is "fintech_devcon"; SXSW
+    London's page is titled with its edition). The place is read from the
+    text right after the name: searched from the left, "SaaStr Annual San
+    Mateo, CA" was read as the place "Annual San Mateo" and held."""
+    if not tail or not _title_identifies(titles, names, year):
+        return False
+    raw = prefix.split()
+    for k in range(1, min(len(raw), 7) + 1):
+        piece = ' '.join(raw[-k:])
+        if _fold(piece) != tail:
+            continue
+        place = _BARE_PLACE.fullmatch(piece.strip())
+        city = _fold(place.group(1)).split() if place else []
+        return bool(place and not set(city) & (_EDITION_WORDS | _EVENTISH | _TIE_WORDS)
+                    and not _edition_place(_fold(piece).split(), names))
+    return False
+
+
+def _owns_date(prefix, names, year, titles=None):
     last_clause = re.split(r'[.!?]\s+',prefix)[-1]
-    opening = _fold(last_clause).split()[:1]
-    if last_clause.strip() and opening not in (['get'],['choose'],['join'],['register'],['book']):
+    clause = _fold(last_clause).split()
+    if last_clause.strip() and not (clause and clause[0] in _CTA and set(clause) <= _CTA_CLAUSE):
         prefix = last_clause
     folded = _fold(prefix)
     for name in names:
-        matches = list(re.finditer(r'(?<!\w)'+re.escape(name)+r'(?!\w)',folded))
+        matches = list(re.finditer(_name_re(name),folded))
         if not matches:
             continue
         tail = folded[matches[-1].end():].strip()
         if any(y != str(year) for y in re.findall(r'\b20\d{2}\b',tail)):
             continue
         tail = re.sub(r'^'+str(year)+r'\b', '', tail).strip()
-        # A bare regional suffix or another event name is a different identity.
-        first = tail.split()[0] if tail else ''
-        # Real organizer copy routinely uses one of these openers between an
-        # event's name and its date ("TechConf 2026, taking place March 3-5",
-        # "TechConf 2026 will be held March 3-5", "TechConf 2026 convenes
-        # March 3-5"). Only the first word after the name is checked, so
-        # "will"/"taking" alone is enough to cover the whole connecting
-        # phrase that follows it. The list was originally narrow enough to
-        # reject several of these on real, perfectly legitimate pages.
-        allowed = {'on','runs','returns','takes','taking','starts','is','join','at','from',
-                  'get','choose','register','book','will','convenes','occurs','happens'}
-        allowed.update(m.casefold() for m in calendar.month_name if m)
-        allowed.update(m.casefold() for m in calendar.month_abbr if m)
-        if not first or first in allowed or first.isdigit():
-            return True
         # "MRC Vegas 2027 Conference 15 - 18 Mar, 2027" (merchantriskcouncil.org,
         # 2026-09-30): one of the event's own nouns, and nothing else, is the
         # event naming itself. Two words ("Payments Summit") is another event.
-        if tail in _OWN_NOUNS:
+        if tail in _SELF_NOUNS:
             return True
-        # "NRF 2027: Retail's Big Show in New York City, January 10 - 12, 2027".
-        # A short place is all that may stand between name and dates: nothing
-        # naming another gathering, nothing tying this one to it.
-        words = tail.split()
-        if first == 'in' and len(words) <= 5 and not set(words) & (_EVENT_WORDS | _TIE_WORDS):
+        if _connecting(tail.split(), names, year):
             return True
-        # "fintech_devcon Boulder, CO August 2-4, 2027" (fintechdevcon.io,
-        # 2026-09-30): a header's "City, ST" and nothing else. Never a season
-        # or region, which name an edition: "Shoptalk Fall Chicago, IL".
-        place = _BARE_PLACE.search(prefix)
-        if (place and _fold(place.group(0)) == tail
-                and not set(_fold(place.group(1)).split()) & (_EDITION_WORDS | _EVENT_WORDS | _TIE_WORDS)):
+        if _bare_place(prefix, tail, names, year, titles):
             return True
     return False
 
@@ -446,6 +556,11 @@ def _structured_date(value):
 _STRUCTURED_SEGMENTS = re.compile(r'\s+[|\u2013\u2014\u00b7\u2022-]\s+|:\s+|,\s+')
 
 
+def _key(name):
+    """A folded name with its spacing removed: "Money 20/20" is "Money20/20"."""
+    return re.sub(r'\s+', '', name)
+
+
 def _structured_name_matches(row_name, names, year):
     """Is this schema.org Event node THIS event?
 
@@ -453,18 +568,25 @@ def _structured_name_matches(row_name, names, year):
     title: "Fintech Meetup | Leading Fintech Event | Networking & Innovation",
     "Web Summit, Lisbon". The dates on that node are the organizer's own, so
     the name only has to lead it, and nothing after it may name another
-    gathering ("SaaStr Annual | CMO Summit" is not SaaStr Annual's node) or
-    tie it to one."""
-    if set(_names({'name': row_name}, year)).intersection(names):
+    gathering ("SaaStr Annual | CMO Summit" is not SaaStr Annual's node),
+    tie it to one, or name an edition the event's name does not carry:
+    an audit on 2026-09-30 found "Web Summit | Vancouver", "Money20/20,
+    Europe" and "SaaStr Annual: Virtual Edition" all admitting the plain
+    name with that edition's dates."""
+    keys = {_key(n) for n in names}
+    if {_key(n) for n in _names({'name': row_name}, year)} & keys:
         return True
     segments = [x for x in _STRUCTURED_SEGMENTS.split(row_name) if x.strip()]
-    if len(segments) < 2 or not set(_names({'name': segments[0]}, year)).intersection(names):
+    if len(segments) < 2 or not {_key(n) for n in _names({'name': segments[0]}, year)} & keys:
         return False
-    rest = set(_fold(' '.join(segments[1:])).split())
+    rest_words = _fold(' '.join(segments[1:])).split()
+    rest = set(rest_words)
     # "and" alone joins words in a tagline ("Networking & Innovation"); it only
     # ties two gatherings together when one of them is named, which the event
     # words already catch.
-    if rest & (_EVENT_WORDS | (_TIE_WORDS - {'and'})):
+    if rest & (_EVENT_WORDS | (_TIE_WORDS - {'and'}) | {'edition'}):
+        return False
+    if _edition_place(rest_words, names):
         return False
     return not any(y != str(year) for y in re.findall(r'\b20\d{2}\b', ' '.join(segments[1:])))
 
@@ -529,10 +651,37 @@ def _title_owns(segment, names):
     """The words after the name, if this segment is led by the name."""
     folded = _fold(segment)
     for name in names:
-        m = re.search(r'(?<!\w)'+re.escape(name)+r'(?!\w)', folded)
+        m = re.search(_name_re(name), folded)
         if m and set(folded[:m.start()].split()) <= _TITLE_LEAD:
             return folded[m.end():].split()
     return None
+
+
+# Phrases that tie a title to another event wherever they sit in it.
+_TIE_PHRASE = re.compile(r'(?<!\w)(?:part of|powered by|presented by|hosted by|organi[sz]ed by|'
+                         r'brought to you by|co located|colocated|in partnership|in association|'
+                         r'alongside|during|within|returns to|comes to|coming to)(?!\w)')
+
+
+def _foreign_segment(segment, names):
+    """A title segment that ties the event to another one or names an
+    edition. "CMO Summit | September 9-11, 2026 | at SaaStr Annual" (audit,
+    2026-09-30) was admitted because only the first two segments were read."""
+    words = _fold(segment).split()
+    if not words:
+        return False
+    if words[0] == 'at' and _place_ok('at', words[1:], names):
+        return False  # "at Moscone Center" is where, not whose.
+    if words[0] in _TITLE_FOREIGN or _edition_place(words, names) or 'edition' in words:
+        return True
+    tie = _TIE_PHRASE.search(' '.join(words))
+    if not tie:
+        return False
+    # "returns to Las Vegas" is a place; "returns to SaaStr Annual" is not.
+    after = ' '.join(words)[tie.end():].split()
+    if tie.group(0) in ('returns to', 'comes to', 'coming to'):
+        return not _place_ok('to', after[:5], names) or len(after) > 5
+    return True
 
 
 def _title_support(titles, names, start, end):
@@ -549,21 +698,28 @@ def _title_support(titles, names, start, end):
                 continue  # "Money20/20 USA 2025" is another edition.
             tail = tail[1:]
             pinned = True
-        months = {m.casefold() for m in list(calendar.month_name) + list(calendar.month_abbr) if m}
+        months = _MONTH_NAMES
         if tail and not (tail[0] in _TITLE_NEXT or tail[0] in months or tail[0].isdigit()):
             continue
-        # Between the name and the dates, nothing that introduces another event.
+        # Between the name and the dates, nothing that introduces another
+        # event: the same connecting-copy grammar as the body, so "CMO Summit
+        # returns to SaaStr Annual | September 9-11, 2026" is refused.
         head = []
         for w in tail:
             if w in months or w.isdigit():
                 break
             head.append(w)
-        if set(head) & _TITLE_FOREIGN or any(y != str(start.year) for y in re.findall(r'\b20\d{2}\b', ' '.join(head))):
+        if (set(head) & _TITLE_FOREIGN or not _connecting(head, names, start.year)
+                or any(y != str(start.year) for y in re.findall(r'\b20\d{2}\b', ' '.join(head)))):
             continue
         for pattern in _date_patterns(start, end, title):
-            if pattern.search(segments[0]):
-                return title
-            if len(segments) > 1:
+            found = pattern.search(segments[0])
+            if found:
+                dated = 0
+                # "CMO Summit, September 9-11, 2026 at SaaStr Annual".
+                if _foreign_segment(segments[0][found.end():], names):
+                    continue
+            elif len(segments) > 1:
                 second = segments[1]
                 # "Hong Kong FinTech Week x StartmeupHK 2026 | Nov 2-6"
                 # (fintechweek.hk, 2026-09-30): the name segment gives the
@@ -572,8 +728,15 @@ def _title_support(titles, names, start, end):
                 if pinned and not re.search(r'\b20\d{2}\b', second):
                     second = second + ' ' + str(start.year)
                 rest = pattern.sub('', second)
-                if pattern.search(second) and not re.search(r'\w', rest):
-                    return title
+                if not (pattern.search(second) and not re.search(r'\w', rest)):
+                    continue
+                dated = 1
+            else:
+                continue
+            # Every other segment is read too.
+            if any(_foreign_segment(x, names) for i, x in enumerate(segments) if i not in (0, dated)):
+                continue
+            return title
     return None
 
 
@@ -603,13 +766,22 @@ _OWN_NOUNS = {'conference', 'summit', 'expo', 'forum', 'event', 'show',
               'convention', 'congress', 'festival', 'exhibition'}
 _SELF_REF = re.compile(
     r"(?<![\w-])(?:the|this|our)\s+(?:(?:in[- ]person|annual|main|flagship|live)\s+){0,2}"
-    r"(?:event|conference|summit|expo|show|forum|festival|convention|congress|exhibition)\s+"
+    r"(?P<noun>event|conference|summit|expo|show|forum|festival|convention|congress|exhibition)\s+"
     r"(?:takes\s+place|will\s+take\s+place|is\s+taking\s+place|is\s+held|will\s+be\s+held|"
     r"runs|returns|happens|comes\s+to|lands\s+in)\b", re.I)
+# "by", "within" and "x" tie the event to another as surely as "during"
+# does (audit, 2026-09-30). "at" is read separately: Nacha's own sentence
+# is "takes place at the Gaylord National Harbor Resort & Convention
+# Center", and "takes place at SaaStr Annual" is another event's dates.
 _SELF_REF_FOREIGN = {'during', 'alongside', 'with', 'part', 'co', 'colocated',
-                     'located', 'ahead', 'before', 'after', 'following'}
-_VENUE_NOUNS = {'center', 'centre', 'hall', 'halls', 'room', 'venue', 'hotel',
-                'resort', 'campus', 'complex', 'park'}
+                     'located', 'ahead', 'before', 'after', 'following', 'by',
+                     'within', 'x'}
+# A proper name ending in an event word: "the CMO Summit", "Women in SaaS
+# Breakfast". A lone determiner is not a name: "The Summit takes place".
+_NAMED_EVENT = re.compile(
+    r"\b(?!(?:The|This|Our|Each|Every|An?|Its|Their)\b)[A-Z][\w'&/-]*"
+    r"(?:\s+(?:[A-Z0-9][\w'&/-]*|of|in|for|and|&|on|the))*\s+"
+    r"(?:" + '|'.join(w.capitalize() for w in sorted(_EVENT_WORDS - {'day', 'days'})) + r")\b")
 
 
 def _title_identifies(titles, names, year):
@@ -620,22 +792,69 @@ def _title_identifies(titles, names, year):
         tail = _title_owns(segments[0], names) if segments else None
         if tail and tail[0] == str(year):
             tail = tail[1:]  # "MRC Vegas 2027" is the plainest title there is.
-        if tail is not None and (not tail or (len(tail) == 1 and tail[0] in _OWN_NOUNS)):
-            return title
+        if tail is None or not (not tail or (len(tail) == 1 and tail[0] in _SELF_NOUNS)):
+            continue
+        # "SaaStr Annual: Virtual Edition" names an edition, not the event.
+        if any(_foreign_segment(x, names) for x in segments[1:]):
+            continue
+        return title
     return None
 
 
-def _self_referenced_dates(text, start, end):
-    for sentence in re.split(r'[.!?](?=\s+[A-Z]|\s*$)', text):
+def _title_noun(title, names, year):
+    """The generic noun the title gives the event, if any: "Conference" in
+    "Smarter Faster Payments Conference", "summit" in "CMO Summit"."""
+    tail = [w for w in (_title_owns(_TITLE_SEGMENTS.split(title)[0], names) or []) if w != str(year)]
+    if tail and tail[0] in _OWN_NOUNS:
+        return tail[0]
+    last = names[0].split()[-1] if names and names[0].split() else ''
+    return last if last in _OWN_NOUNS else None
+
+
+def _names_other_event(text, names):
+    for m in _NAMED_EVENT.finditer(text):
+        if not _names_any(names, _fold(m.group(0))):
+            return True
+    return False
+
+
+def _self_referenced_dates(text, start, end, names=(), noun=None):
+    """The sentence that dates "the event" on a page whose title names it.
+
+    Refused (audit, 2026-09-30) unless:
+      * the sentence's noun agrees with the title's ("The conference takes
+        place ..." on a page titled "CMO Summit" is the parent conference),
+        or is plain "event";
+      * neither this sentence nor the one before names another event
+        ("Join us for the CMO Summit. The summit takes place ..." on
+        "SaaStr Annual 2026");
+      * nothing between the verb and the dates ties it to another event or
+        names an edition ("takes place online" is the virtual edition)."""
+    sentences = re.split(r'[.!?](?=\s+[A-Z]|\s*$)', text)
+    for index, sentence in enumerate(sentences):
         ref = _SELF_REF.search(sentence)
         if not ref:
+            continue
+        said = ref.group('noun').casefold()
+        if noun and said not in ('event', noun):
+            continue
+        # The previous sentence is read only near its end: on Nacha's page
+        # it is a navigation run with no full stop, and its "15 Under 40
+        # Awards" menu item 500 characters back is not what "our event"
+        # refers to.
+        before = (sentences[index - 1][-160:] if index else '') + ' ' + sentence[:ref.start()]
+        if _names_other_event(before, names):
             continue
         for pattern in _date_patterns(start, end, sentence):
             m = pattern.search(sentence, ref.end())
             if not m:
                 continue
             between = _fold(sentence[ref.end():m.start()]).split()
-            if set(between) & _SELF_REF_FOREIGN:
+            if set(between) & _SELF_REF_FOREIGN or _edition_place(between, names):
+                continue
+            if 'at' in between and not _place_ok('at', between[between.index('at')+1:][:8], names):
+                continue
+            if _names_other_event(sentence[ref.end():m.start()], names):
                 continue
             named = [w for i, w in enumerate(between) if w in _EVENT_WORDS | _OWN_NOUNS
                      and not (i + 1 < len(between) and between[i + 1] in _VENUE_NOUNS)]
@@ -725,7 +944,7 @@ def inspect(event, fetcher=None):
             for match in pattern.finditer(text):
                 context = text[max(0,match.start()-180):match.end()+180]
                 prefix = text[max(0,match.start()-180):match.start()]
-                if _owns_date(prefix,names,start.year):
+                if _owns_date(prefix,names,start.year,fetched.get('titles')):
                     supported = True
                     check['date_excerpt'] = context
                     check['support'] = 'literal_name_and_dates_only'
@@ -741,7 +960,8 @@ def inspect(event, fetcher=None):
                 check['support'] = 'organizer_title_name_and_dates'
         if not check.get('support'):
             title = _title_identifies(fetched.get('titles'), names, start.year)
-            sentence = title and _self_referenced_dates(text, start, end)
+            sentence = title and _self_referenced_dates(
+                text, start, end, names, _title_noun(title, names, start.year))
             if sentence:
                 supported = True
                 check['title_excerpt'] = title

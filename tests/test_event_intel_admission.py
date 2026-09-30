@@ -654,6 +654,10 @@ def test_anything_else_is_still_a_restriction(text):
 
 DEVCON = dict(name='fintech_devcon', website='https://fintechdevcon.io/', sources=[],
               starts_on='2027-08-02', ends_on='2027-08-04')
+# The real page's title. Since the 2026-09-30 audit a bare place needs it:
+# the same words after "SXSW" are SXSW London (see
+# test_event_intel_admission_identity.py).
+DEVCON_TITLES = ['fintech_devcon']
 
 
 @pytest.mark.parametrize('text', [
@@ -665,7 +669,8 @@ DEVCON = dict(name='fintech_devcon', website='https://fintechdevcon.io/', source
     'Past hosts Denver, CO and Austin, TX fintech_devcon Boulder, CO August 2-4, 2027',
 ])
 def test_a_bare_city_and_state_between_name_and_dates_is_allowed(text):
-    assert A.inspect(DEVCON, lambda url: page(text))['support'] == 'literal_name_and_dates_only', text
+    result = A.inspect(DEVCON, lambda url: page(text, titles=DEVCON_TITLES))
+    assert result['support'] == 'literal_name_and_dates_only', text
 
 
 @pytest.mark.parametrize('text', [
@@ -679,4 +684,5 @@ def test_a_bare_city_and_state_between_name_and_dates_is_allowed(text):
     'fintech_devcon Boulder, CO August 3-4, 2027',                # other dates
 ])
 def test_anything_but_a_bare_place_is_refused(text):
-    assert A.inspect(DEVCON, lambda url: page(text))['support'] == 'unverified', text
+    for titles in ([], DEVCON_TITLES):
+        assert A.inspect(DEVCON, lambda url: page(text, titles=titles))['support'] == 'unverified', text
