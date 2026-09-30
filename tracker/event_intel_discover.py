@@ -171,8 +171,24 @@ FIND_MAX_USES = 6
 # count); raising the writing budget is not.
 FIND_MAX_TOKENS = 9000
 
-# What the retry asks for, when the first attempt spent its whole search
-# budget and still returned nothing. See `propose_category`.
+# How many names one find call is asked for, ranked strongest first.
+#
+# More than a pass confirms, on purpose. Names cost only output tokens, and
+# the run-to-run variance a user complained about came from each later pass
+# depending on one different pick: the finder asked for exactly two named a
+# different second event on two runs of the same client, and every pass after
+# that diverged. So a find call names up to FIND_ASK, the top PASS_WANT not
+# already seen are confirmed in this pass, and the rest are carried to the
+# next pass instead of being paid for and thrown away (the first version
+# sliced the reply to two and discarded the others after searching for them).
+# A later pass whose carried names already cover it makes no call at all.
+FIND_ASK = 5
+
+# What the retry asks for. The retry only fires when a search BROKE (see
+# `_find_reply_is_broken_and_empty`), and it asks for less than the first
+# attempt did: the two strongest, with no extra ranked names. It used to be
+# equal to PASS_WANT while the first attempt also asked for PASS_WANT, so the
+# "narrower" retry asked the same number again.
 RETRY_PER_CATEGORY = 2
 
 # Each category is searched in short passes of PASS_WANT, not one big ask.
@@ -188,8 +204,11 @@ RETRY_PER_CATEGORY = 2
 # question asked: a first pass for the PASS_WANT strongest events, then
 # further passes, each told everything already found and asked for the
 # PASS_WANT strongest OTHER events, up to FIND_PASSES in all. A pass that
-# adds nothing new ends the category's search, as does any pass that is not
-# a clean answer. The ceiling per category stays PER_CATEGORY.
+# adds nothing new ends the category's search, as does a pass that failed.
+# A pass that was cut short but still added events does NOT end it: stopping
+# there made the size of a category depend on which pass happened to hit a
+# bad minute, which is the variance this change exists to remove. The ceiling
+# per category stays PER_CATEGORY.
 PASS_WANT = 2
 FIND_PASSES = 3
 CONFIRM_MAX_USES = 6
@@ -801,6 +820,23 @@ def merge(by_category: dict, force_exclude: str | None = None,
 
 # ── one category ──────────────────────────────────────────────────────────
 
+def _strict_bool(value) -> bool:
+    """True only for a real true. `bool("false")` is True, so a reply that
+    wrote the flag as a string used to mark every event organizer-matched
+    and famous."""
+    if isinstance(value, bool):
+        return value
+    return isinstance(value, str) and value.strip().lower() == "true"
+
+
+def _is_iso_date(value) -> bool:
+    try:
+        datetime.date.fromisoformat(str(value or "")[:10])
+    except ValueError:
+        return False
+    return len(str(value)) >= 10
+
+
 def _clean_event(raw: dict, category: str) -> dict | None:
     if not isinstance(raw, dict):
         return None
@@ -841,9 +877,9 @@ def _clean_event(raw: dict, category: str) -> dict | None:
         "cost_note": _t("cost_note", 400),
         "availability": raw.get("availability") if raw.get("availability") in ("open","sold_out","cancelled") else "unknown",
         "availability_source": _t("availability_source", 1000),
-        "organizer_run": bool(raw.get("organizer_run")),
+        "organizer_run": _strict_bool(raw.get("organizer_run")),
         "matchmaking_evidence": _t("matchmaking_evidence", 800),
-        "famous": bool(raw.get("famous")),
+        "famous": _strict_bool(raw.get("famous")),
         "category": category,
         "category_fit": _t("category_fit", 500),
         "confidence": str(raw.get("confidence") or "medium").strip().lower()[:10],
@@ -862,9 +898,22 @@ def _today() -> str:
     return datetime.date.today().isoformat()
 
 
+def _run_date(profile: dict | None) -> str:
+    """The date this run is measured from.
+
+    The profile's `as_of` when it carries a valid one, else today. discover()
+    pins it once at the start, so every prompt in a run states the same date
+    even when the run crosses midnight: `_today()` changing mid-run changed
+    every later prompt's hash, and a resume after midnight re-billed every
+    call instead of replaying the ones already paid for.
+    """
+    as_of = str((profile or {}).get("as_of") or "")
+    return as_of[:10] if _is_iso_date(as_of) else _today()
+
+
 def _prompt_common(profile: dict) -> dict:
     return {
-        "today": _today(),
+        "today": _run_date(profile),
         "profile": profile_brief(profile),
         "where_buyers": rubric.CLASSIFICATION_WHERE_BUYERS_ARE.get(
             profile.get("classification"), "Confirm with the client."),
@@ -1060,48 +1109,67 @@ def _dedupe_proposals(proposals: list) -> list:
 def _find_user(category: str, want: int, narrowed: bool = False) -> str:
     """The request sent to the finder, for `want` candidates.
 
-    `narrowed` is the retry's version. It says outright that the first
-    attempt came back empty and asks for the strongest few instead of a full
-    slate, because the observed failure is a finder that spends its whole
-    search budget hunting for a full slate and then reports itself incomplete
-    rather than returning the one or two events it did find.
+    The normal ask is for the `want` strongest plus up to FIND_ASK in all,
+    ranked, and only names already seen: see FIND_ASK for why.
+
+    `narrowed` is the retry's version, sent only after a search BROKE and the
+    attempt came back with nothing. It says that, rather than claiming the
+    earlier search used its whole budget (a spent budget is never retried,
+    so on this path that sentence was always false), and it asks for the
+    `want` strongest with no extra names.
     """
     label = rubric.CATEGORY_LABELS[category]
     if narrowed:
         return ("An earlier search of the \"%s\" category for this client "
-                "used its whole budget and came back with nothing, so this is "
-                "a second attempt. Name the %d STRONGEST "
-                "candidate events you can actually support with a page you "
-                "opened. Two well-sourced events are the goal here, not "
-                "coverage: stop searching as soon as you have them and write "
-                "your answer while you still have room. If you genuinely "
-                "cannot find even one, return an empty array, set "
-                "search_complete true and say plainly in `note` what this "
-                "category holds for them."
+                "did not finish: a search it needed failed or stopped "
+                "returning results, and it came back with nothing. This is a "
+                "second attempt, and it asks for less. Name only the %d "
+                "STRONGEST candidate events you can actually support with a "
+                "page you opened, and no others. Two well-sourced events are "
+                "the goal here, not coverage: stop searching as soon as you "
+                "have them and write your answer while you still have room. "
+                "If you genuinely cannot find even one, return an empty "
+                "array, set search_complete true and say plainly in `note` "
+                "what this category holds for them."
                 % (label, want))
+    extra = max(0, FIND_ASK - want)
     return ("Name the %d STRONGEST candidate events in the \"%s\" category "
             "for this client that you can support with a page you opened. "
             "%d well-sourced events are the goal here, not coverage: stop "
             "searching as soon as you have them and write your answer while "
-            "you still have room. If this category genuinely has nothing for "
-            "them, return an empty array, set search_complete true and say "
-            "plainly in `note` what this category holds for them."
-            % (want, label, want))
+            "you still have room. After them, list up to %d more candidates "
+            "you have ALREADY seen on pages you opened, ranked strongest "
+            "first; never spend a search only to lengthen the list. If this "
+            "category genuinely has nothing for them, return an empty array, "
+            "set search_complete true and say plainly in `note` what this "
+            "category holds for them."
+            % (want, label, want, extra))
 
 
 def _find_more_user(category: str, want: int, already: list) -> str:
-    """A later pass: the same category, the strongest events not yet found."""
+    """A later pass: the same category, the strongest events not yet found.
+
+    A different regional edition is allowed, because the rest of the module
+    treats one as a separate event (see _REGION_WORDS): this prompt used to
+    forbid "another edition, regional version" of anything already found, so
+    a pass that found Money20/20 USA could never offer Money20/20 Europe.
+    """
     label = rubric.CATEGORY_LABELS[category]
+    extra = max(0, FIND_ASK - want)
     return ("Earlier searches of the \"%s\" category for this client already "
             "found these events: %s. Name the %d STRONGEST OTHER candidate "
             "events in this category that you can support with a page you "
-            "opened. Do not name any event above again, or another edition, "
-            "regional version or sub-event of one. %d well-sourced events are "
-            "the goal, not coverage: stop searching as soon as you have them "
-            "and write your answer while you still have room. If there are "
-            "genuinely no others, return an empty array and set "
-            "search_complete true."
-            % (label, "; ".join(already), want, want))
+            "opened. Do not name any event above again, under the same name "
+            "or another one, and do not name a sub-event of one. A different "
+            "regional edition of one (another continent or city, with its "
+            "own dates and its own buyers) is a separate event and may be "
+            "named. %d well-sourced events are the goal, not coverage: stop "
+            "searching as soon as you have them and write your answer while "
+            "you still have room. After them, list up to %d more candidates "
+            "you have ALREADY seen, ranked strongest first; never spend a "
+            "search only to lengthen the list. If there are genuinely no "
+            "others, return an empty array and set search_complete true."
+            % (label, "; ".join(already), want, want, extra))
 
 
 def _find_reply_is_broken_and_empty(res: dict) -> bool:
@@ -1119,8 +1187,12 @@ def _find_reply_is_broken_and_empty(res: dict) -> bool:
     """
     err = res.get("error")
     if err:
-        return err.get("kind") in (claude_websearch.ERR_SEARCH_LIMIT,
-                                   claude_websearch.ERR_TRANSPORT)
+        if err.get("kind") == claude_websearch.ERR_SEARCH_LIMIT:
+            # A rate-limited search still writes an answer, and that answer
+            # has often already named candidates. Retrying it threw those
+            # away for a second call that came back empty just as often.
+            return not _proposals_in(res)
+        return err.get("kind") == claude_websearch.ERR_TRANSPORT
     if bool(res.get("budget_spent")) or not res.get("search_count"):
         return False
     parsed = claude_websearch.extract_json(res.get("text") or "",
@@ -1128,6 +1200,18 @@ def _find_reply_is_broken_and_empty(res: dict) -> bool:
     if not isinstance(parsed, dict) or parsed.get("candidates"):
         return False
     return parsed.get("search_complete") is False
+
+
+def _proposals_in(res: dict) -> list:
+    """The cleaned, deduped candidates a find reply named, or []."""
+    parsed = claude_websearch.extract_json(res.get("text") or "",
+                                           require="candidates")
+    if not isinstance(parsed, dict):
+        return []
+    raw = parsed.get("candidates")
+    return _dedupe_proposals([c for c in (_clean_proposal(x) for x in
+                                          (raw if isinstance(raw, list) else []))
+                              if c])[:FIND_ASK]
 
 
 def propose_category(category: str, profile: dict, avoid: list | None = None) -> dict:
@@ -1204,6 +1288,25 @@ def propose_category(category: str, profile: dict, avoid: list | None = None) ->
                 "note": note, "detail": detail, "budget_spent": budget,
                 "spend": spend, "error_kind": error_kind}
 
+    if res.get("error") and res["error"].get("kind") == claude_websearch.ERR_SEARCH_LIMIT:
+        named = _proposals_in(res)
+        if named and res.get("search_count"):
+            # The search broke part-way, after it had already named events.
+            # Those names are kept and checked like any others; the category
+            # is partial because what the broken searches would have added is
+            # unknown, never empty and never an error that loses the names.
+            logger.warning("event_intel_discover: category %s was rate "
+                           "limited after naming %d candidates; keeping them",
+                           category, len(named))
+            parsed = claude_websearch.extract_json(res.get("text") or "",
+                                                   require="candidates")
+            return _out(STATUS_PARTIAL, named,
+                        _reader_note((parsed or {}).get("note")),
+                        "The search tool stopped returning results part-way "
+                        "through this category, so it was only partly "
+                        "searched. The events it had already named are kept "
+                        "and were checked like any others.")
+
     if res.get("error"):
         err = res["error"]
         # The kind is a machine token and belongs in the log, not in a
@@ -1243,13 +1346,28 @@ def propose_category(category: str, profile: dict, avoid: list | None = None) ->
                     "The search ran but its answer could not be read. %s"
                     % _searches_used(res))
 
+    raw_candidates = parsed.get("candidates")
+    raw_candidates = raw_candidates if isinstance(raw_candidates, list) else []
     proposals = []
-    for c in (parsed.get("candidates") or []):
+    for c in raw_candidates:
         clean = _clean_proposal(c)
         if clean:
             proposals.append(clean)
-    proposals = _dedupe_proposals(proposals)[:want]
+    # Kept up to FIND_ASK, ranked as the finder ranked them. The caller
+    # confirms PASS_WANT of them now and carries the rest to the next pass.
+    proposals = _dedupe_proposals(proposals)[:FIND_ASK]
     note = _reader_note(parsed.get("note"))
+
+    if raw_candidates and not proposals:
+        # It named candidates, in a shape none of which could be read (bare
+        # strings, rows without a name). That is not a category with
+        # nothing in it, and it used to be reported as exactly that.
+        logger.warning("event_intel_discover: category %s named %d candidates "
+                       "and none could be read (first=%r)", category,
+                       len(raw_candidates), str(raw_candidates[0])[:200])
+        return _out(STATUS_ERROR, [], "",
+                    "The search named events for this category but its "
+                    "answer could not be read. %s" % _searches_used(res))
 
     # A search that was cut off is not a category that is empty. The model is
     # asked to declare this outright, because the alternative signals are all
@@ -1258,7 +1376,13 @@ def propose_category(category: str, profile: dict, avoid: list | None = None) ->
     # got starved once reported "Emerging event: empty", which the report then
     # renders to a paying client as "there is nothing in this category for
     # you", when the truth was that the search never finished.
+    #
+    # Only a real boolean counts. The string "false" is truthy, and a reply
+    # that wrote the flag as a string was falling through every check below
+    # to "this category genuinely has nothing".
     complete = parsed.get("search_complete")
+    if not isinstance(complete, bool):
+        complete = None
     if complete is None and not proposals:
         return _out(STATUS_ERROR, [], note,
                     'The search did not confirm its coverage. No verified empty-market conclusion is available.')
@@ -1300,14 +1424,6 @@ def propose_category(category: str, profile: dict, avoid: list | None = None) ->
             (parsed.get("note") or "")[:400], (res.get("text") or "")[:1200])
         return _out(STATUS_ERROR, [], note, detail)
 
-    if not proposals and complete is None:
-        # Nothing found and no declaration either way. Report the thing that
-        # could not be measured instead of picking the flattering reading.
-        return _out(STATUS_EMPTY, [], note,
-                    "This category returned no events and did not say "
-                    "whether its search finished, so it cannot be told "
-                    "apart from a search that was cut off.")
-
     return _out(STATUS_OK if proposals else STATUS_EMPTY, proposals, note, "")
 
 
@@ -1340,7 +1456,7 @@ def _unchecked(name: str, reason: str, website=None) -> dict:
 RECOVER_PAGES = 2
 
 
-def _recover_dates(event: dict) -> None:
+def _recover_dates(event: dict, today_iso: str | None = None) -> None:
     from datetime import date
     from .event_intel_access import organizer_url
     from .event_intel_admission import _names, _structured_date, _structured_name_matches
@@ -1353,7 +1469,7 @@ def _recover_dates(event: dict) -> None:
     for url in [website] + list(event.get("sources") or []):
         if isinstance(url, str) and organizer_url(url, host) and url not in urls:
             urls.append(url)
-    today = date.fromisoformat(_today())
+    today = date.fromisoformat(today_iso or _today())
     editions = {}
     for url in urls[:RECOVER_PAGES]:
         try:
@@ -1453,8 +1569,14 @@ def _url_key(url) -> str:
     return str(url or "").strip().rstrip(".,;:").rstrip("/").lower()
 
 
-def _reformat_confirm(reply: str):
-    """(parsed envelope or None, the reformat call's result or None)."""
+def _reformat_confirm(reply: str, searched: list | None = None):
+    """(parsed envelope or None, the reformat call's result or None).
+
+    `searched` is the confirm call's own result_urls. When it has any, they
+    are what a restated URL is checked against, by page or host, instead of
+    the URLs the reply's prose happened to type: the prose is exactly the
+    thing whose citations are in question.
+    """
     if not reply.strip():
         return None, None
     fixed = _ask(_REFORMAT_SYSTEM,
@@ -1468,13 +1590,15 @@ def _reformat_confirm(reply: str):
                                            require="confirmed")
     if not isinstance(parsed, dict):
         return None, fixed
-    found = _URL.findall(reply)
+    found = list(searched) if searched else _URL.findall(reply)
     seen = {_url_key(u) for u in found}
     hosts = {host_key(u) for u in found} - {""}
     event = parsed.get("event")
     if isinstance(event, dict):
         event["sources"] = [u for u in (event.get("sources") or [])
-                            if isinstance(u, str) and _url_key(u) in seen]
+                            if isinstance(u, str)
+                            and (_url_key(u) in seen
+                                 or (searched and host_key(u) in hosts))]
         if _url_key(event.get("availability_source")) not in seen:
             event["availability_source"] = None
         # The website is an identity, not a citation: its HOST is what source
@@ -1557,7 +1681,7 @@ def _confirm_event(proposal: dict, category: str, profile: dict,
                        name[:80], res.get("text_block_count"),
                        res.get("stop_reason"), len(reply), reply[:600],
                        reply[-600:])
-        parsed, fixed = _reformat_confirm(reply)
+        parsed, fixed = _reformat_confirm(reply, res.get("result_urls"))
         box["spend"] = claude_websearch.spend_sum(
             box["spend"], claude_websearch.spend_of(fixed))
         if not isinstance(parsed, dict):
@@ -1591,8 +1715,51 @@ def _confirm_event(proposal: dict, category: str, profile: dict,
                                          "without citing a single page, so "
                                          "nothing here can be checked.")
 
-    if not event.get("starts_on"):
-        _recover_dates(event)
+    # The confirmer may correct a name ("you are looking at the page and they
+    # were not"), but it may not swap the event. A proposal of "FinTech
+    # Connect" came back confirmed as "Money20/20 Europe", status ok, and a
+    # different event entered the list under a check that was never run on
+    # it. A rename is accepted when the names still match or the confirmed
+    # event lives on the proposal's own host.
+    p_site = (proposal or {}).get("website") or ""
+    same_host = bool(host_key(p_site)) and host_key(p_site) == host_key(
+        event.get("website") or "")
+    if not (same_host or names_match(name, event["name"])):
+        logger.warning("event_intel_discover: confirm for %r came back as %r",
+                       name[:80], event["name"][:80])
+        return _unchecked(name, "The event's identity changed during "
+                                "checking: the check came back describing a "
+                                "different event from the one proposed, so "
+                                "it was not kept.", p_site or None)
+
+    # Every cited page must be traceable to what the searches returned. The
+    # sources used to be whatever URLs the reply typed. Checked by page or by
+    # host, because a reply routinely cites the agenda page of a site whose
+    # home page was the search hit. Not checked when the call recorded no
+    # result URLs at all (a replayed reply from before they were kept, or a
+    # result shape this module does not read), and that is logged rather
+    # than guessed.
+    searched = res.get("result_urls")
+    if isinstance(searched, list) and searched:
+        keys = {_url_key(u) for u in searched}
+        hosts = {host_key(u) for u in searched} - {""}
+        if not any(_url_key(u) in keys or host_key(u) in hosts
+                   for u in event["sources"]):
+            return _unchecked(event["name"], "None of the pages this check "
+                                             "cited were among the pages its "
+                                             "searches returned, so the "
+                                             "confirmation could not be traced "
+                                             "to anything it read.",
+                              event.get("website"))
+    elif res.get("search_count"):
+        logger.info("event_intel_discover: confirm for %r carried no search "
+                    "result URLs; its sources were not traced", name[:80])
+
+    # Any starts_on that is not an ISO date, not only a missing one: a reply
+    # of "March 2027" skipped recovery and was then held back for dates the
+    # organizer's own page could have supplied.
+    if not _is_iso_date(event.get("starts_on")):
+        _recover_dates(event, _run_date(profile))
     from .event_intel_policy import eligibility
     reasons = eligibility(event, profile)
     if reasons:
@@ -1618,18 +1785,38 @@ def search_category(category: str, profile: dict) -> dict:
     proposed an event also decided whether to keep it.
     """
     found = propose_category(category, profile)
-    proposals = list(found["proposals"])
+    ranked = list(found["proposals"])
+    # This pass confirms the PASS_WANT strongest; the rest of what the finder
+    # ranked is carried to the next pass. See FIND_ASK.
+    proposals, carried = ranked[:PASS_WANT], ranked[PASS_WANT:]
     later = []
-    ok = True  # a first pass that failed or found nothing has no proposals
-    while ok and proposals and len(later) < FIND_PASSES - 1:
+    passes = 1
+    go = bool(proposals)  # a first pass that failed or found nothing ends it
+    while go and passes < FIND_PASSES:
+        passes += 1
+        if len(carried) >= PASS_WANT:
+            # Already named by an earlier call: no search is needed to fill
+            # this pass, and none is paid for.
+            proposals.extend(carried[:PASS_WANT])
+            carried = carried[PASS_WANT:]
+            continue
         more = propose_category(category, profile,
-                                avoid=[p["name"] for p in proposals])
-        seen = {name_key(p["name"]) for p in proposals}
-        added = [p for p in more["proposals"] if name_key(p["name"]) not in seen]
-        proposals.extend(added)
+                                avoid=[p["name"] for p in proposals + carried])
+        # The same test merge uses (name, region, site and dates), not an
+        # exact name key: the key dropped a regional edition found in a later
+        # pass ("Money20/20 Europe" after "Money20/20 USA" share one key) and
+        # the empty `added` then ended the search, while it kept "Fintech
+        # Meetup Las Vegas" after "Fintech Meetup" and paid to confirm both.
+        fresh = [p for p in more["proposals"]
+                 if not any(same_event(p, q) for q in proposals + carried)]
+        pool = carried + fresh
+        proposals.extend(pool[:PASS_WANT])
+        carried = pool[PASS_WANT:]
         later.append({"status": more["status"], "detail": more.get("detail") or "",
-                      "added": len(added), "spend": more.get("spend")})
-        ok = bool(added) and more["status"] == STATUS_OK
+                      "added": len(fresh), "spend": more.get("spend")})
+        # Stop when a pass found nothing new or failed. A partial pass that
+        # still added events carries on (see PASS_WANT).
+        go = bool(fresh) and more["status"] in (STATUS_OK, STATUS_PARTIAL)
     base = {"category": category, "note": found["note"],
             "error_kind": found.get("error_kind"),
             "proposed": len(proposals), "rejected": [],
@@ -1700,9 +1887,19 @@ def search_category(category: str, profile: dict) -> dict:
 
     # Nothing survived. Which of the two absences this is depends entirely on
     # WHY, and the whole module is built around not guessing.
-    if unchecked or found["status"] == STATUS_PARTIAL:
+    #
+    # A later pass that failed or was cut short counts here. Two candidates
+    # found, both ruled out, and a second pass that never ran used to print
+    # "2 candidates in this category were checked and none qualified", a
+    # finished-search sentence about a search that did not finish.
+    short_later = any(p["status"] in (STATUS_ERROR, STATUS_PARTIAL)
+                      for p in later)
+    if unchecked or found["status"] == STATUS_PARTIAL or short_later:
+        extra = (["A later search for more events in this category could not "
+                  "be finished, so this is not a complete check of it."]
+                 if short_later else [])
         detail = " ".join(([found["detail"]] if found["status"] == STATUS_PARTIAL
-                           else []) + bits)
+                           else []) + bits + extra)
         return dict(base, status=STATUS_PARTIAL, events=[], detail=detail)
 
     # Every candidate was searched and ruled out. That is a finished piece of
@@ -1728,6 +1925,8 @@ def discover(profile: dict) -> dict:
     """
     by_category: dict[str, list[dict]] = {}
     statuses: dict[str, dict] = {}
+    # One date for every prompt in the run. See _run_date.
+    profile = dict(profile or {}, as_of=_run_date(profile))
 
     spends = []
     with ContextExecutor(max_workers=MAX_CONCURRENCY) as pool:
