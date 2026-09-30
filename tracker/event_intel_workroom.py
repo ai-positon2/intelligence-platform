@@ -553,6 +553,18 @@ DRAFT_NO_EVIDENCE = "rewritten_no_booth_note"
 DRAFT_AGGRESSIVE = "rewritten_aggressive"
 DRAFT_ACCOUNT = "account_play"
 
+# What each status is called wherever a reader sees it. The page has its own
+# copy of these words (DRAFT_LABEL in the template); the CSV printed the raw
+# token ("rewritten_no_booth_note") into a file somebody pastes into a
+# sequencer.
+DRAFT_LABELS = {
+    DRAFT_OK: "Written as drafted",
+    DRAFT_REVIEW: "Review before use",
+    DRAFT_NO_EVIDENCE: "Opener replaced: claimed a conversation",
+    DRAFT_AGGRESSIVE: "Opener replaced: displacement language",
+    DRAFT_ACCOUNT: "Account play, no named person",
+}
+
 # The non-personalized fallback for `angle`/`fit_note` on a row Rule 1 or
 # Rule 2 rewrote. `opener` gets a real, per-class deterministic sentence from
 # fallback_opener(); these two fields have no per-class equivalent, so they

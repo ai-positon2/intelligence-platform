@@ -9694,6 +9694,17 @@ def event_conference_intelligence_candidates_csv(run_id):
                 "Published attendance (their claim)", "Published exhibitors",
                 "Cost (never scored)", "Not measured", "What it is",
                 "Why it matters to this client", "Website", "Your decision", "Decision note", "Analysis as of"])
+    # The file says what the screen says, in the screen's words. The verdict
+    # and decision columns printed their stored tokens (kept, cut, unaudited,
+    # going, skipped, went).
+    verdict_labels = {
+        event_intel_audit.VERDICT_KEPT: "Kept after comparison with an alternative",
+        event_intel_audit.VERDICT_CUT: "A better-targeted alternative was preferred",
+        event_intel_audit.VERDICT_UNAUDITED: "Not compared",
+        event_intel_audit.VERDICT_PROMOTED: "Added as a better-targeted alternative",
+        "compared": "Compared with an alternative",
+    }
+    decision_labels = event_intel_store.DECISION_LABELS
     for c in rows:
         total = c.get("total")
         key = event_key(c)
@@ -9716,16 +9727,41 @@ def event_conference_intelligence_candidates_csv(run_id):
             outcome_row.get("outcome_adjustment_reason") or "",
             cross_row.get("cross_client_note") or "",
             event_intel_rubric.CATEGORY_LABELS.get(c.get("category"), c.get("category") or ""),
-            c.get("audit_verdict") or "", c.get("audit_note") or "",
+            (verdict_labels.get(c.get("audit_verdict"), "Compared")
+             if c.get("audit_verdict") else ""), c.get("audit_note") or "",
             c.get("starts_on") or "", c.get("ends_on") or "",
             c.get("city") or "", c.get("country") or "",
             c.get("attendees") or "", c.get("booths") or "",
             c.get("cost_note") or "",
             " ".join(c.get("gaps") or []),
             c.get("description") or "", c.get("client_line") or "",
-            c.get("website") or "", c.get("prior_decision") or "", c.get("prior_note") or "",
+            c.get("website") or "",
+            (decision_labels.get(c.get("prior_decision"), "Recorded")
+             if c.get("prior_decision") else ""), c.get("prior_note") or "",
             summary.get("selection", {}).get("as_of", ""),
         ]])
+
+    # The events the page lists under "Not scored". Leaving them out made the
+    # file read as though every event found had been ranked. The reason is
+    # the pipeline's own sentence; a stored one that is a crash message is
+    # replaced rather than exported.
+    from tracker.event_intel_pipeline import unscored_kind
+    unscored_status = {
+        "policy": "Not scored: kept out by a rule (see reason)",
+        "evidence": "Not scored: the evidence to score it was incomplete",
+        "scoring": "Not scored: the scoring pass returned no result",
+    }
+    for u in summary.get("unscored") or []:
+        note = str(u.get("note") or "").strip()
+        if not note or note.lower().startswith("unexpected failure"):
+            note = "The research did not establish enough evidence to score this event."
+        kind = u.get("kind") or unscored_kind(re.findall(r"[^.!?]+[.!?]*", note))
+        blank = [""] * 33
+        blank[0], blank[3], blank[4], blank[26] = (
+            u.get("name") or "", "not scored",
+            unscored_status.get(kind, unscored_status["evidence"]), note)
+        blank[32] = summary.get("selection", {}).get("as_of", "")
+        w.writerow([_csv_safe(v) for v in blank])
 
     client = (summary.get("title") or run.get("query") or "events")
     slug = re.sub(r"[^a-z0-9]+", "-", client.lower()).strip("-")[:60] or "events"
@@ -9774,7 +9810,7 @@ def event_conference_intelligence_outreach_csv(run_id):
             r.get("fit") if r.get("fit") is not None else "not qualified",
             r.get("fit_note") or r.get("qualify_note") or "",
             r.get("angle") or "", r.get("opener") or "",
-            "written as drafted" if status == "ok" else status,
+            event_intel_workroom.DRAFT_LABELS.get(status, "Review before use"),
             r.get("draft_reason") or "",
             "; ".join(r.get("draft_flagged") or []),
             r.get("booth_note") or "", r.get("account_note") or "",
@@ -9789,8 +9825,9 @@ def event_conference_intelligence_outreach_csv(run_id):
                 "Nothing here has been sent. These are drafts to read, edit and "
                 "send yourself."])
     w.writerow(["NOTE", ((summary.get("repeats") or {}).get("crm_note")) or ""])
-    w.writerow(["NOTE", "Rows marked rewritten_no_booth_note had an opener that "
-                        "claimed a conversation nobody recorded. It was replaced."])
+    w.writerow(["NOTE", "Rows marked \"%s\" had an opener that claimed a "
+                        "conversation nobody recorded. It was replaced."
+                % event_intel_workroom.DRAFT_LABELS[event_intel_workroom.DRAFT_NO_EVIDENCE]])
 
     name = summary.get("event_name") or run.get("query") or "event"
     slug = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")[:60] or "event"
@@ -9901,6 +9938,11 @@ def event_conference_intelligence_export(run_id):
         event_intel_store.SOURCE_OK, event_intel_store.SOURCE_RECOVERED)
         for source in sources)
 
+    # Labels, not the stored tokens ("literal_support_only", "complete").
+    evidence_labels = {"literal_support_only": "Named on the published page",
+                       "unverified": "Not verified"}
+    run_labels = {"complete": "Complete", "failed": "Did not finish",
+                  "running": "In progress", "queued": "In progress"}
     buf = io.StringIO()
     # csv.writer defaults to \r\n regardless of how the handle was opened,
     # which is correct for CSV and is called out here so nobody "fixes" it.
@@ -9922,10 +9964,10 @@ def event_conference_intelligence_export(run_id):
             (ap.get("industry") or "") if isinstance(ap, dict) else "",
             (ap.get("employees") or "") if isinstance(ap, dict) else "",
             r.get("source_url") or "",
-            evidence.get("status") or "unverified",
+            evidence_labels.get(evidence.get("status"), evidence_labels["unverified"]),
             evidence.get("expected_edition") or "",
             ", ".join(str(year) for year in (evidence.get("observed_roster_years") or [])),
-            run.get("status") or "unknown", unreadable,
+            run_labels.get(run.get("status"), "In progress"), unreadable,
             "Not independently verified",
             "Published companies and roles only; not an attendee list. "
             "A partial roster does not establish complete event coverage.",

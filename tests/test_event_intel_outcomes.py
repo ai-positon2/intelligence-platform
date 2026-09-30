@@ -352,7 +352,8 @@ def test_the_drafts_export_carries_the_rewrite_reason_and_the_phrase(monkeypatch
         "event_name": "FinovateFall", "event_class": W.CLASS_EXHIBITED}])
     rows = _rows(_client().get(BASE + "/runs/7/outreach.csv"))
     head, body = rows[0], rows[1]
-    assert body[head.index("Draft status")] == W.DRAFT_NO_EVIDENCE
+    # The status in the reader's words, not the stored token.
+    assert body[head.index("Draft status")] == W.DRAFT_LABELS[W.DRAFT_NO_EVIDENCE]
     assert "nobody recorded" in body[head.index("Why the draft was changed")]
     assert "good to meet" in body[head.index("Phrases that triggered the change")]
 
