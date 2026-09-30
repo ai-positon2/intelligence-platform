@@ -577,6 +577,12 @@ def _run_recommend(run_id: int, email: str, profile: dict) -> None:
         banned=banned, thin=thin, unscored=scored["unscored"],
         promoted=promoted, scoring_batches=scored.get("batches") or 0)
     summary['source_admission'] = admission
+    # Which events had their dates taken from the organizer's own structured
+    # listing during discovery. The field lives on the discovered event and
+    # is not a candidate column, so the report could never say it.
+    summary['dates_from'] = {c.get('name'): c.get('dates_from')
+                             for c in found['candidates'] + list(promoted['promoted'] or [])
+                             if c.get('dates_from') and c.get('name')}
     # What the run cost, summed from every stage's own report rather than
     # from a shared counter: `run_job` is a thread entry point and two runs
     # can be in flight in one process, so a global would bill one client for

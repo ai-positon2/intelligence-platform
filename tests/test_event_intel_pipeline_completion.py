@@ -150,7 +150,7 @@ def test_a_run_where_no_category_ran_is_still_failed(monkeypatch):
 def _full_run(monkeypatch, fake, *, admission_reasons=(), score_errors=(), scorer_unscored=(),
               excluded=("Sold Summit",)):
     _wire(monkeypatch, fake)
-    cands = [_cand("PMM Summit"), _cand("Sold Summit")]
+    cands = [_cand("PMM Summit", dates_from="organizer_structured_data"), _cand("Sold Summit")]
     monkeypatch.setattr(P.event_intel_discover, "discover", _discover(
         {c: {"status": "ok", "kept": 2, "detail": ""} for c in R.CATEGORIES},
         shortfall=[], candidates=cands))
@@ -205,3 +205,8 @@ def test_every_event_kept_out_by_policy_is_a_complete_empty_answer(monkeypatch):
         excluded=("PMM Summit", "Sold Summit"))
     assert run2["status"] == "complete" and run2["summary"]["completion_state"] == "complete"
     assert {u["kind"] for u in run2["summary"]["unscored"]} == {"policy"}
+
+
+def test_recovered_dates_are_recorded_in_the_summary(monkeypatch):
+    run = _full_run(monkeypatch, _FakeStore())
+    assert run["summary"]["dates_from"] == {"PMM Summit": "organizer_structured_data"}

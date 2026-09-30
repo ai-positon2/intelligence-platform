@@ -2997,6 +2997,57 @@
         '<div class="st"><span style="width:' + pct + '%"></span></div></div>';
     }
 
+    /* What the source check established about a card's own event, in one
+       short line each, and only when there is something to say. The summary
+       has carried these since the source check existed and the page showed
+       none of them: which organizer evidence the dates stand on, and when a
+       restriction on the organizer's page was judged to belong to something
+       other than this event. Unknown future values get a generic phrase. */
+    var SUPPORT_LABEL = {
+      organizer_structured_name_and_dates: 'the organizer\'s event listing',
+      literal_name_and_dates_only: 'the organizer\'s page text',
+      organizer_title_name_and_dates: 'the organizer\'s page title',
+      organizer_title_name_and_self_referenced_dates: 'the organizer\'s page title and text'};
+    var DATES_FROM_LABEL = {organizer_structured_data: 'the organizer\'s event listing'};
+    var SCOPE_LABEL = {
+      named_other_programme: 'another named programme',
+      timed_session: 'a single session',
+      other_dated_event: 'another dated event',
+      concession_pass: 'a discounted or concession pass',
+      hypothetical_question: 'a question on an FAQ page',
+      other_inventory: 'other inventory, such as hotel rooms or VIP tickets'};
+    var CARD_CTX = {admission: {}, datesFrom: {}};
+
+    function cardContext(s){
+      var byName = {};
+      (s.source_admission || []).forEach(function(a){
+        if (a && a.name) byName[a.name] = a; });
+      CARD_CTX = {admission: byName, datesFrom: s.dates_from || {}};
+    }
+
+    function cardEvidenceHtml(c){
+      var a = CARD_CTX.admission[c.name];
+      var lines = [];
+      var from = DATES_FROM_LABEL[CARD_CTX.datesFrom[c.name]] ||
+        (CARD_CTX.datesFrom[c.name] ? 'the organizer\'s own pages' : '');
+      var support = a && a.support && a.support !== 'unverified'
+        ? (SUPPORT_LABEL[a.support] || 'the organizer\'s own pages') : '';
+      if (from || support) lines.push('Dates confirmed from: ' + (from || support) + '.');
+      var scopes = [];
+      ((a && a.checks) || []).forEach(function(ch){
+        (ch.access_observations || []).forEach(function(o){
+          if (!o || !o.scope || o.scope === 'unresolved_event_access') return;
+          var l = SCOPE_LABEL[o.scope] || 'something other than this event';
+          if (scopes.indexOf(l) < 0) scopes.push(l);
+        });
+      });
+      if (scopes.length) {
+        lines.push('The organizer\'s page mentions restricted access, read here as ' +
+          'applying to ' + joinClauses(scopes) + ' rather than to this event.');
+      }
+      return lines.length ? '<p class="cshort">' + lines.map(esc).join(' ') + '</p>' : '';
+    }
+
     function candidateRow(c, prior, labels, idx, shortfallLine){
       prior = prior || null; labels = labels || {};
       var site = safeUrl(c.website);
@@ -3071,6 +3122,7 @@
               '</span></div>' : '') +
         '</div>' +
         (shortfallLine ? '<p class="cshort">' + esc(shortfallLine) + '</p>' : '') +
+        cardEvidenceHtml(c) +
         (c.description ? '<p class="cd">' + esc(c.description) + ' ' +
           '<b>' + esc(c.client_line || '') + '</b></p>' : '') +
         '<details class="cwhy"><summary>Why these scores</summary>' +
@@ -3693,6 +3745,34 @@
         }).join('') + '</div></div>';
     }
 
+    /* A category searches once, then again for anything the first pass
+       missed. A follow-up that broke never changes the category's status
+       (the first pass already answered for it), so it was invisible: a
+       category could look fully searched while its second search had lost
+       its connection part-way. One line, naming the categories. */
+    function laterSearchHtml(statuses){
+      var names = [], why = [];
+      Object.keys(statuses || {}).forEach(function(k){
+        var broke = (statuses[k].later_searches || []).filter(function(l){
+          return l && (l.status === 'error' || l.status === 'partial'); });
+        if (!broke.length) return;
+        names.push(catLabel(k) || statuses[k].label || '');
+        broke.forEach(function(l){
+          /* Stored in the first search's words; said of the follow-up. */
+          var r = readerText(l.detail, '').replace(
+            /^The search for this category could not be completed: (\w)/,
+            function(_, ch){ return 'It stopped because ' + ch.toLowerCase(); });
+          if (r && why.indexOf(r) < 0) why.push(r);
+        });
+      });
+      if (!names.length) return '';
+      return '<div class="evi-note" style="margin-top:10px">' +
+        'A follow-up search for more events did not finish in ' +
+        esc(joinClauses(names)) + ', so ' + (names.length === 1 ? 'it lists' : 'they list') +
+        ' what the first search found. ' + (why.length === 1 ? esc(why[0]) : '') +
+        '</div>';
+    }
+
     function coverageHtml(s){
       var rows = s.shortfall || [];
       var statuses = s.statuses || {};
@@ -3789,7 +3869,7 @@
         '<p>They are searched one at a time and never merged, which is what ' +
         'stops the famous names crowding out the narrower summits, the free ' +
         'sponsor-funded days and the side events.</p></details></div>' +
-        coverageWhyHtml(rows) + '</div>' +
+        coverageWhyHtml(rows) + laterSearchHtml(statuses) + '</div>' +
         searchFunnelHtml(s);
     }
 
@@ -4185,6 +4265,7 @@
         return !finished && (c.tier !== 'P3' || c.committed);
       }).sort(function(a,b){ return ((b.total || 0) + (b.outcome_adjustment || 0)) - ((a.total || 0) + (a.outcome_adjustment || 0)); }).slice(0, keepN);
       var counts = counts0;
+      cardContext(s);
       var outc = s.outcomes || {};
       var byName = outc.by_identity || outc.by_name || {};
       var decLabels = outc.labels || {};
