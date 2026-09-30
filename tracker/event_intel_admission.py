@@ -15,9 +15,20 @@ from .event_intel_evidence import source_snapshot
 from .event_intel_jobs import ContextExecutor
 
 MAX_PAGES = 2
+# The phrases an organizer uses to say the event itself is closed or gated.
+# An audit on 2026-09-30 found nine everyday ones admitted clean with no
+# reason at all ("Registration is now closed", "Registrations are closed",
+# "SOLD-OUT", "Fully booked", "postponed", "Apply to attend", "Request an
+# invitation", "At capacity"), so the wording allows an adverb, a hyphen
+# and a plural where real pages use them. "Apply to sponsor" and "Apply to
+# exhibit" (fintechweek.hk's header) are not in it: those gate a stand, not
+# a seat.
 _RESTRICTED = re.compile(r'\b(?:invite[- ]only|invitation[- ]only|members[- ]only|'
-                         r'by invitation|application[- ]only|application required|subject to approval|sold out|waitlist|'
-                         r'registration (?:is )?closed|cancelled|canceled)\b', re.I)
+                         r'by invitation|application[- ]only|application required|subject to approval|'
+                         r'sold[- ]?out|wait[- ]?list(?:ed)?|fully[- ]booked|at capacity|postponed|'
+                         r'apply to attend|request (?:an? )?invit(?:e|ation)|'
+                         r'registrations? (?:is |are |has |have )?(?:now |officially |already )?closed|'
+                         r'cancelled|canceled)\b', re.I)
 
 
 # Words that name a different gathering, or tie this one to another. Either,
@@ -42,6 +53,16 @@ _EDITION_WORDS = {'spring', 'summer', 'fall', 'autumn', 'winter', 'europe', 'asi
 def _fold(text):
     text = unicodedata.normalize('NFKC',text).casefold().replace('&',' and ')
     return ' '.join(re.findall(r'\w+',text))
+
+
+def _name_re(name):
+    """A folded name as a pattern over folded text.
+
+    Letters and digits are separate tokens and any spacing between tokens
+    is allowed, so "Money 20/20" and "Money20/20" (both on money2020.com)
+    are one name; nothing but whitespace may come between them."""
+    tokens = re.findall(r'[^\W\d]+|\d+', name)
+    return r'(?<!\w)' + r'\s*'.join(map(re.escape, tokens)) + r'(?!\w)'
 
 
 def _names(event, year):
@@ -133,7 +154,7 @@ def _another_edition(text, match, own, dates):
     current = pieces[-1]
     # The restriction is its own sentence, or shares one with the range.
     window = current if current.strip() else ' '.join(pieces[-2:])
-    if re.search(r'(?<!\w)'+re.escape(own)+r'(?!\w)', _fold(window)):
+    if _names_any(own, _fold(window)):
         return False
     months = {start.month, end.month}
     for m in _DAY_RANGE.finditer(window):
@@ -152,19 +173,77 @@ def _another_edition(text, match, own, dates):
     return False
 
 
-def _other_programme(text, match, clause, event_name, dates):
+def _own_names(event_name, year):
+    """Every way the page may name this event: its folded names, plus the
+    acronym _names strips. An audit on 2026-09-30 found "Singapore FinTech
+    Festival (SFF)" kept its "(SFF)" here, so the page's "Singapore FinTech
+    Festival is an invite-only Leadership Forum" was never recognised as
+    the festival describing itself and was cleared as another programme."""
+    own = list(_names({'name': event_name}, year))
+    acronym = re.search(r'\(([A-Z0-9]{2,12})\)\s*$', str(event_name or ''))
+    if acronym:
+        own.append(_fold(acronym.group(1)))
+    return own
+
+
+def _names_any(own, folded):
+    return any(re.search(_name_re(n), folded) for n in own)
+
+
+# "Our flagship gathering is an invite-only Executive Summit" (audit,
+# 2026-09-30): a subject and a copula in front of the modifier is the page
+# describing a thing as invite-only, and on the event's own page that thing
+# is the event. Only a modifier with no copula before it ("leads into the
+# invitation-only Insights2040 Annual Meetings") names something else.
+_COPULA = re.compile(r"\b(?:is|are|was|will be|remains|becomes)\s+(?:(?:an?|the|our|this|now|once again|again)\s+){0,2}\*?$", re.I)
+_MONTH_WORD = (r'(' + '|'.join([m for m in calendar.month_name if m] + ['Sept'] +
+                                [m for m in calendar.month_abbr if m]) + r')\b\.?')
+_DAY_IN_ENTRY = re.compile(r'(?<![\d:.])\b(\d{1,2})(?:st|nd|rd|th)?\s+' + _MONTH_WORD + '|'
+                           r'\b' + _MONTH_WORD + r'\s+(\d{1,2})(?:st|nd|rd|th)?\b', re.I)
+
+
+def _entry_day(entry, year):
+    m = None
+    for m in _DAY_IN_ENTRY.finditer(entry):
+        pass
+    if not m:
+        return None
+    day, month = (m.group(1), m.group(2)) if m.group(1) else (m.group(4), m.group(3))
+    number = [i for i, x in enumerate(calendar.month_abbr) if x and x.lower() == month[:3].lower()]
+    try:
+        return date(year, number[0], int(day))
+    except (ValueError, IndexError):
+        return None
+
+
+def _clock_hours(clock):
+    """Length in hours of a clock range, or None when it cannot be read."""
+    times = re.findall(r'(\d{1,2})(?:[:.](\d{2}))?\s*([ap])?\.?m?\.?', clock, re.I)
+    if len(times) < 2:
+        return None
+    def hours(h, m, ap):
+        h = int(h) % 12 + (12 if (ap or '').lower() == 'p' else 0) if ap else int(h)
+        return h + int(m or 0) / 60
+    (h1, m1, a1), (h2, m2, a2) = times[0], times[-1]
+    start, end = hours(h1, m1, a1 or a2), hours(h2, m2, a2)
+    return (end - start) % 24
+
+
+def _other_programme(text, match, clause, event_name, dates, page):
     """A restriction that plainly belongs to something other than the event.
 
     Singapore FinTech Festival's own overview page, 2026-09-29: "the
     invitation-only Insights2040 Annual Meetings" and a 19:00 - 22:00 evening
     session "*By invite-only", on a site selling general passes. Both were
-    read as the whole festival being closed. Only two shapes are scoped, and
-    anything else stays unresolved for a reviewer:
+    read as the whole festival being closed. Only these shapes are scoped,
+    and anything else stays unresolved for a reviewer:
 
       * the restriction is a modifier and the named thing it modifies is not
-        this event ("invitation-only Insights2040 Annual Meetings");
-      * the restriction sits in a calendar entry with a clock-time range,
-        which is a session on the agenda, not admission to the event;
+        this event ("invitation-only Insights2040 Annual Meetings"), with no
+        copula in front of it ("X is an invite-only Summit" is X itself);
+      * the restriction sits in a calendar entry with a clock-time range
+        that is plainly one session and not the event's own hours (see
+        below);
       * the restriction closes a sentence dating another multi-day event
         (see _another_edition).
 
@@ -173,26 +252,50 @@ def _other_programme(text, match, clause, event_name, dates):
     word = match.group(0).lower()
     if not re.search(r'only|invitation', word):
         return None
-    own = _fold(re.sub(r'\s+20\d{2}$', '', event_name or ''))
+    own = _own_names(event_name, dates[0].year)
     # A sentence that names this event is about this event: "CMO Summit is
     # an invitation-only Executive Gathering" is the summit being closed.
-    if not own or re.search(r'(?<!\w)'+re.escape(own)+r'(?!\w)', _fold(clause)):
+    if not own or _names_any(own, _fold(clause)):
         return None
-    modified = _MODIFIER.match(text, match.start())
-    if modified:
+    modified = _MODIFIER.match(text[match.start():match.start()+300])
+    if modified and not _COPULA.search(clause):
         target = _fold(modified.group(1))
-        if (own not in target and target not in own
+        if (not any(n in target or target in n for n in own)
                 and set(target.split()) & _EVENT_WORDS):
             return 'named_other_programme'
     # An agenda entry spans lines (day, time, venue, then the note), so the
     # session window reads back across line breaks but never past a sentence.
     entry = re.split(r'[.;!?]', text[max(0, match.start()-120):match.start()])[-1]
-    if _CLOCK.search(entry) and not re.search(
-            r'(?<!\w)'+re.escape(own)+r'(?!\w)', _fold(entry)):
+    clocks = list(_CLOCK.finditer(entry))
+    if clocks and not _names_any(own, _fold(entry)) and _one_session(entry, clocks[-1], dates, page):
         return 'timed_session'
     if _another_edition(text, match, own, dates):
         return 'other_dated_event'
     return None
+
+
+def _one_session(entry, clock, dates, page):
+    """Is this timed entry one session, not the event's own opening hours?
+
+    An audit on 2026-09-30: a hero block "9 September 2026 / 09:00 - 17:30 /
+    Moscone West / Invitation only" was cleared as a session, and that is
+    the event's first day and its doors. SFF's real entry is "Tuesday 17th
+    November / 19:00 - 22:00 / Jiak Kim House / *By invite-only", the night
+    before an 18-20 November festival. So an entry is a session only when
+    its day falls outside the event's own dates, or when the page runs an
+    agenda (at least one other timed entry) and this one is short (under six
+    hours) or is itself a named gathering ("Founders Dinner")."""
+    start, end = dates
+    day = _entry_day(entry, start.year)
+    if day and not (start <= day <= end):
+        return True
+    if page.setdefault('clocks', None) is None:
+        page['clocks'] = sum(1 for _ in zip(range(50), _CLOCK.finditer(page['text'])))
+    if page['clocks'] < 2:
+        return False
+    hours = _clock_hours(clock.group(0))
+    named = set(_fold(entry[clock.end():]).split()) & (_EVENT_WORDS - {'day', 'days', 'week'})
+    return bool(named) or (hours is not None and hours < 6)
 
 
 # Passes a festival hands out to a category of guest, not to the paying
@@ -202,6 +305,10 @@ def _other_programme(text, match, clause, event_name, dates):
 _CONCESSION = {'government', 'media', 'press', 'journalist', 'student', 'academic',
                'startup', 'investor', 'volunteer', 'nonprofit', 'non', 'profit'}
 _PASS_JOIN = {'and', 'or'}
+# All that may stand between the concession pass and the restriction: the
+# pass must be the subject the restriction is said of.
+_PASS_VERB = {'are', 'is', 'will', 'be', 'remain', 'remains', 'complimentary',
+              'free', 'and', 'also', 'still'}
 
 
 def _concession_pass(clause, match):
@@ -209,7 +316,11 @@ def _concession_pass(clause, match):
 
     The words just before "pass" must name concession categories only, and
     a phrase joining one to anything else is not one: "Delegate and media
-    passes are subject to approval" covers the paying audience too."""
+    passes are subject to approval" covers the paying audience too. The
+    pass must also be what the restriction is said OF: an audit on
+    2026-09-30 found "Apart from media passes, attendance is by invitation
+    only" and "Media passes sold separately, and all attendee registration
+    is subject to approval" both cleared, and each closes the whole event."""
     if not re.search(r'approval|application|invit', match.group(0), re.I):
         return None
     for named in re.finditer(r'\bpass(?:es)?\b', clause, re.I):
@@ -217,7 +328,9 @@ def _concession_pass(clause, match):
         kinds = []
         while words and (words[-1] in _PASS_JOIN or words[-1] in _CONCESSION):
             kinds.append(words.pop())
-        if kinds and kinds[-1] not in _PASS_JOIN and kinds[0] not in _PASS_JOIN:
+        between = set(_fold(clause[named.end():]).split())
+        if (kinds and kinds[-1] not in _PASS_JOIN and kinds[0] not in _PASS_JOIN
+                and between <= _PASS_VERB):
             return 'concession_pass'
     return None
 
@@ -226,8 +339,13 @@ def _hypothetical(text, match):
     """A restriction asked about, not stated: "What happens if the Event is
     canceled or postponed?" is on every FAQ page. Only a question that is
     itself conditional counts; "Is the conference sold out?" is left for a
-    reviewer, because the next line may answer yes."""
-    after = re.match(r'[^.!?\n]*([.!?\n]|$)', text[match.end():])
+    reviewer, because the next line may answer yes.
+
+    The look-ahead is bounded: unbounded, it rescanned the rest of the page
+    for every restriction, and an audit on 2026-09-30 timed 180KB of
+    punctuation-free "sold out" at 12 seconds. A question mark further than
+    200 characters away does not end this sentence anyway."""
+    after = re.match(r'[^.!?\n]*([.!?\n])', text[match.end():match.end()+200])
     if not after or after.group(1) != '?':
         return None
     question = re.split(r'[.!?\n]', text[max(0, match.start()-160):match.start()])[-1]
@@ -236,8 +354,14 @@ def _hypothetical(text, match):
     return None
 
 
+# Enough to show a reviewer the pattern; the page is still read to its end
+# for a blocking restriction.
+MAX_OBSERVATIONS = 50
+
+
 def _access(text, event_name, dates):
     observations, blocking = [], []
+    page = {'text': text}
     general_open = bool(re.search(r'\b(?:general admission|event registration) (?:is |remains )?open\b',text,re.I))
     for match in _RESTRICTED.finditer(text):
         prefix=text[max(0,match.start()-80):match.start()]
@@ -260,10 +384,13 @@ def _access(text, event_name, dates):
         excerpt=text[max(0,match.start()-80):match.end()+120]
         scope = ('other_inventory' if scoped else _concession_pass(clause, match)
                  or _hypothetical(text, match) or _other_programme(
-                     text, match, clause, event_name, dates))
-        observations.append({'text':excerpt,'scope':scope or 'unresolved_event_access'})
+                     text, match, clause, event_name, dates, page))
+        if len(observations) < MAX_OBSERVATIONS:
+            observations.append({'text':excerpt,'scope':scope or 'unresolved_event_access'})
         if not scope:
             blocking.append(excerpt)
+            if len(blocking) >= MAX_OBSERVATIONS:
+                break
     return observations, blocking
 
 
@@ -558,6 +685,11 @@ def inspect(event, fetcher=None):
             check['snapshot'] = source_snapshot(final,raw_text)
         # Public JSON-LD is organizer metadata, explicitly distinct from rendered text.
         # It must match this event and the complete date range; parent metadata cannot admit a subevent.
+        # Link destinations are provenance, not visible evidence of names,
+        # dates or access: "Join [https://.../waitlist]" is a link, and an
+        # audit on 2026-09-30 found it blocking a JSON-LD-admitted page
+        # because the structured branch read the raw text.
+        visible = re.sub(r'\[https?://[^\]\s]+\]', '', raw_text)
         structured = []
         if not fetched.get('truncated') and fetched.get('http_status') == 200:
             structured, structured_restrictions = _structured_support(
@@ -568,15 +700,20 @@ def inspect(event, fetcher=None):
             check['structured_snapshot'] = source_snapshot(final,json.dumps(structured,sort_keys=True))
             check['support'] = 'organizer_structured_name_and_dates'
             supported = True
-            _, blocked = _access(raw_text, str(event.get('name') or ''), (start, end))
+            _, blocked = _access(visible, str(event.get('name') or ''), (start, end))
             if blocked:
                 restrictions.append('The organizer page describes restricted or unavailable access; verify this client’s access before recommending attendance.')
+            # fetch_page returns a JavaScript-rendered page as status
+            # 'blocked' with NO text at all, so its JSON-LD admitted it
+            # clean: the access check above ran on nothing (audit,
+            # 2026-09-30). Dates from metadata are fine; "nothing restricts
+            # access" cannot be concluded from a page nobody read.
+            if not visible.strip():
+                restrictions.append('The organizer page text could not be read, so access could not be verified; confirm registration is open before recommending attendance.')
         # WordPress/React markers alone also occur on fully readable pages.
         if fetched.get('status') != 'ok' or fallback or fetched.get('truncated'):
             check['reason'] = 'The complete rendered page could not be read reliably.'
             continue
-        # Link destinations are provenance, not visible evidence of names/dates.
-        visible = re.sub(r'\[https?://[^\]\s]+\]', '', raw_text)
         text = re.sub(r'\s+', ' ', visible).strip()
         check['visible_text_snapshot'] = source_snapshot(final,text)
         observations, blocked = _access(visible,str(event.get('name') or ''),(start,end))
