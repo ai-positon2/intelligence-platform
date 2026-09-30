@@ -1167,9 +1167,83 @@ def propose_category(category: str, profile: dict) -> dict:
     return _out(STATUS_OK if proposals else STATUS_EMPTY, proposals, note, "")
 
 
-def _unchecked(name: str, reason: str) -> dict:
-    return {"kind": CONFIRM_UNCHECKED, "event": None, "name": name,
-            "reason": reason, "facts_complete": False}
+def _unchecked(name: str, reason: str, website=None) -> dict:
+    out = {"kind": CONFIRM_UNCHECKED, "event": None, "name": name,
+           "reason": reason, "facts_complete": False}
+    if website:
+        # Kept so an event held back after confirmation can be looked at:
+        # until 2026-09-30 only its name and reason survived, and no one
+        # could tell a real gap from a check that was too strict.
+        out["website"] = website
+    return out
+
+
+# ── dates the organizer published and the confirm reply left out ──────────
+#
+# FTT Embedded Finance & Super-Apps, 2026-09-30: confirmed as real and
+# upcoming, returned with null dates, and held back as "the edition dates
+# need confirmation". Its own page carries a schema.org Event, "FTT Embedded
+# Finance & Super-Apps", 2027-05-12. The organizer had answered the question.
+#
+# Only that answer is used: the organizer's structured Event data, matched to
+# this event by the same name rule source admission applies, on the event's
+# own host. And only when it is unambiguous: exactly ONE distinct upcoming
+# date range under this name. A series page listing "AWS Summit, New York"
+# and "AWS Summit, London" names two editions and fills in neither, and a
+# page with only past editions fills in nothing. Source admission then reads
+# the same page again before scoring, so these dates are checked twice.
+
+RECOVER_PAGES = 2
+
+
+def _recover_dates(event: dict) -> None:
+    from datetime import date
+    from .event_intel_access import organizer_url
+    from .event_intel_admission import _names, _structured_date, _structured_name_matches
+    from .event_intel_harvest import fetch_page
+    website = event.get("website") or ""
+    host = urlparse(website).hostname
+    if not host:
+        return
+    urls = []
+    for url in [website] + list(event.get("sources") or []):
+        if isinstance(url, str) and organizer_url(url, host) and url not in urls:
+            urls.append(url)
+    today = date.fromisoformat(_today())
+    editions = {}
+    for url in urls[:RECOVER_PAGES]:
+        try:
+            fetched = fetch_page(url)
+        except Exception:
+            continue
+        if (fetched.get("status") != "ok" or fetched.get("truncated")
+                or fetched.get("http_status") != 200
+                or not organizer_url(fetched.get("final_url") or url, host)):
+            continue
+        for row in fetched.get("structured_events") or []:
+            if not isinstance(row, dict) or not isinstance(row.get("name"), str):
+                continue
+            try:
+                start = _structured_date(row.get("startDate"))
+                end = _structured_date(row.get("endDate") or row.get("startDate"))
+            except ValueError:
+                continue
+            if end < start or start < today:
+                continue
+            if _structured_name_matches(row["name"], _names(event, start.year), start.year):
+                editions.setdefault((start, end), url)
+    if len(editions) != 1:
+        return
+    (start, end), url = next(iter(editions.items()))
+    event["starts_on"], event["ends_on"] = start.isoformat(), end.isoformat()
+    event["dates_from"] = "organizer_structured_data"
+    # The organizer's own Event data naming this event with this edition's
+    # dates settles the identity question a "low" self-rating raises. It
+    # never lifts an event past "medium", and nothing else changes it.
+    if event.get("confidence") not in ("high", "medium"):
+        event["confidence"] = "medium"
+    if url not in (event.get("sources") or []):
+        event["sources"] = list(event.get("sources") or []) + [url]
 
 
 # ── an answer that was found but not written as JSON ──────────────────────
@@ -1373,10 +1447,12 @@ def _confirm_event(proposal: dict, category: str, profile: dict,
                                          "without citing a single page, so "
                                          "nothing here can be checked.")
 
+    if not event.get("starts_on"):
+        _recover_dates(event)
     from .event_intel_policy import eligibility
     reasons = eligibility(event, profile)
     if reasons:
-        return _unchecked(event['name'], ' '.join(reasons))
+        return _unchecked(event['name'], ' '.join(reasons), event.get('website'))
     event["facts_complete"] = facts_complete
     event["proposed_as"] = (proposal or {}).get("why") or None
     return {"kind": CONFIRM_OK, "event": event, "name": event["name"],
@@ -1435,7 +1511,9 @@ def search_category(category: str, profile: dict) -> dict:
                 for r in results if r["kind"] == CONFIRM_REJECTED]
     unchecked = [r for r in results if r["kind"] == CONFIRM_UNCHECKED]
     base["rejected"] = rejected
-    base["unverified"] = [{"name": r["name"], "reason": r["reason"]} for r in unchecked]
+    base["unverified"] = [dict({"name": r["name"], "reason": r["reason"]},
+                               **({"website": r["website"]} if r.get("website") else {}))
+                          for r in unchecked]
 
     bits = []
     if unchecked:

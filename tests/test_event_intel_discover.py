@@ -1590,3 +1590,131 @@ def test_the_restatement_filter_itself_drops_every_url_the_reply_never_had(monke
     assert parsed["event"]["availability_source"] is None
     assert parsed["event"]["sources"] == ["https://example.com/e"]
     assert fixed["search_count"] == 0
+
+
+# ── dates the organizer published and the confirm reply left out ─────────
+#
+# FTT Embedded Finance & Super-Apps, 2026-09-30: confirmed with null dates;
+# its own page carries a schema.org Event dated 2027-05-12.
+
+FTT = "FTT Embedded Finance & Super-Apps"
+FTT_SITE = "https://fttembeddedfinance.com/events/europe/ftt_em_fin/"
+
+
+def _organizer(monkeypatch, rows, **over):
+    import tracker.event_intel_harvest as H
+    seen = []
+
+    def fetch(url):
+        seen.append(url)
+        out = dict(status="ok", http_status=200, truncated=False, final_url=url,
+                   text="page", structured_events=rows)
+        out.update(over)
+        return out
+    monkeypatch.setattr(H, "fetch_page", fetch)
+    monkeypatch.setattr(D, "_today", lambda: "2026-09-30")
+    return seen
+
+
+def _undated(**over):
+    ev = dict(name=FTT, website=FTT_SITE, sources=[FTT_SITE], confidence="low",
+              starts_on=None, ends_on=None)
+    ev.update(over)
+    return ev
+
+
+def test_the_organizers_one_upcoming_edition_fills_in_missing_dates(monkeypatch):
+    _organizer(monkeypatch, [
+        {"name": FTT, "startDate": "2027-05-12", "endDate": "2027-05-12"},
+        {"name": FTT + " Europe", "startDate": "2025-05-13", "endDate": "2025-05-13"}])
+    ev = _undated()
+    D._recover_dates(ev)
+    assert (ev["starts_on"], ev["ends_on"]) == ("2027-05-12", "2027-05-12")
+    assert ev["dates_from"] == "organizer_structured_data"
+    assert ev["confidence"] == "medium"
+
+
+@pytest.mark.parametrize("rows", [
+    # Only past editions.
+    [{"name": FTT, "startDate": "2026-05-12", "endDate": "2026-05-12"}],
+    # Two upcoming editions under the name: which one is not ours to pick.
+    [{"name": FTT + ", London", "startDate": "2027-05-12", "endDate": "2027-05-12"},
+     {"name": FTT + ", New York", "startDate": "2027-10-01", "endDate": "2027-10-02"}],
+    # Another gathering's node, and the parent brand alone.
+    [{"name": FTT + " | Founders Dinner", "startDate": "2027-05-11", "endDate": "2027-05-11"}],
+    [{"name": "FTT Fintech Festival", "startDate": "2027-05-12", "endDate": "2027-05-12"}],
+    # Broken dates.
+    [{"name": FTT, "startDate": "May 2027", "endDate": "May 2027"}],
+    [{"name": FTT, "startDate": "2027-05-14", "endDate": "2027-05-12"}],
+    [],
+])
+def test_nothing_is_filled_in_unless_the_organizer_names_exactly_one_upcoming_edition(monkeypatch, rows):
+    _organizer(monkeypatch, rows)
+    ev = _undated()
+    D._recover_dates(ev)
+    assert ev["starts_on"] is None and "dates_from" not in ev
+    assert ev["confidence"] == "low"
+
+
+@pytest.mark.parametrize("over", [
+    dict(status="blocked"), dict(truncated=True), dict(http_status=203),
+    dict(final_url="https://elsewhere.example/ftt"),
+])
+def test_an_unreliable_or_foreign_page_supplies_no_dates(monkeypatch, over):
+    _organizer(monkeypatch, [{"name": FTT, "startDate": "2027-05-12", "endDate": "2027-05-12"}], **over)
+    ev = _undated()
+    D._recover_dates(ev)
+    assert ev["starts_on"] is None
+
+
+def test_only_the_events_own_host_is_read_and_only_two_pages(monkeypatch):
+    seen = _organizer(monkeypatch, [])
+    ev = _undated(sources=["https://aggregator.example/ftt", FTT_SITE + "agenda/",
+                           FTT_SITE + "venue/", FTT_SITE + "tickets/"])
+    D._recover_dates(ev)
+    assert seen == [FTT_SITE, FTT_SITE + "agenda/"]
+
+
+def test_a_confident_event_keeps_its_confidence(monkeypatch):
+    _organizer(monkeypatch, [{"name": FTT, "startDate": "2027-05-12", "endDate": "2027-05-12"}])
+    ev = _undated(confidence="high")
+    D._recover_dates(ev)
+    assert ev["confidence"] == "high"
+
+
+def test_a_confirmed_undated_event_is_kept_when_its_organizer_dates_it(monkeypatch):
+    seen = _organizer(monkeypatch, [{"name": FTT, "startDate": "2027-05-12", "endDate": "2027-05-12"}])
+    ev = dict(name=FTT, website=FTT_SITE, sources=[FTT_SITE], country="UK", city="London",
+              confidence="low", category_fit="fits")
+    _confirm_calls(monkeypatch, _confirm_reply(ev))
+    profile = dict(PROFILE, geo_scope="Europe, UK")
+    out = D.confirm_event({"name": FTT, "website": FTT_SITE, "why": "w"}, R.CAT_EMERGING, profile)
+    assert out["kind"] == D.CONFIRM_OK, out
+    assert out["event"]["starts_on"] == "2027-05-12"
+    assert seen
+
+
+def test_an_event_that_already_has_dates_is_not_looked_up(monkeypatch):
+    seen = _organizer(monkeypatch, [{"name": "Real Event", "startDate": "2031-01-01", "endDate": "2031-01-02"}])
+    _confirm_calls(monkeypatch, _confirm_reply(_named()))
+    out = D.confirm_event(_proposal(), R.CAT_VERTICAL_SUMMIT, PROFILE)
+    assert out["kind"] == D.CONFIRM_OK and seen == []
+
+
+def test_an_event_held_back_after_confirmation_keeps_its_website(monkeypatch):
+    _organizer(monkeypatch, [])
+    ev = dict(name=FTT, website=FTT_SITE, sources=[FTT_SITE], country="UK", confidence="medium")
+    _confirm_calls(monkeypatch, _confirm_reply(ev))
+    out = D.confirm_event({"name": FTT, "website": FTT_SITE, "why": "w"}, R.CAT_EMERGING, PROFILE)
+    assert out["kind"] == D.CONFIRM_UNCHECKED
+    assert "dates need confirmation" in out["reason"]
+    assert out["website"] == FTT_SITE
+
+
+def test_the_category_report_lists_a_held_back_event_with_its_website(monkeypatch):
+    _organizer(monkeypatch, [])
+    _stages(monkeypatch, confirm=_confirm_reply(dict(_EVENT, starts_on=None)))
+    r = D.search_category(R.CAT_VERTICAL_SUMMIT, PROFILE)
+    assert r["unverified"] == [{"name": "Real Event",
+                                "reason": r["unverified"][0]["reason"],
+                                "website": "https://example.com"}]
