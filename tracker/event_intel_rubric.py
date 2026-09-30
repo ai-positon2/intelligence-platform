@@ -17,6 +17,10 @@ The rubric, verbatim from the source skill:
     P2  70-79   strong
     P3  <  70   EXCLUDED from the ranked list, no padding
 
+On top of the skill's bars this module applies one gate the skill implies but
+never enforces: relevance must reach RELEVANCE_GATE (24 of 40) for an event to
+be recommended at all. See rank() for why a total alone is not enough.
+
 Four rules from that skill are enforced here rather than requested:
 
 1. **Budget can never move a score.** `score()` takes three sub-scores and a
@@ -204,6 +208,14 @@ TIER_LABELS = {
 # So the bar still decides what is RECOMMENDED, and no longer decides what
 # EXISTS. Below it, the two gates below decide between a real option and a
 # genuine miss.
+#
+# And the bar alone no longer recommends. A total of 70 can be reached with a
+# relevance of 14 when access and engagement are high: a busy buying floor
+# full of somebody else's buyers. That is exactly the event the relevance
+# dimension exists to catch, and until the gate below applied above the bar
+# as well as under it, such an event was printed as "Strong. Attend if budget
+# and calendar allow." Relevance now has to clear RELEVANCE_GATE for an event
+# to be recommended OR worth a look.
 RANK_FLOOR = TIER_MIN[TIER_P2]
 
 # The two gates that separate "below the bar but worth your time" from
@@ -223,8 +235,54 @@ RANK_FLOOR = TIER_MIN[TIER_P2]
 #
 # Neither gate pads. Nothing is topped up toward a target count, and an event
 # below either gate is still reported, in the same discard bucket as before.
+#
+# RELEVANCE_GATE applies to the recommendation too, not just to this tier:
+# an event under it is excluded whatever its total, with a reason saying the
+# audience is not this client's buyers. Only a committed event is kept
+# regardless, as it always has been.
 RELEVANCE_GATE = 24
 CONSIDER_FLOOR = 50
+
+# How close to a cut-off counts as "on it". Measured, not chosen: the same
+# event graded twice moves by up to three points of relevance between runs,
+# so a 23 and a 25 are one reading, and a verdict that flips on that is noise.
+# event_intel_scorer re-scores anything this close to RELEVANCE_GATE or to
+# one of the totals in BORDERLINE_TOTALS and keeps the median.
+BORDERLINE_MARGIN = 3
+BORDERLINE_TOTALS = (CONSIDER_FLOOR, RANK_FLOOR, TIER_MIN[TIER_P1])
+
+# The per-row caveat event_intel_scorer attaches to a re-scored event, as a
+# prefix so the report can tell it apart from a field that was never
+# measured: this one WAS measured, three times.
+RESCORE_NOTE_PREFIX = "This event sat within"
+
+
+def relevance_clears(candidate: dict) -> bool:
+    """Whether the audience is measurably this client's buyers.
+
+    An unreadable relevance fails, in the safe direction: a dimension nobody
+    scored is not evidence that the event is for this client.
+    """
+    value, readable = read_subscore(DIM_RELEVANCE,
+                                    (candidate or {}).get(DIM_RELEVANCE))
+    return readable and value >= RELEVANCE_GATE
+
+
+def exclusion_reason(candidate: dict) -> str:
+    """One reader-English sentence saying why this event is not on the list."""
+    c = candidate or {}
+    total = c.get("total") or 0
+    value, readable = read_subscore(DIM_RELEVANCE, c.get(DIM_RELEVANCE))
+    if not readable:
+        return ("How closely its audience matches your buyers was never "
+                "measured, so it is not recommended.")
+    if value < RELEVANCE_GATE:
+        return ("Scored %d, but its audience is not mainly your buyers "
+                "(relevance %d of %d, under the %d needed), so it is not "
+                "recommended." % (total, value, DIMENSION_MAX[DIM_RELEVANCE],
+                                  RELEVANCE_GATE))
+    return ("Scored %d, under the %d needed to be shown as an option."
+            % (total, CONSIDER_FLOOR))
 
 DEFAULT_CAP = 15
 
@@ -518,29 +576,72 @@ def outcome_adjustment(category: str | None, category_pattern: dict | None,
     Returns {"adjustment": -OUTCOME_ADJUSTMENT|0|OUTCOME_ADJUSTMENT,
              "applied": bool, "basis": "category"|"format"|None, "reason": str}.
     """
+    # The reason is printed to the client, so it names the kind of event in
+    # words and says exactly what was counted. It used to read "3 of the last
+    # 3 recommended side_event events": a raw enum, and "last" and
+    # "recommended" when the count is every decision this client has ever
+    # recorded on any row, recommended or not. And with six decisions split
+    # three and three it said "fewer than 3 decisions".
+    split = None
     for basis, label, pattern in (("category", category, category_pattern),
                                   ("format", format, format_pattern)):
         direction, skipped, went, decisions = _pattern_signal(pattern)
+        kind = _outcome_kind(basis, label)
         if direction == 0:
+            if decisions >= OUTCOME_MIN_SAMPLE and split is None:
+                split = (kind, decisions, went, skipped)
             continue
         if direction < 0:
             return {"adjustment": -OUTCOME_ADJUSTMENT, "applied": True,
                     "basis": basis,
-                    "reason": ("This client skipped %d of the last %d "
-                              "recommended %s events, so this one is ordered "
-                              "lower. It is still on the list: a pattern in "
-                              "your own history is a reason to look twice, "
-                              "never a reason to hide something."
-                              % (skipped, decisions, label))}
+                    "reason": ("This client has recorded %d %s on %s, and %d "
+                              "of them were to skip, so this one is ordered "
+                              "lower among events of the same priority. It "
+                              "is still on the list: a pattern in your own "
+                              "history is a reason to look twice, never a "
+                              "reason to hide something."
+                              % (decisions, "decision" if decisions == 1
+                                 else "decisions", kind, skipped))}
         return {"adjustment": OUTCOME_ADJUSTMENT, "applied": True,
                 "basis": basis,
-                "reason": ("This client attended or committed to %d of the "
-                          "last %d recommended %s events, so this one is "
-                          "ordered higher." % (went, decisions, label))}
+                "reason": ("This client has recorded %d %s on %s, and %d of "
+                          "them were to go or went, so this one is ordered "
+                          "higher among events of the same priority."
+                          % (decisions, "decision" if decisions == 1
+                             else "decisions", kind, went))}
+    if split:
+        kind, decisions, went, skipped = split
+        return {"adjustment": 0, "applied": False, "basis": None,
+                "reason": ("This client's %d recorded decisions on %s are "
+                          "split, %d to go or went and %d to skip, which is "
+                          "not a clear enough pattern to change the order."
+                          % (decisions, kind, went, skipped))}
     return {"adjustment": 0, "applied": False, "basis": None,
             "reason": ("Not enough of this client's own history with this "
-                      "category or format yet (fewer than %d decisions) to "
+                      "kind of event yet (fewer than %d decisions) to "
                       "adjust anything." % OUTCOME_MIN_SAMPLE)}
+
+
+# Plural noun phrases for the outcome reason, so a client reads "side events"
+# rather than the stored enum.
+_CATEGORY_PLURAL = {
+    CAT_INDUSTRY_FLAGSHIP: "industry flagships",
+    CAT_VERTICAL_SUMMIT: "vertical summits",
+    CAT_REGIONAL_FLAGSHIP: "regional flagships",
+    CAT_FREE_VENDOR: "free sponsor-funded events",
+    CAT_EMERGING: "emerging events",
+    CAT_SIDE_EVENT: "side events",
+}
+_FORMAT_PLURAL = {
+    "in_person": "in-person events",
+    "virtual": "online events",
+    "hybrid": "hybrid events",
+}
+
+
+def _outcome_kind(basis: str, value) -> str:
+    table = _CATEGORY_PLURAL if basis == "category" else _FORMAT_PLURAL
+    return table.get(str(value or ""), "events like this one")
 
 
 # ── Scoring ───────────────────────────────────────────────────────────────
@@ -717,10 +818,8 @@ def is_worth_a_look(candidate: dict) -> bool:
     without a relevance score is one whose fit was never established, and
     offering it as an option would be padding the list with an unknown.
     """
-    value, readable = read_subscore(DIM_RELEVANCE, candidate.get(DIM_RELEVANCE))
-    if not readable:
-        return False
-    return value >= RELEVANCE_GATE and (candidate.get("total") or 0) >= CONSIDER_FLOOR
+    return (relevance_clears(candidate)
+            and (candidate.get("total") or 0) >= CONSIDER_FLOOR)
 
 
 def rank(candidates: list[dict], cap: int = DEFAULT_CAP, today=None) -> dict:
@@ -731,8 +830,13 @@ def rank(candidates: list[dict], cap: int = DEFAULT_CAP, today=None) -> dict:
     toward it, and the three buckets are decided by measurements rather than
     by how many rows a section would like to have.
 
-    `kept` is the recommendation: everything at or above RANK_FLOOR, plus
-    anything already committed to.
+    `kept` is the recommendation: everything at or above RANK_FLOOR whose
+    relevance clears RELEVANCE_GATE, plus anything already committed to.
+    Relevance is checked FIRST, above the bar as well as below it: a total of
+    70 built on high access and engagement with a relevance of 14 is a busy
+    floor full of somebody else's buyers, and recommending it on the total
+    alone is the padding the skill forbids. Such an event goes to `excluded`
+    with an `excluded_reason` saying the audience is not this client's.
 
     `worth_a_look` is the second tier, and it is the answer to a real
     complaint about this agent: it returned one event for one client and none
@@ -745,15 +849,21 @@ def rank(candidates: list[dict], cap: int = DEFAULT_CAP, today=None) -> dict:
     and the event is not structurally unworkable (CONSIDER_FLOOR on the
     total).
 
-    `excluded` is everything else below the bar, with its score, as before. A
-    list truncated in silence reads as "nothing else was found", which is a
-    different and false claim from "six more were found and none cleared the
-    bar".
+    `excluded` is everything else, with its score and a reader-English
+    `excluded_reason`. A list truncated in silence reads as "nothing else was
+    found", which is a different and false claim from "six more were found
+    and none cleared the bar".
+
+    `committed_off_audience` names committed events kept although their
+    relevance is under the gate. It is separate from `committed_below_bar`
+    because that list means "scored under 70", and a committed event at 76
+    with the wrong audience must not be described that way.
     """
     scored = sorted((c for c in candidates or []),
                     key=lambda c: (-(c.get("total") or 0),
                                    (c.get("name") or "").lower()))
     kept, excluded, below, finished, considered = [], [], [], [], []
+    off_audience = []
     for c in scored:
         # Before any question of merit: an edition that is over cannot be
         # attended. It is reported in its own bucket rather than dropped,
@@ -763,16 +873,26 @@ def rank(candidates: list[dict], cap: int = DEFAULT_CAP, today=None) -> dict:
         if has_finished(c, today):
             finished.append(dict(c))
             continue
-        if (c.get("total") or 0) >= RANK_FLOOR:
-            kept.append(c)
-        elif c.get("committed"):
+        relevant = relevance_clears(c)
+        if c.get("committed"):
             # An event the client has already committed to is kept whatever it
             # scores. Cutting it would hide the single most actionable thing
             # this analysis can say: that money is already spent on an event
             # that does not clear the bar. It is marked, never quietly mixed
             # in with the events that earned their place.
             kept.append(c)
-            below.append({"name": c.get("name"), "total": c.get("total") or 0})
+            if (c.get("total") or 0) < RANK_FLOOR:
+                below.append({"name": c.get("name"), "total": c.get("total") or 0})
+            if not relevant:
+                off_audience.append({"name": c.get("name"),
+                                     "total": c.get("total") or 0,
+                                     "reason": exclusion_reason(c)})
+        elif not relevant:
+            # The approved policy: the wrong audience is not recommended, and
+            # not offered, however busy the floor. Excluded with its reason.
+            excluded.append(dict(c, excluded_reason=exclusion_reason(c)))
+        elif (c.get("total") or 0) >= RANK_FLOOR:
+            kept.append(c)
         elif is_worth_a_look(c):
             # Below the priority bar, but the audience is measurably this
             # client's and the event is workable. A real option, so it keeps
@@ -780,7 +900,7 @@ def rank(candidates: list[dict], cap: int = DEFAULT_CAP, today=None) -> dict:
             # description has not been offered anything.
             considered.append(c)
         else:
-            excluded.append(dict(c))
+            excluded.append(dict(c, excluded_reason=exclusion_reason(c)))
     over_cap = []
     if cap and len(kept) > cap:
         # The cap never drops a committed event. Being pushed off the end of a
@@ -803,6 +923,8 @@ def rank(candidates: list[dict], cap: int = DEFAULT_CAP, today=None) -> dict:
         "finished": finished,
         # Committed events that did not clear the bar on their own merits.
         "committed_below_bar": below,
+        # Committed events whose audience is not mainly this client's buyers.
+        "committed_off_audience": off_audience,
         "counts": {
             "kept": len(kept),
             TIER_P1: sum(1 for c in kept if c.get("tier") == TIER_P1),
@@ -812,6 +934,7 @@ def rank(candidates: list[dict], cap: int = DEFAULT_CAP, today=None) -> dict:
             "over_cap": len(over_cap),
             "finished": len(finished),
             "committed_below_bar": len(below),
+            "committed_off_audience": len(off_audience),
         },
     }
 
@@ -832,11 +955,22 @@ def methodology_note(classification: str) -> str:
         "You are classified as %s, which puts the people you sell to %s.%s "
         "Relevance and access are therefore scored at %s rather than on the "
         "other side of the room. "
-        "P1 is 80 or above, P2 is 70 to 79, and anything below 70 is excluded "
-        "rather than used to pad the list. Cost is shown beside each event as "
-        "context for your decision and is never an input to a score."
+        "An event is only recommended when its relevance is at least %d of "
+        "40, meaning most of its audience is your buyers; below that it is "
+        "excluded whatever its total, because a busy floor full of somebody "
+        "else's buyers is not an opportunity. "
+        "Of the events that clear that, P1 is %d or above and P2 is %d to %d, "
+        "and those are the recommendations. An event scoring %d to %d is shown "
+        "as worth a look rather than recommended, and anything under %d is "
+        "excluded rather than used to pad the list. "
+        "An event within %d points of any of these lines is scored again, "
+        "up to three readings in all, and the median is used, so a verdict "
+        "near a line never rests on one reading. Cost is shown beside each event as context for your "
+        "decision and is never an input to a score."
         % (CLASSIFICATION_LABELS[classification],
            CLASSIFICATION_BUYER_PLACE[classification],
            (" " + CLASSIFICATION_WHY[classification])
            if classification in CLASSIFICATION_WHY else "",
-           side))
+           side, RELEVANCE_GATE, TIER_MIN[TIER_P1], RANK_FLOOR,
+           TIER_MIN[TIER_P1] - 1, CONSIDER_FLOOR, RANK_FLOOR - 1,
+           CONSIDER_FLOOR, BORDERLINE_MARGIN))

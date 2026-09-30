@@ -101,6 +101,17 @@ def test_methodology_note_states_cost_is_not_scored():
     assert "booth" in note.lower()
 
 
+def test_methodology_note_describes_both_gates_and_the_bar():
+    """It said "anything below 70 is excluded", which contradicted the
+    worth-a-look tier printed under it and said nothing of the relevance cut."""
+    note = R.methodology_note(R.CLASS_B2B_TO_MARKETING)
+    assert "anything below 70 is excluded" not in note
+    assert "at least %d of 40" % R.RELEVANCE_GATE in note
+    assert "worth a look" in note
+    assert "%d to %d" % (R.CONSIDER_FLOOR, R.RANK_FLOOR - 1) in note
+    assert "median" in note
+
+
 # ── Step 5: the +10 bonus and its veto list ───────────────────────────────
 
 def test_no_bonus_without_an_organizer_run_claim():
@@ -248,14 +259,69 @@ def test_a_full_sweep_reports_no_shortfall():
 # ── Step 7 / the no-padding rule ──────────────────────────────────────────
 
 def _c(name, total, cat=R.CAT_INDUSTRY_FLAGSHIP):
-    return {"name": name, "total": total, "tier": R.tier_for(total), "category": cat}
+    # Relevance is set at the gate: since the approved relevance-cut policy a
+    # row with no relevance is never recommended, and these tests are about
+    # the bar and the cap, not about the gate.
+    return {"name": name, "total": total, "tier": R.tier_for(total), "category": cat,
+            R.DIM_RELEVANCE: R.RELEVANCE_GATE}
 
 
 def test_rank_excludes_everything_below_seventy():
     out = R.rank([_c("A", 85), _c("B", 69), _c("C", 70), _c("D", 12)])
     assert [c["name"] for c in out["kept"]] == ["A", "C"]
-    assert {e["name"] for e in out["excluded"]} == {"B", "D"}
-    assert out["counts"]["excluded"] == 2
+    # B (69, relevance at the gate) is an option, not a recommendation; D is
+    # under CONSIDER_FLOOR. Before the relevance-cut policy the fixture had no
+    # relevance at all, so B landed in `excluded` for a reason this test
+    # never meant to exercise.
+    assert [c["name"] for c in out["worth_a_look"]] == ["B"]
+    assert {e["name"] for e in out["excluded"]} == {"D"}
+    assert out["counts"]["excluded"] == 1
+
+
+def test_the_wrong_audience_is_not_recommended_however_high_it_scores():
+    """The approved policy. 14 + 38 + 20 = 72 is a busy buying floor full of
+    somebody else's buyers. It used to be recommended as P2 on the total."""
+    c = _full("Busy wrong floor", 14, 38, 20)
+    assert c["total"] >= R.RANK_FLOOR, "fixture no longer reproduces the case"
+    out = R.rank([c])
+    assert out["kept"] == [] and out["worth_a_look"] == []
+    [ex] = out["excluded"]
+    assert "not mainly your buyers" in ex["excluded_reason"]
+    assert "14 of 40" in ex["excluded_reason"]
+
+
+def test_the_relevance_gate_decides_the_recommendation_at_its_own_line():
+    """One point either side of the gate, total held above the bar."""
+    at = R.rank([_full("At", R.RELEVANCE_GATE, 36, 16)])
+    under = R.rank([_full("Under", R.RELEVANCE_GATE - 1, 37, 16)])
+    assert [c["name"] for c in at["kept"]] == ["At"]
+    assert under["kept"] == [] and len(under["excluded"]) == 1
+
+
+def test_an_unmeasured_relevance_is_not_recommended_on_its_total():
+    c = _full("Ungraded", 30, 36, 18, **{R.DIM_RELEVANCE: None})
+    c["total"] = 84
+    out = R.rank([c])
+    assert out["kept"] == []
+    assert "never measured" in out["excluded"][0]["excluded_reason"]
+
+
+def test_a_committed_event_with_the_wrong_audience_is_still_kept_and_named():
+    c = _full("Paid, wrong crowd", 12, 38, 20, committed=True)
+    assert c["total"] >= R.RANK_FLOOR
+    out = R.rank([c])
+    assert [x["name"] for x in out["kept"]] == ["Paid, wrong crowd"]
+    # Not "below the bar": it scored 70. Its own list, with its own reason.
+    assert out["committed_below_bar"] == []
+    assert [x["name"] for x in out["committed_off_audience"]] == ["Paid, wrong crowd"]
+    assert out["counts"]["committed_off_audience"] == 1
+
+
+def test_every_excluded_row_carries_a_reader_reason():
+    out = R.rank([_full("Low", 30, 5, 2), _full("Off", 10, 30, 12)])
+    for row in out["excluded"]:
+        assert row["excluded_reason"].endswith(".")
+        assert "_" not in row["excluded_reason"]
 
 
 def test_rank_never_pads_toward_the_cap():
@@ -514,7 +580,8 @@ def test_rank_keeps_a_finished_edition_out_of_the_list():
     past = {"name": "Ghost Summit", "total": 92, "tier": R.TIER_P1,
             "starts_on": "2019-03-01", "ends_on": "2019-03-03"}
     live = {"name": "Real Summit", "total": 84, "tier": R.TIER_P1,
-            "starts_on": "2026-11-01", "ends_on": "2026-11-03"}
+            "starts_on": "2026-11-01", "ends_on": "2026-11-03",
+            R.DIM_RELEVANCE: 34}
     out = R.rank([past, live], today=datetime.date(2026, 9, 1))
     assert [c["name"] for c in out["kept"]] == ["Real Summit"]
     assert [c["name"] for c in out["finished"]] == ["Ghost Summit"]
@@ -596,8 +663,30 @@ def test_three_of_three_skipped_applies_a_negative_adjustment():
     assert out["applied"] is True
     assert out["adjustment"] == -R.OUTCOME_ADJUSTMENT
     assert out["basis"] == "category"
-    assert "3 of the last 3" in out["reason"]
-    assert "vertical_summit" in out["reason"]
+    # Reader English: what was counted, in words. The old reason printed the
+    # raw enum and "the last 3 recommended", which counted something else.
+    assert "recorded 3 decisions on vertical summits" in out["reason"]
+    assert "3 of them were to skip" in out["reason"]
+    assert "vertical_summit" not in out["reason"]
+    assert "last" not in out["reason"] and "recommended" not in out["reason"]
+
+
+def test_a_split_history_is_not_reported_as_too_little_history():
+    """Six decisions split three and three is plenty of history with no
+    pattern in it. It used to say "fewer than 3 decisions"."""
+    out = R.outcome_adjustment("side_event", _pattern(6, 3, 3), None, None)
+    assert out["applied"] is False
+    assert "fewer than" not in out["reason"]
+    assert "6 recorded decisions on side events are split" in out["reason"]
+
+
+@pytest.mark.parametrize("cat", R.CATEGORIES)
+def test_every_outcome_reason_names_the_kind_in_words(cat):
+    for pat in (_pattern(3, skipped=3), _pattern(3, went_or_going=3),
+                _pattern(4, 2, 2)):
+        reason = R.outcome_adjustment(cat, pat, None, None)["reason"]
+        assert cat not in reason or "_" not in cat, reason
+        assert "_" not in reason, reason
 
 
 def test_three_of_four_went_applies_a_positive_adjustment():

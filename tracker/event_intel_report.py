@@ -606,6 +606,12 @@ def status_labels(rows: list[dict], cap: int = rubric.DEFAULT_CAP,
     # win over the finished/excluded default a row would otherwise get if it
     # somehow appeared in more than one bucket.
     _set(ranked["excluded"], "Excluded, below the bar")
+    # Excluded for the audience, not the total: said as such, because "below
+    # the bar" beside a 72 reads as an arithmetic error.
+    for c in ranked["excluded"]:
+        label = _excluded_label(c)
+        if label:
+            _set([c], label)
     _set(ranked["finished"], "Edition already finished")
     _set(ranked["over_cap"], "Cleared the bar, cut only by list length")
     _set(ranked["worth_a_look"],
@@ -613,9 +619,33 @@ def status_labels(rows: list[dict], cap: int = rubric.DEFAULT_CAP,
         "client's")
     _set(ranked["kept"], "Recommended")
     for key in committed & set(out):
-        out[key] = ("Recommended: already committed, did not clear the bar "
-                    "on its own merits")
+        out[key] = COMMITTED_BELOW_LABEL
+    off = {name_key(c.get("name") or "")
+           for c in ranked.get("committed_off_audience") or []}
+    for key in off & set(out):
+        out[key] = COMMITTED_OFF_AUDIENCE_LABEL
     return out
+
+
+OFF_AUDIENCE_LABEL = "Excluded: the audience is not mainly this client's buyers"
+COMMITTED_BELOW_LABEL = ("Recommended: already committed, did not clear the "
+                         "bar on its own merits")
+COMMITTED_OFF_AUDIENCE_LABEL = ("Recommended: already committed, but the "
+                                "audience is not mainly this client's buyers")
+
+
+UNMEASURED_AUDIENCE_LABEL = ("Excluded: the audience was never measured "
+                             "against this client's buyers")
+
+
+def _excluded_label(row: dict) -> str | None:
+    """The label for a row the relevance gate excluded, or None when it was
+    the total that excluded it and "below the bar" is the true statement."""
+    if rubric.relevance_clears(row):
+        return None
+    _, readable = rubric.read_subscore(rubric.DIM_RELEVANCE,
+                                       row.get(rubric.DIM_RELEVANCE))
+    return OFF_AUDIENCE_LABEL if readable else UNMEASURED_AUDIENCE_LABEL
 
 
 def selection_snapshot(ranked, profile):
@@ -635,8 +665,15 @@ def selection_snapshot(ranked, profile):
             row['event_identity'] = event_key(row)
             row['disposition'] = bucket
             row['status_label'] = label
-            if bucket == 'kept' and row.get('committed') and (row.get('total') or 0) < 70:
-                row['status_label'] = 'Recommended: already committed, did not clear the bar on its own merits'
+            # RANK_FLOOR, not a typed 70: a second copy of the bar drifts
+            # from the one rank() applies the moment anybody moves it.
+            if bucket == 'kept' and row.get('committed'):
+                if (row.get('total') or 0) < rubric.RANK_FLOOR:
+                    row['status_label'] = COMMITTED_BELOW_LABEL
+                elif not rubric.relevance_clears(row):
+                    row['status_label'] = COMMITTED_OFF_AUDIENCE_LABEL
+            if bucket == 'excluded' and _excluded_label(row):
+                row['status_label'] = _excluded_label(row)
             if bucket == 'over_cap' and row.get('cap_bucket') == 'worth_a_look':
                 row['status_label'] = 'Worth a look, omitted only by list length'
             groups[bucket].append(row)
@@ -824,6 +861,12 @@ def apply_outcome_pattern(candidates: list[dict], pattern: dict) -> list[dict]:
     rank() has already put in the SAME bucket; it must never be given the
     unbucketed, uncapped list to sort (call it separately on `kept` and on
     `worth_a_look`, after rank() has already decided both).
+
+    Sorted by TIER first and only then by the nudged total, so the nudge
+    reorders within a tier and never across one. Sorting on total plus
+    adjustment alone moved a P2 at 76+5 above a P1 at 82-5, and the P1 then
+    fell out of "Top five must-attend", which is the first five rows of
+    `kept`: a five-point preference was overruling the rubric's own tiers.
     """
     from . import event_intel_rubric as rubric
     by_cat = (pattern or {}).get("by_category") or {}
@@ -838,8 +881,11 @@ def apply_outcome_pattern(candidates: list[dict], pattern: dict) -> list[dict]:
         c["outcome_adjustment_basis"] = verdict["basis"]
         c["outcome_adjustment_reason"] = verdict["reason"]
         out.append(c)
-    out.sort(key=lambda c: (-((c.get("total") or 0) + (c.get("outcome_adjustment") or 0)),
-                            (c.get("name") or "").lower()))
+    order = {rubric.TIER_P1: 0, rubric.TIER_P2: 1, rubric.TIER_P3: 2}
+    out.sort(key=lambda c: (
+        order.get(c.get("tier") or rubric.tier_for(c.get("total") or 0), 2),
+        -((c.get("total") or 0) + (c.get("outcome_adjustment") or 0)),
+        (c.get("name") or "").lower()))
     return out
 
 
