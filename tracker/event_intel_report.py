@@ -26,6 +26,9 @@ attendance figures are the event's own unverified claims.
 
 from __future__ import annotations
 
+import re as _re
+
+from . import claude_websearch
 from . import event_intel_rubric as rubric
 
 MAX_TOP = 5
@@ -156,6 +159,59 @@ _SENTENCE = __import__("re").compile(
     r"[\s\S]+?(?:[.!?](?=\s+[A-Z(\"\u201c])|[.!?]$|$)")
 
 
+# ── Developer detail, kept out of a client's report ──────────────────────
+#
+# The writers now store claude_websearch.reader_reason(err). Runs stored
+# before that carry the developer detail, and they are still opened and
+# printed, so every renderer here reads a stored string through reader_text.
+# Two live examples, both printed to a client:
+#
+#   Scoring: "Max_tokens: Ran out of output budget before finishing
+#             (stop_reason=max_tokens). Raise max_tokens or lower max_uses.."
+#   Audit:   "...for the one it was given, max_tokens: Ran out of output
+#             budget before finishing (stop_reason=max_tokens). Raise
+#             max_tokens or lower max_uses."
+
+_KIND_PREFIX = _re.compile(
+    r"\b(%s)\s*:\s*" % "|".join(sorted(
+        (_re.escape(k) for k in claude_websearch.READER_REASON),
+        key=len, reverse=True)), _re.I)
+_PLUMBING = _re.compile(
+    r"max_tokens|max_uses|stop_reason|web_search|server_tool|"
+    r"\b(raise|lower)\s+max|output budget|tool_use|\bHTTP\s*\d{3}\b|"
+    r"Traceback|Exception|Error\(", _re.I)
+_PAREN = _re.compile(r"\s*\(([^()]*(?:\([^()]*\)[^()]*)*)\)")
+_SENTENCE_SPLIT = _re.compile(r"(?<=[.!?])\s+(?=[A-Z(\"\u201c])")
+
+
+def reader_text(text) -> str:
+    """A stored string with our plumbing taken out, safe to print.
+
+    Known error kinds at the head of a clause ("max_tokens: ...") become the
+    reader clause for that kind; a parenthetical or sentence that talks about
+    the tooling is dropped; doubled full stops collapse; em and en dashes
+    become commas. If nothing readable is left, the generic reader clause is
+    returned rather than the original: printing the plumbing is the defect.
+    """
+    t = " ".join(str(text or "").split())
+    if not t:
+        return ""
+    t = claude_websearch.strip_em_dash(t)
+    t = _KIND_PREFIX.sub(
+        lambda m: claude_websearch.reader_reason(m.group(1).lower()) + ". ", t)
+    if _PLUMBING.search(t):
+        t = _PAREN.sub(lambda m: "" if _PLUMBING.search(m.group(1)) else m.group(0), t)
+        kept = [x for x in _SENTENCE_SPLIT.split(t)
+                if x.strip() and not _PLUMBING.search(x)]
+        t = " ".join(kept).strip()
+    t = _re.sub(r"\.(\s*\.)+", ".", t)
+    t = _re.sub(r"\s+([.,;:])", r"\1", t).strip()
+    t = _re.sub(r",\s*\.", ".", t)
+    if not t:
+        t = claude_websearch.reader_reason(None) + "."
+    return t[0].upper() + t[1:]
+
+
 def _fmt_where(c: dict) -> str:
     return ", ".join([x for x in (c.get("city"), c.get("country")) if x]) or "location unconfirmed"
 
@@ -207,7 +263,8 @@ def notes(*, shortfall: list, audit: dict, generic: dict,
           finished: list | None = None,
           promoted: dict | None = None,
           scoring_batches: int = 0,
-          graded: int | None = None) -> list[dict]:
+          graded: int | None = None,
+          rescored: list | None = None) -> list[dict]:
     """Everything this run could not establish, as {level, head, detail}.
 
     Ordered by how much it should change a reader's confidence, not by the
@@ -279,7 +336,7 @@ def notes(*, shortfall: list, audit: dict, generic: dict,
         add(LEVEL_GAP, "The famous-event audit produced no usable result",
             "Any marquee event below has not been weighed against a more "
             "targeted alternative and may be there out of habit. %s"
-            % audit["error"])
+            % reader_text(audit["error"]))
     elif audit and audit.get('comparison_only') and audit.get('checked'):
         failed = audit.get('failed') or {}
         add(LEVEL_GAP if failed else LEVEL_NOTE,
@@ -437,10 +494,25 @@ def notes(*, shortfall: list, audit: dict, generic: dict,
             "the rubric, but two events one point apart may have been graded "
             "in different passes, so treat small gaps near the top as a tie.")
 
+    if rescored:
+        add(LEVEL_NOTE,
+            "%s near a cut-off %s scored again"
+            % (_n(len(rescored), "event", "events"),
+               "was" if len(rescored) == 1 else "were"),
+            "A score moves by a few points between readings, so an event "
+            "within %d points of a line was graded up to three times and the "
+            "median kept: %s."
+            % (rubric.BORDERLINE_MARGIN, _names(rescored, cap=8)))
+
     if scoring_errors:
+        # Scrubbed, because a stored run from before the writers were fixed
+        # carries "Max_tokens: Ran out of output budget ... Raise max_tokens
+        # or lower max_uses.." and this is printed to the client.
+        said = [reader_text(e) for e in scoring_errors[:3]]
         add(LEVEL_GAP,
             "Scoring reported %s" % _n(len(scoring_errors), "error", "errors"),
-            "; ".join(scoring_errors[:3]) + ".")
+            " ".join(x if x.endswith((".", "!", "?")) else x + "."
+                     for x in said if x))
 
     if interchangeable:
         add(LEVEL_THIN,
@@ -476,7 +548,9 @@ def notes(*, shortfall: list, audit: dict, generic: dict,
             % ", ".join("%s (ended %s)" % (f.get("name"), f.get("ends_on") or "?")
                         for f in finished[:6]))
 
-    gapped = [c for c in (candidates or []) if c.get("gaps")]
+    # A re-score caveat is not an unmeasured field, so it does not count here.
+    gapped = [c for c in (candidates or [])
+              if [g for g in (c.get("gaps") or []) if not rubric.is_rescore_note(g)]]
     if gapped:
         add(LEVEL_THIN,
             "%s an unmeasured field"
@@ -681,6 +755,24 @@ def selection_snapshot(ranked, profile):
                 profile=deepcopy(profile), counts=deepcopy(ranked['counts']))
 
 
+# The levels the page has a label for. The pipeline appends a note at level
+# 'warn' ("Research is incomplete") that no renderer knows, so the page
+# printed it with no tally label; it means a hole, so it reads as one.
+_LEVEL_ALIASES = {"warn": LEVEL_GAP, "warning": LEVEL_GAP, "error": LEVEL_GAP}
+KNOWN_LEVELS = (LEVEL_GAP, LEVEL_THIN, LEVEL_NOTE, LEVEL_OK)
+
+
+def present_note(n):
+    """One stored note, as the page may render it: a known level, and no
+    developer detail in the head or the detail."""
+    if not isinstance(n, dict):
+        return reader_text(n)
+    level = str(n.get("level") or LEVEL_NOTE).lower()
+    level = level if level in KNOWN_LEVELS else _LEVEL_ALIASES.get(level, LEVEL_NOTE)
+    return dict(n, level=level, head=reader_text(n.get("head")),
+                detail=reader_text(n.get("detail")) if n.get("detail") else "")
+
+
 def disabled_cross_client_check():
     return {
         'measured': False, 'flagged': False, 'checked': 0,
@@ -724,12 +816,15 @@ def present_run(run, profile, rows, decisions):
             return [strip_cross(v) for v in value]
         return value
     summary = strip_cross(summary)
-    summary['notes'] = [n for n in summary.get('notes', [])
+    summary['notes'] = [present_note(n) for n in summary.get('notes', [])
                         if 'watched by other clients' not in str(n).lower()
                         and 'cross-client check' not in str(n).lower()]
-    summary['assumptions'] = [n for n in summary.get('assumptions', [])
+    summary['assumptions'] = [reader_text(n) for n in summary.get('assumptions', [])
                               if 'watched by other clients' not in str(n).lower()
                         and 'cross-client check' not in str(n).lower()]
+    summary['unscored'] = [dict(u, note=reader_text(u.get('note')) or None)
+                           if isinstance(u, dict) else u
+                           for u in summary.get('unscored') or []]
     summary['generic'] = disabled_cross_client_check()
     selection = strip_cross(selection)
     all_rows = []
@@ -763,6 +858,13 @@ def executive_summary(*, profile: dict, ranked: dict, **kw) -> dict:
     client = p.get("client_name") or "Client"
     counts = (ranked or {}).get("counts") or {}
     r = ranked or {}
+    # Every re-scored row, whichever bucket it landed in: a re-score is most
+    # interesting precisely for the event it moved off the list.
+    rescored = [c for bucket in ("kept", "worth_a_look", "excluded", "over_cap")
+                for c in (r.get(bucket) or [])
+                if c.get("rescored") or any(rubric.is_rescore_note(g)
+                                            for g in (c.get("gaps") or []))]
+    kw.setdefault("rescored", rescored)
     facts = notes(candidates=r.get("kept") or [],
                   over_cap=r.get("over_cap") or [],
                   finished=r.get("finished") or [],

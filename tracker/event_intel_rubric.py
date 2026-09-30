@@ -801,7 +801,18 @@ def gaps_for(candidate: dict, today=None) -> list[str]:
     if has_finished(c, today):
         out.append("This edition has already ended, so it is history rather "
                    "than a recommendation.")
+    # Not a hole: this one was measured more carefully than the rest. It
+    # rides in `gaps` because that is the row's stored list of caveats, and
+    # a total that sat on a line deserves one. Prefixed with
+    # RESCORE_NOTE_PREFIX so the report can keep it out of its count of
+    # rows with an unmeasured field.
+    if c.get("rescore_note"):
+        out.append(str(c["rescore_note"])[:400])
     return out
+
+
+def is_rescore_note(text) -> bool:
+    return str(text or "").startswith(RESCORE_NOTE_PREFIX)
 
 
 def is_worth_a_look(candidate: dict) -> bool:
