@@ -225,8 +225,8 @@ def test_the_scored_export_includes_the_cut_events_and_marks_them(monkeypatch):
     found", which is the exact claim the screen refuses to make."""
     monkeypatch.setattr(store, "get_run", lambda rid, email: {"id": rid, "query": "N", "summary": {}})
     monkeypatch.setattr(store, "get_candidates", lambda rid: [
-        {"name": "Kept", "total": 88, "tier": "P1", "category": "industry_flagship"},
-        {"name": "Cut", "total": 41, "tier": "P3", "category": "industry_flagship"}])
+        {"name": "Kept", "total": 88, "tier": "P1", "relevance": 30, "category": "industry_flagship"},
+        {"name": "Cut", "total": 41, "tier": "P3", "relevance": 30, "category": "industry_flagship"}])
     rows = _rows(_client().get(BASE + "/runs/7/candidates.csv"))
     head = rows[0]
     status = head.index("Status")
@@ -258,8 +258,8 @@ def test_the_status_column_matches_the_runs_own_cap(monkeypatch):
     monkeypatch.setattr(store, "get_profile",
                         lambda pid, email: {"max_events": 1})
     monkeypatch.setattr(store, "get_candidates", lambda rid: [
-        {"name": "First", "total": 90, "tier": "P1", "category": "industry_flagship"},
-        {"name": "Second", "total": 85, "tier": "P1", "category": "industry_flagship"}])
+        {"name": "First", "total": 90, "tier": "P1", "relevance": 30, "category": "industry_flagship"},
+        {"name": "Second", "total": 85, "tier": "P1", "relevance": 30, "category": "industry_flagship"}])
     rows = _rows(_client().get(BASE + "/runs/7/candidates.csv"))
     head = rows[0]
     status = head.index("Status")

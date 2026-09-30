@@ -123,7 +123,9 @@ def test_an_event_the_scorer_skipped_is_unranked_not_ranked_low(monkeypatch):
 def test_a_failed_scoring_batch_is_reported(monkeypatch):
     _stub(monkeypatch, error={"kind": "transport", "detail": "HTTP 503"})
     out = SC.score_all([_cand("A")], PROFILE)
-    assert out["errors"] and "503" in out["errors"][0]
+    # The reader sees what happened, never the transport's status code.
+    assert out["errors"] and "503" not in out["errors"][0]
+    assert claude_websearch.reader_reason({"kind": "transport"}).rstrip(".").lower() in out["errors"][0].lower()
     assert out["scored"] == [] and len(out["unscored"]) == 1
 
 
