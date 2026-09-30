@@ -63,9 +63,10 @@ def test_renewal_loop_sets_current_so_a_connection_opened_there_gets_the_real_to
         "not the default (None) a fresh thread context starts with")
 
 
-def test_a_heartbeat_exception_ends_the_loop_without_raising(monkeypatch):
-    """The database fences a stale worker's later writes after lease expiry
-    -- heartbeat() failing is an expected end state, not a crash."""
+def test_a_heartbeat_exception_never_escapes_the_renewal_thread(monkeypatch):
+    """A failing heartbeat is retried (see test_event_intel_platform_jobs for
+    the backoff), never raised out of the thread; the loop ends when the
+    worker stops it or the lease is definitely lost."""
     def raising_heartbeat(j):
         raise RuntimeError("connection reset")
     monkeypatch.setattr(J, "heartbeat", raising_heartbeat)

@@ -116,13 +116,21 @@ def test_process_kill_preserves_paid_call_outcome_boundaries(account, boundary):
                        capture_output=True, text=True, timeout=30)
         ledger = J.ledger(run_id, account)
         assert ledger['attempts'] == 2
-        assert len(ledger['calls']) == 1
         if boundary == 'before_response':
-            assert ledger['state'] == 'failed'
-            assert ledger['unknown_provider_outcomes'] == 1
-            assert S.get_events(run_id) == []
-            assert 'unknown outcome' in S.get_run(run_id, account)['error']
+            # The killed worker's call has no outcome. It used to strand the
+            # run on "manual reconciliation is required"; the replacement's
+            # claim now marks it abandoned and the retry issues it again.
+            assert ledger['state'] == 'complete'
+            assert len(ledger['calls']) == 2
+            assert ledger['abandoned_calls'] == 1
+            assert ledger['unknown_provider_outcomes'] == 0
+            assert ledger['cost_estimate']['partial']
+            assert any(u['counted_from_reservation'] and 'stopped before' in u['reason']
+                       for u in ledger['cost_estimate']['unresolved'])
+            assert ledger['cost_estimate']['estimated_usd'] is not None
+            assert [event['name'] for event in S.get_events(run_id)] == ['Recovered probe event']
         else:
+            assert len(ledger['calls']) == 1
             assert ledger['state'] == 'complete'
             assert ledger['unknown_provider_outcomes'] == 0
             assert len(ledger['stages']) == 1

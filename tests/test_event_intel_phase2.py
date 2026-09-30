@@ -350,7 +350,11 @@ def test_known_sold_out_and_cancelled_editions_are_not_actionable():
 
 
 @sql
-def test_version_mismatch_preserves_partial_results_and_does_not_call_models(monkeypatch):
+def test_version_mismatch_is_left_queued_for_its_own_worker_not_failed(monkeypatch):
+    """A job built for another worker used to be claimed and failed on the
+    spot, so every run submitted during a deploy died. It is now left
+    queued, untouched, with its partial results intact, for a worker of its
+    own build (or for expire_stale once none is left)."""
     from tracker import event_intel_pipeline as P
     rid,email=new_job('version-change')
     assert S.save_event(rid,{'name':'Existing partial evidence'})
@@ -358,7 +362,11 @@ def test_version_mismatch_preserves_partial_results_and_does_not_call_models(mon
         cur.execute("UPDATE evi_jobs SET payload=jsonb_set(payload,'{runtime_versions}','{}'::jsonb) WHERE run_id=%s",(rid,))
     pipeline=Mock()
     monkeypatch.setattr(P,'run_job',pipeline)
-    assert J.run_once()
-    pipeline.assert_not_called()
+    while J.run_once():
+        pass  # drain anything else runnable in the shared test database
+    pipeline_calls=[c for c in pipeline.call_args_list if c.args and c.args[0]==rid]
+    assert pipeline_calls==[]
     assert S.get_events(rid)[0]['name']=='Existing partial evidence'
-    assert S.get_run(rid,email)['status']=='failed'
+    assert S.get_run(rid,email)['status']=='running'
+    assert J.ledger(rid,email)['state']=='queued'
+    J.cancel(rid,email)
