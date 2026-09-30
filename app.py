@@ -9593,7 +9593,10 @@ def event_conference_intelligence_run_detail(run_id):
         from tracker.event_intel_evidence import get_observations
         from tracker.event_intel_jobs import ledger
         run['evidence_ledger'] = get_observations(run_id,email)
-        run['execution_ledger'] = ledger(run_id,email)
+        # ?replies=1 adds excerpts of the model's own replies, for admins only:
+        # the one way to see why a stage misread a reply without database access.
+        run['execution_ledger'] = ledger(run_id,email,
+            request.args.get('replies') == '1' and email in ADMIN_EMAILS)
         if run['execution_ledger']:
             run['summary'] = run.get('summary') or {}
             spend = run['summary']['spend'] = run['summary'].get('spend') or {}

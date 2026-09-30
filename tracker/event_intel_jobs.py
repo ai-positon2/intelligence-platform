@@ -320,7 +320,14 @@ def code_version():
     return hashlib.sha256(b''.join(p.read_bytes() for p in paths)).hexdigest()
 
 
-def ledger(run_id,email):
+REPLY_EXCERPT_CHARS = 1500
+
+
+def ledger(run_id,email,replies=False):
+    """The run's execution record. `replies` adds a head and tail excerpt of
+    each stored model reply, for an ADMIN diagnosing a stage from what the
+    model actually wrote; the route decides who may ask. Without it, reply
+    text never leaves the database, as before."""
     with db() as conn, conn.cursor() as cur:
         cur.execute("SELECT state,attempts,cancel_requested,created_at,updated_at,payload FROM evi_jobs WHERE run_id=%s AND email=%s", (run_id,email))
         row = cur.fetchone()
@@ -329,8 +336,14 @@ def ledger(run_id,email):
         job = dict(zip([c[0] for c in cur.description],row))
         cur.execute('SELECT stage,version,elapsed_ms,completed_at FROM evi_stages WHERE run_id=%s ORDER BY completed_at', (run_id,))
         job['stages'] = [dict(zip([c[0] for c in cur.description],r)) for r in cur.fetchall()]
-        cur.execute('SELECT stage,model,prompt_hash,reserved_tokens,reserved_searches,result,elapsed_ms,created_at FROM evi_provider_calls WHERE run_id=%s ORDER BY id', (run_id,))
+        cur.execute('SELECT stage,model,prompt_hash,reserved_tokens,reserved_searches,result,elapsed_ms,created_at'
+                    + (',response' if replies else '') + ' FROM evi_provider_calls WHERE run_id=%s ORDER BY id', (run_id,))
         job['calls'] = [dict(zip([c[0] for c in cur.description],r)) for r in cur.fetchall()]
+        if replies:
+            n = REPLY_EXCERPT_CHARS
+            for call in job['calls']:
+                text = str((call.pop('response') or {}).get('text') or '')
+                call['reply'] = text if len(text) <= 2 * n else text[:n] + ' [...] ' + text[-n:]
         job['unknown_provider_outcomes'] = sum(c['result'] is None for c in job['calls'])
         job['calls_without_usage'] = sum(not (c['result'] or {}).get('usage') for c in job['calls'])
         job['runtime_versions'] = job['payload'].get('runtime_versions')

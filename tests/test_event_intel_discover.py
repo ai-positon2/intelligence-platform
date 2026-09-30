@@ -1761,7 +1761,7 @@ def test_the_second_search_is_told_what_the_first_found_and_adds_only_new_events
     assert "up to %d" % D.SECOND_PASS_WANT in users[1]
     assert sorted(e["name"] for e in r["events"]) == ["Alpha Summit", "Beta Forum", "Delta Congress", "Gamma Expo"]
     assert r["proposed"] == 4
-    assert r["second_search"] == {"status": D.STATUS_OK, "added": 2}
+    assert (r["second_search"]["status"], r["second_search"]["added"]) == (D.STATUS_OK, 2)
 
 
 def test_the_second_search_adds_at_most_its_cap(monkeypatch):
@@ -1790,7 +1790,8 @@ def test_a_failed_second_search_costs_the_category_nothing(monkeypatch):
     r = D.search_category(R.CAT_VERTICAL_SUMMIT, PROFILE)
     assert r["status"] == D.STATUS_OK
     assert [e["name"] for e in r["events"]] == ["Alpha Summit"]
-    assert r["second_search"] == {"status": D.STATUS_ERROR, "added": 0}
+    assert (r["second_search"]["status"], r["second_search"]["added"]) == (D.STATUS_ERROR, 0)
+    assert "could not be completed" in r["second_search"]["detail"]
 
 
 def test_a_broken_second_search_is_not_retried(monkeypatch):
@@ -1812,5 +1813,5 @@ def test_the_run_report_carries_what_each_second_search_added(monkeypatch):
     _two_searches(monkeypatch, _find_reply([_cand("Alpha Summit")], complete=True),
                   _find_reply([_cand("Gamma Expo")], complete=True))
     out = D.discover(PROFILE)
-    assert all(s["second_search"] == {"status": D.STATUS_OK, "added": 1}
+    assert all((s["second_search"]["status"], s["second_search"]["added"]) == (D.STATUS_OK, 1)
                for s in out["statuses"].values())

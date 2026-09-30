@@ -220,6 +220,29 @@ def test_a_configured_token_allowance_is_still_enforced(monkeypatch):
 
 
 @sql
+def test_reply_excerpts_appear_only_when_asked_for(monkeypatch):
+    rid,email=new_job('replies')
+    job=J.claim()
+    token=J.CURRENT.set(job)
+    try:
+        short=J.reserve_call('system','short','test-model',100,0)
+        J.finish_call(short['id'],{'text':'{"candidates": []}','usage':{}},10)
+        long=J.reserve_call('system','long','test-model',100,0)
+        J.finish_call(long['id'],{'text':'A'*2000+'MIDDLE'+'Z'*2000,'usage':{}},10)
+    finally:
+        J.CURRENT.reset(token)
+    plain=J.ledger(rid,email)
+    assert all('reply' not in c and 'response' not in c for c in plain['calls'])
+    with_replies=J.ledger(rid,email,replies=True)
+    first,second=with_replies['calls']
+    assert first['reply']=='{"candidates": []}' and 'response' not in first
+    assert second['reply'].startswith('A'*J.REPLY_EXCERPT_CHARS) and second['reply'].endswith('Z'*J.REPLY_EXCERPT_CHARS)
+    assert 'MIDDLE' not in second['reply'] and ' [...] ' in second['reply']
+    assert J.ledger(rid,'other@position2.com',replies=True) is None
+    J.cancel(rid,email)
+
+
+@sql
 def test_catalog_observations_remain_run_owned_and_unverified():
     rid,email=new_job('catalog')
     event={'name':'Forum 2027','starts_on':'2027-04-01','website':'https://forum.example','country':'USA','city':'Boston'}

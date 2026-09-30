@@ -1527,6 +1527,7 @@ def search_category(category: str, profile: dict) -> dict:
         # means only that there was no extra coverage this time.
         base["second_search"] = {
             "status": second["status"],
+            "detail": second.get("detail") or "",
             "added": len(proposals) - len(found["proposals"])}
 
     if not proposals:

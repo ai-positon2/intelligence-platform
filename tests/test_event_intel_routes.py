@@ -476,3 +476,29 @@ def test_the_form_says_what_drafting_actually_does_and_how_long_it_takes():
     assert re.search(r"\b(read|fetch)\b", hint, re.I), hint
     assert "pages" in hint.lower(), (
         "the hint no longer says we read their pages: %s" % hint)
+
+
+
+@pytest.mark.parametrize("email,ask,expected", [
+    ("reporting@position2.com", "?replies=1", True),      # an admin who asked
+    ("reporting@position2.com", "", False),               # an admin who did not
+    ("someone.else@position2.com", "?replies=1", False),  # not an admin
+])
+def test_reply_excerpts_are_for_admins_who_ask(monkeypatch, email, ask, expected):
+    import tracker.event_intel_jobs as J
+    import tracker.event_intel_evidence as E
+    monkeypatch.setenv("DATABASE_URL", "postgresql://unused")
+    monkeypatch.setattr(store, "get_run", lambda run_id, email: {
+        "id": run_id, "mode": "lookup", "query": "q", "status": "complete",
+        "stage": "done", "error": None, "summary": {}, "credits_spent": 0})
+    for name in ("get_events", "get_participants", "get_sources"):
+        monkeypatch.setattr(store, name, lambda *a, **k: [])
+    monkeypatch.setattr(E, "get_observations", lambda run_id, email: [])
+    seen = {}
+
+    def ledger(run_id, email, replies=False):
+        seen["replies"] = replies  # passed positionally by the route
+        return None
+    monkeypatch.setattr(J, "ledger", ledger)
+    _client(email).get(BASE + "/runs/5" + ask)
+    assert seen["replies"] is expected
