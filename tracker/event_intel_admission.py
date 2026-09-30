@@ -981,8 +981,9 @@ def inspect(event, fetcher=None):
         result['reasons'] = ['The named edition has no usable date range.']
         return result
     urls = []
-    for url in [event.get('website')] + list(event.get('sources') or []):
-        if organizer_url(url,host):
+    website = event.get('website')
+    for url in [website] + list(event.get('sources') or []):
+        if organizer_url(url,host,website):
             url = urldefrag(url)[0]
             if url not in urls:
                 urls.append(url)
@@ -998,7 +999,7 @@ def inspect(event, fetcher=None):
         final = fetched.get('final_url') or url
         check = {'url':url, 'final_url':final, 'status':fetched.get('status','error')}
         result['checks'].append(check)
-        if not organizer_url(final,host):
+        if not organizer_url(final,host,website):
             check['reason'] = 'The page redirected outside the event host.'
             continue
         raw_text = fetched.get('text') or ''

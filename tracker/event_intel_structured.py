@@ -54,30 +54,45 @@ def events(markup):
 
 
 class _Titles(HTMLParser):
-    """The document <title> and its og:/twitter: title twins, nothing else."""
+    """The document <title> and its og:/twitter: title twins, nothing else.
+
+    Only the head's title: an SVG icon's <title> ("Icon", "Close") is also
+    a <title> tag, and an audit on 2026-09-30 found it taken as the page
+    title whenever the head's own <title> was empty."""
     META = ('og:title', 'twitter:title')
+    FOREIGN = ('svg', 'math')
 
     def __init__(self):
         super().__init__(convert_charrefs=True)
         self.in_title = False
+        self.seen_title = False
+        self.in_body = False
+        self.foreign = 0
         self.parts = []
         self.found = []
 
     def handle_starttag(self, tag, attrs):
         a = dict(attrs)
-        if tag == 'title' and not self.parts:
+        if tag in self.FOREIGN:
+            self.foreign += 1
+        elif tag == 'body':
+            self.in_body = True
+        elif tag == 'title' and not self.seen_title and not self.in_body and not self.foreign:
             self.in_title = True
+            self.seen_title = True
         elif tag == 'meta' and (a.get('property') or a.get('name') or '').lower() in self.META:
             self.found.append(a.get('content') or '')
+
+    def handle_endtag(self, tag):
+        if tag in self.FOREIGN and self.foreign:
+            self.foreign -= 1
+        elif tag == 'title' and self.in_title:
+            self.in_title = False
+            self.found.insert(0, ''.join(self.parts))
 
     def handle_data(self, data):
         if self.in_title:
             self.parts.append(data)
-
-    def handle_endtag(self, tag):
-        if tag == 'title' and self.in_title:
-            self.in_title = False
-            self.found.insert(0, ''.join(self.parts))
 
 
 def titles(markup):
