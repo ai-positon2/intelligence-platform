@@ -85,7 +85,7 @@ def test_phase1_decision_survives_route_reload_and_csv():
     assert run['summary']['outcomes']['by_name']['Reload Forum']['decision']=='going'
     result=client.get(base+'/runs/'+str(rid)+'/candidates.csv')
     rows=list(csv.DictReader(io.StringIO(result.get_data(as_text=True))))
-    assert rows[0]['Your decision']=='going' and rows[0]['Decision note']=='Booked'
+    assert rows[0]['Your decision']==S.DECISION_LABELS['going'] and rows[0]['Decision note']=='Booked'
     stranger=appmod.app.test_client()
     with stranger.session_transaction() as session:session['google_user']={'email':'stranger@position2.com','name':'Other'}
     assert stranger.post(base+'/outcomes',json=dict(run_id=rid,event_name='Reload Forum',decision='skipped')).status_code==400
