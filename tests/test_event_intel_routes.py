@@ -84,10 +84,19 @@ def test_run_rejects_an_unknown_mode_and_an_empty_query(monkeypatch):
 
 
 def test_run_reports_storage_being_unavailable_rather_than_pretending(monkeypatch):
-    """save_run returns None when DATABASE_URL is unset. Answering 200 with a
-    null run_id would leave the page polling forever for a run that was never
-    created."""
-    monkeypatch.setattr(store, "save_run", lambda *a, **k: None)
+    """The route creates a run through event_intel_jobs.start (run and queue
+    row in one transaction), which raises when storage is unavailable.
+    Answering 200 with a null run_id would leave the page polling forever for
+    a run that was never created.
+
+    This used to patch store.save_run, which the route stopped calling when
+    runs were queued, so it passed only when DATABASE_URL was unset and got
+    a 200 against a real database."""
+    from tracker import event_intel_jobs
+
+    def unavailable(*a, **k):
+        raise RuntimeError("Event job storage is unavailable")
+    monkeypatch.setattr(event_intel_jobs, "start", unavailable)
     r = _client("reporting@position2.com").post(
         BASE + "/run", json={"mode": "lookup", "query": "Web Summit"})
     assert r.status_code == 500
