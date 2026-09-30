@@ -175,20 +175,23 @@ FIND_MAX_TOKENS = 9000
 # budget and still returned nothing. See `propose_category`.
 RETRY_PER_CATEGORY = 2
 
-# A second, different search per category.
+# Each category is searched in short passes of PASS_WANT, not one big ask.
 #
-# What a category finds depends on which pages its six searches happen to
-# land on, so one search is one sample of the category. The same Stripe
-# profile proposed 17, 12 and 10 events in runs 13, 16 and 17 (2026-09-29/30)
-# and recommended 3, 2 and 2, with real events like FTT Embedded Finance and
-# Fintech Meetup found by one run and missed by the next. Repeating the same
-# question mostly returns the same names, so the second search is told what
-# the first found and asked for OTHER events in the category. It runs only
-# when the first search worked and found something (an empty category that
-# searched properly has already answered, and a broken one had its retry),
-# and it may add at most SECOND_PASS_WANT new names, which caps the extra
-# confirmation calls it can cause.
-SECOND_PASS_WANT = 4
+# Asking one call for up to PER_CATEGORY (six) events failed in most
+# categories of every run measured: 4, 5, 6 and 5 of the six categories in
+# runs 13, 16, 17 and 18 (2026-09-29/30) came back with an empty list and
+# search_complete false. The replies say why: the finder verifies every name
+# on a page it opened, as the prompt requires, runs out of searches before
+# it has six, and reports nothing rather than an unverified list. What
+# rescued those categories was the narrowed retry asking for "the 2
+# STRONGEST", which succeeded every time. So that is now the only shape of
+# question asked: a first pass for the PASS_WANT strongest events, then
+# further passes, each told everything already found and asked for the
+# PASS_WANT strongest OTHER events, up to FIND_PASSES in all. A pass that
+# adds nothing new ends the category's search, as does any pass that is not
+# a clean answer. The ceiling per category stays PER_CATEGORY.
+PASS_WANT = 2
+FIND_PASSES = 3
 CONFIRM_MAX_USES = 6
 
 # Raised 4000 -> 9000, for the same reason as FIND_MAX_TOKENS above and on
@@ -265,8 +268,8 @@ from your own sense of when now is.
 YOUR ONLY JOB IS TO NAME CANDIDATES. Something else confirms them afterwards \
 and reads their published numbers, so do not gather dates, attendee counts, \
 ticket prices or exhibitor counts here. Spend your searches on FINDING events \
-rather than on studying the ones you have already found. Naming six plausible \
-candidates is more useful than fully researching one.
+rather than on studying the ones you have already found. Naming two plausible \
+candidates you can cite is more useful than fully researching one.
 
 RULES.
 1. Use web search. Do not answer from memory. A plausible-sounding conference \
@@ -962,7 +965,7 @@ def _find_user(category: str, want: int, narrowed: bool = False) -> str:
     if narrowed:
         return ("An earlier search of the \"%s\" category for this client "
                 "used its whole budget and came back with nothing, so this is "
-                "a second and narrower attempt. Name the %d STRONGEST "
+                "a second attempt. Name the %d STRONGEST "
                 "candidate events you can actually support with a page you "
                 "opened. Two well-sourced events are the goal here, not "
                 "coverage: stop searching as soon as you have them and write "
@@ -971,26 +974,29 @@ def _find_user(category: str, want: int, narrowed: bool = False) -> str:
                 "search_complete true and say plainly in `note` what this "
                 "category holds for them."
                 % (label, want))
-    return ("Name up to %d candidate events in the \"%s\" category for this "
-            "client. Search actively, and spend your searches on finding "
-            "events rather than on studying the ones you have found. If this "
-            "category has nothing for them, return an empty array and say why."
-            % (want, label))
+    return ("Name the %d STRONGEST candidate events in the \"%s\" category "
+            "for this client that you can support with a page you opened. "
+            "%d well-sourced events are the goal here, not coverage: stop "
+            "searching as soon as you have them and write your answer while "
+            "you still have room. If this category genuinely has nothing for "
+            "them, return an empty array, set search_complete true and say "
+            "plainly in `note` what this category holds for them."
+            % (want, label, want))
 
 
 def _find_more_user(category: str, want: int, already: list) -> str:
-    """The second search's request: the same category, different events."""
+    """A later pass: the same category, the strongest events not yet found."""
     label = rubric.CATEGORY_LABELS[category]
-    return ("A first search of the \"%s\" category for this client already "
-            "found these events: %s. Do not name any of them again, and do not "
-            "name another edition, regional version or sub-event of them. "
-            "Search for DIFFERENT events that genuinely belong in this "
-            "category and name up to %d. Look where the first search may not "
-            "have: other regions the client covers, trade associations, "
-            "regulators and industry bodies, and vendor or community "
-            "programmes. If there are genuinely no others, return an empty "
-            "array and set search_complete true."
-            % (label, "; ".join(already), want))
+    return ("Earlier searches of the \"%s\" category for this client already "
+            "found these events: %s. Name the %d STRONGEST OTHER candidate "
+            "events in this category that you can support with a page you "
+            "opened. Do not name any event above again, or another edition, "
+            "regional version or sub-event of one. %d well-sourced events are "
+            "the goal, not coverage: stop searching as soon as you have them "
+            "and write your answer while you still have room. If there are "
+            "genuinely no others, return an empty array and set "
+            "search_complete true."
+            % (label, "; ".join(already), want, want))
 
 
 def _find_reply_is_broken_and_empty(res: dict) -> bool:
@@ -1035,7 +1041,7 @@ def propose_category(category: str, profile: dict, avoid: list | None = None) ->
     conclude, which is on a category that came up short.
     """
     system = find_system(category, profile)
-    want = SECOND_PASS_WANT if avoid else PER_CATEGORY
+    want = PASS_WANT
     user = _find_more_user(category, want, avoid) if avoid else _find_user(category, want)
     res = _ask(system, user, max_uses=FIND_MAX_USES, max_tokens=FIND_MAX_TOKENS)
     spend = claude_websearch.spend_of(res)
@@ -1053,7 +1059,7 @@ def propose_category(category: str, profile: dict, avoid: list | None = None) ->
                        "retrying for %d instead of %d", category,
                        (res.get("error") or {}).get("kind"),
                        res.get("search_count"), RETRY_PER_CATEGORY,
-                       PER_CATEGORY)
+                       PASS_WANT)
         time.sleep(FIND_RETRY_BACKOFF_SECONDS)
         # A NARROWER question, not the same one again.
         #
@@ -1508,27 +1514,28 @@ def search_category(category: str, profile: dict) -> dict:
     """
     found = propose_category(category, profile)
     proposals = list(found["proposals"])
-    second = None
-    if proposals and found["status"] in (STATUS_OK, STATUS_PARTIAL):
-        second = propose_category(category, profile,
-                                  avoid=[p["name"] for p in proposals])
+    later = []
+    ok = True  # a first pass that failed or found nothing has no proposals
+    while ok and proposals and len(later) < FIND_PASSES - 1:
+        more = propose_category(category, profile,
+                                avoid=[p["name"] for p in proposals])
         seen = {name_key(p["name"]) for p in proposals}
-        added = [p for p in second["proposals"] if name_key(p["name"]) not in seen]
-        proposals.extend(added)  # propose_category already capped it at SECOND_PASS_WANT
+        added = [p for p in more["proposals"] if name_key(p["name"]) not in seen]
+        proposals.extend(added)
+        later.append({"status": more["status"], "detail": more.get("detail") or "",
+                      "added": len(added), "spend": more.get("spend")})
+        ok = bool(added) and more["status"] == STATUS_OK
     base = {"category": category, "note": found["note"],
             "error_kind": found.get("error_kind"),
             "proposed": len(proposals), "rejected": [],
             "budget_spent": found.get("budget_spent", False),
             "spend": claude_websearch.spend_sum(
-                found.get("spend"), (second or {}).get("spend"))}
-    if second is not None:
-        # Reported, never folded into the category's status: the first search
-        # already answered for the category, and a second one that failed
+                found.get("spend"), *[p.pop("spend") for p in later])}
+    if later:
+        # Reported, never folded into the category's status: the first pass
+        # already answered for the category, and a later one that failed
         # means only that there was no extra coverage this time.
-        base["second_search"] = {
-            "status": second["status"],
-            "detail": second.get("detail") or "",
-            "added": len(proposals) - len(found["proposals"])}
+        base["later_searches"] = later
 
     if not proposals:
         return dict(base, status=found["status"], events=[],
@@ -1637,7 +1644,7 @@ def discover(profile: dict) -> dict:
             statuses[cat] = {"status": r["status"], "note": r["note"],
                              "detail": r["detail"],
                              "error_kind": r.get("error_kind"),
-                             "second_search": r.get("second_search"),
+                             "later_searches": r.get("later_searches") or [],
                              "label": rubric.CATEGORY_LABELS[cat],
                              "found": len(r["events"]),
                              # Whether the finder ran out of the searches it
