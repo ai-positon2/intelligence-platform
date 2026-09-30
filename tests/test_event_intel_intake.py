@@ -805,3 +805,16 @@ def test_the_fallback_prompt_anchors_identity_on_the_domain_not_the_typed_name()
     assert "GROUND TRUTH" in p
     assert "misspelled" in p
     assert "https://amazon.com" in p
+
+
+def test_a_draft_reports_what_its_model_calls_cost(monkeypatch):
+    """A draft runs in a web request, outside any job, so the run ledger
+    never sees it: the route prices it from this."""
+    _stub(monkeypatch)
+    out = I.draft_profile("Northwind", SITE)
+    assert out["spend"]["calls"] == 1
+
+
+def test_a_refused_draft_made_no_call(monkeypatch):
+    _stub(monkeypatch)
+    assert I.draft_profile("", SITE)["spend"]["calls"] == 0

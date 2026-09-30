@@ -287,7 +287,7 @@ def test_a_billed_search_is_recorded_against_the_account(monkeypatch):
     _apollo(monkeypatch, [])
     c.get(BASE + "/search?q=Nobody")             # a zero-row search is not billed
     usage = store.account_usage(email)["company_search"]
-    assert usage == {"calls": 2, "credits": 1}
+    assert usage == {"calls": 2, "credits": 1, "usd": 0.0}
 
 
 # ── profile drafting ──────────────────────────────────────────────────────

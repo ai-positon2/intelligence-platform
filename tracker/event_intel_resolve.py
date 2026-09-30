@@ -73,11 +73,18 @@ _SYSTEM = (
     '"ends_on": "YYYY-MM-DD"|null, "location": str|null, "venue": str|null, '
     '"format": "in_person"|"virtual"|"hybrid"|null, '
     '"stated_size": str|null, "audience_note": str|null, '
+    '"organizer_run": true|false, "matchmaking_evidence": str|null, '
     '"country": str|null, "city": str|null, "availability": "open"|"sold_out"|"cancelled"|"unknown", "availability_source": str|null, '
     '"pages": [{"url": str, "kind": "exhibitors"|"sponsors"|"speakers"|'
     '"agenda"|"partners"|"attendees", "note": str}]}\n\n'
     "`stated_size` is the event's OWN published attendance claim, quoted as "
     "they state it (\"12,000+ attendees\"), or null. Never estimate one. "
+    "`matchmaking_evidence` quotes or closely paraphrases what the ORGANISER "
+    "says they do to pair attendees, or null. Set `organizer_run` true only "
+    "when the organiser takes active responsibility for pairing people "
+    "against stated criteria; a conference app where attendees book their "
+    "own meetings, invite-only admission, or a parent conference's "
+    "programme is not that, so say so in the evidence and set it false.\n"
     "`audience_note` is who the event says it is for, in one sentence."
 )
 
@@ -231,6 +238,11 @@ def _resolve_event(query: str, year_hint: str | None, box: dict) -> dict:
         "format": (parsed.get("format") or "").strip() or None,
         "stated_size": _clean((parsed.get("stated_size") or "").strip()) or None,
         "audience_note": _clean((parsed.get("audience_note") or "").strip()) or None,
+        # A recommendation's promoted alternative is scored on these, the
+        # same way a discovered event is: without them it could never earn
+        # the matchmaking bonus the event it replaced kept.
+        "organizer_run": parsed.get("organizer_run") is True,
+        "matchmaking_evidence": _clean(str(parsed.get("matchmaking_evidence") or "").strip())[:800] or None,
         "confidence": confidence,
         "reasoning": reasoning,
     }

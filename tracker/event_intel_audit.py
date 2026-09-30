@@ -797,7 +797,7 @@ def _candidate_from_alternative(res: dict, alt: dict,
         # it can read, so carrying the claim through cannot award the bonus
         # on its own. Never taken from the audit's prose: a sentence about
         # why one event beats another is not evidence of a programme.
-        "organizer_run": bool(ev.get("organizer_run")),
+        "organizer_run": ev.get("organizer_run") is True,
         "matchmaking_evidence": (str(ev.get("matchmaking_evidence") or "")
                                  .strip()[:800] or None),
         "famous": False,

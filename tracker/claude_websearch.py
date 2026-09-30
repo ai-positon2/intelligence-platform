@@ -768,12 +768,17 @@ def ask(system: str, user: str, *, max_uses: int = 8, max_tokens: int = 8000,
         temperature: float | None = 0.0, deadline: float | None = None):
     """Record and bound event-worker calls; other platform callers are unchanged.
 
-    Only a SUCCESSFUL reply is replayed from the call ledger. A reply stored
-    with an error (a 529, a dropped connection, a stalled search) used to be
-    handed back on every retry of the same prompt after the job was
-    re-claimed, so a run resumed precisely to get past a bad minute re-read
-    the bad minute and never called the provider again. A stored failure is
-    re-attempted under the same ledger row, and its outcome replaces it.
+    reserve_call decides what is replayed. A stored reply that failed for a
+    reason of the moment (a 529, a dropped connection, a stalled search)
+    used to be handed back on every retry after the job was re-claimed, so a
+    run resumed precisely to get past a bad minute re-read the bad minute.
+    reserve_call now re-issues those under a NEW ledger row, which also
+    passes the daily limits again; anything it hands back as cached is the
+    answer. Re-attempting a cached failure here as well wrote a second
+    outcome over the first row and skipped the daily limits.
+
+    A call that raises still gets an outcome: a row with no response reads
+    as "unknown outcome" to every later attempt and blocks the retry.
     """
     from .event_intel_jobs import CURRENT, reserve_call, finish_call
     import time
@@ -784,11 +789,15 @@ def ask(system: str, user: str, *, max_uses: int = 8, max_tokens: int = 8000,
     began = time.monotonic()
     try:
         reservation = reserve_call(system,user,model or os.getenv('ANTHROPIC_MODEL','claude-sonnet-5'),max_tokens,max_uses)
-        cached = reservation['cached']
-        if cached is not None and not (isinstance(cached, dict) and cached.get('error')):
-            return cached
+        if reservation['cached'] is not None:
+            return reservation['cached']
     except RuntimeError as exc:
         return {'text':'', 'error':{'kind':_limit_kind(str(exc)),'detail':str(exc)}, 'usage':{}}
-    result = _ask(system, user, **kw)
+    try:
+        result = _ask(system, user, **kw)
+    except Exception as exc:
+        result = {'text': '', 'error': _err(ERR_TRANSPORT, describe_exception(exc)), 'usage': {}}
+        finish_call(reservation['id'],result,int((time.monotonic()-began)*1000))
+        raise
     finish_call(reservation['id'],result,int((time.monotonic()-began)*1000))
     return result

@@ -156,15 +156,29 @@ def ledger(monkeypatch, transport):
     J.CURRENT.reset(token)
 
 
-def test_a_stored_failure_is_retried_rather_than_replayed(ledger, transport):
-    """The 529 case: a run resumed to get past a bad minute re-read it."""
-    ledger["cached"] = {"text": "", "error": {"kind": C.ERR_TRANSPORT,
-                                              "detail": "HTTP 529"}, "usage": {}}
+def test_what_the_ledger_hands_back_is_the_answer(ledger, transport):
+    """reserve_call decides what is replayed: it re-issues a failure of the
+    moment under a NEW row (tests/test_event_intel_platform_jobs.py covers
+    that against Postgres), so whatever it still returns as cached is the
+    answer. Re-attempting it here as well wrote a second outcome over the
+    first row and skipped the daily limits."""
+    ledger["cached"] = {"text": "", "error": {"kind": C.ERR_MAX_TOKENS,
+                                              "detail": "stop_reason=max_tokens"}, "usage": {}}
     r = C.ask("s", "u")
-    assert transport["calls"] == 1, "the provider was never called again"
-    assert r["error"] is None and r["text"] == "answer"
-    assert [cid for cid, _ in ledger["finished"]] == [7], (
-        "the retry's outcome must replace the stored failure on the same row")
+    assert transport["calls"] == 0 and ledger["finished"] == []
+    assert r["error"]["kind"] == C.ERR_MAX_TOKENS
+
+
+def test_a_call_that_raises_still_records_an_outcome(ledger, monkeypatch):
+    """A row with no response reads as "unknown outcome" to every later
+    attempt, and the retry is refused."""
+    def boom(*a, **k):
+        raise RuntimeError("socket closed")
+    monkeypatch.setattr(C, "_ask", boom)
+    with pytest.raises(RuntimeError):
+        C.ask("s", "u")
+    [(cid, result)] = ledger["finished"]
+    assert cid == 7 and result["error"]["kind"] == C.ERR_TRANSPORT
 
 
 def test_a_stored_success_is_replayed_without_a_call(ledger, transport):

@@ -874,3 +874,28 @@ def _check_orphan_sweep(J, email, old_orphan, fresh_orphan, done, queued):
     assert S.get_run(done, email)['status'] == 'complete'
     assert S.get_run(queued, email)['status'] == 'running'
     assert old_orphan not in J.close_orphaned_runs()
+
+
+def test_cross_client_interest_counts_clients_that_kept_the_event():
+    """A client is a profile, not a login, and "kept" means what rank()
+    keeps: over the bar, aimed at that client's buyers, not already over.
+    The feature is disabled; this pins the count it would report."""
+    from tracker.event_intel_discover import name_key
+    agency = 'xc-agency@position2.com'
+    others = []
+    for client in ('XC One', 'XC Two'):          # one login, two clients
+        pid = _saved_profile(agency, client)
+        others.append((agency, pid, _cand('XC Shared Forum')))
+    low = 'xc-low@position2.com'                 # over 70 on the wrong audience
+    others.append((low, _saved_profile(low, 'XC Low'),
+                   _cand('XC Shared Forum', relevance=10, dm_access=40, engagement=20)))
+    past = 'xc-past@position2.com'               # an edition already over
+    others.append((past, _saved_profile(past, 'XC Past'),
+                   _cand('XC Shared Forum', starts_on='2020-01-01', ends_on='2020-01-03')))
+    for email, pid, cand in others:
+        rid = S.save_run(email, 'recommend', 'xc', profile_id=pid)
+        S.save_candidates(rid, [cand])
+        S.update_run(rid, status='complete')
+    key = name_key('XC Shared Forum')
+    got = S.cross_client_interest([key], None, 30, 'xc-caller@position2.com')
+    assert got[key]['distinct_clients'] == 2

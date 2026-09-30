@@ -9576,9 +9576,14 @@ def event_conference_intelligence_profile_draft():
                                            body.get("website") or "")
     kind = (out.get("error") or {}).get("kind")
     if kind != "bad_request":
-        # One Claude call per draft: the direct read, or the search fallback
-        # when the site could not be read. Only a refused request makes none.
-        event_intel_store.record_account_usage(email, "profile_draft", calls=1)
+        # The direct read, the search fallback when the site could not be
+        # read, or both; a refused request makes none. Priced here because a
+        # draft runs outside any job and never reaches the run ledger.
+        from tracker import claude_websearch
+        spend = out.get("spend") or {}
+        event_intel_store.record_account_usage(
+            email, "profile_draft", calls=max(1, int(spend.get("calls") or 0)),
+            usd=claude_websearch.spend_usd(spend) if spend else 0.0)
     if out.get("error"):
         code = 400 if kind in ("bad_request", "wrong_company") else 502
         return jsonify({"error": _evi_draft_error_message(out["error"]), "kind": kind,

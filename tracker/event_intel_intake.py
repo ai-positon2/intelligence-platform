@@ -102,6 +102,7 @@ WHAT THIS MODULE IS NOT ALLOWED TO DO
 from __future__ import annotations
 
 import collections
+import contextvars
 import concurrent.futures
 import logging
 import re
@@ -728,7 +729,7 @@ def _search_draft(name: str, site: str) -> dict | None:
     user = ("%s's own site could not be read directly. Search for public "
             "information about them from other sources and fill in the form, "
             "leaving blank anything you cannot find and point to." % name[:200])
-    res = claude_websearch.ask(system, user, max_uses=SEARCH_MAX_USES,
+    res = _ask(system, user, max_uses=SEARCH_MAX_USES,
                                max_tokens=MAX_TOKENS, timeout=SEARCH_TIMEOUT)
     if res.get("error") or not res.get("search_count"):
         if res.get("error"):
@@ -750,7 +751,31 @@ def _search_draft(name: str, site: str) -> dict | None:
     return parsed
 
 
+# What this draft's model calls cost. A draft runs in a web request, outside
+# any job, so the run ledger never sees it; the route records this instead.
+_SPENT = contextvars.ContextVar("event_intel_intake_spent", default=None)
+
+
+def _ask(system, user, **kw):
+    res = claude_websearch.ask(system, user, **kw)
+    spent = _SPENT.get()
+    if spent is not None:
+        spent.append(claude_websearch.spend_of(res))
+    return res
+
+
 def draft_profile(client_name: str, website: str) -> dict:
+    """draft_profile_uncosted's answer, with `spend` for every model call it made."""
+    spent = []
+    token = _SPENT.set(spent)
+    try:
+        out = draft_profile_uncosted(client_name, website)
+    finally:
+        _SPENT.reset(token)
+    return dict(out, spend=claude_websearch.spend_sum(*spent))
+
+
+def draft_profile_uncosted(client_name: str, website: str) -> dict:
     """Propose an intake for one company. Never raises.
 
     Returns a dict with `draft` (the fields to put in the form), `evidence`
@@ -802,7 +827,7 @@ def draft_profile(client_name: str, website: str) -> dict:
     user = ("Fill in the form for %s from these pages, and leave blank "
             "anything they do not tell you.\n\n%s" % (name[:200], corpus))
 
-    res = claude_websearch.ask(system, user, max_uses=MAX_USES,
+    res = _ask(system, user, max_uses=MAX_USES,
                                max_tokens=MAX_TOKENS, timeout=TIMEOUT)
     if res.get("error"):
         e = res["error"]

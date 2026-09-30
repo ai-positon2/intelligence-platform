@@ -448,3 +448,19 @@ def test_a_promoted_alternative_cannot_be_confirmed_from_memory(monkeypatch):
     assert not out["promoted"], "a recalled event reached the list"
     assert out["unconfirmed"] and "recalled" in out["unconfirmed"][0]["why"]
     assert RES  # the resolver under test is the real one, not a fake
+
+
+@pytest.mark.parametrize("flag,evidence,expect", [
+    (True, "The organiser pre-books meetings against each buyer's brief.", True),
+    ("true", "Pre-booked meetings.", False),   # a string is not a yes
+    ("false", "Only an app.", False),          # bool("false") is True
+    (None, None, False),
+])
+def test_an_event_lookup_carries_the_matchmaking_claim_strictly(monkeypatch, flag, evidence, expect):
+    """A promoted alternative is scored on these, like a discovered event."""
+    from tracker import event_intel_resolve as RES
+    reply = dict(_RESOLVE_REPLY, organizer_run=flag, matchmaking_evidence=evidence)
+    _ask(monkeypatch, RES, reply, search_count=2)
+    ev = RES.resolve_event("INBOUND")["event"]
+    assert ev["organizer_run"] is expect
+    assert ev["matchmaking_evidence"] == evidence

@@ -441,6 +441,10 @@ def _ensure_tables(conn) -> None:
                 created_at TIMESTAMPTZ NOT NULL DEFAULT now()
             )
         """)
+        # List-rate estimate of the model calls a draft made, which run
+        # outside any job and so never reach the run ledger.
+        cur.execute("ALTER TABLE evi_account_usage ADD COLUMN IF NOT EXISTS "
+                    "usd NUMERIC(12,4) NOT NULL DEFAULT 0")
         cur.execute("CREATE INDEX IF NOT EXISTS idx_evi_account_usage "
                     "ON evi_account_usage (email, created_at)")
         from .event_intel_evidence import schema
@@ -833,8 +837,9 @@ def finish_resolution(run_id: int, state: str, result: dict | None,
         conn.close()
 
 
-def record_account_usage(email: str, kind: str, calls: int = 0, credits: int = 0) -> None:
-    if not (calls or credits):
+def record_account_usage(email: str, kind: str, calls: int = 0, credits: int = 0,
+                         usd: float = 0.0) -> None:
+    if not (calls or credits or usd):
         return
     conn = _pg_conn()
     if conn is None:
@@ -842,8 +847,9 @@ def record_account_usage(email: str, kind: str, calls: int = 0, credits: int = 0
     try:
         _ensure_tables(conn)
         with conn.cursor() as cur:
-            cur.execute("INSERT INTO evi_account_usage (email, kind, calls, credits) "
-                        "VALUES (%s, %s, %s, %s)", (email, kind, int(calls), int(credits)))
+            cur.execute("INSERT INTO evi_account_usage (email, kind, calls, credits, usd) "
+                        "VALUES (%s, %s, %s, %s, %s)",
+                        (email, kind, int(calls), int(credits), round(float(usd or 0), 4)))
         conn.commit()
     except Exception as e:
         logger.warning("event_intel_store.record_account_usage failed: %s", e)
@@ -852,7 +858,7 @@ def record_account_usage(email: str, kind: str, calls: int = 0, credits: int = 0
 
 
 def account_usage(email: str, hours: int = 24) -> dict:
-    """{kind: {"calls": n, "credits": n}} over the last `hours`, plus the
+    """{kind: {"calls": n, "credits": n, "usd": x}} over the last `hours`, plus the
     run ledger's provider calls under "run_calls"."""
     conn = _pg_conn()
     if conn is None:
@@ -861,12 +867,13 @@ def account_usage(email: str, hours: int = 24) -> dict:
         _ensure_tables(conn)
         out = {}
         with conn.cursor() as cur:
-            cur.execute("SELECT kind, COALESCE(sum(calls), 0), COALESCE(sum(credits), 0) "
+            cur.execute("SELECT kind, COALESCE(sum(calls), 0), COALESCE(sum(credits), 0), "
+                        "COALESCE(sum(usd), 0) "
                         "FROM evi_account_usage WHERE email = %s "
                         "AND created_at >= now() - %s * interval '1 hour' GROUP BY kind",
                         (email, hours))
-            for kind, calls, credits in cur.fetchall():
-                out[kind] = {"calls": int(calls), "credits": int(credits)}
+            for kind, calls, credits, usd in cur.fetchall():
+                out[kind] = {"calls": int(calls), "credits": int(credits), "usd": float(usd)}
             cur.execute("SELECT count(*) FROM evi_provider_calls WHERE email = %s "
                         "AND created_at >= now() - %s * interval '1 hour'", (email, hours))
             out["run_calls"] = {"calls": int(cur.fetchone()[0]), "credits": 0}
@@ -1487,17 +1494,25 @@ def cross_client_interest(name_keys: list[str], classification: str | None,
         _ensure_tables(conn)
         sql = (
             "SELECT c.name_key, MIN(c.name) AS name, "
-            "       COUNT(DISTINCT r.email) AS distinct_clients "
+            # A client is a profile, not a login: two people at one agency
+            # researching the same client are one client, and one person
+            # researching three clients is three. A run with no profile
+            # falls back to its login.
+            "       COUNT(DISTINCT COALESCE('p' || r.profile_id::text, 'e' || r.email)) AS distinct_clients "
             "FROM evi_candidates c "
             "JOIN evi_runs r ON r.id = c.run_id "
             "LEFT JOIN evi_profiles p ON p.id = r.profile_id "
             "WHERE c.name_key = ANY(%s) "
             "AND r.mode = 'recommend' AND r.status = 'complete' "
-            "AND c.total >= %s "
+            # Kept means what rank() keeps: over the bar, aimed at that
+            # client's buyers, and not an edition that was already over.
+            "AND c.total >= %s AND c.relevance >= %s "
+            "AND (c.ends_on IS NULL OR c.ends_on >= r.created_at::date) "
             "AND r.created_at >= now() - (%s || ' days')::interval "
             "AND r.email <> %s "
             "AND NOT COALESCE(p.confidential, false)")
-        args: list[Any] = [name_keys, rubric.RANK_FLOOR, window_days, exclude_email]
+        args: list[Any] = [name_keys, rubric.RANK_FLOOR, rubric.RELEVANCE_GATE,
+                           window_days, exclude_email]
         if classification:
             sql += " AND p.classification = %s"
             args.append(classification)
