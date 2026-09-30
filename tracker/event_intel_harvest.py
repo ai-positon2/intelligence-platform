@@ -659,8 +659,11 @@ def harvest_page(page: dict, event_name: str, event_host: str = "",
 
     from .event_intel_access import discover
     from .event_intel_fit import agenda_evidence
-    source["access_links"] = discover(fetched["text"], here, event_host)
-    source["agenda_excerpts"] = agenda_evidence(fetched["text"], here, event_host, kind)
+    # Organizer checks get the website itself: on a shared platform host only
+    # the listing's own path is the organizer's (see organizer_url).
+    site = page.get("event_website") or event_host
+    source["access_links"] = discover(fetched["text"], here, site)
+    source["agenda_excerpts"] = agenda_evidence(fetched["text"], here, site, kind)
     source["snapshots"] = []
     source["extraction"] = []
     from .event_intel_evidence import roster_years, source_snapshot
@@ -723,8 +726,8 @@ def harvest_page(page: dict, event_name: str, event_host: str = "",
             stopped = 'A later roster page names a different edition; its rows were withheld.'
             source['snapshots'].append(source_snapshot(nxt,got['text'],observed_roster_years=page_years))
             break
-        source["access_links"].extend(discover(got["text"], nxt, event_host))
-        source["agenda_excerpts"].extend(agenda_evidence(got["text"], nxt, event_host, kind))
+        source["access_links"].extend(discover(got["text"], nxt, site))
+        source["agenda_excerpts"].extend(agenda_evidence(got["text"], nxt, site, kind))
         sub = read(got, nxt)
         source["snapshots"].append(sub.get("snapshot", {}))
         source["extraction"].append(sub.get("coverage", {}))

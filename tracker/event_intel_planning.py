@@ -144,8 +144,10 @@ def context(run_id, email, profile_id=None, identity=None):
     from .event_intel_access import assess, organizer_url
     from urllib.parse import urlsplit
     participants = [row for row in S.get_participants(run_id) if row.get('event_id') == selected.get('id')] if run.get('mode') == 'lookup' else []
+    # The website, not just its host: on a shared platform (Eventbrite,
+    # Luma) only the listing's own path is the organizer's.
     try:
-        host = urlsplit(selected.get('website') or '').hostname or ''
+        host = selected.get('website') if urlsplit(selected.get('website') or '').hostname else ''
     except ValueError:
         host = ''
     links, seen, excerpts, access_checks = [], set(), [], []

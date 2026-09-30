@@ -1467,7 +1467,7 @@ def _recover_dates(event: dict, today_iso: str | None = None) -> None:
         return
     urls = []
     for url in [website] + list(event.get("sources") or []):
-        if isinstance(url, str) and organizer_url(url, host) and url not in urls:
+        if isinstance(url, str) and organizer_url(url, host, website) and url not in urls:
             urls.append(url)
     today = date.fromisoformat(today_iso or _today())
     editions = {}
@@ -1478,7 +1478,7 @@ def _recover_dates(event: dict, today_iso: str | None = None) -> None:
             continue
         if (fetched.get("status") != "ok" or fetched.get("truncated")
                 or fetched.get("http_status") != 200
-                or not organizer_url(fetched.get("final_url") or url, host)):
+                or not organizer_url(fetched.get("final_url") or url, host, website)):
             continue
         for row in fetched.get("structured_events") or []:
             if not isinstance(row, dict) or not isinstance(row.get("name"), str):
