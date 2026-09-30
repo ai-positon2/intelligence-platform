@@ -96,7 +96,47 @@ _CLOCK = re.compile(r'\b\d{1,2}[:.]\d{2}\s*(?:[ap]\.?m\.?)?\s*(?:-|\u2013|\u2014
                     r'\b\d{1,2}(?::\d{2})?\s*[ap]\.?m\.?\s*(?:-|\u2013|\u2014|to)\s*\d{1,2}(?::\d{2})?\s*[ap]\.?m\b', re.I)
 
 
-def _other_programme(text, match, clause, event_name):
+_MONTH = (r'(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)[a-z]*\.?')
+_DAY_RANGE = re.compile(r'\b(\d{1,2})(?:st|nd|rd|th)?\s*[-\u2013\u2014]\s*\d{1,2}(?:st|nd|rd|th)?\s+'+_MONTH+
+                        r'(?:,?\s+(20\d{2}))?|\b'+_MONTH+r'\s+(\d{1,2})(?:st|nd|rd|th)?\s*[-\u2013\u2014]\s*'
+                        r'\d{1,2}(?:st|nd|rd|th)?(?:,?\s+(20\d{2}))?', re.I)
+
+
+def _another_edition(text, match, own, dates):
+    """The restriction closes a sentence dating a DIFFERENT multi-day event.
+
+    Merchant Risk Council's home page, 2026-09-30: "Connect with Europe's
+    payments and fraud prevention leaders 2\u20134 November in Dublin.
+    Members-Only." That is MRC Dublin; MRC Vegas is 15-18 March. Only a day
+    range counts (a deadline is one day: "Early bird ends 27 January.
+    Members only." stays unresolved), and only one that cannot overlap this
+    event: a range with no year in one of this event's months could be it."""
+    start, end = dates
+    before = text[max(0, match.start()-240):match.start()]
+    pieces = re.split(r'(?<=[.!?])\s+', before)
+    current = pieces[-1]
+    # The restriction is its own sentence, or shares one with the range.
+    window = current if current.strip() else ' '.join(pieces[-2:])
+    if re.search(r'(?<!\w)'+re.escape(own)+r'(?!\w)', _fold(window)):
+        return False
+    months = {start.month, end.month}
+    for m in _DAY_RANGE.finditer(window):
+        month = m.group(2) or m.group(4)
+        year = m.group(3) or m.group(6)
+        number = [i for i, x in enumerate(calendar.month_abbr) if x and month[:3].lower() == x.lower()]
+        if not number:
+            continue
+        if year:
+            y = int(year)
+            if not (date(y, number[0], 1) <= date(end.year, end.month, 1)
+                    and date(y, number[0], 1) >= date(start.year, start.month, 1)):
+                return True
+        elif number[0] not in months:
+            return True
+    return False
+
+
+def _other_programme(text, match, clause, event_name, dates):
     """A restriction that plainly belongs to something other than the event.
 
     Singapore FinTech Festival's own overview page, 2026-09-29: "the
@@ -108,7 +148,9 @@ def _other_programme(text, match, clause, event_name):
       * the restriction is a modifier and the named thing it modifies is not
         this event ("invitation-only Insights2040 Annual Meetings");
       * the restriction sits in a calendar entry with a clock-time range,
-        which is a session on the agenda, not admission to the event.
+        which is a session on the agenda, not admission to the event;
+      * the restriction closes a sentence dating another multi-day event
+        (see _another_edition).
 
     Neither can clear "sold out", "cancelled", "registration closed" or a
     waitlist: those are about inventory the event itself runs out of."""
@@ -132,10 +174,12 @@ def _other_programme(text, match, clause, event_name):
     if _CLOCK.search(entry) and not re.search(
             r'(?<!\w)'+re.escape(own)+r'(?!\w)', _fold(entry)):
         return 'timed_session'
+    if _another_edition(text, match, own, dates):
+        return 'other_dated_event'
     return None
 
 
-def _access(text, event_name=''):
+def _access(text, event_name, dates):
     observations, blocking = [], []
     general_open = bool(re.search(r'\b(?:general admission|event registration) (?:is |remains )?open\b',text,re.I))
     for match in _RESTRICTED.finditer(text):
@@ -158,7 +202,7 @@ def _access(text, event_name=''):
         scoped = other and general_open and not named_inventory
         excerpt=text[max(0,match.start()-80):match.end()+120]
         scope = 'other_inventory' if scoped else _other_programme(
-            text, match, clause, event_name)
+            text, match, clause, event_name, dates)
         observations.append({'text':excerpt,'scope':scope or 'unresolved_event_access'})
         if not scope:
             blocking.append(excerpt)
@@ -457,7 +501,7 @@ def inspect(event, fetcher=None):
             check['structured_snapshot'] = source_snapshot(final,json.dumps(structured,sort_keys=True))
             check['support'] = 'organizer_structured_name_and_dates'
             supported = True
-            _, blocked = _access(raw_text, str(event.get('name') or ''))
+            _, blocked = _access(raw_text, str(event.get('name') or ''), (start, end))
             if blocked:
                 restrictions.append('The organizer page describes restricted or unavailable access; verify this client’s access before recommending attendance.')
         # WordPress/React markers alone also occur on fully readable pages.
@@ -468,7 +512,7 @@ def inspect(event, fetcher=None):
         visible = re.sub(r'\[https?://[^\]\s]+\]', '', raw_text)
         text = re.sub(r'\s+', ' ', visible).strip()
         check['visible_text_snapshot'] = source_snapshot(final,text)
-        observations, blocked = _access(visible,str(event.get('name') or ''))
+        observations, blocked = _access(visible,str(event.get('name') or ''),(start,end))
         check['access_observations'] = observations
         if blocked:
             restrictions.append('The organizer page describes restricted or unavailable access; verify this client’s access before recommending attendance.')

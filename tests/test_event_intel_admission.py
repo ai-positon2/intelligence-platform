@@ -546,3 +546,45 @@ def test_more_than_the_events_own_noun_is_refused(text):
 def test_a_title_of_the_name_and_this_year_identifies_the_event(titles, support):
     body = 'The conference takes place at ARIA Resort, March 15-18, 2027.'
     assert A.inspect(MRC, lambda url: page(body, titles=titles))['support'] == support, titles
+
+
+# ── a restriction closing a sentence that dates another event (MRC, 2026-09-30) ──
+
+MRC_OWN = 'MRC Vegas 2027 Conference 15 - 18 Mar, 2027 ARIA Resort. '
+
+
+@pytest.mark.parametrize('text', [
+    "Connect with Europe's payments and fraud prevention leaders 2–4 November in Dublin. Members-Only.",
+    'Leaders meet 2-4 November 2026 in Dublin, members-only.',
+    'Leaders meet November 2-4 in Dublin. Invitation-only.',
+    'Leaders met 15-18 March 2026 in Dublin. Members-only.',  # same months, another year
+])
+def test_a_members_only_note_on_another_dated_event_does_not_close_this_one(text):
+    result = A.inspect(MRC, lambda url: page(MRC_OWN + text))
+    assert result['reasons'] == [], text
+    assert result['support'] == 'literal_name_and_dates_only'
+    assert [o['scope'] for o in result['checks'][0]['access_observations']] == ['other_dated_event']
+
+
+@pytest.mark.parametrize('text', [
+    'Early bird ends 27 January 2027. Members only.',           # a deadline, not an event
+    'Leaders meet 15-18 March in Las Vegas. Members-only.',     # could be this event
+    'Leaders meet 14-19 March 2027 in Las Vegas. Members-only.',  # overlaps this event
+    'MRC Vegas runs 2-4 November. Members-only.',               # names this event
+    'MRC Vegas brings payments and fraud prevention leaders together 2-4 November. Members-only.',
+    'Leaders meet 2-4 November in Dublin. Tickets on sale now. Members-only.',  # two sentences back
+    'Leaders meet 2-4 November in Dublin. Sold out.',            # inventory, not admission
+    'Members-only.',
+])
+def test_anything_else_stays_a_restriction_on_this_event(text):
+    result = A.inspect(MRC, lambda url: page(MRC_OWN + text))
+    assert result['support'] == 'unverified', text
+    assert any('restricted' in r for r in result['reasons']), text
+
+
+def test_structured_support_also_scopes_a_note_on_another_dated_event():
+    row = {'name': 'MRC Vegas 2027', 'startDate': '2027-03-15', 'endDate': '2027-03-18'}
+    text = "Welcome. Connect with Europe's leaders 2-4 November in Dublin. Members-Only."
+    result = A.inspect(MRC, lambda url: page(text, http_status=200, structured_events=[row]))
+    assert result['reasons'] == []
+    assert result['support'] == 'organizer_structured_name_and_dates'
