@@ -23,7 +23,13 @@ def _geo(text):
 
 
 def eligibility(event, profile, today=None):
-    """Return reasons requiring verification; never silently admit unknowns."""
+    """Return reasons requiring verification; never silently admit unknowns.
+
+    One side effect, on purpose: an edition that already ended, and is
+    otherwise valid, is marked `event["finished"] = True` and returns no
+    date reason (see below). Genuinely out-of-window future dates and
+    impossible ranges are still refused.
+    """
     from .event_intel_discover import _excluded
     today = today or date.today()
     reasons = []
@@ -47,8 +53,17 @@ def eligibility(event, profile, today=None):
         month = today.month - 1 + months
         year, month = today.year + month // 12, month % 12 + 1
         last = date(year, month, min(today.day, calendar.monthrange(year, month)[1]))
-        if end < start or end < today or start > last:
+        if end < start or start > last:
             reasons.append('The edition is outside the requested date window or has invalid dates.')
+        elif end < today:
+            # Over, and otherwise valid: flagged and let through rather than
+            # refused. Refusing it here meant rank() never saw it, so the
+            # report's "Already over" section could never fill, and a real
+            # edition that had just happened was shown under "Not scored" as
+            # "outside the requested date window", which reads as a gap in
+            # the search. rubric.has_finished reads the same dates and puts it
+            # in `finished`; the flag says so to anything before ranking.
+            event['finished'] = True
     except (ValueError, TypeError):
         reasons.append('The edition dates need confirmation.')
     scope = _geo(profile.get('geo_scope'))
