@@ -551,13 +551,66 @@ def _contains_tokens(hay: tuple, needle: tuple) -> bool:
     return any(hay[i:i + n] == needle for i in range(len(hay) - n + 1))
 
 
-def names_match(a: str, b: str) -> bool:
+# Words that name a FIELD rather than an event.
+#
+# name_key strips the show words ("summit", "conference", "world"), and for a
+# name like "Fintech Summit" that leaves one topic word, which then contains
+# itself inside every other fintech event. Measured on real names:
+# names_match("Fintech Summit", "Fintech Meetup"), ("Fintech Conference",
+# "FinTech Connect") and ("AI Expo", "The AI Summit New York") all came back
+# True. The consequences were not cosmetic: a force-exclude of "Fintech
+# Conference" silently dropped Fintech Meetup, FinTech Connect and FinTech
+# Festival Asia from the client's year; a commitment to "Fintech Summit"
+# marked Fintech Meetup and FinTech Connect as already paid for; and a finder
+# that named all three kept only the first. When the shorter key is one of
+# these words, the show words are part of the identity and are compared.
+#
+# "martech" is deliberately absent: "MarTech Summit" is a brand, and a name
+# with and without its region ("MarTech Summit Europe") must stay one event.
+_TOPIC_WORDS = frozenset((
+    "fintech", "ai", "payments", "payment", "marketing", "retail", "data",
+    "cloud", "security", "cyber", "cybersecurity", "saas", "web", "tech",
+    "technology", "digital", "innovation", "finance", "banking", "insurance",
+    "insurtech", "healthtech", "health", "healthcare", "hr", "sales",
+    "revenue", "growth", "commerce", "ecommerce", "crypto", "blockchain",
+    "analytics", "devops", "product", "startup", "startups", "b2b", "cx",
+    "ml", "iot", "mobile", "media", "advertising", "adtech", "leadership",
+    "wealth", "lending", "regtech", "proptech", "edtech", "energy",
+    "climate", "logistics", "manufacturing", "customer", "brand",
+))
+
+_LITE_DROP = re.compile(r"\b(20\d\d|the|annual)\b")
+
+
+def _plain_lite(name: str) -> tuple:
+    """The name with only the year, "the" and "annual" removed.
+
+    Unlike name_key it keeps the show word, which is the only thing telling
+    "Fintech Summit" from "Fintech Meetup" once the topic word is shared.
+    """
+    plain = " ".join(_NONWORD.sub(" ", (name or "").lower()).split())
+    toks = _LITE_DROP.sub(" ", plain).split()
+    return tuple("conference" if t == "conf" else t for t in toks)
+
+
+def names_match(a: str, b: str, site_a: str | None = None,
+                site_b: str | None = None) -> bool:
     """One event under two names.
 
-    Two tests: the stripped names must contain one another token for token,
-    AND their regions must not contradict. A name with no region is compatible
-    with any region, which is what keeps "MarTech Summit" and "MarTech Summit
+    Three tests: the stripped names must contain one another token for token,
+    their regions must not contradict, and when the shorter name reduces to a
+    single topic word (see _TOPIC_WORDS) the names must contain one another
+    with their show words intact. A name with no region is compatible with
+    any region, which is what keeps "MarTech Summit" and "MarTech Summit
     Europe" together.
+
+    `site_a` / `site_b` are optional websites, for callers that have them.
+    With a topic-word name, two different hosts and a longer name adding a
+    word that is not a region ("Web Summit" on websummit.com and "Web Summit
+    Vancouver" on vancouver.websummit.com), the pair is two events. Without
+    websites that case cannot be told apart from "Web Summit" and "Web Summit
+    Lisbon", which is the flagship in its home city and a client's commitment
+    to "Web Summit" has to match it, so a name alone still says True there.
     """
     ka, kb = name_key(a), name_key(b)
     if not ka or not kb:
@@ -566,7 +619,20 @@ def names_match(a: str, b: str) -> bool:
     if not (_contains_tokens(ta, tb) or _contains_tokens(tb, ta)):
         return False
     ra, rb = region_key(a), region_key(b)
-    return not ra or not rb or ra == rb
+    if ra and rb and ra != rb:
+        return False
+    short = ta if len(ta) <= len(tb) else tb
+    if len(short) == 1 and short[0] in _TOPIC_WORDS:
+        pa, pb = _plain_lite(a), _plain_lite(b)
+        if not (_contains_tokens(pa, pb) or _contains_tokens(pb, pa)):
+            return False
+        if pa != pb and site_a and site_b:
+            ha, hb = host_key(site_a), host_key(site_b)
+            longer, shorter = (pa, pb) if len(pa) > len(pb) else (pb, pa)
+            extra = set(longer) - set(shorter) - _REGION_WORDS
+            if ha and hb and ha != hb and extra:
+                return False
+    return True
 
 
 def site_key(url: str) -> str:
@@ -650,6 +716,57 @@ def is_committed_same_edition(name: str, keys: set) -> bool:
               for k in (keys or set()))
 
 
+# How far apart two date ranges may sit and still be one edition. A confirm
+# reply and a second one for the same event disagreed by a day
+# ("Money20/20 USA" 2026-10-25 and "Money20/20 USA 2026" 2026-10-26, same
+# site), and the exact-date test kept both, so one event took two slots.
+# Distinct editions of one series are months apart, never days.
+DATE_DRIFT_DAYS = 3
+
+
+def _date_range(ev: dict):
+    try:
+        start = datetime.date.fromisoformat(str(ev.get("starts_on") or "")[:10])
+    except ValueError:
+        return None
+    try:
+        end = datetime.date.fromisoformat(str(ev.get("ends_on") or "")[:10])
+    except ValueError:
+        end = start
+    return start, max(start, end)
+
+
+def _dates_compatible(a: dict, b: dict) -> bool:
+    """Overlapping or within DATE_DRIFT_DAYS, or either side undated."""
+    ra, rb = _date_range(a), _date_range(b)
+    if not ra or not rb:
+        return True
+    gap = (max(ra[0], rb[0]) - min(ra[1], rb[1])).days
+    return gap <= DATE_DRIFT_DAYS
+
+
+def same_event(a: dict, b: dict) -> bool:
+    """Two rows (proposals or confirmed events) that are one edition.
+
+    The one test merge, _dedupe_proposals and the later-pass dedupe all use,
+    so the three stages cannot disagree about what counts as the same event.
+    The same page decides it, unless the rows state contradicting regions or
+    dates too far apart to be one edition; otherwise names_match decides,
+    with both websites so a topic-word name on two hosts stays two events.
+    """
+    if not _dates_compatible(a, b):
+        return False
+    na, nb = a.get("name") or "", b.get("name") or ""
+    ra, rb = region_key(na), region_key(nb)
+    if ra and rb and ra != rb:
+        return False
+    wa, wb = a.get("website") or "", b.get("website") or ""
+    sk = site_key(wa)
+    if sk and sk == site_key(wb):
+        return True
+    return names_match(na, nb, wa or None, wb or None)
+
+
 def merge(by_category: dict, force_exclude: str | None = None,
           force_include: str | None = None) -> list[dict]:
     """Flatten the six category results into one deduped candidate list.
@@ -668,17 +785,10 @@ def merge(by_category: dict, force_exclude: str | None = None,
                 continue
             if _excluded(name, force_exclude):
                 continue
-            sk = site_key(ev.get("website") or "")
             # Compared against the names already kept rather than against a set
             # of keys, because "same event" now depends on two names together
             # (their regions have to agree) and cannot be reduced to one string.
-            def same_edition(kept):
-                left, right = ev.get('starts_on'), kept.get('starts_on')
-                if left and right and str(left)[:10] != str(right)[:10]:
-                    return False
-                return names_match(name, kept.get('name') or '') or bool(
-                    sk and sk == site_key(kept.get('website') or ''))
-            if any(same_edition(kept) for kept in out):
+            if any(same_event(ev, kept) for kept in out):
                 continue
             # Set here, in code, from the user's own profile. A model that
             # returns committed:true for an event nobody committed to must not
@@ -939,15 +1049,10 @@ def _dedupe_proposals(proposals: list) -> list:
     test is the one `merge` uses, so the two stages agree about what counts as
     the same event.
     """
-    out, seen_sites = [], set()
+    out = []
     for pr in proposals:
-        if any(names_match(pr["name"], k["name"]) for k in out):
+        if any(same_event(pr, k) for k in out):
             continue
-        sk = site_key(pr.get("website") or "")
-        if sk and sk in seen_sites:
-            continue
-        if sk:
-            seen_sites.add(sk)
         out.append(pr)
     return out
 
