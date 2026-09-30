@@ -507,3 +507,42 @@ def test_a_sentence_break_is_not_hidden_by_an_abbreviation():
 def test_a_date_in_the_next_sentence_is_not_the_events():
     body = 'The event takes place in Boston. Early pricing ends April 11-14, 2027.'
     assert A.inspect(SFP, lambda url: page(body, titles=SFP_TITLE))['support'] == 'unverified'
+
+
+# ── the event's own noun, and a year in the title (MRC, 2026-09-30) ──
+
+MRC = dict(name='MRC Vegas', website='https://merchantriskcouncil.org/events/2027/mrc-vegas-2027',
+           sources=[], starts_on='2027-03-15', ends_on='2027-03-18')
+
+
+@pytest.mark.parametrize('text', [
+    'Vegas Skyline Photo MRC Vegas 2027 Conference 15 - 18 Mar, 2027 ARIA Resort & Casino',
+    'MRC Vegas Summit March 15-18, 2027.',
+])
+def test_the_events_own_noun_between_name_and_dates_is_allowed(text):
+    result = A.inspect(MRC, lambda url: page(text))
+    assert result['support'] == 'literal_name_and_dates_only', text
+
+
+@pytest.mark.parametrize('text', [
+    'MRC Vegas Payments Summit 15 - 18 Mar, 2027.',
+    'MRC Vegas Awards Dinner 15 - 18 Mar, 2027.',
+    'MRC Vegas Workshop 15 - 18 Mar, 2027.',
+    'MRC Vegas 2026 Conference 15 - 18 Mar, 2027.',
+    'MRC Vegas Conference Expo 15 - 18 Mar, 2027.',
+])
+def test_more_than_the_events_own_noun_is_refused(text):
+    assert A.inspect(MRC, lambda url: page(text))['support'] == 'unverified', text
+
+
+@pytest.mark.parametrize('titles,support', [
+    (['MRC Vegas 2027'], 'organizer_title_name_and_self_referenced_dates'),
+    (['MRC Vegas 2027 | MRC Conferences'], 'organizer_title_name_and_self_referenced_dates'),
+    (['MRC Vegas 2026'], 'unverified'),
+    (['MRC Vegas 2027 Awards'], 'unverified'),
+    (['MRC Vegas Awards'], 'unverified'),
+    (['MRC Vegas 3'], 'unverified'),  # a sequel number is not this year
+])
+def test_a_title_of_the_name_and_this_year_identifies_the_event(titles, support):
+    body = 'The conference takes place at ARIA Resort, March 15-18, 2027.'
+    assert A.inspect(MRC, lambda url: page(body, titles=titles))['support'] == support, titles

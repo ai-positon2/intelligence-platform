@@ -74,6 +74,11 @@ def _owns_date(prefix, names, year):
         allowed.update(m.casefold() for m in calendar.month_abbr if m)
         if not first or first in allowed or first.isdigit():
             return True
+        # "MRC Vegas 2027 Conference 15 - 18 Mar, 2027" (merchantriskcouncil.org,
+        # 2026-09-30): one of the event's own nouns, and nothing else, is the
+        # event naming itself. Two words ("Payments Summit") is another event.
+        if tail in _OWN_NOUNS:
+            return True
         # "NRF 2027: Retail's Big Show in New York City, January 10 - 12, 2027".
         # A short place is all that may stand between name and dates: nothing
         # naming another gathering, nothing tying this one to it.
@@ -375,6 +380,8 @@ def _title_identifies(titles, names, year):
             continue
         segments = [x for x in _TITLE_SEGMENTS.split(title) if x.strip()]
         tail = _title_owns(segments[0], names) if segments else None
+        if tail and tail[0] == str(year):
+            tail = tail[1:]  # "MRC Vegas 2027" is the plainest title there is.
         if tail is not None and (not tail or (len(tail) == 1 and tail[0] in _OWN_NOUNS)):
             return title
     return None
