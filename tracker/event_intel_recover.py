@@ -83,7 +83,8 @@ def recover_page(url: str, kind: str, event_name: str, event_host: str = "",
                  event_edition: str | None = None) -> dict:
     """Try to recover one unreadable listing by searching.
 
-    Returns {"source": ledger-entry, "rows": [...]}. Never raises. The ledger
+    Returns {"source": ledger-entry, "rows": [...], "spend": record}. Never
+    raises. The ledger
     entry it returns is a NEW row describing the recovery attempt; the caller
     keeps the original failed-fetch row too, so the record shows both that the
     page could not be read and what was done about it.
@@ -102,10 +103,21 @@ def recover_page(url: str, kind: str, event_name: str, event_host: str = "",
 
     res = claude_websearch.ask(_SYSTEM, user, max_uses=MAX_SEARCHES,
                                max_tokens=8000)
+    # What this recovery cost, returned beside the rows like every other
+    # model-calling stage returns its spend. Recovery had no accounting at
+    # all, so its searches were missing from every run's cost line.
+    spend = claude_websearch.spend_of(res)
     if res.get("error"):
-        source["note"] = ("Recovery by search failed: %s: %s"
-                          % (res["error"]["kind"], res["error"]["detail"]))[:500]
-        return {"source": source, "rows": []}
+        # The note is printed on the source ledger a reader sees. It used to
+        # carry "kind: detail", which put an error class and the provider's
+        # own message ("overloaded: 529") in front of that reader; the kind
+        # and detail go to the log, and the note gets the reader's clause.
+        logger.warning("event_intel_recover: recovery of %s failed (%s: %s)",
+                       url, res["error"].get("kind"), res["error"].get("detail"))
+        reason = claude_websearch.reader_reason(res["error"])
+        source["note"] = ("Recovery by search failed: %s%s."
+                          % (reason[0].lower(), reason[1:]))[:500]
+        return {"source": source, "rows": [], "spend": spend}
 
     # The check that matters most. A reply produced without a single search is
     # a recollection of this event, not a reading of its listing, and it is
@@ -115,13 +127,13 @@ def recover_page(url: str, kind: str, event_name: str, event_host: str = "",
                           "without running a single search, which means the "
                           "answer came from training data rather than from this "
                           "event's listing.")
-        return {"source": source, "rows": []}
+        return {"source": source, "rows": [], "spend": spend}
 
     parsed = claude_websearch.extract_json(res.get("text") or "", require="rows")
     if not isinstance(parsed, dict):
         source["note"] = ("Recovery by search ran but its answer could not be "
                           "read.")
-        return {"source": source, "rows": []}
+        return {"source": source, "rows": [], "spend": spend}
 
     rows, uncited = [], 0
     for r in (parsed.get("rows") or []):
@@ -173,7 +185,7 @@ def recover_page(url: str, kind: str, event_name: str, event_host: str = "",
         notes.append("Recovery by search found nothing published for this "
                      "listing.")
     source["note"] = " ".join(notes)[:800]
-    return {"source": source, "rows": rows}
+    return {"source": source, "rows": rows, "spend": spend}
 
 
 def should_recover(source: dict) -> bool:

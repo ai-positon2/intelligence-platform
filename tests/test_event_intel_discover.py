@@ -1796,15 +1796,18 @@ def test_a_failed_later_pass_ends_the_search_and_costs_the_category_nothing(monk
     assert "could not be completed" in later["detail"]
 
 
-def test_a_pass_that_added_but_was_not_clean_ends_the_search(monkeypatch):
+def test_a_pass_that_added_but_was_not_clean_does_not_end_the_search(monkeypatch):
+    """Stopping here made a category's size depend on which pass hit a bad
+    minute, which is run-to-run variance for no reason: the partial pass DID
+    add an event, so the search is still producing."""
     users = _passes(monkeypatch, [
         _find_reply([_cand("Alpha Summit")], complete=True),
         _find_reply([_cand("Gamma Expo")], complete=False),
-        _find_reply([_cand("Never Asked Expo")], complete=True)])
+        _find_reply([_cand("Delta Congress")], complete=True)])
     r = D.search_category(R.CAT_VERTICAL_SUMMIT, PROFILE)
-    # A partial pass still contributes what it found, and stops there.
-    assert len(users) == 2
-    assert sorted(e["name"] for e in r["events"]) == ["Alpha Summit", "Gamma Expo"]
+    assert len(users) == 3
+    assert sorted(e["name"] for e in r["events"]) == [
+        "Alpha Summit", "Delta Congress", "Gamma Expo"]
 
 
 def test_each_pass_keeps_at_most_two_names(monkeypatch):
