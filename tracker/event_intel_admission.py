@@ -334,6 +334,72 @@ def _title_support(titles, names, start, end):
     return None
 
 
+# ── a page whose title names the event and whose body says "the event" ────
+#
+# payments.nacha.org, 2026-09-30: title "Smarter Faster Payments Conference |
+# Payments 2027", body "The in-person event takes place at the Gaylord
+# National Harbor Resort & Convention Center, minutes from Washington, D.C.,
+# April 11-14, 2027." The organizer names its event in the title and refers
+# to it as "the event" in the sentence that dates it. Both rules above refuse
+# that, correctly on their own terms: the title has no full date and the body
+# never repeats the name.
+#
+# Accepted only in this shape:
+#   * the title's FIRST segment is led by the name, followed by nothing or
+#     by one generic noun for the event itself ("Conference", "Summit"), and
+#     the title carries no other year;
+#   * one sentence refers to the event with "the/this/our", optionally
+#     "in-person"/"annual"/"main"/"flagship", then a noun for the event and a
+#     verb of taking place, and the candidate's full date range follows in
+#     that sentence;
+#   * nothing between that verb and the dates ties the event to another one.
+# "The virtual event takes place June 7-9" is refused: a virtual edition is
+# another event on the same page. So is "the event takes place during X".
+
+_OWN_NOUNS = {'conference', 'summit', 'expo', 'forum', 'event', 'show',
+              'convention', 'congress', 'festival', 'exhibition'}
+_SELF_REF = re.compile(
+    r"(?<![\w-])(?:the|this|our)\s+(?:(?:in[- ]person|annual|main|flagship|live)\s+){0,2}"
+    r"(?:event|conference|summit|expo|show|forum|festival|convention|congress|exhibition)\s+"
+    r"(?:takes\s+place|will\s+take\s+place|is\s+taking\s+place|is\s+held|will\s+be\s+held|"
+    r"runs|returns|happens|comes\s+to|lands\s+in)\b", re.I)
+_SELF_REF_FOREIGN = {'during', 'alongside', 'with', 'part', 'co', 'colocated',
+                     'located', 'ahead', 'before', 'after', 'following'}
+_VENUE_NOUNS = {'center', 'centre', 'hall', 'halls', 'room', 'venue', 'hotel',
+                'resort', 'campus', 'complex', 'park'}
+
+
+def _title_identifies(titles, names, year):
+    for title in titles or []:
+        if any(y != str(year) for y in re.findall(r'\b20\d{2}\b', title)):
+            continue
+        segments = [x for x in _TITLE_SEGMENTS.split(title) if x.strip()]
+        tail = _title_owns(segments[0], names) if segments else None
+        if tail is not None and (not tail or (len(tail) == 1 and tail[0] in _OWN_NOUNS)):
+            return title
+    return None
+
+
+def _self_referenced_dates(text, start, end):
+    for sentence in re.split(r'[.!?](?=\s+[A-Z]|\s*$)', text):
+        ref = _SELF_REF.search(sentence)
+        if not ref:
+            continue
+        for pattern in _date_patterns(start, end, sentence):
+            m = pattern.search(sentence, ref.end())
+            if not m:
+                continue
+            between = _fold(sentence[ref.end():m.start()]).split()
+            if set(between) & _SELF_REF_FOREIGN:
+                continue
+            named = [w for i, w in enumerate(between) if w in _EVENT_WORDS | _OWN_NOUNS
+                     and not (i + 1 < len(between) and between[i + 1] in _VENUE_NOUNS)]
+            if named or any(y != str(start.year) for y in re.findall(r'\b20\d{2}\b', ' '.join(between))):
+                continue
+            return sentence.strip()
+    return None
+
+
 def inspect(event, fetcher=None):
     from .event_intel_harvest import fetch_page
     fetcher = fetcher or fetch_page
@@ -418,6 +484,15 @@ def inspect(event, fetcher=None):
                 check['title_excerpt'] = title
                 check['title_snapshot'] = source_snapshot(final, title)
                 check['support'] = 'organizer_title_name_and_dates'
+        if not check.get('support'):
+            title = _title_identifies(fetched.get('titles'), names, start.year)
+            sentence = title and _self_referenced_dates(text, start, end)
+            if sentence:
+                supported = True
+                check['title_excerpt'] = title
+                check['title_snapshot'] = source_snapshot(final, title)
+                check['date_excerpt'] = sentence[:500]
+                check['support'] = 'organizer_title_name_and_self_referenced_dates'
     if not supported:
         result['reasons'].append('The named event and its date range could not be found together in readable organizer text; parent-event dates or model claims alone are insufficient.')
     result['reasons'].extend(sorted(set(restrictions)))
@@ -426,7 +501,8 @@ def inspect(event, fetcher=None):
         kinds = {c.get('support') for c in result['checks']}
         result['support'] = next(k for k in ('organizer_structured_name_and_dates',
                                              'literal_name_and_dates_only',
-                                             'organizer_title_name_and_dates') if k in kinds)
+                                             'organizer_title_name_and_dates',
+                                             'organizer_title_name_and_self_referenced_dates') if k in kinds)
     result['not_read'] = max(0,len(urls)-MAX_PAGES)
     return result
 

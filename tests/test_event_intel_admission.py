@@ -457,3 +457,53 @@ def test_a_short_place_between_the_name_and_the_dates_is_allowed(text):
 ])
 def test_anything_more_than_a_place_between_name_and_dates_is_refused(text):
     assert A.inspect(NRF, lambda url: page(text))['support'] == 'unverified', text
+
+
+# ── title names the event, body calls it "the event" (Nacha, 2026-09-30) ──
+
+SFP = dict(name='Smarter Faster Payments', website='https://payments.nacha.org/',
+           sources=['https://payments.nacha.org/'], starts_on='2027-04-11', ends_on='2027-04-14')
+SFP_TITLE = ['Smarter Faster Payments Conference | Payments 2027']
+SFP_BODY = ('Payments 2027 is where the industry meets. Our in-person event takes place at the '
+            'Gaylord National Harbor Resort & Convention Center, minutes from Washington, D.C., '
+            'April 11-14, 2027. Consider Remote Connect, our virtual event, June 7-9, 2027.')
+
+
+def test_a_title_named_event_dated_by_its_own_self_reference_is_admitted():
+    result = A.inspect(SFP, lambda url: page(SFP_BODY, titles=SFP_TITLE))
+    assert result['reasons'] == []
+    assert result['support'] == 'organizer_title_name_and_self_referenced_dates'
+    assert 'April 11-14, 2027' in result['checks'][0]['date_excerpt']
+
+
+@pytest.mark.parametrize('body,titles,dates', [
+    # The virtual sister event's dates on the same page.
+    ('The virtual event takes place June 7-9, 2027.', SFP_TITLE, ('2027-06-07', '2027-06-09')),
+    (SFP_BODY, SFP_TITLE, ('2027-06-07', '2027-06-09')),
+    # Dates that belong to something the sentence ties the event to.
+    ('The event takes place during Fintech Week, April 11-14, 2027.', SFP_TITLE, None),
+    ('The event takes place alongside Money20/20, April 11-14, 2027.', SFP_TITLE, None),
+    ('The event takes place at the Payments Summit, April 11-14, 2027.', SFP_TITLE, None),
+    # A title that is not led by this event, names a sub-event, or another year.
+    (SFP_BODY, ['Payments 2027 | Smarter Faster Payments Conference'], None),
+    (SFP_BODY, ['Smarter Faster Payments Awards Dinner | Payments 2027'], None),
+    (SFP_BODY, ['Smarter Faster Payments Conference | Payments 2026'], None),
+    (SFP_BODY, [], None),
+    # No self-reference at all, or the wrong dates.
+    ('Registration opens soon. April 11-14, 2027.', SFP_TITLE, None),
+    (SFP_BODY, SFP_TITLE, ('2027-04-11', '2027-04-13')),
+])
+def test_anything_short_of_that_shape_stays_unverified(body, titles, dates):
+    event = dict(SFP, starts_on=dates[0], ends_on=dates[1]) if dates else SFP
+    result = A.inspect(event, lambda url: page(body, titles=titles))
+    assert result['support'] == 'unverified', (body, titles, dates)
+
+
+def test_a_sentence_break_is_not_hidden_by_an_abbreviation():
+    body = 'The event takes place in Washington. D.C. Payments Forum runs April 11-14, 2027.'
+    assert A.inspect(SFP, lambda url: page(body, titles=SFP_TITLE))['support'] == 'unverified'
+
+
+def test_a_date_in_the_next_sentence_is_not_the_events():
+    body = 'The event takes place in Boston. Early pricing ends April 11-14, 2027.'
+    assert A.inspect(SFP, lambda url: page(body, titles=SFP_TITLE))['support'] == 'unverified'
