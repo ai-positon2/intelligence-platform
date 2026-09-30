@@ -246,7 +246,10 @@ def _harvest_event(run_id: int, event_id: int, event: dict,
                            page.get("url"), e)
             store.save_source(run_id, event_id, page.get("url") or "",
                               page.get("kind") or "unknown", "error",
-                              note="Harvest failed unexpectedly: %s" % str(e)[:200])
+                              # The exception is logged above; the ledger
+                              # note is printed in the report.
+                              note="This page could not be read because the "
+                                   "step reading it stopped unexpectedly.")
             unreadable += 1
             continue
 
@@ -886,5 +889,33 @@ def resolve_run_companies(run_id: int, email: str, titles: list[str] | None = No
         "unattempted": len(res.get("unattempted") or []),
         "credits": res.get("credits", 0),
         "people": people.get("total", 0),
-        "error": res.get("error") or people.get("error"),
+        "error": _resolve_error(res, people),
     }
+
+
+def _resolve_error(res: dict, people: dict) -> str | None:
+    """What the Match companies button says when something went wrong.
+
+    event_intel_enrich writes its errors for whoever reads the log
+    ("APOLLO_API_KEY is not configured on this deployment.", "Apollo company
+    lookup failed: HTTP 503 ..."), and the button used to throw the whole
+    response away, so a missing key or a failed batch looked exactly like a
+    lookup that found nothing. The detail is logged here; the person who
+    pressed the button gets what happened and what it cost.
+    """
+    company, contacts = res.get("error"), people.get("error")
+    if not (company or contacts):
+        return None
+    logger.warning("event_intel_pipeline: company resolution error: %s / %s",
+                   company, contacts)
+    if "APOLLO_API_KEY" in str(company or contacts or ""):
+        return ("Company matching is not switched on for this workspace, so "
+                "no company was looked up and no credits were spent.")
+    if company:
+        return ("The company lookup stopped part-way, so %s not looked up. "
+                "Credits were spent only on the companies that were. Run it "
+                "again to match the rest."
+                % _n(len(res.get("unattempted") or []), "company was",
+                     "companies were"))
+    return ("Companies were matched, but the contact lookup could not be "
+            "completed, so some of them show no contacts.")

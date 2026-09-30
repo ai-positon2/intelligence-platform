@@ -439,7 +439,9 @@ def test_a_failed_qualification_batch_is_surfaced_in_work_the_room():
                        "repeats": {}, "floor": 55}}
     html = _render(run)
     assert "did not run" in html
-    assert "overloaded: 529" in html
+    # The call's own diagnostic is not shown; a reader sentence is.
+    assert "overloaded: 529" not in html
+    assert "could not be qualified" in html
     assert "failure to look rather than a judgement" in html
 
 

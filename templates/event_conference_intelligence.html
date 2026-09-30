@@ -1777,20 +1777,39 @@
         body + '</tbody></table></div>';
     }
 
+    /* The source ledger, in the reader's words. It printed each page's kind
+       and status as stored ("access_review", "ok", "error") and the note as
+       stored, which on runs made before the writers were fixed is an
+       exception's text, a model's raw reply, or a model's note written in
+       its own schema ("so org_domain is null for all"). An unknown future
+       kind or status gets a plain generic phrase, never the token. */
+    var SOURCE_KIND_LABEL = {exhibitors: 'Exhibitor list', sponsors: 'Sponsor list',
+      speakers: 'Speaker list', agenda: 'Agenda', partners: 'Partner list',
+      attendees: 'Attendees page', media: 'Media list',
+      access_review: 'Registration or access page', unknown: 'Event page'};
+    var SOURCE_STATUS_LABEL = {ok: 'Read', recovered: 'Recovered by search',
+      blocked: 'Could not be read', not_found: 'Not found', error: 'Could not be read'};
+    var SOURCE_FALLBACK_NOTE = {
+      blocked: 'This page could not be read.', error: 'This page could not be read.',
+      not_found: 'This page could not be found.',
+      recovered: 'Its list was recovered by searching for a published copy.'};
+
     function sourcesHtml(run){
       var srcs = run.sources || [];
       if (!srcs.length) return '<div class="evi-empty">No pages were attempted.</div>';
       return '<div class="evi-sources">' + srcs.map(function(s){
         var u = safeUrl(s.url);
+        var status = String(s.status || '');
+        var note = s.note ? readerText(s.note, SOURCE_FALLBACK_NOTE[status] || '') : '';
         return '<div class="evi-source">' +
-          '<span class="st ' + esc(s.status) + '">' + esc(s.status.replace('_', ' ')) + '</span>' +
+          '<span class="st ' + (SOURCE_STATUS_LABEL[status] ? esc(status) : 'other') + '">' +
+            esc(SOURCE_STATUS_LABEL[status] || 'Checked') + '</span>' +
           '<span class="body"><span class="u">' +
             (u ? '<a href="' + esc(u) + '" target="_blank" rel="noopener noreferrer">' +
                  esc(s.url) + '</a>' : esc(s.url)) + '</span>' +
-          '<span class="n">' + esc(s.kind || '') +
+          '<span class="n">' + esc(SOURCE_KIND_LABEL[s.kind] || 'Event page') +
             (s.rows_found ? ' · ' + s.rows_found + ' listed' : '') +
-            (s.http_status ? ' · HTTP ' + s.http_status : '') +
-            (s.note ? ' · ' + esc(s.note) : '') + '</span></span></div>';
+            (note ? ' · ' + esc(note) : '') + '</span></span></div>';
       }).join('') + '</div>';
     }
 
@@ -2857,6 +2876,28 @@
         '</div></div>';
     }
 
+    /* What the last press of "Match companies" said, per run. The button
+       used to throw the response away and reload the run, so a missing key
+       or a batch that failed part-way looked exactly like a lookup that
+       found nothing. Kept outside the drawer because reopening the run
+       redraws it. */
+    var RESOLVE_NOTE = {};
+
+    function resolveNoteHtml(run){
+      var n = RESOLVE_NOTE[run.id];
+      if (!n) return '';
+      return '<div class="evi-coverage' + (n.bad ? ' warn' : '') + '" role="status">' +
+        '<span class="ic">' + (n.bad ? '!' : 'i') + '</span><span class="tx">' +
+        esc(n.text) + '</span></div>';
+    }
+
+    function resolveSummary(j){
+      var bits = [plural(Number(j.resolved) || 0, 'company', 'companies') + ' matched'];
+      if (j.unmatched) bits.push(j.unmatched + ' with no Apollo record');
+      if (j.people) bits.push(plural(j.people, 'contact') + ' found');
+      return bits.join(', ') + ', costing ' + plural(Number(j.credits) || 0, 'credit') + '.';
+    }
+
     function resolveBar(run){
       var s = run.summary || {};
       var est = s.cost_estimate || {};
@@ -2865,7 +2906,7 @@
         return p.resolution && p.resolution !== 'unresolved';
       });
       if (already) {
-        return '<div class="evi-sec"><h3>Company data</h3>' +
+        return '<div class="evi-sec"><h3>Company data</h3>' + resolveNoteHtml(run) +
           '<div class="evi-empty" style="padding:16px">Companies have been matched in ' +
           'Apollo for this run' + (run.credits_spent ? ', costing ' + run.credits_spent +
           ' credit' + (run.credits_spent === 1 ? '' : 's') : '') + '. Contacts shown are ' +
@@ -2877,6 +2918,7 @@
         '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
         'stroke-width="2" stroke-linecap="round"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>' +
         '</span><span class="tx">' + esc(est.note || '') + '</span></div>' +
+        resolveNoteHtml(run) +
         '<button class="evi-btn" type="button" onclick="eviResolve(' + run.id + ')" ' +
         'id="resolveBtn">Match ' + est.domains + ' compan' +
         (est.domains === 1 ? 'y' : 'ies') + ' in Apollo</button></div>';
@@ -2888,10 +2930,34 @@
       fetch(BASE + '/runs/' + runId + '/resolve', {
         method: 'POST', headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({})
-      }).then(function(r){ return r.json(); })
-        .then(function(){ openRun(runId); })
+      }).then(function(r){
+          return r.json().then(function(j){ return {ok: r.ok, j: j || {}}; },
+                               function(){ return {ok: r.ok, j: {}}; });
+        })
+        .then(function(x){
+          var j = x.j;
+          if (!x.ok) {
+            RESOLVE_NOTE[runId] = {bad: true, text: 'The company lookup could not ' +
+              'be started. Nothing was looked up. Try again in a moment.'};
+          } else if (j.error) {
+            /* The route's error is written for the person pressing this. */
+            RESOLVE_NOTE[runId] = {bad: true, text: String(j.error) +
+              (j.resolved ? ' So far: ' + resolveSummary(j) : '')};
+          } else if (j.note) {
+            RESOLVE_NOTE[runId] = {bad: false, text: String(j.note)};
+          } else {
+            RESOLVE_NOTE[runId] = {bad: false, text: resolveSummary(j)};
+          }
+          openRun(runId);
+        })
         .catch(function(){
+          RESOLVE_NOTE[runId] = {bad: true, text: 'The company lookup could not be ' +
+            'reached. Nothing was looked up. Try again in a moment.'};
           if (btn) { btn.disabled = false; btn.textContent = 'Match companies in Apollo'; }
+          var bar = btn && btn.parentNode;
+          if (bar && !bar.querySelector('[role="status"]')) {
+            btn.insertAdjacentHTML('beforebegin', resolveNoteHtml({id: runId}));
+          }
         });
     };
 
@@ -4498,7 +4564,16 @@
       if ((s.qualify_errors || []).length) {
         html += '<div class="evi-coverage warn"><span class="ic">!</span>' +
           '<span class="tx"><b>Part of the qualification pass did not run.</b> ' +
-          esc(s.qualify_errors.join(' ')) +
+          /* Stored runs carry the call's own diagnostic ("max_tokens: Ran
+             out of output budget..."). Cleaned, and identical lines said
+             once: three batches that broke the same way are one fact. */
+          esc(s.qualify_errors.map(function(e){
+            /* Written as a sentence since the writer was fixed; anything
+               else stored here is a call's diagnostic and is replaced. */
+            return /could not be qualified/.test(String(e))
+              ? readerText(e, 'One batch of companies could not be qualified.')
+              : 'One batch of companies could not be qualified.';
+          }).filter(function(e, i, all){ return all.indexOf(e) === i; }).join(' ')) +
           ' Companies below marked &ldquo;not qualified&rdquo; may be a ' +
           'failure to look rather than a judgement about them.</span></div>';
       }
