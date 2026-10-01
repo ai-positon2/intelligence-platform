@@ -275,7 +275,29 @@ def _owns_date(prefix, names, year, titles=None):
             return True
         if _bare_place(prefix, tail, names, year, titles):
             return True
+        if _year_dash_place(prefix, name, year, names):
+            return True
     return False
+
+
+def _year_dash_place(prefix, name, year, names):
+    """ "HITEC 2027 - Orlando" then the dates (hitec.org, live run 29): the
+    name, this edition's year, a dash and where. The year is required, the
+    words right before it must be exactly the event's name ("HITEC Tokyo
+    2026 - Tokyo" is not HITEC), and the place passes the same checks as any
+    other, so "MWC 2027 - Shanghai" and "SaaStr Annual 2026 - Virtual" still
+    refuse. Read off the end of the prefix: the text here has its line
+    breaks collapsed."""
+    m = re.search(r'\s' + str(year) + r'\s*[-\u2010-\u2014|]\s*'
+                  r'([A-Z][\w.\']*(?:[ ,]+[A-Z][\w.\']*){0,3})\s*$', prefix)
+    if not m:
+        return False
+    head = _fold(prefix[:m.start()]).split()
+    want = name.split()
+    if head[-len(want):] != want:
+        return False
+    place = _fold(m.group(1)).split()
+    return bool(place) and _place_ok('in', place, names)
 
 
 # Spaces only: the words a restriction modifies are on its own line, and the
@@ -717,8 +739,10 @@ def _structured_date(value):
         raise ValueError("Missing structured date")
     if len(value) == 10:
         return date.fromisoformat(value)
-    if len(value) > 10 and value[10] == 'T':
-        return datetime.fromisoformat(value.replace('Z', '+00:00')).date()
+    if len(value) > 10 and value[10] in 'T ':
+        # "2026-11-17 08:00" (ibtmworld.com, live run 29, 2026-10-01): a
+        # space is as common as the T in organizer metadata.
+        return datetime.fromisoformat(value[:10] + 'T' + value[11:].replace('Z', '+00:00')).date()
     raise ValueError("Invalid structured date")
 
 
@@ -734,8 +758,8 @@ def _structured_local_dates(value):
     day (offsets +10 to +14 put local midnight at 10:00 to 14:00 UTC, +1 to
     +9 at 15:00 to 23:00), so that day is accepted too. A date, a local time
     with no zone, or one with its own offset means exactly its own date."""
-    if isinstance(value, str) and len(value) > 10 and value[10] == 'T':
-        moment = datetime.fromisoformat(value.replace('Z', '+00:00'))
+    if isinstance(value, str) and len(value) > 10 and value[10] in 'T ':
+        moment = datetime.fromisoformat(value[:10] + 'T' + value[11:].replace('Z', '+00:00'))
         offset = moment.utcoffset()
         if offset is not None and not offset and moment.hour >= 10:
             return {moment.date(), moment.date() + timedelta(days=1)}
@@ -750,7 +774,7 @@ def _key(name):
     return re.sub(r'\s+', '', name)
 
 
-def _structured_name_matches(row_name, names, year):
+def _structured_name_matches(row_name, names, year, titles=()):
     """Is this schema.org Event node THIS event?
 
     Organizers routinely write the node's name the way they write a page
@@ -779,19 +803,26 @@ def _structured_name_matches(row_name, names, year):
     # "and" alone joins words in a tagline ("Networking & Innovation"); it only
     # ties two gatherings together when one of them is named, which the event
     # words already catch.
-    if rest & (_EVENT_WORDS | (_TIE_WORDS - {'and'}) | {'edition'}):
+    if rest & ((_TIE_WORDS - {'and'}) | {'edition'}):
+        return False
+    # An event word in the tagline names another gathering, unless the node is
+    # named exactly as this page is titled: "IBTM World: Meetings & Events
+    # Industry Expo" is ibtmworld.com's own <title> and its own Event node
+    # (live run 29, 2026-10-01), a description of itself, not a second event.
+    own_title = any(row_name.strip() == (t or '').strip() for t in titles or ())
+    if rest & _EVENT_WORDS and not own_title:
         return False
     if _edition_place(rest_words, names):
         return False
     return not any(y != str(year) for y in re.findall(r'\b20\d{2}\b', ' '.join(segments[1:])))
 
 
-def _structured_support(rows, names, start, end):
+def _structured_support(rows, names, start, end, titles=()):
     matches, restrictions = [], []
     for row in rows or []:
         if not isinstance(row, dict) or not isinstance(row.get('name'), str):
             continue
-        if not _structured_name_matches(row['name'], names, start.year):
+        if not _structured_name_matches(row['name'], names, start.year, titles):
             continue
         try:
             starts = _structured_local_dates(row.get('startDate'))
@@ -1106,6 +1137,43 @@ def _self_referenced_dates(text, start, end, names=(), noun=None):
     return None
 
 
+def _owner_redirect(url, final, host, website):
+    """The event's own home page sending readers to its organizer's site.
+
+    imexamerica.com answers with a redirect to america.imexevents.com (live
+    run 29, 2026-10-01), and IMEX America, the one flagship of the meetings
+    industry, was refused as "redirected outside the event host". Accepted
+    only from the website's root, never to a shared platform or a social
+    site, and the page it lands on must still name the event and its dates
+    like any other."""
+    from .event_intel_access import _shared_host
+    from .event_intel_harvest import _NON_COMPANY_HOSTS
+    if not organizer_url(url, host, website):
+        return False
+    if urlsplit(url).path.strip('/') or urlsplit(url).query:
+        return False
+    target = (urlsplit(final).hostname or '').lower()
+    target = target[4:] if target.startswith('www.') else target
+    if not target or urlsplit(final).scheme not in ('http', 'https'):
+        return False
+    registrable = '.'.join(target.split('.')[-2:])
+    if _shared_host(target) or target in _NON_COMPANY_HOSTS or registrable in _NON_COMPANY_HOSTS:
+        return False
+    # The same organizer under another name: the two sites' own labels share
+    # a stem of four letters or more ("imexamerica" and "imexevents"). A
+    # home page that sends readers to an unrelated site is not vouching for
+    # it, however the page there is titled.
+    def label(h):
+        parts = (h or '').lower().split('.')
+        parts = parts[1:] if parts and parts[0] == 'www' else parts
+        return parts[-2] if len(parts) >= 2 else (parts[0] if parts else '')
+    a, b = label(urlsplit(url).hostname), label(target)
+    stem = 0
+    while stem < min(len(a), len(b)) and a[stem] == b[stem]:
+        stem += 1
+    return stem >= 4
+
+
 def inspect(event, fetcher=None):
     token = _OWN_PLACE.set(_fold(str(event.get('city') or '')))
     try:
@@ -1144,9 +1212,11 @@ def _inspect(event, fetcher=None):
         final = fetched.get('final_url') or url
         check = {'url':url, 'final_url':final, 'status':fetched.get('status','error')}
         result['checks'].append(check)
-        if not organizer_url(final,host,website):
+        if not organizer_url(final,host,website) and not _owner_redirect(url, final, host, website):
             check['reason'] = 'The page redirected outside the event host.'
             continue
+        if final != url and not organizer_url(final, host, website):
+            check['owner_redirect'] = urlsplit(final).hostname
         raw_text = fetched.get('text') or ''
         fallback = fetched.get('spa') and re.search(
             r'javascript is disabled|please enable javascript|enable javascript to', raw_text, re.I)
@@ -1163,7 +1233,7 @@ def _inspect(event, fetcher=None):
         structured = []
         if not fetched.get('truncated') and fetched.get('http_status') == 200:
             structured, structured_restrictions = _structured_support(
-                fetched.get('structured_events'), names, start, end)
+                fetched.get('structured_events'), names, start, end, fetched.get('titles'))
             restrictions.extend(structured_restrictions)
         if structured:
             check['structured_event_evidence'] = structured
