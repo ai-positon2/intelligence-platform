@@ -90,11 +90,11 @@ def test_request_worker_report_and_csv_preserve_evidence_and_ownership(owner, mo
     row = rows[0]
     assert row['Organisation'] == run['participants'][0]['org_name'] == 'Acme'
     assert row['Source page'] == SOURCE
-    assert row['Evidence status'] == 'literal_support_only'
+    assert row['Evidence status'] == 'Named on the published page'
     assert row['Requested edition'] == '2027'
     assert row['Observed roster editions'] == '2027'
     assert row['Unreadable sources'] == '1'
-    assert row['Run status'] == run['status']
+    assert run['status'] == 'complete' and row['Run status'] == 'Complete'
     assert 'not an attendee list' in row['Roster caveat']
     assert row['Coverage'] == 'Not independently verified'
     stranger = client('other-'+uuid.uuid4().hex+'@position2.com')

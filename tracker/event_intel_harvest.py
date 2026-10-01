@@ -196,7 +196,11 @@ def fetch_page(url: str) -> dict:
         out["note"] = "Timed out after %ss." % _TIMEOUT
         return out
     except Exception as e:
-        out["note"] = "Request failed: %s" % str(e)[:200]
+        # The exception text ("HTTPSConnectionPool(host=..., port=443): Read
+        # timed out. (read timeout=20)") is for the log. The note is printed
+        # in the report's source ledger.
+        logger.warning("event_intel_harvest: fetch failed for %s: %s", url, e)
+        out["note"] = "The page could not be reached."
         return out
 
     out["http_status"] = r.status_code
@@ -249,12 +253,9 @@ def fetch_page(url: str) -> dict:
     out["spa"] = client_render_marker(markup)
     if len(text) < _MIN_USEFUL_CHARS:
         out["status"] = SOURCE_BLOCKED
-        out["note"] = ("Returned only %d characters of readable text%s, so its "
-                       "list is rendered by JavaScript after load and a plain "
-                       "fetch cannot see it."
-                       % (len(text),
-                          " and carries a %s mount point" % out["spa"]
-                          if out["spa"] else ""))
+        out["note"] = ("Returned only %d characters of readable text, so its "
+                       "list is built in the browser after the page loads and "
+                       "a plain read cannot see it." % len(text))
         return out
 
     if len(text) > _MAX_CHARS:
@@ -483,7 +484,10 @@ _SYSTEM = (
     '"booth": str|null}], "note": str}\n\n'
     "`note` is one short sentence on what the page was and anything that "
     "limits the extraction, for example that it is page 1 of several. If the "
-    "page lists nobody, return an empty rows array and say so in note."
+    "page lists nobody, return an empty rows array and say so in note. The "
+    "note is printed in a report for a client, so write it for that person: "
+    "plain English about the page, never a field name from this format "
+    "(no org_domain, null, rows or JSON), and no dashes."
 )
 
 _DOMAIN_RE = re.compile(r"^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$")
@@ -567,9 +571,14 @@ def _extract_chunk(page_text: str, page_url: str, page_kind: str,
 
     parsed = claude_websearch.extract_json(res.get("text") or "", require="rows")
     if not isinstance(parsed, dict):
+        # The reply itself goes to the log, not into the stored error: this
+        # detail used to be the model's first 400 characters, and the source
+        # ledger printed it to the client as the reason a page was unread.
+        logger.warning("event_intel_harvest: unparsable extraction for %s: %r",
+                       page_url, (res.get("text") or "")[:400])
         return {"rows": [], "note": "",
                 "error": {"kind": claude_websearch.ERR_UNPARSABLE,
-                          "detail": (res.get("text") or "")[:400]}}
+                          "detail": "The extraction reply could not be parsed."}}
 
     rows = []
     for r in (parsed.get("rows") or []):
@@ -689,8 +698,8 @@ def harvest_page(page: dict, event_name: str, event_host: str = "",
     source["truncated"] = bool(fetched.get("truncated"))
     if ext.get("error"):
         source["status"] = SOURCE_ERROR
-        source["note"] = ("The page was fetched but could not be read: %s"
-                          % ext["error"]["detail"])[:500]
+        source["note"] = ("The page was fetched but its list could not be "
+                          "read: %s." % claude_websearch.reader_reason(ext["error"]))
         return {"source": source, "rows": []}
 
     rows = list(ext["rows"])
@@ -794,10 +803,10 @@ def harvest_page(page: dict, event_name: str, event_host: str = "",
         # Read fine, listed nobody, and the markup says the list is built in
         # the browser. That is a hole in the read, not a fact about the event.
         source["status"] = SOURCE_BLOCKED
-        notes.append("This page listed nobody and carries a %s mount point, so "
-                     "its list is built in the browser and a plain fetch cannot "
-                     "see it. This is not evidence the event has no %s."
-                     % (source["spa"], kind if kind != "unknown" else "participants"))
+        notes.append("This page listed nobody, and its list is built in the "
+                     "browser after the page loads, so a plain read cannot see "
+                     "it. This is not evidence the event has no %s."
+                     % (kind if kind != "unknown" else "participants"))
     source["coverage"] = {"complete": False, "scope": "published pages only",
         "pages_read": source["pages_read"], "pages_seen": source["pages_seen"],
         "pages_declared": declared, "truncated": source["truncated"],

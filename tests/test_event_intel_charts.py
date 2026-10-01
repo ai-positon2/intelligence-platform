@@ -709,16 +709,17 @@ def test_the_funnel_never_shows_more_kept_than_confirmed(page_script):
 
 
 @pytest.mark.parametrize('extra', [
-    {'completion_state':'partial'},
-    {'shortfall':[{'category':'side_event','status':'partial','found':0,'required':2,'label':'Side event','why':'Verification unfinished'}]},
+    {'shortfall':[{'category':'side_event','status':'partial','found':0,'quota':2,'short_by':2,'label':'Side event','why':'The search reported it could not be finished.'}]},
     {'unscored':[{'name':'Unresolved summit','note':'Dates need confirmation'}]},
 ])
-def test_incomplete_research_leads_with_provisional_answer(page_script,extra):
+def test_incomplete_research_keeps_its_answer_and_says_it_is_provisional(page_script,extra):
+    """The answer line is never replaced; what is missing goes under it.
+    (It used to be replaced by "Research incomplete" on every run.)"""
     html = _render(page_script,_recommend([_cand('Winner',90,'P1')],**extra))
-    assert 'Research incomplete' in html
     answer = re.search(r'<div class="al">(.*?)</div>',html).group(1)
-    assert 'must-attend' not in answer
-    assert 'needs verification' in answer
+    assert answer == '1 must-attend event'
+    assert 'Treat this as provisional' in html
+    assert 'Research incomplete' not in html
 
 
 @pytest.mark.parametrize('mode', ['recommend', 'workroom'])

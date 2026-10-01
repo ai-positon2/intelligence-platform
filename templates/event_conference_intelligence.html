@@ -1627,6 +1627,28 @@
       return String(text).replace(ISO_IN_TEXT, function(m){ return fmtDate(m); });
     }
 
+    /* Element 5 stores its dates as finished text, "May 4, 2027 to May 6,
+       2027" (or ISO on older runs). Read back into a range and written the
+       one way the rest of the page writes a range; text that is not a date
+       range is left as it was, with any ISO date in it rewritten. */
+    var MONTH_IX = {jan:1, feb:2, mar:3, apr:4, may:5, jun:6, jul:7, aug:8,
+                    sep:9, sept:9, oct:10, nov:11, dec:12};
+    var DATE_IN_TEXT = /(\d{4})-(\d{2})-(\d{2})|\b([A-Z][a-z]{2,8})\.? (\d{1,2}), (\d{4})\b/g;
+    function whenText(text){
+      var found = [], m, re = new RegExp(DATE_IN_TEXT.source, 'g');
+      while ((m = re.exec(String(text || '')))) {
+        if (m[1]) { found.push(m[1] + '-' + m[2] + '-' + m[3]); continue; }
+        var mi = MONTH_IX[m[4].slice(0, m[4].toLowerCase() === 'sept' ? 4 : 3).toLowerCase()];
+        if (!mi) continue;
+        found.push(m[6] + '-' + ('0' + mi).slice(-2) + '-' + ('0' + m[5]).slice(-2));
+      }
+      if (found.length === 1 || found.length === 2) {
+        var r = dateRangeText({starts_on: found[0], ends_on: found[1] || found[0]});
+        if (r) return r;
+      }
+      return fmtDatesIn(text);
+    }
+
     /* Attendance is the event's own claim and is labelled as one. The label
        was appended unconditionally, so a figure that already carried it came
        out as "600 attendees (their claim) (their claim)". And a value with no
@@ -1642,8 +1664,8 @@
     function eventLine(ev){
       var bits = [];
       if (ev.edition) bits.push(esc(ev.edition));
-      var when = ev.starts_on ? fmtDate(ev.starts_on) +
-        (ev.ends_on && ev.ends_on !== ev.starts_on ? ' to ' + fmtDate(ev.ends_on) : '') : '';
+      /* One date format for one event everywhere on the page. */
+      var when = dateRangeText(ev) || (ev.starts_on ? fmtDate(ev.starts_on) : '');
       if (when) bits.push(esc(when));
       if (ev.location) bits.push(esc(ev.location));
       if (ev.format) bits.push(esc(ev.format.replace('_', ' ')));
@@ -1777,20 +1799,39 @@
         body + '</tbody></table></div>';
     }
 
+    /* The source ledger, in the reader's words. It printed each page's kind
+       and status as stored ("access_review", "ok", "error") and the note as
+       stored, which on runs made before the writers were fixed is an
+       exception's text, a model's raw reply, or a model's note written in
+       its own schema ("so org_domain is null for all"). An unknown future
+       kind or status gets a plain generic phrase, never the token. */
+    var SOURCE_KIND_LABEL = {exhibitors: 'Exhibitor list', sponsors: 'Sponsor list',
+      speakers: 'Speaker list', agenda: 'Agenda', partners: 'Partner list',
+      attendees: 'Attendees page', media: 'Media list',
+      access_review: 'Registration or access page', unknown: 'Event page'};
+    var SOURCE_STATUS_LABEL = {ok: 'Read', recovered: 'Recovered by search',
+      blocked: 'Could not be read', not_found: 'Not found', error: 'Could not be read'};
+    var SOURCE_FALLBACK_NOTE = {
+      blocked: 'This page could not be read.', error: 'This page could not be read.',
+      not_found: 'This page could not be found.',
+      recovered: 'Its list was recovered by searching for a published copy.'};
+
     function sourcesHtml(run){
       var srcs = run.sources || [];
       if (!srcs.length) return '<div class="evi-empty">No pages were attempted.</div>';
       return '<div class="evi-sources">' + srcs.map(function(s){
         var u = safeUrl(s.url);
+        var status = String(s.status || '');
+        var note = s.note ? readerText(s.note, SOURCE_FALLBACK_NOTE[status] || '') : '';
         return '<div class="evi-source">' +
-          '<span class="st ' + esc(s.status) + '">' + esc(s.status.replace('_', ' ')) + '</span>' +
+          '<span class="st ' + (SOURCE_STATUS_LABEL[status] ? esc(status) : 'other') + '">' +
+            esc(SOURCE_STATUS_LABEL[status] || 'Checked') + '</span>' +
           '<span class="body"><span class="u">' +
             (u ? '<a href="' + esc(u) + '" target="_blank" rel="noopener noreferrer">' +
                  esc(s.url) + '</a>' : esc(s.url)) + '</span>' +
-          '<span class="n">' + esc(s.kind || '') +
+          '<span class="n">' + esc(SOURCE_KIND_LABEL[s.kind] || 'Event page') +
             (s.rows_found ? ' · ' + s.rows_found + ' listed' : '') +
-            (s.http_status ? ' · HTTP ' + s.http_status : '') +
-            (s.note ? ' · ' + esc(s.note) : '') + '</span></span></div>';
+            (note ? ' · ' + esc(note) : '') + '</span></span></div>';
       }).join('') + '</div>';
     }
 
@@ -2857,6 +2898,28 @@
         '</div></div>';
     }
 
+    /* What the last press of "Match companies" said, per run. The button
+       used to throw the response away and reload the run, so a missing key
+       or a batch that failed part-way looked exactly like a lookup that
+       found nothing. Kept outside the drawer because reopening the run
+       redraws it. */
+    var RESOLVE_NOTE = {};
+
+    function resolveNoteHtml(run){
+      var n = RESOLVE_NOTE[run.id];
+      if (!n) return '';
+      return '<div class="evi-coverage' + (n.bad ? ' warn' : '') + '" role="status">' +
+        '<span class="ic">' + (n.bad ? '!' : 'i') + '</span><span class="tx">' +
+        esc(n.text) + '</span></div>';
+    }
+
+    function resolveSummary(j){
+      var bits = [plural(Number(j.resolved) || 0, 'company', 'companies') + ' matched'];
+      if (j.unmatched) bits.push(j.unmatched + ' with no Apollo record');
+      if (j.people) bits.push(plural(j.people, 'contact') + ' found');
+      return bits.join(', ') + ', costing ' + plural(Number(j.credits) || 0, 'credit') + '.';
+    }
+
     function resolveBar(run){
       var s = run.summary || {};
       var est = s.cost_estimate || {};
@@ -2865,7 +2928,7 @@
         return p.resolution && p.resolution !== 'unresolved';
       });
       if (already) {
-        return '<div class="evi-sec"><h3>Company data</h3>' +
+        return '<div class="evi-sec"><h3>Company data</h3>' + resolveNoteHtml(run) +
           '<div class="evi-empty" style="padding:16px">Companies have been matched in ' +
           'Apollo for this run' + (run.credits_spent ? ', costing ' + run.credits_spent +
           ' credit' + (run.credits_spent === 1 ? '' : 's') : '') + '. Contacts shown are ' +
@@ -2877,6 +2940,7 @@
         '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
         'stroke-width="2" stroke-linecap="round"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>' +
         '</span><span class="tx">' + esc(est.note || '') + '</span></div>' +
+        resolveNoteHtml(run) +
         '<button class="evi-btn" type="button" onclick="eviResolve(' + run.id + ')" ' +
         'id="resolveBtn">Match ' + est.domains + ' compan' +
         (est.domains === 1 ? 'y' : 'ies') + ' in Apollo</button></div>';
@@ -2888,10 +2952,34 @@
       fetch(BASE + '/runs/' + runId + '/resolve', {
         method: 'POST', headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({})
-      }).then(function(r){ return r.json(); })
-        .then(function(){ openRun(runId); })
+      }).then(function(r){
+          return r.json().then(function(j){ return {ok: r.ok, j: j || {}}; },
+                               function(){ return {ok: r.ok, j: {}}; });
+        })
+        .then(function(x){
+          var j = x.j;
+          if (!x.ok) {
+            RESOLVE_NOTE[runId] = {bad: true, text: 'The company lookup could not ' +
+              'be started. Nothing was looked up. Try again in a moment.'};
+          } else if (j.error) {
+            /* The route's error is written for the person pressing this. */
+            RESOLVE_NOTE[runId] = {bad: true, text: String(j.error) +
+              (j.resolved ? ' So far: ' + resolveSummary(j) : '')};
+          } else if (j.note) {
+            RESOLVE_NOTE[runId] = {bad: false, text: String(j.note)};
+          } else {
+            RESOLVE_NOTE[runId] = {bad: false, text: resolveSummary(j)};
+          }
+          openRun(runId);
+        })
         .catch(function(){
+          RESOLVE_NOTE[runId] = {bad: true, text: 'The company lookup could not be ' +
+            'reached. Nothing was looked up. Try again in a moment.'};
           if (btn) { btn.disabled = false; btn.textContent = 'Match companies in Apollo'; }
+          var bar = btn && btn.parentNode;
+          if (bar && !bar.querySelector('[role="status"]')) {
+            btn.insertAdjacentHTML('beforebegin', resolveNoteHtml({id: runId}));
+          }
         });
     };
 
@@ -2909,12 +2997,65 @@
         '<div class="st"><span style="width:' + pct + '%"></span></div></div>';
     }
 
+    /* What the source check established about a card's own event, in one
+       short line each, and only when there is something to say. The summary
+       has carried these since the source check existed and the page showed
+       none of them: which organizer evidence the dates stand on, and when a
+       restriction on the organizer's page was judged to belong to something
+       other than this event. Unknown future values get a generic phrase. */
+    var SUPPORT_LABEL = {
+      organizer_structured_name_and_dates: 'the organizer\'s event listing',
+      literal_name_and_dates_only: 'the organizer\'s page text',
+      organizer_title_name_and_dates: 'the organizer\'s page title',
+      organizer_title_name_and_self_referenced_dates: 'the organizer\'s page title and text'};
+    var DATES_FROM_LABEL = {organizer_structured_data: 'the organizer\'s event listing'};
+    var SCOPE_LABEL = {
+      named_other_programme: 'another named programme',
+      timed_session: 'a single session',
+      other_dated_event: 'another dated event',
+      concession_pass: 'a discounted or concession pass',
+      hypothetical_question: 'a question on an FAQ page',
+      other_inventory: 'other inventory, such as hotel rooms or VIP tickets'};
+    var CARD_CTX = {admission: {}, datesFrom: {}};
+
+    function cardContext(s){
+      var byName = {};
+      (s.source_admission || []).forEach(function(a){
+        if (a && a.name) byName[a.name] = a; });
+      CARD_CTX = {admission: byName, datesFrom: s.dates_from || {}};
+    }
+
+    function cardEvidenceHtml(c){
+      var a = CARD_CTX.admission[c.name];
+      var lines = [];
+      var from = DATES_FROM_LABEL[CARD_CTX.datesFrom[c.name]] ||
+        (CARD_CTX.datesFrom[c.name] ? 'the organizer\'s own pages' : '');
+      var support = a && a.support && a.support !== 'unverified'
+        ? (SUPPORT_LABEL[a.support] || 'the organizer\'s own pages') : '';
+      if (from || support) lines.push('Dates confirmed from: ' + (from || support) + '.');
+      var scopes = [];
+      ((a && a.checks) || []).forEach(function(ch){
+        (ch.access_observations || []).forEach(function(o){
+          if (!o || !o.scope || o.scope === 'unresolved_event_access') return;
+          var l = SCOPE_LABEL[o.scope] || 'something other than this event';
+          if (scopes.indexOf(l) < 0) scopes.push(l);
+        });
+      });
+      if (scopes.length) {
+        lines.push('The organizer\'s page mentions restricted access, read here as ' +
+          'applying to ' + joinClauses(scopes) + ' rather than to this event.');
+      }
+      return lines.length ? '<p class="cshort">' + lines.map(esc).join(' ') + '</p>' : '';
+    }
+
     function candidateRow(c, prior, labels, idx, shortfallLine){
       prior = prior || null; labels = labels || {};
       var site = safeUrl(c.website);
+      /* The same format the answer button and the calendar use for this
+         event. The card said "May 4, 2027 to May 6, 2027" while the button
+         at the top said "May 4 to 6, 2027" for the same event. */
       var when = c.starts_on
-        ? fmtDate(c.starts_on) + (c.ends_on && c.ends_on !== c.starts_on
-            ? ' to ' + fmtDate(c.ends_on) : '')
+        ? (dateRangeText(c) || fmtDate(c.starts_on))
         : 'dates not announced';
       var where = [c.city, c.country].filter(Boolean).join(', ') || 'location unconfirmed';
       var gaps = c.gaps || [];
@@ -2981,6 +3122,7 @@
               '</span></div>' : '') +
         '</div>' +
         (shortfallLine ? '<p class="cshort">' + esc(shortfallLine) + '</p>' : '') +
+        cardEvidenceHtml(c) +
         (c.description ? '<p class="cd">' + esc(c.description) + ' ' +
           '<b>' + esc(c.client_line || '') + '</b></p>' : '') +
         '<details class="cwhy"><summary>Why these scores</summary>' +
@@ -3130,11 +3272,26 @@
        descending order. The gap between found and scored is accounted for in
        words rather than in a fourth bar, because the pieces of it are
        reported separately below and a bar would imply they add up to it. */
-    function verdictHtml(s, counts) {
+    /* How many on the recommended list actually cleared the bar. `kept`
+       also carries an event the client is already committed to, which stays
+       on the list whatever it scored, so counting `kept` printed "Cleared
+       the bar of 70: 5" over a list whose own committed note said one of
+       the five scored 43. */
+    function clearedCount(kept, counts){
+      if (kept) {
+        return kept.filter(function(c){
+          return (Number(c.total) || 0) >= RANK_FLOOR; }).length;
+      }
+      return Math.max(0, (Number(counts.kept) || 0) -
+                         (Number(counts.committed_below_bar) || 0));
+    }
+
+    function verdictHtml(s, counts, kept) {
       var found = Number(s.discovered) || 0;
       var scored = (Number(counts.kept) || 0) + (Number(counts.worth_a_look) || 0) +
                    (Number(counts.excluded) || 0);
-      var cleared = Number(counts.kept) || 0;
+      var cleared = clearedCount(kept, counts);
+      var carried = Math.max(0, (kept ? kept.length : Number(counts.kept) || 0) - cleared);
       if (!found && !scored) return '';
       var gaps = [];
       if (counts.finished) gaps.push(plural(counts.finished, 'edition') + ' already over');
@@ -3171,13 +3328,22 @@
            var tail = l ? ' ' + plural(l, 'more event') + ' cleared both ' +
                           'relevance gates and ' + (l === 1 ? 'is' : 'are') +
                           ' under Worth a look.' : '';
+           /* Said, because the ranked list below is longer than this bar by
+              exactly these, and a reader counting would otherwise find one
+              too many. */
+           if (carried) {
+             tail += ' The ranked list also carries ' +
+               plural(carried, 'event') + ' you are already committed to, ' +
+               'which scored below the bar.';
+           }
            if (!cleared) {
              return (l ? 'None, and that is the honest answer to the bar.'
                        : 'None. The list is not padded to a target count.') + tail;
            }
-           return (cleared === 1 ? 'The one below is what it is.'
-                                 : 'Everything below is what these ' + cleared +
-                                   ' are.') + tail;
+           return (carried ? ''
+                   : (cleared === 1 ? 'The one below is what it is.'
+                                    : 'Everything below is what these ' + cleared +
+                                      ' are.')) + tail.replace(/^ /, carried ? '' : ' ');
          })()}
       ]);
     }
@@ -3333,14 +3499,17 @@
       if (unchecked) {
         html += '<div class="evi-coverage warn"><span class="ic">!</span><span class="tx">' +
           '<b>' + esc(plural(unchecked, 'candidate')) + ' could not be checked ' +
-          'to a conclusion.</b> They remain unverified, not because they were found wanting.</span></div>';
+          'to a conclusion.</b> ' + (unchecked === 1 ? 'It remains' : 'They remain') +
+          ' unverified, not because ' + (unchecked === 1 ? 'it was' : 'they were') +
+          ' found wanting.</span></div>';
       }
       if (unverified.length) {
         html += '<div class="evi-unverified"><h4>Verification unresolved</h4>' +
           unverified.map(function(r){
             return '<div class="rr"><span class="rn">' + esc(r.name) + '</span>' +
               '<span class="rc">' + esc(r.label) + '</span>' +
-              '<span class="rw">' + esc(r.reason) + '</span></div>';
+              '<span class="rw">' + esc(readerText(r.reason,
+                'The check stopped before it reached a conclusion.')) + '</span></div>';
           }).join('') + '</div>';
       }
       if (ruled.length) {
@@ -3418,23 +3587,65 @@
              !REASON_PLUMBING.test(text);
     }
 
-    /* A search that did not finish, whichever way it stopped. `error` is a
-       search that never produced anything usable and `partial` is one that
-       was cut off part-way, and neither is a fact about the client's market.
-       Reading only `error` as a hole put "Nothing here for this client"
-       under a category whose own stored reason said, in our words, that it
-       could not finish searching. */
+    /* One reading of a category's stored result, and every surface reads it:
+       the ring, the bars, the reasons under them, the verdict and the
+       qualifier under the answer. The report used to describe one partial
+       category as "came up short" in its ring and "did not finish" two
+       sections further down, because the ring had its own reading.
+
+       The pipeline writes this as `gap_kind` since it learned to, and the
+       same rules are applied here to runs stored before that (see
+       event_intel_pipeline.category_gap_kind; change both together).
+
+         failed      the search returned nothing usable        a hole
+         unfinished  the search was cut off part-way           a hole
+         budget      searched to the limit it was given        thin
+         unresolved  finished, but some candidates unsettled   thin
+         short       finished, and the market is thin          a finding
+
+       `partial` is two different things. A search that was cut off is a
+       hole. A search that finished and found candidates the confirmation
+       could not settle, or a confirmed event whose attendance figure could
+       not be read, has searched the market to the end, and calling that "did
+       not finish" is what made every production run read as incomplete. */
+    var VERIFICATION_BITS = '\\d+ of the \\d+ candidates? found here could not be ' +
+      'checked to a conclusion \\(.*\\)\\.|\\d+ confirmed events? had published ' +
+      'numbers we could not finish reading\\.';
+    var BUDGET_TAIL = /It also used every one of the \d+ searches allowed for finding events here, so there may be more to find than this search could reach\./g;
+    var GAP_LEVEL = {failed: 'gap', unfinished: 'gap', budget: 'thin',
+                     unresolved: 'thin', short: 'thin', met: 'ok'};
+
+    function gapKind(sf){
+      sf = sf || {};
+      if (GAP_LEVEL[sf.gap_kind]) return sf.gap_kind;
+      var text = String(sf.why || sf.detail || '');
+      if (sf.status !== 'error' && sf.status !== 'partial') {
+        return (sf.short_by != null || sf.quota != null) ? 'short' : 'met';
+      }
+      if (/max_uses_exceeded/i.test(text)) return 'budget';
+      if (sf.status === 'error') return 'failed';
+      var rest = text.replace(BUDGET_TAIL, '');
+      if (new RegExp(VERIFICATION_BITS).test(rest) &&
+          !rest.replace(new RegExp(VERIFICATION_BITS, 'g'), '').replace(/[\s.]+/g, '')) {
+        return 'unresolved';
+      }
+      return 'unfinished';
+    }
+
     function reasonIsGap(sf){
-      return sf.status === 'error' || sf.status === 'partial';
+      return GAP_LEVEL[gapKind(sf)] === 'gap';
     }
 
     function coverageReason(sf){
       var full = cleanReason(sf.why);
       var found = Number(sf.found) || 0;
       var quota = Number(sf.quota) || 0;
-      var level = reasonIsGap(sf) ? 'gap' : 'thin';
+      var kind = gapKind(sf);
+      var level = GAP_LEVEL[kind] === 'gap' ? 'gap' : 'thin';
       var head;
-      if (reasonIsGap(sf)) {
+      if (kind === 'unresolved') {
+        head = 'Searched to the end, but part of what it found could not be checked';
+      } else if (sf.status === 'error' || sf.status === 'partial') {
         head = 'The search did not finish';
         /* A stored reason naming max_uses_exceeded is describing this run's
            own search budget being enforced, which is a complete piece of
@@ -3534,6 +3745,34 @@
         }).join('') + '</div></div>';
     }
 
+    /* A category searches once, then again for anything the first pass
+       missed. A follow-up that broke never changes the category's status
+       (the first pass already answered for it), so it was invisible: a
+       category could look fully searched while its second search had lost
+       its connection part-way. One line, naming the categories. */
+    function laterSearchHtml(statuses){
+      var names = [], why = [];
+      Object.keys(statuses || {}).forEach(function(k){
+        var broke = (statuses[k].later_searches || []).filter(function(l){
+          return l && (l.status === 'error' || l.status === 'partial'); });
+        if (!broke.length) return;
+        names.push(catLabel(k) || statuses[k].label || '');
+        broke.forEach(function(l){
+          /* Stored in the first search's words; said of the follow-up. */
+          var r = readerText(l.detail, '').replace(
+            /^The search for this category could not be completed: (\w)/,
+            function(_, ch){ return 'It stopped because ' + ch.toLowerCase(); });
+          if (r && why.indexOf(r) < 0) why.push(r);
+        });
+      });
+      if (!names.length) return '';
+      return '<div class="evi-note" style="margin-top:10px">' +
+        'A follow-up search for more events did not finish in ' +
+        esc(joinClauses(names)) + ', so ' + (names.length === 1 ? 'it lists' : 'they list') +
+        ' what the first search found. ' + (why.length === 1 ? esc(why[0]) : '') +
+        '</div>';
+    }
+
     function coverageHtml(s){
       var rows = s.shortfall || [];
       var statuses = s.statuses || {};
@@ -3583,6 +3822,27 @@
         return coverageReason(r).level === 'gap'; })
         .map(function(r){ return r.label || catLabel(r.category); });
       var short = rows.length - failed;
+      /* A short category is a finding only when its search FINISHED. One
+         that spent every search it was allowed, or left candidates nobody
+         could check, is under-searched rather than settled, and the verdict
+         said "an empty category is a fact about this client's market" over
+         both, beside a banner saying the opposite. */
+      var unsettled = rows.filter(function(r){
+        var k = gapKind(r); return k === 'budget' || k === 'unresolved'; })
+        .map(function(r){ return r.label || catLabel(r.category); });
+      var settledNote = !unsettled.length
+        ? ' after a search that finished. A category searched to the end and ' +
+          'still short is a fact about this client&rsquo;s market.'
+        : (unsettled.length === short
+            ? ' after searching, but ' + (short === 1 ? 'its search' : 'each search') +
+              ' either used every search it was allowed or left candidates ' +
+              'unchecked, so ' + (short === 1 ? 'it is' : 'they are') +
+              ' under-searched rather than settled.'
+            : ' after searching. ' + esc(unsettled.join(', ')) + ' used every ' +
+              'search allowed or left candidates unchecked, so ' +
+              (unsettled.length === 1 ? 'it is' : 'those are') + ' not settled; ' +
+              'the rest searched to the end, which makes them a fact about this ' +
+              'client&rsquo;s market.');
       var verdict = failed
         /* "1 search did not run" reads as one query out of dozens. What did
            not run is a whole kind of event, and the count is of categories. */
@@ -3594,8 +3854,7 @@
           'the market.'
         : (short
             ? esc(plural(short, 'category', 'categories')) +
-              ' came back under quota after ' +
-              'searching. An empty category is a fact about this client&rsquo;s market.'
+              ' came back under quota' + settledNote
             : 'Every category returned what was asked of it, so no kind of event ' +
               'is missing from this list.');
 
@@ -3610,7 +3869,7 @@
         '<p>They are searched one at a time and never merged, which is what ' +
         'stops the famous names crowding out the narrower summits, the free ' +
         'sponsor-funded days and the side events.</p></details></div>' +
-        coverageWhyHtml(rows) + '</div>' +
+        coverageWhyHtml(rows) + laterSearchHtml(statuses) + '</div>' +
         searchFunnelHtml(s);
     }
 
@@ -3624,12 +3883,90 @@
       var rows = s.shortfall || [];
       var known = Object.keys(CATEGORY_LABELS).length ||
                   Object.keys(s.statuses || {}).length;
+      /* Read through coverageReason, the reading the bars and the reasons
+         under them use. Counting only `error` as a hole put a partial
+         category under "came up short" here while the section below said it
+         did not finish, and skipped the re-reading of a stored
+         max_uses_exceeded as a spent budget rather than a broken search. */
       var failed = 0, short = 0;
       rows.forEach(function(r){
-        if (r.status === 'error') failed += 1; else short += 1;
+        if (coverageReason(r).level === 'gap') failed += 1; else short += 1;
       });
       return {total: known, failed: failed, short: short,
               met: Math.max(0, known - failed - short)};
+    }
+
+    /* Why an event is unscored decides whether it makes the report
+       provisional. A RULE keeping it out (sold out, outside the window, on
+       the client's own exclusion list) is a finished judgement; missing
+       evidence is a hole. Stored runs carry the reason as prose, so it is
+       read sentence by sentence, the same list the pipeline uses
+       (event_intel_pipeline._POLICY_REASONS). */
+    var POLICY_REASONS = [
+      'the organizer reports this edition is cancelled',
+      'this edition is sold out',
+      'this event is on the client exclusion list',
+      'the edition is outside the requested date window',
+      'the location could not be verified against the client geography',
+      'the organizer page describes restricted or unavailable access'];
+
+    function unscoredKind(u){
+      if (u && (u.kind === 'policy' || u.kind === 'evidence' || u.kind === 'scoring')) {
+        return u.kind;
+      }
+      var note = String((u && (u.note || u.scoring_note)) || '').trim();
+      if (!note) return 'evidence';
+      if (/scoring pass returned no result/i.test(note)) return 'scoring';
+      var sentences = note.match(/[^.!?]+(?:[.!?]+|$)/g) || [];
+      var policy = sentences.every(function(x){
+        var low = x.trim().toLowerCase();
+        return !low || POLICY_REASONS.some(function(p){ return low.indexOf(p) === 0; });
+      });
+      return policy ? 'policy' : 'evidence';
+    }
+
+    function joinClauses(list){
+      if (list.length < 2) return list.join('');
+      return list.slice(0, -1).join(', ') + ' and ' + list[list.length - 1];
+    }
+
+    /* The one sentence under the answer, or nothing. A run written since
+       the pipeline learned to say this carries it, built from the same
+       reading as its `completion_state`; an older run gets the same rules
+       applied to what it stored. */
+    function completionQualifier(s){
+      var c = s.completion;
+      if (c && typeof c.qualifier === 'string') return c.qualifier;
+      var gaps = [];
+      var holes = (s.shortfall || []).filter(function(r){
+        return coverageReason(r).level === 'gap'; })
+        .map(function(r){ return r.label || catLabel(r.category); });
+      if (holes.length) {
+        gaps.push('the search for ' +
+          plural(holes.length, 'kind of event', 'kinds of event') +
+          ' did not finish (' + holes.join(', ') + ')');
+      }
+      (s.notes || []).forEach(function(n){
+        var m = /^Scoring reported (\d+ errors?)/.exec(n.head || '');
+        if (m) gaps.push('scoring reported ' + m[1]);
+      });
+      var a = s.audit || {};
+      var aFailed = Object.keys(a.failed || {}).length;
+      if (a.error) gaps.push('the marquee-event audit produced no usable result');
+      else if (aFailed) {
+        gaps.push('the marquee-event audit could not be completed for ' +
+                  plural(aFailed, 'event'));
+      }
+      var ev = 0, sc = 0;
+      (s.unscored || []).forEach(function(u){
+        var k = unscoredKind(u);
+        if (k === 'evidence') ev += 1; else if (k === 'scoring') sc += 1;
+      });
+      if (ev) gaps.push(plural(ev, 'event') + ' could not be scored for lack of evidence');
+      if (sc) gaps.push('the scoring pass returned no result for ' + plural(sc, 'event'));
+      if (!gaps.length) return '';
+      return 'Treat this as provisional: ' + joinClauses(gaps) +
+             '. What was not measured, below, has the detail.';
     }
 
     function answerHtml(s, counts, kept){
@@ -3646,11 +3983,12 @@
                      : (look ? 'Nothing unmissable, ' + plural(look, 'event') +
                                ' worth a look'
                              : 'Nothing cleared the bar of ' + RANK_FLOOR));
-      var provisional = s.completion_state && s.completion_state !== 'complete';
-      provisional = provisional || (s.shortfall || []).some(function(r){
-        return r.status === 'error' || r.status === 'partial';
-      }) || (s.unscored || []).length > 0;
-      if (provisional) line = 'Research incomplete — shortlist needs verification';
+      /* The answer line is always the answer. It used to be replaced
+         outright by a warning whenever anything at all was imperfect, which
+         was every production run, so the one line a reader came for said
+         nothing. What is missing now goes UNDER it, and only when it is
+         something that changes what the list is worth. */
+      var qualifier = completionQualifier(s);
       /* A ring, not a donut. The glance wants one number against a stated
          maximum, and a donut's centre has to be the sum of its own segments,
          which here would be the constant 6 on every run. */
@@ -3659,12 +3997,14 @@
         cv.failed ? 'f-bad' : (cv.short ? 'f-mid' : 'f-hi'),
         (cv.short ? cv.short + ' came up short' : '') +
         (cv.short && cv.failed ? ', ' : '') +
-        (cv.failed ? cv.failed + ' returned no usable result' : '')) : '';
+        (cv.failed ? cv.failed + ' did not finish' : '')) : '';
 
       return '<div class="evi-answer">' +
         '<div class="aw">' +
           '<div class="ae">The answer</div>' +
           '<div class="al">' + esc(line) + '</div>' +
+          (qualifier ? '<div class="az aq" style="margin:-4px 0 12px">' +
+            esc(qualifier) + '</div>' : '') +
           (top
             ? '<button type="button" class="at ' + tierClass(top.tier) + '" ' +
               'onclick="eviReveal(\'' + esc(candAnchor(0)) + '\')">' +
@@ -3732,6 +4072,47 @@
       return kept.join(' ').replace(/\s+([.,;:])/g, '$1').trim();
     }
 
+    /* Any stored sentence a client is about to read, cleaned on the way out.
+
+       scrubStored above is deliberately conservative, and it guards the
+       category reasons. This is for the places that had no guard at all and
+       printed what was stored: the notes under "What was not measured", the
+       note on every page in a roster's source ledger, the qualification
+       pass's errors, and a candidate's unverified reason. Stored runs carry
+       "max_tokens: Ran out of output budget ... Raise max_tokens or lower
+       max_uses", the text of a Python exception, and a model's note written
+       in its own schema ("so org_domain is null for all").
+
+       Four passes: citation tags go (their words stay), a dash becomes a
+       comma (house style), a parenthetical that is entirely about our
+       tooling or a field name goes, and then any sentence that is. When
+       nothing survives, the caller's own plain sentence stands in: a reader
+       is better served by "This page could not be read." than by a stack
+       of our diagnostics, and far better than by an empty line. */
+    var DEV_DETAIL = /web_search|max_uses|max_tokens|stop_reason|search_limit|server tool|output budget|ConnectionPool|Errno|Traceback|\b[A-Z]\w*(?:Error|Exception)\b|\w=\w|Unexpected failure|unparsable|tool errors/i;
+    var SCHEMA_WORDS = /\bnull\b|\bjson\b|\bschema\b|\b[a-z]+_[a-z0-9]+(?:_[a-z0-9]+)*\b/i;
+    function devSpeak(t){ return DEV_DETAIL.test(t) || SCHEMA_WORDS.test(t); }
+
+    function readerText(text, fallback, asHead){
+      var t = reworded(text)
+        .replace(/<\/?cite\b[^>]*>/gi, '')
+        .replace(/\s*[\u2013\u2014]\s*/g, ', ')
+        .replace(/\s+/g, ' ').trim().replace(REASON_KIND, '');
+      if (t && devSpeak(t)) {
+        t = t.replace(/\s*\(([^()]*(?:\([^()]*\)[^()]*)*)\)/g,
+          function(whole, inner){ return devSpeak(inner) ? '' : whole; });
+        t = (t.match(/[^.!?]+(?:[.!?]+|$)/g) || [])
+          .map(function(x){ return x.trim(); })
+          .filter(function(x){ return x && !devSpeak(x); })
+          .join(' ').replace(/\s+([.,;:])/g, '$1').replace(/:\s*$/, '.').trim();
+      }
+      if (!t || !/[A-Za-z]{3}/.test(t)) return fallback || '';
+      /* A head is a line, not a sentence, so it gets no full stop added. */
+      if (asHead) t = t.replace(/[.]$/, '');
+      else if (!/[.!?\u2026]$/.test(t)) t += '.';
+      return t[0].toUpperCase() + t.slice(1);
+    }
+
     /* A head for a paragraph of stored prose, and only when the paragraph
        offers one.
        A head is the FIRST SENTENCE, whole, and short enough to scan. Nothing
@@ -3765,7 +4146,10 @@
         return '<div class="ex-notes"><div class="nh">' +
           '<h4>What was not measured</h4></div><div class="nl">' +
           old.map(function(a, i){
-            var full = scrubStored(a);
+            /* scrubStored's conservative rule stands here: a legacy
+               paragraph is the whole of a fact, so it is never emptied.
+               Only the house-style dash is changed. */
+            var full = scrubStored(a).replace(/\s*[\u2013\u2014]\s*/g, ', ');
             if (!full) return '';
             var head = foldHead(full);
             if (!head) {
@@ -3792,6 +4176,23 @@
               '<p>' + esc(full) + '</p></details>';
           }).join('') + '</div></div>';
       }
+      /* The provisional line is rebuilt from the same reading as the
+         qualifier under the answer rather than trusted as stored. Runs made
+         before the pipeline learned what "incomplete" means carry a
+         "Research is incomplete" line on every run, including ones with
+         nothing incomplete, and it told the reader to "review the coverage
+         and unscored events" on a run that had none. Drawn in the hole
+         colour and first, because it summarises the rest. */
+      var q = completionQualifier(s);
+      ns = ns.filter(function(n){ return n.level !== 'warn'; });
+      if (q) ns = [{level: 'warn', head: 'This shortlist is provisional', detail: q}].concat(ns);
+      /* Every note is written for a reader, but some of what a note quotes
+         was not: a scoring error arrives as the call's own diagnostic. */
+      ns = ns.map(function(n){
+        return {level: n.level, head: readerText(n.head, n.head, true),
+                detail: n.detail ? readerText(n.detail,
+                  'One of the research calls behind this stopped before it finished.') : ''};
+      });
       var counts = {};
       ns.forEach(function(n){ counts[n.level] = (counts[n.level] || 0) + 1; });
       var tally = ['gap', 'thin', 'note'].filter(function(k){ return counts[k]; })
@@ -3803,17 +4204,42 @@
         '<div class="nh"><h4>What was not measured</h4>' +
           (tally ? '<div class="ntally">' + tally + '</div>' : '') + '</div>' +
         '<div class="nl">' + ns.map(function(n, i){
-          var head = '<span class="nd n-' + esc(n.level || 'note') + '"></span>' +
+          /* A provisional line is drawn as a hole: it is one. */
+          var lv = n.level === 'warn' ? 'gap' : (n.level || 'note');
+          var head = '<span class="nd n-' + esc(lv) + '"></span>' +
             '<span class="nx">' + esc(n.head) + '</span>';
           if (!n.detail) {
-            return '<div class="nr n-' + esc(n.level || 'note') +
+            return '<div class="nr n-' + esc(lv) +
                    '" style="--i:' + i + '">' + head + '</div>';
           }
-          return '<details class="nr n-' + esc(n.level || 'note') +
+          return '<details class="nr n-' + esc(lv) +
             '" style="--i:' + i + '"><summary>' + head +
             '<span class="nmore" aria-hidden="true">Why</span></summary>' +
             '<p>' + esc(n.detail) + '</p></details>';
         }).join('') + '</div></div>';
+    }
+
+    /* The banner over a run that kept nothing. Runs stored before the
+       pipeline wrote a status-aware one carry the same hedge on every run,
+       "incomplete searches or verification do not establish that the market
+       has no suitable events", which sat directly above a coverage verdict
+       calling the same empty categories a fact about the market. Both now
+       come from the one classification. */
+    var LEGACY_EMPTY_NOTE = /incomplete searches or verification do not establish/i;
+    function emptyRunNote(s){
+      if (s.note && !LEGACY_EMPTY_NOTE.test(s.note)) return s.note;
+      var holes = (s.shortfall || []).filter(function(r){
+        return coverageReason(r).level === 'gap'; }).length;
+      if (!(s.shortfall || []).length) return s.note || '';
+      return holes
+        ? 'No verified candidates survived this run, and ' +
+          plural(holes, 'category search', 'category searches') + ' did not ' +
+          'finish, so these results do not establish that the market has no ' +
+          'suitable events. The category results below say which.'
+        : 'No verified candidates survived this run. Every category search ' +
+          'finished, so this is a finding about this client\'s market for the ' +
+          'window searched rather than a gap in the search. The category ' +
+          'results below say what each found.';
     }
 
     function recommendHtml(run){
@@ -3821,7 +4247,7 @@
       var cands = run.candidates || [];
       if (s.no_candidates) {
         return '<div class="evi-coverage"><span class="ic">i</span><span class="tx">' +
-          esc(s.note) + '</span></div>' + coverageHtml(s);
+          esc(emptyRunNote(s)) + '</span></div>' + coverageHtml(s);
       }
       var counts0 = s.counts || {};
       // One authority for how long the list is. The summary's count comes from
@@ -3839,6 +4265,7 @@
         return !finished && (c.tier !== 'P3' || c.committed);
       }).sort(function(a,b){ return ((b.total || 0) + (b.outcome_adjustment || 0)) - ((a.total || 0) + (a.outcome_adjustment || 0)); }).slice(0, keepN);
       var counts = counts0;
+      cardContext(s);
       var outc = s.outcomes || {};
       var byName = outc.by_identity || outc.by_name || {};
       var decLabels = outc.labels || {};
@@ -3869,7 +4296,7 @@
           '<span class="c-cut"><b>' + (counts.excluded || 0) + '</b>scored and cut' +
             '<i>below ' + RANK_FLOOR + '</i></span>' +
         '</div>' +
-        verdictHtml(s, counts) +
+        verdictHtml(s, counts, kept) +
         '<details class="ex-method"><summary>How these were scored</summary><p>' +
           esc(s.methodology || '') + '</p></details>' +
         notesHtml(s) +
@@ -3906,7 +4333,9 @@
             var body = '<div class="tn">' + esc(t.name) +
               '<span class="ts">' + esc(t.total) + '<i>/110</i></span></div>' +
               '<div class="tb"><span style="width:' + pct.toFixed(1) + '%"></span></div>' +
-              '<div class="tm">' + esc(t.where) + ' &middot; ' + esc(fmtDatesIn(t.when)) + '</div>' +
+              '<div class="tm">' + esc(t.where) + ' &middot; ' +
+                esc(at != null && kept[at].starts_on ? dateRangeText(kept[at])
+                                                     : whenText(t.when)) + '</div>' +
               '<div class="tc">' + esc(t.case) + '</div>';
             return '<li class="' + tierClass(t.tier) + (at == null ? '' : ' go') + '">' +
               (at == null ? body
@@ -3987,7 +4416,8 @@
           'Left out of the ranking rather than ranked low.</div><div class="evi-cut">' +
           s.unscored.map(function(e){
             return '<span class="cutp">' + esc(e.name) + '<b>' +
-              esc(e.note || e.scoring_note || 'The research did not establish enough evidence to score this event.') +
+              esc(readerText(e.note || e.scoring_note,
+                'The research did not establish enough evidence to score this event.')) +
               '</b></span>'; }).join('') +
           '</div></div>';
       }
@@ -4008,7 +4438,7 @@
       document.getElementById('drawerSub').textContent =
         run.status === 'complete'
           ? (function(){
-              var k = (s.counts || {}).kept || 0;
+              var k = clearedCount(s.selection ? s.selection.kept : null, s.counts || {});
               var l = (s.counts || {}).worth_a_look || 0;
               /* The one-tier wording is left exactly as it was. Only a run
                  that actually has a second tier says anything new, so a run
@@ -4265,7 +4695,16 @@
       if ((s.qualify_errors || []).length) {
         html += '<div class="evi-coverage warn"><span class="ic">!</span>' +
           '<span class="tx"><b>Part of the qualification pass did not run.</b> ' +
-          esc(s.qualify_errors.join(' ')) +
+          /* Stored runs carry the call's own diagnostic ("max_tokens: Ran
+             out of output budget..."). Cleaned, and identical lines said
+             once: three batches that broke the same way are one fact. */
+          esc(s.qualify_errors.map(function(e){
+            /* Written as a sentence since the writer was fixed; anything
+               else stored here is a call's diagnostic and is replaced. */
+            return /could not be qualified/.test(String(e))
+              ? readerText(e, 'One batch of companies could not be qualified.')
+              : 'One batch of companies could not be qualified.';
+          }).filter(function(e, i, all){ return all.indexOf(e) === i; }).join(' ')) +
           ' Companies below marked &ldquo;not qualified&rdquo; may be a ' +
           'failure to look rather than a judgement about them.</span></div>';
       }
@@ -4342,7 +4781,13 @@
       }
       var planLink = document.getElementById('eventPlanLink');
       if (planLink) {
-        planLink.hidden = run.status !== 'complete' || !['lookup', 'recommend'].includes(run.mode);
+        /* Only when there is something to plan. A complete report that kept
+           no event still offered the link, and it opened on a bare "Choose
+           an event from this report." with nothing to choose. */
+        var plannable = run.mode === 'recommend' ? (run.candidates || []).length
+                      : (run.events || []).length;
+        planLink.hidden = run.status !== 'complete' ||
+          !['lookup', 'recommend'].includes(run.mode) || !plannable;
         planLink.href = BASE + '/runs/' + run.id + '/plan';
       }
       if (run.mode === 'recommend') { return renderRecommend(run); }

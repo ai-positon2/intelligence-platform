@@ -469,8 +469,17 @@ def draft_batch(rows: list[dict], profile: dict, event: dict,
             % (len(rows), _roster_brief(rows, notes)))
     res = claude_websearch.ask(system, user, max_uses=4, max_tokens=DRAFT_MAX_TOKENS)
     if res.get("error"):
+        # The kind and the detail are for the log. `error` is printed on the
+        # report under "Part of the qualification pass did not run", and a
+        # live one read "max_tokens: Ran out of output budget before
+        # finishing (stop_reason=max_tokens). Raise max_tokens or lower
+        # max_uses." to the person deciding who to follow up with.
+        logger.warning("event_intel_workroom: qualify batch failed (%s: %s)",
+                       res["error"].get("kind"), res["error"].get("detail"))
         return {"drafts": {},
-                "error": "%s: %s" % (res["error"]["kind"], res["error"]["detail"])}
+                "error": ("One batch of %d compan%s could not be qualified: %s."
+                          % (len(rows), "y" if len(rows) == 1 else "ies",
+                             claude_websearch.reader_reason(res["error"])))}
     parsed = claude_websearch.extract_json(res.get("text") or "", require="companies")
     if not isinstance(parsed, dict):
         return {"drafts": {},
@@ -504,7 +513,11 @@ def draft_all(rows: list[dict], profile: dict, event: dict,
                     r = fut.result()
                 except Exception as e:
                     logger.exception("event_intel_workroom: batch crashed")
-                    errors.append("A qualification batch failed: %s" % str(e)[:200])
+                    # The exception is in the log line above; the report
+                    # gets a sentence, never the exception's own text.
+                    errors.append("One batch of companies could not be "
+                                  "qualified because the step stopped "
+                                  "unexpectedly.")
                     continue
                 if r.get("error"):
                     errors.append(r["error"])
@@ -539,6 +552,18 @@ DRAFT_REVIEW = "review_required"
 DRAFT_NO_EVIDENCE = "rewritten_no_booth_note"
 DRAFT_AGGRESSIVE = "rewritten_aggressive"
 DRAFT_ACCOUNT = "account_play"
+
+# What each status is called wherever a reader sees it. The page has its own
+# copy of these words (DRAFT_LABEL in the template); the CSV printed the raw
+# token ("rewritten_no_booth_note") into a file somebody pastes into a
+# sequencer.
+DRAFT_LABELS = {
+    DRAFT_OK: "Written as drafted",
+    DRAFT_REVIEW: "Review before use",
+    DRAFT_NO_EVIDENCE: "Opener replaced: claimed a conversation",
+    DRAFT_AGGRESSIVE: "Opener replaced: displacement language",
+    DRAFT_ACCOUNT: "Account play, no named person",
+}
 
 # The non-personalized fallback for `angle`/`fit_note` on a row Rule 1 or
 # Rule 2 rewrote. `opener` gets a real, per-class deterministic sentence from
