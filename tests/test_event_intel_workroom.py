@@ -78,7 +78,8 @@ def test_a_missing_end_date_never_reports_an_open_window():
     (24 * 30, W.WINDOW_EXPIRED),
 ])
 def test_the_window_state_tracks_the_48_and_72_hour_boundaries(hours, expected):
-    ended = datetime.datetime(2026, 8, 20, 23, 59, tzinfo=UTC)
+    # The final day ends where it ends last, UTC-12: 11:59 UTC the next day.
+    ended = datetime.datetime(2026, 8, 21, 11, 59, tzinfo=UTC)
     assert W.window_state("2026-08-20", ended + datetime.timedelta(hours=hours)
                           )["state"] == expected
 
@@ -108,13 +109,30 @@ def test_a_real_date_object_is_accepted_as_well_as_a_string():
 @pytest.mark.parametrize("a,b", [
     ("Acme Technologies, Inc.", "Acme Technologies"),
     ("Acme Ltd", "acme"),
-    ("The Widget Group", "Widget"),
+    ("The Widget Group", "Widget Group"),
     ("Foo  Bar   GmbH", "foo bar"),
+    ("Salesforce.com", "Salesforce"),
+    ("Société Générale", "Societe Generale"),
 ])
 def test_two_spellings_of_one_company_share_a_key(a, b):
     """A note written against one spelling has to be found against the other,
     or the booth rule refuses a conversation that really happened."""
     assert W.org_key(a) == W.org_key(b)
+
+
+def test_a_descriptor_is_kept_when_it_is_what_tells_two_companies_apart():
+    """"Apex Systems" and "Apex Group" both reduced to "apex": one was dropped
+    from the workroom and a note about one licensed the other (audit)."""
+    assert W.org_key("Apex Systems") != W.org_key("Apex Group")
+    # A note written as just "Widget" still finds "The Widget Group".
+    notes = W.match_booth_notes(W.index_booth_notes("Widget: asked for pricing"),
+                                [{"org_name": "The Widget Group"}])
+    assert notes["by_org"] == {W.org_key("The Widget Group"): "asked for pricing"}
+
+
+@pytest.mark.parametrize("name", ["株式会社リコー", "Яндекс", "삼성전자"])
+def test_a_name_in_another_script_keeps_a_key(name):
+    assert W.org_key(name) == name.casefold()
 
 
 def test_a_name_made_only_of_noise_words_does_not_collapse_to_empty():
@@ -637,3 +655,24 @@ def test_a_branded_opener_agrees_with_its_own_verb(cls):
 def test_an_unbranded_opener_agrees_with_its_own_verb(cls):
     o = _fb(cls, client=None)
     assert "We was" not in o and "We is" not in o
+
+
+def test_a_us_evening_event_still_running_is_not_called_over():
+    """Workroom audit, 2026-10-01: at 6pm PDT on its final day (01:00 UTC
+    the next morning) an event was reported "1 hours since this event
+    ended"."""
+    six_pm_pdt = datetime.datetime(2026, 8, 21, 1, 0, tzinfo=UTC)
+    assert W.window_state("2026-08-20", six_pm_pdt)["state"] == W.WINDOW_EARLY
+
+
+@pytest.mark.parametrize("hours,phrase", [(1.2, "1 hour"), (30, "30 hours")])
+def test_the_window_note_counts_in_words(hours, phrase):
+    ended = datetime.datetime(2026, 8, 21, 11, 59, tzinfo=UTC)
+    note = W.window_state("2026-08-20", ended + datetime.timedelta(hours=hours))["note"]
+    assert note.startswith("About %s since" % phrase) and "1 hours" not in note
+
+
+def test_an_expired_window_counts_days_in_words():
+    ended = datetime.datetime(2026, 8, 21, 11, 59, tzinfo=UTC)
+    note = W.window_state("2026-08-20", ended + datetime.timedelta(hours=80))["note"]
+    assert "About 3 days since" in note

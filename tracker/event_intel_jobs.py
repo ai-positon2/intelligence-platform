@@ -511,7 +511,9 @@ def run_once():
         pipeline.run_job(job['run_id'],payload['mode'],payload['query'],
                          **dict(payload['kwargs'], as_of=payload.get('as_of')))
     except Exception as exc:
-        store.update_run(job['run_id'],status='failed',error=str(exc)[:300])
+        import logging
+        logging.getLogger(__name__).exception('event run %s failed', job['run_id'])
+        store.update_run(job['run_id'],status='failed',error=reader_failure(exc))
     finally:
         CURRENT.reset(marker)
         stop.set()
@@ -523,6 +525,44 @@ def run_once():
             AND r.status IN ('complete','failed') ''',
             (job['run_id'],job['token']))
     return True
+
+
+# The worker's own refusals, as the person who started the run should read
+# them. Anything else is an exception's own text ("'int' object has no
+# attribute 'strip'"), which went into the run's error and onto the page
+# (audits, 2026-10-01); it goes to the log instead.
+_READER_FAILURES = (
+    ('A completed stage has different code or inputs',
+     "This run's saved progress no longer matches what it was started with, so "
+     "it stopped rather than mix two versions. Start a new run."),
+    ('Event run cancelled or lease lost',
+     'This run was cancelled, or the worker running it lost hold of it. Start '
+     'a new run if you still need it.'),
+    ('A previous provider call has an unknown outcome',
+     'A research call made by this run has an outcome that could not be '
+     'confirmed, so it stopped rather than risk paying for it twice. Ask an '
+     'administrator to check it before retrying.'),
+    ('The account event research budget has been reached',
+     'This account has used its event research allowance for the last 24 '
+     'hours. Start the run again later.'),
+    ('Worker code or runtime changed after submission',
+     'The platform was updated after this run was submitted, so it was not run '
+     'on a mix of versions. Start a new run.'),
+    ('Event job storage is unavailable',
+     'Run storage was unavailable, so the run could not continue. Try again '
+     'shortly.'),
+)
+READER_FAILURE_DEFAULT = ('The run stopped unexpectedly. Start it again, and if '
+                          'it fails the same way, report it.')
+
+
+def reader_failure(exc) -> str:
+    """What a failed run tells its reader about `exc`."""
+    text = str(exc or '')
+    for prefix, sentence in _READER_FAILURES:
+        if text.startswith(prefix):
+            return sentence
+    return READER_FAILURE_DEFAULT
 
 
 def runtime_versions():

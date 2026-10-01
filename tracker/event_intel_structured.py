@@ -12,7 +12,7 @@ class _JSONLD(HTMLParser):
 
     def handle_starttag(self, tag, attrs):
         if tag == 'script':
-            self.active = dict(attrs).get('type', '').lower().split(';')[0].strip() == 'application/ld+json'
+            self.active = (dict(attrs).get('type') or '').lower().split(';')[0].strip() == 'application/ld+json'
             self.parts = []
 
     def handle_data(self, data):

@@ -34,13 +34,30 @@ def chunks(text, size=12000, overlap=600):
         start = end - overlap
 
 
-def supported_rows(rows, text, page_kind):
+def _link_hosts(text):
+    """The hosts of every [url] link in the text, without a leading www."""
+    hosts = set()
+    for url in re.findall(r'\[(https?://[^\]\s]+)\]', text or ''):
+        host = (urlsplit(url).hostname or '').lower()
+        if host:
+            hosts.add(host[4:] if host.startswith('www.') else host)
+    return hosts
+
+
+def supported_rows(rows, text, page_kind, page_text=None):
     """Require literal local support; never infer personal attendance.
 
     Literal occurrence is a necessary gate, not semantic proof. Store that
     distinction rather than calling the result independently verified.
+
+    The name must be in `text`, the chunk the row was read from. The role
+    word may be anywhere on the page (`page_text`): a 400-card speakers page
+    with one "Speakers" heading kept 217 rows, because every chunk after the
+    first had no role word in it (roster audit, 2026-10-01).
     """
     folded = strict_name(text)
+    folded_page = strict_name(page_text) if page_text else folded
+    hosts = _link_hosts(page_text or text)
     role_words = {'exhibitor': ('exhibitor', 'exhibitors'),
                   'sponsor': ('sponsor', 'sponsors'),
                   'speaker': ('speaker', 'speakers'),
@@ -62,7 +79,7 @@ def supported_rows(rows, text, page_kind):
         role = row.get('role')
         # The URL classifier is not evidence of what the page says.
         tokens = role_words.get(role, ())
-        if pos < 0 or not any(re.search(r'\b' + word + r'\b', folded) for word in tokens):
+        if pos < 0 or not any(re.search(r'\b' + word + r'\b', folded_page) for word in tokens):
             rejected.append({'org_name': row.get('org_name'), 'reason': 'Organization or published role lacks literal page support.'})
             continue
         evidence = {'org_name': name, 'role': role, 'status': 'literal_support_only'}
@@ -73,7 +90,15 @@ def supported_rows(rows, text, page_kind):
             elif value:
                 evidence[field] = value
         domain = row.get('org_domain')
-        if domain and not re.search(r'(?<![\w.-])' + re.escape(domain) + r'(?![\w.-])', text, re.I):
+        # Supported when the page links to it, to www. on it, or to a
+        # subdomain of it. "Acme Corp [https://www.acme.com/]" used to lose
+        # acme.com, because the literal check refused the dot before it: most
+        # sponsor grids link with www., so most rows lost their website and
+        # Match companies had nothing to look up (roster audit, 2026-10-01).
+        linked = domain and any(h == domain.lower() or h.endswith('.' + domain.lower())
+                                for h in hosts)
+        if domain and not linked and not re.search(
+                r'(?<![\w.-])' + re.escape(domain) + r'(?![\w.-])', text, re.I):
             row['org_domain'] = None
         elif domain:
             evidence['org_domain'] = domain
@@ -170,11 +195,17 @@ def get_observations(run_id, email):
 
 
 def roster_years(text):
-    """Years explicitly attached to roster headings, not footer copyright."""
+    """Years explicitly attached to roster headings, not footer copyright.
+
+    Not link labels either: a current "Our 2026 Sponsors" page with a nav link
+    "2025 Sponsors [https://.../2025/sponsors]" was withheld whole as another
+    edition (roster audit, 2026-10-01). A link names a different page."""
     roles = r'(?:exhibitors?|sponsors?|speakers?|partners?)'
     years = set()
     for line in text.splitlines():
         if 'copyright' in line.lower() or '©' in line:
+            continue
+        if re.search(r'\[https?://[^\]\s]+\]\s*$', line):
             continue
         for pattern in (r'\b(20\d{2})\b.{0,60}\b'+roles+r'\b',
                         r'\b'+roles+r'\b.{0,30}\b(20\d{2})\b'):

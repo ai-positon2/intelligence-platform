@@ -235,7 +235,18 @@ def _harvest_event(run_id: int, event_id: int, event: dict,
         cache_identity = None
     total_rows, readable, unreadable, recovered = 0, 0, 0, 0
     access_links = []
+    # One listing read once. "/exhibitors", "/exhibitors/" and "http://..."
+    # were three pages, and 30 exhibitors came out as 90 participants (roster
+    # audit, 2026-10-01); so were two addresses redirecting to one page.
+    read_pages, saved_rows = set(), set()
+    unique = []
     for page in pages:
+        key = _page_key(page.get("url"))
+        if key and key not in read_pages:
+            read_pages.add(key)
+            unique.append(page)
+    read_pages = set()
+    for page in unique:
         page = dict(page, edition=str(event.get("starts_on") or event.get("edition") or "")[:4],
                     cache_identity=cache_identity, event_website=event.get("website") or "")
         try:
@@ -254,11 +265,29 @@ def _harvest_event(run_id: int, event_id: int, event: dict,
             continue
 
         src = got["source"]
+        landed = _page_key(src.get("final_url") or src.get("url"))
+        if src["status"] == SOURCE_OK and landed in read_pages:
+            store.save_source(run_id, event_id, src["url"], src["kind"], "duplicate",
+                              src.get("http_status"), 0,
+                              "This address opened a page already read above, so "
+                              "its rows were not counted twice.")
+            continue
+        read_pages.add(landed)
+        # The same company listed again on another of this event's pages
+        # (a sponsor shown on the exhibitor list too keeps both roles).
+        fresh = []
+        for r in got["rows"]:
+            k = (event_intel_workroom.org_key(r.get("org_name") or ""),
+                 (r.get("person_name") or "").lower(), r.get("role"))
+            if k not in saved_rows:
+                saved_rows.add(k)
+                fresh.append(r)
+        got = dict(got, rows=fresh)
         if src["status"] == SOURCE_OK:
             access_links.extend(src.get("access_links", []))
         store.save_source(run_id, event_id, src["url"], src["kind"], src["status"],
                           src.get("http_status"), src.get("rows_found", 0),
-                          src.get("note", ""), metadata={k:src[k] for k in ("agenda_excerpts", "access_links", "snapshots", "extraction", "coverage", "pages_read", "pages_seen", "pages_declared", "truncated", "expected_edition", "observed_roster_years") if k in src})
+                          src.get("note", ""), metadata={k:src[k] for k in ("agenda_excerpts", "access_links", "snapshots", "extraction", "coverage", "partial", "pages_read", "pages_seen", "pages_declared", "truncated", "expected_edition", "observed_roster_years") if k in src})
         if src["status"] == SOURCE_OK:
             readable += 1
         else:
@@ -284,7 +313,7 @@ def _harvest_event(run_id: int, event_id: int, event: dict,
         rsrc = rec["source"]
         store.save_source(run_id, event_id, rsrc["url"], rsrc["kind"],
                           rsrc["status"], None, rsrc.get("rows_found", 0),
-                          rsrc.get("note", ""))
+                          rsrc.get("note", ""), metadata={"recovery_of": src["url"]})
         if rec["rows"]:
             # Search recovery must not erase a known edition mismatch.
             if (src.get('coverage') or {}).get('edition_mismatch'):
@@ -304,6 +333,18 @@ def _harvest_event(run_id: int, event_id: int, event: dict,
             "recovered": recovered}
 
 
+def _page_key(url) -> str:
+    """One listing however its address is written: no scheme, no www, no
+    fragment, no trailing slash, host in lower case."""
+    from urllib.parse import urlsplit
+    parts = urlsplit(str(url or "").strip())
+    host = (parts.hostname or "").lower()
+    if host.startswith("www."):
+        host = host[4:]
+    path = (parts.path or "/").rstrip("/") or "/"
+    return host + path + ("?" + parts.query if parts.query else "")
+
+
 def _summarise(run_id: int) -> dict:
     """Build the run summary from what actually landed, not from what was
     attempted. Counts are read back out of the store so the summary can never
@@ -318,26 +359,45 @@ def _summarise(run_id: int) -> dict:
         by_role[p["role"]] = by_role.get(p["role"], 0) + 1
         prov = p.get("provenance") or VIA_PAGE
         by_provenance[prov] = by_provenance.get(prov, 0) + 1
-        key = (p.get("org_domain") or p["org_name"]).lower()
-        orgs.add(key)
+        # By name: keyed on the domain when there was one, the same company
+        # with and without its website counted twice. A speaker stored with
+        # their own name as the organisation is not an organisation.
+        key = event_intel_workroom.org_key(p.get("org_name") or "")
+        if key and key != event_intel_workroom.org_key(p.get("person_name") or ""):
+            orgs.add(key)
         if p.get("org_domain"):
             with_domain.add(p["org_domain"])
 
-    # A recovered source is neither read nor simply unreadable, and folding it
-    # into either number would hide the thing the reader most needs to know.
-    recovered_srcs = [s for s in sources if s["status"] == SOURCE_RECOVERED]
-    unreadable = [s for s in sources
-                  if s["status"] not in (SOURCE_OK, SOURCE_RECOVERED)]
+    # One roster page per address: the registration-page checks are not
+    # roster pages, a duplicate address is not a second page, and a page
+    # recovered by searching is that page's outcome rather than another page
+    # (roster audit, 2026-10-01: 2 pages were reported as "2 of 5").
+    pages: dict = {}
+    for src in sources:
+        if src.get("kind") == "access_review" or src.get("status") == "duplicate":
+            continue
+        meta = src.get("metadata") or {}
+        url = meta.get("recovery_of") or src.get("url")
+        status = src["status"]
+        if status == SOURCE_OK and (meta.get("partial") or (meta.get("coverage") or {}).get("partial")):
+            status = "partial"
+        prev = pages.get(url)
+        rank = {SOURCE_OK: 3, "partial": 2, SOURCE_RECOVERED: 1}
+        if prev is None or rank.get(status, 0) > rank.get(prev, 0):
+            pages[url] = status
+    states = list(pages.values())
     return {
         "participants": len(participants),
         "organisations": len(orgs),
         "resolvable_domains": len(with_domain),
         "by_role": by_role,
         "declared_attendees": by_role.get(ROLE_ATTENDEE_DECLARED, 0),
-        "sources_tried": len(sources),
-        "sources_read": len(sources) - len(unreadable) - len(recovered_srcs),
-        "sources_recovered": len(recovered_srcs),
-        "sources_unreadable": len(unreadable),
+        "sources_tried": len(states),
+        "sources_read": states.count(SOURCE_OK) + states.count("partial"),
+        "sources_partial": states.count("partial"),
+        "sources_recovered": states.count(SOURCE_RECOVERED),
+        "sources_unreadable": len([x for x in states
+                                   if x not in (SOURCE_OK, "partial", SOURCE_RECOVERED)]),
         "by_provenance": by_provenance,
         "provenance_note": (
             "%d row%s parsed from the event's own pages and %d recovered by "
@@ -376,7 +436,12 @@ def _run_lookup(run_id: int, query: str, year_hint: str | None) -> None:
 
     if __import__("os").environ.get("DATABASE_URL"):
         from .event_intel_evidence import record_event
-        record_event(run_id, event)
+        # A side ledger. A storage hiccup writing it failed the whole roster
+        # with developer text (roster audit, 2026-10-01); it is logged instead.
+        try:
+            record_event(run_id, event)
+        except Exception:
+            logger.exception("event_intel_pipeline: evidence ledger write failed for run %s", run_id)
     pages = res.get("pages") or []
     if not pages:
         store.update_run(
@@ -716,7 +781,7 @@ def _run_workroom(run_id: int, email: str, source_run_id: int, profile: dict,
         event["ends_on"] = ends_on_override
 
     window = event_intel_workroom.window_state(event.get("ends_on"))
-    notes = event_intel_workroom.index_booth_notes(booth_notes)
+    written = event_intel_workroom.index_booth_notes(booth_notes)
 
     if not participants:
         store.update_run(
@@ -733,10 +798,17 @@ def _run_workroom(run_id: int, email: str, source_run_id: int, profile: dict,
     # sponsor is one conversation, not two, and drafting twice for it would
     # produce two different openers for the same inbox.
     by_org: dict = {}
+    domain_key: dict = {}
     for p in participants:
         key = event_intel_workroom.org_key(p.get("org_name") or "")
         if not key:
             continue
+        # One company under two names ("Salesforce" and "Salesforce.com" are
+        # caught by org_key; "Meta" and "Facebook" are not) is still one
+        # inbox when both rows carry the same website.
+        domain = (p.get("org_domain") or "").lower()
+        if domain:
+            key = domain_key.setdefault(domain, key)
         prev = by_org.get(key)
         # A row that names a person beats one that does not: the named
         # contact is the whole difference between a message and an account
@@ -745,6 +817,11 @@ def _run_workroom(run_id: int, email: str, source_run_id: int, profile: dict,
                             and (p.get("person_name") or "")):
             by_org[key] = p
     rows = list(by_org.values())
+    merged_rows = len([p for p in participants if event_intel_workroom.org_key(p.get("org_name") or "")]) - len(rows)
+    # Notes tied to the one company each names. A note that names none is
+    # reported, not silently dropped (workroom audit, 2026-10-01).
+    matched = event_intel_workroom.match_booth_notes(written, rows)
+    notes = matched["by_org"]
 
     store.update_run(run_id, stage="qualifying")
     drafted = durable_stage("qualify", event_intel_workroom.draft_all,
@@ -753,7 +830,8 @@ def _run_workroom(run_id: int, email: str, source_run_id: int, profile: dict,
     store.update_run(run_id, stage="checking_drafts")
     enforced = event_intel_workroom.enforce(
         drafted["rows"], event_class=event_class, notes=notes,
-        event_name=event_name, client_name=profile.get("client_name"))
+        event_name=event_name, client_name=profile.get("client_name"),
+        client_site=profile.get("website"))
 
     split = event_intel_workroom.split_by_fit(enforced["rows"])
     repeats = event_intel_workroom.repeat_signal(
@@ -784,6 +862,9 @@ def _run_workroom(run_id: int, email: str, source_run_id: int, profile: dict,
         "rewritten": enforced["rewritten"],
         "rewritten_count": enforced["rewritten_count"],
         "booth_notes_given": len(notes),
+        "booth_notes_unmatched": matched["unmatched"],
+        "merged_rows": merged_rows,
+        "window_ends_on": event.get("ends_on"),
         "qualify_errors": drafted["errors"],
         "unqualified_count": drafted["missing"],
         "repeats": repeats,
@@ -857,8 +938,8 @@ def run_job(run_id: int, mode: str, query: str, **kwargs) -> None:
             _run_lookup(run_id, query, kwargs.get("year_hint"))
     except Exception as e:
         logger.exception("event_intel_pipeline: run %s crashed", run_id)
-        store.update_run(run_id, status="failed",
-                         error="The run failed unexpectedly: %s" % str(e)[:300])
+        from .event_intel_jobs import reader_failure
+        store.update_run(run_id, status="failed", error=reader_failure(e))
 
 
 def resolve_run_companies(run_id: int, email: str, titles: list[str] | None = None) -> dict:

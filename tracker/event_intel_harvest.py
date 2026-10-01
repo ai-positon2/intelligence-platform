@@ -257,14 +257,25 @@ def fetch_page(url: str) -> dict:
             if raw is None:
                 out["note"] = "The page's compressed response could not be decoded."
                 return out
-        markup = raw.decode(r.encoding or "utf-8", errors="replace")
+        markup = raw.decode(_charset(r, raw), errors="replace")
     finally:
         r.close()
 
     # Relative links resolve against where the document actually came from.
     from .event_intel_structured import events as structured_events, titles
-    out["structured_events"] = structured_events(markup)
-    out["titles"] = titles(markup)
+    # Metadata is a bonus on top of the page text, never a reason to lose it:
+    # a <script type> with no value raised AttributeError out of here, which
+    # this function promises never to do (roster audit, 2026-10-01).
+    try:
+        out["structured_events"] = structured_events(markup)
+    except Exception:
+        logger.warning("event_intel_harvest: structured data unreadable on %s", url, exc_info=True)
+        out["structured_events"] = []
+    try:
+        out["titles"] = titles(markup)
+    except Exception:
+        logger.warning("event_intel_harvest: titles unreadable on %s", url, exc_info=True)
+        out["titles"] = []
     text = html_to_linked_text(markup, out["final_url"])
     out["spa"] = client_render_marker(markup)
     if len(text) < _MIN_USEFUL_CHARS:
@@ -285,6 +296,29 @@ def fetch_page(url: str) -> dict:
     out["status"] = SOURCE_OK
     out["text"] = text
     return out
+
+
+_META_CHARSET = re.compile(rb"""<meta[^>]+charset\s*=\s*["']?\s*([A-Za-z0-9_.:-]+)""", re.I)
+
+
+def _charset(r, raw: bytes) -> str:
+    """The body's encoding: the header's charset, else the page's own <meta>,
+    else UTF-8.
+
+    `requests` reads "Content-Type: text/html" with no charset as ISO-8859-1,
+    which turned "Société Générale" into "SociÃ©tÃ© GÃ©nÃ©rale" on a page that
+    declares <meta charset="utf-8"> (roster audit, 2026-10-01)."""
+    import codecs
+    ctype = (r.headers.get("Content-Type") or "").lower()
+    if "charset=" in ctype and r.encoding:
+        candidate = r.encoding
+    else:
+        m = _META_CHARSET.search(raw[:4096])
+        candidate = m.group(1).decode("ascii", "ignore") if m else "utf-8"
+    try:
+        return codecs.lookup(candidate).name
+    except LookupError:
+        return "utf-8"
 
 
 def _read_body(r, out) -> bytes:
@@ -556,6 +590,12 @@ _NON_COMPANY_HOSTS = {
     "accelevents.com", "pheedloop.com", "attendify.com", "expofp.com",
     "map-dynamics.com", "a2zinc.net", "mapyourshow.com", "swoogo.com",
     "regfox.com", "ticketmaster.com", "meetup.com",
+    # Roster audit, 2026-10-01: platforms whose exhibitor profiles would give
+    # every row on a directory the platform's own domain.
+    "luma.com", "eventscribe.net", "eventscribe.com", "vfairs.com", "hubilo.com",
+    "goldcast.io", "on24.com", "expoplatform.com", "airmeet.com", "eventsair.com",
+    "cvent-assets.com", "eventmobi.com", "socio.events", "bizzabo-cdn.com",
+    "matchmaking.grip.events", "inxpo.com", "6connex.com", "intrado.com",
 }
 
 
@@ -647,29 +687,53 @@ def _extract_chunk(page_text: str, page_url: str, page_kind: str,
     return {"rows": rows, "note": note, "error": None, "spend": claude_websearch.spend_of(res)}
 
 
+def _extract_split(piece, page_url, page_kind, event_name, event_host, spend):
+    """One chunk, split once and retried when its reply ran out of output.
+
+    A dense A to Z index runs to about 260 rows a chunk, more than the 8,000
+    output tokens one reply has, and failed the same way every time (roster
+    audit, 2026-10-01). Halved at a line, each half fits."""
+    result = _extract_chunk(piece, page_url, page_kind, event_name, event_host)
+    spend.append(result.get('spend'))
+    if (result.get('error') or {}).get('kind') != claude_websearch.ERR_MAX_TOKENS or len(piece) < 2000:
+        return [(piece, result)]
+    cut = piece.rfind('\n', 0, len(piece) // 2 + 1) + 1 or len(piece) // 2
+    out = []
+    for half in (piece[:cut], piece[cut:]):
+        res = _extract_chunk(half, page_url, page_kind, event_name, event_host)
+        spend.append(res.get('spend'))
+        out.append((half, res))
+    return out
+
+
 def extract_participants(page_text, page_url, page_kind, event_name, event_host=""):
     from .event_intel_evidence import chunks, supported_rows, source_snapshot, text_hash
     pieces = list(chunks(page_text))
     rows, rejected, errors, spend, notes = [], [], [], [], []
     for index, piece in enumerate(pieces):
-        result = _extract_chunk(piece, page_url, page_kind, event_name, event_host)
-        spend.append(result.get('spend'))
-        if result.get('error'):
-            errors.append(dict(result['error'], chunk=index))
-            continue
-        accepted, refused = supported_rows(result['rows'], piece, page_kind)
-        rows.extend(accepted)
-        rejected.extend(refused)
-        if result.get('note'):
-            notes.append(result['note'])
-    if rejected:
-        notes.append('%d proposed rows lacked literal organization/role support and were withheld.' % len(rejected))
+        for part, result in _extract_split(piece, page_url, page_kind, event_name,
+                                           event_host, spend):
+            if result.get('error'):
+                errors.append(dict(result['error'], chunk=index))
+                continue
+            accepted, refused = supported_rows(result['rows'], part, page_kind, page_text)
+            rows.extend(accepted)
+            rejected.extend(refused)
+            if result.get('note'):
+                notes.append(result['note'])
+    failed = len({e['chunk'] for e in errors})
+    # What makes the read incomplete goes FIRST: the page note is capped at
+    # 800 characters, and with each chunk's own note ahead of it the "failed"
+    # sentence was routinely the part that was cut off (roster audit).
+    warnings = []
     if errors:
-        notes.append('%d of %d extraction chunks failed; the roster is incomplete.' % (len(errors), len(pieces)))
-    return {'rows': rows, 'note': ' '.join(notes),
-            'error': errors[0] if pieces and len(errors) == len(pieces) else None,
+        warnings.append('%d of %d extraction chunks failed; the roster is incomplete.' % (failed, len(pieces)))
+    if rejected:
+        warnings.append('%d proposed rows lacked literal organization/role support and were withheld.' % len(rejected))
+    return {'rows': rows, 'note': ' '.join(warnings + notes),
+            'error': errors[0] if pieces and failed == len(pieces) and not rows else None,
             'spend': claude_websearch.spend_sum(*spend),
-            'coverage': {'chunks_total': len(pieces), 'chunks_read': len(pieces)-len(errors),
+            'coverage': {'chunks_total': len(pieces), 'chunks_read': len(pieces)-failed,
                          'chunker_version': 1,
                          'chunks': [{'index':i,'text_sha256':text_hash(piece),'characters':len(piece)} for i,piece in enumerate(pieces)],
                          'rejected_rows': len(rejected), 'errors': errors,
@@ -765,7 +829,13 @@ def harvest_page(page: dict, event_name: str, event_host: str = "",
         if nxt in seen_urls:
             continue
         seen_urls.add(nxt)
-        got = fetch_page(nxt)
+        try:
+            got = fetch_page(nxt)
+        except Exception:
+            # Pages already read are kept: an exception here used to lose the
+            # whole listing, pages 1 to 6 with page 7 (roster audit).
+            logger.exception("event_intel_harvest: page %s of a listing raised", nxt)
+            got = {"status": SOURCE_ERROR, "note": "The page could not be read."}
         if got["status"] != SOURCE_OK:
             stopped = ("Stopped following this listing at page %d of %d: %s"
                        % (source["pages_read"] + 1, source["pages_seen"],
@@ -780,7 +850,12 @@ def harvest_page(page: dict, event_name: str, event_host: str = "",
             break
         source["access_links"].extend(discover(got["text"], nxt, site))
         source["agenda_excerpts"].extend(agenda_evidence(got["text"], nxt, site, kind))
-        sub = read(got, nxt)
+        try:
+            sub = read(got, nxt)
+        except Exception:
+            logger.exception("event_intel_harvest: reading page %s of a listing raised", nxt)
+            sub = {"rows": [], "error": {"kind": claude_websearch.ERR_TRANSPORT,
+                                         "detail": "reading the page raised"}}
         source["snapshots"].append(sub.get("snapshot", {}))
         source["extraction"].append(sub.get("coverage", {}))
         source["truncated"] = source["truncated"] or bool(got.get("truncated"))
@@ -800,14 +875,20 @@ def harvest_page(page: dict, event_name: str, event_host: str = "",
                 queue.append(extra)
                 source["pages_seen"] += 1
 
+    # What makes this read incomplete is said first, ahead of the per-page
+    # notes, so the 800-character cap can never cut it off (roster audit).
+    warnings = []
+    if stopped:
+        warnings.append(stopped)
+    elif queue and source["pages_read"] >= max_pages:
+        warnings.append("This listing has more pages than the %d-page limit, so "
+                        "it is incomplete." % max_pages)
+    if source["truncated"]:
+        warnings.append("Part of this listing was longer than the reading limit "
+                        "and was cut, so it is incomplete.")
     if source["pages_read"] > 1:
         notes.append("Followed %d of %d pages of this listing."
                      % (source["pages_read"], source["pages_seen"]))
-    if stopped:
-        notes.append(stopped)
-    elif queue and source["pages_read"] >= max_pages:
-        notes.append("This listing has more pages than the %d-page limit, so "
-                     "it is incomplete." % max_pages)
 
     # A directory that prints "Page 1 of 14" has told us its own size. If we
     # read fewer than that, the roster is short by a knowable amount, and
@@ -817,7 +898,7 @@ def harvest_page(page: dict, event_name: str, event_host: str = "",
     # a cursor, a button that posts, a page number rendered in the browser.
     if declared and source["pages_read"] < declared:
         source["pages_declared"] = declared
-        notes.append("This listing says it has %d pages and %d %s read, so it "
+        warnings.append("This listing says it has %d pages and %d %s read, so it "
                      "is incomplete%s."
                      % (declared, source["pages_read"],
                         "was" if source["pages_read"] == 1 else "were",
@@ -850,9 +931,16 @@ def harvest_page(page: dict, event_name: str, event_host: str = "",
                      "browser after the page loads, so a plain read cannot see "
                      "it. This is not evidence the event has no %s."
                      % (kind if kind != "unknown" else "participants"))
+    chunks_short = any((e or {}).get("chunks_read", 0) < (e or {}).get("chunks_total", 0)
+                       for e in source["extraction"])
+    pagination_incomplete = bool(stopped or queue or (declared and source["pages_read"] < declared))
     source["coverage"] = {"complete": False, "scope": "published pages only",
         "pages_read": source["pages_read"], "pages_seen": source["pages_seen"],
         "pages_declared": declared, "truncated": source["truncated"],
-        "pagination_incomplete": bool(stopped or queue or (declared and source["pages_read"] < declared))}
-    source["note"] = " ".join(notes)[:800]
+        "pagination_incomplete": pagination_incomplete,
+        # One flag the summary can count: this page was opened and listed
+        # people, but not all of it was read (roster audit, 2026-10-01).
+        "partial": bool(pagination_incomplete or source["truncated"] or chunks_short)}
+    source["partial"] = source["coverage"]["partial"]
+    source["note"] = " ".join(warnings + notes)[:800]
     return {"source": source, "rows": deduped}

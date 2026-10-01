@@ -368,7 +368,7 @@ def test_the_drafts_export_carries_the_caveats_off_the_page_with_it(monkeypatch)
     text = _client().get(BASE + "/runs/7/outreach.csv").get_data(as_text=True)
     assert "Nothing here has been sent" in text
     assert "No CRM is connected" in text
-    assert "claimed a conversation nobody recorded" in text
+    assert "claimed something nobody recorded" in text
 
 
 def test_a_drafts_row_uses_the_stores_role_wording(monkeypatch):

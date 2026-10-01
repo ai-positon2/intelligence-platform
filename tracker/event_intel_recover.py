@@ -135,7 +135,12 @@ def recover_page(url: str, kind: str, event_name: str, event_host: str = "",
                           "read.")
         return {"source": source, "rows": [], "spend": spend}
 
-    rows, uncited = [], 0
+    import re
+    from urllib.parse import urlsplit
+    year = (re.search(r"\b(20\d{2})\b", str(event_edition or "")) or [None, None])[1]
+    home = (event_host or "").lower()
+    home = home[4:] if home.startswith("www.") else home
+    rows, uncited, other_edition = [], 0, 0
     for r in (parsed.get("rows") or []):
         if not isinstance(r, dict):
             continue
@@ -149,6 +154,16 @@ def recover_page(url: str, kind: str, event_name: str, event_host: str = "",
             # this published here" and "we came up with this".
             uncited += 1
             continue
+        # The direct read withholds another edition's roster; a row found on
+        # one is withheld here too ("ev.example/2024/exhibitors" was accepted
+        # for the 2026 edition: roster audit, 2026-10-01).
+        cited_years = set(re.findall(r"(?<!\d)(20\d{2})(?!\d)", found_at))
+        if year and cited_years and year not in cited_years:
+            other_edition += 1
+            continue
+        host = (urlsplit(found_at).hostname or "").lower()
+        host = host[4:] if host.startswith("www.") else host
+        off_site = bool(home) and not (host == home or host.endswith("." + home))
         rows.append({
             "org_name": name[:200],
             "org_domain": clean_domain(r.get("org_domain"), event_host),
@@ -161,6 +176,9 @@ def recover_page(url: str, kind: str, event_name: str, event_host: str = "",
             # row has to point at something a reader can open.
             "source_url": found_at[:800],
             "provenance": VIA_SEARCH,
+            # Found on a page the event does not publish: a third party's
+            # list, said so on the row rather than presented as the event's.
+            "evidence": {"status": "recovered_by_search", "off_site": off_site},
         })
 
     notes = []
@@ -173,6 +191,14 @@ def recover_page(url: str, kind: str, event_name: str, event_host: str = "",
         notes.append("%d recovered row%s named no source page and %s discarded."
                      % (uncited, "" if uncited == 1 else "s",
                         "was" if uncited == 1 else "were"))
+    if other_edition:
+        notes.append("%d recovered row%s came from another edition's page and %s "
+                     "withheld." % (other_edition, "" if other_edition == 1 else "s",
+                                    "was" if other_edition == 1 else "were"))
+    off = sum(1 for r in rows if r["evidence"]["off_site"])
+    if off:
+        notes.append("%d of the recovered rows %s found on sites other than the "
+                     "event's own." % (off, "was" if off == 1 else "were"))
     if rows:
         source["status"] = SOURCE_RECOVERED
         source["rows_found"] = len(rows)

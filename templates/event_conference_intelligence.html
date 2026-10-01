@@ -1690,6 +1690,16 @@
           ' could not be read</b>, so this roster is incomplete by an unknown amount. ' +
           'Every attempt is listed under Sources below.');
       }
+      var partial = s.sources_partial || 0;
+      if (partial) {
+        /* Opened and read in part: a stopped pagination, a cut page, a
+           chunk that failed. Counted as read above, and said here, because
+           "Read 1 of 1" over half a directory is the claim this banner
+           exists to prevent. */
+        parts.push('<b>' + partial + ' of the pages read ' + (partial === 1 ? 'was' : 'were') +
+          ' only read in part</b>, so this roster is short by whatever the rest of ' +
+          (partial === 1 ? 'it' : 'them') + ' lists. The note on each source says where it stopped.');
+      }
       if (s.declared_attendees) {
         parts.push(s.declared_attendees + ' row' + (s.declared_attendees === 1 ? '' : 's') +
           ' came from someone publicly saying they are attending.');
@@ -1747,7 +1757,9 @@
         var nm = li ? '<a href="' + esc(li) + '" target="_blank" rel="noopener noreferrer">' +
           esc(c.name || 'View') + '</a>' : esc(c.name || '');
         return '<div class="evi-contact">' + nm +
-          (c.title ? ' <span class="t">' + esc(c.title) + '</span>' : '') + '</div>';
+          (c.title ? ' <span class="t">' + esc(c.title) + '</span>' : '') +
+          (c.employer_unconfirmed ? ' <span class="t">(employer matched by name, not ' +
+            'confirmed)</span>' : '') + '</div>';
       }).join('') + '</div>';
     }
 
@@ -2438,8 +2450,13 @@
     }
 
     function sourcePanel(run){
-      var srcs = run.sources || [];
+      /* Roster pages only: the registration-page checks are not pages of
+         the roster, and an address that opened a page already read is not
+         a second page (roster audit, 2026-10-01). */
+      var srcs = (run.sources || []).filter(function(x){
+        return x.kind !== 'access_review' && x.status !== 'duplicate'; });
       if (!srcs.length) return '';
+      var sp = (run.summary || {}).sources_partial || 0;
       var counts = {};
       srcs.forEach(function(x){ counts[x.status] = (counts[x.status] || 0) + 1; });
       var keys = Object.keys(counts).sort(function(a, b){ return counts[b] - counts[a]; });
@@ -2455,14 +2472,19 @@
             (unread === 1 ? 'it' : 'them') + ', and there is no way to know how ' +
             'much that is. Every attempt is listed under Sources at the foot of ' +
             'this report.'
-          : 'Every page the harvester tried came back readable, so this roster ' +
-            'is as complete as what the event has published.');
+          : sp
+            ? 'Every page the harvester tried opened, but ' + esc(plural(sp, 'page')) +
+              ' of them ' + (sp === 1 ? 'was' : 'were') + ' only read in part, so the ' +
+              'roster is short by whatever the rest listed.'
+            : 'Every page the harvester tried came back readable, so this roster ' +
+              'is as complete as what the event has published.');
     }
 
     function firmoPanel(run){
       var rows = run.participants || [];
-      var inds = {}, looked = 0;
+      var inds = {}, looked = 0, noMatch = 0;
       rows.forEach(function(p){
+        if (p.resolution === 'no_match') { noMatch += 1; return; }
         var ind = (p.apollo || {}).industry;
         if (!ind) return;
         looked += 1;
@@ -2477,11 +2499,13 @@
       var rest = keys.length - top.length;
       return panel('What they do',
         evBars(bars),
-        'Industry as Apollo records it, for the ' + esc(looked) + ' of ' +
-        esc(rows.length) + ' organisations that have been matched. ' +
-        (rest ? esc(plural(rest, 'other industry', 'other industries')) + ' had one row each. ' : '') +
-        'The other ' + esc(rows.length - looked) + ' have not been looked up, so ' +
-        'they are absent from this chart rather than counted as unknown.');
+        'Industry as Apollo records it, for ' + esc(looked) + ' of the ' +
+        esc(rows.length) + ' rows on the roster. ' +
+        (rest ? esc(plural(rest, 'other industry', 'other industries')) + ' are not drawn. ' : '') +
+        (noMatch ? esc(noMatch) + ' were looked up and Apollo has no record of them. ' : '') +
+        (rows.length - looked - noMatch > 0
+          ? 'The other ' + esc(rows.length - looked - noMatch) + ' have not been looked up, so ' +
+            'they are absent from this chart rather than counted as unknown.' : ''));
     }
 
     function rosterGlance(run){
@@ -2927,13 +2951,24 @@
       var already = (run.participants || []).some(function(p){
         return p.resolution && p.resolution !== 'unresolved';
       });
+      /* Domains nobody has looked up yet. A match that stopped part-way
+         leaves some, and the button that would finish it used to vanish as
+         soon as anything was matched (roster audit, 2026-10-01). */
+      var pending = {};
+      (run.participants || []).forEach(function(p){
+        if (p.org_domain && (!p.resolution || p.resolution === 'unresolved')) pending[p.org_domain] = 1;
+      });
+      var left = Object.keys(pending).length;
       if (already) {
         return '<div class="evi-sec"><h3>Company data</h3>' + resolveNoteHtml(run) +
           '<div class="evi-empty" style="padding:16px">Companies have been matched in ' +
           'Apollo for this run' + (run.credits_spent ? ', costing ' + run.credits_spent +
           ' credit' + (run.credits_spent === 1 ? '' : 's') : '') + '. Contacts shown are ' +
           'from Apollo\'s free people search; revealing email or phone is a separate, ' +
-          'billed action in Contact Finder.</div></div>';
+          'billed action in Contact Finder.</div>' +
+          (left ? '<button class="evi-btn" type="button" onclick="eviResolve(' + run.id + ')" ' +
+            'id="resolveBtn">Match the remaining ' + left + ' compan' +
+            (left === 1 ? 'y' : 'ies') + '</button>' : '') + '</div>';
       }
       return '<div class="evi-sec"><h3>Company data</h3>' +
         '<div class="evi-coverage"><span class="ic">' +
@@ -4501,6 +4536,8 @@
       review_required: 'Review before use',
       rewritten_no_booth_note: 'Opener replaced: claimed a conversation',
       rewritten_aggressive: 'Opener replaced: displacement language',
+      rewritten_no_booth: 'Opener replaced: claimed a booth you did not have',
+      rewritten_link: 'Opener replaced: contained a link nobody supplied',
       account_play: 'Account play, no named person'
     };
 
@@ -4562,7 +4599,11 @@
           '<p>' + esc(r.opener) + '</p></div>' : '') +
         (status !== 'ok' && DRAFT_LABEL[status]
           ? '<div class="ow"><div class="owt">' + esc(DRAFT_LABEL[status]) + '</div>' +
-            '<div class="own">' + esc(r.draft_reason || r.account_note || '') + '</div>' +
+            '<div class="own">' + esc(r.draft_reason || '') + '</div>' +
+            /* Both, not either: a rewritten row with nobody named is still an
+               account play, and showing only the rewrite reason hid that. */
+            (r.draft_reason && r.account_note && status !== 'account_play'
+              ? '<div class="own">' + esc(r.account_note) + '</div>' : '') +
             (flagged.length
               ? '<div class="owf">' + flagged.map(function(f){
                   return '<code>' + esc(f) + '</code>'; }).join('') + '</div>'
@@ -4725,12 +4766,31 @@
           'failure to look rather than a judgement about them.</span></div>';
       }
       if (s.rewritten_count) {
+        /* Only the companies that cleared the floor get a card below, so the
+           promise to show the phrase is made for those alone; the rest are
+           in the cut tail, where no draft is shown at all. */
+        var shownRewrites = keptRows.filter(function(r){
+          return /^rewritten_/.test(r.draft_status || ''); }).length;
+        var tail = s.rewritten_count - shownRewrites;
         html += '<div class="evi-sec"><h3>What was thrown away</h3>' +
           '<div class="evi-note">' + esc(s.rewritten_count) + ' draft' +
           (s.rewritten_count === 1 ? '' : 's') + ' claimed something that is not on ' +
-          'record. Each one was replaced with an opener that only says what is ' +
-          'known, and both the phrase and the reason are shown on the company below.' +
+          'record. Each one was replaced with an opener that only says what is known.' +
+          (shownRewrites ? ' The phrase and the reason are shown on ' +
+            (shownRewrites === 1 ? 'the company' : 'the ' + esc(shownRewrites) + ' companies') +
+            ' below that cleared the floor.' : '') +
+          (tail > 0 ? ' ' + esc(tail) + (tail === 1 ? ' was' : ' were') +
+            ' on companies cut below the floor, which are listed without drafts.' : '') +
           '</div></div>';
+      }
+      var unmatchedNotes = s.booth_notes_unmatched || [];
+      if (unmatchedNotes.length) {
+        html += '<div class="evi-coverage warn"><span class="ic">!</span><span class="tx">' +
+          '<b>' + esc(unmatchedNotes.length) + ' booth note' +
+          (unmatchedNotes.length === 1 ? '' : 's') + ' matched no single company on the roster' +
+          '</b>, so ' + (unmatchedNotes.length === 1 ? 'it was' : 'they were') +
+          ' not used: ' + esc(unmatchedNotes.join(', ')) + '. Write the company name ' +
+          'as the roster lists it, then a colon, and run it again.</span></div>';
       }
 
       var repeats = (s.repeats || {}).repeats || [];
@@ -4749,7 +4809,10 @@
          once: a chart and a list that each filter the rows themselves are
          two chances to disagree about where the floor is. */
       var kept = keptRows, cut = cutRows;
-      var unq = rows.filter(function(r){ return r.unqualified; });
+      /* A row with no usable fit is unqualified whatever its flag says:
+         runs stored before the fix carry fit null with unqualified false,
+         and matched none of the three lists, so they vanished. */
+      var unq = rows.filter(function(r){ return r.unqualified || r.fit == null; });
 
       html += '<div class="evi-sec"><h3>Worth contacting</h3>' +
         (kept.length
@@ -4772,8 +4835,8 @@
       }
       if (unq.length) {
         html += '<div class="evi-sec"><h3>Not qualified</h3><div class="evi-note">' +
-          'The qualification pass returned nothing for these, so they are unscored ' +
-          'rather than scored low.</div><div class="evi-cut">' +
+          'The qualification pass returned nothing usable for these, so they are ' +
+          'unscored rather than scored low.</div><div class="evi-cut">' +
           unq.map(function(r){
             return '<span class="cutp">' + esc(r.org_name) + '</span>'; }).join('') +
           '</div></div>';

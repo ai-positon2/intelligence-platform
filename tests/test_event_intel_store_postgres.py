@@ -899,3 +899,38 @@ def test_cross_client_interest_counts_clients_that_kept_the_event():
     key = name_key('XC Shared Forum')
     got = S.cross_client_interest([key], None, 30, 'xc-caller@position2.com')
     assert got[key]['distinct_clients'] == 2
+
+
+# ── the 2026-10-01 roster and workroom audits, against real SQL ────────────
+
+def _roster(email, event_name, orgs):
+    rid = S.save_run(email, "lookup", event_name)
+    eid = S.save_event(rid, {"name": event_name, "website": "https://e.example",
+                             "starts_on": _soon()})
+    S.save_participants(rid, eid, [{"org_name": o, "role": "exhibitor",
+                                    "source_url": "https://e.example/x", "provenance": "page"}
+                                   for o in orgs])
+    return rid
+
+
+def test_seen_before_leaves_out_every_run_of_the_same_event():
+    email = "prior-events@position2.com"
+    first = _roster(email, "Money20/20 USA", ["Acme Inc"])
+    again = _roster(email, "money20/20 usa", ["Acme"])
+    _roster(email, "Sibos", ["Acme"])
+    prior = S.prior_participant_events(email, exclude_run_id=again)
+    assert prior[__import__("tracker.event_intel_workroom", fromlist=["x"]).org_key("Acme")] == ["Sibos"]
+    assert first  # the first lookup of the same event is not "another event"
+
+
+def test_a_retry_after_a_failed_match_is_not_the_first_press():
+    rid = S.save_run(EMAIL, "lookup", "resolution retry")
+    assert S.begin_resolution(rid, EMAIL, "[]") == ("go", True)
+    S.finish_resolution(rid, "failed", {"credits": 2})
+    assert S.begin_resolution(rid, EMAIL, "[]") == ("go", False)
+
+
+def test_a_duplicate_page_source_is_stored(run):
+    S.save_source(run, None, "https://m.example/exhibitors/", "exhibitors", "duplicate",
+                  200, 0, "This address opened a page already read above.")
+    assert [s["status"] for s in S.get_sources(run)] == ["duplicate"]

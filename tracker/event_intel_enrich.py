@@ -273,10 +273,18 @@ def find_people(domains: list[str], titles: list[str] | None = None,
     # error=None while doing it. Grouping therefore falls back to the employer
     # NAME, matched against the label of each domain that was asked for.
     by_label: dict = {}
+    shared = set()
     for dom in uniq:
         label = _company_label(dom)
         if label:
+            if label in by_label and by_label[label] != dom:
+                shared.add(label)
             by_label.setdefault(label, dom)
+    # A label two requested domains share says nothing about which of them
+    # employs this person: with acme.com and acme.io both on the roster,
+    # every "Acme" person landed under acme.com (roster audit, 2026-10-01).
+    for label in shared:
+        by_label.pop(label, None)
 
     unattributed: dict = {}
     masked = 0
@@ -284,6 +292,7 @@ def find_people(domains: list[str], titles: list[str] | None = None,
         d = clean_domain(p.get("company_domain") or p.get("organization_domain")
                          or p.get("company_website") or "")
         org_name = p.get("organization_name") or p.get("company_name") or ""
+        by_name = not d
         if not d:
             d = by_label.get(_normalise_company_name(org_name))
         # Apollo's q_organization_domains_list is a relevance hint, not a
@@ -316,6 +325,9 @@ def find_people(domains: list[str], titles: list[str] | None = None,
             "linkedin": p.get("linkedin_url"),
             "location": p.get("location") or p.get("city"),
             "name_masked": bool(p.get("name_masked")),
+            # Tied to this company by its employer's NAME, not a domain
+            # Apollo gave: likely, and shown as such rather than as certain.
+            "employer_unconfirmed": by_name,
         })
     out["total"] = sum(len(v) for v in out["by_domain"].values())
     out["unattributed"] = unattributed

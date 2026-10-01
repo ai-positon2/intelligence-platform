@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import datetime
 import logging
+import re
 
 from . import claude_websearch
 
@@ -35,6 +36,36 @@ logger = logging.getLogger(__name__)
 # `attendees` is last and is expected to be absent almost always -- events
 # sell that list rather than publish it.
 PAGE_KINDS = ("exhibitors", "sponsors", "speakers", "agenda", "partners", "attendees")
+# What a reply calls a page kind, beyond the exact plural asked for. Unmapped
+# kinds ("Sponsor", "exhibitor", "floor_plan") were dropped, and a run whose
+# every page was dropped reported "a real finding about the event" (roster
+# audit, 2026-10-01).
+_KIND_ALIASES = {
+    "exhibitor": "exhibitors", "exhibitor_list": "exhibitors", "exhibitor list": "exhibitors",
+    "exhibitor_directory": "exhibitors", "floor_plan": "exhibitors", "floorplan": "exhibitors",
+    "floor plan": "exhibitors", "expo": "exhibitors", "directory": "exhibitors",
+    "sponsor": "sponsors", "sponsorship": "sponsors", "sponsor_list": "sponsors",
+    "speaker": "speakers", "speaker_list": "speakers", "faculty": "speakers",
+    "programme": "agenda", "program": "agenda", "schedule": "agenda", "sessions": "agenda",
+    "partner": "partners", "partner_list": "partners",
+    "attendee": "attendees", "attendee_list": "attendees", "delegates": "attendees",
+}
+
+
+def _kind(raw) -> str:
+    k = " ".join(str(raw or "").strip().lower().replace("-", "_").split())
+    if k in PAGE_KINDS:
+        return k
+    return _KIND_ALIASES.get(k) or _KIND_ALIASES.get(k.replace(" ", "_")) or ""
+
+
+def _url_key(url: str) -> str:
+    """The same listing however its address was written."""
+    from urllib.parse import urlsplit
+    parts = urlsplit(url)
+    host = (parts.hostname or "").lower()
+    host = host[4:] if host.startswith("www.") else host
+    return host + ((parts.path or "/").rstrip("/") or "/") + ("?" + parts.query if parts.query else "")
 
 _MIN_CONFIDENCE = ("high", "medium")
 
@@ -101,13 +132,13 @@ def _clean_pages(raw) -> list[dict]:
         if not isinstance(p, dict):
             continue
         url = str(p.get("url") or "").strip()
-        kind = str(p.get("kind") or "").strip().lower()
+        kind = _kind(p.get("kind"))
         low = url.lower()
         if not (low.startswith("https://") or low.startswith("http://")):
             continue
-        if kind not in PAGE_KINDS or url in seen:
+        if not kind or _url_key(url) in seen:
             continue
-        seen.add(url)
+        seen.add(_url_key(url))
         out.append({"url": url, "kind": kind, "note": str(p.get("note") or "")[:300]})
     return out
 
@@ -203,10 +234,26 @@ def _resolve_event(query: str, year_hint: str | None, box: dict) -> dict:
                         "detail": (res.get("text") or "")[:400]}
         return out
 
-    confidence = str(parsed.get("confidence") or "none").lower()
-    reasoning = claude_websearch.strip_em_dash(str(parsed.get("reasoning") or ""))[:1200]
-    name = claude_websearch.strip_em_dash((parsed.get("name") or "").strip())
-    website = (parsed.get("website") or "").strip()
+    def text(key):
+        """A field as text whatever JSON type it came back as: `"edition":
+        2027` raised AttributeError on .strip() and failed the run with that
+        exception's own text, after the lookup was paid for (roster audit)."""
+        value = parsed.get(key)
+        if value is None or isinstance(value, (dict, list)):
+            return ""
+        return str(value).strip()
+
+    def iso(key):
+        value = text(key)[:10]
+        try:
+            return datetime.date.fromisoformat(value).isoformat()
+        except ValueError:
+            return None
+
+    confidence = text("confidence").lower() or "none"
+    reasoning = claude_websearch.strip_em_dash(text("reasoning"))[:1200]
+    name = claude_websearch.strip_em_dash(text("name"))
+    website = text("website")
 
     from urllib.parse import urlparse
     parsed_site = urlparse(website)
@@ -222,27 +269,39 @@ def _resolve_event(query: str, year_hint: str | None, box: dict) -> dict:
     # alternative's name, edition and audience_note are built from, and a
     # dash left in `edition` here was found live in a client's top-five list.
     _clean = claude_websearch.strip_em_dash
+    starts_on, ends_on = iso("starts_on"), iso("ends_on")
+    # The year the user typed is the edition they asked for. A lookup for
+    # 2025 that came back with 2027 was accepted and that edition harvested
+    # without a word (roster audit, 2026-10-01).
+    asked = re.search(r"\b(20\d{2})\b", str(year_hint or ""))
+    found_year = (starts_on or "")[:4] or (re.search(r"\b(20\d{2})\b", text("edition")) or [None, None])[1]
+    if asked and found_year and found_year != asked.group(1):
+        return _failed(confidence, (
+            "The lookup found the %s edition of %s, not the %s edition you asked "
+            "for, so nothing was harvested. Run it again without a year to take "
+            "the %s edition, or check that the %s edition exists."
+            % (found_year, name, asked.group(1), found_year, asked.group(1))))
     event = {
         "name": name,
-        "edition": _clean((parsed.get("edition") or "").strip()) or None,
+        "edition": _clean(text("edition")) or None,
         "website": website or None,
-        "organizer": _clean((parsed.get("organizer") or "").strip()) or None,
-        "starts_on": (parsed.get("starts_on") or None),
-        "ends_on": (parsed.get("ends_on") or None),
-        "location": _clean((parsed.get("location") or "").strip()) or None,
-        "country": _clean((parsed.get("country") or "").strip()) or None,
-        "city": _clean((parsed.get("city") or parsed.get("location") or "").strip()) or None,
-        "availability": parsed.get("availability") if parsed.get("availability") in ("open","sold_out","cancelled") else "unknown",
-        "availability_source": (parsed.get("availability_source") or "")[:1000] or None,
-        "venue": _clean((parsed.get("venue") or "").strip()) or None,
-        "format": (parsed.get("format") or "").strip() or None,
-        "stated_size": _clean((parsed.get("stated_size") or "").strip()) or None,
-        "audience_note": _clean((parsed.get("audience_note") or "").strip()) or None,
+        "organizer": _clean(text("organizer")) or None,
+        "starts_on": starts_on,
+        "ends_on": ends_on,
+        "location": _clean(text("location")) or None,
+        "country": _clean(text("country")) or None,
+        "city": _clean(text("city") or text("location")) or None,
+        "availability": text("availability") if text("availability") in ("open","sold_out","cancelled") else "unknown",
+        "availability_source": text("availability_source")[:1000] or None,
+        "venue": _clean(text("venue")) or None,
+        "format": text("format")[:16] or None,
+        "stated_size": _clean(text("stated_size")) or None,
+        "audience_note": _clean(text("audience_note")) or None,
         # A recommendation's promoted alternative is scored on these, the
         # same way a discovered event is: without them it could never earn
         # the matchmaking bonus the event it replaced kept.
         "organizer_run": parsed.get("organizer_run") is True,
-        "matchmaking_evidence": _clean(str(parsed.get("matchmaking_evidence") or "").strip())[:800] or None,
+        "matchmaking_evidence": _clean(text("matchmaking_evidence"))[:800] or None,
         "confidence": confidence,
         "reasoning": reasoning,
     }

@@ -9664,7 +9664,10 @@ def event_conference_intelligence_run():
         except (TypeError, ValueError):
             source_run_id = 0
         source = event_intel_store.get_run(source_run_id, email) if source_run_id else None
-        if not source or source.get("status") != "complete" or source.get("mode") not in ("lookup", "discover"):
+        # Lookup only. A retired audience-search run carries participants from
+        # several events, and every one of them was drafted against the first
+        # event's name and window (workroom audit, 2026-10-01).
+        if not source or source.get("status") != "complete" or source.get("mode") != "lookup":
             return jsonify({"error": "Pick a completed event roster to work "
                                      "from. This play reads a roster you have "
                                      "already harvested."}), 400
@@ -9763,6 +9766,12 @@ def event_conference_intelligence_run_detail(run_id):
     run = event_intel_store.get_run(run_id, email)
     if not run:
         abort(404)
+    summary = run.get("summary") or {}
+    if run.get("mode") == "workroom" and "window_ends_on" in summary:
+        # Read now, not when the run was written: a note saying "12 hours
+        # since this event ended" was still saying it days later.
+        from tracker import event_intel_workroom
+        summary["window"] = event_intel_workroom.window_state(summary["window_ends_on"])
     if os.environ.get('DATABASE_URL'):
         from tracker.event_intel_evidence import get_observations
         from tracker.event_intel_jobs import ledger
@@ -9842,9 +9851,13 @@ def event_conference_intelligence_resolve(run_id):
     if state == "busy":
         return jsonify(error="Companies for this run are already being matched. "
                              "The results will appear when that finishes."), 409
-    if not titles and any(p.get("resolution") in ("matched", "no_match")
+    # Matched before records existed: never billed again by default. Only when
+    # this press created the record. With a record already there (a match
+    # that failed part-way), this check answered "already matched" to the
+    # retry the error message asks for, and the unattempted companies were
+    # never looked up (roster audit, 2026-10-01).
+    if stored is True and not titles and any(p.get("resolution") in ("matched", "no_match")
                           for p in event_intel_store.get_participants(run_id)):
-        # Matched before this record existed. Never billed again by default.
         legacy = {"resolved": None, "credits": 0, "already_resolved": True,
                   "credits_previously_spent": run.get("credits_spent", 0),
                   "note": "Companies were already matched for this run."}
@@ -10016,20 +10029,38 @@ def event_conference_intelligence_outreach_csv(run_id):
 
     buf = io.StringIO()
     w = csv.writer(buf)
+    floor = summary.get("floor") or event_intel_workroom.ICP_FLOOR
+    # Kept first, then the tail, then what was never qualified: the order the
+    # page shows them in.
+    def _band(r):
+        fit = r.get("fit")
+        if r.get("unqualified") or fit is None:
+            return 2
+        return 0 if fit >= floor else 1
+    rows = sorted(rows, key=lambda r: (_band(r), -(r.get("fit") or 0),
+                                       (r.get("org_name") or "").lower()))
     w.writerow(["Organisation", "Domain", "Listed as", "Person", "Title",
-                "ICP fit /100", "Why that fit", "Angle", "Opener",
+                "ICP fit /100", "Cleared the ICP floor", "Why that fit", "Angle", "Opener",
                 "Draft status", "Why the draft was changed",
                 "Phrases that triggered the change", "Your booth note",
                 "Account guidance", "Event", "Your relationship to the event"])
     for r in rows:
         status = r.get("draft_status") or "ok"
+        band = _band(r)
+        # The page shows no draft for a company below the floor, and this
+        # file is what goes into a sequencer: an opener exported for a fit-12
+        # company in the same shape as a kept one undid the ICP cut
+        # (workroom audit, 2026-10-01).
+        drafted = band == 0
         w.writerow([_csv_safe(v) for v in [
             r.get("org_name") or "", r.get("org_domain") or "",
             labels.get(r.get("role"), r.get("role") or ""),
             r.get("person_name") or "", r.get("person_title") or "",
             r.get("fit") if r.get("fit") is not None else "not qualified",
+            ("Yes", "No, cut below %d" % floor, "Not qualified")[band],
             r.get("fit_note") or r.get("qualify_note") or "",
-            r.get("angle") or "", r.get("opener") or "",
+            (r.get("angle") or "") if drafted else "",
+            (r.get("opener") or "") if drafted else "",
             event_intel_workroom.DRAFT_LABELS.get(status, "Review before use"),
             r.get("draft_reason") or "",
             "; ".join(r.get("draft_flagged") or []),
@@ -10045,9 +10076,12 @@ def event_conference_intelligence_outreach_csv(run_id):
                 "Nothing here has been sent. These are drafts to read, edit and "
                 "send yourself."])
     w.writerow(["NOTE", ((summary.get("repeats") or {}).get("crm_note")) or ""])
-    w.writerow(["NOTE", "Rows marked \"%s\" had an opener that claimed a "
-                        "conversation nobody recorded. It was replaced."
-                % event_intel_workroom.DRAFT_LABELS[event_intel_workroom.DRAFT_NO_EVIDENCE]])
+    w.writerow(["NOTE", "Rows whose status begins \"Opener replaced\" had an "
+                        "opener that claimed something nobody recorded. It was "
+                        "replaced, and the reason and the phrase are in the row."])
+    w.writerow(["NOTE", "Companies below the ICP floor of %d, and companies that "
+                        "could not be qualified, are listed without an angle or "
+                        "opener, as on the page." % floor])
 
     name = summary.get("event_name") or run.get("query") or "event"
     slug = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")[:60] or "event"
@@ -12982,7 +13016,9 @@ def _csv_safe(value) -> str:
     if isinstance(value, (list, tuple)):
         value = ", ".join(str(v) for v in value if v not in (None, ""))
     text = str(value)
-    if text[:1] in ("=", "+", "-", "@") and not _NUMERIC_CELL_RE.match(text):
+    # Tab and carriage return too: a spreadsheet strips them and then reads
+    # the formula behind them (roster audit, 2026-10-01).
+    if text[:1] in ("=", "+", "-", "@", "\t", "\r") and not _NUMERIC_CELL_RE.match(text):
         return "'" + text
     return text
 

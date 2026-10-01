@@ -777,7 +777,8 @@ def begin_resolution(run_id: int, email: str, titles_key: str):
     Returns ("cached", result) when this run was already matched with the
     same titles, ("busy", None) when a match is in progress (one younger than
     RESOLVE_STALE_MINUTES, which is far past gunicorn's request timeout), or
-    ("go", None) after taking the run's slot. (None, None) if storage is
+    ("go", fresh) after taking the run's slot, where `fresh` is True only when
+    this call created the run's record. (None, None) if storage is
     unavailable. The row lock makes two simultaneous presses one match."""
     conn = _pg_conn()
     if conn is None:
@@ -788,6 +789,7 @@ def begin_resolution(run_id: int, email: str, titles_key: str):
             cur.execute("INSERT INTO evi_resolutions (run_id, email, titles_key, state) "
                         "VALUES (%s, %s, %s, 'new') ON CONFLICT (run_id) DO NOTHING",
                         (run_id, email, titles_key))
+            fresh = cur.rowcount == 1
             cur.execute("SELECT state, titles_key, result, "
                         "started_at < now() - %s * interval '1 minute' "
                         "FROM evi_resolutions WHERE run_id = %s AND email = %s FOR UPDATE",
@@ -807,7 +809,7 @@ def begin_resolution(run_id: int, email: str, titles_key: str):
                         "started_at = now(), finished_at = NULL WHERE run_id = %s",
                         (titles_key, run_id))
         conn.commit()
-        return "go", None
+        return "go", fresh
     except Exception as e:
         logger.warning("event_intel_store.begin_resolution failed: %s", e)
         return None, None
@@ -1694,17 +1696,23 @@ def get_outreach(run_id: int) -> list[dict]:
 
 
 def prior_participant_events(email: str, exclude_run_id: int | None = None,
-                             limit: int = 4000) -> dict:
+                             limit: int = 4000) -> dict | None:
     """{org_key: [event names]} across this user's earlier roster runs.
 
     The substitute for event-radar's CRM lookup, built from the only prior
     context this deployment actually holds. Keyed by the same org_key the
     workroom module uses so "Acme Ltd" on one floor and "Acme" on another are
     one company rather than two.
+
+    None, not {}, when the history could not be read: {} is "this account has
+    no earlier rosters", and a database error was printed as exactly that
+    (workroom audit, 2026-10-01). Every run of the excluded run's own event
+    is left out too, so a second lookup of the same event is not "another
+    event" this company was seen at.
     """
     conn = _pg_conn()
     if conn is None:
-        return {}
+        return None
     try:
         _ensure_tables(conn)
         sql = ("SELECT p.org_name, COALESCE(e.name, r.query) AS event_name "
@@ -1714,16 +1722,18 @@ def prior_participant_events(email: str, exclude_run_id: int | None = None,
                "WHERE r.email = %s")
         args: list[Any] = [email]
         if exclude_run_id:
-            sql += " AND r.id <> %s"
-            args.append(exclude_run_id)
-        sql += " LIMIT %s"
+            sql += (" AND r.id <> %s AND lower(COALESCE(e.name, r.query)) NOT IN ("
+                    "SELECT lower(COALESCE(e2.name, r2.query)) FROM evi_runs r2 "
+                    "LEFT JOIN evi_events e2 ON e2.run_id = r2.id WHERE r2.id = %s)")
+            args.extend([exclude_run_id, exclude_run_id])
+        sql += " ORDER BY r.created_at DESC, p.id LIMIT %s"
         args.append(limit)
         with conn.cursor() as cur:
             cur.execute(sql, args)
             rows = cur.fetchall()
     except Exception as e:
         logger.warning("event_intel_store.prior_participant_events failed: %s", e)
-        return {}
+        return None
     finally:
         conn.close()
 

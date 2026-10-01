@@ -767,7 +767,9 @@ def test_an_unexpected_crash_never_leaves_a_run_stuck_on_running(monkeypatch):
     monkeypatch.setattr(P.event_intel_discover, "discover", boom)
     P.run_job(1, "recommend", "Northwind", profile=PROFILE, email="me@p2.example")
     assert fake.runs[1]["status"] == "failed"
-    assert "kaboom" in fake.runs[1]["error"]
+    # Said for the reader; the exception's own text goes to the log.
+    assert "kaboom" not in fake.runs[1]["error"]
+    assert fake.runs[1]["error"].startswith("The run stopped unexpectedly.")
 
 
 # ── a finished edition travels all the way to the reader ──────────────────

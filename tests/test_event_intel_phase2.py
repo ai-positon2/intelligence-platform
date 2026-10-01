@@ -89,10 +89,12 @@ def test_partial_chunk_failure_preserves_good_rows_and_reports_incompleteness(mo
     def extract(text,*args):
         return dict(rows=[dict(org_name='Acme',role='exhibitor')],note='',error=None) if 'Acme' in text else dict(rows=[],error={'kind':'timeout','detail':'Timed out'})
     monkeypatch.setattr(H,'_extract_chunk',extract)
-    result=H.extract_participants('full original','https://event.example','exhibitor_list','Forum')
+    result=H.extract_participants('Exhibitors Acme broken','https://event.example','exhibitor_list','Forum')
     assert len(result['rows'])==1 and result['error'] is None
     assert result['coverage']['chunks_read']==1 and not result['coverage']['complete']
-    assert result['snapshot']['text_sha256']==E.text_hash('full original')
+    assert result['snapshot']['text_sha256']==E.text_hash('Exhibitors Acme broken')
+    # Said first, so the stored note's length cap can never cut it off.
+    assert result['note'].startswith('1 of 2 extraction chunks failed')
 
 
 def test_job_context_reaches_parallel_model_calls():
