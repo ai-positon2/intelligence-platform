@@ -1459,7 +1459,7 @@ RECOVER_PAGES = 2
 def _recover_dates(event: dict, today_iso: str | None = None) -> None:
     from datetime import date
     from .event_intel_access import organizer_url
-    from .event_intel_admission import _names, _structured_date, _structured_name_matches
+    from .event_intel_admission import _names, _structured_local_dates, _structured_name_matches
     from .event_intel_harvest import fetch_page
     website = event.get("website") or ""
     host = urlparse(website).hostname
@@ -1484,10 +1484,16 @@ def _recover_dates(event: dict, today_iso: str | None = None) -> None:
             if not isinstance(row, dict) or not isinstance(row.get("name"), str):
                 continue
             try:
-                start = _structured_date(row.get("startDate"))
-                end = _structured_date(row.get("endDate") or row.get("startDate"))
+                starts = _structured_local_dates(row.get("startDate"))
+                ends = _structured_local_dates(row.get("endDate") or row.get("startDate"))
             except ValueError:
                 continue
+            # A UTC time that can be either of two local days is not a date
+            # to write onto an event: "2027-05-24T22:00:00Z" is 25 May in
+            # Amsterdam and 24 May in London (live run 26, 2026-10-01).
+            if len(starts) != 1 or len(ends) != 1:
+                continue
+            start, end = next(iter(starts)), next(iter(ends))
             if end < start or start < today:
                 continue
             if _structured_name_matches(row["name"], _names(event, start.year), start.year):

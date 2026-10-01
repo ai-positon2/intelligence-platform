@@ -234,14 +234,30 @@ def fetch_page(url: str) -> dict:
             out["note"] = "Not an HTML page (Content-Type: %s)." % ctype[:80]
             return out
 
-        chunks, total = [], 0
-        for chunk in r.iter_content(65536):
-            chunks.append(chunk)
-            total += len(chunk)
-            if total >= _MAX_BYTES:
-                out["truncated"] = True
-                break
-        markup = b"".join(chunks).decode(r.encoding or "utf-8", errors="replace")
+        try:
+            raw = _read_body(r, out)
+        except requests.exceptions.ContentDecodingError:
+            # sales30conf.com (live run 26, 2026-10-01) labels a plain HTML
+            # body "Content-Encoding: gzip,deflate", whatever the request
+            # accepts. Decoding it raised out of this function, the page was
+            # recorded as an error, and Sales 3.0 went unscored. Asked again,
+            # the body is read as sent: decompressed only when it really is
+            # gzip, otherwise used as it is.
+            r.close()
+            try:
+                r = public_get(url, timeout=_TIMEOUT, stream=True, headers={
+                    "User-Agent": _UA,
+                    "Accept": "text/html,application/xhtml+xml",
+                    "Accept-Language": "en-US,en;q=0.9",
+                })
+                raw = _read_mislabelled(r, out) if r.status_code == 200 else None
+            except Exception as e:
+                logger.warning("event_intel_harvest: re-read of a mislabelled body failed for %s: %s", url, e)
+                raw = None
+            if raw is None:
+                out["note"] = "The page's compressed response could not be decoded."
+                return out
+        markup = raw.decode(r.encoding or "utf-8", errors="replace")
     finally:
         r.close()
 
@@ -269,6 +285,33 @@ def fetch_page(url: str) -> dict:
     out["status"] = SOURCE_OK
     out["text"] = text
     return out
+
+
+def _read_body(r, out) -> bytes:
+    """The response body, up to _MAX_BYTES. Marks `out` truncated at the cap."""
+    chunks, total = [], 0
+    for chunk in r.iter_content(65536):
+        chunks.append(chunk)
+        total += len(chunk)
+        if total >= _MAX_BYTES:
+            out["truncated"] = True
+            break
+    return b"".join(chunks)
+
+
+def _read_mislabelled(r, out):
+    """The body of a response whose Content-Encoding is wrong, or None."""
+    import gzip
+    import zlib
+    body = r.raw.read(_MAX_BYTES, decode_content=False) or b""
+    if len(body) >= _MAX_BYTES:
+        out["truncated"] = True
+    if body[:2] == b"\x1f\x8b":
+        try:
+            return gzip.decompress(body)
+        except (OSError, EOFError, zlib.error):
+            return None
+    return body
 
 
 def _same_page(a: str, b: str) -> bool:

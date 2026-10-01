@@ -7,7 +7,7 @@ import calendar
 import json
 import re
 import unicodedata
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from urllib.parse import urlsplit, urldefrag
 
 from .event_intel_access import organizer_url
@@ -696,6 +696,26 @@ def _structured_date(value):
     raise ValueError("Invalid structured date")
 
 
+def _structured_local_dates(value):
+    """The calendar dates a structured start or end can mean where the event is.
+
+    A timestamp in UTC is the organizer's local time converted, and the
+    converted day is not the local day east of Greenwich: the Chief Revenue
+    Officer Summit Amsterdam (live run 26, 2026-10-01) publishes
+    "2027-05-24T22:00:00.000Z", which is midnight on 25 May in Amsterdam, the
+    date its own page prints. Read as its first ten characters it said 24 May
+    and contradicted the page. A UTC time from 10:00 on can be the next local
+    day (offsets +10 to +14 put local midnight at 10:00 to 14:00 UTC, +1 to
+    +9 at 15:00 to 23:00), so that day is accepted too. A date, a local time
+    with no zone, or one with its own offset means exactly its own date."""
+    if isinstance(value, str) and len(value) > 10 and value[10] == 'T':
+        moment = datetime.fromisoformat(value.replace('Z', '+00:00'))
+        offset = moment.utcoffset()
+        if offset is not None and not offset and moment.hour >= 10:
+            return {moment.date(), moment.date() + timedelta(days=1)}
+    return {_structured_date(value)}
+
+
 _STRUCTURED_SEGMENTS = re.compile(r'\s+[|\u2013\u2014\u00b7\u2022-]\s+|:\s+|,\s+')
 
 
@@ -720,6 +740,12 @@ def _structured_name_matches(row_name, names, year):
     if {_key(n) for n in _names({'name': row_name}, year)} & keys:
         return True
     segments = [x for x in _STRUCTURED_SEGMENTS.split(row_name) if x.strip()]
+    # "Home | Revenue Operations Summit | Boston" (revenueoperationsalliance
+    # .com, live run 26, 2026-10-01): the CMS names the node after the page.
+    while len(segments) > 1 and set(_fold(segments[0]).split()) <= _PAGE_LABEL:
+        segments = segments[1:]
+    if len(segments) == 1:
+        return bool({_key(n) for n in _names({'name': segments[0]}, year)} & keys)
     if len(segments) < 2 or not {_key(n) for n in _names({'name': segments[0]}, year)} & keys:
         return False
     rest_words = _fold(' '.join(segments[1:])).split()
@@ -742,11 +768,11 @@ def _structured_support(rows, names, start, end):
         if not _structured_name_matches(row['name'], names, start.year):
             continue
         try:
-            actual_start = _structured_date(row.get('startDate'))
-            actual_end = _structured_date(row.get('endDate'))
+            starts = _structured_local_dates(row.get('startDate'))
+            ends = _structured_local_dates(row.get('endDate'))
         except ValueError:
             continue
-        if (actual_start, actual_end) != (start, end):
+        if start not in starts or end not in ends:
             continue
         matches.append(row)
         status = str(row.get('eventStatus') or '').rsplit('/',1)[-1]
