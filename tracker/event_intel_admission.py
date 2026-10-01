@@ -4,6 +4,7 @@ Literal support is a necessary admission condition, not semantic verification.
 Dynamic pages and restricted access require review rather than optimistic dates.
 """
 import calendar
+import contextvars
 import json
 import re
 import unicodedata
@@ -75,7 +76,20 @@ def _names(event, year):
     # Strip only a matching year and an explicit acronym, never regional names.
     name = re.sub(r'\s*\([A-Z0-9]{2,12}\)\s*$', '', name)
     name = re.sub(r'\s+'+str(year)+r'$', '', name)
-    return [_fold(name)] if _fold(name) else []
+    folded = _fold(name)
+    if not folded:
+        return []
+    out = [folded]
+    # "Forrester B2B Summit North America" on forrester.com, whose pages
+    # call it "B2B Summit North America" (live run 27, 2026-10-01): the
+    # leading word is the host's own brand. The rest is a name too when it
+    # is still at least two words that are not just the event's noun.
+    words = folded.split()
+    host = urlsplit(str(event.get('website') or '')).hostname or ''
+    brand = set(host.split('.')) - {'www', 'com', 'co', 'org', 'net', 'io', 'uk', 'events', 'event'}
+    if len(words) >= 3 and words[0] in brand and not set(words[1:]) <= _OWN_NOUNS:
+        out.append(' '.join(words[1:]))
+    return out
 
 
 # Cities that big brands use to NAME a regional spin-off ("Web Summit Rio",
@@ -88,6 +102,8 @@ def _names(event, year):
 # a place, and a city missing here falls back to the other checks.
 _REGION_WORDS = {'europe', 'asia', 'africa', 'america', 'americas', 'usa', 'emea',
                  'apac', 'latam', 'mena', 'middle', 'east'}
+# The candidate's own city while inspect() reads its pages, folded.
+_OWN_PLACE = contextvars.ContextVar('event_intel_admission_own_place', default='')
 _EDITION_CITIES = ('rio', 'rio de janeiro', 'vancouver', 'qatar', 'doha', 'tokyo',
                    'shanghai', 'riyadh', 'toronto', 'sao paulo', 'mexico city',
                    'abu dhabi', 'jakarta', 'bangalore', 'bengaluru', 'mumbai',
@@ -147,7 +163,10 @@ def _edition_place(words, names):
     # carry no region ("MWC Shanghai" is not MWC).
     if own & _REGION_WORDS:
         return False
-    folded, owned = ' '.join(words), ' '.join(names)
+    # The candidate's own city is its place, not a spin-off: "Customer
+    # Success Summit | Toronto" for the candidate whose city is Toronto
+    # (customersuccesscollective.com/location/toronto, live run 27).
+    folded, owned = ' '.join(words), ' '.join(names) + ' ' + _OWN_PLACE.get()
     return any(re.search(r'(?<!\w)'+c+r'(?!\w)', folded) and not re.search(r'(?<!\w)'+c+r'(?!\w)', owned)
                for c in _EDITION_CITIES)
 
@@ -538,6 +557,13 @@ def _access(text, event_name, dates):
     for match in _RESTRICTED.finditer(text):
         prefix=text[max(0,match.start()-80):match.start()]
         if re.search(r'\b(?:until|if|unless|not|never|no longer)\s*$',prefix,re.I):
+            continue
+        # "you'll be able to invite your group members only after the payment
+        # has cleared" (salesforce.com/dreamforce/faq, live run 27,
+        # 2026-10-01): "members only" there is a word order, not a members-
+        # only event. "X only after/once/until/when" is when, never who.
+        if (re.match(r'members[- ]only$', match.group(0), re.I)
+                and re.match(r'\s+(?:after|once|until|when|while|before|if)\b', text[match.end():], re.I)):
             continue
         # Use the current clause so a different preceding inventory item does
         # not explain away an event-wide closure later in the same paragraph.
@@ -937,8 +963,13 @@ def _title_support(titles, names, start, end):
                 # lent only to a segment that has none of its own.
                 if pinned and not re.search(r'\b20\d{2}\b', second):
                     second = second + ' ' + str(start.year)
-                rest = pattern.sub('', second)
-                if not (pattern.search(second) and not re.search(r'\w', rest)):
+                rest = _fold(pattern.sub('', second)).split()
+                # "Gainsight Pulse | 19-20 October 2026 in London"
+                # (gainsightpulse.com/europe, live run 27): the dates and
+                # where, and nothing else.
+                where = (not rest or (rest[0] in ('in', 'at')
+                                      and _place_ok(rest[0], rest[1:], names)))
+                if not (pattern.search(second) and where):
                     continue
                 dated = 1
             else:
@@ -1076,6 +1107,14 @@ def _self_referenced_dates(text, start, end, names=(), noun=None):
 
 
 def inspect(event, fetcher=None):
+    token = _OWN_PLACE.set(_fold(str(event.get('city') or '')))
+    try:
+        return _inspect(event, fetcher)
+    finally:
+        _OWN_PLACE.reset(token)
+
+
+def _inspect(event, fetcher=None):
     from .event_intel_harvest import fetch_page
     fetcher = fetcher or fetch_page
     result = {'name':event.get('name'), 'support':'unverified', 'checks':[], 'reasons':[]}
