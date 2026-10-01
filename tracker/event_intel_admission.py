@@ -86,6 +86,8 @@ def _names(event, year):
 # a short list on purpose: a flagship's own city ("Web Summit, Lisbon",
 # "Money20/20 Europe in Amsterdam", "Fintech Meetup, Las Vegas") must stay
 # a place, and a city missing here falls back to the other checks.
+_REGION_WORDS = {'europe', 'asia', 'africa', 'america', 'americas', 'usa', 'emea',
+                 'apac', 'latam', 'mena', 'middle', 'east'}
 _EDITION_CITIES = ('rio', 'rio de janeiro', 'vancouver', 'qatar', 'doha', 'tokyo',
                    'shanghai', 'riyadh', 'toronto', 'sao paulo', 'mexico city',
                    'abu dhabi', 'jakarta', 'bangalore', 'bengaluru', 'mumbai',
@@ -116,6 +118,8 @@ _CONNECT = {'on', 'runs', 'run', 'returns', 'return', 'returning', 'takes', 'tak
             'register', 'book', 'your', 'now', 'today', 'ticket', 'tickets', 'pass',
             'passes', 'officially'}
 _PLACE_INTRO = {'in', 'to', 'at'}
+# The words that make a place phrase hybrid: "in Portland, OR and virtually".
+_HYBRID = {'virtually', 'online'}
 # A call to action that may carry the previous sentence's name to a date:
 # "CMO Summit 2027. Choose your pass to join us May 11-12, 2027." Nothing
 # else may be in it: "Join us for the Women in SaaS Breakfast on ..." and
@@ -136,6 +140,13 @@ def _edition_place(words, names):
     own = set(' '.join(names).split())
     if set(words) & (_EDITION_WORDS - own):
         return True
+    # A name that already says which regional edition it is ("Money20/20
+    # Asia") is followed by its venue city, not by another edition: "Money20/20
+    # Asia in Bangkok" (asia.money2020.com, live run 23, 2026-10-01) was read
+    # as a Bangkok spin-off and refused. The city list exists for names that
+    # carry no region ("MWC Shanghai" is not MWC).
+    if own & _REGION_WORDS:
+        return False
     folded, owned = ' '.join(words), ' '.join(names)
     return any(re.search(r'(?<!\w)'+c+r'(?!\w)', folded) and not re.search(r'(?<!\w)'+c+r'(?!\w)', owned)
                for c in _EDITION_CITIES)
@@ -162,16 +173,26 @@ def _place_ok(intro, words, names):
 def _connecting(words, names, year):
     """Is this stretch between an event's name and a date only connecting
     copy and at most a place, so the date is the event's own?"""
+    def hybrid(k):
+        return words[k] == 'and' and k + 1 < len(words) and words[k + 1] in _HYBRID
     i = 0
     while i < len(words):
         w = words[i]
         if w in _PLACE_INTRO:
             j = i + 1
-            while j < len(words) and words[j] not in _CONNECT and words[j] not in _PLACE_INTRO:
+            while (j < len(words) and words[j] not in _CONNECT and words[j] not in _PLACE_INTRO
+                   and not hybrid(j)):
                 j += 1
             if not _place_ok(w, words[i+1:j], names):
                 return False
             i = j
+            continue
+        # "Join us in Portland, OR and virtually from March 23-26, 2027"
+        # (nten.org, live run 23, 2026-10-01): the in-person edition streamed
+        # as well, one edition. Only straight after a place: "takes place
+        # online" alone is the virtual edition and is still refused.
+        if hybrid(i) and i and words[i - 1] not in _CONNECT:
+            i += 2
             continue
         # "runs from September 9", never "from the SaaStr Annual team".
         if w == 'from' and i == len(words) - 1:
@@ -750,6 +771,25 @@ _TITLE_LEAD = {'attend', 'join', 'register', 'for', 'welcome', 'to', 'the',
 _TITLE_NEXT = {'in', 'on', 'is', 'returns', 'from', 'will', 'takes', 'taking'}
 _TITLE_FOREIGN = {'at', 'during', 'with', 'alongside', 'within', 'part',
                   'powered', 'presented', 'by', 'and', 'x'}
+# A segment that is only the page's own label. "Attend | Money20/20 Asia in
+# Bangkok | 27 - 29 April 2027" (asia.money2020.com/attend, live run 23,
+# 2026-10-01) was refused because only the first segment may carry the name,
+# and here the first segment is the page it is on. Only these words: a
+# leading segment with anything else in it ("CMO Summit | SaaStr Annual |
+# ...") is another event and is still read as the title's subject.
+_PAGE_LABEL = _TITLE_LEAD | {'faq', 'faqs', 'agenda', 'speakers', 'sponsors',
+                             'sponsor', 'about', 'tickets', 'ticket', 'passes',
+                             'pass', 'registration', 'venue', 'schedule',
+                             'overview', 'contact', 'why', 'plan', 'your',
+                             'trip', 'exhibit', 'pricing', 'and'}
+
+
+def _title_segments(title):
+    """The title's segments with any leading page-label segments dropped."""
+    segments = [x for x in _TitleSplit.split(title) if x.strip()]
+    while len(segments) > 1 and set(_fold(segments[0]).split()) <= _PAGE_LABEL:
+        segments = segments[1:]
+    return segments
 
 
 def _title_owns(segment, names):
@@ -791,7 +831,7 @@ def _foreign_segment(segment, names):
 
 def _title_support(titles, names, start, end):
     for title in titles or []:
-        segments = [x for x in _TitleSplit.split(title) if x.strip()]
+        segments = _title_segments(title)
         if not segments:
             continue
         tail = _title_owns(segments[0], names)
@@ -893,7 +933,7 @@ def _title_identifies(titles, names, year):
     for title in titles or []:
         if any(y != str(year) for y in re.findall(r'\b20\d{2}\b', title)):
             continue
-        segments = [x for x in _TitleSplit.split(title) if x.strip()]
+        segments = _title_segments(title)
         tail = _title_owns(segments[0], names) if segments else None
         if tail and tail[0] == str(year):
             tail = tail[1:]  # "MRC Vegas 2027" is the plainest title there is.
@@ -909,7 +949,8 @@ def _title_identifies(titles, names, year):
 def _title_noun(title, names, year):
     """The generic noun the title gives the event, if any: "Conference" in
     "Smarter Faster Payments Conference", "summit" in "CMO Summit"."""
-    tail = [w for w in (_title_owns(_TitleSplit.split(title)[0], names) or []) if w != str(year)]
+    segments = _title_segments(title)
+    tail = [w for w in (_title_owns(segments[0], names) if segments else None) or [] if w != str(year)]
     if tail and tail[0] in _OWN_NOUNS:
         return tail[0]
     last = names[0].split()[-1] if names and names[0].split() else ''

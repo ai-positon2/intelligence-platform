@@ -158,6 +158,23 @@ def test_the_prompt_grades_against_fixed_bands_not_batch_mates(monkeypatch):
     assert "never against the" in system
 
 
+def test_the_relevance_bands_match_the_gate_not_a_headcount(monkeypatch):
+    """Live run 23 (2026-10-01): bands written as shares of the floor ("at
+    least three quarters ... in the client's verticals") graded Stripe at
+    Money20/20 Europe 16, after 37, 35 and 29, and the 24 gate cut it. The
+    gate means the client's buyers are a core audience the event is built
+    for, and a vertical list is not everyone the client sells to."""
+    calls = _stub(monkeypatch, lambda u, n: [])
+    SC.score_all([_cand("X")], PROFILE)
+    system = calls[0]["system"]
+    assert "three quarters" not in system and "a quarter to a half" not in system
+    assert "core audiences the event is" in system
+    assert "24 and above" in system and "under 24" in system
+    assert "not all it sells to" in system
+    from tracker import event_intel_rubric as R
+    assert R.RELEVANCE_GATE == 24  # the number the band text names
+
+
 # ── 7c. search budget per event ──────────────────────────────────────────
 
 def test_a_small_batch_gets_a_small_search_budget(monkeypatch):

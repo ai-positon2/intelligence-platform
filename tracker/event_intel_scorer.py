@@ -106,14 +106,19 @@ are not. For an audience-driven client, the reverse.
 THE RUBRIC. Each band is a fixed description. Place the event in the band \
 its evidence supports, then within the band by how strongly.
 - relevance, 0 to 40: how closely the composition of this event matches the \
-client's ICP above.
-  30-40: at least three quarters of the relevant side of the event are the \
-client's buyer roles in the client's verticals.
-  20-29: roughly half to three quarters are; the rest are adjacent roles or \
-verticals.
-  10-19: a quarter to a half are; the client's buyers attend but are a \
-minority.
-  0-9: under a quarter, or the event serves a different market.
+client's ICP above. A buyer is someone in one of the client's buyer roles at \
+an organisation the client sells to. The verticals listed are where the \
+client sells most, not all it sells to: count an organisation outside them \
+when the client's product is plainly bought by organisations like it.
+  30-40: the event is built for the client's buyers. They are the audience \
+the programme and the relevant side of the floor are aimed at.
+  20-29: the client's buyers are one of the core audiences the event is \
+built for, beside others (partners, peers, adjacent roles). 24 and above \
+means a buyer of this client finds sessions made for them and their peers \
+there in numbers; under 24, they are present but not who it is for.
+  10-19: the client's buyers attend, but the event is aimed at another \
+function or market and they are a side crowd.
+  0-9: they are rare, or the event serves a different market.
 - dm_access, 0 to 40: density of actual decision-makers AND the structural \
 reach to them. Floor layout, meeting infrastructure, side events, whether you \
 can physically get to the people who sign.

@@ -223,7 +223,11 @@ RANK_FLOOR = TIER_MIN[TIER_P2]
 #
 # RELEVANCE_GATE is on the `relevance` sub-score, which means precisely "how
 # closely the composition of this event matches the client's ICP". 24 of 40 is
-# a clear majority of the audience being the client's own buyers. It is the
+# the client's buyers being one of the core audiences the event is built for,
+# not a side crowd at an event aimed at somebody else. (It is NOT a headcount
+# majority: written that way in the scorer's bands, live run 23 graded Stripe
+# at Money20/20 Europe 16, down from 37, 35 and 29 in runs 20 to 22, because
+# no horizontal show is half one client's verticals.) It is the
 # gate that answers "is this event actually for them", and it is why widening
 # the list does not mean padding it with anything that was found.
 #
