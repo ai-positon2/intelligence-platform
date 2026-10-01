@@ -51,7 +51,9 @@ def _profile_sentence(profile: dict) -> str:
         bits.append("on a %s cycle" % p["sales_cycle"])
     if p.get("geo_scope"):
         bits.append("across %s" % p["geo_scope"])
-    return ", ".join(bits) + "."
+    # A field written as a sentence already ends in one: Stripe's geo_scope
+    # ends "...and other regions." and the report printed "regions..".
+    return ", ".join(bits).rstrip(" .") + "."
 
 
 _MONTHS = ("Jan", "Feb", "Mar", "Apr", "May", "Jun",
