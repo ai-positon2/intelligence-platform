@@ -10034,6 +10034,8 @@ def event_conference_intelligence_outreach_csv(run_id):
     # page shows them in.
     def _band(r):
         fit = r.get("fit")
+        if r.get("booth_note"):
+            return 0   # spoken to on the floor: kept, as on the page
         if r.get("unqualified") or fit is None:
             return 2
         return 0 if fit >= floor else 1
@@ -10057,7 +10059,8 @@ def event_conference_intelligence_outreach_csv(run_id):
             labels.get(r.get("role"), r.get("role") or ""),
             r.get("person_name") or "", r.get("person_title") or "",
             r.get("fit") if r.get("fit") is not None else "not qualified",
-            ("Yes", "No, cut below %d" % floor, "Not qualified")[band],
+            ("Yes, you spoke to them" if r.get("booth_note") else
+             ("Yes", "No, cut below %d" % floor, "Not qualified")[band]),
             r.get("fit_note") or r.get("qualify_note") or "",
             (r.get("angle") or "") if drafted else "",
             (r.get("opener") or "") if drafted else "",

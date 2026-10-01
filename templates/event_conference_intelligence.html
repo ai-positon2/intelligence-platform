@@ -4593,7 +4593,9 @@
         (r.fit_note ? '<p class="ofn">' + esc(r.fit_note) + '</p>' : '') +
         (r.angle ? '<p class="oa"><b>Angle.</b> ' + esc(r.angle) + '</p>' : '') +
         (r.booth_note
-          ? '<div class="obn"><b>Your booth note.</b> ' + esc(r.booth_note) + '</div>'
+          ? '<div class="obn"><b>Your booth note.</b> ' + esc(r.booth_note) +
+            (r.fit != null && r.fit < ((current && current.summary || {}).floor || 55)
+              ? ' <i>Kept because you spoke to them, whatever its fit.</i>' : '') + '</div>'
           : '') +
         (r.opener ? '<div class="oo"><div class="ool">Opener</div>' +
           '<p>' + esc(r.opener) + '</p></div>' : '') +
@@ -4726,10 +4728,13 @@
         '</span></div>';
 
       var floorN = s.floor || 55;
-      var keptRows = rows.filter(function(r){ return !r.unqualified && r.fit != null &&
-                                                     r.fit >= floorN; });
-      var cutRows = rows.filter(function(r){ return !r.unqualified && r.fit != null &&
-                                                    r.fit < floorN; });
+      /* A company somebody spoke to on the floor is kept whatever its fit,
+         first in the list: the same rule split_by_fit applies. */
+      var keptRows = rows.filter(function(r){ return r.booth_note ||
+                                   (!r.unqualified && r.fit != null && r.fit >= floorN); })
+        .sort(function(a, b){ return (b.booth_note ? 1 : 0) - (a.booth_note ? 1 : 0); });
+      var cutRows = rows.filter(function(r){ return !r.booth_note && !r.unqualified &&
+                                                    r.fit != null && r.fit < floorN; });
       var funnel = roomFunnel(s, c, rows);
       var roles = roomRoles(keptRows, run.role_labels);
       if (funnel || roles) {
@@ -4783,6 +4788,12 @@
             ' on companies cut below the floor, which are listed without drafts.' : '') +
           '</div></div>';
       }
+      if (s.notes_before_event) {
+        html += '<div class="evi-coverage warn"><span class="ic">!</span><span class="tx">' +
+          '<b>Booth notes were given for an event that has not happened yet.</b> ' +
+          'The drafts below use them as conversations that took place. If they are ' +
+          'from another edition, run this again without them.</span></div>';
+      }
       var unmatchedNotes = s.booth_notes_unmatched || [];
       if (unmatchedNotes.length) {
         html += '<div class="evi-coverage warn"><span class="ic">!</span><span class="tx">' +
@@ -4812,7 +4823,7 @@
       /* A row with no usable fit is unqualified whatever its flag says:
          runs stored before the fix carry fit null with unqualified false,
          and matched none of the three lists, so they vanished. */
-      var unq = rows.filter(function(r){ return r.unqualified || r.fit == null; });
+      var unq = rows.filter(function(r){ return !r.booth_note && (r.unqualified || r.fit == null); });
 
       html += '<div class="evi-sec"><h3>Worth contacting</h3>' +
         (kept.length

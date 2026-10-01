@@ -200,7 +200,7 @@ def window_state(ends_on, now: datetime.datetime | None = None) -> dict:
         return {"state": WINDOW_EARLY, "hours": round(-hours, 1), "known": True,
                 "note": ("This event has not ended yet. The follow-up window "
                          "opens when it does, in about %s."
-                         % _hours(-hours))}
+                         % (_hours(-hours) if -hours <= 48 else _days(-hours / 24)))}
     if hours <= PRIME_HOURS:
         return {"state": WINDOW_PRIME, "hours": round(hours, 1), "known": True,
                 "note": ("About %s since this event ended. This is the window "
@@ -995,13 +995,20 @@ def split_by_fit(rows: list[dict], floor: int = ICP_FLOOR) -> dict:
     """
     kept, cut, unqualified = [], [], []
     for r in (rows or []):
-        if r.get("unqualified") or r.get("fit") is None:
+        if r.get("booth_note"):
+            # Somebody on the floor spoke to them and wrote it down. That is
+            # the strongest signal this play has, and the model's guess at ICP
+            # fit does not overrule it: live run 32 cut Checkout.com at fit 28
+            # with "wants a demo of Connect next week" in its note, and the
+            # CSV then gave it no opener.
+            kept.append(dict(r, kept_by_note=True))
+        elif r.get("unqualified") or r.get("fit") is None:
             unqualified.append(r)
         elif r["fit"] >= floor:
             kept.append(r)
         else:
             cut.append(r)
-    kept.sort(key=lambda r: (-(r.get("fit") or 0),
+    kept.sort(key=lambda r: (not r.get("kept_by_note"), -(r.get("fit") or 0),
                              (r.get("org_name") or "").lower()))
     cut.sort(key=lambda r: (-(r.get("fit") or 0),
                             (r.get("org_name") or "").lower()))

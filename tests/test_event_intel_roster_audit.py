@@ -311,3 +311,29 @@ def test_an_evidence_ledger_failure_does_not_fail_the_roster(monkeypatch):
     monkeypatch.setattr(P, "_summarise", lambda rid: {})
     P._run_lookup(1, "Money20/20 USA", None)
     assert runs[1]["status"] == "complete"
+
+
+def test_a_recovered_row_another_page_lists_directly_is_not_saved_twice(monkeypatch):
+    """Live run 31 (IMEX America): the exhibitor directory was recovered by
+    search as the partner list, and every partner was on the roster twice."""
+    saved = []
+    monkeypatch.setattr(P.store, "save_source", lambda *a, **k: None)
+    monkeypatch.setattr(P.store, "save_participants",
+                        lambda rid, eid, rows: saved.extend(rows) or len(rows))
+    monkeypatch.setattr(P, "durable_stage", lambda name, fn, *a, **k: fn(*a, **k))
+
+    def harvest(page, *a, **k):
+        if "exhibitor" in page["url"]:
+            return {"source": {"url": page["url"], "kind": "exhibitors", "status": "blocked"}, "rows": []}
+        return {"source": {"url": page["url"], "kind": "partners", "status": "ok"},
+                "rows": [dict(org_name="ASAE", role="partner", provenance="page")]}
+    monkeypatch.setattr(P.event_intel_harvest, "harvest_page", harvest)
+    monkeypatch.setattr(P.event_intel_recover, "should_recover", lambda src: src["status"] == "blocked")
+    monkeypatch.setattr(P.event_intel_recover, "recover_page", lambda *a, **k: {
+        "source": {"url": a[0], "kind": "exhibitors", "status": "recovered"},
+        "rows": [dict(org_name="ASAE", role="partner", provenance="search"),
+                 dict(org_name="Caesars", role="exhibitor", provenance="search")]})
+    P._harvest_event(1, 2, {"name": "IMEX America", "website": "https://imexamerica.com"}, [
+        {"url": "https://imexamerica.com/exhibitor-directory", "kind": "exhibitors"},
+        {"url": "https://imexamerica.com/all-partners", "kind": "partners"}])
+    assert [(r["org_name"], r["provenance"]) for r in saved] == [("ASAE", "page"), ("Caesars", "search")]

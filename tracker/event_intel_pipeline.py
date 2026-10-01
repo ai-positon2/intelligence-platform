@@ -246,6 +246,7 @@ def _harvest_event(run_id: int, event_id: int, event: dict,
             read_pages.add(key)
             unique.append(page)
     read_pages = set()
+    held = []
     for page in unique:
         page = dict(page, edition=str(event.get("starts_on") or event.get("edition") or "")[:4],
                     cache_identity=cache_identity, event_website=event.get("website") or "")
@@ -319,7 +320,21 @@ def _harvest_event(run_id: int, event_id: int, event: dict,
             if (src.get('coverage') or {}).get('edition_mismatch'):
                 continue
             recovered += 1
-            total_rows += store.save_participants(run_id, event_id, rec["rows"])
+            # Held until every page has been read: a row recovered for one
+            # page that another page lists directly is that page's row.
+            # Saved as it came, IMEX America's recovered "exhibitors" were
+            # its partner list again, and every partner was on the roster
+            # twice (live run 31, 2026-10-01: 106 rows for 57 companies).
+            held.extend(rec["rows"])
+    fresh = []
+    for r in held:
+        k = (event_intel_workroom.org_key(r.get("org_name") or ""),
+             (r.get("person_name") or "").lower(), r.get("role"))
+        if k not in saved_rows:
+            saved_rows.add(k)
+            fresh.append(r)
+    if fresh:
+        total_rows += store.save_participants(run_id, event_id, fresh)
     if access_links:
         from .event_intel_access_review import inspect
         review = durable_stage('access-review:'+str(event_id), inspect, access_links,
@@ -863,6 +878,10 @@ def _run_workroom(run_id: int, email: str, source_run_id: int, profile: dict,
         "rewritten_count": enforced["rewritten_count"],
         "booth_notes_given": len(notes),
         "booth_notes_unmatched": matched["unmatched"],
+        # Notes about conversations at an event that has not happened yet
+        # are either for another edition or a mistake; the drafts built on
+        # them say "at our booth" all the same.
+        "notes_before_event": bool(notes) and window.get("state") == event_intel_workroom.WINDOW_EARLY,
         "merged_rows": merged_rows,
         "window_ends_on": event.get("ends_on"),
         "qualify_errors": drafted["errors"],

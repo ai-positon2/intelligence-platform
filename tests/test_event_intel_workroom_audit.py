@@ -380,3 +380,41 @@ def test_the_new_statuses_have_reader_labels(page_script, status, label):
                  [row("Acme", fit=80, draft_status=status, draft_reason="r")])
     text = re.sub(r"<[^>]+>", " ", body)   # what a reader sees, not class names
     assert label in text and status not in text
+
+
+# ── live run 32: a company somebody spoke to is never cut ──
+
+def test_a_company_with_a_booth_note_is_kept_whatever_its_fit():
+    rows = [row("Checkout.com", fit=28, booth_note="wants a demo of Connect next week"),
+            row("OpenAI", fit=65), row("Tail Co", fit=10)]
+    split = W.split_by_fit(rows)
+    assert [r["org_name"] for r in split["kept"]] == ["Checkout.com", "OpenAI"]
+    assert split["kept"][0]["kept_by_note"] is True
+    assert [r["org_name"] for r in split["cut"]] == ["Tail Co"]
+
+
+def test_the_csv_gives_the_noted_company_its_opener(client, monkeypatch):
+    run = {"id": 7, "mode": "workroom", "status": "complete", "query": "q",
+           "summary": {"event_class": "exhibited", "event_name": "Money20/20 USA", "floor": 55}}
+    rows = [row("Checkout.com", fit=28, opener="Following up on the Connect demo.",
+                booth_note="wants a demo", event_class="exhibited")]
+    monkeypatch.setattr(S, "get_run", lambda rid, email: run)
+    monkeypatch.setattr(S, "get_outreach", lambda rid: [dict(r) for r in rows])
+    text = client.get("/p2/strategic-agents/event-conference-intelligence/runs/7/outreach.csv"
+                      ).get_data(as_text=True)
+    assert "Yes, you spoke to them" in text and "Following up on the Connect demo." in text
+
+
+def test_the_page_keeps_the_noted_company_and_warns_about_notes_before_the_event(page_script):
+    body = _page(page_script, {"notes_before_event": True,
+                               "counts": {"roster": 2, "kept": 1, "cut": 1, "unqualified": 0}},
+                 [row("Checkout.com", fit=28, booth_note="wants a demo", draft_status="review_required"),
+                  row("Tail Co", fit=10, draft_status="review_required")])
+    kept = body.split("Worth contacting")[1].split("Cut below the ICP floor")[0]
+    assert "Checkout.com" in kept and "Kept because you spoke to them" in kept
+    assert "Booth notes were given for an event that has not happened yet" in body
+
+
+def test_a_wait_of_weeks_is_said_in_days():
+    note = W.window_state("2026-10-21", datetime.datetime(2026, 10, 1, tzinfo=datetime.timezone.utc))["note"]
+    assert "in about 21 days" in note
