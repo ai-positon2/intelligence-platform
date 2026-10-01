@@ -130,7 +130,7 @@ floor, general networking).
   10-19: few of them attend, or they attend but the format keeps them out of \
 reach (keynote halls, no floor, no meeting space).
   0-9: the people who sign are essentially absent or unreachable.
-- engagement, 0 to 20: are these people in a vendor-buying mindset, or is this \
+{host_rule}- engagement, 0 to 20: are these people in a vendor-buying mindset, or is this \
 a learning and keynote crowd who will not take a meeting?
   15-20: they come to evaluate and buy; vendor meetings are part of why they \
 attend.
@@ -263,6 +263,36 @@ def _clean(raw: dict) -> dict | None:
     return out
 
 
+# Whose access a hosted format is. Live run 28 (Gong, 2026-10-01) made "RevOps
+# Hospitality: a GTM Dinner Event in Atlanta" its one P1 at 85: a single
+# dinner run by RevOps Co-op and paid for by CaliberMind, another sales-tech
+# vendor, graded as "the archetypal hosted-meeting format, putting Gong
+# face-to-face with the actual signers". The table is the sponsor's. A client
+# that sells from a booth or as a sponsor reaches people only through what
+# an event sells to vendors, so that is what dm_access must measure for it.
+# Audience-side clients (they attend; their buyers are in the seats) are not
+# given this paragraph, and their scoring is unchanged.
+HOST_RULE = """\
+  Whose access it is. This client sells from a booth or as a sponsor, so it \
+reaches people only through what the event offers vendors: exhibit space, \
+sponsorship, hosted-meeting programmes open to sponsors, or a floor vendors may \
+work. A dinner, roundtable, private session or party hosted or paid for by \
+another vendor gives the hosted access to that vendor, not to this client: \
+unless the event offers this client a way to sponsor or take part as a vendor, \
+grade its dm_access 0-9 and say so in the note. A large event run by a vendor \
+that sells exhibit space or sponsorship to others is graded on that offer.
+"""
+
+
+def host_rule(profile: dict) -> str:
+    """HOST_RULE for a booth-oriented client, nothing for an audience one."""
+    try:
+        orient = rubric.orientation_for((profile or {}).get("classification"))
+    except ValueError:
+        return ""
+    return HOST_RULE if orient == rubric.ORIENTATION_BOOTH else ""
+
+
 def max_uses_for(batch: list) -> int:
     """This batch's search budget: SCORE_SEARCHES_PER_EVENT each, capped."""
     return max(1, min(SCORE_MAX_USES, len(batch or []) * SCORE_SEARCHES_PER_EVENT))
@@ -282,7 +312,8 @@ def score_batch(batch: list[dict], profile: dict, rescore_pass: int = 0) -> dict
     system = _SYSTEM.format(
         profile=profile_brief(profile),
         where_buyers=rubric.CLASSIFICATION_WHERE_BUYERS_ARE.get(
-            profile.get("classification"), "Confirm with the client."))
+            profile.get("classification"), "Confirm with the client."),
+        host_rule=host_rule(profile))
     user = ("Score these %d events and write each description:\n\n%s"
             % (len(batch), "\n".join(_candidate_brief(c) for c in batch)))
     if rescore_pass:
