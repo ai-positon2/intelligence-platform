@@ -469,6 +469,44 @@ def _concession_pass(clause, match):
     return None
 
 
+def _concession_terms(text, match):
+    """The terms line under a concession pass offer, not the event's access.
+
+    informaconnect.com/finovatefall (live run 24, 2026-10-01):
+
+        Join FinovateFall with a Startup Pass
+        ... at startup-friendly pricing.
+        Eligibility: Fintech/tech startups founded January 1, 2021+ ...
+        Subject to approval. Limited availability. ...
+
+    "Subject to approval" opens its own line, so the clause before it is
+    empty and _concession_pass has nothing to read; the event was held as
+    access-restricted. Accepted only in this shape: the restriction starts
+    its line, one of the two lines just above is an "Eligibility" line that
+    names a concession category, and a concession pass is named within the
+    five lines above. "Eligibility: all attendees ..." names no category
+    and still holds the event."""
+    if not re.search(r'approval|application|invit', match.group(0), re.I):
+        return None
+    start = text.rfind('\n', 0, match.start()) + 1
+    if text[start:match.start()].strip():
+        return None
+    above = [l for l in text[max(0, start - 800):start].split('\n') if l.strip()][-5:]
+
+    def concession(words):
+        return any(w.startswith(c) for w in words for c in _CONCESSION if len(c) > 3)
+
+    if not any(re.match(r'\s*eligib', l, re.I) and concession(_fold(l).split())
+               for l in above[-2:]):
+        return None
+    for line in above:
+        for named in re.finditer(r'\bpass(?:es)?\b', line, re.I):
+            words = _fold(line[:named.start()]).split()
+            if words and concession(words[-1:]):
+                return 'concession_pass'
+    return None
+
+
 def _hypothetical(text, match):
     """A restriction asked about, not stated: "What happens if the Event is
     canceled or postponed?" is on every FAQ page. Only a question that is
@@ -517,6 +555,7 @@ def _access(text, event_name, dates):
         scoped = other and general_open and not named_inventory
         excerpt=text[max(0,match.start()-80):match.end()+120]
         scope = ('other_inventory' if scoped else _concession_pass(clause, match)
+                 or _concession_terms(text, match)
                  or _hypothetical(text, match) or _other_programme(
                      text, match, clause, event_name, dates, page))
         if len(observations) < MAX_OBSERVATIONS:

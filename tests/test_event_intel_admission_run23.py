@@ -89,3 +89,39 @@ def test_in_person_and_virtually_is_the_same_edition(text):
 ])
 def test_virtual_without_a_place_is_still_refused(text):
     assert support(NTC, text) == 'unverified', text
+
+
+# ── run 24: the terms line under a concession pass offer ──
+
+FV = E('FinovateFall', '2027-09-13', '2027-09-15')
+FV_HEAD = 'FinovateFall\nSeptember 13-15, 2027\nThe Marriott Marquis, New York\n'
+
+
+def access(text):
+    fetched = dict(status='ok', text=text, titles=[])
+    r = A.inspect(FV, lambda url: fetched)
+    return r['support'], [o['scope'] for c in r['checks'] for o in c.get('access_observations') or []]
+
+
+def test_a_startup_pass_terms_line_is_not_the_events_access():
+    text = FV_HEAD + ('Join FinovateFall with a Startup Pass\n'
+                      'Experience the event as an attendee at startup-friendly pricing.\n'
+                      'Eligibility: Fintech/tech startups founded January 1, 2021+ with <$7M funding.\n'
+                      'Subject to approval. Limited availability. Cannot be combined with other offers.\n')
+    assert access(text) == ('literal_name_and_dates_only', ['concession_pass'])
+
+
+@pytest.mark.parametrize('tail', [
+    # The eligibility line names no concession category.
+    'Join FinovateFall with a Startup Pass\nEligibility: all attendees must be verified.\nSubject to approval.\n',
+    # The pass named above is the paying audience's.
+    'Get your Delegate Pass\nEligibility: startups founded 2021+.\nSubject to approval.\n',
+    # No concession pass named above.
+    'Register for FinovateFall\nEligibility: startups founded 2021+.\nSubject to approval.\n',
+    # The restriction is said of the event, mid-line.
+    'Startup Pass\nEligibility: startups founded 2021+.\nAll registration is subject to approval.\n',
+    # The eligibility line is not next to the restriction.
+    'Startup Pass\nEligibility: startups founded 2021+.\nAgenda\nSpeakers\nSubject to approval.\n',
+])
+def test_an_event_wide_approval_is_still_held(tail):
+    assert access(FV_HEAD + tail)[0] == 'unverified', tail
