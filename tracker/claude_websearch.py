@@ -694,6 +694,34 @@ def strip_em_dash(text: str) -> str:
     return _EM_EN_DASH.sub(", ", str(text or ""))
 
 
+_UNREADABLE = object()
+# A valid escape is consumed whole, so an escaped backslash stays one and
+# only a backslash that starts no escape at all is dropped.
+_BAD_ESCAPE = re.compile(r'\\(["\\/bfnrtu])|\\')
+
+
+def _loads_lenient(text: str):
+    """json.loads, then once more without invalid escapes.
+
+    Live run 24 (2026-10-01): two of nine audit replies quoted an organizer
+    with a backslash before a closing curly quote ("...breakthroughs\\" then
+    U+201D). That is not a JSON escape, the object did not decode, and
+    each audit was reported as "its answer could not be read" with its three
+    searches paid for. Only a backslash that begins no valid escape is
+    removed; nothing else about the text changes."""
+    try:
+        return json.loads(text)
+    except Exception:
+        pass
+    repaired = _BAD_ESCAPE.sub(lambda m: m.group(0) if m.group(1) else '', text)
+    if repaired == text:
+        return _UNREADABLE
+    try:
+        return json.loads(repaired)
+    except Exception:
+        return _UNREADABLE
+
+
 def extract_json(raw: str, require: str | None = None):
     """Pull the first balanced JSON object or array out of a reply.
 
@@ -737,9 +765,8 @@ def extract_json(raw: str, require: str | None = None):
                 elif ch == closer:
                     depth -= 1
                     if depth == 0:
-                        try:
-                            found = json.loads(raw[start:i + 1])
-                        except Exception:
+                        found = _loads_lenient(raw[start:i + 1])
+                        if found is _UNREADABLE:
                             break
                         if require and not (isinstance(found, dict)
                                             and require in found):
