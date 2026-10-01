@@ -418,3 +418,43 @@ def test_the_page_keeps_the_noted_company_and_warns_about_notes_before_the_event
 def test_a_wait_of_weeks_is_said_in_days():
     note = W.window_state("2026-10-21", datetime.datetime(2026, 10, 1, tzinfo=datetime.timezone.utc))["note"]
     assert "in about 21 days" in note
+
+
+# ── live run 33: what the event was like, told as seen ──
+
+@pytest.mark.parametrize("opener", [
+    "We were at IMEX America without a booth this year, and the business events strategy "
+    "sessions felt noticeably more data-driven than past years. What stuck with you?",
+    "We were walking IMEX America this year, and the sessions on planner career pathways "
+    "drew bigger crowds than I expected.",
+    "We noticed the floor was busier than last year.",
+    "Turnout at IMEX America looked bigger than last year.",
+])
+def test_an_invented_observation_of_the_event_is_replaced(opener):
+    out = enforce([row(opener=opener)], W.CLASS_ATTENDED)[0]
+    assert out["draft_status"] == W.DRAFT_NO_EVIDENCE
+    assert "described what the event was like" in out["draft_reason"]
+    assert "sessions" not in out["opener"]
+
+
+@pytest.mark.parametrize("opener", [
+    "Curious which sessions your team found most useful at IMEX America.",
+    "What stood out from the show for your planners?",
+    "How did the sessions on AI land with your team?",
+])
+def test_asking_about_the_event_is_not_an_observation(opener):
+    assert enforce([row(opener=opener)], W.CLASS_ATTENDED)[0]["opener"] == opener
+
+
+def test_an_observation_the_note_records_stands():
+    out = enforce([row(opener="The sessions felt more data-driven than past years, as you said.")],
+                  W.CLASS_ATTENDED, notes={W.org_key("Acme"): "said the sessions felt more data-driven"})[0]
+    assert out["draft_status"] != W.DRAFT_NO_EVIDENCE
+
+
+def test_the_drafting_prompt_forbids_describing_the_event_as_seen(monkeypatch):
+    seen = {}
+    monkeypatch.setattr(W.claude_websearch, "ask", lambda system, user, **k: (
+        seen.update(system=system) or {"text": '{"companies": []}', "error": None}))
+    W.draft_batch([{"org_name": "A", "role": "exhibitor"}], {}, {"name": "E"}, W.CLASS_ATTENDED, {})
+    assert "You were told nothing about what the event was like" in seen["system"]

@@ -372,6 +372,21 @@ _CLAIMS_CONTACT = tuple(re.compile(p) for p in (
     r"\bfollowing\s+up\s+(from|after)\s+(our|the)\s+(booth|chat|conversation|meeting|demo)",
 ))
 
+# What the event was like, told as if the sender saw it. Live run 33 (Cvent
+# at IMEX America, 2026-10-01) drafted "the business events strategy
+# sessions felt noticeably more data-driven than past years" and "the
+# sessions on planner career pathways drew bigger crowds than I expected"
+# for an event that had not yet taken place. Nobody recorded either.
+_CLAIMS_OBSERVED = tuple(re.compile(p) for p in (
+    r"\b(sessions?|talks?|keynotes?|panels?|tracks?|floor|crowds?|rooms?|energy|buzz|show|agenda|conversations)\b"
+    r"[^.?!]{0,50}?\b(felt|seemed|drew|got|ran|was|were)\b[^.?!]{0,40}?\b(more|less|bigger|smaller|"
+    r"packed|busier|quieter|fuller|noticeably|markedly|clearly|surprisingly|data[- ]driven)\b",
+    r"\b(we|i)\s+(noticed|observed|heard|felt|sensed)\b",
+    r"\bthan\s+(i|we)\s+expected\b",
+    r"\bthan\s+(past|previous|last)\s+(years?|editions?)\b",
+    r"\b(stood|stand)\s+out\s+(to\s+(me|us))\b",
+))
+
 # Asserting the client had a booth or a stand. On an event the client only
 # attended, or a competitor's, there was none, whatever the notes say.
 _CLAIMS_BOOTH = tuple(re.compile(p) for p in (
@@ -416,6 +431,13 @@ def claims_contact(text: str) -> list[str]:
     """Every phrase in this draft that asserts a prior interaction."""
     low = (text or "").lower()
     return sorted({m.group(0).strip() for p in _CLAIMS_CONTACT
+                   for m in p.finditer(low)})
+
+
+def claims_observed(text: str) -> list[str]:
+    """Every phrase that tells what the event was like as if it was seen."""
+    low = (text or "").lower()
+    return sorted({m.group(0).strip() for p in _CLAIMS_OBSERVED
                    for m in p.finditer(low)})
 
 
@@ -501,6 +523,10 @@ opener for whoever is eventually identified, and do not invent a name, a \
 title, or a person's action.
 5. Never state the company attended. The roster says how they appeared: \
 exhibitor, sponsor, speaker, partner. Use that word.
+6. You were told nothing about what the event was like. Do not describe its \
+sessions, crowds, themes, mood or takeaways as something anyone observed \
+("the sessions felt more data-driven", "drew bigger crowds than expected"). \
+Unless a booth note says it, ask about it instead of asserting it.
 
 Respond with ONLY a JSON object:
 {{"companies": [{{"org": str, "fit": int, "fit_note": str, "angle": str, \
@@ -849,6 +875,8 @@ def enforce(rows: list[dict], *, event_class: str, notes: dict,
         # `fit_note` as it is in `opener`.
         claims = sorted({c for text in (opener, angle, fit_note) if text
                         for c in claims_contact(text)})
+        observed = sorted({c for text in (opener, angle, fit_note) if text
+                           for c in claims_observed(text)})
         booth = sorted({c for text in (opener, angle, fit_note) if text
                         for c in claims_booth(text)})
         if booth and event_class in NO_BOOTH_CLASSES:
@@ -887,6 +915,21 @@ def enforce(rows: list[dict], *, event_class: str, notes: dict,
                 "anyone spoke to them, and it has been replaced with an opener "
                 "that only says what is known."
                 % ("; ".join('"%s"' % c for c in claims), row.get("org_name")))
+            opener = fallback_opener(
+                org=row.get("org_name") or "this company", event_name=event_name,
+                role_label=role_label, event_class=event_class,
+                client_name=client_name)
+            angle, fit_note = _SAFE_ANGLE, _SAFE_FIT_NOTE
+
+        # What the event was like, told as seen, with no note saying so.
+        if observed and not note and row["draft_status"] not in REWRITTEN:
+            row["draft_flagged"] = observed
+            row["draft_status"] = DRAFT_NO_EVIDENCE
+            row["draft_reason"] = (
+                "This draft described what the event was like (%s) as if "
+                "someone saw it, and nobody recorded that, so it has been "
+                "replaced with an opener that only says what is known."
+                % "; ".join('"%s"' % c for c in observed))
             opener = fallback_opener(
                 org=row.get("org_name") or "this company", event_name=event_name,
                 role_label=role_label, event_class=event_class,
