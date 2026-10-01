@@ -111,7 +111,7 @@ def _slim(c: dict) -> dict:
 
 
 def resolve_companies(domains: list[str], key: str | None = None,
-                      strict: bool = True) -> dict:
+                      strict: bool = True, on_credit=None) -> dict:
     """Batch-resolve domains to Apollo companies.
 
     Returns {"by_domain": {...}, "credits": int, "unmatched": [...],
@@ -123,6 +123,10 @@ def resolve_companies(domains: list[str], key: str | None = None,
     returning [], because an empty result would otherwise be indistinguishable
     from "none of these companies exist" and get written into the report as a
     fact about the world. That exact conflation is audit round 9.
+
+    `on_credit(n)` is told about each billed batch as it returns, so a caller
+    killed part-way (a web request timing out) has already recorded what was
+    spent rather than losing the whole record.
     """
     from . import apollo_client
     key = key or api_key()
@@ -162,6 +166,8 @@ def resolve_companies(domains: list[str], key: str | None = None,
         attempted.extend(batch)
         if rows:
             result["credits"] += 1
+            if on_credit:
+                on_credit(1)
         for domain, row in _index_by_domain(rows).items():
             matched.setdefault(domain, row)
 

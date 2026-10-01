@@ -1394,7 +1394,7 @@
         cancelButton.disabled = false;
         cancelButton.onclick = function(){
           cancelButton.disabled = true;
-          fetch(BASE + '/runs/' + runId + '/cancel', {method:'POST'})
+          fetch(BASE + '/runs/' + runId + '/cancel', {method:'POST', headers: {'Content-Type': 'application/json'}, body: '{}'})
             .then(function(response){ if (!response.ok) throw new Error('Cancellation failed'); })
             .catch(function(){ cancelButton.disabled = false; showFormError('Could not cancel. Please retry.'); });
         };
@@ -4392,12 +4392,28 @@
       }
 
       if ((s.excluded || []).length) {
+        /* Two reasons since 2026-10-01, and they read differently: a score
+           under the floor, or an audience that is not this client's buyers
+           whatever the score. "Below 70" over a row scored 77 was false. */
+        var offAudience = s.excluded.filter(function(e){
+          var r = Number(e.relevance);
+          return e.relevance == null || isNaN(r) || r < RELEVANCE_GATE;
+        });
+        var lowScore = s.excluded.filter(function(e){ return offAudience.indexOf(e) < 0; });
+        var chips = function(list){
+          return '<div class="evi-cut">' + list.map(function(e){
+            return '<span class="cutp" title="' + esc(e.excluded_reason || '') + '">' +
+              esc(e.name) + '<b>' + esc(e.total) + '</b></span>'; }).join('') + '</div>';
+        };
         html += '<div class="evi-sec"><h3>Scored and cut</h3>' +
-          '<div class="evi-note">Below ' + RANK_FLOOR + '. Shown so that "nothing else was found" ' +
-          'and "more were found and none cleared the bar" are not the same picture.' +
-          '</div><div class="evi-cut">' + s.excluded.map(function(e){
-            return '<span class="cutp">' + esc(e.name) + '<b>' + esc(e.total) +
-              '</b></span>'; }).join('') + '</div></div>';
+          '<div class="evi-note">Shown so that "nothing else was found" and "more were ' +
+          'found and none made the list" are not the same picture.</div>' +
+          (lowScore.length ? '<div class="evi-note">Scored under ' + CONSIDER_FLOOR +
+            ', too low to offer as an option:</div>' + chips(lowScore) : '') +
+          (offAudience.length ? '<div class="evi-note">Cut for audience, whatever the ' +
+            'score: relevance under ' + RELEVANCE_GATE + ' of 40 means its crowd is not ' +
+            'mainly this client\'s buyers.</div>' + chips(offAudience) : '') +
+          '</div>';
       }
       if ((s.finished || []).length) {
         html += '<div class="evi-sec"><h3>Already over</h3>' +

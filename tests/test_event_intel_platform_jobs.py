@@ -358,3 +358,48 @@ def test_old_replies_of_finished_jobs_are_pruned_and_live_ones_kept(builds):
     assert rows[live]['text'] == 'REPLY', 'a reply a live job may still replay was pruned'
     assert J.ledger(done, email)['unknown_provider_outcomes'] == 0
     J.cancel(live, email)
+
+
+# ── the run's date is pinned at submission (2026-10-01) ─────────────────
+
+@sql
+def test_a_run_carries_the_date_it_was_submitted(builds, monkeypatch):
+    import datetime as dt
+    email = _email()
+    rid = J.start(email, 'recommend', 'Forum', {'profile': {'classification': 'x'}}, 'k')
+    with J.db() as conn, conn.cursor() as cur:
+        cur.execute('SELECT payload FROM evi_jobs WHERE run_id=%s', (rid,))
+        assert cur.fetchone()[0]['as_of'] == dt.date.today().isoformat()
+
+    tomorrow = dt.date.today() + dt.timedelta(days=1)
+
+    class Tomorrow(dt.date):
+        @classmethod
+        def today(cls):
+            return tomorrow
+    monkeypatch.setattr(J.datetime, 'date', Tomorrow)
+    # Retried the next day with the same key: still the same request.
+    assert J.start(email, 'recommend', 'Forum', {'profile': {'classification': 'x'}}, 'k') == rid
+
+
+def test_the_pinned_date_reaches_the_recommend_profile(monkeypatch):
+    from tracker import event_intel_pipeline as P
+    seen = {}
+    monkeypatch.setattr(P, '_run_recommend', lambda rid, email, profile: seen.update(profile))
+    P.run_job(1, 'recommend', 'q', profile={'classification': 'x'}, as_of='2026-10-01')
+    assert seen['as_of'] == '2026-10-01'
+    P.run_job(1, 'recommend', 'q', profile={'classification': 'x', 'as_of': '2026-09-01'},
+              as_of='2026-10-01')
+    assert seen['as_of'] == '2026-09-01'
+
+
+def test_the_audit_asks_about_the_pinned_date():
+    from tracker import event_intel_audit as A
+    assert A._profile_line({'as_of': '2026-10-01'}).startswith('TODAY: 2026-10-01')
+
+
+def test_eligibility_judges_finished_against_the_pinned_date():
+    from tracker import event_intel_pipeline as P
+    import datetime as dt
+    assert P._as_of_date({'as_of': '2026-10-01'}) == dt.date(2026, 10, 1)
+    assert P._as_of_date({}) is None and P._as_of_date({'as_of': 'soon'}) is None

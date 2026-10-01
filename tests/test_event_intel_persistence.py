@@ -7,6 +7,8 @@ refusals and recomputation rather than about SQL.
 
 import datetime
 
+import os
+
 import pytest
 
 from tracker import event_intel_rubric as R
@@ -223,6 +225,8 @@ def test_cost_note_rides_along_without_touching_the_score():
     assert b["cost_note"].startswith("$28,000")
 
 
+@pytest.mark.skipif(bool(os.environ.get("DATABASE_URL")),
+                    reason="about running with no database; a configured one has rows")
 def test_the_store_degrades_to_empty_without_a_database():
     """DATABASE_URL is unset under test, so every read path must return a safe
     empty rather than raise into a request handler."""

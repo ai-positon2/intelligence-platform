@@ -210,3 +210,28 @@ def test_every_event_kept_out_by_policy_is_a_complete_empty_answer(monkeypatch):
 def test_recovered_dates_are_recorded_in_the_summary(monkeypatch):
     run = _full_run(monkeypatch, _FakeStore())
     assert run["summary"]["dates_from"] == {"PMM Summit": "organizer_structured_data"}
+
+
+# ── the committed-event line (2026-10-01) ──
+
+def _committed(name, relevance, dm, eng):
+    import datetime
+    soon = (datetime.date.today() + datetime.timedelta(days=60)).isoformat()
+    return {"name": name, "committed": True, "relevance": relevance, "dm_access": dm,
+            "engagement": eng, "total": relevance + dm + eng,
+            "starts_on": soon, "ends_on": soon}
+
+
+def test_the_committed_line_names_the_bar_and_the_audience_cut():
+    from tracker import event_intel_pipeline as P, event_intel_rubric as R
+    ranked = R.rank([_committed("Low Score Expo", 30, 10, 5),
+                     _committed("Wrong Crowd Summit", 10, 40, 20)])
+    note = P.committed_note(ranked)
+    assert "scored below %d" % R.RANK_FLOOR in note and "Low Score Expo at 45" in note
+    assert "not mainly this client's buyers" in note and "Wrong Crowd Summit" in note
+    assert "—" not in note
+
+
+def test_no_committed_line_when_nothing_committed_falls_short():
+    from tracker import event_intel_pipeline as P, event_intel_rubric as R
+    assert P.committed_note(R.rank([_committed("Fine Forum", 35, 35, 15)])) is None

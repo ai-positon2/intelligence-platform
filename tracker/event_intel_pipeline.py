@@ -495,7 +495,7 @@ def _run_recommend(run_id: int, email: str, profile: dict) -> None:
     from .event_intel_admission import inspect_all
     admission = durable_stage('source-admission', inspect_all, survivors)
     for candidate, source_check in zip(survivors, admission):
-        reasons = eligibility(candidate, profile)
+        reasons = eligibility(candidate, profile, today=_as_of_date(profile))
         reasons.extend(source_check['reasons'])
         if reasons:
             policy_unconfirmed.append(dict(candidate, scoring_note=' '.join(reasons),
@@ -532,20 +532,7 @@ def _run_recommend(run_id: int, email: str, profile: dict) -> None:
             record_event(run_id, candidate)
     cap = int(profile.get("max_events") or event_intel_rubric.DEFAULT_CAP)
     ranked = event_intel_rubric.rank(rows, cap=cap)
-    if ranked["committed_below_bar"]:
-        # Money already spent on an event that does not clear the bar is the
-        # most actionable single line this analysis produces, so it is said in
-        # the summary rather than left for the reader to notice a badge.
-        summary_note_committed = (
-            "%d event%s you are already committed to scored below 70 and %s "
-            "kept on the list anyway, marked: %s."
-            % (len(ranked["committed_below_bar"]),
-               "" if len(ranked["committed_below_bar"]) == 1 else "s",
-               "was" if len(ranked["committed_below_bar"]) == 1 else "were",
-               ", ".join("%s at %s" % (c["name"], c["total"])
-                         for c in ranked["committed_below_bar"])))
-    else:
-        summary_note_committed = None
+    summary_note_committed = committed_note(ranked)
 
     # What this user already decided about any of these. Attached, never used
     # to filter: a previously rejected event stays on the list carrying the
@@ -643,6 +630,7 @@ def _run_recommend(run_id: int, email: str, profile: dict) -> None:
                      for c in scored["unscored"]],
         "orientation": profile.get("orientation"),
         "committed_below_bar": ranked["committed_below_bar"],
+        "committed_off_audience": ranked.get("committed_off_audience") or [],
         "committed_note": summary_note_committed,
         "outcomes": {"counts": outcomes["counts"], "ruled_on": outcomes["ruled_on"],
                      "note": outcomes["note"], "by_name": outcomes["by_name"],
@@ -668,6 +656,45 @@ def _run_recommend(run_id: int, email: str, profile: dict) -> None:
         u.get('kind') == 'scoring' for u in summary['unscored']))
     store.update_run(run_id, status='failed' if failed else 'complete', stage='done', summary=summary,
                      error='No event could be verified and scored.' if failed else None)
+
+
+def _as_of_date(profile: dict):
+    """The run's pinned date as a date, or None for "today"."""
+    from datetime import date
+    try:
+        return date.fromisoformat(str((profile or {}).get("as_of") or "")[:10])
+    except ValueError:
+        return None
+
+
+def committed_note(ranked: dict) -> str | None:
+    """What the client has already paid for that this run would not pick.
+
+    Money already spent on an event that does not clear the bar, or that
+    is aimed at someone else's buyers, is the most actionable single line
+    this analysis produces, so it is said in the summary rather than left
+    for the reader to notice a badge."""
+    committed_lines = []
+    below = ranked["committed_below_bar"]
+    if below:
+        committed_lines.append(
+            "%d event%s you are already committed to scored below %d and %s "
+            "kept on the list anyway, marked: %s."
+            % (len(below), "" if len(below) == 1 else "s",
+               event_intel_rubric.RANK_FLOOR,
+               "was" if len(below) == 1 else "were",
+               ", ".join("%s at %s" % (c["name"], c["total"]) for c in below)))
+    off = ranked.get("committed_off_audience") or []
+    if off:
+        committed_lines.append(
+            "%d event%s you are already committed to %s an audience that is "
+            "not mainly this client's buyers and %s kept on the list anyway, "
+            "marked: %s."
+            % (len(off), "" if len(off) == 1 else "s",
+               "draws" if len(off) == 1 else "draw",
+               "was" if len(off) == 1 else "were",
+               ", ".join(c["name"] for c in off)))
+    return " ".join(committed_lines) or None
 
 
 def _run_workroom(run_id: int, email: str, source_run_id: int, profile: dict,
@@ -774,6 +801,10 @@ def run_job(run_id: int, mode: str, query: str, **kwargs) -> None:
     try:
         if mode == "recommend":
             profile = kwargs.get("profile") or {}
+            if kwargs.get("as_of") and not profile.get("as_of"):
+                # The date the run was submitted, so a resume after midnight
+                # asks the same questions and replays its stored replies.
+                profile = dict(profile, as_of=kwargs["as_of"])
             if not profile.get("classification"):
                 # The skill's HARD STOP, enforced here as well as at the route.
                 # Nothing is discovered or scored until the classification is
@@ -858,9 +889,35 @@ def resolve_run_companies(run_id: int, email: str, titles: list[str] | None = No
                          "guessing a domain from a name attaches real firmographics "
                          "to the wrong company.")}
 
+    # A company Apollo has already answered for is never paid for again: a
+    # retry after a partial failure, or a new set of job titles, re-bills only
+    # what was never looked up. The people lookup is free, so it reruns for
+    # every match, old or new, against the titles asked for now.
+    known = {}
+    looked = set()
+    for p in participants:
+        d = p.get("org_domain")
+        if d and p.get("resolution") in ("matched", "no_match"):
+            looked.add(d)
+            if p.get("resolution") == "matched" and isinstance(p.get("apollo"), dict):
+                known[d] = {k: v for k, v in p["apollo"].items() if k != "contacts"}
+    pending = [d for d in domains if d not in looked]
+
+    previous_stage = run.get("stage") or "done"
     store.update_run(run_id, stage="resolving_companies")
-    res = event_intel_enrich.resolve_companies(domains)
-    matched = res.get("by_domain") or {}
+    recorded = []
+
+    def spent(n):
+        recorded.append(n)
+        store.add_credits(run_id, n)
+    res = (event_intel_enrich.resolve_companies(pending, on_credit=spent)
+           if pending else {"by_domain": {}, "credits": 0, "unmatched": [],
+                            "unattempted": [], "error": None})
+    # Whatever the resolver reported but did not announce batch by batch is
+    # still recorded: a credit spent is never dropped from the run.
+    if (res.get("credits") or 0) > sum(recorded):
+        store.add_credits(run_id, res["credits"] - sum(recorded))
+    matched = dict(known, **(res.get("by_domain") or {}))
 
     people = {"by_domain": {}, "total": 0, "error": None}
     if matched:
@@ -881,14 +938,14 @@ def resolve_run_companies(run_id: int, email: str, titles: list[str] | None = No
             if contacts:
                 payload["contacts"] = contacts
             store.update_participant_resolution(ids, domain, payload, "matched")
-        else:
+        elif domain not in looked:
             # Explicitly recorded, not left blank. "We looked and Apollo has
             # no record" is a different fact from "we never looked".
             store.update_participant_resolution(ids, None, None, "no_match")
 
-    if res.get("credits"):
-        store.add_credits(run_id, res["credits"])
-    store.update_run(run_id, stage="done")
+    # Credits were recorded batch by batch as they were spent. The stage goes
+    # back to what it was: this runs beside the run, not as a stage of it.
+    store.update_run(run_id, stage=previous_stage)
 
     return {
         "resolved": len(matched),

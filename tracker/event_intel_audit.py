@@ -140,8 +140,10 @@ Respond with ONLY a JSON object:
 
 
 def _profile_line(profile: dict) -> str:
-    from .event_intel_discover import profile_brief, _today
-    return "TODAY: %s\n%s" % (_today(), profile_brief(profile))
+    # The run's pinned date when it has one, like discovery's prompts, so a
+    # resumed run asks the same question and replays the stored reply.
+    from .event_intel_discover import profile_brief, _run_date
+    return "TODAY: %s\n%s" % (_run_date(profile), profile_brief(profile))
 
 
 def _event_label(c: dict) -> str:

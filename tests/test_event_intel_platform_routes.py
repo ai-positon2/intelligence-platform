@@ -188,12 +188,12 @@ def test_a_repeat_resolve_returns_the_stored_result_without_billing(billing):
     assert again.status_code == 200 and body["already_resolved"] and body["credits"] == 0
     assert len(billing) == 1
     assert store.get_run(rid, email)["credits_spent"] == 1
-    # Same titles in another order and case are the same request.
+    # New titles re-run the free people lookup, never the billed company
+    # match: every company here was already answered for.
     c.post(BASE + "/runs/%d/resolve" % rid, json={"titles": ["CMO", "VP Marketing"]}, headers=SAME)
-    assert len(billing) == 2
     c.post(BASE + "/runs/%d/resolve" % rid, json={"titles": ["vp marketing", "cmo"]}, headers=SAME)
-    assert len(billing) == 2, "a reordered title list billed again"
-    assert store.get_run(rid, email)["credits_spent"] == 2
+    assert len(billing) == 1, "a company already matched was paid for again"
+    assert store.get_run(rid, email)["credits_spent"] == 1
 
 
 @sql
@@ -333,3 +333,13 @@ def test_drafts_are_recorded_and_obey_the_daily_call_cap(monkeypatch):
     assert store.account_usage(email)["profile_draft"]["calls"] == 2
     monkeypatch.delenv("EVI_DAILY_CALL_LIMIT")
     assert c.post(BASE + "/profiles/draft", json=body).status_code == 200
+
+
+def test_the_pages_cancel_button_posts_json():
+    """The state-change guard accepts a body-less POST only so a page left
+    open across a deploy can still cancel; the current page posts JSON."""
+    import pathlib, re
+    page = pathlib.Path(__file__).resolve().parents[1].joinpath(
+        "templates", "event_conference_intelligence.html").read_text()
+    call = re.search(r"fetch\(BASE \+ '/runs/' \+ runId \+ '/cancel', \{[^}]*\}[^)]*\)", page)
+    assert call and "application/json" in call.group(0), call and call.group(0)

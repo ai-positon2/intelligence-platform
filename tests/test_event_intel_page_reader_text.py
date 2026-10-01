@@ -224,7 +224,7 @@ def test_the_route_s_resolve_error_is_a_reader_sentence(monkeypatch):
     out = P.resolve_run_companies(1, "me@p2.example")
     assert out["error"].startswith("Company matching is not switched on")
     assert "APOLLO_API_KEY" not in out["error"]
-    monkeypatch.setattr(E, "resolve_companies", lambda d: {
+    monkeypatch.setattr(E, "resolve_companies", lambda d, **k: {
         "by_domain": {"acme.com": {"name": "Acme"}}, "credits": 1, "unmatched": [],
         "unattempted": ["beta.com"], "error": "Apollo company lookup failed: HTTP 503"})
     monkeypatch.setattr(E, "find_people", lambda d, titles=None: {"by_domain": {}, "total": 0, "error": None})

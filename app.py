@@ -9320,8 +9320,9 @@ def _evi_state_change_guard():
     Origin/Referer check closes it again for any browser that sends them.
 
     The single exception is a POST with no body and no Content-Type at all,
-    which is what the page's own cancel button sends (fetch with no body).
-    No HTML form can produce one: a form always sends a Content-Type.
+    which is what the page's cancel button sent before it posted JSON; it is
+    kept so a page left open across a deploy can still cancel its run. No
+    HTML form can produce one: a form always sends a Content-Type.
 
     Scoped to this agent's prefix, and only for a signed-in Position2 user:
     anyone else falls through to the route's own position2_required, so a

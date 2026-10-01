@@ -191,3 +191,19 @@ def test_the_plan_page_labels_its_stored_tokens(monkeypatch):
                   "Announced for this edition", "Blocked until reviewed", "Exhibitor",
                   "May 4 to 6, 2027"):
         assert shown in html, shown
+
+
+# ── the cut list says which cut it was (relevance cut, 2026-10-01) ──────
+
+def test_the_cut_list_separates_a_low_score_from_the_wrong_audience(page_script):
+    excluded = [{"name": "Low Score Expo", "total": 41, "relevance": 30,
+                 "excluded_reason": "Scored 41, under the 50 needed to be shown as an option."},
+                {"name": "Wrong Crowd Summit", "total": 77, "relevance": 18,
+                 "excluded_reason": "Scored 77, but its audience is not mainly your buyers."}]
+    body = _render(page_script, _recommend([_cand("A", 92, "P1")], excluded=excluded,
+                                           counts={"P1": 1, "kept": 1, "excluded": 2, "finished": 0}))
+    cut = body[body.index("Scored and cut"):]
+    low, aud = cut.index("Low Score Expo"), cut.index("Wrong Crowd Summit")
+    assert cut.index("too low to offer") < low < cut.index("Cut for audience") < aud
+    assert "Below 70" not in cut
+    assert 'title="Scored 77, but its audience is not mainly your buyers."' in cut

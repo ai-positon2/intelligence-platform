@@ -5,6 +5,7 @@ owners. Completed stage results survive retries; unknown provider outcomes
 are never represented as zero-cost success.
 """
 import contextvars
+import datetime
 import hashlib
 import json
 import os
@@ -93,7 +94,12 @@ def start(email, mode, query, kwargs, request_key):
     if not request_key or len(request_key) > 128:
         raise ValueError('A request key of 1–128 characters is required')
     request_payload = dict(mode=mode, query=query, kwargs=kwargs)
-    payload = dict(request_payload, code_version=code_version(), runtime_versions=runtime_versions())
+    # The run's own date, fixed at submission. Every prompt carries "today",
+    # so a run resumed after midnight built new prompts, missed every stored
+    # reply and paid for the whole run again. Kept out of request_payload:
+    # the same request retried tomorrow is still the same request.
+    payload = dict(request_payload, code_version=code_version(), runtime_versions=runtime_versions(),
+                   as_of=datetime.date.today().isoformat())
     with db() as conn, conn.cursor() as cur:
         cur.execute('SELECT pg_advisory_xact_lock(hashtext(%s))', ('evi-submit:' + email,))
         cur.execute('SELECT run_id,payload FROM evi_jobs WHERE email=%s AND request_key=%s', (email,request_key))
@@ -502,7 +508,8 @@ def run_once():
             for table in ('evi_outreach','evi_participants','evi_sources','evi_candidates','evi_observations','evi_events'):
                 cur.execute('DELETE FROM ' + table + ' WHERE run_id=%s', (job['run_id'],))
         store.update_run(job['run_id'], status='running', summary={}, error=None)
-        pipeline.run_job(job['run_id'],payload['mode'],payload['query'],**payload['kwargs'])
+        pipeline.run_job(job['run_id'],payload['mode'],payload['query'],
+                         **dict(payload['kwargs'], as_of=payload.get('as_of')))
     except Exception as exc:
         store.update_run(job['run_id'],status='failed',error=str(exc)[:300])
     finally:
