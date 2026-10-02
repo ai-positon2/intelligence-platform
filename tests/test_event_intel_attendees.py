@@ -219,9 +219,9 @@ def test_a_batch_that_could_not_be_read_is_counted(monkeypatch):
     posts = _posts("At Widget Expo")
     out = A.people_in_posts(posts, EVENT, TODAY,
                             classify=lambda b, e, t: {"posts": None, "error": "unparsable"})
-    assert out["failed"] == 1 and out["batches"] == 1
-    assert "1 of 1 groups of LinkedIn posts could not be read" in A.note(
-        {"linkedin": {"failed_batches": 1, "batches": 1}, "counts": {"confirmed": 1}})
+    assert out["failed"] == 1 and out["batches"] == 1 and out["unread_posts"] == 1
+    assert "1 of the 1 LinkedIn posts found could not be read" in A.note(
+        {"linkedin": {"unread_posts": 1, "posts": 1}, "counts": {"confirmed": 1}})
 
 
 def test_posts_are_read_in_batches_that_cover_every_post():
@@ -633,3 +633,14 @@ def test_a_failed_batch_is_tried_again_and_a_reply_out_of_room_is_halved(monkeyp
         return {"posts": [], "error": None}
     out = A.people_in_posts(posts, EVENT, TODAY, classify=long)
     assert calls == [4, 2, 2] and out["failed"] == 0
+
+    calls.clear()
+
+    def half(batch, event, today):
+        calls.append(len(batch))
+        if len(batch) > 2 or len(calls) == 3:
+            return {"posts": None, "error": "max_tokens"}
+        return {"posts": [], "error": None}
+    out = A.people_in_posts(posts, EVENT, TODAY, classify=half)
+    # Half read is not all read: the half that failed is counted, not lost.
+    assert calls == [4, 2, 2] and out["failed"] == 0 and out["unread_posts"] == 2

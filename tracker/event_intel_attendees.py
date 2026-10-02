@@ -65,7 +65,7 @@ EDITIONS = (EDITION_THIS, EDITION_EARLIER, EDITION_UNCLEAR)
 POSTS_PER_QUERY = 150
 POSTS_PER_PAGE = 50
 MAX_POSTS = 300
-BATCH = 20
+BATCH = 15
 WORKERS = 4
 POST_CHARS = 1400
 QUOTE_CHARS = 240
@@ -473,7 +473,7 @@ def _classify_batch(batch: list[tuple[str, dict]], event: dict, today: date) -> 
             post.get("posted_at") or "unknown", post["text"][:POST_CHARS]))
     user = ("Event: %s\nToday: %s\n\n%s" % (_event_brief(event), today.isoformat(),
                                              "\n\n".join(lines)))
-    res = claude_websearch.ask(_POST_SYSTEM, user, max_uses=0, max_tokens=6000, timeout=150.0)
+    res = claude_websearch.ask(_POST_SYSTEM, user, max_uses=0, max_tokens=10000, timeout=180.0)
     spend = claude_websearch.spend_of(res)
     if res.get("error"):
         return {"posts": None, "error": (res["error"] or {}).get("kind") or "error", "spend": spend}
@@ -502,23 +502,24 @@ def people_in_posts(posts: list[dict], event: dict, today: date | None = None,
         first = classify(batch, event, today)
         spent = [first.get("spend")]
         if first.get("posts") is not None:
-            return first["posts"], spent, None
+            return first["posts"], spent, None, 0
         if first.get("error") == "max_tokens" and len(batch) > 1:
             parts = [batch[:len(batch) // 2], batch[len(batch) // 2:]]
         else:
             time.sleep(RETRY_PAUSE)
             parts = [batch]
-        posts, kinds = [], []
+        posts, kinds, unread = [], [], 0
         for part in parts:
             again = classify(part, event, today)
             spent.append(again.get("spend"))
             if again.get("posts") is None:
                 kinds.append(again.get("error") or first.get("error") or "error")
+                unread += len(part)
             else:
                 posts.extend(again["posts"])
-        if kinds and not posts:
-            return None, spent, kinds[0]
-        return posts, spent, (kinds[0] if kinds else None)
+        if len(kinds) == len(parts):
+            return None, spent, kinds[0], unread
+        return posts, spent, (kinds[0] if kinds else None), unread
 
     results = []
     if batches:
@@ -528,9 +529,10 @@ def people_in_posts(posts: list[dict], event: dict, today: date | None = None,
             futures = [pool.submit(contextvars.copy_context().run, read, b) for b in batches]
             results = [f.result() for f in futures]
     out = {"people": [], "batches": len(batches), "failed": 0, "spend": [],
-           "rejected": 0, "failed_kinds": []}
-    for posts_read, spent, kind in results:
+           "rejected": 0, "failed_kinds": [], "unread_posts": 0}
+    for posts_read, spent, kind, unread in results:
         out["spend"].extend(spent)
+        out["unread_posts"] += unread
         if kind:
             out["failed_kinds"].append(kind)
         if posts_read is None:
@@ -857,7 +859,8 @@ def gather(event: dict, participants: list[dict], event_host: str = "",
         people.extend(read["people"])
         report["linkedin"].update(people=len(read["people"]), batches=read["batches"],
                                   failed_batches=read["failed"], rejected=read["rejected"],
-                                  failed_kinds=read["failed_kinds"])
+                                  failed_kinds=read["failed_kinds"],
+                                  unread_posts=read["unread_posts"])
 
     try:
         web = (sources.get("web") or search_web)(event, event_host, today)
@@ -915,9 +918,9 @@ def note(report: dict) -> str:
     elif li.get("error"):
         bits.append("The LinkedIn search stopped part-way (%s), so posts after "
                     "that point were not read." % li["error"])
-    if li.get("failed_batches"):
-        bits.append("%d of %d groups of LinkedIn posts could not be read, so some "
-                    "posts were not checked." % (li["failed_batches"], li.get("batches", 0)))
+    if li.get("unread_posts"):
+        bits.append("%d of the %d LinkedIn posts found could not be read, so the "
+                    "people in them were not checked." % (li["unread_posts"], li.get("posts", 0)))
     web = report.get("web") or {}
     if web.get("error"):
         bits.append("The web search did not finish, so public pages beyond LinkedIn "
