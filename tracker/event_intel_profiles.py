@@ -302,7 +302,7 @@ def choose_website(links: list[dict], skip: set, event_host: str = "",
 _UI_LINES = re.compile(r"^(share( on \w+)?|copy link|back|connect|follow( us)?|menu|"
                        r"website|visit website|see all\b.*|book tickets|login|log in|"
                        r"register|skip to main content|close|next|previous|more|less|"
-                       r"read more|show more|show less|view profile)$", re.I)
+                       r"read more|show more|show less|view profile|sessions)$", re.I)
 _LABEL = re.compile(r"^(About\b[^\n]{0,160}|[A-Z][^:\n]{0,40}):$")
 MAX_TAGS, MAX_FIELDS, MAX_ABOUT, MAX_VALUE = 6, 6, 1500, 300
 

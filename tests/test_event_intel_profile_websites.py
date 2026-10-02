@@ -419,7 +419,7 @@ def test_site_lines_go_and_what_the_event_says_about_the_company_stays():
 
 def test_labelled_fields_and_an_about_paragraph_are_read_as_printed():
     about = "Checkout.com runs a global payments network for enterprise merchants, " * 3
-    lines = ["Back", "Checkout.com", "Payments & Payments Technology", "Checkout.com",
+    lines = ["Back", "Sessions", "Checkout.com", "Payments & Payments Technology", "Checkout.com",
              "Location:", "Money Row - Gjelina - Monday + Tuesday", "About Checkout.com:",
              about.strip(), "Second paragraph of the about text.", "Connect"]
     d = PR.profile_details(lines, "Checkout.com", set())
@@ -476,15 +476,26 @@ def test_the_roster_shows_what_the_event_says_and_opens_into_details():
 
 @pytest.mark.skipif(not _node_available(), reason="node is not available")
 def test_a_label_on_every_company_is_said_once_above_the_list():
+    """All 50 of Web Summit Qatar's partners read PAST PARTNER (live run 36)."""
     run = _with_details(_run_fixture())
-    base = run["participants"][1]
-    for i in range(4):
-        run["participants"].append(dict(base, id=20 + i, org_name="Co %d" % i))
+    base = dict(run["participants"][0], role="partner")
+    run["participants"] = [dict(base, id=20 + i, org_name="Co %d" % i) for i in range(5)]
+    run["participants"][0]["evidence"] = dict(run["participants"][0]["evidence"], profile_detail={
+        "tags": ["PAST PARTNER", "Singapore"]})
+    for p in run["participants"][1:]:
+        p["evidence"] = dict(p["evidence"], profile_detail={"tags": ["PAST PARTNER", "Qatar"]})
     html = _render(run)["drawerBody"]
     assert "The event labels every one of these <b>PAST PARTNER</b>" in html
     assert "partners of an earlier edition, not confirmed for this one" in html
     assert '<div class="evi-tags-line">Singapore</div>' in html
-    assert "evi-tags-line\">PAST PARTNER" not in html
+    assert 'evi-tags-line">PAST PARTNER' not in html
+    # In a mixed list the label is said per role, and still taken off the rows.
+    run["participants"].append(dict(base, id=40, role="speaker", org_name="Pat Doe",
+                                    evidence={"profile_detail": {"tags": ["Past Featured Speaker"]}}))
+    html = _render(run)["drawerBody"]
+    assert "The event labels every partner <b>PAST PARTNER</b>" in html
+    assert 'evi-tags-line">PAST PARTNER' not in html
+    assert '<div class="evi-tags-line">Past Featured Speaker</div>' in html
 
 
 def test_the_csv_carries_what_the_event_profile_says(monkeypatch):

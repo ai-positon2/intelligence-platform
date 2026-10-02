@@ -1794,14 +1794,26 @@
        all 50 of Web Summit Qatar's partners) is a fact about the list, said
        once above it; repeated on every row it read as noise and hid what it
        means: last edition's partners, not this one's. */
+    /* Worked out per role, because Web Summit Qatar's partners all read
+       PAST PARTNER while its speakers read "Past Featured Speaker", and in
+       the All view one label never covered every row. {role: [tags]}. */
     function commonTags(rows){
-      var withDetail = rows.filter(function(p){ return (detailOf(p).tags || []).length; });
-      if (withDetail.length < 5) return [];
-      var count = {};
-      withDetail.forEach(function(p){
-        (detailOf(p).tags || []).forEach(function(t){ count[t] = (count[t] || 0) + 1; });
+      var byRole = {};
+      rows.forEach(function(p){
+        if ((detailOf(p).tags || []).length) (byRole[p.role] = byRole[p.role] || []).push(p);
       });
-      return Object.keys(count).filter(function(t){ return count[t] === withDetail.length; });
+      var out = {};
+      Object.keys(byRole).forEach(function(role){
+        var group = byRole[role];
+        if (group.length < 5) return;
+        var count = {};
+        group.forEach(function(p){
+          (detailOf(p).tags || []).forEach(function(t){ count[t] = (count[t] || 0) + 1; });
+        });
+        var shared = Object.keys(count).filter(function(t){ return count[t] === group.length; });
+        if (shared.length) out[role] = shared;
+      });
+      return out;
     }
 
     var OPEN_ROWS = {};
@@ -1915,12 +1927,16 @@
         notes.push(withSite + ' of ' + rows.length + ' have a website on record.' + findLink);
       }
       var common = commonTags(rows);
-      if (common.length) {
-        notes.push('The event labels every one of these <b>' + common.map(esc).join(', ') +
-          '</b> on its profile page.' + (common.some(function(t){ return /\bpast\b/i.test(t); })
-            ? ' That is the event calling them partners of an earlier edition, not ' +
-              'confirmed for this one.' : ''));
-      }
+      var roleNames = Object.keys(common);
+      roleNames.forEach(function(role){
+        var tagsHere = common[role];
+        var who = roleNames.length === 1 && rows.every(function(p){ return p.role === role; })
+          ? 'every one of these' : 'every ' + esc(String(labels[role] || role).toLowerCase());
+        notes.push('The event labels ' + who + ' <b>' + tagsHere.map(esc).join(', ') +
+          '</b> on its profile page.' + (tagsHere.some(function(t){ return /\bpast\b/i.test(t); })
+            ? ' That is the event calling them ' + esc(String(labels[role] || role).toLowerCase()) +
+              's of an earlier edition, not confirmed for this one.' : ''));
+      });
       var caption = notes.filter(Boolean).length
         ? '<p class="evi-roster-note">' + notes.filter(Boolean).join(' ') + '</p>' : '';
 
@@ -1938,7 +1954,7 @@
             (p.person_title ? '<div class="evi-dom">' + esc(p.person_title) + '</div>' : '') +
             contactsHtml(p);
         var d = detailOf(p);
-        var tags = (d.tags || []).filter(function(t){ return common.indexOf(t) < 0; });
+        var tags = (d.tags || []).filter(function(t){ return (common[p.role] || []).indexOf(t) < 0; });
         var openable = !!(d.about || (d.fields || []).length || tags.length || d.linkedin ||
           d.x || look.profile_url || p.org_domain || (ap.contacts || []).length || ap.industry);
         var cols = 2 + (showPerson ? 1 : 0) + (showFirmo ? 1 : 0) + (showSrc ? 1 : 0);
