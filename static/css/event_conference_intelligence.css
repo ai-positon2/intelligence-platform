@@ -3120,3 +3120,7 @@ table.evi-table { width: 100%; border-collapse: separate; border-spacing: 0;
   padding: 8px 0; }
 .evi-att-staff summary:focus-visible { outline: 2px solid var(--evi-a1); outline-offset: 2px; }
 .evi-att-staff[open] summary { margin-bottom: 4px; }
+.evi-att-name a.evi-att-x { margin-left: 6px; font-size: 10.5px; font-weight: 600; color: var(--evi-a1);
+  text-decoration: none; border: 1px solid var(--evi-line); border-radius: var(--radius-xs, 5px);
+  padding: 1px 6px; }
+.evi-att-name a.evi-att-x:hover { border-color: rgba(56,189,248,.45); }

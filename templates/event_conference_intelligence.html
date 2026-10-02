@@ -11,7 +11,7 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-components.css') }}">
   <script src="/static/js/theme.js"></script>
   <link rel="stylesheet" href="/static/css/grid-tokens.css">
-  <link rel="stylesheet" href="/static/css/event_conference_intelligence.css?v=6">
+  <link rel="stylesheet" href="/static/css/event_conference_intelligence.css?v=7">
   <link rel="stylesheet" href="/static/css/thinking-orb.css">
   <link rel="stylesheet" href="/static/css/border-beam.css">
   <link rel="stylesheet" href="/static/css/aurora-app.css?v=3">
@@ -3236,6 +3236,10 @@
     function attScan(run){ return run.attendee_scan || null; }
     function attRunning(run){ var sc = attScan(run); return !!sc && sc.state === 'running'; }
 
+    function attOnX(a){
+      return ((a.evidence || {}).proof || []).some(function(p){ return p.kind === 'x_post'; });
+    }
+
     function attFilterKeys(rows){
       var out = [['all', 'All', rows.length]];
       var by = function(fn){ return rows.filter(fn).length; };
@@ -3245,6 +3249,7 @@
       if ((n = by(function(a){ return a.status === 'speaking'; })) && n < rows.length) out.push(['speaking', 'Speakers', n]);
       if ((n = by(function(a){ return a.basis === 'self' || a.basis === 'others'; })) && n < rows.length)
         out.push(['posted', 'From posts', n]);
+      if ((n = by(attOnX)) && n < rows.length) out.push(['x', 'From X', n]);
       return out;
     }
 
@@ -3253,6 +3258,7 @@
       if (f === 'this' || f === 'earlier') return a.edition === f;
       if (f === 'speaking') return a.status === 'speaking';
       if (f === 'posted') return a.basis === 'self' || a.basis === 'others';
+      if (f === 'x') return attOnX(a);
       return true;
     }
 
@@ -3261,7 +3267,8 @@
       return proof.map(function(p){
         var url = safeUrl(p.url);
         var link = url ? ' <a href="' + esc(url) + '" target="_blank" rel="noopener noreferrer">' +
-          (p.kind === 'linkedin_post' ? 'View post' : p.kind === 'web_page' ? 'View page' :
+          (p.kind === 'linkedin_post' || p.kind === 'x_post' ? 'View post' :
+           p.kind === 'web_page' ? 'View page' :
            'View source') + '</a>' : '';
         return '<div class="evi-att-proof">' +
           '<span class="evi-att-plabel">' + esc(p.label || '') +
@@ -3277,6 +3284,9 @@
       var nm = li ? '<a href="' + esc(li) + '" target="_blank" rel="noopener noreferrer">' +
         esc(a.name) + '</a>' : esc(a.name);
       var sub = [a.title, staff ? null : a.company].filter(Boolean).map(esc).join(' &middot; ');
+      var x = safeUrl((a.evidence || {}).x);
+      if (x) nm += ' <a class="evi-att-x" href="' + esc(x) + '" target="_blank" ' +
+        'rel="noopener noreferrer" title="Their X profile">on X</a>';
       return '<b class="evi-att-name">' + nm + '</b>' +
         (sub ? '<span class="evi-att-sub">' + sub + '</span>' : '') +
         (!staff && a.company_domain && a.company ? '<span class="evi-att-dom">' + esc(a.company_domain) + '</span>' : '');
@@ -3335,7 +3345,7 @@
       var note = ATT_NOTE[run.id];
       var html = '<div class="evi-sec" id="eviAttendees"><h3>Attendees</h3>' +
         '<p class="evi-roster-note">Events do not publish who bought a ticket. These are the ' +
-        'people there is public proof for: the event naming them, their own post saying they ' +
+        'people there is public proof for: the event naming them, their own LinkedIn or X post saying they ' +
         'are going or went, or someone else\'s post naming them there. Each row shows its proof.</p>';
       if (note) {
         html += '<div class="evi-coverage' + (note.bad ? ' warn' : '') + '" role="status"><span class="ic">' +
@@ -3343,13 +3353,13 @@
       }
       if (attRunning(run)) {
         return html + '<div class="evi-running"><span class="thinking-orb-slot" data-orb-state="working" ' +
-          'data-orb-size="20"></span><span role="status" aria-live="polite">Searching LinkedIn posts ' +
+          'data-orb-size="20"></span><span role="status" aria-live="polite">Searching LinkedIn and X posts ' +
           'and the public web for people at this event, and reading each one. This takes a minute ' +
           'or two.</span></div></div>';
       }
       if (!scan && !rows.length) {
         return html + '<div class="evi-webfind"><p>Searches LinkedIn for posts that name this event, ' +
-          'through the LinkedIn account connected to this workspace, then the public web, and keeps ' +
+          'through the LinkedIn account connected to this workspace, then X and the public web, and keeps ' +
           'each person only where the words of the post show them there. Also looks up senior ' +
           'people at the listed exhibitors and sponsors in Apollo\'s free people search. Uses about ' +
           'a dollar of model time and no Apollo credits.</p>' +

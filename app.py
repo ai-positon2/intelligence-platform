@@ -9963,7 +9963,7 @@ def event_conference_intelligence_attendees_csv(run_id):
         abort(404)
     buf = io.StringIO()
     w = csv.writer(buf)
-    w.writerow(["Name", "Title", "Company", "Company website", "LinkedIn",
+    w.writerow(["Name", "Title", "Company", "Company website", "LinkedIn", "X profile",
                 "How we know", "At the event as", "Edition", "Proof", "Quote",
                 "Proof link", "Posted", "Other proof", "Caveat"])
     for a in event_intel_store.get_attendees(run_id):
@@ -9972,7 +9972,7 @@ def event_conference_intelligence_attendees_csv(run_id):
         first = proof[0] if proof else {}
         w.writerow([_csv_safe(v) for v in [
             a.get("name"), a.get("title"), a.get("company"), a.get("company_domain"),
-            a.get("linkedin"), BASIS_LABELS.get(a.get("basis"), a.get("basis")),
+            a.get("linkedin"), ev.get("x"), BASIS_LABELS.get(a.get("basis"), a.get("basis")),
             STATUS_LABELS.get(a.get("status"), a.get("status")),
             EDITION_LABELS.get(a.get("edition"), ""),
             first.get("label"), first.get("quote"), first.get("url"), first.get("posted_at"),

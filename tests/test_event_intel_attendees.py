@@ -220,8 +220,9 @@ def test_a_batch_that_could_not_be_read_is_counted(monkeypatch):
     out = A.people_in_posts(posts, EVENT, TODAY,
                             classify=lambda b, e, t: {"posts": None, "error": "unparsable"})
     assert out["failed"] == 1 and out["batches"] == 1 and out["unread_posts"] == 1
-    assert "1 of the 1 LinkedIn posts found could not be read" in A.note(
-        {"linkedin": {"unread_posts": 1, "posts": 1}, "counts": {"confirmed": 1}})
+    assert "1 of the 3 posts found could not be read" in A.note(
+        {"linkedin": {"unread_posts": 1, "posts": 1}, "x": {"posts": 2},
+         "counts": {"confirmed": 1}})
 
 
 def test_posts_are_read_in_batches_that_cover_every_post():
@@ -440,7 +441,7 @@ def test_the_csv_carries_each_persons_proof_and_never_calls_staff_attendees(monk
     monkeypatch.setattr(event_intel_store, "get_attendees", lambda rid: [
         {"name": "Jane Doe", "title": "VP", "company": "Acme", "linkedin": "https://www.linkedin.com/in/j",
          "basis": "self", "status": "attending", "edition": "this",
-         "evidence": {"proof": [{"label": "Their own LinkedIn post", "quote": "=see you there",
+         "evidence": {"x": "https://x.com/jane", "proof": [{"label": "Their own LinkedIn post", "quote": "=see you there",
                                  "url": "https://www.linkedin.com/feed/update/1",
                                  "posted_at": "2026-02-20"}]}},
         {"name": "Hank Scorpio", "company": "Globex", "basis": "staff", "status": "staff",
@@ -451,6 +452,7 @@ def test_the_csv_carries_each_persons_proof_and_never_calls_staff_attendees(monk
     jane, hank = list(csv.DictReader(io.StringIO(r.get_data(as_text=True))))
     assert jane["How we know"] == "Said so publicly" and jane["At the event as"] == "Going"
     assert jane["Quote"] == "'=see you there"            # a formula is defused
+    assert jane["X profile"] == "https://x.com/jane" and hank["X profile"] == ""
     assert jane["Proof link"] == "https://www.linkedin.com/feed/update/1"
     assert hank["At the event as"] == "Not confirmed"
     assert hank["Caveat"].startswith("Not confirmed attending")
@@ -535,7 +537,7 @@ def test_a_search_in_progress_shows_progress_not_a_button():
     run["attendee_scan"] = {"state": "running"}
     sec = _render(run)
     sec = sec[sec.index('id="eviAttendees"'):]
-    assert "Searching LinkedIn posts" in sec and "Find attendees" not in sec
+    assert "Searching LinkedIn and X posts" in sec and "Find attendees" not in sec
 
 
 @pytest.mark.skipif(not _node_available(), reason="node is not available")
@@ -644,3 +646,114 @@ def test_a_failed_batch_is_tried_again_and_a_reply_out_of_room_is_halved(monkeyp
     out = A.people_in_posts(posts, EVENT, TODAY, classify=half)
     # Half read is not all read: the half that failed is counted, not lost.
     assert calls == [4, 2, 2] and out["failed"] == 0 and out["unread_posts"] == 2
+
+
+
+# ── X ──
+
+def _tweet(tid, text, name="Sam Lee", handle="samlee", bio="Head of Growth at Initech",
+           **extra):
+    return dict({"id": tid, "text": text, "url": "https://x.com/%s/status/%s" % (handle, tid),
+                 "createdAt": "Fri Feb 20 10:12:00 +0000 2026",
+                 "author": {"name": name, "userName": handle, "description": bio}}, **extra)
+
+
+def test_a_retweet_or_an_organisation_is_not_a_person_on_x():
+    assert A.x_post(_tweet("1", "RT @widget: See you at Widget Expo")) is None
+    assert A.x_post(_tweet("2", "At Widget Expo", isRetweet=True)) is None
+    assert A.x_post(_tweet("3", "At Widget Expo", author={"name": "Acme", "userName": "acme",
+                                                          "type": "Business"})) is None
+    p = A.x_post(_tweet("4", "At Widget Expo"))
+    assert p["id"] == "x:4" and p["platform"] == "x"
+    assert p["author"]["x"] == "https://x.com/samlee" and p["author"]["url"] is None
+    assert p["posted_at"].startswith("2026-02-20")
+
+
+def test_the_x_search_is_one_run_with_both_names_and_keeps_tweets_naming_the_event():
+    asked = []
+
+    def run(terms):
+        asked.append(terms)
+        return [_tweet("1", "Landed for Widget Expo!"), _tweet("2", "Nice weather"),
+                _tweet("1", "Landed for Widget Expo!"), _tweet("3", "#WidgetExpo day one")]
+    out = A.search_x(EVENT, run=run)
+    assert asked == [['"Widget Expo" -filter:retweets', "#WidgetExpo -filter:retweets"]]
+    assert [p["id"] for p in out["posts"]] == ["x:1", "x:3"] and out["returned"] == 4
+
+
+def test_an_x_search_that_fails_or_is_not_set_up_says_so(monkeypatch):
+    def boom(terms):
+        raise RuntimeError("actor failed")
+    assert A.search_x(EVENT, run=boom)["error"] == "search_failed"
+    monkeypatch.delenv("APIFY_API_TOKEN", raising=False)
+    out = A.search_x(EVENT)
+    assert out["error"] == "not_configured"
+    assert "X was not searched" in A.note({"x": out, "counts": {"confirmed": 1}})
+
+
+def test_an_x_author_is_kept_with_their_profile_and_a_bio_is_not_a_job_title():
+    posts = [A.x_post(_tweet("1", "Speaking at Widget Expo tomorrow on the main stage")),
+             A.x_post(_tweet("2", "Off to Widget Expo next week, who else is going?",
+                             name="Kai Moss", handle="kai", bio="Dad. Runner. Builder of things"))]
+    out = A.people_in_posts(posts, EVENT, TODAY, classify=_reading(
+        {"id": "p1", "same_event": True, "people": [
+            {"who": "author", "status": "speaking", "quote": "Speaking at Widget Expo tomorrow"}]},
+        {"id": "p2", "same_event": True, "people": [
+            {"who": "author", "status": "attending", "quote": "Off to Widget Expo next week"}]}))
+    sam, kai = out["people"]
+    assert (sam["title"], sam["company"], sam["x"]) == ("Head of Growth", "Initech", "https://x.com/samlee")
+    assert sam["proof"][0]["kind"] == "x_post" and sam["proof"][0]["label"] == "Their own post on X"
+    assert (kai["title"], kai["company"]) == (None, None)
+
+
+def test_the_same_person_on_linkedin_and_x_is_one_row_with_both_profiles():
+    rows = A.merge([
+        {"name": "Sam Lee", "company": "Initech", "linkedin": "https://www.linkedin.com/in/samlee",
+         "basis": "self", "status": "attending", "edition": "this", "proof": [{"kind": "linkedin_post"}]},
+        {"name": "Sam Lee", "company": None, "linkedin": None, "x": "https://x.com/samlee",
+         "basis": "self", "status": "speaking", "edition": "this", "proof": [{"kind": "x_post"}]},
+    ])
+    (sam,) = rows
+    assert sam["x"] == "https://x.com/samlee" and sam["linkedin"].endswith("/in/samlee")
+    assert A.for_storage(rows)[0]["evidence"]["x"] == "https://x.com/samlee"
+
+
+def test_x_posts_are_read_with_the_linkedin_ones_and_counted_apart():
+    got = A.gather(EVENT, [], today=TODAY, sources={
+        "linkedin": lambda e, d: {"posts": _posts("Going to Widget Expo next week, so excited")},
+        "x": lambda e, d: {"posts": [A.x_post(_tweet("9", "Going to Widget Expo next week too"))],
+                           "returned": 5},
+        "classify": lambda batch, e, t: {"posts": [
+            {"id": ref, "same_event": True, "people": [
+                {"who": "author", "status": "attending", "quote": "Going to Widget Expo next week"}]}
+            for ref, _ in batch]},
+        "web": lambda e, h, t: {"people": []}, "staff": lambda p, eid: {"people": []}})
+    assert got["report"]["x"] == {"posts": 1, "returned": 5, "error": None, "people": 1}
+    assert got["report"]["linkedin"]["people"] == 1
+    assert sorted(r["name"] for r in got["rows"]) == ["Jane Doe", "Sam Lee"]
+
+
+def test_one_failing_x_search_never_stops_the_others():
+    def boom(*a):
+        raise RuntimeError("down")
+    got = A.gather(EVENT, [], today=TODAY, sources={
+        "linkedin": lambda e, d: {"posts": []}, "x": boom,
+        "web": lambda e, h, t: {"people": []}, "staff": lambda p, eid: {"people": []}})
+    assert got["report"]["x"]["error"] == "search_failed"
+
+
+@pytest.mark.skipif(not _node_available(), reason="node is not available")
+def test_an_x_post_shows_their_profile_and_can_be_filtered_to():
+    run = _with_attendees()
+    run["attendees"].insert(1, {
+        "name": "Sam Lee", "title": "Head of Growth", "company": "Initech", "basis": "self",
+        "status": "attending", "edition": "this", "linkedin": None,
+        "evidence": {"x": "https://x.com/samlee", "proof": [
+            {"kind": "x_post", "label": "Their own post on X", "quote": "Off to Widget Expo",
+             "url": "https://x.com/samlee/status/1"}]}})
+    run["attendees"][2]["evidence"]["x"] = "javascript:alert(2)"
+    sec = _render(run)
+    sec = sec[sec.index('id="eviAttendees"'):]
+    assert 'href="https://x.com/samlee"' in sec and ">on X</a>" in sec
+    assert sec.count(">on X</a>") == 1                    # the unsafe one is not linked
+    assert "From X<span class=\"n\">1</span>" in sec

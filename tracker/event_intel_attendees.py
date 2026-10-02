@@ -5,8 +5,8 @@ do. What can be shown is narrower and more useful: every person for whom
 there is public proof of being there, each with that proof beside them.
 
     event    the event's own pages name them: its speakers, hosts and judges
-    self     their own public post says they are going, are there, went, are
-             speaking, or are on their company's stand
+    self     their own public post (LinkedIn or X) says they are going, are
+             there, went, are speaking, or are on their company's stand
     others   someone else's public post names them as there ("great to meet
              Jane Doe at ...", "our CEO John Smith is speaking at ...")
     staff    they work at a company the event lists as exhibiting or
@@ -16,7 +16,8 @@ there is public proof of being there, each with that proof beside them.
 Where the proof comes from: the event roster this agent already read, a
 LinkedIn post search through the workspace's connected LinkedIn account
 (Unipile), a public web search, and Apollo's free people search at the
-listed companies. A model reads each post and says who it shows at the
+listed companies, and X's own search through the Apify tweet scraper the
+Social Media agent already uses. A model reads each post and says who it shows at the
 event; nothing it says is kept unless the words it quotes are in the post
 and the person it names is in the post too. The model never supplies a
 name, a title or a profile link that the post did not.
@@ -335,6 +336,7 @@ def linkedin_post(item: dict) -> dict | None:
            or ("https://www.linkedin.com/in/%s" % slug if slug else None))
     return {
         "id": pid,
+        "platform": "linkedin",
         "url": item.get("share_url") or item.get("post_url") or item.get("url"),
         "text": text,
         "posted_at": item.get("parsed_datetime") or item.get("posted_at"),
@@ -343,6 +345,101 @@ def linkedin_post(item: dict) -> dict | None:
                                    or "").strip()[:300] or None,
                    "url": url if linkedin_key(url or "") else None},
     }
+
+
+# ── 2b. what people posted on X ──────────────────────────────────────────
+
+X_POSTS = 200
+
+
+def _x_date(value):
+    """X's own date string ("Wed Feb 04 10:12:00 +0000 2026") or ISO, as ISO."""
+    if not value:
+        return None
+    try:
+        return datetime.strptime(str(value), "%a %b %d %H:%M:%S %z %Y").isoformat()
+    except ValueError:
+        return str(value)
+
+
+def x_post(item: dict) -> dict | None:
+    """One tweet from the Apify scraper in the same shape as linkedin_post.
+    None for a retweet (it is someone else's words), for anything without
+    text or an author, and for an organisation's account the scraper marks
+    as one."""
+    if not isinstance(item, dict):
+        return None
+    pid = str(item.get("id") or item.get("id_str") or item.get("tweetId") or "").strip()
+    text = str(item.get("text") or item.get("fullText") or item.get("full_text") or "").strip()
+    author = item.get("author") or {}
+    if not pid or not text or not isinstance(author, dict):
+        return None
+    if item.get("isRetweet") or item.get("retweeted_status") or text.startswith("RT @"):
+        return None
+    if str(author.get("type") or "").lower() in ("business", "organization", "company"):
+        return None
+    handle = str(author.get("userName") or author.get("username")
+                 or author.get("screen_name") or "").lstrip("@").strip()
+    name = str(author.get("name") or "").strip()
+    if not name or not handle:
+        return None
+    return {
+        "id": "x:" + pid,
+        "platform": "x",
+        "url": item.get("url") or item.get("twitterUrl") or (
+            "https://x.com/%s/status/%s" % (handle, pid)),
+        "text": text,
+        "posted_at": _x_date(item.get("createdAt") or item.get("created_at")),
+        "author": {"name": name[:200],
+                   "headline": str(author.get("description") or "").strip()[:300] or None,
+                   "url": None, "x": "https://x.com/" + handle, "handle": handle},
+    }
+
+
+def x_terms(event: dict) -> list[str]:
+    """The same two names the LinkedIn search uses, in X's own search
+    syntax, with retweets left out at the source."""
+    return ["%s -filter:retweets" % q for q in linkedin_queries(event)]
+
+
+def search_x(event: dict, deadline: float | None = None, run=None) -> dict:
+    """Tweets that name the event, from X's own search via the Apify tweet
+    scraper. One actor run carries both search terms. `run` stands in for
+    apify_transport.run_actor_and_wait in tests."""
+    import os
+    out = {"posts": [], "searched": 0, "returned": 0, "error": None}
+    if run is None:
+        from . import apify_transport, sci_source_x
+        token = os.environ.get("APIFY_API_TOKEN", "")
+        if not token:
+            out["error"] = "not_configured"
+            return out
+
+        def run(terms):
+            return apify_transport.run_actor_and_wait(
+                sci_source_x.actor_id(),
+                {"searchTerms": terms, "maxItems": X_POSTS, "sort": "Top"},
+                token, timeout=240, strict=True)
+    terms = x_terms(event)
+    if not terms or (deadline and time.monotonic() > deadline):
+        return out
+    out["searched"] = 1
+    try:
+        items = run(terms) or []
+    except Exception as e:
+        logger.warning("event_intel_attendees: X search failed: %s", e)
+        out["error"] = "search_failed"
+        return out
+    out["returned"] = len(items)
+    names = event_terms(event)
+    seen = set()
+    for item in items:
+        post = x_post(item)
+        if not post or post["id"] in seen or not mentions_event(post["text"], names):
+            continue
+        seen.add(post["id"])
+        out["posts"].append(post)
+    return out
 
 
 def linkedin_queries(event: dict) -> list[str]:
@@ -414,8 +511,8 @@ def search_linkedin(event: dict, deadline: float | None = None,
     return out
 
 
-_POST_SYSTEM = """You read public LinkedIn posts that mention one event, and \
-say which people each post shows at that event, or going to it.
+_POST_SYSTEM = """You read public LinkedIn and X posts that mention one \
+event, and say which people each post shows at that event, or going to it.
 
 Rules:
 1. Use only the words of the post. Never add a person, title or company the \
@@ -468,8 +565,9 @@ def _classify_batch(batch: list[tuple[str, dict]], event: dict, today: date) -> 
     lines = []
     for ref, post in batch:
         a = post["author"]
-        lines.append("--- %s\nauthor: %s%s\nposted: %s\n%s" % (
-            ref, a["name"], (" (" + a["headline"] + ")") if a.get("headline") else "",
+        lines.append("--- %s (%s)\nauthor: %s%s\nposted: %s\n%s" % (
+            ref, "X" if post.get("platform") == "x" else "LinkedIn", a["name"],
+            (" (" + a["headline"] + ")") if a.get("headline") else "",
             post.get("posted_at") or "unknown", post["text"][:POST_CHARS]))
     user = ("Event: %s\nToday: %s\n\n%s" % (_event_brief(event), today.isoformat(),
                                              "\n\n".join(lines)))
@@ -554,6 +652,17 @@ def people_in_posts(posts: list[dict], event: dict, today: date | None = None,
     return out
 
 
+def author_role(author: dict, on_x: bool = False) -> tuple[str | None, str | None]:
+    """Title and employer from the author's own profile line. A LinkedIn
+    headline is a job line; an X bio is free text ("Dad. Runner. Building
+    @acme"), so from X only a plain "Title at Company" is read and anything
+    else is left blank rather than shown as a job title."""
+    title, company = split_headline(author.get("headline"))
+    if on_x and not company:
+        return None, None
+    return title, company
+
+
 def _person_from_post(person, post, edition, event, today):
     """One person a model read off a post, checked against the post. None
     when the check fails (counted), {} when there is nothing to keep."""
@@ -567,8 +676,9 @@ def _person_from_post(person, post, edition, event, today):
         return None
     who = str(person.get("who") or "").strip().lower()
     author = post["author"]
+    on_x = post.get("platform") == "x"
     if who == "author":
-        title, company = split_headline(author.get("headline"))
+        title, company = author_role(author, on_x)
         name, linkedin, basis = author["name"], author.get("url"), BASIS_SELF
     else:
         name = re.sub(r"\s+", " ", str(person.get("name") or "")).strip()
@@ -576,7 +686,7 @@ def _person_from_post(person, post, edition, event, today):
         if len(name.split()) < 2 or _fold(name) not in _fold(post["text"]):
             return None
         if name_key(name) == name_key(author["name"]):
-            title, company = split_headline(author.get("headline"))
+            title, company = author_role(author, on_x)
             name, linkedin, basis = author["name"], author.get("url"), BASIS_SELF
         else:
             title = str(person.get("title") or "").strip() or None
@@ -588,14 +698,16 @@ def _person_from_post(person, post, edition, event, today):
             if company and _fold(company) not in _fold(post["text"]):
                 company = None
             linkedin, basis = None, BASIS_OTHERS
+    where = "post on X" if on_x else "LinkedIn post"
     return {
         "name": name[:200], "title": title, "company": company, "company_domain": None,
         "linkedin": linkedin, "basis": basis, "status": status,
+        "x": author.get("x") if basis == BASIS_SELF else None,
         "edition": settle_edition(str(edition or ""), status, post.get("posted_at"), event, today),
         "proof": [{
-            "kind": "linkedin_post",
-            "label": ("Their own LinkedIn post" if basis == BASIS_SELF
-                      else "Named in a LinkedIn post by %s" % author["name"]),
+            "kind": "x_post" if on_x else "linkedin_post",
+            "label": ("Their own %s" % where if basis == BASIS_SELF
+                      else "Named in a %s by %s" % (where, author["name"])),
             "url": post.get("url"), "quote": quote,
             "posted_at": str(post.get("posted_at") or "")[:10] or None,
         }],
@@ -802,7 +914,7 @@ def merge(people: list[dict]) -> list[dict]:
             continue
         if p["basis"] not in r["bases"]:
             r["bases"].append(p["basis"])
-        for f in ("title", "company", "company_domain", "linkedin"):
+        for f in ("title", "company", "company_domain", "linkedin", "x"):
             if not r.get(f) and p.get(f):
                 r[f] = p[f]
         r["proof"].extend(x for x in (p.get("proof") or []) if x not in r["proof"])
@@ -831,7 +943,7 @@ def for_storage(rows: list[dict]) -> list[dict]:
         "company_domain": r.get("company_domain"), "linkedin": r.get("linkedin"),
         "basis": r["basis"], "status": r.get("status"), "edition": r.get("edition"),
         "evidence": {"bases": r.get("bases") or [r["basis"]], "proof": r.get("proof") or [],
-                     "name_masked": bool(r.get("name_masked"))},
+                     "name_masked": bool(r.get("name_masked")), "x": r.get("x")},
     } for r in rows]
 
 
@@ -853,11 +965,22 @@ def gather(event: dict, participants: list[dict], event_host: str = "",
     li = (sources.get("linkedin") or search_linkedin)(event, deadline)
     report["linkedin"] = {"posts": len(li.get("posts") or []), "searches": li.get("searched", 0),
                           "returned": li.get("returned", 0), "error": li.get("error")}
-    if li.get("posts"):
-        read = people_in_posts(li["posts"], event, today, classify=sources.get("classify"))
+    try:
+        xs = (sources.get("x") or search_x)(event, deadline)
+    except Exception:
+        logger.exception("event_intel_attendees: X search failed")
+        xs = {"posts": [], "error": "search_failed"}
+    report["x"] = {"posts": len(xs.get("posts") or []), "returned": xs.get("returned", 0),
+                   "error": xs.get("error")}
+    posts = (li.get("posts") or []) + (xs.get("posts") or [])
+    if posts:
+        read = people_in_posts(posts, event, today, classify=sources.get("classify"))
         spend.extend(read["spend"])
         people.extend(read["people"])
-        report["linkedin"].update(people=len(read["people"]), batches=read["batches"],
+        report["x"]["people"] = sum(1 for p in read["people"]
+                                    if (p.get("proof") or [{}])[0].get("kind") == "x_post")
+        report["linkedin"].update(people=len(read["people"]) - report["x"]["people"],
+                                  batches=read["batches"],
                                   failed_batches=read["failed"], rejected=read["rejected"],
                                   failed_kinds=read["failed_kinds"],
                                   unread_posts=read["unread_posts"])
@@ -918,9 +1041,16 @@ def note(report: dict) -> str:
     elif li.get("error"):
         bits.append("The LinkedIn search stopped part-way (%s), so posts after "
                     "that point were not read." % li["error"])
+    x = report.get("x") or {}
+    if x.get("error") == "not_configured":
+        bits.append("X was not searched: the X scraper is not configured on this "
+                    "deployment.")
+    elif x.get("error"):
+        bits.append("The X search did not finish, so posts on X were not read.")
     if li.get("unread_posts"):
-        bits.append("%d of the %d LinkedIn posts found could not be read, so the "
-                    "people in them were not checked." % (li["unread_posts"], li.get("posts", 0)))
+        bits.append("%d of the %d posts found could not be read, so the people in "
+                    "them were not checked." % (li["unread_posts"],
+                                                li.get("posts", 0) + x.get("posts", 0)))
     web = report.get("web") or {}
     if web.get("error"):
         bits.append("The web search did not finish, so public pages beyond LinkedIn "
