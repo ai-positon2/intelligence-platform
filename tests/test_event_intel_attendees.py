@@ -791,3 +791,23 @@ def test_names_lose_their_decoration_and_keep_their_letters(raw, clean):
 ])
 def test_an_x_bio_gives_a_job_only_when_it_plainly_states_one(bio, role):
     assert A.author_role({"headline": bio}, on_x=True) == role
+
+
+def test_x_the_web_and_staff_run_while_linkedin_is_searched():
+    import threading
+    started = {k: threading.Event() for k in ("x", "web", "staff")}
+
+    def linkedin(e, d):
+        # Only finishes if the other three were already running beside it.
+        ok = all(ev.wait(5) for ev in started.values())
+        return {"posts": [], "error": None if ok else "ran one after another"}
+
+    def mark(key, out):
+        def fn(*a):
+            started[key].set()
+            return out
+        return fn
+    got = A.gather(EVENT, [], today=TODAY, sources={
+        "linkedin": linkedin, "x": mark("x", {"posts": []}),
+        "web": mark("web", {"people": []}), "staff": mark("staff", {"people": []})})
+    assert got["report"]["linkedin"]["error"] is None

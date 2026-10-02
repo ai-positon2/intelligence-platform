@@ -986,45 +986,54 @@ def gather(event: dict, participants: list[dict], event_host: str = "",
     report = {"event": len(people)}
     spend = []
 
-    li = (sources.get("linkedin") or search_linkedin)(event, deadline)
-    report["linkedin"] = {"posts": len(li.get("posts") or []), "searches": li.get("searched", 0),
-                          "returned": li.get("returned", 0), "error": li.get("error")}
-    try:
-        xs = (sources.get("x") or search_x)(event, deadline)
-    except Exception:
-        logger.exception("event_intel_attendees: X search failed")
-        xs = {"posts": [], "error": "search_failed"}
-    report["x"] = {"posts": len(xs.get("posts") or []), "returned": xs.get("returned", 0),
-                   "error": xs.get("error")}
-    posts = (li.get("posts") or []) + (xs.get("posts") or [])
-    if posts:
-        read = people_in_posts(posts, event, today, classify=sources.get("classify"))
-        spend.extend(read["spend"])
-        people.extend(read["people"])
-        report["x"]["people"] = sum(1 for p in read["people"]
-                                    if (p.get("proof") or [{}])[0].get("kind") == "x_post")
-        report["linkedin"].update(people=len(read["people"]) - report["x"]["people"],
-                                  batches=read["batches"],
-                                  failed_batches=read["failed"], rejected=read["rejected"],
-                                  failed_kinds=read["failed_kinds"],
-                                  unread_posts=read["unread_posts"])
+    # X, the web search and the staff lookup do not depend on anything else,
+    # so they run while LinkedIn is searched and its posts are read. One
+    # after another, a Lisbon search took 14 minutes.
+    def safely(fn, fallback, *args):
+        try:
+            return fn(*args)
+        except Exception as e:
+            logger.exception("event_intel_attendees: a source failed")
+            return dict(fallback, error=fallback.get("error") or str(e)[:200])
 
-    try:
-        web = (sources.get("web") or search_web)(event, event_host, today)
-    except Exception as e:
-        logger.exception("event_intel_attendees: web search failed")
-        web = {"people": [], "error": "error", "spend": None}
+    with ThreadPoolExecutor(max_workers=3) as pool:
+        def later(fn, fallback, *args):
+            return pool.submit(contextvars.copy_context().run, safely, fn, fallback, *args)
+        x_job = later(sources.get("x") or search_x,
+                      {"posts": [], "error": "search_failed"}, event, deadline)
+        web_job = later(sources.get("web") or search_web,
+                        {"people": [], "error": "error", "spend": None}, event, event_host, today)
+        staff_job = later(sources.get("staff") or staff_at_companies,
+                          {"people": [], "error": None}, participants, eid)
+
+        li = safely(sources.get("linkedin") or search_linkedin,
+                    {"posts": [], "error": "search_failed"}, event, deadline)
+        report["linkedin"] = {"posts": len(li.get("posts") or []),
+                              "searches": li.get("searched", 0),
+                              "returned": li.get("returned", 0), "error": li.get("error")}
+        xs = x_job.result()
+        report["x"] = {"posts": len(xs.get("posts") or []), "returned": xs.get("returned", 0),
+                       "error": xs.get("error")}
+        posts = (li.get("posts") or []) + (xs.get("posts") or [])
+        if posts:
+            read = people_in_posts(posts, event, today, classify=sources.get("classify"))
+            spend.extend(read["spend"])
+            people.extend(read["people"])
+            report["x"]["people"] = sum(1 for p in read["people"]
+                                        if (p.get("proof") or [{}])[0].get("kind") == "x_post")
+            report["linkedin"].update(people=len(read["people"]) - report["x"]["people"],
+                                      batches=read["batches"],
+                                      failed_batches=read["failed"], rejected=read["rejected"],
+                                      failed_kinds=read["failed_kinds"],
+                                      unread_posts=read["unread_posts"])
+        web = web_job.result()
+        staff = staff_job.result()
+
     spend.append(web.get("spend"))
     people.extend(web.get("people") or [])
     report["web"] = {k: web.get(k) for k in ("found", "checked", "unopened", "error",
                                               "searches", "pages")}
     report["web"]["people"] = len(web.get("people") or [])
-
-    try:
-        staff = (sources.get("staff") or staff_at_companies)(participants, eid)
-    except Exception as e:
-        logger.exception("event_intel_attendees: staff lookup failed")
-        staff = {"people": [], "error": str(e)[:200]}
     people.extend(staff.get("people") or [])
     report["staff"] = {"companies": staff.get("companies", 0), "skipped": staff.get("skipped", 0),
                        "people": len(staff.get("people") or []), "error": staff.get("error")}
