@@ -962,12 +962,21 @@ def run_job(run_id: int, mode: str, query: str, **kwargs) -> None:
 
 
 def websites_pending(participants: list[dict]) -> int:
-    """Rows with no website that a profile-page read has not settled yet."""
-    from .event_intel_profiles import SETTLED
-    return sum(1 for p in participants
-               if not p.get("org_domain") and p.get("provenance") != VIA_SEARCH
-               and (((p.get("evidence") or {}).get("profile_lookup") or {}).get("status")
-                    not in SETTLED))
+    """Rows a profile-page read still has something to do for: no website and
+    not settled yet, or a profile read before its details were kept."""
+    from .event_intel_profiles import FOUND, NO_WEBSITE, SETTLED
+    n = 0
+    for p in participants:
+        if p.get("provenance") == VIA_SEARCH:
+            continue
+        ev = p.get("evidence") or {}
+        look = ev.get("profile_lookup") or {}
+        if not p.get("org_domain") and look.get("status") not in SETTLED:
+            n += 1
+        elif (look.get("status") in (FOUND, NO_WEBSITE) and look.get("profile_url")
+              and "profile_detail" not in ev):
+            n += 1
+    return n
 
 
 def find_run_websites(run_id: int, email: str, seconds: float = 75.0) -> dict:
@@ -989,8 +998,7 @@ def find_run_websites(run_id: int, email: str, seconds: float = 75.0) -> dict:
     participants = store.get_participants(run_id)
     if not websites_pending(participants):
         return {"profiles": 0, "read": 0, "websites": 0, "unreadable": 0, "left": 0,
-                "note": "Every company here already has a website, or its "
-                        "profile page has already been read."}
+                "note": "Every company's profile page here has already been read."}
     events = store.get_events(run_id)
     hosts = {e.get("id"): _host(e.get("website")) for e in events}
     by_event: dict = {}
@@ -1001,7 +1009,7 @@ def find_run_websites(run_id: int, email: str, seconds: float = 75.0) -> dict:
         urls = [x.get("url") for x in (meta.get("snapshots") or []) if x.get("url")]
         by_event.setdefault(src.get("event_id"), []).extend(urls or [src.get("url")])
     totals = {"profiles": 0, "read": 0, "websites": 0, "unreadable": 0, "left": 0,
-              "no_profile": 0, "listings_unreadable": 0}
+              "no_profile": 0, "details": 0, "listings_unreadable": 0}
     for event_id, urls in by_event.items():
         texts = []
         for u in dict.fromkeys(u for u in urls if u):
@@ -1016,18 +1024,20 @@ def find_run_websites(run_id: int, email: str, seconds: float = 75.0) -> dict:
                 if p.get("event_id") == event_id and p.get("provenance") != VIA_SEARCH]
         if not texts or not rows:
             continue
-        before = {p["id"]: (p.get("org_domain"),
-                            (p["evidence"].get("profile_lookup") or {}).get("status"))
-                  for p in rows}
+        def state(p):
+            return (p.get("org_domain"), (p["evidence"].get("profile_lookup") or {}).get("status"),
+                    "profile_detail" in p["evidence"])
+        before = {p["id"]: state(p) for p in rows}
         stats = event_intel_profiles.fill_websites(rows, texts, hosts.get(event_id, ""),
                                                    deadline=deadline)
-        for k in ("profiles", "read", "websites", "unreadable", "left", "no_profile"):
+        for k in ("profiles", "read", "websites", "unreadable", "left", "no_profile", "details"):
             totals[k] += stats.get(k, 0)
         updates = []
         for p in rows:
             rec = p["evidence"].get("profile_lookup")
-            if rec and before[p["id"]] != (p.get("org_domain"), rec.get("status")):
-                updates.append((p["id"], p.get("org_domain"), rec))
+            if rec and before[p["id"]] != state(p):
+                updates.append((p["id"], p.get("org_domain"), rec,
+                                p["evidence"].get("profile_detail")))
         store.update_participant_websites(updates)
     if totals["websites"]:
         # The summary carries the Apollo estimate, which is what offers the

@@ -767,11 +767,12 @@ def update_participant_resolution(participant_ids: list[int], domain: str | None
 
 
 def update_participant_websites(updates: list[tuple]) -> int:
-    """(participant id, website or None, profile lookup record) per row.
+    """(participant id, website or None, profile lookup record[, profile
+    detail]) per row.
 
     The website is only ever written onto a row that has none, so a pass over
     profile pages can never replace a link the listing itself published, and
-    the record goes into evidence beside whatever is already there. Returns
+    the records go into evidence beside whatever is already there. Returns
     how many rows were written."""
     if not updates:
         return 0
@@ -781,12 +782,17 @@ def update_participant_websites(updates: list[tuple]) -> int:
     try:
         _ensure_tables(conn)
         with conn.cursor() as cur:
+            payload = []
+            for u in updates:
+                pid, domain, record = u[0], u[1], u[2]
+                patch = {"profile_lookup": record or {}}
+                if len(u) > 3 and u[3] is not None:
+                    patch["profile_detail"] = u[3]
+                payload.append((domain or None, json.dumps(patch), pid))
             cur.executemany(
                 "UPDATE evi_participants SET org_domain = COALESCE(org_domain, %s), "
-                "evidence = COALESCE(evidence, '{}'::jsonb) || jsonb_build_object("
-                "'profile_lookup', %s::jsonb) WHERE id = %s",
-                [(domain or None, json.dumps(record or {}), pid)
-                 for pid, domain, record in updates])
+                "evidence = COALESCE(evidence, '{}'::jsonb) || %s::jsonb WHERE id = %s",
+                payload)
         conn.commit()
         return len(updates)
     except Exception as e:

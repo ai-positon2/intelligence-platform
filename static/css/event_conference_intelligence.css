@@ -869,6 +869,37 @@ table.evi-table { width: 100%; border-collapse: separate; border-spacing: 0;
 .evi-dom a.evi-dom-from { color: var(--evi-ink-3); margin-left: 6px; font-size: 10.5px; }
 .evi-dom a.evi-dom-from:hover { color: var(--evi-a1); }
 .evi-person { margin-top: 6px; font-size: 12px; color: var(--evi-ink-2); }
+/* What the event's profile page says, under the company's name. */
+.evi-tags-line { margin-top: 4px; font-size: 11.5px; color: var(--evi-ink-2);
+  white-space: normal; }
+.evi-where { color: var(--evi-ink-2); white-space: normal; }
+.evi-row-more {
+  appearance: none; margin-top: 6px; padding: 2px 9px; font: inherit; font-size: 11px;
+  font-weight: 600; color: var(--evi-a1); background: none; cursor: pointer;
+  border: 1px solid var(--evi-line); border-radius: var(--radius-xs, 5px);
+}
+.evi-row-more:hover { border-color: rgba(99,102,241,.45); }
+.evi-row-more:focus-visible { outline: 2px solid var(--evi-a1); outline-offset: 2px; }
+.evi-table tr.evi-detail-row > td { background: rgba(99,102,241,.045); white-space: normal;
+  overflow: visible; padding-top: 4px; }
+.evi-detail-row[hidden] { display: none; }
+/* Striped by company, not by table row: the hidden detail rows count as
+   children, so nth-child striped every row the same once they existed. */
+.evi-roster tbody tr:nth-child(even) td { background: none; }
+.evi-roster tbody tr.evi-alt td { background: rgba(127,140,180,.035); }
+.evi-dt { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 14px 22px; padding: 6px 0 4px; }
+.evi-dt-block h5 { margin: 0 0 6px; font-size: 10.5px; letter-spacing: .06em;
+  text-transform: uppercase; color: var(--evi-ink-3); font-weight: 600;
+  font-family: var(--font-mono, "JetBrains Mono", ui-monospace, monospace); }
+.evi-dt-block p { margin: 0; font-size: 12.5px; line-height: 1.6; color: var(--evi-ink-2); }
+.evi-dt-block dl { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 4px 12px;
+  font-size: 12.5px; }
+.evi-dt-block dt { color: var(--evi-ink-3); }
+.evi-dt-block dd { margin: 0; color: var(--evi-ink); overflow-wrap: anywhere; }
+.evi-dt-block a { color: var(--evi-a1); text-decoration: none; }
+.evi-dt-block a:hover { text-decoration: underline; }
+.evi-dt-quiet p { color: var(--evi-ink-3); }
 /* What every row would otherwise repeat, said once above the table. */
 .evi-roster-note { font-size: 12px; line-height: 1.55; color: var(--evi-ink-3);
   margin: 0 0 10px; }

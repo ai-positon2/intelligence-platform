@@ -160,6 +160,21 @@ def profile_links(rows: list[dict], listing_texts: list[tuple[str, str]]) -> dic
     return out
 
 
+def repair_href(href: str) -> str:
+    """A link as its author meant it. Web Summit Qatar's Accenture, Google and
+    Snapchat profiles publish "http:// http://www.accenture.com", which no
+    URL parser reads, so three real websites were reported as none (live run
+    36). The last complete address in the value wins; a bare www. host gets
+    a scheme."""
+    h = (href or "").strip()
+    found = re.findall(r"https?://[^\s\"'<>]+", h)
+    if found and (len(found) > 1 or not h.startswith(found[0])):
+        return found[-1]
+    if re.match(r"^www\.[a-z0-9-]+\.[a-z]", h, re.I):
+        return "https://" + h
+    return h
+
+
 class _Anchors(HTMLParser):
     def __init__(self, base):
         super().__init__(convert_charrefs=True)
@@ -174,7 +189,7 @@ class _Anchors(HTMLParser):
             self._open = None
             return
         labels = " ".join(str(a.get(k) or "") for k in ("label", "aria-label", "title", "name"))
-        self._open = {"href": urljoin(self.base, href), "label": labels, "text": []}
+        self._open = {"href": urljoin(self.base, repair_href(href)), "label": labels, "text": []}
 
     def handle_data(self, data):
         if self._open is not None:
@@ -230,10 +245,35 @@ def _fetch(url: str) -> str | None:
         r.close()
 
 
-def choose_website(links: list[dict], skip: set, event_host: str = "") -> str | None:
+def _own_platform(href: str, org_name: str) -> str | None:
+    """A labelled website on a host the roster normally refuses (a social
+    network, a search engine) that IS this company: TikTok's profile links
+    tiktok.com and Google's links cloud.google.com, and both were reported
+    as publishing no website (live run 36). Only when the site's own name is
+    the company's name, so another company's TikTok page never qualifies."""
+    host = _host(href)
+    parts = host.split(".")
+    if len(parts) < 2:
+        return None
+    reg = parts[-3:] if len(parts) >= 3 and parts[-2] in _SUFFIX_LABELS else parts[-2:]
+    label, n = reg[0], _norm(org_name)
+    if len(label) >= 3 and n and (n == label or n.startswith(label)):
+        return ".".join(reg)
+    return None
+
+
+def choose_website(links: list[dict], skip: set, event_host: str = "",
+                   org_name: str = "") -> str | None:
     """The one domain this profile publishes as the company's own, or None."""
     from .event_intel_harvest import clean_domain
     labelled, plain = set(), set()
+    for l in links:
+        if (org_name and not clean_domain(l["href"], event_host)
+                and (_WEBSITE_LABEL.search(l.get("label") or "")
+                     or _WEBSITE_LABEL.search(l.get("text") or ""))):
+            own = _own_platform(l["href"], org_name)
+            if own and own not in skip:
+                labelled.add(own)
     for l in links:
         d = clean_domain(l["href"], event_host)
         if not d or d in skip or any(d == s or d.endswith("." + s) for s in skip):
@@ -248,6 +288,105 @@ def choose_website(links: list[dict], skip: set, event_host: str = "") -> str | 
     return None
 
 
+# ── what the profile says about the company ────────────────────────────
+#
+# The same pages carry more than a link: Web Summit prints a company's stage,
+# country and industry ("GROWTH", "Singapore", "Hardware, robotics & IoT"),
+# Money20/20 its category, where it is at the event ("Location: Adyen
+# Lounge", a stand number) and an About paragraph. Read without a model: a
+# line on most profiles that the listing also carries is the site's own
+# navigation or footer, a line in _UI_LINES is a control, and what is left is
+# what this page says about this company, copied as printed. Nothing is
+# summarised, so nothing can be invented.
+
+_UI_LINES = re.compile(r"^(share( on \w+)?|copy link|back|connect|follow( us)?|menu|"
+                       r"website|visit website|see all\b.*|book tickets|login|log in|"
+                       r"register|skip to main content|close|next|previous|more|less|"
+                       r"read more|show more|show less|view profile)$", re.I)
+_LABEL = re.compile(r"^(About\b[^\n]{0,160}|[A-Z][^:\n]{0,40}):$")
+MAX_TAGS, MAX_FIELDS, MAX_ABOUT, MAX_VALUE = 6, 6, 1500, 300
+
+
+def _lines(text: str) -> list[str]:
+    return [l.strip() for l in (text or "").split("\n") if l.strip()]
+
+
+def chrome_lines(profile_lines: list[list[str]], listing_texts) -> set:
+    """Lines that belong to the site, not to any one company: printed on the
+    listing too and on at least half the profiles read (never fewer than
+    two). A line on every profile but not on the listing ("PAST PARTNER",
+    "GROWTH") is the event saying something about each company, and stays."""
+    from collections import Counter
+    listing = set()
+    for _, t in listing_texts:
+        listing.update(_lines(t))
+    seen = Counter(l for ls in profile_lines for l in set(ls))
+    floor = max(2, len(profile_lines) * 0.5)
+    return {l for l, c in seen.items() if l in listing and c >= floor}
+
+
+def _clip(v: str, n: int) -> str:
+    v = " ".join(v.split())
+    return v if len(v) <= n else v[:n].rsplit(" ", 1)[0] + "..."
+
+
+def profile_details(lines: list[str], org_name: str, chrome: set,
+                    links: list[dict] | None = None, shared: set | None = None) -> dict:
+    """Facts a profile page prints about its company, as printed.
+
+    {"tags": [...], "fields": [[label, value], ...], "about": str|None,
+     "linkedin": url|None, "x": url|None}; empty values are left out."""
+    own = []
+    name = _norm(org_name)
+    for l in lines:
+        if l in chrome or "[http" in l or _UI_LINES.match(l) or _norm(l) == name:
+            continue
+        own.append(l)
+    tags, fields, about = [], [], []
+    i = 0
+    while i < len(own):
+        l = own[i]
+        m = _LABEL.match(l)
+        if m:
+            label = m.group(1).strip()
+            body = []
+            j = i + 1
+            while j < len(own) and not _LABEL.match(own[j]):
+                body.append(own[j])
+                j += 1
+                if not label.lower().startswith("about"):
+                    break
+            if body:
+                if label.lower().startswith("about"):
+                    about.extend(body)
+                elif len(fields) < MAX_FIELDS:
+                    fields.append([label, _clip(" ".join(body), MAX_VALUE)])
+            i = j
+            continue
+        if len(l) >= 120:
+            about.append(l)
+        elif len(l) <= 80 and len(tags) < MAX_TAGS and l not in tags:
+            tags.append(l)
+        i += 1
+    out = {}
+    if tags:
+        out["tags"] = tags
+    if fields:
+        out["fields"] = fields
+    if about:
+        out["about"] = _clip(" ".join(about), MAX_ABOUT)
+    for l in links or []:
+        h, host = l["href"], _host(l["href"])
+        d = host.split(":")[0]
+        if shared and any(h.rstrip("/") == x for x in shared):
+            continue
+        if "linkedin" not in out and d.endswith("linkedin.com") and re.search(r"/(company|school|showcase|in)/", h):
+            out["linkedin"] = h
+        elif "x" not in out and (d in ("x.com", "twitter.com")) and not re.search(r"/(intent|share|home)\b", h):
+            out["x"] = h
+    return out
+
+
 def fill_websites(rows: list[dict], listing_texts: list[tuple[str, str]],
                   event_host: str = "", deadline: float | None = None,
                   limit: int = MAX_PROFILES, fetch=None) -> dict:
@@ -260,7 +399,7 @@ def fill_websites(rows: list[dict], listing_texts: list[tuple[str, str]],
     which is what lets a web request backfill inside its own timeout.
     """
     stats = {"profiles": 0, "read": 0, "websites": 0, "unreadable": 0, "left": 0,
-             "no_profile": 0}
+             "no_profile": 0, "details": 0}
     try:
         links = profile_links(rows, listing_texts)
     except Exception:
@@ -281,8 +420,17 @@ def fill_websites(rows: list[dict], listing_texts: list[tuple[str, str]],
             ev["profile_lookup"] = {"status": NO_PROFILE}
             stats["no_profile"] += 1
     # Only a settled answer is final. A page that could not be read is asked
-    # again on the next pass rather than written off.
+    # again on the next pass rather than written off. A profile read before
+    # its details were kept is read once more for them, from the address
+    # already on record.
     todo = [(i, u) for i, u in links.items() if status(i) not in SETTLED]
+    queued = {i for i, _ in todo}
+    for i, r in enumerate(rows):
+        look = (r.get("evidence") or {}).get("profile_lookup") or {}
+        if (i not in queued and look.get("status") in (FOUND, NO_WEBSITE)
+                and look.get("profile_url") and "profile_detail" not in (r.get("evidence") or {})):
+            todo.append((i, look["profile_url"]))
+            links[i] = look["profile_url"]
     stats["profiles"] = len(todo)
     if not todo:
         return stats
@@ -312,7 +460,10 @@ def fill_websites(rows: list[dict], listing_texts: list[tuple[str, str]],
             # after a pause, before calling the page unreadable.
             time.sleep(1.5)
             markup = fetch(url)
-        return i, url, (outside_links(markup, url) if markup else None)
+        if not markup:
+            return i, url, None
+        from .event_intel_harvest import html_to_linked_text
+        return i, url, (outside_links(markup, url), _lines(html_to_linked_text(markup, url)))
 
     with ThreadPoolExecutor(max_workers=WORKERS) as pool:
         for i, url, got in pool.map(one, batch):
@@ -324,12 +475,16 @@ def fill_websites(rows: list[dict], listing_texts: list[tuple[str, str]],
     # A domain on two different companies' profiles is the page's own
     # furniture (a sponsor banner, a sister event), not either company's site.
     seen_on: dict[str, set] = {}
+    link_on: dict[str, set] = {}
     for i, got in pages.items():
-        for l in got or []:
+        for l in (got or ([], []))[0]:
+            link_on.setdefault(l["href"].rstrip("/"), set()).add(_norm(rows[i].get("org_name") or ""))
             d = clean_domain(l["href"], event_host)
             if d:
                 seen_on.setdefault(d, set()).add(_norm(rows[i].get("org_name") or ""))
     shared = {d for d, owners in seen_on.items() if len(owners) > 1}
+    shared_links = {h for h, owners in link_on.items() if len(owners) > 1}
+    site_lines = chrome_lines([got[1] for got in pages.values() if got], listing_texts)
 
     for i, got in pages.items():
         row = rows[i]
@@ -338,10 +493,22 @@ def fill_websites(rows: list[dict], listing_texts: list[tuple[str, str]],
             ev = row["evidence"] = {}
         if got is None:
             stats["unreadable"] += 1
-            ev["profile_lookup"] = {"status": UNREADABLE, "profile_url": links[i]}
+            if not row.get("org_domain"):
+                ev["profile_lookup"] = {"status": UNREADABLE, "profile_url": links[i]}
             continue
         stats["read"] += 1
-        site = choose_website(got, chrome | shared, event_host)
+        out_links, page_lines = got
+        try:
+            ev["profile_detail"] = profile_details(page_lines, row.get("org_name") or "",
+                                                   site_lines, out_links, shared_links)
+            if ev["profile_detail"]:
+                stats["details"] += 1
+        except Exception:
+            logger.exception("event_intel_profiles: reading details failed on %s", links[i])
+        if row.get("org_domain"):
+            continue
+        site = choose_website(out_links, chrome | shared, event_host,
+                              row.get("org_name") or "")
         if site:
             row["org_domain"] = site
             stats["websites"] += 1
@@ -359,6 +526,8 @@ def note(stats: dict) -> str:
     s = ("Opened %d company profile page%s on the event's site and found %d "
          "website%s published there."
          % (read, "" if read == 1 else "s", found, "" if found == 1 else "s"))
+    if stats.get("details"):
+        s += " %d of them also say what the company is." % stats["details"]
     if stats.get("unreadable"):
         s += " %d profile page%s could not be read." % (
             stats["unreadable"], "" if stats["unreadable"] == 1 else "s")

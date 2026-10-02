@@ -147,7 +147,10 @@ def test_fill_sets_only_published_websites_and_records_every_outcome():
     # One domain on two companies' profiles belongs to neither.
     assert not rows[3].get("org_domain") and not rows[4].get("org_domain")
     assert st == {"profiles": 5, "read": 4, "websites": 1, "unreadable": 1, "left": 0,
-                  "no_profile": 0}
+                  "no_profile": 0, "details": 1}
+    # The profile with no website still gave its LinkedIn page.
+    assert rows[1]["evidence"]["profile_detail"] == {
+        "linkedin": "https://www.linkedin.com/company/blank"}
     # The unreadable page is asked twice before it is written off.
     assert calls.count("https://ev.example/p/gone") == 2
     assert "found 1 website" in PR.note(st) and "1 profile page could not be read" in PR.note(st)
@@ -227,14 +230,16 @@ def test_a_finished_run_is_backfilled_and_its_estimate_recomputed(monkeypatch):
         return {"status": "ok", "final_url": url,
                 "text": "Acme [https://ev.example/p/acme]\nFound Elsewhere [https://ev.example/p/found-elsewhere]"}
     monkeypatch.setattr(H, "fetch_page", page)
-    monkeypatch.setattr(PR, "_fetch", lambda url: _profile(("https://acme.io/", "", "")))
+    monkeypatch.setattr(PR, "_fetch", lambda url: _profile(("https://acme.io/", "", "")) +
+                        "<p>Singapore</p>")
 
     def upd(u):
         written.extend(u)
-        for pid, dom, rec in u:
+        for pid, dom, rec, det in u:
             for p in parts:
                 if p["id"] == pid:
-                    p["org_domain"], p["evidence"] = dom, {"profile_lookup": rec}
+                    p["org_domain"], p["evidence"] = dom, {"profile_lookup": rec,
+                                                           "profile_detail": det}
         return len(u)
     monkeypatch.setattr(S, "update_participant_websites", upd)
     monkeypatch.setattr(S, "update_run", lambda rid, **f: updated.append(f))
@@ -243,6 +248,8 @@ def test_a_finished_run_is_backfilled_and_its_estimate_recomputed(monkeypatch):
     assert fetched == [LIST, LIST + "?page=2"]
     # A row recovered by search did not come from these listings.
     assert [w[0] for w in written] == [1] and written[0][1] == "acme.io"
+    # What the profile said is saved with the website, not dropped.
+    assert written[0][3] == {"tags": ["Singapore"]}
     assert updated == [{"summary": {"keep": 1, "cost_estimate": {"domains": 1}}}]
     assert out["websites"] == 1 and out["pending"] == 0
 
@@ -297,8 +304,8 @@ def test_columns_with_nothing_in_them_are_not_drawn():
 @pytest.mark.skipif(not _node_available(), reason="node is not available")
 def test_a_roster_with_no_websites_offers_to_find_them():
     html = _render(_web_summit_like())["drawerBody"]
-    assert 'id="websitesBtn"' in html and "Find websites for 2 companies" in html
-    assert 'id="eviCompanyData"' in html and "Find their websites" in html
+    assert 'id="websitesBtn"' in html and "Read 2 company profiles" in html
+    assert 'id="eviCompanyData"' in html and "Read their profiles" in html
 
 
 @pytest.mark.skipif(not _node_available(), reason="node is not available")
@@ -367,3 +374,146 @@ def test_the_header_links_sit_in_their_own_row():
     assert head.index('class="evi-drawer-actions"') < head.index('id="eventPlanLink"')
     assert ".evi-drawer-actions .evi-btn[hidden] { display: none; }" in css
     assert "text-decoration: none" in css[css.index(".evi-drawer-actions .evi-btn {"):][:300]
+
+
+# ── what the profile says about the company (2026-10-03) ──
+
+def test_a_doubled_scheme_in_a_published_link_is_repaired():
+    """Web Summit Qatar's Accenture, Google and Snapchat profiles publish
+    "http:// http://www.accenture.com"; read as written, three real
+    websites were reported as none."""
+    assert PR.repair_href("http:// http://www.accenture.com") == "http://www.accenture.com"
+    assert PR.repair_href("www.acme.com/x") == "https://www.acme.com/x"
+    assert PR.repair_href("https://a.com/?next=https://b.com") == "https://a.com/?next=https://b.com"
+    links = PR.outside_links(_profile(("http:// http://www.accenture.com", "website", "")),
+                             "https://ev.example/p")
+    assert PR.choose_website(links, set()) == "accenture.com"
+
+
+def test_a_company_that_is_a_platform_keeps_its_own_labelled_site():
+    links = PR.outside_links(_profile(("https://www.tiktok.com/", "website", "")), "https://ev.example/p")
+    assert PR.choose_website(links, set(), org_name="TikTok") == "tiktok.com"
+    links = PR.outside_links(_profile(("https://cloud.google.com/", "website", "")), "https://ev.example/p")
+    assert PR.choose_website(links, set(), org_name="Google") == "google.com"
+    # Another company's page on that platform is never its website.
+    links = PR.outside_links(_profile(("https://www.tiktok.com/@acme", "website", "")), "https://ev.example/p")
+    assert PR.choose_website(links, set(), org_name="Acme") is None
+
+
+NAV = ["Home [https://ev.example/]", "Meet our partners [https://ev.example/partners/]", "Company"]
+
+
+def _ws_lines(name, country, industry):
+    return NAV + [name, "website [https://%s.io]" % name.lower(), "See all partners [https://ev.example/partners/]",
+                  "PAST PARTNER", "Share", "Share on X", "Copy link", name, country, industry] + NAV
+
+
+def test_site_lines_go_and_what_the_event_says_about_the_company_stays():
+    pages = [_ws_lines("Acme", "Singapore", "Fintech"), _ws_lines("Globex", "Qatar", "AI"),
+             _ws_lines("Initech", "Qatar", "AI")]
+    chrome = PR.chrome_lines(pages, [(LIST, "\n".join(NAV + ["Acme", "Globex"]))])
+    assert set(NAV) <= chrome and "PAST PARTNER" not in chrome
+    d = PR.profile_details(pages[0], "Acme", chrome)
+    assert d == {"tags": ["PAST PARTNER", "Singapore", "Fintech"]}
+
+
+def test_labelled_fields_and_an_about_paragraph_are_read_as_printed():
+    about = "Checkout.com runs a global payments network for enterprise merchants, " * 3
+    lines = ["Back", "Checkout.com", "Payments & Payments Technology", "Checkout.com",
+             "Location:", "Money Row - Gjelina - Monday + Tuesday", "About Checkout.com:",
+             about.strip(), "Second paragraph of the about text.", "Connect"]
+    d = PR.profile_details(lines, "Checkout.com", set())
+    assert d["tags"] == ["Payments & Payments Technology"]
+    assert d["fields"] == [["Location", "Money Row - Gjelina - Monday + Tuesday"]]
+    assert d["about"].startswith("Checkout.com runs") and d["about"].endswith("about text.")
+    long_label = PR.profile_details(["About Silicon Valley Bank, A Division of First Citizens Bank:",
+                                     "SVB is a bank."], "SVB", set())
+    assert long_label == {"about": "SVB is a bank."}
+
+
+def test_the_events_own_social_links_are_not_the_companys():
+    links = [{"href": "https://www.linkedin.com/company/the-event/", "label": "", "text": ""},
+             {"href": "https://www.linkedin.com/company/acme/", "label": "", "text": ""},
+             {"href": "https://x.com/acme", "label": "", "text": ""}]
+    d = PR.profile_details([], "Acme", set(), links, {"https://www.linkedin.com/company/the-event"})
+    assert d == {"linkedin": "https://www.linkedin.com/company/acme/", "x": "https://x.com/acme"}
+
+
+def test_a_profile_read_before_details_existed_is_read_again_without_touching_its_website():
+    rows = [{"org_name": "Acme", "org_domain": "acme.io",
+             "evidence": {"profile_lookup": {"status": PR.FOUND, "profile_url": "https://ev.example/p/acme"}}}]
+    assert P.websites_pending([dict(rows[0], provenance="page")]) == 1
+    st = PR.fill_websites(rows, _listing(), fetch=lambda u: _profile(("https://other.io", "", "")) +
+                          "<p>Singapore</p>")
+    assert rows[0]["org_domain"] == "acme.io" and st["websites"] == 0 and st["read"] == 1
+    assert rows[0]["evidence"]["profile_lookup"]["status"] == PR.FOUND
+    assert "profile_detail" in rows[0]["evidence"]
+    assert P.websites_pending([dict(rows[0], provenance="page")]) == 0
+
+
+def _with_details(run):
+    p0, p1 = run["participants"]
+    p0["evidence"] = {"profile_lookup": {"status": "found", "profile_url": "https://widgetexpo.com/p/acme"},
+                      "profile_detail": {"tags": ["PAST PARTNER", "Singapore"],
+                                         "fields": [["Location", "Hall 2 - B14"]],
+                                         "about": "Acme builds robots for warehouses.",
+                                         "linkedin": "https://www.linkedin.com/company/acme/"}}
+    p1["evidence"] = {"profile_lookup": {"status": "no_website", "profile_url": "https://widgetexpo.com/p/globex"},
+                      "profile_detail": {"tags": ["PAST PARTNER", "Qatar"]}}
+    return run
+
+
+@pytest.mark.skipif(not _node_available(), reason="node is not available")
+def test_the_roster_shows_what_the_event_says_and_opens_into_details():
+    html = _render(_with_details(_run_fixture()))["drawerBody"]
+    assert '<div class="evi-tags-line">PAST PARTNER · Singapore</div>' in html
+    assert "Location: Hall 2 - B14" in html
+    assert 'onclick="eviRow(1, this)"' in html and 'id="evid-1" hidden' in html
+    assert "Acme builds robots for warehouses." in html
+    assert 'href="https://www.linkedin.com/company/acme/"' in html
+    assert "Not matched yet." in html
+
+
+@pytest.mark.skipif(not _node_available(), reason="node is not available")
+def test_a_label_on_every_company_is_said_once_above_the_list():
+    run = _with_details(_run_fixture())
+    base = run["participants"][1]
+    for i in range(4):
+        run["participants"].append(dict(base, id=20 + i, org_name="Co %d" % i))
+    html = _render(run)["drawerBody"]
+    assert "The event labels every one of these <b>PAST PARTNER</b>" in html
+    assert "partners of an earlier edition, not confirmed for this one" in html
+    assert '<div class="evi-tags-line">Singapore</div>' in html
+    assert "evi-tags-line\">PAST PARTNER" not in html
+
+
+def test_the_csv_carries_what_the_event_profile_says(monkeypatch):
+    import csv
+    import io
+    import app as appmod
+    from tracker import event_intel_store
+    run = _with_details(_run_fixture())
+    monkeypatch.setattr(event_intel_store, "get_run", lambda rid, em: run)
+    monkeypatch.setattr(event_intel_store, "get_participants", lambda rid: run["participants"])
+    monkeypatch.setattr(event_intel_store, "get_sources", lambda rid: run["sources"])
+    monkeypatch.setattr(event_intel_store, "get_events", lambda rid: run["events"])
+    c = appmod.app.test_client()
+    with c.session_transaction() as sess:
+        sess["google_user"] = {"email": "harness@position2.com", "name": "T"}
+    r = c.get("/p2/strategic-agents/event-conference-intelligence/runs/7/export.csv")
+    row = next(csv.DictReader(io.StringIO(r.get_data(as_text=True))))
+    assert row["Event profile says"] == "PAST PARTNER; Singapore"
+    assert row["Event profile details"] == "Location: Hall 2 - B14"
+    assert row["About (event profile)"] == "Acme builds robots for warehouses."
+    assert row["LinkedIn"] == "https://www.linkedin.com/company/acme/"
+    assert row["Event profile page"] == "https://widgetexpo.com/p/acme"
+
+
+@pytest.mark.skipif(not _node_available(), reason="node is not available")
+def test_a_profile_read_before_details_existed_is_offered_again():
+    run = _run_fixture()
+    run["participants"][0]["evidence"] = {"profile_lookup": {
+        "status": "found", "profile_url": "https://widgetexpo.com/p/acme"}}
+    run["participants"][1]["evidence"] = {"profile_lookup": {"status": "no_profile"}}
+    html = _render(run)["drawerBody"]
+    assert 'id="websitesBtn"' in html and "Read 1 company profile<" in html

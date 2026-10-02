@@ -10231,6 +10231,8 @@ def event_conference_intelligence_export(run_id):
     w = csv.writer(buf)
     w.writerow(["Organisation", "Domain", "Listed as", "Person", "Title",
                 "Tier", "Booth", "Apollo match", "Industry", "Employees",
+                "Event profile says", "Event profile details", "About (event profile)",
+                "LinkedIn", "Event profile page",
                 "Source page", "Evidence status", "Requested edition",
                 "Observed roster editions", "Run status", "Unreadable sources",
                 "Coverage", "Roster caveat"])
@@ -10245,6 +10247,15 @@ def event_conference_intelligence_export(run_id):
             (ap.get("name") or "") if isinstance(ap, dict) else "",
             (ap.get("industry") or "") if isinstance(ap, dict) else "",
             (ap.get("employees") or "") if isinstance(ap, dict) else "",
+            # What the event's own profile page printed about the company,
+            # as printed (event_intel_profiles.profile_details).
+            "; ".join((evidence.get("profile_detail") or {}).get("tags") or []),
+            "; ".join("%s: %s" % (f[0], f[1]) for f in
+                      ((evidence.get("profile_detail") or {}).get("fields") or [])),
+            (evidence.get("profile_detail") or {}).get("about") or "",
+            (evidence.get("profile_detail") or {}).get("linkedin")
+            or ((ap.get("linkedin") or "") if isinstance(ap, dict) else ""),
+            (evidence.get("profile_lookup") or {}).get("profile_url") or "",
             r.get("source_url") or "",
             evidence_labels.get(evidence.get("status"), evidence_labels["unverified"]),
             evidence.get("expected_edition") or "",

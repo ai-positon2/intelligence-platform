@@ -11,7 +11,7 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-components.css') }}">
   <script src="/static/js/theme.js"></script>
   <link rel="stylesheet" href="/static/css/grid-tokens.css">
-  <link rel="stylesheet" href="/static/css/event_conference_intelligence.css?v=4">
+  <link rel="stylesheet" href="/static/css/event_conference_intelligence.css?v=5">
   <link rel="stylesheet" href="/static/css/thinking-orb.css">
   <link rel="stylesheet" href="/static/css/border-beam.css">
   <link rel="stylesheet" href="/static/css/aurora-app.css?v=3">
@@ -1786,6 +1786,84 @@
       return kind ? (SOURCE_KIND_LABEL[kind] || 'Event page') : 'Event page';
     }
 
+    /* What the event's own profile page printed about a company
+       (event_intel_profiles.profile_details), as printed. */
+    function detailOf(p){ return (p.evidence || {}).profile_detail || {}; }
+
+    /* A label the event gives every company on the list ("PAST PARTNER" on
+       all 50 of Web Summit Qatar's partners) is a fact about the list, said
+       once above it; repeated on every row it read as noise and hid what it
+       means: last edition's partners, not this one's. */
+    function commonTags(rows){
+      var withDetail = rows.filter(function(p){ return (detailOf(p).tags || []).length; });
+      if (withDetail.length < 5) return [];
+      var count = {};
+      withDetail.forEach(function(p){
+        (detailOf(p).tags || []).forEach(function(t){ count[t] = (count[t] || 0) + 1; });
+      });
+      return Object.keys(count).filter(function(t){ return count[t] === withDetail.length; });
+    }
+
+    var OPEN_ROWS = {};
+    window.eviRow = function(id, btn){
+      OPEN_ROWS[id] = !OPEN_ROWS[id];
+      var tr = document.getElementById('evid-' + id);
+      if (tr) tr.hidden = !OPEN_ROWS[id];
+      if (btn) {
+        btn.setAttribute('aria-expanded', OPEN_ROWS[id] ? 'true' : 'false');
+        btn.textContent = OPEN_ROWS[id] ? 'Hide details' : 'Details';
+      }
+    };
+
+    /* Everything known about one company, in one place: what the event's
+       profile says, the links it gave, what Apollo says once matched, and
+       the contacts found there. Each block says where it came from. */
+    function detailPanel(p){
+      var d = detailOf(p), ap = p.apollo || {}, look = (p.evidence || {}).profile_lookup || {};
+      var parts = [];
+      if (d.about) {
+        parts.push('<div class="evi-dt-block"><h5>About, from the event\'s profile</h5>' +
+          '<p>' + esc(d.about) + '</p></div>');
+      }
+      var facts = [];
+      (d.fields || []).forEach(function(f){ facts.push([f[0], esc(f[1])]); });
+      if ((d.tags || []).length) facts.push(['Listed with', esc(d.tags.join(' · '))]);
+      var links = [];
+      var site = safeUrl(p.org_domain ? 'https://' + p.org_domain : null);
+      if (site) links.push('<a href="' + esc(site) + '" target="_blank" rel="noopener noreferrer">Website</a>');
+      var li = safeUrl(d.linkedin || ap.linkedin);
+      if (li) links.push('<a href="' + esc(li) + '" target="_blank" rel="noopener noreferrer">LinkedIn</a>');
+      var xu = safeUrl(d.x);
+      if (xu) links.push('<a href="' + esc(xu) + '" target="_blank" rel="noopener noreferrer">X</a>');
+      var pu = safeUrl(look.profile_url);
+      if (pu) links.push('<a href="' + esc(pu) + '" target="_blank" rel="noopener noreferrer">Event profile</a>');
+      if (links.length) facts.push(['Links', links.join(' · ')]);
+      if (facts.length) {
+        parts.push('<div class="evi-dt-block"><h5>From the event</h5><dl>' +
+          facts.map(function(f){ return '<dt>' + esc(f[0]) + '</dt><dd>' + f[1] + '</dd>'; }).join('') +
+          '</dl></div>');
+      }
+      var firm = [];
+      if (ap.industry) firm.push(['Industry', ap.industry]);
+      if (ap.employees) firm.push(['Employees', ap.employees]);
+      if (ap.revenue) firm.push(['Revenue', ap.revenue]);
+      if (ap.location) firm.push(['Headquarters', ap.location]);
+      if (ap.founded_year) firm.push(['Founded', ap.founded_year]);
+      if (firm.length) {
+        parts.push('<div class="evi-dt-block"><h5>From Apollo</h5><dl>' +
+          firm.map(function(f){ return '<dt>' + esc(f[0]) + '</dt><dd>' + esc(f[1]) + '</dd>'; }).join('') +
+          '</dl></div>');
+      } else {
+        parts.push('<div class="evi-dt-block evi-dt-quiet"><h5>From Apollo</h5><p>' +
+          (p.resolution === 'no_match' ? 'Apollo has no record of this company.'
+            : p.org_domain ? 'Size, revenue, headquarters and contacts come from the ' +
+              'Apollo match under Company data. Not matched yet.'
+            : 'No website on record, so Apollo cannot be asked about this company.') +
+          '</p></div>');
+      }
+      return '<div class="evi-dt">' + parts.join('') + '</div>';
+    }
+
     function hasPerson(p){
       return !!(p.person_name || p.person_title || ((p.apollo || {}).contacts || []).length);
     }
@@ -1828,7 +1906,7 @@
           esc(sourceLabel(run, srcList[0]).toLowerCase()) + '</a>.' : '');
       }
       var findLink = websitesPending(run) && run.status === 'complete'
-        ? ' <a href="#eviCompanyData" onclick="eviToCompanyData(event)">Find their websites</a> below.' : '';
+        ? ' <a href="#eviCompanyData" onclick="eviToCompanyData(event)">Read their profiles</a> below.' : '';
       if (!withSite) {
         notes.push('No website on record for ' + (rows.length === 1 ? 'this company' :
           'any of these ' + rows.length) + ', so company data cannot be looked up for them yet.' +
@@ -1836,10 +1914,17 @@
       } else if (withSite < rows.length) {
         notes.push(withSite + ' of ' + rows.length + ' have a website on record.' + findLink);
       }
+      var common = commonTags(rows);
+      if (common.length) {
+        notes.push('The event labels every one of these <b>' + common.map(esc).join(', ') +
+          '</b> on its profile page.' + (common.some(function(t){ return /\bpast\b/i.test(t); })
+            ? ' That is the event calling them partners of an earlier edition, not ' +
+              'confirmed for this one.' : ''));
+      }
       var caption = notes.filter(Boolean).length
         ? '<p class="evi-roster-note">' + notes.filter(Boolean).join(' ') + '</p>' : '';
 
-      var body = rows.map(function(p){
+      var body = rows.map(function(p, idx){
         var site = safeUrl(p.org_domain ? 'https://' + p.org_domain : null);
         var src = safeUrl(p.source_url);
         var ap = p.apollo || {};
@@ -1852,13 +1937,22 @@
         var person = (p.person_name ? esc(p.person_name) : '') +
             (p.person_title ? '<div class="evi-dom">' + esc(p.person_title) + '</div>' : '') +
             contactsHtml(p);
+        var d = detailOf(p);
+        var tags = (d.tags || []).filter(function(t){ return common.indexOf(t) < 0; });
+        var openable = !!(d.about || (d.fields || []).length || tags.length || d.linkedin ||
+          d.x || look.profile_url || p.org_domain || (ap.contacts || []).length || ap.industry);
+        var cols = 2 + (showPerson ? 1 : 0) + (showFirmo ? 1 : 0) + (showSrc ? 1 : 0);
         var cells = '<td><div class="evi-org">' + esc(p.org_name) + '</div>' +
             (site ? '<div class="evi-dom"><a href="' + esc(site) +
               '" target="_blank" rel="noopener noreferrer">' + esc(p.org_domain) + '</a>' +
               (prof ? ' <a class="evi-dom-from" href="' + esc(prof) + '" target="_blank" ' +
                 'rel="noopener noreferrer" title="Read from this company\'s profile on the ' +
                 'event\'s site">via profile</a>' : '') + '</div>' : '') +
+            (tags.length ? '<div class="evi-tags-line">' + esc(tags.join(' · ')) + '</div>' : '') +
             (!showPerson && person ? '<div class="evi-person">' + person + '</div>' : '') +
+            (openable ? '<button type="button" class="evi-row-more" aria-expanded="' +
+              (OPEN_ROWS[p.id] ? 'true' : 'false') + '" onclick="eviRow(' + Number(p.id) +
+              ', this)">' + (OPEN_ROWS[p.id] ? 'Hide details' : 'Details') + '</button>' : '') +
           '</td>' +
           '<td><span class="evi-role r-' + esc(p.role) + '">' +
             esc(labels[p.role] || p.role) + '</span>' +
@@ -1868,6 +1962,9 @@
                 'page it was actually seen on.">via search</span>' : '') +
             (p.tier ? '<div class="evi-dom">' + esc(p.tier) + '</div>' : '') +
             (p.booth ? '<div class="evi-dom">Booth ' + esc(p.booth) + '</div>' : '') +
+            (d.fields || []).filter(function(f){ return /^(location|stand|booth|where)/i.test(f[0]); })
+              .map(function(f){ return '<div class="evi-dom evi-where">' + esc(f[0]) + ': ' +
+                esc(f[1]) + '</div>'; }).join('') +
           '</td>';
         if (showPerson) cells += '<td>' + person + '</td>';
         if (showFirmo) {
@@ -1880,9 +1977,12 @@
             '" target="_blank" rel="noopener noreferrer">' + esc(sourceLabel(run, p.source_url)) +
             '</a>' : '') + '</td>';
         }
-        return '<tr>' + cells + '</tr>';
+        return '<tr' + (idx % 2 ? ' class="evi-alt"' : '') + '>' + cells + '</tr>' + (openable
+          ? '<tr class="evi-detail-row" id="evid-' + Number(p.id) + '"' +
+            (OPEN_ROWS[p.id] ? '' : ' hidden') + '><td colspan="' + cols + '">' +
+            detailPanel(p) + '</td></tr>' : '');
       }).join('');
-      return caption + '<div class="evi-tablewrap"><table class="evi-table"><thead><tr>' +
+      return caption + '<div class="evi-tablewrap evi-roster"><table class="evi-table"><thead><tr>' +
         '<th class="c-org">Organisation</th><th class="c-role">Listed as</th>' +
         (showPerson ? '<th class="c-person">Person</th>' : '') +
         (showFirmo ? '<th class="c-firmo">Firmographics</th>' : '') +
@@ -3024,12 +3124,14 @@
     }
 
     /* Rows with no website whose profile page on the event's site has not
-       been read yet. Mirrors event_intel_pipeline.websites_pending. */
+       been read yet, or read before its details were kept. Mirrors
+       event_intel_pipeline.websites_pending. */
     function websitesPending(run){
       return (run.participants || []).filter(function(p){
-        var st = ((p.evidence || {}).profile_lookup || {}).status;
-        return !p.org_domain && p.provenance !== 'search' &&
-          st !== 'found' && st !== 'no_website' && st !== 'no_profile';
+        if (p.provenance === 'search') return false;
+        var ev = p.evidence || {}, look = ev.profile_lookup || {}, st = look.status;
+        if (!p.org_domain && st !== 'found' && st !== 'no_website' && st !== 'no_profile') return true;
+        return (st === 'found' || st === 'no_website') && !!look.profile_url && !ev.profile_detail;
       }).length;
     }
 
@@ -3047,15 +3149,14 @@
       var none = !(run.participants || []).some(function(p){ return p.org_domain; });
       return noteHtml + '<div class="evi-webfind"><p>' +
         (none ? 'This roster printed no company websites, and company data is looked up ' +
-                'by website. '
-              : plural(left, 'company', 'companies') + ' here ' + (left === 1 ? 'has' : 'have') +
-                ' no website on record. ') +
-        'Many events print each company\'s website on its profile page instead of on ' +
-        'the list. This opens those pages and keeps only a website the event itself ' +
-        'published. It is free.</p>' +
+                'by website. ' : '') +
+        'Many events give each company a profile page and print its website and ' +
+        'details there instead of on the list: country, category, where to find them ' +
+        'at the event, an About paragraph. This opens those pages and keeps only what ' +
+        'the event itself printed. It is free.</p>' +
         '<button class="evi-btn evi-btn-ghost" type="button" id="websitesBtn" ' +
-        'onclick="eviWebsites(' + run.id + ')">Find websites for ' +
-        plural(left, 'company', 'companies') + '</button></div>';
+        'onclick="eviWebsites(' + run.id + ')">Read ' +
+        plural(left, 'company profile', 'company profiles') + '</button></div>';
     }
 
     var WEBSITE_NOTE = {};
