@@ -447,6 +447,42 @@ def _ensure_tables(conn) -> None:
                     "usd NUMERIC(12,4) NOT NULL DEFAULT 0")
         cur.execute("CREATE INDEX IF NOT EXISTS idx_evi_account_usage "
                     "ON evi_account_usage (email, created_at)")
+        # The people found at an event, one row per person per event, with
+        # every piece of proof kept beside them (event_intel_attendees). Kept
+        # out of evi_participants on purpose: that table is the companies the
+        # event published, and its counts, roster and CSV all read it.
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS evi_attendees (
+                id BIGSERIAL PRIMARY KEY,
+                run_id INTEGER NOT NULL REFERENCES evi_runs(id) ON DELETE CASCADE,
+                event_id INTEGER,
+                name TEXT NOT NULL,
+                title TEXT,
+                company TEXT,
+                company_domain TEXT,
+                linkedin TEXT,
+                basis VARCHAR(16) NOT NULL,
+                status VARCHAR(16),
+                edition VARCHAR(16),
+                evidence JSONB,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+            )
+        """)
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_evi_attendees_run "
+                    "ON evi_attendees (run_id, event_id)")
+        # One row per run: the last attendee search and what it found. Like
+        # evi_resolutions, it is what makes a second press while one search
+        # is still going a no-op rather than a second search.
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS evi_attendee_scans (
+                run_id INTEGER PRIMARY KEY REFERENCES evi_runs(id) ON DELETE CASCADE,
+                email TEXT NOT NULL,
+                state VARCHAR(16) NOT NULL,
+                result JSONB,
+                started_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+                finished_at TIMESTAMPTZ
+            )
+        """)
         from .event_intel_evidence import schema
         schema(cur)
         from .event_intel_jobs import schema as jobs_schema
@@ -798,6 +834,149 @@ def update_participant_websites(updates: list[tuple]) -> int:
     except Exception as e:
         logger.warning("event_intel_store.update_participant_websites failed: %s", e)
         return 0
+    finally:
+        conn.close()
+
+
+# ── attendees ─────────────────────────────────────────────────────────────
+
+ATTENDEE_SCAN_STALE_MINUTES = 15
+_ATTENDEE_COLS = ("id", "event_id", "name", "title", "company", "company_domain",
+                  "linkedin", "basis", "status", "edition", "evidence")
+
+
+def save_attendees(run_id: int, event_id: int | None, rows: list[dict]) -> int:
+    """Replace one event's attendee rows for a run with `rows`.
+
+    Replaced, not appended: a search run again finds the same people again,
+    and appending listed each of them once per press."""
+    conn = _pg_conn()
+    if conn is None:
+        return 0
+    try:
+        _ensure_tables(conn)
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM evi_attendees WHERE run_id = %s AND "
+                        "event_id IS NOT DISTINCT FROM %s", (run_id, event_id))
+            cur.executemany(
+                "INSERT INTO evi_attendees (run_id, event_id, name, title, company, "
+                "company_domain, linkedin, basis, status, edition, evidence) "
+                "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb)",
+                [(run_id, event_id, str(r.get("name") or "")[:200],
+                  (r.get("title") or None) and str(r["title"])[:300],
+                  (r.get("company") or None) and str(r["company"])[:200],
+                  r.get("company_domain") or None,
+                  (r.get("linkedin") or None) and str(r["linkedin"])[:300],
+                  r.get("basis"), r.get("status") or None, r.get("edition") or None,
+                  json.dumps(r.get("evidence") or {}))
+                 for r in rows if r.get("name") and r.get("basis")])
+        conn.commit()
+        return len(rows)
+    except Exception as e:
+        logger.warning("event_intel_store.save_attendees failed: %s", e)
+        return 0
+    finally:
+        conn.close()
+
+
+def get_attendees(run_id: int) -> list[dict]:
+    conn = _pg_conn()
+    if conn is None:
+        return []
+    try:
+        _ensure_tables(conn)
+        with conn.cursor() as cur:
+            cur.execute("SELECT " + ", ".join(_ATTENDEE_COLS) + " FROM evi_attendees "
+                        "WHERE run_id = %s ORDER BY id", (run_id,))
+            return [dict(zip(_ATTENDEE_COLS, r)) for r in cur.fetchall()]
+    except Exception as e:
+        logger.warning("event_intel_store.get_attendees failed: %s", e)
+        return []
+    finally:
+        conn.close()
+
+
+def begin_attendee_scan(run_id: int, email: str):
+    """Take the run's attendee-search slot. "go" when this call may search,
+    "busy" when a search younger than ATTENDEE_SCAN_STALE_MINUTES is still
+    going, None when storage is unavailable. A search older than that is
+    one a restarted server never finished, and may be started again."""
+    conn = _pg_conn()
+    if conn is None:
+        return None
+    try:
+        _ensure_tables(conn)
+        with conn.cursor() as cur:
+            cur.execute("INSERT INTO evi_attendee_scans (run_id, email, state) "
+                        "VALUES (%s, %s, 'new') ON CONFLICT (run_id) DO NOTHING",
+                        (run_id, email))
+            cur.execute("SELECT state, started_at < now() - %s * interval '1 minute' "
+                        "FROM evi_attendee_scans WHERE run_id = %s FOR UPDATE",
+                        (ATTENDEE_SCAN_STALE_MINUTES, run_id))
+            row = cur.fetchone()
+            if row is None:
+                conn.rollback()
+                return None
+            if row[0] == "running" and not row[1]:
+                conn.commit()
+                return "busy"
+            cur.execute("UPDATE evi_attendee_scans SET state = 'running', email = %s, "
+                        "started_at = now(), finished_at = NULL WHERE run_id = %s",
+                        (email, run_id))
+        conn.commit()
+        return "go"
+    except Exception as e:
+        logger.warning("event_intel_store.begin_attendee_scan failed: %s", e)
+        return None
+    finally:
+        conn.close()
+
+
+def finish_attendee_scan(run_id: int, state: str, result: dict | None) -> None:
+    conn = _pg_conn()
+    if conn is None:
+        return
+    try:
+        _ensure_tables(conn)
+        with conn.cursor() as cur:
+            cur.execute("INSERT INTO evi_attendee_scans (run_id, email, state) "
+                        "SELECT id, email, %s FROM evi_runs WHERE id = %s "
+                        "ON CONFLICT (run_id) DO NOTHING", (state, run_id))
+            cur.execute("UPDATE evi_attendee_scans SET state = %s, result = %s::jsonb, "
+                        "finished_at = now() WHERE run_id = %s",
+                        (state, json.dumps(result) if result is not None else None, run_id))
+        conn.commit()
+    except Exception as e:
+        logger.warning("event_intel_store.finish_attendee_scan failed: %s", e)
+    finally:
+        conn.close()
+
+
+def get_attendee_scan(run_id: int) -> dict | None:
+    """The run's last attendee search: state, result, and whether a running
+    one has gone stale (a server restart ends it without a word)."""
+    conn = _pg_conn()
+    if conn is None:
+        return None
+    try:
+        _ensure_tables(conn)
+        with conn.cursor() as cur:
+            cur.execute("SELECT state, result, started_at, finished_at, "
+                        "started_at < now() - %s * interval '1 minute' "
+                        "FROM evi_attendee_scans WHERE run_id = %s",
+                        (ATTENDEE_SCAN_STALE_MINUTES, run_id))
+            row = cur.fetchone()
+        if not row:
+            return None
+        out = {"state": row[0], "result": row[1], "started_at": row[2],
+               "finished_at": row[3]}
+        if row[0] == "running" and row[4]:
+            out["state"] = "stale"
+        _ts(out, "started_at", "finished_at")
+        return out
+    except Exception as e:
+        logger.warning("event_intel_store.get_attendee_scan failed: %s", e)
+        return None
     finally:
         conn.close()
 

@@ -505,7 +505,7 @@ def run_once():
         # Replay deterministic writes from saved stage results. Source runs
         # cannot be selected by workroom until they finish successfully.
         with db() as conn, conn.cursor() as cur:
-            for table in ('evi_outreach','evi_participants','evi_sources','evi_candidates','evi_observations','evi_events'):
+            for table in ('evi_attendees','evi_outreach','evi_participants','evi_sources','evi_candidates','evi_observations','evi_events'):
                 cur.execute('DELETE FROM ' + table + ' WHERE run_id=%s', (job['run_id'],))
         store.update_run(job['run_id'], status='running', summary={}, error=None)
         pipeline.run_job(job['run_id'],payload['mode'],payload['query'],

@@ -9797,6 +9797,9 @@ def event_conference_intelligence_run_detail(run_id):
     # not an optional extra the frontend can forget to ask for.
     run["sources"] = event_intel_store.get_sources(run_id)
     run["role_labels"] = event_intel_store.ROLE_LABELS
+    if run.get("mode") == "lookup":
+        run["attendees"] = event_intel_store.get_attendees(run_id)
+        run["attendee_scan"] = event_intel_store.get_attendee_scan(run_id)
     if run.get("mode") == "recommend":
         run["candidates"] = event_intel_store.get_candidates(run_id)
     if run.get("mode") == "workroom":
@@ -9901,6 +9904,91 @@ def event_conference_intelligence_websites(run_id):
     if result.get("error") == "not_found":
         abort(404)
     return jsonify(result)
+
+
+@app.route("/p2/strategic-agents/event-conference-intelligence/runs/<int:run_id>/attendees",
+           methods=["POST"])
+@position2_required
+def event_conference_intelligence_attendees(run_id):
+    """Search for the people at a looked-up event: the ones the event names,
+    the ones who posted that they were going or went, and the senior people
+    at its exhibitors. Runs beside the request, because a LinkedIn search
+    and the reading of a few hundred posts take longer than one request is
+    allowed; the drawer polls the run until the search reports back."""
+    import threading
+    from tracker import event_intel_attendees, event_intel_store
+    email = (_get_user() or {}).get("email", "").lower()
+    run = event_intel_store.get_run(run_id, email)
+    if not run:
+        abort(404)
+    if run.get("mode") != "lookup":
+        return jsonify(error="Attendees are searched for one looked-up event at a time."), 400
+    if run.get("status") != "complete":
+        return jsonify(error="This run is still in progress. Look for attendees "
+                             "once it has finished."), 409
+    if _cpi_rate_limited("evi-attendees", email):
+        return jsonify(error="Too many attendee searches in a row. Wait a few "
+                             "minutes and try again."), 429
+    state = event_intel_store.begin_attendee_scan(run_id, email)
+    if state is None:
+        return jsonify(error="Could not start the search. Storage is unavailable."), 500
+    if state == "busy":
+        return jsonify(state="running", note="A search for this event's attendees "
+                                             "is already running."), 202
+
+    def work():
+        try:
+            result = event_intel_attendees.find_for_run(run_id, email)
+            event_intel_store.finish_attendee_scan(
+                run_id, "failed" if result.get("error") else "done", result)
+        except Exception:
+            app.logger.exception("event attendee search failed for run %s", run_id)
+            event_intel_store.finish_attendee_scan(run_id, "failed", None)
+    threading.Thread(target=work, daemon=True, name="evi-attendees-%d" % run_id).start()
+    return jsonify(state="running"), 202
+
+
+@app.route("/p2/strategic-agents/event-conference-intelligence/runs/<int:run_id>/attendees.csv")
+@position2_required
+def event_conference_intelligence_attendees_csv(run_id):
+    """The attendee list as a file, with the proof for every row in it, so
+    the file says what the screen says once it leaves the page."""
+    import csv
+    import io
+    from tracker import event_intel_store
+    from tracker.event_intel_attendees import BASIS_LABELS, STATUS_LABELS, EDITION_LABELS
+    email = (_get_user() or {}).get("email", "").lower()
+    run = event_intel_store.get_run(run_id, email)
+    if not run:
+        abort(404)
+    buf = io.StringIO()
+    w = csv.writer(buf)
+    w.writerow(["Name", "Title", "Company", "Company website", "LinkedIn",
+                "How we know", "At the event as", "Edition", "Proof", "Quote",
+                "Proof link", "Posted", "Other proof", "Caveat"])
+    for a in event_intel_store.get_attendees(run_id):
+        ev = a.get("evidence") or {}
+        proof = ev.get("proof") or [{}]
+        first = proof[0] if proof else {}
+        w.writerow([_csv_safe(v) for v in [
+            a.get("name"), a.get("title"), a.get("company"), a.get("company_domain"),
+            a.get("linkedin"), BASIS_LABELS.get(a.get("basis"), a.get("basis")),
+            STATUS_LABELS.get(a.get("status"), a.get("status")),
+            EDITION_LABELS.get(a.get("edition"), ""),
+            first.get("label"), first.get("quote"), first.get("url"), first.get("posted_at"),
+            "; ".join("%s %s" % (p.get("label") or "", p.get("url") or "") for p in proof[1:]),
+            ("Not confirmed attending: works at a listed company"
+             if a.get("basis") == "staff" else
+             "Public proof of attendance; not the event's ticket list"),
+        ]])
+    events = event_intel_store.get_events(run_id)
+    name = (events[0]["name"] if events else run.get("query")) or "event"
+    slug = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")[:60] or "event"
+    resp = make_response(buf.getvalue())
+    resp.headers["Content-Type"] = "text/csv; charset=utf-8"
+    resp.headers["Content-Disposition"] = 'attachment; filename="%s-attendees.csv"' % slug
+    resp.headers["Cache-Control"] = "no-store"
+    return resp
 
 
 @app.route("/p2/strategic-agents/event-conference-intelligence/runs/<int:run_id>/candidates.csv")
@@ -13483,6 +13571,9 @@ _CPI_RATE_LIMITS = {
     # Free, but each press opens up to a few hundred pages on the event's
     # site, so a scripted loop is bounded the same way.
     "evi-websites": (4, 60),
+    # An attendee search spends model calls and LinkedIn searches on the
+    # workspace's connected account, so presses are few and far between.
+    "evi-attendees": (3, 600),
     "tli-search": (30, 60),
     "tli-resolve": (10, 60),
     "tli-collect": (8, 60),

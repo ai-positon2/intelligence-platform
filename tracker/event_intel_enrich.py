@@ -215,7 +215,8 @@ def _company_label(domain: str) -> str:
 
 
 def find_people(domains: list[str], titles: list[str] | None = None,
-                key: str | None = None, per_company: int = 5) -> dict:
+                key: str | None = None, per_company: int = 5,
+                seniorities: list[str] | None = None) -> dict:
     """Free people lookup at resolved companies.
 
     mixed_people/api_search costs nothing, so this runs for every resolved
@@ -244,6 +245,8 @@ def find_people(domains: list[str], titles: list[str] | None = None,
         # exhibitor that was not. The title box did the opposite of its label,
         # silently, on the one step that bills.
         filters["titles"] = list(titles)
+    if seniorities:
+        filters["seniorities"] = list(seniorities)
 
     people: list[dict] = []
     try:

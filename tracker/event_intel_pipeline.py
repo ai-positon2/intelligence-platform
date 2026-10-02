@@ -459,6 +459,8 @@ def _run_lookup(run_id: int, query: str, year_hint: str | None) -> None:
             logger.exception("event_intel_pipeline: evidence ledger write failed for run %s", run_id)
     pages = res.get("pages") or []
     if not pages:
+        # Nothing published to read, but people still post about going.
+        _find_attendees(run_id, event_id)
         store.update_run(
             run_id, status="complete", stage="done",
             summary={**_summarise(run_id),
@@ -472,8 +474,61 @@ def _run_lookup(run_id: int, query: str, year_hint: str | None) -> None:
 
     store.update_run(run_id, stage="harvesting")
     _harvest_event(run_id, event_id, event, pages)
+    _find_attendees(run_id, event_id)
     store.update_run(run_id, status="complete", stage="done",
                      summary=_summarise(run_id))
+
+
+# The roster fields the attendee search reads. Only these go into the durable
+# stage's inputs: a replay re-saves every row under new ids, and a stage whose
+# inputs changed refuses to replay at all.
+_ATTENDEE_FIELDS = ("person_name", "person_title", "org_name", "org_domain", "role",
+                    "source_url", "evidence")
+_EVENT_FIELDS = ("name", "edition", "website", "starts_on", "ends_on", "city", "country")
+
+
+def attendee_inputs(event: dict, participants: list[dict]) -> tuple[dict, list[dict]]:
+    """The event and its roster as the attendee search needs them, with no
+    row ids, so the same run replayed asks the same question."""
+    eid = event.get("id")
+    ev = {k: event.get(k) for k in _EVENT_FIELDS}
+    rows = []
+    for p in participants:
+        if p.get("event_id") != eid:
+            continue
+        evd = p.get("evidence") or {}
+        row = {k: p.get(k) for k in _ATTENDEE_FIELDS if k != "evidence"}
+        row["evidence"] = {k: evd[k] for k in ("profile_detail", "profile_lookup") if k in evd}
+        rows.append(row)
+    return ev, rows
+
+
+def _gather_attendees(event: dict, rows: list[dict], host: str) -> dict:
+    from . import event_intel_attendees
+    import time
+    return event_intel_attendees.gather(event, rows, host,
+                                        deadline=time.monotonic() + 600.0)
+
+
+def _find_attendees(run_id: int, event_id: int) -> None:
+    """The attendee search, as the last stage of a lookup. A failure here is
+    recorded and never fails the roster it follows."""
+    from . import event_intel_attendees
+    store.update_run(run_id, stage="finding_attendees")
+    event = next((e for e in store.get_events(run_id) if e.get("id") == event_id), None)
+    if not event:
+        return
+    ev, rows = attendee_inputs(event, store.get_participants(run_id))
+    try:
+        got = durable_stage("attendees", _gather_attendees, ev, rows, _host(event.get("website")))
+    except Exception:
+        logger.exception("event_intel_pipeline: attendee search failed for run %s", run_id)
+        store.finish_attendee_scan(run_id, "failed", None)
+        return
+    store.save_attendees(run_id, event_id, got.get("rows") or [])
+    rep = dict(got.get("report") or {}, event_id=event_id)
+    rep["note"] = event_intel_attendees.note(rep)
+    store.finish_attendee_scan(run_id, "done", {"events": [rep], "usd": rep.get("usd") or 0})
 
 
 def _run_recommend(run_id: int, email: str, profile: dict) -> None:

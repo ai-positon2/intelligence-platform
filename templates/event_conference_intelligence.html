@@ -11,7 +11,7 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-components.css') }}">
   <script src="/static/js/theme.js"></script>
   <link rel="stylesheet" href="/static/css/grid-tokens.css">
-  <link rel="stylesheet" href="/static/css/event_conference_intelligence.css?v=5">
+  <link rel="stylesheet" href="/static/css/event_conference_intelligence.css?v=6">
   <link rel="stylesheet" href="/static/css/thinking-orb.css">
   <link rel="stylesheet" href="/static/css/border-beam.css">
   <link rel="stylesheet" href="/static/css/aurora-app.css?v=3">
@@ -1366,6 +1366,7 @@
       checking_drafts: 'Throwing away every draft that claims a conversation nobody recorded.',
       saving: 'Saving the drafts.',
       resolving_companies: 'Matching companies in Apollo.',
+      finding_attendees: 'Finding the people at the event: LinkedIn posts, the public web and the listed companies.',
       done: 'Finishing up.'
     };
 
@@ -1375,7 +1376,7 @@
        table above, which matches what the pipeline reports. */
     var STAGE_ORDER = {
       recommend: ['discovering_categories', 'auditing', 'scoring', 'ranking'],
-      lookup: ['resolving', 'harvesting'],
+      lookup: ['resolving', 'harvesting', 'finding_attendees'],
       workroom: ['reading_roster', 'qualifying', 'checking_drafts', 'saving']
     };
     var SHORT = {
@@ -3209,6 +3210,252 @@
         .catch(function(){
           WEBSITE_NOTE[runId] = {bad: true, text: 'The website lookup could not be ' +
             'reached. Nothing was changed. Try again in a moment.'};
+          openRun(runId);
+        });
+    };
+
+    /* ── attendees ─────────────────────────────────────────────────────
+       Events do not publish who bought a ticket. This section is the people
+       there is public proof for, each with the proof beside them, and the
+       senior people at the listed companies kept apart because nothing
+       says they are going. Labels match tracker/event_intel_attendees.py. */
+    var ATT_BASIS = {
+      event: 'Named by the event', self: 'Said so publicly',
+      others: 'Named by someone who was there',
+      staff: 'Works at an exhibitor or sponsor'
+    };
+    var ATT_STATUS = {
+      speaking: 'Speaking', exhibiting: 'On the stand', attending: 'Going',
+      attended: 'Went', organising: 'Organising', listed: 'Listed by the event',
+      staff: 'Not confirmed'
+    };
+    var ATT_FILTER = {};
+    var ATT_NOTE = {};
+    var attPoll = null;
+
+    function attScan(run){ return run.attendee_scan || null; }
+    function attRunning(run){ var sc = attScan(run); return !!sc && sc.state === 'running'; }
+
+    function attFilterKeys(rows){
+      var out = [['all', 'All', rows.length]];
+      var by = function(fn){ return rows.filter(fn).length; };
+      var n;
+      if ((n = by(function(a){ return a.edition === 'this'; })) && n < rows.length) out.push(['this', 'This edition', n]);
+      if ((n = by(function(a){ return a.edition === 'earlier'; }))) out.push(['earlier', 'Earlier edition', n]);
+      if ((n = by(function(a){ return a.status === 'speaking'; })) && n < rows.length) out.push(['speaking', 'Speakers', n]);
+      if ((n = by(function(a){ return a.basis === 'self' || a.basis === 'others'; })) && n < rows.length)
+        out.push(['posted', 'From posts', n]);
+      return out;
+    }
+
+    function attPasses(a, f){
+      if (!f || f === 'all') return true;
+      if (f === 'this' || f === 'earlier') return a.edition === f;
+      if (f === 'speaking') return a.status === 'speaking';
+      if (f === 'posted') return a.basis === 'self' || a.basis === 'others';
+      return true;
+    }
+
+    function attProof(a){
+      var proof = ((a.evidence || {}).proof || []);
+      return proof.map(function(p){
+        var url = safeUrl(p.url);
+        var link = url ? ' <a href="' + esc(url) + '" target="_blank" rel="noopener noreferrer">' +
+          (p.kind === 'linkedin_post' ? 'View post' : p.kind === 'web_page' ? 'View page' :
+           'View source') + '</a>' : '';
+        return '<div class="evi-att-proof">' +
+          '<span class="evi-att-plabel">' + esc(p.label || '') +
+          (p.posted_at ? ', ' + esc(fmtDate(p.posted_at)) : '') + '</span>' + link +
+          (p.quote ? '<q>' + esc(p.quote) + '</q>' : '') + '</div>';
+      }).join('');
+    }
+
+    /* In the staff table the company has its own column, so it is not said
+       twice in the person's cell. */
+    function attPerson(a, staff){
+      var li = safeUrl(a.linkedin);
+      var nm = li ? '<a href="' + esc(li) + '" target="_blank" rel="noopener noreferrer">' +
+        esc(a.name) + '</a>' : esc(a.name);
+      var sub = [a.title, staff ? null : a.company].filter(Boolean).map(esc).join(' &middot; ');
+      return '<b class="evi-att-name">' + nm + '</b>' +
+        (sub ? '<span class="evi-att-sub">' + sub + '</span>' : '') +
+        (!staff && a.company_domain && a.company ? '<span class="evi-att-dom">' + esc(a.company_domain) + '</span>' : '');
+    }
+
+    function attEdition(a){
+      if (a.edition === 'earlier') return '<span class="evi-att-ed past">Earlier edition</span>';
+      if (a.edition === 'this') return '<span class="evi-att-ed">This edition</span>';
+      return '';
+    }
+
+    function attTable(rows, staff){
+      if (!rows.length) return '';
+      return '<div class="evi-tablewrap evi-att-wrap"><table class="evi-table evi-att-table">' +
+        '<thead><tr><th class="c-att-p">Person</th><th class="c-att-s">' +
+        (staff ? 'Listed company' : 'At the event') + '</th><th>' +
+        (staff ? 'Why they are here' : 'How we know') + '</th></tr></thead><tbody>' +
+        rows.map(function(a){
+          return '<tr><td>' + attPerson(a, staff) + '</td><td>' +
+            (staff ? esc(a.company || '') + (a.company_domain ? '<span class="evi-att-dom">' +
+               esc(a.company_domain) + '</span>' : '') :
+             '<span class="evi-att-st">' + esc(ATT_STATUS[a.status] || a.status || '') + '</span>' +
+             attEdition(a)) + '</td><td>' + attProof(a) + '</td></tr>';
+        }).join('') + '</tbody></table></div>';
+    }
+
+    function attHeadline(sure, staff, scan){
+      var thisEd = sure.filter(function(a){ return a.edition === 'this'; }).length;
+      var earlier = sure.filter(function(a){ return a.edition === 'earlier'; }).length;
+      if (!sure.length && !staff.length) {
+        return 'No one was found with public proof of being at this event.';
+      }
+      var parts = [];
+      if (sure.length) {
+        var split = [];
+        if (thisEd) split.push(thisEd + ' for this edition');
+        if (earlier) split.push(earlier + ' from an earlier one');
+        parts.push('<b>' + plural(sure.length, 'person', 'people') + '</b> with public proof of ' +
+          'being at this event or going to it' + (split.length ? ' (' + split.join(', ') + ')' : '') + '.');
+      } else {
+        parts.push('No one was found with public proof of being at this event.');
+      }
+      if (staff.length) {
+        parts.push('Below them, ' + plural(staff.length, 'senior person', 'senior people') +
+          ' at the companies the event lists as exhibiting or sponsoring. Nothing says ' +
+          'they are going; they are who to ask for.');
+      }
+      return parts.join(' ');
+    }
+
+    function attendeesSection(run){
+      if (run.mode !== 'lookup' || run.status !== 'complete') return '';
+      var rows = run.attendees || [];
+      var scan = attScan(run);
+      var res = (scan && scan.result) || {};
+      var note = ATT_NOTE[run.id];
+      var html = '<div class="evi-sec" id="eviAttendees"><h3>Attendees</h3>' +
+        '<p class="evi-roster-note">Events do not publish who bought a ticket. These are the ' +
+        'people there is public proof for: the event naming them, their own post saying they ' +
+        'are going or went, or someone else\'s post naming them there. Each row shows its proof.</p>';
+      if (note) {
+        html += '<div class="evi-coverage' + (note.bad ? ' warn' : '') + '" role="status"><span class="ic">' +
+          (note.bad ? '!' : 'i') + '</span><span class="tx">' + esc(note.text) + '</span></div>';
+      }
+      if (attRunning(run)) {
+        return html + '<div class="evi-running"><span class="thinking-orb-slot" data-orb-state="working" ' +
+          'data-orb-size="20"></span><span role="status" aria-live="polite">Searching LinkedIn posts ' +
+          'and the public web for people at this event, and reading each one. This takes a minute ' +
+          'or two.</span></div></div>';
+      }
+      if (!scan && !rows.length) {
+        return html + '<div class="evi-webfind"><p>Searches LinkedIn for posts that name this event, ' +
+          'through the LinkedIn account connected to this workspace, then the public web, and keeps ' +
+          'each person only where the words of the post show them there. Also looks up senior ' +
+          'people at the listed exhibitors and sponsors in Apollo\'s free people search. Uses about ' +
+          'a dollar of model time and no Apollo credits.</p>' +
+          '<button class="evi-btn" type="button" id="attendeesBtn" onclick="eviAttendees(' + run.id +
+          ')">Find attendees</button></div></div>';
+      }
+      var sure = rows.filter(function(a){ return a.basis !== 'staff'; });
+      var staff = rows.filter(function(a){ return a.basis === 'staff'; });
+      html += '<div class="evi-coverage"><span class="ic">i</span><span class="tx">' +
+        attHeadline(sure, staff, scan) + '</span></div>';
+      (res.events || []).forEach(function(e){
+        if (e.note) html += '<div class="evi-coverage warn"><span class="ic">!</span><span class="tx">' +
+          esc(e.note) + '</span></div>';
+      });
+      if (scan && scan.state === 'failed') {
+        html += '<div class="evi-coverage warn"><span class="ic">!</span><span class="tx">The last ' +
+          'attendee search did not finish. What is shown is what earlier searches kept.</span></div>';
+      } else if (scan && scan.state === 'stale') {
+        html += '<div class="evi-coverage warn"><span class="ic">!</span><span class="tx">The last ' +
+          'attendee search was cut off when the service restarted. Search again to finish it.</span></div>';
+      }
+      if (sure.length) {
+        var f = ATT_FILTER[run.id] || 'all';
+        var keys = attFilterKeys(sure);
+        if (keys.length > 1) {
+          html += '<div class="evi-rolebar">' + keys.map(function(k){
+            return '<button class="evi-chip" type="button" aria-pressed="' + (f === k[0]) +
+              '" onclick="eviAttFilter(' + run.id + ',\'' + k[0] + '\')">' + esc(k[1]) +
+              '<span class="n">' + k[2] + '</span></button>';
+          }).join('') + '</div>';
+        }
+        html += attTable(sure.filter(function(a){ return attPasses(a, f); }), false);
+      }
+      if (staff.length) {
+        html += '<details class="evi-att-staff"' + (sure.length ? '' : ' open') + '><summary>' +
+          'At the exhibiting and sponsoring companies: ' + plural(staff.length, 'person', 'people') +
+          ', not confirmed attending</summary><p class="evi-roster-note">Apollo\'s free people search, ' +
+          'senior roles only. Who staffs a stand is never published, so treat these as the people ' +
+          'to ask for, not people you will meet.</p>' + attTable(staff, true) + '</details>';
+      }
+      html += '<div style="margin-top:14px;display:flex;gap:10px;flex-wrap:wrap">' +
+        (rows.length ? '<a class="evi-btn evi-btn-ghost" style="text-decoration:none;display:inline-block" ' +
+          'href="' + BASE + '/runs/' + run.id + '/attendees.csv">Download attendees CSV</a>' : '') +
+        '<button class="evi-btn evi-btn-ghost" type="button" id="attendeesBtn" onclick="eviAttendees(' +
+        run.id + ')">Search again</button></div>';
+      return html + eviFb(run.id, 'lookup:attendees', 'Attendees') + '</div>';
+    }
+
+    window.eviAttFilter = function(runId, f){
+      ATT_FILTER[runId] = f;
+      if (current && current.id === runId) {
+        var el = document.getElementById('eviAttendees');
+        if (el) {
+          var box = document.createElement('div');
+          box.innerHTML = attendeesSection(current);
+          el.replaceWith(box.firstChild);
+        }
+      }
+    };
+
+    function stopAttWatch(){ if (attPoll) { clearTimeout(attPoll); attPoll = null; } }
+    /* While a search runs the drawer re-reads the run every few seconds and
+       redraws once the search reports back. Only one watch at a time, and
+       none once the drawer shows a different run. */
+    function watchAttendees(run){
+      stopAttWatch();
+      if (!run || !attRunning(run)) return;
+      var runId = run.id, misses = 0;
+      function tick(){
+        if (!current || current.id !== runId) { stopAttWatch(); return; }
+        fetch(BASE + '/runs/' + runId)
+          .then(function(r){ if (!r.ok) throw new Error('status ' + r.status); return r.json(); })
+          .then(function(fresh){
+            if (!current || current.id !== runId) return;
+            if (attRunning(fresh)) { attPoll = setTimeout(tick, 4000); return; }
+            current = fresh;
+            render(fresh);
+          })
+          .catch(function(){
+            misses += 1;
+            if (misses < 5) attPoll = setTimeout(tick, 4000 * misses);
+          });
+      }
+      attPoll = setTimeout(tick, 4000);
+    }
+
+    window.eviAttendees = function(runId){
+      var btn = document.getElementById('attendeesBtn');
+      if (btn) { btn.disabled = true; btn.textContent = 'Starting the search...'; }
+      fetch(BASE + '/runs/' + runId + '/attendees', {
+        method: 'POST', headers: {'Content-Type': 'application/json'}, body: '{}'
+      }).then(function(r){
+          return r.json().then(function(j){ return {ok: r.ok, j: j || {}}; },
+                               function(){ return {ok: r.ok, j: {}}; });
+        })
+        .then(function(x){
+          delete ATT_NOTE[runId];
+          if (!x.ok && x.j.state !== 'running') {
+            ATT_NOTE[runId] = {bad: true, text: x.j.error ? String(x.j.error) :
+              'The attendee search could not be started. Try again in a moment.'};
+          }
+          openRun(runId);
+        })
+        .catch(function(){
+          ATT_NOTE[runId] = {bad: true, text: 'The attendee search could not be reached. ' +
+            'Try again in a moment.'};
           openRun(runId);
         });
     };
@@ -5197,10 +5444,14 @@
           '<a class="evi-btn evi-btn-ghost" style="text-decoration:none;display:inline-block" ' +
           'href="' + BASE + '/runs/' + run.id + '/export.csv">Download CSV</a></div>' +
           (run.mode === 'lookup' ? eviFb(run.id, 'lookup:roster', 'Roster') : '') + '</div>';
+        html += attendeesSection(run);
         html += resolveBar(run);
-      } else if (run.status === 'complete' && !s.no_pages && !s.no_events) {
-        html += '<div class="evi-empty">No participants were published on the pages that ' +
-          'could be read. Check Sources below to see what was tried.</div>';
+      } else {
+        if (run.status === 'complete' && !s.no_pages && !s.no_events) {
+          html += '<div class="evi-empty">No participants were published on the pages that ' +
+            'could be read. Check Sources below to see what was tried.</div>';
+        }
+        html += attendeesSection(run);
       }
       if ((run.sources || []).length) {
         html += '<div class="evi-sec"><h3>Sources (' + (run.sources || []).length +
@@ -5214,6 +5465,7 @@
             'Nothing to show for this run.') + '</span></div>';
       mountOrbsIn(document.getElementById('drawerBody'));
       armAnim(run.mode + ':' + run.id + ':' + run.status);
+      watchAttendees(run);
     }
 
     if (document.readyState === 'loading') {
