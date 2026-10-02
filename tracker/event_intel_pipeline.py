@@ -288,7 +288,7 @@ def _harvest_event(run_id: int, event_id: int, event: dict,
             access_links.extend(src.get("access_links", []))
         store.save_source(run_id, event_id, src["url"], src["kind"], src["status"],
                           src.get("http_status"), src.get("rows_found", 0),
-                          src.get("note", ""), metadata={k:src[k] for k in ("agenda_excerpts", "access_links", "snapshots", "extraction", "coverage", "partial", "pages_read", "pages_seen", "pages_declared", "truncated", "expected_edition", "observed_roster_years") if k in src})
+                          src.get("note", ""), metadata={k:src[k] for k in ("agenda_excerpts", "access_links", "snapshots", "extraction", "coverage", "partial", "pages_read", "pages_seen", "pages_declared", "truncated", "expected_edition", "observed_roster_years", "profile_websites") if k in src})
         if src["status"] == SOURCE_OK:
             readable += 1
         else:
@@ -959,6 +959,91 @@ def run_job(run_id: int, mode: str, query: str, **kwargs) -> None:
         logger.exception("event_intel_pipeline: run %s crashed", run_id)
         from .event_intel_jobs import reader_failure
         store.update_run(run_id, status="failed", error=reader_failure(e))
+
+
+def websites_pending(participants: list[dict]) -> int:
+    """Rows with no website that a profile-page read has not settled yet."""
+    from .event_intel_profiles import SETTLED
+    return sum(1 for p in participants
+               if not p.get("org_domain") and p.get("provenance") != VIA_SEARCH
+               and (((p.get("evidence") or {}).get("profile_lookup") or {}).get("status")
+                    not in SETTLED))
+
+
+def find_run_websites(run_id: int, email: str, seconds: float = 75.0) -> dict:
+    """Read company websites off the event's profile pages for a finished run.
+
+    The same step the harvest now runs (event_intel_profiles), for rosters
+    harvested before it existed. Free: the run's own listing pages are read
+    again and each company's profile on the event's site is opened; no model
+    call and no Apollo credit. Bounded by `seconds` so it answers inside one
+    web request, and resumable, because every settled row is recorded and a
+    second press only opens what is left.
+    """
+    import time
+    from . import event_intel_profiles
+    run = store.get_run(run_id, email)
+    if not run:
+        return {"error": "not_found"}
+    deadline = time.monotonic() + seconds
+    participants = store.get_participants(run_id)
+    if not websites_pending(participants):
+        return {"profiles": 0, "read": 0, "websites": 0, "unreadable": 0, "left": 0,
+                "note": "Every company here already has a website, or its "
+                        "profile page has already been read."}
+    events = store.get_events(run_id)
+    hosts = {e.get("id"): _host(e.get("website")) for e in events}
+    by_event: dict = {}
+    for src in store.get_sources(run_id):
+        if src.get("status") != SOURCE_OK or src.get("kind") == "access_review":
+            continue
+        meta = src.get("metadata") or {}
+        urls = [x.get("url") for x in (meta.get("snapshots") or []) if x.get("url")]
+        by_event.setdefault(src.get("event_id"), []).extend(urls or [src.get("url")])
+    totals = {"profiles": 0, "read": 0, "websites": 0, "unreadable": 0, "left": 0,
+              "no_profile": 0, "listings_unreadable": 0}
+    for event_id, urls in by_event.items():
+        texts = []
+        for u in dict.fromkeys(u for u in urls if u):
+            if time.monotonic() > deadline:
+                break
+            got = event_intel_harvest.fetch_page(u)
+            if got.get("status") == SOURCE_OK:
+                texts.append((got.get("final_url") or u, got["text"]))
+            else:
+                totals["listings_unreadable"] += 1
+        rows = [dict(p, evidence=dict(p.get("evidence") or {})) for p in participants
+                if p.get("event_id") == event_id and p.get("provenance") != VIA_SEARCH]
+        if not texts or not rows:
+            continue
+        before = {p["id"]: (p.get("org_domain"),
+                            (p["evidence"].get("profile_lookup") or {}).get("status"))
+                  for p in rows}
+        stats = event_intel_profiles.fill_websites(rows, texts, hosts.get(event_id, ""),
+                                                   deadline=deadline)
+        for k in ("profiles", "read", "websites", "unreadable", "left", "no_profile"):
+            totals[k] += stats.get(k, 0)
+        updates = []
+        for p in rows:
+            rec = p["evidence"].get("profile_lookup")
+            if rec and before[p["id"]] != (p.get("org_domain"), rec.get("status")):
+                updates.append((p["id"], p.get("org_domain"), rec))
+        store.update_participant_websites(updates)
+    if totals["websites"]:
+        # The summary carries the Apollo estimate, which is what offers the
+        # company match; it was computed when there were no websites at all.
+        summary = dict(run.get("summary") or {})
+        summary.update(_summarise(run_id))
+        store.update_run(run_id, summary=summary)
+    totals["note"] = event_intel_profiles.note(totals) or (
+        "No company on this roster links to a profile page on the event's site, "
+        "so there was nowhere to read a website from."
+        if not totals["profiles"] else "")
+    if totals["listings_unreadable"] and not totals["profiles"]:
+        totals["note"] = ("The event's listing pages could not be read again just "
+                          "now, so no profile pages were opened. Try again later.")
+    totals["pending"] = websites_pending(store.get_participants(run_id))
+    return totals
 
 
 def resolve_run_companies(run_id: int, email: str, titles: list[str] | None = None) -> dict:

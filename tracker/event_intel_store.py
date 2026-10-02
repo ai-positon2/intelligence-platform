@@ -766,6 +766,36 @@ def update_participant_resolution(participant_ids: list[int], domain: str | None
         conn.close()
 
 
+def update_participant_websites(updates: list[tuple]) -> int:
+    """(participant id, website or None, profile lookup record) per row.
+
+    The website is only ever written onto a row that has none, so a pass over
+    profile pages can never replace a link the listing itself published, and
+    the record goes into evidence beside whatever is already there. Returns
+    how many rows were written."""
+    if not updates:
+        return 0
+    conn = _pg_conn()
+    if conn is None:
+        return 0
+    try:
+        _ensure_tables(conn)
+        with conn.cursor() as cur:
+            cur.executemany(
+                "UPDATE evi_participants SET org_domain = COALESCE(org_domain, %s), "
+                "evidence = COALESCE(evidence, '{}'::jsonb) || jsonb_build_object("
+                "'profile_lookup', %s::jsonb) WHERE id = %s",
+                [(domain or None, json.dumps(record or {}), pid)
+                 for pid, domain, record in updates])
+        conn.commit()
+        return len(updates)
+    except Exception as e:
+        logger.warning("event_intel_store.update_participant_websites failed: %s", e)
+        return 0
+    finally:
+        conn.close()
+
+
 # ── company resolution record, and account-level usage ───────────────────
 
 RESOLVE_STALE_MINUTES = 10

@@ -11,7 +11,7 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-components.css') }}">
   <script src="/static/js/theme.js"></script>
   <link rel="stylesheet" href="/static/css/grid-tokens.css">
-  <link rel="stylesheet" href="/static/css/event_conference_intelligence.css?v=3">
+  <link rel="stylesheet" href="/static/css/event_conference_intelligence.css?v=4">
   <link rel="stylesheet" href="/static/css/thinking-orb.css">
   <link rel="stylesheet" href="/static/css/border-beam.css">
   <link rel="stylesheet" href="/static/css/aurora-app.css?v=3">
@@ -558,8 +558,10 @@
         <div style="min-width:0">
           <h2 id="drawerTitle">Loading</h2>
           <div class="sub" id="drawerSub"></div>
-          <a id="eventPlanLink" class="evi-btn" hidden>Plan &amp; results</a>
-          <a id="eventExportLink" class="evi-btn evi-btn-ghost" download hidden>Download full research (JSON)</a>
+          <div class="evi-drawer-actions">
+            <a id="eventPlanLink" class="evi-btn" hidden>Plan &amp; results</a>
+            <a id="eventExportLink" class="evi-btn evi-btn-ghost" download hidden>Download full research (JSON)</a>
+          </div>
         </div>
         <button class="evi-x" onclick="closeDrawer()" aria-label="Close">×</button>
       </div>
@@ -615,6 +617,16 @@
        becomes a live XSS sink the moment it is written into an href. Returns
        null for anything that is not plain http(s), and callers render text
        instead of a link. Same rule as the SCI report's absUrl(). */
+    /* The organiser's own name, without a description the lookup wrapped in
+       brackets after it: "Web Summit (company founded by Paddy Cosgrave)"
+       (live run 35). Mirrors event_intel_resolve.organizer_name, which now
+       cleans new runs; this cleans the ones already stored. */
+    function orgName(v){
+      v = String(v || '').trim();
+      var cut = v.replace(/\s*\((?:[^()]*\s){2,}[^()]*\)\s*$/, '').trim();
+      return cut || v;
+    }
+
     function safeUrl(u){
       if (!u) return null;
       var s = String(u).trim();
@@ -1763,27 +1775,90 @@
       }).join('') + '</div>';
     }
 
+    /* Which list on the event's site a row was read from, in words. */
+    function sourceLabel(run, url){
+      var kind = null;
+      (run.sources || []).forEach(function(s){
+        if (kind) return;
+        var snaps = ((s.metadata || {}).snapshots || []).map(function(x){ return x.url; });
+        if (s.url === url || snaps.indexOf(url) >= 0) kind = s.kind;
+      });
+      return kind ? (SOURCE_KIND_LABEL[kind] || 'Event page') : 'Event page';
+    }
+
+    function hasPerson(p){
+      return !!(p.person_name || p.person_title || ((p.apollo || {}).contacts || []).length);
+    }
+
+    /* Columns are drawn only when some row has something to put in them.
+       Web Summit's 124 rows (live run 35) printed an empty Person column,
+       "no website published" and "not looked up" under every company, and
+       the same "source" link 100 times: four columns of filler around the
+       one that carried anything. The facts those repeated cells stood for
+       are said once, above the table, instead. */
     function rosterTable(run){
       var labels = run.role_labels || {};
-      var rows = (run.participants || []).filter(function(p){
+      var all = run.participants || [];
+      var rows = all.filter(function(p){
         return activeRoles === null || p.role === activeRoles;
       });
       if (!rows.length) {
         return '<div class="evi-empty">Nothing listed under this filter.</div>';
       }
+      /* A column only when people are what the list is mostly about (a
+         speaker list). Four named people among 124 companies got a column
+         of 120 blanks; they read as well on a second line under the
+         company. */
+      var named = rows.filter(hasPerson).length;
+      var showPerson = named > 0 && named * 4 >= rows.length;
+      var showFirmo = all.some(function(p){
+        return p.resolution && p.resolution !== 'unresolved';
+      });
+      var srcs = {};
+      rows.forEach(function(p){ if (p.source_url) srcs[p.source_url] = 1; });
+      var srcList = Object.keys(srcs);
+      var showSrc = srcList.length > 1;
+      var withSite = rows.filter(function(p){ return p.org_domain; }).length;
+
+      var notes = [];
+      if (srcList.length === 1) {
+        var only = safeUrl(srcList[0]);
+        notes.push(only ? 'All from the event\'s <a href="' + esc(only) +
+          '" target="_blank" rel="noopener noreferrer">' +
+          esc(sourceLabel(run, srcList[0]).toLowerCase()) + '</a>.' : '');
+      }
+      var findLink = websitesPending(run) && run.status === 'complete'
+        ? ' <a href="#eviCompanyData" onclick="eviToCompanyData(event)">Find their websites</a> below.' : '';
+      if (!withSite) {
+        notes.push('No website on record for ' + (rows.length === 1 ? 'this company' :
+          'any of these ' + rows.length) + ', so company data cannot be looked up for them yet.' +
+          findLink);
+      } else if (withSite < rows.length) {
+        notes.push(withSite + ' of ' + rows.length + ' have a website on record.' + findLink);
+      }
+      var caption = notes.filter(Boolean).length
+        ? '<p class="evi-roster-note">' + notes.filter(Boolean).join(' ') + '</p>' : '';
+
       var body = rows.map(function(p){
         var site = safeUrl(p.org_domain ? 'https://' + p.org_domain : null);
         var src = safeUrl(p.source_url);
         var ap = p.apollo || {};
+        var look = (p.evidence || {}).profile_lookup || {};
+        var prof = look.status === 'found' ? safeUrl(look.profile_url) : null;
         var firmo = [];
         if (ap.industry) firmo.push(esc(ap.industry));
         if (ap.employees) firmo.push(esc(ap.employees) + ' staff');
         if (ap.location) firmo.push(esc(ap.location));
-        return '<tr>' +
-          '<td><div class="evi-org">' + esc(p.org_name) + '</div>' +
+        var person = (p.person_name ? esc(p.person_name) : '') +
+            (p.person_title ? '<div class="evi-dom">' + esc(p.person_title) + '</div>' : '') +
+            contactsHtml(p);
+        var cells = '<td><div class="evi-org">' + esc(p.org_name) + '</div>' +
             (site ? '<div class="evi-dom"><a href="' + esc(site) +
-              '" target="_blank" rel="noopener noreferrer">' + esc(p.org_domain) + '</a></div>'
-             : '<div class="evi-dom">no website published</div>') +
+              '" target="_blank" rel="noopener noreferrer">' + esc(p.org_domain) + '</a>' +
+              (prof ? ' <a class="evi-dom-from" href="' + esc(prof) + '" target="_blank" ' +
+                'rel="noopener noreferrer" title="Read from this company\'s profile on the ' +
+                'event\'s site">via profile</a>' : '') + '</div>' : '') +
+            (!showPerson && person ? '<div class="evi-person">' + person + '</div>' : '') +
           '</td>' +
           '<td><span class="evi-role r-' + esc(p.role) + '">' +
             esc(labels[p.role] || p.role) + '</span>' +
@@ -1793,22 +1868,26 @@
                 'page it was actually seen on.">via search</span>' : '') +
             (p.tier ? '<div class="evi-dom">' + esc(p.tier) + '</div>' : '') +
             (p.booth ? '<div class="evi-dom">Booth ' + esc(p.booth) + '</div>' : '') +
-          '</td>' +
-          '<td>' + (p.person_name ? esc(p.person_name) : '') +
-            (p.person_title ? '<div class="evi-dom">' + esc(p.person_title) + '</div>' : '') +
-            contactsHtml(p) +
-          '</td>' +
-          '<td>' + (firmo.length ? firmo.join('<br>') :
-            (p.resolution === 'no_match' ? '<span class="evi-dom">no Apollo match</span>' :
-             '<span class="evi-dom">not looked up</span>')) + '</td>' +
-          '<td>' + (src ? '<a class="evi-src-link" href="' + esc(src) +
-            '" target="_blank" rel="noopener noreferrer">source</a>' : '') + '</td>' +
-          '</tr>';
+          '</td>';
+        if (showPerson) cells += '<td>' + person + '</td>';
+        if (showFirmo) {
+          cells += '<td>' + (firmo.length ? firmo.join('<br>') :
+            '<span class="evi-dom">' + (p.resolution === 'no_match' ? 'no Apollo match'
+              : p.org_domain ? 'not matched yet' : 'no website to match by') + '</span>') + '</td>';
+        }
+        if (showSrc) {
+          cells += '<td>' + (src ? '<a class="evi-src-link" href="' + esc(src) +
+            '" target="_blank" rel="noopener noreferrer">' + esc(sourceLabel(run, p.source_url)) +
+            '</a>' : '') + '</td>';
+        }
+        return '<tr>' + cells + '</tr>';
       }).join('');
-      return '<div class="evi-tablewrap"><table class="evi-table"><thead><tr>' +
-        '<th>Organisation</th><th>Listed as</th><th>Person</th>' +
-        '<th>Firmographics</th><th>From</th></tr></thead><tbody>' +
-        body + '</tbody></table></div>';
+      return caption + '<div class="evi-tablewrap"><table class="evi-table"><thead><tr>' +
+        '<th class="c-org">Organisation</th><th class="c-role">Listed as</th>' +
+        (showPerson ? '<th class="c-person">Person</th>' : '') +
+        (showFirmo ? '<th class="c-firmo">Firmographics</th>' : '') +
+        (showSrc ? '<th class="c-src">From</th>' : '') +
+        '</tr></thead><tbody>' + body + '</tbody></table></div>';
     }
 
     /* The source ledger, in the reader's words. It printed each page's kind
@@ -2546,7 +2625,7 @@
         '<div class="evi-tags">' + tags.join('') + '</div>' +
         (ev.audience_note ? '<p class="ha">' + esc(citeText(ev.audience_note)) + '</p>' : '') +
         (site ? '<a class="hl" href="' + esc(site) + '" target="_blank" ' +
-                'rel="noopener noreferrer">' + esc(ev.organizer || 'Event site') +
+                'rel="noopener noreferrer">' + esc(orgName(ev.organizer) || 'Event site') +
                 '<i aria-hidden="true">&#8599;</i></a>' : '') +
       '</div>';
     }
@@ -2753,7 +2832,7 @@
               '<path d="M18 14v5a1 1 0 01-1 1H5a1 1 0 01-1-1V7a1 1 0 011-1h5"/></svg></a>'
             : esc(ev.name)) +
             (ed ? '<span class="ed">' + esc(ed) + '</span>' : '') + '</h4>' +
-          (ev.organizer ? '<div class="org">organised by ' + esc(ev.organizer) + '</div>' : '') +
+          (ev.organizer ? '<div class="org">organised by ' + esc(orgName(ev.organizer)) + '</div>' : '') +
           '<div class="tags">' + tags.join('') + '</div>' +
           (ev.fit_reasoning ? '<p class="why">' + citeText(ev.fit_reasoning) + '</p>' : '') +
           (ev.audience_note ? '<p class="aud">' + citeText(ev.audience_note) + '</p>' : '') +
@@ -2944,10 +3023,86 @@
       return bits.join(', ') + ', costing ' + plural(Number(j.credits) || 0, 'credit') + '.';
     }
 
+    /* Rows with no website whose profile page on the event's site has not
+       been read yet. Mirrors event_intel_pipeline.websites_pending. */
+    function websitesPending(run){
+      return (run.participants || []).filter(function(p){
+        var st = ((p.evidence || {}).profile_lookup || {}).status;
+        return !p.org_domain && p.provenance !== 'search' &&
+          st !== 'found' && st !== 'no_website' && st !== 'no_profile';
+      }).length;
+    }
+
+    /* Free, so no estimate first: a press reads the event's own profile pages
+       and nothing else. It is offered beside the paid match because without
+       websites there is nothing for the match to look up, and on a roster
+       whose list printed no links at all it is the only way forward. */
+    function websitesBlock(run){
+      var left = run.status === 'complete' ? websitesPending(run) : 0;
+      var note = WEBSITE_NOTE[run.id];
+      var noteHtml = note ? '<div class="evi-coverage' + (note.bad ? ' warn' : '') +
+        '" role="status"><span class="ic">' + (note.bad ? '!' : 'i') +
+        '</span><span class="tx">' + esc(note.text) + '</span></div>' : '';
+      if (!left) return noteHtml;
+      var none = !(run.participants || []).some(function(p){ return p.org_domain; });
+      return noteHtml + '<div class="evi-webfind"><p>' +
+        (none ? 'This roster printed no company websites, and company data is looked up ' +
+                'by website. '
+              : plural(left, 'company', 'companies') + ' here ' + (left === 1 ? 'has' : 'have') +
+                ' no website on record. ') +
+        'Many events print each company\'s website on its profile page instead of on ' +
+        'the list. This opens those pages and keeps only a website the event itself ' +
+        'published. It is free.</p>' +
+        '<button class="evi-btn evi-btn-ghost" type="button" id="websitesBtn" ' +
+        'onclick="eviWebsites(' + run.id + ')">Find websites for ' +
+        plural(left, 'company', 'companies') + '</button></div>';
+    }
+
+    var WEBSITE_NOTE = {};
+    /* The drawer body is its own scroller, so the fragment link scrolls it
+       rather than the page behind the scrim. */
+    window.eviToCompanyData = function(e){
+      var el = document.getElementById('eviCompanyData');
+      if (!el) return;
+      e.preventDefault();
+      el.scrollIntoView({behavior: 'smooth', block: 'start'});
+    };
+    window.eviWebsites = function(runId){
+      var btn = document.getElementById('websitesBtn');
+      if (btn) { btn.disabled = true; btn.textContent = 'Reading profile pages...'; }
+      fetch(BASE + '/runs/' + runId + '/websites', {
+        method: 'POST', headers: {'Content-Type': 'application/json'}, body: '{}'
+      }).then(function(r){
+          return r.json().then(function(j){ return {ok: r.ok, j: j || {}}; },
+                               function(){ return {ok: r.ok, j: {}}; });
+        })
+        .then(function(x){
+          var j = x.j;
+          if (!x.ok || j.error) {
+            WEBSITE_NOTE[runId] = {bad: true, text: j.error ? String(j.error) :
+              'The website lookup could not be started. Nothing was changed. ' +
+              'Try again in a moment.'};
+          } else {
+            WEBSITE_NOTE[runId] = {bad: false, text: String(j.note || '') +
+              (j.pending ? ' ' + plural(j.pending, 'company', 'companies') +
+                ' still to read; press again to continue.' : '')};
+          }
+          openRun(runId);
+        })
+        .catch(function(){
+          WEBSITE_NOTE[runId] = {bad: true, text: 'The website lookup could not be ' +
+            'reached. Nothing was changed. Try again in a moment.'};
+          openRun(runId);
+        });
+    };
+
     function resolveBar(run){
       var s = run.summary || {};
       var est = s.cost_estimate || {};
-      if (!est.domains) return '';
+      var web = websitesBlock(run);
+      if (!est.domains) {
+        return web ? '<div class="evi-sec" id="eviCompanyData"><h3>Company data</h3>' + web + '</div>' : '';
+      }
       var already = (run.participants || []).some(function(p){
         return p.resolution && p.resolution !== 'unresolved';
       });
@@ -2960,17 +3115,17 @@
       });
       var left = Object.keys(pending).length;
       if (already) {
-        return '<div class="evi-sec"><h3>Company data</h3>' + resolveNoteHtml(run) +
-          '<div class="evi-empty" style="padding:16px">Companies have been matched in ' +
+        return '<div class="evi-sec" id="eviCompanyData"><h3>Company data</h3>' + resolveNoteHtml(run) +
+          '<div class="evi-empty" style="padding:16px">Companies with a website have been matched in ' +
           'Apollo for this run' + (run.credits_spent ? ', costing ' + run.credits_spent +
           ' credit' + (run.credits_spent === 1 ? '' : 's') : '') + '. Contacts shown are ' +
           'from Apollo\'s free people search; revealing email or phone is a separate, ' +
           'billed action in Contact Finder.</div>' +
           (left ? '<button class="evi-btn" type="button" onclick="eviResolve(' + run.id + ')" ' +
             'id="resolveBtn">Match the remaining ' + left + ' compan' +
-            (left === 1 ? 'y' : 'ies') + '</button>' : '') + '</div>';
+            (left === 1 ? 'y' : 'ies') + '</button>' : '') + web + '</div>';
       }
-      return '<div class="evi-sec"><h3>Company data</h3>' +
+      return '<div class="evi-sec" id="eviCompanyData"><h3>Company data</h3>' +
         '<div class="evi-coverage"><span class="ic">' +
         '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
         'stroke-width="2" stroke-linecap="round"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>' +
@@ -2978,7 +3133,7 @@
         resolveNoteHtml(run) +
         '<button class="evi-btn" type="button" onclick="eviResolve(' + run.id + ')" ' +
         'id="resolveBtn">Match ' + est.domains + ' compan' +
-        (est.domains === 1 ? 'y' : 'ies') + ' in Apollo</button></div>';
+        (est.domains === 1 ? 'y' : 'ies') + ' in Apollo</button>' + web + '</div>';
     }
 
     window.eviResolve = function(runId){
@@ -4892,7 +5047,7 @@
           ? esc(plural(s.discovered_events || evs.length, 'event') + ' found' +
                 (s.harvested_events
                   ? ', ' + plural(s.harvested_events, 'roster') + ' sampled' : ''))
-          : eventLine(ev) + (ev.organizer ? ' · organised by ' + esc(ev.organizer) : '');
+          : eventLine(ev) + (ev.organizer ? ' · organised by ' + esc(orgName(ev.organizer)) : '');
 
       var html = '';
       if (run.status === 'failed') {

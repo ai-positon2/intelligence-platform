@@ -813,6 +813,8 @@ def harvest_page(page: dict, event_name: str, event_host: str = "",
     for row in rows:
         row.setdefault('evidence', {}).update(observed_roster_years=observed_years)
     notes = [n for n in (fetched["note"], ext.get("note")) if n]
+    # Every page of the listing as read, for the profile-page websites below.
+    listing_texts = [(here, fetched["text"])]
     source["pages_read"] = 1
 
     # Follow the rest of the listing. A page that fails mid-run stops the
@@ -869,6 +871,7 @@ def harvest_page(page: dict, event_name: str, event_host: str = "",
         for row in sub['rows']:
             row.setdefault('evidence', {}).update(observed_roster_years=page_years)
         rows.extend(sub["rows"])
+        listing_texts.append((nxt, got["text"]))
         source["pages_read"] += 1
         for extra in next_page_links(got["text"], nxt, limit=max_pages):
             if extra not in seen_urls and extra not in queue:
@@ -921,6 +924,22 @@ def harvest_page(page: dict, event_name: str, event_host: str = "",
     if len(deduped) < len(rows):
         notes.append("%d duplicate rows across pages were merged."
                      % (len(rows) - len(deduped)))
+
+    # A directory that links each company to a profile on the event's own
+    # site prints the company's website THERE, not on the list: Web Summit
+    # and Money20/20 rosters came back with no website on any row, which left
+    # nothing for company data to be looked up by. Read, never guessed; a
+    # failure here costs the websites and never the roster.
+    if any(not r.get("org_domain") for r in deduped):
+        from . import event_intel_profiles
+        try:
+            found = event_intel_profiles.fill_websites(deduped, listing_texts, event_host)
+        except Exception:
+            logger.exception("event_intel_harvest: profile websites failed for %s", url)
+            found = {}
+        if event_intel_profiles.note(found):
+            notes.append(event_intel_profiles.note(found))
+        source["profile_websites"] = found
 
     source["rows_found"] = len(deduped)
     if not deduped and source["spa"]:

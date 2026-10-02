@@ -9878,6 +9878,31 @@ def event_conference_intelligence_resolve(run_id):
     return jsonify(result)
 
 
+@app.route("/p2/strategic-agents/event-conference-intelligence/runs/<int:run_id>/websites",
+           methods=["POST"])
+@position2_required
+def event_conference_intelligence_websites(run_id):
+    """Read company websites off the event's own profile pages. Free: no
+    model call and no Apollo credit, so no estimate is shown first. Bounded
+    to answer inside one request, and a second press opens only what the
+    first did not reach."""
+    from tracker import event_intel_pipeline, event_intel_store
+    email = (_get_user() or {}).get("email", "").lower()
+    run = event_intel_store.get_run(run_id, email)
+    if not run:
+        abort(404)
+    if run.get("status") != "complete":
+        return jsonify(error="This run is still in progress. Look for websites "
+                             "once it has finished."), 409
+    if _cpi_rate_limited("evi-websites", email):
+        return jsonify(error="Too many website lookups in a row. Wait a moment "
+                             "and try again."), 429
+    result = event_intel_pipeline.find_run_websites(run_id, email)
+    if result.get("error") == "not_found":
+        abort(404)
+    return jsonify(result)
+
+
 @app.route("/p2/strategic-agents/event-conference-intelligence/runs/<int:run_id>/candidates.csv")
 @position2_required
 def event_conference_intelligence_candidates_csv(run_id):
@@ -13444,6 +13469,9 @@ _CPI_RATE_LIMITS = {
     # action and a deliberate click, so a handful a minute is plenty.
     "evi-search": (30, 60),
     "evi-resolve": (5, 60),
+    # Free, but each press opens up to a few hundred pages on the event's
+    # site, so a scripted loop is bounded the same way.
+    "evi-websites": (4, 60),
     "tli-search": (30, 60),
     "tli-resolve": (10, 60),
     "tli-collect": (8, 60),

@@ -116,8 +116,25 @@ _SYSTEM = (
     "against stated criteria; a conference app where attendees book their "
     "own meetings, invite-only admission, or a parent conference's "
     "programme is not that, so say so in the evidence and set it false.\n"
-    "`audience_note` is who the event says it is for, in one sentence."
+    "`audience_note` is who the event says it is for, in one sentence.\n"
+    "`organizer` is the organising company or body's own name only, as it "
+    "names itself (\"Web Summit\", \"Informa Connect\"), never a description "
+    "of who founded or runs it."
 )
+
+
+# A description the model wrapped in brackets after the name. Printed in the
+# drawer's heading line it read "organised by Web Summit (company founded by
+# Paddy Cosgrave)" (live run 35, 2026-10-02). A one or two word bracket is
+# kept, because "Informa (UBM)" is how an organiser can name itself.
+_ORG_ASIDE = re.compile(r"\s*\((?:[^()]*\s){2,}[^()]*\)\s*$")
+
+
+def organizer_name(value):
+    """The organiser's name without a trailing descriptive aside."""
+    v = (value or "").strip()
+    stripped = _ORG_ASIDE.sub("", v).strip()
+    return stripped or v
 
 
 def _clean_pages(raw) -> list[dict]:
@@ -285,7 +302,7 @@ def _resolve_event(query: str, year_hint: str | None, box: dict) -> dict:
         "name": name,
         "edition": _clean(text("edition")) or None,
         "website": website or None,
-        "organizer": _clean(text("organizer")) or None,
+        "organizer": organizer_name(_clean(text("organizer"))) or None,
         "starts_on": starts_on,
         "ends_on": ends_on,
         "location": _clean(text("location")) or None,

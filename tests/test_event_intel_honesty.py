@@ -307,7 +307,9 @@ def test_a_company_with_no_published_link_says_so_rather_than_guessing():
         "render(%s); console.log(JSON.stringify(__html));" % json.dumps(_run_fixture()),
         None)
     html = json.loads(out)["drawerBody"]
-    assert "no website published" in html
+    # Said once above the table rather than under every row (live run 35:
+    # 124 rows each repeating it), and never as a guessed link.
+    assert "1 of 2 have a website on record." in html
     assert "globex.com" not in html.lower()
 
 
@@ -322,7 +324,13 @@ def test_unresolved_and_no_match_are_shown_differently():
         "render(%s); console.log(JSON.stringify(__html));" % json.dumps(run), None)
     html = json.loads(out)["drawerBody"]
     assert "no Apollo match" in html
-    assert "not looked up" in html
+    # Globex was never looked up because it has no website to look up by.
+    assert "no website to match by" in html
+    run["participants"][1]["org_domain"] = "globex.example"
+    out = _run_in_node(
+        "render(%s); console.log(JSON.stringify(__html));" % json.dumps(run), None)
+    html = json.loads(out)["drawerBody"]
+    assert "no Apollo match" in html and "not matched yet" in html
 
 
 @pytest.mark.skipif(not _node_available(), reason="node is not available")
