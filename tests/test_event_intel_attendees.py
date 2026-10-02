@@ -795,19 +795,21 @@ def test_an_x_bio_gives_a_job_only_when_it_plainly_states_one(bio, role):
 
 def test_x_the_web_and_staff_run_while_linkedin_is_searched():
     import threading
-    started = {k: threading.Event() for k in ("x", "web", "staff")}
+    li_started = threading.Event()
+    overlapped = []
 
     def linkedin(e, d):
-        # Only finishes if the other three were already running beside it.
-        ok = all(ev.wait(5) for ev in started.values())
-        return {"posts": [], "error": None if ok else "ran one after another"}
+        li_started.set()
+        return {"posts": [], "error": None}
 
-    def mark(key, out):
+    def beside(out):
         def fn(*a):
-            started[key].set()
+            # Run one after another, LinkedIn has not started yet and never
+            # will until this returns.
+            overlapped.append(li_started.wait(3))
             return out
         return fn
-    got = A.gather(EVENT, [], today=TODAY, sources={
-        "linkedin": linkedin, "x": mark("x", {"posts": []}),
-        "web": mark("web", {"people": []}), "staff": mark("staff", {"people": []})})
-    assert got["report"]["linkedin"]["error"] is None
+    A.gather(EVENT, [], today=TODAY, sources={
+        "linkedin": linkedin, "x": beside({"posts": []}),
+        "web": beside({"people": []}), "staff": beside({"people": []})})
+    assert overlapped == [True, True, True]
