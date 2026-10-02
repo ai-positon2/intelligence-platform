@@ -757,3 +757,37 @@ def test_an_x_post_shows_their_profile_and_can_be_filtered_to():
     assert 'href="https://x.com/samlee"' in sec and ">on X</a>" in sec
     assert sec.count(">on X</a>") == 1                    # the unsafe one is not linked
     assert "From X<span class=\"n\">1</span>" in sec
+
+
+def test_a_brand_account_on_x_is_not_listed_as_a_person():
+    assert A.x_post(_tweet("5", "At Widget Expo", author={
+        "name": "WhiteBIT", "userName": "whitebit", "verifiedType": "Business"})) is None
+    # X rarely marks a brand, so the reader says so, and its own words list nobody.
+    posts = [A.x_post(_tweet("6", "We are coming to Widget Expo to meet founders, with Ravi Kumar on stage",
+                             name="Intrascope", handle="intrascope", bio=""))]
+    out = A.people_in_posts(posts, EVENT, TODAY, classify=_reading(
+        {"id": "p1", "same_event": True, "author_is_person": False, "people": [
+            {"who": "author", "status": "exhibiting", "quote": "We are coming to Widget Expo"},
+            {"who": "named", "name": "Ravi Kumar", "status": "speaking",
+             "quote": "with Ravi Kumar on stage"}]}))
+    assert [p["name"] for p in out["people"]] == ["Ravi Kumar"]
+
+
+@pytest.mark.parametrize("raw,clean", [
+    ("Tyler Denk \U0001F41D", "Tyler Denk"),
+    ("Bellotti Alessandro \U0001F383 \U0001F47B", "Bellotti Alessandro"),
+    ("Ana ✨ Silva", "Ana Silva"),
+    ("Seán O'Brien-Murphy", "Seán O'Brien-Murphy"),
+])
+def test_names_lose_their_decoration_and_keep_their_letters(raw, clean):
+    assert A.clean_name(raw) == clean
+    assert A.x_post(_tweet("7", "At Widget Expo", name=raw))["author"]["name"] == clean
+
+
+@pytest.mark.parametrize("bio,role", [
+    ("Head of Growth at Initech", ("Head of Growth", "Initech")),
+    ("cofounder/ceo @beehiiv. former product @ youtube, morning brew", (None, None)),
+    ("Dad. Runner. Builder at heart", (None, None)),
+])
+def test_an_x_bio_gives_a_job_only_when_it_plainly_states_one(bio, role):
+    assert A.author_role({"headline": bio}, on_x=True) == role

@@ -67,7 +67,7 @@ POSTS_PER_QUERY = 150
 POSTS_PER_PAGE = 50
 MAX_POSTS = 300
 BATCH = 15
-WORKERS = 4
+WORKERS = 8
 POST_CHARS = 1400
 QUOTE_CHARS = 240
 STAFF_COMPANIES = 60
@@ -133,6 +133,20 @@ def in_text(fragment: str, text: str) -> bool:
             return False
         at = found + len(p)
     return True
+
+
+def clean_name(name: str) -> str:
+    """A display name without the emoji and symbols people decorate it with
+    ("Tyler Denk \U0001F41D", "Ana \u2728 Silva"): letters, marks, digits,
+    spaces and the punctuation real names use."""
+    out = []
+    for c in unicodedata.normalize("NFC", str(name or "")):
+        cat = unicodedata.category(c)
+        if cat[0] in ("L", "M", "N") or c in " .-'\u2019":
+            out.append(c)
+        else:
+            out.append(" ")
+    return re.sub(r"\s+", " ", "".join(out)).strip(" .-")
 
 
 def name_key(name: str) -> str:
@@ -329,6 +343,7 @@ def linkedin_post(item: dict) -> dict | None:
     if not name:
         first, last = author.get("first_name"), author.get("last_name")
         name = " ".join(x for x in (first, last) if x).strip()
+    name = clean_name(name)
     if not name:
         return None
     slug = str(author.get("public_identifier") or "").strip()
@@ -376,11 +391,12 @@ def x_post(item: dict) -> dict | None:
         return None
     if item.get("isRetweet") or item.get("retweeted_status") or text.startswith("RT @"):
         return None
-    if str(author.get("type") or "").lower() in ("business", "organization", "company"):
+    if (str(author.get("type") or "").lower() in ("business", "organization", "company")
+            or str(author.get("verifiedType") or "").lower() in ("business", "government")):
         return None
     handle = str(author.get("userName") or author.get("username")
                  or author.get("screen_name") or "").lstrip("@").strip()
-    name = str(author.get("name") or "").strip()
+    name = clean_name(author.get("name"))
     if not name or not handle:
         return None
     return {
@@ -541,9 +557,13 @@ character, at most 200 characters. Never paraphrase.
 8. title and company for a named person only when the post says them.
 9. The organiser's own promotion, ticket offers, job ads and news about the \
 event name nobody: return an empty people list.
+10. author_is_person is false when the author is a company, brand, product, \
+publication, community or event account rather than one human being. Then \
+do not list the author; people the post names may still be listed.
 
 Reply with JSON only:
-{"posts": [{"id": "p1", "same_event": true, "edition": "this", "people": \
+{"posts": [{"id": "p1", "same_event": true, "author_is_person": true, \
+"edition": "this", "people": \
 [{"who": "author", "name": null, "status": "attending", "title": null, \
 "company": null, "quote": "..."}]}]}
 For the author, leave name null: it is taken from the post itself."""
@@ -644,6 +664,9 @@ def people_in_posts(posts: list[dict], event: dict, today: date | None = None,
             if not post or row.get("same_event") is False:
                 continue
             for person in row.get("people") or []:
+                if (row.get("author_is_person") is False and isinstance(person, dict)
+                        and str(person.get("who") or "").lower() == "author"):
+                    continue
                 got = _person_from_post(person, post, row.get("edition"), event, today)
                 if got is None:
                     out["rejected"] += 1
@@ -658,7 +681,8 @@ def author_role(author: dict, on_x: bool = False) -> tuple[str | None, str | Non
     @acme"), so from X only a plain "Title at Company" is read and anything
     else is left blank rather than shown as a job title."""
     title, company = split_headline(author.get("headline"))
-    if on_x and not company:
+    if on_x and not (company and title and len(title) <= 50 and len(company) <= 40
+                     and not re.search(r"[.,;@/]", title + company)):
         return None, None
     return title, company
 
@@ -681,7 +705,7 @@ def _person_from_post(person, post, edition, event, today):
         title, company = author_role(author, on_x)
         name, linkedin, basis = author["name"], author.get("url"), BASIS_SELF
     else:
-        name = re.sub(r"\s+", " ", str(person.get("name") or "")).strip()
+        name = clean_name(person.get("name"))
         # A full name, as written in the post: two words at least, and there.
         if len(name.split()) < 2 or _fold(name) not in _fold(post["text"]):
             return None
