@@ -214,7 +214,8 @@ def test_another_edition_of_the_series_or_a_non_attendance_lists_nobody():
     assert out["people"] == [] and out["rejected"] == 0
 
 
-def test_a_batch_that_could_not_be_read_is_counted():
+def test_a_batch_that_could_not_be_read_is_counted(monkeypatch):
+    monkeypatch.setattr(A, "RETRY_PAUSE", 0)
     posts = _posts("At Widget Expo")
     out = A.people_in_posts(posts, EVENT, TODAY,
                             classify=lambda b, e, t: {"posts": None, "error": "unparsable"})
@@ -605,3 +606,30 @@ def test_the_strongest_status_wins_whichever_source_came_first():
     ])
     (ana,) = rows
     assert ana["status"] == "speaking" and ana["basis"] == "event"
+
+
+def test_a_failed_batch_is_tried_again_and_a_reply_out_of_room_is_halved(monkeypatch):
+    monkeypatch.setattr(A, "RETRY_PAUSE", 0)
+    posts = _posts(*["Off to Widget Expo, post %d" % i for i in range(4)])
+    calls = []
+
+    def flaky(batch, event, today):
+        calls.append(len(batch))
+        if len(calls) == 1:
+            return {"posts": None, "error": "transport"}
+        return {"posts": [{"id": ref, "same_event": True, "people": [
+            {"who": "author", "status": "attending", "quote": "Off to Widget Expo, post"}]}
+            for ref, _ in batch], "error": None}
+    out = A.people_in_posts(posts, EVENT, TODAY, classify=flaky)
+    assert calls == [4, 4] and out["failed"] == 0 and len(out["people"]) == 4
+    assert out["failed_kinds"] == []
+
+    calls.clear()
+
+    def long(batch, event, today):
+        calls.append(len(batch))
+        if len(batch) > 2:
+            return {"posts": None, "error": "max_tokens"}
+        return {"posts": [], "error": None}
+    out = A.people_in_posts(posts, EVENT, TODAY, classify=long)
+    assert calls == [4, 2, 2] and out["failed"] == 0

@@ -77,6 +77,7 @@ STAFF_CHUNK = 10
 # ranks first, which at a large exhibitor is an intern as often as not.
 STAFF_SENIORITIES = ["owner", "founder", "c_suite", "partner", "vp", "head", "director"]
 WEB_SEARCHES = 6
+RETRY_PAUSE = 2.0
 
 STAFF_ROLES = ("exhibitor", "sponsor", "partner")
 
@@ -432,8 +433,12 @@ different edition city of the same series (for example Web Summit Lisbon \
 when the event is Web Summit Qatar). Then list nobody.
 5. edition: "this" for the edition given below, "earlier" for an earlier \
 year, "unclear" when the post does not say.
-6. status, one of: speaking, exhibiting, attending (going or there now), \
-attended (was there), organising (works for the organiser).
+6. status, one of: speaking (they say they spoke, presented, pitched, \
+moderated or were on a panel or stage there), exhibiting (on their \
+company's stand or booth), attending (going, or there now), attended (was \
+there, and says nothing about being on stage), organising (works for the \
+organiser). Being in the audience for a talk is attending or attended, \
+never speaking.
 7. quote: the exact words from the post that show it, copied character for \
 character, at most 200 characters. Never paraphrase.
 8. title and company for a named person only when the post says them.
@@ -490,21 +495,48 @@ def people_in_posts(posts: list[dict], event: dict, today: date | None = None,
     refs = [("p%d" % (i + 1), p) for i, p in enumerate(posts)]
     by_ref = dict(refs)
     batches = [refs[i:i + BATCH] for i in range(0, len(refs), BATCH)]
+    def read(batch):
+        """One batch, tried again once when it fails, and as two halves when
+        the reply ran out of room: on the first live run 4 of 9 batches came
+        back unread and their posts were never checked at all."""
+        first = classify(batch, event, today)
+        spent = [first.get("spend")]
+        if first.get("posts") is not None:
+            return first["posts"], spent, None
+        if first.get("error") == "max_tokens" and len(batch) > 1:
+            parts = [batch[:len(batch) // 2], batch[len(batch) // 2:]]
+        else:
+            time.sleep(RETRY_PAUSE)
+            parts = [batch]
+        posts, kinds = [], []
+        for part in parts:
+            again = classify(part, event, today)
+            spent.append(again.get("spend"))
+            if again.get("posts") is None:
+                kinds.append(again.get("error") or first.get("error") or "error")
+            else:
+                posts.extend(again["posts"])
+        if kinds and not posts:
+            return None, spent, kinds[0]
+        return posts, spent, (kinds[0] if kinds else None)
+
     results = []
     if batches:
         with ThreadPoolExecutor(max_workers=min(WORKERS, len(batches))) as pool:
             # Each batch runs in a copy of this context, so a call made inside
             # a worker job is still recorded on that job's ledger.
-            futures = [pool.submit(contextvars.copy_context().run, classify, b, event, today)
-                       for b in batches]
+            futures = [pool.submit(contextvars.copy_context().run, read, b) for b in batches]
             results = [f.result() for f in futures]
     out = {"people": [], "batches": len(batches), "failed": 0, "spend": [],
-           "rejected": 0}
-    for res in results:
-        out["spend"].append(res.get("spend"))
-        if res.get("posts") is None:
+           "rejected": 0, "failed_kinds": []}
+    for posts_read, spent, kind in results:
+        out["spend"].extend(spent)
+        if kind:
+            out["failed_kinds"].append(kind)
+        if posts_read is None:
             out["failed"] += 1
             continue
+        res = {"posts": posts_read}
         for row in res["posts"]:
             if not isinstance(row, dict):
                 continue
@@ -585,7 +617,10 @@ copied character for character, at most 200 characters.
 5. edition: "this" for the edition given, "earlier" for an earlier year, \
 "unclear" when the page does not say.
 6. title and company only when that page states them.
-7. Return at most 40 people. Return an empty list rather than a guess.
+7. Earlier editions of the same event count too (the same series in the \
+same city): an event's past speakers and attendees are who to expect again. \
+Say which edition each person was at.
+8. Return at most 40 people. Return an empty list rather than a guess.
 
 Reply with JSON only:
 {"people": [{"name": "...", "title": null, "company": null, "status": \
@@ -609,7 +644,9 @@ def search_web(event: dict, event_host: str = "", today: date | None = None,
     user = "Event: %s\nToday: %s" % (_event_brief(event), today.isoformat())
     res = ask(_WEB_SYSTEM, user, max_uses=WEB_SEARCHES, max_tokens=6000, timeout=240.0)
     out = {"people": [], "found": 0, "checked": 0, "unopened": 0, "error": None,
-           "spend": claude_websearch.spend_of(res)}
+           "spend": claude_websearch.spend_of(res),
+           "searches": int(res.get("search_count") or 0),
+           "pages": len(res.get("result_urls") or [])}
     if res.get("error"):
         out["error"] = (res["error"] or {}).get("kind") or "error"
         return out
@@ -819,7 +856,8 @@ def gather(event: dict, participants: list[dict], event_host: str = "",
         spend.extend(read["spend"])
         people.extend(read["people"])
         report["linkedin"].update(people=len(read["people"]), batches=read["batches"],
-                                  failed_batches=read["failed"], rejected=read["rejected"])
+                                  failed_batches=read["failed"], rejected=read["rejected"],
+                                  failed_kinds=read["failed_kinds"])
 
     try:
         web = (sources.get("web") or search_web)(event, event_host, today)
@@ -828,7 +866,8 @@ def gather(event: dict, participants: list[dict], event_host: str = "",
         web = {"people": [], "error": "error", "spend": None}
     spend.append(web.get("spend"))
     people.extend(web.get("people") or [])
-    report["web"] = {k: web.get(k) for k in ("found", "checked", "unopened", "error")}
+    report["web"] = {k: web.get(k) for k in ("found", "checked", "unopened", "error",
+                                              "searches", "pages")}
     report["web"]["people"] = len(web.get("people") or [])
 
     try:
