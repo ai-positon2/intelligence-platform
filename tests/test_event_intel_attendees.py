@@ -1057,13 +1057,14 @@ def test_the_browser_ties_each_page_back_to_the_address_asked_for():
 
     def run(urls):
         asked.append(urls)
-        return [{"url": "https://a.example.com/x", "text": "Lee Park spoke at Widget Expo." + LONG},
+        return {"status": "SUCCEEDED", "items": [
+                {"url": "https://a.example.com/x", "text": "Lee Park spoke at Widget Expo." + LONG},
                 # Redirected: only the crawl record still holds the address asked for.
                 {"url": "https://b.example.com/z", "crawl": {"requestUrl": "http://b.example.com/y/",
                                                              "loadedUrl": "https://b.example.com/z"},
                  "text": "Mia Wong exhibited at Widget Expo." + LONG},
                 {"url": "https://c.example.com/", "text": "Accept cookies"},
-                "junk"]
+                "junk"]}
     out = A.browser_open(["https://www.a.example.com/x", "https://b.example.com/y",
                           "https://c.example.com/"], run=run)
     assert asked == [["https://www.a.example.com/x", "https://b.example.com/y",
@@ -1074,7 +1075,7 @@ def test_the_browser_ties_each_page_back_to_the_address_asked_for():
     def boom(urls):
         raise RuntimeError("actor failed")
     assert A.browser_open(["https://a.example.com/"], run=boom)["error"] == "browser_failed"
-    assert A.browser_open([], run=boom) == {"pages": {}, "error": None}
+    assert A.browser_open([], run=boom)["pages"] == {}
 
 
 def test_pages_that_refuse_are_opened_in_the_browser_and_read(monkeypatch):
@@ -1111,3 +1112,44 @@ def test_the_browser_is_not_started_when_every_page_opened():
                        google=lambda e: {"results": [{"url": "https://p.example.com/",
                                                       "title": "", "snippet": "", "query": "q"}]})
     assert out["opened"] == 1 and "rescued" not in out
+
+
+
+def test_pages_the_browser_loaded_before_its_time_ran_out_are_kept():
+    out = A.browser_open(["https://a.example.com/x", "https://b.example.com/y"], run=lambda us: {
+        "status": "TIMED-OUT", "error": None,
+        "items": [{"url": "https://a.example.com/x", "text": "Lee Park at Widget Expo." + LONG}]})
+    assert list(out["pages"]) == ["https://a.example.com/x"] and out["error"] is None
+    assert out["status"] == "TIMED-OUT"
+    out = A.browser_open(["https://a.example.com/x"], run=lambda us: {
+        "status": "FAILED", "error": "start failed: 400 invalid input", "items": []})
+    assert out["error"] == "browser_failed" and out["detail"].startswith("start failed")
+
+
+def test_an_actor_run_cut_off_still_hands_back_its_dataset(monkeypatch):
+    from tracker import apify_transport as T
+
+    class R:
+        def __init__(self, data):
+            self._d = data
+
+        def raise_for_status(self):
+            pass
+
+        def json(self):
+            return {"data": self._d}
+    posted = []
+
+    def post(url, **kw):
+        posted.append((url, kw.get("params")))
+        return R({"id": "run1", "defaultDatasetId": "ds1"})
+    monkeypatch.setattr(T.requests, "post", post)
+
+    def poll(run_id, token, timeout, interval):
+        raise T.ApifyTransportError("did not finish")
+    monkeypatch.setattr(T, "_poll_run", poll)
+    monkeypatch.setattr(T, "_fetch_dataset_items", lambda ds, tok: [{"url": "u", "text": "t"}])
+    out = T.run_actor_collect("apify/website-content-crawler", {}, "tok", timeout=60)
+    assert out["items"] == [{"url": "u", "text": "t"}] and "did not finish" in out["error"]
+    assert posted[0][1] == {"timeout": 60}                  # Apify stops the run itself
+    assert posted[1][0].endswith("/actor-runs/run1/abort")  # and a run still going is stopped

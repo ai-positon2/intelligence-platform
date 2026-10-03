@@ -1087,7 +1087,7 @@ def rank_results(results: list[dict], event: dict, event_host: str = "") -> list
 # Content Crawler, all in one run. On the live Lisbon run 43 of 196 Google
 # results would not open the plain way.
 BROWSER_ACTOR = "apify/website-content-crawler"
-BROWSER_SECONDS = 300
+BROWSER_SECONDS = 240
 
 
 def _url_key(u: str) -> str:
@@ -1096,9 +1096,14 @@ def _url_key(u: str) -> str:
 
 def browser_open(urls: list[str], run=None) -> dict:
     """Open `urls` in a browser. Returns {"pages": {requested url: {text,
-    final}}, "error"}. `run` stands in for the actor in tests."""
+    final}}, "error", "status", "detail"}. `run` stands in for the actor in
+    tests and returns what apify_transport.run_actor_collect does.
+
+    Whatever the crawler loaded is kept even when its run is cut off: on
+    the first live run it was still going at its limit and every page it
+    had already loaded was thrown away with it."""
     import os
-    out = {"pages": {}, "error": None}
+    out = {"pages": {}, "error": None, "status": None, "detail": None}
     if not urls:
         return out
     if run is None:
@@ -1109,20 +1114,24 @@ def browser_open(urls: list[str], run=None) -> dict:
             return out
 
         def run(us):
-            return apify_transport.run_actor_and_wait(
+            return apify_transport.run_actor_collect(
                 os.environ.get("EVI_BROWSER_ACTOR_ID", BROWSER_ACTOR),
                 {"startUrls": [{"url": u} for u in us], "maxCrawlDepth": 0,
-                 "maxCrawlPages": len(us), "crawlerType": "playwright:adaptive",
-                 "removeCookieWarnings": True, "saveMarkdown": False,
-                 "saveHtml": False, "requestTimeoutSecs": 60,
-                 "proxyConfiguration": {"useApifyProxy": True}},
-                token, timeout=BROWSER_SECONDS, strict=True)
+                 "maxCrawlPages": len(us), "crawlerType": "playwright:firefox",
+                 "maxConcurrency": 20, "maxRequestRetries": 1,
+                 "requestTimeoutSecs": 45, "removeCookieWarnings": True,
+                 "saveMarkdown": False, "proxyConfiguration": {"useApifyProxy": True}},
+                token, timeout=BROWSER_SECONDS)
     try:
-        items = run(list(urls)) or []
+        got = run(list(urls)) or {}
     except Exception as e:
         logger.warning("event_intel_attendees: browser opening failed: %s", e)
+        got = {"items": [], "error": str(e)[:200]}
+    items = got.get("items") or []
+    out["status"] = got.get("status")
+    out["detail"] = got.get("error")
+    if not items and (got.get("error") or got.get("status") not in (None, "SUCCEEDED")):
         out["error"] = "browser_failed"
-        return out
     wanted = {_url_key(u): u for u in urls}
     for item in items:
         if not isinstance(item, dict):
@@ -1214,6 +1223,8 @@ def search_web(event: dict, event_host: str = "", today: date | None = None,
     if refused and not (deadline and time.monotonic() > deadline):
         b = (browser or browser_open)(refused)
         out["browser_error"] = b.get("error")
+        out["browser_status"] = b.get("status")
+        out["browser_detail"] = b.get("detail")
         rescued = b.get("pages") or {}
         out["rescued"] = len(rescued)
         fetched = [(url, dict(rescued[url], browser=True) if url in rescued else got)
@@ -1469,7 +1480,8 @@ def gather(event: dict, participants: list[dict], event_host: str = "",
     spend.append(web.get("spend"))
     people.extend(web.get("people") or [])
     report["web"] = {k: web.get(k) for k in ("via", "searches", "results", "pages", "opened",
-                                              "rescued", "browser_error",
+                                              "rescued", "browser_error", "browser_status",
+                                              "browser_detail",
                                               "on_event", "read", "not_read", "unread",
                                               "unopened", "rejected", "skipped", "error",
                                               "google_error", "find_seconds", "seconds")}

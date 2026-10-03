@@ -75,6 +75,43 @@ def _fetch_dataset_items(dataset_id: str, token: str) -> list[dict]:
     return items if isinstance(items, list) else []
 
 
+def run_actor_collect(actor_id: str, run_input: dict, token: str, timeout: int = 240,
+                      poll_interval: int = 5) -> dict:
+    """Run an actor for at most `timeout` seconds and keep whatever it saved.
+
+    For actors whose partial output is worth having (a crawler that loaded
+    30 of 35 pages before its time ran out). Apify is told to stop the run
+    itself at `timeout`; whatever state it ends in, its dataset is read.
+    A run still going when polling gives up is aborted first. Never raises:
+    returns {"items": [...], "status": str|None, "error": str|None}."""
+    out: dict = {"items": [], "status": None, "error": None}
+    try:
+        url = f"{_BASE_URL}/acts/{_normalize_actor_id(actor_id)}/runs"
+        resp = requests.post(url, json=run_input, headers=_headers(token),
+                             params={"timeout": int(timeout)}, timeout=30)
+        resp.raise_for_status()
+        run = resp.json()["data"]
+    except Exception as e:
+        out["error"] = "start failed: %s" % str(e)[:200]
+        return out
+    try:
+        run = _poll_run(run["id"], token, timeout + 30, poll_interval)
+    except Exception as e:
+        out["error"] = str(e)[:200]
+        try:
+            requests.post(f"{_BASE_URL}/actor-runs/{run['id']}/abort",
+                          headers=_headers(token), timeout=30)
+        except Exception:
+            pass
+    out["status"] = run.get("status")
+    if run.get("defaultDatasetId"):
+        try:
+            out["items"] = _fetch_dataset_items(run["defaultDatasetId"], token)
+        except Exception as e:
+            out["error"] = out["error"] or "dataset read failed: %s" % str(e)[:200]
+    return out
+
+
 def run_actor_and_wait(actor_id: str, run_input: dict, token: str, timeout: int = 300,
                        poll_interval: int = 5, strict: bool = False) -> list[dict]:
     """Start `actor_id` with `run_input`, poll until it finishes (or `timeout`
