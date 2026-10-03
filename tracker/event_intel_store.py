@@ -840,7 +840,7 @@ def update_participant_websites(updates: list[tuple]) -> int:
 
 # ── attendees ─────────────────────────────────────────────────────────────
 
-ATTENDEE_SCAN_STALE_MINUTES = 15
+ATTENDEE_SCAN_STALE_MINUTES = 30
 _ATTENDEE_COLS = ("id", "event_id", "name", "title", "company", "company_domain",
                   "linkedin", "basis", "status", "edition", "evidence")
 

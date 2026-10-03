@@ -3354,15 +3354,16 @@
       if (attRunning(run)) {
         return html + '<div class="evi-running"><span class="thinking-orb-slot" data-orb-state="working" ' +
           'data-orb-size="20"></span><span role="status" aria-live="polite">Searching LinkedIn and X posts ' +
-          'and the public web for people at this event, and reading each one. This takes a minute ' +
-          'or two.</span></div></div>';
+          'and the public web for people at this event, and reading each one. This takes about ' +
+          'ten minutes; you can close this and come back.</span></div></div>';
       }
       if (!scan && !rows.length) {
         return html + '<div class="evi-webfind"><p>Searches LinkedIn for posts that name this event, ' +
-          'through the LinkedIn account connected to this workspace, then X and the public web, and keeps ' +
-          'each person only where the words of the post show them there. Also looks up senior ' +
-          'people at the listed exhibitors and sponsors in Apollo\'s free people search. Uses about ' +
-          'a dollar of model time and no Apollo credits.</p>' +
+          'through the LinkedIn account connected to this workspace, then X, then searches the web ' +
+          'for news, announcements and recaps and reads every page it finds. Keeps each person only ' +
+          'where the words of the post or page show them there. Also looks up senior people at the ' +
+          'listed exhibitors and sponsors in Apollo\'s free people search. Takes about ten minutes ' +
+          'and a few dollars of model time; no Apollo credits.</p>' +
           '<button class="evi-btn" type="button" id="attendeesBtn" onclick="eviAttendees(' + run.id +
           ')">Find attendees</button></div></div>';
       }

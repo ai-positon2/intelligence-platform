@@ -239,40 +239,78 @@ def test_posts_are_read_in_batches_that_cover_every_post():
 
 # ── 3. the public web ──
 
-def test_a_web_finding_is_kept_only_when_its_page_was_searched_and_says_it():
-    pages = {"https://news.example.com/a": "Acme CEO Lee Park will speak at Widget Expo in May.",
-             "https://blog.example.com/b": "A post about something else.",
-             "https://www.linkedin.com/posts/x": None}
+def test_pages_are_found_from_every_angle_then_opened_and_read_whole():
+    asked = []
 
     def ask(system, user, **kw):
-        return {"text": json.dumps({"people": [
-            {"name": "Lee Park", "title": "CEO", "company": "Acme", "status": "speaking",
-             "edition": "this", "url": "https://news.example.com/a",
-             "quote": "Acme CEO Lee Park will speak at Widget Expo"},
-            {"name": "Sam Roe", "status": "speaking", "url": "https://blog.example.com/b",
-             "quote": "Sam Roe will speak at Widget Expo"},
-            {"name": "Kim Li", "status": "attended", "url": "https://www.linkedin.com/posts/x",
-             "quote": "I attended Widget Expo"},
-            {"name": "Never Searched", "status": "attended", "url": "https://made.up/page",
-             "quote": "Never Searched attended Widget Expo"},
-            {"name": "Event Own", "status": "speaking", "url": "https://widgetexpo.com/speakers",
-             "quote": "Event Own speaks"},
-        ]}), "error": None, "result_urls": list(pages) + ["https://widgetexpo.com/speakers"]}
+        asked.append(user.split("Angle: ")[1][:12])
+        return {"text": json.dumps({"pages": [
+            {"url": "https://news.example.com/a"}, {"url": "https://made.up/never-returned"}]}),
+            "error": None, "search_count": 6,
+            "result_urls": ["https://news.example.com/a", "https://blog.example.com/b",
+                            "https://www.linkedin.com/posts/x", "https://widgetexpo.com/speakers",
+                            "https://dead.example.com/c", "https://off.example.com/d"]}
+    pages = {"https://news.example.com/a": "At Widget Expo 2026 the speakers include Acme CEO "
+                                           "Lee Park, who will speak at Widget Expo in May. "
+                                           + "Filler sentence here. " * 40 +
+                                           "Also on stage: Mia Wong, CTO of Globex. Bo Chen too.",
+             "https://blog.example.com/b": "Recap: Ana Silva attended Widget Expo and loved it.",
+             "https://off.example.com/d": "A page about something else entirely, naming Bo Chen."}
+    opened = []
 
     def fetch(url):
+        opened.append(url)
         text = pages.get(url)
         return {"status": "ok", "text": text} if text else {"status": "blocked"}
-    out = A.search_web(EVENT, "widgetexpo.com", TODAY, fetch=fetch, ask=ask)
-    (p,) = out["people"]
-    assert (p["name"], p["title"], p["company"], p["basis"]) == ("Lee Park", "CEO", "Acme", "others")
-    assert p["proof"][0]["label"] == "Named on news.example.com"
-    assert out["unopened"] == 1 and out["checked"] == 1 and out["found"] == 5
+
+    def read(url, text, event, today):
+        if "news" in url:
+            return {"people": [
+                {"name": "Lee Park", "title": "CEO", "company": "Globex", "status": "speaking",
+                 "quote": "Acme CEO Lee Park, who will speak at Widget Expo in May"},
+                {"name": "Mia Wong", "title": "CTO", "company": "Initech", "status": "speaking",
+                 "quote": "Also on stage: Mia Wong, CTO of Globex"},
+                {"name": "Bo Chen", "status": "speaking",
+                 "quote": "Bo Chen gave the closing keynote at Widget Expo"},
+                {"name": "Invented Person", "status": "speaking",
+                 "quote": "the speakers include Acme CEO Lee Park"}]}
+        return {"people": [{"name": "Ana Silva", "status": "attended",
+                            "quote": "Ana Silva attended Widget Expo"}]}
+    out = A.search_web(EVENT, "widgetexpo.com", TODAY, fetch=fetch, ask=ask, read=read)
+    assert len(asked) == len(A.WEB_ANGLES) and out["searches"] == 6 * len(A.WEB_ANGLES)
+    # Never the event's own site, LinkedIn, or an address no search returned.
+    assert sorted(opened) == ["https://blog.example.com/b", "https://dead.example.com/c",
+                              "https://news.example.com/a", "https://off.example.com/d"]
+    assert opened.index("https://news.example.com/a") == 0     # the one the search named first
+    people = {p["name"]: p for p in out["people"]}
+    assert sorted(people) == ["Ana Silva", "Lee Park", "Mia Wong"]
+    # Globex is on the page, but next to Mia Wong, not Lee Park.
+    assert (people["Lee Park"]["title"], people["Lee Park"]["company"]) == ("CEO", None)
+    # "Initech" is not on the page at all.
+    assert (people["Mia Wong"]["title"], people["Mia Wong"]["company"]) == ("CTO", None)
+    assert people["Ana Silva"]["proof"][0]["label"] == "Named on blog.example.com"
+    assert (out["pages"], out["unopened"], out["on_event"], out["read"], out["rejected"]) == (
+        4, 1, 2, 2, 2)
+
+
+def test_a_title_far_from_the_name_on_a_long_page_is_not_theirs():
+    text = "Lee Park spoke at Widget Expo. " + "x " * 400 + "Head of Sales at Globex."
+    assert not A._near("Head of Sales", "Lee Park", text)
+    assert A._near("spoke", "Lee Park", text)
+
+
+def test_a_long_page_is_read_from_just_before_the_event_is_named():
+    text = "menu " * 5000 + "Widget Expo speakers: Lee Park" + " more" * 5000
+    part = A.page_excerpt(text, A.event_terms(EVENT))
+    assert "Widget Expo speakers: Lee Park" in part and len(part) == A.PAGE_CHARS
 
 
 def test_a_web_search_that_fails_is_reported():
     out = A.search_web(EVENT, ask=lambda s, u, **k: {"text": "", "error": {"kind": "transport"}},
                        fetch=lambda u: {})
     assert out["error"] == "transport" and out["people"] == []
+    assert "public pages beyond LinkedIn and X were not checked" in A.note(
+        {"web": out, "counts": {"confirmed": 1}})
 
 
 # ── 4. people at the listed companies ──
@@ -527,7 +565,7 @@ def test_the_drawer_lists_attendees_with_their_proof_and_staff_apart():
 def test_a_run_never_searched_offers_the_search_and_says_what_it_uses():
     html = _render(_run_fixture())
     sec = html[html.index('id="eviAttendees"'):]
-    assert "Find attendees" in sec and "no Apollo credits" in sec
+    assert "Find attendees" in sec and "no Apollo credits" in sec and "ten minutes" in sec
     assert "Events do not publish who bought a ticket" in sec
 
 
@@ -677,7 +715,8 @@ def test_the_x_search_is_one_run_with_both_names_and_keeps_tweets_naming_the_eve
         return [_tweet("1", "Landed for Widget Expo!"), _tweet("2", "Nice weather"),
                 _tweet("1", "Landed for Widget Expo!"), _tweet("3", "#WidgetExpo day one")]
     out = A.search_x(EVENT, run=run)
-    assert asked == [['"Widget Expo" -filter:retweets', "#WidgetExpo -filter:retweets"]]
+    assert asked == [['"Widget Expo" -filter:retweets', "#WidgetExpo -filter:retweets",
+                      "#WidgetExpo2026 -filter:retweets", "#WidgetExpo2025 -filter:retweets"]]
     assert [p["id"] for p in out["posts"]] == ["x:1", "x:3"] and out["returned"] == 4
 
 
@@ -813,3 +852,32 @@ def test_x_the_web_and_staff_run_while_linkedin_is_searched():
         "linkedin": linkedin, "x": beside({"posts": []}),
         "web": beside({"people": []}), "staff": beside({"people": []})})
     assert overlapped == [True, True, True]
+
+
+def test_linkedin_posts_are_read_while_x_is_still_loading():
+    import threading
+    li_reading = threading.Event()
+    waited = []
+
+    def classify(batch, event, today):
+        if any(p.get("platform") == "linkedin" for _, p in batch):
+            li_reading.set()
+        return {"posts": [], "error": None}
+
+    def x(e, d):
+        # Returns only once LinkedIn's posts are being read: read one after
+        # the other, that never happens until this has returned.
+        waited.append(li_reading.wait(3))
+        return {"posts": [A.x_post(_tweet("1", "At Widget Expo today"))]}
+    A.gather(EVENT, [], today=TODAY, sources={
+        "linkedin": lambda e, d: {"posts": _posts("At Widget Expo today, booth 4")},
+        "x": x, "classify": classify,
+        "web": lambda e, h, t: {"people": []}, "staff": lambda p, eid: {"people": []}})
+    assert waited == [True]
+
+
+def test_searches_carry_the_hashtag_of_this_edition_and_the_last():
+    assert A.linkedin_queries({"name": "Web Summit Qatar 2027"}) == [
+        '"Web Summit Qatar"', "#WebSummitQatar", "#WebSummitQatar2027", "#WebSummitQatar2026"]
+    assert A.linkedin_queries({"name": "Money20/20 USA", "starts_on": "2026-10-25"})[-2:] == [
+        "#Money2020USA2026", "#Money2020USA2025"]

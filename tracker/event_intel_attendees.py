@@ -32,6 +32,7 @@ from __future__ import annotations
 import contextvars
 import logging
 import re
+import threading
 import time
 import unicodedata
 from concurrent.futures import ThreadPoolExecutor
@@ -65,19 +66,21 @@ EDITIONS = (EDITION_THIS, EDITION_EARLIER, EDITION_UNCLEAR)
 
 POSTS_PER_QUERY = 150
 POSTS_PER_PAGE = 50
-MAX_POSTS = 300
+MAX_POSTS = 600
 BATCH = 15
 WORKERS = 8
 POST_CHARS = 1400
 QUOTE_CHARS = 240
-STAFF_COMPANIES = 60
+STAFF_COMPANIES = 150
 STAFF_PER_COMPANY = 3
 STAFF_CHUNK = 10
 # Who a company sends to its own stand, or who decides to: Apollo's own
 # seniority names. Without a filter the free search returns whoever Apollo
 # ranks first, which at a large exhibitor is an intern as often as not.
 STAFF_SENIORITIES = ["owner", "founder", "c_suite", "partner", "vp", "head", "director"]
-WEB_SEARCHES = 6
+# Model calls in flight at once across every source of one search: LinkedIn
+# posts, X posts and web pages are all read at the same time now.
+_MODEL_SLOTS = threading.BoundedSemaphore(10)
 RETRY_PAUSE = 2.0
 
 STAFF_ROLES = ("exhibitor", "sponsor", "partner")
@@ -364,7 +367,7 @@ def linkedin_post(item: dict) -> dict | None:
 
 # ── 2b. what people posted on X ──────────────────────────────────────────
 
-X_POSTS = 200
+X_POSTS = 500
 
 
 def _x_date(value):
@@ -458,7 +461,18 @@ def search_x(event: dict, deadline: float | None = None, run=None) -> dict:
     return out
 
 
+def _edition_year(event: dict) -> int | None:
+    m = _YEAR.search(str(event.get("name") or "")) or _YEAR.search(str(event.get("edition") or ""))
+    if m:
+        return int(m.group(0))
+    start = _as_date(event.get("starts_on"))
+    return start.year if start else None
+
+
 def linkedin_queries(event: dict) -> list[str]:
+    """The name without its year, its hashtag, and the hashtag with this
+    edition's year and the year before: people tag a post with the edition
+    they were at (#WebSummitQatar2026), and the bare hashtag misses them."""
     terms = event_terms(event)
     plain = [t for t in terms if not t.startswith("#")]
     tags = [t for t in terms if t.startswith("#")]
@@ -466,7 +480,13 @@ def linkedin_queries(event: dict) -> list[str]:
     if plain:
         out.append('"%s"' % plain[-1])          # the name without the year
     if tags:
-        out.append(tags[-1])
+        bare = tags[-1]
+        out.append(bare)
+        year = _edition_year(event)
+        if year:
+            for y in (year, year - 1):
+                if "%s%d" % (bare, y) not in out:
+                    out.append("%s%d" % (bare, y))
     return out
 
 
@@ -591,7 +611,9 @@ def _classify_batch(batch: list[tuple[str, dict]], event: dict, today: date) -> 
             post.get("posted_at") or "unknown", post["text"][:POST_CHARS]))
     user = ("Event: %s\nToday: %s\n\n%s" % (_event_brief(event), today.isoformat(),
                                              "\n\n".join(lines)))
-    res = claude_websearch.ask(_POST_SYSTEM, user, max_uses=0, max_tokens=10000, timeout=180.0)
+    with _MODEL_SLOTS:
+        res = claude_websearch.ask(_POST_SYSTEM, user, max_uses=0, max_tokens=10000,
+                                   timeout=180.0)
     spend = claude_websearch.spend_of(res)
     if res.get("error"):
         return {"posts": None, "error": (res["error"] or {}).get("kind") or "error", "spend": spend}
@@ -739,98 +761,258 @@ def _person_from_post(person, post, edition, event, today):
 
 
 # ── 3. public pages found by web search ──────────────────────────────────
+#
+# Two steps, so nothing rests on a search snippet. Several searches, each
+# from a different angle, collect the addresses of pages that may name people
+# at the event. Then every page is opened here and read whole, and a person
+# is kept only where that page's own text names them and says the quote.
+# The first version asked one search for the people directly and kept 1
+# person for Web Summit Qatar from 43 pages it never read.
 
-_WEB_SYSTEM = """You search the public web for named people who were at one \
-event, or say they will be: speakers announced in company news, people who \
-wrote that they attended, exhibitors' staff announced for the stand, \
-published interviews recorded there. Search for posts, articles, press \
-releases and blogs, not the event's own website.
+WEB_ANGLES = (
+    ("announcements", "speakers, panellists, judges and hosts announced in "
+     "news, press releases, company blogs and university or government news: "
+     "who is speaking, presenting, moderating or giving a keynote"),
+    ("exhibitors", "companies and startups announcing they will exhibit, pitch "
+     "or have a stand or booth, and the people from them who will be there; "
+     "startup programme and showcase lists; delegation and pavilion lists"),
+    ("recaps", "recaps, takeaways, highlights and diaries written by people who "
+     "were there; interviews, podcasts and videos recorded at the event; photo "
+     "galleries and award winners"),
+)
+WEB_SEARCHES_PER_ANGLE = 6
+MAX_WEB_PAGES = 45
+PAGE_CHARS = 16000
+PAGE_WORKERS = 8
+# Read elsewhere (LinkedIn, X), unreadable as pages, or not pages at all.
+_SKIP_HOSTS = ("linkedin.com", "x.com", "twitter.com", "facebook.com", "instagram.com",
+               "tiktok.com", "youtube.com", "youtu.be", "google.com", "bing.com",
+               "duckduckgo.com", "reddit.com")
+
+_FIND_SYSTEM = """You find public web pages that name specific people at one \
+event. You are not listing the people: you are finding the pages, which will \
+be opened and read afterwards.
+
+Search widely from the angle you are given. Vary the wording, use the year, \
+the event's hashtag and the language of the host country as well as English, \
+and include earlier editions of the same event (same series, same city). \
+Leave out the event's own website, linkedin.com, x.com, twitter.com, \
+facebook.com, instagram.com and youtube.com.
+
+Reply with JSON only, every relevant page you found, at most 30:
+{"pages": [{"url": "...", "why": "a few words"}]}"""
+
+_PAGE_SYSTEM = """You read one public web page and list the people it shows at \
+one event: speaking, exhibiting, attending, having attended, or organising.
 
 Rules:
-1. Only people named in full on a page you found in these searches.
-2. quote: the exact words on that page that show the person at the event, \
+1. Only people named in full on this page. Never add anyone.
+2. Only people the page shows at THIS event (the same series in the same \
+city; any edition). Not people merely quoted, thanked or mentioned.
+3. quote: the exact words on the page that show the person at the event, \
 copied character for character, at most 200 characters.
-3. url: the page the quote is on, exactly as the search returned it.
-4. status, one of: speaking, exhibiting, attending, attended, organising.
+4. status, one of: speaking (spoke, presented, pitched, moderated, judged, \
+on a panel or stage), exhibiting (on a stand, booth or pavilion), attending, \
+attended, organising.
 5. edition: "this" for the edition given, "earlier" for an earlier year, \
 "unclear" when the page does not say.
-6. title and company only when that page states them.
-7. Earlier editions of the same event count too (the same series in the \
-same city): an event's past speakers and attendees are who to expect again. \
-Say which edition each person was at.
-8. Return at most 40 people. Return an empty list rather than a guess.
+6. title and company only as the page states them for that person.
+7. A page that is a list (speakers, startups, delegation) can name many \
+people: list every one, up to 80.
 
 Reply with JSON only:
 {"people": [{"name": "...", "title": null, "company": null, "status": \
-"speaking", "edition": "this", "url": "...", "quote": "..."}]}"""
+"speaking", "edition": "this", "quote": "..."}]}"""
 
 
-def search_web(event: dict, event_host: str = "", today: date | None = None,
-               fetch=None, ask=None) -> dict:
-    """People named on public pages, each re-checked by opening the page.
+def _host_of(url: str) -> str:
+    m = re.match(r"https?://([^/:?#]+)", str(url or ""), re.I)
+    return re.sub(r"^www\.", "", m.group(1).lower()) if m else ""
 
-    A quote the page itself does not contain is dropped, so is a page the
-    searches never returned. Pages that cannot be opened (LinkedIn's own
-    post pages mostly refuse) are dropped too: a quote that cannot be
-    checked is not kept as one. Returns {"people", "found", "checked",
-    "error", "spend"}."""
+
+def _skipped_host(host: str, event_host: str = "") -> bool:
+    if not host:
+        return True
+    if event_host and (host == event_host or host.endswith("." + event_host)):
+        return True  # the event's own pages were read already, with their own proof
+    return any(host == h or host.endswith("." + h) for h in _SKIP_HOSTS)
+
+
+def find_pages(event: dict, angle: tuple, today: date, ask=None) -> dict:
+    """One angle's searches. Pages the model points at come first; every
+    other address the searches returned follows, because a page the model
+    did not mention can still name people and is cheap to open."""
     from . import claude_websearch
-    from .event_intel_harvest import fetch_page
-    today = today or date.today()
-    fetch = fetch or fetch_page
     ask = ask or claude_websearch.ask
-    user = "Event: %s\nToday: %s" % (_event_brief(event), today.isoformat())
-    res = ask(_WEB_SYSTEM, user, max_uses=WEB_SEARCHES, max_tokens=6000, timeout=240.0)
-    out = {"people": [], "found": 0, "checked": 0, "unopened": 0, "error": None,
-           "spend": claude_websearch.spend_of(res),
-           "searches": int(res.get("search_count") or 0),
-           "pages": len(res.get("result_urls") or [])}
+    user = ("Event: %s\nToday: %s\nAngle: %s"
+            % (_event_brief(event), today.isoformat(), angle[1]))
+    with _MODEL_SLOTS:
+        res = ask(_FIND_SYSTEM, user, max_uses=WEB_SEARCHES_PER_ANGLE, max_tokens=4000,
+                  timeout=240.0)
+    out = {"urls": [], "named": 0, "spend": claude_websearch.spend_of(res), "error": None,
+           "searches": int(res.get("search_count") or 0)}
     if res.get("error"):
         out["error"] = (res["error"] or {}).get("kind") or "error"
-        return out
+    returned = [str(u) for u in (res.get("result_urls") or []) if u]
+    by_key = {u.rstrip("/"): u for u in returned}
     parsed = claude_websearch.extract_json(
-        claude_websearch.remove_citation_tags(res.get("text") or ""), require="people")
+        claude_websearch.remove_citation_tags(res.get("text") or ""), require="pages")
+    named = []
+    pages = parsed.get("pages") if isinstance(parsed, dict) else None
+    for p in pages or []:
+        u = str(p.get("url") or "").strip() if isinstance(p, dict) else ""
+        # Only an address the searches really returned: a URL the model
+        # wrote from memory is not a search result.
+        if u and u.rstrip("/") in by_key:
+            named.append(by_key[u.rstrip("/")])
+    named = list(dict.fromkeys(named))
+    out["urls"] = list(dict.fromkeys(named + returned))
+    out["named"] = len(named)
+    return out
+
+
+def _near(fragment: str, name: str, text: str, span: int = 400) -> bool:
+    """Whether `fragment` appears within `span` characters of `name` in the
+    text: on a page that names fifty people, a title somewhere on it is not
+    this person's title."""
+    body, n, f = _fold(text), _fold(name), _fold(fragment)
+    if not (n and f):
+        return False
+    at = body.find(n)
+    while at >= 0:
+        if f in body[max(0, at - span): at + len(n) + span]:
+            return True
+        at = body.find(n, at + 1)
+    return False
+
+
+def page_excerpt(text: str, terms: list[str], limit: int = PAGE_CHARS) -> str:
+    """The part of a long page to read: all of it when it fits, otherwise
+    the stretch from shortly before the first mention of the event."""
+    if len(text) <= limit:
+        return text
+    body = _fold(text)
+    hits = [i for i in (body.find(_fold(t)) for t in terms if not t.startswith("#")) if i >= 0]
+    start = max(0, (min(hits) if hits else 0) - 1500)
+    return text[start:start + limit]
+
+
+def _read_page(url: str, text: str, event: dict, today: date) -> dict:
+    from . import claude_websearch
+    user = "Event: %s\nToday: %s\nPage: %s\n\n--- PAGE TEXT ---\n%s" % (
+        _event_brief(event), today.isoformat(), url, text)
+    with _MODEL_SLOTS:
+        res = claude_websearch.ask(_PAGE_SYSTEM, user, max_uses=0, max_tokens=8000,
+                                   timeout=180.0)
+    spend = claude_websearch.spend_of(res)
+    if res.get("error"):
+        return {"people": None, "error": (res["error"] or {}).get("kind") or "error",
+                "spend": spend}
+    parsed = claude_websearch.extract_json(res.get("text") or "", require="people")
     if not isinstance(parsed, dict):
-        out["error"] = "unparsable"
-        return out
-    returned = {str(u).rstrip("/") for u in (res.get("result_urls") or [])}
-    pages: dict = {}
-    for person in (parsed.get("people") or [])[:40]:
+        return {"people": None, "error": "unparsable", "spend": spend}
+    return {"people": parsed.get("people") or [], "error": None, "spend": spend}
+
+
+def people_on_page(url: str, text: str, event: dict, today: date, read=None) -> dict:
+    """Everyone one opened page shows at the event, each checked against the
+    page's own text."""
+    read = read or _read_page
+    excerpt = page_excerpt(text, event_terms(event))
+    res = read(url, excerpt, event, today)
+    out = {"people": [], "spend": res.get("spend"), "error": res.get("error"), "rejected": 0}
+    host = _host_of(url)
+    for person in res.get("people") or []:
         if not isinstance(person, dict):
             continue
-        out["found"] += 1
-        url = str(person.get("url") or "").strip()
-        name = re.sub(r"\s+", " ", str(person.get("name") or "")).strip()
+        name = clean_name(person.get("name"))
         quote = str(person.get("quote") or "").strip()[:QUOTE_CHARS]
         status = str(person.get("status") or "").strip().lower()
-        if (not url or url.rstrip("/") not in returned or len(name.split()) < 2
-                or status not in POST_STATUSES):
+        if status not in POST_STATUSES:
             continue
-        host = re.sub(r"^www\.", "", (re.match(r"https?://([^/]+)", url) or [None, ""])[1].lower())
-        if event_host and (host == event_host or host.endswith("." + event_host)):
-            continue  # the event's own pages were read already, with their own proof
-        if url not in pages:
-            got = fetch(url)
-            pages[url] = got.get("text") if got.get("status") == "ok" else None
-        text = pages[url]
-        if not text:
-            out["unopened"] += 1
+        if (len(name.split()) < 2 or _fold(name) not in _fold(excerpt)
+                or not in_text(quote, excerpt)):
+            out["rejected"] += 1
             continue
-        if not (in_text(quote, text) and _fold(name) in _fold(text)):
-            continue
-        out["checked"] += 1
         title = str(person.get("title") or "").strip() or None
         company = str(person.get("company") or "").strip() or None
         out["people"].append({
             "name": name[:200],
-            "title": title if title and _fold(title) in _fold(text) else None,
-            "company": company if company and _fold(company) in _fold(text) else None,
+            "title": title if title and _near(title, name, excerpt) else None,
+            "company": company if company and _near(company, name, excerpt) else None,
             "company_domain": None, "linkedin": None,
             "basis": BASIS_OTHERS, "status": status,
             "edition": settle_edition(str(person.get("edition") or ""), status, None, event, today),
             "proof": [{"kind": "web_page", "label": "Named on %s" % (host or "a public page"),
                        "url": url, "quote": quote}],
         })
+    return out
+
+
+def search_web(event: dict, event_host: str = "", today: date | None = None,
+               fetch=None, ask=None, read=None, deadline: float | None = None) -> dict:
+    """People named on public pages: found by searching from three angles,
+    then every page opened here and read whole."""
+    from . import claude_websearch
+    from .event_intel_harvest import fetch_page
+    today = today or date.today()
+    fetch = fetch or fetch_page
+    out = {"people": [], "searches": 0, "pages": 0, "opened": 0, "on_event": 0,
+           "read": 0, "unopened": 0, "rejected": 0, "unread": 0, "error": None, "spend": None}
+    spend = []
+    with ThreadPoolExecutor(max_workers=len(WEB_ANGLES)) as pool:
+        found = [f.result() for f in [
+            pool.submit(contextvars.copy_context().run, find_pages, event, a, today, ask)
+            for a in WEB_ANGLES]]
+    errors = [f["error"] for f in found if f.get("error")]
+    named, rest = [], []
+    for f in found:
+        spend.append(f.get("spend"))
+        out["searches"] += f.get("searches", 0)
+        urls = f.get("urls") or []
+        named.extend(urls[:f.get("named", 0)])
+        rest.extend(urls[f.get("named", 0):])
+    if errors and len(errors) == len(found):
+        out["error"] = errors[0]
+    # The pages the searches pointed at first, then everything else they
+    # returned, deduped, without the event's own site or the social sites.
+    seen, keep = set(), []
+    for u in named + rest:
+        k = u.rstrip("/").lower()
+        if k in seen or _skipped_host(_host_of(u), event_host):
+            continue
+        seen.add(k)
+        keep.append(u)
+    keep = keep[:MAX_WEB_PAGES]
+    out["pages"] = len(keep)
+    terms = event_terms(event)
+
+    def one(url):
+        if deadline and time.monotonic() > deadline:
+            return {"skipped": True}
+        got = fetch(url)
+        if got.get("status") != "ok" or not got.get("text"):
+            return {"unopened": True}
+        text = got["text"]
+        if not mentions_event(text, terms):
+            return {"opened": True}
+        res = people_on_page(got.get("final_url") or url, text, event, today, read)
+        return dict(res, opened=True, on_event=True)
+    results = []
+    if keep:
+        with ThreadPoolExecutor(max_workers=PAGE_WORKERS) as pool:
+            results = [f.result() for f in [
+                pool.submit(contextvars.copy_context().run, one, u) for u in keep]]
+    for r in results:
+        out["unopened"] += 1 if r.get("unopened") else 0
+        out["opened"] += 1 if r.get("opened") else 0
+        if r.get("on_event"):
+            out["on_event"] += 1
+            spend.append(r.get("spend"))
+            out["unread" if r.get("error") else "read"] += 1
+            out["rejected"] += r.get("rejected", 0)
+            out["people"].extend(r.get("people") or [])
+    out["spend"] = claude_websearch.spend_sum(*[s for s in spend if s])
     return out
 
 
@@ -996,43 +1178,55 @@ def gather(event: dict, participants: list[dict], event_host: str = "",
             logger.exception("event_intel_attendees: a source failed")
             return dict(fallback, error=fallback.get("error") or str(e)[:200])
 
-    with ThreadPoolExecutor(max_workers=3) as pool:
+    classify = sources.get("classify")
+    with ThreadPoolExecutor(max_workers=5) as pool:
         def later(fn, fallback, *args):
             return pool.submit(contextvars.copy_context().run, safely, fn, fallback, *args)
         x_job = later(sources.get("x") or search_x,
                       {"posts": [], "error": "search_failed"}, event, deadline)
-        web_job = later(sources.get("web") or search_web,
-                        {"people": [], "error": "error", "spend": None}, event, event_host, today)
+        web_job = later(sources.get("web") or (
+                            lambda e, h, t: search_web(e, h, t, deadline=deadline)),
+                        {"people": [], "error": "error", "spend": None},
+                        event, event_host, today)
         staff_job = later(sources.get("staff") or staff_at_companies,
                           {"people": [], "error": None}, participants, eid)
 
         li = safely(sources.get("linkedin") or search_linkedin,
                     {"posts": [], "error": "search_failed"}, event, deadline)
-        report["linkedin"] = {"posts": len(li.get("posts") or []),
-                              "searches": li.get("searched", 0),
-                              "returned": li.get("returned", 0), "error": li.get("error")}
+        # LinkedIn's posts are read the moment they are in, while X is still
+        # being scraped; X's are read the moment they arrive.
+        empty = {"people": [], "batches": 0, "failed": 0, "spend": [], "rejected": 0,
+                 "failed_kinds": [], "unread_posts": 0}
+        li_read = (later(people_in_posts, empty, li["posts"], event, today, classify)
+                   if li.get("posts") else None)
         xs = x_job.result()
-        report["x"] = {"posts": len(xs.get("posts") or []), "returned": xs.get("returned", 0),
-                       "error": xs.get("error")}
-        posts = (li.get("posts") or []) + (xs.get("posts") or [])
-        if posts:
-            read = people_in_posts(posts, event, today, classify=sources.get("classify"))
-            spend.extend(read["spend"])
-            people.extend(read["people"])
-            report["x"]["people"] = sum(1 for p in read["people"]
-                                        if (p.get("proof") or [{}])[0].get("kind") == "x_post")
-            report["linkedin"].update(people=len(read["people"]) - report["x"]["people"],
-                                      batches=read["batches"],
-                                      failed_batches=read["failed"], rejected=read["rejected"],
-                                      failed_kinds=read["failed_kinds"],
-                                      unread_posts=read["unread_posts"])
+        x_read = (people_in_posts(xs["posts"], event, today, classify=classify)
+                  if xs.get("posts") else dict(empty))
+        li_read = li_read.result() if li_read else dict(empty)
         web = web_job.result()
         staff = staff_job.result()
 
+    report["linkedin"] = {"posts": len(li.get("posts") or []),
+                          "searches": li.get("searched", 0),
+                          "returned": li.get("returned", 0), "error": li.get("error")}
+    report["x"] = {"posts": len(xs.get("posts") or []), "returned": xs.get("returned", 0),
+                   "error": xs.get("error")}
+    for key, read in (("linkedin", li_read), ("x", x_read)):
+        spend.extend(read.get("spend") or [])
+        people.extend(read.get("people") or [])
+        report[key]["people"] = len(read.get("people") or [])
+    report["linkedin"].update(
+        batches=li_read["batches"] + x_read["batches"],
+        failed_batches=li_read["failed"] + x_read["failed"],
+        rejected=li_read["rejected"] + x_read["rejected"],
+        failed_kinds=li_read["failed_kinds"] + x_read["failed_kinds"],
+        unread_posts=li_read["unread_posts"] + x_read["unread_posts"])
+
     spend.append(web.get("spend"))
     people.extend(web.get("people") or [])
-    report["web"] = {k: web.get(k) for k in ("found", "checked", "unopened", "error",
-                                              "searches", "pages")}
+    report["web"] = {k: web.get(k) for k in ("searches", "pages", "opened", "on_event",
+                                              "read", "unread", "unopened", "rejected",
+                                              "error")}
     report["web"]["people"] = len(web.get("people") or [])
     people.extend(staff.get("people") or [])
     report["staff"] = {"companies": staff.get("companies", 0), "skipped": staff.get("skipped", 0),
@@ -1087,7 +1281,10 @@ def note(report: dict) -> str:
     web = report.get("web") or {}
     if web.get("error"):
         bits.append("The web search did not finish, so public pages beyond LinkedIn "
-                    "were not checked.")
+                    "and X were not checked.")
+    elif web.get("unread"):
+        bits.append("%d of the %d web pages naming the event could not be read." % (
+            web["unread"], web.get("on_event", 0)))
     st = report.get("staff") or {}
     if st.get("error") and "APOLLO_API_KEY" in str(st["error"]):
         bits.append("People at the exhibiting companies were not looked up: company "
@@ -1102,7 +1299,7 @@ def note(report: dict) -> str:
     return " ".join(bits)
 
 
-def find_for_run(run_id: int, email: str, deadline_seconds: float = 600.0) -> dict:
+def find_for_run(run_id: int, email: str, deadline_seconds: float = 900.0) -> dict:
     """Search every event in a finished run and store what was found.
     Never raises; the result is what the scan record keeps."""
     from . import event_intel_store as store
