@@ -64,9 +64,9 @@ EDITION_EARLIER = "earlier"
 EDITION_UNCLEAR = "unclear"
 EDITIONS = (EDITION_THIS, EDITION_EARLIER, EDITION_UNCLEAR)
 
-POSTS_PER_QUERY = 150
+POSTS_PER_QUERY = 250
 POSTS_PER_PAGE = 50
-MAX_POSTS = 600
+MAX_POSTS = 900
 BATCH = 15
 WORKERS = 8
 POST_CHARS = 1400
@@ -370,7 +370,7 @@ def linkedin_post(item: dict) -> dict | None:
 
 # ── 2b. what people posted on X ──────────────────────────────────────────
 
-X_POSTS = 500
+X_POSTS = 1000
 
 
 def _x_date(value):
@@ -784,7 +784,7 @@ WEB_ANGLES = (
      "galleries and award winners"),
 )
 WEB_SEARCHES_PER_ANGLE = 6
-MAX_WEB_PAGES = 60
+MAX_WEB_PAGES = 120
 PAGE_CHARS = 16000
 PAGE_WORKERS = 8
 # Read elsewhere (LinkedIn, X), unreadable as pages, or not pages at all.
@@ -920,6 +920,24 @@ def _read_page(url: str, text: str, event: dict, today: date) -> dict:
     return {"people": parsed.get("people") or [], "error": None, "spend": spend}
 
 
+def page_edition(model_edition: str, excerpt: str, event: dict) -> str:
+    """Which edition a web page is about, from the years the page itself
+    prints. A page has no post date, and on the live Lisbon run the model
+    called Wikipedia's article on the event and recaps of past editions
+    "this edition". It is this edition only when the page prints this
+    edition's year; earlier when it prints only earlier years; otherwise
+    the page does not say."""
+    year = _edition_year(event)
+    if not year:
+        return model_edition if model_edition in EDITIONS else EDITION_UNCLEAR
+    years = {int(m.group(0)) for m in _YEAR.finditer(excerpt)}
+    if year in years:
+        return model_edition if model_edition in EDITIONS else EDITION_UNCLEAR
+    if any(y < year for y in years):
+        return EDITION_EARLIER
+    return EDITION_UNCLEAR
+
+
 def people_on_page(url: str, text: str, event: dict, today: date, read=None) -> dict:
     """Everyone one opened page shows at the event, each checked against the
     page's own text."""
@@ -948,7 +966,8 @@ def people_on_page(url: str, text: str, event: dict, today: date, read=None) -> 
             "company": company if company and _near(company, name, excerpt) else None,
             "company_domain": None, "linkedin": None,
             "basis": BASIS_OTHERS, "status": status,
-            "edition": settle_edition(str(person.get("edition") or ""), status, None, event, today),
+            "edition": settle_edition(page_edition(str(person.get("edition") or ""),
+                                                   excerpt, event), status, None, event, today),
             "proof": [{"kind": "web_page", "label": "Named on %s" % (host or "a public page"),
                        "url": url, "quote": quote}],
         })
@@ -962,7 +981,7 @@ def people_on_page(url: str, text: str, event: dict, today: date, read=None) -> 
 # limit and found nothing.
 GOOGLE_ACTOR = "apify/google-search-scraper"
 GOOGLE_PAGES_PER_QUERY = 2
-MAX_FETCH = 120
+MAX_FETCH = 200
 
 _QUERY_SHAPES = (
     '"{n}" speakers', '"{n} {y}" speaker', '"{n}" keynote', '"{n}" panel',

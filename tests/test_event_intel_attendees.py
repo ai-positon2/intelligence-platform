@@ -997,3 +997,25 @@ def test_when_google_cannot_be_searched_the_model_search_takes_over():
                        google=lambda e: {"results": [], "error": "search_failed"})
     assert out["via"] == "model" and out["google_error"] == "search_failed"
     assert len(asked) == len(A.WEB_ANGLES)
+
+
+
+@pytest.mark.parametrize("page,said,edition", [
+    ("Widget Expo 2026 speakers: Lee Park", "this", "this"),
+    ("Widget Expo 2024 recap: Lee Park spoke", "this", "earlier"),
+    ("Widget Expo speakers: Lee Park", "this", "unclear"),
+    ("Widget Expo 2025 and 2026: Lee Park", "earlier", "earlier"),
+])
+def test_a_web_page_is_about_this_edition_only_when_it_prints_its_year(page, said, edition):
+    assert A.page_edition(said, page, EVENT) == edition
+
+
+def test_a_person_read_off_a_page_takes_the_pages_edition_not_the_models():
+    out = A.people_on_page(
+        "https://en.example.org/wiki/Widget_Expo",
+        "Widget Expo has hosted speakers such as Lee Park, who spoke at Widget Expo in 2023.",
+        EVENT, TODAY,
+        read=lambda u, t, e, d: {"people": [{"name": "Lee Park", "status": "speaking",
+                                             "edition": "this",
+                                             "quote": "Lee Park, who spoke at Widget Expo in 2023"}]})
+    assert out["people"][0]["edition"] == "earlier"
