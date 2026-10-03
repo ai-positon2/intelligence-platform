@@ -1082,9 +1082,69 @@ def rank_results(results: list[dict], event: dict, event_host: str = "") -> list
     return [first[k][1] for k in order]
 
 
+# Pages that refuse a plain request (bot walls, scripts that build the page,
+# timeouts) are opened again in a real browser through Apify's Website
+# Content Crawler, all in one run. On the live Lisbon run 43 of 196 Google
+# results would not open the plain way.
+BROWSER_ACTOR = "apify/website-content-crawler"
+BROWSER_SECONDS = 300
+
+
+def _url_key(u: str) -> str:
+    return re.sub(r"^https?://(www\.)?", "", str(u or "").strip().lower()).rstrip("/")
+
+
+def browser_open(urls: list[str], run=None) -> dict:
+    """Open `urls` in a browser. Returns {"pages": {requested url: {text,
+    final}}, "error"}. `run` stands in for the actor in tests."""
+    import os
+    out = {"pages": {}, "error": None}
+    if not urls:
+        return out
+    if run is None:
+        from . import apify_transport
+        token = os.environ.get("APIFY_API_TOKEN", "")
+        if not token:
+            out["error"] = "not_configured"
+            return out
+
+        def run(us):
+            return apify_transport.run_actor_and_wait(
+                os.environ.get("EVI_BROWSER_ACTOR_ID", BROWSER_ACTOR),
+                {"startUrls": [{"url": u} for u in us], "maxCrawlDepth": 0,
+                 "maxCrawlPages": len(us), "crawlerType": "playwright:adaptive",
+                 "removeCookieWarnings": True, "saveMarkdown": False,
+                 "saveHtml": False, "requestTimeoutSecs": 60,
+                 "proxyConfiguration": {"useApifyProxy": True}},
+                token, timeout=BROWSER_SECONDS, strict=True)
+    try:
+        items = run(list(urls)) or []
+    except Exception as e:
+        logger.warning("event_intel_attendees: browser opening failed: %s", e)
+        out["error"] = "browser_failed"
+        return out
+    wanted = {_url_key(u): u for u in urls}
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        text = str(item.get("text") or item.get("markdown") or "").strip()
+        if len(text) < 200:
+            continue  # a consent wall or an empty shell is not the page
+        crawl = item.get("crawl") if isinstance(item.get("crawl"), dict) else {}
+        loaded = crawl.get("loadedUrl") or item.get("loadedUrl") or item.get("url")
+        # The crawler reports the address it was given and the one it ended
+        # on after redirects; either ties the text to the request.
+        for cand in (item.get("url"), crawl.get("requestUrl"), loaded):
+            asked = wanted.get(_url_key(cand))
+            if asked and asked not in out["pages"]:
+                out["pages"][asked] = {"text": text, "final": loaded or asked}
+                break
+    return out
+
+
 def search_web(event: dict, event_host: str = "", today: date | None = None,
                fetch=None, ask=None, read=None, deadline: float | None = None,
-               google=None) -> dict:
+               google=None, browser=None) -> dict:
     """People named on public pages: Google searched directly from every
     angle (the model's own search when Google cannot be reached), then every
     page opened here and read whole."""
@@ -1149,6 +1209,15 @@ def search_web(event: dict, event_host: str = "", today: date | None = None,
         with ThreadPoolExecutor(max_workers=24) as pool:
             fetched = [f.result() for f in [
                 pool.submit(contextvars.copy_context().run, opened, u) for u in keep]]
+    # The pages that refused, once more in a real browser.
+    refused = [url for url, got in fetched if got.get("unopened")]
+    if refused and not (deadline and time.monotonic() > deadline):
+        b = (browser or browser_open)(refused)
+        out["browser_error"] = b.get("error")
+        rescued = b.get("pages") or {}
+        out["rescued"] = len(rescued)
+        fetched = [(url, dict(rescued[url], browser=True) if url in rescued else got)
+                   for url, got in fetched]
     to_read = []
     for url, got in fetched:
         if got.get("skipped"):
@@ -1400,6 +1469,7 @@ def gather(event: dict, participants: list[dict], event_host: str = "",
     spend.append(web.get("spend"))
     people.extend(web.get("people") or [])
     report["web"] = {k: web.get(k) for k in ("via", "searches", "results", "pages", "opened",
+                                              "rescued", "browser_error",
                                               "on_event", "read", "not_read", "unread",
                                               "unopened", "rejected", "skipped", "error",
                                               "google_error", "find_seconds", "seconds")}
@@ -1459,6 +1529,12 @@ def note(report: dict) -> str:
     if web.get("error"):
         bits.append("The web search did not finish, so public pages beyond LinkedIn "
                     "and X were not checked.")
+    if web.get("unopened"):
+        bits.append("%d of the %d web pages found would not open, even in a browser%s, so "
+                    "whether they name anyone is not known." % (
+                        web["unopened"], web.get("pages", 0),
+                        "" if not web.get("browser_error") else
+                        " (the browser could not be used this time)"))
     if web.get("skipped"):
         bits.append("%d of the %d web pages found were not opened or read: the search "
                     "ran out of time first." % (web["skipped"], web.get("pages", 0)))

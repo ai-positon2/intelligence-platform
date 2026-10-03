@@ -1045,3 +1045,69 @@ def test_a_page_that_could_not_be_read_is_read_again_once(monkeypatch):
                            EVENT, TODAY, read=lambda *a: calls.append(1) or {"people": None,
                                                                             "error": "transport"})
     assert len(calls) == 2 and out["error"] == "transport" and out["people"] == []
+
+
+# ── the browser for pages that refuse ──
+
+LONG = " The rest of the article goes on for a while." * 10
+
+
+def test_the_browser_ties_each_page_back_to_the_address_asked_for():
+    asked = []
+
+    def run(urls):
+        asked.append(urls)
+        return [{"url": "https://a.example.com/x", "text": "Lee Park spoke at Widget Expo." + LONG},
+                # Redirected: only the crawl record still holds the address asked for.
+                {"url": "https://b.example.com/z", "crawl": {"requestUrl": "http://b.example.com/y/",
+                                                             "loadedUrl": "https://b.example.com/z"},
+                 "text": "Mia Wong exhibited at Widget Expo." + LONG},
+                {"url": "https://c.example.com/", "text": "Accept cookies"},
+                "junk"]
+    out = A.browser_open(["https://www.a.example.com/x", "https://b.example.com/y",
+                          "https://c.example.com/"], run=run)
+    assert asked == [["https://www.a.example.com/x", "https://b.example.com/y",
+                      "https://c.example.com/"]]
+    assert sorted(out["pages"]) == ["https://b.example.com/y", "https://www.a.example.com/x"]
+    assert out["pages"]["https://b.example.com/y"]["final"] == "https://b.example.com/z"
+
+    def boom(urls):
+        raise RuntimeError("actor failed")
+    assert A.browser_open(["https://a.example.com/"], run=boom)["error"] == "browser_failed"
+    assert A.browser_open([], run=boom) == {"pages": {}, "error": None}
+
+
+def test_pages_that_refuse_are_opened_in_the_browser_and_read(monkeypatch):
+    results = [{"url": "https://p%d.example.com/" % i, "title": "", "snippet": "", "query": "q"}
+               for i in range(3)]
+    sent = []
+
+    def browser(urls):
+        sent.append(list(urls))
+        return {"pages": {"https://p1.example.com/": {
+            "text": "Mia Wong exhibited at Widget Expo 2026.", "final": "https://p1.example.com/"}},
+            "error": None}
+
+    def read(url, text, event, today):
+        return {"people": [{"name": " ".join(text.split()[:2]), "status": "exhibiting",
+                            "quote": text.rstrip(".")}]}
+    out = A.search_web(EVENT, "", TODAY, read=read, browser=browser,
+                       fetch=lambda u: ({"status": "ok", "text": "Lee Park spoke at Widget Expo."}
+                                        if u.startswith("https://p0") else {"status": "blocked"}),
+                       google=lambda e: {"results": results, "queries": 26})
+    assert sent == [["https://p1.example.com/", "https://p2.example.com/"]]
+    assert (out["opened"], out["rescued"], out["unopened"], out["read"]) == (2, 1, 1, 2)
+    assert sorted(p["name"] for p in out["people"]) == ["Lee Park", "Mia Wong"]
+    assert "1 of the 3 web pages found would not open, even in a browser" in A.note(
+        {"web": out, "counts": {"confirmed": 1}})
+
+
+def test_the_browser_is_not_started_when_every_page_opened():
+    def browser(urls):
+        raise AssertionError("nothing refused")
+    out = A.search_web(EVENT, "", TODAY, browser=browser,
+                       read=lambda *a: {"people": []},
+                       fetch=lambda u: {"status": "ok", "text": "Widget Expo"},
+                       google=lambda e: {"results": [{"url": "https://p.example.com/",
+                                                      "title": "", "snippet": "", "query": "q"}]})
+    assert out["opened"] == 1 and "rescued" not in out
