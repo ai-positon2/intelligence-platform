@@ -1019,3 +1019,29 @@ def test_a_person_read_off_a_page_takes_the_pages_edition_not_the_models():
                                              "edition": "this",
                                              "quote": "Lee Park, who spoke at Widget Expo in 2023"}]})
     assert out["people"][0]["edition"] == "earlier"
+
+
+
+def test_every_page_one_search_can_return_is_opened_and_read():
+    most = len(A.google_queries(EVENT)) * A.GOOGLE_PAGES_PER_QUERY * 10
+    assert A.MAX_FETCH >= most and A.MAX_WEB_PAGES >= most
+
+
+def test_a_page_that_could_not_be_read_is_read_again_once(monkeypatch):
+    monkeypatch.setattr(A, "RETRY_PAUSE", 0)
+    calls = []
+
+    def read(url, text, event, today):
+        calls.append(url)
+        if len(calls) == 1:
+            return {"people": None, "error": "transport"}
+        return {"people": [{"name": "Lee Park", "status": "speaking",
+                            "quote": "Lee Park spoke at Widget Expo"}]}
+    out = A.people_on_page("https://a.example.com/", "Lee Park spoke at Widget Expo 2026.",
+                           EVENT, TODAY, read=read)
+    assert len(calls) == 2 and out["error"] is None and out["people"][0]["name"] == "Lee Park"
+    calls.clear()
+    out = A.people_on_page("https://a.example.com/", "Lee Park spoke at Widget Expo 2026.",
+                           EVENT, TODAY, read=lambda *a: calls.append(1) or {"people": None,
+                                                                            "error": "transport"})
+    assert len(calls) == 2 and out["error"] == "transport" and out["people"] == []

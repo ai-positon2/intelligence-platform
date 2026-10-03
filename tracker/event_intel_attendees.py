@@ -80,7 +80,7 @@ STAFF_CHUNK = 10
 STAFF_SENIORITIES = ["owner", "founder", "c_suite", "partner", "vp", "head", "director"]
 # Model calls in flight at once across every source of one search: LinkedIn
 # posts, X posts and web pages are all read at the same time now.
-_MODEL_SLOTS = threading.BoundedSemaphore(12)
+_MODEL_SLOTS = threading.BoundedSemaphore(20)
 # Whole-call limits, in seconds.
 FIND_SECONDS = 240.0
 READ_SECONDS = 180.0
@@ -784,9 +784,13 @@ WEB_ANGLES = (
      "galleries and award winners"),
 )
 WEB_SEARCHES_PER_ANGLE = 6
-MAX_WEB_PAGES = 120
+# Above anything one search can return (26 queries x 2 results pages x 10
+# results), so every page that names the event is read: on the live runs a
+# cap of 120 left 25 such pages unread at Lisbon. Kept as a number only so
+# a runaway can never read without end.
+MAX_WEB_PAGES = 600
 PAGE_CHARS = 16000
-PAGE_WORKERS = 8
+PAGE_WORKERS = 16
 # Read elsewhere (LinkedIn, X), unreadable as pages, or not pages at all.
 _SKIP_HOSTS = ("linkedin.com", "x.com", "twitter.com", "facebook.com", "instagram.com",
                "tiktok.com", "youtube.com", "youtu.be", "google.com", "bing.com",
@@ -944,7 +948,16 @@ def people_on_page(url: str, text: str, event: dict, today: date, read=None) -> 
     read = read or _read_page
     excerpt = page_excerpt(text, event_terms(event))
     res = read(url, excerpt, event, today)
-    out = {"people": [], "spend": res.get("spend"), "error": res.get("error"), "rejected": 0}
+    spent = [res.get("spend")]
+    if res.get("people") is None:
+        # Read again once, as a batch of posts is: with every page now read,
+        # one bad minute would otherwise cost a page for good.
+        time.sleep(RETRY_PAUSE)
+        res = read(url, excerpt, event, today)
+        spent.append(res.get("spend"))
+    from . import claude_websearch
+    out = {"people": [], "spend": claude_websearch.spend_sum(*[x for x in spent if x]),
+           "error": res.get("error") if res.get("people") is None else None, "rejected": 0}
     host = _host_of(url)
     for person in res.get("people") or []:
         if not isinstance(person, dict):
@@ -981,7 +994,7 @@ def people_on_page(url: str, text: str, event: dict, today: date, read=None) -> 
 # limit and found nothing.
 GOOGLE_ACTOR = "apify/google-search-scraper"
 GOOGLE_PAGES_PER_QUERY = 2
-MAX_FETCH = 200
+MAX_FETCH = 600
 
 _QUERY_SHAPES = (
     '"{n}" speakers', '"{n} {y}" speaker', '"{n}" keynote', '"{n}" panel',
@@ -1133,7 +1146,7 @@ def search_web(event: dict, event_host: str = "", today: date | None = None,
         return url, {"text": got["text"], "final": got.get("final_url") or url}
     fetched = []
     if keep:
-        with ThreadPoolExecutor(max_workers=12) as pool:
+        with ThreadPoolExecutor(max_workers=24) as pool:
             fetched = [f.result() for f in [
                 pool.submit(contextvars.copy_context().run, opened, u) for u in keep]]
     to_read = []
