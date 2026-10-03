@@ -784,7 +784,7 @@ WEB_ANGLES = (
      "galleries and award winners"),
 )
 WEB_SEARCHES_PER_ANGLE = 6
-MAX_WEB_PAGES = 45
+MAX_WEB_PAGES = 60
 PAGE_CHARS = 16000
 PAGE_WORKERS = 8
 # Read elsewhere (LinkedIn, X), unreadable as pages, or not pages at all.
@@ -955,73 +955,199 @@ def people_on_page(url: str, text: str, event: dict, today: date, read=None) -> 
     return out
 
 
+# Google, searched directly through Apify's Google Search scraper on the
+# platform's own Apify account: about a minute for every query below, and a
+# few cents. The model-driven search above is the fallback when it cannot
+# run: on the live Lisbon run all three of its searches hit their 4-minute
+# limit and found nothing.
+GOOGLE_ACTOR = "apify/google-search-scraper"
+GOOGLE_PAGES_PER_QUERY = 2
+MAX_FETCH = 120
+
+_QUERY_SHAPES = (
+    '"{n}" speakers', '"{n} {y}" speaker', '"{n}" keynote', '"{n}" panel',
+    '"{n}" "fireside chat"', '"speaking at {n}"', '"{n}" moderator',
+    '"{n}" exhibiting', '"{n}" booth', '"{n}" stand', '"{n}" startup pitch',
+    '"{n}" "startup showcase"', '"{n}" delegation', '"{n}" pavilion',
+    '"{n}" recap', '"{n}" takeaways', '"{n} {p}" highlights', '"{n}" interview',
+    '"{n}" podcast', '"{n}" "press release"', '"see you at {n}"', '"join us at {n}"',
+    '"meet us at {n}"', '"{n} {y}"', '"{n} {p}"',
+)
+
+
+def google_queries(event: dict) -> list[str]:
+    plain = [t for t in event_terms(event) if not t.startswith("#")]
+    tags = [t for t in event_terms(event) if t.startswith("#")]
+    if not plain:
+        return []
+    n = plain[-1]
+    year = _edition_year(event) or date.today().year
+    out = [q.format(n=n, y=year, p=year - 1) for q in _QUERY_SHAPES]
+    if tags:
+        out.append(tags[-1])
+    return list(dict.fromkeys(out))
+
+
+def google_results(event: dict, run=None) -> dict:
+    """Every organic result for google_queries, as {"results": [{url, title,
+    snippet, query}], "queries", "error"}. `run` stands in for the actor."""
+    import os
+    out = {"results": [], "queries": 0, "error": None}
+    queries = google_queries(event)
+    if not queries:
+        return out
+    if run is None:
+        from . import apify_transport
+        token = os.environ.get("APIFY_API_TOKEN", "")
+        if not token:
+            out["error"] = "not_configured"
+            return out
+
+        def run(qs):
+            return apify_transport.run_actor_and_wait(
+                os.environ.get("EVI_GOOGLE_ACTOR_ID", GOOGLE_ACTOR),
+                {"queries": "\n".join(qs), "maxPagesPerQuery": GOOGLE_PAGES_PER_QUERY,
+                 "resultsPerPage": 10, "mobileResults": False, "saveHtml": False,
+                 "saveHtmlToKeyValueStore": False, "includeUnfilteredResults": False},
+                token, timeout=240, strict=True)
+    out["queries"] = len(queries)
+    try:
+        pages = run(queries) or []
+    except Exception as e:
+        logger.warning("event_intel_attendees: Google search failed: %s", e)
+        out["error"] = "search_failed"
+        return out
+    for page in pages:
+        if not isinstance(page, dict):
+            continue
+        q = ((page.get("searchQuery") or {}).get("term") if isinstance(
+            page.get("searchQuery"), dict) else None) or ""
+        for r in page.get("organicResults") or []:
+            if isinstance(r, dict) and r.get("url"):
+                out["results"].append({"url": str(r["url"]), "title": str(r.get("title") or ""),
+                                       "snippet": str(r.get("description") or ""), "query": q})
+    return out
+
+
+def rank_results(results: list[dict], event: dict, event_host: str = "") -> list[str]:
+    """Addresses worth opening, best first: a result whose own title or
+    snippet names the event, then how many different searches returned it.
+    The event's own site and the social sites are left out."""
+    terms = event_terms(event)
+    score: dict = {}
+    first: dict = {}
+    for i, r in enumerate(results):
+        url = r["url"]
+        if _skipped_host(_host_of(url), event_host):
+            continue
+        k = url.rstrip("/").lower()
+        first.setdefault(k, (i, url))
+        named = mentions_event(r.get("title", "") + " " + r.get("snippet", ""), terms)
+        hits, was_named, queries = score.get(k, (0, False, set()))
+        queries = queries | {r.get("query")}
+        score[k] = (len(queries), was_named or named, queries)
+    order = sorted(score, key=lambda k: (not score[k][1], -score[k][0], first[k][0]))
+    return [first[k][1] for k in order]
+
+
 def search_web(event: dict, event_host: str = "", today: date | None = None,
-               fetch=None, ask=None, read=None, deadline: float | None = None) -> dict:
-    """People named on public pages: found by searching from three angles,
-    then every page opened here and read whole."""
+               fetch=None, ask=None, read=None, deadline: float | None = None,
+               google=None) -> dict:
+    """People named on public pages: Google searched directly from every
+    angle (the model's own search when Google cannot be reached), then every
+    page opened here and read whole."""
     from . import claude_websearch
     from .event_intel_harvest import fetch_page
     today = today or date.today()
     fetch = fetch or fetch_page
     out = {"people": [], "searches": 0, "pages": 0, "opened": 0, "on_event": 0,
            "read": 0, "unopened": 0, "rejected": 0, "unread": 0, "skipped": 0,
-           "error": None, "spend": None}
+           "error": None, "spend": None, "via": "google", "results": 0}
     spend = []
     began = time.monotonic()
-    with ThreadPoolExecutor(max_workers=len(WEB_ANGLES)) as pool:
-        found = [f.result() for f in [
-            pool.submit(contextvars.copy_context().run, find_pages, event, a, today, ask)
-            for a in WEB_ANGLES]]
-    errors = [f["error"] for f in found if f.get("error")]
-    named, rest = [], []
-    for f in found:
-        spend.append(f.get("spend"))
-        out["searches"] += f.get("searches", 0)
-        urls = f.get("urls") or []
-        named.extend(urls[:f.get("named", 0)])
-        rest.extend(urls[f.get("named", 0):])
-    if errors and len(errors) == len(found):
-        out["error"] = errors[0]
-    # The pages the searches pointed at first, then everything else they
-    # returned, deduped, without the event's own site or the social sites.
-    seen, keep = set(), []
-    for u in named + rest:
-        k = u.rstrip("/").lower()
-        if k in seen or _skipped_host(_host_of(u), event_host):
-            continue
-        seen.add(k)
-        keep.append(u)
-    keep = keep[:MAX_WEB_PAGES]
+    g = (google or google_results)(event)
+    keep = []
+    if g.get("results"):
+        out["searches"] = g.get("queries", 0)
+        out["results"] = len(g["results"])
+        keep = rank_results(g["results"], event, event_host)
+    else:
+        out["via"] = "model"
+        out["google_error"] = g.get("error") or "no_results"
+        with ThreadPoolExecutor(max_workers=len(WEB_ANGLES)) as pool:
+            found = [f.result() for f in [
+                pool.submit(contextvars.copy_context().run, find_pages, event, a, today, ask)
+                for a in WEB_ANGLES]]
+        errors = [f["error"] for f in found if f.get("error")]
+        named, rest = [], []
+        for f in found:
+            spend.append(f.get("spend"))
+            out["searches"] += f.get("searches", 0)
+            urls = f.get("urls") or []
+            named.extend(urls[:f.get("named", 0)])
+            rest.extend(urls[f.get("named", 0):])
+        if errors and len(errors) == len(found):
+            out["error"] = errors[0]
+        # The pages the searches pointed at first, then everything else
+        # they returned, deduped, without the event's own site or the
+        # social sites.
+        seen = set()
+        for u in named + rest:
+            k = u.rstrip("/").lower()
+            if k in seen or _skipped_host(_host_of(u), event_host):
+                continue
+            seen.add(k)
+            keep.append(u)
+    keep = keep[:MAX_FETCH]
     out["pages"] = len(keep)
     out["find_seconds"] = int(time.monotonic() - began)
     terms = event_terms(event)
 
-    def one(url):
+    # Opening is free, so every candidate is opened; reading costs a model
+    # call, so the first MAX_WEB_PAGES that name the event are read.
+    def opened(url):
         if deadline and time.monotonic() > deadline:
-            return {"skipped": True}
+            return url, {"skipped": True}
         got = fetch(url)
         if got.get("status") != "ok" or not got.get("text"):
-            return {"unopened": True}
-        text = got["text"]
-        if not mentions_event(text, terms):
-            return {"opened": True}
-        res = people_on_page(got.get("final_url") or url, text, event, today, read)
-        return dict(res, opened=True, on_event=True)
-    results = []
+            return url, {"unopened": True}
+        return url, {"text": got["text"], "final": got.get("final_url") or url}
+    fetched = []
     if keep:
+        with ThreadPoolExecutor(max_workers=12) as pool:
+            fetched = [f.result() for f in [
+                pool.submit(contextvars.copy_context().run, opened, u) for u in keep]]
+    to_read = []
+    for url, got in fetched:
+        if got.get("skipped"):
+            out["skipped"] += 1
+        elif got.get("unopened"):
+            out["unopened"] += 1
+        else:
+            out["opened"] += 1
+            if mentions_event(got["text"], terms):
+                out["on_event"] += 1
+                to_read.append((got["final"], got["text"]))
+    out["not_read"] = max(0, len(to_read) - MAX_WEB_PAGES)
+    to_read = to_read[:MAX_WEB_PAGES]
+
+    def one(item):
+        if deadline and time.monotonic() > deadline:
+            return {"skipped": True}
+        return people_on_page(item[0], item[1], event, today, read)
+    results = []
+    if to_read:
         with ThreadPoolExecutor(max_workers=PAGE_WORKERS) as pool:
             results = [f.result() for f in [
-                pool.submit(contextvars.copy_context().run, one, u) for u in keep]]
+                pool.submit(contextvars.copy_context().run, one, it) for it in to_read]]
     for r in results:
-        out["skipped"] += 1 if r.get("skipped") else 0
-        out["unopened"] += 1 if r.get("unopened") else 0
-        out["opened"] += 1 if r.get("opened") else 0
-        if r.get("on_event"):
-            out["on_event"] += 1
-            spend.append(r.get("spend"))
-            out["unread" if r.get("error") else "read"] += 1
-            out["rejected"] += r.get("rejected", 0)
-            out["people"].extend(r.get("people") or [])
+        if r.get("skipped"):
+            out["skipped"] += 1
+            continue
+        spend.append(r.get("spend"))
+        out["unread" if r.get("error") else "read"] += 1
+        out["rejected"] += r.get("rejected", 0)
+        out["people"].extend(r.get("people") or [])
     out["spend"] = claude_websearch.spend_sum(*[s for s in spend if s])
     out["seconds"] = int(time.monotonic() - began)
     return out
@@ -1241,9 +1367,10 @@ def gather(event: dict, participants: list[dict], event_host: str = "",
 
     spend.append(web.get("spend"))
     people.extend(web.get("people") or [])
-    report["web"] = {k: web.get(k) for k in ("searches", "pages", "opened", "on_event",
-                                              "read", "unread", "unopened", "rejected",
-                                              "skipped", "error", "find_seconds", "seconds")}
+    report["web"] = {k: web.get(k) for k in ("via", "searches", "results", "pages", "opened",
+                                              "on_event", "read", "not_read", "unread",
+                                              "unopened", "rejected", "skipped", "error",
+                                              "google_error", "find_seconds", "seconds")}
     report["web"]["people"] = len(web.get("people") or [])
     people.extend(staff.get("people") or [])
     report["staff"] = {"companies": staff.get("companies", 0), "skipped": staff.get("skipped", 0),
@@ -1301,8 +1428,11 @@ def note(report: dict) -> str:
         bits.append("The web search did not finish, so public pages beyond LinkedIn "
                     "and X were not checked.")
     if web.get("skipped"):
-        bits.append("%d of the %d web pages found were not opened: the search ran out "
-                    "of time first." % (web["skipped"], web.get("pages", 0)))
+        bits.append("%d of the %d web pages found were not opened or read: the search "
+                    "ran out of time first." % (web["skipped"], web.get("pages", 0)))
+    if web.get("not_read"):
+        bits.append("%d more web pages naming the event were found than are read in one "
+                    "search; the best-matching %d were read." % (web["not_read"], MAX_WEB_PAGES))
     if web.get("unread"):
         bits.append("%d of the %d web pages naming the event could not be read." % (
             web["unread"], web.get("on_event", 0)))

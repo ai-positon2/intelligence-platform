@@ -239,6 +239,10 @@ def test_posts_are_read_in_batches_that_cover_every_post():
 
 # ── 3. the public web ──
 
+def _no_google(event):
+    return {"results": [], "queries": 0, "error": "not_configured"}
+
+
 def test_pages_are_found_from_every_angle_then_opened_and_read_whole():
     asked = []
 
@@ -276,7 +280,8 @@ def test_pages_are_found_from_every_angle_then_opened_and_read_whole():
                  "quote": "the speakers include Acme CEO Lee Park"}]}
         return {"people": [{"name": "Ana Silva", "status": "attended",
                             "quote": "Ana Silva attended Widget Expo"}]}
-    out = A.search_web(EVENT, "widgetexpo.com", TODAY, fetch=fetch, ask=ask, read=read)
+    out = A.search_web(EVENT, "widgetexpo.com", TODAY, fetch=fetch, ask=ask, read=read,
+                       google=_no_google)
     assert len(asked) == len(A.WEB_ANGLES) and out["searches"] == 6 * len(A.WEB_ANGLES)
     # Never the event's own site, LinkedIn, or an address no search returned.
     assert sorted(opened) == ["https://blog.example.com/b", "https://dead.example.com/c",
@@ -307,7 +312,7 @@ def test_a_long_page_is_read_from_just_before_the_event_is_named():
 
 def test_a_web_search_that_fails_is_reported():
     out = A.search_web(EVENT, ask=lambda s, u, **k: {"text": "", "error": {"kind": "transport"}},
-                       fetch=lambda u: {})
+                       fetch=lambda u: {}, google=_no_google)
     assert out["error"] == "transport" and out["people"] == []
     assert "public pages beyond LinkedIn and X were not checked" in A.note(
         {"web": out, "counts": {"confirmed": 1}})
@@ -903,7 +908,92 @@ def test_pages_left_unopened_at_the_time_limit_are_counted_and_said():
         return {"text": "{}", "error": None, "result_urls": ["https://a.example.com/1",
                                                              "https://b.example.com/2"]}
     out = A.search_web(EVENT, ask=ask, fetch=lambda u: {"status": "ok", "text": "x"},
-                       deadline=_t.monotonic() - 1)
+                       deadline=_t.monotonic() - 1, google=_no_google)
     assert out["skipped"] == 2 and out["opened"] == 0
     assert "2 of the 2 web pages found were not opened" in A.note(
         {"web": out, "counts": {"confirmed": 1}})
+
+
+
+# ── Google ──
+
+def test_google_is_asked_from_every_angle_with_the_years_and_hashtag():
+    qs = A.google_queries({"name": "Web Summit Qatar 2027"})
+    assert '"Web Summit Qatar" speakers' in qs and '"Web Summit Qatar 2027" speaker' in qs
+    assert '"Web Summit Qatar 2026" highlights' in qs and '"see you at Web Summit Qatar"' in qs
+    assert "#WebSummitQatar" in qs and len(qs) == len(set(qs)) >= 25
+
+
+def _serp(term, *rows):
+    return {"searchQuery": {"term": term}, "organicResults": [
+        {"url": u, "title": t, "description": d} for u, t, d in rows]}
+
+
+def test_google_results_are_read_off_every_results_page():
+    out = A.google_results(EVENT, run=lambda qs: [
+        _serp(qs[0], ("https://a.example.com/1", "Widget Expo speakers", "Lee Park")),
+        _serp(qs[1], ("https://b.example.com/2", "Other", "")), "junk"])
+    assert [r["url"] for r in out["results"]] == ["https://a.example.com/1", "https://b.example.com/2"]
+    assert out["results"][0]["query"] == '"Widget Expo" speakers'
+
+    def boom(qs):
+        raise RuntimeError("actor failed")
+    assert A.google_results(EVENT, run=boom)["error"] == "search_failed"
+
+
+def test_results_naming_the_event_and_found_by_more_searches_are_opened_first():
+    order = A.rank_results([
+        {"url": "https://plain.example.com/", "title": "Nothing", "snippet": "", "query": "q1"},
+        {"url": "https://often.example.com/x", "title": "Nothing", "snippet": "", "query": "q1"},
+        {"url": "https://often.example.com/x/", "title": "Nothing", "snippet": "", "query": "q2"},
+        {"url": "https://named.example.com/y", "title": "Widget Expo 2026 recap", "snippet": "",
+         "query": "q3"},
+        {"url": "https://widgetexpo.com/speakers", "title": "Widget Expo", "snippet": "", "query": "q1"},
+        {"url": "https://www.linkedin.com/posts/z", "title": "Widget Expo", "snippet": "", "query": "q1"},
+    ], EVENT, "widgetexpo.com")
+    assert order == ["https://named.example.com/y", "https://often.example.com/x",
+                     "https://plain.example.com/"]
+
+
+def test_with_google_every_result_is_opened_and_only_pages_naming_the_event_are_read(monkeypatch):
+    monkeypatch.setattr(A, "MAX_WEB_PAGES", 2)
+    results = [{"url": "https://p%d.example.com/" % i, "title": "", "snippet": "", "query": "q"}
+               for i in range(5)]
+    texts = {"https://p0.example.com/": "Lee Park spoke at Widget Expo.",
+             "https://p1.example.com/": "Nothing relevant here at all.",
+             "https://p2.example.com/": "Mia Wong exhibited at Widget Expo.",
+             "https://p3.example.com/": "Bo Chen attended Widget Expo."}
+    opened, read_urls = [], []
+
+    def fetch(url):
+        opened.append(url)
+        return {"status": "ok", "text": texts[url]} if url in texts else {"status": "blocked"}
+
+    def read(url, text, event, today):
+        read_urls.append(url)
+        name = text.split(" ")[0] + " " + text.split(" ")[1]
+        return {"people": [{"name": name, "status": "attended", "quote": text.rstrip(".")}]}
+
+    def no_model(*a, **k):
+        raise AssertionError("the model search is only the fallback")
+    out = A.search_web(EVENT, "", TODAY, fetch=fetch, ask=no_model, read=read,
+                       google=lambda e: {"results": results, "queries": 26, "error": None})
+    assert sorted(opened) == sorted(r["url"] for r in results)
+    assert read_urls == ["https://p0.example.com/", "https://p2.example.com/"]
+    assert (out["via"], out["searches"], out["opened"], out["unopened"], out["on_event"],
+            out["read"], out["not_read"]) == ("google", 26, 4, 1, 3, 2, 1)
+    assert [p["name"] for p in out["people"]] == ["Lee Park", "Mia Wong"]
+    assert "1 more web pages naming the event were found" in A.note(
+        {"web": out, "counts": {"confirmed": 1}})
+
+
+def test_when_google_cannot_be_searched_the_model_search_takes_over():
+    asked = []
+
+    def ask(system, user, **kw):
+        asked.append(1)
+        return {"text": "{}", "error": None, "result_urls": []}
+    out = A.search_web(EVENT, ask=ask, fetch=lambda u: {},
+                       google=lambda e: {"results": [], "error": "search_failed"})
+    assert out["via"] == "model" and out["google_error"] == "search_failed"
+    assert len(asked) == len(A.WEB_ANGLES)
