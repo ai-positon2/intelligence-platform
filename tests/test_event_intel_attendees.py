@@ -767,7 +767,9 @@ def test_x_posts_are_read_with_the_linkedin_ones_and_counted_apart():
                 {"who": "author", "status": "attending", "quote": "Going to Widget Expo next week"}]}
             for ref, _ in batch]},
         "web": lambda e, h, t: {"people": []}, "staff": lambda p, eid: {"people": []}})
-    assert got["report"]["x"] == {"posts": 1, "returned": 5, "error": None, "people": 1}
+    x = dict(got["report"]["x"])
+    assert isinstance(x.pop("seconds"), int)
+    assert x == {"posts": 1, "returned": 5, "error": None, "people": 1}
     assert got["report"]["linkedin"]["people"] == 1
     assert sorted(r["name"] for r in got["rows"]) == ["Jane Doe", "Sam Lee"]
 
@@ -881,3 +883,27 @@ def test_searches_carry_the_hashtag_of_this_edition_and_the_last():
         '"Web Summit Qatar"', "#WebSummitQatar", "#WebSummitQatar2027", "#WebSummitQatar2026"]
     assert A.linkedin_queries({"name": "Money20/20 USA", "starts_on": "2026-10-25"})[-2:] == [
         "#Money2020USA2026", "#Money2020USA2025"]
+
+
+
+def test_every_search_and_reading_has_a_whole_call_limit():
+    seen = []
+
+    def ask(system, user, **kw):
+        seen.append(kw)
+        return {"text": "{}", "error": None, "result_urls": []}
+    A.find_pages(EVENT, A.WEB_ANGLES[0], TODAY, ask=ask)
+    assert seen[0]["deadline"] == A.FIND_SECONDS and seen[0]["max_uses"] > 0
+
+
+def test_pages_left_unopened_at_the_time_limit_are_counted_and_said():
+    import time as _t
+
+    def ask(system, user, **kw):
+        return {"text": "{}", "error": None, "result_urls": ["https://a.example.com/1",
+                                                             "https://b.example.com/2"]}
+    out = A.search_web(EVENT, ask=ask, fetch=lambda u: {"status": "ok", "text": "x"},
+                       deadline=_t.monotonic() - 1)
+    assert out["skipped"] == 2 and out["opened"] == 0
+    assert "2 of the 2 web pages found were not opened" in A.note(
+        {"web": out, "counts": {"confirmed": 1}})

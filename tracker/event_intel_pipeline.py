@@ -507,7 +507,7 @@ def _gather_attendees(event: dict, rows: list[dict], host: str) -> dict:
     from . import event_intel_attendees
     import time
     return event_intel_attendees.gather(event, rows, host,
-                                        deadline=time.monotonic() + 900.0)
+                                        deadline=time.monotonic() + 1500.0)
 
 
 def _find_attendees(run_id: int, event_id: int) -> None:

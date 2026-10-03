@@ -80,7 +80,10 @@ STAFF_CHUNK = 10
 STAFF_SENIORITIES = ["owner", "founder", "c_suite", "partner", "vp", "head", "director"]
 # Model calls in flight at once across every source of one search: LinkedIn
 # posts, X posts and web pages are all read at the same time now.
-_MODEL_SLOTS = threading.BoundedSemaphore(10)
+_MODEL_SLOTS = threading.BoundedSemaphore(12)
+# Whole-call limits, in seconds.
+FIND_SECONDS = 240.0
+READ_SECONDS = 180.0
 RETRY_PAUSE = 2.0
 
 STAFF_ROLES = ("exhibitor", "sponsor", "partner")
@@ -613,7 +616,7 @@ def _classify_batch(batch: list[tuple[str, dict]], event: dict, today: date) -> 
                                              "\n\n".join(lines)))
     with _MODEL_SLOTS:
         res = claude_websearch.ask(_POST_SYSTEM, user, max_uses=0, max_tokens=10000,
-                                   timeout=180.0)
+                                   timeout=120.0, deadline=READ_SECONDS)
     spend = claude_websearch.spend_of(res)
     if res.get("error"):
         return {"posts": None, "error": (res["error"] or {}).get("kind") or "error", "spend": spend}
@@ -847,8 +850,11 @@ def find_pages(event: dict, angle: tuple, today: date, ask=None) -> dict:
     user = ("Event: %s\nToday: %s\nAngle: %s"
             % (_event_brief(event), today.isoformat(), angle[1]))
     with _MODEL_SLOTS:
+        # `deadline` is the whole call's limit; `timeout` is only one read's.
+        # Without it a search could run for the helper's 40-minute default,
+        # and on the live Qatar run the pages were never reached.
         res = ask(_FIND_SYSTEM, user, max_uses=WEB_SEARCHES_PER_ANGLE, max_tokens=4000,
-                  timeout=240.0)
+                  timeout=120.0, deadline=FIND_SECONDS)
     out = {"urls": [], "named": 0, "spend": claude_websearch.spend_of(res), "error": None,
            "searches": int(res.get("search_count") or 0)}
     if res.get("error"):
@@ -903,7 +909,7 @@ def _read_page(url: str, text: str, event: dict, today: date) -> dict:
         _event_brief(event), today.isoformat(), url, text)
     with _MODEL_SLOTS:
         res = claude_websearch.ask(_PAGE_SYSTEM, user, max_uses=0, max_tokens=8000,
-                                   timeout=180.0)
+                                   timeout=120.0, deadline=READ_SECONDS)
     spend = claude_websearch.spend_of(res)
     if res.get("error"):
         return {"people": None, "error": (res["error"] or {}).get("kind") or "error",
@@ -958,8 +964,10 @@ def search_web(event: dict, event_host: str = "", today: date | None = None,
     today = today or date.today()
     fetch = fetch or fetch_page
     out = {"people": [], "searches": 0, "pages": 0, "opened": 0, "on_event": 0,
-           "read": 0, "unopened": 0, "rejected": 0, "unread": 0, "error": None, "spend": None}
+           "read": 0, "unopened": 0, "rejected": 0, "unread": 0, "skipped": 0,
+           "error": None, "spend": None}
     spend = []
+    began = time.monotonic()
     with ThreadPoolExecutor(max_workers=len(WEB_ANGLES)) as pool:
         found = [f.result() for f in [
             pool.submit(contextvars.copy_context().run, find_pages, event, a, today, ask)
@@ -985,6 +993,7 @@ def search_web(event: dict, event_host: str = "", today: date | None = None,
         keep.append(u)
     keep = keep[:MAX_WEB_PAGES]
     out["pages"] = len(keep)
+    out["find_seconds"] = int(time.monotonic() - began)
     terms = event_terms(event)
 
     def one(url):
@@ -1004,6 +1013,7 @@ def search_web(event: dict, event_host: str = "", today: date | None = None,
             results = [f.result() for f in [
                 pool.submit(contextvars.copy_context().run, one, u) for u in keep]]
     for r in results:
+        out["skipped"] += 1 if r.get("skipped") else 0
         out["unopened"] += 1 if r.get("unopened") else 0
         out["opened"] += 1 if r.get("opened") else 0
         if r.get("on_event"):
@@ -1013,6 +1023,7 @@ def search_web(event: dict, event_host: str = "", today: date | None = None,
             out["rejected"] += r.get("rejected", 0)
             out["people"].extend(r.get("people") or [])
     out["spend"] = claude_websearch.spend_sum(*[s for s in spend if s])
+    out["seconds"] = int(time.monotonic() - began)
     return out
 
 
@@ -1171,9 +1182,14 @@ def gather(event: dict, participants: list[dict], event_host: str = "",
     # X, the web search and the staff lookup do not depend on anything else,
     # so they run while LinkedIn is searched and its posts are read. One
     # after another, a Lisbon search took 14 minutes.
+    began = time.monotonic()
+
     def safely(fn, fallback, *args):
+        t = time.monotonic()
         try:
-            return fn(*args)
+            got = fn(*args)
+            # How long each source took, so a slow search says where it went.
+            return dict(got, seconds=int(time.monotonic() - t)) if isinstance(got, dict) else got
         except Exception as e:
             logger.exception("event_intel_attendees: a source failed")
             return dict(fallback, error=fallback.get("error") or str(e)[:200])
@@ -1208,9 +1224,10 @@ def gather(event: dict, participants: list[dict], event_host: str = "",
 
     report["linkedin"] = {"posts": len(li.get("posts") or []),
                           "searches": li.get("searched", 0),
-                          "returned": li.get("returned", 0), "error": li.get("error")}
+                          "returned": li.get("returned", 0), "error": li.get("error"),
+                          "seconds": li.get("seconds")}
     report["x"] = {"posts": len(xs.get("posts") or []), "returned": xs.get("returned", 0),
-                   "error": xs.get("error")}
+                   "error": xs.get("error"), "seconds": xs.get("seconds")}
     for key, read in (("linkedin", li_read), ("x", x_read)):
         spend.extend(read.get("spend") or [])
         people.extend(read.get("people") or [])
@@ -1226,11 +1243,12 @@ def gather(event: dict, participants: list[dict], event_host: str = "",
     people.extend(web.get("people") or [])
     report["web"] = {k: web.get(k) for k in ("searches", "pages", "opened", "on_event",
                                               "read", "unread", "unopened", "rejected",
-                                              "error")}
+                                              "skipped", "error", "find_seconds", "seconds")}
     report["web"]["people"] = len(web.get("people") or [])
     people.extend(staff.get("people") or [])
     report["staff"] = {"companies": staff.get("companies", 0), "skipped": staff.get("skipped", 0),
                        "people": len(staff.get("people") or []), "error": staff.get("error")}
+    report["seconds"] = int(time.monotonic() - began)
 
     rows = merge(people)
     total = claude_websearch.spend_sum(*[s for s in spend if s])
@@ -1282,7 +1300,10 @@ def note(report: dict) -> str:
     if web.get("error"):
         bits.append("The web search did not finish, so public pages beyond LinkedIn "
                     "and X were not checked.")
-    elif web.get("unread"):
+    if web.get("skipped"):
+        bits.append("%d of the %d web pages found were not opened: the search ran out "
+                    "of time first." % (web["skipped"], web.get("pages", 0)))
+    if web.get("unread"):
         bits.append("%d of the %d web pages naming the event could not be read." % (
             web["unread"], web.get("on_event", 0)))
     st = report.get("staff") or {}
@@ -1299,7 +1320,7 @@ def note(report: dict) -> str:
     return " ".join(bits)
 
 
-def find_for_run(run_id: int, email: str, deadline_seconds: float = 900.0) -> dict:
+def find_for_run(run_id: int, email: str, deadline_seconds: float = 1500.0) -> dict:
     """Search every event in a finished run and store what was found.
     Never raises; the result is what the scan record keeps."""
     from . import event_intel_store as store
