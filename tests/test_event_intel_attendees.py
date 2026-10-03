@@ -1149,7 +1149,8 @@ def test_an_actor_run_cut_off_still_hands_back_its_dataset(monkeypatch):
         raise T.ApifyTransportError("did not finish")
     monkeypatch.setattr(T, "_poll_run", poll)
     monkeypatch.setattr(T, "_fetch_dataset_items", lambda ds, tok: [{"url": "u", "text": "t"}])
-    out = T.run_actor_collect("apify/website-content-crawler", {}, "tok", timeout=60)
+    out = T.run_actor_collect("apify/website-content-crawler", {}, "tok", timeout=60,
+                              memory_mb=8192)
     assert out["items"] == [{"url": "u", "text": "t"}] and "did not finish" in out["error"]
-    assert posted[0][1] == {"timeout": 60}                  # Apify stops the run itself
+    assert posted[0][1] == {"timeout": 60, "memory": 8192}  # Apify stops the run itself
     assert posted[1][0].endswith("/actor-runs/run1/abort")  # and a run still going is stopped

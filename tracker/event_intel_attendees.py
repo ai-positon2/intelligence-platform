@@ -1087,7 +1087,11 @@ def rank_results(results: list[dict], event: dict, event_host: str = "") -> list
 # Content Crawler, all in one run. On the live Lisbon run 43 of 196 Google
 # results would not open the plain way.
 BROWSER_ACTOR = "apify/website-content-crawler"
-BROWSER_SECONDS = 240
+# The live Lisbon run loaded 14 of 39 pages in 4 minutes at the crawler's
+# default memory and ran out of time; memory is what lets it run more
+# browsers at once.
+BROWSER_SECONDS = 360
+BROWSER_MEMORY_MB = 8192
 
 
 def _url_key(u: str) -> str:
@@ -1121,7 +1125,7 @@ def browser_open(urls: list[str], run=None) -> dict:
                  "maxConcurrency": 20, "maxRequestRetries": 1,
                  "requestTimeoutSecs": 45, "removeCookieWarnings": True,
                  "saveMarkdown": False, "proxyConfiguration": {"useApifyProxy": True}},
-                token, timeout=BROWSER_SECONDS)
+                token, timeout=BROWSER_SECONDS, memory_mb=BROWSER_MEMORY_MB)
     try:
         got = run(list(urls)) or {}
     except Exception as e:
