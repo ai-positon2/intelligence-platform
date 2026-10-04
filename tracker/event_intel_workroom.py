@@ -243,6 +243,13 @@ _DESCRIPTORS = {"holdings", "group", "technologies", "technology", "solutions",
 _TLDS = {"com", "io", "ai", "net", "org", "co", "app", "dev", "tech"}
 
 
+def event_series_key(name: str) -> str:
+    """An event's name without its year, case or punctuation: "Money20/20
+    USA 2026" and "money20/20 usa" are one event, not two places a company
+    was seen."""
+    return re.sub(r"[^\w]+", "", re.sub(r"\b(?:19|20)\d{2}\b", " ", str(name or "").casefold()))
+
+
 def roster_key(name: str) -> str:
     """org_key for telling companies apart rather than matching a note.
 
@@ -336,17 +343,33 @@ def match_booth_notes(notes: dict, rows: list[dict]) -> dict:
             roster[key] = r
     by_org, unmatched = {}, []
     for note_key, note in (notes or {}).items():
+        # The company the note is written against, exactly, wins outright:
+        # "Acme" is Acme even with Acme Analytics on the roster too, and
+        # "Google Cloud" is Google Cloud, not Google (workroom audit,
+        # 2026-10-04: both were reported as matching nothing).
         hits = {k for k, r in roster.items()
-                if k == note_key
-                or org_key(str(r.get("org_domain") or "")) == note_key
-                or re.search(r"(?<!\w)%s(?!\w)" % re.escape(k), note_key)
-                or re.match(r"%s(?!\w)" % re.escape(note_key), k)}
+                if k == note_key or org_key(str(r.get("org_domain") or "")) == note_key}
+        if not hits and not _NOTE_OTHER_COMPANY.search(note_key):
+            # A note about another company that merely names a roster one
+            # ("Splunk, a Cisco company", "Contoso, a Microsoft partner")
+            # is not about that roster company: it was being attached to
+            # Cisco, and the draft followed up on a demo Cisco never asked for.
+            hits = {k for k in roster
+                    if re.search(r"(?<!\w)%s(?!\w)" % re.escape(k), note_key)
+                    or re.match(r"%s(?!\w)" % re.escape(note_key), k)}
         if len(hits) == 1:
             k = hits.pop()
             by_org[k] = ("%s %s" % (by_org[k], note)).strip() if k in by_org else note
         else:
             unmatched.append(note_key)
     return {"by_org": by_org, "unmatched": sorted(unmatched)}
+
+
+# Words that make a note's company a different one from a roster company it
+# names: an owner, a parent, a partner, a customer.
+_NOTE_OTHER_COMPANY = re.compile(
+    r"\b(?:a|an|company|partner|partners|subsidiary|division|unit|owned|part|"
+    r"reseller|customer|client|spinoff|spin|formerly|acquired|by|of)\b")
 
 
 # Language that asserts a conversation took place. Any of it, on a row with no
@@ -396,6 +419,20 @@ _CLAIMS_OBSERVED = tuple(re.compile(p) for p in (
     r"\bthan\s+(i|we)\s+expected\b",
     r"\bthan\s+(past|previous|last)\s+(years?|editions?)\b",
     r"\b(stood|stand)\s+out\s+(to\s+(me|us))\b",
+    # Workroom audit, 2026-10-04: a talk described as heard, and attendance
+    # assumed, each passed unflagged on an attended-class run.
+    r"\b(loved|enjoyed|liked|appreciated|admired)\s+(your|the|their|his|her)\s+"
+    r"(keynote|talk|session|panel|presentation|demo|remarks|fireside|pitch|workshop)",
+    r"\b(caught|heard|watched|attended|saw|catching|hearing|watching)\s+(your|the|their|his|her)\s+"
+    r"(keynote|talk|session|panel|presentation|fireside|remarks|pitch|workshop)",
+    r"\byour\s+(keynote|talk|session|panel|presentation|pitch|workshop)\b[^.!?]{0,60}?"
+    r"\b(was|were)\b",
+    r"\b(since|as|now\s+that|given\s+that)\s+(you|your\s+team|your\s+people)\s+(was|were)\s+(at|there)\b",
+    r"\bwhile\s+you\s+were\s+(at|there)\b",
+    # Live run 32 (Stripe, Money20/20 USA, read before the event): "Saw HSBC
+    # speaking at Money20/20 USA this year".
+    r"\b(saw|seeing|watched|caught|heard)\s+[^.!?]{1,40}?\s+(speaking|present|presenting|"
+    r"on\s+stage|on\s+the\s+panel|on\s+a\s+panel|talk\s+about|keynoting)\b",
 ))
 
 # Asserting the client had a booth or a stand. On an event the client only
@@ -422,7 +459,7 @@ _AGGRESSIVE = tuple(re.compile(p) for p in (
     r"\bwhy\s+(customers|companies|teams)\s+(leave|left|churn)",
     r"\b(outperform|outgrow|beat)s?\b",
     r"\bmaking\s+the\s+switch\b",
-    r"\bstuck\s+(with|on)\b",
+    r"\bstuck\s+(with|on)\b(?!\s+(me|us|my|our)\b)",
     r"\btired\s+of\b",
     r"\bfed\s+up\b",
     r"\bdisappointed\s+(with|by)\b",
@@ -567,7 +604,10 @@ def profile_brief(profile: dict) -> str:
 
 def event_brief(event: dict) -> str:
     bits = ["Event: %s" % (event.get("name") or "unnamed")]
-    for label, key in (("edition", "edition"), ("dates", "starts_on"), ("ended", "ends_on"),
+    ends = str(event.get("ends_on") or "")[:10]
+    # "ended" for a date still ahead told the drafter the event was over.
+    ended = "ended" if ends and ends < datetime.date.today().isoformat() else "ends (not yet held)"
+    for label, key in (("edition", "edition"), ("dates", "starts_on"), (ended, "ends_on"),
                        ("where", "location"), ("organiser", "organizer"),
                        ("site", "website")):
         if event.get(key):
@@ -783,7 +823,8 @@ _SAFE_FIT_NOTE = "Model-estimated company fit; verify against the client ICP and
 
 
 def fallback_opener(*, org: str, event_name: str, role_label: str,
-                    event_class: str, client_name: str | None = None) -> str:
+                    event_class: str, client_name: str | None = None,
+                    upcoming: bool = False) -> str:
     """A true opener, built in code from facts already established.
 
     Deliberately not a second model call. A model that has just fabricated a
@@ -800,6 +841,24 @@ def fallback_opener(*, org: str, event_name: str, role_label: str,
         subject, was = client_name, "was"
     else:
         subject, was = "We", "were"
+    if upcoming:
+        # The event has not happened. Nothing can be said about a stand
+        # anyone had, an audience anyone sat in, or a company anyone saw
+        # there (workroom audit, 2026-10-04: "had a stand there too" on an
+        # event three weeks away).
+        listed = _listed_as(org, role_label, event_name, upcoming=True)
+        if event_class == CLASS_EXHIBITED:
+            return ("%s. %s will have a stand there too, and there is one thing I "
+                    "would like to ask before then." % (listed, subject))
+        if event_class == CLASS_ATTENDED:
+            return ("%s. %s will be there too, and there is one thing I would like "
+                    "to ask before then." % (listed, subject))
+        if event_class == CLASS_PARTNER:
+            return ("%s. %s %s on an adjacent problem, and the overlap is usually "
+                    "worth a short conversation."
+                    % (listed, subject, "works" if client_name else "work"))
+        return ("%s. There is one question worth asking before then, and it is "
+                "worth twenty minutes if it is on your list too." % listed)
 
     if event_class == CLASS_COMPETITOR:
         # Says nothing about where the sender was. The previous version opened
@@ -836,7 +895,7 @@ def fallback_opener(*, org: str, event_name: str, role_label: str,
             % (listed, subject, was))
 
 
-def _listed_as(org: str, role_label: str, event_name: str) -> str:
+def _listed_as(org: str, role_label: str, event_name: str, upcoming: bool = False) -> str:
     """How the roster lists this company, as the start of a sentence.
 
     "Publicly said they are attending" is a role label, not a list name, and
@@ -845,12 +904,13 @@ def _listed_as(org: str, role_label: str, event_name: str) -> str:
     from .event_intel_store import ROLE_LABELS, ROLE_ATTENDEE_DECLARED
     if role_label == ROLE_LABELS.get(ROLE_ATTENDEE_DECLARED):
         return "I saw %s say publicly it would be at %s" % (org, event_name)
-    return "I saw %s on the %s list at %s" % (org, (role_label or "roster").lower(), event_name)
+    return "I saw %s on the %s list %s %s" % (org, (role_label or "roster").lower(),
+                                             "for" if upcoming else "at", event_name)
 
 
 def enforce(rows: list[dict], *, event_class: str, notes: dict,
             event_name: str, client_name: str | None = None,
-            client_site: str | None = None) -> dict:
+            client_site: str | None = None, upcoming: bool = False) -> dict:
     """Apply the four rules to every draft, and rewrite what breaks them.
 
     Returns the rows with a `draft_status` and, where a draft was thrown away,
@@ -904,7 +964,7 @@ def enforce(rows: list[dict], *, event_class: str, notes: dict,
             opener = fallback_opener(
                 org=row.get("org_name") or "this company", event_name=event_name,
                 role_label=role_label, event_class=event_class,
-                client_name=client_name)
+                client_name=client_name, upcoming=upcoming)
             angle, fit_note = _SAFE_ANGLE, _SAFE_FIT_NOTE
             claims = []
         elif claims and note:
@@ -929,7 +989,7 @@ def enforce(rows: list[dict], *, event_class: str, notes: dict,
             opener = fallback_opener(
                 org=row.get("org_name") or "this company", event_name=event_name,
                 role_label=role_label, event_class=event_class,
-                client_name=client_name)
+                client_name=client_name, upcoming=upcoming)
             angle, fit_note = _SAFE_ANGLE, _SAFE_FIT_NOTE
 
         # What the event was like, told as seen, with no note saying so.
@@ -944,7 +1004,7 @@ def enforce(rows: list[dict], *, event_class: str, notes: dict,
             opener = fallback_opener(
                 org=row.get("org_name") or "this company", event_name=event_name,
                 role_label=role_label, event_class=event_class,
-                client_name=client_name)
+                client_name=client_name, upcoming=upcoming)
             angle, fit_note = _SAFE_ANGLE, _SAFE_FIT_NOTE
 
         # Rule 2. Displacement, on a competitor's event.
@@ -962,7 +1022,7 @@ def enforce(rows: list[dict], *, event_class: str, notes: dict,
                 opener = fallback_opener(
                     org=row.get("org_name") or "this company",
                     event_name=event_name, role_label=role_label,
-                    event_class=event_class, client_name=client_name)
+                    event_class=event_class, client_name=client_name, upcoming=upcoming)
                 angle, fit_note = _SAFE_ANGLE, _SAFE_FIT_NOTE
 
         # A link in an outbound draft that nobody supplied: the roster and the
@@ -982,7 +1042,7 @@ def enforce(rows: list[dict], *, event_class: str, notes: dict,
             opener = fallback_opener(
                 org=row.get("org_name") or "this company", event_name=event_name,
                 role_label=role_label, event_class=event_class,
-                client_name=client_name)
+                client_name=client_name, upcoming=upcoming)
             angle, fit_note = _SAFE_ANGLE, _SAFE_FIT_NOTE
 
         # Rule 3. Nobody named means no personal outreach.
@@ -1030,8 +1090,20 @@ def present_outreach(run, rows):
         return [dict(r, opener=None, angle=None, fit_note=None,
                      draft_status='review_required', draft_reason='The event relationship needs confirmation.') for r in rows]
     notes = {org_key(r.get('org_name')): r['booth_note'] for r in rows if r.get('booth_note')}
+    # The same client and window the run was drafted with: without them a
+    # link to the client's own site was replaced here as "a link nobody
+    # supplied", and the page disagreed with what was stored.
+    profile = run.get('profile') or {}
+    if not profile and run.get('profile_id'):
+        try:
+            from .event_intel_store import get_profile
+            profile = get_profile(run['profile_id'], run.get('email') or '') or {}
+        except Exception:
+            profile = {}
     safe_rows = enforce(rows, event_class=event_class, notes=notes,
-                   event_name=summary.get('event_name') or run.get('query') or 'this event')['rows']
+                   event_name=summary.get('event_name') or run.get('query') or 'this event',
+                   client_name=profile.get('client_name'), client_site=profile.get('website'),
+                   upcoming=(summary.get('window') or {}).get('state') == WINDOW_EARLY)['rows']
     for original, safe in zip(rows, safe_rows):
         if original.get('draft_status') in REWRITTEN:
             for key in ('draft_status', 'draft_reason', 'draft_flagged'):
@@ -1074,7 +1146,7 @@ def split_by_fit(rows: list[dict], floor: int = ICP_FLOOR) -> dict:
 
 # ── The CRM step, replaced by something this deployment can actually know ──
 
-def repeat_signal(org_names: list[str], prior: dict) -> dict:
+def repeat_signal(org_names: list[str], prior: dict, event_name: str | None = None) -> dict:
     """Which of these companies you have seen on an event floor before.
 
     event-radar's Step 4 reads the CRM for prior context: already in sequence,
@@ -1090,8 +1162,19 @@ def repeat_signal(org_names: list[str], prior: dict) -> dict:
     unreadable = prior is None
     prior = prior or {}
     seen = []
-    for name in (org_names or []):
-        events = prior.get(org_key(name)) or []
+    here = event_series_key(event_name or "")
+    for item in (org_names or []):
+        name, domain = (item if isinstance(item, (tuple, list)) else (item, None))
+        events = []
+        for e in prior.get(org_key(name)) or []:
+            if isinstance(e, dict):
+                # The same name on another website is another company:
+                # Mercury the bank is not Mercury the defence firm.
+                if domain and e.get("domains") and domain.lower() not in e["domains"]:
+                    continue
+                e = e.get("event")
+            if e and not (here and event_series_key(e) == here):
+                events.append(e)
         if len(events) >= 2:
             seen.append({"org": name, "count": len(events),
                          "events": sorted(events)[:6]})

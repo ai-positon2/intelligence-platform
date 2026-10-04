@@ -5284,6 +5284,25 @@
         html += '<div class="evi-sec"><h3>Against the floor</h3>' + spread + '</div>';
       }
 
+      /* Roster rows that are not companies to contact, said rather than
+         silently missing from the count. */
+      var setAside = [];
+      if (s.own_rows) {
+        setAside.push(esc(s.own_rows) + ' roster row' + (s.own_rows === 1 ? ' is' : 's are') +
+          ' your own company, so ' + (s.own_rows === 1 ? 'it was' : 'they were') + ' left out');
+      }
+      if (s.people_only) {
+        setAside.push(esc(s.people_only) + ' ' + (s.people_only === 1 ? 'person is' : 'people are') +
+          ' listed with no company, so there is no company to qualify');
+      }
+      if (s.merged_rows) {
+        setAside.push(esc(s.merged_rows) + ' row' + (s.merged_rows === 1 ? ' was' : 's were') +
+          ' the same company listed again and merged');
+      }
+      if (setAside.length) {
+        html += '<div class="evi-coverage"><span class="ic">i</span><span class="tx">' +
+          setAside.join('; ') + '.</span></div>';
+      }
       if ((s.qualify_errors || []).length) {
         html += '<div class="evi-coverage warn"><span class="ic">!</span>' +
           '<span class="tx"><b>Part of the qualification pass did not run.</b> ' +
@@ -5359,8 +5378,13 @@
         (kept.length
           ? '<div class="evi-outs">' + kept.map(function(r, i){
               return outreachCard(r, run.role_labels || {}, i); }).join('') + '</div>'
-          : '<div class="evi-empty">Nothing on this roster cleared the ICP floor. ' +
-            'That is the answer, not a failure.</div>') +
+          : (s.qualify_failed
+            /* Every batch failed: an empty list here is a failure to look,
+               not a verdict (workroom audit, 2026-10-04). */
+            ? '<div class="evi-empty">The qualification did not run, so nothing here ' +
+              'is a verdict on any company. Run it again.</div>'
+            : '<div class="evi-empty">Nothing on this roster cleared the ICP floor. ' +
+              'That is the answer, not a failure.</div>')) +
         '<div style="margin-top:14px">' +
         '<a class="evi-btn evi-btn-ghost" style="text-decoration:none;display:inline-block" ' +
         'href="' + BASE + '/runs/' + run.id + '/outreach.csv">Download drafts CSV</a></div>' +

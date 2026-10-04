@@ -923,6 +923,23 @@ def test_seen_before_leaves_out_every_run_of_the_same_event():
     assert first  # the first lookup of the same event is not "another event"
 
 
+def test_seen_before_carries_each_companys_website_and_one_event_per_name():
+    email = "prior-domains@position2.com"
+    for event, domain in (("AUSA 2025", "mrcy.com"), ("AUSA", "mrcy.com"), ("Sibos", "mercury.com")):
+        rid = S.save_run(email, "lookup", event)
+        eid = S.save_event(rid, {"name": event, "website": "https://e.example", "starts_on": _soon()})
+        S.save_participants(rid, eid, [{"org_name": "Mercury", "org_domain": domain,
+                                        "role": "exhibitor", "source_url": "https://e.example/x",
+                                        "provenance": "page"}])
+    prior = S.prior_participant_events(email, with_domains=True)
+    from tracker.event_intel_workroom import org_key
+    assert sorted((e["event"], tuple(e["domains"])) for e in prior[org_key("Mercury")]) == [
+        ("AUSA", ("mrcy.com",)), ("Sibos", ("mercury.com",))] or sorted(
+        (e["event"], tuple(e["domains"])) for e in prior[org_key("Mercury")]) == [
+        ("AUSA 2025", ("mrcy.com",)), ("Sibos", ("mercury.com",))]
+    assert len(S.prior_participant_events(email)[org_key("Mercury")]) == 2
+
+
 def test_a_retry_after_a_failed_match_is_not_the_first_press():
     rid = S.save_run(EMAIL, "lookup", "resolution retry")
     assert S.begin_resolution(rid, EMAIL, "[]") == ("go", True)

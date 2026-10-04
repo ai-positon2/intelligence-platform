@@ -874,30 +874,59 @@ def _run_workroom(run_id: int, email: str, source_run_id: int, profile: dict,
                               "event first.")})
         return
 
-    # One row per company. A company on the floor as both exhibitor and
-    # sponsor is one conversation, not two, and drafting twice for it would
-    # produce two different openers for the same inbox.
+    # One row per company, or per named person at it. A company on the floor
+    # as both exhibitor and sponsor is one conversation, not two, and drafting
+    # twice for it would produce two different openers for the same inbox;
+    # two people the event names at one company are two inboxes.
+    wr = event_intel_workroom
+    own_key = wr.org_key(profile.get("client_name") or "")
+    own_site = _host(profile.get("website")) if profile.get("website") else ""
     by_org: dict = {}
     domain_key: dict = {}
+    name_domain: dict = {}
+    own_rows = people_only = 0
     for p in participants:
-        key = event_intel_workroom.org_key(p.get("org_name") or "")
+        key = wr.roster_key(p.get("org_name") or "")
         if not key:
             continue
-        # One company under two names ("Salesforce" and "Salesforce.com" are
-        # caught by org_key; "Meta" and "Facebook" are not) is still one
-        # inbox when both rows carry the same website.
         domain = (p.get("org_domain") or "").lower()
+        # The client on its own event's roster (live run 32: Stripe drafted
+        # an opener to Stripe, and stored the model's refusal as one).
+        if (own_key and wr.org_key(p.get("org_name") or "") == own_key) or (
+                own_site and domain and (domain == own_site or domain.endswith("." + own_site))):
+            own_rows += 1
+            continue
+        # A speaker the event lists with no employer is stored under their
+        # own name as the company. That is a person, not a company to
+        # qualify: Lookup leaves these out of its counts, and here "Priya
+        # Raman" was qualified as a company and drafted "your talk was great".
+        if wr.org_key(p.get("person_name") or "") == wr.org_key(p.get("org_name") or ""):
+            people_only += 1
+            continue
+        # One company under two names ("Meta" and "Facebook") is one inbox
+        # when both rows carry the same website; one name on two websites
+        # (Mercury the bank, Mercury the defence firm) is two companies.
         if domain:
-            key = domain_key.setdefault(domain, key)
-        prev = by_org.get(key)
-        # A row that names a person beats one that does not: the named
-        # contact is the whole difference between a message and an account
-        # play, and it must not be lost to insertion order.
-        if prev is None or (not (prev.get("person_name") or "")
-                            and (p.get("person_name") or "")):
-            by_org[key] = p
+            if domain in domain_key:
+                key = domain_key[domain]
+            else:
+                if name_domain.setdefault(key, domain) != domain:
+                    key = "%s|%s" % (key, domain)
+                domain_key[domain] = key
+        person = (p.get("person_name") or "").strip().lower()
+        named = [k for k in by_org if k[0] == key and k[1]]
+        if person:
+            slot = (key, person)
+            by_org.pop((key, ""), None)     # a named row covers the company row
+        elif named:
+            continue                        # the company is already covered by a person
+        else:
+            slot = (key, "")
+        if slot not in by_org:
+            by_org[slot] = p
     rows = list(by_org.values())
-    merged_rows = len([p for p in participants if event_intel_workroom.org_key(p.get("org_name") or "")]) - len(rows)
+    merged_rows = len([p for p in participants if wr.roster_key(p.get("org_name") or "")]) \
+        - len(rows) - own_rows - people_only
     # Notes tied to the one company each names. A note that names none is
     # reported, not silently dropped (workroom audit, 2026-10-01).
     matched = event_intel_workroom.match_booth_notes(written, rows)
@@ -911,12 +940,14 @@ def _run_workroom(run_id: int, email: str, source_run_id: int, profile: dict,
     enforced = event_intel_workroom.enforce(
         drafted["rows"], event_class=event_class, notes=notes,
         event_name=event_name, client_name=profile.get("client_name"),
-        client_site=profile.get("website"))
+        client_site=profile.get("website"),
+        upcoming=window.get("state") == event_intel_workroom.WINDOW_EARLY)
 
     split = event_intel_workroom.split_by_fit(enforced["rows"])
     repeats = event_intel_workroom.repeat_signal(
-        [r.get("org_name") for r in split["kept"]],
-        store.prior_participant_events(email, exclude_run_id=source_run_id))
+        [(r.get("org_name"), r.get("org_domain")) for r in split["kept"]],
+        store.prior_participant_events(email, exclude_run_id=source_run_id, with_domains=True),
+        event_name=event_name)
 
     store.update_run(run_id, stage="saving")
     expected_rows = split["kept"] + split["cut"] + split["unqualified"]
@@ -948,6 +979,10 @@ def _run_workroom(run_id: int, email: str, source_run_id: int, profile: dict,
         # them say "at our booth" all the same.
         "notes_before_event": bool(notes) and window.get("state") == event_intel_workroom.WINDOW_EARLY,
         "merged_rows": merged_rows,
+        "own_rows": own_rows,
+        "people_only": people_only,
+        # Every batch failed: nothing below is a verdict on any company.
+        "qualify_failed": bool(drafted["errors"]) and drafted["missing"] >= len(rows),
         "window_ends_on": event.get("ends_on"),
         "qualify_errors": drafted["errors"],
         "unqualified_count": drafted["missing"],

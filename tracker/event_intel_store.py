@@ -1819,11 +1819,13 @@ def normalise_outreach(raw: dict, run_id: int, source_run_id: int | None,
         return v[:limit] or None
 
     status = str(raw.get("draft_status") or wr.DRAFT_REVIEW).strip()
-    if status not in (wr.DRAFT_OK, wr.DRAFT_REVIEW, wr.DRAFT_NO_EVIDENCE, wr.DRAFT_AGGRESSIVE,
-                      wr.DRAFT_ACCOUNT):
+    # Every status enforce() can write. The booth and link rewrites were
+    # missing, so both were stored as "Review before use" and the page lost
+    # the phrase and the reason (workroom audit, 2026-10-04).
+    if status not in (wr.DRAFT_OK, wr.DRAFT_REVIEW, wr.DRAFT_ACCOUNT) + wr.REWRITTEN:
         status = wr.DRAFT_REVIEW
     reason = _txt("draft_reason", 1200)
-    if status in (wr.DRAFT_NO_EVIDENCE, wr.DRAFT_AGGRESSIVE) and not reason:
+    if status in wr.REWRITTEN and not reason:
         reason = ("This draft was rewritten by the safety pass, but the reason "
                   "was lost before it could be stored. Treat the opener as "
                   "unverified and read it before using it.")
@@ -1911,7 +1913,7 @@ def get_outreach(run_id: int) -> list[dict]:
 
 
 def prior_participant_events(email: str, exclude_run_id: int | None = None,
-                             limit: int = 4000) -> dict | None:
+                             limit: int = 4000, with_domains: bool = False) -> dict | None:
     """{org_key: [event names]} across this user's earlier roster runs.
 
     The substitute for event-radar's CRM lookup, built from the only prior
@@ -1930,7 +1932,7 @@ def prior_participant_events(email: str, exclude_run_id: int | None = None,
         return None
     try:
         _ensure_tables(conn)
-        sql = ("SELECT p.org_name, COALESCE(e.name, r.query) AS event_name "
+        sql = ("SELECT p.org_name, COALESCE(e.name, r.query) AS event_name, p.org_domain "
                "FROM evi_participants p "
                "JOIN evi_runs r ON r.id = p.run_id "
                "LEFT JOIN evi_events e ON e.id = p.event_id "
@@ -1952,14 +1954,25 @@ def prior_participant_events(email: str, exclude_run_id: int | None = None,
     finally:
         conn.close()
 
-    from .event_intel_workroom import org_key
-    out: dict[str, set] = {}
-    for org_name, event_name in rows:
+    from .event_intel_workroom import org_key, event_series_key
+    out: dict[str, dict] = {}
+    for row in rows:
+        org_name, event_name = row[0], row[1]
+        domain = (row[2] if len(row) > 2 else None) or ""
         key = org_key(org_name or "")
         if not key or not event_name:
             continue
-        out.setdefault(key, set()).add(str(event_name))
-    return {k: sorted(v) for k, v in out.items()}
+        # One event under its name with and without a year is one event.
+        events = out.setdefault(key, {})
+        ek = event_series_key(str(event_name))
+        if ek not in events:
+            events[ek] = (str(event_name), set())
+        if domain:
+            events[ek][1].add(domain.lower())
+    if not with_domains:
+        return {k: sorted(n for n, _ in v.values()) for k, v in out.items()}
+    return {k: [{"event": n, "domains": sorted(d)} for n, d in sorted(v.values())]
+            for k, v in out.items()}
 
 
 # ── Outcomes: the "tighten over time" loop ────────────────────────────────

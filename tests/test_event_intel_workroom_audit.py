@@ -194,7 +194,7 @@ def _wire(monkeypatch, participants, prior=None, ends_on="2026-09-30"):
     monkeypatch.setattr(P.store, "update_run", fake.update_run)
     monkeypatch.setattr(P.store, "get_participants", lambda rid: [dict(p) for p in participants])
     monkeypatch.setattr(P.store, "get_events", lambda rid: [{"name": "RSA 2026", "ends_on": ends_on}])
-    monkeypatch.setattr(P.store, "prior_participant_events", lambda email, exclude_run_id=None: prior)
+    monkeypatch.setattr(P.store, "prior_participant_events", lambda email, exclude_run_id=None, **kw: prior)
 
     def save(run_id, source, name, cls, rows):
         fake.saved = rows
