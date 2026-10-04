@@ -15,6 +15,7 @@
   <link rel="stylesheet" href="/static/css/thinking-orb.css">
   <link rel="stylesheet" href="/static/css/border-beam.css">
   <link rel="stylesheet" href="/static/css/aurora-app.css?v=3">
+  <link rel="stylesheet" href="/static/css/event_intel_report.css?v=1">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/agent-feedback.css') }}">
   <script src="{{ url_for('static', filename='js/agent_feedback.js') }}"></script>
 </head>
@@ -2736,7 +2737,21 @@
         tags.push(tag('mut', 'size', ev.stated_size, 'The organiser’s own claim.'));
       }
       var site = safeUrl(ev.website);
-      return '<div class="evi-hero-ev">' +
+      /* A calendar tile: the month and the days, the way a ticket prints
+         them. Only from a real ISO start; an unannounced date has no tile. */
+      var tile = '';
+      var sm = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(ev.starts_on || ''));
+      if (sm) {
+        var em = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(ev.ends_on || '')) || sm;
+        var mon = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+        var d1 = String(Number(sm[3])), d2 = String(Number(em[3]));
+        tile = '<div class="hdt" aria-hidden="true"><span class="hm">' + mon[Number(sm[2]) - 1] +
+          (em[2] !== sm[2] ? '&ndash;' + mon[Number(em[2]) - 1] : '') + '</span>' +
+          '<span class="hd">' + d1 + (d2 !== d1 || em[2] !== sm[2] ? '<i>&ndash;</i>' + d2 : '') + '</span>' +
+          '<span class="hy">' + sm[1] + '</span></div>';
+      }
+      return '<div class="evi-hero-ev' + (tile ? ' has-tile' : '') + '">' + tile +
+        '<div class="hbody">' +
         '<div class="hn">' + esc(ev.name) +
           (ev.edition ? '<span class="he">' + esc(ev.edition) + '</span>' : '') + '</div>' +
         '<div class="evi-tags">' + tags.join('') + '</div>' +
@@ -2744,7 +2759,7 @@
         (site ? '<a class="hl" href="' + esc(site) + '" target="_blank" ' +
                 'rel="noopener noreferrer">' + esc(orgName(ev.organizer) || 'Event site') +
                 '<i aria-hidden="true">&#8599;</i></a>' : '') +
-      '</div>';
+      '</div></div>';
     }
 
     /* ── the calendar rail ─────────────────────────────────────────────── */
@@ -3337,6 +3352,94 @@
       return parts.join(' ');
     }
 
+    /* Initials on a colour picked from the name, so the same person looks
+       the same wherever they appear and nobody needs a photo we do not have. */
+    function avatarHtml(name, cls){
+      var words = String(name || '').replace(/[^\p{L}\p{N} ]/gu, ' ').trim().split(/\s+/);
+      var ini = ((words[0] || '?')[0] + (words.length > 1 ? words[words.length - 1][0] : '')).toUpperCase();
+      var h = 0;
+      for (var i = 0; i < String(name || '').length; i++) h = (h * 31 + String(name).charCodeAt(i)) % 360;
+      return '<span class="evi-av ' + (cls || '') + '" style="--h:' + h + '" aria-hidden="true">' +
+        esc(ini) + '</span>';
+    }
+
+    var ATT_KIND = {linkedin_post: 'LinkedIn', x_post: 'X', web_page: 'Web', event_page: 'Event site',
+                    apollo: 'Apollo'};
+
+    /* How the list was made, at a glance: one strip split by how each person
+       is known, and the tallies a reader asks first. The staff segment is
+       drawn apart and hatched, because nothing says those people are going. */
+    function attMixHtml(sure, staff){
+      var by = function(b){ return sure.filter(function(a){ return a.basis === b; }).length; };
+      var segs = [
+        {k: 'event', n: by('event'), label: ATT_BASIS.event},
+        {k: 'self', n: by('self'), label: ATT_BASIS.self},
+        {k: 'others', n: by('others'), label: ATT_BASIS.others},
+        {k: 'staff', n: staff.length, label: 'At a listed company, not confirmed'}
+      ].filter(function(x){ return x.n; });
+      var total = segs.reduce(function(n, x){ return n + x.n; }, 0);
+      if (!total) return '';
+      var kinds = {};
+      sure.forEach(function(a){
+        var p = ((a.evidence || {}).proof || [])[0];
+        var k = p && ATT_KIND[p.kind];
+        if (k) kinds[k] = (kinds[k] || 0) + 1;
+      });
+      var thisEd = sure.filter(function(a){ return a.edition === 'this'; }).length;
+      var tiles = [{v: thisEd, l: 'with proof for this edition', c: 'k-this'},
+                   {v: sure.length - thisEd, l: 'from an earlier edition or not stated', c: 'k-past'}]
+        .concat(Object.keys(kinds).sort(function(a, b){ return kinds[b] - kinds[a]; })
+          .map(function(k){ return {v: kinds[k], l: 'proved by ' + (k === 'Web' ? 'a web page' :
+                                    k === 'Event site' ? 'the event site' : 'a ' + k + ' post'),
+                                    c: 'k-src'}; }));
+      return '<div class="evi-att-mix">' +
+        '<div class="amx" role="img" aria-label="' + esc(segs.map(function(x){
+          return x.n + ' ' + x.label; }).join(', ')) + '">' + segs.map(function(x){
+          return '<span class="b-' + x.k + '" style="flex:' + x.n + '" title="' +
+            esc(x.n + ' ' + x.label) + '"></span>'; }).join('') + '</div>' +
+        '<div class="aml">' + segs.map(function(x){
+          return '<span class="b-' + x.k + '"><i></i><b>' + x.n + '</b> ' + esc(x.label) + '</span>';
+        }).join('') + '</div>' +
+        '<div class="amt">' + tiles.map(function(t){
+          return '<div class="' + t.c + '"><b>' + esc(t.v) + '</b><span>' + esc(t.l) + '</span></div>';
+        }).join('') + '</div></div>';
+    }
+
+    /* The people a reader came for: proof for THIS edition, in their own
+       words first. At most six, the rest are in the table under it. */
+    function attSpotlight(sure){
+      var pick = sure.filter(function(a){ return a.edition === 'this'; });
+      var rank = {self: 0, others: 1, event: 2};
+      pick.sort(function(a, b){
+        var qa = (((a.evidence || {}).proof || [])[0] || {}).quote ? 0 : 1;
+        var qb = (((b.evidence || {}).proof || [])[0] || {}).quote ? 0 : 1;
+        var ra = a.basis in rank ? rank[a.basis] : 3, rb = b.basis in rank ? rank[b.basis] : 3;
+        return (qa - qb) || (ra - rb);
+      });
+      pick = pick.slice(0, 6);
+      if (pick.length < 2) return '';
+      return '<div class="evi-att-spot"><div class="asx">Going this year, in their own words</div>' +
+        '<div class="asg">' + pick.map(function(a){
+          var p = ((a.evidence || {}).proof || [])[0] || {};
+          var url = safeUrl(p.url);
+          var li = safeUrl(a.linkedin);
+          return '<div class="asc">' +
+            '<div class="ash">' + avatarHtml(a.name) + '<div class="asn">' +
+              (li ? '<a href="' + esc(li) + '" target="_blank" rel="noopener noreferrer">' +
+                esc(a.name) + '</a>' : '<b>' + esc(a.name) + '</b>') +
+              '<span>' + [a.title, a.company].filter(Boolean).map(esc).join(' &middot; ') + '</span>' +
+            '</div><span class="ass s-' + esc(a.status || '') + '">' +
+              esc(ATT_STATUS[a.status] || a.status || '') + '</span></div>' +
+            (p.quote ? '<q>' + esc(p.quote) + '</q>' : '<p class="asl">' + esc(p.label || '') + '</p>') +
+            '<div class="asf"><span class="k k-' + esc(p.kind || '') + '">' +
+              esc(ATT_KIND[p.kind] || 'Source') + '</span>' +
+              (p.posted_at ? '<span>' + esc(fmtDate(p.posted_at)) + '</span>' : '') +
+              (url ? '<a href="' + esc(url) + '" target="_blank" rel="noopener noreferrer">' +
+                'Open proof</a>' : '') + '</div>' +
+          '</div>';
+        }).join('') + '</div></div>';
+    }
+
     function attendeesSection(run){
       if (run.mode !== 'lookup' || run.status !== 'complete') return '';
       var rows = run.attendees || [];
@@ -3382,6 +3485,8 @@
         html += '<div class="evi-coverage warn"><span class="ic">!</span><span class="tx">The last ' +
           'attendee search was cut off when the service restarted. Search again to finish it.</span></div>';
       }
+      html += attMixHtml(sure, staff);
+      if ((ATT_FILTER[run.id] || 'all') === 'all') html += attSpotlight(sure);
       if (sure.length) {
         var f = ATT_FILTER[run.id] || 'all';
         var keys = attFilterKeys(sure);
@@ -3554,10 +3659,10 @@
        which was assembled from stored rows rather than written by a model, so
        nothing on screen can disagree with the table under it. */
 
-    function bar(label, value, max){
+    function bar(label, value, max, dim){
       var pct = max ? Math.round((value / max) * 100) : 0;
       var band = pct >= 75 ? 's-hi' : pct >= 50 ? 's-mid' : 's-lo';
-      return '<div class="evi-sub ' + band + '">' +
+      return '<div class="evi-sub ' + band + (dim ? ' ' + dim : '') + '">' +
         '<div class="sl">' + esc(label) + '<b>' + esc(value) + '<i>/' + max + '</i></b></div>' +
         '<div class="st"><span style="width:' + pct + '%"></span></div></div>';
     }
@@ -3669,9 +3774,9 @@
         '<div class="cscore">' +
           evRing(c.total, 110, TIER_LABEL[c.tier] || 'scored',
                  tierClass(c.tier)) +
-          bar('Relevance', c.relevance, 40) +
-          bar('DM access', c.dm_access, 40) +
-          bar('Engagement', c.engagement, 20) +
+          bar('Relevance', c.relevance, 40, 'x-rel') +
+          bar('DM access', c.dm_access, 40, 'x-dm') +
+          bar('Engagement', c.engagement, 20, 'x-eng') +
           '<div class="mm' + (c.matchmaking ? ' on' : '') + '">' +
             (c.matchmaking ? '+10 matchmaking' : 'No matchmaking bonus') +
             '<span>' + esc(c.matchmaking_reason || '') + '</span></div>' +
@@ -4571,13 +4676,24 @@
           (qualifier ? '<div class="az aq" style="margin:-4px 0 12px">' +
             esc(qualifier) + '</div>' : '') +
           (top
-            ? '<button type="button" class="at ' + tierClass(top.tier) + '" ' +
-              'onclick="eviReveal(\'' + esc(candAnchor(0)) + '\')">' +
-              '<span class="an">' + esc(top.name) + '</span>' +
-              '<span class="as"><b>' + esc(top.total) + '</b><i>/110</i></span>' +
-              '<span class="am">' + esc(dateRangeText(top)) +
-              (top.city ? ' &middot; ' + esc(top.city) : '') + '</span>' +
-              '</button>'
+            /* The podium: the first three of the ranked list, each a way into
+               its card. One event is still one button, as it always was. */
+            ? '<div class="apod n' + Math.min(kept.length, 3) + '">' +
+              kept.slice(0, 3).map(function(c, i){
+                return '<button type="button" class="at ' + tierClass(c.tier) + '" ' +
+                  'onclick="eviReveal(\'' + esc(candAnchor(i)) + '\')">' +
+                  '<span class="ar">' + (i + 1) + '</span>' +
+                  '<span class="an">' + esc(c.name) + '</span>' +
+                  '<span class="as"><b>' + esc(c.total) + '</b><i>/110</i></span>' +
+                  '<span class="am">' + esc(dateRangeText(c)) +
+                  (c.city ? ' &middot; ' + esc(c.city) : '') + '</span>' +
+                  '<span class="amr"><span style="width:' +
+                    Math.max(0, Math.min(100, (Number(c.total) || 0) / 110 * 100)).toFixed(1) +
+                    '%"></span></span>' +
+                  (c.client_line && kept.length > 1
+                    ? '<span class="ac">' + esc(c.client_line) + '</span>' : '') +
+                  '</button>';
+              }).join('') + '</div>'
             : '<div class="az">The list is not padded to a target count, so an ' +
               'empty one is an answer.</div>') +
         '</div>' +
@@ -4807,6 +4923,61 @@
           'results below say what each found.';
     }
 
+    /* ── what each score is made of ─────────────────────────────────────
+       The ranked list says how high each event scored; this says why, side
+       by side. Each bar is the event's total out of 110, split into the
+       three rubric dimensions and the matchmaking bonus, so "88 because
+       the audience is exactly right" and "88 because the floor is easy to
+       work" stop looking like the same 88. The sentence under it is read
+       off the same numbers: which dimension the list leans on, and which
+       one it is thinnest on. */
+    var ANATOMY = [
+      {k: 'relevance', max: 40, label: 'Relevance', cls: 'x-rel'},
+      {k: 'dm_access', max: 40, label: 'Decision-maker access', cls: 'x-dm'},
+      {k: 'engagement', max: 20, label: 'Engagement', cls: 'x-eng'},
+      {k: 'matchmaking', max: 10, label: 'Matchmaking bonus', cls: 'x-mm'}];
+
+    function anatomyHtml(kept){
+      var rows = (kept || []).filter(function(c){ return c.total != null; }).slice(0, 10);
+      if (rows.length < 2) return '';
+      var share = function(c){
+        var used = ANATOMY.map(function(d){ return Math.max(0, Number(c[d.k]) || 0); });
+        return used;
+      };
+      var avg = ANATOMY.slice(0, 3).map(function(d){
+        var sum = rows.reduce(function(n, c){ return n + (Number(c[d.k]) || 0); }, 0);
+        return {d: d, pct: sum / rows.length / d.max, avg: sum / rows.length};
+      });
+      var hi = avg.slice().sort(function(a, b){ return b.pct - a.pct; })[0];
+      var lo = avg.slice().sort(function(a, b){ return a.pct - b.pct; })[0];
+      var bonus = rows.filter(function(c){ return Number(c.matchmaking) > 0; }).length;
+      var insight = hi.d.k === lo.d.k ? '' :
+        'This list leans on <b>' + esc(hi.d.label.toLowerCase()) + '</b> (' +
+        Math.round(hi.avg) + ' of ' + hi.d.max + ' on average) and is thinnest on <b>' +
+        esc(lo.d.label.toLowerCase()) + '</b> (' + Math.round(lo.avg) + ' of ' + lo.d.max + ').' +
+        (bonus ? ' ' + plural(bonus, 'event') + ' earned the matchmaking bonus.' : '');
+      var floorPct = (RANK_FLOOR / 110 * 100).toFixed(1);
+      return '<div class="evi-sec evi-anat"><h3>What each score is made of</h3>' +
+        (insight ? '<p class="xin">' + insight + '</p>' : '') +
+        '<div class="xleg">' + ANATOMY.map(function(d){
+          return '<span class="' + d.cls + '"><i></i>' + esc(d.label) + ' <em>/' + d.max + '</em></span>';
+        }).join('') + '</div>' +
+        '<div class="xrows" style="--floor:' + floorPct + '%">' + rows.map(function(c, i){
+          var parts = share(c);
+          return '<button type="button" class="xr ' + tierClass(c.tier) + '" ' +
+            'onclick="eviReveal(\'' + esc(candAnchor(i)) + '\')" aria-label="' +
+            esc(c.name + ', ' + c.total + ' of 110') + '">' +
+            '<span class="xn">' + esc(c.name) + '</span>' +
+            '<span class="xb">' + ANATOMY.map(function(d, j){
+              return parts[j] ? '<span class="' + d.cls + '" style="width:' +
+                (parts[j] / 110 * 100).toFixed(2) + '%" title="' +
+                esc(d.label + ': ' + parts[j] + ' of ' + d.max) + '"></span>' : '';
+            }).join('') + '</span>' +
+            '<span class="xt">' + esc(c.total) + '</span></button>';
+        }).join('') + '<div class="xfoot">The white line on each bar is the bar of ' +
+        RANK_FLOOR + '. Pick a row to jump to its card.</div></div></div>';
+    }
+
     function recommendHtml(run){
       var s = run.summary || {};
       var cands = run.candidates || [];
@@ -4870,6 +5041,7 @@
 
       html += planRail(kept, s.worth_a_look || []);
       html += spreadHtml(kept, s);
+      html += anatomyHtml(kept);
 
       /* The five and the ranked list are the same events written twice, and
          the top five used to be a dead end: the reader met a name here and
@@ -5107,7 +5279,7 @@
       var flagged = r.draft_flagged || [];
       return '<div class="evi-out s-' + esc(status) + '" id="' +
         esc(outAnchor(idx || 0)) + '">' +
-        '<div class="ot">' +
+        '<div class="ot">' + avatarHtml(r.org_name, 'org') +
           '<div class="on">' + esc(r.org_name) +
             (r.role ? '<span class="orl">' + esc(labels[r.role] || r.role) +
               '</span>' : '') + '</div>' +
@@ -5120,6 +5292,7 @@
           ? '<div class="op">' + esc(r.person_name) +
             (r.person_title ? ' &middot; ' + esc(r.person_title) : '') + '</div>'
           : '') +
+        '<div class="obody"><div class="ocol">' +
         (r.fit_note ? '<p class="ofn">' + esc(r.fit_note) + '</p>' : '') +
         (r.angle ? '<p class="oa"><b>Angle.</b> ' + esc(r.angle) + '</p>' : '') +
         (r.booth_note
@@ -5127,8 +5300,12 @@
             (r.fit != null && r.fit < ((current && current.summary || {}).floor || 55)
               ? ' <i>Kept because you spoke to them, whatever its fit.</i>' : '') + '</div>'
           : '') +
-        (r.opener ? '<div class="oo"><div class="ool">Opener</div>' +
+        '</div>' +
+        (r.opener ? '<div class="oo"><div class="ool">Opener' +
+          '<span class="oto">To ' + esc(r.person_name || ('the right person at ' + r.org_name)) +
+          '</span></div>' +
           '<p>' + esc(r.opener) + '</p></div>' : '') +
+        '</div>' +
         (status !== 'ok' && DRAFT_LABEL[status]
           ? '<div class="ow"><div class="owt">' + esc(DRAFT_LABEL[status]) + '</div>' +
             '<div class="own">' + esc(r.draft_reason || '') + '</div>' +

@@ -1,0 +1,723 @@
+/* event_intel_report.css - the report drawer's design layer.
+
+   Loaded after event_conference_intelligence.css and aurora-app.css, and
+   scoped to the screen: a printed report keeps the print rules the main
+   stylesheet already has (and its tests), so nothing here can change what
+   a client gets on paper.
+
+   One idea throughout: the answer first and largest, the reasons beside it
+   as pictures, the detail one step behind. Colours carry meaning and only
+   that: sky-to-indigo is a must-attend, violet is strong, teal is worth a
+   look, slate is cut; the four score dimensions keep one colour each
+   everywhere they appear. */
+
+@media screen {
+
+/* ── tokens ─────────────────────────────────────────────────────────────── */
+.evi-drawer {
+  --r-ink: #eef1ff;
+  --r-ink-2: #b8c2e6;
+  --r-ink-3: #8a95bd;
+  --r-line: rgba(148, 163, 255, .12);
+  --r-line-2: rgba(148, 163, 255, .07);
+  --r-card: linear-gradient(180deg, rgba(255,255,255,.045), rgba(255,255,255,.018));
+  --r-card-solid: #0b1124;
+  --r-glass: rgba(10, 15, 33, .72);
+  --r-t1a: #38bdf8; --r-t1b: #818cf8;
+  --r-t2a: #a78bfa; --r-t2b: #e879f9;
+  --r-look: #2dd4bf;
+  --r-cut: #64748b;
+  --r-ok: #4ade80; --r-warn: #fbbf24; --r-bad: #fb7185;
+  --x-rel: #38bdf8; --x-dm: #818cf8; --x-eng: #c084fc; --x-mm: #f472b6;
+  --r-shadow: 0 1px 0 rgba(255,255,255,.04) inset, 0 18px 50px -24px rgba(0,0,0,.65);
+}
+:root[data-theme="light"] .evi-drawer {
+  --r-ink: #10162b;
+  --r-ink-2: #3c4770;
+  --r-ink-3: #5d6789;
+  --r-line: rgba(40, 52, 110, .13);
+  --r-line-2: rgba(40, 52, 110, .07);
+  --r-card: linear-gradient(180deg, #ffffff, #f7f9ff);
+  --r-card-solid: #ffffff;
+  --r-glass: rgba(255, 255, 255, .82);
+  --r-t1a: #0284c7; --r-t1b: #4f46e5;
+  --r-t2a: #7c3aed; --r-t2b: #c026d3;
+  --r-look: #0d9488;
+  --r-cut: #64748b;
+  --r-ok: #15803d; --r-warn: #a16207; --r-bad: #be123c;
+  --x-rel: #0ea5e9; --x-dm: #6366f1; --x-eng: #a855f7; --x-mm: #ec4899;
+  --r-shadow: 0 1px 2px rgba(20,30,70,.05), 0 16px 40px -22px rgba(30,40,90,.28);
+}
+
+/* ── the drawer ─────────────────────────────────────────────────────────── */
+.evi-drawer {
+  max-width: 1240px;
+  border-radius: 24px;
+  border-color: var(--r-line);
+  background-color: #050815;
+  background-image:
+    radial-gradient(900px 340px at 8% -6%, rgba(56,189,248,.14), transparent 60%),
+    radial-gradient(760px 320px at 96% -4%, rgba(139,92,246,.16), transparent 62%),
+    linear-gradient(180deg, #070b1b 0%, #050815 40%);
+  box-shadow: 0 50px 140px rgba(0,0,0,.65), 0 0 0 1px rgba(129,140,248,.08);
+}
+:root[data-theme="light"] .evi-drawer {
+  background-color: #f6f8ff;
+  background-image:
+    radial-gradient(900px 340px at 8% -6%, rgba(56,189,248,.16), transparent 60%),
+    radial-gradient(760px 320px at 96% -4%, rgba(139,92,246,.14), transparent 62%),
+    linear-gradient(180deg, #ffffff 0%, #f5f7ff 40%);
+}
+.evi-drawer-head {
+  padding: 22px 34px 18px;
+  border-bottom: 1px solid var(--r-line);
+  background: linear-gradient(180deg, rgba(255,255,255,.025), transparent);
+}
+.evi-drawer-head h2 {
+  font-size: 30px; font-weight: 750; letter-spacing: -.02em; line-height: 1.12;
+  background: linear-gradient(100deg, var(--r-ink) 30%, var(--r-t1a) 75%, var(--r-t1b));
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.evi-drawer-head .sub { font-size: 13.5px; color: var(--r-ink-2); margin-top: 6px; }
+.evi-drawer-body { padding: 28px 34px 56px; counter-reset: evisec; }
+.evi-drawer-body, .evi-drawer-body p { color: var(--r-ink-2); }
+@media (max-width: 720px) {
+  .evi-drawer-head { padding: 18px 18px 14px; }
+  .evi-drawer-head h2 { font-size: 23px; }
+  .evi-drawer-body { padding: 20px 16px 40px; }
+}
+
+/* Sections: a numbered heading with a gradient tick, and air between them. */
+.evi-drawer-body .evi-sec { margin-top: 44px; }
+.evi-drawer-body .evi-sec:first-child { margin-top: 0; }
+.evi-drawer-body .evi-sec > h3 {
+  display: flex; align-items: center; gap: 12px;
+  font-family: 'Bricolage Grotesque', 'Space Grotesk', sans-serif;
+  font-size: 20px; font-weight: 700; letter-spacing: -.01em; text-transform: none;
+  color: var(--r-ink); margin-bottom: 16px;
+}
+.evi-drawer-body .evi-sec > h3::before {
+  counter-increment: evisec;
+  content: counter(evisec, decimal-leading-zero);
+  font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 11px; font-weight: 600;
+  letter-spacing: .04em; color: #fff;
+  padding: 4px 7px; border-radius: 7px;
+  background: linear-gradient(135deg, var(--r-t1a), var(--r-t1b));
+  box-shadow: 0 4px 14px -4px rgba(99,102,241,.6);
+}
+.evi-drawer-body .evi-sec > h3::after { background: linear-gradient(90deg, var(--r-line), transparent); }
+.evi-drawer-body .evi-note, .evi-drawer-body .evi-roster-note {
+  font-size: 13.5px; line-height: 1.65; color: var(--r-ink-3); max-width: 78ch;
+}
+
+/* Callouts. */
+.evi-drawer-body .evi-coverage {
+  border-radius: 14px; border: 1px solid var(--r-line);
+  background: linear-gradient(90deg, rgba(56,189,248,.07), rgba(129,140,248,.03));
+  padding: 13px 16px; font-size: 13.5px; line-height: 1.6; color: var(--r-ink-2);
+}
+.evi-drawer-body .evi-coverage b { color: var(--r-ink); }
+.evi-drawer-body .evi-coverage.warn {
+  background: linear-gradient(90deg, rgba(251,191,36,.10), rgba(251,191,36,.02));
+  border-color: color-mix(in srgb, var(--r-warn) 30%, transparent);
+}
+
+/* Buttons and chips inside the report. */
+.evi-drawer-body .evi-btn { border-radius: 12px; padding: 10px 18px; font-weight: 600; }
+.evi-drawer-body .evi-btn-ghost {
+  background: var(--r-card); border: 1px solid var(--r-line); color: var(--r-ink);
+}
+.evi-drawer-body .evi-btn-ghost:hover { border-color: color-mix(in srgb, var(--r-t1a) 50%, transparent); }
+.evi-drawer-body .evi-chip { border-radius: 999px; padding: 7px 14px; font-size: 12.5px; }
+.evi-drawer-body .evi-chip[aria-pressed="true"] {
+  background: linear-gradient(135deg, var(--r-t1a), var(--r-t1b)); color: #fff; border-color: transparent;
+  box-shadow: 0 6px 18px -8px rgba(99,102,241,.8);
+}
+.evi-drawer-body .evi-chip[aria-pressed="true"] .n { color: rgba(255,255,255,.85); }
+
+/* ── shared surfaces: every panel, tile and table gets the same card ─── */
+.evi-drawer-body .evi-panel,
+.evi-drawer-body .evi-tile,
+.evi-drawer-body .evi-stat,
+.evi-drawer-body .evi-tablewrap,
+.evi-drawer-body .evi-calwrap,
+.evi-drawer-body .evi-cols,
+.evi-drawer-body .evi-funnel,
+.evi-drawer-body .evi-classplay,
+.evi-drawer-body .evi-window {
+  background: var(--r-card);
+  border: 1px solid var(--r-line);
+  border-radius: 18px;
+  box-shadow: var(--r-shadow);
+}
+
+/* Big numbers. */
+.evi-drawer-body .evi-stats { gap: 14px; }
+.evi-drawer-body .evi-stat { padding: 18px 20px; position: relative; overflow: hidden; }
+.evi-drawer-body .evi-stat::after {
+  content: ""; position: absolute; inset: auto -30% -60% auto; width: 160px; height: 160px;
+  background: radial-gradient(circle, rgba(99,102,241,.16), transparent 70%); pointer-events: none;
+}
+.evi-drawer-body .evi-stat .v {
+  font-family: 'Bricolage Grotesque', sans-serif; font-size: 38px; font-weight: 750; letter-spacing: -.03em;
+  line-height: 1; color: var(--r-ink);
+}
+.evi-drawer-body .evi-stat .l { font-size: 12.5px; color: var(--r-ink-3); margin-top: 8px; }
+.evi-drawer-body .evi-stat.warn .v { color: var(--r-warn); }
+
+/* Rings everywhere: a softer track and a glow on the arc. */
+.evi-drawer-body .evi-ring .tr { stroke: color-mix(in srgb, var(--r-ink) 9%, transparent); }
+.evi-drawer-body .evi-ring svg { filter: drop-shadow(0 0 8px rgba(99,102,241,.35)); }
+
+/* ── RECOMMEND ──────────────────────────────────────────────────────────── */
+.evi-drawer-body .evi-exec {
+  padding: 34px 34px 28px; border-radius: 26px;
+  background:
+    radial-gradient(600px 240px at 0% 0%, rgba(56,189,248,.12), transparent 70%),
+    radial-gradient(500px 260px at 100% 0%, rgba(139,92,246,.14), transparent 70%),
+    var(--r-card);
+  border: 1px solid var(--r-line);
+  box-shadow: var(--r-shadow);
+}
+.evi-drawer-body .evi-exec::before { height: 3px; background: linear-gradient(90deg, var(--r-t1a), var(--r-t1b), var(--r-t2b)); }
+.evi-drawer-body .evi-exec .ex-eyebrow {
+  font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: .14em; color: var(--r-t1a);
+}
+.evi-drawer-body .evi-exec .ex-title {
+  font-family: 'Bricolage Grotesque', sans-serif; font-size: 34px; font-weight: 750;
+  letter-spacing: -.025em; color: var(--r-ink); margin-top: 6px;
+}
+.evi-drawer-body .evi-exec .ex-profile { font-size: 14px; line-height: 1.7; color: var(--r-ink-3); max-width: 90ch; }
+.evi-drawer-body .evi-exec .ex-where {
+  border-radius: 14px; border: 1px solid var(--r-line); background: rgba(129,140,248,.06);
+  font-size: 13.5px; line-height: 1.6;
+}
+
+/* The answer: one line, as large as the page allows, then the podium. */
+.evi-drawer-body .evi-answer {
+  margin-top: 22px; padding: 26px 26px 24px; border-radius: 22px;
+  border: 1px solid color-mix(in srgb, var(--r-t1a) 22%, var(--r-line));
+  background:
+    radial-gradient(400px 180px at 10% 0%, rgba(56,189,248,.14), transparent 70%),
+    color-mix(in srgb, var(--r-card-solid) 70%, transparent);
+  gap: 28px; align-items: flex-start;
+}
+.evi-drawer-body .evi-answer .ae {
+  font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: .14em; color: var(--r-ink-3);
+}
+.evi-drawer-body .evi-answer .al {
+  font-family: 'Bricolage Grotesque', sans-serif; font-size: clamp(34px, 4.2vw, 50px); font-weight: 780;
+  letter-spacing: -.035em; line-height: 1.02; margin: 6px 0 14px;
+  background: linear-gradient(95deg, var(--r-ink) 20%, var(--r-t1a) 70%, var(--r-t1b));
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.evi-drawer-body .evi-answer .aq {
+  display: inline-block; font-size: 13px; color: var(--r-warn);
+  background: color-mix(in srgb, var(--r-warn) 9%, transparent);
+  border: 1px solid color-mix(in srgb, var(--r-warn) 25%, transparent);
+  border-radius: 10px; padding: 7px 12px; margin: 0 0 16px !important;
+}
+.evi-drawer-body .apod { display: grid; gap: 14px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.evi-drawer-body .apod.n1 { grid-template-columns: minmax(0, 520px); }
+.evi-drawer-body .apod.n2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@media (max-width: 860px) { .evi-drawer-body .apod { grid-template-columns: 1fr !important; } }
+.evi-drawer-body .evi-answer .at {
+  position: relative; overflow: hidden; display: grid; text-align: left;
+  grid-template-columns: 1fr auto; grid-template-areas: "n s" "m m" "b b" "c c";
+  gap: 6px 12px; padding: 18px 18px 16px; border-radius: 18px; width: 100%;
+  border: 1px solid var(--r-line); border-left-width: 1px;
+  background: linear-gradient(160deg, rgba(56,189,248,.10), rgba(129,140,248,.04) 55%, transparent),
+              var(--r-card-solid);
+  transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease;
+}
+.evi-drawer-body .evi-answer .at.t-P2 {
+  background: linear-gradient(160deg, rgba(167,139,250,.12), rgba(232,121,249,.04) 55%, transparent), var(--r-card-solid);
+}
+.evi-drawer-body .evi-answer .at.t-P3 {
+  background: linear-gradient(160deg, rgba(45,212,191,.10), transparent 60%), var(--r-card-solid);
+}
+.evi-drawer-body .evi-answer .at:hover {
+  transform: translateY(-3px); border-color: color-mix(in srgb, var(--r-t1a) 55%, transparent);
+  box-shadow: 0 18px 40px -20px rgba(56,189,248,.55);
+}
+.evi-drawer-body .evi-answer .ar {
+  position: absolute; right: 12px; bottom: -22px; font-family: 'Bricolage Grotesque', sans-serif;
+  font-size: 110px; font-weight: 800; line-height: 1; color: color-mix(in srgb, var(--r-ink) 5%, transparent);
+  pointer-events: none;
+}
+.evi-drawer-body .evi-answer .an { grid-area: n; font-size: 17px; font-weight: 700; color: var(--r-ink); line-height: 1.25; }
+.evi-drawer-body .evi-answer .as { grid-area: s; align-self: start; }
+.evi-drawer-body .evi-answer .as b {
+  font-family: 'Bricolage Grotesque', sans-serif; font-size: 30px; font-weight: 780; letter-spacing: -.03em;
+  background: linear-gradient(135deg, var(--r-t1a), var(--r-t1b)); -webkit-background-clip: text;
+  background-clip: text; color: transparent;
+}
+.evi-drawer-body .evi-answer .at.t-P2 .as b { background-image: linear-gradient(135deg, var(--r-t2a), var(--r-t2b)); }
+.evi-drawer-body .evi-answer .am { grid-area: m; font-size: 12.5px; color: var(--r-ink-3); }
+.evi-drawer-body .evi-answer .amr {
+  grid-area: b; height: 6px; border-radius: 99px; overflow: hidden; margin-top: 6px;
+  background: color-mix(in srgb, var(--r-ink) 8%, transparent);
+}
+.evi-drawer-body .evi-answer .amr span {
+  display: block; height: 100%; border-radius: inherit;
+  background: linear-gradient(90deg, var(--r-t1a), var(--r-t1b));
+}
+.evi-drawer-body .evi-answer .at.t-P2 .amr span { background: linear-gradient(90deg, var(--r-t2a), var(--r-t2b)); }
+.evi-drawer-body .evi-answer .ac {
+  grid-area: c; font-size: 12.5px; line-height: 1.55; color: var(--r-ink-2); margin-top: 6px;
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+}
+/* The ring sits in the corner so the podium can run the full width. */
+.evi-drawer-body .evi-answer { position: relative; display: block; }
+.evi-drawer-body .evi-answer .ad { position: absolute; top: 24px; right: 26px; padding: 0; }
+.evi-drawer-body .evi-answer .ae, .evi-drawer-body .evi-answer .al,
+.evi-drawer-body .evi-answer .aq { max-width: calc(100% - 270px); }
+@media (max-width: 860px) {
+  .evi-drawer-body .evi-answer .ad { position: static; margin-top: 18px; }
+  .evi-drawer-body .evi-answer .ae, .evi-drawer-body .evi-answer .al,
+  .evi-drawer-body .evi-answer .aq { max-width: none; }
+}
+
+/* The tallies under the answer. */
+.evi-drawer-body .evi-exec .ex-counts { gap: 12px; margin-top: 22px; }
+.evi-drawer-body .evi-exec .ex-counts span {
+  border-radius: 16px; padding: 16px 16px 14px; background: color-mix(in srgb, var(--r-card-solid) 70%, transparent);
+  border: 1px solid var(--r-line); font-size: 12.5px; color: var(--r-ink-3);
+}
+.evi-drawer-body .evi-exec .ex-counts b {
+  font-family: 'Bricolage Grotesque', sans-serif; font-size: 36px; font-weight: 780; letter-spacing: -.03em;
+}
+
+/* What was not measured: a two-column checklist. */
+.evi-drawer-body .evi-exec .ex-notes { margin-top: 26px; }
+.evi-drawer-body .evi-exec .nl { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+@media (max-width: 860px) { .evi-drawer-body .evi-exec .nl { grid-template-columns: 1fr; } }
+.evi-drawer-body .evi-exec .nr {
+  border-radius: 12px; border: 1px solid var(--r-line-2);
+  background: color-mix(in srgb, var(--r-card-solid) 60%, transparent);
+}
+.evi-drawer-body .evi-exec .nr .nd { width: 9px; height: 9px; box-shadow: 0 0 10px currentColor; }
+.evi-drawer-body .evi-exec .nr.n-gap { background: linear-gradient(90deg, rgba(251,113,133,.10), transparent 70%); }
+.evi-drawer-body .evi-exec .nr.n-thin { background: linear-gradient(90deg, rgba(251,191,36,.08), transparent 70%); }
+
+/* The calendar and the spread. */
+.evi-drawer-body .evi-calwrap { padding: 20px 20px 16px; }
+.evi-drawer-body .evi-cal .mk {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--r-card-solid) 90%, transparent), 0 6px 16px -4px rgba(99,102,241,.7);
+}
+.evi-drawer-body .evi-cols { padding: 22px 20px 14px; }
+.evi-drawer-body .evi-cols .cs { border-radius: 8px 8px 3px 3px; }
+
+/* What each score is made of. */
+.evi-drawer-body .evi-anat .xin {
+  font-size: 15px; line-height: 1.6; color: var(--r-ink-2); margin-bottom: 14px; max-width: 80ch;
+}
+.evi-drawer-body .evi-anat .xin b { color: var(--r-ink); }
+.evi-drawer-body .evi-anat .xleg { display: flex; flex-wrap: wrap; gap: 8px 18px; margin-bottom: 14px; }
+.evi-drawer-body .evi-anat .xleg span { display: inline-flex; align-items: center; gap: 7px; font-size: 12.5px; color: var(--r-ink-2); }
+.evi-drawer-body .evi-anat .xleg i { width: 11px; height: 11px; border-radius: 4px; background: currentColor; }
+.evi-drawer-body .evi-anat .xleg em { font-style: normal; color: var(--r-ink-3); }
+.evi-drawer-body .evi-anat .xleg .x-rel { color: var(--x-rel); }
+.evi-drawer-body .evi-anat .xleg .x-dm { color: var(--x-dm); }
+.evi-drawer-body .evi-anat .xleg .x-eng { color: var(--x-eng); }
+.evi-drawer-body .evi-anat .xleg .x-mm { color: var(--x-mm); }
+.evi-drawer-body .evi-anat .xleg span { color: var(--r-ink-2); }
+.evi-drawer-body .evi-anat .xleg span i { color: inherit; }
+.evi-drawer-body .evi-anat .xleg .x-rel i { background: var(--x-rel); }
+.evi-drawer-body .evi-anat .xleg .x-dm i { background: var(--x-dm); }
+.evi-drawer-body .evi-anat .xleg .x-eng i { background: var(--x-eng); }
+.evi-drawer-body .evi-anat .xleg .x-mm i { background: var(--x-mm); }
+.evi-drawer-body .xrows {
+  position: relative; display: grid; gap: 10px; padding: 20px 22px; border-radius: 18px;
+  background: var(--r-card); border: 1px solid var(--r-line); box-shadow: var(--r-shadow);
+}
+.evi-drawer-body .xr {
+  display: grid; grid-template-columns: minmax(120px, 230px) 1fr 44px; align-items: center; gap: 14px;
+  background: none; border: 0; padding: 4px 0; cursor: pointer; text-align: left; font: inherit;
+  color: inherit; border-radius: 10px;
+}
+.evi-drawer-body .xr:hover .xn { color: var(--r-t1a); }
+.evi-drawer-body .xr:focus-visible { outline: 2px solid var(--r-t1a); outline-offset: 3px; }
+.evi-drawer-body .xn { font-size: 13.5px; font-weight: 600; color: var(--r-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.evi-drawer-body .xb {
+  position: relative; display: flex; height: 14px; border-radius: 99px; overflow: hidden;
+  background: color-mix(in srgb, var(--r-ink) 7%, transparent);
+}
+.evi-drawer-body .xb span { height: 100%; }
+.evi-drawer-body .xb span + span { box-shadow: -1px 0 0 rgba(5,8,21,.6); }
+.evi-drawer-body .xb .x-rel { background: linear-gradient(90deg, #0ea5e9, var(--x-rel)); }
+.evi-drawer-body .xb .x-dm { background: linear-gradient(90deg, #6366f1, var(--x-dm)); }
+.evi-drawer-body .xb .x-eng { background: linear-gradient(90deg, #a855f7, var(--x-eng)); }
+.evi-drawer-body .xb .x-mm { background: linear-gradient(90deg, #ec4899, var(--x-mm)); }
+.evi-drawer-body .xt {
+  font-family: 'Bricolage Grotesque', sans-serif; font-size: 18px; font-weight: 750; color: var(--r-ink);
+  text-align: right; font-variant-numeric: tabular-nums;
+}
+.evi-drawer-body .xr.t-P3 .xn { color: var(--r-ink-2); }
+/* The bar of 70, at the same place on every row. */
+.evi-drawer-body .xb::after {
+  content: ""; position: absolute; top: 0; bottom: 0; left: var(--floor, 63.6%); width: 2px;
+  background: color-mix(in srgb, var(--r-ink) 70%, transparent); box-shadow: 0 0 6px rgba(255,255,255,.5);
+}
+.evi-drawer-body .xfoot { display: flex; justify-content: flex-end; font-size: 11.5px; color: var(--r-ink-3); margin-top: 4px; }
+@media (prefers-reduced-motion: no-preference) {
+  .evi-anim .evi-drawer-body .xb span, .evi-drawer-body .evi-anim .xb span { animation: evi-grow-w .7s cubic-bezier(.22,.85,.3,1) both; }
+}
+
+/* The ranked cards. */
+.evi-drawer-body .evi-cands { gap: 18px; }
+.evi-drawer-body .evi-cand {
+  padding: 24px 26px 20px 30px; border-radius: 22px;
+  background: var(--r-card); border: 1px solid var(--r-line); box-shadow: var(--r-shadow);
+  transition: border-color .2s ease, box-shadow .2s ease, transform .2s ease;
+}
+.evi-drawer-body .evi-cand:hover {
+  border-color: color-mix(in srgb, var(--r-t1a) 35%, var(--r-line));
+  box-shadow: 0 24px 60px -30px rgba(56,189,248,.45);
+}
+.evi-drawer-body .evi-cand::before { width: 4px; border-radius: 22px 0 0 22px; }
+.evi-drawer-body .evi-cand.t-P1 {
+  background: radial-gradient(520px 200px at 0% 0%, rgba(56,189,248,.10), transparent 70%), var(--r-card);
+}
+.evi-drawer-body .evi-cand.t-P2 {
+  background: radial-gradient(520px 200px at 0% 0%, rgba(167,139,250,.10), transparent 70%), var(--r-card);
+}
+.evi-drawer-body .evi-cand.t-P2::before { background: linear-gradient(180deg, var(--r-t2a), var(--r-t2b)); }
+.evi-drawer-body .evi-cand .cn { font-family: 'Bricolage Grotesque', sans-serif; font-size: 22px; font-weight: 720; letter-spacing: -.015em; }
+.evi-drawer-body .evi-cand .cn .tier {
+  font-family: 'JetBrains Mono', monospace; font-size: 11px; padding: 4px 8px; border-radius: 8px; vertical-align: 3px;
+}
+.evi-drawer-body .evi-cand.t-P1 .cn .tier { background: linear-gradient(135deg, var(--r-t1a), var(--r-t1b)); color: #fff; border-color: transparent; }
+.evi-drawer-body .evi-cand.t-P2 .cn .tier { background: linear-gradient(135deg, var(--r-t2a), var(--r-t2b)); color: #fff; border-color: transparent; }
+.evi-drawer-body .evi-cand .cm { font-size: 13px; color: var(--r-ink-3); margin-top: 2px; }
+.evi-drawer-body .evi-cand .cscore {
+  margin-top: 16px; padding: 18px; border-radius: 16px; gap: 14px 22px;
+  background: color-mix(in srgb, var(--r-card-solid) 65%, transparent); border: 1px solid var(--r-line-2);
+}
+.evi-drawer-body .evi-sub .sl { font-size: 12.5px; color: var(--r-ink-2); }
+.evi-drawer-body .evi-sub .sl b { font-size: 13.5px; color: var(--r-ink); }
+.evi-drawer-body .evi-sub .st { height: 9px; border-radius: 99px; background: color-mix(in srgb, var(--r-ink) 7%, transparent); }
+.evi-drawer-body .evi-sub .st span { border-radius: 99px; }
+.evi-drawer-body .evi-sub.x-rel .st span { background: linear-gradient(90deg, #0ea5e9, var(--x-rel)); }
+.evi-drawer-body .evi-sub.x-dm .st span { background: linear-gradient(90deg, #6366f1, var(--x-dm)); }
+.evi-drawer-body .evi-sub.x-eng .st span { background: linear-gradient(90deg, #a855f7, var(--x-eng)); }
+.evi-drawer-body .evi-cand .mm, .evi-drawer-body .evi-cand .oc, .evi-drawer-body .evi-cand .cci {
+  border-radius: 12px; border: 1px solid var(--r-line-2); background: color-mix(in srgb, var(--r-ink) 3%, transparent);
+}
+.evi-drawer-body .evi-cand .mm.on {
+  border-color: color-mix(in srgb, var(--x-mm) 40%, transparent);
+  background: linear-gradient(90deg, rgba(244,114,182,.12), transparent);
+}
+.evi-drawer-body .evi-cand .cd {
+  margin-top: 16px; font-size: 14.5px; line-height: 1.7; color: var(--r-ink-2); max-width: 92ch;
+}
+.evi-drawer-body .evi-cand .cd b {
+  display: block; margin-top: 10px; padding: 12px 16px; border-radius: 14px; font-weight: 600; color: var(--r-ink);
+  border-left: 3px solid var(--r-t1a);
+  background: linear-gradient(90deg, rgba(56,189,248,.10), transparent 80%);
+}
+.evi-drawer-body .evi-cand.t-P2 .cd b { border-left-color: var(--r-t2a); background: linear-gradient(90deg, rgba(167,139,250,.11), transparent 80%); }
+.evi-drawer-body .evi-cand .cshort {
+  border-radius: 12px; font-size: 13px; padding: 10px 14px; margin-top: 14px;
+  background: color-mix(in srgb, var(--r-look) 8%, transparent); border: 1px solid color-mix(in srgb, var(--r-look) 22%, transparent);
+}
+.evi-drawer-body .evi-cand .cwhy summary { font-size: 13px; font-weight: 600; color: var(--r-t1a); }
+.evi-drawer-body .evi-cand .cwhy p { font-size: 13.5px; line-height: 1.7; }
+.evi-drawer-body .evi-dec { margin-top: 16px; padding-top: 14px; border-top: 1px dashed var(--r-line); }
+.evi-drawer-body .evi-dec .db {
+  display: inline-flex; gap: 0; padding: 4px; border-radius: 12px;
+  background: color-mix(in srgb, var(--r-ink) 5%, transparent); border: 1px solid var(--r-line-2);
+}
+.evi-drawer-body .evi-dec .dbtn {
+  border: 0; border-radius: 9px; background: transparent; padding: 8px 14px; font-size: 12.5px; color: var(--r-ink-2);
+}
+.evi-drawer-body .evi-dec .dbtn:hover { color: var(--r-ink); background: color-mix(in srgb, var(--r-ink) 6%, transparent); }
+.evi-drawer-body .evi-dec .dbtn.on { background: linear-gradient(135deg, var(--r-t1a), var(--r-t1b)); color: #fff; }
+
+/* The leftovers: chips with a little more presence. */
+.evi-drawer-body .evi-cut { gap: 9px; }
+.evi-drawer-body .evi-cut .cutp {
+  border-radius: 12px; padding: 8px 12px; font-size: 13px; background: var(--r-card); border: 1px solid var(--r-line);
+}
+
+/* ── LOOKUP ─────────────────────────────────────────────────────────────── */
+.evi-drawer-body .evi-hero-ev {
+  position: relative; overflow: hidden; padding: 26px 28px; border-radius: 24px;
+  background:
+    radial-gradient(520px 220px at 100% 0%, rgba(139,92,246,.18), transparent 70%),
+    radial-gradient(520px 220px at 0% 100%, rgba(56,189,248,.14), transparent 70%),
+    var(--r-card);
+  border: 1px solid var(--r-line); box-shadow: var(--r-shadow);
+}
+.evi-drawer-body .evi-hero-ev.has-tile { display: grid; grid-template-columns: auto 1fr; gap: 26px; align-items: center; }
+@media (max-width: 640px) { .evi-drawer-body .evi-hero-ev.has-tile { grid-template-columns: 1fr; } }
+.evi-drawer-body .evi-hero-ev .hdt {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  width: 118px; height: 132px; border-radius: 20px; text-align: center; position: relative;
+  background: linear-gradient(160deg, var(--r-t1a), var(--r-t1b) 55%, var(--r-t2a));
+  box-shadow: 0 20px 40px -18px rgba(99,102,241,.8), inset 0 1px 0 rgba(255,255,255,.3);
+  color: #fff;
+}
+.evi-drawer-body .evi-hero-ev .hdt::before {
+  content: ""; position: absolute; left: 0; right: 0; top: 34px; border-top: 2px dashed rgba(255,255,255,.35);
+}
+.evi-drawer-body .evi-hero-ev .hm {
+  font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 700; letter-spacing: .16em; text-transform: uppercase;
+  position: absolute; top: 10px;
+}
+.evi-drawer-body .evi-hero-ev .hd {
+  font-family: 'Bricolage Grotesque', sans-serif; font-size: 38px; font-weight: 800; letter-spacing: -.04em; line-height: 1;
+  margin-top: 22px;
+}
+.evi-drawer-body .evi-hero-ev .hd i { font-style: normal; opacity: .7; margin: 0 1px; }
+.evi-drawer-body .evi-hero-ev .hy { font-size: 12.5px; font-weight: 600; opacity: .85; margin-top: 6px; }
+.evi-drawer-body .evi-hero-ev .hn {
+  font-family: 'Bricolage Grotesque', sans-serif; font-size: 36px; font-weight: 780; letter-spacing: -.03em; color: var(--r-ink);
+  line-height: 1.05;
+}
+.evi-drawer-body .evi-hero-ev .he {
+  font-family: 'JetBrains Mono', monospace; font-size: 12px; vertical-align: 10px; margin-left: 10px; padding: 4px 9px;
+  border-radius: 8px; background: color-mix(in srgb, var(--r-t1a) 16%, transparent); color: var(--r-t1a);
+}
+.evi-drawer-body .evi-hero-ev .evi-tags { margin-top: 14px; gap: 8px; }
+.evi-drawer-body .evi-tag {
+  border-radius: 999px; padding: 6px 12px; font-size: 12.5px; border: 1px solid var(--r-line);
+  background: color-mix(in srgb, var(--r-card-solid) 70%, transparent); color: var(--r-ink-2);
+}
+.evi-drawer-body .evi-tag.go {
+  background: linear-gradient(135deg, rgba(56,189,248,.18), rgba(129,140,248,.14)); color: var(--r-ink);
+  border-color: color-mix(in srgb, var(--r-t1a) 40%, transparent);
+}
+.evi-drawer-body .evi-hero-ev .ha { font-size: 14px; line-height: 1.65; color: var(--r-ink-2); margin-top: 12px; max-width: 80ch; }
+.evi-drawer-body .evi-hero-ev .hl { margin-top: 12px; font-size: 13px; font-weight: 600; color: var(--r-t1a); }
+
+.evi-drawer-body .evi-glance { gap: 14px; }
+.evi-drawer-body .evi-panels { gap: 14px; }
+.evi-drawer-body .evi-panel { padding: 18px 20px; }
+.evi-drawer-body .evi-panel h4 {
+  font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: .12em; color: var(--r-ink-3);
+}
+.evi-drawer-body .evi-donut .dc, .evi-drawer-body .evi-donut text { font-family: 'Bricolage Grotesque', sans-serif; }
+
+/* The roster table. */
+.evi-drawer-body .evi-tablewrap { overflow: auto; }
+.evi-drawer-body .evi-table { border-collapse: separate; border-spacing: 0; }
+.evi-drawer-body .evi-table th {
+  position: sticky; top: 0; z-index: 1;
+  background: color-mix(in srgb, var(--r-card-solid) 94%, transparent); backdrop-filter: blur(8px);
+  font-family: 'JetBrains Mono', monospace; font-size: 10.5px; letter-spacing: .1em; color: var(--r-ink-3);
+  padding: 13px 16px; border-bottom: 1px solid var(--r-line);
+}
+.evi-drawer-body .evi-table td { padding: 14px 16px; border-bottom: 1px solid var(--r-line-2); font-size: 13.5px; }
+.evi-drawer-body .evi-table tbody tr { transition: background .15s ease; }
+.evi-drawer-body .evi-table tbody tr:hover { background: color-mix(in srgb, var(--r-t1a) 5%, transparent); }
+.evi-drawer-body .evi-table tbody tr:last-child td { border-bottom: 0; }
+
+/* Attendees: how the list was made. */
+.evi-drawer-body .evi-att-mix {
+  margin-top: 16px; padding: 20px 22px; border-radius: 18px; background: var(--r-card);
+  border: 1px solid var(--r-line); box-shadow: var(--r-shadow);
+}
+.evi-drawer-body .evi-att-mix .amx { display: flex; gap: 3px; height: 16px; border-radius: 99px; overflow: hidden; }
+.evi-drawer-body .evi-att-mix .amx span { min-width: 6px; }
+.evi-drawer-body .evi-att-mix .b-event, .evi-drawer-body .evi-att-mix .aml .b-event i { background: linear-gradient(90deg, #0ea5e9, #38bdf8); }
+.evi-drawer-body .evi-att-mix .b-self, .evi-drawer-body .evi-att-mix .aml .b-self i { background: linear-gradient(90deg, #6366f1, #818cf8); }
+.evi-drawer-body .evi-att-mix .b-others, .evi-drawer-body .evi-att-mix .aml .b-others i { background: linear-gradient(90deg, #a855f7, #c084fc); }
+.evi-drawer-body .evi-att-mix .b-staff, .evi-drawer-body .evi-att-mix .aml .b-staff i {
+  background: repeating-linear-gradient(135deg, #475569 0 5px, #64748b 5px 10px);
+}
+.evi-drawer-body .evi-att-mix .aml { display: flex; flex-wrap: wrap; gap: 8px 20px; margin-top: 12px; }
+.evi-drawer-body .evi-att-mix .aml span { display: inline-flex; align-items: center; gap: 7px; font-size: 12.5px; color: var(--r-ink-2); background: none !important; }
+.evi-drawer-body .evi-att-mix .aml i { width: 11px; height: 11px; border-radius: 4px; }
+.evi-drawer-body .evi-att-mix .aml b { color: var(--r-ink); }
+.evi-drawer-body .evi-att-mix .amt {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-top: 18px;
+}
+.evi-drawer-body .evi-att-mix .amt div {
+  padding: 14px 16px; border-radius: 14px; border: 1px solid var(--r-line-2);
+  background: color-mix(in srgb, var(--r-card-solid) 60%, transparent);
+}
+.evi-drawer-body .evi-att-mix .amt b {
+  display: block; font-family: 'Bricolage Grotesque', sans-serif; font-size: 30px; font-weight: 780; letter-spacing: -.03em;
+  color: var(--r-ink); line-height: 1;
+}
+.evi-drawer-body .evi-att-mix .amt .k-this b {
+  background: linear-gradient(135deg, var(--r-t1a), var(--r-t1b)); -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.evi-drawer-body .evi-att-mix .amt span { display: block; font-size: 12px; color: var(--r-ink-3); margin-top: 6px; line-height: 1.4; }
+
+/* Attendees: the people a reader came for. */
+.evi-drawer-body .evi-att-spot { margin-top: 22px; }
+.evi-drawer-body .evi-att-spot .asx {
+  font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: .12em; text-transform: uppercase;
+  color: var(--r-ink-3); margin-bottom: 12px;
+}
+.evi-drawer-body .evi-att-spot .asg { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; }
+.evi-drawer-body .evi-att-spot .asc {
+  display: flex; flex-direction: column; gap: 12px; padding: 18px; border-radius: 18px;
+  background: var(--r-card); border: 1px solid var(--r-line); box-shadow: var(--r-shadow);
+  transition: transform .18s ease, border-color .18s ease;
+}
+.evi-drawer-body .evi-att-spot .asc:hover { transform: translateY(-2px); border-color: color-mix(in srgb, var(--r-t1a) 40%, var(--r-line)); }
+.evi-drawer-body .evi-att-spot .ash { display: flex; align-items: center; gap: 12px; }
+.evi-drawer-body .evi-att-spot .asn { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.evi-drawer-body .evi-att-spot .asn a, .evi-drawer-body .evi-att-spot .asn b {
+  font-size: 14.5px; font-weight: 700; color: var(--r-ink); text-decoration: none;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.evi-drawer-body .evi-att-spot .asn a:hover { color: var(--r-t1a); }
+.evi-drawer-body .evi-att-spot .asn span { font-size: 12px; color: var(--r-ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.evi-drawer-body .evi-att-spot .ass {
+  flex-shrink: 0; font-size: 11px; font-weight: 700; padding: 4px 9px; border-radius: 99px;
+  background: color-mix(in srgb, var(--r-t1a) 15%, transparent); color: var(--r-t1a);
+}
+.evi-drawer-body .evi-att-spot .ass.s-speaking { background: color-mix(in srgb, var(--x-eng) 16%, transparent); color: var(--x-eng); }
+.evi-drawer-body .evi-att-spot .ass.s-exhibiting { background: color-mix(in srgb, var(--r-look) 16%, transparent); color: var(--r-look); }
+.evi-drawer-body .evi-att-spot q {
+  font-family: 'Instrument Serif', Georgia, serif; font-size: 18px; line-height: 1.4; color: var(--r-ink);
+  quotes: "\201C" "\201D"; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden;
+}
+.evi-drawer-body .evi-att-spot q::before { color: var(--r-t1a); font-size: 26px; line-height: 0; vertical-align: -8px; margin-right: 2px; }
+.evi-drawer-body .evi-att-spot .asl { font-size: 13px; color: var(--r-ink-2); }
+.evi-drawer-body .evi-att-spot .asf { display: flex; align-items: center; gap: 10px; margin-top: auto; font-size: 12px; color: var(--r-ink-3); }
+.evi-drawer-body .evi-att-spot .asf .k {
+  font-weight: 700; font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase; padding: 3px 8px; border-radius: 7px;
+  background: color-mix(in srgb, var(--r-ink) 7%, transparent); color: var(--r-ink-2);
+}
+.evi-drawer-body .evi-att-spot .asf .k-linkedin_post { background: rgba(10,102,194,.22); color: #6bb3ff; }
+.evi-drawer-body .evi-att-spot .asf .k-x_post { background: color-mix(in srgb, var(--r-ink) 12%, transparent); color: var(--r-ink); }
+.evi-drawer-body .evi-att-spot .asf a { margin-left: auto; color: var(--r-t1a); font-weight: 600; text-decoration: none; }
+
+/* Initials avatars. */
+.evi-av {
+  flex-shrink: 0; display: inline-grid; place-items: center; width: 42px; height: 42px; border-radius: 14px;
+  font-family: 'Bricolage Grotesque', sans-serif; font-size: 15px; font-weight: 750; color: #fff; letter-spacing: -.02em;
+  background: linear-gradient(140deg, hsl(var(--h, 220) 85% 62%), hsl(calc(var(--h, 220) + 50) 75% 52%));
+  box-shadow: 0 8px 18px -8px hsl(var(--h, 220) 80% 45% / .8), inset 0 1px 0 rgba(255,255,255,.3);
+}
+.evi-av.org { border-radius: 12px; width: 40px; height: 40px; }
+
+/* The people table: quotes as quotes. */
+.evi-drawer-body .evi-att-table q { font-family: 'Instrument Serif', Georgia, serif; font-size: 15.5px; color: var(--r-ink); }
+.evi-drawer-body .evi-att-ed {
+  border-radius: 99px; font-size: 10.5px; padding: 3px 8px;
+  background: linear-gradient(135deg, rgba(56,189,248,.2), rgba(129,140,248,.2)); color: var(--r-ink);
+}
+.evi-drawer-body .evi-att-ed.past { background: color-mix(in srgb, var(--r-ink) 7%, transparent); color: var(--r-ink-3); }
+
+/* Sources. */
+.evi-drawer-body .evi-src, .evi-drawer-body .evi-source { border-radius: 14px; }
+
+/* ── WORKROOM ───────────────────────────────────────────────────────────── */
+.evi-drawer-body .evi-window { padding: 20px 22px; gap: 20px; border-left-width: 1px; }
+.evi-drawer-body .evi-window .wt { font-family: 'Bricolage Grotesque', sans-serif; font-size: 19px; font-weight: 720; }
+.evi-drawer-body .evi-window .wn { font-size: 13.5px; }
+.evi-drawer-body .evi-classplay {
+  margin-top: 14px; padding: 22px 24px;
+  background: radial-gradient(500px 200px at 0% 0%, rgba(129,140,248,.14), transparent 70%), var(--r-card);
+}
+.evi-drawer-body .evi-classplay .pl { font-family: 'Bricolage Grotesque', sans-serif; font-size: 24px; font-weight: 750; letter-spacing: -.02em; color: var(--r-ink); }
+.evi-drawer-body .evi-classplay .ps {
+  font-family: 'JetBrains Mono', monospace; font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase;
+  padding: 4px 9px; border-radius: 8px; vertical-align: 5px;
+}
+.evi-drawer-body .evi-classplay .pp {
+  margin-top: 14px; padding: 12px 16px; border-radius: 14px; font-size: 14px;
+  border-left: 3px solid var(--r-t1a); background: linear-gradient(90deg, rgba(56,189,248,.09), transparent);
+}
+.evi-drawer-body .evi-funnel { padding: 20px 20px 16px; }
+.evi-drawer-body .evi-funnel .fb { border-radius: 12px; height: 34px; }
+
+/* Each company's draft, as an email waiting to be sent. */
+.evi-drawer-body .evi-outs { gap: 16px; }
+.evi-drawer-body .evi-out {
+  padding: 22px 24px 20px 28px; border-radius: 22px; background: var(--r-card);
+  border: 1px solid var(--r-line); box-shadow: var(--r-shadow);
+}
+.evi-drawer-body .evi-out::before { width: 4px; border-radius: 22px 0 0 22px; }
+.evi-drawer-body .evi-out .ot { display: flex; align-items: center; gap: 14px; }
+.evi-drawer-body .evi-out .on {
+  flex: 1; min-width: 0; font-family: 'Bricolage Grotesque', sans-serif; font-size: 20px; font-weight: 720; color: var(--r-ink);
+  letter-spacing: -.015em;
+}
+.evi-drawer-body .evi-out .orl {
+  font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: .08em; text-transform: uppercase;
+  border-radius: 7px; padding: 3px 8px; margin-left: 10px; vertical-align: 3px;
+}
+.evi-drawer-body .evi-out .op { margin: 6px 0 0 54px; font-size: 13px; color: var(--r-ink-2); }
+.evi-drawer-body .evi-out .obody {
+  display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); gap: 18px; margin-top: 16px;
+}
+@media (max-width: 860px) { .evi-drawer-body .evi-out .obody { grid-template-columns: 1fr; } }
+.evi-drawer-body .evi-out .ocol:empty { display: none; }
+.evi-drawer-body .evi-out .ofn, .evi-drawer-body .evi-out .oa { font-size: 13.5px; line-height: 1.65; color: var(--r-ink-2); }
+.evi-drawer-body .evi-out .oa { margin-top: 8px; }
+.evi-drawer-body .evi-out .oa b { color: var(--r-ink); }
+.evi-drawer-body .evi-out .obn {
+  margin-top: 12px; border-radius: 12px; padding: 10px 14px; font-size: 13px;
+  background: linear-gradient(90deg, rgba(74,222,128,.12), transparent); border: 1px solid color-mix(in srgb, var(--r-ok) 28%, transparent);
+}
+.evi-drawer-body .evi-out .oo {
+  position: relative; margin: 0; padding: 16px 18px 18px; border-radius: 18px 18px 18px 6px;
+  background: linear-gradient(160deg, rgba(56,189,248,.10), rgba(129,140,248,.06)), color-mix(in srgb, var(--r-card-solid) 80%, transparent);
+  border: 1px solid color-mix(in srgb, var(--r-t1a) 22%, var(--r-line));
+}
+.evi-drawer-body .evi-out .ool {
+  display: flex; justify-content: space-between; gap: 10px; align-items: baseline;
+  font-family: 'JetBrains Mono', monospace; font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--r-t1a);
+}
+.evi-drawer-body .evi-out .oto {
+  font-family: 'Space Grotesk', sans-serif; letter-spacing: 0; text-transform: none; font-size: 12px; color: var(--r-ink-3);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.evi-drawer-body .evi-out .oo p { margin-top: 10px; font-size: 15px; line-height: 1.65; color: var(--r-ink); }
+.evi-drawer-body .evi-out .ow {
+  margin-top: 14px; border-radius: 14px; padding: 12px 16px;
+  background: color-mix(in srgb, var(--r-warn) 8%, transparent); border: 1px solid color-mix(in srgb, var(--r-warn) 24%, transparent);
+}
+/* An account play is the normal case, not a warning: a quiet stripe and a
+   pill, and the colours kept for drafts something was wrong with. */
+.evi-drawer-body .evi-out.s-account_play::before,
+.evi-drawer-body .evi-out.s-review_required::before { background: linear-gradient(180deg, var(--r-t1a), var(--r-t1b)); }
+.evi-drawer-body .evi-out.s-account_play .ow {
+  display: inline-flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; padding: 6px 12px; border-radius: 99px;
+  background: color-mix(in srgb, var(--r-ink) 5%, transparent); border-color: var(--r-line);
+}
+.evi-drawer-body .evi-out.s-account_play .owt { color: var(--r-ink-3); }
+.evi-drawer-body .evi-out.s-account_play .own:empty { display: none; }
+.evi-drawer-body .evi-out .owt { font-family: 'JetBrains Mono', monospace; font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; }
+.evi-drawer-body .evi-out .ow code {
+  border-radius: 6px; padding: 2px 7px; background: color-mix(in srgb, var(--r-bad) 14%, transparent); color: var(--r-bad);
+}
+
+/* Phones: tighter cards, charts that scroll rather than spill. */
+.evi-drawer-body .evi-cols { overflow-x: auto; }
+.evi-drawer-body .evi-out .oto { min-width: 0; }
+.evi-drawer-body .evi-out .ool > :first-child { flex-shrink: 0; }
+@media (max-width: 640px) {
+  .evi-drawer-body .evi-exec { padding: 22px 16px 18px; border-radius: 20px; }
+  .evi-drawer-body .evi-exec .ex-title { font-size: 26px; }
+  .evi-drawer-body .evi-answer { padding: 18px 14px; }
+  .evi-drawer-body .evi-cand, .evi-drawer-body .evi-out { padding: 18px 16px 16px 20px; }
+  .evi-drawer-body .evi-cand .cn { font-size: 19px; }
+  .evi-drawer-body .evi-hero-ev { padding: 20px 18px; }
+  .evi-drawer-body .evi-hero-ev .hn { font-size: 28px; }
+  .evi-drawer-body .xr { grid-template-columns: minmax(90px, 120px) 1fr 34px; gap: 8px; }
+  .evi-drawer-body .xrows { padding: 14px; }
+  .evi-drawer-body .evi-out .op { margin-left: 0; }
+  .evi-drawer-body .evi-stat .v { font-size: 30px; }
+}
+
+/* Reveal: cards rise in as the report opens. */
+@media (prefers-reduced-motion: no-preference) {
+  .evi-drawer-body .evi-exec, .evi-drawer-body .evi-hero-ev,
+  .evi-drawer-body .evi-cand, .evi-drawer-body .evi-out, .evi-drawer-body .evi-att-spot .asc {
+    animation: evi-r-rise .5s cubic-bezier(.2,.75,.25,1) both;
+  }
+  .evi-drawer-body .evi-cand:nth-child(2), .evi-drawer-body .evi-out:nth-child(2) { animation-delay: .04s; }
+  .evi-drawer-body .evi-cand:nth-child(3), .evi-drawer-body .evi-out:nth-child(3) { animation-delay: .08s; }
+  .evi-drawer-body .evi-cand:nth-child(4), .evi-drawer-body .evi-out:nth-child(4) { animation-delay: .12s; }
+}
+@keyframes evi-r-rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+
+}
