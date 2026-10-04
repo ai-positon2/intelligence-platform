@@ -658,7 +658,7 @@
   background: linear-gradient(90deg, rgba(74,222,128,.12), transparent); border: 1px solid color-mix(in srgb, var(--r-ok) 28%, transparent);
 }
 .evi-drawer-body .evi-out .oo {
-  position: relative; margin: 0; padding: 16px 18px 18px; border-radius: 18px 18px 18px 6px;
+  position: relative; margin: 0; align-self: start; padding: 16px 18px 18px; border-radius: 18px 18px 18px 6px;
   background: linear-gradient(160deg, rgba(56,189,248,.10), rgba(129,140,248,.06)), color-mix(in srgb, var(--r-card-solid) 80%, transparent);
   border: 1px solid color-mix(in srgb, var(--r-t1a) 22%, var(--r-line));
 }

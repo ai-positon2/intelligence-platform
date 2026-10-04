@@ -15,7 +15,7 @@
   <link rel="stylesheet" href="/static/css/thinking-orb.css">
   <link rel="stylesheet" href="/static/css/border-beam.css">
   <link rel="stylesheet" href="/static/css/aurora-app.css?v=3">
-  <link rel="stylesheet" href="/static/css/event_intel_report.css?v=1">
+  <link rel="stylesheet" href="/static/css/event_intel_report.css?v=2">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/agent-feedback.css') }}">
   <script src="{{ url_for('static', filename='js/agent_feedback.js') }}"></script>
 </head>
@@ -3414,7 +3414,12 @@
         var qa = (((a.evidence || {}).proof || [])[0] || {}).quote ? 0 : 1;
         var qb = (((b.evidence || {}).proof || [])[0] || {}).quote ? 0 : 1;
         var ra = a.basis in rank ? rank[a.basis] : 3, rb = b.basis in rank ? rank[b.basis] : 3;
-        return (qa - qb) || (ra - rb);
+        /* Then the freshest proof: a post written in the weeks before the
+           event is the surest it is about this edition, and the front of
+           the report is where an old one would mislead most. */
+        var da = String((((a.evidence || {}).proof || [])[0] || {}).posted_at || '');
+        var db = String((((b.evidence || {}).proof || [])[0] || {}).posted_at || '');
+        return (qa - qb) || (ra - rb) || (db > da ? 1 : db < da ? -1 : 0);
       });
       pick = pick.slice(0, 6);
       if (pick.length < 2) return '';

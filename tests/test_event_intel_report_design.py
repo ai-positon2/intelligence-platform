@@ -138,3 +138,16 @@ def test_the_design_layer_is_screen_only_and_loaded_last():
     dark = re.search(r"\.evi-drawer \{\s*--r-ink:(.*?)\}", css, re.S).group(1)
     light = re.search(r':root\[data-theme="light"\] \.evi-drawer \{\s*--r-ink:(.*?)\}', css, re.S).group(1)
     assert set(re.findall(r"--[\w-]+", dark)) == set(re.findall(r"--[\w-]+", light))
+
+
+def test_the_spotlight_shows_the_freshest_posts_first(page_script):
+    people = []
+    for i, d in enumerate(["2026-05-14", "2026-10-02", "2026-09-28", "2026-08-01", "2026-10-03",
+                           "2026-09-01", "2026-07-01"]):
+        p = _att("Person %d" % i, "self", "this", "I will be at A Conference (%d)" % i)
+        p["evidence"]["proof"][0]["posted_at"] = d
+        people.append(p)
+    body = _render(page_script, _with_people(people))
+    spot = body[body.index('class="evi-att-spot"'):]
+    names = re.findall(r'class="asn"><(?:a[^>]*|b)>([^<]+)', spot)[:6]
+    assert names == ["Person 4", "Person 1", "Person 2", "Person 5", "Person 3", "Person 6"]
