@@ -596,7 +596,27 @@ _NON_COMPANY_HOSTS = {
     "goldcast.io", "on24.com", "expoplatform.com", "airmeet.com", "eventsair.com",
     "cvent-assets.com", "eventmobi.com", "socio.events", "bizzabo-cdn.com",
     "matchmaking.grip.events", "inxpo.com", "6connex.com", "intrado.com",
+    # Lookup audit, 2026-10-04: link-in-bio pages, chat links and site
+    # builders' shared hosts. Exhibitors in the Gulf and South Asia often
+    # list a WhatsApp or Linktree link as their only website, and four
+    # companies became two, with Linktree's CEO shown as one's staff.
+    "linktr.ee", "linktree.com", "wa.me", "whatsapp.com", "api.whatsapp.com",
+    "t.me", "telegram.me", "beacons.ai", "bio.link", "lnk.bio", "taplink.cc",
+    "msha.ke", "carrd.co", "about.me", "linkin.bio", "wixsite.com",
+    "wordpress.com", "blogspot.com", "sites.google.com", "forms.gle",
+    "calendly.com", "docs.google.com", "drive.google.com", "dropbox.com",
+    "wechat.com", "line.me", "vk.com", "weibo.com", "threads.net",
 }
+
+
+# A listing that says its names are still to come: empty for a reason the
+# page itself gives, which is a finding about the event.
+_SAYS_LATER = re.compile(r"\b(?:coming soon|tba|tbc|"
+                         r"(?:will|to|is going to|are going to) be (?:published|announced|revealed|"
+                         r"released|available|shared|posted|updated|listed|confirmed|added)|"
+                         r"(?:be|being) announced (?:soon|shortly)|announced soon|stay tuned|"
+                         r"check back|not yet (?:been )?(?:announced|confirmed|available)|"
+                         r"will be revealed|(?:be|being) revealed soon|watch this space)\b", re.I)
 
 
 def clean_domain(value: str | None, event_host: str = "") -> str | None:
@@ -783,7 +803,10 @@ def harvest_page(page: dict, event_name: str, event_host: str = "",
     source["snapshots"] = []
     source["extraction"] = []
     from .event_intel_evidence import roster_years, source_snapshot
-    expected_year = str(page.get('edition') or '')[:4]
+    # The edition's year wherever it stands ("Spring 2026"), not its first
+    # four characters ("Spri"), which switched this check off.
+    found_year = re.search(r'\b20\d{2}\b', str(page.get('edition') or ''))
+    expected_year = found_year.group(0) if found_year else ''
     observed_years = roster_years(fetched['text'])
     source['expected_edition'] = expected_year or None
     source['observed_roster_years'] = observed_years
@@ -950,6 +973,17 @@ def harvest_page(page: dict, event_name: str, event_host: str = "",
                      "browser after the page loads, so a plain read cannot see "
                      "it. This is not evidence the event has no %s."
                      % (kind if kind != "unknown" else "participants"))
+    elif not deduped and not _SAYS_LATER.search(" ".join(t for _, t in listing_texts)):
+        # Read fine and listed nobody, with no "coming soon" to say why. GITEX's
+        # exhibitor directory (exhibitors.gitex.com, live run 37) is 28,000
+        # characters of search filters with the list itself behind a search
+        # box and no framework marker; logo walls name nobody in text either.
+        # Either way the list was not seen, which is not the same as empty.
+        source["status"] = SOURCE_BLOCKED
+        notes.append("This page was read but no %s could be found in its text: "
+                     "the list may sit behind a search box, be drawn in the "
+                     "browser, or be shown only as logos. This is not evidence "
+                     "the event has none." % (kind if kind != "unknown" else "participants"))
     chunks_short = any((e or {}).get("chunks_read", 0) < (e or {}).get("chunks_total", 0)
                        for e in source["extraction"])
     pagination_incomplete = bool(stopped or queue or (declared and source["pages_read"] < declared))

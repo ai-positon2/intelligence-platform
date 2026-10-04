@@ -247,8 +247,14 @@ def _harvest_event(run_id: int, event_id: int, event: dict,
             unique.append(page)
     read_pages = set()
     held = []
+    # The edition's year, wherever the event states one. Taking the first four
+    # characters of "Spring 2026" gave "Spri", which switched the check that
+    # withholds last year's roster off (Lookup audit, 2026-10-04).
+    year = next((m.group(0) for v in (event.get("starts_on"), event.get("edition"),
+                                      event.get("name"))
+                 for m in [re.search(r"\b20\d{2}\b", str(v or ""))] if m), "")
     for page in unique:
-        page = dict(page, edition=str(event.get("starts_on") or event.get("edition") or "")[:4],
+        page = dict(page, edition=year,
                     cache_identity=cache_identity, event_website=event.get("website") or "")
         try:
             got = durable_stage("harvest:" + page["url"], event_intel_harvest.harvest_page, page, event.get("name") or "", host)
@@ -278,7 +284,7 @@ def _harvest_event(run_id: int, event_id: int, event: dict,
         # (a sponsor shown on the exhibitor list too keeps both roles).
         fresh = []
         for r in got["rows"]:
-            k = (event_intel_workroom.org_key(r.get("org_name") or ""),
+            k = (event_intel_workroom.roster_key(r.get("org_name") or ""),
                  (r.get("person_name") or "").lower(), r.get("role"))
             if k not in saved_rows:
                 saved_rows.add(k)
@@ -328,7 +334,7 @@ def _harvest_event(run_id: int, event_id: int, event: dict,
             held.extend(rec["rows"])
     fresh = []
     for r in held:
-        k = (event_intel_workroom.org_key(r.get("org_name") or ""),
+        k = (event_intel_workroom.roster_key(r.get("org_name") or ""),
              (r.get("person_name") or "").lower(), r.get("role"))
         if k not in saved_rows:
             saved_rows.add(k)
@@ -499,6 +505,10 @@ def attendee_inputs(event: dict, participants: list[dict]) -> tuple[dict, list[d
         evd = p.get("evidence") or {}
         row = {k: p.get(k) for k in _ATTENDEE_FIELDS if k != "evidence"}
         row["evidence"] = {k: evd[k] for k in ("profile_detail", "profile_lookup") if k in evd}
+        if evd.get("status") == "recovered_by_search":
+            # Where a recovered row came from decides whether the event
+            # itself named the person: a blog's list of speakers is not.
+            row["evidence"].update(status=evd["status"], off_site=bool(evd.get("off_site")))
         rows.append(row)
     return ev, rows
 

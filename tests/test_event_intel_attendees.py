@@ -76,10 +76,84 @@ def test_dates_overrule_the_model_on_which_edition():
     assert A.settle_edition("this", "attending", "2025-04-01", EVENT, TODAY) == "earlier"
     # "I was there" about an edition that has not happened yet.
     assert A.settle_edition("this", "attended", "2026-02-01", EVENT, TODAY) == "earlier"
-    # Written in the run-up and the model could not tell: this edition.
-    assert A.settle_edition("unclear", "attending", "2026-02-20", EVENT, TODAY) == "this"
+    # Written in the run-up, going or there, and the model could not tell: this edition.
+    assert A.settle_edition("unclear", "attending", "2026-02-20", EVENT, TODAY, "future") == "this"
+    assert A.settle_edition("unclear", "attending", "2026-02-20", EVENT, TODAY, "now") == "earlier"
+    # With no tense, a date in the run-up proves nothing about which edition.
+    assert A.settle_edition("unclear", "attending", "2026-02-20", EVENT, TODAY) == "unclear"
     # "I'll be there" written long after this edition ended proves nothing about it.
     assert A.settle_edition("this", "attending", "2026-12-20", EVENT, date(2027, 1, 1)) == "unclear"
+    assert A.settle_edition("this", "attending", "2026-05-20", EVENT, date(2027, 1, 1),
+                            "future") == "unclear"
+
+
+@pytest.mark.parametrize("model,status,posted,tense,today,edition", [
+    # Run 35, Lisbon in November read in October: a bio line in the run-up.
+    ("this", "speaking", "2026-02-20", "past", TODAY, "earlier"),
+    ("unclear", "speaking", "2026-04-20", "past", date(2026, 4, 25), "earlier"),
+    # Past tense once this edition has begun is about this one.
+    ("this", "speaking", "2026-05-07", "past", date(2026, 6, 1), "this"),
+    ("unclear", "attending", "2026-05-05", "now", date(2026, 6, 1), "this"),
+    ("this", "attending", "2026-04-01", "now", date(2026, 6, 1), "earlier"),
+    # Something that already happened, said before an edition that has not.
+    ("this", "exhibiting", None, "past", TODAY, "earlier"),
+    # Read after this edition: "I spoke at Widget Expo" written before it began.
+    ("this", "speaking", "2026-04-20", "past", date(2026, 6, 1), "earlier"),
+])
+def test_what_already_happened_before_this_edition_is_an_earlier_one(
+        model, status, posted, tense, today, edition):
+    assert A.settle_edition(model, status, posted, EVENT, today, tense) == edition
+
+
+LISBON = {"name": "Web Summit", "city": "Lisbon", "country": "Portugal",
+          "starts_on": "2026-11-09", "ends_on": "2026-11-12"}
+
+
+@pytest.mark.parametrize("text,event,other", [
+    ("Web Summit Vancouver was great", LISBON, True),
+    ("Day two at #WebSummitRio", LISBON, True),
+    ("We are live at Web Summit Qatar!", LISBON, True),
+    ("Lessons from #WebSummit2026", LISBON, False),
+    ("See you at Web Summit in Lisbon", LISBON, False),
+    ("Web Summit Vancouver last May, Lisbon in November", LISBON, False),
+    ("Web Summit in Europe is the big one", LISBON, False),
+    ("Off to Web Summit Lisbon", {"name": "Web Summit Qatar", "city": "Doha",
+                                  "country": "Qatar"}, True),
+    ("web summit doha next week", {"name": "Web Summit Qatar", "city": "Doha",
+                                   "country": "Qatar"}, False),
+    ("Money20/20 Europe in Amsterdam", {"name": "Money20/20 USA", "city": "Las Vegas",
+                                        "country": "United States"}, True),
+    ("#Money2020USA here we come", {"name": "Money20/20 USA", "city": "Las Vegas",
+                                    "country": "United States"}, False),
+])
+def test_another_city_of_the_series_is_another_edition(text, event, other):
+    assert A.other_edition(text, event) is other
+
+
+@pytest.mark.parametrize("quote,denies", [
+    ("I want to join Web Summit", True),
+    ("couldn't make it to Web Summit 2026", True),
+    ("Sadly missed Web Summit this year", True),
+    ("hoping to make it to Web Summit", True),
+    ("We won't be at Web Summit", True),
+    ("Can't wait to see you at Web Summit", False),
+    ("Don't miss our talk at Web Summit", False),
+    ("I will speak at Web Summit 2026", False),
+])
+def test_a_wish_or_a_no_is_not_proof_of_being_there(quote, denies):
+    assert A.denies_presence(quote) is denies
+
+
+def test_an_ellipsis_may_not_cut_out_a_not():
+    assert not A.in_text("I was ... at Web Summit", "I was not at Web Summit this year")
+    assert A.in_text("I was ... at Web Summit", "I was so happy at Web Summit")
+
+
+def test_a_quote_is_proof_only_for_the_person_it_is_about():
+    text = "Tom Lee gave a keynote at Web Summit. " + "More news. " * 40 + "Satya Nadella is CEO."
+    assert not A.tied_to("Satya Nadella", "Tom Lee gave a keynote at Web Summit", text)
+    assert A.tied_to("Tom Lee", "gave a keynote at Web Summit", text)
+    assert A.tied_to("Tom Lee", "Lee gave a keynote", "Tom Lee joined. Lee gave a keynote.")
 
 
 # ── 1. named by the event ──
@@ -212,6 +286,138 @@ def test_another_edition_of_the_series_or_a_non_attendance_lists_nobody():
         {"id": "p1", "same_event": True, "people": [
             {"who": "author", "status": "interested", "quote": "see you at Widget Expo soon"}]}))
     assert out["people"] == [] and out["rejected"] == 0
+
+
+def test_live_run_35_rows_that_were_not_this_edition_are_not_counted_as_it():
+    """Posts from the live Lisbon run (November 2026, read on 3 October)
+    that were listed as at this edition."""
+    texts = [
+        ("Spoken at Web Summit, European Parliament, 15+ countries", "2026-10-02",
+         {"who": "author", "status": "speaking", "tense": "past",
+          "quote": "Spoken at Web Summit, European Parliament, 15+ countries"}),
+        ("One of my biggest lessons from #WebSummit2026 in Vancouver", "2026-05-16",
+         {"who": "author", "status": "attended", "tense": "past",
+          "quote": "One of my biggest lessons from #WebSummit2026"}),
+        ("I want to join Web Summit to meet global Web3 security researchers", "2026-10-02",
+         {"who": "author", "status": "attending", "tense": "future",
+          "quote": "I want to join Web Summit to meet global Web3 security researchers"}),
+        ("I WILL SPEAK AT WEB SUMMIT 2026 IN LISBON", "2026-09-28",
+         {"who": "author", "status": "speaking", "tense": "future",
+          "quote": "I WILL SPEAK AT WEB SUMMIT 2026 IN LISBON"}),
+    ]
+    posts = [A.linkedin_post(_post(str(i + 1), t, posted=d + "T10:00:00Z"))
+             for i, (t, d, _) in enumerate(texts)]
+    out = A.people_in_posts(posts, LISBON, date(2026, 10, 3), classify=_reading(*[
+        {"id": "p%d" % (i + 1), "same_event": True, "edition": "this", "people": [person]}
+        for i, (_, _, person) in enumerate(texts)]))
+    assert [(p["status"], p["edition"]) for p in out["people"]] == [
+        ("speaking", "earlier"), ("speaking", "this")]
+    assert out["other_edition"] == 1 and out["rejected"] == 1
+
+
+def test_a_no_just_before_the_quote_still_counts_as_a_no():
+    posts = _posts("Gutted that I couldn't make it to Widget Expo 2026 this time.")
+    out = A.people_in_posts(posts, EVENT, TODAY, classify=_reading(
+        {"id": "p1", "same_event": True, "people": [
+            {"who": "author", "status": "attending", "tense": "future",
+             "quote": "make it to Widget Expo 2026"}]}))
+    assert out["people"] == [] and out["rejected"] == 1
+
+
+def test_a_speaker_card_ties_the_title_line_to_the_name_line_above_only():
+    card = "Speakers\nJen Wong\nChief Operating Officer, Reddit\nJill Kramer\nHead of Comms"
+    assert A.tied_to("Jen Wong", "Chief Operating Officer, Reddit", card)
+    assert not A.tied_to("Jill Kramer", "Chief Operating Officer, Reddit", card)
+
+
+def test_a_web_page_credits_a_sentence_only_to_the_person_it_is_about():
+    page = ("Widget Expo 2026 speakers announced. Jane Doe, CEO of Foo, will speak at "
+            "Widget Expo 2026 on Centre Stage. Commenting on the line-up, analyst John Roe "
+            "of Gartner said the AI track was strong.")
+    out = A.people_on_page("https://news.example/w", page, EVENT, TODAY,
+                           read=lambda u, t, e, d: {"people": [
+                               {"name": "John Roe", "status": "speaking", "tense": "future",
+                                "company": "Gartner",
+                                "quote": "will speak at Widget Expo 2026 on Centre Stage"}]})
+    assert out["people"] == [] and out["rejected"] == 1
+
+
+def test_a_web_page_about_another_city_of_the_series_is_not_read():
+    results = [{"url": "https://a.example/", "title": "", "snippet": "", "query": "q"},
+               {"url": "https://b.example/", "title": "", "snippet": "", "query": "q"}]
+    texts = {"https://a.example/": "Lee Park spoke at Web Summit Vancouver this May.",
+             "https://b.example/": "Mia Wong will speak at Web Summit in Lisbon."}
+    read_urls = []
+
+    def read(url, text, event, today):
+        read_urls.append(url)
+        return {"people": []}
+    out = A.search_web(LISBON, "", date(2026, 10, 3),
+                       fetch=lambda u: {"status": "ok", "text": texts[u]},
+                       ask=None, read=read,
+                       google=lambda e: {"results": results, "queries": 1, "error": None})
+    assert read_urls == ["https://b.example/"] and out["other_edition"] == 1
+
+
+def test_a_named_person_needs_the_quote_to_be_about_them():
+    posts = _posts("Tom Lee gave a keynote at Widget Expo. " + "Other news. " * 40 +
+                   "Satya Nadella is a CEO.")
+    out = A.people_in_posts(posts, EVENT, TODAY, classify=_reading(
+        {"id": "p1", "same_event": True, "people": [
+            {"who": "named", "name": "Satya Nadella", "status": "speaking", "tense": "past",
+             "quote": "Tom Lee gave a keynote at Widget Expo"}]}))
+    assert out["people"] == [] and out["rejected"] == 1
+
+
+def test_a_page_about_another_city_is_not_read_and_a_past_one_is_earlier():
+    page = ("Hub Azul Portugal attends Web Summit. Jan 5, 2026. Gonçalo Faria, Lead "
+            "Manager, participated in a Fireside Chat at Web Summit in Lisbon.")
+    out = A.people_on_page("https://hubazul.pt/x", page, LISBON, date(2026, 10, 3),
+                           read=lambda u, t, e, d: {"people": [
+                               {"name": "Gonçalo Faria", "status": "speaking", "tense": "past",
+                                "edition": "this",
+                                "quote": "Gonçalo Faria, Lead Manager, participated in a Fireside Chat"}]})
+    assert out["people"][0]["edition"] == "earlier"
+    out = A.people_on_page("https://x.example/p", "Lee Park said she couldn't make it to "
+                           "Web Summit this year.", LISBON, date(2026, 10, 3),
+                           read=lambda u, t, e, d: {"people": [
+                               {"name": "Lee Park", "status": "attending", "tense": "future",
+                                "quote": "Lee Park said she couldn't make it to Web Summit"}]})
+    assert out["people"] == [] and out["rejected"] == 1
+
+
+def test_a_cut_off_search_and_a_long_page_say_so():
+    import time as _t
+    out = A.search_linkedin(EVENT, deadline=_t.monotonic() - 1,
+                            search=lambda *a, **k: ({"items": []}, None), account_id="a")
+    assert out["error"] == "out_of_time"
+    assert "ran out of time" in A.note({"linkedin": out, "counts": {"confirmed": 1}})
+    assert A.search_x(EVENT, deadline=_t.monotonic() - 1, run=lambda t: [])["error"] == "out_of_time"
+    long = "Widget Expo 2026 speakers. " + "Lee Park, CTO. " * 3000
+    out = A.people_on_page("https://x.example/p", long, EVENT, TODAY,
+                           read=lambda u, t, e, d: {"people": []})
+    assert out["cut"] is True
+    assert "read only in part" in A.note({"web": {"cut": 2}, "counts": {"confirmed": 1}})
+
+
+def test_a_row_recovered_from_someone_elses_site_is_not_named_by_the_event():
+    rows = A.named_by_event([
+        {"event_id": 1, "role": "speaker", "person_name": "Ana Silva", "org_name": "Acme",
+         "source_url": "https://someblog.example/speakers-we-loved",
+         "evidence": {"status": "recovered_by_search", "off_site": True}},
+        {"event_id": 1, "role": "speaker", "person_name": "Bo Chen", "org_name": "Acme",
+         "source_url": "https://widgetexpo.com/speakers",
+         "evidence": {"status": "recovered_by_search", "off_site": False}},
+    ], event_id=1)
+    assert [(r["basis"], r["status"], r["edition"]) for r in rows] == [
+        ("others", "speaking", "unclear"), ("event", "speaking", "this")]
+    assert rows[0]["proof"][0]["label"] == "Named as speaker on someblog.example"
+    _, inputs = P.attendee_inputs({"id": 1}, [
+        {"event_id": 1, "person_name": "Ana Silva",
+         "evidence": {"status": "recovered_by_search", "off_site": True, "raw": "x"}},
+        {"event_id": 1, "person_name": "Bo Chen", "evidence": {"status": "parsed"}}])
+    assert inputs[0]["evidence"] == {"status": "recovered_by_search", "off_site": True}
+    assert inputs[1]["evidence"] == {}
 
 
 def test_a_batch_that_could_not_be_read_is_counted(monkeypatch):

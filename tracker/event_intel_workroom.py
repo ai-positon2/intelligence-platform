@@ -243,7 +243,18 @@ _DESCRIPTORS = {"holdings", "group", "technologies", "technology", "solutions",
 _TLDS = {"com", "io", "ai", "net", "org", "co", "app", "dev", "tech"}
 
 
-def org_key(name: str) -> str:
+def roster_key(name: str) -> str:
+    """org_key for telling companies apart rather than matching a note.
+
+    The descriptor words stay: "Blue Ocean Technologies" and "Blue Ocean
+    Systems", or "Delta Health Software" and "Delta Health Group", are two
+    companies on a floor, and deduping by org_key kept one of each pair
+    (Lookup audit, 2026-10-04). Legal suffixes and a trailing ".com" still
+    go, so "Acme Technologies, Inc." is "Acme Technologies"."""
+    return org_key(name, keep_descriptors=True)
+
+
+def org_key(name: str, keep_descriptors: bool = False) -> str:
     """A company name reduced to something two spellings of it agree on.
 
     "Acme Technologies, Inc." and "Acme Technologies" have to collide, or a
@@ -266,7 +277,7 @@ def org_key(name: str) -> str:
         words = words[:-1]
     words = [w for w in words if w not in _LEGAL] or words
     trimmed = [w for w in words if w not in _DESCRIPTORS]
-    if len(trimmed) >= 2:
+    if len(trimmed) >= 2 and not keep_descriptors:
         words = trimmed
     return " ".join(words) or plain
 

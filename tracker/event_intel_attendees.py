@@ -133,12 +133,96 @@ def in_text(fragment: str, text: str) -> bool:
     if not pieces or sum(len(p) for p in pieces) < 12:
         return False
     at = 0
-    for p in pieces:
+    for i, p in enumerate(pieces):
         found = body.find(p, at)
         if found < 0:
             return False
+        # What the ellipsis left out may not turn the sentence round: "I was
+        # ... at Web Summit" cut from "I was not at Web Summit" says the
+        # opposite of the post.
+        if i and _NEGATION.search(body[at:found]):
+            return False
         at = found + len(p)
     return True
+
+
+_NEGATION = re.compile(r"\b(?:not|no|never|didn'?t|couldn'?t|can'?t|cannot|won'?t|wasn'?t|"
+                       r"weren'?t|isn'?t|aren'?t|unable|missed|missing)\b")
+# A wish, a regret or a "no" is nobody's proof of being there, whatever a
+# model made of it ("I want to join Web Summit", live run 35).
+_NOT_THERE = re.compile(
+    r"\b(?:(?:could|can|did|will|would|was|were|is|are|wo|ca)n'?t|cannot|unable to|not able to|"
+    r"won'?t be|not (?:going|attending|be|there|make)|missed|missing|skipp(?:ed|ing)|"
+    r"(?:want|wanted|wanting|wish|wished|hope|hoping|hoped|would love|'d love|dream|dreaming|"
+    r"plan(?:ning)? to apply|apply(?:ing)? to) (?:to )?(?:join|go|attend|be at|be there|"
+    r"make it|speak|visit|get to)|wish i (?:was|were|could))\b")
+
+
+# Negatives that mean yes: "can't wait to see you at Web Summit".
+_EAGER = re.compile(
+    r"\b(?:can'?t|cannot|couldn'?t) (?:wait|be (?:more )?(?:happier|prouder|excited|more))|"
+    r"\b(?:won'?t|wouldn'?t|don'?t|never|can'?t|not) (?:want to )?miss\b|"
+    r"\bnot to be missed\b|\bnot only\b|\bno better\b")
+
+
+def _sentence_of(quote: str, text: str) -> list[tuple[str, str]]:
+    """For each place the quote stands in the text: the words of its
+    sentence before it, and after it. Both folded."""
+    q = _fold(quote)
+    # Folded line by line: a speaker card's lines are its sentences.
+    body = "\n".join(_fold(line) for line in str(text or "").splitlines())
+    pieces = [x.strip(" .,;:-") for x in re.split(r"\.\.\.|…", q) if x.strip(" .,;:-")]
+    if not pieces:
+        return []
+    if body.find(pieces[0]) < 0:
+        body = _fold(text)        # a quote that runs over a line break
+    out = []
+    at = body.find(pieces[0])
+    while at >= 0:
+        stop = at + len(q)
+        window = body[max(0, at - 300):at]
+        cut = max(window.rfind(c) for c in ".!?\n")
+        before = window[cut + 1:] if cut >= 0 else window
+        if cut >= 0 and window[cut] == "\n":
+            # A speaker card prints the name on its own line above the
+            # title: a short line just above belongs with this one.
+            above = window[:cut].rsplit("\n", 1)[-1]
+            if len(above.strip()) <= 60 and not re.search(r"[.!?]", above):
+                before = above + " " + before
+        after = body[stop:stop + 120]
+        m = re.search(r"[.!?\n]", after)
+        out.append((before, after[:m.start()] if m else after))
+        at = body.find(pieces[0], at + 1)
+    return out
+
+
+def denies_presence(quote: str, text: str = "") -> bool:
+    """Whether a quote says the person is not going, was not there, or only
+    wishes they were, reading the words of its sentence just before it too:
+    "make it to Web Summit 2026" cut from "I couldn't make it to Web Summit
+    2026" is a no."""
+    if _NOT_THERE.search(_EAGER.sub(" ", _fold(quote))):
+        return True
+    for before, _ in _sentence_of(quote, text):
+        lead = before[-40:] + " " + _fold(quote)
+        if _NOT_THERE.search(_EAGER.sub(" ", lead)):
+            return True
+    return False
+
+
+def tied_to(name: str, quote: str, text: str) -> bool:
+    """Whether a quote credited to `name` is about them: it names them, or
+    its own sentence does. "Our CTO Tom Lee is on stage at Web Summit"
+    is no proof that Satya Nadella, named one sentence earlier, is."""
+    n, q = _fold(name), _fold(quote)
+    if not n:
+        return False
+    last = _fold(name.split()[-1]) if name.split() else ""
+    def names(span):
+        return n in span or (len(last) > 2 and re.search(r"\b%s\b" % re.escape(last), span))
+    if names(q):
+        return True
+    return any(names(before) or names(after) for before, after in _sentence_of(quote, text))
 
 
 def clean_name(name: str) -> str:
@@ -219,6 +303,82 @@ def mentions_event(text: str, terms: list[str]) -> bool:
     return False
 
 
+# Places that series name their editions after. A post that puts the
+# event's own name next to one of these, and never next to this edition's
+# city, is about another edition: on the live Lisbon run "#WebSummit2026"
+# posts from May (Vancouver) and June (Rio) were counted for November.
+_SERIES_PLACES = (
+    "lisbon", "lisboa", "vancouver", "rio", "rio de janeiro", "qatar", "doha", "tokyo",
+    "shanghai", "riyadh", "toronto", "sao paulo", "mexico city", "abu dhabi", "dubai",
+    "jakarta", "bangalore", "bengaluru", "mumbai", "delhi", "cape town", "nairobi", "lagos",
+    "seoul", "manila", "bangkok", "kuala lumpur", "singapore", "hong kong", "sydney",
+    "melbourne", "london", "paris", "berlin", "munich", "amsterdam", "barcelona", "madrid",
+    "milan", "dublin", "stockholm", "copenhagen", "helsinki", "warsaw", "istanbul",
+    "new york", "nyc", "las vegas", "vegas", "san francisco", "austin", "miami", "chicago",
+    "boston", "denver", "atlanta", "dallas", "seattle", "orlando", "europe", "asia",
+    "africa", "latam", "mena", "apac", "emea", "india", "usa", "middle east", "americas",
+    "north america", "china", "japan", "korea", "brazil", "canada", "australia")
+_PLACE_ALIASES = {"lisbon": ("lisboa",), "lisboa": ("lisbon",), "qatar": ("doha",),
+                  "doha": ("qatar",), "rio de janeiro": ("rio",), "rio": ("rio de janeiro",),
+                  "new york": ("nyc",), "las vegas": ("vegas",), "usa": ("us", "america")}
+
+
+def _own_places(event: dict) -> set:
+    own = set()
+    for v in (event.get("city"), event.get("country")):
+        for part in re.split(r"[,/]", str(v or "")):
+            f = _fold(part).strip()
+            if f:
+                own.add(f)
+    name = _fold(event.get("name"))
+    own.update(p for p in _SERIES_PLACES if re.search(r"\b%s\b" % re.escape(p), name))
+    for p in list(own):
+        own.update(_PLACE_ALIASES.get(p, ()))
+    return own
+
+
+def _series_stem(event: dict, own: set) -> str:
+    """The event's name with its year and its own place taken off: "Web
+    Summit Qatar 2027" is the "web summit" series in Qatar."""
+    stem = _YEAR.sub(" ", _fold(event.get("name")))
+    for p in sorted(own, key=len, reverse=True):
+        stem = re.sub(r"\b%s\b" % re.escape(p), " ", stem)
+    return re.sub(r"\s+", " ", stem).strip(" -,:|")
+
+
+def other_edition(text: str, event: dict) -> bool:
+    """Whether the text places this event's series in another city or
+    region and never in this edition's own."""
+    own = _own_places(event)
+    stem = _series_stem(event, own)
+    if len(_letters(stem)) < 4:
+        return False
+    body = _fold(text)
+    words = r"\s+".join(re.escape(w) for w in stem.split())
+    tag = re.escape(_letters(stem))
+    sep = r"(?:\s*(?:in|at|,|\||-|–|:)\s*|\s+)"
+
+    def placed(place):
+        p = r"\s+".join(re.escape(w) for w in place.split())
+        return bool(re.search(r"\b%s(?:\s*(?:19|20)\d{2})?%s%s\b" % (words, sep, p), body)
+                    or re.search(r"#%s(?:\d{2,4})?(?:%s)?%s\b" % (tag, sep, p), body)
+                    or re.search(r"#%s(?:\d{2,4})?%s\b" % (tag, re.escape(_letters(place))), body))
+    if any(placed(p) for p in own) or any(
+            re.search(r"\b%s\b" % re.escape(p), body) for p in own if len(p) > 3):
+        return False
+    # A region is another edition only for a series that names editions by
+    # region ("Money20/20 Europe" against "Money20/20 USA"); "Web Summit in
+    # Europe" is just where Lisbon is.
+    by_region = bool(own & _REGIONS)
+    return any(placed(p) for p in _SERIES_PLACES
+               if p not in own and (by_region or p not in _REGIONS))
+
+
+_REGIONS = {"europe", "asia", "africa", "latam", "mena", "apac", "emea", "india", "usa",
+            "middle east", "americas", "north america", "china", "japan", "korea", "brazil",
+            "canada", "australia", "us", "america"}
+
+
 def _as_date(value):
     if not value:
         return None
@@ -235,27 +395,48 @@ def _as_date(value):
             return None
 
 
+TENSE_PAST = "past"
+TENSE_NOW = "now"
+TENSE_FUTURE = "future"
+TENSES = (TENSE_PAST, TENSE_NOW, TENSE_FUTURE)
+
+
 def settle_edition(model_edition: str, status: str, posted_at, event: dict,
-                   today: date | None = None) -> str:
+                   today: date | None = None, tense: str | None = None) -> str:
     """Which edition a post is about, with the dates overruling the model
     where they can. A post written more than ten months before this edition
     starts is about an earlier one; "I was there" about an edition that has
     not happened yet is about an earlier one; and "I'll be there" written
     long after this edition ended is about a later one, which is no proof
-    for this one either way."""
+    for this one either way.
+
+    The tense decides what a date can prove. On the live Lisbon run (run 35,
+    November 2026, read in October) half of the "this edition" rows were
+    past tense written in the months before: a bio line "Spoken at Web
+    Summit", "lessons from #WebSummit2026" after the May edition in
+    Vancouver. Something that already happened, said before this edition
+    began, is about an earlier one; and only "will be" or "am there" written
+    in the run-up is taken as this one when the post names no year."""
     today = today or date.today()
     start = _as_date(event.get("starts_on"))
     end = _as_date(event.get("ends_on")) or start
     posted = _as_date(posted_at)
     edition = model_edition if model_edition in EDITIONS else EDITION_UNCLEAR
+    tense = tense if tense in TENSES else (TENSE_PAST if status == ST_ATTENDED else None)
     if start and posted and posted < start - timedelta(days=300):
         return EDITION_EARLIER
-    if start and start > today and status == ST_ATTENDED:
+    if start and start > today and (status == ST_ATTENDED or tense == TENSE_PAST):
         return EDITION_EARLIER
-    if end and posted and posted > end + timedelta(days=150) and status in (
+    if start and posted and tense == TENSE_PAST and posted < start:
+        return EDITION_EARLIER
+    if start and posted and tense == TENSE_NOW and posted < start - timedelta(days=2):
+        return EDITION_EARLIER
+    if end and posted and posted > end + timedelta(days=2) and tense in (TENSE_NOW, TENSE_FUTURE):
+        return EDITION_UNCLEAR
+    if end and posted and posted > end + timedelta(days=150) and tense != TENSE_PAST and status in (
             ST_ATTENDING, ST_SPEAKING, ST_EXHIBITING):
         return EDITION_UNCLEAR
-    if (start and posted and edition == EDITION_UNCLEAR
+    if (start and posted and edition == EDITION_UNCLEAR and tense in (TENSE_NOW, TENSE_FUTURE)
             and start - timedelta(days=200) <= posted <= (end or start) + timedelta(days=45)):
         # Written in the run-up to this edition or during it, and naming it.
         return EDITION_THIS
@@ -287,6 +468,24 @@ def named_by_event(participants: list[dict], event_id=None) -> list[dict]:
         tags = [str(t) for t in (detail.get("tags") or [])]
         past = any(re.match(r"^past\b", t, re.I) for t in tags)
         role = p.get("role") or ""
+        role_label = ROLE_LABELS.get(role, role).lower()
+        url = look.get("profile_url") or p.get("source_url")
+        if ev.get("status") == "recovered_by_search" and ev.get("off_site"):
+            # Found by search on someone else's site: that page names the
+            # person, the event did not, and it need not be this edition's.
+            out.append({
+                "name": name[:200], "title": p.get("person_title") or None,
+                "company": company, "company_domain": p.get("org_domain") or None,
+                "linkedin": None, "basis": BASIS_OTHERS,
+                # Never "Listed by the event": the event did not list them.
+                "status": {"speaker": ST_SPEAKING, "exhibitor": ST_EXHIBITING,
+                           "sponsor": ST_EXHIBITING, "partner": ST_EXHIBITING}.get(role, ST_ATTENDING),
+                "edition": EDITION_EARLIER if past else EDITION_UNCLEAR,
+                "proof": [{"kind": "web_page",
+                           "label": "Named as %s on %s" % (role_label, _host_of(url) or "a public page"),
+                           "url": url}],
+            })
+            continue
         out.append({
             "name": name[:200],
             "title": p.get("person_title") or None,
@@ -302,8 +501,8 @@ def named_by_event(participants: list[dict], event_id=None) -> list[dict]:
             "edition": EDITION_EARLIER if past else EDITION_THIS,
             "proof": [{
                 "kind": "event_page",
-                "label": "Listed by the event as %s" % ROLE_LABELS.get(role, role).lower(),
-                "url": look.get("profile_url") or p.get("source_url"),
+                "label": "Listed by the event as %s" % role_label,
+                "url": url,
             }],
         })
     return out
@@ -443,7 +642,10 @@ def search_x(event: dict, deadline: float | None = None, run=None) -> dict:
                 {"searchTerms": terms, "maxItems": X_POSTS, "sort": "Top"},
                 token, timeout=240, strict=True)
     terms = x_terms(event)
-    if not terms or (deadline and time.monotonic() > deadline):
+    if not terms:
+        return out
+    if deadline and time.monotonic() > deadline:
+        out["error"] = "out_of_time"
         return out
     out["searched"] = 1
     try:
@@ -521,6 +723,9 @@ def search_linkedin(event: dict, deadline: float | None = None,
         cursor, got = None, 0
         while got < POSTS_PER_QUERY and len(out["posts"]) < MAX_POSTS:
             if deadline and time.monotonic() > deadline:
+                # Cut off, not finished: a run that stops here has not read
+                # what the remaining pages hold, and must say so.
+                out["error"] = out["error"] or "out_of_time"
                 return out
             try:
                 data, err = search(account_id, keywords=q, cursor=cursor, limit=POSTS_PER_PAGE)
@@ -576,7 +781,15 @@ there, and says nothing about being on stage), organising (works for the \
 organiser). Being in the audience for a talk is attending or attended, \
 never speaking.
 7. quote: the exact words from the post that show it, copied character for \
-character, at most 200 characters. Never paraphrase.
+character, at most 200 characters. Never paraphrase. The quote must be about \
+that person: their name, or the author's own "I"/"we".
+11. tense, for each person: "past" (spoke, was there, met them there, \
+"lessons from"), "now" (there today, live from the stand), or "future" \
+(will speak, got a ticket, see you there). A bio line or a list of stages \
+someone has spoken on is "past".
+12. List nobody for a wish, a hope or a maybe ("I want to join", "hoping to \
+make it", "would love to go"), or for anyone who is not going or did not \
+go ("couldn't make it", "missed it this year").
 8. title and company for a named person only when the post says them.
 9. The organiser's own promotion, ticket offers, job ads and news about the \
 event name nobody: return an empty people list.
@@ -587,8 +800,8 @@ do not list the author; people the post names may still be listed.
 Reply with JSON only:
 {"posts": [{"id": "p1", "same_event": true, "author_is_person": true, \
 "edition": "this", "people": \
-[{"who": "author", "name": null, "status": "attending", "title": null, \
-"company": null, "quote": "..."}]}]}
+[{"who": "author", "name": null, "status": "attending", "tense": "future", \
+"title": null, "company": null, "quote": "..."}]}]}
 For the author, leave name null: it is taken from the post itself."""
 
 
@@ -672,7 +885,7 @@ def people_in_posts(posts: list[dict], event: dict, today: date | None = None,
             futures = [pool.submit(contextvars.copy_context().run, read, b) for b in batches]
             results = [f.result() for f in futures]
     out = {"people": [], "batches": len(batches), "failed": 0, "spend": [],
-           "rejected": 0, "failed_kinds": [], "unread_posts": 0}
+           "rejected": 0, "failed_kinds": [], "unread_posts": 0, "other_edition": 0}
     for posts_read, spent, kind, unread in results:
         out["spend"].extend(spent)
         out["unread_posts"] += unread
@@ -687,6 +900,11 @@ def people_in_posts(posts: list[dict], event: dict, today: date | None = None,
                 continue
             post = by_ref.get(str(row.get("id") or ""))
             if not post or row.get("same_event") is False:
+                continue
+            if other_edition(post["text"], event):
+                # Checked here as well as asked of the model: a reply that
+                # leaves same_event out is not a yes.
+                out["other_edition"] += 1
                 continue
             for person in row.get("people") or []:
                 if (row.get("author_is_person") is False and isinstance(person, dict)
@@ -721,8 +939,9 @@ def _person_from_post(person, post, edition, event, today):
     quote = str(person.get("quote") or "").strip()[:QUOTE_CHARS]
     if status not in POST_STATUSES:
         return {}
-    if not in_text(quote, post["text"]):
+    if not in_text(quote, post["text"]) or denies_presence(quote, post["text"]):
         return None
+    tense = str(person.get("tense") or "").strip().lower()
     who = str(person.get("who") or "").strip().lower()
     author = post["author"]
     on_x = post.get("platform") == "x"
@@ -747,12 +966,15 @@ def _person_from_post(person, post, edition, event, today):
             if company and _fold(company) not in _fold(post["text"]):
                 company = None
             linkedin, basis = None, BASIS_OTHERS
+            if not tied_to(name, quote, post["text"]):
+                return None
     where = "post on X" if on_x else "LinkedIn post"
     return {
         "name": name[:200], "title": title, "company": company, "company_domain": None,
         "linkedin": linkedin, "basis": basis, "status": status,
         "x": author.get("x") if basis == BASIS_SELF else None,
-        "edition": settle_edition(str(edition or ""), status, post.get("posted_at"), event, today),
+        "edition": settle_edition(str(edition or ""), status, post.get("posted_at"), event, today,
+                                  tense),
         "proof": [{
             "kind": "x_post" if on_x else "linkedin_post",
             "label": ("Their own %s" % where if basis == BASIS_SELF
@@ -826,10 +1048,14 @@ attended, organising.
 6. title and company only as the page states them for that person.
 7. A page that is a list (speakers, startups, delegation) can name many \
 people: list every one, up to 80.
+8. tense: "past" when the page says it already happened (spoke, took part, \
+was present), "future" when it is announced or to come, "now" when the page \
+reports it live.
+9. Nobody who only hopes, plans to apply, or did not go.
 
 Reply with JSON only:
 {"people": [{"name": "...", "title": null, "company": null, "status": \
-"speaking", "edition": "this", "quote": "..."}]}"""
+"speaking", "tense": "future", "edition": "this", "quote": "..."}]}"""
 
 
 def _host_of(url: str) -> str:
@@ -957,7 +1183,10 @@ def people_on_page(url: str, text: str, event: dict, today: date, read=None) -> 
         spent.append(res.get("spend"))
     from . import claude_websearch
     out = {"people": [], "spend": claude_websearch.spend_sum(*[x for x in spent if x]),
-           "error": res.get("error") if res.get("people") is None else None, "rejected": 0}
+           "error": res.get("error") if res.get("people") is None else None, "rejected": 0,
+           # A 400-speaker page is longer than one reading: say so rather
+           # than let the people past the cut look like nobody.
+           "cut": len(text) > len(excerpt)}
     host = _host_of(url)
     for person in res.get("people") or []:
         if not isinstance(person, dict):
@@ -968,9 +1197,11 @@ def people_on_page(url: str, text: str, event: dict, today: date, read=None) -> 
         if status not in POST_STATUSES:
             continue
         if (len(name.split()) < 2 or _fold(name) not in _fold(excerpt)
-                or not in_text(quote, excerpt)):
+                or not in_text(quote, excerpt) or denies_presence(quote, excerpt)
+                or not tied_to(name, quote, excerpt)):
             out["rejected"] += 1
             continue
+        tense = str(person.get("tense") or "").strip().lower()
         title = str(person.get("title") or "").strip() or None
         company = str(person.get("company") or "").strip() or None
         out["people"].append({
@@ -980,7 +1211,8 @@ def people_on_page(url: str, text: str, event: dict, today: date, read=None) -> 
             "company_domain": None, "linkedin": None,
             "basis": BASIS_OTHERS, "status": status,
             "edition": settle_edition(page_edition(str(person.get("edition") or ""),
-                                                   excerpt, event), status, None, event, today),
+                                                   excerpt, event), status, None, event, today,
+                                      tense),
             "proof": [{"kind": "web_page", "label": "Named on %s" % (host or "a public page"),
                        "url": url, "quote": quote}],
         })
@@ -1167,7 +1399,8 @@ def search_web(event: dict, event_host: str = "", today: date | None = None,
     fetch = fetch or fetch_page
     out = {"people": [], "searches": 0, "pages": 0, "opened": 0, "on_event": 0,
            "read": 0, "unopened": 0, "rejected": 0, "unread": 0, "skipped": 0,
-           "error": None, "spend": None, "via": "google", "results": 0}
+           "other_edition": 0, "cut": 0, "error": None, "spend": None, "via": "google",
+           "results": 0}
     spend = []
     began = time.monotonic()
     g = (google or google_results)(event)
@@ -1243,6 +1476,9 @@ def search_web(event: dict, event_host: str = "", today: date | None = None,
             out["opened"] += 1
             if mentions_event(got["text"], terms):
                 out["on_event"] += 1
+                if other_edition(page_excerpt(got["text"], terms), event):
+                    out["other_edition"] += 1
+                    continue
                 to_read.append((got["final"], got["text"]))
     out["not_read"] = max(0, len(to_read) - MAX_WEB_PAGES)
     to_read = to_read[:MAX_WEB_PAGES]
@@ -1263,6 +1499,7 @@ def search_web(event: dict, event_host: str = "", today: date | None = None,
         spend.append(r.get("spend"))
         out["unread" if r.get("error") else "read"] += 1
         out["rejected"] += r.get("rejected", 0)
+        out["cut"] += 1 if r.get("cut") else 0
         out["people"].extend(r.get("people") or [])
     out["spend"] = claude_websearch.spend_sum(*[s for s in spend if s])
     out["seconds"] = int(time.monotonic() - began)
@@ -1454,7 +1691,7 @@ def gather(event: dict, participants: list[dict], event_host: str = "",
         # LinkedIn's posts are read the moment they are in, while X is still
         # being scraped; X's are read the moment they arrive.
         empty = {"people": [], "batches": 0, "failed": 0, "spend": [], "rejected": 0,
-                 "failed_kinds": [], "unread_posts": 0}
+                 "failed_kinds": [], "unread_posts": 0, "other_edition": 0}
         li_read = (later(people_in_posts, empty, li["posts"], event, today, classify)
                    if li.get("posts") else None)
         xs = x_job.result()
@@ -1479,7 +1716,8 @@ def gather(event: dict, participants: list[dict], event_host: str = "",
         failed_batches=li_read["failed"] + x_read["failed"],
         rejected=li_read["rejected"] + x_read["rejected"],
         failed_kinds=li_read["failed_kinds"] + x_read["failed_kinds"],
-        unread_posts=li_read["unread_posts"] + x_read["unread_posts"])
+        unread_posts=li_read["unread_posts"] + x_read["unread_posts"],
+        other_edition=li_read.get("other_edition", 0) + x_read.get("other_edition", 0))
 
     spend.append(web.get("spend"))
     people.extend(web.get("people") or [])
@@ -1488,6 +1726,7 @@ def gather(event: dict, participants: list[dict], event_host: str = "",
                                               "browser_detail",
                                               "on_event", "read", "not_read", "unread",
                                               "unopened", "rejected", "skipped", "error",
+                                              "other_edition", "cut",
                                               "google_error", "find_seconds", "seconds")}
     report["web"]["people"] = len(web.get("people") or [])
     people.extend(staff.get("people") or [])
@@ -1528,6 +1767,9 @@ def note(report: dict) -> str:
     if li.get("error") == "no_account":
         bits.append("LinkedIn was not searched: no LinkedIn account is connected "
                     "to this workspace.")
+    elif li.get("error") == "out_of_time":
+        bits.append("The LinkedIn search ran out of time part-way, so posts after "
+                    "that point were not read.")
     elif li.get("error"):
         bits.append("The LinkedIn search stopped part-way (%s), so posts after "
                     "that point were not read." % li["error"])
@@ -1560,6 +1802,12 @@ def note(report: dict) -> str:
     if web.get("unread"):
         bits.append("%d of the %d web pages naming the event could not be read." % (
             web["unread"], web.get("on_event", 0)))
+    if web.get("cut"):
+        bits.append("%d long web page%s read only in part, from where %s the "
+                    "event; people named further down %s not checked." % (
+                        web["cut"], " was" if web["cut"] == 1 else "s were",
+                        "it first names" if web["cut"] == 1 else "each first names",
+                        "it were" if web["cut"] == 1 else "them were"))
     st = report.get("staff") or {}
     if st.get("error") and "APOLLO_API_KEY" in str(st["error"]):
         bits.append("People at the exhibiting companies were not looked up: company "

@@ -205,6 +205,11 @@ def roster_years(text):
     for line in text.splitlines():
         if 'copyright' in line.lower() or '©' in line:
             continue
+        # A heading, not a sentence: one bio line on a 2027 speaker page
+        # saying "she was among the 2026 speakers" withheld the whole page
+        # as another edition (Lookup audit, 2026-10-04).
+        if len(line.strip()) > 90 or re.search(r'[.!?]["\')\]]?\s*$', line.strip()):
+            continue
         if re.search(r'\[https?://[^\]\s]+\]\s*$', line):
             continue
         for pattern in (r'\b(20\d{2})\b.{0,60}\b'+roles+r'\b',
