@@ -9753,9 +9753,12 @@ def event_conference_intelligence_status(run_id):
                 run = event_intel_store.get_run(run_id, email) or run
         except Exception:
             app.logger.exception("event conference intelligence: stale-job sweep failed")
+    # started_at lets the progress panel count from when the run began, not
+    # from when this page happened to start watching it.
     return jsonify({"run_id": run_id, "status": run["status"],
                     "stage": run.get("stage"), "error": run.get("error"),
-                    "credits_spent": run.get("credits_spent", 0)})
+                    "credits_spent": run.get("credits_spent", 0),
+                    "started_at": run.get("created_at")})
 
 
 @app.route("/p2/strategic-agents/event-conference-intelligence/runs/<int:run_id>")

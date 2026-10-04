@@ -519,14 +519,26 @@
           </div>
         </form>
 
-          <div id="runningWrap" style="display:none">
-            <div class="evi-running">
-              <span class="thinking-orb-slot" data-orb-state="working" data-orb-size="20"></span>
-              <span id="runningText">Working. This runs in the background, so you can leave
-                this page and find the result in History when it is done.</span>
+          {# The run, in place of the form that started it. The same panel is
+             drawn in the drawer for a run opened while it is still going
+             (progressShell), and both are kept current by paintProgress, so
+             the two views of one run cannot disagree. #}
+          <div id="runningWrap" class="evi-prog" style="display:none">
+            <div class="pg-top">
+              <span class="pg-orb thinking-orb-slot" data-orb-state="working" data-orb-size="64"></span>
+              <div class="pg-tt">
+                <span class="pg-k" id="runningKick">Starting</span>
+                <span class="pg-now" id="runningText" role="status" aria-live="polite">Working.</span>
+              </div>
+              <span class="pg-clock"><b id="runningClock">0:00</b><i>elapsed</i></span>
             </div>
-            <button type="button" id="cancelEventRun" class="evi-btn">Cancel research</button>
-            <ol id="runningSteps" class="evi-steps" aria-label="Run progress"></ol>
+            <div class="pg-bar" aria-hidden="true"><span id="runningBar"></span></div>
+            <ol id="runningSteps" class="evi-steps pg-steps" aria-label="Run progress"></ol>
+            <div class="pg-foot">
+              <span class="pg-note" id="runningNote">Runs in the background. You can close
+                this page; the result appears under Your runs.</span>
+              <button type="button" id="cancelEventRun" class="evi-btn evi-btn-ghost pg-cancel">Cancel research</button>
+            </div>
           </div>
           <div id="formError" class="evi-err" style="display:none"></div>
         </div>
@@ -1408,14 +1420,19 @@
       }
       var btn = document.getElementById('runBtn');
       btn.disabled = true;
-      document.getElementById('runningWrap').style.display = '';
+      showRunning(true);
       mountOrbsIn(document.getElementById('runningWrap'));
       document.getElementById('runningText').textContent =
         mode === 'recommend'
-          ? 'Searching all six event categories. This takes a few minutes and runs in the background, so you can leave this page.'
+          ? 'Searching all six event categories.'
         : mode === 'lookup'
-          ? 'Resolving the event and reading the pages it publishes. This runs in the background, so you can leave this page.'
-          : 'Qualifying the roster and drafting an opener for each company. This runs in the background, so you can leave this page.';
+          ? 'Resolving the event and reading the pages it publishes.'
+          : 'Qualifying the roster and drafting an opener for each company.';
+      var note = document.getElementById('runningNote');
+      if (note) note.textContent = (PLAY_TYPICAL[mode] ? PLAY_TYPICAL[mode] + ' ' : '') +
+        'Runs in the background. You can close this page; the result appears under Your runs.';
+      paintProgress('running', mode, null, new Date().toISOString());
+      startClocks();
 
       if (mode !== 'lookup') body.selected_product = (document.getElementById('runOffer') || {}).value || '';
       var signature = JSON.stringify(body);
@@ -1434,12 +1451,21 @@
         })
         .catch(function(err){
           btn.disabled = false;
-          document.getElementById('runningWrap').style.display = 'none';
+          showRunning(false);
           showFormError(err.message);
         });
       return false;
     }
     window.startRun = startRun;
+
+    /* While a run is going, its progress stands where the form was: the
+       form has nothing left to ask, and a filled-in form under a live run
+       reads as a second thing to do. */
+    function showRunning(on){
+      document.getElementById('runningWrap').style.display = on ? '' : 'none';
+      var card = document.getElementById('formCard');
+      if (card && card.classList) card.classList.toggle('is-running', !!on);
+    }
 
     /* One key per pipeline stage. `discovering` used to appear twice here, and
        the second literal silently won, so recommend runs showed the discover
@@ -1474,23 +1500,105 @@
       discovering_categories: 'Search six categories', auditing: 'Audit the famous names',
       scoring: 'Score every event', ranking: 'Rank and cut below 70',
       resolving: 'Identify the event', harvesting: 'Read the published pages',
+      finding_attendees: 'Find the people going',
       reading_roster: 'Read the roster',
       qualifying: 'Qualify and draft', checking_drafts: 'Check every draft',
       saving: 'Save the drafts'
     };
 
-    function renderSteps(mode, stage){
-      var el = document.getElementById('runningSteps');
+    /* The run in progress, drawn the same way in the form and in the drawer.
+       `prefix` names the panel's elements (running... in the form,
+       drawerLive... in the drawer), so one function keeps both current. */
+    var PLAY_RUNNING = {recommend: 'Scoring the calendar', lookup: 'Building the roster',
+                        workroom: 'Working the room'};
+    // Only the duration the play card already promises. The other two have
+    // no measured figure, and a guessed one is a promise nobody made.
+    var PLAY_TYPICAL = {recommend: 'Usually twenty to forty minutes.'};
+
+    function progressState(mode, stage){
       var order = STAGE_ORDER[mode] || [];
-      if (!order.length) { el.innerHTML = ''; return; }
       var at = order.indexOf(stage);
-      el.innerHTML = order.map(function(key, i){
-        var state = at < 0 ? 'pending'
-                  : (i < at ? 'done' : (i === at ? 'now' : 'pending'));
-        return '<li class="' + state + '"><span class="dot"></span>' +
-               '<span class="tx">' + esc(SHORT[key] || key) + '</span></li>';
+      if (stage === 'done') at = order.length;
+      var pct = !order.length ? 0
+              : at < 0 ? 3
+              : at >= order.length ? 100
+              : Math.round((at + 0.5) / order.length * 100);
+      var kick = stage === 'queued' ? 'Queued'
+               : at < 0 ? 'Starting'
+               : at >= order.length ? 'Finishing'
+               : 'Step ' + (at + 1) + ' of ' + order.length;
+      return {order: order, at: at, pct: pct, kick: kick};
+    }
+
+    function stepsHtml(mode, stage){
+      var st = progressState(mode, stage);
+      return st.order.map(function(key, i){
+        var state = st.at < 0 ? 'pending'
+                  : (i < st.at ? 'done' : (i === st.at ? 'now' : 'pending'));
+        return '<li class="' + state + '"><span class="dot">' + (i + 1) + '</span>' +
+               '<span class="tx">' + esc(SHORT[key] || key) + '</span>' +
+               (state === 'now' ? '<span class="nw">In progress</span>' : '') + '</li>';
       }).join('');
     }
+
+    function renderSteps(mode, stage){
+      var el = document.getElementById('runningSteps');
+      if (el) el.innerHTML = stepsHtml(mode, stage);
+    }
+
+    function paintProgress(prefix, mode, stage, since){
+      var st = progressState(mode, stage);
+      var get = function(k){ return document.getElementById(prefix + k); };
+      var steps = get('Steps'), bar = get('Bar'), kick = get('Kick'), text = get('Text'), clock = get('Clock');
+      if (steps) steps.innerHTML = stepsHtml(mode, stage);
+      if (bar && bar.style) bar.style.width = st.pct + '%';
+      if (kick) kick.textContent = (PLAY_RUNNING[mode] || 'Running') + ' · ' + st.kick;
+      if (text && stage && STAGES[stage]) text.textContent = STAGES[stage];
+      if (clock && since) { clock.setAttribute('data-since', since); tickClocks(); }
+    }
+
+    function progressShell(prefix, mode, stage, since){
+      var st = progressState(mode, stage);
+      startClocks();
+      return '<div class="evi-prog in-drawer">' +
+        '<div class="pg-top">' +
+          '<span class="pg-orb thinking-orb-slot" data-orb-state="working" data-orb-size="64"></span>' +
+          '<div class="pg-tt"><span class="pg-k" id="' + prefix + 'Kick">' +
+            esc((PLAY_RUNNING[mode] || 'Running') + ' \u00b7 ' + st.kick) + '</span>' +
+            '<span class="pg-now" id="' + prefix + 'Text" role="status" aria-live="polite">' +
+            esc(STAGES[stage] || 'Working.') + '</span></div>' +
+          '<span class="pg-clock"><b id="' + prefix + 'Clock"' +
+            (since ? ' data-since="' + esc(since) + '"' : '') + '>0:00</b><i>elapsed</i></span>' +
+        '</div>' +
+        '<div class="pg-bar" aria-hidden="true"><span id="' + prefix + 'Bar" style="width:' + st.pct + '%"></span></div>' +
+        '<ol id="' + prefix + 'Steps" class="evi-steps pg-steps" aria-label="Run progress">' +
+          stepsHtml(mode, stage) + '</ol>' +
+        '<div class="pg-foot"><span class="pg-note">' + esc(PLAY_TYPICAL[mode] ? PLAY_TYPICAL[mode] + ' ' : '') +
+          'This page updates itself when the run finishes.</span></div>' +
+      '</div>';
+    }
+
+    /* One clock for every panel on screen, ticking from the run's own start
+       time rather than from when this page happened to open it. */
+    function fmtElapsed(ms){
+      var t = Math.max(0, Math.floor(ms / 1000));
+      var h = Math.floor(t / 3600), m = Math.floor(t / 60) % 60, sec = t % 60;
+      var two = function(n){ return (n < 10 ? '0' : '') + n; };
+      return h ? h + ':' + two(m) + ':' + two(sec) : m + ':' + two(sec);
+    }
+    function tickClocks(){
+      ['runningClock', 'drawerLiveClock'].forEach(function(id){
+        var el = document.getElementById(id);
+        var since = el && el.getAttribute && el.getAttribute('data-since');
+        var t = since ? Date.parse(since) : NaN;
+        if (!isNaN(t)) el.textContent = fmtElapsed(Date.now() - t);
+      });
+    }
+    var clockTimer = null;
+    function startClocks(){
+      if (!clockTimer && typeof setInterval === 'function') clockTimer = setInterval(tickClocks, 1000);
+    }
+    window.fmtElapsed = fmtElapsed;
 
     function watch(runId, mode){
       var cancelButton = document.getElementById('cancelEventRun');
@@ -1522,14 +1630,11 @@
           })
           .then(function(s){
             misses = 0;
-            if (s.stage && STAGES[s.stage]) {
-              document.getElementById('runningText').textContent = STAGES[s.stage];
-            }
-            renderSteps(mode, s.stage);
+            paintProgress('running', mode, s.stage, s.started_at);
             if (s.status === 'complete' || s.status === 'failed') {
               stop();
               document.getElementById('runBtn').disabled = false;
-              document.getElementById('runningWrap').style.display = 'none';
+              showRunning(false);
               openRun(runId);
               return;
             }
@@ -1543,6 +1648,10 @@
               document.getElementById('runningText').textContent =
                 'Lost contact with the run. It may still be going: reload the ' +
                 'page and open it under Your runs.';
+              // The form comes back under the message, so the button just
+              // re-enabled is somewhere a person can press it.
+              var card = document.getElementById('formCard');
+              if (card && card.classList) card.classList.remove('is-running');
               return;
             }
             poll = setTimeout(tick, 2500 * misses);
@@ -1660,10 +1769,9 @@
               openRun(runId);
               return;
             }
-            var live = document.getElementById('drawerLive');
-            if (live && s.stage && STAGES[s.stage]) {
-              live.textContent = STAGES[s.stage];
-            }
+            paintProgress('drawerLive', mode, s.stage, s.started_at);
+            var sub = document.getElementById('drawerSub');
+            if (sub && s.stage && STAGES[s.stage]) sub.textContent = STAGES[s.stage];
             drawerPoll = setTimeout(tick, 2500);
           })
           .catch(function(){
@@ -5303,8 +5411,7 @@
       if (run.status === 'failed') {
         html += '<div class="evi-err">' + esc(run.error || 'This run failed.') + '</div>';
       } else if (run.status === 'running') {
-        html += '<div class="evi-running"><span class="thinking-orb-slot" data-orb-state="working" data-orb-size="20"></span><span>' +
-          esc(STAGES[run.stage] || 'Working.') + '</span></div>';
+        html += progressShell('drawerLive', 'recommend', run.stage, run.created_at);
       } else {
         html += recommendHtml(run);
       }
@@ -5495,8 +5602,7 @@
         return;
       }
       if (run.status === 'running') {
-        html += '<div class="evi-running"><span class="thinking-orb-slot" data-orb-state="working" data-orb-size="20"></span><span>' +
-          esc(STAGES[run.stage] || 'Working.') + '</span></div>';
+        html += progressShell('drawerLive', 'workroom', run.stage, run.created_at);
       }
       if (s.no_roster) {
         html += '<div class="evi-coverage"><span class="ic">i</span><span class="tx">' +
@@ -5725,9 +5831,7 @@
         html += '<div class="evi-err">' + esc(run.error || 'This run failed.') + '</div>';
       }
       if (run.status === 'running') {
-        html += '<div class="evi-running"><span class="thinking-orb-slot" data-orb-state="working" data-orb-size="20"></span>' +
-          '<span id="drawerLive" role="status" aria-live="polite">' +
-          esc(STAGES[run.stage] || 'Working.') + '</span></div>';
+        html += progressShell('drawerLive', run.mode === 'discover' ? 'discover' : 'lookup', run.stage, run.created_at);
       }
       if (s.no_pages) {
         html += '<div class="evi-coverage"><span class="ic">i</span><span class="tx">' +
