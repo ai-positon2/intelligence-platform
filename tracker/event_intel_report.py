@@ -291,7 +291,14 @@ def notes(*, shortfall: list, audit: dict, generic: dict,
     # search is a hole in the coverage even when it confirmed an event, which
     # is exactly how the page's coverage chart reads it, and folding it into
     # "searched, and short" made one report describe one category both ways.
-    partial = [s for s in (shortfall or []) if s.get("status") == "partial"]
+    # Read with the pipeline's own classification, so this list and the
+    # completion state cannot disagree: a category held back only by events
+    # it found and could not settle FINISHED its search, and "did not finish
+    # searching" beside "complete" said both (Recommend audit, 2026-10-04).
+    from .event_intel_pipeline import GAP_UNRESOLVED, category_gap_kind
+    partial_all = [s for s in (shortfall or []) if s.get("status") == "partial"]
+    unsettled = [s for s in partial_all if (s.get("gap_kind") or category_gap_kind(s)) == GAP_UNRESOLVED]
+    partial = [s for s in partial_all if s not in unsettled]
     empty = [s for s in (shortfall or [])
              if s.get("status") not in ("error", "partial")]
     spent = [s for s in (shortfall or []) if s.get("budget_spent")]
@@ -313,6 +320,14 @@ def notes(*, shortfall: list, audit: dict, generic: dict,
             "of it, so they are under-searched rather than settled. %s"
             % " ".join("%s: %s" % (s["label"], _reason(s["why"]))
                        for s in partial))
+    if unsettled:
+        add(LEVEL_THIN,
+            "%s found events that could not be confirmed"
+            % _n(len(unsettled), "category search", "category searches"),
+            "These searches finished, but some events they found could not be "
+            "settled either way, so they are neither recommended nor ruled "
+            "out. %s" % " ".join("%s: %s" % (s["label"], _reason(s["why"]))
+                                 for s in unsettled))
     if empty:
         add(LEVEL_THIN,
             "%s came back under the two-event quota"

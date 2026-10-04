@@ -486,6 +486,23 @@ _MATCHMAKING_SUPPORTING = tuple(re.compile(p, re.I) for p in (
 _MATCHMAKING_AFFIRM = _MATCHMAKING_STRONG + _MATCHMAKING_SUPPORTING
 
 
+# Evidence that names the programme only to say it is not there.
+_MATCHMAKING_NEGATED = re.compile(
+    r"\b(?:no|not|never|without|none)\b[^.;]{0,60}?\b(?:match\w*|hosted|buyer|meetings?|"
+    r"programm?e|introduc\w*|concierge)|"
+    r"\b(?:match\w*|hosted\s+buyer|buyer|meetings?|programm?e|concierge)\b[^.;]{0,60}?\b(?:"
+    r"(?:is|are|was|were|has\s+been|have\s+been)\s+(?:not|no\s+longer)|isn'?t|aren'?t|wasn'?t|"
+    r"discontinued|cancell?ed|dropped|ended|suspended|retired|unavailable|not\s+(?:offered|available|"
+    r"run|provided))", re.I)
+
+
+# "No-cost", "at no charge", "not only": a no that is not about whether the
+# programme exists.
+_MATCHMAKING_NOT_NEGATION = re.compile(
+    r"\bno[- ](?:cost|charge|fee|extra\s+(?:cost|charge))\b|\bat\s+no\s+(?:cost|charge|extra)\b|"
+    r"\bnot\s+only\b|\bno\s+matter\b|\bno\s+fewer\s+than\b|\bnot\s+just\b", re.I)
+
+
 def matchmaking_bonus(organizer_run: bool, evidence: str) -> dict:
     """Award the +10 only for organizer-run matchmaking-as-a-service.
 
@@ -511,6 +528,13 @@ def matchmaking_bonus(organizer_run: bool, evidence: str) -> dict:
                 "reason": ("Matchmaking was claimed but nothing was cited to "
                            "support it, so the bonus is not awarded.")}
 
+    if _MATCHMAKING_NEGATED.search(_MATCHMAKING_NOT_NEGATION.sub(" ", text)):
+        # "Matchmaking is not offered", "There is no hosted buyer programme",
+        # "was discontinued": each collected the full ten points because the
+        # affirming phrase was in the sentence (Recommend audit, 2026-10-04).
+        return {"bonus": 0, "awarded": False,
+                "reason": ("The evidence says there is no organizer-run "
+                           "matchmaking at this edition.")}
     hedged = [r.pattern for r in _MATCHMAKING_HEDGE if r.search(text)]
     if hedged:
         return {"bonus": 0, "awarded": False,

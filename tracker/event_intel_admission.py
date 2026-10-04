@@ -73,6 +73,12 @@ def _names(event, year):
     name = str(event.get('name') or '').strip()
     if any(y != str(year) for y in re.findall(r'\b20\d{2}\b',name)):
         return []
+    name = re.sub(r'[\u00ae\u2122\u00a9]', '', name)
+    # A name and its spelled-out form in brackets is two names for one event:
+    # "HITEC (Hospitality Industry Technology Exposition and Conference)"
+    # never matched hitec.org's "HITEC 2027 - Orlando" (live run 29), so the
+    # flagship of the hotel-technology market went unscored.
+    spelled = re.match(r'^(.{2,40}?)\s*\(([^)]{13,})\)\s*$', name)
     # Strip only a matching year and an explicit acronym, never regional names.
     name = re.sub(r'\s*\([A-Z0-9]{2,12}\)\s*$', '', name)
     name = re.sub(r'\s+'+str(year)+r'$', '', name)
@@ -80,6 +86,8 @@ def _names(event, year):
     if not folded:
         return []
     out = [folded]
+    if spelled:
+        out = [_fold(spelled.group(1)), _fold(spelled.group(2))]
     # "Forrester B2B Summit North America" on forrester.com, whose pages
     # call it "B2B Summit North America" (live run 27, 2026-10-01): the
     # leading word is the host's own brand. The rest is a name too when it
@@ -621,6 +629,28 @@ def _access(text, event_name, dates):
 _RANGE_SEP = r'(?:[-\u2010-\u2014\u2212]|to|through|thru|until|till)'
 
 
+_FOREIGN_MONTHS = (
+    ('Januar', 'janvier', 'enero', 'gennaio', 'janeiro', 'Jänner'),
+    ('Februar', 'février', 'fevrier', 'febrero', 'febbraio', 'fevereiro'),
+    ('März', 'Maerz', 'mars', 'marzo', 'março', 'marco'),
+    ('April', 'avril', 'abril', 'aprile'),
+    ('Mai', 'mai', 'mayo', 'maggio', 'maio'),
+    ('Juni', 'juin', 'junio', 'giugno', 'junho'),
+    ('Juli', 'juillet', 'julio', 'luglio', 'julho'),
+    ('August', 'août', 'aout', 'agosto'),
+    ('September', 'septembre', 'septiembre', 'settembre', 'setembro'),
+    ('Oktober', 'octobre', 'octubre', 'ottobre', 'outubro'),
+    ('November', 'novembre', 'noviembre', 'novembro'),
+    ('Dezember', 'décembre', 'decembre', 'diciembre', 'dicembre', 'dezembro'),
+)
+# Range words in those languages: "16 au 19 juin", "16. bis 19. November",
+# "del 16 al 19 de junio", "de 16 a 19 de junho".
+_FOREIGN_SEP = r'\s*(?:[-\u2010-\u2014\u2212]|to|bis|au|al|a)\s*'
+# Joining words, which cover a range only when the two days touch: "16. und
+# 17. September" is both days, "21 & 23 April" is two days apart.
+_FOREIGN_JOIN = r'\s*(?:&|und|et|y|e)\s*'
+
+
 def _month_rx(m):
     """A month as organizers write it: "September", "Sep", "Sep." and the
     most common US form, "Sept"/"Sept." (audit, 2026-09-30: "Sept 9-11,
@@ -628,6 +658,10 @@ def _month_rx(m):
     forms = [calendar.month_name[m], calendar.month_abbr[m] + r'\.?']
     if m == 9:
         forms.insert(1, r'Sept\.?')
+    # German, French, Spanish, Italian and Portuguese names: DMEXCO's "16.
+    # und 17. September 2026" and VivaTech's "du 16 au 19 juin 2027" were held
+    # as unreadable (Recommend audit, 2026-10-04).
+    forms += [f for f in _FOREIGN_MONTHS[m - 1] if f.lower() != calendar.month_name[m].lower()]
     return '(?:' + '|'.join(forms) + ')'
 
 
@@ -681,6 +715,14 @@ class _DatePattern:
         return ''.join(out + [text[last:]])
 
 
+def _only_year(text):
+    """The one year a page prints outside its copyright line, or None."""
+    years = {int(y) for line in str(text or "").splitlines()
+             if 'copyright' not in line.lower() and '©' not in line
+             for y in re.findall(r'\b(20\d{2})\b', line)}
+    return years.pop() if len(years) == 1 else None
+
+
 def _date_patterns(start, end, text=""):
     """Explicit ISO or English dates/ranges; unsupported formats stay unknown."""
     def single(d):
@@ -722,6 +764,31 @@ def _date_patterns(start, end, text=""):
             patterns += [ws + ms + r'\s+' + ds + j + we + de + r',?\s+' + str(start.year),
                          ws + ds + j + we + de + r'\s+' + ms + r',?\s+' + str(start.year)]
     if start.year == end.year:
+        y = str(start.year)
+        fs = _FOREIGN_SEP
+        # Day first, as most of the world writes it, with the joining words
+        # and the "de"s of other languages: "16. und 17. September 2026",
+        # "du 16 au 19 juin 2027", "del 16 al 19 de junio de 2027",
+        # "16.-19. November 2026".
+        dd = lambda d: r'(?:0?' + str(d.day) + r')(?:\.|er|º|°)?'
+        lead = r'(?:(?:du|del|de|vom|von|from)\s+)?'
+        of = r'\s+(?:de\s+|del\s+)?'
+        if (end - start).days == 1:
+            fs = r'(?:%s|%s)' % (_FOREIGN_SEP, _FOREIGN_JOIN)
+        if start.month == end.month:
+            patterns += [lead + dd(start) + fs + dd(end) + of + me + r',?' + of + y]
+        patterns += [lead + dd(start) + of + ms + fs + dd(end) + of + me + r',?' + of + y]
+        # Numbers with dots are European order whatever else the page uses:
+        # "15.09. - 17.09.2026", "16.-19.11.2026", "16.09.2026 - 17.09.2026".
+        num = lambda d: r'0?' + str(d.day) + r'\.0?' + str(d.month) + r'\.'
+        patterns += [num(start) + r'(?:' + y + r')?' + fs + num(end) + y]
+        if start.month == end.month:
+            patterns += [r'0?' + str(start.day) + r'\.?' + fs + num(end) + y]
+        # No year beside the dates ("October 20-22 | Mandalay Bay") counts
+        # only on a page whose one year is this edition's.
+        if _only_year(text) == start.year:
+            patterns += [ws + ms + r'\s+' + ds + sep + we + (me + r'\s+' if start.month != end.month else '')
+                         + de + r'(?![\d,]*\s*(?:19|20)\d{2})']
         # "November 2 - November 6, 2026", "30 October - 2 November 2026",
         # "Monday 2 November - Friday 6 November 2026".
         patterns += [ws + ms + r'\s+' + ds + sep + we + me + r'\s+' + de + r',?\s+' + str(end.year),

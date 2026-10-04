@@ -307,7 +307,9 @@ def _resolve_event(query: str, year_hint: str | None, box: dict) -> dict:
         "ends_on": ends_on,
         "location": _clean(text("location")) or None,
         "country": _clean(text("country")) or None,
-        "city": _clean(text("city") or text("location")) or None,
+        # A city, not a venue address: "location" is a fallback only when it
+        # is short enough to be one.
+        "city": _clean(text("city") or (text("location") if len(text("location")) <= 80 else "")) or None,
         "availability": text("availability") if text("availability") in ("open","sold_out","cancelled") else "unknown",
         "availability_source": text("availability_source")[:1000] or None,
         "venue": _clean(text("venue")) or None,

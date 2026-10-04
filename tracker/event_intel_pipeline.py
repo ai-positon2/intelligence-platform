@@ -105,6 +105,8 @@ _BUDGET_TAIL = re.compile(
     r"It also used every one of the \d+ searches allowed for finding events "
     r"here, so there may be more to find than this search could reach\.")
 
+_CHECK_BROKE = re.compile(r"The check could not be completed|Unexpected failure")
+
 GAP_FAILED = "failed"          # the search returned nothing usable
 GAP_UNFINISHED = "unfinished"  # the search was cut off part-way
 GAP_BUDGET = "budget"          # searched to the limit it was given
@@ -137,6 +139,12 @@ def category_gap_kind(st: dict) -> str:
         return GAP_BUDGET
     if status == "error":
         return GAP_FAILED
+    # A candidate whose check itself broke (cut off, the connection lost, a
+    # crash) was not looked at, which is a hole in the search and not a fact
+    # about the event: every confirmation truncating used to read as "a
+    # finding about this client's market" (Recommend audit, 2026-10-04).
+    if _CHECK_BROKE.search(text):
+        return GAP_UNFINISHED
     rest = _BUDGET_TAIL.sub("", text)
     if _VERIFICATION_BITS.search(rest) and not _VERIFICATION_BITS.sub("", rest).strip(" ."):
         return GAP_UNRESOLVED
@@ -597,11 +605,22 @@ def _run_recommend(run_id: int, email: str, profile: dict) -> None:
         # classification. An empty result after a search that FINISHED is a
         # finding about the market; one after a search that did not is a hole,
         # and the banner must never hedge the first or assert the second.
+        unsettled = [s for s in statuses.values()
+                     if (s.get('gap_kind') or category_gap_kind(s)) == GAP_UNRESOLVED]
         if holes:
             note = ("No verified candidates survived this run, and %s did not "
                     "finish, so these results do not establish that the market has "
                     "no suitable events. The category results below say which."
                     % _n(len(holes), "category search", "category searches"))
+        elif unsettled:
+            # Found, and not settled either way: an edition announced with no
+            # dates yet, or a page that would not confirm it. Not a market
+            # with nothing in it.
+            note = ("No verified candidates survived this run. Every category "
+                    "search finished, but in %s events were found that could not "
+                    "be confirmed (for example an edition announced without dates), "
+                    "so this is not proof the market has none. The category "
+                    "results below name them." % _n(len(unsettled), "category", "categories"))
         else:
             note = ("No verified candidates survived this run. Every category "
                     "search finished, so this is a finding about this client's "
@@ -661,7 +680,10 @@ def _run_recommend(run_id: int, email: str, profile: dict) -> None:
     saved = store.save_candidates(run_id, scored["scored"])
     rows = store.get_candidates(run_id)
     from .event_intel_identity import event_key
-    expected = {event_key(c) for c in scored['scored']}
+    # Keyed as the store keeps them: a 136-character venue address in `city`
+    # is stored cut to 120, and comparing it with the uncut one failed a run
+    # whose every row was saved (Recommend audit, 2026-10-04).
+    expected = {event_key(store.normalise_candidate(c) or c) for c in scored['scored']}
     actual = {event_key(c) for c in rows}
     if saved != len(scored['scored']) or len(rows) != saved or actual != expected:
         spend = event_intel_discover.claude_websearch.spend_sum(found.get('spend'), audit.get('spend'), promoted.get('spend'), scored.get('spend'))

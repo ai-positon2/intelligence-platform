@@ -676,7 +676,36 @@ def site_key(url: str) -> str:
     return host + path
 
 
-def _excluded(name: str, force_exclude: str | None) -> bool:
+def _line_matches(name: str, line: str, event: dict | None = None) -> bool:
+    """Whether one line the client wrote ("Money20/20 Europe") is this event.
+
+    names_match lets a name with no region stand for any regional edition,
+    which is right when the CLIENT wrote no region ("Money20/20" is the whole
+    series) and wrong the other way round: a client who excluded "Money20/20
+    Europe" lost the USA show, returned as plain "Money20/20", and a
+    commitment to the Europe show badged the USA one "already committed"
+    (Recommend audit, 2026-10-04). A region the client named must be where
+    the event is held."""
+    if not names_match(name, line):
+        return False
+    from .event_intel_policy import event_country, scope_countries
+    # The words the client's line adds to the event's name, when they name a
+    # place: a region word ("Europe"), or a city or country ("Vancouver").
+    extra = " ".join(t for t in _plain_lite(line) if t not in set(_plain_lite(name)))
+    want = region_key(line) if not region_key(name) else ""
+    place = want or (extra if (scope_countries(extra) or event_country({"location": extra}))
+                     else "")
+    if not place:
+        return True
+    allowed = scope_countries(place) or ({event_country({"location": place})} - {None})
+    country = event_country(event or {})
+    if country and allowed:
+        return country in allowed
+    where = " ".join(str((event or {}).get(k) or "") for k in ("city", "country", "location")).lower()
+    return bool(where.strip()) and all(w in where for w in place.split())
+
+
+def _excluded(name: str, force_exclude: str | None, event: dict | None = None) -> bool:
     """Honour the profile's force-exclude list on our side too.
 
     The prompt asks the model to skip these, and a model asked to skip
@@ -687,7 +716,7 @@ def _excluded(name: str, force_exclude: str | None) -> bool:
         return False
     if not name_key(name):
         return False
-    return any(names_match(name, line)
+    return any(_line_matches(name, line, event)
                for line in re.split(r"[\n,;]+", force_exclude) if line.strip())
 
 
@@ -697,14 +726,14 @@ def committed_keys(force_include: str | None) -> set:
             if line.strip() and name_key(line)}
 
 
-def is_committed(name: str, keys: set) -> bool:
+def is_committed(name: str, keys: set, event: dict | None = None) -> bool:
     """Same whole-name match force-exclude uses, so "Money20/20" written on the
     profile matches "Money20/20 USA 2026" coming back from a search and
     "SaaStr" matches "SaaStr Annual", while "Money20/20 USA" no longer claims
     the client has paid for "Money20/20 Europe"."""
     if not name_key(name):
         return False
-    return any(names_match(name, k) for k in (keys or set()))
+    return any(_line_matches(name, k, event) for k in (keys or set()))
 
 
 def is_committed_same_edition(name: str, keys: set) -> bool:
@@ -764,6 +793,16 @@ def _dates_compatible(a: dict, b: dict) -> bool:
     return gap <= DATE_DRIFT_DAYS
 
 
+# A page that lists many events rather than being one: its path ends in one
+# of these words, on the organizer's own site.
+_LISTING_PAGE = re.compile(r"/(?:[a-z]{2}(?:-[a-z]{2})?/)?(?:events?|conferences?|calendar|"
+                           r"upcoming(?:-events)?|webinars?|whats-on|event-calendar|"
+                           r"all-events|our-events)$")
+# Platforms whose front page is everyone's events.
+_SHARED_EVENT_HOSTS = {"lu.ma", "luma.com", "eventbrite.com", "meetup.com", "splashthat.com",
+                       "hopin.com", "bizzabo.com", "cvent.com", "airmeet.com", "goldcast.io"}
+
+
 def same_event(a: dict, b: dict) -> bool:
     """Two rows (proposals or confirmed events) that are one edition.
 
@@ -782,7 +821,18 @@ def same_event(a: dict, b: dict) -> bool:
     wa, wb = a.get("website") or "", b.get("website") or ""
     sk = site_key(wa)
     if sk and sk == site_key(wb):
-        return True
+        # One page is one event: a side event renamed from one year to the
+        # next keeps its registration page. Except a page that lists many
+        # events, an organizer's /events or a ticketing platform's front page:
+        # "Dreamforce" and "Salesforce World Tour NYC", both proposed with
+        # salesforce.com/events/, became one, and two lu.ma events another
+        # (Recommend audit, 2026-10-04). There the names have to agree too.
+        if not _LISTING_PAGE.search(sk) and host_key(wa) not in _SHARED_EVENT_HOSTS:
+            return True
+        ta, tb = set(_tokens(name_key(na))), set(_tokens(name_key(nb)))
+        short = min(len(ta), len(tb))
+        if short and len(ta & tb) * 2 > short:
+            return True
     return names_match(na, nb, wa or None, wb or None)
 
 
@@ -802,7 +852,7 @@ def merge(by_category: dict, force_exclude: str | None = None,
             name = ev.get("name") or ""
             if not name_key(name):
                 continue
-            if _excluded(name, force_exclude):
+            if _excluded(name, force_exclude, ev):
                 continue
             # Compared against the names already kept rather than against a set
             # of keys, because "same event" now depends on two names together
@@ -813,7 +863,7 @@ def merge(by_category: dict, force_exclude: str | None = None,
             # returns committed:true for an event nobody committed to must not
             # be able to promote itself past the floor.
             ev = dict(ev)
-            ev["committed"] = is_committed(ev.get("name") or "", committed)
+            ev["committed"] = is_committed(ev.get("name") or "", committed, ev)
             out.append(ev)
     return out
 
@@ -1730,7 +1780,20 @@ def _confirm_event(proposal: dict, category: str, profile: dict,
     p_site = (proposal or {}).get("website") or ""
     same_host = bool(host_key(p_site)) and host_key(p_site) == host_key(
         event.get("website") or "")
-    if not (same_host or names_match(name, event["name"])):
+    # The host vouches for a rename unless the proposal pointed at a page of
+    # many events. An organizer's events page is not one event: "Salesforce
+    # World Tour NYC" on salesforce.com/events/ came back as "Dreamforce" and
+    # was kept as confirmed (Recommend audit, 2026-10-04), and the World Tour
+    # was never checked.
+    # And the two pages must be one, or one above the other on that site
+    # (nwfin.example/day and nwfin.example/): /events/world-tour/nyc/ and
+    # /dreamforce/ on salesforce.com are two events' pages.
+    pa, pb = site_key(p_site), site_key(event.get("website") or "")
+    nested = pa == pb or pa.startswith(pb + "/") or pb.startswith(pa + "/")
+    own_site = same_host and nested and not _LISTING_PAGE.search(pa) \
+        and host_key(p_site) not in _SHARED_EVENT_HOSTS
+    if not (own_site or same_event({"name": name, "website": p_site}, event)
+            or names_match(name, event["name"])):
         logger.warning("event_intel_discover: confirm for %r came back as %r",
                        name[:80], event["name"][:80])
         return _unchecked(name, "The event's identity changed during "

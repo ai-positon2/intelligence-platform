@@ -39,7 +39,7 @@ from .event_intel_identity import event_key
 import logging
 
 from . import claude_websearch
-from .event_intel_discover import name_key, names_match
+from .event_intel_discover import _line_matches, name_key, names_match
 
 logger = logging.getLogger(__name__)
 
@@ -526,7 +526,10 @@ def alternatives_to_promote(audit: dict, candidates: list[dict]) -> list[dict]:
         key = name_key(name)
         if not key or key in seen:
             continue
-        if any(names_match(name, c.get("name") or "") for c in candidates or []):
+        # Already on the list only when it is the same edition: plain
+        # "Money20/20" (the USA show) is not "Money20/20 Europe", which was
+        # never looked up because of it (Recommend audit, 2026-10-04).
+        if any(_line_matches(c.get("name") or "", name, c) for c in candidates or []):
             continue
         seen.add(key)
         out.append({
