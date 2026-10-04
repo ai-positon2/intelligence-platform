@@ -260,7 +260,61 @@ def _bare_place(prefix, tail, names, year, titles):
     return False
 
 
+# Words a venue line carries besides the venue's own name.
+_VENUE_FILL = {'the', 'from', 'and', '&', 'hotel', 'resort', 'center', 'centre', 'convention',
+               'arena', 'hall', 'expo', 'fair', 'grounds', 'park', 'casino', 'pavilion'}
+# A label that says "the dates follow", standing on its own.
+_DATE_LABEL = re.compile(r"^(?:the\s+)?(?:next\s+)?(?:show|event|conference|summit|expo|edition)?\s*"
+                         r"dates?\s*:?\s*$")
+
+
+def _own_place_tail(tail):
+    """The words between the name and the date are this edition's own city,
+    with a venue, a state or a bullet, and nothing that names an event:
+    "PCMA Convening Leaders 2027 Miami Beach Miami Beach, Florida \u2022
+    January 10-13, 2027" and "2026 FICP Annual Conference at the Hyatt
+    Regency New Orleans, New Orleans from November 15-18, 2026" were both
+    refused on pages that date nothing else (live run 39, 2026-10-04). Only
+    the city inspect() was given counts, so another edition's city cannot."""
+    own = _OWN_PLACE.get().split()
+    words = [w.strip(".,;:\u2022|\u2013\u2014-()") for w in tail.split()]
+    words = [w for w in words if w]
+    if not own or not words:
+        return False
+    n = len(own)
+    hits = [i for i in range(len(words) - n + 1) if words[i:i + n] == own]
+    if not hits:
+        return False
+    rest, i = [], 0
+    while i < len(words):
+        if i in hits:
+            i += n
+            continue
+        rest.append(words[i])
+        i += 1
+    from .event_intel_policy import _US_STATES, _COUNTRY_ALIASES
+    countries = {w for names_ in _COUNTRY_ALIASES.values() for n_ in names_ for w in n_.split()}
+    rest = [w for w in rest if w not in _CONNECT and w not in _PLACE_INTRO and w not in _VENUE_FILL
+            and w not in _US_STATES and w not in countries]
+    if set(rest) & (_EVENTISH | _EDITION_WORDS):
+        return False
+    # A venue's name, a few words, and only one introduced as a place.
+    return len(rest) <= 4 and (not rest or bool(set(tail.split()) & _PLACE_INTRO))
+
+
 def _owns_date(prefix, names, year, titles=None):
+    clauses = re.split(r'[.!?]\s+', prefix)
+    if len(clauses) > 1 and _DATE_LABEL.match(_fold(clauses[-1])):
+        # "IMEX America Where the global industry converges ... trade show.
+        # Next show dates: October 13-15, 2026." (imexevents.com/our-shows,
+        # live run 39): a bare dates label belongs to the event the sentence
+        # before it named, when nothing between names another one.
+        before = ' '.join(clauses[-2:-1])[-400:]
+        folded_before = _fold(before)
+        for name in names:
+            found = list(re.finditer(_name_re(name), folded_before))
+            if found and not _names_other_event(before[found[-1].end():], names):
+                return True
     last_clause = re.split(r'[.!?]\s+',prefix)[-1]
     clause = _fold(last_clause).split()
     if last_clause.strip() and not (clause and clause[0] in _CTA and set(clause) <= _CTA_CLAUSE):
@@ -284,6 +338,8 @@ def _owns_date(prefix, names, year, titles=None):
         if _bare_place(prefix, tail, names, year, titles):
             return True
         if _year_dash_place(prefix, name, year, names):
+            return True
+        if _own_place_tail(tail):
             return True
     return False
 
@@ -580,6 +636,24 @@ def _hypothetical(text, match):
 MAX_OBSERVATIONS = 50
 
 
+def _agenda_item(text, match, event_name):
+    """A bracketed restriction on one line of an agenda: "Chapter Leaders
+    Workshop (Invite Only)" on conveningleaders.org (live run 39,
+    2026-10-04) held PCMA Convening Leaders as an invitation-only event. The
+    brackets close round the restriction alone and the words before them on
+    that line are a short title that is not the event's own name."""
+    before = text[max(0, match.start() - 2):match.start()]
+    after = text[match.end():match.end() + 2]
+    if not (before.rstrip().endswith('(') and after.lstrip().startswith(')')):
+        return None
+    line = text[:match.start()].rsplit('\n', 1)[-1].rstrip(' (')
+    if not line.strip() or len(line) > 80:
+        return None
+    if _fold(event_name) and _fold(event_name) in _fold(line):
+        return None
+    return 'agenda_item'
+
+
 def _access(text, event_name, dates):
     observations, blocking = [], []
     page = {'text': text}
@@ -610,7 +684,15 @@ def _access(text, event_name, dates):
             event_name,re.I))
         scoped = other and general_open and not named_inventory
         excerpt=text[max(0,match.start()-80):match.end()+120]
-        scope = ('other_inventory' if scoped else _concession_pass(clause, match)
+        # "Our calendar has been fully booked every day" (an exhibitor quoted
+        # on frankfurt.imexevents.com, live run 39): someone's own diary of
+        # meetings, which is the event working, not the event closed.
+        diary = bool(re.search(r'\b(?:calendar|diary|schedule|agenda|appointments?|meetings?)\b'
+                               r'[^.;!\n]{0,30}$', prefix, re.I)) and re.match(
+                                   r'(?:fully[- ]booked|at capacity)$', match.group(0), re.I)
+        scope = ('other_inventory' if scoped else 'own_diary' if diary
+                 else _agenda_item(text, match, event_name)
+                 or _concession_pass(clause, match)
                  or _concession_terms(text, match)
                  or _hypothetical(text, match) or _other_programme(
                      text, match, clause, event_name, dates, page))

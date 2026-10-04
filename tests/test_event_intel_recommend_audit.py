@@ -272,3 +272,73 @@ def test_a_year_less_date_on_a_page_naming_two_years_is_not_enough():
                    "website": site, "sources": [site]},
                   _page("HR Tech, October 20-22 | Mandalay Bay. 2025 recap and 2026 tickets."))
     assert r["support"] == "unverified"
+
+
+# ── live run 39 (Cvent, 2026-10-04): organizer pages that date the event plainly ──
+
+def _inspect(name, start, end, city, text, site="https://ev.example/"):
+    return A.inspect({"name": name, "starts_on": start, "ends_on": end, "website": site,
+                      "sources": [site], "city": city}, _page(text))
+
+
+IMEX_SHOWS = ("Our shows IMEX America Where the global industry converges in a standout Las "
+              "Vegas setting, for the world's largest meetings industry trade show. Next show "
+              "dates: October 13-15, 2026. IMEX Frankfurt Where global meeting planners connect. "
+              "Next show dates: May 11-13, 2027.")
+
+
+def test_a_dates_label_belongs_to_the_event_named_just_before_it():
+    assert _inspect("IMEX America", "2026-10-13", "2026-10-15", "Las Vegas",
+                    IMEX_SHOWS)["support"] != "unverified"
+    assert _inspect("IMEX Frankfurt", "2027-05-11", "2027-05-13", "Frankfurt",
+                    IMEX_SHOWS)["support"] != "unverified"
+    # Another show's dates under the label are not this one's.
+    assert _inspect("IMEX Frankfurt", "2026-10-13", "2026-10-15", "Frankfurt",
+                    IMEX_SHOWS)["support"] == "unverified"
+
+
+@pytest.mark.parametrize("name,start,end,city,text", [
+    ("PCMA Convening Leaders", "2027-01-10", "2027-01-13", "Miami Beach",
+     "Translate this page: PCMA Convening Leaders 2027 Miami Beach Miami Beach, Florida • "
+     "January 10-13, 2027 From Fluency to Influence"),
+    ("FICP Annual Conference", "2026-11-15", "2026-11-18", "New Orleans",
+     "Mark your calendars to join us for the 2026 FICP Annual Conference at the Hyatt Regency "
+     "New Orleans, New Orleans from November 15-18, 2026."),
+])
+def test_the_events_own_city_and_venue_between_name_and_dates_are_its_own(name, start, end, city, text):
+    assert _inspect(name, start, end, city, text)["support"] != "unverified"
+
+
+def test_another_event_at_the_same_city_is_still_not_this_one():
+    text = "Join us for the 2026 FICP Payments Summit at the Hyatt Las Vegas from November 15-18, 2026."
+    assert _inspect("FICP", "2026-11-15", "2026-11-18", "Las Vegas", text)["support"] == "unverified"
+    text = "Acme Summit 2026 Chicago, IL November 15-18, 2026"
+    assert _inspect("Acme Summit", "2026-11-15", "2026-11-18", "Las Vegas", text)["support"] == "unverified"
+
+
+def test_one_invite_only_session_or_a_booked_diary_does_not_close_the_event():
+    d = (date(2027, 1, 10), date(2027, 1, 13))
+    assert A._access("Chapter Leaders Workshop (Invite Only)\n9:00 AM", "PCMA Convening Leaders", d)[1] == []
+    assert A._access("“Our calendar has been fully booked every day from 10am to 4pm.”",
+                     "IMEX Frankfurt", d)[1] == []
+    assert A._access("PCMA Convening Leaders (Invite Only)\n9:00 AM", "PCMA Convening Leaders", d)[1]
+    assert A._access("This summit is invite only for CFOs.", "CFO Summit", d)[1]
+    assert A._access("The show is fully booked for 2027.", "IMEX Frankfurt", d)[1]
+
+
+def test_the_new_rules_stay_narrow():
+    # A dates label after a sentence naming another event too.
+    text = ("Acme Summit is co-located with the Beta Expo 2026 conference. "
+            "Next show dates: November 15-18, 2026.")
+    assert _inspect("Acme Summit", "2026-11-15", "2026-11-18", "Austin", text)["support"] == "unverified"
+    # A venue in another city is not this edition's own.
+    text = "Acme Summit 2026 at the Hilton Chicago from November 15-18, 2026."
+    assert _inspect("Acme Summit", "2026-11-15", "2026-11-18", "Las Vegas", text)["support"] == "unverified"
+    # More than a venue between the name and the dates.
+    text = ("2026 Acme Annual Conference after our partners and sponsors meet at New Orleans "
+            "from November 15-18, 2026.")
+    assert _inspect("Acme Annual Conference", "2026-11-15", "2026-11-18", "New Orleans",
+                    text)["support"] == "unverified"
+    # "Sold out" after a meetings word is still the event selling out.
+    d = (date(2027, 1, 10), date(2027, 1, 13))
+    assert A._access("Our meetings programme is sold out.", "Acme Summit", d)[1]
