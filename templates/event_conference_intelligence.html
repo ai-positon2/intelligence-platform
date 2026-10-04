@@ -16,6 +16,7 @@
   <link rel="stylesheet" href="/static/css/border-beam.css">
   <link rel="stylesheet" href="/static/css/aurora-app.css?v=3">
   <link rel="stylesheet" href="/static/css/event_intel_report.css?v=2">
+  <link rel="stylesheet" href="/static/css/event_intel_intake.css?v=1">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/agent-feedback.css') }}">
   <script src="{{ url_for('static', filename='js/agent_feedback.js') }}"></script>
 </head>
@@ -129,7 +130,18 @@
     </div>
 
     <div class="evi-layout">
-      <div class="evi-card evi-card-main">
+      <div class="evi-card evi-card-main" id="formCard" data-play="recommend">
+        {# The chosen play, said again at the top of the form it opened. Filled
+           by setMode() from the play card itself (icon, title, what you hand
+           it, what it hands back), so the two can never say different things. #}
+        <div class="evi-fhead" aria-live="polite">
+          <span class="fi" id="formIcon" aria-hidden="true"></span>
+          <div class="ft">
+            <span class="fk" id="formKick">Play 1 of 3</span>
+            <span class="fn" id="formTitle">Which events are worth going to</span>
+          </div>
+          <span class="fio" id="formIO"></span>
+        </div>
         <div class="evi-card-pad">
         <form class="evi-form" id="eviForm" onsubmit="return startRun(event)">
           <div id="recommendFields">
@@ -166,9 +178,11 @@
             {% set cl = classifications | selectattr('key', 'equalto', p.classification) | first %}
             <div class="evi-psum" data-profile="{{ p.id }}" hidden>
               <div class="ps-head">
+                {% set words = (p.client_name or '?').split() %}
+                <span class="ps-av" aria-hidden="true">{{ (words[0][:1] ~ (words[1][:1] if words|length > 1 else words[0][1:2])) | upper }}</span>
                 <span class="ps-name">{{ p.client_name }}</span>
                 {% if p.website %}<span class="ps-site">{{ p.website }}</span>{% endif %}
-                {% if cl %}<span class="ps-or">{{ cl.orientation }}-driven</span>{% endif %}
+                {% if cl %}<span class="ps-or" data-orient="{{ cl.orientation }}">{{ cl.orientation }}-driven</span>{% endif %}
                 <span class="ps-lock">Saved</span>
               </div>
               {% if cl %}
@@ -188,14 +202,14 @@
               {% if p.force_include or p.force_exclude or p.budget_note %}
               <div class="ps-standing">
                 {% if p.force_include %}
-                <p><b>Already committed.</b> {{ p.force_include | replace('\n', ', ') }}
+                <p class="ps-in"><b>Already committed.</b> {{ p.force_include | replace('\n', ', ') }}
                   <i>Kept on the list whatever it scores, and marked.</i></p>
                 {% endif %}
                 {% if p.force_exclude %}
-                <p><b>Never suggest.</b> {{ p.force_exclude | replace('\n', ', ') }}</p>
+                <p class="ps-out"><b>Never suggest.</b> {{ p.force_exclude | replace('\n', ', ') }}</p>
                 {% endif %}
                 {% if p.budget_note %}
-                <p><b>Budget.</b> {{ p.budget_note }}
+                <p class="ps-bud"><b>Budget.</b> {{ p.budget_note }}
                   <i>Shown beside events, never used to score one.</i></p>
                 {% endif %}
               </div>
@@ -280,7 +294,7 @@
                   {% for c in classifications %}
                   <button type="button" class="evi-class" role="radio"
                           aria-checked="false"
-                          data-classification="{{ c.key }}"
+                          data-classification="{{ c.key }}" data-orient="{{ c.orientation }}"
                           onclick="pickClass('{{ c.key }}')">
                     <span class="cl">{{ c.label }}</span>
                     <span class="cw">{{ c.where }}</span>
@@ -390,12 +404,21 @@
                 <label for="eventName">Event or conference name</label>
                 <input type="text" id="eventName" autocomplete="off"
                        placeholder="e.g. SaaStr Annual, Web Summit, HIMSS" />
+                <span class="evi-try"><span>Try</span>{% for ex in ['Web Summit', 'HIMSS', 'Money20/20 USA', 'SaaStr Annual'] %}<button type="button" onclick="tryEvent(this.textContent)">{{ ex }}</button>{% endfor %}</span>
               </div>
               <div class="evi-field">
                 <label for="eventYear">Edition or year (optional)</label>
                 <input type="text" id="eventYear" placeholder="2026" autocomplete="off" />
                 <span class="hint">Leave it blank for the next edition.</span>
               </div>
+            </div>
+            {# What a roster is made of, said before the run rather than
+               discovered after it. #}
+            <div class="evi-yield" aria-label="What the roster includes">
+              <span class="yk">Comes back with</span>
+              <span class="yc r-ex">Exhibitors</span><span class="yc r-sp">Sponsors</span>
+              <span class="yc r-sk">Speakers</span><span class="yc r-pa">Partners</span>
+              <span class="yc r-pe">Attendees with public proof</span>
             </div>
           </div>
 
@@ -439,11 +462,11 @@
                 {% for c in event_classes %}
                 <button type="button" class="evi-class" role="radio"
                         aria-checked="false"
-                        data-eventclass="{{ c.key }}"
+                        data-eventclass="{{ c.key }}" data-signal="{{ c.signal | lower }}"
                         onclick="pickEventClass('{{ c.key }}')">
                   <span class="cl">{{ c.label }}</span>
                   <span class="cw">{{ c.why }}</span>
-                  <span class="co">{{ c.signal }} signal</span>
+                  <span class="co"><span class="sg" aria-hidden="true"><i></i><i></i><i></i><i></i></span>{{ c.signal }} signal</span>
                 </button>
                 {% endfor %}
               </div>
@@ -457,8 +480,9 @@
             <div class="evi-row" style="margin-top:16px">
               <div class="evi-field">
                 <label for="boothNotes">Booth notes, one company per line</label>
-                <textarea id="boothNotes" rows="4"
+                <textarea id="boothNotes" rows="4" oninput="countNotes()"
                           placeholder="Acme Inc: asked about SOC2, wants the benchmark deck&#10;Globex: pricing for 200 seats"></textarea>
+                <span class="evi-count" id="noteCount" hidden></span>
                 <span class="hint">
                   <b>This is the only thing that licenses a draft to reference a
                   conversation.</b> Any opener that claims you spoke to a company
@@ -512,7 +536,7 @@
         <div class="evi-card" id="eviHistoryCard">
           <div class="evi-card-pad">
             <div class="evi-sec">
-              <h3>Your runs</h3>
+              <h3>Your runs{% if runs %}<span class="evi-runcount">{{ runs | length }}</span>{% endif %}</h3>
               <div class="evi-runs" id="runsList">
                 {% if runs %}
                   {% for r in runs %}
@@ -664,8 +688,74 @@
          to naming an event carried "Finish setting up the client first"
          onto a form with no client in it. */
       onProfilePick();
+      formHead(card, MODES.indexOf(m));
     }
     window.setMode = setMode;
+
+    /* The form's own heading, copied off the play card that opened it: one
+       source for the icon, the title and the give-and-get line, so the card
+       and the form cannot drift into describing two different plays. */
+    function formHead(card, i){
+      /* A heading, never a reason for the play switch to fail: anything
+         missing leaves the old heading in place and the form working. */
+      var box = document.getElementById('formCard');
+      var el = function(id){ return document.getElementById(id) || {}; };
+      if (!box || !card || typeof card.querySelector !== 'function') return;
+      box.setAttribute('data-play', card.getAttribute('data-play') || '');
+      var pick = function(sel){ return card.querySelector(sel) || null; };
+      var icon = pick('.pi'), name = pick('.pn'), a = pick('.pio .a'), b = pick('.pio .b');
+      el('formIcon').innerHTML = icon ? icon.innerHTML : '';
+      el('formTitle').textContent = name ? name.textContent : '';
+      el('formKick').textContent = 'Play ' + (i + 1) + ' of ' + MODES.length;
+      el('formIO').innerHTML = (a && b)
+        ? '<span class="g"><i>You give</i>' + esc(a.textContent) + '</span>'
+          + '<span class="arr" aria-hidden="true"></span>'
+          + '<span class="t"><i>You get</i>' + esc(b.textContent.replace(/^\s*\u2192\s*/, '')) + '</span>'
+        : '';
+    }
+
+    /* An example name, put in the box rather than run: a roster costs a
+       search, so the click only fills the field and leaves the run to you. */
+    function tryEvent(name){
+      var el = document.getElementById('eventName');
+      if (!el) return;
+      el.value = String(name || '').trim();
+      el.focus();
+    }
+    window.tryEvent = tryEvent;
+
+    /* How many notes the server will read, counted the way it reads them
+       (event_intel_workroom.index_booth_notes): a time in front is dropped,
+       and a line only counts once it splits into a company and a note. A line
+       with no separator is skipped there without a word, so it is named here,
+       while it can still be fixed. Notes, not companies: telling two spellings
+       of one company apart is the server's job, and a copy of that rule here
+       would drift from it. */
+    var NOTE_TIME = /^\s*\d{1,2}[:.]\d{2}\s*(?:[ap]\.?m\.?)?\s*[-\u2013\u2014:|]?\s*/i;
+    var NOTE_SPLIT = /\s*:\s+|\s*:$|\s+[-\u2013\u2014|]\s+/;
+    function readNotes(raw){
+      var kept = 0, skipped = 0;
+      String(raw || '').split(/\r\n|\r|\n/).forEach(function(line){
+        line = line.trim().replace(NOTE_TIME, '');
+        if (!line) return;
+        var m = NOTE_SPLIT.exec(line);
+        var name = m ? line.slice(0, m.index).trim() : '';
+        var note = m ? line.slice(m.index + m[0].length).trim() : '';
+        if (/[\p{L}\p{N}]/u.test(name) && note) kept++; else skipped++;
+      });
+      return {notes: kept, skipped: skipped};
+    }
+    function countNotes(){
+      var el = document.getElementById('boothNotes'), out = document.getElementById('noteCount');
+      if (!el || !out) return;
+      var r = readNotes(el.value);
+      out.hidden = !(r.notes || r.skipped);
+      out.className = 'evi-count' + (r.skipped ? ' has-skip' : '');
+      out.innerHTML = (r.notes ? '<span><b>' + plural(r.notes, 'note') + '</b> ready</span>' : '')
+        + (r.skipped ? '<em>' + plural(r.skipped, 'line') + ' will be skipped: write it as Company: what was said</em>' : '');
+    }
+    window.countNotes = countNotes;
+    window.readNotes = readNotes;
 
     /* Step 0 of the rubric. The four options come from the server, which reads
        them off the rubric module, so this list can never drift into offering a

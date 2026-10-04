@@ -133,7 +133,10 @@ def test_the_design_layer_is_screen_only_and_loaded_last():
     page = open(os.path.join(os.path.dirname(__file__), "..", "templates",
                              "event_conference_intelligence.html")).read()
     links = re.findall(r'href="/static/css/([^"?]+)', page)
-    assert links[-1] == "event_intel_report.css"
+    # After every stylesheet it overrides; only the intake layer, which never
+    # touches the drawer, comes later.
+    assert links.index("event_intel_report.css") > links.index("aurora-app.css")
+    assert links[links.index("event_intel_report.css") + 1:] == ["event_intel_intake.css"]
     # Every colour the layer uses is defined for both themes.
     dark = re.search(r"\.evi-drawer \{\s*--r-ink:(.*?)\}", css, re.S).group(1)
     light = re.search(r':root\[data-theme="light"\] \.evi-drawer \{\s*--r-ink:(.*?)\}', css, re.S).group(1)

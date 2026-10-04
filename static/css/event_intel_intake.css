@@ -1,0 +1,546 @@
+/* event_intel_intake.css - the intake form's design layer.
+
+   The companion to event_intel_report.css, loaded after it and scoped to the
+   screen the same way, so a printed page keeps the main stylesheet's print
+   rules untouched.
+
+   One idea throughout: the form is the play you picked, opened. It takes the
+   play card's colours and says the play's give-and-get at its top; setting up
+   a client reads as a short timeline with a visible end; every choice is a
+   card that looks chosen when it is chosen; and the button that starts the
+   run is the brightest thing on the page. */
+
+@media screen {
+
+/* ── tokens ─────────────────────────────────────────────────────────────── */
+.evi-layout {
+  --i-ink: #eef1ff;
+  --i-ink-2: #b8c2e6;
+  --i-ink-3: #8a95bd;
+  --i-line: rgba(148, 163, 255, .13);
+  --i-line-2: rgba(148, 163, 255, .07);
+  --i-field: rgba(8, 12, 28, .55);
+  --i-field-hi: rgba(14, 20, 44, .8);
+  --i-card: linear-gradient(180deg, rgba(255,255,255,.045), rgba(255,255,255,.015));
+  --i-glass: rgba(10, 15, 33, .74);
+  --i-ok: #4ade80; --i-warn: #fbbf24; --i-bad: #fb7185;
+  --i-booth: #a78bfa; --i-aud: #38bdf8;
+  --i-shadow: 0 1px 0 rgba(255,255,255,.05) inset, 0 24px 60px -28px rgba(0,0,0,.7);
+}
+:root[data-theme="light"] .evi-layout {
+  --i-ink: #10162b;
+  --i-ink-2: #3c4770;
+  --i-ink-3: #5d6789;
+  --i-line: rgba(40, 52, 110, .14);
+  --i-line-2: rgba(40, 52, 110, .08);
+  --i-field: #ffffff;
+  --i-field-hi: #ffffff;
+  --i-card: linear-gradient(180deg, #ffffff, #f7f9ff);
+  --i-glass: rgba(255, 255, 255, .86);
+  --i-ok: #15803d; --i-warn: #a16207; --i-bad: #be123c;
+  --i-booth: #7c3aed; --i-aud: #0284c7;
+  --i-shadow: 0 1px 2px rgba(20,30,70,.05), 0 20px 48px -26px rgba(30,40,90,.3);
+}
+
+/* The form card takes the colours of the play that opened it, from the same
+   two stops the play card uses. */
+#formCard { --p1: #38bdf8; --p2: #6366f1; }
+#formCard[data-play="lookup"] { --p1: #22d3ee; --p2: #38bdf8; }
+#formCard[data-play="workroom"] { --p1: #2dd4aa; --p2: #22d3ee; }
+:root[data-theme="light"] #formCard { --p1: #0284c7; --p2: #4f46e5; }
+:root[data-theme="light"] #formCard[data-play="lookup"] { --p1: #0891b2; --p2: #0284c7; }
+:root[data-theme="light"] #formCard[data-play="workroom"] { --p1: #0d9488; --p2: #0891b2; }
+
+/* ── the card ───────────────────────────────────────────────────────────── */
+.evi-layout .evi-card-main {
+  border-radius: 24px;
+  border-color: var(--i-line);
+  background-color: #070b1a;
+  background-image:
+    radial-gradient(720px 260px at 0% -4%, color-mix(in srgb, var(--p1) 15%, transparent), transparent 62%),
+    radial-gradient(620px 260px at 100% -2%, color-mix(in srgb, var(--p2) 14%, transparent), transparent 64%),
+    linear-gradient(180deg, #0a0f22, #070b1a 260px);
+  box-shadow: 0 40px 110px -40px rgba(0,0,0,.75), 0 0 0 1px rgba(129,140,248,.05);
+  transition: background-image .4s ease;
+}
+:root[data-theme="light"] .evi-layout .evi-card-main {
+  background-color: #ffffff;
+  background-image:
+    radial-gradient(720px 260px at 0% -4%, color-mix(in srgb, var(--p1) 12%, transparent), transparent 62%),
+    radial-gradient(620px 260px at 100% -2%, color-mix(in srgb, var(--p2) 10%, transparent), transparent 64%),
+    linear-gradient(180deg, #fbfcff, #ffffff 260px);
+  box-shadow: 0 30px 80px -40px rgba(30,40,90,.35), 0 0 0 1px rgba(40,52,110,.04);
+}
+.evi-layout .evi-card-main::before {
+  height: 3px;
+  background: linear-gradient(90deg, var(--p1), var(--p2) 55%, transparent);
+}
+.evi-layout .evi-card-main > .evi-card-pad { padding: 26px 32px 30px; }
+
+/* ── the head: which play this is, and what it trades ─────────────────── */
+.evi-fhead {
+  display: grid; grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center; gap: 16px 18px;
+  padding: 24px 32px 22px;
+  border-bottom: 1px solid var(--i-line-2);
+}
+.evi-fhead .fi {
+  width: 50px; height: 50px; border-radius: 15px;
+  display: grid; place-items: center; color: #fff;
+  background: linear-gradient(140deg, var(--p1), var(--p2));
+  box-shadow: 0 12px 30px -10px color-mix(in srgb, var(--p2) 70%, transparent),
+              inset 0 1px 0 rgba(255,255,255,.3);
+}
+.evi-fhead .fi svg { width: 25px; height: 25px; }
+.evi-fhead .ft { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.evi-fhead .fk {
+  font-family: 'JetBrains Mono', monospace; font-size: 10.5px; font-weight: 600;
+  letter-spacing: .14em; text-transform: uppercase; color: var(--p1);
+}
+.evi-fhead .fn {
+  font-family: 'Bricolage Grotesque', 'Space Grotesk', sans-serif;
+  font-size: 23px; font-weight: 700; letter-spacing: -.02em; line-height: 1.15;
+  color: var(--i-ink);
+}
+.evi-fhead .fio {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 14px; border-radius: 14px;
+  border: 1px solid var(--i-line); background: var(--i-glass);
+}
+.evi-fhead .fio:empty { display: none; }
+.evi-fhead .fio > span:not(.arr) { display: flex; flex-direction: column; gap: 1px; font-size: 12.5px; font-weight: 600; color: var(--i-ink); white-space: nowrap; }
+.evi-fhead .fio i {
+  font-style: normal; font-family: 'JetBrains Mono', monospace; font-size: 9.5px;
+  letter-spacing: .12em; text-transform: uppercase; color: var(--i-ink-3); font-weight: 500;
+}
+.evi-fhead .fio .t { color: var(--p1); }
+.evi-fhead .fio .arr {
+  width: 26px; height: 1.5px; border-radius: 2px; position: relative;
+  background: linear-gradient(90deg, var(--i-line), var(--p1));
+}
+.evi-fhead .fio .arr::after {
+  content: ""; position: absolute; right: -1px; top: 50%; width: 6px; height: 6px;
+  border-top: 1.5px solid var(--p1); border-right: 1.5px solid var(--p1);
+  transform: translateY(-50%) rotate(45deg);
+}
+@media (max-width: 860px) {
+  .evi-fhead { grid-template-columns: auto minmax(0, 1fr); }
+  .evi-fhead .fio { grid-column: 1 / -1; justify-self: start; }
+}
+
+/* ── fields ─────────────────────────────────────────────────────────────── */
+.evi-layout .evi-field { gap: 8px; }
+.evi-layout .evi-field label {
+  font-size: 12.5px; font-weight: 600; letter-spacing: -.003em; color: var(--i-ink-2);
+}
+.evi-layout .evi-field input,
+.evi-layout .evi-field textarea,
+.evi-layout .evi-field select {
+  font-size: 14.5px; color: var(--i-ink);
+  background-color: var(--i-field);
+  border: 1px solid var(--i-line);
+  border-radius: 13px;
+  box-shadow: inset 0 1px 2px rgba(0,0,0,.22);
+  transition: border-color .18s, box-shadow .2s, background-color .2s;
+}
+.evi-layout .evi-field input,
+.evi-layout .evi-field textarea { padding: 13px 15px; }
+.evi-layout .evi-field select { padding: 13px 40px 13px 15px; }
+:root[data-theme="light"] .evi-layout .evi-field input,
+:root[data-theme="light"] .evi-layout .evi-field textarea,
+:root[data-theme="light"] .evi-layout .evi-field select {
+  box-shadow: inset 0 1px 2px rgba(20,30,70,.05), 0 1px 0 rgba(255,255,255,.9);
+}
+.evi-layout .evi-field input::placeholder,
+.evi-layout .evi-field textarea::placeholder { color: color-mix(in srgb, var(--i-ink-3) 78%, transparent); }
+.evi-layout .evi-field input:hover,
+.evi-layout .evi-field textarea:hover,
+.evi-layout .evi-field select:hover { border-color: color-mix(in srgb, var(--p1) 34%, var(--i-line)); }
+.evi-layout .evi-field input:focus,
+.evi-layout .evi-field textarea:focus,
+.evi-layout .evi-field select:focus {
+  background-color: var(--i-field-hi);
+  border-color: color-mix(in srgb, var(--p1) 70%, transparent);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--p1) 16%, transparent),
+              0 10px 30px -12px color-mix(in srgb, var(--p2) 55%, transparent);
+}
+/* A field that has something in it reads as answered. */
+.evi-layout .evi-field input:not(:placeholder-shown):not(:focus),
+.evi-layout .evi-field textarea:not(:placeholder-shown):not(:focus) {
+  border-color: color-mix(in srgb, var(--p1) 26%, var(--i-line));
+}
+.evi-layout .evi-field .hint { font-size: 12px; color: var(--i-ink-3); line-height: 1.55; }
+.evi-layout .evi-field .hint b { color: var(--i-ink-2); font-weight: 600; }
+
+/* The picker the whole Recommend play hangs off. */
+.evi-layout #profilePick {
+  font-size: 15.5px; font-weight: 650; padding-top: 15px; padding-bottom: 15px;
+  background-color: color-mix(in srgb, var(--p1) 8%, var(--i-field));
+  border-color: color-mix(in srgb, var(--p1) 30%, var(--i-line));
+}
+
+/* ── setting up a client: a timeline with a visible end ──────────────────── */
+.evi-layout #profileForm {
+  margin-top: 6px; padding: 26px 26px 26px 66px;
+  border-radius: 20px; border-color: var(--i-line);
+  background:
+    radial-gradient(500px 180px at 0% 0%, color-mix(in srgb, var(--p1) 8%, transparent), transparent 70%),
+    var(--i-card);
+  box-shadow: var(--i-shadow);
+}
+.evi-layout #profileForm::before { left: 66px; right: 26px; }
+/* The rail the step numbers sit on. */
+.evi-layout #profileForm::after {
+  content: ""; position: absolute; left: 37px; top: 40px; bottom: 44px; width: 2px;
+  border-radius: 2px;
+  background: linear-gradient(180deg, var(--p1), color-mix(in srgb, var(--p2) 60%, transparent) 60%, transparent);
+  opacity: .5;
+}
+.evi-layout #profileForm .evi-group.step { position: relative; }
+.evi-layout #profileForm .evi-group.step .gh { font-size: 16px; font-weight: 700; letter-spacing: -.012em; }
+.evi-layout #profileForm .evi-group.step .gs { font-size: 12.5px; color: var(--i-ink-3); }
+.evi-layout #profileForm .evi-group.step .gn {
+  position: absolute; left: -44px; top: 15px; margin-top: 0;
+  width: 30px; height: 30px; font-size: 13px;
+  background: linear-gradient(145deg, var(--p1), var(--p2));
+  box-shadow: 0 0 0 5px #0a0f22, 0 8px 20px -6px color-mix(in srgb, var(--p2) 80%, transparent);
+}
+.evi-layout #profileForm > .evi-group.step:first-child .gn { top: -4px; }
+:root[data-theme="light"] .evi-layout #profileForm .evi-group.step .gn {
+  box-shadow: 0 0 0 5px #ffffff, 0 8px 20px -8px color-mix(in srgb, var(--p2) 60%, transparent);
+}
+/* Step 2 is the one question we will not guess. Once it is answered it says so. */
+.evi-layout #profileRest:has([data-classification][aria-checked="true"]) > .evi-group.step:first-child .gn {
+  font-size: 0; background: linear-gradient(145deg, #34d399, #10b981);
+}
+.evi-layout #profileRest:has([data-classification][aria-checked="true"]) > .evi-group.step:first-child .gn::after {
+  content: ""; width: 9px; height: 5px; margin-top: -2px;
+  border-left: 2px solid #fff; border-bottom: 2px solid #fff; transform: rotate(-45deg);
+}
+.evi-layout #profileForm .evi-group { border-top-color: var(--i-line-2); }
+
+.evi-layout .evi-draftbar {
+  margin-top: 4px; padding: 14px 16px; border-radius: 16px;
+  border: 1px dashed color-mix(in srgb, var(--p1) 30%, var(--i-line));
+  background: color-mix(in srgb, var(--p1) 5%, transparent);
+}
+.evi-layout .evi-draftbar .evi-btn-ghost {
+  color: var(--i-ink); font-weight: 650;
+  border-color: color-mix(in srgb, var(--p1) 40%, var(--i-line));
+  background: color-mix(in srgb, var(--p1) 10%, var(--i-field));
+  display: inline-flex; align-items: center; gap: 9px;
+}
+.evi-layout .evi-draftbar .evi-btn-ghost::before {
+  content: ""; width: 8px; height: 8px; border-radius: 50%;
+  background: var(--p1); box-shadow: 0 0 0 4px color-mix(in srgb, var(--p1) 22%, transparent);
+}
+.evi-layout .evi-draftbar .evi-btn-ghost:hover {
+  border-color: var(--p1); background: color-mix(in srgb, var(--p1) 16%, var(--i-field));
+}
+
+/* ── choice cards: classifications and event classes ─────────────────────── */
+.evi-layout .evi-classes { gap: 12px; }
+.evi-layout .evi-class {
+  position: relative; padding: 16px 44px 15px 17px; border-radius: 16px;
+  background: var(--i-card); border-color: var(--i-line);
+  box-shadow: var(--i-shadow);
+}
+/* The radio, drawn: an empty ring until chosen, a filled tick once it is. */
+.evi-layout .evi-class::after {
+  content: ""; position: absolute; top: 15px; right: 15px;
+  width: 18px; height: 18px; border-radius: 50%;
+  border: 1.5px solid color-mix(in srgb, var(--i-ink-3) 60%, transparent);
+  transition: background .2s, border-color .2s, box-shadow .2s;
+}
+.evi-layout .evi-class[aria-checked="true"]::after {
+  border-color: transparent;
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2.6 6.3l2.2 2.2 4.6-4.9' fill='none' stroke='white' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / 11px no-repeat,
+    linear-gradient(145deg, var(--p1), var(--p2));
+  box-shadow: 0 4px 12px -2px color-mix(in srgb, var(--p2) 70%, transparent);
+}
+.evi-layout .evi-class:hover { border-color: color-mix(in srgb, var(--p1) 40%, var(--i-line)); transform: translateY(-2px); }
+.evi-layout .evi-class[aria-checked="true"] {
+  border-color: color-mix(in srgb, var(--p1) 62%, transparent);
+  background:
+    radial-gradient(300px 120px at 0% 0%, color-mix(in srgb, var(--p1) 16%, transparent), transparent 70%),
+    linear-gradient(140deg, color-mix(in srgb, var(--p1) 10%, transparent), color-mix(in srgb, var(--p2) 8%, transparent));
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--p1) 12%, transparent), var(--i-shadow);
+}
+.evi-layout .evi-class .cl { font-size: 14px; font-weight: 650; color: var(--i-ink); }
+.evi-layout .evi-class .cw { font-size: 12px; color: var(--i-ink-3); }
+.evi-layout .evi-class .co {
+  font-family: 'JetBrains Mono', monospace; font-size: 9.5px; letter-spacing: .1em;
+  padding: 4px 9px; border-radius: 999px; display: inline-flex; align-items: center; gap: 7px;
+  white-space: nowrap; letter-spacing: .06em;
+}
+/* Which side of the floor: booth-driven violet, audience-driven sky, the
+   same pair the saved-client card uses. */
+.evi-layout .evi-class[data-orient="booth"] .co { background: color-mix(in srgb, var(--i-booth) 15%, transparent); color: var(--i-booth); }
+.evi-layout .evi-class[data-orient="audience"] .co { background: color-mix(in srgb, var(--i-aud) 15%, transparent); color: var(--i-aud); }
+.evi-layout .evi-class[data-suggested] { border-style: dashed; border-color: color-mix(in srgb, var(--p1) 55%, transparent); }
+.evi-layout .evi-class[data-suggested][aria-checked="true"] { border-style: solid; }
+
+/* Signal strength as bars, four of them, lit by how strong the class is. */
+.evi-layout .evi-class .sg { display: inline-flex; align-items: flex-end; gap: 2px; height: 10px; }
+.evi-layout .evi-class .sg i { width: 3px; border-radius: 1px; background: currentColor; opacity: .22; }
+.evi-layout .evi-class .sg i:nth-child(1) { height: 4px; }
+.evi-layout .evi-class .sg i:nth-child(2) { height: 6px; }
+.evi-layout .evi-class .sg i:nth-child(3) { height: 8px; }
+.evi-layout .evi-class .sg i:nth-child(4) { height: 10px; }
+.evi-layout .evi-class[data-signal="low-medium"] .sg i:nth-child(-n+1),
+.evi-layout .evi-class[data-signal="medium"] .sg i:nth-child(-n+2),
+.evi-layout .evi-class[data-signal="medium-high"] .sg i:nth-child(-n+3),
+.evi-layout .evi-class[data-signal="high"] .sg i { opacity: 1; }
+.evi-layout .evi-class[data-signal="high"] .co { background: color-mix(in srgb, var(--i-ok) 15%, transparent); color: var(--i-ok); }
+.evi-layout .evi-class[data-signal="medium-high"] .co { background: color-mix(in srgb, var(--p1) 15%, transparent); color: var(--p1); }
+.evi-layout .evi-class[data-signal="low-medium"] .co { background: color-mix(in srgb, var(--i-warn) 14%, transparent); color: var(--i-warn); }
+
+/* ── a saved client: an ID card ─────────────────────────────────────────── */
+.evi-layout .evi-psum {
+  border-radius: 20px; padding: 0; overflow: hidden;
+  border: 1px solid var(--i-line); background: var(--i-card); box-shadow: var(--i-shadow);
+}
+.evi-layout .evi-psum .ps-head {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px;
+  padding: 20px 22px 16px;
+  background:
+    radial-gradient(420px 140px at 0% 0%, color-mix(in srgb, var(--p1) 16%, transparent), transparent 72%),
+    radial-gradient(360px 140px at 100% 0%, color-mix(in srgb, var(--p2) 12%, transparent), transparent 72%);
+  border-bottom: 1px solid var(--i-line-2);
+}
+.evi-layout .evi-psum .ps-av {
+  width: 44px; height: 44px; border-radius: 13px; flex: 0 0 auto;
+  display: grid; place-items: center; color: #fff;
+  font-family: 'Bricolage Grotesque', sans-serif; font-size: 16px; font-weight: 700;
+  background: linear-gradient(140deg, var(--p1), var(--p2));
+  box-shadow: 0 10px 24px -10px color-mix(in srgb, var(--p2) 80%, transparent), inset 0 1px 0 rgba(255,255,255,.3);
+}
+.evi-layout .evi-psum .ps-name {
+  font-family: 'Bricolage Grotesque', sans-serif; font-size: 21px; font-weight: 700;
+  letter-spacing: -.02em; color: var(--i-ink);
+}
+.evi-layout .evi-psum .ps-site {
+  font-family: 'JetBrains Mono', monospace; font-size: 11.5px; color: var(--i-ink-3);
+}
+.evi-layout .evi-psum .ps-or {
+  font-family: 'JetBrains Mono', monospace; font-size: 9.5px; font-weight: 600; letter-spacing: .1em;
+  text-transform: uppercase; padding: 4px 9px; border-radius: 999px; border: 0;
+}
+.evi-layout .evi-psum .ps-or[data-orient="booth"] { background: color-mix(in srgb, var(--i-booth) 16%, transparent); color: var(--i-booth); }
+.evi-layout .evi-psum .ps-or[data-orient="audience"] { background: color-mix(in srgb, var(--i-aud) 16%, transparent); color: var(--i-aud); }
+.evi-layout .evi-psum .ps-lock {
+  margin-left: auto; display: inline-flex; align-items: center; gap: 6px;
+  font-family: 'JetBrains Mono', monospace; font-size: 9.5px; letter-spacing: .12em;
+  text-transform: uppercase; padding: 5px 10px; border-radius: 999px;
+  color: var(--i-ok); background: color-mix(in srgb, var(--i-ok) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--i-ok) 26%, transparent);
+}
+.evi-layout .evi-psum .ps-lock::before {
+  content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor;
+  box-shadow: 0 0 8px currentColor;
+}
+.evi-layout .evi-psum .ps-class {
+  margin: 0; padding: 14px 22px; font-size: 13px; line-height: 1.6; color: var(--i-ink-2);
+  border-bottom: 1px solid var(--i-line-2);
+}
+.evi-layout .evi-psum .ps-class b { color: var(--i-ink); }
+.evi-layout .evi-psum .ps-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 10px; padding: 16px 22px; margin: 0; border: 0;
+}
+.evi-layout .evi-psum .ps-grid > div {
+  padding: 11px 13px; border-radius: 12px;
+  border: 1px solid var(--i-line-2);
+  background: color-mix(in srgb, var(--i-ink) 3%, transparent);
+}
+.evi-layout .evi-psum .ps-grid dt {
+  font-family: 'JetBrains Mono', monospace; font-size: 9.5px; letter-spacing: .12em;
+  text-transform: uppercase; color: var(--i-ink-3); margin-bottom: 5px;
+}
+.evi-layout .evi-psum .ps-grid dd { margin: 0; font-size: 13px; line-height: 1.5; color: var(--i-ink); }
+.evi-layout .evi-psum .ps-standing {
+  display: grid; gap: 8px; padding: 0 22px 20px; margin: 0; border: 0;
+}
+.evi-layout .evi-psum .ps-standing p {
+  --c: var(--p1);
+  margin: 0; padding: 10px 14px 10px 16px; border-radius: 12px; position: relative;
+  font-size: 13px; line-height: 1.55; color: var(--i-ink);
+  background: color-mix(in srgb, var(--c) 7%, transparent);
+  border: 1px solid color-mix(in srgb, var(--c) 22%, transparent);
+}
+.evi-layout .evi-psum .ps-standing p::before {
+  content: ""; position: absolute; left: 0; top: 10px; bottom: 10px; width: 3px; border-radius: 0 3px 3px 0;
+  background: var(--c);
+}
+.evi-layout .evi-psum .ps-standing p.ps-in { --c: var(--i-ok); }
+.evi-layout .evi-psum .ps-standing p.ps-out { --c: var(--i-bad); }
+.evi-layout .evi-psum .ps-standing p.ps-bud { --c: var(--i-warn); }
+.evi-layout .evi-psum .ps-standing b { color: var(--c); font-weight: 650; margin-right: 4px; }
+.evi-layout .evi-psum .ps-standing i { display: block; margin-top: 2px; font-style: normal; font-size: 11.5px; color: var(--i-ink-3); }
+
+/* ── lookup: examples, and what comes back ──────────────────────────────── */
+.evi-try { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 2px; }
+.evi-try > span {
+  font-family: 'JetBrains Mono', monospace; font-size: 9.5px; letter-spacing: .12em;
+  text-transform: uppercase; color: var(--i-ink-3); margin-right: 2px;
+}
+.evi-try button {
+  appearance: none; font: inherit; font-size: 12px; font-weight: 550; cursor: pointer;
+  padding: 5px 11px; border-radius: 999px; color: var(--i-ink-2);
+  border: 1px solid var(--i-line); background: color-mix(in srgb, var(--p1) 5%, transparent);
+  transition: border-color .15s, color .15s, background .15s, transform .15s;
+}
+.evi-try button:hover {
+  color: var(--i-ink); border-color: color-mix(in srgb, var(--p1) 55%, transparent);
+  background: color-mix(in srgb, var(--p1) 12%, transparent); transform: translateY(-1px);
+}
+.evi-try button:focus-visible { outline: 2px solid var(--p1); outline-offset: 2px; }
+.evi-yield {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+  padding: 14px 16px; border-radius: 16px;
+  border: 1px solid var(--i-line-2); background: var(--i-card);
+}
+.evi-yield .yk {
+  font-family: 'JetBrains Mono', monospace; font-size: 9.5px; letter-spacing: .12em;
+  text-transform: uppercase; color: var(--i-ink-3); margin-right: 4px;
+}
+.evi-yield .yc {
+  --c: var(--p1);
+  display: inline-flex; align-items: center; gap: 7px;
+  font-size: 12px; font-weight: 600; color: var(--i-ink-2);
+  padding: 5px 11px 5px 9px; border-radius: 999px;
+  background: color-mix(in srgb, var(--c) 9%, transparent);
+  border: 1px solid color-mix(in srgb, var(--c) 22%, transparent);
+}
+.evi-yield .yc::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--c); }
+.evi-yield .yc.r-ex { --c: #38bdf8; }
+.evi-yield .yc.r-sp { --c: #818cf8; }
+.evi-yield .yc.r-sk { --c: #c084fc; }
+.evi-yield .yc.r-pa { --c: #2dd4bf; }
+.evi-yield .yc.r-pe { --c: #f472b6; }
+:root[data-theme="light"] .evi-yield .yc.r-ex { --c: #0284c7; }
+:root[data-theme="light"] .evi-yield .yc.r-sp { --c: #4f46e5; }
+:root[data-theme="light"] .evi-yield .yc.r-sk { --c: #9333ea; }
+:root[data-theme="light"] .evi-yield .yc.r-pa { --c: #0d9488; }
+:root[data-theme="light"] .evi-yield .yc.r-pe { --c: #db2777; }
+
+/* ── workroom: the notes counter ────────────────────────────────────────── */
+.evi-count {
+  display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: center;
+  font-size: 12px; color: var(--i-ink-2);
+}
+.evi-count[hidden] { display: none; }
+.evi-count b {
+  display: inline-flex; align-items: center; gap: 6px; color: var(--i-ok); font-weight: 650;
+}
+.evi-count b::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.evi-count em { font-style: normal; color: var(--i-warn); font-weight: 550; }
+
+/* ── the run bar ────────────────────────────────────────────────────────── */
+.evi-layout .evi-actions {
+  margin-top: 8px; padding: 18px 20px; border-radius: 18px;
+  border: 1px solid var(--i-line);
+  background:
+    radial-gradient(420px 120px at 0% 50%, color-mix(in srgb, var(--p1) 10%, transparent), transparent 70%),
+    var(--i-glass);
+}
+.evi-layout .evi-actions .evi-btn {
+  position: relative; overflow: hidden; isolation: isolate;
+  padding: 16px 34px; font-size: 15px; font-weight: 700; letter-spacing: -.005em;
+  background: linear-gradient(100deg, var(--p1), var(--p2) 62%, color-mix(in srgb, var(--p2) 70%, #8b5cf6));
+  box-shadow: 0 14px 34px -10px color-mix(in srgb, var(--p2) 75%, transparent),
+              inset 0 1px 0 rgba(255,255,255,.28);
+}
+/* The light that crosses the button on hover. */
+.evi-layout .evi-actions .evi-btn::after {
+  content: ""; position: absolute; inset: 0; z-index: -1;
+  background: linear-gradient(110deg, transparent 30%, rgba(255,255,255,.32) 48%, transparent 66%);
+  transform: translateX(-120%);
+}
+.evi-layout .evi-actions .evi-btn:hover::after { transform: translateX(120%); transition: transform .8s ease; }
+.evi-layout .evi-actions .evi-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 20px 44px -12px color-mix(in srgb, var(--p2) 85%, transparent),
+              inset 0 1px 0 rgba(255,255,255,.3);
+}
+.evi-layout .evi-actions .evi-btn.is-wait {
+  background: var(--i-field); color: var(--i-ink-2); border: 1px solid var(--i-line);
+  box-shadow: none;
+}
+.evi-layout .evi-actions .evi-btn.is-wait::after { content: none; }
+.evi-layout .evi-actions-note {
+  max-width: 46ch; display: inline-flex; align-items: flex-start; gap: 9px; color: var(--i-ink-3); font-size: 12px;
+}
+.evi-layout .evi-actions-note::before {
+  content: ""; flex: 0 0 auto; width: 14px; height: 14px; margin-top: 1px; border-radius: 50%;
+  border: 1.5px solid currentColor; opacity: .8;
+  background:
+    linear-gradient(currentColor, currentColor) 6px 2.5px / 1.5px 5px no-repeat,
+    linear-gradient(currentColor, currentColor) 6px 6px / 4px 1.5px no-repeat;
+}
+
+/* ── the rail: your runs ────────────────────────────────────────────────── */
+.evi-layout .evi-rail .evi-card {
+  border-radius: 22px; border-color: var(--i-line);
+  background: var(--i-card), #080c1d; box-shadow: var(--i-shadow);
+}
+:root[data-theme="light"] .evi-layout .evi-rail .evi-card { background: var(--i-card); }
+.evi-layout .evi-rail .evi-sec h3 { align-items: center; }
+.evi-runcount {
+  order: 2; margin-left: 2px; padding: 2px 8px; border-radius: 999px;
+  font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0;
+  color: var(--i-ink-2); background: color-mix(in srgb, var(--i-ink) 7%, transparent);
+}
+.evi-layout .evi-rail .evi-sec h3::after { order: 3; }
+.evi-layout .evi-run {
+  border-radius: 14px; border-color: var(--i-line-2);
+  background: color-mix(in srgb, var(--i-ink) 2.5%, transparent);
+  transition: border-color .18s, background .18s, transform .18s;
+}
+.evi-layout .evi-run:hover {
+  transform: translateX(3px);
+  border-color: color-mix(in srgb, var(--evi-a2) 45%, transparent);
+  background: color-mix(in srgb, var(--evi-a2) 8%, transparent);
+}
+.evi-layout .evi-run .q { font-size: 13.5px; color: var(--i-ink); }
+.evi-layout .evi-badge {
+  display: inline-flex; align-items: center; gap: 6px; border-radius: 999px;
+  font-family: 'JetBrains Mono', monospace;
+}
+.evi-layout .evi-badge::before { content: ""; width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+:root[data-theme="light"] .evi-layout .evi-badge.running { color: #0369a1; background: rgba(2,132,199,.12); }
+@media (prefers-reduced-motion: no-preference) {
+  .evi-layout .evi-badge.running::before { animation: evi-i-pulse 1.4s ease-in-out infinite; }
+}
+@keyframes evi-i-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 currentColor; opacity: 1; }
+  50% { box-shadow: 0 0 0 4px transparent; opacity: .45; }
+}
+
+/* ── phones ─────────────────────────────────────────────────────────────── */
+@media (max-width: 640px) {
+  .evi-fhead { padding: 18px 16px 16px; gap: 12px 14px; }
+  .evi-fhead .fi { width: 42px; height: 42px; border-radius: 13px; }
+  .evi-fhead .fn { font-size: 19px; }
+  .evi-fhead .fio > span:not(.arr) { white-space: normal; }
+  .evi-layout .evi-card-main > .evi-card-pad { padding: 20px 16px 22px; }
+  .evi-layout #profileForm { padding: 20px 16px 20px 48px; }
+  .evi-layout #profileForm::before { left: 48px; right: 16px; }
+  .evi-layout #profileForm::after { left: 25px; }
+  .evi-layout #profileForm .evi-group.step .gn { left: -36px; width: 26px; height: 26px; font-size: 12px; }
+  .evi-layout .evi-psum .ps-head, .evi-layout .evi-psum .ps-class,
+  .evi-layout .evi-psum .ps-grid, .evi-layout .evi-psum .ps-standing { padding-left: 16px; padding-right: 16px; }
+  .evi-layout .evi-psum .ps-lock { margin-left: 0; }
+  .evi-layout .evi-psum .ps-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .evi-layout .evi-actions { padding: 16px; }
+  .evi-layout .evi-actions .evi-btn { width: 100%; text-align: center; }
+}
+
+/* Reveal: the form rises in when a play is picked. */
+@media (prefers-reduced-motion: no-preference) {
+  #recommendFields, #lookupFields, #workroomFields { animation: evi-i-rise .45s cubic-bezier(.2,.75,.25,1) both; }
+}
+@keyframes evi-i-rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+}
