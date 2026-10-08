@@ -8809,6 +8809,56 @@ def admin_external_usage_market_radar_schema_check():
         return jsonify(error="%s: %s" % (type(e).__name__, str(e)[:300])), 500
 
 
+MR_APIFY_TEST_DOMAIN = "mr-phase0-test.example"   # .example is reserved: never a real company
+MR_APIFY_TEST_QUERY = "dentist Austin TX"
+
+
+@app.route("/p2/admin/external-usage/market-radar-apify-check", methods=["POST"])
+@admin_required
+def admin_external_usage_market_radar_apify_check():
+    """Market Radar Phase 0: ONE real Google search (one query, one results
+    page) on the platform's own Apify account, to measure what it costs and
+    what comes back. This SPENDS MONEY (about $0.003 on the Starter plan), so
+    the body must carry {"confirm_spend": true}; Apify is capped at $0.05 for
+    the run and the charge is written to the Market Radar cost ledger under a
+    labelled test company."""
+    if not _evi_same_origin():
+        return jsonify(error="This request came from another site and was refused."), 403
+    if (request.get_json(silent=True) or {}).get("confirm_spend") is not True:
+        return jsonify(error='This check spends money. Send {"confirm_spend": true} to run it.'), 400
+    token = os.environ.get("APIFY_API_TOKEN", "")
+    if not token:
+        return jsonify(error="APIFY_API_TOKEN is not set on this service."), 503
+    from tracker import apify_transport, market_radar_ledger, market_radar_search
+    from tracker import market_radar_store as mr_store
+    account, account_error = apify_transport.probe_token(token)
+    if account_error:
+        return jsonify(error="Apify account check failed: " + account_error), 502
+    plan = account.get("plan") or {}
+    email = (_get_user() or {}).get("email", "")
+    try:
+        entity = mr_store.upsert_entity(MR_APIFY_TEST_DOMAIN, name="Phase 0 Apify test (not a company)")
+        client = mr_store.upsert_client(email, entity)
+        run_id = mr_store.create_run(client, email, "baseline", cost_cap_usd="0.10")
+        mr_store.update_run(run_id, status="running", stage="apify_test")
+    except mr_store.StoreUnavailable as e:
+        return jsonify(error="Not run: the cost ledger is unavailable (%s)." % e), 503
+    result = market_radar_search.search([MR_APIFY_TEST_QUERY], token=token, run_id=run_id,
+                                        stage="apify_test")
+    mr_store.update_run(run_id, status="failed" if result["error"] else "complete",
+                        error=result["error"],
+                        summary={"apify_run_id": result["apify_run_id"], "pages": result["pages"],
+                                 "results": len(result["results"])})
+    return jsonify(
+        account={"username": account.get("username"),
+                 "plan": {k: plan.get(k) for k in ("id", "description", "tier",
+                                                   "monthlyBasePriceUsd", "monthlyUsageCreditsUsd")
+                          if k in plan}},
+        search={k: v for k, v in result.items() if k != "results"},
+        top_results=result["results"][:10],
+        ledger=market_radar_ledger.summary(run_id))
+
+
 def _unipile_selftest() -> dict:
     """Prove the Unipile integration end to end -- see
     tracker/unipile_client.probe. Free: list_accounts() needs no connected
