@@ -627,7 +627,6 @@
           <h2 id="drawerTitle">Loading</h2>
           <div class="sub" id="drawerSub"></div>
           <div class="evi-drawer-actions">
-            <a id="eventPlanLink" class="evi-btn" hidden>Plan &amp; results</a>
             <a id="eventExportLink" class="evi-btn evi-btn-ghost" download hidden>Download full research (JSON)</a>
           </div>
         </div>
@@ -5976,17 +5975,6 @@
       if (exportLink) {
         exportLink.hidden = !run.id;
         exportLink.href = BASE + '/runs/' + run.id + '?download=1';
-      }
-      var planLink = document.getElementById('eventPlanLink');
-      if (planLink) {
-        /* Only when there is something to plan. A complete report that kept
-           no event still offered the link, and it opened on a bare "Choose
-           an event from this report." with nothing to choose. */
-        var plannable = run.mode === 'recommend' ? (run.candidates || []).length
-                      : (run.events || []).length;
-        planLink.hidden = run.status !== 'complete' ||
-          !['lookup', 'recommend'].includes(run.mode) || !plannable;
-        planLink.href = BASE + '/runs/' + run.id + '/plan';
       }
       if (run.mode === 'recommend') { return renderRecommend(run); }
       if (run.mode === 'workroom') { return renderWorkroom(run); }

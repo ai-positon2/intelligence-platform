@@ -134,11 +134,11 @@ def test_repeated_pipeline_fetches_sources_but_reuses_extraction(monkeypatch):
         runs.append(rid)
         assert J.run_once()
         assert S.get_run(rid, email)['status'] == 'complete'
-    assert len(fetches) == 4 and len(calls) == 1
-    assert fetches.count("https://fixture.example/register") == 2
-    assert any(source["kind"] == "access_review" for source in S.get_sources(runs[1]))
+    # The roster page is fetched on each run; nothing beyond it is (the
+    # registration-page reads went with the plan page, 2026-10-08).
+    assert len(fetches) == 2 and len(calls) == 1
+    assert "https://fixture.example/register" not in fetches
     source = S.get_sources(runs[1])[0]
-    assert source['metadata']['access_links'][0]['url'] == 'https://fixture.example/register'
     reuse = source['metadata']['extraction'][0]['reuse']
     assert reuse['origin_run_id'] == runs[0]
     assert S.get_participants(runs[1])[0]['evidence']['observed_roster_years'] == ['2027']

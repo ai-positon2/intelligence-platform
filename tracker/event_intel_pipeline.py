@@ -242,7 +242,6 @@ def _harvest_event(run_id: int, event_id: int, event: dict,
     except ValueError:
         cache_identity = None
     total_rows, readable, unreadable, recovered = 0, 0, 0, 0
-    access_links = []
     # One listing read once. "/exhibitors", "/exhibitors/" and "http://..."
     # were three pages, and 30 exhibitors came out as 90 participants (roster
     # audit, 2026-10-01); so were two addresses redirecting to one page.
@@ -298,11 +297,9 @@ def _harvest_event(run_id: int, event_id: int, event: dict,
                 saved_rows.add(k)
                 fresh.append(r)
         got = dict(got, rows=fresh)
-        if src["status"] == SOURCE_OK:
-            access_links.extend(src.get("access_links", []))
         store.save_source(run_id, event_id, src["url"], src["kind"], src["status"],
                           src.get("http_status"), src.get("rows_found", 0),
-                          src.get("note", ""), metadata={k:src[k] for k in ("agenda_excerpts", "access_links", "snapshots", "extraction", "coverage", "partial", "pages_read", "pages_seen", "pages_declared", "truncated", "expected_edition", "observed_roster_years", "profile_websites") if k in src})
+                          src.get("note", ""), metadata={k:src[k] for k in ("snapshots", "extraction", "coverage", "partial", "pages_read", "pages_seen", "pages_declared", "truncated", "expected_edition", "observed_roster_years", "profile_websites") if k in src})
         if src["status"] == SOURCE_OK:
             readable += 1
         else:
@@ -349,15 +346,6 @@ def _harvest_event(run_id: int, event_id: int, event: dict,
             fresh.append(r)
     if fresh:
         total_rows += store.save_participants(run_id, event_id, fresh)
-    if access_links:
-        from .event_intel_access_review import inspect
-        review = durable_stage('access-review:'+str(event_id), inspect, access_links,
-                               event.get('website') or host,
-                               str(event.get('starts_on') or event.get('edition') or ''))
-        for check in review['checks']:
-            store.save_source(run_id, event_id, check['url'], 'access_review', check['status'],
-                              note=check['note'], metadata={'access_review':check,
-                                  'access_review_scope':{k:v for k,v in review.items() if k != 'checks'}})
     return {"rows": total_rows, "readable": readable, "unreadable": unreadable,
             "recovered": recovered}
 

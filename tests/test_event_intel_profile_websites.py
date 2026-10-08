@@ -371,7 +371,7 @@ def test_the_header_links_sit_in_their_own_row():
     page = open(os.path.join(here, "templates", "event_conference_intelligence.html")).read()
     css = open(os.path.join(here, "static", "css", "event_conference_intelligence.css")).read()
     head = page[page.index('<div class="evi-drawer-head">'):page.index('id="drawerBody"')]
-    assert head.index('class="evi-drawer-actions"') < head.index('id="eventPlanLink"')
+    assert head.index('class="evi-drawer-actions"') < head.index('id="eventExportLink"')
     assert ".evi-drawer-actions .evi-btn[hidden] { display: none; }" in css
     assert "text-decoration: none" in css[css.index(".evi-drawer-actions .evi-btn {"):][:300]
 

@@ -1,5 +1,14 @@
 # Event intelligence Phase 3: plans and reported results
 
+> **Removed on 2026-10-08.** The plan and results page, its routes, the
+> planning, fit, access-review and plan-review modules, and the harvest-time
+> reads that fed them (organizer access links, agenda excerpts, up to four
+> registration-page reads per lookup) were all removed. This document is kept
+> as history. The `evi_execution_plans` table was left in the database
+> untouched; nothing reads or writes it now. Older lookup runs still carry
+> `access_review` sources, which the report and roster counts keep filtering
+> out.
+
 The first increment adds a plan and results page to completed lookup and recommendation reports. It is scoped to Event & Conference Intelligence. Phase 3 is not complete, and Phase 2's live Position2 benchmark and independent relevance review remain open.
 
 ## Behavior

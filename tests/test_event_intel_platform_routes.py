@@ -24,7 +24,7 @@ SAME = {"Origin": "http://localhost", "Referer": "http://localhost" + BASE}
 
 sql = pytest.mark.skipif(not os.getenv("DATABASE_URL"), reason="requires disposable PostgreSQL")
 
-POST_ROUTES = ["/run", "/runs/1/cancel", "/runs/1/resolve", "/runs/1/plan", "/outcomes",
+POST_ROUTES = ["/run", "/runs/1/cancel", "/runs/1/resolve", "/outcomes",
                "/profiles", "/profiles/1", "/profiles/draft"]
 
 
