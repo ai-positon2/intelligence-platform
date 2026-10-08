@@ -104,7 +104,28 @@ def test_a_successful_search_reports_results_charge_and_page_fields():
     assert out["charged_usd"] == 0.00255
     assert out["fields_seen"] == ["organicResults", "relatedQueries", "searchQuery"]
     actor, _, params = api.started_with
-    assert actor == mrs.ACTOR and params["maxTotalChargeUsd"] == "0.05"
+    assert actor == mrs.ACTOR
+    assert params["maxTotalChargeUsd"] == "0.50"          # never below Apify's minimum
+    assert out["booked_usd"] == 0.0047                     # 1 page at $0.0045 + start events
+
+
+def test_apify_cap_is_never_below_the_actors_minimum_or_the_booking():
+    api = FakeApify()
+    mrs.search(["q"], token="t", api=api, sleep=lambda s: None, apify_cap_usd="0.05")
+    assert api.started_with[2]["maxTotalChargeUsd"] == "0.50"
+    api = FakeApify()
+    mrs.search(["q"] * 50, token="t", api=api, sleep=lambda s: None, apify_cap_usd="1.00")
+    assert api.started_with[2]["maxTotalChargeUsd"] == "1.00"
+    assert mrs.booking_usd(50) == mrs.Decimal("0.2252")
+
+
+def test_a_refused_start_keeps_apifys_explanation(monkeypatch):
+    class Resp:
+        status_code, text = 400, '{"error":{"type":"invalid-input","message":"maxTotalChargeUsd too low"}}'
+    monkeypatch.setattr(mrs.requests, "post", lambda *a, **k: Resp())
+    out = mrs.search(["q"], token="t", sleep=lambda s: None)
+    assert out["start"] == "refused"
+    assert "maxTotalChargeUsd too low" in out["error"] and "HTTP 400" in out["error"]
 
 
 def test_a_run_that_never_finishes_is_aborted_and_its_charge_still_read():
@@ -148,21 +169,21 @@ def test_an_unanswered_start_counts_at_its_booking(world):
     out = go(FakeApify(start_error=requests.Timeout("read timed out")), run_id=world["run"])
     s = ledger.summary(world["run"])
     assert out["start"] == "unknown"
-    assert s["partial"] and s["total_usd"] == 0.05      # the run may exist and may have charged
+    assert s["partial"] and s["total_usd"] == 0.0047    # the run may exist and may have charged
 
 
 def test_a_run_whose_charge_cannot_be_read_counts_at_its_booking(world):
     out = go(FakeApify(charge=None), run_id=world["run"])
     s = ledger.summary(world["run"])
-    assert out["charged_usd"] is None and s["partial"] and s["total_usd"] == 0.05
+    assert out["charged_usd"] is None and s["partial"] and s["total_usd"] == 0.0047
 
 
 def test_a_search_that_could_pass_the_cap_never_starts(world):
     ledger.reserve(world["run"], "earlier", "anthropic", model="claude-sonnet-5-5",
-                   prompt_tokens=30_000, max_output_tokens=0)                  # $0.06 of $0.10
+                   prompt_tokens=48_000, max_output_tokens=0)                  # $0.096 of $0.10
     api = FakeApify()
     with pytest.raises(ledger.BudgetExceeded):
-        go(api, run_id=world["run"])                                          # books $0.05
+        go(api, run_id=world["run"])                                          # books $0.0047
     assert api.started_with is None
 
 

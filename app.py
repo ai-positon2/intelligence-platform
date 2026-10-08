@@ -8819,9 +8819,10 @@ def admin_external_usage_market_radar_apify_check():
     """Market Radar Phase 0: ONE real Google search (one query, one results
     page) on the platform's own Apify account, to measure what it costs and
     what comes back. This SPENDS MONEY (about $0.003 on the Starter plan), so
-    the body must carry {"confirm_spend": true}; Apify is capped at $0.05 for
-    the run and the charge is written to the Market Radar cost ledger under a
-    labelled test company."""
+    the body must carry {"confirm_spend": true}. The ledger books the worst
+    case (about half a cent), Apify's own backstop cap is its $0.50 minimum,
+    and the charge Apify reports is written to the Market Radar cost ledger
+    under a labelled test company."""
     if not _evi_same_origin():
         return jsonify(error="This request came from another site and was refused."), 403
     if (request.get_json(silent=True) or {}).get("confirm_spend") is not True:

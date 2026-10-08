@@ -3,10 +3,11 @@ account (apify/google-search-scraper). No new search vendor, account or card.
 
 Every search goes through the cost ledger when given a run:
 
-  * the call is booked at `max_charge_usd` before it starts, against the
-    run's cap (tracker/market_radar_ledger.py);
-  * Apify is told the same limit (maxTotalChargeUsd), so the vendor stops
-    charging there too, not just our bookkeeping;
+  * the call is booked at its worst case (booking_usd) before it starts,
+    against the run's cap (tracker/market_radar_ledger.py);
+  * Apify is given a spending cap of its own (maxTotalChargeUsd), so the
+    vendor stops charging too, not just our bookkeeping (see below for why
+    the two limits differ);
   * afterwards the run's own `usageTotalUsd` (what the account actually
     pays, per Apify's API docs) replaces the booking. A run that reports no
     charge stays counted at its booking, never zero.
@@ -16,6 +17,17 @@ page on the Bronze/Starter tier ($0.0045 on Free), plus an "Actor Start"
 event of $0.00005 per GB of memory. One page holds about 10 results. The
 actor saves each page's HTML to a key-value store by default; that is turned
 off here, along with every paid add-on.
+
+Two different limits, on purpose:
+
+  * the LEDGER BOOKING is the real worst case for this many queries (every
+    page at the highest tier's price, plus start events): about half a cent
+    for one query. That is what counts against the run's $1.00 cap;
+  * APIFY'S OWN CAP (maxTotalChargeUsd) is only a backstop, and Apify
+    refuses (HTTP 400) any value below the actor's minimalMaxTotalChargeUsd,
+    which is $0.50 for this actor. The first live test sent $0.05 and was
+    refused for exactly that (2026-10-09, nothing charged). Booking $0.50 in
+    the ledger instead would let two searches use up a whole run's budget.
 """
 from __future__ import annotations
 
@@ -30,7 +42,9 @@ from . import apify_transport
 ACTOR = "apify/google-search-scraper"
 MAX_QUERIES_PER_CALL = 50
 MAX_QUERY_WORDS = 32                  # Google's own limit, per the actor's docs
-DEFAULT_MAX_CHARGE_USD = Decimal("0.05")
+APIFY_MIN_MAX_CHARGE_USD = Decimal("0.50")    # the actor's minimalMaxTotalChargeUsd
+PRICE_PER_PAGE_MAX_USD = Decimal("0.0045")     # the highest tier's price (Free)
+START_EVENTS_USD = Decimal("0.0002")           # 4 x $0.00005; the default run uses 1 GB
 SETTLE_SECONDS = 3                    # re-read the run after it ends: the charge can land late
 
 
@@ -51,7 +65,11 @@ class ApifyApi:
     def start(self, actor, run_input, params):
         url = "%s/acts/%s/runs" % (self.base, apify_transport._normalize_actor_id(actor))
         resp = requests.post(url, json=run_input, params=params, headers=self._h(), timeout=30)
-        resp.raise_for_status()
+        if resp.status_code >= 400:
+            # Keep Apify's own explanation: raise_for_status() alone gave only
+            # "400 Bad Request for url: ...", which hid why the run was refused.
+            raise requests.HTTPError("HTTP %s: %s" % (resp.status_code, (resp.text or "")[:400]),
+                                     response=resp)
         return resp.json()["data"]
 
     def run(self, run_id):
@@ -111,8 +129,13 @@ def organic_results(pages):
     return rows
 
 
+def booking_usd(n_queries):
+    """The most a search of n queries (one page each) can cost."""
+    return n_queries * PRICE_PER_PAGE_MAX_USD + START_EVENTS_USD
+
+
 def search(queries, *, token, country="us", search_language=None, run_id=None,
-           stage="search", max_charge_usd=DEFAULT_MAX_CHARGE_USD, timeout=180, api=None,
+           stage="search", apify_cap_usd=APIFY_MIN_MAX_CHARGE_USD, timeout=180, api=None,
            sleep=time.sleep):
     """Run the queries (one results page each) and return what came back, what
     it cost, and what the pages contained. Never raises on a vendor failure:
@@ -121,15 +144,18 @@ def search(queries, *, token, country="us", search_language=None, run_id=None,
     if not token:
         raise SearchError("APIFY_API_TOKEN is not set")
     api = api or ApifyApi(token)
+    booked = booking_usd(len(queries))
+    apify_cap_usd = max(Decimal(str(apify_cap_usd)), APIFY_MIN_MAX_CHARGE_USD, booked)
     started = time.monotonic()
     out = {"queries": queries, "status": None, "error": None, "apify_run_id": None,
-           "charged_usd": None, "charged_events": None, "max_charge_usd": float(max_charge_usd),
+           "charged_usd": None, "charged_events": None, "booked_usd": float(booked),
+           "apify_cap_usd": float(apify_cap_usd),
            "pages": 0, "results": [], "fields_seen": [], "elapsed_ms": None, "start": None}
 
     def go():
         try:
             run = api.start(ACTOR, build_input(queries, country, search_language),
-                            {"timeout": int(timeout), "maxTotalChargeUsd": str(max_charge_usd)})
+                            {"timeout": int(timeout), "maxTotalChargeUsd": str(apify_cap_usd)})
         except requests.HTTPError as e:
             # Apify answered and refused: no run exists, nothing was charged.
             out["error"] = "Apify refused the run: %s" % str(e)[:300]
@@ -175,7 +201,7 @@ def search(queries, *, token, country="us", search_language=None, run_id=None,
         return out
 
     from . import market_radar_ledger as ledger
-    with ledger.track(run_id, stage, "apify", reserved_usd=max_charge_usd) as call:
+    with ledger.track(run_id, stage, "apify", reserved_usd=booked) as call:
         timed()
         if out["charged_usd"] is not None:
             call.record(actual_usd=out["charged_usd"], units=out["pages"], error=out["error"])
