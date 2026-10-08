@@ -603,7 +603,7 @@
                       </span>
                     </span>
                     <span class="rs">
-                      <span class="evi-badge {{ r.status }}">{{ r.status }}</span>
+                      <span class="evi-badge {{ 'pick' if r.needs_pick else r.status }}">{{ 'pick one' if r.needs_pick else r.status }}</span>
                       <span class="rt"></span>
                     </span>
                   </button>
@@ -1011,13 +1011,15 @@
       if (count) count.textContent = String(list.querySelectorAll('.evi-run').length);
       decorateRuns();
     }
-    function setRunRowStatus(runId, status){
+    function setRunRowStatus(runId, status, needsPick){
       var list = document.getElementById('runsList');
       var row = list && typeof list.querySelector === 'function' && list.querySelector('[data-run="' + runId + '"]');
       if (!row) return;
       row.setAttribute('data-status', status);
       var b = row.querySelector('.evi-badge');
-      if (b) { b.className = 'evi-badge ' + status; b.textContent = status; }
+      // An ambiguous lookup is waiting on the reader, not broken.
+      if (b) { b.className = 'evi-badge ' + (needsPick ? 'pick' : status);
+               b.textContent = needsPick ? 'pick one' : status; }
     }
 
     /* ── reading a client's site to fill this form in ──────────────────
@@ -1808,7 +1810,7 @@
             paintProgress('running', mode, s.stage, s.started_at);
             if (s.status === 'complete' || s.status === 'failed') {
               stop();
-              try { setRunRowStatus(runId, s.status); } catch (e) {}
+              try { setRunRowStatus(runId, s.status, s.needs_pick); } catch (e) {}
               document.getElementById('runBtn').disabled = false;
               showRunning(false);
               openRun(runId);
@@ -6033,6 +6035,81 @@
        two differ in one place only: the drawer heading is the event in a
        lookup and the query in a discover, because a discover run had no one
        subject event. */
+    /* A name several events share. The lookup hands back the events it
+       found, and the reader picks one: a fresh lookup pinned to that event
+       (the server reads the pick back from this run by its position, so the
+       page only ever chooses among what the lookup found). */
+    function pickDay(iso){
+      var d = iso ? new Date(iso + 'T00:00:00') : null;
+      return d && !isNaN(d) ? d.toLocaleDateString('en-US', {month: 'short', day: 'numeric', year: 'numeric'}) : '';
+    }
+
+    function pickHtml(run){
+      var s = run.summary || {}, choices = s.choices || [];
+      var cards = choices.map(function(c, i){
+        var meta = [c.organizer, pickDay(c.starts_on) || c.edition, c.location].filter(Boolean);
+        var web = /^https?:\/\//i.test(c.website || '') ? c.website : '';
+        var host = web ? web.replace(/^https?:\/\/(www\.)?/i, '').split(/[\/?#]/)[0] : '';
+        return '<article class="evi-pick-card">' +
+          '<span class="pi">' + (i + 1) + '</span>' +
+          '<div class="pb"><div class="pn">' + esc(c.name) + '</div>' +
+          (meta.length ? '<div class="pm">' + meta.map(esc).join(' \u00b7 ') + '</div>' : '') +
+          (c.about ? '<p class="pa">' + esc(c.about) + '</p>' : '') +
+          '<div class="pf">' +
+          (web ? '<a class="pw" href="' + esc(web) + '" target="_blank" rel="noopener noreferrer">' + esc(host) + '</a>' : '') +
+          '<button type="button" class="evi-btn pgo" onclick="pickEvent(' + i + ', this)">Build this roster</button>' +
+          '</div></div></article>';
+      }).join('');
+      return '<section class="evi-pick">' +
+        '<div class="evi-pick-head"><span class="k">Which one did you mean?</span>' +
+        '<p>' + esc(run.error || '') + '</p></div>' +
+        '<div class="evi-pick-list">' + cards + '</div>' +
+        (s.choice_note ? '<details class="evi-pick-why"><summary>Why the lookup could not choose</summary><p>' +
+          esc(s.choice_note) + '</p></details>' : '') +
+        '<p class="evi-pick-none">None of these? Run the lookup again with the organiser or the city in the name.</p>' +
+        '</section>';
+    }
+
+    function pickEvent(i, btn){
+      var run = current;
+      var c = run && ((run.summary || {}).choices || [])[i];
+      if (!c || (btn && btn.disabled)) return;
+      if (btn) { btn.disabled = true; btn.textContent = 'Starting\u2026'; }
+      fetch(BASE + '/run', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({mode: 'lookup', pick: {run_id: run.id, index: i},
+                              request_key: crypto.randomUUID()})
+      }).then(function(r){ return r.json().then(function(j){ return {ok: r.ok, j: j}; }); })
+        .then(function(res){
+          if (!res.ok) throw new Error(res.j.error || 'The run could not be started.');
+          closeDrawer();
+          // The form shows the play that is running, with the picked event
+          // in it, so a run that fails hands back a form already filled in.
+          setMode('lookup');
+          var named = document.getElementById('eventName');
+          if (named) named.value = c.name;
+          document.getElementById('runBtn').disabled = true;
+          showRunning(true);
+          mountOrbsIn(document.getElementById('runningWrap'));
+          document.getElementById('runningText').textContent =
+            'Building the roster for ' + c.name + '.';
+          var note = document.getElementById('runningNote');
+          if (note) note.textContent = 'Runs in the background. You can close this page; the result appears under Your runs.';
+          paintProgress('running', 'lookup', null, new Date().toISOString());
+          startClocks();
+          try { addRunRow(res.j.run_id, 'lookup', c.name); } catch (e) {}
+          watch(res.j.run_id, 'lookup');
+          var card = document.getElementById('formCard');
+          if (card && card.scrollIntoView) card.scrollIntoView({block: 'start', behavior: 'smooth'});
+        })
+        .catch(function(err){
+          if (!btn) return;
+          btn.textContent = err.message || 'Could not start';
+          setTimeout(function(){ btn.disabled = false; btn.textContent = 'Build this roster'; }, 4000);
+        });
+    }
+    window.pickEvent = pickEvent;
+
     function render(run){
       var exportLink = document.getElementById('eventExportLink');
       // Only a finished report: a run still going has nothing to export.
@@ -6052,7 +6129,9 @@
           : eventLine(ev) + (ev.organizer ? ' · organised by ' + esc(orgName(ev.organizer)) : '');
 
       var html = '';
-      if (run.status === 'failed') {
+      if (run.status === 'failed' && (s.choices || []).length) {
+        html += pickHtml(run);
+      } else if (run.status === 'failed') {
         html += '<div class="evi-err">' + esc(run.error || 'This run failed.') + '</div>';
       }
       if (run.status === 'running') {

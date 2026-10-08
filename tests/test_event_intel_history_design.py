@@ -176,7 +176,7 @@ def test_a_started_run_joins_the_list_and_takes_its_final_status():
     assert "addRunRow(res.j.run_id, mode, runTitle(mode, body))" in start
     watch = src[src.index("    function watch(runId, mode){"):src.index("    function readingMode(on){")]
     done = watch[watch.index("if (s.status === 'complete' || s.status === 'failed') {"):]
-    assert done.index("setRunRowStatus(runId, s.status)") < done.index("openRun(runId)")
+    assert done.index("setRunRowStatus(runId, s.status, s.needs_pick)") < done.index("openRun(runId)")
     row = _fn(src, "addRunRow")
     for attr in ("data-run", "data-mode", "data-status", "data-created", "data-q"):
         assert "'%s'" % attr in row, attr

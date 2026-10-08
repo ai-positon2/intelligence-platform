@@ -9689,6 +9689,24 @@ def event_conference_intelligence_run():
         query = (events[0]["name"] if events else source.get("query")) or "event"
     else:
         query = str(payload.get("query") or "").strip()
+        pick = None
+        if isinstance(payload.get("pick"), dict):
+            # One of the events an ambiguous lookup offered. Read back from
+            # the reader's own stored run by position, never taken from the
+            # request: the pick goes into a model prompt, and the page is
+            # only allowed to choose among what the lookup itself found.
+            try:
+                from_run = int(payload["pick"].get("run_id") or 0)
+                index = int(payload["pick"].get("index"))
+            except (TypeError, ValueError):
+                from_run, index = 0, -1
+            offered = event_intel_store.get_run(from_run, email) if from_run else None
+            choices = ((offered or {}).get("summary") or {}).get("choices") or []
+            if not offered or offered.get("mode") != "lookup" or not 0 <= index < len(choices):
+                return jsonify({"error": "That event is no longer on offer. Run "
+                                         "the lookup again."}), 400
+            pick = choices[index]
+            query = pick.get("name") or ""
         if not query:
             return jsonify({"error": "An event name is required."}), 400
 
@@ -9716,6 +9734,7 @@ def event_conference_intelligence_run():
             "event_class": event_class if mode == "workroom" else None,
             "booth_notes": str(payload.get("booth_notes") or "")[:8000] if mode == "workroom" else None,
             "ends_on": str(payload.get("ends_on") or "").strip()[:10] or None,
+            "pick": pick if mode == "lookup" else None,
         }, payload.get('request_key') or str(uuid.uuid4()))
     except ValueError as exc:
         return jsonify(error=str(exc)), 400
@@ -9758,7 +9777,11 @@ def event_conference_intelligence_status(run_id):
     return jsonify({"run_id": run_id, "status": run["status"],
                     "stage": run.get("stage"), "error": run.get("error"),
                     "credits_spent": run.get("credits_spent", 0),
-                    "started_at": run.get("created_at")})
+                    "started_at": run.get("created_at"),
+                    # An ambiguous lookup ends waiting on the reader's pick,
+                    # so its row says that rather than "failed".
+                    "needs_pick": bool((run.get("summary") or {}).get("choices"))
+                    if run.get("status") == "failed" else False})
 
 
 @app.route("/p2/strategic-agents/event-conference-intelligence/runs/<int:run_id>")

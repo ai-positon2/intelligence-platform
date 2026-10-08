@@ -810,6 +810,10 @@
 .evi-layout .evi-run .evi-badge {
   font-size: 9px; letter-spacing: .08em; padding: 3px 7px;
 }
+/* An ambiguous lookup is waiting on the reader's pick, not broken. */
+.evi-layout .evi-run .evi-badge.pick {
+  background: color-mix(in srgb, var(--i-warn) 14%, transparent); color: var(--i-warn);
+}
 .evi-layout .evi-run .evi-badge.complete {
   background: transparent; color: color-mix(in srgb, var(--i-ok) 85%, var(--i-ink-3)); padding-right: 0;
 }

@@ -618,7 +618,13 @@ def list_runs(email: str, limit: int = 60) -> list[dict]:
                 "  (SELECT e.name FROM evi_events e "
                 "   WHERE e.run_id = COALESCE(r.source_run_id, r.id) "
                 "   ORDER BY e.id LIMIT 1) AS event_name, "
-                "  r.source_run_id "
+                "  r.source_run_id, "
+                # CASE, not AND: Postgres may evaluate either side of an AND
+                # first, and jsonb_array_length raises on a non-array.
+                "  CASE WHEN r.status = 'failed' "
+                "        AND jsonb_typeof(r.summary->'choices') = 'array' "
+                "       THEN jsonb_array_length(r.summary->'choices') > 0 "
+                "       ELSE false END AS needs_pick "
                 "FROM evi_runs r WHERE r.email = %s "
                 "ORDER BY r.created_at DESC LIMIT %s", (email, limit))
             cols = [c[0] for c in cur.description]

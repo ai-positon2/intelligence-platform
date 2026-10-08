@@ -430,9 +430,31 @@ def _summarise(run_id: int) -> dict:
     }
 
 
-def _run_lookup(run_id: int, query: str, year_hint: str | None) -> None:
+def _run_lookup(run_id: int, query: str, year_hint: str | None,
+                pick: dict | None = None) -> None:
     store.update_run(run_id, stage="resolving")
-    res = durable_stage("resolve", event_intel_resolve.resolve_event, query, year_hint)
+    # The pick is passed only when there is one, so an ordinary lookup keeps
+    # the same stage key it always had and an interrupted run still replays.
+    res = durable_stage("resolve", event_intel_resolve.resolve_event, query, year_hint,
+                        *((pick,) if pick else ()))
+    if not res.get("ok") and res.get("choices"):
+        # A name several events share. The lookup found them, so the reader
+        # picks one (the drawer shows them) rather than being told to guess
+        # a better name. Still `failed`: nothing was harvested, and every
+        # place that waits on a run treats complete/failed as the end.
+        store.update_run(run_id, status="failed", stage="resolving",
+                         error=(("\u201c%s\u201d matches more than one event. Pick "
+                                 "the one you meant and the roster will be built "
+                                 "for it." if len(res["choices"]) > 1 else
+                                 "\u201c%s\u201d did not match one event exactly. "
+                                 "The lookup found a close match: if it is the one "
+                                 "you meant, pick it and the roster will be built "
+                                 "for it.") % query),
+                         summary={"confidence": res.get("confidence"),
+                                  "choices": res["choices"],
+                                  "choice_note": res.get("reasoning") or None,
+                                  "roster_note": ROSTER_NOTE})
+        return
     if not res.get("ok"):
         # A named event we could not pin to one edition has nothing safe to
         # harvest. Failing here beats returning a convincing roster for the
@@ -1064,7 +1086,7 @@ def run_job(run_id: int, mode: str, query: str, **kwargs) -> None:
                        "this leftover one will not run now."))
             return
         else:
-            _run_lookup(run_id, query, kwargs.get("year_hint"))
+            _run_lookup(run_id, query, kwargs.get("year_hint"), kwargs.get("pick"))
     except Exception as e:
         logger.exception("event_intel_pipeline: run %s crashed", run_id)
         from .event_intel_jobs import reader_failure

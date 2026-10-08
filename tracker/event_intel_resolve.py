@@ -96,7 +96,14 @@ _SYSTEM = (
     "4. Do not report an attendee list unless the event genuinely publishes "
     "one openly. Almost none do. An exhibitor directory is NOT an attendee "
     "list, a sponsor page is NOT an attendee list, and a registration page is "
-    "not one either. Leaving `pages` short is the correct answer.\n\n"
+    "not one either. Leaving `pages` short is the correct answer.\n"
+    "5. When you set confidence \"low\" or \"none\", list in `choices` the "
+    "real events you found whose names are the same as, or close to, what "
+    "the user typed, so the user can pick the one they meant: at most 6, the "
+    "likeliest first. Each must be a DIFFERENT event (two editions of one "
+    "event are one choice), with the official website you actually found for "
+    "it and one sentence in `about` saying who runs it and who it is for. "
+    "Leave `choices` empty when you are confident.\n\n"
     "Respond with ONLY a JSON object, no prose before or after:\n"
     '{"confidence": "high"|"medium"|"low"|"none", "reasoning": str, '
     '"name": str|null, "edition": str|null, "website": str|null, '
@@ -107,7 +114,10 @@ _SYSTEM = (
     '"organizer_run": true|false, "matchmaking_evidence": str|null, '
     '"country": str|null, "city": str|null, "availability": "open"|"sold_out"|"cancelled"|"unknown", "availability_source": str|null, '
     '"pages": [{"url": str, "kind": "exhibitors"|"sponsors"|"speakers"|'
-    '"agenda"|"partners"|"attendees", "note": str}]}\n\n'
+    '"agenda"|"partners"|"attendees", "note": str}], '
+    '"choices": [{"name": str, "organizer": str|null, "edition": str|null, '
+    '"starts_on": "YYYY-MM-DD"|null, "location": str|null, "website": str, '
+    '"about": str}]}\n\n'
     "`stated_size` is the event's OWN published attendance claim, quoted as "
     "they state it (\"12,000+ attendees\"), or null. Never estimate one. "
     "`matchmaking_evidence` quotes or closely paraphrases what the ORGANISER "
@@ -162,10 +172,67 @@ def _clean_pages(raw) -> list[dict]:
 
 def _failed(confidence: str, reasoning: str) -> dict:
     return {"ok": False, "confidence": confidence, "reasoning": reasoning,
-            "event": None, "pages": [], "error": None}
+            "event": None, "pages": [], "error": None, "choices": []}
 
 
-def resolve_event(query: str, year_hint: str | None = None) -> dict:
+MAX_CHOICES = 6
+
+
+def _clean_choices(raw) -> list[dict]:
+    """The events an ambiguous lookup found, for the reader to pick from.
+
+    Only an entry with a name and a real http(s) website survives: the
+    website is what pins the follow-up lookup to that one event, and a
+    choice without one would send it straight back into the ambiguity.
+    Deduped by website, because two editions of one event are one choice.
+    """
+    from urllib.parse import urlparse
+    clean = claude_websearch.strip_em_dash
+    out, seen = [], set()
+    for c in raw if isinstance(raw, list) else []:
+        if not isinstance(c, dict):
+            continue
+
+        def field(key, cap=200):
+            v = c.get(key)
+            return "" if v is None or isinstance(v, (dict, list)) else clean(str(v).strip())[:cap]
+        name, website = field("name"), str(c.get("website") or "").strip()[:500]
+        site = urlparse(website)
+        if not name or site.scheme not in ("http", "https") or not site.hostname:
+            continue
+        if _url_key(website) in seen:
+            continue
+        seen.add(_url_key(website))
+        starts = field("starts_on", 10)
+        try:
+            starts = datetime.date.fromisoformat(starts).isoformat()
+        except ValueError:
+            starts = None
+        out.append({"name": name, "website": website,
+                    "organizer": organizer_name(field("organizer")) or None,
+                    "edition": field("edition") or None, "starts_on": starts,
+                    "location": field("location") or None,
+                    "about": field("about", 300) or None})
+        if len(out) == MAX_CHOICES:
+            break
+    return out
+
+
+def pick_note(pick: dict) -> str:
+    """The prompt lines that pin a lookup to the event the reader picked."""
+    lines = ["%s: %s" % (label, pick.get(key)) for key, label in (
+        ("name", "Name"), ("organizer", "Organiser"), ("edition", "Edition"),
+        ("starts_on", "Starts"), ("location", "Location"), ("website", "Website"))
+        if pick.get(key)]
+    return ("\nSeveral events share this name. The user was shown the ones a "
+            "previous lookup found and picked THIS one:\n" + "\n".join(lines) +
+            "\nResolve this event and no other event that shares its name. "
+            "Start from its website above. If it runs several editions, apply "
+            "rule 1 to this event's own editions.")
+
+
+def resolve_event(query: str, year_hint: str | None = None,
+                  pick: dict | None = None) -> dict:
     """Find one named event, and report what the lookup cost.
 
     A thin wrapper for the same reason `event_intel_discover.confirm_event`
@@ -174,12 +241,13 @@ def resolve_event(query: str, year_hint: str | None = None) -> dict:
     is refused, and the refused ones are the version worth being able to see.
     """
     box = {}
-    out = _resolve_event(query, year_hint, box)
+    out = _resolve_event(query, year_hint, box, pick)
     out["spend"] = box.get("spend") or claude_websearch.spend_sum()
     return out
 
 
-def _resolve_event(query: str, year_hint: str | None, box: dict) -> dict:
+def _resolve_event(query: str, year_hint: str | None, box: dict,
+                   pick: dict | None = None) -> dict:
     """Resolve one named event. Never raises.
 
     Returns {"ok": bool, "confidence": str, "reasoning": str,
@@ -201,6 +269,8 @@ def _resolve_event(query: str, year_hint: str | None, box: dict) -> dict:
             "on or after that date." % (query, datetime.date.today().isoformat()))
     if year_hint:
         user += "\nEdition/year the user is asking about: %s" % year_hint
+    if pick:
+        user += pick_note(pick)
 
     # max_tokens raised 6000 -> 9000. Same live-run evidence as the budgets
     # in event_intel_discover and event_intel_audit: with web_search on, the
@@ -276,10 +346,17 @@ def _resolve_event(query: str, year_hint: str | None, box: dict) -> dict:
     parsed_site = urlparse(website)
     if confidence not in _MIN_CONFIDENCE or not name or parsed_site.scheme not in ('http','https') or not parsed_site.hostname:
         # Deliberately not downgraded into a partial result. A named event we
-        # could not pin to one edition has nothing safe to harvest.
-        return _failed(confidence if confidence in
-                       ("high", "medium", "low", "none") else "none",
-                       reasoning or "The event could not be identified confidently.")
+        # could not pin to one edition has nothing safe to harvest. What it
+        # can do is hand back the events it did find, so the reader picks
+        # one instead of retyping the name and paying for the same search.
+        # A lookup that was already pinned to a pick offers no second list:
+        # that would be a loop with a bill attached.
+        out = _failed(confidence if confidence in
+                      ("high", "medium", "low", "none") else "none",
+                      reasoning or "The event could not be identified confidently.")
+        if not pick:
+            out["choices"] = _clean_choices(parsed.get("choices"))
+        return out
 
     # Every free-text field the model wrote here (not `website`, not the
     # dates) goes through strip_em_dash: this event dict is what a promoted
