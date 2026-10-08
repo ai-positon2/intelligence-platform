@@ -1280,6 +1280,9 @@ def google_results(event: dict, run=None) -> dict:
     except Exception as e:
         logger.warning("event_intel_attendees: Google search failed: %s", e)
         out["error"] = "search_failed"
+        # Kept on the report, as the browser's is: "search_failed" alone
+        # left a live failure (run 43, 2026-10-08) with no cause to read.
+        out["detail"] = str(e)[:300]
         return out
     for page in pages:
         if not isinstance(page, dict):
@@ -1412,6 +1415,7 @@ def search_web(event: dict, event_host: str = "", today: date | None = None,
     else:
         out["via"] = "model"
         out["google_error"] = g.get("error") or "no_results"
+        out["google_detail"] = g.get("detail")
         with ThreadPoolExecutor(max_workers=len(WEB_ANGLES)) as pool:
             found = [f.result() for f in [
                 pool.submit(contextvars.copy_context().run, find_pages, event, a, today, ask)
@@ -1727,7 +1731,8 @@ def gather(event: dict, participants: list[dict], event_host: str = "",
                                               "on_event", "read", "not_read", "unread",
                                               "unopened", "rejected", "skipped", "error",
                                               "other_edition", "cut",
-                                              "google_error", "find_seconds", "seconds")}
+                                              "google_error", "google_detail",
+                                              "find_seconds", "seconds")}
     report["web"]["people"] = len(web.get("people") or [])
     people.extend(staff.get("people") or [])
     report["staff"] = {"companies": staff.get("companies", 0), "skipped": staff.get("skipped", 0),

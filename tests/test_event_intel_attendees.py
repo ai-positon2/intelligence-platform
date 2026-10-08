@@ -1144,7 +1144,8 @@ def test_google_results_are_read_off_every_results_page():
 
     def boom(qs):
         raise RuntimeError("actor failed")
-    assert A.google_results(EVENT, run=boom)["error"] == "search_failed"
+    failed = A.google_results(EVENT, run=boom)
+    assert failed["error"] == "search_failed" and failed["detail"] == "actor failed"
 
 
 def test_results_naming_the_event_and_found_by_more_searches_are_opened_first():
@@ -1360,3 +1361,21 @@ def test_an_actor_run_cut_off_still_hands_back_its_dataset(monkeypatch):
     assert out["items"] == [{"url": "u", "text": "t"}] and "did not finish" in out["error"]
     assert posted[0][1] == {"timeout": 60, "memory": 8192}  # Apify stops the run itself
     assert posted[1][0].endswith("/actor-runs/run1/abort")  # and a run still going is stopped
+
+
+def test_a_failed_google_search_keeps_its_reason_on_the_report():
+    def ask(system, user, **kw):
+        return {"text": "{}", "error": None, "result_urls": []}
+    out = A.search_web(EVENT, ask=ask, fetch=lambda u: {},
+                       google=lambda e: {"results": [], "error": "search_failed",
+                                         "detail": "run ended with status TIMED-OUT"})
+    assert out["google_detail"] == "run ended with status TIMED-OUT"
+    src = open(A.__file__).read()
+    assert '"google_error", "google_detail",' in src
+
+
+def test_the_worker_names_the_keys_it_is_missing():
+    from tracker import event_intel_jobs as J
+    assert J.missing_keys({"ANTHROPIC_API_KEY": "k", "APIFY_API_TOKEN": " ", "UNIPILE_DSN": "d"}) == [
+        "APIFY_API_TOKEN", "UNIPILE_API_KEY"]
+    assert J.missing_keys({k: "x" for k in J.WORKER_KEYS}) == []

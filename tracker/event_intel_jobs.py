@@ -620,12 +620,30 @@ def ledger(run_id,email,replies=False):
         return job
 
 
+# What the worker's research reads. This worker is its own Railway service
+# with its own variables: on 2026-10-08 it had none of the Apify or Unipile
+# keys the web service had, so every roster run skipped LinkedIn, X, Google
+# and the browser and still finished. Said once, loudly, at start.
+WORKER_KEYS = ("ANTHROPIC_API_KEY", "APIFY_API_TOKEN", "UNIPILE_API_KEY", "UNIPILE_DSN")
+
+
+def missing_keys(env=None) -> list:
+    env = os.environ if env is None else env
+    return [k for k in WORKER_KEYS if not (env.get(k) or "").strip()]
+
+
 def main():
     import argparse
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--migrate', action='store_true', help='Initialize the schema and exit')
     parser.add_argument('--once', action='store_true', help='Process at most one job and exit')
     args = parser.parse_args()
+    missing = missing_keys()
+    if missing:
+        import logging
+        logging.warning("Event worker is missing %s: those research steps will be "
+                        "skipped on every run. Set them on this service, not only "
+                        "on the web service.", ", ".join(missing))
     if args.migrate:
         with db():
             pass
