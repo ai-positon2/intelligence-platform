@@ -326,7 +326,7 @@ def checks(site, p):
     if unsourced:
         out.append("%d evidence quote(s) cite a page that was not read." % len(unsourced))
     unfound = [e for e in p.get("evidence", []) if _u(e.get("url")) in texts
-               and _norm(e.get("quote")) and _norm(e["quote"]) not in _norm(texts[_u(e["url"])])]
+               and _norm(e.get("quote")) and not _quote_on_page(e["quote"], texts[_u(e["url"])])]
     if unfound:
         out.append("%d evidence quote(s) do not appear on the page they cite." % len(unfound))
     return out
@@ -336,10 +336,20 @@ def _u(url):
     return (url or "").strip().rstrip("/").lower()
 
 
-def _norm(text):
+def _quote_on_page(quote, text):
+    """Is the quote on the page? Matched with the reader's link addresses
+    removed (a quote can run across a link's label) and kept (the model may
+    quote a link itself: gymshark.com's "uk.linkedin.com/company/gymshark")."""
+    q = _norm(quote)
+    return q in _norm(text) or q in _norm(text, keep_links=True)
+
+
+def _norm(text, keep_links=False):
     """Text for quote matching: link targets the reader appended ("[https://...]")
     removed, punctuation and case ignored."""
-    text = re.sub(r"\[(?:https?:|mailto:|tel:)[^\]]*\]", " ", text or "")
+    text = text or ""
+    if not keep_links:
+        text = re.sub(r"\[(?:https?:|mailto:|tel:)[^\]]*\]", " ", text)
     return " ".join(re.sub(r"[^\w\s]", " ", text.lower()).split())
 
 

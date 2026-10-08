@@ -314,3 +314,25 @@ def test_homepage_access_route_runs_only_the_matrix(monkeypatch):
     resp = _client(ADMIN).post(ROUTE, json={"homepages": ["a.example", "b.example"]})
     assert resp.status_code == 200 and resp.get_json() == {"homepages": [{"site": "a.example"},
                                                                          {"site": "b.example"}]}
+
+
+def test_reader_variants_try_keepalive_tls_and_plain_requests(monkeypatch):
+    from tracker import event_intel_http
+    calls = []
+
+    class R:
+        status_code = 429
+
+        def close(self):
+            pass
+
+    def fake_public_get(url, timeout, stream, headers, ssl_context=None):
+        calls.append((headers.get("Connection"), ssl_context is not None))
+        return R()
+
+    monkeypatch.setattr(event_intel_http, "public_get", fake_public_get)
+    monkeypatch.setattr(mrp, "_fetch", lambda url, **kw: res(200, "<p>ok</p>"))
+    out = mrp.reader_variants("https://shop.example/")
+    assert calls == [("keep-alive", False), (None, True)]
+    assert out["pinned_keepalive"] == {"status": 429} and out["pinned_urllib3_tls"] == {"status": 429}
+    assert out["requests_reader_headers"] == {"status": 200, "verdict": "ok"}

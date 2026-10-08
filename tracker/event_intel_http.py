@@ -61,7 +61,7 @@ def public_addresses(host, port):
     return addresses
 
 
-def public_get(url, *, timeout=20, stream=True, headers=None):
+def public_get(url, *, timeout=20, stream=True, headers=None, ssl_context=None):
     """Connect to the validated IP, retaining the original TLS hostname.
 
     No environment proxy is used. Every redirect resolves and validates anew.
@@ -82,7 +82,8 @@ def public_get(url, *, timeout=20, stream=True, headers=None):
         address = public_addresses(host, port)[0]
         if target.scheme == 'https':
             pool = urllib3.HTTPSConnectionPool(address, port=port,
-                server_hostname=host, assert_hostname=host, ssl_context=ssl.create_default_context())
+                server_hostname=host, assert_hostname=host,
+                ssl_context=ssl_context or ssl.create_default_context())
         else:
             pool = urllib3.HTTPConnectionPool(address, port=port)
         req_headers = dict(headers or {}, Host=target.netloc)

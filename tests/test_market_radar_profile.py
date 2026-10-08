@@ -701,6 +701,7 @@ def test_page_titles_head_the_text_so_quoted_titles_verify(web):
     out = site.read_site("https://t.example/")
     text = out["texts"]["https://t.example/"]
     assert text.startswith("TITLE: Gymshark Official Store - Gym Clothes\n")
+    assert "DESCRIPTION" not in text      # no meta description on this page
     quote = {"field": "name", "quote": "Gymshark Official Store - Gym Clothes", "url": "https://t.example/"}
     p = dict(GOOD, evidence=[quote])
     assert prof.checks(dict(site_for(), texts=out["texts"], pages=out["pages"]), p) == []
@@ -809,3 +810,16 @@ def test_wayback_latest_reads_the_newest_capture(monkeypatch):
     assert site.wayback_latest("https://a.example/") is None
     monkeypatch.setattr(site, "fetch_text", lambda url, limit=0: None)
     assert site.wayback_latest("https://a.example/") is None
+
+
+def test_a_quoted_meta_description_or_link_address_verifies():
+    # gymshark.com: its tagline is its meta description; its HQ evidence a link.
+    d = site.parse_html('<html><head><title>T</title><meta name="description" content="Shop gym clothing for the gym, running &amp; everything in-between."></head><body>x</body></html>')
+    text = site.page_head(d) + "Follow us LinkedIn [https://uk.linkedin.com/company/gymshark]"
+    s = site_for(texts={"https://acme.example/": text})
+    for quote in ("Shop gym clothing for the gym, running & everything in-between.",
+                  "uk.linkedin.com/company/gymshark"):
+        p = dict(GOOD, evidence=[{"field": "x", "quote": quote, "url": "https://acme.example/"}])
+        assert prof.checks(s, p) == [], quote
+    p = dict(GOOD, evidence=[{"field": "x", "quote": "Best gym in Leeds", "url": "https://acme.example/"}])
+    assert prof.checks(s, p) == ["1 evidence quote(s) do not appear on the page they cite."]

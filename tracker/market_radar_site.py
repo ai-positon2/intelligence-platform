@@ -802,6 +802,21 @@ def choose_home(url):
     return home, notes
 
 
+def page_head(doc):
+    """A page's <title> and meta description, as lines heading its text.
+    Both are real page content the model quotes (Gymshark's name came from
+    its title, its tagline from its description), and a quote check that
+    cannot see them reports a true quote as invented."""
+    lines = []
+    title = " ".join(doc.title.split())
+    if title:
+        lines.append("TITLE: " + title)
+    desc = " ".join((doc.meta.get("description") or doc.meta.get("og:description") or "").split())
+    if desc:
+        lines.append("DESCRIPTION: " + desc)
+    return "".join(line + "\n" for line in lines)
+
+
 def read_site(url):
     """Read a company's homepage and up to MAX_EXTRA_PAGES of its own pages.
     Returns {"home_url", "domain", "pages", "signals", "country", ...}.
@@ -871,11 +886,7 @@ def read_site(url):
         if page["status"] == "ok":
             docs.append((kind, page, parse_html(page["html"])))
 
-    # Each page's <title> heads its text: titles are real page content the
-    # model quotes (Gymshark's name came from its title), and a quote check
-    # that cannot see them reports a true quote as invented.
-    out["texts"] = {p["final_url"]: ("TITLE: %s\n" % " ".join(d.title.split()) if d.title.strip() else "")
-                    + p["text"] for _, p, d in docs}
+    out["texts"] = {p["final_url"]: page_head(d) + p["text"] for _, p, d in docs}
     out["signals"] = signals_from(docs, home_url)
     sitemap = None if refused else read_sitemap(home_url, sitemaps)
     out["signals"]["sitemap"] = sitemap

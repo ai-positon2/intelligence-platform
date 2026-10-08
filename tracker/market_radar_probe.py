@@ -441,6 +441,7 @@ def homepage_access(urls):
         page = site_reader.fetch(url if urlsplit(url).path else url + "/")
         row["current_reader"] = {"status": page["http_status"], "outcome": page["status"],
                                  "words": len(page["text"].split())}
+        row.update(reader_variants(url if urlsplit(url).path else url + "/"))
         row["browser_headers"] = _status_only(url, BROWSER_HEADERS)
         row["bot_ua_accept_any"] = _status_only(url, {"User-Agent": site_reader.UA, "Accept": "*/*"})
         meta = _fetch(url.rstrip("/") + "/meta.json", ua=BROWSER_UA,
@@ -462,3 +463,41 @@ def homepage_access(urls):
             row["wayback_latest"] = {"status": cdx["status"], "verdict": verdict(cdx)}
         out.append(row)
     return out
+
+
+def reader_variants(url):
+    """The reader's own request made three other ways, to isolate why a site
+    answers it 429 when a plain `requests` call with the same user agent gets
+    200 (three Shopify stores from Railway, 2026-10-09): a keep-alive header,
+    urllib3's own TLS settings instead of ssl.create_default_context(), and
+    plain `requests` with exactly the reader's headers."""
+    from tracker import market_radar_site as site_reader
+    from tracker.event_intel_http import public_get
+    base = {"User-Agent": site_reader.UA, "Accept": "*/*", "Accept-Encoding": "gzip, deflate"}
+
+    def via_public_get(headers, ctx=None):
+        try:
+            r = public_get(url, timeout=15, stream=True, headers=headers, ssl_context=ctx)
+            try:
+                return {"status": r.status_code}
+            finally:
+                r.close()
+        except Exception as e:
+            return {"status": None, "error": "%s: %s" % (type(e).__name__, str(e)[:120])}
+
+    out = {
+        "pinned_keepalive": via_public_get(dict(base, Connection="keep-alive")),
+        "pinned_urllib3_tls": via_public_get(base, _urllib3_context()),
+    }
+    res = _fetch(url, ua=site_reader.UA, headers=base, timeout=15)
+    out["requests_reader_headers"] = {"status": res["status"], "verdict": verdict(res)}
+    return out
+
+
+def _urllib3_context():
+    """The TLS settings `requests` uses (urllib3's context with certifi's CAs)."""
+    import certifi
+    from urllib3.util.ssl_ import create_urllib3_context
+    ctx = create_urllib3_context()
+    ctx.load_verify_locations(certifi.where())
+    return ctx
