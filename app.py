@@ -8773,6 +8773,23 @@ def admin_external_usage_sci_reddit_check():
     return jsonify(_sci_reddit_selftest())
 
 
+@app.route("/p2/admin/external-usage/market-radar-sources-check", methods=["POST"])
+@admin_required
+def admin_external_usage_market_radar_sources_check():
+    """Market Radar Phase 0: which free sources answer from this server's IP,
+    Google News above all (see tracker/market_radar_probe). POST so no crawler
+    or prefetch can trigger it; refused when the browser says it came from
+    another site, since each run sends about 60 requests to outside hosts.
+    Takes up to about a minute."""
+    if not _evi_same_origin():
+        return jsonify(error="This request came from another site and was refused."), 403
+    from tracker import market_radar_probe
+    try:
+        return jsonify(market_radar_probe.probe())
+    except Exception as e:
+        return jsonify(error="%s: %s" % (type(e).__name__, str(e)[:300])), 500
+
+
 def _unipile_selftest() -> dict:
     """Prove the Unipile integration end to end -- see
     tracker/unipile_client.probe. Free: list_accounts() needs no connected
