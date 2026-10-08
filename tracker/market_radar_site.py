@@ -496,6 +496,25 @@ def geo_redirect(requested, final):
 
 # == fetching ======================================================================
 
+_TLS = []
+
+
+def tls_context():
+    """The TLS settings `requests` uses: urllib3's context with certifi's
+    certificates. Measured from Railway (2026-10-09), with the same address,
+    user agent and headers: three Shopify stores answered 429 to a connection
+    made with ssl.create_default_context() and 200 to one made with these
+    settings, so their edge tells the two handshakes apart. Built once; an
+    SSLContext is safe to share between connections."""
+    if not _TLS:
+        import certifi
+        from urllib3.util.ssl_ import create_urllib3_context
+        ctx = create_urllib3_context()
+        ctx.load_verify_locations(certifi.where())
+        _TLS.append(ctx)
+    return _TLS[0]
+
+
 def fetch(url):
     """One page, raw HTML and readable text, classified. Never raises."""
     out = {"url": url, "final_url": url, "status": "error", "http_status": None,
@@ -506,7 +525,7 @@ def fetch(url):
         # it sent "Accept: text/html,application/xhtml+xml" and 200 when it
         # sent "*/*" with gzip (allbirds.com, snocks.com, insiderstore.com.br,
         # 2026-10-09). The Content-Type check below still refuses non-pages.
-        r = public_get(url, timeout=TIMEOUT, stream=True,
+        r = public_get(url, timeout=TIMEOUT, stream=True, ssl_context=tls_context(),
                        headers={"User-Agent": UA, "Accept": "*/*", "Accept-Encoding": "gzip, deflate"})
     except requests.Timeout:
         out["note"] = "timed out after %ss" % TIMEOUT
@@ -550,7 +569,7 @@ def fetch_text(url, limit=3_000_000):
     try:
         # Shopify's edge answers 403 to a request with no Accept header
         # (allbirds.com, snocks.com: robots.txt and sitemap.xml, 2026-10-09).
-        r = public_get(url, timeout=TIMEOUT, stream=True,
+        r = public_get(url, timeout=TIMEOUT, stream=True, ssl_context=tls_context(),
                        headers={"User-Agent": UA, "Accept": "*/*", "Accept-Encoding": "gzip"})
     except Exception:
         return None

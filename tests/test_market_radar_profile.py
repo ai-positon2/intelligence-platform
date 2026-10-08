@@ -666,8 +666,9 @@ def test_robots_and_sitemaps_are_requested_with_an_accept_header(monkeypatch):
         def close(self):
             pass
 
-    def fake_get(url, timeout, stream, headers):
+    def fake_get(url, timeout, stream, headers, ssl_context=None):
         seen.update(headers)
+        assert ssl_context is site.tls_context()
         return Resp() if headers.get("Accept") else SimpleNamespace(status_code=403, close=lambda: None)
 
     monkeypatch.setattr(site, "public_get", fake_get)
@@ -725,12 +726,15 @@ def test_pages_are_requested_as_ourselves_with_generic_accept_headers(monkeypatc
         def close(self):
             pass
 
-    def fake_get(url, timeout, stream, headers):
+    def fake_get(url, timeout, stream, headers, ssl_context=None):
         seen.update(headers)
+        seen["tls"] = ssl_context
         return Resp()
 
     monkeypatch.setattr(site, "public_get", fake_get)
     assert site.fetch("https://shop.example/")["status"] == "ok"
+    # requests' TLS settings: Shopify answered 429 to the stdlib default (Railway, 2026-10-09)
+    assert seen.pop("tls") is site.tls_context()
     assert seen == {"User-Agent": site.UA, "Accept": "*/*", "Accept-Encoding": "gzip, deflate"}
     assert "Position2-MarketRadar" in seen["User-Agent"]          # never a disguised browser
 
@@ -823,3 +827,11 @@ def test_a_quoted_meta_description_or_link_address_verifies():
         assert prof.checks(s, p) == [], quote
     p = dict(GOOD, evidence=[{"field": "x", "quote": "Best gym in Leeds", "url": "https://acme.example/"}])
     assert prof.checks(s, p) == ["1 evidence quote(s) do not appear on the page they cite."]
+
+
+def test_tls_context_verifies_certificates_and_is_built_once():
+    import ssl
+    ctx = site.tls_context()
+    assert ctx is site.tls_context()
+    assert ctx.verify_mode == ssl.CERT_REQUIRED and ctx.check_hostname
+    assert ctx.cert_store_stats()["x509_ca"] > 50          # certifi's bundle is loaded
