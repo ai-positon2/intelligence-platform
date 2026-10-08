@@ -106,7 +106,8 @@ Archetypes, pick one:
 
 Rules:
 - location_count: the number of physical locations the pages or the facts support. Use the sitemap's location-page count only as a rough guide and say so in location_count_basis. 0 for an online-only business, -1 when nothing supports a number.
-- hq.country_code: ISO 3166-1 alpha-2. Prefer a stated address (structured data, legal or contact page) over any other signal. If the facts note that the site chose a version for our location, do not treat that version's country as the company's.
+- hq.country_code: ISO 3166-1 alpha-2. Prefer a stated address (structured data, legal or contact page) over any other signal. A "shopify_store_info" fact is the registered address of the store's Shopify account, which is often a warehouse or an office other than the head office: use it only when the pages state no address, and say so in evidence or unknowns.
+- Pages marked as read from the Wayback Machine are dated copies of the site, because the live site refused our server. Treat them as the site's content as of that date. If the facts note that the site chose a version for our location, do not treat that version's country as the company's.
 - markets: ISO alpha-2 codes of the countries the company actually serves or ships to, per the pages.
 - industry.naics_code: the best-matching 6-digit NAICS 2022 code, and its title.
 - competitors_named: only companies the site itself presents as competitors or alternatives (comparison pages, "vs" pages, "switch from"). Not partners, clients, insurers, suppliers or press outlets. Usually empty.
@@ -173,9 +174,11 @@ def facts_for_model(site):
         "country_signals": site.get("country"),
         "sitemap": {k: sm.get(k) for k in ("urls", "top_sections", "location_like", "product_like")}
         if sm else "no readable sitemap",
-        "pages_read": [{k: p.get(k) for k in ("kind", "url", "status", "words", "note")}
+        "pages_read": [{k: p.get(k) for k in ("kind", "url", "status", "words", "note", "via")}
                        for p in site.get("pages", [])],
         "program_hints": site.get("hints", []),
+        "shopify_store_info": site.get("shopify_store") or "not a Shopify store, or not readable",
+        "read_from_archive": bool(site.get("via_archive")),
     }
 
 
@@ -350,6 +353,16 @@ def assemble(site, parsed, meta):
     p["unknowns"] = [_clean(x) for x in p.get("unknowns", [])][:10]
     p["hq"] = {k: (v.upper() if k == "country_code" else v).strip()
                for k, v in (p.get("hq") or {}).items()}
+    # The pages may never state where the company is (gymshark.com does
+    # not). Then a strong vote of the site's own signals stands in, labelled
+    # as such, rather than leaving the country blank.
+    vote = site.get("country") or {}
+    p["hq_country_source"] = "pages" if p["hq"].get("country_code") else None
+    if not p["hq"].get("country_code") and vote.get("code") and vote.get("confidence", 0) >= 0.8:
+        p["hq"]["country_code"] = vote["code"]
+        p["hq_country_source"] = "site signals (%s, %d%%)" % (
+            ", ".join(sorted({e["signal"] for e in vote.get("evidence", [])})),
+            round(vote["confidence"] * 100))
     p["markets"] = sorted({m.strip().upper() for m in p.get("markets", []) if len(m.strip()) == 2})
     s = site.get("signals") or {}
     p["facts"] = {
@@ -365,10 +378,12 @@ def assemble(site, parsed, meta):
         "sitemap": s.get("sitemap"),
         "structured_locations": [o for o in s.get("organizations", []) if o.get("address")][:20],
         "hints": site.get("hints", []),
+        "shopify_store": site.get("shopify_store"),
+        "read_from_archive": bool(site.get("via_archive")),
     }
     p["checks"] = checks(site, p)
     p["coverage"] = {
-        "pages": [{k: pg.get(k) for k in ("kind", "url", "status", "note")} for pg in site.get("pages", [])],
+        "pages": [{k: pg.get(k) for k in ("kind", "url", "status", "note", "via")} for pg in site.get("pages", [])],
         "home_notes": site.get("home_notes", []),
         "needs_browser": site.get("needs_browser", False),
         "robots": site.get("robots"),

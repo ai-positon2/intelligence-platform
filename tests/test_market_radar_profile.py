@@ -673,3 +673,139 @@ def test_robots_and_sitemaps_are_requested_with_an_accept_header(monkeypatch):
     monkeypatch.setattr(site, "public_get", fake_get)
     assert site.fetch_text("https://shop.example/robots.txt").startswith("User-agent")
     assert seen["Accept"] == "*/*"
+
+
+def test_a_blank_hq_country_takes_a_strong_site_signal_and_says_so():
+    # gymshark.com never states a headquarters; its prices are in GBP.
+    s = site_for(country={"code": "GB", "confidence": 0.8,
+                          "evidence": [{"signal": "currency", "country": "GB", "detail": "GBP"}]})
+    p = prof.assemble(s, dict(GOOD, hq={"city": "", "region": "", "country_code": ""}), {})
+    assert p["hq"]["country_code"] == "GB"
+    assert p["hq_country_source"] == "site signals (currency, 80%)"
+
+
+def test_a_weak_site_signal_does_not_fill_a_blank_country():
+    s = site_for(country={"code": "US", "confidence": 0.5, "evidence": []})
+    p = prof.assemble(s, dict(GOOD, hq={"city": "", "region": "", "country_code": ""}), {})
+    assert p["hq"]["country_code"] == "" and p["hq_country_source"] is None
+
+
+def test_a_stated_country_is_never_replaced():
+    p = prof.assemble(site_for(), dict(GOOD), {})
+    assert p["hq"]["country_code"] == "GB" and p["hq_country_source"] == "pages"
+
+
+def test_page_titles_head_the_text_so_quoted_titles_verify(web):
+    web.pages["https://t.example/"] = page("https://t.example/",
+        "<html><head><title>Gymshark Official Store - Gym Clothes</title></head><body><p>%s</p></body></html>" % words(200))
+    out = site.read_site("https://t.example/")
+    text = out["texts"]["https://t.example/"]
+    assert text.startswith("TITLE: Gymshark Official Store - Gym Clothes\n")
+    quote = {"field": "name", "quote": "Gymshark Official Store - Gym Clothes", "url": "https://t.example/"}
+    p = dict(GOOD, evidence=[quote])
+    assert prof.checks(dict(site_for(), texts=out["texts"], pages=out["pages"]), p) == []
+
+
+# == sites that refuse this server ========================================================
+
+def test_pages_are_requested_as_ourselves_with_generic_accept_headers(monkeypatch):
+    # Three Shopify stores refused "Accept: text/html,..." from Railway and
+    # accepted "*/*" with gzip, our own user agent unchanged (2026-10-09).
+    seen = {}
+
+    class Resp:
+        status_code, url = 200, "https://shop.example/"
+        headers = {"Content-Type": "text/html; charset=utf-8"}
+        encoding = "utf-8"
+
+        def iter_content(self, n):
+            yield b"<html><body><p>hello</p></body></html>"
+
+        def close(self):
+            pass
+
+    def fake_get(url, timeout, stream, headers):
+        seen.update(headers)
+        return Resp()
+
+    monkeypatch.setattr(site, "public_get", fake_get)
+    assert site.fetch("https://shop.example/")["status"] == "ok"
+    assert seen == {"User-Agent": site.UA, "Accept": "*/*", "Accept-Encoding": "gzip, deflate"}
+    assert "Position2-MarketRadar" in seen["User-Agent"]          # never a disguised browser
+
+
+def refused(url, code=403):
+    return page(url, "", status="blocked", http=code)
+
+
+def test_a_site_that_refuses_us_is_read_from_the_wayback_machine(web, monkeypatch):
+    # clovedental.in: 403 to every request style from Railway.
+    home = ('<html><head><title>Clinic Chain</title></head><body><p>%s</p>'
+            '<a href="/about-us">About</a><a href="/locations">Our clinics</a>'
+            '<a href="/contact">Contact</a><a href="/careers">Careers</a>'
+            '<a href="/pricing">Prices</a><a href="/news">News</a></body></html>' % words(300))
+    for path in ("/", "/about-us", "/locations", "/contact", "/careers", "/pricing", "/news"):
+        web.pages["https://chain.example" + path] = refused("https://chain.example" + path)
+        web.pages["https://web.archive.org/web/20260901000000id_/https://chain.example" + path] = page(
+            "https://web.archive.org/web/20260901000000id_/https://chain.example" + path,
+            home if path == "/" else "<p>%s</p>" % words(80, path.strip("/")))
+    monkeypatch.setattr(site, "wayback_latest",
+                        lambda url: ("20260901000000", url))
+    out = site.read_site("https://chain.example/")
+    assert out["status"] == "ok" and out["via_archive"]
+    assert out["pages"][0]["via"] == "wayback:20260901000000"
+    assert "Wayback Machine's copy of 2026-09-01" in out["pages"][0]["note"]
+    assert "refused this server (HTTP 403)" in out["home_notes"][-1]
+    assert len(out["pages"]) == 1 + site.MAX_ARCHIVE_PAGES       # a few archive pages only
+    assert all(p["via"] for p in out["pages"])
+    assert out["signals"]["sitemap"] is None                       # not fetched from a refusing site
+    assert "https://chain.example/" in out["texts"]                # keyed by the real address
+
+
+def test_a_refusing_site_with_no_archive_copy_stays_unread_but_keeps_its_shop_record(web, monkeypatch):
+    web.pages["https://shop.example/"] = refused("https://shop.example/", 429)
+    monkeypatch.setattr(site, "wayback_latest", lambda url: None)
+    web.texts["https://shop.example/meta.json"] = json.dumps({
+        "name": "Shop", "city": "Mannheim", "province": "", "country": "DE", "currency": "EUR",
+        "myshopify_domain": "shop.myshopify.com", "ships_to_countries": ["DE", "AT", "CH"],
+        "published_products_count": 485})
+    out = site.read_site("https://shop.example/")
+    assert out["status"] == "blocked"
+    assert out["pages"][0]["note"].endswith("the Wayback Machine has no readable copy")
+    assert out["shopify_store"]["country"] == "DE" and out["shopify_store"]["products"] == 485
+
+
+def test_a_not_found_site_is_not_sent_to_the_archive(web, monkeypatch):
+    monkeypatch.setattr(site, "wayback_latest", lambda url: pytest.fail("asked the archive"))
+    assert site.read_site("https://gone.example/")["status"] == "not_found"
+
+
+def test_shopify_record_is_read_for_shops_and_votes_for_a_country(web):
+    web.pages["https://brand.example/"] = page("https://brand.example/",
+        '<script src="https://cdn.shopify.com/x.js"></script><p>%s</p>' % words(300))
+    web.texts["https://brand.example/meta.json"] = json.dumps({
+        "name": "Brand", "city": "Extrema", "province": "Minas Gerais", "country": "BR",
+        "currency": "BRL", "myshopify_domain": "brand.myshopify.com", "ships_to_countries": ["BR"]})
+    out = site.read_site("https://brand.example/")
+    assert out["shopify_store"]["city"] == "Extrema"
+    assert out["country"]["code"] == "BR"
+    assert {"signal": "shop_registration", "country": "BR",
+            "detail": "Shopify store's registered country"} in out["country"]["evidence"]
+    facts = prof.facts_for_model(out)
+    assert facts["shopify_store_info"]["province"] == "Minas Gerais"
+    assert facts["read_from_archive"] is False
+
+
+def test_non_shopify_json_is_ignored():
+    assert site.shopify_store({"name": "x"}) is None and site.shopify_store(None) is None
+
+
+def test_wayback_latest_reads_the_newest_capture(monkeypatch):
+    monkeypatch.setattr(site, "fetch_text", lambda url, limit=0:
+                        '[["timestamp","original"],["20260101000000","https://a.example/"],'
+                        '["20260901000000","https://a.example/"]]' if "cdx" in url else None)
+    assert site.wayback_latest("https://a.example/") == ("20260901000000", "https://a.example/")
+    monkeypatch.setattr(site, "fetch_text", lambda url, limit=0: "[]")
+    assert site.wayback_latest("https://a.example/") is None
+    monkeypatch.setattr(site, "fetch_text", lambda url, limit=0: None)
+    assert site.wayback_latest("https://a.example/") is None

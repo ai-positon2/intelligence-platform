@@ -165,6 +165,7 @@ COUNTRY_NAMES = {"united states": "US", "usa": "US", "united states of america":
                  "austria": "AT", "österreich": "AT", "singapore": "SG",
                  "united arab emirates": "AE", "uae": "AE"}
 WEIGHTS = {"jsonld_address": 3.0, "cctld": 3.0, "phone": 2.0, "phone_text": 1.0,
+           "shop_registration": 2.0,
            "currency": 1.0, "lang_region": 1.0, "lang_default_region": 0.25, "lang_only": 0.5,
            "impressum": 0.5}
 # "en-US" is WordPress's default locale and is left on sites everywhere
@@ -425,7 +426,7 @@ def currencies(markup, text):
 
 
 def country_vote(domain, orgs, phones, currency_list, lang, og_locale, *, text_phones=(),
-                 has_impressum=False, geo_redirected=False):
+                 has_impressum=False, geo_redirected=False, shop_country=None):
     """Where the company is, from independent signals, with the evidence.
     Confidence is the winner's share of all the weight cast. Language and
     locale are ignored when the site redirected us by location: then they
@@ -458,6 +459,8 @@ def country_vote(domain, orgs, phones, currency_list, lang, og_locale, *, text_p
         cast(CURRENCY_COUNTRY[currency_list[0]], "currency", currency_list[0])
     if has_impressum:
         cast("DE", "impressum", "has an Impressum (German legal notice) page")
+    if shop_country:
+        cast(_country_code(shop_country), "shop_registration", "Shopify store's registered country")
     if not geo_redirected:
         for tag in (og_locale, lang):
             tag = (tag or "").strip()
@@ -498,8 +501,13 @@ def fetch(url):
     out = {"url": url, "final_url": url, "status": "error", "http_status": None,
            "html": "", "text": "", "note": "", "truncated": False}
     try:
+        # Our own user agent, always; only the Accept headers are generic.
+        # From Railway, three Shopify stores answered this crawler 429 when
+        # it sent "Accept: text/html,application/xhtml+xml" and 200 when it
+        # sent "*/*" with gzip (allbirds.com, snocks.com, insiderstore.com.br,
+        # 2026-10-09). The Content-Type check below still refuses non-pages.
         r = public_get(url, timeout=TIMEOUT, stream=True,
-                       headers={"User-Agent": UA, "Accept": "text/html,application/xhtml+xml"})
+                       headers={"User-Agent": UA, "Accept": "*/*", "Accept-Encoding": "gzip, deflate"})
     except requests.Timeout:
         out["note"] = "timed out after %ss" % TIMEOUT
         return out
@@ -565,6 +573,74 @@ def fetch_text(url, limit=3_000_000):
         return raw.decode("utf-8", errors="replace")
     finally:
         r.close()
+
+
+def fetch_json(url):
+    """A small JSON document (Shopify's /meta.json), or None."""
+    text = fetch_text(url, limit=300_000)
+    if not text:
+        return None
+    try:
+        data = json.loads(text)
+    except ValueError:
+        return None
+    return data if isinstance(data, dict) else None
+
+
+# == the Wayback Machine, for sites that refuse this server ==========================
+#
+# clovedental.in answered 403 to every request style from Railway, even
+# full browser headers (2026-10-09): it refuses datacenter addresses, not a
+# header. Its public copy in the Internet Archive is the honest way to read
+# it. A page read this way is labelled with the capture date everywhere it
+# is shown. No proxies, no disguised browsers.
+
+WAYBACK_CDX = "https://web.archive.org/cdx/search/cdx"
+MAX_ARCHIVE_PAGES = 4
+
+
+def wayback_latest(url):
+    """The newest capture of this exact URL that the archive saw answer 200,
+    as (timestamp, original_url), or None."""
+    parts = urlsplit(url)
+    query = parts.netloc + (parts.path or "/")
+    text = fetch_text("%s?url=%s&output=json&limit=-1&filter=statuscode:200&fl=timestamp,original"
+                      % (WAYBACK_CDX, requests.utils.quote(query, safe="/:")), limit=100_000)
+    try:
+        rows = json.loads(text or "")
+    except ValueError:
+        return None
+    if len(rows) < 2 or len(rows[-1]) < 2:
+        return None
+    return rows[-1][0], rows[-1][1]
+
+
+def fetch_archived(url):
+    """The page as the Wayback Machine last saw it, shaped like fetch()'s
+    result with final_url set to the ORIGINAL address (so its links resolve
+    against the real site) and `via` naming the capture. Never raises."""
+    found = wayback_latest(url)
+    if not found:
+        return dict(fetch_failed(url), note="the Wayback Machine has no readable copy")
+    stamp, original = found
+    page = fetch("https://web.archive.org/web/%sid_/%s" % (stamp, original))
+    if page["status"] != "ok":
+        return dict(page, final_url=url, note="the Wayback Machine copy could not be read (%s)"
+                    % (page["note"] or page["status"]))
+    when = "%s-%s-%s" % (stamp[:4], stamp[4:6], stamp[6:8])
+    page.update(final_url=url, via="wayback:" + stamp,
+                note="read from the Wayback Machine's copy of %s: the site refuses this server" % when)
+    page["text"] = html_to_linked_text(page["html"], url)
+    return page
+
+
+def fetch_failed(url):
+    return {"url": url, "final_url": url, "status": "error", "http_status": None, "html": "",
+            "text": "", "note": "", "truncated": False}
+
+
+def refuses_us(page):
+    return page["status"] == "blocked" and page.get("http_status") in (401, 403, 429)
 
 
 # == robots.txt =====================================================================
@@ -744,10 +820,26 @@ def read_site(url):
            "pages": [], "texts": {}, "signals": {}, "country": None,
            "needs_browser": False, "geo_redirect": home.get("geo_redirect"),
            "home_notes": notes, "robots": None, "status": home["status"]}
+    refused = refuses_us(home)
+    if refused:
+        archived = fetch_archived(home_url)
+        notes.append("the site refused this server (HTTP %s)" % home["http_status"])
+        if archived["status"] == "ok":
+            home = archived
+            out["status"] = "ok"
+        else:
+            # Say we tried: "refused" alone reads as if no fallback existed.
+            home["note"] = "; ".join(x for x in (home["note"], archived["note"]) if x)
+    out["via_archive"] = bool(home.get("via"))
     out["pages"].append({"kind": "home", "url": home_url, "status": home["status"],
                          "http_status": home["http_status"], "note": home["note"],
-                         "words": len(home["text"].split())})
+                         "words": len(home["text"].split()), "via": home.get("via")})
     if home["status"] != "ok":
+        if refused:
+            # Shopify's store record often answers even when the pages do not.
+            meta = fetch_json(urljoin(home_url, "/meta.json"))
+            if shopify_store(meta):
+                out["shopify_store"] = shopify_store(meta)
         return out
 
     robots_text = fetch_text(urljoin(home_url, "/robots.txt"), limit=500_000)
@@ -764,27 +856,59 @@ def read_site(url):
                 words, client_render_marker(home["html"]) or "no framework marker")
 
     extra = pick_pages(home_doc.links, home_url, rules)
+    if refused:
+        # The live site already refused us; its other pages come from the
+        # archive too, a few only, since each archive read is slow.
+        extra = extra[:MAX_ARCHIVE_PAGES]
     docs = [("home", home, home_doc)]
+    reader = fetch_archived if refused else fetch
     with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:
-        results = list(pool.map(lambda kv: (kv[0], fetch(kv[1])), extra))
+        results = list(pool.map(lambda kv: (kv[0], reader(kv[1])), extra))
     for kind, page in results:
         out["pages"].append({"kind": kind, "url": page["final_url"], "status": page["status"],
                              "http_status": page["http_status"], "note": page["note"],
-                             "words": len(page["text"].split())})
+                             "words": len(page["text"].split()), "via": page.get("via")})
         if page["status"] == "ok":
             docs.append((kind, page, parse_html(page["html"])))
 
-    out["texts"] = {p["final_url"]: p["text"] for _, p, _ in docs}
+    # Each page's <title> heads its text: titles are real page content the
+    # model quotes (Gymshark's name came from its title), and a quote check
+    # that cannot see them reports a true quote as invented.
+    out["texts"] = {p["final_url"]: ("TITLE: %s\n" % " ".join(d.title.split()) if d.title.strip() else "")
+                    + p["text"] for _, p, d in docs}
     out["signals"] = signals_from(docs, home_url)
-    sitemap = read_sitemap(home_url, sitemaps)
+    sitemap = None if refused else read_sitemap(home_url, sitemaps)
     out["signals"]["sitemap"] = sitemap
     s = out["signals"]
+    if refused or any(p["name"] == "shopify" for p in s["platforms"]):
+        store = shopify_store(fetch_json(urljoin(home_url, "/meta.json")))
+        if store:
+            out["shopify_store"] = store
+            if not any(p["name"] == "shopify" for p in s["platforms"]):
+                s["platforms"].append({"name": "shopify", "kind": "commerce"})
     out["country"] = country_vote(domain, s["organizations"], s["phones"], s["currencies"],
                                   s["html_lang"], s["og_locale"], text_phones=s["text_phones"],
                                   has_impressum=s["has_impressum"],
-                                  geo_redirected=bool(out["geo_redirect"]))
+                                  geo_redirected=bool(out["geo_redirect"]),
+                                  shop_country=(out.get("shopify_store") or {}).get("country"))
     out["hints"] = archetype_hints(s)
     return out
+
+
+def shopify_store(meta):
+    """The public record a Shopify store serves at /meta.json, reduced to what
+    a profile uses. Its address is the store ACCOUNT's registered address,
+    which can differ from the head office (allbirds.com's says Beverly Hills;
+    the company is in San Francisco)."""
+    if not isinstance(meta, dict) or not meta.get("myshopify_domain"):
+        return None
+    ships = meta.get("ships_to_countries") or []
+    return {"name": meta.get("name"), "city": meta.get("city"), "province": meta.get("province"),
+            "country": meta.get("country"), "currency": meta.get("currency"),
+            "ships_to_countries": ships[:60] if isinstance(ships, list) else [],
+            "products": meta.get("published_products_count"),
+            "collections": meta.get("published_collections_count"),
+            "description": (meta.get("description") or "")[:400]}
 
 
 def signals_from(docs, home_url):
