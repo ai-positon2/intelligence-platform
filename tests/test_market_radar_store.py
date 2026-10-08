@@ -151,7 +151,10 @@ def pg(monkeypatch):
     tmp = tempfile.mkdtemp()
     data = os.path.join(tmp, "data")
     env = dict(os.environ, LC_ALL="C")
-    subprocess.run([initdb, "-D", data, "-U", "t", "--auth=trust"], check=True, capture_output=True, env=env)
+    # UTF-8, as production is: under LC_ALL=C initdb picks SQL_ASCII, which
+    # refuses the "\u2014" in a quoted page and the "ã" in São Paulo.
+    subprocess.run([initdb, "-D", data, "-U", "t", "--auth=trust", "-E", "UTF8", "--locale=C"],
+                   check=True, capture_output=True, env=env)
     sock = socket.socket(); sock.bind(("127.0.0.1", 0)); port = sock.getsockname()[1]; sock.close()
     subprocess.run([pg_ctl, "-D", data, "-l", os.path.join(tmp, "log"), "-o",
                     "-p %d -c listen_addresses=127.0.0.1 -c unix_socket_directories=''" % port,

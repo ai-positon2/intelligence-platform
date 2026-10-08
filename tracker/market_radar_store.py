@@ -33,7 +33,7 @@ logger = logging.getLogger(__name__)
 _TABLES_READY = False
 
 TABLES = ("mr_entities", "mr_clients", "mr_competitors", "mr_runs", "mr_provider_calls",
-          "mr_snapshots", "mr_events", "mr_client_events", "mr_industry_sources")
+          "mr_snapshots", "mr_events", "mr_client_events", "mr_industry_sources", "mr_geocodes")
 
 COMPETITOR_KINDS = ("direct", "indirect", "local", "aspirational")
 COMPETITOR_STATUSES = ("proposed", "confirmed", "removed")
@@ -233,6 +233,12 @@ SCHEMA = [
         item_count INTEGER,
         created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
         UNIQUE (industry_key, country, feed_url))""",
+    # Place name to coordinates, cached forever: OpenStreetMap's geocoder
+    # asks callers to cache and to stay under one request a second.
+    """CREATE TABLE IF NOT EXISTS mr_geocodes (
+        query TEXT PRIMARY KEY,
+        result JSONB NOT NULL,
+        fetched_at TIMESTAMPTZ NOT NULL DEFAULT now())""",
 ]
 
 
@@ -560,6 +566,20 @@ def save_industry_source(industry_key, feed_url, *, country="", site_domain=None
                      ok is True, None if ok else error, item_count,
                      ok is True, ok, None if ok else error))
         return cur.fetchone()[0]
+
+
+def cached_geocode(query, *, conn=None):
+    with _tx(conn) as cur:
+        cur.execute("SELECT result FROM mr_geocodes WHERE query=%s", (query,))
+        row = cur.fetchone()
+    return row[0] if row else None
+
+
+def save_geocode(query, result, *, conn=None):
+    with _tx(conn) as cur:
+        cur.execute("""INSERT INTO mr_geocodes (query, result) VALUES (%s,%s::jsonb)
+                       ON CONFLICT (query) DO UPDATE SET result=EXCLUDED.result, fetched_at=now()""",
+                    (query, json.dumps(result)))
 
 
 def table_counts(*, conn=None):

@@ -33,8 +33,14 @@ def run(owner_email):
         with conn.cursor() as cur:
             cur.execute("SHOW server_version")
             out["postgres_version"] = cur.fetchone()[0]
+            cur.execute("SHOW server_encoding")
+            out["server_encoding"] = cur.fetchone()[0]
 
         entity = store.upsert_entity(SELFTEST_DOMAIN, name="Self-test Co", conn=conn)
+        text = "S\u00e3o Paulo \u2014 Zahn\u00e4rzte \u6b6f\u79d1"   # profiles carry text like this
+        store.set_profile(entity, {"quote": text}, conn=conn)
+        stored = (store.get_entity(entity, conn=conn) or {}).get("profile", {}).get("quote")
+        check("non-English text survives a round trip", stored == text, repr(stored))
         rival = store.upsert_entity("https://www.rival." + SELFTEST_DOMAIN + "/about", conn=conn)
         client = store.upsert_client(owner_email, entity, radius_km=5, conn=conn)
         run_id = store.create_run(client, owner_email, "baseline", cost_cap_usd="0.05", conn=conn)

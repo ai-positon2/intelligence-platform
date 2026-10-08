@@ -1,0 +1,675 @@
+"""Market Radar Phase 1: reading a company's site (tracker/market_radar_site)
+and turning it into a profile (tracker/market_radar_profile).
+
+No network and no model: pages, robots.txt, sitemaps and the Claude client
+are all fakes. Most cases here were found live on the 2026-10-09 test set of
+12 real sites, and each test names the site that showed the trap.
+"""
+
+import json
+import os
+import sys
+from types import SimpleNamespace
+
+import pytest
+
+os.environ.setdefault("GOOGLE_CLIENT_ID", "test")
+os.environ.setdefault("GOOGLE_CLIENT_SECRET", "test")
+os.environ.setdefault("FLASK_SECRET_KEY", "test")
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from tracker import market_radar_profile as prof  # noqa: E402
+from tracker import market_radar_site as site  # noqa: E402
+from tests.test_market_radar_store import OWNER, pg, world  # noqa: E402,F401  (fixtures)
+
+
+# == HTML, JSON-LD and vendor signals ============================================
+
+PAGE = """<!doctype html><html lang="en-GB"><head><title> Acme Dental | Dentist in London </title>
+<meta name="description" content="Family dentist in Kensington.">
+<meta property="og:site_name" content="Acme Dental">
+<link rel="alternate" hreflang="x-default" href="https://acme.example/">
+<script type="application/ld+json">{"@context":"https://schema.org","@graph":[
+ {"@type":"Dentist","name":"Acme Dental","telephone":"+44 20 7946 0000",
+  "address":{"@type":"PostalAddress","streetAddress":"1 High St","addressLocality":"London",
+             "postalCode":"W8 1AA","addressCountry":"United Kingdom"},
+  "geo":{"latitude":"51.50","longitude":"-0.19"},"sameAs":["https://www.instagram.com/acmedental"]},
+ {"@type":"WebSite","name":"Acme"}]}</script>
+<script type="application/ld+json">{ not json </script>
+<script src="https://cdn.shopify.com/s/files/theme.js"></script>
+</head><body>
+<a href="/about-us">About us</a> <a href="/impressum">Impressum</a> <a href="/unidades">Nossas unidades</a>
+<a href="/cart">Cart</a> <a href="/brochure.pdf">Brochure</a> <a href="https://other.example/about">About them</a>
+<a href="tel:+442079460000">Call</a> <a href="mailto:Hello@Acme.example?subject=hi">Email</a>
+<a href="https://www.facebook.com/sharer/sharer.php?u=x">Share</a> <a href="https://www.facebook.com/acmedental">FB</a>
+<a href="https://www.linkedin.com/company/acme-dental/">LinkedIn</a> <a href="https://twitter.com/intent/tweet">Tweet</a>
+<a href="https://boards.greenhouse.io/acmedental">Jobs</a> <a href="https://acme.jobs.personio.de">Karriere</a>
+</body></html>"""
+
+
+def test_parse_html_collects_what_the_signals_need():
+    d = site.parse_html(PAGE)
+    assert d.lang == "en-GB" and d.title.strip().startswith("Acme Dental")
+    assert d.meta["description"] == "Family dentist in Kensington."
+    assert ("x-default", "https://acme.example/") in d.hreflang
+    assert len(d.jsonld_raw) == 2 and ("/about-us", "About us") in d.links
+
+
+def test_jsonld_graph_is_flattened_and_a_broken_block_is_skipped():
+    nodes = site._jsonld_nodes(site.parse_html(PAGE).jsonld_raw)
+    assert {t for n in nodes for t in site._types(n)} == {"Dentist", "WebSite"}
+    [org] = site.organizations(nodes)
+    assert org["address"]["country"] == "GB" and org["address"]["addressLocality"] == "London"
+    assert org["geo"] == {"lat": 51.5, "lon": -0.19}
+    assert org["same_as"] == ["https://www.instagram.com/acmedental"]
+
+
+@pytest.mark.parametrize("value, code", [("US", "US"), ("uk", "GB"), ("United Kingdom", "GB"),
+                                         ({"@type": "Country", "name": "DE"}, "DE"),
+                                         ("Brasil", "BR"), ("Atlantis", None), (7, None)])
+def test_country_codes_from_structured_addresses(value, code):
+    assert site._country_code(value) == code
+
+
+def test_social_profiles_skip_share_and_intent_links():
+    hrefs = [h for h, _ in site.parse_html(PAGE).links]
+    assert site.social_profiles(hrefs) == {"facebook": "acmedental", "linkedin": "acme-dental"}
+
+
+def test_jobs_boards_are_found_with_their_board_names():
+    hrefs = " ".join(h for h, _ in site.parse_html(PAGE).links)
+    assert site.ats_boards(hrefs) == [{"vendor": "greenhouse", "board": "acmedental"},
+                                      {"vendor": "personio", "board": "acme"}]
+
+
+@pytest.mark.parametrize("phone, code", [("+44 20 7946 0000", "GB"), ("0044 20 7946", "GB"),
+                                         ("+1 (512) 555-0100", "US"), ("+91 80 4000 0000", "IN"),
+                                         ("+351 21 000 0000", "PT"), ("020 7946 0000", None)])
+def test_phone_prefixes(phone, code):
+    assert site.phone_countries([phone]) == ([code] if code else [])
+
+
+def test_currencies_prefer_structured_data_then_prices():
+    markup = '{"priceCurrency":"BRL"} {"priceCurrency":"BRL"}'
+    assert site.currencies(markup, "R$ 199,90 or US$ 40") [0] == "BRL"
+    assert site.currencies("", "£25 £30 €10") == ["GBP", "EUR"]
+
+
+# == country ==================================================================
+
+def test_country_vote_names_its_evidence():
+    v = site.country_vote("acme.co.uk", [{"name": "A", "address": {"country": "GB"}}],
+                          ["+44 20 1"], ["GBP"], "en-GB", None)
+    assert v["code"] == "GB" and v["confidence"] == 1.0
+    assert [e["signal"] for e in v["evidence"]] == ["cctld", "jsonld_address", "phone", "currency",
+                                                    "lang_region"]
+
+
+def test_wordpress_default_en_us_barely_counts():
+    # pembridgedental.co.uk and clovedental.in both declare en-US.
+    v = site.country_vote("acme.in", [], ["+91 80 1"], [], "en-US", None)
+    assert v["code"] == "IN" and v["confidence"] > 0.9
+
+
+def test_language_is_ignored_after_a_location_redirect():
+    # orangetheory.com sent a visitor in India to /en-in.
+    v = site.country_vote("brand.com", [], [], ["USD"], "en-IN", None, geo_redirected=True)
+    assert v["code"] == "US" and all(e["signal"] != "lang_region" for e in v["evidence"])
+
+
+def test_a_dot_com_with_german_text_and_numbers_is_german():
+    # snocks.com: no structured address, no phone links, EUR.
+    v = site.country_vote("snocks.com", [], [], ["EUR"], "de", None,
+                          text_phones=["+49 621 000000"], has_impressum=True)
+    assert v["code"] == "DE"
+    assert {e["signal"] for e in v["evidence"]} == {"phone_text", "lang_only", "impressum"}
+
+
+def test_text_phones_count_only_when_there_are_no_phone_links():
+    v = site.country_vote("brand.com", [], ["+1 512 555 0100"], [], None, None,
+                          text_phones=["+44 20 7946 0000"])
+    assert v["code"] == "US" and all(e["signal"] != "phone_text" for e in v["evidence"])
+
+
+def test_no_signals_means_no_country():
+    assert site.country_vote("brand.com", [], [], [], None, None)["code"] is None
+
+
+def test_dot_co_is_not_colombia():
+    assert site.country_vote("exceldent.co", [], [], [], None, None)["code"] is None
+
+
+# == robots.txt ================================================================
+
+ROBOTS = """User-agent: *
+Disallow: /private
+Disallow: /*?sort=
+Allow: /private/press
+Sitemap: https://acme.example/sitemap.xml
+
+User-agent: Position2
+Disallow: /secret$
+"""
+
+
+def test_robots_our_own_group_wins_over_star():
+    rules, maps = site.parse_robots(ROBOTS)
+    assert maps == ["https://acme.example/sitemap.xml"]
+    assert rules == {"disallow": ["/secret$"], "allow": []}
+    assert not site.allowed("/secret", rules) and site.allowed("/secret/x", rules)
+
+
+def test_robots_star_rules_longest_match_and_wildcards():
+    rules, _ = site.parse_robots(ROBOTS.split("User-agent: Position2")[0])
+    assert not site.allowed("/private/x", rules)
+    assert site.allowed("/private/press", rules)          # the longer Allow wins
+    assert not site.allowed("/shop?sort=price", rules)    # wildcard
+    assert site.allowed("/about", rules)
+
+
+def test_no_robots_allows_everything():
+    rules, maps = site.parse_robots(None)
+    assert maps == [] and site.allowed("/anything", rules)
+
+
+# == choosing pages ===============================================================
+
+def test_pick_pages_by_kind_in_any_language_same_site_only():
+    rules, _ = site.parse_robots("User-agent: *\nDisallow: /unidades")
+    chosen = site.pick_pages(site.parse_html(PAGE).links, "https://acme.example/", rules)
+    assert chosen == [("about", "https://acme.example/about-us"),
+                      ("legal", "https://acme.example/impressum")]   # /unidades refused by robots
+
+
+def test_pick_pages_skips_carts_files_and_other_sites():
+    links = [("/cart", "Shop cart"), ("/menu.pdf", "Our services"), ("https://x.example/about", "About"),
+             ("/services/", "Services"), ("/services", "Services again")]
+    assert site.pick_pages(links, "https://acme.example/", {}) == [
+        ("offerings", "https://acme.example/services/")]
+
+
+@pytest.mark.parametrize("requested, final, expected", [
+    ("https://orangetheory.com/", "https://www.orangetheory.com/en-in", "locale path /en-in"),
+    ("https://gymshark.com/", "https://us.checkout.gymshark.com/", "host us.checkout.gymshark.com"),
+    ("https://acme.com/", "https://www.acme.com/", None),
+    ("https://acme.com/en-us/", "https://acme.com/en-us/", None),
+])
+def test_geo_redirect(requested, final, expected):
+    assert site.geo_redirect(requested, final) == expected
+
+
+# == fake network for whole-site reads =============================================
+
+def page(url, html, status="ok", final=None, http=200):
+    text = site.html_to_linked_text(html, final or url) if status == "ok" else ""
+    return {"url": url, "final_url": final or url, "status": status, "http_status": http,
+            "html": html if status == "ok" else "", "text": text, "note": "", "truncated": False}
+
+
+def words(n, prefix="word"):
+    return " ".join("%s%d" % (prefix, i) for i in range(n))
+
+
+@pytest.fixture
+def web(monkeypatch):
+    """A fake web: {url: page dict} for fetch, {url: text} for fetch_text."""
+    pages, texts, asked = {}, {}, []
+
+    def fake_fetch(url):
+        asked.append(url)
+        return pages.get(url) or page(url, "", status="not_found", http=404)
+
+    monkeypatch.setattr(site, "fetch", fake_fetch)
+    monkeypatch.setattr(site, "fetch_text", lambda url, limit=0: texts.get(url))
+    return SimpleNamespace(pages=pages, texts=texts, asked=asked)
+
+
+def test_sitemap_index_is_followed_places_and_products_first(web):
+    web.texts["https://a.example/sitemap.xml"] = (
+        '<sitemapindex><sitemap><loc>https://a.example/blog-sitemap.xml</loc></sitemap>'
+        '<sitemap><loc>https://a.example/locations-sitemap.xml</loc></sitemap></sitemapindex>')
+    web.texts["https://a.example/locations-sitemap.xml"] = "<urlset>" + "".join(
+        "<url><loc>https://a.example/locations/town-%d/</loc></url>" % i for i in range(30)) + "</urlset>"
+    web.texts["https://a.example/blog-sitemap.xml"] = "<urlset>" + "".join(
+        "<url><loc>https://a.example/products/p-%d</loc></url>" % i for i in range(25)) + "</urlset>"
+    sm = site.read_sitemap("https://a.example/", [])
+    assert sm["urls"] == 55 and sm["location_like"] == 30 and sm["product_like"] == 25
+    assert sm["top_sections"][0] == ("/locations", 30)
+
+
+def test_no_sitemap_is_none_not_an_empty_one(web):
+    assert site.read_sitemap("https://a.example/", []) is None
+
+
+def test_bare_domain_that_lands_on_a_useless_host_is_read_as_www(web):
+    # gymshark.com led to a 3-word checkout subdomain; www.gymshark.com is the store.
+    web.pages["https://gym.example/"] = page("https://gym.example/", "<p>loading</p>",
+                                             final="https://us.checkout.gym.example/")
+    web.pages["https://www.gym.example/"] = page("https://www.gym.example/",
+                                                 "<p>%s</p>" % words(400))
+    home, notes = site.choose_home("https://gym.example/")
+    assert home["final_url"] == "https://www.gym.example/" and home["geo_redirect"] is None
+    assert notes and "www.gym.example" in notes[0]
+
+
+def test_a_location_redirect_is_undone_with_the_sites_own_default(web):
+    # orangetheory.com: India got /en-in; the page names /en-us as x-default.
+    india = ('<html lang="en-IN"><head><link rel="alternate" hreflang="x-default" '
+             'href="https://www.fit.example/en-us"></head><body>%s</body></html>' % words(300))
+    web.pages["https://www.fit.example/"] = page("https://www.fit.example/", india,
+                                                 final="https://www.fit.example/en-in")
+    web.pages["https://www.fit.example/en-us"] = page("https://www.fit.example/en-us",
+                                                      "<p>%s</p>" % words(300))
+    home, notes = site.choose_home("https://www.fit.example/")
+    assert home["final_url"] == "https://www.fit.example/en-us" and home["geo_redirect"] is None
+    assert "en-in" in notes[0] and "default version" in notes[0]
+
+
+def test_a_location_redirect_without_a_default_stays_flagged(web):
+    web.pages["https://www.fit.example/"] = page("https://www.fit.example/", "<p>%s</p>" % words(300),
+                                                 final="https://www.fit.example/en-in")
+    home, _ = site.choose_home("https://www.fit.example/")
+    assert home["geo_redirect"] == "locale path /en-in"
+
+
+def test_read_site_end_to_end(web):
+    web.pages["https://acme.example/"] = page("https://acme.example/", PAGE.replace(
+        "</body>", "<p>%s</p></body>" % words(200)))
+    web.pages["https://acme.example/about-us"] = page("https://acme.example/about-us",
+                                                      "<p>%s</p>" % words(50, "about"))
+    web.pages["https://acme.example/unidades"] = page("https://acme.example/unidades",
+                                                      "<p>%s</p>" % words(20, "loc"))
+    out = site.read_site("acme.example")
+    assert out["status"] == "ok" and out["domain"] == "acme.example"
+    kinds = [(p["kind"], p["status"]) for p in out["pages"]]
+    assert kinds == [("home", "ok"), ("about", "ok"), ("legal", "not_found"), ("locations", "ok")]
+    s = out["signals"]
+    assert s["platforms"] == [{"name": "shopify", "kind": "commerce"}]
+    assert s["phones"] == ["+442079460000", "+44 20 7946 0000"]
+    assert s["emails"] == ["hello@acme.example"]
+    assert out["country"]["code"] == "GB"
+    assert "runs on a shop platform: shopify" in out["hints"]
+    assert "structured data gives one business address" in out["hints"]
+    assert set(out["texts"]) == {"https://acme.example/", "https://acme.example/about-us",
+                                 "https://acme.example/unidades"}
+
+
+def test_a_site_built_in_the_browser_is_flagged(web):
+    web.pages["https://spa.example/"] = page("https://spa.example/",
+                                             '<div id="__next"></div><p>Loading</p>')
+    out = site.read_site("https://spa.example/")
+    assert out["needs_browser"] and "built in the browser" in out["pages"][0]["note"]
+
+
+def test_an_unreachable_site_says_so(web):
+    out = site.read_site("https://down.example/")
+    assert out["status"] == "not_found" and out["texts"] == {}
+
+
+# == business-type hints ===============================================================
+
+def signals(**over):
+    base = {"platforms": [], "sitemap": None, "product_schema": False, "has_cart": False,
+            "location_links": {"count": 0}, "locator_vendors": [], "organizations": []}
+    base.update(over)
+    return base
+
+
+def test_a_woocommerce_plugin_without_products_is_not_a_shop():
+    # austincitydental.com and pembridgedental.co.uk
+    hints = site.archetype_hints(signals(platforms=[{"name": "woocommerce", "kind": "commerce"}]))
+    assert hints == ["has a shop plugin installed (woocommerce) but no product pages were found"]
+
+
+def test_woocommerce_with_products_is_a_shop_and_shopify_always_is():
+    with_products = signals(platforms=[{"name": "woocommerce", "kind": "commerce"}],
+                            sitemap={"product_like": 40, "location_like": 0})
+    assert site.archetype_hints(with_products)[0] == "has a shop plugin with products: woocommerce"
+    assert site.archetype_hints(signals(platforms=[{"name": "shopify", "kind": "commerce"}]))[0] == \
+        "runs on a shop platform: shopify"
+
+
+def test_one_place_written_two_ways_is_one_address():
+    orgs = [{"address": {"addressLocality": "Austin", "postalCode": "78701", "streetAddress": "1 Main"}},
+            {"address": {"addressLocality": "Austin ", "postalCode": "78701", "country": "US"}}]
+    assert site.archetype_hints(signals(organizations=orgs)) == [
+        "structured data gives one business address"]
+
+
+def test_location_pages_named_near_me_count():
+    # clovedental.in lists 688 pages under /dentist-near-me/
+    assert site.LOCATION_PATH.search("/dentist-near-me/hsr-layout/")
+
+
+# == the corpus =========================================================================
+
+def test_corpus_keeps_the_homepage_whole_and_drops_shared_chrome():
+    texts = {"https://a/": "Menu\nFooter\nHome intro",
+             "https://a/about": "Menu\nFooter\nAbout text",
+             "https://a/contact": "Menu\nFooter\nContact text"}
+    corpus = prof.build_corpus({"texts": texts})
+    assert "=== https://a/ ===\nMenu\nFooter\nHome intro" in corpus
+    assert "=== https://a/about ===\nAbout text" in corpus
+
+
+def test_corpus_is_capped():
+    texts = {"https://a/%d" % i: "x" * 20_000 for i in range(10)}
+    assert len(prof.build_corpus({"texts": texts})) <= prof.CORPUS_CHARS + 200
+
+
+# == the model, faked =====================================================================
+
+GOOD = {"name": "Acme Dental", "one_liner": "A family dental practice \u2014 in London.",
+        "offerings": ["Check-ups", "Implants"], "customer_type": "B2C", "archetype": "local_single",
+        "archetype_reason": "One practice.", "business_model": "Private dental fees",
+        "sells_online": False, "location_count": 1, "location_count_basis": "One address",
+        "hq": {"city": "London", "region": "", "country_code": "gb"}, "markets": ["gb", "GBR"],
+        "service_area": "West London", "price_positioning": "premium",
+        "industry": {"plain_label": "Dentist", "naics_code": "621210",
+                     "naics_title": "Offices of Dentists", "keywords": ["dentist"]},
+        "competitors_named": [], "languages": ["English"],
+        "evidence": [{"field": "name", "quote": "Family dentist \u2014 Kensington",
+                      "url": "https://acme.example/"}],
+        "confidence": {"archetype": "high", "industry": "high", "hq": "high", "location_count": "high"},
+        "unknowns": []}
+
+
+def reply(body=GOOD, stop="end_turn", model="claude-sonnet-5-5",
+          usage=None):
+    usage = usage or {"input_tokens": 12_000, "output_tokens": 2_000}
+    return SimpleNamespace(
+        content=[SimpleNamespace(type="thinking", thinking=""),
+                 SimpleNamespace(type="text", text=json.dumps(body) if not isinstance(body, str) else body)],
+        stop_reason=stop, model=model, stop_details=None,
+        usage=SimpleNamespace(model_dump=lambda: dict(usage)))
+
+
+class FakeClient:
+    def __init__(self, *replies, beta_error=None, plain_error=None):
+        self.replies, self.calls = list(replies), []
+        self.beta_error, self.plain_error = beta_error, plain_error
+        outer = self
+
+        class _Msgs:
+            def __init__(self, beta):
+                self.beta = beta
+
+            def create(self, **kw):
+                outer.calls.append(("beta" if self.beta else "plain", kw))
+                err = outer.beta_error if self.beta else outer.plain_error
+                if err:
+                    raise err
+                return outer.replies.pop(0)
+
+        self.messages = _Msgs(False)
+        self.beta = SimpleNamespace(messages=_Msgs(True))
+
+
+def api_error(cls, status, message):
+    import httpx2
+    resp = httpx2.Response(status, request=httpx2.Request("POST", "https://api.anthropic.com/v1/messages"))
+    return cls(message, response=resp, body=None)
+
+
+def test_the_request_asks_for_structured_output_with_fallbacks_and_no_tools():
+    client = FakeClient(reply())
+    parsed, meta = prof.ask_model({"website": "x"}, "TEXT", client=client)
+    kind, kw = client.calls[0]
+    assert kind == "beta" and kw["fallbacks"] == "default"
+    assert kw["betas"] == ["server-side-fallback-2026-07-01"]
+    assert kw["output_config"]["format"]["schema"] is prof.PROFILE_SCHEMA
+    assert kw["output_config"]["effort"] == "low"
+    assert "tools" not in kw and kw["model"] == prof.MODEL
+    assert parsed["name"] == "Acme Dental"
+
+
+def test_a_rejected_fallback_option_is_retried_without_it():
+    import anthropic
+    client = FakeClient(reply(), beta_error=api_error(anthropic.BadRequestError, 400,
+                                                      "fallbacks: unsupported with output_config"))
+    parsed, meta = prof.ask_model({}, "T", client=client)
+    assert [k for k, _ in client.calls] == ["beta", "plain"]
+    assert meta["fallbacks"].startswith("rejected")
+
+
+@pytest.mark.parametrize("stop, kind", [("refusal", "refused"), ("max_tokens", "truncated")])
+def test_refusals_and_truncation_are_errors_not_profiles(stop, kind):
+    with pytest.raises(prof.ProfileError) as e:
+        prof.ask_model({}, "T", client=FakeClient(reply(stop=stop)))
+    assert e.value.kind == kind
+
+
+def test_unparseable_text_is_an_error():
+    with pytest.raises(prof.ProfileError) as e:
+        prof.ask_model({}, "T", client=FakeClient(reply(body="{not json")))
+    assert e.value.kind == "bad_json"
+
+
+from tracker import market_radar_ledger as ledger  # noqa: E402
+
+
+def test_a_measured_call_is_priced_at_the_model_that_served_it(world):
+    # A fallback can serve the request on another model at that model's rates.
+    client = FakeClient(reply(model="claude-opus-5-5", usage={"input_tokens": 10_000,
+                                                             "output_tokens": 1_000}))
+    prof.ask_model({}, "T", client=client, run_id=world["run"])
+    s = ledger.summary(world["run"])
+    assert s["total_usd"] == 0.06 and not s["partial"]       # 10k x $4 + 1k x $20
+
+
+def test_a_refused_reply_is_still_billed(world):
+    with pytest.raises(prof.ProfileError):
+        prof.ask_model({}, "T", client=FakeClient(reply(stop="refusal")), run_id=world["run"])
+    assert ledger.summary(world["run"])["calls_by_status"] == {"done": 1}
+
+
+def test_a_request_the_api_rejects_costs_nothing(world):
+    import anthropic
+    err = api_error(anthropic.AuthenticationError, 401, "invalid x-api-key")
+    with pytest.raises(prof.ProfileError) as e:
+        prof.ask_model({}, "T", client=FakeClient(beta_error=err), run_id=world["run"])
+    s = ledger.summary(world["run"])
+    assert e.value.kind == "api_error" and s["total_usd"] == 0 and s["calls_by_status"] == {"failed": 1}
+
+
+def test_a_dropped_connection_counts_at_its_booking(world):
+    with pytest.raises(prof.ProfileError):
+        prof.ask_model({}, "T", client=FakeClient(beta_error=ConnectionError("reset")),
+                       run_id=world["run"])
+    s = ledger.summary(world["run"])
+    assert s["partial"] and s["calls_by_status"] == {"unmeasured": 1} and s["total_usd"] > 0
+
+
+def test_no_call_is_made_when_the_budget_cannot_cover_it(world):
+    ledger.reserve(world["run"], "x", "anthropic", model="claude-sonnet-5-5",
+                   prompt_tokens=45_000, max_output_tokens=0)          # $0.09 of $0.10
+    client = FakeClient(reply())
+    with pytest.raises(prof.ProfileError) as e:
+        prof.ask_model({}, "T", client=client, run_id=world["run"])
+    assert e.value.kind == "budget" and client.calls == []
+
+
+# == checking and assembling ==============================================================
+
+def site_for(**over):
+    base = {"status": "ok", "home_url": "https://acme.example/", "domain": "acme.example",
+            "country": {"code": "GB", "confidence": 1.0, "evidence": []},
+            "signals": signals(), "hints": [], "pages": [{"kind": "home", "url": "https://acme.example/",
+                                                          "status": "ok", "note": ""}],
+            "texts": {"https://acme.example/": "Family dentist \u2014 Kensington [https://acme.example/x] since 1990"},
+            "home_notes": [], "needs_browser": False, "robots": None, "read_at": "2026-10-09T00:00:00+00:00"}
+    base.update(over)
+    return base
+
+
+def test_assemble_cleans_prose_but_never_the_quotes():
+    p = prof.assemble(site_for(), dict(GOOD), {"model_served": "claude-sonnet-5-5"})
+    assert p["one_liner"] == "A family dental practice, in London."
+    assert p["evidence"][0]["quote"] == "Family dentist \u2014 Kensington"   # verbatim from the page
+    assert p["hq"]["country_code"] == "GB" and p["markets"] == ["GB"]
+    assert p["checks"] == []          # the quote is found, ignoring dash and link markers
+
+
+def test_checks_flag_a_shop_with_no_shop():
+    p = dict(GOOD, archetype="ecommerce", sells_online=True)
+    assert "no shop platform or product pages" in prof.checks(site_for(), p)[0]
+
+
+def test_checks_flag_a_single_location_with_hundreds_of_location_pages():
+    s = site_for(signals=signals(sitemap={"location_like": 500, "product_like": 0}))
+    assert "500 location-like pages" in prof.checks(s, dict(GOOD))[0]
+
+
+def test_checks_flag_a_headquarters_the_sites_own_signals_contradict():
+    p = dict(GOOD, hq={"city": "Austin", "region": "TX", "country_code": "US"})
+    assert "point to GB (100%)" in prof.checks(site_for(), p)[0]
+
+
+def test_checks_flag_quotes_not_on_the_page_or_from_unread_pages():
+    p = dict(GOOD, evidence=[{"field": "name", "quote": "Best dentist in Paris", "url": "https://acme.example/"},
+                             {"field": "hq", "quote": "x", "url": "https://elsewhere.example/"}])
+    out = prof.checks(site_for(), p)
+    assert "1 evidence quote(s) cite a page that was not read." in out
+    assert "1 evidence quote(s) do not appear on the page they cite." in out
+
+
+def test_hq_uses_the_sites_own_coordinates_only_for_one_place(monkeypatch):
+    monkeypatch.setattr(prof, "geocode", lambda q, conn=None: {"lat": 1.0, "lon": 2.0, "label": q})
+    one = {"archetype": "local_single", "hq": {"city": "London"},
+           "facts": {"structured_locations": [{"geo": {"lat": 51.5, "lon": -0.19}}]}}
+    assert prof.locate_hq(one)["source"] == "structured data"
+    chain = {"archetype": "multi_location", "hq": {"city": "Chicago", "country_code": "US"},
+             "facts": {"structured_locations": [{"geo": {"lat": 1, "lon": 1}}, {"geo": {"lat": 2, "lon": 2}}]}}
+    assert prof.locate_hq(chain) == {"lat": 1.0, "lon": 2.0, "label": "Chicago, US", "source": "geocoded"}
+    assert prof.locate_hq({"hq": {"city": ""}, "facts": {}}) is None
+
+
+def test_build_profile_end_to_end_saves_the_company(world, monkeypatch):
+    monkeypatch.setattr(prof.site_reader, "read_site", lambda url: site_for())
+    monkeypatch.setattr(prof, "geocode", lambda q, conn=None: None)
+    out = prof.build_profile("https://acme.example/", client=FakeClient(reply()), run_id=world["run"])
+    assert out["status"] == "ok" and out["entity_id"]
+    from tracker import market_radar_store as store
+    row = store.get_entity(out["entity_id"])
+    assert (row["domain"], row["name"], row["country"], row["archetype"]) == \
+        ("acme.example", "Acme Dental", "GB", "local_single")
+    assert row["profile"]["industry"]["naics_code"] == "621210"
+    assert row["profile"]["model"]["cost_usd"] == 0.044      # 12k x $2 + 2k x $10
+
+
+def test_build_profile_reports_an_unreadable_site_without_calling_the_model(monkeypatch):
+    monkeypatch.setattr(prof.site_reader, "read_site", lambda url: {"status": "blocked", "pages": [],
+                                                                   "texts": {}})
+    client = FakeClient()
+    out = prof.build_profile("https://x.example/", client=client, save=False)
+    assert out["status"] == "unreadable" and client.calls == []
+
+
+def test_geocode_is_cached_and_survives_a_failure(pg, monkeypatch):
+    calls = []
+
+    class R:
+        def raise_for_status(self):
+            pass
+
+        def json(self):
+            return [{"lat": "30.27", "lon": "-97.74", "display_name": "Austin, Texas"}]
+
+    monkeypatch.setattr(prof.requests, "get", lambda *a, **k: calls.append(1) or R())
+    monkeypatch.setattr(prof.time, "sleep", lambda s: None)
+    assert prof.geocode("Austin, TX, US")["lat"] == 30.27
+    assert prof.geocode("Austin,  TX, US")["lat"] == 30.27     # same query once spaces settle
+    assert len(calls) == 1
+
+    def boom(*a, **k):
+        raise ConnectionError("down")
+    monkeypatch.setattr(prof.requests, "get", boom)
+    assert prof.geocode("Nowhere") is None
+
+
+# == the admin route ======================================================================
+
+ROUTE = "/p2/admin/external-usage/market-radar-profile-check"
+ADMIN = "reporting@position2.com"
+
+
+def _client(email):
+    import app as appmod
+    c = appmod.app.test_client()
+    if email:
+        with c.session_transaction() as sess:
+            sess["google_user"] = {"email": email, "name": "T"}
+    return c
+
+
+@pytest.fixture
+def no_profile(monkeypatch):
+    def refuse(*a, **k):
+        raise AssertionError("the route tried to spend money")
+    monkeypatch.setattr(prof, "build_profile", refuse)
+
+
+@pytest.mark.parametrize("body", [None, {"url": "acme.example"}, {"url": "acme.example", "confirm_spend": "yes"}])
+def test_route_needs_an_explicit_confirmation(no_profile, body):
+    c = _client(ADMIN)
+    resp = c.post(ROUTE, json=body) if body is not None else c.post(ROUTE)
+    assert resp.status_code == 400 and "confirm_spend" in resp.get_json()["error"]
+
+
+def test_route_refuses_a_url_without_a_host(no_profile):
+    resp = _client(ADMIN).post(ROUTE, json={"url": "localhost", "confirm_spend": True})
+    assert resp.status_code == 400 and "usable company URL" in resp.get_json()["error"]
+
+
+@pytest.mark.parametrize("email, headers, status", [
+    (None, {}, 302), ("someone@position2.com", {}, 403),
+    (ADMIN, {"Origin": "https://evil.example"}, 403)])
+def test_route_access(no_profile, email, headers, status):
+    resp = _client(email).post(ROUTE, json={"url": "acme.example", "confirm_spend": True}, headers=headers)
+    assert resp.status_code == status
+
+
+def test_route_profiles_books_and_closes_the_run(world, monkeypatch):
+    monkeypatch.setattr(prof.site_reader, "read_site", lambda url: site_for())
+    monkeypatch.setattr(prof, "geocode", lambda q, conn=None: None)
+    monkeypatch.setattr(prof, "_client", lambda: FakeClient(reply()))
+    resp = _client(ADMIN).post(ROUTE, json={"url": "https://acme.example/", "confirm_spend": True})
+    body = resp.get_json()
+    assert resp.status_code == 200, body
+    assert body["status"] == "ok" and body["profile"]["archetype"] == "local_single"
+    assert body["ledger"]["total_usd"] == 0.044 and not body["ledger"]["partial"]
+    from tracker import market_radar_store as store
+    assert store.get_run(body["run_id"], ADMIN)["status"] == "complete"
+
+
+def test_route_marks_the_run_failed_when_the_model_fails(world, monkeypatch):
+    monkeypatch.setattr(prof.site_reader, "read_site", lambda url: site_for())
+    monkeypatch.setattr(prof, "_client", lambda: FakeClient(reply(stop="refusal")))
+    body = _client(ADMIN).post(ROUTE, json={"url": "acme.example", "confirm_spend": True}).get_json()
+    assert body["status"] == "failed" and body["error"]["kind"] == "refused"
+    from tracker import market_radar_store as store
+    run = store.get_run(body["run_id"], ADMIN)
+    assert run["status"] == "failed" and "refused" in run["error"]
+
+
+def test_robots_and_sitemaps_are_requested_with_an_accept_header(monkeypatch):
+    # Shopify answered 403 to robots.txt and sitemap.xml without one
+    # (allbirds.com, snocks.com, 2026-10-09), which hid every shop's sitemap.
+    seen = {}
+
+    class Resp:
+        status_code = 200
+
+        def iter_content(self, n):
+            yield b"User-agent: *\nDisallow:\n"
+
+        def close(self):
+            pass
+
+    def fake_get(url, timeout, stream, headers):
+        seen.update(headers)
+        return Resp() if headers.get("Accept") else SimpleNamespace(status_code=403, close=lambda: None)
+
+    monkeypatch.setattr(site, "public_get", fake_get)
+    assert site.fetch_text("https://shop.example/robots.txt").startswith("User-agent")
+    assert seen["Accept"] == "*/*"

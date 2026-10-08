@@ -8860,6 +8860,50 @@ def admin_external_usage_market_radar_apify_check():
         ledger=market_radar_ledger.summary(run_id))
 
 
+@app.route("/p2/admin/external-usage/market-radar-profile-check", methods=["POST"])
+@admin_required
+def admin_external_usage_market_radar_profile_check():
+    """Market Radar Phase 1: profile ONE company from its URL, on this server
+    (tracker/market_radar_profile). One Sonnet call, about $0.05, so the body
+    must carry {"url": ..., "confirm_spend": true}. The call is booked in the
+    cost ledger under a run owned by the admin, and the profile is stored on
+    the company's shared record."""
+    import time as _time
+    if not _evi_same_origin():
+        return jsonify(error="This request came from another site and was refused."), 403
+    body = request.get_json(silent=True) or {}
+    if body.get("confirm_spend") is not True:
+        return jsonify(error='This check spends money. Send {"url": ..., "confirm_spend": true}.'), 400
+    from tracker import market_radar_ledger, market_radar_profile
+    from tracker import market_radar_store as mr_store
+    try:
+        domain = mr_store.normalize_domain(body.get("url") or "")
+    except ValueError as e:
+        return jsonify(error="Not a usable company URL: %s" % e), 400
+    email = (_get_user() or {}).get("email", "")
+    started = _time.monotonic()
+    try:
+        entity = mr_store.upsert_entity(domain)
+        client = mr_store.upsert_client(email, entity)
+        run_id = mr_store.create_run(client, email, "baseline")
+        mr_store.update_run(run_id, status="running", stage="profile")
+    except mr_store.StoreUnavailable as e:
+        return jsonify(error="Not run: the cost ledger is unavailable (%s)." % e), 503
+    try:
+        result = market_radar_profile.build_profile(body["url"], run_id=run_id)
+    except Exception as e:
+        mr_store.update_run(run_id, status="failed", error="%s: %s" % (type(e).__name__, str(e)[:300]))
+        return jsonify(error="%s: %s" % (type(e).__name__, str(e)[:300]), run_id=run_id), 500
+    failed = result["status"] != "ok"
+    mr_store.update_run(run_id, status="failed" if failed else "complete",
+                        error=json.dumps(result["error"]) if failed else None,
+                        summary={"status": result["status"], "entity_id": result["entity_id"]})
+    return jsonify(status=result["status"], error=result["error"], run_id=run_id,
+                   entity_id=result["entity_id"], profile=result["profile"],
+                   pages=result.get("pages"), seconds=round(_time.monotonic() - started, 1),
+                   ledger=market_radar_ledger.summary(run_id))
+
+
 def _unipile_selftest() -> dict:
     """Prove the Unipile integration end to end -- see
     tracker/unipile_client.probe. Free: list_accounts() needs no connected
