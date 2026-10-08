@@ -183,7 +183,7 @@ def test_the_run_count_is_the_list_it_heads(monkeypatch):
              "participant_count": 3} for i in range(4)]
     html = _render(monkeypatch, runs=runs)
     assert re.search(r'<h3>Your runs<span class="evi-runcount">4</span></h3>', html)
-    assert "evi-runcount" not in _render(monkeypatch, runs=[])
+    assert "<h3>Your runs</h3>" in _render(monkeypatch, runs=[])
 
 
 def test_the_example_events_only_fill_the_box(monkeypatch):

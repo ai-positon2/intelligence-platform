@@ -547,8 +547,31 @@
       <aside class="evi-rail">
         <div class="evi-card" id="eviHistoryCard">
           <div class="evi-card-pad">
-            <div class="evi-sec">
+            <div class="evi-sec evi-hist">
               <h3>Your runs{% if runs %}<span class="evi-runcount">{{ runs | length }}</span>{% endif %}</h3>
+              {# The plays' own icons, so a row says what kind of run it is
+                 before a word of it is read. #}
+              {% set icons = {
+                'recommend': '<rect x="3" y="4.5" width="18" height="16" rx="2.5"/><path d="M3 9.5h18M8 2.5v4M16 2.5v4"/><path d="M9 14.5l2.2 2.2L15.5 12"/>',
+                'lookup': '<path d="M4 5.5h10M4 12h10M4 18.5h7"/><circle cx="18.5" cy="17" r="3"/><path d="M20.8 19.4L23 21.5"/>',
+                'workroom': '<path d="M3.5 6.5a2 2 0 012-2h13a2 2 0 012 2v8a2 2 0 01-2 2H9l-4.5 3.5v-3.5a1 1 0 00-1-1z"/><path d="M8 9h8M8 12.5h5"/>',
+                'discover': '<circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/>'} %}
+              {% if runs %}
+              {# What the list holds, by play, and each count is also the
+                 filter for it. Retired discover runs count under All only. #}
+              {% set by = {} %}
+              {% for r in runs %}{% set _ = by.update({r.mode: by.get(r.mode, 0) + 1}) %}{% endfor %}
+              <div class="hfilter" role="tablist" aria-label="Filter runs">
+                <button type="button" class="hf on" data-filter="all" onclick="filterRuns('all')"><b>{{ runs | length }}</b><span>All</span></button>
+                {% for key, label in [('recommend', 'Calendars'), ('lookup', 'Rosters'), ('workroom', 'Rooms')] %}
+                <button type="button" class="hf m-{{ key }}" data-filter="{{ key }}" onclick="filterRuns('{{ key }}')"{% if not by.get(key) %} disabled{% endif %}><b>{{ by.get(key, 0) }}</b><span>{{ label }}</span></button>
+                {% endfor %}
+              </div>
+              {% if runs | length > 6 %}
+              <label class="hsearch"><span class="evi-sr">Find a run</span>
+                <input type="search" id="runsSearch" placeholder="Find a run" autocomplete="off" oninput="filterRuns()"></label>
+              {% endif %}
+              {% endif %}
               <div class="evi-runs" id="runsList">
                 {% if runs %}
                   {% for r in runs %}
@@ -566,7 +589,11 @@
                                   'discover': 'Audience search (retired)',
                                   'workroom': 'Room worked'} %}
                   <button class="evi-run m-{{ r.mode }}" type="button"
+                          data-run="{{ r.id }}" data-mode="{{ r.mode }}" data-status="{{ r.status }}"
+                          data-created="{{ r.created_at or '' }}"
+                          data-q="{{ ((r.event_name or '') ~ ' ' ~ (r.query or '')) | lower }}"
                           onclick="openRun({{ r.id }})">
+                    <span class="ri" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">{{ icons.get(r.mode, icons['discover']) | safe }}</svg></span>
                     <span class="rl">
                       <span class="q">{{ r.event_name or r.query }}</span>
                       <span class="sub">
@@ -575,13 +602,17 @@
                         {%- if r.credits_spent %} · {{ r.credits_spent }} Apollo credit{{ '' if r.credits_spent == 1 else 's' }}{% endif %}
                       </span>
                     </span>
-                    <span class="evi-badge {{ r.status }}">{{ r.status }}</span>
+                    <span class="rs">
+                      <span class="evi-badge {{ r.status }}">{{ r.status }}</span>
+                      <span class="rt"></span>
+                    </span>
                   </button>
                   {% endfor %}
                 {% else %}
                   <div class="evi-empty">No runs yet. Pick a play above and run it.</div>
                 {% endif %}
               </div>
+              <div class="evi-empty hnone" id="runsNone" hidden>No run matches that.</div>
             </div>
           </div>
         </div>
@@ -858,6 +889,135 @@
       // that runs it are the same fact. Left to the template alone the card
       // said "Which events to attend" while the button said "Run".
       setMode(mode);
+      // The history is decoration on top of a list that already works, so a
+      // failure here must never take the form down with it.
+      try { decorateRuns(); } catch (e) {}
+    }
+
+    /* ── your runs ────────────────────────────────────────────────────
+       The list arrives from the server in date order, newest first. Here it
+       gains what only the browser can say: when each run happened in the
+       reader's own time, grouped under Today, Yesterday, This week and then
+       by month, plus a filter by play and a search. */
+    var RUN_DAY = 86400000;
+    function runGroup(when, now){
+      var day = function(d){ return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime(); };
+      var diff = Math.round((day(now) - day(when)) / RUN_DAY);
+      if (diff <= 0) return 'Today';
+      if (diff === 1) return 'Yesterday';
+      if (diff < 7) return 'This week';
+      var months = ['January','February','March','April','May','June','July','August',
+                    'September','October','November','December'];
+      return months[when.getMonth()] + (when.getFullYear() === now.getFullYear() ? '' : ' ' + when.getFullYear());
+    }
+    function runTime(when, group, now){
+      var two = function(n){ return (n < 10 ? '0' : '') + n; };
+      var mins = Math.round((now - when) / 60000);
+      if (group === 'Today' && mins < 60) return mins < 1 ? 'just now' : mins + ' min ago';
+      if (group === 'Today' || group === 'Yesterday') return when.getHours() + ':' + two(when.getMinutes());
+      var mon = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      return mon[when.getMonth()] + ' ' + when.getDate();
+    }
+    window.runGroup = runGroup;
+    window.runTime = runTime;
+
+    function decorateRuns(){
+      var list = document.getElementById('runsList');
+      if (!list || typeof list.querySelectorAll !== 'function') return;
+      Array.prototype.forEach.call(list.querySelectorAll('.hg'), function(h){ h.parentNode.removeChild(h); });
+      var now = new Date(), last = null;
+      Array.prototype.forEach.call(list.querySelectorAll('.evi-run'), function(row){
+        var when = new Date(row.getAttribute('data-created') || '');
+        if (isNaN(when.getTime())) return;
+        var group = runGroup(when, now);
+        var t = row.querySelector('.rt');
+        if (t) { t.textContent = runTime(when, group, now); t.title = when.toLocaleString(); }
+        if (group !== last) {
+          var h = document.createElement('div');
+          h.className = 'hg'; h.textContent = group;
+          list.insertBefore(h, row);
+          last = group;
+        }
+      });
+      filterRuns();
+    }
+    window.decorateRuns = decorateRuns;
+
+    var runFilter = 'all';
+    function filterRuns(kind){
+      if (kind) runFilter = kind;
+      var list = document.getElementById('runsList');
+      if (!list || typeof list.querySelectorAll !== 'function') return;
+      var box = document.getElementById('runsSearch');
+      var q = box ? box.value.trim().toLowerCase() : '';
+      Array.prototype.forEach.call(document.querySelectorAll('.hfilter .hf'), function(b){
+        var on = b.getAttribute('data-filter') === runFilter;
+        b.classList.toggle('on', on);
+        b.setAttribute('aria-selected', on ? 'true' : 'false');
+      });
+      var shown = 0, heading = null, headingShown = false;
+      Array.prototype.forEach.call(list.children, function(el){
+        if (el.classList.contains('hg')) {
+          if (heading) heading.hidden = !headingShown;
+          heading = el; headingShown = false;
+          return;
+        }
+        if (!el.classList.contains('evi-run')) return;
+        var ok = (runFilter === 'all' || el.getAttribute('data-mode') === runFilter)
+              && (!q || (el.getAttribute('data-q') || '').indexOf(q) !== -1);
+        el.hidden = !ok;
+        if (ok) { shown++; headingShown = true; }
+      });
+      if (heading) heading.hidden = !headingShown;
+      var none = document.getElementById('runsNone');
+      var total = list.querySelectorAll('.evi-run').length;
+      if (none) none.hidden = !(total && !shown);
+    }
+    window.filterRuns = filterRuns;
+
+    /* A run started here joins the list at once, as running, and takes its
+       final status when the watch sees it finish. Before, the list did not
+       know about it until the page was reloaded. */
+    function addRunRow(runId, m, title){
+      var list = document.getElementById('runsList');
+      if (!list || typeof list.querySelector !== 'function' || list.querySelector('[data-run="' + runId + '"]')) return;
+      var kinds = {recommend: 'Scored calendar', lookup: 'Event roster', workroom: 'Room worked'};
+      var card = document.getElementById(TABS[m]);
+      var icon = card && card.querySelector('.pi svg');
+      var row = document.createElement('button');
+      row.type = 'button';
+      row.className = 'evi-run m-' + m;
+      row.setAttribute('data-run', runId);
+      row.setAttribute('data-mode', m);
+      row.setAttribute('data-status', 'running');
+      row.setAttribute('data-created', new Date().toISOString());
+      row.setAttribute('data-q', String(title || '').toLowerCase());
+      row.onclick = function(){ openRun(runId); };
+      row.innerHTML = '<span class="ri" aria-hidden="true">' + (icon ? icon.outerHTML : '') + '</span>' +
+        '<span class="rl"><span class="q">' + esc(title || 'New run') + '</span>' +
+        '<span class="sub"><span class="k">' + esc(kinds[m] || m) + '</span></span></span>' +
+        '<span class="rs"><span class="evi-badge running">running</span><span class="rt"></span></span>';
+      var empty = list.querySelector('.evi-empty');
+      if (empty) empty.parentNode.removeChild(empty);
+      list.insertBefore(row, list.firstChild);
+      // The first run on a new account has no count to update yet.
+      var count = document.querySelector('.evi-runcount');
+      var head = document.querySelector('.evi-hist h3');
+      if (!count && head) {
+        count = document.createElement('span');
+        count.className = 'evi-runcount';
+        head.appendChild(count);
+      }
+      if (count) count.textContent = String(list.querySelectorAll('.evi-run').length);
+      decorateRuns();
+    }
+    function setRunRowStatus(runId, status){
+      var list = document.getElementById('runsList');
+      var row = list && typeof list.querySelector === 'function' && list.querySelector('[data-run="' + runId + '"]');
+      if (!row) return;
+      row.setAttribute('data-status', status);
+      var b = row.querySelector('.evi-badge');
+      if (b) { b.className = 'evi-badge ' + status; b.textContent = status; }
     }
 
     /* ── reading a client's site to fill this form in ──────────────────
@@ -1447,6 +1607,7 @@
         .then(function(res){
           if (!res.ok) { throw new Error(res.j.error || 'The run could not be started.'); }
           window.eviPendingRequest = null;
+          try { addRunRow(res.j.run_id, mode, runTitle(mode, body)); } catch (e) {}
           watch(res.j.run_id, mode);
         })
         .catch(function(err){
@@ -1457,6 +1618,20 @@
       return false;
     }
     window.startRun = startRun;
+
+    /* What the new row is called, from the same things the server names it
+       by: the client for a calendar, the event for a roster, the roster's
+       event for a worked room. */
+    function runTitle(m, body){
+      var label = function(id){
+        var sel = document.getElementById(id);
+        var opt = sel && sel.options && sel.options[sel.selectedIndex];
+        return opt ? String(opt.textContent || '').split(' \u00b7 ')[0].trim() : '';
+      };
+      if (m === 'lookup') return body.query || '';
+      if (m === 'workroom') return label('sourceRun');
+      return label('profilePick') || (document.getElementById('clientName') || {}).value || '';
+    }
 
     /* While a run is going, its progress stands where the form was: the
        form has nothing left to ask, and a filled-in form under a live run
@@ -1633,6 +1808,7 @@
             paintProgress('running', mode, s.stage, s.started_at);
             if (s.status === 'complete' || s.status === 'failed') {
               stop();
+              try { setRunRowStatus(runId, s.status); } catch (e) {}
               document.getElementById('runBtn').disabled = false;
               showRunning(false);
               openRun(runId);
