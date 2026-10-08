@@ -835,3 +835,16 @@ def test_tls_context_verifies_certificates_and_is_built_once():
     assert ctx is site.tls_context()
     assert ctx.verify_mode == ssl.CERT_REQUIRED and ctx.check_hostname
     assert ctx.cert_store_stats()["x509_ca"] > 50          # certifi's bundle is loaded
+
+
+def test_a_quote_from_the_sites_structured_data_verifies():
+    # drcjagadeesh.com: "688 9th A Main Road" in structured data, "687 ... Rd" in its text.
+    orgs = [{"name": "Clinic", "address": {"streetAddress": "688 9th A Main Road, Near Chinmaya Mission Hospital, Indiranagar"}}]
+    s = site_for(signals=signals(organizations=orgs),
+                 texts={"https://acme.example/": "Visit us at 687 9th A Main Rd near Chinmaya Mission Hospital"})
+    quote = {"field": "hq", "quote": "688 9th A Main Road, Near Chinmaya Mission Hospital, Indiranagar",
+             "url": "https://acme.example/"}
+    assert prof.checks(s, dict(GOOD, evidence=[quote])) == []
+    made_up = dict(quote, quote="12 Baker Street, London")
+    assert prof.checks(s, dict(GOOD, evidence=[made_up])) == [
+        "1 evidence quote(s) do not appear on the page they cite."]

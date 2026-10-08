@@ -325,8 +325,15 @@ def checks(site, p):
     unsourced = [e for e in p.get("evidence", []) if _u(e.get("url")) not in page_urls]
     if unsourced:
         out.append("%d evidence quote(s) cite a page that was not read." % len(unsourced))
+    # Structured data is on the page too, just not in its visible text: the
+    # model sees it among the facts and quotes it (drcjagadeesh.com's address
+    # is "688 9th A Main Road" in its structured data and "687 9th A Main Rd"
+    # in its visible text, the site's own inconsistency).
+    structured = _norm(json.dumps((site.get("signals") or {}).get("organizations", []),
+                                  ensure_ascii=False).replace("\\n", " "))
     unfound = [e for e in p.get("evidence", []) if _u(e.get("url")) in texts
-               and _norm(e.get("quote")) and not _quote_on_page(e["quote"], texts[_u(e["url"])])]
+               and _norm(e.get("quote")) and not _quote_on_page(e["quote"], texts[_u(e["url"])])
+               and _norm(e["quote"]) not in structured]
     if unfound:
         out.append("%d evidence quote(s) do not appear on the page they cite." % len(unfound))
     return out
