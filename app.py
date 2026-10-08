@@ -8790,6 +8790,25 @@ def admin_external_usage_market_radar_sources_check():
         return jsonify(error="%s: %s" % (type(e).__name__, str(e)[:300])), 500
 
 
+@app.route("/p2/admin/external-usage/market-radar-schema-check", methods=["POST"])
+@admin_required
+def admin_external_usage_market_radar_schema_check():
+    """Market Radar Phase 0: create the mr_ tables if missing, then prove them
+    and the cost ledger end to end on this database inside a transaction that
+    is rolled back (see tracker/market_radar_selftest). POST and same-origin
+    only, like the source check above it."""
+    if not _evi_same_origin():
+        return jsonify(error="This request came from another site and was refused."), 403
+    from tracker import market_radar_selftest
+    from tracker.market_radar_store import StoreUnavailable
+    try:
+        return jsonify(market_radar_selftest.run((_get_user() or {}).get("email", "")))
+    except StoreUnavailable as e:
+        return jsonify(error=str(e)), 503
+    except Exception as e:
+        return jsonify(error="%s: %s" % (type(e).__name__, str(e)[:300])), 500
+
+
 def _unipile_selftest() -> dict:
     """Prove the Unipile integration end to end -- see
     tracker/unipile_client.probe. Free: list_accounts() needs no connected
