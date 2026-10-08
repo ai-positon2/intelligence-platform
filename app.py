@@ -9817,8 +9817,43 @@ def event_conference_intelligence_run_detail(run_id):
             event_intel_store.get_outcomes(email, profile.get("id")))
     response = jsonify(run)
     response.headers['Cache-Control'] = 'private, no-store'
-    if request.args.get('download') == '1':
-        response.headers['Content-Disposition'] = f'attachment; filename="event-research-{run_id}.json"'
+    return response
+
+
+@app.route("/p2/strategic-agents/event-conference-intelligence/runs/<int:run_id>/pdf",
+           methods=["POST"])
+@position2_required
+def event_conference_intelligence_run_pdf(run_id):
+    """The report the reader is looking at, as a PDF.
+
+    The page sends the report it rendered, with every row's details and
+    every folded reason open and no filter applied, and this lays it out
+    (tracker/event_intel_pdf.py says why the HTML comes from the page rather
+    than being rebuilt here). Only a run the caller owns can be exported, and
+    only a finished one: a half-built report printed as a PDF reads as the
+    answer."""
+    from tracker import event_intel_pdf, event_intel_store
+    email = (_get_user() or {}).get("email", "").lower()
+    run = event_intel_store.get_run(run_id, email)
+    if not run:
+        abort(404)
+    if run.get("status") != "complete":
+        return jsonify(error="This run has not finished, so there is no report to export yet."), 409
+    payload = request.get_json(silent=True) or {}
+    title = str(payload.get("title") or run.get("query") or "Report")[:200]
+    subtitle = str(payload.get("subtitle") or "")[:400]
+    try:
+        data = event_intel_pdf.build(payload.get("html"), title, subtitle)
+    except ValueError as e:
+        return jsonify(error=str(e)), 400
+    except Exception:
+        app.logger.exception("event conference intelligence: PDF export failed for run %s", run_id)
+        return jsonify(error="The PDF could not be built. Please try again."), 500
+    slug = re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-")[:60] or "report"
+    response = make_response(data)
+    response.headers["Content-Type"] = "application/pdf"
+    response.headers["Content-Disposition"] = 'attachment; filename="%s-%d.pdf"' % (slug, run_id)
+    response.headers["Cache-Control"] = "private, no-store"
     return response
 
 

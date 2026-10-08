@@ -627,7 +627,8 @@
           <h2 id="drawerTitle">Loading</h2>
           <div class="sub" id="drawerSub"></div>
           <div class="evi-drawer-actions">
-            <a id="eventExportLink" class="evi-btn evi-btn-ghost" download hidden>Download full research (JSON)</a>
+            <button type="button" id="eventExportLink" class="evi-btn evi-btn-ghost" hidden
+                    onclick="downloadPdf(this)">Download PDF</button>
           </div>
         </div>
         <button class="evi-x" onclick="closeDrawer()" aria-label="Close">×</button>
@@ -1882,6 +1883,68 @@
       _printOpened.forEach(function(d){ d.removeAttribute('open'); });
       _printOpened = [];
     });
+
+    /* ── the report as a PDF ──────────────────────────────────────────
+       The report is rendered once more with everything showing (every
+       row's details, every folded reason, no role or attendee filter), that
+       HTML goes to the server, and the reader's own view is put back
+       exactly as it was. The server lays it out; nothing is rebuilt there,
+       so the PDF cannot drift from the page. */
+    function exportReportHtml(run){
+      var body = document.getElementById('drawerBody');
+      var saved = {roles: activeRoles, att: ATT_FILTER[run.id], fmt: FORMAT_FILTER,
+                   scroll: body.scrollTop};
+      var html;
+      activeRoles = null; ATT_FILTER[run.id] = 'all'; FORMAT_FILTER = null;
+      try {
+        render(run);
+        var clone = body.cloneNode(true);
+        Array.prototype.forEach.call(clone.querySelectorAll('.evi-detail-row[hidden]'),
+          function(r){ r.removeAttribute('hidden'); });
+        Array.prototype.forEach.call(clone.querySelectorAll('details'),
+          function(d){ d.setAttribute('open', ''); });
+        html = clone.innerHTML;
+      } finally {
+        activeRoles = saved.roles; ATT_FILTER[run.id] = saved.att; FORMAT_FILTER = saved.fmt;
+        render(run);
+        body.scrollTop = saved.scroll;
+      }
+      return html;
+    }
+
+    function downloadPdf(btn){
+      var run = current;
+      if (!run || !run.id || (btn && btn.disabled)) return;
+      var label = btn ? btn.textContent : '';
+      if (btn) { btn.disabled = true; btn.textContent = 'Preparing the PDF\u2026'; }
+      var done = function(msg){
+        if (!btn) return;
+        btn.textContent = msg || label;
+        btn.disabled = false;
+        if (msg) setTimeout(function(){ btn.textContent = label; }, 4000);
+      };
+      var html;
+      try { html = exportReportHtml(run); } catch (e) { done('Could not build the PDF'); return; }
+      fetch(BASE + '/runs/' + run.id + '/pdf', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({html: html,
+          title: document.getElementById('drawerTitle').textContent,
+          subtitle: document.getElementById('drawerSub').textContent})
+      }).then(function(r){
+        if (!r.ok) return r.json().then(function(j){ throw new Error(j.error || 'failed'); },
+                                       function(){ throw new Error('failed'); });
+        var name = ((r.headers.get('Content-Disposition') || '').match(/filename="([^"]+)"/) || [])[1] || 'report.pdf';
+        return r.blob().then(function(b){
+          var url = URL.createObjectURL(b), a = document.createElement('a');
+          a.href = url; a.download = name;
+          document.body.appendChild(a); a.click(); a.remove();
+          setTimeout(function(){ URL.revokeObjectURL(url); }, 10000);
+          done();
+        });
+      }).catch(function(e){ done(e && e.message && e.message !== 'failed' ? e.message : 'Could not build the PDF'); });
+    }
+    window.downloadPdf = downloadPdf;
+    window.exportReportHtml = exportReportHtml;
 
     function openRun(runId){
       document.getElementById('drawer').classList.add('on');
@@ -5972,10 +6035,8 @@
        subject event. */
     function render(run){
       var exportLink = document.getElementById('eventExportLink');
-      if (exportLink) {
-        exportLink.hidden = !run.id;
-        exportLink.href = BASE + '/runs/' + run.id + '?download=1';
-      }
+      // Only a finished report: a run still going has nothing to export.
+      if (exportLink) exportLink.hidden = !run.id || run.status !== 'complete';
       if (run.mode === 'recommend') { return renderRecommend(run); }
       if (run.mode === 'workroom') { return renderWorkroom(run); }
       var evs = run.events || [];
