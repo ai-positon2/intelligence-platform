@@ -281,3 +281,36 @@ def test_a_crashing_probe_returns_its_error_not_a_500_page(monkeypatch):
     resp = _client(ADMIN).post(ROUTE)
     assert resp.status_code == 500
     assert resp.get_json() == {"error": "RuntimeError: network stack missing"}
+
+
+# -- homepage access diagnostic ------------------------------------------------
+
+def test_homepage_access_reports_each_request_style_and_both_fallbacks(monkeypatch):
+    from tracker import market_radar_site as site_reader
+    monkeypatch.setattr(site_reader, "fetch", lambda url: {
+        "http_status": 429, "status": "blocked", "text": "", "final_url": url})
+
+    def fake_fetch(url, **kw):
+        if url.endswith("/meta.json"):
+            return res(200, '{"name":"Shop","city":"Mannheim","country":"DE","currency":"EUR",'
+                            '"ships_to_countries":["DE","AT"],"published_products_count":485}')
+        if "web.archive.org" in url:
+            return res(200, '[["timestamp"],["20261001120000"]]')
+        ua = (kw.get("headers") or {}).get("User-Agent", "")
+        return res(200, "<p>hello world</p>") if "Mozilla/5.0 (Macintosh" in ua else res(429, "slow down")
+
+    monkeypatch.setattr(mrp, "_fetch", fake_fetch)
+    [row] = mrp.homepage_access(["shop.example"])
+    assert row["current_reader"] == {"status": 429, "outcome": "blocked", "words": 0}
+    assert row["browser_headers"]["verdict"] == "ok" and row["browser_headers"]["words"] == 2
+    assert row["bot_ua_accept_any"]["verdict"] == "rate_limited"
+    assert row["shopify_meta"]["country"] == "DE" and row["shopify_meta"]["ships_to"] == 2
+    assert row["wayback_latest"] == "20261001120000"
+
+
+def test_homepage_access_route_runs_only_the_matrix(monkeypatch):
+    monkeypatch.setattr(mrp, "homepage_access", lambda urls: [{"site": u} for u in urls])
+    monkeypatch.setattr(mrp, "probe", lambda: (_ for _ in ()).throw(AssertionError("full probe ran")))
+    resp = _client(ADMIN).post(ROUTE, json={"homepages": ["a.example", "b.example"]})
+    assert resp.status_code == 200 and resp.get_json() == {"homepages": [{"site": "a.example"},
+                                                                         {"site": "b.example"}]}

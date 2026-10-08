@@ -34,6 +34,7 @@ import json
 import re
 import time
 import urllib.parse
+from urllib.parse import urlsplit
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 
@@ -400,3 +401,64 @@ def probe():
         "Reddit (already covered by the sci-reddit-check self-test)",
     ]
     return result
+
+
+# -- Homepage access: why a site refuses this server -------------------------
+#
+# Phase 1's first live run on Railway (2026-10-09) could not read 4 of 12
+# homepages that answered a laptop normally: three Shopify stores answered
+# 429 and clovedental.in answered 403, each on the very first request. Before
+# choosing a fix, this measures from the server which request styles get
+# through, and whether two free fallbacks reach the same company: Shopify's
+# public /meta.json (store name, city, country, currency, ships-to) and the
+# Wayback Machine's latest capture of the homepage.
+
+BROWSER_HEADERS = {
+    "User-Agent": BROWSER_UA,
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+    "Accept-Language": "en-US,en;q=0.9",
+    "Accept-Encoding": "gzip, deflate",
+    "Upgrade-Insecure-Requests": "1",
+    "Sec-Fetch-Dest": "document",
+    "Sec-Fetch-Mode": "navigate",
+    "Sec-Fetch-Site": "none",
+    "Sec-Fetch-User": "?1",
+}
+
+
+def _status_only(url, headers):
+    res = _fetch(url, ua=headers.get("User-Agent", BOT_UA), headers=headers, timeout=15)
+    return {"status": res["status"], "verdict": verdict(res), "ms": res["ms"],
+            "words": len(re.sub(r"<[^>]+>", " ", res["text"]).split()) if res["status"] == 200 else 0}
+
+
+def homepage_access(urls):
+    from tracker import market_radar_site as site_reader
+    out = []
+    for raw in urls[:8]:
+        url = raw if "://" in raw else "https://" + raw
+        row = {"site": raw}
+        page = site_reader.fetch(url if urlsplit(url).path else url + "/")
+        row["current_reader"] = {"status": page["http_status"], "outcome": page["status"],
+                                 "words": len(page["text"].split())}
+        row["browser_headers"] = _status_only(url, BROWSER_HEADERS)
+        row["bot_ua_accept_any"] = _status_only(url, {"User-Agent": site_reader.UA, "Accept": "*/*"})
+        meta = _fetch(url.rstrip("/") + "/meta.json", ua=BROWSER_UA,
+                      headers={"Accept": "application/json"}, timeout=15)
+        try:
+            m = json.loads(meta["text"])
+            row["shopify_meta"] = {k: m.get(k) for k in ("name", "city", "province", "country",
+                                                         "currency", "published_products_count")}
+            row["shopify_meta"]["ships_to"] = len(m.get("ships_to_countries") or [])
+        except Exception:
+            row["shopify_meta"] = {"status": meta["status"], "verdict": verdict(meta)}
+        cdx = _fetch("https://web.archive.org/cdx/search/cdx?url=%s&output=json&limit=-1"
+                     "&filter=statuscode:200&fl=timestamp" % urllib.parse.quote(urlsplit(url).netloc),
+                     timeout=20)
+        try:
+            rows = json.loads(cdx["text"])
+            row["wayback_latest"] = rows[-1][0] if len(rows) > 1 else None
+        except Exception:
+            row["wayback_latest"] = {"status": cdx["status"], "verdict": verdict(cdx)}
+        out.append(row)
+    return out

@@ -8784,7 +8784,12 @@ def admin_external_usage_market_radar_sources_check():
     if not _evi_same_origin():
         return jsonify(error="This request came from another site and was refused."), 403
     from tracker import market_radar_probe
+    homepages = (request.get_json(silent=True) or {}).get("homepages")
     try:
+        if homepages:
+            # Only the homepage access matrix, for the sites named (at most 8).
+            return jsonify(homepages=market_radar_probe.homepage_access(
+                [str(h) for h in homepages if h][:8]))
         return jsonify(market_radar_probe.probe())
     except Exception as e:
         return jsonify(error="%s: %s" % (type(e).__name__, str(e)[:300])), 500
