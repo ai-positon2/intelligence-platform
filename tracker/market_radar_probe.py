@@ -19,9 +19,10 @@ rests on it:
     nothing about the 30th, so a run of sequential queries reports how many
     succeeded and where the first failure came;
   * article links: Google changed its link format and news_client's
-    offline decoder recovers 0 of 52 links in a live feed (2026-10-08). The
-    current method costs two more Google requests per article, so it is
-    measured here too, from this IP, alongside the old decoder's hit rate.
+    offline decoder recovers 0 of 52 links in a live feed (2026-10-08).
+    news_client now falls back to the current method, which costs two more
+    Google requests per article, so it is measured here too, from this IP,
+    by calling news_client's own code, alongside the offline hit rate.
 
 Every other source in the plan gets one request. Nothing here writes
 anything, holds a key or costs money. A check that could not run says so
@@ -43,9 +44,6 @@ BROWSER_UA = ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.3
               "(KHTML, like Gecko) Chrome/128.0 Safari/537.36")
 TIMEOUT = 12            # seconds per request
 MAX_READ = 512 * 1024   # bytes read per response; some job boards return megabytes
-# Google's article page carries the decode signature near its END: measured at
-# byte 595,767 of a 597,296-byte page (2026-10-08). Read it whole.
-ARTICLE_PAGE_MAX_READ = 2 * 1024 * 1024
 GDELT_GAP = 5.5         # GDELT asks for at most one request every 5 seconds
 
 # One query per edition, in that market's language, about local openings: the
@@ -168,53 +166,18 @@ def _item_links(text):
             (re.search(r"<link>(.*?)</link>", it) for it in rss_items(text)) if m]
 
 
-def decode_params(article_html):
-    """The signature and timestamp Google's article page carries, which the
-    batchexecute call needs. None when the page does not have them."""
-    sg = re.search(r'data-n-a-sg="([^"]+)"', article_html)
-    ts = re.search(r'data-n-a-ts="([^"]+)"', article_html)
-    if not (sg and ts):
-        return None
-    return sg.group(1), int(ts.group(1))
-
-
-def batchexecute_body(article_id, ts, sig):
-    inner = ["garturlreq",
-             [["X", "X", ["X", "X"], None, None, 1, 1, "US:en", None, 1, None, None,
-               None, None, None, 0, 1], "X", "X", 1, [1, 1, 1], 1, 1, None, 0, 0, None, 0],
-             article_id, ts, sig]
-    freq = [[["Fbv4je", json.dumps(inner, separators=(",", ":")), None, "generic"]]]
-    return "f.req=" + urllib.parse.quote(json.dumps(freq, separators=(",", ":")))
-
-
-def decoded_url(batchexecute_text):
-    m = re.search(r'\[\\"garturlres\\",\\"(.*?)\\"', batchexecute_text)
-    return m.group(1) if m else None
-
-
 def _decode_current(link):
-    """Google's current link decode: fetch the article page for its signature,
-    then ask batchexecute for the real URL. Two requests to Google."""
-    m = re.search(r"/articles/([^?/]+)", link)
-    if not m:
-        return {"ok": False, "reason": "no article id in link", "ms": 0}
-    aid = m.group(1)
-    page = _fetch("https://news.google.com/rss/articles/" + aid, ua=BROWSER_UA,
-                  max_read=ARTICLE_PAGE_MAX_READ)
-    params = decode_params(page["text"])
-    if not params:
-        return {"ok": False, "ms": page["ms"],
-                "reason": "article page gave no signature (%s, %s, %d bytes%s)" % (
-                    verdict(page), page["status"], page["bytes"],
-                    ", cut short" if page["truncated"] else "")}
-    sig, ts = params
-    post = _fetch("https://news.google.com/_/DotsSplashUi/data/batchexecute",
-                  ua=BROWSER_UA, method="POST", data=batchexecute_body(aid, ts, sig),
-                  headers={"Content-Type": "application/x-www-form-urlencoded;charset=UTF-8"})
-    url = decoded_url(post["text"])
-    return {"ok": bool(url), "url": url, "ms": page["ms"] + post["ms"],
-            "reason": None if url else "batchexecute gave no URL (%s, %s)" % (
-                verdict(post), post["status"])}
+    """Google's current link decode, run through news_client's own code (the
+    article page for its signature, then batchexecute: two requests), so this
+    measures what the platform runs rather than a copy of it. No cache and
+    no breaker sit in this path."""
+    try:
+        from tracker.news_client import _resolve_article_url
+        r = _resolve_article_url(link)
+    except Exception as e:  # a broken decoder is a result here, not a crash
+        return {"ok": False, "url": None, "ms": 0,
+                "reason": "%s: %s" % (type(e).__name__, str(e)[:120])}
+    return {"ok": bool(r["url"]), "url": r["url"], "ms": r["ms"], "reason": r["reason"]}
 
 
 def check_google_news(budget=GOOGLE_BUDGET):
@@ -280,9 +243,10 @@ def check_google_news(budget=GOOGLE_BUDGET):
         return out
     links = _item_links(us_feed)
     try:
-        from tracker.news_client import _decode_google_news_url
-        old_hits = sum(1 for l in links if "news.google.com" not in _decode_google_news_url(l))
-        old = {"links": len(links), "decoded": old_hits}
+        # Offline half only: _decode_google_news_url would send two requests
+        # per link here, about 200 for one feed.
+        from tracker.news_client import _decode_offline
+        old = {"links": len(links), "decoded": sum(1 for l in links if _decode_offline(l))}
     except Exception as e:
         old = {"not_checked": "%s: %s" % (type(e).__name__, str(e)[:120])}
     sample = [_decode_current(l) for l in links[:DECODE_SAMPLE]]

@@ -15,6 +15,8 @@ import urllib.request
 import concurrent.futures
 from datetime import datetime, timedelta, timezone
 
+import requests
+
 logger = logging.getLogger(__name__)
 
 # Hard cap on every Google News RSS request so a single slow/throttled
@@ -114,37 +116,268 @@ def _fetch_feed(url: str):
     return feedparser.parse(b"")
 
 
-def _decode_google_news_url(google_url: str) -> str:
-    """Decode a Google News redirect URL to the actual article URL.
+# ── Google News article links ───────────────────────────────────────────────
+# A Google News RSS <link> is a redirect, news.google.com/rss/articles/<id>.
+# Old ids were base64 of a record that held the publisher URL, so it could be
+# read offline. Current ids hold an opaque token instead: on 2026-10-08 the
+# offline read recovered 0 of 52 links from a Mac and 0 of 50 from Railway.
+# The only way to the publisher URL now is to ask Google: fetch the article
+# page for its signature and timestamp, then post them to batchexecute, which
+# answers with the URL (verified from Railway in 8daf483 with
+# tracker/market_radar_probe.py). That is two requests per link, so the
+# offline read still goes first, answers are cached by article id, and a
+# breaker stops asking when decoding keeps failing.
 
-    Google News RSS wraps every article link in a redirect like:
-        https://news.google.com/rss/articles/CBMi<base64>?...
-    The base64 path encodes (among other things) the original article URL.
-    This function extracts it without making any HTTP requests.
-    Returns the original google_url unchanged on any failure.
-    """
-    if not google_url or "news.google.com" not in google_url:
-        return google_url
-    match = re.search(r"/articles/([A-Za-z0-9_=-]+)", google_url)
-    if not match:
-        return google_url
-    encoded = match.group(1)
+_GNEWS_HOST = "news.google.com"
+_GNEWS_ARTICLE_PAGE = "https://news.google.com/rss/articles/"
+_GNEWS_BATCHEXECUTE = "https://news.google.com/_/DotsSplashUi/data/batchexecute"
+# The verified method sent a browser user agent; _FEED_UA was never tried
+# against these two endpoints.
+_DECODE_UA = ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
+              "(KHTML, like Gecko) Chrome/128.0 Safari/537.36")
+_DECODE_TIMEOUT = 8          # seconds per request, counting the whole body read
+# The signature sits near the END of the article page: byte 595,767 of
+# 597,296 from Railway, ~594 KB of ~596 KB from a Mac (2026-10-08). A cap
+# anywhere near the page size turns every decode into "no signature", so this
+# only guards against a runaway response and sits far above the page.
+_DECODE_PAGE_MAX_READ = 4 * 1024 * 1024
+_DECODE_REPLY_MAX_READ = 256 * 1024   # the reply is a few hundred bytes
+_DECODE_CIRCUIT_THRESHOLD = 5         # consecutive failed decodes before we stop
+_DECODE_COOLDOWN = 30 * 60            # seconds the decode breaker stays open
+_DECODE_CACHE_MAX = 5000
+
+_decode_lock = threading.Lock()
+_decode_cache: dict[str, str] = {}    # article id -> publisher URL (successes only)
+_decode_fails = 0
+_decode_open_until = 0.0              # time.monotonic() before which we do not ask
+
+
+def _gnews_article_id(link: str) -> str | None:
+    """The article id in a news.google.com article link, or None."""
+    if not link:
+        return None
+    try:
+        host = urllib.parse.urlsplit(link).hostname
+    except ValueError:
+        return None
+    if host != _GNEWS_HOST:
+        return None
+    match = re.search(r"/articles/([A-Za-z0-9_=-]+)", link)
+    return match.group(1) if match else None
+
+
+def _is_publisher_url(url: str) -> bool:
+    try:
+        parts = urllib.parse.urlsplit(url)
+    except ValueError:
+        return False
+    return parts.scheme in ("http", "https") and bool(parts.hostname) \
+        and parts.hostname != _GNEWS_HOST
+
+
+def _decode_offline(google_url: str) -> str | None:
+    """The publisher URL read straight out of an old-format article id, or
+    None. Current ids hold an opaque token, so this now almost always misses;
+    it stays first because it costs nothing."""
+    encoded = _gnews_article_id(google_url)
+    if not encoded:
+        return None
     # Restore standard base64 padding
     padding = (4 - len(encoded) % 4) % 4
     try:
         decoded_bytes = base64.urlsafe_b64decode(encoded + "=" * padding)
-        decoded_text = decoded_bytes.decode("utf-8", errors="replace")
-        # The real URL sits inside the decoded bytes — find the first non-Google http(s) URL
+        # Latin-1 maps every byte to one character, so the pattern's \x80-\xff
+        # exclusion ends the URL at the first non-ASCII byte. A UTF-8 decode
+        # turned the 0xD2 field marker after the URL into U+FFFD, which the
+        # class does not exclude, and every such link came back ending in it.
+        decoded_text = decoded_bytes.decode("latin-1")
+        # The real URL sits inside the decoded bytes: the first non-Google http(s) URL
         url_match = re.search(
             r"https?://(?!news\.google\.com)[^\s\x00-\x1f\"'<>\x80-\xff]{10,}",
             decoded_text,
         )
         if url_match:
-            real_url = url_match.group(0).rstrip(".,;)")
-            return real_url
+            return url_match.group(0).rstrip(".,;)")
     except Exception:
         pass
-    return google_url
+    return None
+
+
+def decode_params(article_html: str):
+    """The signature and timestamp Google's article page carries, which the
+    batchexecute call needs. None when the page does not have them."""
+    sg = re.search(r'data-n-a-sg="([^"]+)"', article_html or "")
+    ts = re.search(r'data-n-a-ts="([^"]+)"', article_html or "")
+    if not (sg and ts):
+        return None
+    try:
+        return sg.group(1), int(ts.group(1))
+    except ValueError:
+        return None
+
+
+def batchexecute_body(article_id: str, ts: int, sig: str) -> str:
+    inner = ["garturlreq",
+             [["X", "X", ["X", "X"], None, None, 1, 1, "US:en", None, 1, None, None,
+               None, None, None, 0, 1], "X", "X", 1, [1, 1, 1], 1, 1, None, 0, 0, None, 0],
+             article_id, ts, sig]
+    freq = [[["Fbv4je", json.dumps(inner, separators=(",", ":")), None, "generic"]]]
+    return "f.req=" + urllib.parse.quote(json.dumps(freq, separators=(",", ":")))
+
+
+def decoded_url(reply: str) -> str | None:
+    """The publisher URL in a batchexecute reply, or None.
+
+    The reply is JSON behind a `)]}'` guard and the answer is a JSON string
+    inside it, so it is read with two json.loads, not a regex: a regex over
+    the raw text keeps the escaping, and gave `watch?v\\\\u003dID` for a YouTube
+    link (live, 2026-10-08)."""
+    text = (reply or "").lstrip()
+    if text.startswith(")]}'"):
+        text = text[4:]
+    try:
+        rows = json.loads(text)
+    except ValueError:
+        return None
+    for row in rows if isinstance(rows, list) else []:
+        if not (isinstance(row, list) and len(row) > 2 and row[:2] == ["wrb.fr", "Fbv4je"]
+                and isinstance(row[2], str)):
+            continue
+        try:
+            inner = json.loads(row[2])
+        except ValueError:
+            continue
+        if (isinstance(inner, list) and len(inner) > 1 and inner[0] == "garturlres"
+                and isinstance(inner[1], str) and _is_publisher_url(inner[1].strip())):
+            return inner[1].strip()
+    return None
+
+
+def _decode_http(url: str, *, max_read: int, data: str | None = None) -> dict:
+    """One request to Google for link decoding, never raising. Reads at most
+    `max_read` bytes of the body and stops once _DECODE_TIMEOUT has passed in
+    total (requests' own timeout is per socket read, so a slow trickle would
+    otherwise never trip it). On that timeout, `text` holds what was read."""
+    headers = {"User-Agent": _DECODE_UA, "Accept": "*/*"}
+    if data is not None:
+        headers["Content-Type"] = "application/x-www-form-urlencoded;charset=UTF-8"
+    started = time.monotonic()
+    out = {"status": None, "final_url": url, "text": "", "bytes": 0,
+           "truncated": False, "error": None}
+    try:
+        with requests.request("POST" if data is not None else "GET", url,
+                              headers=headers, data=data, timeout=_DECODE_TIMEOUT,
+                              stream=True, allow_redirects=True) as resp:
+            out["status"], out["final_url"] = resp.status_code, resp.url or url
+            body = bytearray()
+            for chunk in resp.iter_content(65536):
+                body += chunk
+                if len(body) >= max_read:
+                    del body[max_read:]
+                    out["truncated"] = True
+                    break
+                if time.monotonic() - started > _DECODE_TIMEOUT:
+                    out["error"] = "timeout"
+                    break
+            out["bytes"] = len(body)
+            out["text"] = body.decode("utf-8", errors="replace")
+    except requests.Timeout:
+        out["error"] = "timeout"
+    except Exception as exc:
+        out["error"] = "%s: %s" % (type(exc).__name__, str(exc)[:160])
+    out["ms"] = int((time.monotonic() - started) * 1000)
+    return out
+
+
+def _describe(res: dict, max_read: int) -> str:
+    """A failed decode request in a few words, for the reason a decode gives."""
+    if res["error"]:
+        return res["error"]
+    parts = [str(res["status"]), "%d bytes" % res["bytes"]]
+    final = urllib.parse.urlsplit(res["final_url"] or "")
+    if final.hostname and final.hostname != _GNEWS_HOST:
+        parts.append("redirected to %s%s" % (
+            final.hostname, "/sorry" if "/sorry/" in final.path else ""))
+    if res["truncated"]:
+        parts.append("cut short at the %d KB read cap" % (max_read // 1024))
+    return ", ".join(parts)
+
+
+def _resolve_article_url(google_url: str) -> dict:
+    """Ask Google for an article link's publisher URL: fetch the article page
+    for its signature, then post it to batchexecute. Two requests, with no
+    cache and no breaker, so the market radar probe can call it to measure the
+    method itself. Returns {"url": str | None, "reason": str | None, "ms": int}.
+    """
+    aid = _gnews_article_id(google_url)
+    if not aid:
+        return {"url": None, "reason": "no article id in link", "ms": 0}
+    # What was read before a timeout still counts: a signature that arrived
+    # in time is as good as any other.
+    page = _decode_http(_GNEWS_ARTICLE_PAGE + aid, max_read=_DECODE_PAGE_MAX_READ)
+    params = decode_params(page["text"])
+    if not params:
+        return {"url": None, "ms": page["ms"],
+                "reason": "article page gave no signature (%s)"
+                          % _describe(page, _DECODE_PAGE_MAX_READ)}
+    sig, ts = params
+    reply = _decode_http(_GNEWS_BATCHEXECUTE, max_read=_DECODE_REPLY_MAX_READ,
+                         data=batchexecute_body(aid, ts, sig))
+    url = decoded_url(reply["text"])
+    return {"url": url, "ms": page["ms"] + reply["ms"],
+            "reason": None if url else "batchexecute gave no URL (%s)"
+                                       % _describe(reply, _DECODE_REPLY_MAX_READ)}
+
+
+def _decode_record(aid: str, result: dict) -> None:
+    global _decode_fails, _decode_open_until
+    with _decode_lock:
+        if result["url"]:
+            _decode_fails = 0
+            _decode_open_until = 0.0
+            if aid not in _decode_cache and len(_decode_cache) >= _DECODE_CACHE_MAX:
+                _decode_cache.pop(next(iter(_decode_cache)))
+            _decode_cache[aid] = result["url"]
+            return
+        _decode_fails += 1
+        logger.debug("[NEWS] link decode failed for %s: %s", aid, result["reason"])
+        if _decode_fails >= _DECODE_CIRCUIT_THRESHOLD:
+            # Past the cooldown this is one trial request: one more failure
+            # re-opens at once, one success (above) closes it.
+            _decode_open_until = time.monotonic() + _DECODE_COOLDOWN
+            logger.error("[NEWS] link-decode circuit OPEN after %d consecutive failures "
+                         "(last: %s). Article links stay news.google.com redirects for "
+                         "the next %d min.", _decode_fails, result["reason"],
+                         _DECODE_COOLDOWN // 60)
+
+
+def _decode_google_news_url(google_url: str) -> str:
+    """The publisher URL behind a Google News article link.
+
+    Offline read first (free), then the cache, then Google's own decode (two
+    requests). Returns `google_url` unchanged when it is not a Google News
+    article link or when decoding fails, so a caller always gets a working
+    link, just not always the publisher's. No request is made while the feed
+    breaker is open (Google is refusing this IP) or the decode breaker is
+    (decoding keeps failing), so a blocked Google costs nothing per link.
+    """
+    aid = _gnews_article_id(google_url)
+    if not aid:
+        return google_url
+    offline = _decode_offline(google_url)
+    if offline:
+        return offline
+    with _decode_lock:
+        cached = _decode_cache.get(aid)
+        skip = _circuit_open or time.monotonic() < _decode_open_until
+    if cached:
+        return cached
+    if skip:
+        return google_url
+    result = _resolve_article_url(google_url)
+    _decode_record(aid, result)
+    return result["url"] or google_url
+
 
 MAX_NEWS_AGE_DAYS = 90
 
