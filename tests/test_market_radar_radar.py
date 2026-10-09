@@ -261,9 +261,8 @@ def test_entrants_are_new_brands_that_really_compete():
                           {"name": "Rival", "headline": 1, "is_new_brand": False}]})
 
     def search(queries, **kw):
-        return {"results": [{"query": queries[0], "position": 1, "domain": "runjanuary.com"},
-                            {"query": queries[1], "position": 1, "domain": "oldshoe.com"},
-                            {"query": queries[2], "position": 1, "domain": "rival.com"}]}
+        assert queries == ['"January" official site']      # only the new brand is looked up
+        return {"results": [{"query": queries[0], "position": 1, "domain": "runjanuary.com"}]}
 
     def verify(items, briefs, profile, **kw):
         return {i["domain"]: {"site_type": "business", "same_offering": "yes", "same_customers": "yes",
@@ -279,9 +278,10 @@ def test_entrants_are_new_brands_that_really_compete():
     # headline is not an entrant either (below).
     f = out["findings"][0]
     assert any("registered on 2026-03-01" in e for e in f["evidence"])
-    assert out["coverage"]["candidates"] == 2          # the known competitor is not a candidate
+    assert out["coverage"]["candidates"] == 1
     assert {l["name"]: l["why"] for l in out["coverage"]["left_out"]} == {
-        "Old Shoe Co": "established: its domain was registered on 1999-01-01"}
+        "Old Shoe Co": "an established brand launching a product, not a new brand",
+        "Rival": "an established brand launching a product, not a new brand"}
     assert "refused" in out["note"]                     # the domain list failure is said
 
 
@@ -536,3 +536,17 @@ def test_a_non_english_market_says_launch_news_is_read_in_english():
                           now=NOW, token="", llm=Llm({"brands": []}),
                           breaker=news.Breaker(gap=0, sleep=lambda s: None))
     assert "asked in English" in out["note"]
+
+
+def test_brands_past_the_search_limit_say_they_were_not_looked_up(monkeypatch):
+    monkeypatch.setattr(R, "MAX_BRAND_SEARCHES", 1)
+    llm = Llm({"brands": [{"name": "A1", "headline": 0, "is_new_brand": True},
+                          {"name": "B2", "headline": 0, "is_new_brand": True}]})
+    out = R.scan_entrants({"name": "S", "industry": {"keywords": ["shoes"]}}, own_domain="s.com",
+                          competitors=[], get=net({"https://news.google.com/": gnews("New shoe brand A1 launches")}),
+                          fetch_home=lambda i: {}, now=NOW, token="t", llm=llm,
+                          breaker=news.Breaker(gap=0, sleep=lambda s: None),
+                          search=lambda q, **k: {"results": []})
+    assert {l["name"]: l["why"] for l in out["coverage"]["left_out"]} == {
+        "A1": "its website was not found",
+        "B2": "not looked up: at most 1 brands are searched per scan"}

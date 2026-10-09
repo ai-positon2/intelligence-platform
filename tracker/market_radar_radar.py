@@ -635,9 +635,13 @@ def scan_entrants(profile, *, own_domain, competitors, get, fetch_home, now=None
         notes.append("reading the headlines failed (%s: %s)" % (
             getattr(e, "kind", type(e).__name__), str(getattr(e, "detail", e))[:160]))
     known = set(competitors) | {own_domain}
-    sites, err = resolve_brands([b for b in brands if b["is_new_brand"]] +
-                                [b for b in brands if not b["is_new_brand"]],
-                                country=markets[0], token=token, run_id=run_id, search=search)
+    # Only brands the headlines call NEW are looked up: an established
+    # brand launching a product (Reebok, adidas, Hoka in Allbirds' headlines,
+    # 2026-10-10) can never be a new entrant, and used up the searches.
+    fresh_brands = [b for b in brands if b["is_new_brand"]]
+    looked_up = fresh_brands[:MAX_BRAND_SEARCHES]
+    sites, err = resolve_brands(looked_up, country=markets[0], token=token, run_id=run_id,
+                                search=search)
     if err:
         notes.append("finding brand websites: %s" % err)
     cands = {}
@@ -670,8 +674,15 @@ def scan_entrants(profile, *, own_domain, competitors, get, fetch_home, now=None
         notes.append("%d check batches failed" % len(errors))
     findings, left_out = [], []
     for b in brands:
-        if b["name"] not in sites:
-            left_out.append({"name": b["name"], "why": "its website was not found"})
+        if not b["is_new_brand"]:
+            why = "an established brand launching a product, not a new brand"
+        elif b not in looked_up:
+            why = "not looked up: at most %d brands are searched per scan" % MAX_BRAND_SEARCHES
+        elif b["name"] not in sites:
+            why = "its website was not found"
+        else:
+            continue
+        left_out.append({"name": b["name"], "why": why})
     for i in items:
         if i not in readable:
             left_out.append({"name": i.get("name") or i["domain"], "domain": i["domain"],
