@@ -22,6 +22,9 @@ import traceback
 logger = logging.getLogger(__name__)
 
 STALE_AFTER_S = 600
+# A collection's stage after its competitors, shown by the moves card. Not a
+# step of the competitor search's progress bar (STAGE_STEP in the page script).
+RADAR_STAGE = "radar"
 
 
 def start(url, owner_email, *, reuse_profile=False, spawn=None):
@@ -133,7 +136,12 @@ def start_collect(client_id, owner_email, *, spawn=None):
     return run_id
 
 
-def collect_job(run_id, client_id, owner_email, *, collect=None):
+def _radar(client_id, owner_email, *, run_id=None):
+    from . import market_radar_radar as mr
+    return mr.run_for_client(client_id, owner_email, run_id=run_id)
+
+
+def collect_job(run_id, client_id, owner_email, *, collect=None, radar=None):
     from . import market_radar_store as store
     from . import market_radar_collect as mc
     collect = collect or mc.collect_client
@@ -146,6 +154,14 @@ def collect_job(run_id, client_id, owner_email, *, collect=None):
 
     try:
         result = collect(client_id, owner_email, run_id=run_id, progress=stage)
+        # Phase 4: businesses like the client's opening nearby, or new brands
+        # in its category. A radar that breaks does not lose the collection.
+        stage(RADAR_STAGE)
+        try:
+            result["radar"] = (radar or _radar)(client_id, owner_email, run_id=run_id)
+        except Exception as e:
+            logger.exception("market_radar_run radar %s failed", run_id)
+            result["radar"] = {"error": "%s: %s" % (type(e).__name__, str(e)[:300])}
         store.update_run(run_id, status="complete", stage="done", summary=result,
                          coverage={"lines": result.get("coverage")})
     except Exception as e:

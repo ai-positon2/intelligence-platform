@@ -217,3 +217,9 @@
 .mr-st.failed{color:var(--mr-bad)}
 .mr-st.ok,.mr-st.reused{color:var(--mr-ok)}
 @media (max-width:640px){.mr-move{grid-template-columns:1fr;gap:4px}.mr-trk-t td:nth-child(3){display:none}}
+
+/* == nearby and new (Phase 4) == */
+.mr-sub{margin:16px 0 4px;font-size:14px}
+.mr-sub:first-child{margin-top:0}
+.mr-ev{margin:6px 0 0;padding-left:18px;font-size:12.5px;color:var(--mr-tx2);overflow-wrap:anywhere}
+.mr-ev li{margin:2px 0}

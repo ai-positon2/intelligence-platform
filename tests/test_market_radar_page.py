@@ -511,3 +511,24 @@ def test_script_shows_the_latest_moves_and_folds_the_rest():
     html = run_js("return MR.renderMoves(%s, null);" % json.dumps(
         {"events": [ev(i) for i in range(30)], "competitors": [], "last_collect": {"status": "complete"}}))
     assert "5 earlier moves" in html and html.index("T24") < html.index("earlier moves") < html.index("T25")
+
+
+def test_script_shows_the_radar_and_escapes_it():
+    f = {"name": EVIL, "category": "dental_clinic", "distance_km": 1.2, "address": EVIL,
+         "website": "javascript:alert(1)", "status": "planned", "certain": True, "evidence": [EVIL],
+         "date": "2026-09-25", "is_competitor": True}
+    weak = dict(f, name="Weak", certain=False, status="unknown", website="https://weak.example/")
+    radar = {"local": {"status": "ok", "note": EVIL, "findings": [f, weak],
+                       "news": [{"title": EVIL, "publisher": EVIL, "date": "2026-09-25",
+                                 "link": "javascript:alert(1)"}]},
+             "entrants": {"status": "skipped", "note": "the profile names no products"}}
+    out = run_js("return [MR.renderRadar(%s), MR.renderRadar({skipped: 'b2b'}), MR.renderRadar(null),"
+                 "MR.renderRadar({local: {status: 'ok', note: 'n', findings: [], news: []}})];"
+                 % json.dumps(radar))
+    _no_markup_from(out[0])
+    import re
+    assert not [h for h in re.findall(r'href="([^"]*)"', out[0]) if "javascript" in h]
+    assert "Coming soon" in out[0] and "Possibly new" in out[0] and "On your competitor list" in out[0]
+    assert "1.2 km away" in out[0] and "Local opening news (1)" in out[0]
+    assert "the profile names no products" in out[0]
+    assert "b2b" in out[1] and out[2] == "" and "Nothing new found" in out[3]

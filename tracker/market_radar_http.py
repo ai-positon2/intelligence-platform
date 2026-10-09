@@ -20,7 +20,8 @@ from .market_radar_site import TIMEOUT, UA, tls_context
 MAX_BODY = 8_000_000
 
 
-def get(url, *, limit=MAX_BODY, accept="*/*", post=None, headers=None, timeout=TIMEOUT):
+def get(url, *, limit=MAX_BODY, accept="*/*", post=None, headers=None, timeout=TIMEOUT,
+        raw=False):
     """{"status", "http", "body", "note", "final_url", "truncated"}.
 
     status is ok (HTTP 200), not_found (404 or 410), blocked (401, 403, 429
@@ -66,14 +67,17 @@ def get(url, *, limit=MAX_BODY, accept="*/*", post=None, headers=None, timeout=T
             if total >= limit:
                 out["truncated"] = True
                 break
-        raw = b"".join(chunks)
-        if raw[:2] == b"\x1f\x8b":           # a .xml.gz sitemap served as bytes
+        data = b"".join(chunks)
+        if raw:                                # a zip file: the bytes as they came
+            out["raw"], out["status"] = data, "ok"
+            return out
+        if data[:2] == b"\x1f\x8b":          # a .xml.gz sitemap served as bytes
             try:
-                raw = gzip.decompress(raw)
+                data = gzip.decompress(data)
             except Exception:
                 out["note"] = "a compressed file that would not open"
                 return out
-        out["body"] = raw.decode("utf-8", errors="replace")
+        out["body"] = data.decode("utf-8", errors="replace")
         out["status"] = "ok"
     except Exception as e:
         out["note"] = "reading the answer failed (%s)" % type(e).__name__

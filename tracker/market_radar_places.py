@@ -49,6 +49,31 @@ class PlacesUnavailable(RuntimeError):
     pass
 
 
+def releases(fetch_text=None):
+    """Every release folder on the bucket, oldest first."""
+    if fetch_text is None:
+        from .market_radar_site import fetch_text
+    text = fetch_text(LIST_URL, limit=500_000)
+    out = []
+    try:
+        root = ET.fromstring(text or "")
+        for el in root.iter():
+            if el.tag.endswith("Prefix") and el.text and re.fullmatch(r"release/[\d\-.]+/", el.text):
+                out.append(el.text.split("/")[1])
+    except ET.ParseError:
+        pass
+    return sorted(out)
+
+
+def previous_release(current, all_releases):
+    """The newest release from an EARLIER month than `current`: 2026-09-23.0
+    and 2026-09-23.1 are one month's data, a fix release and its original,
+    and comparing them would show nothing new."""
+    month = current[:7]
+    older = [r for r in all_releases if r[:7] < month]
+    return max(older) if older else None
+
+
 def latest_release(fetch_text=None):
     """The newest release folder on the bucket (cached for a few hours)."""
     now = time.time()
@@ -104,9 +129,10 @@ def distance_km(lat1, lon1, lat2, lon2):
 
 COLUMNS = """names.primary, basic_category, taxonomy.primary, taxonomy.hierarchy, websites,
              operating_status, confidence, bbox.xmin, bbox.ymin, addresses[1].freeform,
-             addresses[1].locality, addresses[1].country, brand.names.primary"""
+             addresses[1].locality, addresses[1].country, brand.names.primary, id,
+             sources[1].dataset, sources[1].update_time"""
 KEYS = ("name", "category", "taxonomy", "hierarchy", "websites", "status", "confidence",
-        "lon", "lat", "street", "city", "country", "brand")
+        "lon", "lat", "street", "city", "country", "brand", "id", "source", "source_updated")
 
 
 def query(lat, lon, radius_km, *, categories=(), terms=(), release=None, runner=None):

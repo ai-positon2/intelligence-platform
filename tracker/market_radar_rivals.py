@@ -520,6 +520,8 @@ def _candidate_line(item, brief):
             via.append("named on the client's own site")
         elif v["kind"] == "article":
             via.append("linked from an article at %s" % v.get("article"))
+        elif v["kind"] == "radar":
+            via.append(v.get("note") or "found as a possible new entrant")
     if brief.get("archived"):
         via.append("homepage read from the Wayback Machine's copy of %s (the site refuses our "
                    "server)" % brief["archived"])

@@ -352,8 +352,10 @@
   }
 
   function renderCollectProgress(run) {
-    var m = /collect (\d+)\/(\d+)/.exec((run && run.stage) || '');
-    var text = m ? 'Read ' + m[1] + ' of ' + m[2] + ' competitors' : 'Starting';
+    var stage = (run && run.stage) || '';
+    var m = /collect (\d+)\/(\d+)/.exec(stage);
+    var text = m ? 'Read ' + m[1] + ' of ' + m[2] + ' competitors'
+      : stage === 'radar' ? 'Looking for new businesses nearby and new brands' : 'Starting';
     return '<div class="mr-callout">' + esc(text) + '… This runs in the background; you can leave the page.</div>';
   }
 
@@ -406,6 +408,60 @@
     return '<div class="card mr-card" id="mrMoves">' + head + '<div class="mr-card-b">' + body + '</div></div>';
   }
 
+  // == nearby and new (Phase 4) =======================================================
+
+  function radarChip(f) {
+    if (f.certain === false) return '<span class="mr-chip">Possibly new</span>';
+    if (f.status === 'planned') return '<span class="mr-chip warn">Coming soon</span>';
+    return '<span class="mr-chip ok">New</span>';
+  }
+
+  function renderFinding(f, local) {
+    var href = safeUrl(f.website);
+    var name = href ? '<a href="' + esc(href) + '" target="_blank" rel="noopener noreferrer">' + esc(f.name) + '</a>' : esc(f.name);
+    var where = local
+      ? [String(f.category || '').replace(/_/g, ' '), f.distance_km != null ? f.distance_km + ' km away' : '', f.address].filter(Boolean).join(' · ')
+      : [f.location, f.reason].filter(Boolean).join(' · ');
+    return '<li class="mr-move"><div class="mr-move-when">' + esc(f.date || '') + '</div><div class="mr-move-b">' +
+      '<div class="mr-move-t">' + radarChip(f) + '<b>' + name + '</b>' +
+      (f.is_competitor ? '<span class="mr-chip acc">On your competitor list</span>' : '') + '</div>' +
+      (where ? '<div class="mr-move-sum">' + esc(where) + '</div>' : '') +
+      '<ul class="mr-ev">' + (f.evidence || []).map(function (e) { return '<li>' + esc(e) + '</li>'; }).join('') + '</ul></div></li>';
+  }
+
+  function renderHeadlines(items, title) {
+    if (!items || !items.length) return '';
+    return '<details class="mr-more"><summary>' + esc(title) + ' (' + esc(items.length) + ')</summary><ul class="mr-list">' +
+      items.map(function (h) {
+        var href = safeUrl(h.link);
+        var t = href ? '<a href="' + esc(href) + '" target="_blank" rel="noopener noreferrer">' + esc(h.title) + '</a>' : esc(h.title);
+        return '<li>' + t + ' <span class="mr-hint">' + esc([h.publisher, h.date].filter(Boolean).join(', ')) + '</span></li>';
+      }).join('') + '</ul></details>';
+  }
+
+  function renderRadarPart(part, local) {
+    if (!part) return '';
+    var head = '<h4 class="mr-sub">' + (local ? 'New businesses like this one nearby' : 'New brands in this category') + '</h4>';
+    if (part.status !== 'ok') return head + '<p class="mr-hint">' + esc(part.note || 'Not run.') + '</p>';
+    var f = part.findings || [];
+    return head + '<p class="mr-hint">' + esc(part.note || '') + (part.reused ? ' (from a scan in the last day)' : '') + '</p>' +
+      (f.length ? '<ul class="mr-moves">' + f.map(function (x) { return renderFinding(x, local); }).join('') + '</ul>'
+        : '<div class="mr-empty"><b>Nothing new found</b>' + (local ? 'No business of this kind nearby shows a sign of having just opened.' : 'No new brand was confirmed this time.') + '</div>') +
+      renderHeadlines(part.news, local ? 'Local opening news' : 'Launch news read');
+  }
+
+  function renderRadar(radar) {
+    if (!radar) return '';
+    var body = '';
+    if (radar.error) body += '<div class="mr-callout bad">The radar failed: ' + esc(radar.error) + '</div>';
+    if (radar.skipped) body += '<p class="mr-hint">' + esc(radar.skipped) + '</p>';
+    body += renderRadarPart(radar.local, true) + renderRadarPart(radar.entrants, false);
+    return '<div class="card mr-card" id="mrRadar"><div class="mr-card-h"><div><h3>Nearby and new</h3>' +
+      '<p>Businesses like this one that opened or are about to open nearby, and new brands entering its category. ' +
+      'Each is listed only with a sign that it is really new; the reasons are under each name.</p></div></div>' +
+      '<div class="mr-card-b">' + body + '</div></div>';
+  }
+
   function renderHead(view, running) {
     var c = view.client || {}, p = view.profile || {}, f = p.fields || {};
     var href = siteUrl(c.domain);
@@ -423,7 +479,8 @@
     var running = state.run && state.run.status === 'running';
     return renderHead(v, running) + (running ? renderProgress(state.run) : '') +
       renderProfile(v, state.editing, state.errors) + renderCompetitors(v.competitors, state.filter) +
-      renderMoves(state.moves, state.collect) + (running ? '' : renderRun(v.last_run));
+      renderMoves(state.moves, state.collect) + renderRadar(state.moves && state.moves.radar) +
+      (running ? '' : renderRun(v.last_run));
   }
 
   /** The edits a submitted form makes: only fields whose value changed. */
@@ -449,7 +506,7 @@
   var MR = { esc: esc, safeUrl: safeUrl, siteUrl: siteUrl, renderClientList: renderClientList,
     renderProgress: renderProgress, renderProfile: renderProfile, renderCompetitors: renderCompetitors,
     renderRow: renderRow, renderRun: renderRun, renderDetail: renderDetail, formChanges: formChanges,
-    renderMoves: renderMoves, renderMoveRow: renderMoveRow,
+    renderMoves: renderMoves, renderMoveRow: renderMoveRow, renderRadar: renderRadar,
     FIELDS: FIELDS, STAGE_STEP: STAGE_STEP };
   root.MR = MR;
 

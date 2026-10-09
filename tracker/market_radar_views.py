@@ -380,7 +380,8 @@ EVENT_LABELS = {
     "page_changed": "Page changed", "review_growth": "More reviews",
     "announcement": "Announcement", "hiring_surge": "Hiring up",
     "hiring_slowdown": "Hiring down", "new_job_location": "Hiring in a new place",
-    "senior_hire_search": "Senior role open",
+    "senior_hire_search": "Senior role open", "nearby_opening": "Opening nearby",
+    "new_entrant": "New brand",
 }
 def _detector_labels():
     from .market_radar_collect import DETECTORS
@@ -439,6 +440,26 @@ def moves_view(client_id, owner_email, *, conn=None):
                                          "items": r.get("items"), "events": r.get("events")}
                                         for r in c.get("rows") or []]}
                               for c in summary.get("companies") or []]}
-    return {"events": events, "last_collect": last,
+    radar = None
+    if run:
+        r = (run.get("summary") or {}).get("radar")
+        if isinstance(r, dict):
+            radar = {}
+            for part in ("local", "entrants"):
+                x = r.get(part)
+                if isinstance(x, dict):
+                    radar[part] = {k: x.get(k) for k in ("status", "note", "reused")}
+                    radar[part]["findings"] = [
+                        {k: f.get(k) for k in ("name", "category", "distance_km", "address",
+                                               "website", "status", "certain", "evidence", "date",
+                                               "is_competitor", "reason", "location")}
+                        for f in x.get("findings") or []][:40]
+                    radar[part]["news"] = [{k: h.get(k) for k in ("title", "publisher", "date",
+                                                                  "link")}
+                                           for h in x.get("news") or []][:25]
+            for k in ("skipped", "error"):
+                if r.get(k):
+                    radar[k] = r[k]
+    return {"events": events, "last_collect": last, "radar": radar,
             "competitors": [{"entity_id": i, "name": names[i][0], "domain": names[i][1],
                              "tracked": tracked.get(i, {})} for i in ids]}
