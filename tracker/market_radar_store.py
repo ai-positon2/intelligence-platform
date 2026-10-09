@@ -687,6 +687,17 @@ def drop_product_announcements(*, conn=None):
         return events, cur.rowcount
 
 
+def drop_radar_scans(*, conn=None):
+    """One-off (2026-10-10): forget the radar scans made before the entrant
+    and headline rules were tightened, and the new-entrant events they
+    stored, so the next collection scans again. Returns (events, snapshots)."""
+    with _tx(conn) as cur:
+        cur.execute("DELETE FROM mr_events WHERE type='new_entrant'")
+        events = cur.rowcount
+        cur.execute("DELETE FROM mr_snapshots WHERE detector IN ('radar_local','radar_entrants')")
+        return events, cur.rowcount
+
+
 def snapshot_summaries(entity_ids, *, conn=None):
     """For each company and detector, when it was last read and how many
     items it held: the "what we track" table, without the payloads."""

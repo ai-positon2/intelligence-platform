@@ -268,7 +268,8 @@ def test_entrants_are_new_brands_that_really_compete():
     def verify(items, briefs, profile, **kw):
         return {i["domain"]: {"site_type": "business", "same_offering": "yes", "same_customers": "yes",
                               "name": i["name"], "sells": "running shoes", "reason": "same",
-                              "location": "US"} for i in items}, []
+                              "location": "US", "where": "same_country", "locations": "online_only"}
+                for i in items}, []
     out = R.scan_entrants(profile, own_domain="allbirds.com", competitors=["rival.com"],
                           get=net(pages), fetch_home=lambda i: {"status": "ok"}, now=NOW, token="t",
                           breaker=news.Breaker(gap=0, sleep=lambda s: None), llm=llm,
@@ -413,3 +414,42 @@ def test_a_finding_with_only_a_young_domain_is_titled_possibly_new():
          "website": "https://x.com/"}]}, NOW)
     assert s.ev[0]["title"] == "Possibly new nearby: Smokey Tacos (restaurant, 3.5 km away)"
     assert s.ev[0]["status"] == "unknown"
+
+
+def test_a_neighbourhood_named_practice_does_not_claim_neighbourhood_headlines():
+    assert not R._mentions("A Burger Restaurant Is Opening In Notting Hill", "Notting Hill Dental", "London")
+    assert R._mentions("Luigi's Pizza opens in Cedar Park", "Luigi's Pizza", "Cedar Park")
+    assert not R._mentions("New shop opens in Cedar Park", "Cedar Park", "Cedar Park")
+    assert not R._mentions("Pizzeria opens", "Pizza", "")
+
+
+@pytest.mark.parametrize("change, ok_", [({}, True), ({"same_offering": "partly"}, False),
+                                         ({"where": "other_country"}, False), ({"locations": "one"}, False),
+                                         ({"same_customers": "no"}, False), ({"site_type": "other"}, False)])
+def test_an_entrant_sells_the_same_thing_to_the_same_customers_in_the_same_markets(change, ok_):
+    v = dict({"site_type": "business", "same_offering": "yes", "same_customers": "partly",
+              "where": "worldwide", "locations": "online_only"}, **change)
+    assert R.entrant(v) is ok_
+
+
+def test_a_failed_headline_read_says_why():
+    class Bad:
+        def call_json(self, *a, **k):
+            from tracker.market_radar_llm import ModelError
+            raise ModelError("truncated", "the reply hit max_tokens")
+    out = R.scan_entrants({"name": "A", "industry": {"keywords": ["wool shoes"]}}, own_domain="a.com",
+                          competitors=[], get=net({"https://news.google.com/": gnews("New shoe brand X launches")}),
+                          fetch_home=lambda i: {}, now=NOW, token="", llm=Bad(),
+                          breaker=news.Breaker(gap=0, sleep=lambda s: None))
+    assert "truncated: the reply hit max_tokens" in out["note"]
+
+
+def test_the_one_off_radar_tidy_forgets_scans_and_entrant_events_only(pg):
+    e = pg.upsert_entity("shop.example")
+    pg.record_event(e, "radar_entrants:x", type="new_entrant", title="New brand", source={"url": "u", "detector": "radar_entrants"})
+    pg.record_event(e, "radar_local:y", type="nearby_opening", title="New nearby", source={"url": "u", "detector": "radar_local"})
+    pg.save_snapshot(e, "radar_local", {"scan": {}})
+    pg.save_snapshot(e, "catalog", {"products": {}})
+    assert pg.drop_radar_scans() == (1, 1)
+    assert [x["type"] for x in pg.recent_events([e])] == ["nearby_opening"]
+    assert pg.latest_snapshot(e, "catalog") and pg.latest_snapshot(e, "radar_local") is None

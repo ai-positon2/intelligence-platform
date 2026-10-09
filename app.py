@@ -9177,7 +9177,11 @@ def admin_market_radar_tidy_events():
         return refused
     from tracker import market_radar_store as mr_store
     events, snapshots = mr_store.drop_product_announcements()
-    return jsonify(events_deleted=events, snapshots_deleted=snapshots)
+    out = {"events_deleted": events, "snapshots_deleted": snapshots}
+    if (request.get_json(silent=True) or {}).get("radar"):
+        # 2026-10-10: radar scans made under the loose entrant rule.
+        out["radar_events_deleted"], out["radar_snapshots_deleted"] = mr_store.drop_radar_scans()
+    return jsonify(out)
 
 
 @app.route("/p2/admin/market-radar/api/tidy-suggestions", methods=["POST"])

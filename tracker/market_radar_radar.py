@@ -257,14 +257,16 @@ def local_news(entity_country, city, words, lang, *, get, breaker, stems=(), nam
 
 
 def _mentions(headline, name, city=""):
-    """Does a headline name this business? Its distinctive words, all of
-    them. The city's own words are not distinctive: a place called just
-    "Cedar Park" would otherwise be named by every Cedar Park headline."""
-    skip = {"the", "and", "dental", "dentist", "clinic", "care", "family", "center", "centre",
-            "studio", "gym", "fitness", "restaurant", "cafe", "shop", "store"} | \
-        set(fold(city).split())
-    words = [w for w in fold(name).split() if len(w) > 2 and w not in skip]
-    return bool(words) and all(re.search(r"\b%s\b" % re.escape(w), fold(headline)) for w in words)
+    """Does a headline name this business? Its whole name, as a phrase
+    ("Luigi's Pizza opens in Cedar Park"). Matching its words one by one,
+    leaving out "dental", let a practice named after its neighbourhood
+    claim "A Burger & Champagne Restaurant Is Opening In Notting Hill"
+    (London, 2026-10-10). A name that is only the city's words names
+    nothing."""
+    n = fold(name)
+    if len(n) < 4 or set(n.split()) <= set(fold(city).split()):
+        return False
+    return bool(re.search(r"(^| )%s( |$)" % re.escape(n), fold(headline)))
 
 
 def _site_evidence(url, fetch):
@@ -519,7 +521,7 @@ BRANDS_SYSTEM = """You read news headlines about launches in a product category 
 - headline: the number of the headline it comes from.
 - is_new_brand: true when the headline presents the brand itself as new (a new brand, a startup, a debut), false when an established company is launching a product.
 
-Leave out the client itself, retailers and marketplaces (Amazon, Target, Walmart), publishers, and anything that is not a brand. Return an empty list when no headline names a brand."""
+Leave out the client itself, retailers and marketplaces (Amazon, Target, Walmart), publishers, and anything that is not a brand. List at most 15 brands, new brands first. Return an empty list when no headline names a brand."""
 
 
 def brands_from_headlines(headlines, profile, *, run_id=None, client=None, llm=None):
@@ -531,7 +533,7 @@ def brands_from_headlines(headlines, profile, *, run_id=None, client=None, llm=N
         profile.get("name"), profile.get("one_liner") or "",
         "\n".join("%d. %s" % (i, h["title"]) for i, h in enumerate(headlines)))
     data, _meta = llm.call_json(BRANDS_SYSTEM, user, BRANDS_SCHEMA, model="claude-haiku-5-5",
-                                max_tokens=1500, run_id=run_id, stage="radar_brands",
+                                max_tokens=3000, run_id=run_id, stage="radar_brands",
                                 client=client)
     out, seen = [], set()
     for b in data.get("brands") or []:
@@ -572,6 +574,17 @@ def resolve_brands(brands, *, country, token, run_id=None, search=None):
     return found, res.get("error")
 
 
+def entrant(v):
+    """Stricter than a competitor: a NEW brand is only worth a card when it
+    sells the same thing to the same customers in the client's markets.
+    With partial overlaps let through, yesterday's domains gave a general
+    store in India, an apparel shop and a hoodie printer as new entrants to
+    Allbirds' category (2026-10-10)."""
+    return bool(v) and v.get("site_type") == "business" and v.get("same_offering") == "yes" \
+        and v.get("same_customers") in ("yes", "partly") and v.get("where") != "other_country" \
+        and v.get("locations") != "one"
+
+
 def scan_entrants(profile, *, own_domain, competitors, get, fetch_home, now=None, token=None,
                   run_id=None, client=None, breaker, llm=None, search=None, verify=None):
     """The new-entrant scan for a business selling online. Returns
@@ -591,7 +604,8 @@ def scan_entrants(profile, *, own_domain, competitors, get, fetch_home, now=None
         brands = brands_from_headlines(headlines, profile, run_id=run_id, client=client, llm=llm)
     except Exception as e:
         brands = []
-        notes.append("reading the headlines failed (%s)" % type(e).__name__)
+        notes.append("reading the headlines failed (%s: %s)" % (
+            getattr(e, "kind", type(e).__name__), str(getattr(e, "detail", e))[:160]))
     known = set(competitors) | {own_domain}
     sites, err = resolve_brands([b for b in brands if b["is_new_brand"]] +
                                 [b for b in brands if not b["is_new_brand"]],
@@ -629,7 +643,7 @@ def scan_entrants(profile, *, own_domain, competitors, get, fetch_home, now=None
     findings = []
     for i in readable:
         v = verdicts.get(i["domain"])
-        if not v or not rivals.passes(v):
+        if not entrant(v):
             continue
         reg = i.get("registered") or registered_on(i["domain"], get=get)
         age = months_old(reg, now)
