@@ -333,6 +333,7 @@
 
   // == competitor moves (Phase 3) ====================================================
 
+  var MOVES_SHOWN = 25;
   var STATUS_WORD = { ok: 'Read', reused: 'Read earlier', empty: 'Nothing listed', none: 'Not there',
     failed: 'Could not read', skipped: 'Skipped' };
   var TONE = { new_location: 'ok', product_launch: 'ok', hiring_surge: 'ok', new_job_location: 'ok',
@@ -374,7 +375,11 @@
     if (last && last.status === 'failed') body += '<div class="mr-callout bad">The last collection failed: ' + esc(last.error || 'no reason given') + '</div>';
     var events = moves.events || [];
     if (events.length) {
-      body += '<ul class="mr-moves">' + events.map(renderMoveRow).join('') + '</ul>';
+      body += '<ul class="mr-moves">' + events.slice(0, MOVES_SHOWN).map(renderMoveRow).join('') + '</ul>';
+      if (events.length > MOVES_SHOWN) {
+        body += '<details class="mr-more"><summary>' + esc(events.length - MOVES_SHOWN) + ' earlier moves</summary>' +
+          '<ul class="mr-moves">' + events.slice(MOVES_SHOWN).map(renderMoveRow).join('') + '</ul></details>';
+      }
     } else if (last && last.status === 'complete') {
       body += '<div class="mr-empty"><b>No moves yet</b>' + (moves.competitors || []).length + ' competitors are tracked. ' +
         'A move appears when something differs from the previous collection, or when a source dates it in the last 90 days.</div>';

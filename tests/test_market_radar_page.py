@@ -221,7 +221,7 @@ def test_every_route_is_admin_only(method, path, email, status):
 
 @pytest.mark.parametrize("path", ["/api/clients/1/profile", "/api/clients/1/competitors",
                                   "/api/clients/1/competitors/2", "/api/runs",
-                                  "/api/clients/1/collect"])
+                                  "/api/clients/1/collect", "/api/tidy-events"])
 def test_posts_from_another_site_are_refused(path):
     resp = _client(ADMIN).post(BASE + path, json={}, headers={"Origin": "https://evil.example"})
     assert resp.status_code == 403
@@ -503,3 +503,11 @@ def test_script_shows_moves_and_escapes_them():
     assert "Read 3 of 10 competitors" in out["running"] and "disabled" in out["running"]
     assert "Nothing collected yet" in out["none"] and "Collect now" in out["none"]
     assert "No moves yet" in out["quiet"] and "2 competitors are tracked" in out["quiet"]
+
+
+def test_script_shows_the_latest_moves_and_folds_the_rest():
+    ev = lambda i: {"id": i, "name": "R", "type": "promotion", "label": "New offer", "title": "T%d" % i,
+                    "date": "2026-10-01", "detectors": [], "evidence": 1}
+    html = run_js("return MR.renderMoves(%s, null);" % json.dumps(
+        {"events": [ev(i) for i in range(30)], "competitors": [], "last_collect": {"status": "complete"}}))
+    assert "5 earlier moves" in html and html.index("T24") < html.index("earlier moves") < html.index("T25")

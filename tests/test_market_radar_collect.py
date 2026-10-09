@@ -250,6 +250,12 @@ def test_a_client_collection_on_postgres_stores_a_baseline_then_the_weeks_moves(
                               + timedelta(hours=13))
     assert later["new_events"] == 1
     (ev,) = pg.recent_events([rival])
+    pg.record_event(rival, "x:older", type="promotion", title="Older", source={"url": "u", "detector": "x"},
+                    event_date="2026-01-01")
+    pg.record_event(rival, "x:newer", type="promotion", title="Newer", source={"url": "u", "detector": "x"},
+                    event_date="2099-01-01")
+    assert [e["title"] for e in pg.recent_events([rival])][0] == "Newer"
+    assert [e["title"] for e in pg.recent_events([rival])][-1] == "Older"
     assert ev["type"] == "new_location" and ev["title"] == "New location page: Merced"
     summary = {(s["detector"], s["versions"]) for s in pg.snapshot_summaries([rival])}
     assert ("locations", 2) in summary and ("catalog", 1) in summary
@@ -293,3 +299,18 @@ def test_an_older_table_gains_the_collect_mode_once(pg):
         cur.execute("SELECT pg_get_constraintdef(oid) FROM pg_constraint "
                     "WHERE conname='mr_runs_mode_check'")
         assert "collect" in cur.fetchone()[0]
+
+
+def test_the_one_off_tidy_drops_product_announcements_only(pg):
+    e = pg.upsert_entity("shop.example")
+    pg.record_event(e, "newsroom:post:a", type="announcement", title="Runner",
+                    source={"url": "https://shop.example/products/runner", "detector": "newsroom"})
+    pg.record_event(e, "newsroom:post:b", type="announcement", title="We open in Leeds",
+                    source={"url": "https://shop.example/blogs/news/leeds", "detector": "newsroom"})
+    pg.record_event(e, "catalog:prod+:x", type="product_launch", title="New product: Runner",
+                    source={"url": "https://shop.example/products/runner", "detector": "catalog"})
+    pg.save_snapshot(e, "newsroom", {"source": "https://shop.example/collections/all.atom", "items": []})
+    pg.save_snapshot(e, "catalog", {"products": {}})
+    assert pg.drop_product_announcements() == (1, 1)
+    assert sorted(x["title"] for x in pg.recent_events([e])) == ["New product: Runner", "We open in Leeds"]
+    assert pg.latest_snapshot(e, "newsroom") is None and pg.latest_snapshot(e, "catalog")

@@ -759,6 +759,10 @@ FEEDISH = re.compile(r"news|press|presse|blog|media|imprensa|noticias|actualites
 POSTISH = re.compile(r"/(news|press|presse|blog|media|stories|articles?|imprensa|noticias|"
                      r"newsroom|insights|updates)/", re.I)
 MAX_POSTS = 40
+# Feeds that are not news: comment feeds, and the product feeds Shopify
+# announces on every store (wildling.shoes' /collections/all.atom listed 26
+# shoes as "announcements", 2026-10-09).
+NOT_NEWS_FEED = re.compile(r"/comments/|/collections/|/products?[./]|\.atom\?|/shop/feed", re.I)
 NOT_NEWS = re.compile(r"newsletter|subscribe|sign-?up|unsubscribe|preferences", re.I)
 
 
@@ -814,7 +818,7 @@ def links_under(html, page_url):
 def read_newsroom(ctx):
     rs, get = ctx["site"], ctx["get"]
     s = rs.get("signals") or {}
-    feeds = sorted((f for f in s.get("feeds") or [] if not re.search(r"/comments/", f)),
+    feeds = sorted((f for f in s.get("feeds") or [] if not NOT_NEWS_FEED.search(f)),
                    key=lambda u: 0 if FEEDISH.search(u) else 1)
     if not feeds and any(p["name"] == "wordpress" for p in s.get("platforms") or []):
         feeds = [urljoin(rs["home_url"], "/feed/")]
@@ -829,6 +833,10 @@ def read_newsroom(ctx):
         if read["status"] == "not_found" or (read["status"] == "ok" and not items):
             # A guessed /feed/ that does not exist, or that answers with a
             # page instead of a feed, means there is no feed: not a failure.
+            continue
+        # A feed whose items are mostly product pages is a catalogue, not news.
+        if items and sum(1 for i in items if site.PRODUCT_PATH.search(urlsplit(i["url"]).path
+                                                                    or "")) > len(items) / 2:
             continue
         if items:
             items = items[:MAX_POSTS]

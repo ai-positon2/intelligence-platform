@@ -666,10 +666,25 @@ def recent_events(entity_ids, *, days=120, limit=400, conn=None):
                    evidence_count, first_seen_at
             FROM mr_events WHERE entity_id = ANY(%s)
               AND first_seen_at > now() - make_interval(days => %s)
-            ORDER BY first_seen_at DESC, id DESC LIMIT %s""", (ids, int(days), int(limit)))
+            ORDER BY COALESCE(event_date, first_seen_at::date) DESC, first_seen_at DESC, id DESC
+            LIMIT %s""", (ids, int(days), int(limit)))
         keys = ("id", "entity_id", "type", "status", "event_date", "title", "summary",
                 "location", "sources", "evidence_count", "first_seen_at")
         return [dict(zip(keys, r)) for r in cur.fetchall()]
+
+
+def drop_product_announcements(*, conn=None):
+    """One-off (2026-10-09): delete "announcement" events that were product
+    pages read from a shop's product feed (/collections/all.atom), and the
+    newsroom snapshots that held them, so the next collection reads the
+    newsroom afresh. Returns (events, snapshots) deleted."""
+    with _tx(conn) as cur:
+        cur.execute("""DELETE FROM mr_events WHERE type='announcement'
+                       AND sources->0->>'url' ~* '/products?/'""")
+        events = cur.rowcount
+        cur.execute("""DELETE FROM mr_snapshots WHERE detector='newsroom'
+                       AND payload->>'source' ~* '/collections/|\\.atom'""")
+        return events, cur.rowcount
 
 
 def snapshot_summaries(entity_ids, *, conn=None):

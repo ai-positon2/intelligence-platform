@@ -9167,6 +9167,19 @@ def admin_market_radar_moves(client_id):
     return jsonify(view)
 
 
+@app.route("/p2/admin/market-radar/api/tidy-events", methods=["POST"])
+@admin_required
+def admin_market_radar_tidy_events():
+    """One-off, free: remove product pages stored as announcements before the
+    newsroom learnt to skip shop product feeds (2026-10-09)."""
+    refused = _mr_guard_post()
+    if refused:
+        return refused
+    from tracker import market_radar_store as mr_store
+    events, snapshots = mr_store.drop_product_announcements()
+    return jsonify(events_deleted=events, snapshots_deleted=snapshots)
+
+
 @app.route("/p2/admin/market-radar/api/tidy-suggestions", methods=["POST"])
 @admin_required
 def admin_market_radar_tidy():

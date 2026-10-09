@@ -781,3 +781,13 @@ def test_the_summary_card_of_a_big_launch_wave_is_dated():
                                      "2026-09-01"] for i in range(30)}}
     evs = det.baseline_catalog(payload, NOW)
     assert evs[-1]["title"] == "5 more new products" and evs[-1]["date"] == "2026-10-09"
+
+
+def test_a_shopify_product_feed_is_not_a_newsroom():
+    rs = site(signals={"feeds": ["https://acme.com/collections/all.atom"]})
+    net = Net({"https://acme.com/collections/all.atom": ATOM})
+    assert det.read_newsroom(ctx(net, rs))["status"] == "none"
+    products = ATOM.replace("/blog/launch", "/products/runner")
+    rs = site(signals={"feeds": ["https://acme.com/feed.atom"]})
+    net = Net({"https://acme.com/feed.atom": products})
+    assert det.read_newsroom(ctx(net, rs))["status"] == "none"
