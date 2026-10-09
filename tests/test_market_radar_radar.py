@@ -275,6 +275,8 @@ def test_entrants_are_new_brands_that_really_compete():
                           breaker=news.Breaker(gap=0, sleep=lambda s: None), llm=llm,
                           search=search, verify=verify)
     assert [f["domain"] for f in out["findings"]] == ["runjanuary.com"]
+    # "Old Shoe Co" was called new by nobody; an old domain called new by a
+    # headline is not an entrant either (below).
     f = out["findings"][0]
     assert any("registered on 2026-03-01" in e for e in f["evidence"])
     assert out["coverage"]["candidates"] == 2          # the known competitor is not a candidate
@@ -489,3 +491,19 @@ def test_local_news_asks_with_the_map_category_unquoted_and_the_label():
     from urllib.parse import unquote_plus
     qs = [unquote_plus(u.split("q=")[1].split("&")[0]) for u in asked if "news.google" in u]
     assert qs[0].startswith('"Austin" dental clinic (') and qs[1].startswith('"Austin" General dentistry (')
+
+
+def test_an_old_domain_outweighs_a_headline_that_calls_the_brand_new():
+    profile = {"name": "Allbirds", "industry": {"keywords": ["wool shoes"]}, "markets": ["US"]}
+    pages = {"https://news.google.com/": gnews("First-Ever Shaq shoe collection debuts"),
+             "https://rdap.org/domain/shaq.com": rdap("1996-01-01")}
+    llm = Llm({"brands": [{"name": "Shaq", "headline": 0, "is_new_brand": True}]})
+    out = R.scan_entrants(
+        profile, own_domain="allbirds.com", competitors=[], get=net(pages),
+        fetch_home=lambda i: {"status": "ok"}, now=NOW, token="t",
+        breaker=news.Breaker(gap=0, sleep=lambda s: None), llm=llm,
+        search=lambda q, **k: {"results": [{"query": q[0], "position": 1, "domain": "shaq.com"}]},
+        verify=lambda items, b, p, **k: ({i["domain"]: {"site_type": "business", "same_offering": "yes",
+                                                         "same_customers": "yes", "where": "same_country",
+                                                         "locations": "online_only"} for i in items}, []))
+    assert out["findings"] == []

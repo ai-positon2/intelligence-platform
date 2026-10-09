@@ -57,7 +57,7 @@ MAX_CANDIDATES = 40            # nearest new listings checked for evidence
 MAX_SITE_READS = 15
 SAME_PLACE_KM = 0.3
 NEWS_DAYS = 90
-MAX_BRAND_SEARCHES = 5
+MAX_BRAND_SEARCHES = 8
 MAX_ENTRANTS_JUDGED = 24
 NRD_URL = "https://www.whoisds.com//whois-database/newly-registered-domains/%s/nrd"
 
@@ -655,7 +655,11 @@ def scan_entrants(profile, *, own_domain, competitors, get, fetch_home, now=None
         reg = i.get("registered") or registered_on(i["domain"], get=get)
         age = months_old(reg, now)
         young = age is not None and age <= 24
-        if not (young or i["news_says_new"]):
+        # A headline calling a brand new does not outweigh a domain held for
+        # years: "First-Ever Shareef by Shaq Collection" sent "SHAQ" through
+        # on a long-established site (2026-10-10).
+        established = age is not None and age > 36
+        if not (young or (i["news_says_new"] and not established)):
             continue        # an established brand: a competitor, not a new entrant
         ev = []
         if i.get("headline"):
