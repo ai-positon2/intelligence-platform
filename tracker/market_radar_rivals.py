@@ -940,7 +940,8 @@ def _plan_view(plan):
 def save(result, *, client_id, owner_email, conn=None):
     """Store the list on the client: each competitor becomes (or refreshes) a
     shared company record and a proposed link. A competitor the user already
-    confirmed or removed keeps that decision (market_radar_store)."""
+    confirmed or removed keeps that decision (market_radar_store). Earlier
+    suggestions this full search no longer makes are dropped."""
     from . import market_radar_store as store
     saved = []
     for c in result.get("competitors") or []:
@@ -952,4 +953,10 @@ def save(result, *, client_id, owner_email, conn=None):
                                  confidence=round(c["score"] / 100.0, 2),
                                  found_via=c.get("found"), details=details, conn=conn)
         saved.append(entity)
+    # A full search replaces the agent's earlier suggestions; a search that
+    # failed in part keeps them, since it may simply have missed them.
+    search_ok = ((result.get("coverage") or {}).get("search") or {}).get("status") == "ok"
+    if result.get("status") == "ok" and search_ok:
+        result["retired_suggestions"] = store.retire_suggestions(client_id, owner_email, saved,
+                                                                 conn=conn)
     return saved

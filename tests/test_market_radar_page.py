@@ -373,3 +373,52 @@ def test_rows_saved_before_details_existed_borrow_them_from_their_run(client_wit
          "checked_on": "its own homepage"}]}})
     [row] = views.competitor_rows(w["client"], OWNER)
     assert row["reason"] == "Next door." and row["score"] == 80 and row["checked_on"] == "its own homepage"
+
+
+
+@pytest.mark.parametrize("status, search, retired", [("ok", "ok", True), ("ok", "partial", False),
+                                                     ("ok", "failed", False)])
+def test_a_full_search_replaces_old_suggestions_but_never_a_users_decision(client_with_reading, status, search, retired):
+    from tracker import market_radar_rivals as rv
+    from tracker import market_radar_store as store
+    w = client_with_reading
+    ids = {d: store.upsert_entity(d) for d in ("old.example", "kept.example", "confirmed.example",
+                                                "removed.example", "mine.example")}
+    for d in ("old.example", "kept.example", "confirmed.example", "removed.example"):
+        store.propose_competitor(w["client"], OWNER, ids[d], "direct")
+    store.set_competitor_status(w["client"], OWNER, ids["confirmed.example"], "confirmed")
+    store.set_competitor_status(w["client"], OWNER, ids["removed.example"], "removed")
+    store.add_competitor(w["client"], OWNER, ids["mine.example"], "direct")
+    result = {"status": status, "coverage": {"search": {"status": search}},
+              "competitors": [{"domain": "kept.example", "kind": "direct", "score": 70, "found": []}]}
+    rv.save(result, client_id=w["client"], owner_email=OWNER)
+    left = {r["domain"]: r["status"] for r in store.competitors(w["client"], OWNER, include_removed=True)}
+    assert ("old.example" not in left) is retired
+    assert left["kept.example"] == "proposed" and left["confirmed.example"] == "confirmed"
+    assert left["removed.example"] == "removed" and left["mine.example"] == "confirmed"
+
+
+def test_test_records_are_not_listed(pg):
+    from tracker import market_radar_store as store
+    store.upsert_client(OWNER, store.upsert_entity("mr-phase0-test.example"))
+    store.upsert_client(OWNER, store.upsert_entity("real-company.com"))
+    assert [c["domain"] for c in views.client_list(OWNER)] == ["real-company.com"]
+
+
+def test_tidy_keeps_only_the_latest_full_searchs_suggestions(client_with_reading, monkeypatch):
+    import app as appmod
+    from tracker import market_radar_store as store
+    monkeypatch.setattr(appmod, "ADMIN_EMAILS", set(appmod.ADMIN_EMAILS) | {OWNER})
+    w = client_with_reading
+    old, new, mine = (store.upsert_entity(d) for d in ("old.example", "new.example", "mine.example"))
+    for e in (old, new):
+        store.propose_competitor(w["client"], OWNER, e, "direct")
+    store.add_competitor(w["client"], OWNER, mine, "direct")
+    store.update_run(w["run"], status="complete", summary={"saved_entities": [new], "result": {
+        "status": "ok", "coverage": {"search": {"status": "ok"}}}})
+    r = _client(OWNER).post(BASE + "/api/tidy-suggestions", json={})
+    assert r.get_json()["dropped"] == {"acme-dental.com": 1}
+    left = {x["domain"] for x in store.competitors(w["client"], OWNER)}
+    assert left == {"new.example", "mine.example"}
+    assert _client(OWNER).post(BASE + "/api/tidy-suggestions", json={},
+                               headers={"Origin": "https://evil.example"}).status_code == 403

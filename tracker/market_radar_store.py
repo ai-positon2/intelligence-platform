@@ -398,9 +398,22 @@ def add_competitor(client_id, owner_email, entity_id, kind, *, conn=None):
                     (client_id, entity_id, kind))
 
 
+def retire_suggestions(client_id, owner_email, keep_entity_ids, *, conn=None):
+    """Drop the agent's earlier suggestions that its latest full search no
+    longer makes. Only rows still 'proposed' go: anything the user confirmed,
+    removed or added stays. Returns how many were dropped."""
+    with _tx(conn) as cur:
+        _owned_client(cur, client_id, owner_email)
+        cur.execute("""DELETE FROM mr_competitors
+                       WHERE client_id=%s AND status='proposed' AND NOT (entity_id = ANY(%s))""",
+                    (client_id, list(keep_entity_ids)))
+        return cur.rowcount
+
+
 def list_clients(owner_email, *, conn=None):
     """The companies this person tracks, newest first, with competitor counts
-    and their latest run."""
+    and their latest run. Test records (the reserved .example domain, such
+    as the Phase 0 Apify check's) are not listed."""
     with _tx(conn) as cur:
         cur.execute("""
             SELECT cl.id, cl.entity_id, e.domain, e.name, e.archetype, e.country, cl.updated_at,
@@ -412,7 +425,7 @@ def list_clients(owner_email, *, conn=None):
                       FROM mr_runs r WHERE r.client_id = cl.id ORDER BY r.id DESC LIMIT 1)
             FROM mr_clients cl JOIN mr_entities e ON e.id = cl.entity_id
             LEFT JOIN mr_competitors c ON c.client_id = cl.id
-            WHERE cl.owner_email=%s
+            WHERE cl.owner_email=%s AND e.domain NOT LIKE '%%.example'
             GROUP BY cl.id, e.id
             ORDER BY cl.updated_at DESC""", ((owner_email or "").strip().lower(),))
         keys = ("client_id", "entity_id", "domain", "name", "archetype", "country", "updated_at",

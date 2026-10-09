@@ -9114,6 +9114,18 @@ def admin_market_radar_run_start():
     return jsonify(run_id=run_id, client_id=client_id), 202
 
 
+@app.route("/p2/admin/market-radar/api/tidy-suggestions", methods=["POST"])
+@admin_required
+def admin_market_radar_tidy():
+    """One-off, free: drop earlier suggestions that each company's latest full
+    search no longer makes (tracker/market_radar_views.tidy_suggestions)."""
+    refused = _mr_guard_post()
+    if refused:
+        return refused
+    from tracker import market_radar_views as views
+    return jsonify(dropped=views.tidy_suggestions(_mr_email()))
+
+
 @app.route("/p2/admin/market-radar/api/runs/<int:run_id>")
 @admin_required
 def admin_market_radar_run(run_id):

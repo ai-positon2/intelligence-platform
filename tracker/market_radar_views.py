@@ -345,3 +345,25 @@ def client_list(owner_email, *, conn=None):
     for c in store.list_clients(owner_email, conn=conn):
         out.append(dict(c, updated_at=_iso(c["updated_at"]), name=c["name"] or c["domain"]))
     return out
+
+
+def tidy_suggestions(owner_email, *, conn=None):
+    """One-off for lists built before a new search replaced old suggestions
+    (2026-10-09): for each of this person's companies, keep only the
+    suggestions its latest full search made. Free; touches nothing the user
+    decided. Returns {domain: suggestions dropped}."""
+    out = {}
+    for c in store.list_clients(owner_email, conn=conn):
+        with store._tx(conn) as cur:
+            cur.execute("""SELECT summary FROM mr_runs WHERE client_id=%s AND status='complete'
+                           ORDER BY id DESC LIMIT 1""", (c["client_id"],))
+            row = cur.fetchone()
+        summary = (row[0] if row else None) or {}
+        result = summary.get("result") or {}
+        search = ((result.get("coverage") or {}).get("search") or {}).get("status")
+        if result.get("status") != "ok" or search != "ok" or not summary.get("saved_entities"):
+            out[c["domain"]] = "kept (latest search was not a full one)"
+            continue
+        out[c["domain"]] = store.retire_suggestions(c["client_id"], owner_email,
+                                                    summary["saved_entities"], conn=conn)
+    return out
