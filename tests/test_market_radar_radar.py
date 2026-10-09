@@ -402,6 +402,8 @@ def test_a_brand_the_check_says_does_not_compete_is_not_an_entrant():
         verify=lambda items, b, p, **k: ({i["domain"]: {"site_type": "business", "same_offering": "no",
                                                          "same_customers": "yes"} for i in items}, []))
     assert out["findings"] == [] and out["coverage"]["readable"] == 1
+    assert out["coverage"]["left_out"] == [{"name": "January", "domain": "runjanuary.com",
+                                            "why": "sells something else: unknown"}]
 
 
 def test_a_finding_with_only_a_young_domain_is_titled_possibly_new():
