@@ -261,6 +261,11 @@ def test_a_client_collection_on_postgres_stores_a_baseline_then_the_weeks_moves(
                               + timedelta(hours=1))
     rows = third["companies"][0]["rows"]
     assert all(r["reused"] for r in rows if r["detector"] in ("catalog", "locations"))
+    # ... and says what those reads found, from the real store (an in-memory
+    # store once hid that latest_snapshot did not return item_count).
+    status = {r["detector"]: (r["status"], r["items"]) for r in rows}
+    assert status["catalog"] == ("ok", 1) and status["locations"] == ("ok", 2)
+    assert status["newsroom"] == ("none", 0)
 
 
 def test_collection_runs_do_not_replace_the_last_search(pg):

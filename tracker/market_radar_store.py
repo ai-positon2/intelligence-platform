@@ -601,13 +601,13 @@ def save_snapshot(entity_id, detector, payload, *, item_count=None, run_id=None,
 
 def latest_snapshot(entity_id, detector, *, conn=None):
     with _tx(conn) as cur:
-        cur.execute("""SELECT payload, first_seen_at, last_seen_at, seen_count FROM mr_snapshots
-                       WHERE entity_id=%s AND detector=%s
+        cur.execute("""SELECT payload, first_seen_at, last_seen_at, seen_count, item_count
+                       FROM mr_snapshots WHERE entity_id=%s AND detector=%s
                        ORDER BY last_seen_at DESC, id DESC LIMIT 1""", (entity_id, detector))
         row = cur.fetchone()
     if not row:
         return None
-    return dict(zip(("payload", "first_seen_at", "last_seen_at", "seen_count"), row))
+    return dict(zip(("payload", "first_seen_at", "last_seen_at", "seen_count", "item_count"), row))
 
 
 # -- events --------------------------------------------------------------------
