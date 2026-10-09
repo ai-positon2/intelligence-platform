@@ -623,9 +623,30 @@ WAYBACK_CDX = "https://web.archive.org/cdx/search/cdx"
 MAX_ARCHIVE_PAGES = 4
 
 
+WAYBACK_AVAILABLE = "https://archive.org/wayback/available"
+MAX_ARCHIVE_AGE_DAYS = 400
+
+
+def _now():
+    return datetime.now(timezone.utc)
+
+
+def _recent(stamp):
+    """A capture older than about a year describes a different company: the
+    nearest 200 capture of lululemon.com is from 2011, because every recent
+    capture of the bare domain is a redirect (2026-10-09)."""
+    try:
+        when = datetime.strptime(stamp[:8], "%Y%m%d").replace(tzinfo=timezone.utc)
+    except (TypeError, ValueError):
+        return False
+    return (_now() - when).days <= MAX_ARCHIVE_AGE_DAYS
+
+
 def wayback_latest(url):
-    """The newest capture of this exact URL that the archive saw answer 200,
-    as (timestamp, original_url), or None."""
+    """The newest capture of this URL that the archive saw answer 200, as
+    (timestamp, original_url), or None. The CDX search is asked first; when
+    it fails (it answered 503 for two days running, 2026-10-08 and 09), the
+    simpler availability API is asked for the capture nearest today."""
     parts = urlsplit(url)
     query = parts.netloc + (parts.path or "/")
     text = fetch_text("%s?url=%s&output=json&limit=-1&filter=statuscode:200&fl=timestamp,original"
@@ -633,10 +654,29 @@ def wayback_latest(url):
     try:
         rows = json.loads(text or "")
     except ValueError:
-        return None
-    if len(rows) < 2 or len(rows[-1]) < 2:
-        return None
-    return rows[-1][0], rows[-1][1]
+        rows = None
+    if rows is not None:
+        if len(rows) < 2 or len(rows[-1]) < 2 or not _recent(rows[-1][0]):
+            return None
+        return rows[-1][0], rows[-1][1]
+    # The availability API answers {} for "host/" but finds "host", and the
+    # capture nearest today of a bare domain is often its redirect to www
+    # (planetfitness.com), so the www form is asked too.
+    path = parts.path if parts.path not in ("", "/") else ""
+    host = parts.netloc
+    hosts = [host, host[4:] if host.startswith("www.") else "www." + host]
+    for h in hosts:
+        data = fetch_json("%s?url=%s&timestamp=%s" % (WAYBACK_AVAILABLE,
+                                                     requests.utils.quote(h + path, safe="/:"),
+                                                     _now().strftime("%Y%m%d")))
+        snap = ((data or {}).get("archived_snapshots") or {}).get("closest") or {}
+        stamp = str(snap.get("timestamp") or "")
+        if not snap.get("available") or str(snap.get("status")) != "200" or not _recent(stamp):
+            continue
+        m = re.match(r"https?://web\.archive\.org/web/\d+/(.+)$", snap.get("url") or "")
+        if m:
+            return stamp, m.group(1)
+    return None
 
 
 def fetch_archived(url):

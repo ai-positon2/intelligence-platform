@@ -430,6 +430,7 @@ def run_discover(client, *, search_results=(), found=(), reader=None, profile=PR
     def fake_search(queries, **k):
         return {"results": list(search_results), "error": None, "charged_usd": 0.005}
     fp = FakePlaces([], list(found))
+    kw.setdefault("archive_reader", lambda item: {"status": "error", "note": "no archived copy"})
     return rv.discover(profile, client=client, token="t", search=fake_search, places=fp,
                        reader=reader or home(), fetch=lambda url: {"status": "error"}, **kw)
 
@@ -452,7 +453,7 @@ def test_discover_end_to_end_ranks_only_checked_candidates():
     assert c.steps()[0] == "plan" and c.steps()[-1] == "rank"
     assert stages == ["rivals_plan", "rivals_search", "rivals_verify", "rivals_rank"]
     got = {x["domain"]: x for x in out["competitors"]}
-    assert list(got) == ["rival.example", "near.example", "web.example"]
+    assert list(got) == ["rival.example", "near.example", "web.example"]     # by score
     assert out["coverage"]["rank_dropped"]["domains"] == ["invented.example"]
     assert got["near.example"]["kind"] == "local" and got["near.example"]["distance_km"] == 0.5
     assert got["web.example"]["kind"] == "direct"     # "local" needs the map or a same-city address
@@ -468,7 +469,7 @@ def test_discover_keeps_unreadable_sites_visible_and_drops_self_redirects():
                      "named.example": {"final_domain": "acme.example"}})
     out = run_discover(Scripted(), reader=reader, found=[place("Near", "https://near.example", 0.5)])
     assert [u["domain"] for u in out["unread"]] == ["rival.example"]
-    assert out["unread"][0]["why"] == "server refused (HTTP 403)"
+    assert out["unread"][0]["why"] == "server refused (HTTP 403); archive: no archived copy"
     assert [c["domain"] for c in out["competitors"]] == ["near.example"]
     assert out["competitors"][0]["checked_on"] == "map listing only"
     assert {"domain": "named.example", "why": "redirects to the client's own site"} in out["rejected"]
@@ -658,12 +659,12 @@ def test_a_chain_does_not_get_single_offices_as_rivals():
 
 
 def test_weak_matches_are_left_out_with_their_score():
-    ranked = {"competitors": [{"domain": "rival.example", "kind": "direct", "score": 39, "reason": "far"},
-                              {"domain": "named.example", "kind": "direct", "score": 40, "reason": "ok"}],
+    ranked = {"competitors": [{"domain": "rival.example", "kind": "direct", "score": 49, "reason": "far"},
+                              {"domain": "named.example", "kind": "direct", "score": 50, "reason": "ok"}],
               "left_out": [], "gaps": []}
     out = run_discover(Scripted(ranked=ranked))
     assert [x["domain"] for x in out["competitors"]] == ["named.example"]
-    assert out["left_out"][0]["domain"] == "rival.example" and "score 39" in out["left_out"][0]["why"]
+    assert out["left_out"][0]["domain"] == "rival.example" and "score 49" in out["left_out"][0]["why"]
 
 
 def test_a_city_level_location_is_flagged_on_the_map_search():
@@ -690,3 +691,56 @@ def test_a_domain_pointing_at_a_reserved_address_says_so(monkeypatch):
     monkeypatch.setattr(site, "public_get", refuse)
     out = site.fetch("https://pacificdentalservices.com/")
     assert out["status"] == "error" and "address we do not fetch" in out["note"]
+
+
+
+def test_a_refused_homepage_is_read_from_the_archive_and_labelled():
+    # planetfitness.com answered 403 from Railway (2026-10-09).
+    reader = home(**{"rival.example": {"status": "blocked", "note": "server refused (HTTP 403)"},
+                     "near.example": {"status": "blocked", "note": "server refused (HTTP 403)"}})
+    tried = []
+
+    def archive(item):
+        tried.append(item["domain"])
+        return {"status": "ok", "final_domain": item["domain"], "head": "TITLE: Rival",
+                "text": "Dentist", "archived": "2026-09-30"}
+    c = Scripted()
+    out = run_discover(c, reader=reader, archive_reader=archive,
+                       found=[place("Near", "https://near.example", 0.5)])
+    assert tried == ["rival.example"]           # the map already vouches for near.example
+    got = {x["domain"]: x for x in out["competitors"]}
+    assert got["rival.example"]["checked_on"] == "an archived copy of its homepage (2026-09-30)"
+    assert out["coverage"]["checked"]["read_from_archive"] == 1
+    asked = [kw for kw in c.calls if kw["system"] is rv.VERIFY_SYSTEM]
+    assert "Wayback Machine's copy of 2026-09-30" in asked[0]["messages"][0]["content"]
+
+
+def test_read_archived_labels_the_capture_date(monkeypatch):
+    from tracker import market_radar_site as site
+    monkeypatch.setattr(site, "fetch_archived", lambda url: {
+        "status": "ok", "html": "<title>PF</title>", "text": "Gyms", "final_url": url,
+        "via": "wayback:20260930120000", "note": "read from the Wayback Machine"})
+    b = rv.read_archived({"domain": "planetfitness.com"})
+    assert b["status"] == "ok" and b["archived"] == "2026-09-30" and b["final_domain"] == "planetfitness.com"
+    monkeypatch.setattr(site, "fetch_archived", lambda url: {"status": "error", "note": "no copy"})
+    assert rv.read_archived({"domain": "x.example"}) == {"status": "error", "note": "no copy"}
+
+
+
+@pytest.mark.parametrize("brief, retry", [
+    ({"status": "blocked", "note": "server refused (HTTP 403)"}, True),
+    ({"status": "error", "note": "could not be reached (ReadTimeoutError)"}, True),
+    ({"status": "error", "note": "unexpected HTTP 418"}, True),
+    ({"status": "error", "note": "could not be reached (gaierror)"}, False),
+    ({"status": "not_found", "note": "page not found (404)"}, False),
+    ({"status": "ok"}, False)])
+def test_which_unread_sites_are_retried_from_the_archive(brief, retry):
+    assert rv.worth_archive(brief) is retry
+
+
+def test_competitors_come_out_in_score_order():
+    ranked = {"competitors": [{"domain": "named.example", "kind": "direct", "score": 70, "reason": "a"},
+                              {"domain": "rival.example", "kind": "direct", "score": 90, "reason": "b"}],
+              "left_out": [], "gaps": []}
+    out = run_discover(Scripted(ranked=ranked))
+    assert [c["domain"] for c in out["competitors"]] == ["rival.example", "named.example"]

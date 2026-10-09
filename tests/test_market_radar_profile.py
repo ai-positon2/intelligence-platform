@@ -806,7 +806,13 @@ def test_non_shopify_json_is_ignored():
     assert site.shopify_store({"name": "x"}) is None and site.shopify_store(None) is None
 
 
-def test_wayback_latest_reads_the_newest_capture(monkeypatch):
+@pytest.fixture
+def today(monkeypatch):
+    from datetime import datetime, timezone
+    monkeypatch.setattr(site, "_now", lambda: datetime(2026, 10, 9, tzinfo=timezone.utc))
+
+
+def test_wayback_latest_reads_the_newest_capture(monkeypatch, today):
     monkeypatch.setattr(site, "fetch_text", lambda url, limit=0:
                         '[["timestamp","original"],["20260101000000","https://a.example/"],'
                         '["20260901000000","https://a.example/"]]' if "cdx" in url else None)
@@ -880,3 +886,53 @@ def test_a_local_business_is_located_by_its_street_not_its_city_centre(monkeypat
 
 def test_profile_asks_for_the_street_and_postcode():
     assert {"street", "postal_code"} <= set(prof.PROFILE_SCHEMA["properties"]["hq"]["required"])
+
+
+def test_wayback_falls_back_to_the_availability_api_when_the_search_fails(monkeypatch, today):
+    asked = []
+
+    def fetch_json(url):
+        asked.append(url)
+        return {"archived_snapshots": {"closest": {
+            "status": "200", "available": True, "timestamp": "20261004041021",
+            "url": "http://web.archive.org/web/20261004041021/https://www.planetfitness.com/"}}}
+    monkeypatch.setattr(site, "fetch_text", lambda url, limit=0: None)        # CDX answered 503
+    monkeypatch.setattr(site, "fetch_json", fetch_json)
+    assert site.wayback_latest("https://planetfitness.com/") == (
+        "20261004041021", "https://www.planetfitness.com/")
+    assert "url=planetfitness.com&timestamp=20261009" in asked[0]
+
+
+@pytest.mark.parametrize("snap", [
+    {"status": "200", "available": True, "timestamp": "20111018195440",
+     "url": "http://web.archive.org/web/20111018195440/http://www.lululemon.com/"},
+    {"status": "301", "available": True, "timestamp": "20261001000000",
+     "url": "http://web.archive.org/web/20261001000000/http://x.example/"},
+    {}])
+def test_an_old_redirected_or_missing_capture_is_no_copy(monkeypatch, today, snap):
+    monkeypatch.setattr(site, "fetch_text", lambda url, limit=0: None)
+    monkeypatch.setattr(site, "fetch_json", lambda url: {"archived_snapshots": {"closest": snap} if snap else {}})
+    assert site.wayback_latest("https://lululemon.com/") is None
+
+
+def test_an_old_capture_from_the_search_is_no_copy_either(monkeypatch, today):
+    monkeypatch.setattr(site, "fetch_text", lambda url, limit=0:
+                        '[["timestamp","original"],["20111018195440","http://www.lululemon.com/"]]')
+    assert site.wayback_latest("https://lululemon.com/") is None
+
+
+def test_the_www_form_is_asked_when_the_bare_domain_has_only_a_redirect(monkeypatch, today):
+    asked = []
+
+    def fetch_json(url):
+        asked.append(url)
+        if "url=www.planetfitness.com" in url:
+            return {"archived_snapshots": {"closest": {
+                "status": "200", "available": True, "timestamp": "20261004041021",
+                "url": "http://web.archive.org/web/20261004041021/https://www.planetfitness.com/"}}}
+        return {"archived_snapshots": {"closest": {"status": "301", "available": True,
+                                                   "timestamp": "20261008000000", "url": "x"}}}
+    monkeypatch.setattr(site, "fetch_text", lambda url, limit=0: None)
+    monkeypatch.setattr(site, "fetch_json", fetch_json)
+    assert site.wayback_latest("https://planetfitness.com/")[0] == "20261004041021"
+    assert len(asked) == 2

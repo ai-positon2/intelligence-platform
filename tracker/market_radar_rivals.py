@@ -56,12 +56,13 @@ MAX_VERIFY = 70            # candidates read and judged in the first round
 MAX_ARTICLES = 4           # "top 10" pages whose links are read
 MAX_FROM_ARTICLE = 15
 MAX_VERIFY_ROUND2 = 30
+MAX_ARCHIVED = 10          # refused homepages retried from the Wayback Machine
 VERIFY_BATCH = 8
 TEXT_CHARS = 1200
 FETCH_WORKERS = 8
 DEFAULT_RADIUS_KM = 5
 MIN_PLACES = 8             # fewer than this nearby: widen the radius once
-MIN_SCORE = 40             # a weaker match is listed as left out, not as a competitor
+MIN_SCORE = 50             # a weaker match is listed as left out, not as a competitor
 LIMITS = {"local_single": 15, "multi_location": 12, "ecommerce": 12}
 DEFAULT_LIMIT = 10
 SEARCH_LANGUAGES = {"ar", "bg", "ca", "cs", "da", "de", "el", "en", "es", "et", "fi", "fr", "hr",
@@ -385,6 +386,28 @@ def read_home(item):
         return {"status": "error", "note": "%s" % type(e).__name__}
     if page["status"] != "ok":
         return {"status": page["status"], "note": page.get("note")}
+    return _brief(page, notes)
+
+
+def read_archived(item):
+    """The Wayback Machine's latest copy of a homepage that refused this
+    server (planetfitness.com and purebarre.com answered 403 from Railway,
+    2026-10-09). Labelled with its capture date wherever it is shown."""
+    url = "https://%s/" % item["domain"]
+    try:
+        page = site_reader.fetch_archived(url)
+    except Exception as e:
+        return {"status": "error", "note": "archive: %s" % type(e).__name__}
+    if page.get("status") != "ok":
+        return {"status": page.get("status") or "error", "note": page.get("note")}
+    brief = _brief(page, [page.get("note") or ""])
+    stamp = (page.get("via") or "").split(":", 1)[-1]
+    brief["archived"] = "%s-%s-%s" % (stamp[:4], stamp[4:6], stamp[6:8]) if len(stamp) >= 8 else "unknown date"
+    brief["final_domain"] = item["domain"]
+    return brief
+
+
+def _brief(page, notes):
     doc = site_reader.parse_html(page["html"])
     text = _LINK.sub("", page["text"])
     text = " ".join(text.split())[:TEXT_CHARS]
@@ -395,6 +418,37 @@ def read_home(item):
     return {"status": "ok", "final_domain": final, "head": site_reader.page_head(doc).strip(),
             "text": text, "lang": doc.lang, "address_countries": countries,
             "words": len(page["text"].split()), "notes": notes}
+
+
+def worth_archive(brief):
+    """A site that refused, stalled or answered oddly (Gymshark's rivals on
+    2026-10-09: alphaleteathletics.com and adidas.com 403, lululemon.com a
+    read timeout, underarmour.com HTTP 418) may still be read from the
+    archive. A domain that does not resolve or a page that is gone is not
+    retried: an old copy of a dead company is not a competitor."""
+    if brief.get("status") not in ("blocked", "error"):
+        return False
+    note = (brief.get("note") or "").lower()
+    return not any(x in note for x in ("gaierror", "name or service", "nodename", "not found"))
+
+
+def archive_unread(items, briefs, archive_reader=read_archived):
+    """Second try, from the archive, for candidates whose site refused us and
+    that the map does not already vouch for. Bounded: the archive is slow."""
+    todo = [i for i in items if worth_archive(briefs.get(i["domain"]) or {})
+            and not any(v["kind"] == "places" for v in i["via"])][:MAX_ARCHIVED]
+    if not todo:
+        return 0
+    got = read_all(todo, reader=archive_reader)
+    n = 0
+    for d, b in got.items():
+        if b.get("status") == "ok":
+            briefs[d] = b
+            n += 1
+        else:
+            briefs[d] = dict(briefs[d], note="%s; archive: %s" % (briefs[d].get("note"),
+                                                                 b.get("note") or b.get("status")))
+    return n
 
 
 def read_all(items, reader=read_home):
@@ -461,6 +515,9 @@ def _candidate_line(item, brief):
             via.append("named on the client's own site")
         elif v["kind"] == "article":
             via.append("linked from an article at %s" % v.get("article"))
+    if brief.get("archived"):
+        via.append("homepage read from the Wayback Machine's copy of %s (the site refuses our "
+                   "server)" % brief["archived"])
     return {"domain": item["domain"], "found_as": via, "homepage_title_and_description":
             brief.get("head", ""), "homepage_text": brief.get("text", ""),
             "addresses_in_structured_data": brief.get("address_countries", [])}
@@ -671,7 +728,9 @@ def _rank_line(item, verdict, brief):
             "branches_nearby": near[0].get("branches_nearby") if near else None,
             "found_by": sorted({v["kind"] for v in item["via"]}),
             "found_count": len(item["via"]), "check": verdict.get("reason"),
-            "checked_on": "map listing only" if verdict.get("map_only") else "its own homepage"}
+            "checked_on": "map listing only" if verdict.get("map_only") else (
+                "an archived copy of its homepage (%s)" % brief["archived"] if brief.get("archived")
+                else "its own homepage")}
 
 
 def rank(profile, survivors, *, limit, run_id=None, client=None):
@@ -699,7 +758,7 @@ def _via_label(v):
 
 
 def discover(profile, *, run_id=None, client=None, token=None, progress=None, search=None,
-             places=None, reader=read_home, fetch=None):
+             places=None, reader=read_home, fetch=None, archive_reader=read_archived):
     """Returns {"status", "competitors", "unread", "rejected", "coverage", "plan", "gaps"}.
     Never raises for a failed source: each source reports its own status in
     coverage, and a failed source is never reported as "no competitors"."""
@@ -734,6 +793,7 @@ def discover(profile, *, run_id=None, client=None, token=None, progress=None, se
     say("rivals_verify")
     first = pool.ordered()[:MAX_VERIFY]
     briefs = read_all(first, reader=reader)
+    archived = archive_unread(first, briefs, archive_reader) if archive_reader else 0
     kept_by_final = {}
     merge_redirects(first, briefs, kept_by_final)
     verdicts, errors = verify(first, briefs, profile, run_id=run_id, client=client)
@@ -745,6 +805,8 @@ def discover(profile, *, run_id=None, client=None, token=None, progress=None, se
     if second:
         briefs2 = read_all(second, reader=reader)
         briefs.update(briefs2)
+        if archive_reader:
+            archived += archive_unread(second, briefs, archive_reader)
         merge_redirects(second, briefs, kept_by_final)
         v2, e2 = verify(second, briefs, profile, run_id=run_id, client=client)
         verdicts.update(v2)
@@ -753,6 +815,7 @@ def discover(profile, *, run_id=None, client=None, token=None, progress=None, se
     coverage["checked"] = {"candidates": len(pool.items), "read": sum(
         1 for i in judged if briefs[i["domain"]].get("status") == "ok"),
         "judged": len(verdicts), "not_fetched": max(0, len(pool.items) - len(judged)),
+        "read_from_archive": archived,
         "check_errors": errors}
 
     # A candidate that redirects to the client's own site is the client.
@@ -833,6 +896,7 @@ def discover(profile, *, run_id=None, client=None, token=None, progress=None, se
                 "found_by": line_by[d]["found_by"], "checked_on": line_by[d]["checked_on"]})
             if len(competitors) >= limit:
                 break
+        competitors.sort(key=lambda c: -c["score"])     # the model's order and scores can disagree
         gaps = [_clean(g) for g in ranked.get("gaps") or []]
         left_out = weak + [{"domain": x.get("domain"), "why": _clean(x.get("why"))}
                            for x in ranked.get("left_out") or []]
