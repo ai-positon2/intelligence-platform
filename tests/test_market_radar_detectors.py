@@ -205,7 +205,8 @@ def test_locations_read_the_main_and_the_locator_host_sitemaps():
 
 
 def test_no_sitemap_answering_is_a_failure_not_an_absence():
-    r = det.read_locations(ctx(Net(), site()))
+    net = Net({"https://acme.com/sitemap.xml": miss("error", "timed out after 20s")})
+    r = det.read_locations(ctx(net, site()))
     assert r["status"] == "failed" and r["payload"] is None
     net = Net({"https://acme.com/sitemap.xml": urlset("https://acme.com/about")})
     assert det.read_locations(ctx(net, site()))["status"] == "none"
@@ -739,3 +740,44 @@ def test_a_company_without_a_country_reads_the_client_country_edition():
     c["client_country"] = "IN"
     c["get"] = lambda url, **kw: (asked.append(url), ok(gnews()))[1]
     assert news.read_news(c)["status"] == "empty" and "ceid=IN%3Aen" in asked[0]
+
+
+# == false failures found in the first live collections (2026-10-09) ==================
+
+def test_a_woocommerce_plugin_without_products_is_no_shop():
+    rs = site(signals={"platforms": [{"name": "woocommerce", "kind": "commerce"}]})
+    r = det.read_catalog(ctx(Net(), rs))
+    assert r["status"] == "none"
+    # ... but a refused store API on a site with product pages is a failure.
+    rs = site(signals={"platforms": [{"name": "woocommerce", "kind": "commerce"}],
+                       "product_schema": True})
+    assert det.read_catalog(ctx(Net(), rs))["status"] == "failed"
+
+
+def test_a_sitemap_that_does_not_exist_is_none_but_one_that_refuses_is_failed():
+    r = det.read_locations(ctx(Net(), site()))
+    assert r["status"] == "none" and r["note"].startswith("no sitemap")
+    net = Net({"https://acme.com/sitemap.xml": miss("blocked", "refused (HTTP 403)")})
+    assert det.read_locations(ctx(net, site()))["status"] == "failed"
+
+
+def test_a_feed_with_no_posts_is_empty_and_a_feed_that_is_a_page_is_none():
+    rs = site(signals={"platforms": [{"name": "wordpress", "kind": "cms"}]})
+    net = Net({"https://acme.com/feed/": "<rss><channel><title>x</title></channel></rss>"})
+    assert det.read_newsroom(ctx(net, rs))["status"] == "empty"
+    net = Net({"https://acme.com/feed/": "<html><body>Home</body></html>"})
+    assert det.read_newsroom(ctx(net, rs))["status"] == "none"
+    net = Net({"https://acme.com/feed/": miss("blocked", "refused (HTTP 403)")})
+    assert det.read_newsroom(ctx(net, rs))["status"] == "failed"
+
+
+def test_colourways_fold_even_without_a_space_before_the_dash():
+    assert det._family("Women's Alta High Top- Mid Grey") == "Women's Alta High Top"
+    assert det._family("3-Pack Crew Socks") == "3-Pack Crew Socks"
+
+
+def test_the_summary_card_of_a_big_launch_wave_is_dated():
+    payload = {"products": {str(i): ["P%d" % i, "/p/%d" % i, 1.0, 1.0, None, True, 1, "2026-09-01", "",
+                                     "2026-09-01"] for i in range(30)}}
+    evs = det.baseline_catalog(payload, NOW)
+    assert evs[-1]["title"] == "5 more new products" and evs[-1]["date"] == "2026-10-09"

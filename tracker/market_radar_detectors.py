@@ -100,7 +100,7 @@ def read_sitemaps(get, sitemap_urls, *, prefer, keep, max_files=8, max_urls=60_0
     does not make the read incomplete once a file that does was read."""
     import concurrent.futures
     queue = list(dict.fromkeys(sitemap_urls))
-    seen, entries, files, failed = set(), {}, 0, []
+    seen, entries, files, failed, refused = set(), {}, 0, [], []
     complete, wanted_read, unwanted_failed = True, False, False
     with concurrent.futures.ThreadPoolExecutor(max_workers=parallel) as pool:
         while queue:
@@ -118,6 +118,8 @@ def read_sitemaps(get, sitemap_urls, *, prefer, keep, max_files=8, max_urls=60_0
             for sm, read in zip(batch, reads):
                 if read["status"] != "ok":
                     failed.append("%s: %s" % (sm, read["note"] or read["status"]))
+                    if read["status"] != "not_found":
+                        refused.append(sm)
                     if prefer.search(sm) or sm in sitemap_urls:
                         complete = False
                     else:
@@ -150,7 +152,8 @@ def read_sitemaps(get, sitemap_urls, *, prefer, keep, max_files=8, max_urls=60_0
                             break
     if unwanted_failed and not wanted_read:
         complete = False
-    return {"entries": entries, "files_read": files, "complete": complete, "failed": failed}
+    return {"entries": entries, "files_read": files, "complete": complete, "failed": failed,
+            "refused": refused}
 
 
 # == locations =====================================================================
@@ -238,7 +241,7 @@ def read_locations(ctx):
                               a.get("postalCode"), a.get("country")) if x)
         for o in s.get("organizations") or [] for a in [o.get("address") or {}]
         if a.get("streetAddress") and a.get("addressLocality")})[:200]
-    pages, complete, files, failed = [], True, 0, []
+    pages, complete, files, failed, refused = [], True, 0, [], []
     for host in _location_hosts(s, domain):
         if host == domain:
             sitemaps = ((rs.get("robots") or {}).get("sitemaps") or
@@ -253,15 +256,20 @@ def read_locations(ctx):
         files += got["files_read"]
         complete = complete and got["complete"]
         failed.extend(got["failed"])
+        refused.extend(got["refused"])
         pages.extend(_page_key(u) for u in got["entries"])
     places = leaves(pages)
     if not places and not addresses:
-        if failed and len(failed) >= files:
-            # Not one sitemap file answered: we did not look, so we cannot
-            # say there are no locations.
+        if refused and len(failed) >= files:
+            # Not one sitemap file answered and at least one refused us: we
+            # did not look, so we cannot say there are no locations. A
+            # sitemap that answers 404 does not exist (nwhillsdentist.com,
+            # veja-store.com, 2026-10-09): that is "none", said below.
             return _fail("failed", "the sitemap could not be read (%s)" % failed[0])
-        return {"status": "none", "note": "no location pages in the sitemap and no address in "
-                "structured data", "payload": None, "items": 0, "complete": complete}
+        where = "no sitemap" if failed and len(failed) >= files else \
+            "no location pages in the sitemap"
+        return {"status": "none", "note": where + " and no address in structured data",
+                "payload": None, "items": 0, "complete": complete}
     vendors = s.get("locator_vendors") or []
     note = "%d location pages, %d addresses" % (len(places), len(addresses))
     if vendors:
@@ -423,6 +431,14 @@ def read_catalog(ctx):
         if platform == "woocommerce" and "woocommerce" not in names:
             continue
         payload, note = reader(ctx)
+        # WooCommerce is a plugin many sites install and never sell through:
+        # three Austin dental practices answered 404 or 403 to its store API
+        # (2026-10-09). With no sign of products elsewhere that is not a
+        # shop, not a failure. (The API is still asked first: nutribullet.com
+        # sells 180 products through it with no product markup on its pages.)
+        if payload is None and platform == "woocommerce" and \
+                sm.get("product_like", 0) < 20 and not s.get("product_schema"):
+            continue
         if payload is not None:
             prices = [p[2] for p in payload["products"].values() if p[2] is not None]
             on_sale = sum(1 for p in payload["products"].values() if p[4] and p[2] and p[4] > p[2])
@@ -458,7 +474,8 @@ def read_catalog(ctx):
 def _family(title):
     """Colourways are one product: "Tree Runner - Dusty Pink" and
     "Tree Runner - Navy" launch as one line."""
-    return re.split(r"\s+[-–|/]\s+", title or "", maxsplit=1)[0].strip() or title or "?"
+    return re.split(r"\s+[-–|/]\s*|\s*[-–|/]\s+", title or "", maxsplit=1)[0].strip() \
+        or title or "?"
 
 
 def _launch_events(rows, day, currency=""):
@@ -500,8 +517,8 @@ def baseline_catalog(cur, now):
     rows = [(pid, p) for pid, p in (cur.get("products") or {}).items()
             if p[0] and _recent(_launched(p), now)
             and (not p[7] or _recent(p[7], now, days=365))]
-    return _capped(_launch_events(rows, now.strftime("%Y-%m-%d")), "new products",
-                   "prod+many:baseline")
+    day = now.strftime("%Y-%m-%d")
+    return _capped(_launch_events(rows, day), "new products", "prod+many:baseline", date=day)
 
 
 def compare_catalog(prev, cur, now):
@@ -801,10 +818,18 @@ def read_newsroom(ctx):
                    key=lambda u: 0 if FEEDISH.search(u) else 1)
     if not feeds and any(p["name"] == "wordpress" for p in s.get("platforms") or []):
         feeds = [urljoin(rs["home_url"], "/feed/")]
-    notes = []
+    notes, answered_empty = [], None
     for f in feeds[:3]:
         read = get(f, limit=2_000_000)
         items = parse_feed(read["body"]) if read["status"] == "ok" else []
+        if read["status"] == "ok" and not items and re.search(r"<(rss|feed|channel)[\s>]",
+                                                              read["body"][:3000]):
+            answered_empty = answered_empty or f
+            continue
+        if read["status"] == "not_found" or (read["status"] == "ok" and not items):
+            # A guessed /feed/ that does not exist, or that answers with a
+            # page instead of a feed, means there is no feed: not a failure.
+            continue
         if items:
             items = items[:MAX_POSTS]
             return {"status": "ok", "note": "%d posts from the site's feed" % len(items),
@@ -830,6 +855,10 @@ def read_newsroom(ctx):
                     "payload": {"source": page["final_url"], "kind": "page", "items": []},
                     "items": 0, "complete": True}
         notes.append("news page: " + (page["note"] or page["status"]))
+    if answered_empty:
+        return {"status": "empty", "note": "the site's feed has no posts",
+                "payload": {"source": answered_empty, "kind": "feed", "items": []},
+                "items": 0, "complete": True}
     if notes:
         return _fail("failed", "; ".join(notes[:2]))
     return {"status": "none", "note": "no news page or feed on the site", "payload": None,
