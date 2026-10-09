@@ -172,7 +172,7 @@ def search(queries, *, token, country="us", search_language=None, run_id=None,
             run = _poll(api, rid, timeout + 30, sleep)
             out["status"] = run.get("status")
             if run.get("defaultDatasetId"):
-                pages = api.items(run["defaultDatasetId"])
+                pages = _retrying(lambda: api.items(run["defaultDatasetId"]), sleep)
                 out["pages"] = len(pages)
                 out["results"] = organic_results(pages)
                 out["fields_seen"] = sorted({k for p in pages if isinstance(p, dict) for k in p})
@@ -186,7 +186,7 @@ def search(queries, *, token, country="us", search_language=None, run_id=None,
                 pass
         try:
             sleep(SETTLE_SECONDS)
-            settled = api.run(rid)
+            settled = _retrying(lambda: api.run(rid), sleep)
             out["charged_usd"] = settled.get("usageTotalUsd")
             out["charged_events"] = settled.get("chargedEventCounts")
         except Exception as e:
@@ -212,10 +212,31 @@ def search(queries, *, token, country="us", search_language=None, run_id=None,
     return out
 
 
+POLL_RETRIES = 5     # consecutive failed status reads tolerated while a run works
+
+
+def _retrying(read, sleep, attempts=POLL_RETRIES):
+    """A read of Apify's API that survives a brief outage. Apify answered a
+    status read with 502 Bad Gateway mid-run on 2026-10-09; treating that as
+    fatal aborted a run that had already been charged and threw its results
+    away. Only a 4xx refusal (not a gateway or connection error) is final."""
+    for attempt in range(attempts):
+        try:
+            return read()
+        except requests.HTTPError as e:
+            code = getattr(getattr(e, "response", None), "status_code", None) or 0
+            if 400 <= code < 500 and code != 429 or attempt == attempts - 1:
+                raise
+        except (requests.ConnectionError, requests.Timeout):
+            if attempt == attempts - 1:
+                raise
+        sleep(3)
+
+
 def _poll(api, run_id, timeout, sleep):
     deadline = time.monotonic() + timeout
     while True:
-        run = api.run(run_id)
+        run = _retrying(lambda: api.run(run_id), sleep)
         if run.get("status") in ("SUCCEEDED", "FAILED", "ABORTED", "TIMED-OUT"):
             return run
         if time.monotonic() >= deadline:

@@ -530,6 +530,11 @@ def fetch(url):
     except requests.Timeout:
         out["note"] = "timed out after %ss" % TIMEOUT
         return out
+    except ValueError as e:
+        # The safe fetcher refuses private and reserved addresses: the bare
+        # pacificdentalservices.com resolved to 192.0.2.1 (2026-10-09).
+        out["note"] = "the domain points to an address we do not fetch (%s)" % str(e)[:80]
+        return out
     except Exception as e:
         out["note"] = "could not be reached (%s)" % type(e).__name__
         return out

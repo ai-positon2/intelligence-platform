@@ -246,3 +246,51 @@ def test_route_runs_one_search_and_returns_plan_cost_and_ledger(world, monkeypat
     assert body["account"] == {"username": "p2", "plan": {"id": "STARTER", "tier": "BRONZE"}}
     assert body["search"]["charged_usd"] == 0.00255 and len(body["top_results"]) == 2
     assert body["ledger"]["by_provider"] == {"apify": 0.00255} and not body["ledger"]["partial"]
+
+
+def _http_error(code):
+    resp = requests.Response()
+    resp.status_code = code
+    return requests.HTTPError("%s error" % code, response=resp)
+
+
+class FlakyApify(FakeApify):
+    """Fails the first `fails` reads of each kind, then behaves."""
+
+    def __init__(self, error, fails=2, **kw):
+        super().__init__(**kw)
+        self.error, self.left = error, {"run": fails, "items": fails}
+
+    def run(self, run_id):
+        if self.left["run"]:
+            self.left["run"] -= 1
+            raise self.error
+        return super().run(run_id)
+
+    def items(self, dataset_id):
+        if self.left["items"]:
+            self.left["items"] -= 1
+            raise self.error
+        return super().items(dataset_id)
+
+
+@pytest.mark.parametrize("error", [_http_error(502), _http_error(429), requests.ConnectionError("reset"),
+                                   requests.Timeout("slow")])
+def test_a_brief_apify_outage_while_the_run_works_is_waited_out(error):
+    # 2026-10-09, drcjagadeesh.com: one 502 on a status read aborted a run
+    # that had already been charged, and its results were thrown away.
+    api = FlakyApify(error)
+    out = go(api)
+    assert out["error"] is None and len(out["results"]) == 2 and not api.aborted
+
+
+def test_a_refusal_while_polling_is_final():
+    api = FlakyApify(_http_error(404), fails=1)
+    out = go(api)
+    assert out["error"] and "404" in out["error"] and api.aborted
+
+
+def test_an_outage_that_does_not_end_still_gives_up():
+    api = FlakyApify(_http_error(503), fails=99)
+    out = go(api)
+    assert out["error"] and api.aborted

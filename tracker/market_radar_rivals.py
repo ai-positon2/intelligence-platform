@@ -49,6 +49,7 @@ VERIFY_MODEL = os.environ.get("MR_RIVALS_VERIFY_MODEL", "claude-haiku-5-5")
 RANK_MODEL = os.environ.get("MR_RIVALS_RANK_MODEL", "claude-sonnet-5-5")
 
 MAX_QUERIES = 10
+SEARCH_GROUP = 4           # queries per Apify run; the runs go in parallel
 MAX_KNOWN = 15
 MAX_PLACES = 25            # nearest same-category places with a website
 MAX_VERIFY = 70            # candidates read and judged in the first round
@@ -60,6 +61,7 @@ TEXT_CHARS = 1200
 FETCH_WORKERS = 8
 DEFAULT_RADIUS_KM = 5
 MIN_PLACES = 8             # fewer than this nearby: widen the radius once
+MIN_SCORE = 40             # a weaker match is listed as left out, not as a competitor
 LIMITS = {"local_single": 15, "multi_location": 12, "ecommerce": 12}
 DEFAULT_LIMIT = 10
 SEARCH_LANGUAGES = {"ar", "bg", "ca", "cs", "da", "de", "el", "en", "es", "et", "fi", "fr", "hr",
@@ -257,27 +259,42 @@ def from_plan(pool, plan):
 
 def from_search(pool, plan, *, run_id=None, token=None, search=None):
     """Organic results become candidates; every result page is kept so the
-    "top 10" articles among them can be read later."""
+    "top 10" articles among them can be read later.
+
+    The queries go to Apify in parallel groups of SEARCH_GROUP: the actor
+    works through one run's queries one after another, and ten queries in a
+    single run took 134 s on 2026-10-09 (austincitydental.com). Each extra
+    run adds only a $0.00005 start event."""
     queries = [q["q"] for q in plan.get("queries") or []]
     if not queries:
         return {"status": "skipped", "note": "the plan had no searches"}, []
     if search is None:
         from .market_radar_search import search
     token = token if token is not None else os.environ.get("APIFY_API_TOKEN", "")
-    try:
-        out = search(queries, token=token, country=plan["search_country"],
-                     search_language=plan.get("search_language"), run_id=run_id,
-                     stage="rivals_search")
-    except Exception as e:
-        return {"status": "failed", "error": "%s: %s" % (type(e).__name__, str(e)[:300])}, []
-    results = out.get("results") or []
+    groups = [queries[i:i + SEARCH_GROUP] for i in range(0, len(queries), SEARCH_GROUP)]
+
+    def one(group):
+        try:
+            return search(group, token=token, country=plan["search_country"],
+                          search_language=plan.get("search_language"), run_id=run_id,
+                          stage="rivals_search")
+        except Exception as e:
+            return {"results": [], "error": "%s: %s" % (type(e).__name__, str(e)[:300])}
+
+    with ThreadPoolExecutor(max_workers=len(groups)) as ex:
+        outs = list(ex.map(one, groups))
+    results = [r for out in outs for r in (out.get("results") or [])]
     for r in results:
         pool.add(r.get("url") or "", "search", name=None, url=None, query=r.get("query"),
                  position=r.get("position"), title=(r.get("title") or "")[:160],
                  result_url=r.get("url"))
-    meta = {"status": "ok" if not out.get("error") else ("partial" if results else "failed"),
-            "error": out.get("error"), "queries": len(queries), "results": len(results),
-            "charged_usd": out.get("charged_usd"), "elapsed_ms": out.get("elapsed_ms")}
+    errors = [out["error"] for out in outs if out.get("error")]
+    charged = [out.get("charged_usd") for out in outs]
+    meta = {"status": "ok" if not errors else ("partial" if results else "failed"),
+            "error": "; ".join(errors) or None, "queries": len(queries), "runs": len(groups),
+            "results": len(results),
+            "charged_usd": round(sum(c for c in charged if c), 6) if any(charged) else None,
+            "elapsed_ms": max([out.get("elapsed_ms") or 0 for out in outs] or [0])}
     return meta, results
 
 
@@ -298,7 +315,11 @@ def from_places(pool, profile, plan, *, places=None):
         return {"status": "skipped", "note": "the client's location is not known"}
     radius = plan.get("radius_km") or DEFAULT_RADIUS_KM
     own = pool.own
-    meta = {"status": "ok", "radius_km": radius}
+    meta = {"status": "ok", "radius_km": radius, "located_by": point.get("source"),
+            "location_precision": point.get("precision") or "unknown"}
+    if point.get("precision") == "city":
+        meta["warning"] = ("the client was located only by its city, so distances are from the "
+                           "city centre and nearby rivals may be missed")
     try:
         # The client's own listing tells us exactly which category it is in.
         near_self = places.query(point["lat"], point["lon"], places.SELF_RADIUS_KM)
@@ -388,7 +409,7 @@ VERIFY_SCHEMA = {
     "properties": {"verdicts": {"type": "array", "items": {
         "type": "object", "additionalProperties": False,
         "required": ["domain", "site_type", "name", "sells", "same_offering", "same_customers",
-                     "where", "location", "scale", "reason"],
+                     "where", "location", "scale", "locations", "reason"],
         "properties": {
             "domain": {"type": "string"},
             "site_type": {"type": "string", "enum": [
@@ -403,12 +424,16 @@ VERIFY_SCHEMA = {
             "location": {"type": "string"},
             "scale": {"type": "string", "enum": ["smaller", "similar", "larger", "much_larger",
                                                 "unclear"]},
+            "locations": {"type": "string", "enum": ["one", "few", "many", "online_only",
+                                                    "unclear"]},
             "reason": {"type": "string"}}}}},
 }
 
 VERIFY_SYSTEM = """You check candidate competitors for a company, one website at a time, using only the homepage text given for each. You have no search tool and must not use outside knowledge about a company with the same name: two firms often share a name, and the candidate is the one at that domain.
 
 For each candidate return:
+Judge the business behind the site. A group, parent company or support organisation whose own site speaks to dentists, partners, investors or job seekers, but which runs or backs offices, clinics, stores or brands that serve the client's kind of customer, is a business that sells the same offering to the same customers (answer "partly" for same_customers). Heartland Dental and Smile Brands are examples: they back hundreds of dental offices.
+
 - site_type: business (a company selling its own products or services), directory_or_marketplace (lists or sells many other businesses: review sites, booking platforms, retailers of many brands), article_or_publisher (news, blog, magazine, a "best of" list), social_or_profile, parked_or_empty (no real content, for sale, under construction), other.
 - name: the business's name as the page gives it.
 - sells: what it sells, in under 12 words.
@@ -417,6 +442,7 @@ For each candidate return:
 - where: where it operates relative to the client's headquarters.
 - location: its city and country if the page says, else "".
 - scale: its size compared with the client, judged from the page (number of locations, countries, range).
+- locations: how many physical sites it has: one, few (2 to 9), many (10 or more), online_only, or unclear.
 - reason: one plain sentence a client would accept, citing what the page says. No em dashes or en dashes.
 Return one verdict per candidate, with the candidate's domain exactly as given."""
 
@@ -471,6 +497,13 @@ def verify(items, briefs, profile, *, run_id=None, client=None):
                     v["sells"] = _clean(v.get("sells"))
                     verdicts[d] = v
     return verdicts, errors
+
+
+def too_small_for(verdict, archetype):
+    """A single office is not a rival to a chain at the chain's level (Aspen
+    Dental's list had single practices in Richardson and Rancho Cucamonga,
+    2026-10-09). A chain's local rivals belong to the per-region radar."""
+    return archetype == "multi_location" and verdict.get("locations") == "one"
 
 
 def passes(verdict):
@@ -587,7 +620,8 @@ def map_only_verdict(item, plan):
     return {"domain": item["domain"], "site_type": "business",
             "name": (item["names"] or [item["domain"]])[0], "sells": p.get("category") or "",
             "same_offering": "yes", "same_customers": "unclear", "where": "same_city",
-            "location": p.get("address") or "", "scale": "unclear", "map_only": True,
+            "location": p.get("address") or "", "scale": "unclear", "locations": "unclear",
+            "map_only": True,
             "reason": "Its website did not let us read it; the map lists it as %s, %.1f km "
                       "from the client." % ((p.get("category") or "the same category")
                                             .replace("_", " "), p["distance_km"])}
@@ -750,7 +784,10 @@ def discover(profile, *, run_id=None, client=None, token=None, progress=None, se
             unread.append({"domain": item["domain"], "why": "the check did not return a verdict",
                            "found": [_via_label(x) for x in item["via"][:3]]})
             continue
-        if passes(v):
+        if too_small_for(v, archetype):
+            rejected.append({"domain": item["domain"], "site_type": v.get("site_type"),
+                             "why": "a single site, not a rival to a chain at its level"})
+        elif passes(v):
             survivors.append(item)
         else:
             rejected.append({"domain": item["domain"], "site_type": v.get("site_type"),
@@ -770,7 +807,7 @@ def discover(profile, *, run_id=None, client=None, token=None, progress=None, se
                     "survivors": lines}
         by_domain = {i["domain"]: i for i in survivors}
         line_by = {l["domain"]: l for l in lines}
-        invented = []
+        invented, weak = [], []
         for c in ranked.get("competitors") or []:
             d = (c.get("domain") or "").lower()
             item = by_domain.get(d)
@@ -778,13 +815,17 @@ def discover(profile, *, run_id=None, client=None, token=None, progress=None, se
                 if not item:
                     invented.append(d)
                 continue
+            score = max(0, min(100, int(c.get("score") or 0)))
+            if score < MIN_SCORE:
+                weak.append({"domain": d, "why": "weak match (score %d): %s" % (score, _clean(c.get("reason")))})
+                continue
             kind = c.get("kind")
             near = [v for v in item["via"] if v["kind"] == "places"]
             if kind == "local" and not near and line_by[d].get("where") != "same_city":
                 kind = "direct"     # "local" needs a map listing or a same-city address
             competitors.append({
                 "domain": d, "name": line_by[d]["name"], "kind": kind,
-                "score": max(0, min(100, int(c.get("score") or 0))),
+                "score": score,
                 "reason": _clean(c.get("reason")), "sells": line_by[d]["sells"],
                 "location": line_by[d]["location"], "distance_km": line_by[d]["distance_km"],
                 "branches_nearby": line_by[d]["branches_nearby"],
@@ -793,8 +834,8 @@ def discover(profile, *, run_id=None, client=None, token=None, progress=None, se
             if len(competitors) >= limit:
                 break
         gaps = [_clean(g) for g in ranked.get("gaps") or []]
-        left_out = [{"domain": x.get("domain"), "why": _clean(x.get("why"))}
-                    for x in ranked.get("left_out") or []]
+        left_out = weak + [{"domain": x.get("domain"), "why": _clean(x.get("why"))}
+                           for x in ranked.get("left_out") or []]
         if invented:
             coverage["rank_dropped"] = {"domains": invented,
                                         "why": "not among the checked candidates"}

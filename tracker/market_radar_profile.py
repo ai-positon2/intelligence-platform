@@ -61,8 +61,9 @@ PROFILE_SCHEMA = {
         "location_count": {"type": "integer"},
         "location_count_basis": {"type": "string"},
         "hq": {"type": "object", "additionalProperties": False,
-               "required": ["city", "region", "country_code"],
-               "properties": {"city": {"type": "string"}, "region": {"type": "string"},
+               "required": ["street", "postal_code", "city", "region", "country_code"],
+               "properties": {"street": {"type": "string"}, "postal_code": {"type": "string"},
+                              "city": {"type": "string"}, "region": {"type": "string"},
                               "country_code": {"type": "string"}}},
         "markets": {"type": "array", "items": {"type": "string"}},
         "service_area": {"type": "string"},
@@ -107,6 +108,7 @@ Rules:
 - location_count: the number of physical locations the pages or the facts support. Use the sitemap's location-page count only as a rough guide and say so in location_count_basis. 0 for an online-only business, -1 when nothing supports a number.
 - hq.country_code: ISO 3166-1 alpha-2. Prefer a stated address (structured data, legal or contact page) over any other signal. A "shopify_store_info" fact is the registered address of the store's Shopify account, which is often a warehouse or an office other than the head office: use it only when the pages state no address, and say so in evidence or unknowns.
 - Pages marked as read from the Wayback Machine are dated copies of the site, because the live site refused our server. Treat them as the site's content as of that date. If the facts note that the site chose a version for our location, do not treat that version's country as the company's.
+- hq.street and hq.postal_code: the street address and postcode of the head office (for a local business, its premises), as the pages state them (contact page, Impressum, footer, structured data). Empty when not stated.
 - markets: ISO alpha-2 codes of the countries the company actually serves or ships to, per the pages.
 - industry.naics_code: the best-matching 6-digit NAICS 2022 code, and its title.
 - competitors_named: only companies the site itself presents as competitors or alternatives (comparison pages, "vs" pages, "switch from"). Not partners, clients, insurers, suppliers or press outlets. Usually empty.
@@ -366,23 +368,57 @@ def geocode(query, *, conn=None):
     return point
 
 
+def _join(*parts):
+    return ", ".join(" ".join(str(x).split()) for x in parts if x and str(x).strip())
+
+
 def locate_hq(profile, *, conn=None):
-    """The headquarters' coordinates: structured data first (the site's own
-    geo tag for the matching address), then a geocode of city, region and
-    country."""
-    located = [o for o in (profile.get("facts") or {}).get("structured_locations", [])
-               if o.get("geo")]
+    """The headquarters' coordinates, most precise source first, each labelled
+    with its precision:
+
+      exact    the site's own geo tag (structured data), for one place;
+      street   a geocode of the stated street address (structured data for a
+               single-site business, else the profile's hq.street);
+      postcode a geocode of postcode and city, when the street did not match;
+      city     a geocode of the city: its centre, which for a local business
+               can be the wrong neighbourhood. kottident.de is in Kreuzberg,
+               and "Berlin" geocoded 4 km away in Charlottenburg (2026-10-09),
+               so the map search looked for competitors in the wrong area."""
+    facts = profile.get("facts") or {}
+    located = [o for o in facts.get("structured_locations", []) if o.get("geo")]
+    single = profile.get("archetype") == "local_single"
     # One place only: a chain's structured data lists branches, and its first
     # branch is not its headquarters.
-    if located and (profile.get("archetype") == "local_single"
-                    or len({(o["geo"]["lat"], o["geo"]["lon"]) for o in located}) == 1):
-        return dict(located[0]["geo"], source="structured data")
+    if located and (single or len({(o["geo"]["lat"], o["geo"]["lon"]) for o in located}) == 1):
+        return dict(located[0]["geo"], source="structured data", precision="exact")
     hq = profile.get("hq") or {}
-    parts = [hq.get("city"), hq.get("region"), hq.get("country_code")]
-    if not hq.get("city"):
-        return None
-    point = geocode(", ".join(x for x in parts if x), conn=conn)
-    return dict(point, source="geocoded") if point else None
+    tries = []
+    addressed = [o["address"] for o in facts.get("structured_locations", [])
+                 if (o.get("address") or {}).get("streetAddress")]
+    if single and len({a["streetAddress"] for a in addressed}) == 1:
+        a = addressed[0]
+        tries.append((_join(a.get("streetAddress"), a.get("postalCode"),
+                            a.get("addressLocality") or hq.get("city"),
+                            a.get("country") or hq.get("country_code")),
+                      "geocoded street address (structured data)", "street"))
+    if hq.get("street"):
+        tries.append((_join(hq.get("street"), hq.get("postal_code"), hq.get("city"),
+                            hq.get("country_code")), "geocoded street address", "street"))
+    if hq.get("postal_code") and hq.get("city"):
+        tries.append((_join(hq.get("postal_code"), hq.get("city"), hq.get("country_code")),
+                      "geocoded postcode", "postcode"))
+    if hq.get("city"):
+        tries.append((_join(hq.get("city"), hq.get("region"), hq.get("country_code")),
+                      "geocoded", "city"))
+    seen = set()
+    for query, source, precision in tries:
+        if query in seen:
+            continue
+        seen.add(query)
+        point = geocode(query, conn=conn)
+        if point:
+            return dict(point, source=source, precision=precision)
+    return None
 
 
 # == the whole step =============================================================

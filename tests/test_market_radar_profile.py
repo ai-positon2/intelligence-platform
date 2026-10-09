@@ -540,7 +540,8 @@ def test_hq_uses_the_sites_own_coordinates_only_for_one_place(monkeypatch):
     assert prof.locate_hq(one)["source"] == "structured data"
     chain = {"archetype": "multi_location", "hq": {"city": "Chicago", "country_code": "US"},
              "facts": {"structured_locations": [{"geo": {"lat": 1, "lon": 1}}, {"geo": {"lat": 2, "lon": 2}}]}}
-    assert prof.locate_hq(chain) == {"lat": 1.0, "lon": 2.0, "label": "Chicago, US", "source": "geocoded"}
+    assert prof.locate_hq(chain) == {"lat": 1.0, "lon": 2.0, "label": "Chicago, US", "source": "geocoded",
+                                     "precision": "city"}
     assert prof.locate_hq({"hq": {"city": ""}, "facts": {}}) is None
 
 
@@ -848,3 +849,34 @@ def test_a_quote_from_the_sites_structured_data_verifies():
     made_up = dict(quote, quote="12 Baker Street, London")
     assert prof.checks(s, dict(GOOD, evidence=[made_up])) == [
         "1 evidence quote(s) do not appear on the page they cite."]
+
+
+def test_a_local_business_is_located_by_its_street_not_its_city_centre(monkeypatch):
+    # kottident.de is in Kreuzberg; "Berlin" geocoded 4 km away (2026-10-09).
+    asked = []
+
+    def geo(q, conn=None):
+        asked.append(q)
+        return None if q.startswith("Nowhere") else {"lat": 52.49, "lon": 13.42, "label": q}
+    monkeypatch.setattr(prof, "geocode", geo)
+    p = {"archetype": "local_single", "facts": {},
+         "hq": {"street": "Kottbusser Damm 1", "postal_code": "10967", "city": "Berlin", "country_code": "DE"}}
+    got = prof.locate_hq(p)
+    assert got["precision"] == "street" and asked == ["Kottbusser Damm 1, 10967, Berlin, DE"]
+
+    asked.clear()
+    structured = {"archetype": "local_single", "hq": {"city": "Berlin", "country_code": "DE"},
+                  "facts": {"structured_locations": [{"address": {"streetAddress": "Oranienstr. 2",
+                                                                  "postalCode": "10997"}}]}}
+    assert prof.locate_hq(structured)["source"] == "geocoded street address (structured data)"
+    assert asked == ["Oranienstr. 2, 10997, Berlin, DE"]
+
+    asked.clear()
+    unmatched = {"archetype": "local_single", "facts": {},
+                 "hq": {"street": "Nowhere 9", "postal_code": "10967", "city": "Berlin", "country_code": "DE"}}
+    got = prof.locate_hq(unmatched)
+    assert got["precision"] == "postcode" and asked[-1] == "10967, Berlin, DE"
+
+
+def test_profile_asks_for_the_street_and_postcode():
+    assert {"street", "postal_code"} <= set(prof.PROFILE_SCHEMA["properties"]["hq"]["required"])

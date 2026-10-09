@@ -91,7 +91,7 @@ def plan_body(**over):
 def verdict(domain, **over):
     v = {"domain": domain, "site_type": "business", "name": domain.split(".")[0].title(),
          "sells": "dental care", "same_offering": "yes", "same_customers": "yes",
-         "where": "same_city", "location": "Austin, US", "scale": "similar",
+         "where": "same_city", "location": "Austin, US", "scale": "similar", "locations": "one",
          "reason": "A dental practice — in Austin."}
     v.update(over)
     return v
@@ -629,3 +629,64 @@ def test_start_route_refuses_a_url_without_a_host(world):
 def test_client_facing_text_has_no_em_dashes_in_prompts():
     for text in (rv.PLAN_SYSTEM, rv.VERIFY_SYSTEM, rv.RANK_SYSTEM):
         assert "—" not in text and "–" not in text
+
+
+def test_searches_go_in_parallel_groups_and_one_failed_group_makes_it_partial():
+    calls = []
+
+    def fake(queries, **kw):
+        calls.append(list(queries))
+        if "q4" in queries:
+            return {"results": [], "error": "Apify run ended FAILED", "charged_usd": 0.0001,
+                    "elapsed_ms": 5}
+        return {"results": [{"query": queries[0], "position": 1, "url": "https://%s.example/" % queries[0]}],
+                "error": None, "charged_usd": 0.01, "elapsed_ms": 9}
+    plan = {"queries": [{"q": "q%d" % i} for i in range(10)], "search_country": "us"}
+    meta, results = rv.from_search(rv.Pool("a.example"), plan, token="t", search=fake)
+    assert sorted(map(tuple, calls)) == [("q0", "q1", "q2", "q3"), ("q4", "q5", "q6", "q7"), ("q8", "q9")]
+    assert meta["status"] == "partial" and meta["runs"] == 3 and len(results) == 2
+    assert meta["charged_usd"] == pytest.approx(0.0201) and meta["elapsed_ms"] == 9
+
+
+
+def test_a_chain_does_not_get_single_offices_as_rivals():
+    c = Scripted(verdicts={"rival.example": verdict("rival.example", locations="many")})
+    out = run_discover(c, profile=dict(PROFILE, archetype="multi_location"))
+    assert [x["domain"] for x in out["competitors"]] == ["rival.example"]
+    assert {"domain": "named.example", "site_type": "business",
+            "why": "a single site, not a rival to a chain at its level"} in out["rejected"]
+
+
+def test_weak_matches_are_left_out_with_their_score():
+    ranked = {"competitors": [{"domain": "rival.example", "kind": "direct", "score": 39, "reason": "far"},
+                              {"domain": "named.example", "kind": "direct", "score": 40, "reason": "ok"}],
+              "left_out": [], "gaps": []}
+    out = run_discover(Scripted(ranked=ranked))
+    assert [x["domain"] for x in out["competitors"]] == ["named.example"]
+    assert out["left_out"][0]["domain"] == "rival.example" and "score 39" in out["left_out"][0]["why"]
+
+
+def test_a_city_level_location_is_flagged_on_the_map_search():
+    fp = FakePlaces([], [place("P", "https://p.example", 1)] * 9)
+    meta = rv.from_places(rv.Pool("acme.example"),
+                          dict(PROFILE, hq_point={"lat": 1, "lon": 2, "precision": "city", "source": "geocoded"}),
+                          {"place_terms": ["dent"], "radius_km": 4}, places=fp)
+    assert meta["location_precision"] == "city" and "city centre" in meta["warning"]
+    meta = rv.from_places(rv.Pool("acme.example"), dict(PROFILE, hq_point={"lat": 1, "lon": 2, "precision": "street"}),
+                          {"place_terms": ["dent"], "radius_km": 4}, places=fp)
+    assert "warning" not in meta
+
+
+def test_the_check_is_told_to_judge_the_business_behind_a_group_site():
+    assert "business behind the site" in rv.VERIFY_SYSTEM and "Heartland" in rv.VERIFY_SYSTEM
+    assert "locations" in rv.VERIFY_SCHEMA["properties"]["verdicts"]["items"]["required"]
+
+
+def test_a_domain_pointing_at_a_reserved_address_says_so(monkeypatch):
+    from tracker import market_radar_site as site
+
+    def refuse(*a, **k):
+        raise ValueError("Private or reserved page destinations are not allowed.")
+    monkeypatch.setattr(site, "public_get", refuse)
+    out = site.fetch("https://pacificdentalservices.com/")
+    assert out["status"] == "error" and "address we do not fetch" in out["note"]
