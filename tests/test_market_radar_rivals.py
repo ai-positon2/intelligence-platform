@@ -744,3 +744,29 @@ def test_competitors_come_out_in_score_order():
               "left_out": [], "gaps": []}
     out = run_discover(Scripted(ranked=ranked))
     assert [c["domain"] for c in out["competitors"]] == ["rival.example", "named.example"]
+
+
+
+def test_affiliate_redirectors_are_never_candidates():
+    pool = rv.Pool("acme.example")
+    assert pool.add("https://go.redirectingat.com/?id=1", "article") is None
+    assert pool.add("https://insider-app.onelink.me/x", "article") is None
+
+
+def test_only_unread_sites_a_reader_would_expect_are_listed():
+    def fake_search(queries, **k):
+        return {"results": [{"query": "q", "position": 3, "url": "https://twice.example/", "title": "Twice"},
+                            {"query": "q", "position": 1, "url": "https://mag.example/best",
+                             "title": "10 best dentists"}], "error": None}
+    reader = home(**{d: {"status": "blocked", "note": "server refused (HTTP 403)"}
+                     for d in ("one-link.example", "twice.example", "rival.example", "named.example")})
+    article = "<a href='https://one-link.example/'>x</a><a href='https://twice.example/'>y</a>"
+
+    c = Scripted(verdicts={"mag.example": verdict("mag.example", site_type="article_or_publisher")})
+    out = rv.discover(PROFILE, client=c, token="t", search=fake_search,
+                      places=FakePlaces([], []), reader=reader,
+                      fetch=lambda url: {"status": "ok", "html": article, "final_url": url},
+                      archive_reader=lambda item: {"status": "error", "note": "none"})
+    listed = {u["domain"] for u in out["unread"]}
+    assert {"rival.example", "named.example", "twice.example"} <= listed
+    assert "one-link.example" not in listed and out["coverage"]["checked"]["unread_minor"] >= 1

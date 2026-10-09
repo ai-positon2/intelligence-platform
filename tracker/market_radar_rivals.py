@@ -84,6 +84,10 @@ SKIP_DOMAINS = (
     "zocdoc.com", "healthgrades.com", "nhs.uk", "practo.com", "justdial.com", "doctolib.de",
     "jameda.de", "sulekha.com", "mapquest.com", "foursquare.com", "nextdoor.com",
     "wa.me", "whatsapp.com", "linktr.ee", "bit.ly", "t.co",
+    # affiliate and app-link redirectors, linked from "best of" articles
+    "redirectingat.com", "viglink.com", "onelink.me", "app.link", "linksynergy.com",
+    "awin1.com", "shareasale.com", "skimresources.com", "amzn.to", "pntrs.com", "sjv.io",
+    "anrdoezrs.net", "dpbolvw.net", "jdoqocy.com", "kqzyfj.com", "tkqlhce.com", "howl.me",
 )
 _SKIP_SUFFIXES = tuple("." + d for d in SKIP_DOMAINS)
 
@@ -644,6 +648,15 @@ def from_articles(pool, articles, *, fetch=None):
     return meta
 
 
+def _expected(item):
+    """An unread candidate a reader would ask about: one the site or the
+    model named, or one found more than once. A single link from an article
+    (Gymshark's run: nytimes.com, vogue.com.au, finanzen.net) is counted,
+    not listed."""
+    kinds = {v["kind"] for v in item["via"]}
+    return bool(kinds & {"site", "model"}) or len(item["via"]) > 1
+
+
 def merge_redirects(items, briefs, kept_by_final):
     """Two candidates whose homepages land on the same site are one company
     (centralaustindental.com redirects to koladentistry.com, both listed on
@@ -820,6 +833,7 @@ def discover(profile, *, run_id=None, client=None, token=None, progress=None, se
 
     # A candidate that redirects to the client's own site is the client.
     survivors, rejected, unread, merged = [], [], [], []
+    unread_other = 0
     for item in judged:
         b = briefs[item["domain"]]
         if b.get("status") == "merged":
@@ -830,9 +844,11 @@ def discover(profile, *, run_id=None, client=None, token=None, progress=None, se
             if fallback:
                 verdicts[item["domain"]] = fallback
                 survivors.append(item)
-            else:
+            elif _expected(item):
                 unread.append({"domain": item["domain"], "why": b.get("note") or b.get("status"),
                                "found": [_via_label(v) for v in item["via"][:3]]})
+            else:
+                unread_other += 1
             continue
         if b.get("final_domain") == own:
             rejected.append({"domain": item["domain"], "why": "redirects to the client's own site"})
@@ -903,6 +919,7 @@ def discover(profile, *, run_id=None, client=None, token=None, progress=None, se
         if invented:
             coverage["rank_dropped"] = {"domains": invented,
                                         "why": "not among the checked candidates"}
+    coverage["checked"]["unread_minor"] = unread_other
     coverage["seconds"] = round(time.monotonic() - started, 1)
     return {"status": "ok" if competitors else "none_found", "competitors": competitors, "left_out": left_out, "gaps": gaps,
             "unread": unread, "rejected": rejected[:60], "merged": merged, "coverage": coverage,
