@@ -331,6 +331,76 @@
       '</div></div>';
   }
 
+  // == competitor moves (Phase 3) ====================================================
+
+  var STATUS_WORD = { ok: 'Read', reused: 'Read earlier', empty: 'Nothing listed', none: 'Not there',
+    failed: 'Could not read', skipped: 'Skipped' };
+  var TONE = { new_location: 'ok', product_launch: 'ok', hiring_surge: 'ok', new_job_location: 'ok',
+    promotion: 'warn', sale_started: 'warn', price_cut: 'warn', price_increase: 'warn',
+    closed_location: 'bad', product_removed: 'bad', hiring_slowdown: 'bad', location_list_shrank: 'bad' };
+
+  function renderMoveRow(e) {
+    var href = safeUrl(e.url);
+    var title = href ? '<a href="' + esc(href) + '" target="_blank" rel="noopener noreferrer">' + esc(e.title) + '</a>' : esc(e.title);
+    return '<li class="mr-move"><div class="mr-move-when">' + esc(e.date || when(e.seen)) + '</div>' +
+      '<div class="mr-move-b"><div class="mr-move-t"><span class="mr-chip ' + esc(TONE[e.type] || '') + '">' + esc(e.label) + '</span>' +
+      '<b>' + esc(e.name) + '</b></div><div class="mr-move-title">' + title + '</div>' +
+      (e.summary ? '<div class="mr-move-sum">' + esc(e.summary) + '</div>' : '') +
+      '<div class="mr-move-src">Seen in: ' + esc((e.detectors || []).join(', ') || 'unknown') +
+      (e.evidence > 1 ? ' (' + esc(e.evidence) + ' independent sources)' : '') + '</div></div></li>';
+  }
+
+  function renderCollectProgress(run) {
+    var m = /collect (\d+)\/(\d+)/.exec((run && run.stage) || '');
+    var text = m ? 'Read ' + m[1] + ' of ' + m[2] + ' competitors' : 'Starting';
+    return '<div class="mr-callout">' + esc(text) + '… This runs in the background; you can leave the page.</div>';
+  }
+
+  function renderMoves(moves, collectRun) {
+    if (!moves) return '';
+    var running = collectRun && collectRun.status === 'running' && !collectRun.stale;
+    var last = moves.last_collect;
+    var head = '<div class="mr-card-h"><div><h3>Competitor moves</h3><p>What competitors changed on their websites, ' +
+      'shops and job boards, and what the news said, read the same way each time so the difference is the news.</p></div>' +
+      '<button type="button" class="mr-btn" data-act="collect"' + (running ? ' disabled' : '') + '>' +
+      (running ? 'Collecting…' : last ? 'Collect again' : 'Collect now') + '</button></div>';
+    var body = '';
+    if (running) body += renderCollectProgress(collectRun);
+    if (!last && !running) {
+      body += '<div class="mr-empty"><b>Nothing collected yet</b>Collecting is free (no paid search) and takes 2 to 6 minutes. ' +
+        'The first collection stores what each competitor shows today; changes appear from the second one on.</div>';
+      return '<div class="card mr-card" id="mrMoves">' + head + '<div class="mr-card-b">' + body + '</div></div>';
+    }
+    if (last && last.status === 'failed') body += '<div class="mr-callout bad">The last collection failed: ' + esc(last.error || 'no reason given') + '</div>';
+    var events = moves.events || [];
+    if (events.length) {
+      body += '<ul class="mr-moves">' + events.map(renderMoveRow).join('') + '</ul>';
+    } else if (last && last.status === 'complete') {
+      body += '<div class="mr-empty"><b>No moves yet</b>' + (moves.competitors || []).length + ' competitors are tracked. ' +
+        'A move appears when something differs from the previous collection, or when a source dates it in the last 90 days.</div>';
+    }
+    if (last && last.coverage && last.coverage.length) {
+      body += '<details class="mr-more"' + (events.length ? '' : ' open') + '><summary>What was read' +
+        (last.finished_at ? ' (' + esc(when(last.finished_at)) + ')' : '') + '</summary><ul class="mr-list">' +
+        last.coverage.map(function (c) { return '<li>' + esc(c.text) + '</li>'; }).join('') + '</ul>' +
+        (last.left_out ? '<p class="mr-hint">' + esc(last.left_out) + ' more competitors were not collected: at most 12 are, confirmed ones first.</p>' : '') +
+        (last.news_breaker_open ? '<p class="mr-hint">Google News stopped answering during this collection; some news was not read.</p>' : '') +
+        '</details>';
+    }
+    if (last && last.companies && last.companies.length) {
+      body += '<details class="mr-more"><summary>Per competitor</summary>' + last.companies.map(function (c) {
+        var rows = (c.rows || []).map(function (r) {
+          return '<tr><td>' + esc(r.label) + '</td><td class="mr-st ' + esc(r.status) + '">' + esc(STATUS_WORD[r.status] || r.status) +
+            '</td><td>' + esc(r.note || '') + '</td></tr>';
+        }).join('');
+        var site = c.site && c.site.status !== 'ok' ? '<p class="mr-hint">Website: ' + esc(c.site.note || c.site.status) + '</p>' : '';
+        return '<div class="mr-trk"><h4>' + esc(c.name) + ' <span>' + esc(c.domain) + '</span></h4>' + site +
+          '<table class="mr-src mr-trk-t"><tbody>' + rows + '</tbody></table></div>';
+      }).join('') + '</details>';
+    }
+    return '<div class="card mr-card" id="mrMoves">' + head + '<div class="mr-card-b">' + body + '</div></div>';
+  }
+
   function renderHead(view, running) {
     var c = view.client || {}, p = view.profile || {}, f = p.fields || {};
     var href = siteUrl(c.domain);
@@ -348,7 +418,7 @@
     var running = state.run && state.run.status === 'running';
     return renderHead(v, running) + (running ? renderProgress(state.run) : '') +
       renderProfile(v, state.editing, state.errors) + renderCompetitors(v.competitors, state.filter) +
-      (running ? '' : renderRun(v.last_run));
+      renderMoves(state.moves, state.collect) + (running ? '' : renderRun(v.last_run));
   }
 
   /** The edits a submitted form makes: only fields whose value changed. */
@@ -374,6 +444,7 @@
   var MR = { esc: esc, safeUrl: safeUrl, siteUrl: siteUrl, renderClientList: renderClientList,
     renderProgress: renderProgress, renderProfile: renderProfile, renderCompetitors: renderCompetitors,
     renderRow: renderRow, renderRun: renderRun, renderDetail: renderDetail, formChanges: formChanges,
+    renderMoves: renderMoves, renderMoveRow: renderMoveRow,
     FIELDS: FIELDS, STAGE_STEP: STAGE_STEP };
   root.MR = MR;
 
@@ -382,7 +453,7 @@
   if (typeof document === 'undefined' || !document.getElementById('mr')) return;
 
   var state = { clients: [], selected: null, view: null, filter: null, editing: false, errors: null,
-    run: null, poll: null };
+    run: null, poll: null, moves: null, collect: null, collectPoll: null };
   var $ = function (id) { return document.getElementById(id); };
 
   function api(path, body) {
@@ -433,8 +504,34 @@
     $('mrDetail').innerHTML = '<div class="card"><div class="mr-empty">Loading…</div></div>';
     return loadView();
   }
+  function loadMoves() {
+    var id = state.selected;
+    return api('/clients/' + id + '/moves').then(function (m) {
+      if (state.selected !== id) return;
+      state.moves = m;
+      var last = m.last_collect;
+      if (last && last.status === 'running') watchCollect(last.id); else { state.collect = null; paint(); }
+    }).catch(function (e) { toast('Competitor moves: ' + e.message); });
+  }
+  function watchCollect(runId) {
+    clearTimeout(state.collectPoll);
+    var forClient = state.selected;
+    function tick() {
+      api('/runs/' + runId).then(function (r) {
+        if (state.selected !== forClient) return;
+        state.collect = r;
+        if (r.status === 'running' && !r.stale) { paint(); state.collectPoll = setTimeout(tick, 5000); return; }
+        state.collect = null;
+        toast(r.status === 'complete' ? 'Collection finished.' : 'The collection did not finish: ' + (r.error || r.stale || r.status));
+        loadMoves();
+      }).catch(function () { state.collectPoll = setTimeout(tick, 8000); });
+    }
+    tick();
+  }
   function loadView() {
     var id = state.selected;
+    state.moves = null; state.collect = null; clearTimeout(state.collectPoll);
+    loadMoves();
     return api('/clients/' + id).then(function (v) {
       if (state.selected !== id) return;
       state.view = v;
@@ -520,6 +617,14 @@
       ids.reduce(function (p, id) { return p.then(function () { return api('/clients/' + state.selected + '/competitors/' + id, { status: 'confirmed' }); }); }, Promise.resolve())
         .then(function () { toast('Confirmed ' + ids.length + '.'); state.filter = 'confirmed'; return loadView(); })
         .then(loadClients).catch(function (err) { toast(err.message); loadView(); });
+    } else if (act === 'collect') {
+      el.disabled = true;
+      api('/clients/' + state.selected + '/collect', {}).then(function (j) {
+        state.collect = { status: 'running', stage: 'queued' }; paint(); watchCollect(j.run_id);
+      }).catch(function (err) {
+        if (err.status === 409 && err.data && err.data.run_id) { toast(err.message); watchCollect(err.data.run_id); return; }
+        toast(err.message); paint();
+      });
     } else if (act === 'run') {
       var name = (state.view.profile.fields || {}).name || state.view.client.domain;
       startRun({ client_id: state.selected }, 'Search again for ' + name + '?',

@@ -198,3 +198,22 @@
   .mr-card-h,.mr-card-b,.mr-row,.mr-addrow,.mr-progress{padding-left:14px;padding-right:14px}
   .mr-head h2{font-size:21px}
 }
+
+/* == competitor moves (Phase 3) == */
+.mr-moves{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.mr-move{display:grid;grid-template-columns:92px 1fr;gap:12px;padding:12px 0;border-top:1px solid var(--mr-line)}
+.mr-move:first-child{border-top:0;padding-top:0}
+.mr-move-when{font-size:12px;color:var(--mr-tx3);padding-top:2px;font-variant-numeric:tabular-nums}
+.mr-move-b{min-width:0}
+.mr-move-t{display:flex;flex-wrap:wrap;align-items:center;gap:8px;font-size:13px}
+.mr-move-title{margin-top:4px;font-size:14px;line-height:1.45;overflow-wrap:anywhere}
+.mr-move-title a{color:inherit;text-decoration:underline;text-underline-offset:2px}
+.mr-move-sum{margin-top:4px;font-size:13px;color:var(--mr-tx2);white-space:pre-line;overflow-wrap:anywhere}
+.mr-move-src{margin-top:4px;font-size:12px;color:var(--mr-tx3)}
+.mr-trk{margin-top:12px}
+.mr-trk h4{margin:0 0 6px;font-size:14px}
+.mr-trk h4 span{font-weight:400;color:var(--mr-tx3);font-size:12px;margin-left:6px}
+.mr-trk-t td:first-child{white-space:nowrap}
+.mr-st.failed{color:var(--mr-bad)}
+.mr-st.ok,.mr-st.reused{color:var(--mr-ok)}
+@media (max-width:640px){.mr-move{grid-template-columns:1fr;gap:4px}.mr-trk-t td:nth-child(3){display:none}}

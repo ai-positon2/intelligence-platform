@@ -209,7 +209,9 @@ def _client(email):
     ("get", BASE), ("get", BASE + "/api/clients"), ("get", BASE + "/api/clients/1"),
     ("post", BASE + "/api/clients/1/profile"), ("post", BASE + "/api/clients/1/competitors"),
     ("post", BASE + "/api/clients/1/competitors/2"), ("post", BASE + "/api/runs"),
-    ("get", BASE + "/api/runs/1")])
+    ("get", BASE + "/api/runs/1"), ("post", BASE + "/api/clients/1/collect"),
+    ("get", BASE + "/api/clients/1/moves"),
+    ("post", "/p2/admin/external-usage/market-radar-detectors-check")])
 @pytest.mark.parametrize("email, status", [(None, 302), ("someone@position2.com", 403)])
 def test_every_route_is_admin_only(method, path, email, status):
     c = _client(email)
@@ -218,10 +220,61 @@ def test_every_route_is_admin_only(method, path, email, status):
 
 
 @pytest.mark.parametrize("path", ["/api/clients/1/profile", "/api/clients/1/competitors",
-                                  "/api/clients/1/competitors/2", "/api/runs"])
+                                  "/api/clients/1/competitors/2", "/api/runs",
+                                  "/api/clients/1/collect"])
 def test_posts_from_another_site_are_refused(path):
     resp = _client(ADMIN).post(BASE + path, json={}, headers={"Origin": "https://evil.example"})
     assert resp.status_code == 403
+
+
+def test_the_detector_self_test_refuses_another_site():
+    resp = _client(ADMIN).post("/p2/admin/external-usage/market-radar-detectors-check", json={},
+                               headers={"Origin": "https://evil.example"})
+    assert resp.status_code == 403
+
+
+def test_a_collection_starts_once_and_its_moves_are_read_back(client_with_reading, monkeypatch):
+    import app as appmod
+    from tracker import market_radar_run as mrun
+    from tracker import market_radar_store as store
+    monkeypatch.setattr(appmod, "ADMIN_EMAILS", set(appmod.ADMIN_EMAILS) | {OWNER})
+    started = []
+    monkeypatch.setattr(mrun, "collect_job", lambda *a, **k: started.append(a))
+    real_start = mrun.start_collect
+    monkeypatch.setattr(mrun, "start_collect",
+                        lambda cid, email: real_start(cid, email, spawn=lambda f, a: f(*a)))
+    w = client_with_reading
+    rival = store.upsert_entity("rival.example", name="Rival")
+    store.propose_competitor(w["client"], OWNER, rival, "direct", confidence=0.7)
+    c = _client(OWNER)
+    r = c.post(BASE + "/api/clients/%d/collect" % w["client"], json={})
+    assert r.status_code == 202 and len(started) == 1
+    run_id = r.get_json()["run_id"]
+    r = c.post(BASE + "/api/clients/%d/collect" % w["client"], json={})
+    assert r.status_code == 409 and r.get_json()["run_id"] == run_id and len(started) == 1
+    assert c.post(BASE + "/api/clients/999999/collect", json={}).status_code == 404
+    # The search panel still shows the search, not the collection.
+    assert c.get(BASE + "/api/clients/%d" % w["client"]).get_json()["last_run"]["id"] == w["run"]
+
+    store.record_event(rival, "locations:loc+:x", type="new_location", title="New location page: Merced",
+                       source={"url": "https://rival.example/l/merced", "detector": "locations"},
+                       event_date="2026-10-09")
+    store.record_event(rival, "locations:loc+:x", type="new_location", title="New location page: Merced",
+                       source={"url": "https://news.example/a", "detector": "news"})
+    store.save_snapshot(rival, "locations", {"places": ["rival.example/l/merced"]}, item_count=1)
+    store.update_run(run_id, status="complete", stage="done", summary={
+        "seconds": 12.5, "new_events": 1, "left_out": 0, "coverage": [
+            {"label": "Locations", "text": "Locations read for 1 of 1 competitors.", "read": 1, "total": 1}],
+        "companies": [{"entity_id": rival, "domain": "rival.example", "name": "Rival",
+                       "site": {"status": "ok"}, "rows": [{"detector": "locations", "status": "ok",
+                                                          "note": "1 location pages", "items": 1}]}]})
+    m = c.get(BASE + "/api/clients/%d/moves" % w["client"]).get_json()
+    (ev,) = m["events"]
+    assert ev["label"] == "New location" and ev["name"] == "Rival" and ev["date"] == "2026-10-09"
+    assert ev["detectors"] == ["Locations", "News"] and ev["evidence"] == 2
+    assert m["last_collect"]["coverage"][0]["text"].startswith("Locations read for 1 of 1")
+    assert m["competitors"][0]["tracked"]["locations"]["items"] == 1
+    assert _client(OWNER).get(BASE + "/api/clients/999999/moves").status_code == 404
 
 
 def test_the_page_renders_with_its_script_and_menu_entry():
@@ -422,3 +475,31 @@ def test_tidy_keeps_only_the_latest_full_searchs_suggestions(client_with_reading
     assert left == {"new.example", "mine.example"}
     assert _client(OWNER).post(BASE + "/api/tidy-suggestions", json={},
                                headers={"Origin": "https://evil.example"}).status_code == 403
+
+
+def test_script_shows_moves_and_escapes_them():
+    moves = {"events": [{"id": 1, "entity_id": 2, "name": EVIL, "domain": "r.example", "type": "new_location",
+                         "label": EVIL, "status": "unknown", "date": "2026-10-09", "title": EVIL,
+                         "summary": EVIL, "url": "javascript:alert(1)", "detectors": [EVIL], "evidence": 2}],
+             "competitors": [{"entity_id": 2, "name": "R", "domain": "r.example", "tracked": {}}],
+             "last_collect": {"id": 5, "status": "complete", "finished_at": "2026-10-09T10:00:00",
+                              "coverage": [{"label": "Hiring", "text": EVIL, "read": 1, "total": 2}],
+                              "left_out": 3, "news_breaker_open": True,
+                              "companies": [{"entity_id": 2, "name": EVIL, "domain": EVIL,
+                                             "site": {"status": "blocked", "note": EVIL},
+                                             "rows": [{"detector": "jobs", "label": "Hiring", "status": "failed",
+                                                       "note": EVIL}]}]}}
+    out = run_js("""const m = %s; return {
+        full: MR.renderMoves(m, null),
+        running: MR.renderMoves(m, {status: 'running', stage: 'collect 3/10'}),
+        none: MR.renderMoves({events: [], competitors: [], last_collect: null}, null),
+        quiet: MR.renderMoves({events: [], competitors: [{}, {}], last_collect: {status: 'complete',
+                               coverage: []}}, null)};""" % json.dumps(moves))
+    _no_markup_from(out["full"])
+    import re
+    assert not [h for h in re.findall(r'href="([^"]*)"', out["full"]) if "javascript" in h]
+    assert "2 independent sources" in out["full"] and "3 more competitors were not collected" in out["full"]
+    assert "Google News stopped answering" in out["full"] and "Could not read" in out["full"]
+    assert "Read 3 of 10 competitors" in out["running"] and "disabled" in out["running"]
+    assert "Nothing collected yet" in out["none"] and "Collect now" in out["none"]
+    assert "No moves yet" in out["quiet"] and "2 competitors are tracked" in out["quiet"]

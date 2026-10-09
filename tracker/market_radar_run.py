@@ -114,6 +114,50 @@ def job(run_id, url, owner_email, client_id, entity_id, reuse_profile, *, client
             pass
 
 
+def start_collect(client_id, owner_email, *, spawn=None):
+    """Collect what this client's competitors did (Phase 3,
+    tracker/market_radar_collect), in the background. Free: no model and no
+    paid search. Returns the run id; raises PermissionError when the client
+    is not this person's."""
+    from . import market_radar_store as store
+    if not store.get_client(client_id, owner_email):
+        raise PermissionError("client %s is not yours or does not exist" % client_id)
+    run_id = store.create_run(client_id, owner_email, "collect")
+    store.update_run(run_id, status="running", stage="queued")
+    args = (run_id, client_id, owner_email)
+    if spawn is None:
+        threading.Thread(target=collect_job, args=args, name="mr-collect-%s" % run_id,
+                         daemon=True).start()
+    else:
+        spawn(collect_job, args)
+    return run_id
+
+
+def collect_job(run_id, client_id, owner_email, *, collect=None):
+    from . import market_radar_store as store
+    from . import market_radar_collect as mc
+    collect = collect or mc.collect_client
+
+    def stage(name):
+        try:
+            store.update_run(run_id, stage=name)
+        except Exception:
+            logger.warning("market_radar_run %s: could not record stage %s", run_id, name)
+
+    try:
+        result = collect(client_id, owner_email, run_id=run_id, progress=stage)
+        store.update_run(run_id, status="complete", stage="done", summary=result,
+                         coverage={"lines": result.get("coverage")})
+    except Exception as e:
+        logger.exception("market_radar_run collect %s failed", run_id)
+        try:
+            store.update_run(run_id, status="failed",
+                             error="%s: %s" % (type(e).__name__, str(e)[:300]),
+                             summary={"trace": traceback.format_exc()[-1500:]})
+        except Exception:
+            pass
+
+
 def status(run_id, owner_email):
     from . import market_radar_ledger as ledger
     from . import market_radar_store as store

@@ -356,7 +356,7 @@ def tidy_suggestions(owner_email, *, conn=None):
     for c in store.list_clients(owner_email, conn=conn):
         with store._tx(conn) as cur:
             cur.execute("""SELECT summary FROM mr_runs WHERE client_id=%s AND status='complete'
-                           ORDER BY id DESC LIMIT 1""", (c["client_id"],))
+                           AND mode <> 'collect' ORDER BY id DESC LIMIT 1""", (c["client_id"],))
             row = cur.fetchone()
         summary = (row[0] if row else None) or {}
         result = summary.get("result") or {}
@@ -367,3 +367,78 @@ def tidy_suggestions(owner_email, *, conn=None):
         out[c["domain"]] = store.retire_suggestions(c["client_id"], owner_email,
                                                     summary["saved_entities"], conn=conn)
     return out
+
+
+# == competitor moves (Phase 3) =========================================================
+
+EVENT_LABELS = {
+    "new_location": "New location", "closed_location": "Location removed",
+    "site_restructured": "Locations reorganised", "location_list_shrank": "Fewer locations listed",
+    "product_launch": "New product", "product_removed": "Product removed",
+    "price_increase": "Price up", "price_cut": "Price down", "sale_started": "On sale",
+    "sold_out": "Sold out", "promotion": "New offer", "promotion_ended": "Offer ended",
+    "page_changed": "Page changed", "review_growth": "More reviews",
+    "announcement": "Announcement", "hiring_surge": "Hiring up",
+    "hiring_slowdown": "Hiring down", "new_job_location": "Hiring in a new place",
+    "senior_hire_search": "Senior role open",
+}
+def _detector_labels():
+    from .market_radar_collect import DETECTORS
+    return {name: label for name, _r, _c, _b, label in DETECTORS}
+
+
+DETECTOR_LABELS = _detector_labels()
+
+
+def moves_view(client_id, owner_email, *, conn=None):
+    """What this client's competitors did: the events the collections found
+    (newest first), what is tracked for each competitor, and the latest
+    collection's coverage. None when the client is not this person's."""
+    if store.get_client(client_id, owner_email, conn=conn) is None:
+        return None
+    rows = store.competitors(client_id, owner_email, conn=conn)
+    names = {r["entity_id"]: (r.get("name") or r["domain"], r["domain"]) for r in rows}
+    ids = list(names)
+    events = []
+    for e in store.recent_events(ids, conn=conn):
+        sources = e.get("sources") or []
+        name, domain = names.get(e["entity_id"], ("?", "?"))
+        events.append({
+            "id": e["id"], "entity_id": e["entity_id"], "name": name, "domain": domain,
+            "type": e["type"], "label": EVENT_LABELS.get(e["type"], e["type"].replace("_", " ")),
+            "status": e["status"], "date": _iso(e["event_date"]), "title": e["title"],
+            "summary": e.get("summary"), "url": next((s.get("url") for s in sources
+                                                      if s.get("url")), None),
+            "detectors": sorted({DETECTOR_LABELS.get(s.get("detector"), s.get("detector"))
+                                 for s in sources if s.get("detector")}),
+            "evidence": e["evidence_count"], "seen": _iso(e["first_seen_at"])})
+    tracked = {}
+    for s in store.snapshot_summaries(ids, conn=conn):
+        tracked.setdefault(s["entity_id"], {})[s["detector"]] = {
+            "items": s["item_count"], "last_read": _iso(s["last_seen_at"]),
+            "since": _iso(s["first_seen_at"]), "versions": s["versions"]}
+    run = store.latest_run(client_id, owner_email, collect=True, conn=conn)
+    last = None
+    if run:
+        summary = run.get("summary") or {}
+        last = {"id": run["id"], "status": run["status"], "stage": run["stage"],
+                "error": run["error"], "created_at": _iso(run.get("created_at")),
+                "finished_at": _iso(run.get("finished_at")),
+                "seconds": summary.get("seconds"), "new_events": summary.get("new_events"),
+                "left_out": summary.get("left_out"),
+                "news_breaker_open": summary.get("news_breaker_open"),
+                "coverage": [{"label": c["label"], "text": c["text"], "read": c["read"],
+                              "total": c["total"]} for c in summary.get("coverage") or []],
+                "companies": [{"entity_id": c["entity_id"], "domain": c["domain"],
+                               "name": c.get("name") or c["domain"], "site": c.get("site"),
+                               "error": c.get("error"),
+                               "rows": [{"detector": r["detector"],
+                                         "label": DETECTOR_LABELS.get(r["detector"],
+                                                                      r["detector"]),
+                                         "status": r["status"], "note": r.get("note"),
+                                         "items": r.get("items"), "events": r.get("events")}
+                                        for r in c.get("rows") or []]}
+                              for c in summary.get("companies") or []]}
+    return {"events": events, "last_collect": last,
+            "competitors": [{"entity_id": i, "name": names[i][0], "domain": names[i][1],
+                             "tracked": tracked.get(i, {})} for i in ids]}

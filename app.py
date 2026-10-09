@@ -8937,6 +8937,18 @@ def admin_external_usage_market_radar_competitors_check():
     return jsonify(run_id=run_id, status="running"), 202
 
 
+@app.route("/p2/admin/external-usage/market-radar-detectors-check", methods=["POST"])
+@admin_required
+def admin_external_usage_market_radar_detectors_check():
+    """Run every Phase 3 detector once against a public source known to have
+    what it reads (tracker/market_radar_detect_check). Free, writes nothing,
+    about 30 to 95 seconds. POST so no crawler or prefetch can trigger it."""
+    if not _evi_same_origin():
+        return jsonify(error="This request came from another site and was refused."), 403
+    from tracker import market_radar_detect_check
+    return jsonify(market_radar_detect_check.run())
+
+
 @app.route("/p2/admin/external-usage/market-radar-run-status", methods=["POST"])
 @admin_required
 def admin_external_usage_market_radar_run_status():
@@ -9112,6 +9124,47 @@ def admin_market_radar_run_start():
     client_id = next((c["client_id"] for c in mr_store.list_clients(email)
                       if c["domain"] == mr_store.normalize_domain(url)), None)
     return jsonify(run_id=run_id, client_id=client_id), 202
+
+
+@app.route("/p2/admin/market-radar/api/clients/<int:client_id>/collect", methods=["POST"])
+@admin_required
+def admin_market_radar_collect(client_id):
+    """Collect what this company's competitors did (Phase 3,
+    tracker/market_radar_collect): their sites, catalogs, job boards and news.
+    Free (no model, no paid search) and runs in the background, 2 to 6
+    minutes. One collection at a time per company."""
+    refused = _mr_guard_post()
+    if refused:
+        return refused
+    from tracker import market_radar_run, market_radar_store as mr_store
+    email = _mr_email()
+    try:
+        last = mr_store.latest_run(client_id, email, collect=True)
+        if last and last["status"] == "running":
+            status = market_radar_run.status(last["id"], email) or {}
+            if not status.get("stale"):
+                return jsonify(error="A collection for this company is already going.",
+                               run_id=last["id"]), 409
+        run_id = market_radar_run.start_collect(client_id, email)
+    except PermissionError:
+        return jsonify(error="No such company of yours."), 404
+    except mr_store.StoreUnavailable as e:
+        return jsonify(error="The database is unavailable (%s)." % e), 503
+    return jsonify(run_id=run_id), 202
+
+
+@app.route("/p2/admin/market-radar/api/clients/<int:client_id>/moves")
+@admin_required
+def admin_market_radar_moves(client_id):
+    """What this company's competitors did, as the collections found it."""
+    from tracker import market_radar_store as mr_store, market_radar_views as views
+    try:
+        view = views.moves_view(client_id, _mr_email())
+    except mr_store.StoreUnavailable as e:
+        return jsonify(error="The database is unavailable (%s)." % e), 503
+    if view is None:
+        return jsonify(error="No such company of yours."), 404
+    return jsonify(view)
 
 
 @app.route("/p2/admin/market-radar/api/tidy-suggestions", methods=["POST"])

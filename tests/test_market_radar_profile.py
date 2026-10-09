@@ -78,8 +78,28 @@ def test_social_profiles_skip_share_and_intent_links():
 
 def test_jobs_boards_are_found_with_their_board_names():
     hrefs = " ".join(h for h, _ in site.parse_html(PAGE).links)
-    assert site.ats_boards(hrefs) == [{"vendor": "greenhouse", "board": "acmedental"},
-                                      {"vendor": "personio", "board": "acme"}]
+    assert [(b["vendor"], b["board"]) for b in site.ats_boards(hrefs)] == [
+        ("greenhouse", "acmedental"), ("personio", "acme")]
+
+
+def test_a_workday_board_keeps_its_site_path():
+    hay = "https://x.com/a https://acme.wd5.myworkdayjobs.com/en-US/Acme_Careers?q=1 https://y.com"
+    (board,) = site.ats_boards(hay)
+    assert board["vendor"] == "workday" and board["board"] == "acme"
+    assert board["url"] == "acme.wd5.myworkdayjobs.com/en-US/Acme_Careers?q=1"
+
+
+def test_feeds_and_review_scores_are_read_from_a_page():
+    page = """<html><head>
+      <link rel="alternate" type="application/rss+xml" title="News" href="/news/feed/">
+      <link rel="alternate" hreflang="de" href="/de/">
+      <script type="application/ld+json">{"@type":"Product","name":"Runner",
+        "aggregateRating":{"@type":"AggregateRating","ratingValue":"4.6","reviewCount":"9,951"}}</script>
+      <script type="application/ld+json">{"@type":"Product","name":"No count",
+        "aggregateRating":{"ratingValue":"4"}}</script></head><body></body></html>"""
+    assert site.parse_html(page).feeds == [("/news/feed/", "News")]
+    assert site.ratings_from_html(page, "https://a.com/p") == [
+        {"url": "https://a.com/p", "item": "Runner", "rating": 4.6, "count": 9951}]
 
 
 @pytest.mark.parametrize("phone, code", [("+44 20 7946 0000", "GB"), ("0044 20 7946", "GB"),
@@ -936,3 +956,20 @@ def test_the_www_form_is_asked_when_the_bare_domain_has_only_a_redirect(monkeypa
     monkeypatch.setattr(site, "fetch_json", fetch_json)
     assert site.wayback_latest("https://planetfitness.com/")[0] == "20261004041021"
     assert len(asked) == 2
+
+
+def test_careers_links_include_a_careers_host_of_the_company_and_nothing_foreign():
+    links = [("/about", "About us"), ("/careers", "Careers"),
+             ("https://careers.aspendental.com/us/en?utm=1", "Join our team"),
+             ("https://jobs.otherfirm.com/", "Careers at Other"),
+             ("https://www.aspendental.com/dentist/jobs-near-me", "x")]
+    out = site.careers_links(links, "https://www.aspendental.com/")
+    assert out[0] == "https://careers.aspendental.com/us/en?utm=1"
+    assert "https://www.aspendental.com/careers" in out
+    assert not any("otherfirm" in u for u in out)
+
+
+def test_site_root_keeps_country_second_levels():
+    assert site.site_root("www.mydentist.co.uk") == "mydentist.co.uk"
+    assert site.site_root("careers.aspendental.com") == "aspendental.com"
+    assert site.site_root("shop.brand.com.br") == "brand.com.br"

@@ -115,3 +115,42 @@ def public_get(url, *, timeout=20, stream=True, headers=None, ssl_context=None):
         response.close = close
         return response
     raise ValueError('Too many page redirects.')
+
+
+def public_post(url, body, *, timeout=20, headers=None, ssl_context=None):
+    """POST `body` (bytes) to a public HTTP(S) address, with the same address
+    checks as public_get. Redirects are NOT followed: a POST that is
+    redirected comes back as the 3xx response, for the caller to treat as a
+    failure. Used for job boards whose public listing is a POST (Workday)."""
+    target = urlsplit(url)
+    if target.scheme not in ('http','https') or target.username or target.password:
+        raise ValueError('Only public HTTP(S) pages without URL credentials are allowed.')
+    port = target.port if target.port is not None else (443 if target.scheme == 'https' else 80)
+    if port not in (80,443):
+        raise ValueError('Only standard web ports are allowed.')
+    host = target.hostname
+    address = public_addresses(host, port)[0]
+    if target.scheme == 'https':
+        pool = urllib3.HTTPSConnectionPool(address, port=port, server_hostname=host,
+            assert_hostname=host, ssl_context=ssl_context or ssl.create_default_context())
+    else:
+        pool = urllib3.HTTPConnectionPool(address, port=port)
+    path = (target.path or '/') + ('?' + target.query if target.query else '')
+    try:
+        raw = pool.urlopen('POST', path, body=body, headers=dict(headers or {}, Host=target.netloc),
+            redirect=False, retries=False, preload_content=False, timeout=timeout)
+    except Exception:
+        pool.close()
+        raise
+    response = requests.Response()
+    response.status_code = raw.status
+    response.headers = requests.structures.CaseInsensitiveDict(raw.headers)
+    response.url = url
+    response.raw = raw
+    response.encoding = requests.utils.get_encoding_from_headers(response.headers) or 'utf-8'
+    original_close = response.close
+    def close(original_close=original_close, pool=pool):
+        original_close()
+        pool.close()
+    response.close = close
+    return response

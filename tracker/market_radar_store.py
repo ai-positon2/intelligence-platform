@@ -37,7 +37,7 @@ TABLES = ("mr_entities", "mr_clients", "mr_competitors", "mr_runs", "mr_provider
 
 COMPETITOR_KINDS = ("direct", "indirect", "local", "aspirational")
 COMPETITOR_STATUSES = ("proposed", "confirmed", "removed")
-RUN_MODES = ("baseline", "refresh")
+RUN_MODES = ("baseline", "refresh", "collect")
 RUN_STATUSES = ("queued", "running", "complete", "failed", "cancelled")
 EVENT_STATUSES = ("rumored", "announced", "planned", "opened", "completed", "closed", "unknown")
 
@@ -138,7 +138,7 @@ SCHEMA = [
         id BIGSERIAL PRIMARY KEY,
         client_id BIGINT NOT NULL REFERENCES mr_clients(id) ON DELETE CASCADE,
         owner_email TEXT NOT NULL,
-        mode TEXT NOT NULL CHECK (mode IN ('baseline','refresh')),
+        mode TEXT NOT NULL CHECK (mode IN ('baseline','refresh','collect')),
         status TEXT NOT NULL DEFAULT 'queued'
             CHECK (status IN ('queued','running','complete','failed','cancelled')),
         stage TEXT,
@@ -243,6 +243,18 @@ SCHEMA = [
     # how it was checked, as shown to the user. Empty for older rows.
     "ALTER TABLE mr_competitors ADD COLUMN IF NOT EXISTS details JSONB NOT NULL DEFAULT '{}'::jsonb",
     "CREATE INDEX IF NOT EXISTS idx_mr_clients_owner ON mr_clients (owner_email, updated_at DESC)",
+    # Phase 3 (2026-10-09): a "collect" run reads what every competitor did.
+    # The CHECK is replaced only when it does not already allow it, so this
+    # takes no table lock on every start.
+    """DO $$ BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'mr_runs_mode_check'
+                       AND pg_get_constraintdef(oid) LIKE '%collect%') THEN
+            ALTER TABLE mr_runs DROP CONSTRAINT IF EXISTS mr_runs_mode_check;
+            ALTER TABLE mr_runs ADD CONSTRAINT mr_runs_mode_check
+                CHECK (mode IN ('baseline','refresh','collect'));
+        END IF;
+    END $$""",
+    "CREATE INDEX IF NOT EXISTS idx_mr_events_recent ON mr_events (entity_id, updated_at DESC)",
 ]
 
 
@@ -422,14 +434,19 @@ def list_clients(owner_email, *, conn=None):
                    COUNT(c.entity_id) FILTER (WHERE c.status='removed'),
                    (SELECT json_build_object('id', r.id, 'status', r.status, 'stage', r.stage,
                                              'created_at', r.created_at, 'finished_at', r.finished_at)
-                      FROM mr_runs r WHERE r.client_id = cl.id ORDER BY r.id DESC LIMIT 1)
+                      FROM mr_runs r WHERE r.client_id = cl.id AND r.mode <> 'collect'
+                      ORDER BY r.id DESC LIMIT 1),
+                   (SELECT json_build_object('id', r.id, 'status', r.status, 'stage', r.stage,
+                                             'created_at', r.created_at, 'finished_at', r.finished_at)
+                      FROM mr_runs r WHERE r.client_id = cl.id AND r.mode = 'collect'
+                      ORDER BY r.id DESC LIMIT 1)
             FROM mr_clients cl JOIN mr_entities e ON e.id = cl.entity_id
             LEFT JOIN mr_competitors c ON c.client_id = cl.id
             WHERE cl.owner_email=%s AND e.domain NOT LIKE '%%.example'
             GROUP BY cl.id, e.id
             ORDER BY cl.updated_at DESC""", ((owner_email or "").strip().lower(),))
         keys = ("client_id", "entity_id", "domain", "name", "archetype", "country", "updated_at",
-                "confirmed", "proposed", "removed", "last_run")
+                "confirmed", "proposed", "removed", "last_run", "last_collect")
         return [dict(zip(keys, r)) for r in cur.fetchall()]
 
 
@@ -469,7 +486,8 @@ def found_in_runs(client_id, owner_email, *, limit=10, conn=None):
     domain: for rows saved before mr_competitors.details existed."""
     with _tx(conn) as cur:
         cur.execute("""SELECT summary FROM mr_runs WHERE client_id=%s AND owner_email=%s
-                       AND status='complete' AND summary IS NOT NULL ORDER BY id DESC LIMIT %s""",
+                       AND status='complete' AND summary IS NOT NULL AND mode <> 'collect'
+                       ORDER BY id DESC LIMIT %s""",
                     (client_id, (owner_email or "").strip().lower(), limit))
         rows = cur.fetchall()
     out = {}
@@ -480,10 +498,13 @@ def found_in_runs(client_id, owner_email, *, limit=10, conn=None):
     return out
 
 
-def latest_run(client_id, owner_email, *, conn=None):
+def latest_run(client_id, owner_email, *, collect=False, conn=None):
+    """The latest competitor search (collect=False) or the latest collection
+    of competitor moves (collect=True): two different panels on the page."""
     with _tx(conn) as cur:
         cur.execute("SELECT id FROM mr_runs WHERE client_id=%s AND owner_email=%s "
-                    "ORDER BY id DESC LIMIT 1", (client_id, (owner_email or "").strip().lower()))
+                    "AND (mode = 'collect') = %s ORDER BY id DESC LIMIT 1",
+                    (client_id, (owner_email or "").strip().lower(), bool(collect)))
         row = cur.fetchone()
     return get_run(row[0], owner_email, conn=conn) if row else None
 
@@ -631,6 +652,42 @@ def record_event(entity_id, dedupe_key, *, type, title, source, status="unknown"
                        WHERE id=%s""", (json.dumps(sources), len(detectors), new_status,
                                         event_date, summary, event_id))
         return event_id, False
+
+
+def recent_events(entity_ids, *, days=120, limit=400, conn=None):
+    """Events on these companies first seen in the last `days` days, newest
+    first. Public facts: the caller decides whose companies to ask about."""
+    ids = [int(i) for i in entity_ids]
+    if not ids:
+        return []
+    with _tx(conn) as cur:
+        cur.execute("""
+            SELECT id, entity_id, type, status, event_date, title, summary, location, sources,
+                   evidence_count, first_seen_at
+            FROM mr_events WHERE entity_id = ANY(%s)
+              AND first_seen_at > now() - make_interval(days => %s)
+            ORDER BY first_seen_at DESC, id DESC LIMIT %s""", (ids, int(days), int(limit)))
+        keys = ("id", "entity_id", "type", "status", "event_date", "title", "summary",
+                "location", "sources", "evidence_count", "first_seen_at")
+        return [dict(zip(keys, r)) for r in cur.fetchall()]
+
+
+def snapshot_summaries(entity_ids, *, conn=None):
+    """For each company and detector, when it was last read and how many
+    items it held: the "what we track" table, without the payloads."""
+    ids = [int(i) for i in entity_ids]
+    if not ids:
+        return []
+    with _tx(conn) as cur:
+        cur.execute("""
+            SELECT DISTINCT ON (entity_id, detector) entity_id, detector, item_count,
+                   first_seen_at, last_seen_at,
+                   (SELECT count(*) FROM mr_snapshots s2 WHERE s2.entity_id = s.entity_id
+                     AND s2.detector = s.detector) AS versions
+            FROM mr_snapshots s WHERE entity_id = ANY(%s)
+            ORDER BY entity_id, detector, last_seen_at DESC, id DESC""", (ids,))
+        keys = ("entity_id", "detector", "item_count", "first_seen_at", "last_seen_at", "versions")
+        return [dict(zip(keys, r)) for r in cur.fetchall()]
 
 
 def link_client_event(client_id, event_id, *, score=None, severity=None, distance_km=None,

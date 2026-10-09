@@ -200,6 +200,7 @@ class _Collector(HTMLParser):
         self.title = ""
         self.meta = {}
         self.hreflang = []
+        self.feeds = []          # (href, title) of RSS and Atom feeds the page announces
         self.canonical = None
         self.scripts_src = []
         self.jsonld_raw = []
@@ -223,6 +224,9 @@ class _Collector(HTMLParser):
             rel = a.get("rel", "").lower()
             if "alternate" in rel and a.get("hreflang"):
                 self.hreflang.append((a["hreflang"], a.get("href", "")))
+            elif "alternate" in rel and a.get("href") and re.search(
+                    r"(rss|atom)\+xml", a.get("type", ""), re.I):
+                self.feeds.append((a["href"], a.get("title", "")))
             elif rel == "canonical" and a.get("href"):
                 self.canonical = a["href"]
         elif tag == "script":
@@ -351,6 +355,37 @@ def organizations(nodes):
     return out
 
 
+def _number(value):
+    try:
+        return float(str(value).replace(",", "").strip())
+    except (TypeError, ValueError):
+        return None
+
+
+def ratings(nodes, page_url):
+    """Every public review score stated in structured data on one page, as
+    {"url", "item", "rating", "count"}. A count is the only part tracked
+    over time: review volume growing is the proxy for sales growing."""
+    out = []
+    for n in nodes:
+        agg = n.get("aggregateRating")
+        if isinstance(agg, list):
+            agg = agg[0] if agg else None
+        if not isinstance(agg, dict):
+            continue
+        count = _number(agg.get("reviewCount") or agg.get("ratingCount"))
+        if count is None:
+            continue
+        name = n.get("name") if isinstance(n.get("name"), str) else ""
+        out.append({"url": page_url, "item": (name or ",".join(_types(n)))[:120],
+                    "rating": _number(agg.get("ratingValue")), "count": int(count)})
+    return out
+
+
+def ratings_from_html(markup, page_url):
+    return ratings(_jsonld_nodes(parse_html(markup).jsonld_raw), page_url)
+
+
 # == signals from a page ===============================================================
 
 def _host(url):
@@ -361,6 +396,39 @@ def _host(url):
 def _same_site(url, home_host):
     h = _host(url)
     return h == home_host or h.endswith("." + home_host)
+
+
+CAREERS_LINK = re.compile(r"career|jobs?\b|/jobs|karriere|stellen|carreiras|vagas|trabalhe|"
+                          r"empleo|trabaja|join-?us|join-our-team|work-with-us|recrut|採用", re.I)
+SECOND_LEVEL = {"co", "com", "org", "net", "ac", "gov", "edu", "ne", "or"}
+
+
+def site_root(host):
+    """The registrable part of a host, near enough: aspendental.com for
+    careers.aspendental.com, mydentist.co.uk for www.mydentist.co.uk."""
+    labels = (host or "").lower().split(".")
+    if len(labels) >= 3 and labels[-2] in SECOND_LEVEL and len(labels[-1]) == 2:
+        return ".".join(labels[-3:])
+    return ".".join(labels[-2:])
+
+
+def careers_links(links, home_url):
+    """Links to the company's own careers pages, including a careers host of
+    its own (careers.aspendental.com, which runs on Phenom), best first."""
+    root = site_root(_host(home_url))
+    out = []
+    for href, label in links:
+        url = urljoin(home_url, href).split("#", 1)[0]
+        h = _host(url)
+        if not url.startswith("http") or not (h == root or h.endswith("." + root)):
+            continue
+        if CAREERS_LINK.search(urlsplit(url).path or "") or CAREERS_LINK.search(h.split(".")[0]) \
+                or CAREERS_LINK.search(label or ""):
+            if url not in out:
+                out.append(url)
+    # A separate careers host first: it is the jobs site, not a page about it.
+    out.sort(key=lambda u: 0 if _host(u) not in (root, "www." + root) else 1)
+    return out[:4]
 
 
 def detect(pattern_list, haystack):
@@ -377,9 +445,12 @@ def ats_boards(haystack):
     for vendor, pattern in ATS_VENDORS:
         for m in re.finditer(pattern, haystack, re.I):
             slug = m.group(1) if m.groups() else None
-            entry = {"vendor": vendor, "board": slug}
-            if entry not in boards:
-                boards.append(entry)
+            if any(b["vendor"] == vendor and b["board"] == slug for b in boards):
+                continue
+            # The matched address too: a Workday board is reached through its
+            # site path (tenant.wd5.myworkdayjobs.com/<site>), not the tenant.
+            boards.append({"vendor": vendor, "board": slug,
+                           "url": haystack[m.start():m.start() + 200].split()[0]})
     return boards[:6]
 
 
@@ -1030,6 +1101,11 @@ def signals_from(docs, home_url):
         "location_links": {"count": len(location_links), "sample": location_links[:8]},
         "has_cart": any(re.search(r"/cart(/|$|\?)", urlsplit(h).path or "") for h in internal),
         "product_schema": any(t in jsonld_types for t in ("Product", "ProductGroup", "Offer")),
+        "careers_links": careers_links([l for _, _, d in docs for l in d.links], home_url),
+        "feeds": list(dict.fromkeys(urljoin(p["final_url"], h) for _, p, d in docs
+                                    for h, _ in d.feeds))[:6],
+        "ratings": [r for _, p, d in docs for r in ratings(_jsonld_nodes(d.jsonld_raw),
+                                                             p["final_url"])][:12],
     }
 
 
