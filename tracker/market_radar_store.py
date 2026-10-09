@@ -451,6 +451,22 @@ def update_client_settings(client_id, owner_email, *, settings=None, radius_km=F
                         (radius_km, client_id))
 
 
+def found_in_runs(client_id, owner_email, *, limit=10, conn=None):
+    """Each competitor as the most recent finished run described it, by
+    domain: for rows saved before mr_competitors.details existed."""
+    with _tx(conn) as cur:
+        cur.execute("""SELECT summary FROM mr_runs WHERE client_id=%s AND owner_email=%s
+                       AND status='complete' AND summary IS NOT NULL ORDER BY id DESC LIMIT %s""",
+                    (client_id, (owner_email or "").strip().lower(), limit))
+        rows = cur.fetchall()
+    out = {}
+    for (summary,) in rows:
+        for c in ((summary or {}).get("result") or {}).get("competitors") or []:
+            if c.get("domain") and c["domain"] not in out:
+                out[c["domain"]] = c
+    return out
+
+
 def latest_run(client_id, owner_email, *, conn=None):
     with _tx(conn) as cur:
         cur.execute("SELECT id FROM mr_runs WHERE client_id=%s AND owner_email=%s "

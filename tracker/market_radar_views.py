@@ -268,9 +268,15 @@ def profile_view(client):
 
 def competitor_rows(client_id, owner_email, *, conn=None):
     rows = store.competitors(client_id, owner_email, include_removed=True, conn=conn)
+    older = None
     out = []
     for r in rows:
         d = r.get("details") or {}
+        if not d and r.get("found_via") != ["added by you"]:
+            # Saved before details were stored: take them from the run that found it.
+            if older is None:
+                older = store.found_in_runs(client_id, owner_email, conn=conn)
+            d = older.get(r["domain"]) or {}
         out.append({
             "entity_id": r["entity_id"], "domain": r["domain"], "name": r["name"] or r["domain"],
             "kind": r["kind"], "status": r["status"], "score": d.get("score"),

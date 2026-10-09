@@ -361,3 +361,15 @@ def test_script_stage_steps_cover_every_stage_the_run_reports():
     steps = run_js("return Object.keys(MR.STAGE_STEP);")
     assert stages <= set(steps), stages - set(steps)
     assert rv  # imported for the source path
+
+
+def test_rows_saved_before_details_existed_borrow_them_from_their_run(client_with_reading):
+    from tracker import market_radar_store as store
+    w = client_with_reading
+    rival = store.upsert_entity("rival.example", name="Rival")
+    store.propose_competitor(w["client"], OWNER, rival, "local", confidence=0.8, found_via=["map"])
+    store.update_run(w["run"], status="complete", summary={"result": {"competitors": [
+        {"domain": "rival.example", "reason": "Next door.", "distance_km": 0.3, "score": 80,
+         "checked_on": "its own homepage"}]}})
+    [row] = views.competitor_rows(w["client"], OWNER)
+    assert row["reason"] == "Next door." and row["score"] == 80 and row["checked_on"] == "its own homepage"
