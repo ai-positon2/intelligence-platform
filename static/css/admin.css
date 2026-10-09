@@ -112,8 +112,11 @@ h1,h2,h3,.brand-name,.brand b,.ph-left h1,.stat-value,.stat b,.kpi b,.card-title
 .dd-item.danger:hover{background:rgba(239,68,68,.08);color:#f87171}
 
 /* ===== page header ===== */
-.main{flex:1;padding:44px 40px 64px;max-width:1260px;margin:0 auto;width:100%}
-.wrap{max-width:1260px;margin:0 auto;padding:44px 40px 80px;width:100%}
+/* border-box so width:100% includes the side padding; pages without a global
+   reset otherwise measured 80px wider than the screen at every width under 1348px. */
+.main{flex:1;padding:44px 40px 64px;max-width:1260px;margin:0 auto;width:100%;box-sizing:border-box}
+.wrap{max-width:1260px;margin:0 auto;padding:44px 40px 80px;width:100%;box-sizing:border-box}
+@media(max-width:640px){ .main,.wrap{padding-top:28px;padding-left:16px;padding-right:16px} }
 .ph{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:34px;flex-wrap:wrap;gap:14px}
 .eyebrow{font-size:11.5px;font-weight:700;letter-spacing: var(--ls-caps);text-transform:uppercase;color:#818cf8;margin-bottom:8px;
   display:inline-flex;align-items:center;gap:9px}

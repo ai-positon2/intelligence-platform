@@ -194,11 +194,7 @@
 [data-theme="light"] .mr-toast{background:#17213a}
 .mr-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
 
-/* admin.css gives .main width:100% plus 40px side padding without
-   border-box, so it overflows a phone screen; this page keeps to the screen. */
-.main.mr{box-sizing:border-box;max-width:1260px}
 @media(max-width:640px){
-  .main.mr{padding:28px 16px 48px}
   .mr-card-h,.mr-card-b,.mr-row,.mr-addrow,.mr-progress{padding-left:14px;padding-right:14px}
   .mr-head h2{font-size:21px}
 }
