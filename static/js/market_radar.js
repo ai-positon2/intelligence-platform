@@ -447,7 +447,11 @@
     return head + '<p class="mr-hint">' + esc(part.note || '') + (part.reused ? ' (from a scan in the last day)' : '') + '</p>' +
       (f.length ? '<ul class="mr-moves">' + f.map(function (x) { return renderFinding(x, local); }).join('') + '</ul>'
         : '<div class="mr-empty"><b>Nothing new found</b>' + (local ? 'No business of this kind nearby shows a sign of having just opened.' : 'No new brand was confirmed this time.') + '</div>') +
-      renderHeadlines(part.news, local ? 'Local opening news' : 'Launch news read');
+      renderHeadlines(part.news, local ? 'Local opening news' : 'Launch news read') +
+      (part.left_out && part.left_out.length ? '<details class="mr-more"><summary>Considered and left out (' + esc(part.left_out.length) +
+        ')</summary><ul class="mr-list">' + part.left_out.map(function (l) {
+          return '<li><b>' + esc(l.name) + '</b>' + (l.domain && l.domain !== l.name ? ' <span class="mr-hint">' + esc(l.domain) + '</span>' : '') + ': ' + esc(l.why) + '</li>';
+        }).join('') + '</ul></details>' : '');
   }
 
   function renderRadar(radar) {

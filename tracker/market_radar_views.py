@@ -449,6 +449,7 @@ def moves_view(client_id, owner_email, *, conn=None):
                 x = r.get(part)
                 if isinstance(x, dict):
                     radar[part] = {k: x.get(k) for k in ("status", "note", "reused")}
+                    radar[part]["left_out"] = ((x.get("coverage") or {}).get("left_out") or [])[:40]
                     radar[part]["findings"] = [
                         {k: f.get(k) for k in ("name", "category", "distance_km", "address",
                                                "website", "status", "certain", "evidence", "date",

@@ -280,6 +280,8 @@ def test_entrants_are_new_brands_that_really_compete():
     f = out["findings"][0]
     assert any("registered on 2026-03-01" in e for e in f["evidence"])
     assert out["coverage"]["candidates"] == 2          # the known competitor is not a candidate
+    assert {l["name"]: l["why"] for l in out["coverage"]["left_out"]} == {
+        "Old Shoe Co": "established: its domain was registered on 1999-01-01"}
     assert "refused" in out["note"]                     # the domain list failure is said
 
 
@@ -507,3 +509,28 @@ def test_an_old_domain_outweighs_a_headline_that_calls_the_brand_new():
                                                          "same_customers": "yes", "where": "same_country",
                                                          "locations": "online_only"} for i in items}, []))
     assert out["findings"] == []
+
+
+@pytest.mark.parametrize("v, why", [
+    (None, "the check gave no verdict"),
+    ({"site_type": "directory_or_marketplace"}, "not a brand's own shop (directory or marketplace)"),
+    ({"site_type": "business", "same_offering": "no", "sells": "hoodies"}, "sells something else: hoodies"),
+    ({"site_type": "business", "same_offering": "partly", "sells": "dresses"}, "only partly the same products: dresses"),
+    ({"site_type": "business", "same_offering": "yes", "same_customers": "yes", "where": "other_country",
+      "location": "India"}, "sells in another country (India)"),
+    ({"site_type": "business", "same_offering": "yes", "same_customers": "yes", "locations": "one"},
+     "a single local store")])
+def test_each_left_out_candidate_says_why(v, why):
+    assert R._why_not(v) == why
+
+
+def test_generic_business_words_are_not_the_kind_of_business():
+    assert R.category_stems(["dental_clinic"], ["dent"], ["Dental practice"]) == ["dent", "dental"]
+
+
+def test_a_non_english_market_says_launch_news_is_read_in_english():
+    out = R.scan_entrants({"name": "S", "industry": {"keywords": ["socks"]}, "markets": ["DE"]},
+                          own_domain="s.de", competitors=[], get=net({}), fetch_home=lambda i: {},
+                          now=NOW, token="", llm=Llm({"brands": []}),
+                          breaker=news.Breaker(gap=0, sleep=lambda s: None))
+    assert "asked in English" in out["note"]

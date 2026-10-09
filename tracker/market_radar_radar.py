@@ -213,8 +213,11 @@ def category_stems(categories, terms, words):
     for x in list(terms) + [p for c in categories for p in c.split("_")] + \
             [p for w in words for p in str(w).split()]:
         x = fold(x).replace(" ", "")
-        if len(x) >= 4 and x not in stems and x not in {"clinic", "service", "store", "shop",
-                                                        "office", "center", "centre", "general"}:
+        # Words any business uses: "growth[period] Opens London Practice"
+        # (an advisory firm) passed as dental news on "practice" (2026-10-10).
+        if len(x) >= 4 and x not in stems and x not in {
+                "clinic", "service", "services", "store", "shop", "office", "center", "centre",
+                "general", "practice", "surgery", "group", "care", "health", "studio", "company"}:
             stems.append(x)
     return stems
 
@@ -578,6 +581,24 @@ def resolve_brands(brands, *, country, token, run_id=None, search=None):
     return found, res.get("error")
 
 
+def _why_not(v):
+    if not v:
+        return "the check gave no verdict"
+    if v.get("site_type") != "business":
+        return "not a brand's own shop (%s)" % (v.get("site_type") or "unknown").replace("_", " ")
+    if v.get("same_offering") not in ("yes", "partly"):
+        return "sells something else: %s" % (v.get("sells") or "unknown")
+    if v.get("same_offering") == "partly":
+        return "only partly the same products: %s" % (v.get("sells") or "unknown")
+    if v.get("same_customers") not in ("yes", "partly"):
+        return "different customers"
+    if v.get("where") == "other_country":
+        return "sells in another country (%s)" % (v.get("location") or "unknown")
+    if v.get("locations") == "one":
+        return "a single local store"
+    return "not a match"
+
+
 def entrant(v, *, from_news=False):
     """Stricter than a competitor for a bare new domain: it has to sell the
     same thing (not "partly") to the same customers in the client's
@@ -647,10 +668,19 @@ def scan_entrants(profile, *, own_domain, competitors, get, fetch_home, now=None
         if readable else ({}, [])
     if errors:
         notes.append("%d check batches failed" % len(errors))
-    findings = []
+    findings, left_out = [], []
+    for b in brands:
+        if b["name"] not in sites:
+            left_out.append({"name": b["name"], "why": "its website was not found"})
+    for i in items:
+        if i not in readable:
+            left_out.append({"name": i.get("name") or i["domain"], "domain": i["domain"],
+                             "why": "its homepage could not be read"})
     for i in readable:
         v = verdicts.get(i["domain"])
+        who = {"name": (v or {}).get("name") or i.get("name") or i["domain"], "domain": i["domain"]}
         if not entrant(v, from_news=bool(i.get("headline"))):
+            left_out.append(dict(who, why=_why_not(v)))
             continue
         reg = i.get("registered") or registered_on(i["domain"], get=get)
         age = months_old(reg, now)
@@ -660,7 +690,10 @@ def scan_entrants(profile, *, own_domain, competitors, get, fetch_home, now=None
         # on a long-established site (2026-10-10).
         established = age is not None and age > 36
         if not (young or (i["news_says_new"] and not established)):
-            continue        # an established brand: a competitor, not a new entrant
+            # an established brand: a competitor, not a new entrant
+            left_out.append(dict(who, why="established: its domain was registered on %s" % reg
+                                 if reg else "nothing says it is new"))
+            continue
         ev = []
         if i.get("headline"):
             h = i["headline"]
@@ -674,6 +707,11 @@ def scan_entrants(profile, *, own_domain, competitors, get, fetch_home, now=None
                          "date": (i.get("headline") or {}).get("date") or reg,
                          "location": v.get("location")})
     cov["new_entrants"] = len(findings)
+    cov["left_out"] = left_out[:40]
+    english = news.EDITIONS.get(markets[0].upper(), news.EDITIONS["US"])[0].startswith("en")
+    if not english:
+        notes.append("launch news is asked in English, so a %s-language market's own launches "
+                     "may be missed" % markets[0])
     note = ("%d launch headlines for %s; %d brands named, %d of their sites found; %d new "
             "shop domains matched; %d sites read and judged; %d new entrants confirmed" % (
                 len(headlines), ", ".join(words[:3]), len(brands), len(sites), len(matched),

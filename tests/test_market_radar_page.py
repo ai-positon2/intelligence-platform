@@ -521,7 +521,8 @@ def test_script_shows_the_radar_and_escapes_it():
     radar = {"local": {"status": "ok", "note": EVIL, "findings": [f, weak],
                        "news": [{"title": EVIL, "publisher": EVIL, "date": "2026-09-25",
                                  "link": "javascript:alert(1)"}]},
-             "entrants": {"status": "skipped", "note": "the profile names no products"}}
+             "entrants": {"status": "ok", "note": "n", "findings": [], "news": [],
+                          "left_out": [{"name": EVIL, "domain": "x.example", "why": EVIL}]}}
     out = run_js("return [MR.renderRadar(%s), MR.renderRadar({skipped: 'b2b'}), MR.renderRadar(null),"
                  "MR.renderRadar({local: {status: 'ok', note: 'n', findings: [], news: []}})];"
                  % json.dumps(radar))
@@ -530,5 +531,5 @@ def test_script_shows_the_radar_and_escapes_it():
     assert not [h for h in re.findall(r'href="([^"]*)"', out[0]) if "javascript" in h]
     assert "Coming soon" in out[0] and "Possibly new" in out[0] and "On your competitor list" in out[0]
     assert "1.2 km away" in out[0] and "Local opening news (1)" in out[0]
-    assert "the profile names no products" in out[0]
+    assert "Considered and left out (1)" in out[0]
     assert "b2b" in out[1] and out[2] == "" and "Nothing new found" in out[3]
