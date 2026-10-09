@@ -526,7 +526,7 @@ def test_the_background_run_profiles_discovers_saves_and_closes(world):
     def built(url, run_id=None, client=None):
         return {"status": "ok", "profile": dict(PROFILE)}
 
-    def found(profile, run_id=None, client=None, progress=None):
+    def found(profile, run_id=None, client=None, progress=None, radius_km=None):
         progress("rivals_plan")
         return {"status": "ok", "competitors": [{"domain": "rival.example", "name": "Rival",
                                                  "kind": "direct", "score": 70, "found": []}],

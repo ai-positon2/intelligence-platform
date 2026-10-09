@@ -319,6 +319,7 @@ def from_places(pool, profile, plan, *, places=None):
     if not point or point.get("lat") is None:
         return {"status": "skipped", "note": "the client's location is not known"}
     radius = plan.get("radius_km") or DEFAULT_RADIUS_KM
+    by_user = bool(plan.get("radius_set_by_user"))
     own = pool.own
     meta = {"status": "ok", "radius_km": radius, "located_by": point.get("source"),
             "location_precision": point.get("precision") or "unknown"}
@@ -340,7 +341,7 @@ def from_places(pool, profile, plan, *, places=None):
         meta["categories"], meta["terms"] = sorted(categories), terms
         found = places.query(point["lat"], point["lon"], radius, categories=categories,
                              terms=terms)
-        if len(found) < MIN_PLACES and radius < 25:
+        if len(found) < MIN_PLACES and radius < 25 and not by_user:
             radius = min(25, radius * 3)
             meta["radius_km"] = radius
             meta["widened"] = "fewer than %d places nearby" % MIN_PLACES
@@ -771,7 +772,8 @@ def _via_label(v):
 
 
 def discover(profile, *, run_id=None, client=None, token=None, progress=None, search=None,
-             places=None, reader=read_home, fetch=None, archive_reader=read_archived):
+             places=None, reader=read_home, fetch=None, archive_reader=read_archived,
+             radius_km=None):
     """Returns {"status", "competitors", "unread", "rejected", "coverage", "plan", "gaps"}.
     Never raises for a failed source: each source reports its own status in
     coverage, and a failed source is never reported as "no competitors"."""
@@ -789,6 +791,9 @@ def discover(profile, *, run_id=None, client=None, token=None, progress=None, se
     except llm.ModelError as e:
         return {"status": "failed", "error": {"stage": "plan", "kind": e.kind, "detail": e.detail},
                 "competitors": [], "coverage": coverage}
+    if radius_km:
+        plan["radius_km"] = float(radius_km)       # the user's own radius wins
+        plan["radius_set_by_user"] = True
     coverage["site"] = from_site(pool, profile)
     coverage["model"] = from_plan(pool, plan)
 
@@ -928,7 +933,8 @@ def discover(profile, *, run_id=None, client=None, token=None, progress=None, se
 
 def _plan_view(plan):
     return {k: plan.get(k) for k in ("queries", "search_country", "search_language", "known",
-                                     "place_categories", "place_terms", "radius_km", "notes")}
+                                     "place_categories", "place_terms", "radius_km",
+                                     "radius_set_by_user", "notes")}
 
 
 def save(result, *, client_id, owner_email, conn=None):
@@ -939,8 +945,11 @@ def save(result, *, client_id, owner_email, conn=None):
     saved = []
     for c in result.get("competitors") or []:
         entity = store.upsert_entity(c["domain"], name=c.get("name") or None, conn=conn)
+        details = {k: c.get(k) for k in ("reason", "sells", "location", "distance_km",
+                                         "branches_nearby", "checked_on", "found_by", "score")}
+        details["run_id"] = result.get("run_id")
         store.propose_competitor(client_id, owner_email, entity, c["kind"],
                                  confidence=round(c["score"] / 100.0, 2),
-                                 found_via=c.get("found"), conn=conn)
+                                 found_via=c.get("found"), details=details, conn=conn)
         saved.append(entity)
     return saved

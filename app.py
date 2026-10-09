@@ -8955,6 +8955,180 @@ def admin_external_usage_market_radar_run_status():
     return jsonify(out)
 
 
+# == Market Radar: profile and competitor edit page (admin only for now) ==========
+
+def _mr_email():
+    return (_get_user() or {}).get("email", "")
+
+
+def _mr_guard_post():
+    if not _evi_same_origin():
+        return jsonify(error="This request came from another site and was refused."), 403
+    return None
+
+
+@app.route("/p2/admin/market-radar")
+@admin_required
+def admin_market_radar():
+    return render_template("market_radar.html", user=_get_user())
+
+
+@app.route("/p2/admin/market-radar/api/clients")
+@admin_required
+def admin_market_radar_clients():
+    from tracker import market_radar_store as mr_store, market_radar_views as views
+    try:
+        return jsonify(clients=views.client_list(_mr_email()))
+    except mr_store.StoreUnavailable as e:
+        return jsonify(error="The database is unavailable (%s)." % e), 503
+
+
+@app.route("/p2/admin/market-radar/api/clients/<int:client_id>")
+@admin_required
+def admin_market_radar_client(client_id):
+    from tracker import market_radar_store as mr_store, market_radar_views as views
+    try:
+        view = views.client_view(client_id, _mr_email())
+    except mr_store.StoreUnavailable as e:
+        return jsonify(error="The database is unavailable (%s)." % e), 503
+    if view is None:
+        return jsonify(error="No such company of yours."), 404
+    return jsonify(view)
+
+
+@app.route("/p2/admin/market-radar/api/clients/<int:client_id>/profile", methods=["POST"])
+@admin_required
+def admin_market_radar_profile_edit(client_id):
+    """Save profile corrections: {"changes": {field: value}, "reset": [field],
+    "radius_km": number or null}. Free (an address change is geocoded on
+    OpenStreetMap)."""
+    refused = _mr_guard_post()
+    if refused:
+        return refused
+    from tracker import market_radar_views as views
+    body = request.get_json(silent=True) or {}
+    try:
+        notes = views.save_edits(client_id, _mr_email(), changes=body.get("changes") or {},
+                                 reset=body.get("reset") or [],
+                                 radius_km=body["radius_km"] if "radius_km" in body else False)
+    except views.EditError as e:
+        return jsonify(error="Some fields were not saved.", fields=e.errors), 400
+    except (KeyError, PermissionError):
+        return jsonify(error="No such company of yours."), 404
+    return jsonify(notes=notes, view=views.client_view(client_id, _mr_email()))
+
+
+@app.route("/p2/admin/market-radar/api/clients/<int:client_id>/competitors/<int:entity_id>",
+           methods=["POST"])
+@admin_required
+def admin_market_radar_competitor_edit(client_id, entity_id):
+    """Confirm, remove, restore or relabel one competitor: {"status", "kind"}."""
+    refused = _mr_guard_post()
+    if refused:
+        return refused
+    from tracker import market_radar_store as mr_store, market_radar_views as views
+    body = request.get_json(silent=True) or {}
+    status, kind = body.get("status"), body.get("kind")
+    try:
+        if status is None:
+            current = {r["entity_id"]: r for r in mr_store.competitors(client_id, _mr_email(),
+                                                                        include_removed=True)}
+            if entity_id not in current:
+                raise KeyError(entity_id)
+            status = current[entity_id]["status"]
+        mr_store.set_competitor_status(client_id, _mr_email(), entity_id, status, kind=kind)
+    except ValueError as e:
+        return jsonify(error=str(e)), 400
+    except (KeyError, PermissionError):
+        return jsonify(error="That company is not on this list."), 404
+    return jsonify(competitors=views.competitor_rows(client_id, _mr_email()))
+
+
+@app.route("/p2/admin/market-radar/api/clients/<int:client_id>/competitors", methods=["POST"])
+@admin_required
+def admin_market_radar_competitor_add(client_id):
+    """Add a competitor by its website: {"url", "kind"}. Free; it is not
+    checked, and is marked as added by the user."""
+    refused = _mr_guard_post()
+    if refused:
+        return refused
+    from tracker import market_radar_store as mr_store, market_radar_views as views
+    body = request.get_json(silent=True) or {}
+    email = _mr_email()
+    client = mr_store.get_client(client_id, email)
+    if client is None:
+        return jsonify(error="No such company of yours."), 404
+    try:
+        domain = mr_store.normalize_domain(body.get("url") or "")
+    except ValueError:
+        return jsonify(error="Enter a website address, such as rival.com."), 400
+    if domain == client["domain"]:
+        return jsonify(error="That is this company's own website."), 400
+    try:
+        entity = mr_store.upsert_entity(domain)
+        mr_store.add_competitor(client_id, email, entity, body.get("kind") or "direct")
+    except ValueError as e:
+        return jsonify(error=str(e)), 400
+    return jsonify(competitors=views.competitor_rows(client_id, email))
+
+
+@app.route("/p2/admin/market-radar/api/runs", methods=["POST"])
+@admin_required
+def admin_market_radar_run_start():
+    """Find competitors for a new company ({"url"}) or again for one of yours
+    ({"client_id", "refresh_profile"?}). Spends money (about $0.07 to $0.13,
+    capped at $1.00), so {"confirm_spend": true} is required. One run at a
+    time per company."""
+    refused = _mr_guard_post()
+    if refused:
+        return refused
+    body = request.get_json(silent=True) or {}
+    if body.get("confirm_spend") is not True:
+        return jsonify(error="This spends money; confirm to run it."), 400
+    from tracker import market_radar_run, market_radar_store as mr_store
+    email = _mr_email()
+    url = body.get("url") or ""
+    reuse = body.get("refresh_profile") is not True
+    try:
+        if body.get("client_id") is not None:
+            client = mr_store.get_client(int(body["client_id"]), email)
+            if client is None:
+                return jsonify(error="No such company of yours."), 404
+            url = ((client["profile"] or {}).get("facts") or {}).get("website") or \
+                "https://%s/" % client["domain"]
+        domain = mr_store.normalize_domain(url)
+        mine = [c for c in mr_store.list_clients(email) if c["domain"] == domain]
+        last = (mine[0].get("last_run") or {}) if mine else {}
+        if last.get("status") == "running":
+            status = market_radar_run.status(last["id"], email) or {}
+            if not status.get("stale"):
+                return jsonify(error="A run for this company is already going.",
+                               run_id=last["id"]), 409
+        run_id = market_radar_run.start(url, email, reuse_profile=reuse)
+    except ValueError as e:
+        return jsonify(error="Not a usable website address: %s" % e), 400
+    except mr_store.StoreUnavailable as e:
+        return jsonify(error="The database is unavailable (%s)." % e), 503
+    client_id = next((c["client_id"] for c in mr_store.list_clients(email)
+                      if c["domain"] == mr_store.normalize_domain(url)), None)
+    return jsonify(run_id=run_id, client_id=client_id), 202
+
+
+@app.route("/p2/admin/market-radar/api/runs/<int:run_id>")
+@admin_required
+def admin_market_radar_run(run_id):
+    from tracker import market_radar_run, market_radar_store as mr_store, market_radar_views as views
+    email = _mr_email()
+    status = market_radar_run.status(run_id, email)
+    if status is None:
+        return jsonify(error="No such run of yours."), 404
+    out = {k: status.get(k) for k in ("id", "status", "stage", "error", "idle_seconds", "stale")}
+    out["cost_usd"] = (status.get("ledger") or {}).get("total_usd")
+    if status["status"] != "running":
+        out["run"] = views.run_view(mr_store.get_run(run_id, email))
+    return jsonify(out)
+
+
 def _unipile_selftest() -> dict:
     """Prove the Unipile integration end to end -- see
     tracker/unipile_client.probe. Free: list_accounts() needs no connected

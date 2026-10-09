@@ -239,6 +239,10 @@ SCHEMA = [
         query TEXT PRIMARY KEY,
         result JSONB NOT NULL,
         fetched_at TIMESTAMPTZ NOT NULL DEFAULT now())""",
+    # Added with the edit page (2026-10-09): why a competitor was chosen and
+    # how it was checked, as shown to the user. Empty for older rows.
+    "ALTER TABLE mr_competitors ADD COLUMN IF NOT EXISTS details JSONB NOT NULL DEFAULT '{}'::jsonb",
+    "CREATE INDEX IF NOT EXISTS idx_mr_clients_owner ON mr_clients (owner_email, updated_at DESC)",
 ]
 
 
@@ -327,7 +331,7 @@ def _owned_client(cur, client_id, owner_email):
 
 
 def propose_competitor(client_id, owner_email, entity_id, kind, *, confidence=None,
-                       found_via=None, conn=None):
+                       found_via=None, details=None, conn=None):
     """Add or refresh an automatically found competitor. A competitor the
     user already confirmed or removed keeps that decision: a rerun must not
     resurrect a company someone deleted, or demote one they confirmed."""
@@ -336,15 +340,17 @@ def propose_competitor(client_id, owner_email, entity_id, kind, *, confidence=No
     with _tx(conn) as cur:
         _owned_client(cur, client_id, owner_email)
         cur.execute("""
-            INSERT INTO mr_competitors (client_id, entity_id, kind, confidence, found_via)
-            VALUES (%s,%s,%s,%s,%s::jsonb)
+            INSERT INTO mr_competitors (client_id, entity_id, kind, confidence, found_via, details)
+            VALUES (%s,%s,%s,%s,%s::jsonb,%s::jsonb)
             ON CONFLICT (client_id, entity_id) DO UPDATE SET
                 kind = CASE WHEN mr_competitors.status='proposed' THEN EXCLUDED.kind
                             ELSE mr_competitors.kind END,
                 confidence = EXCLUDED.confidence,
                 found_via = EXCLUDED.found_via,
+                details = mr_competitors.details || EXCLUDED.details,
                 updated_at = now()""",
-                    (client_id, entity_id, kind, confidence, json.dumps(found_via or [])))
+                    (client_id, entity_id, kind, confidence, json.dumps(found_via or []),
+                     json.dumps(details or {})))
 
 
 def set_competitor_status(client_id, owner_email, entity_id, status, *, kind=None, conn=None):
@@ -365,13 +371,92 @@ def competitors(client_id, owner_email, *, include_removed=False, conn=None):
     with _tx(conn) as cur:
         _owned_client(cur, client_id, owner_email)
         cur.execute("""
-            SELECT c.entity_id, e.domain, e.name, c.kind, c.confidence, c.status, c.found_via
+            SELECT c.entity_id, e.domain, e.name, c.kind, c.confidence, c.status, c.found_via,
+                   c.details, c.updated_at
             FROM mr_competitors c JOIN mr_entities e ON e.id = c.entity_id
             WHERE c.client_id=%s AND (%s OR c.status <> 'removed')
             ORDER BY c.status='confirmed' DESC, c.confidence DESC NULLS LAST, e.domain""",
                     (client_id, include_removed))
-        keys = ("entity_id", "domain", "name", "kind", "confidence", "status", "found_via")
+        keys = ("entity_id", "domain", "name", "kind", "confidence", "status", "found_via",
+                "details", "updated_at")
         return [dict(zip(keys, r)) for r in cur.fetchall()]
+
+
+def add_competitor(client_id, owner_email, entity_id, kind, *, conn=None):
+    """A competitor the user added by hand: confirmed from the start. If the
+    company was already on the list (even removed), it is confirmed and
+    relabelled rather than duplicated."""
+    if kind not in COMPETITOR_KINDS:
+        raise ValueError("unknown competitor kind %r" % kind)
+    with _tx(conn) as cur:
+        _owned_client(cur, client_id, owner_email)
+        cur.execute("""
+            INSERT INTO mr_competitors (client_id, entity_id, kind, status, found_via, details)
+            VALUES (%s,%s,%s,'confirmed','["added by you"]'::jsonb,'{"added_by_user": true}'::jsonb)
+            ON CONFLICT (client_id, entity_id) DO UPDATE SET
+                kind = EXCLUDED.kind, status = 'confirmed', updated_at = now()""",
+                    (client_id, entity_id, kind))
+
+
+def list_clients(owner_email, *, conn=None):
+    """The companies this person tracks, newest first, with competitor counts
+    and their latest run."""
+    with _tx(conn) as cur:
+        cur.execute("""
+            SELECT cl.id, cl.entity_id, e.domain, e.name, e.archetype, e.country, cl.updated_at,
+                   COUNT(c.entity_id) FILTER (WHERE c.status='confirmed'),
+                   COUNT(c.entity_id) FILTER (WHERE c.status='proposed'),
+                   COUNT(c.entity_id) FILTER (WHERE c.status='removed'),
+                   (SELECT json_build_object('id', r.id, 'status', r.status, 'stage', r.stage,
+                                             'created_at', r.created_at, 'finished_at', r.finished_at)
+                      FROM mr_runs r WHERE r.client_id = cl.id ORDER BY r.id DESC LIMIT 1)
+            FROM mr_clients cl JOIN mr_entities e ON e.id = cl.entity_id
+            LEFT JOIN mr_competitors c ON c.client_id = cl.id
+            WHERE cl.owner_email=%s
+            GROUP BY cl.id, e.id
+            ORDER BY cl.updated_at DESC""", ((owner_email or "").strip().lower(),))
+        keys = ("client_id", "entity_id", "domain", "name", "archetype", "country", "updated_at",
+                "confirmed", "proposed", "removed", "last_run")
+        return [dict(zip(keys, r)) for r in cur.fetchall()]
+
+
+def get_client(client_id, owner_email, *, conn=None):
+    """One client of this person's, with its company record and settings;
+    None when it is not theirs or does not exist."""
+    with _tx(conn) as cur:
+        cur.execute("""
+            SELECT cl.id, cl.entity_id, cl.radius_km, cl.settings, cl.updated_at,
+                   e.domain, e.name, e.archetype, e.country, e.profile, e.profile_updated_at
+            FROM mr_clients cl JOIN mr_entities e ON e.id = cl.entity_id
+            WHERE cl.id=%s AND cl.owner_email=%s""",
+                    (client_id, (owner_email or "").strip().lower()))
+        row = cur.fetchone()
+    if not row:
+        return None
+    keys = ("client_id", "entity_id", "radius_km", "settings", "updated_at", "domain", "name",
+            "archetype", "country", "profile", "profile_updated_at")
+    return dict(zip(keys, row))
+
+
+def update_client_settings(client_id, owner_email, *, settings=None, radius_km=False, conn=None):
+    """Replace the client's settings (the caller merges) and/or set its radius
+    (None clears it; the default False leaves it alone)."""
+    with _tx(conn) as cur:
+        _owned_client(cur, client_id, owner_email)
+        if settings is not None:
+            cur.execute("UPDATE mr_clients SET settings=%s::jsonb, updated_at=now() WHERE id=%s",
+                        (json.dumps(settings), client_id))
+        if radius_km is not False:
+            cur.execute("UPDATE mr_clients SET radius_km=%s, updated_at=now() WHERE id=%s",
+                        (radius_km, client_id))
+
+
+def latest_run(client_id, owner_email, *, conn=None):
+    with _tx(conn) as cur:
+        cur.execute("SELECT id FROM mr_runs WHERE client_id=%s AND owner_email=%s "
+                    "ORDER BY id DESC LIMIT 1", (client_id, (owner_email or "").strip().lower()))
+        row = cur.fetchone()
+    return get_run(row[0], owner_email, conn=conn) if row else None
 
 
 # -- runs ---------------------------------------------------------------------

@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Market Radar · Admin</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=4">
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-tokens.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/grid-tokens.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">
+  <script src="/static/js/theme.js"></script>
+  <link rel="stylesheet" href="/static/css/aurora-app.css?v=3">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/market_radar.css') }}?v=2">
+</head>
+<body>
+  <div class="topbar">
+    <div class="tl">
+      <a href="/p2/hub" class="brand">
+        <div class="brand-icon" style="background:#151b2e;box-shadow:none;border-radius:var(--radius-md);overflow:hidden;display:inline-flex;align-items:center;justify-content:center;padding:5px 8px"><img src="/static/logo-lockup.svg?v=1" alt="arena by Position2" style="display:block;width:auto;height:36px;object-fit:contain"></div>
+      </a>
+      <div class="bc">
+        <a href="/p2/hub">Hub</a><span class="bc-sep">›</span>
+        <a href="/p2/admin/internal-usage">Admin</a><span class="bc-sep">›</span>
+        <span class="bc-cur">Market Radar</span>
+      </div>
+    </div>
+    <div class="tr">
+      <div class="user-menu" id="userMenu">
+        <div class="user-pill" id="userPill" onclick="toggleMenu()">
+          <div class="avatar">
+            {% if user.picture %}<img src="{{ user.picture }}" alt="" />
+            {% else %}{{ (user.name or 'U')[:2]|upper }}{% endif %}
+          </div>
+          <span class="uname">{{ user.given_name or user.name or 'Admin' }}</span>
+          <span class="pill-chevron">▼</span>
+        </div>
+        <div class="user-dropdown" id="userDropdown">
+          <div class="dd-header">
+            <div class="dd-name">{{ user.name or 'User' }}</div>
+            <div class="dd-email">{{ user.email }}</div>
+          </div>
+          <div class="dd-items">{% include "_admin_menu.html" %}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="main mr" id="mr">
+    <div class="ph">
+      <div class="ph-left">
+        <div class="eyebrow">Admin · In development</div>
+        <h1>Market Radar</h1>
+        <p class="mr-lede">
+          From a company's website, the agent works out what the company does and who it competes with.
+          Check its reading here, correct anything it got wrong, and confirm or remove competitors.
+          Your corrections are kept when the website is read again.
+        </p>
+      </div>
+    </div>
+
+    <form class="card mr-add" id="mrAddForm" autocomplete="off">
+      <label class="mr-sr" for="mrAddUrl">Company website</label>
+      <input type="text" id="mrAddUrl" placeholder="Company website, such as acmedental.com" inputmode="url" />
+      <button type="submit" class="mr-btn primary" id="mrAddBtn">Find competitors</button>
+      <div class="mr-add-note">Reads the website, then searches for competitors. About $0.12 and 2 to 4 minutes; it runs in the background.</div>
+    </form>
+
+    <div class="mr-layout">
+      <aside class="mr-rail" id="mrRail" aria-label="Your companies">
+        <div class="mr-rail-h">Your companies</div>
+        <div id="mrClients"><div class="mr-empty">Loading…</div></div>
+      </aside>
+      <section class="mr-detail" id="mrDetail" aria-live="polite">
+        <div class="card"><div class="mr-empty">Loading…</div></div>
+      </section>
+    </div>
+  </div>
+
+  <div class="mr mr-modal-bg" id="mrModal" role="dialog" aria-modal="true" aria-labelledby="mrModalTitle">
+    <div class="mr-modal">
+      <h4 id="mrModalTitle"></h4>
+      <p id="mrModalText"></p>
+      <label id="mrModalOptWrap"><input type="checkbox" id="mrModalOpt" /> <span id="mrModalOptText"></span></label>
+      <div class="mr-modal-foot">
+        <button type="button" class="mr-btn ghost" id="mrModalNo">Cancel</button>
+        <button type="button" class="mr-btn primary" id="mrModalYes">Run</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function toggleMenu(){var d=document.getElementById('userDropdown'),p=document.getElementById('userPill');var o=d.classList.contains('open');d.classList.toggle('open',!o);p.classList.toggle('open',!o);}
+    document.addEventListener('click',function(e){var m=document.getElementById('userMenu');if(m&&!m.contains(e.target)){document.getElementById('userDropdown').classList.remove('open');document.getElementById('userPill').classList.remove('open');}});
+  </script>
+  <script src="{{ url_for('static', filename='js/market_radar.js') }}?v=2"></script>
+  <script src="{{ url_for('static', filename='js/page_track.js') }}?v=1" data-title="Market Radar" data-email="{{ user.email if user else '' }}"></script>
+</body>
+</html>

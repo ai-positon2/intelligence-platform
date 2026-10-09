@@ -74,14 +74,22 @@ def job(run_id, url, owner_email, client_id, entity_id, reuse_profile, *, client
                                           "pages": built.get("pages")})
                 return
             profile = built["profile"]
-        result = discover(profile, run_id=run_id, client=client, progress=stage)
+        # The user's corrections and radius, laid over the site's reading.
+        from . import market_radar_views as views
+        mine = store.get_client(client_id, owner_email) or {}
+        profile = views.effective_profile(profile, mine.get("settings"))
+        radius = mine.get("radius_km")
+        result = discover(profile, run_id=run_id, client=client, progress=stage,
+                          radius_km=float(radius) if radius is not None else None)
+        result["run_id"] = run_id
         saved = []
         if result.get("competitors"):
             stage("save")
             saved = rivals.save(result, client_id=client_id, owner_email=owner_email)
         summary = {
             "profile": {k: profile.get(k) for k in ("name", "archetype", "hq", "hq_point",
-                                                    "one_liner", "location_count")},
+                                                    "one_liner", "location_count",
+                                                    "edited_fields")},
             "profile_note": profile_note,
             "result": result,
             "saved_entities": saved,
