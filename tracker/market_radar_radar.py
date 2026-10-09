@@ -574,13 +574,16 @@ def resolve_brands(brands, *, country, token, run_id=None, search=None):
     return found, res.get("error")
 
 
-def entrant(v):
-    """Stricter than a competitor: a NEW brand is only worth a card when it
-    sells the same thing to the same customers in the client's markets.
-    With partial overlaps let through, yesterday's domains gave a general
-    store in India, an apparel shop and a hoodie printer as new entrants to
-    Allbirds' category (2026-10-10)."""
-    return bool(v) and v.get("site_type") == "business" and v.get("same_offering") == "yes" \
+def entrant(v, *, from_news=False):
+    """Stricter than a competitor for a bare new domain: it has to sell the
+    same thing (not "partly") to the same customers in the client's
+    markets. With partial overlaps let through, yesterday's domains gave a
+    general store in India, an apparel shop and a hoodie printer as new
+    entrants to Allbirds' category (2026-10-10). A brand that launch news
+    names is already a launch in the category, so an overlap is enough:
+    "New Tennis Footwear Brand Vie Artletique" for a sneaker brand."""
+    offering = ("yes", "partly") if from_news else ("yes",)
+    return bool(v) and v.get("site_type") == "business" and v.get("same_offering") in offering \
         and v.get("same_customers") in ("yes", "partly") and v.get("where") != "other_country" \
         and v.get("locations") != "one"
 
@@ -643,7 +646,7 @@ def scan_entrants(profile, *, own_domain, competitors, get, fetch_home, now=None
     findings = []
     for i in readable:
         v = verdicts.get(i["domain"])
-        if not entrant(v):
+        if not entrant(v, from_news=bool(i.get("headline"))):
             continue
         reg = i.get("registered") or registered_on(i["domain"], get=get)
         age = months_old(reg, now)
@@ -663,9 +666,10 @@ def scan_entrants(profile, *, own_domain, competitors, get, fetch_home, now=None
                          "date": (i.get("headline") or {}).get("date") or reg,
                          "location": v.get("location")})
     cov["new_entrants"] = len(findings)
-    note = "%d launch headlines for %s; %d brands named, %d new shop domains matched; %d new " \
-           "entrants confirmed" % (len(headlines), ", ".join(words[:3]), len(brands), len(matched),
-                                   len(findings))
+    note = ("%d launch headlines for %s; %d brands named, %d of their sites found; %d new "
+            "shop domains matched; %d sites read and judged; %d new entrants confirmed" % (
+                len(headlines), ", ".join(words[:3]), len(brands), len(sites), len(matched),
+                len(readable), len(findings)))
     if notes:
         note += "; " + "; ".join(notes)
     return {"status": "ok", "note": note, "findings": findings, "news": headlines,
@@ -744,13 +748,17 @@ def run_for_client(client_id, owner_email, *, run_id=None, store=None, io=None, 
             hq = profile.get("hq") or {}
             radius = float(c.get("radius_km") or settings["radius_km"])
             competitors = {r["domain"] for r in store.competitors(client_id, owner_email)}
+            # The industry's plain label ("Dentist", "Zahnarztpraxis"), not its
+            # keywords: Pembridge Dental's keywords name its neighbourhood
+            # ("dentist Notting Hill"), which made every Notting Hill
+            # opening headline look like dental news (2026-10-10).
+            label = (profile.get("industry") or {}).get("plain_label")
             out["local"] = stored("radar_local", lambda: scan_local(
                 point=point, categories=settings["categories"], terms=settings["terms"],
                 radius_km=radius, city=hq.get("city"), country=hq.get("country_code") or "US",
                 lang=profile.get("language") or "en", own_domain=c["domain"], places=places,
                 get=io["get"], fetch=io["fetch"], cache=cache, breaker=breaker, now=now,
-                industry_words=[w for w in ((profile.get("industry") or {}).get("keywords")
-                                            or [])][:2]))
+                industry_words=[label] if label else []))
             for f in out["local"].get("findings") or []:
                 f["is_competitor"] = f.get("domain") in competitors
     if archetype in ENTRANT_ARCHETYPES:

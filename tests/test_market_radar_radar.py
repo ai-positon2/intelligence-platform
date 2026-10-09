@@ -292,7 +292,8 @@ def test_a_profile_without_products_skips_the_entrant_scan():
 from test_market_radar_store import pg, OWNER  # noqa: E402,F401
 
 LOCAL_PROFILE = {"name": "Acme Dental", "archetype": "local_single", "hq_point": {"lat": 30.5, "lon": -97.82},
-                 "hq": {"city": "Cedar Park", "country_code": "US"}, "industry": {"keywords": ["dentist"]}}
+                 "hq": {"city": "Cedar Park", "country_code": "US"},
+                 "industry": {"keywords": ["dentist Brushy Creek"], "plain_label": "Dentist"}}
 
 
 def _client(pg, profile, domain="acme-dental.com"):
@@ -423,6 +424,12 @@ def test_a_neighbourhood_named_practice_does_not_claim_neighbourhood_headlines()
     assert not R._mentions("Pizzeria opens", "Pizza", "")
 
 
+def test_a_brand_named_in_launch_news_may_overlap_but_a_bare_domain_may_not():
+    v = {"site_type": "business", "same_offering": "partly", "same_customers": "yes",
+         "where": "same_country", "locations": "online_only"}
+    assert R.entrant(v, from_news=True) and not R.entrant(v)
+
+
 @pytest.mark.parametrize("change, ok_", [({}, True), ({"same_offering": "partly"}, False),
                                          ({"where": "other_country"}, False), ({"locations": "one"}, False),
                                          ({"same_customers": "no"}, False), ({"site_type": "other"}, False)])
@@ -453,3 +460,16 @@ def test_the_one_off_radar_tidy_forgets_scans_and_entrant_events_only(pg):
     assert pg.drop_radar_scans() == (1, 1)
     assert [x["type"] for x in pg.recent_events([e])] == ["nearby_opening"]
     assert pg.latest_snapshot(e, "catalog") and pg.latest_snapshot(e, "radar_local") is None
+
+
+def test_local_news_uses_the_industry_label_not_keywords_that_name_a_neighbourhood(pg):
+    e, c = _client(pg, LOCAL_PROFILE)
+    run = pg.create_run(c, OWNER, "baseline")
+    pg.update_run(run, status="complete", summary={"result": {"coverage": {"places": {
+        "categories": ["dental_clinic"], "terms": ["dent"], "radius_km": 5}}}})
+    pages = {"https://news.google.com/": gnews("Smile Dental opens in Cedar Park",
+                                               "Brushy Creek trail opens in Cedar Park")}
+    out = R.run_for_client(c, OWNER, store=pg, places=Places([], []), io={
+        "get": net(pages), "fetch": lambda u: {}, "fetch_home": lambda i: {}},
+        now=datetime.now(timezone.utc))
+    assert [h["title"] for h in out["local"]["news"]] == ["Smile Dental opens in Cedar Park"]
