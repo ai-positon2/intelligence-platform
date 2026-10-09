@@ -31,3 +31,4 @@ psycopg2-binary>=2.9.9
 # scraper output for other platforms is already a direct CDN URL and needs
 # no resolution step).
 yt-dlp>=2024.8.6
+duckdb>=1.5.0

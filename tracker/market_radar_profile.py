@@ -24,11 +24,10 @@ import logging
 import os
 import re
 import time
-from decimal import Decimal
 
 import requests
 
-from . import market_radar_costs as costs
+from . import market_radar_llm as llm
 from . import market_radar_site as site_reader
 
 logger = logging.getLogger(__name__)
@@ -184,107 +183,21 @@ def facts_for_model(site):
 
 # == the model call ==============================================================
 
-class ProfileError(RuntimeError):
-    def __init__(self, kind, detail):
-        self.kind, self.detail = kind, detail
-        super().__init__("%s: %s" % (kind, detail))
+ProfileError = llm.ModelError     # kinds: not_configured, refused, truncated, bad_json, api_error, budget
 
 
 def _client():
-    key = os.environ.get("ANTHROPIC_API_KEY", "")
-    if not key:
-        raise ProfileError("not_configured", "ANTHROPIC_API_KEY is not set")
-    from anthropic import Anthropic
-    return Anthropic(api_key=key, timeout=240, max_retries=2)
-
-
-def _request(client, system, user, use_fallbacks):
-    kwargs = dict(model=MODEL, max_tokens=MAX_OUTPUT_TOKENS, system=system,
-                  messages=[{"role": "user", "content": user}],
-                  output_config={"effort": "low",
-                                 "format": {"type": "json_schema", "schema": PROFILE_SCHEMA}})
-    if use_fallbacks:
-        # If the model declines, the API re-runs the request on a fallback
-        # model inside the same call, routed by the refusal's category.
-        return client.beta.messages.create(betas=["server-side-fallback-2026-07-01"],
-                                           fallbacks="default", **kwargs)
-    return client.messages.create(**kwargs)
+    return llm.default_client()
 
 
 def ask_model(facts, corpus, *, run_id=None, stage="profile", client=None):
-    """One structured-output call. Returns (parsed_profile, meta). Raises
-    ProfileError with a kind: not_configured, refused, truncated, bad_json,
-    api_error, budget."""
+    """One structured-output call (tracker/market_radar_llm). Returns
+    (parsed_profile, meta). Raises ProfileError."""
     user = ("FACTS (read by a program from the site's code and sitemap):\n"
             + json.dumps(facts, ensure_ascii=False, indent=1)
             + "\n\nTEXT OF THE PAGES READ:\n" + corpus)
-    client = client or _client()
-    meta = {"model_requested": MODEL, "prompt_chars": len(SYSTEM) + len(user)}
-
-    def call():
-        started = time.monotonic()
-        try:
-            resp = _request(client, SYSTEM, user, use_fallbacks=True)
-        except Exception as e:
-            # A fallback configuration this API version rejects must not cost
-            # the profile: ask again without it, and say so.
-            if "fallback" in str(e).lower() and getattr(e, "status_code", None) == 400:
-                meta["fallbacks"] = "rejected by the API; asked without them"
-                resp = _request(client, SYSTEM, user, use_fallbacks=False)
-            else:
-                raise
-        meta["elapsed_ms"] = int((time.monotonic() - started) * 1000)
-        return resp
-
-    if run_id is None:
-        return _parse(call(), meta)
-
-    import anthropic
-    from . import market_radar_ledger as ledger
-    unbilled = (anthropic.BadRequestError, anthropic.AuthenticationError,
-                anthropic.PermissionDeniedError, anthropic.NotFoundError)
-    try:
-        with ledger.track(run_id, stage, "anthropic", model=MODEL,
-                          prompt_tokens=costs.estimate_tokens(SYSTEM + user) + 400,
-                          max_output_tokens=MAX_OUTPUT_TOKENS) as call_ctx:
-            try:
-                resp = call()
-            except unbilled as e:
-                # The API refused the request itself: nothing was generated or billed.
-                call_ctx.record(error="%s: %s" % (type(e).__name__, str(e)[:300]), billed=False)
-                raise
-            usage = resp.usage.model_dump() if hasattr(resp.usage, "model_dump") else dict(resp.usage)
-            served = getattr(resp, "model", None) or MODEL
-            meta.update({"model_served": served, "usage": usage, "stop_reason": resp.stop_reason})
-            try:
-                usd, _ = costs.model_cost(served, usage)
-            except (ValueError, costs.UnknownPrice) as e:
-                # Counted at its reservation, with the reason written down.
-                call_ctx.record(usage=usage, error="could not price %s: %s" % (served, e))
-            else:
-                call_ctx.record(actual_usd=usd, usage=usage)
-                meta["cost_usd"] = costs.usd(usd)
-    except ledger.BudgetExceeded as e:
-        raise ProfileError("budget", str(e))
-    except ProfileError:
-        raise
-    except Exception as e:
-        raise ProfileError("api_error", "%s: %s" % (type(e).__name__, str(e)[:300]))
-    return _parse(resp, meta)
-
-
-def _parse(resp, meta):
-    meta.setdefault("stop_reason", resp.stop_reason)
-    meta.setdefault("model_served", getattr(resp, "model", MODEL))
-    if resp.stop_reason == "refusal":
-        raise ProfileError("refused", "the model declined (%s)" % getattr(resp, "stop_details", None))
-    if resp.stop_reason == "max_tokens":
-        raise ProfileError("truncated", "the reply hit the %d-token limit" % MAX_OUTPUT_TOKENS)
-    text = "".join(b.text for b in resp.content if getattr(b, "type", "") == "text")
-    try:
-        return json.loads(text), meta
-    except ValueError as e:
-        raise ProfileError("bad_json", "%s; reply began %r" % (e, text[:120]))
+    return llm.call_json(SYSTEM, user, PROFILE_SCHEMA, model=MODEL, max_tokens=MAX_OUTPUT_TOKENS,
+                         run_id=run_id, stage=stage, client=client or _client())
 
 
 # == checking the model against the facts ======================================

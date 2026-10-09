@@ -8909,6 +8909,52 @@ def admin_external_usage_market_radar_profile_check():
                    ledger=market_radar_ledger.summary(run_id))
 
 
+@app.route("/p2/admin/external-usage/market-radar-competitors-check", methods=["POST"])
+@admin_required
+def admin_external_usage_market_radar_competitors_check():
+    """Market Radar Phase 2: profile ONE company and find its competitors
+    (tracker/market_radar_run, tracker/market_radar_rivals). Spends money
+    (about $0.10 to $0.25, capped at the run's $1.00), so the body must carry
+    {"url": ..., "confirm_spend": true}; {"reuse_profile": true} skips the
+    profile when one is stored. It takes one to three minutes, so it runs in
+    the background: this returns the run id at once, and
+    market-radar-run-status reports progress and the result."""
+    if not _evi_same_origin():
+        return jsonify(error="This request came from another site and was refused."), 403
+    body = request.get_json(silent=True) or {}
+    if body.get("confirm_spend") is not True:
+        return jsonify(error='This check spends money. Send {"url": ..., "confirm_spend": true}.'), 400
+    from tracker import market_radar_run
+    from tracker import market_radar_store as mr_store
+    email = (_get_user() or {}).get("email", "")
+    try:
+        run_id = market_radar_run.start(body.get("url") or "", email,
+                                        reuse_profile=body.get("reuse_profile") is True)
+    except ValueError as e:
+        return jsonify(error="Not a usable company URL: %s" % e), 400
+    except mr_store.StoreUnavailable as e:
+        return jsonify(error="Not run: the database is unavailable (%s)." % e), 503
+    return jsonify(run_id=run_id, status="running"), 202
+
+
+@app.route("/p2/admin/external-usage/market-radar-run-status", methods=["POST"])
+@admin_required
+def admin_external_usage_market_radar_run_status():
+    """Progress and result of a Market Radar run started by this admin. Free."""
+    if not _evi_same_origin():
+        return jsonify(error="This request came from another site and was refused."), 403
+    body = request.get_json(silent=True) or {}
+    try:
+        run_id = int(body.get("run_id"))
+    except (TypeError, ValueError):
+        return jsonify(error='Send {"run_id": <number>}.'), 400
+    from tracker import market_radar_run
+    out = market_radar_run.status(run_id, (_get_user() or {}).get("email", ""))
+    if out is None:
+        return jsonify(error="No such run of yours."), 404
+    return jsonify(out)
+
+
 def _unipile_selftest() -> dict:
     """Prove the Unipile integration end to end -- see
     tracker/unipile_client.probe. Free: list_accounts() needs no connected
