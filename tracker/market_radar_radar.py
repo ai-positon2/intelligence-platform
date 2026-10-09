@@ -227,7 +227,9 @@ def local_news(entity_country, city, words, lang, *, get, breaker, stems=(), nam
     opening = OPENING_WORDS.get((lang or "en")[:2], OPENING_WORDS["en"])
     items, failures = [], []
     for w in words[:2]:
-        q = '"%s" %s %s when:%dd' % (city, '"%s"' % w if " " in w else w, opening, NEWS_DAYS)
+        # Unquoted: an exact phrase ("General dentistry") found nothing in
+        # Austin where "dental clinic" found "Ideal Dental opens" (2026-10-10).
+        q = '"%s" %s %s when:%dd' % (city, w, opening, NEWS_DAYS)
         if breaker.open:
             failures.append("Google News stopped answering")
             break
@@ -308,9 +310,11 @@ def scan_local(*, point, categories, terms, radius_km, city, country, lang, own_
     short_read = len(prev) < 0.7 * len(cur) and len(cur) >= 20
     fresh.sort(key=lambda p: p["distance_km"])
     checked = fresh[:MAX_CANDIDATES]
-    words = list(industry_words) or [c.replace("_", " ") for c in categories][:2]
+    # The map's words ask; the industry's own label ("Zahnarztpraxis") also
+    # asks in the local language, and both decide what a headline must say.
+    words = [c.replace("_", " ") for c in categories][:1] + list(industry_words)[:1]
     headlines, news_fail = local_news(country, city, words, lang, get=get, breaker=breaker,
-                                      stems=category_stems(categories, terms, words),
+                                      stems=category_stems(categories, terms, industry_words),
                                       names=[p["name"] for p in cur if p.get("name")]) \
         if city else ([], [])
     out["news"] = headlines

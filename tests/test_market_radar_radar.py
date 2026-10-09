@@ -473,3 +473,19 @@ def test_local_news_uses_the_industry_label_not_keywords_that_name_a_neighbourho
         "get": net(pages), "fetch": lambda u: {}, "fetch_home": lambda i: {}},
         now=datetime.now(timezone.utc))
     assert [h["title"] for h in out["local"]["news"]] == ["Smile Dental opens in Cedar Park"]
+
+
+def test_local_news_asks_with_the_map_category_unquoted_and_the_label():
+    asked = []
+
+    def get(url, **kw):
+        asked.append(url)
+        return gnews()
+    R.scan_local(point={"lat": 30.5, "lon": -97.82}, categories=["dental_clinic", "dentist"], terms=["dent"],
+                 radius_km=5, city="Austin", country="US", lang="en", own_domain="a.com",
+                 places=Places([], []), get=get, cache=Cache(), fetch=lambda u: {},
+                 breaker=news.Breaker(gap=0, sleep=lambda s: None), now=NOW,
+                 industry_words=["General dentistry"])
+    from urllib.parse import unquote_plus
+    qs = [unquote_plus(u.split("q=")[1].split("&")[0]) for u in asked if "news.google" in u]
+    assert qs[0].startswith('"Austin" dental clinic (') and qs[1].startswith('"Austin" General dentistry (')
