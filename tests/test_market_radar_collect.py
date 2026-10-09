@@ -167,7 +167,11 @@ def test_fresh_reads_are_reused_without_fetching():
     calls = []
     io["read_site"] = lambda url: calls.append(url) or shop_site()
     again = run(store, io, NOW + timedelta(hours=2))
-    assert calls == [] and {r["status"] for r in again["rows"]} == {"reused"}
+    assert calls == [] and all(r["reused"] for r in again["rows"])
+    first = {r["detector"]: r["status"] for r in run(MemStore(), world([product(1, "A", 1)], [], [])[0], NOW)["rows"]}
+    assert {r["detector"]: r["status"] for r in again["rows"]} == first   # same findings, reused
+    line = next(l for l in mc.coverage([again]) if l["detector"] == "newsroom")
+    assert line["text"] == "Own news and blog read for 0 of 1 competitors; 1 has no news page or feed."
 
 
 def test_an_unreadable_site_fails_the_site_detectors_but_news_still_runs():
@@ -215,7 +219,7 @@ def test_coverage_says_how_many_were_read_and_why_not_the_rest():
                {"rows": [{"detector": "jobs", "status": "none"}]},
                {"rows": [{"detector": "jobs", "status": "failed"}]}]
     line = next(l for l in mc.coverage(results) if l["detector"] == "jobs")
-    assert line["text"] == ("Hiring read for 1 of 3 competitors; 1 have no public jobs board, "
+    assert line["text"] == ("Hiring read for 1 of 3 competitors; 1 has no public jobs board, "
                             "1 could not be read.")
 
 
@@ -256,7 +260,7 @@ def test_a_client_collection_on_postgres_stores_a_baseline_then_the_weeks_moves(
     third = mc.collect_client(client, OWNER, io=io, store=pg, now=datetime.now(timezone.utc)
                               + timedelta(hours=1))
     rows = third["companies"][0]["rows"]
-    assert {r["status"] for r in rows if r["detector"] in ("catalog", "locations")} == {"reused"}
+    assert all(r["reused"] for r in rows if r["detector"] in ("catalog", "locations"))
 
 
 def test_collection_runs_do_not_replace_the_last_search(pg):

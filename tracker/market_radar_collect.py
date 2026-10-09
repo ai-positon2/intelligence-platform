@@ -121,10 +121,16 @@ def collect_entity(entity, *, run_id=None, client_country=None, breaker=None, de
                "events": 0, "reused": False}
         if not any(d[0] == name for d in stale):
             snap = latest[name]
-            ctx["results"][name] = {"status": "ok", "payload": snap["payload"]}
-            row.update(status="reused", items=snap.get("item_count") or 0,
-                       note="read %s ago for another collection; not fetched again" % _ago(
-                           now - snap["last_seen_at"]))
+            payload = snap["payload"] or {}
+            # A reused read says what that read found: "none" stays none, so
+            # coverage never counts "no jobs board" as hiring read.
+            found = "none" if "absent" in payload else \
+                ("empty" if not snap.get("item_count") else "ok")
+            ctx["results"][name] = {"status": found, "payload": None if found == "none" else payload}
+            row.update(status=found, reused=True, items=snap.get("item_count") or 0,
+                       note="%s (read %s ago; not fetched again)" % (
+                           payload.get("absent") or "%d items" % (snap.get("item_count") or 0),
+                           _ago(now - snap["last_seen_at"])))
             out["rows"].append(row)
             continue
         if deadline is not None and time.monotonic() > deadline:
@@ -302,7 +308,6 @@ def coverage(results):
         for r in results:
             row = next((x for x in r["rows"] if x["detector"] == name), None)
             st = (row or {}).get("status") or "failed"
-            st = "ok" if st in ("ok", "reused") else st
             counts[st] = counts.get(st, 0) + 1
         read = counts.get("ok", 0) + counts.get("empty", 0)
         parts = []
@@ -312,7 +317,8 @@ def coverage(results):
                                                      "jobs": "had no open roles"}.get(
                                                          name, WHY["empty"])))
         if counts.get("none"):
-            parts.append("%d have %s" % (counts["none"], NONE_WORDS[name]))
+            parts.append("%d %s %s" % (counts["none"], "has" if counts["none"] == 1 else "have",
+                                       NONE_WORDS[name]))
         for st in ("failed", "skipped"):
             if counts.get(st):
                 parts.append("%d %s" % (counts[st], WHY[st]))

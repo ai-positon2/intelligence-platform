@@ -707,7 +707,7 @@ def read_reviews(ctx):
     scores = {}
     for r in (rs.get("signals") or {}).get("ratings") or []:
         scores.setdefault(r["url"], r)
-    tracked = list((prev.get("tracked") or []))
+    tracked = list(prev.get("tracked") or [])
     if not tracked:
         catalog = (ctx["results"].get("catalog") or {}).get("payload") or {}
         products = sorted(((p[7] or "9999", p[1]) for p in (catalog.get("products") or {}).values()
