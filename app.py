@@ -9176,9 +9176,15 @@ def admin_market_radar_tidy_events():
     if refused:
         return refused
     from tracker import market_radar_store as mr_store
+    body = request.get_json(silent=True) or {}
+    if body.get("signals"):
+        # 2026-10-10: forget the first signal-engine reads (made before its
+        # rules were tightened), and nothing else: the product-page tidy
+        # below would also drop newsroom snapshots read from .atom feeds.
+        return jsonify(signals=mr_store.drop_signal_reads())
     events, snapshots = mr_store.drop_product_announcements()
     out = {"events_deleted": events, "snapshots_deleted": snapshots}
-    if (request.get_json(silent=True) or {}).get("radar"):
+    if body.get("radar"):
         # 2026-10-10: radar scans made under the loose entrant rule.
         out["radar_events_deleted"], out["radar_snapshots_deleted"] = mr_store.drop_radar_scans()
     return jsonify(out)

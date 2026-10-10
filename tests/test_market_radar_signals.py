@@ -385,3 +385,33 @@ def test_a_left_out_verdict_cannot_overrule_an_event():
     got = S.triage(ASPEN, ITEMS[:2], [], now=NOW, llm=LLM({
         "events": [ev([0])], "left_out": [{"item": 0, "reason": "other"}, {"item": 1, "reason": "bogus"}]}))
     assert len(got["events"]) == 1 and [(l["item"]["id"], l["reason"]) for l in got["left_out"]] == [("a1", "other")]
+
+
+def test_the_rules_learnt_from_the_first_live_reads_are_in_the_prompt():
+    sysp = S._system()
+    for rule in ("Alo Drink", "acquisition only when ownership changes", "leadership_change only for",
+                 "partnership only when a partnership begins", "plans to open", "marketing_campaign",
+                 "discount-code", "earnings date"):
+        assert rule in sysp, rule
+
+
+def test_a_chain_is_scored_without_distance_and_a_single_site_with_it(monkeypatch):
+    from tracker import market_radar_views as views
+    monkeypatch.setattr(views, "effective_profile", lambda p, s: p)
+    point = {"lat": 26.36, "lon": -80.08}
+    for archetype, expect_km in (("multi_location", None), ("local_single", True)):
+        store = Store()
+        store.clients[1] = {"entity_id": 99, "profile": {"archetype": archetype, "hq_point": point},
+                            "settings": {}}
+        store.comps[1] = [{"entity_id": 10, "kind": "direct", "status": "confirmed"}]
+        store.record_event(10, "k", type="new_location", title="t", source={"url": "u", "detector": "news"},
+                           location={"label": "Four Corners, FL"})
+        S.score_client(1, "o", store=store, now=NOW, geocode=lambda q: {"lat": 28.33, "lon": -81.64})
+        km = store.links[(1, 1)]["distance_km"]
+        assert (km is None) if expect_km is None else (km > 100)
+
+
+def test_a_rumour_counts_less_than_a_done_deal():
+    rows, _ = S.score_events([dict(event(1, "acquisition"), status="rumored"),
+                              dict(event(2, "acquisition", entity=11), status="completed")], tiers={}, now=NOW)
+    assert by_id(rows)[1]["score"] == pytest.approx(by_id(rows)[2]["score"] * 0.6)

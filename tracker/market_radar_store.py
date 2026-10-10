@@ -742,6 +742,22 @@ def drop_radar_scans(*, conn=None):
         return events, cur.rowcount
 
 
+def drop_signal_reads(*, conn=None):
+    """One-off (2026-10-10): undo the signal engine's reads so the next
+    collection reads every headline again: delete the events it made from
+    headlines and posts, show the posts it hid again, and forget its
+    verdicts. Events from other detectors keep their rows; a headline it
+    added to one of them stays as a source. Returns counts."""
+    with _tx(conn) as cur:
+        cur.execute("""DELETE FROM mr_events WHERE dedupe_key LIKE 'news:%%'
+                       OR dedupe_key LIKE 'post-typed:%%'""")
+        events = cur.rowcount
+        cur.execute("UPDATE mr_events SET hidden_reason=NULL WHERE hidden_reason IS NOT NULL")
+        shown = cur.rowcount
+        cur.execute("DELETE FROM mr_snapshots WHERE detector='signals'")
+        return {"events_deleted": events, "posts_shown": shown, "memos_deleted": cur.rowcount}
+
+
 def snapshot_summaries(entity_ids, *, conn=None):
     """For each company and detector, when it was last read and how many
     items it held: the "what we track" table, without the payloads."""

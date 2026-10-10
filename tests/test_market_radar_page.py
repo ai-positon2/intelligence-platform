@@ -659,3 +659,24 @@ def test_script_shows_severity_the_most_important_moves_and_what_was_left_out():
     assert "Most important" in out and out.count(">High<") == 2 and ">Low<" in out
     assert "(13 articles); 2 independent sources" in out and ">Planned<" in out
     assert "Left out as not moves (4)" in out and "3 moves scored High were shown as Medium" in out
+
+
+def test_the_signal_reset_forgets_only_what_the_engine_made(client_with_reading, monkeypatch):
+    from tracker import market_radar_store as store
+    rival = store.upsert_entity("rival.example", name="Rival")
+    a, _ = store.record_event(rival, "news:n1", type="acquisition", title="t",
+                              source={"url": "https://a.example", "detector": "news"})
+    p, _ = store.record_event(rival, "newsroom:post:x", type="announcement", title="post",
+                              source={"url": "https://rival.example/p", "detector": "newsroom"})
+    l, _ = store.record_event(rival, "locations:loc+:/x", type="new_location", title="loc",
+                              source={"url": "https://rival.example/x", "detector": "locations"})
+    store.hide_event(p, "not a move")
+    store.save_snapshot(rival, "signals", {"triaged": {"n1": "news:n1"}})
+    store.save_snapshot(rival, "newsroom", {"source": "https://rival.example/feed.atom", "items": []})
+    import app as appmod
+    monkeypatch.setattr(appmod, "ADMIN_EMAILS", set(appmod.ADMIN_EMAILS) | {OWNER})
+    r = _client(OWNER).post(BASE + "/api/tidy-events", json={"signals": True})
+    assert r.get_json()["signals"] == {"events_deleted": 1, "posts_shown": 1, "memos_deleted": 1}
+    left = {e["id"]: e for e in store.recent_events([rival])}
+    assert set(left) == {p, l} and left[p]["hidden_reason"] is None
+    assert store.latest_snapshot(rival, "newsroom") is not None

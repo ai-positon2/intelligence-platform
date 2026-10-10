@@ -44,6 +44,7 @@ are moved down to MEDIUM and the result says how many.
 """
 from __future__ import annotations
 
+import concurrent.futures
 import logging
 import math
 import os
@@ -61,6 +62,7 @@ CONTEXT_EVENTS = 40          # open events offered to the model per company
 HIGH_SHARE = 0.15
 HIGH_MIN = 3
 GEOCODE_MAX = 15             # news places geocoded per scoring
+PARALLEL = 3
 
 TYPES = {
     "new_location": "opens or plans a new branch, store, clinic, gym or office",
@@ -79,15 +81,17 @@ TYPES = {
     "legal_regulatory": "a lawsuit, fine, recall or regulator action against the company itself",
     "financial_results": "reports results, guidance or sales figures",
     "rebrand": "a new name, brand or positioning",
+    "marketing_campaign": "an advertising campaign, a new ambassador or a sponsored athlete or star",
     "other_move": "another business decision by the company",
 }
 STATUSES = ("rumored", "announced", "planned", "opened", "completed", "closed", "unknown")
 LEFT_OUT = {
     "not_about_company": "not about this company (a namesake, or only a passing mention)",
-    "review_or_deal": "a product review, comparison, deal or shopping post",
+    "review_or_deal": "a product review, comparison, deal, discount-code or shopping post",
     "stock_chatter": "stock-price commentary",
     "incident": "a crime, accident or incident at a branch",
-    "award_or_ranking": "an award, ranking or list",
+    "award_or_ranking": "an award, ranking, list or anniversary",
+    "routine": "routine notice: an earnings date, a website refresh, one staff hire below senior leadership",
     "community": "charity, sponsorship or a community event",
     "opinion_or_profile": "an opinion piece, interview or profile",
     "other": "something else that is not a move",
@@ -133,14 +137,21 @@ For each move, return one event:
 - items: the numbers of EVERY headline that reports this same move. Many outlets cover one move with different headlines (a new CEO's management shake-up reported 13 ways is one event).
 - existing: if the move is one of the EXISTING EVENTS listed (already recorded from the news or from the company's own website), its id (E1, E2, ...). A news story about a new practice in Merced is the same move as "New location page: Merced, CA". Otherwise "".
 - type, status: status is what the headlines say has happened: rumored, announced, planned (will open, coming soon), opened, completed (a deal closed), closed, or unknown. "Coming to" is planned, not opened.
-- title: the move in at most 14 plain English words, naming the company, written by you from the headlines (translate if needed).
+- title: the move in at most 14 plain English words, naming the company, written by you from the headlines (translate if needed). Its tense matches the status: "plans to open" or "will open" for planned, "opens" only for opened.
 - place: the town or region a location move is in, with its state or country ("Merced, CA"); "" otherwise.
 - date: YYYY-MM-DD only when a headline states when the move happens or happened (an opening day). "" otherwise; the publication date is known already.
 
 Every headline you do not put in an event goes in left_out with a reason:
 %s
 
-Be strict. A product review, a sale at a retailer, a crime at one branch, a stock-price article or an award is not a move. A headline about a different company with a similar name is not about this company. Use each headline once. Never use em dashes or en dashes."""
+Be strict:
+- A product review, a sale at a retailer, a discount-code page, a crime at one branch, a stock-price article, an award or an anniversary is not a move.
+- A different company with a similar or partly shared name that sells something else is not this company ("Alo Drink" is not Alo Yoga).
+- acquisition only when ownership changes. A franchisor running a franchisee's sites for a while is other_move.
+- leadership_change only for chief executives, board members and senior leaders, not one more dentist, trainer or manager.
+- partnership only when a partnership begins. A team or athlete leaving the company is other_move.
+- A product launch and the advertising campaign for it are one event, not two. Before answering, check that no two events describe the same move.
+Use each headline once. Never use em dashes or en dashes."""
 
 
 def _system():
@@ -356,12 +367,13 @@ WEIGHTS = {
     "legal_regulatory": 6, "hiring_surge": 6, "hiring_slowdown": 6, "hiring_push": 5,
     "new_job_location": 6, "location_list_shrank": 5, "product_launch": 5, "partnership": 5,
     "financial_results": 5, "rebrand": 5, "senior_hire_search": 4, "promotion": 4,
-    "sale_started": 4, "other_move": 3, "page_changed": 3, "product_removed": 3,
+    "sale_started": 4, "other_move": 3, "marketing_campaign": 3, "page_changed": 3, "product_removed": 3,
     "promotion_ended": 2, "review_growth": 2, "sold_out": 2, "site_restructured": 2,
     "announcement": 2,
 }
 TIER = {"direct": 1.0, "local": 1.0, "indirect": 0.7, "aspirational": 0.5}
 HIGH, MEDIUM = 6.0, 2.5
+CERTAINTY = {"rumored": 0.6}
 REPEAT_DECAY = 0.7           # the k-th event of one type by one company is worth 0.7^(k-1)
 
 
@@ -425,7 +437,8 @@ def score_events(events, *, tiers, now, point=None, local=False, feedback=None, 
         kind, status = tiers.get(e["entity_id"], ("direct", "confirmed"))
         tier = TIER.get(kind, 0.7) * (0.85 if status == "proposed" else 1.0)
         s = WEIGHTS.get(e["type"], 3) * recency(day, now) * distance_factor(km) * tier * \
-            evidence_factor(e) * feedback_factor(e["type"], feedback)
+            evidence_factor(e) * feedback_factor(e["type"], feedback) * \
+            CERTAINTY.get(e.get("status"), 1.0)
         rows.append({"id": e["id"], "entity_id": e["entity_id"], "type": e["type"], "score": s,
                      "km": round(km, 1) if km is not None else None})
     # One company's many events of one type: each further one counts less.
@@ -463,9 +476,14 @@ def score_client(client_id, owner_email, *, store, now, run_id=None, geocode=Non
         if v.get("feedback") and eid in by_id:
             up, down = fb.get(by_id[eid]["type"], (0, 0))
             fb[by_id[eid]["type"]] = (up + (v["feedback"] == "up"), down + (v["feedback"] == "down"))
-    local = (profile.get("archetype") in ("local_single", "multi_location"))
-    rows, demoted = score_events(events, tiers=tiers, now=now, point=profile.get("hq_point"),
-                                 local=local, feedback=fb, geocode=geocode)
+    # Distance means something only from the one place a local business
+    # serves. A chain's head office is not where its customers are
+    # (Orangetheory's HQ in Florida ranked a Florida franchise opening
+    # first, 2026-10-10), so chains are scored without distance until the
+    # report knows their branches.
+    point = profile.get("hq_point") if profile.get("archetype") == "local_single" else None
+    rows, demoted = score_events(events, tiers=tiers, now=now, point=point, local=True,
+                                 feedback=fb, geocode=geocode)
     store.link_client_events(client_id, [(r["id"], round(r["score"], 3), r["severity"], r["km"])
                                          for r in rows], run_id=run_id)
     counts = {s: sum(1 for r in rows if r["severity"] == s) for s in ("HIGH", "MEDIUM", "LOW")}
@@ -489,15 +507,19 @@ def run_for_client(client_id, owner_email, *, run_id=None, store=None, now=None,
     companies, _ = mc.targets(client_id, owner_email, store=store)
     sells = {r["entity_id"]: (r.get("details") or {}).get("sells")
              for r in store.competitors(client_id, owner_email)}
-    rows = []
-    for e in companies:
+    def one(e):
         try:
-            rows.append(triage_company(e, store=store, now=now, run_id=run_id, client=client,
-                                       llm=llm, sells=sells.get(e["id"])))
+            return triage_company(e, store=store, now=now, run_id=run_id, client=client,
+                                  llm=llm, sells=sells.get(e["id"]))
         except Exception as ex:
             logger.exception("market_radar_signals: triage of %s failed", e["domain"])
-            rows.append({"entity_id": e["id"], "domain": e["domain"], "name": e.get("name"),
-                         "status": "failed", "note": "%s: %s" % (type(ex).__name__, str(ex)[:200])})
+            return {"entity_id": e["id"], "domain": e["domain"], "name": e.get("name"),
+                    "status": "failed", "note": "%s: %s" % (type(ex).__name__, str(ex)[:200])}
+
+    # A company with a hundred headlines takes Haiku about a minute; three
+    # at a time keeps a twelve-competitor collection to a few minutes.
+    with concurrent.futures.ThreadPoolExecutor(max_workers=PARALLEL) as pool:
+        rows = list(pool.map(one, companies))
     scored = score_client(client_id, owner_email, store=store, now=now, run_id=run_id,
                           geocode=geocode)
     failed = [r for r in rows if r.get("status") == "failed"]

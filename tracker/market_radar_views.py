@@ -385,7 +385,7 @@ EVENT_LABELS = {
     "funding": "Funding", "leadership_change": "Leadership", "layoffs": "Job cuts",
     "hiring_push": "Hiring drive", "pricing_change": "Pricing", "partnership": "Partnership",
     "new_market": "New market", "legal_regulatory": "Legal", "financial_results": "Results",
-    "rebrand": "Rebrand", "other_move": "Move",
+    "rebrand": "Rebrand", "other_move": "Move", "marketing_campaign": "Campaign",
 }
 def _detector_labels():
     from .market_radar_collect import DETECTORS
