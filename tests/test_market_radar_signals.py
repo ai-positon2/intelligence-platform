@@ -409,9 +409,22 @@ def test_a_chain_is_scored_without_distance_and_a_single_site_with_it(monkeypatc
         S.score_client(1, "o", store=store, now=NOW, geocode=lambda q: {"lat": 28.33, "lon": -81.64})
         km = store.links[(1, 1)]["distance_km"]
         assert (km is None) if expect_km is None else (km > 100)
+        score = store.links[(1, 1)]["score"]
+        # A chain's view of one more rival branch is routine; a single site
+        # weighs it by distance (here 250 km: 0.8).
+        expected = 8 * S.recency(NOW.date(), NOW) * (0.6 if expect_km is None else 0.8)
+        assert score == pytest.approx(expected, abs=0.01)
 
 
 def test_a_rumour_counts_less_than_a_done_deal():
     rows, _ = S.score_events([dict(event(1, "acquisition"), status="rumored"),
                               dict(event(2, "acquisition", entity=11), status="completed")], tiers={}, now=NOW)
     assert by_id(rows)[1]["score"] == pytest.approx(by_id(rows)[2]["score"] * 0.6)
+
+
+def test_for_a_chain_one_more_rival_branch_is_routine():
+    evs = [event(1, "new_location"), event(2, "funding", entity=11)]
+    single, _ = S.score_events(evs, tiers={}, now=NOW)
+    chain, _ = S.score_events(evs, tiers={}, now=NOW, chain=True)
+    assert by_id(chain)[1]["score"] == pytest.approx(by_id(single)[1]["score"] * 0.6)
+    assert by_id(chain)[2]["score"] == pytest.approx(by_id(single)[2]["score"])

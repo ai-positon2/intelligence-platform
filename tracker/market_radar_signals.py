@@ -374,6 +374,12 @@ WEIGHTS = {
 TIER = {"direct": 1.0, "local": 1.0, "indirect": 0.7, "aspirational": 0.5}
 HIGH, MEDIUM = 6.0, 2.5
 CERTAINTY = {"rumored": 0.6}
+# For a chain or an online brand, one more branch of a rival chain is
+# routine (Burn Boot Camp's one franchise opening ranked first for
+# Orangetheory, 2026-10-10). For a business with one site, a branch is
+# weighed by its distance instead.
+BRANCH_TYPES = {"new_location", "closed_location", "relocation"}
+BRANCH_WEIGHT_FOR_CHAINS = 0.6
 REPEAT_DECAY = 0.7           # the k-th event of one type by one company is worth 0.7^(k-1)
 
 
@@ -411,7 +417,8 @@ def feedback_factor(etype, feedback_by_type):
     return 1.0
 
 
-def score_events(events, *, tiers, now, point=None, local=False, feedback=None, geocode=None):
+def score_events(events, *, tiers, now, point=None, local=False, feedback=None, geocode=None,
+                 chain=False):
     """[(event_id, score, severity, distance_km)] and the number of HIGH
     events moved down. `tiers` maps entity_id -> (kind, status)."""
     from .market_radar_places import distance_km as dist
@@ -438,7 +445,8 @@ def score_events(events, *, tiers, now, point=None, local=False, feedback=None, 
         tier = TIER.get(kind, 0.7) * (0.85 if status == "proposed" else 1.0)
         s = WEIGHTS.get(e["type"], 3) * recency(day, now) * distance_factor(km) * tier * \
             evidence_factor(e) * feedback_factor(e["type"], feedback) * \
-            CERTAINTY.get(e.get("status"), 1.0)
+            CERTAINTY.get(e.get("status"), 1.0) * \
+            (BRANCH_WEIGHT_FOR_CHAINS if chain and e["type"] in BRANCH_TYPES else 1.0)
         rows.append({"id": e["id"], "entity_id": e["entity_id"], "type": e["type"], "score": s,
                      "km": round(km, 1) if km is not None else None})
     # One company's many events of one type: each further one counts less.
@@ -483,7 +491,8 @@ def score_client(client_id, owner_email, *, store, now, run_id=None, geocode=Non
     # report knows their branches.
     point = profile.get("hq_point") if profile.get("archetype") == "local_single" else None
     rows, demoted = score_events(events, tiers=tiers, now=now, point=point, local=True,
-                                 feedback=fb, geocode=geocode)
+                                 feedback=fb, geocode=geocode,
+                                 chain=profile.get("archetype") != "local_single")
     store.link_client_events(client_id, [(r["id"], round(r["score"], 3), r["severity"], r["km"])
                                          for r in rows], run_id=run_id)
     counts = {s: sum(1 for r in rows if r["severity"] == s) for s in ("HIGH", "MEDIUM", "LOW")}
