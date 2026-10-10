@@ -147,6 +147,7 @@ Every headline you do not put in an event goes in left_out with a reason:
 Be strict:
 - A product review, a sale at a retailer, a discount-code page, a crime at one branch, a stock-price article, an award or an anniversary is not a move.
 - A different company with a similar or partly shared name that sells something else is not this company ("Alo Drink" is not Alo Yoga).
+- A company's own posts are mostly marketing. Exhibiting at a trade show, speaking at or hosting an event, a webinar or a customer workshop, publishing an article, a customer story or a how-to is routine, not a move. A post is a move only when it announces a decision: a launch, an opening, a deal, a hire at the top, a new market, a price change.
 - When the company a headline names carries a word this company's name does not ("Spur Intelligence" for Spur, "Alo Drink" for Alo), it is a different company: leave it out as not_about_company, unless the headline also names this company's domain or one of its own products.
 - acquisition only when ownership changes. A franchisor running a franchisee's sites for a while is other_move.
 - leadership_change only for chief executives, board members and senior leaders, not one more dentist, trainer or manager.

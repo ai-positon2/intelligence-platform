@@ -411,6 +411,12 @@ def test_linkedin_says_why_it_read_nothing():
     r = L.read_linkedin(ctx(site=li_site(), hooks={"linkedin_collect": wrong}))
     assert r["status"] == "failed" and "Gorgias Pizza" in r["note"]
 
+    def gone(h):
+        raise RuntimeError("Could not resolve LinkedIn company 'gorgias': Unipile returned 404 for this route "
+                           "-- the API path may have changed.")
+    r = L.read_linkedin(ctx(site=li_site(), hooks={"linkedin_collect": gone}))
+    assert r["note"] == "no LinkedIn page at linkedin.com/company/gorgias: the link on its site is out of date"
+
 
 # == which detectors run for whom =====================================================
 

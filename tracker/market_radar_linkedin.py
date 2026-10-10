@@ -87,6 +87,11 @@ def read_linkedin(ctx, *, collect=None, available=None):
         posts, page = collect(handle)
     except Exception as e:
         # A page that is some other company's is said as such, not retried.
+        # A 404 is a page that does not exist (daihen-usa.com links to
+        # "otc-daihen-inc", 2026-10-10), not an API that moved.
+        if "404" in str(e):
+            return _fail("failed", "no LinkedIn page at linkedin.com/company/%s: the link on its "
+                         "site is out of date" % handle)
         return _fail("failed", "LinkedIn page %s: %s" % (handle, str(e)[:200]))
     items = []
     for p in posts or []:
