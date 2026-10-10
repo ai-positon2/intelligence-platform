@@ -367,7 +367,8 @@
       : stage === 'radar' ? 'Looking for new businesses nearby and new brands'
       : stage === 'pulse' ? 'Reading the industry news'
       : stage === 'signals' ? 'Reading competitor headlines and ranking the moves'
-      : stage === 'report' ? 'Writing the report' : 'Starting';
+      : stage === 'report' ? 'Writing the report'
+      : stage === 'digest' ? 'Writing the weekly update' : 'Starting';
     return '<div class="mr-callout">' + esc(text) + '… This runs in the background; you can leave the page.</div>';
   }
 
@@ -563,6 +564,57 @@
       '<div class="mr-card-b">' + body + '</div></div>';
   }
 
+  // == weekly update (Phase 8) =========================================================
+
+  var DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+  var SENT = { sent: ['ok', 'Sent'], failed: ['bad', 'Failed'], not_configured: ['warn', 'Not set up on the server'], not_set_up: ['', 'Not used'] };
+
+  function deliveryChip(name, d) {
+    if (!d) return '';
+    var s = SENT[d.status] || ['', d.status];
+    return '<span class="mr-chip ' + s[0] + '" title="' + esc(d.error || (d.to || []).join(', ') || d.channel || '') + '">' + esc(name) + ': ' + esc(s[1]) + '</span>';
+  }
+
+  function renderUpdate(u) {
+    var st = u.status === 'quiet' ? 'Quiet week' : u.status === 'failed' ? 'Not written' : (u.items || []).length + ' changes';
+    return '<li class="mr-move"><div class="mr-move-when">' + esc(when(u.created_at)) + '</div><div class="mr-move-b">' +
+      '<div class="mr-move-t"><b>' + esc(st) + '</b>' + deliveryChip('Email', (u.delivery || {}).email) + deliveryChip('Slack', (u.delivery || {}).slack) +
+      (u.delivery && u.delivery.at ? '' : '<span class="mr-chip">Preview, not sent</span>') + '</div>' +
+      (u.headline ? '<div class="mr-move-title">' + esc(u.headline) + '</div>' : '') +
+      (u.note ? '<div class="mr-move-sum">' + esc(u.note) + '</div>' : '') +
+      ((u.items || []).length ? '<details class="mr-more"><summary>What it said</summary><ol class="mr-list">' + u.items.map(function (i) {
+        return '<li>' + esc(i.text) + (i.so_what ? ' <span class="mr-hint">So what: ' + esc(i.so_what) + '</span>' : '') + '</li>';
+      }).join('') + '</ol>' + (u.removed ? '<p class="mr-hint">' + esc(u.removed) + ' lines were removed by the fact check.</p>' : '') + '</details>' : '') +
+      '</div></li>';
+  }
+
+  function renderMonitor(m, collectRun) {
+    if (!m) return '';
+    var running = collectRun && collectRun.status === 'running' && !collectRun.stale;
+    var warn = [];
+    if (!m.scheduler) warn.push('The schedule is switched off on this server, so updates only go out when you press "Send an update now".');
+    if (!m.senders.email) warn.push('Email is not set up on the server, so emails cannot be sent.');
+    if (m.slack_channel && !m.senders.slack) warn.push('Slack is not set up on the server, so Slack messages cannot be sent.');
+    if (m.last_error) warn.push('The last scheduled update did not start: ' + m.last_error);
+    var hours = '';
+    for (var h = 0; h < 24; h++) hours += '<option value="' + h + '"' + (h === m.hour ? ' selected' : '') + '>' + (h < 10 ? '0' : '') + h + ':00 UTC</option>';
+    var form = '<form id="mrMonitorForm" class="mr-mon">' +
+      '<label class="mr-mon-on"><input type="checkbox" name="enabled"' + (m.enabled ? ' checked' : '') + '> Send a weekly update</label>' +
+      '<label>Day <select name="weekday">' + DAYS.map(function (d, i) { return '<option value="' + i + '"' + (i === m.weekday ? ' selected' : '') + '>' + d + '</option>'; }).join('') + '</select></label>' +
+      '<label>Time <select name="hour">' + hours + '</select></label>' +
+      '<label class="mr-mon-wide">Email to <input type="text" name="email" value="' + esc((m.email || []).join(', ')) + '" placeholder="name@company.com, another@company.com"></label>' +
+      '<label class="mr-mon-wide">Slack channel <input type="text" name="slack_channel" value="' + esc(m.slack_channel) + '" placeholder="Optional: a channel id such as C0123ABCD"></label>' +
+      '<div class="mr-form-foot"><span class="mr-hint">' + (m.enabled && m.next ? 'Next update: ' + esc(when(m.next)) + '.' : 'Off: nothing is sent on a schedule.') + '</span>' +
+      '<button type="submit" class="mr-btn primary">Save</button></div></form>';
+    var head = '<div class="mr-card-h"><div><h3>Weekly update</h3><p>Once a week the competitors are collected again and a short "what changed since last time" update is written, fact-checked and sent. About $0.05 a week.</p></div>' +
+      '<div class="mr-actions"><button type="button" class="mr-btn" data-act="update-preview"' + (running ? ' disabled' : '') + '>Preview</button>' +
+      '<button type="button" class="mr-btn" data-act="update-now"' + (running ? ' disabled' : '') + '>Send an update now</button></div></div>';
+    var body = warn.map(function (w) { return '<div class="mr-callout warn">' + esc(w) + '</div>'; }).join('') + form;
+    body += (m.updates || []).length ? '<h4 class="mr-sub">Recent updates</h4><ul class="mr-moves">' + m.updates.map(renderUpdate).join('') + '</ul>'
+      : '<p class="mr-hint">No update has been written yet.</p>';
+    return '<div class="card mr-card" id="mrMonitor">' + head + '<div class="mr-card-b">' + body + '</div></div>';
+  }
+
   function renderHead(view, running) {
     var c = view.client || {}, p = view.profile || {}, f = p.fields || {};
     var href = siteUrl(c.domain);
@@ -582,7 +634,7 @@
     return renderHead(v, running) + (running ? renderProgress(state.run) : '') +
       renderProfile(v, state.editing, state.errors) + renderCompetitors(v.competitors, state.filter) +
       renderMoves(state.moves, state.collect) + renderRadar(state.moves && state.moves.radar) +
-        renderPulse(state.moves && state.moves.pulse) +
+        renderPulse(state.moves && state.moves.pulse) + renderMonitor(state.monitor, state.collect) +
       (running ? '' : renderRun(v.last_run));
   }
 
@@ -609,7 +661,7 @@
   var MR = { esc: esc, safeUrl: safeUrl, siteUrl: siteUrl, renderClientList: renderClientList,
     renderProgress: renderProgress, renderProfile: renderProfile, renderCompetitors: renderCompetitors,
     renderRow: renderRow, renderRun: renderRun, renderDetail: renderDetail, formChanges: formChanges,
-    renderMoves: renderMoves, renderMoveRow: renderMoveRow, renderRadar: renderRadar, renderPulse: renderPulse,
+    renderMoves: renderMoves, renderMoveRow: renderMoveRow, renderRadar: renderRadar, renderPulse: renderPulse, renderMonitor: renderMonitor,
     FIELDS: FIELDS, STAGE_STEP: STAGE_STEP };
   root.MR = MR;
 
@@ -618,7 +670,7 @@
   if (typeof document === 'undefined' || !document.getElementById('mr')) return;
 
   var state = { clients: [], selected: null, view: null, filter: null, editing: false, errors: null,
-    run: null, poll: null, moves: null, collect: null, collectPoll: null };
+    run: null, poll: null, moves: null, collect: null, collectPoll: null, monitor: null };
   var $ = function (id) { return document.getElementById(id); };
 
   function api(path, body) {
@@ -669,6 +721,13 @@
     $('mrDetail').innerHTML = '<div class="card"><div class="mr-empty">Loading…</div></div>';
     return loadView();
   }
+  function loadMonitor() {
+    var id = state.selected;
+    return api('/clients/' + id + '/monitor').then(function (m) {
+      if (state.selected !== id) return;
+      state.monitor = m; paint();
+    }).catch(function (e) { toast('Weekly update: ' + e.message); });
+  }
   function loadMoves() {
     var id = state.selected;
     return api('/clients/' + id + '/moves').then(function (m) {
@@ -688,15 +747,15 @@
         if (r.status === 'running' && !r.stale) { paint(); state.collectPoll = setTimeout(tick, 5000); return; }
         state.collect = null;
         toast(r.status === 'complete' ? 'Collection finished.' : 'The collection did not finish: ' + (r.error || r.stale || r.status));
-        loadMoves();
+        loadMoves(); loadMonitor();
       }).catch(function () { state.collectPoll = setTimeout(tick, 8000); });
     }
     tick();
   }
   function loadView() {
     var id = state.selected;
-    state.moves = null; state.collect = null; clearTimeout(state.collectPoll);
-    loadMoves();
+    state.moves = null; state.collect = null; state.monitor = null; clearTimeout(state.collectPoll);
+    loadMoves(); loadMonitor();
     return api('/clients/' + id).then(function (v) {
       if (state.selected !== id) return;
       state.view = v;
@@ -790,6 +849,20 @@
         if (err.status === 409 && err.data && err.data.run_id) { toast(err.message); watchCollect(err.data.run_id); return; }
         toast(err.message); paint();
       });
+    } else if (act === 'update-now' || act === 'update-preview') {
+      var send = act === 'update-now';
+      var who = state.monitor ? [].concat(state.monitor.email || [], state.monitor.slack_channel ? ['Slack ' + state.monitor.slack_channel] : []) : [];
+      ask(send ? 'Send an update now?' : 'Write a preview?',
+        send ? 'Collects the competitors again, writes the "what changed" update and sends it to ' + (who.join(', ') || 'no one yet') + '. About $0.05.'
+          : 'Collects the competitors again and writes the update without sending it. It still counts as the latest update, so the next one starts from it. About $0.05.').then(function (ok) {
+        if (!ok) return;
+        api('/clients/' + state.selected + '/update-now', { send: send }).then(function (j) {
+          state.collect = { status: 'running', stage: 'queued' }; paint(); watchCollect(j.run_id);
+        }).catch(function (err) {
+          if (err.status === 409 && err.data && err.data.run_id) { toast(err.message); watchCollect(err.data.run_id); return; }
+          toast(err.message);
+        });
+      });
     } else if (act === 'run') {
       var name = (state.view.profile.fields || {}).name || state.view.client.domain;
       startRun({ client_id: state.selected }, 'Search again for ' + name + '?',
@@ -814,6 +887,14 @@
       e.preventDefault();
       var v = $('mrRadius').value.trim();
       saveProfile({ radius_km: v === '' ? null : Number(v) });
+    } else if (form.id === 'mrMonitorForm') {
+      e.preventDefault();
+      var f = form.elements;
+      api('/clients/' + state.selected + '/monitor', {
+        enabled: f.enabled.checked, weekday: Number(f.weekday.value), hour: Number(f.hour.value),
+        email: f.email.value, slack_channel: f.slack_channel.value.trim()
+      }).then(function (m) { state.monitor = m; paint(); toast(m.enabled ? 'Saved. Next update: ' + when(m.next) + '.' : 'Saved. Weekly updates are off.'); })
+        .catch(function (err) { toast(err.data && err.data.errors ? Object.keys(err.data.errors).map(function (k) { return err.data.errors[k]; }).join('; ') : err.message); });
     } else if (form.id === 'mrAddCompetitor') {
       e.preventDefault();
       var url = $('mrCompUrl').value.trim();

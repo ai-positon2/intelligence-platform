@@ -28,6 +28,7 @@ RADAR_STAGE = "radar"
 PULSE_STAGE = "pulse"
 SIGNALS_STAGE = "signals"
 REPORT_STAGE = "report"
+DIGEST_STAGE = "digest"
 
 
 def start(url, owner_email, *, reuse_profile=False, spawn=None):
@@ -120,11 +121,13 @@ def job(run_id, url, owner_email, client_id, entity_id, reuse_profile, *, client
             pass
 
 
-def start_collect(client_id, owner_email, *, spawn=None):
+def start_collect(client_id, owner_email, *, spawn=None, monitor=None):
     """Collect what this client's competitors did (Phase 3,
     tracker/market_radar_collect), in the background. Free: no model and no
     paid search. Returns the run id; raises PermissionError when the client
     is not this person's."""
+    if monitor not in (None, "send", "preview"):
+        raise ValueError("monitor must be None, 'send' or 'preview'")
     from . import market_radar_store as store
     if not store.get_client(client_id, owner_email):
         raise PermissionError("client %s is not yours or does not exist" % client_id)
@@ -132,10 +135,11 @@ def start_collect(client_id, owner_email, *, spawn=None):
     store.update_run(run_id, status="running", stage="queued")
     args = (run_id, client_id, owner_email)
     if spawn is None:
-        threading.Thread(target=collect_job, args=args, name="mr-collect-%s" % run_id,
-                         daemon=True).start()
+        threading.Thread(target=collect_job, args=args, kwargs={"monitor": monitor},
+                         name="mr-collect-%s" % run_id, daemon=True).start()
     else:
-        spawn(collect_job, args)
+        spawn(collect_job, args) if monitor is None else spawn(
+            lambda *a: collect_job(*a, monitor=monitor), args)
     return run_id
 
 
@@ -159,8 +163,21 @@ def _report(client_id, owner_email, *, run_id=None, collection=None):
     return mrep.write_report(client_id, owner_email, run_id=run_id, collection=collection)
 
 
+def _digest(client_id, owner_email, *, run_id=None, send=True):
+    """Phase 8: the "what changed" update, stored, and sent when `send`."""
+    from . import market_radar_digest as md
+    from . import market_radar_store as store
+    digest_id, payload = md.make_digest(client_id, owner_email, run_id=run_id)
+    out = {"digest_id": digest_id, "status": payload["status"],
+           "items": len((payload.get("words") or {}).get("items") or [])}
+    if send:
+        settings = (store.get_client(client_id, owner_email) or {}).get("settings") or {}
+        out["delivery"] = md.deliver(digest_id, client_id, payload, settings)
+    return out
+
+
 def collect_job(run_id, client_id, owner_email, *, collect=None, radar=None, pulse=None,
-                signals=None, report=None):
+                signals=None, report=None, monitor=None, digest=None):
     from . import market_radar_store as store
     from . import market_radar_collect as mc
     collect = collect or mc.collect_client
@@ -205,6 +222,15 @@ def collect_job(run_id, client_id, owner_email, *, collect=None, radar=None, pul
         except Exception as e:
             logger.exception("market_radar_run report %s failed", run_id)
             result["report"] = {"error": "%s: %s" % (type(e).__name__, str(e)[:300])}
+        if monitor:
+            # Phase 8: a weekly (or "send now") run ends with the update.
+            stage(DIGEST_STAGE)
+            try:
+                result["digest"] = (digest or _digest)(client_id, owner_email, run_id=run_id,
+                                                       send=monitor == "send")
+            except Exception as e:
+                logger.exception("market_radar_run digest %s failed", run_id)
+                result["digest"] = {"error": "%s: %s" % (type(e).__name__, str(e)[:300])}
         store.update_run(run_id, status="complete", stage="done", summary=result,
                          coverage={"lines": result.get("coverage")})
     except Exception as e:

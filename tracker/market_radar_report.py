@@ -108,7 +108,7 @@ def build_pack(client_id, owner_email, *, store, now, collection=None, run_id=No
             "severity": sc.get("severity"), "score": sc.get("score"),
             "distance_km": sc.get("distance_km"), "feedback": sc.get("feedback"),
             "articles": sum(1 for s in srcs if s.get("detector") == "news"),
-            "evidence": e.get("evidence_count"),
+            "evidence": e.get("evidence_count"), "first_seen": e.get("first_seen_at"),
             "sources": [{k: s.get(k) for k in ("url", "detector", "publisher", "headline", "date")}
                         for s in srcs[:MAX_SOURCES]]})
     left = len(events) - len(pack["moves"])
@@ -142,6 +142,8 @@ def build_pack(client_id, owner_email, *, store, now, collection=None, run_id=No
     for country in (mp.markets(profile) if key else []):
         row = store.latest_pulse(key, country)
         p = (row or {}).get("payload") or {}
+        if p.get("read_at") and p["read_at"] > (pack.get("pulse_read_at") or ""):
+            pack["pulse_read_at"] = p["read_at"]
         if not p:
             pack["coverage"].append("Industry news for %s has not been read yet." % country)
             continue
@@ -217,9 +219,11 @@ def evidence_text(item):
         return "%s | US Federal Register %s, %s, %s: %s" % (ref, item.get("type"), item.get("agency"),
                                                           item.get("date"), item["title"])
     if ref[0] == "H":
-        return "%s | %s hiring: %s open roles in %s places; by function: %s; senior roles: %s" % (
-            ref, item["company"], item["open"], item["places"],
-            ", ".join("%s %s" % kv for kv in item["functions"]) or "n/a",
+        return "%s | %s hiring: %s open roles%s in %s places; by function: %s; senior roles: %s" % (
+            ref, item["company"], item["open"],
+            " (was %s at the previous update)" % item["before"] if item.get("before") is not None
+            else "", item["places"],
+            ", ".join("%s %s" % tuple(kv) for kv in item["functions"]) or "n/a",
             "; ".join(item["senior"]) or "none")
     if ref[0] == "C":
         return "%s | competitor %s (%s), %s, %s%s" % (

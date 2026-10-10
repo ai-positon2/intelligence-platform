@@ -8979,6 +8979,16 @@ def _mr_guard_post():
     return None
 
 
+# Phase 8: weekly updates. One thread per worker; a Postgres lock lets one
+# act (tracker/market_radar_monitor.py). Off under tests, without a
+# database, or with MR_MONITOR_DISABLED=1.
+try:
+    from tracker import market_radar_monitor as _mr_monitor
+    _mr_monitor.start_scheduler()
+except Exception:
+    log.exception("market radar: the weekly-update scheduler did not start")
+
+
 @app.route("/p2/admin/market-radar")
 @admin_required
 def admin_market_radar():
@@ -9246,6 +9256,58 @@ def admin_market_radar_event_feedback(client_id, event_id):
     except KeyError:
         return jsonify(error="That move is not on this company's report."), 404
     return jsonify(ok=True, feedback=feedback)
+
+
+@app.route("/p2/admin/market-radar/api/clients/<int:client_id>/monitor", methods=["GET", "POST"])
+@admin_required
+def admin_market_radar_monitor(client_id):
+    """Weekly updates for one company: GET the settings and the latest
+    updates; POST new settings (tracker/market_radar_views.save_monitor)."""
+    from tracker import market_radar_store as mr_store, market_radar_views as views
+    try:
+        if request.method == "POST":
+            refused = _mr_guard_post()
+            if refused:
+                return refused
+            try:
+                view = views.save_monitor(client_id, _mr_email(), request.get_json(silent=True) or {})
+            except views.EditError as e:
+                return jsonify(error="Some settings need fixing.", errors=e.errors), 400
+            except PermissionError:
+                return jsonify(error="No such company of yours."), 404
+        else:
+            view = views.monitor_view(client_id, _mr_email())
+    except mr_store.StoreUnavailable as e:
+        return jsonify(error="The database is unavailable (%s)." % e), 503
+    if view is None:
+        return jsonify(error="No such company of yours."), 404
+    return jsonify(view)
+
+
+@app.route("/p2/admin/market-radar/api/clients/<int:client_id>/update-now", methods=["POST"])
+@admin_required
+def admin_market_radar_update_now(client_id):
+    """Collect now and write the weekly update; send it to the company's
+    destinations unless {"send": false} (a preview, stored but not sent)."""
+    refused = _mr_guard_post()
+    if refused:
+        return refused
+    from tracker import market_radar_run, market_radar_store as mr_store
+    email = _mr_email()
+    send = (request.get_json(silent=True) or {}).get("send") is not False
+    try:
+        last = mr_store.latest_run(client_id, email, collect=True)
+        if last and last["status"] == "running":
+            status = market_radar_run.status(last["id"], email) or {}
+            if not status.get("stale"):
+                return jsonify(error="A collection is already running for this company.",
+                               run_id=last["id"]), 409
+        run_id = market_radar_run.start_collect(client_id, email, monitor="send" if send else "preview")
+    except PermissionError:
+        return jsonify(error="No such company of yours."), 404
+    except mr_store.StoreUnavailable as e:
+        return jsonify(error="The database is unavailable (%s)." % e), 503
+    return jsonify(run_id=run_id, send=send), 202
 
 
 @app.route("/p2/admin/market-radar/api/tidy-events", methods=["POST"])

@@ -34,7 +34,7 @@ _TABLES_READY = False
 
 TABLES = ("mr_entities", "mr_clients", "mr_competitors", "mr_runs", "mr_provider_calls",
           "mr_snapshots", "mr_events", "mr_client_events", "mr_industry_sources", "mr_geocodes", "mr_pulses",
-          "mr_reports")
+          "mr_reports", "mr_digests")
 
 COMPETITOR_KINDS = ("direct", "indirect", "local", "aspirational")
 COMPETITOR_STATUSES = ("proposed", "confirmed", "removed")
@@ -280,6 +280,17 @@ SCHEMA = [
         payload JSONB NOT NULL,
         created_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp())""",
     "CREATE INDEX IF NOT EXISTS idx_mr_reports_client ON mr_reports (client_id, created_at DESC)",
+    # Phase 8 (2026-10-10): the weekly "what changed" update, what it said
+    # and whether each delivery (email, Slack) went through.
+    """CREATE TABLE IF NOT EXISTS mr_digests (
+        id BIGSERIAL PRIMARY KEY,
+        client_id BIGINT NOT NULL REFERENCES mr_clients(id) ON DELETE CASCADE,
+        run_id BIGINT REFERENCES mr_runs(id) ON DELETE SET NULL,
+        since TIMESTAMPTZ,
+        payload JSONB NOT NULL,
+        delivery JSONB NOT NULL DEFAULT '{}'::jsonb,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp())""",
+    "CREATE INDEX IF NOT EXISTS idx_mr_digests_client ON mr_digests (client_id, created_at DESC)",
 ]
 
 
@@ -901,6 +912,103 @@ def latest_report(client_id, owner_email, *, conn=None):
                     (client_id,))
         row = cur.fetchone()
     return dict(zip(("id", "run_id", "payload", "created_at"), row)) if row else None
+
+
+# -- weekly updates ----------------------------------------------------------------
+
+def save_digest(client_id, payload, *, run_id=None, since=None, conn=None):
+    with _tx(conn) as cur:
+        cur.execute("""INSERT INTO mr_digests (client_id, run_id, since, payload)
+                       VALUES (%s,%s,%s,%s::jsonb) RETURNING id, created_at""",
+                    (client_id, run_id, since, json.dumps(payload, default=str)))
+        return cur.fetchone()
+
+
+def set_digest_delivery(digest_id, delivery, *, conn=None):
+    with _tx(conn) as cur:
+        cur.execute("UPDATE mr_digests SET delivery=%s::jsonb WHERE id=%s",
+                    (json.dumps(delivery, default=str), digest_id))
+
+
+def latest_digest(client_id, *, conn=None):
+    """The client's newest update, for the scheduler and the next update's
+    "since". No owner check: callers already hold the client."""
+    with _tx(conn) as cur:
+        cur.execute("""SELECT id, run_id, since, payload, delivery, created_at FROM mr_digests
+                       WHERE client_id=%s ORDER BY created_at DESC, id DESC LIMIT 1""", (client_id,))
+        row = cur.fetchone()
+    return dict(zip(("id", "run_id", "since", "payload", "delivery", "created_at"), row)) \
+        if row else None
+
+
+def list_digests(client_id, owner_email, *, limit=10, conn=None):
+    with _tx(conn) as cur:
+        _owned_client(cur, client_id, owner_email)
+        cur.execute("""SELECT id, run_id, since, payload, delivery, created_at FROM mr_digests
+                       WHERE client_id=%s ORDER BY created_at DESC, id DESC LIMIT %s""",
+                    (client_id, int(limit)))
+        keys = ("id", "run_id", "since", "payload", "delivery", "created_at")
+        return [dict(zip(keys, r)) for r in cur.fetchall()]
+
+
+def monitored_clients(*, conn=None):
+    """Every client with weekly updates switched on, across owners: the
+    scheduler's list."""
+    with _tx(conn) as cur:
+        cur.execute("""SELECT id, owner_email, settings FROM mr_clients
+                       WHERE (settings->'monitor'->>'enabled') = 'true' ORDER BY id""")
+        return [dict(zip(("client_id", "owner_email", "settings"), r)) for r in cur.fetchall()]
+
+
+def set_monitor_state(client_id, patch, *, conn=None):
+    """Merge keys into the client's settings.monitor (the scheduler's own
+    bookkeeping, such as the last slot it started)."""
+    with _tx(conn) as cur:
+        cur.execute("""UPDATE mr_clients SET settings = COALESCE(settings, '{}'::jsonb) ||
+                           jsonb_build_object('monitor',
+                               COALESCE(settings->'monitor', '{}'::jsonb) || %s::jsonb)
+                       WHERE id=%s""", (json.dumps(patch), client_id))
+
+
+def running_collections(*, within_minutes=30, conn=None):
+    """Collections still running and recently active, across all clients."""
+    with _tx(conn) as cur:
+        cur.execute("""SELECT count(*) FROM mr_runs WHERE mode='collect' AND status='running'
+                       AND updated_at > now() - make_interval(mins => %s)""", (int(within_minutes),))
+        return cur.fetchone()[0]
+
+
+def snapshot_at(entity_id, detector, at, *, conn=None):
+    """The read of a detector on a company that was current at `at`."""
+    with _tx(conn) as cur:
+        cur.execute("""SELECT payload, first_seen_at, last_seen_at, item_count FROM mr_snapshots
+                       WHERE entity_id=%s AND detector=%s AND first_seen_at <= %s
+                       ORDER BY first_seen_at DESC, id DESC LIMIT 1""", (entity_id, detector, at))
+        row = cur.fetchone()
+    return dict(zip(("payload", "first_seen_at", "last_seen_at", "item_count"), row)) if row else None
+
+
+@contextmanager
+def advisory_lock(key, *, conn=None):
+    """Yields True when this process holds the Postgres advisory lock `key`
+    for the duration, False when another process does. Session-level, so it
+    is held on one connection kept open for the block."""
+    own = conn or _connect()
+    try:
+        with own.cursor() as cur:
+            cur.execute("SELECT pg_try_advisory_lock(%s)", (int(key),))
+            got = cur.fetchone()[0]
+        own.commit()
+        try:
+            yield got
+        finally:
+            if got:
+                with own.cursor() as cur:
+                    cur.execute("SELECT pg_advisory_unlock(%s)", (int(key),))
+                own.commit()
+    finally:
+        if conn is None:
+            own.close()
 
 
 def cached_geocode(query, *, conn=None):

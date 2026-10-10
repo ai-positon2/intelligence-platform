@@ -390,3 +390,10 @@ def test_a_long_move_summary_is_clipped_on_the_page():
     v["pack"]["moves"][0]["summary"] = "Added: 77 products | " + "Leggings (9) " * 60
     html = run_js("MRR.render(%s); return document.getElementById('rrBody').innerHTML;" % json.dumps(v))
     assert "Leggings (9) " * 30 not in html and "…" in html
+
+
+def test_hiring_evidence_reads_the_same_after_a_trip_through_json():
+    h = {"ref": "H1", "company": "BigChain", "open": 42, "places": 3, "functions": [["Clinical", 30]],
+         "senior": []}
+    assert "by function: Clinical 30" in R.evidence_text(h)
+    assert "by function: Clinical 30" in R.evidence_text(dict(h, functions=[("Clinical", 30)]))

@@ -590,3 +590,101 @@ def report_view(client_id, owner_email, *, conn=None):
         except Exception:
             out["cost"] = None
     return out
+
+
+# == weekly updates (Phase 8) ============================================================
+
+_EMAIL = re.compile(r"^[^@\s,;<>]+@[^@\s,;<>]+\.[a-z]{2,}$", re.I)
+_SLACK = re.compile(r"^([CG][A-Z0-9]{6,}|#[a-z0-9][a-z0-9._-]{0,79})$")
+
+
+def validate_monitor(body):
+    """Clean weekly-update settings from the page, or raise EditError."""
+    errors, out = {}, {}
+    out["enabled"] = body.get("enabled") is True
+    try:
+        out["weekday"] = int(body.get("weekday", 0))
+        if not 0 <= out["weekday"] <= 6:
+            raise ValueError
+    except (TypeError, ValueError):
+        errors["weekday"] = "pick a day of the week"
+    try:
+        out["hour"] = int(body.get("hour", 7))
+        if not 0 <= out["hour"] <= 23:
+            raise ValueError
+    except (TypeError, ValueError):
+        errors["hour"] = "pick an hour from 0 to 23"
+    raw = body.get("email") or []
+    if isinstance(raw, str):
+        raw = re.split(r"[\s,;]+", raw)
+    emails = []
+    for a in raw:
+        a = str(a).strip().lower()
+        if not a:
+            continue
+        if not _EMAIL.match(a):
+            errors["email"] = "%s is not an email address" % a[:80]
+        elif a not in emails:
+            emails.append(a)
+    if len(emails) > 10:
+        errors["email"] = "at most 10 addresses"
+    out["email"] = emails[:10]
+    ch = str(body.get("slack_channel") or "").strip()
+    if ch and not _SLACK.match(ch):
+        errors["slack_channel"] = "a channel id such as C0123ABCD, or #channel-name"
+    out["slack_channel"] = ch
+    if out["enabled"] and not (out["email"] or out["slack_channel"]):
+        errors["email"] = "add an email address or a Slack channel to send updates to"
+    if errors:
+        raise EditError(errors)
+    return out
+
+
+def save_monitor(client_id, owner_email, body, *, now=None, conn=None):
+    """Store the settings. Switching updates on marks the current week's
+    slot as done, so the first update comes at the next slot, not at once."""
+    from datetime import datetime, timezone
+    from . import market_radar_monitor as mon
+    clean = validate_monitor(body)
+    c = store.get_client(client_id, owner_email, conn=conn)
+    if c is None:
+        raise PermissionError("client %s is not yours or does not exist" % client_id)
+    settings = dict(c["settings"] or {})
+    old = settings.get("monitor") or {}
+    new = dict(old, **clean)
+    now = now or datetime.now(timezone.utc)
+    if clean["enabled"] and (not old.get("enabled") or old.get("weekday") != clean["weekday"]
+                             or old.get("hour") != clean["hour"]):
+        new["last_slot"] = mon.slot_for(now, clean["weekday"], clean["hour"]).isoformat()
+    settings["monitor"] = new
+    store.update_client_settings(client_id, owner_email, settings=settings, conn=conn)
+    return monitor_view(client_id, owner_email, now=now, conn=conn)
+
+
+def monitor_view(client_id, owner_email, *, now=None, conn=None):
+    from datetime import datetime, timezone
+    from . import market_radar_deliver as dl
+    from . import market_radar_monitor as mon
+    c = store.get_client(client_id, owner_email, conn=conn)
+    if c is None:
+        return None
+    m = (c["settings"] or {}).get("monitor") or {}
+    now = now or datetime.now(timezone.utc)
+    weekday, hour = int(m.get("weekday", 0)), int(m.get("hour", 7))
+    out = {"enabled": m.get("enabled") is True, "weekday": weekday, "hour": hour,
+           "email": m.get("email") if m.get("email") is not None else [owner_email.lower()],
+           "slack_channel": m.get("slack_channel") or "",
+           "next": _iso(mon.next_slot(now, weekday, hour)) if m.get("enabled") else None,
+           "last_started_at": m.get("last_started_at"), "last_error": m.get("last_error"),
+           "senders": dl.ready(), "scheduler": mon.enabled(), "updates": []}
+    for d in store.list_digests(client_id, owner_email, limit=8, conn=conn):
+        p = d["payload"] or {}
+        w = p.get("words") or {}
+        out["updates"].append({
+            "id": d["id"], "created_at": _iso(d["created_at"]), "since": _iso(d["since"]),
+            "status": p.get("status"), "note": p.get("note"),
+            "headline": (w.get("headline") or {}).get("text"),
+            "items": [{"text": i["text"], "so_what": i.get("so_what")} for i in w.get("items") or []],
+            "removed": len(p.get("removed") or []),
+            "delivery": {k: v for k, v in (d["delivery"] or {}).items() if k in ("email", "slack", "at")}})
+    return out

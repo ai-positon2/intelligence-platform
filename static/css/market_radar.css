@@ -131,6 +131,7 @@
 .mr-callout.info{background:var(--mr-accent-bg)}
 .mr-callout.bad{background:var(--mr-bad-bg)}
 .mr-callout.ok{background:var(--mr-ok-bg)}
+.mr-callout.warn{background:var(--mr-warn-bg)}
 
 .mr-more{margin-top:18px;border-top:1px solid var(--mr-line);padding-top:12px}
 .mr-more summary{cursor:pointer;font-size:13px;font-weight:650;color:var(--mr-tx2);list-style:none}
@@ -230,3 +231,10 @@
 .mr-theme:first-child { border-top: 0; }
 .mr-theme-sum { margin: 6px 0 4px; }
 .mr-theme-why { margin: 0 0 4px; opacity: .85; }
+
+/* Weekly update (Phase 8) */
+.mr-mon{display:flex;flex-wrap:wrap;gap:12px 16px;align-items:end}
+.mr-mon label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--mr-tx2)}
+.mr-mon .mr-mon-on{flex-direction:row;align-items:center;gap:8px;font-size:13.5px;color:var(--mr-tx);flex-basis:100%}
+.mr-mon .mr-mon-wide{flex:1 1 280px}
+.mr-mon .mr-form-foot{flex-basis:100%}
