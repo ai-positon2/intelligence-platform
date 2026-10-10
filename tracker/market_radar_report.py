@@ -492,6 +492,13 @@ def empty_note(pack, collection):
     found with the network switched off, 2026-10-10)."""
     if collection is None:
         return "Nothing has been collected yet for this client, so there is nothing to write about."
+    if not collection.get("companies"):
+        note = ("No competitors are being followed yet, so there was nothing to collect about them, "
+                "and no industry news or nearby openings were found to write about.")
+        if not (pack.get("client") or {}).get("industry"):
+            note += (" The company's own website has not been read yet, so its industry and "
+                     "location are unknown: find its competitors first.")
+        return note
     lines = [_clean(l, 200) for l in pack.get("coverage") or [] if l and str(l).strip()]
     note = ("This collection found nothing to write about: no competitor moves, nearby openings, "
             "new brands or industry themes.")

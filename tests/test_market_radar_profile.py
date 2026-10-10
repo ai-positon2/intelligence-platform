@@ -257,6 +257,49 @@ def test_sitemap_index_is_followed_places_and_products_first(web):
     assert sm["top_sections"][0] == ("/locations", 30)
 
 
+BAD = "https://[wd_hustle id=1 type=popup]"
+
+
+def test_an_address_python_cannot_take_apart_is_dropped_not_fatal(web):
+    """toothaffair.com (2026-10-10): a plugin shortcode in square brackets in
+    a link made urljoin raise and took the whole read down."""
+    assert site.parseable("/about") and site.parseable("https://a.example/x[1]")
+    assert not site.parseable(BAD) and not site.parseable("//[not an ip]/x")
+    html = ('<html lang="en"><head><title>Tooth</title><link rel="canonical" href="%s">'
+            '<link rel="alternate" hreflang="en" href="%s"><script src="%s"></script></head>'
+            '<body><a href="%s">Offer</a><a href="/contact">Contact us</a> %s</body></html>'
+            % (BAD, BAD, BAD, BAD, words(300)))
+    web.pages["https://tooth.example/"] = page("https://tooth.example/", html)
+    web.texts["https://tooth.example/sitemap.xml"] = (
+        "<urlset><url><loc>%s</loc></url><url><loc>https://tooth.example/clinics/a/</loc></url></urlset>"
+        % BAD.replace(" ", "%20"))
+    rs = site.read_site("https://tooth.example/")
+    assert rs["status"] == "ok" and rs["pages"][0]["status"] == "ok"
+    assert "https://tooth.example/contact" in web.asked
+    assert not any("wd_hustle" in u for u in web.asked)
+    assert rs["signals"]["sitemap"]["urls"] == 1          # the bracketed entry skipped, not fatal
+
+
+def test_the_page_reader_keeps_no_address_python_cannot_parse():
+    c = site._Collector()
+    c.feed('<link rel="canonical" href="%s"><link rel="alternate" hreflang="de" href="%s">'
+           '<link rel="alternate" type="application/rss+xml" href="%s">'
+           '<link rel="alternate" hreflang="en" href="/en/"><a href="%s">x</a><a href="/ok">ok</a>'
+           % (BAD, BAD, BAD, BAD))
+    assert c.canonical is None and c.feeds == [] and c.hreflang == [("en", "/en/")]
+    assert c.links == [("/ok", "ok")]
+
+
+def test_a_reader_that_breaks_still_returns_a_failed_read(monkeypatch):
+    def boom(url):
+        raise RuntimeError("parser exploded")
+    monkeypatch.setattr(site, "choose_home", boom)
+    rs = site.read_site("tooth.example")
+    assert rs["status"] == "failed" and rs["home_url"] == "https://tooth.example"
+    assert "the website reader broke on this site (RuntimeError: parser exploded)" in rs["pages"][0]["note"]
+    assert rs["signals"] == {} and rs["domain"] == "tooth.example"
+
+
 def test_no_sitemap_is_none_not_an_empty_one(web):
     assert site.read_sitemap("https://a.example/", []) is None
 

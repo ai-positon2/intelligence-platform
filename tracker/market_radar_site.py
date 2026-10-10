@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import concurrent.futures
 import json
+import logging
 import re
 from collections import Counter
 from datetime import datetime, timezone
@@ -37,6 +38,8 @@ import requests
 from .event_intel_harvest import (_charset, _read_body, client_render_marker,
                                   html_to_linked_text)
 from .event_intel_http import public_get
+
+logger = logging.getLogger(__name__)
 
 UA = "Mozilla/5.0 (compatible; Position2-MarketRadar/1.0; +https://intelligence.position2.com)"
 TIMEOUT = 20
@@ -191,6 +194,18 @@ PRODUCT_PATH = re.compile(r"/(products?|p|produtos?|produkte?|productos?|item|sh
 
 # == HTML parsing ===================================================================
 
+def parseable(href):
+    """Whether Python can take this address apart. A bracketed host that is
+    not an IP address raises ValueError in urlsplit and urljoin: a WordPress
+    plugin's "[wd_hustle id=1 type=popup]" shortcode left in a link took
+    toothaffair.com's whole read down (2026-10-10)."""
+    try:
+        urlsplit(str(href))
+        return True
+    except ValueError:
+        return False
+
+
 class _Collector(HTMLParser):
     """One pass over a page: what the signals need, nothing rendered."""
 
@@ -222,7 +237,9 @@ class _Collector(HTMLParser):
                 self.meta[key] = a["content"].strip()
         elif tag == "link":
             rel = a.get("rel", "").lower()
-            if "alternate" in rel and a.get("hreflang"):
+            if a.get("href") and not parseable(a["href"]):
+                pass
+            elif "alternate" in rel and a.get("hreflang"):
                 self.hreflang.append((a["hreflang"], a.get("href", "")))
             elif "alternate" in rel and a.get("href") and re.search(
                     r"(rss|atom)\+xml", a.get("type", ""), re.I):
@@ -234,7 +251,7 @@ class _Collector(HTMLParser):
                 self.scripts_src.append(a["src"])
             if "ld+json" in a.get("type", "").lower():
                 self._in_jsonld, self._buf = True, []
-        elif tag == "a" and a.get("href"):
+        elif tag == "a" and a.get("href") and parseable(a["href"]):
             self._a = [a["href"], []]
 
     def handle_endtag(self, tag):
@@ -838,7 +855,7 @@ def read_sitemap(home_url, sitemap_urls):
         files_read += 1
         if not body:
             continue
-        locs = re.findall(r"<loc>\s*([^<\s]+)\s*</loc>", body)
+        locs = [u for u in re.findall(r"<loc>\s*([^<\s]+)\s*</loc>", body) if parseable(u)]
         if "<sitemapindex" in body[:2000]:
             # Prefer the sitemaps that describe places and products.
             locs.sort(key=lambda u: 0 if re.search(r"location|store|product|clinic|office|"
@@ -955,7 +972,29 @@ def page_head(doc):
 def read_site(url):
     """Read a company's homepage and up to MAX_EXTRA_PAGES of its own pages.
     Returns {"home_url", "domain", "pages", "signals", "country", ...}.
-    Never raises; an unreadable site comes back with status and reasons."""
+    Never raises; an unreadable site comes back with status and reasons,
+    and a page that breaks the reader itself is one of those reasons."""
+    try:
+        return _read_site(url)
+    except Exception as e:
+        logger.exception("market_radar_site: reading %s broke", url)
+        home = str(url).strip()
+        home = home if "://" in home else "https://" + home
+        try:
+            domain = _host(home)
+        except ValueError:
+            domain = None
+        note = "the website reader broke on this site (%s: %s)" % (type(e).__name__, str(e)[:160])
+        return {"input_url": url, "home_url": home, "domain": domain,
+                "read_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+                "pages": [{"kind": "home", "url": home, "status": "failed", "http_status": None,
+                           "note": note, "words": 0, "via": None}],
+                "texts": {}, "signals": {}, "country": None, "needs_browser": False,
+                "geo_redirect": None, "home_notes": [note], "robots": None, "status": "failed",
+                "via_archive": False}
+
+
+def _read_site(url):
     started = datetime.now(timezone.utc)
     url = url.strip()
     if "://" not in url:

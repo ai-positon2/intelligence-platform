@@ -218,6 +218,10 @@ def test_coverage_says_how_many_were_read_and_why_not_the_rest():
     results = [{"rows": [{"detector": "jobs", "status": "ok"}]},
                {"rows": [{"detector": "jobs", "status": "none"}]},
                {"rows": [{"detector": "jobs", "status": "failed"}]}]
+    one = [{"rows": [{"detector": "jobs", "status": "skipped"}]}]
+    assert next(l for l in mc.coverage(one) if l["detector"] == "jobs")["text"] == \
+        "Hiring read for 0 of 1 competitors; 1 was skipped."
+    assert mc.coverage([]) == []
     line = next(l for l in mc.coverage(results) if l["detector"] == "jobs")
     assert line["text"] == ("Hiring read for 1 of 3 competitors; 1 has no public jobs board, "
                             "1 could not be read.")

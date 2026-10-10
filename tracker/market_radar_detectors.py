@@ -129,7 +129,8 @@ def read_sitemaps(get, sitemap_urls, *, prefer, keep, max_files=8, max_urls=60_0
                 if read.get("truncated"):
                     complete = False
                 if "<sitemapindex" in body[:3000]:
-                    children = re.findall(r"<loc>\s*([^<\s]+)\s*</loc>", body)
+                    children = [c for c in re.findall(r"<loc>\s*([^<\s]+)\s*</loc>", body)
+                                if site.parseable(c)]
                     wanted = [c for c in children if prefer.search(c)]
                     # Only the children that look like what we want, when any
                     # do; otherwise every child (sitemap-1.xml, sitemap-2.xml)
@@ -144,6 +145,8 @@ def read_sitemaps(get, sitemap_urls, *, prefer, keep, max_files=8, max_urls=60_0
                     if not m:
                         continue
                     url = m.group(1).replace("&amp;", "&")
+                    if not site.parseable(url):
+                        continue
                     if keep(urlsplit(url).path or "/"):
                         lm = re.search(r"<lastmod>\s*([^<\s]+)\s*</lastmod>", block)
                         entries[url] = _date(lm.group(1)) if lm else None

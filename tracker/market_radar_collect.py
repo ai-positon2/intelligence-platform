@@ -300,8 +300,12 @@ NONE_WORDS = {"news": "no articles", "locations": "no location pages or addresse
 
 
 def coverage(results):
-    """One line per detector: read for how many, and why not the rest."""
+    """One line per detector: read for how many, and why not the rest. No
+    lines when there were no competitors ("read for 0 of 0" six times said
+    nothing, clovedental.in, 2026-10-10)."""
     total = len(results)
+    if not total:
+        return []
     lines = []
     for name, _r, _c, _b, label in DETECTORS:
         counts = {}
@@ -321,7 +325,8 @@ def coverage(results):
                                        NONE_WORDS[name]))
         for st in ("failed", "skipped"):
             if counts.get(st):
-                parts.append("%d %s" % (counts[st], WHY[st]))
+                why = "was skipped" if st == "skipped" and counts[st] == 1 else WHY[st]
+                parts.append("%d %s" % (counts[st], why))
         text = "%s read for %d of %d competitors" % (label, read, total)
         if parts:
             text += "; " + ", ".join(parts)

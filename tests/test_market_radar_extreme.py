@@ -86,8 +86,12 @@ def test_a_company_whose_site_could_never_be_read_still_gets_a_finished_run(pg, 
     assert s["status"] == "empty" and s["companies"] == []
     for stage in ("radar", "pulse", "signals", "report"):
         assert stage in s, stage
-    # nothing pretends to have looked
-    assert "error" in s["report"] or s["report"].get("status") != "ok"
+    # nothing pretends to have looked, and the reason is one plain sentence
+    assert s["coverage"] == []
+    note = s["report"]["note"]
+    assert s["report"]["status"] == "empty" and "0 of 0" not in note
+    assert note.startswith("No competitors are being followed yet")
+    assert "website has not been read yet" in note
     moves, report, digest = everything_renders(client)
     assert moves["events"] == [] and digest["status"] in ("quiet", "failed", "no_data")
 

@@ -104,6 +104,20 @@ def test_a_sitemap_index_follows_the_location_children_first_and_only_them():
     assert got["complete"] and "https://acme.com/sm-blog.xml" not in net.asked
 
 
+def test_a_sitemap_entry_python_cannot_parse_is_skipped():
+    bad = "https://[wd_hustle%20id=1]/x"     # as a sitemap spells it
+    net = Net({"https://acme.com/sitemap.xml":
+               "<sitemapindex><sitemap><loc>%s</loc></sitemap>"
+               "<sitemap><loc>https://acme.com/sm-locations.xml</loc></sitemap></sitemapindex>"
+               % "https://[locations%20sitemap]/sm-locations.xml",
+               "https://acme.com/sm-locations.xml": urlset("https://acme.com/locations/austin/", bad)})
+    got = det.read_sitemaps(net.get, ["https://acme.com/sitemap.xml"],
+                            prefer=det.LOCATION_SITEMAP,
+                            keep=lambda p: bool(det.site.LOCATION_PATH.search(p)))
+    assert list(got["entries"]) == ["https://acme.com/locations/austin/"]
+    assert not any("[" in u for u in net.asked)
+
+
 def test_a_sitemap_cut_short_is_not_complete():
     net = Net({"https://acme.com/sitemap.xml": urlset(*["https://acme.com/locations/%d" % i
                                                         for i in range(5)])})
