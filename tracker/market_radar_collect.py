@@ -80,7 +80,8 @@ FOR_ARCHETYPES = {
 REUSE = {"subdomains": 7 * 24, "headcount": 30 * 24, "linkedin": 7 * 24}
 
 
-HOOKS = ("crt_connect", "apollo_enrich", "linkedin_collect", "linkedin_available")
+HOOKS = ("crt_connect", "apollo_enrich", "linkedin_collect", "linkedin_available", "sleep",
+         "linkedin_allowance")
 
 
 def applies(name, archetype):
@@ -283,6 +284,9 @@ def collect_client(client_id, owner_email, *, run_id=None, progress=None, store=
     breaker = news.Breaker()
     done, results = 0, []
     started = time.monotonic()
+
+    io = dict(io or {})
+    io.setdefault("linkedin_allowance", li.Allowance())
 
     def one(entity):
         return collect_entity(entity, run_id=run_id, client_country=client_country,

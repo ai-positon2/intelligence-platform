@@ -106,7 +106,7 @@ def run(budget_s=BUDGET_S):
     def crtsh():
         import psycopg2
         from . import market_radar_b2b as b2b
-        conn = psycopg2.connect(**b2b.CRT)
+        conn = b2b._connect_with_retry(psycopg2.connect, time.sleep)
         try:
             cur = conn.cursor()
             cur.execute("SELECT 1")

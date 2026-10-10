@@ -18,8 +18,29 @@ import re
 
 from .market_radar_detectors import _date, _event, _fail
 
+import threading
+
 MAX_POSTS = 20
 WINDOW_DAYS = 30
+# Every read uses a real person's LinkedIn session: at most this many
+# companies per collection, the highest-ranked first (a first B2B
+# collection would otherwise make two dozen calls in a minute).
+PER_COLLECTION = 6
+
+
+class Allowance:
+    """How many LinkedIn reads a collection may still make, shared by its
+    threads."""
+
+    def __init__(self, n=None):
+        self.left, self._lock = PER_COLLECTION if n is None else n, threading.Lock()
+
+    def take(self):
+        with self._lock:
+            if self.left <= 0:
+                return False
+            self.left -= 1
+            return True
 
 
 def _title(caption):
@@ -57,6 +78,11 @@ def read_linkedin(ctx, *, collect=None, available=None):
     if available is not None and not available():
         return {"status": "skipped", "note": "no LinkedIn account is connected on Unipile",
                 "payload": None, "items": 0}
+    allowance = hooks.get("linkedin_allowance")
+    if allowance is not None and not allowance.take():
+        return {"status": "skipped", "note": "LinkedIn is read for at most %d companies per "
+                "collection, the highest-ranked first" % PER_COLLECTION, "payload": None,
+                "items": 0}
     try:
         posts, page = collect(handle)
     except Exception as e:

@@ -125,6 +125,28 @@ def test_when_crtsh_fails_cert_spotter_answers_without_history_and_a_first_read_
     assert B.baseline_subdomains(r["payload"], NOW) == []
 
 
+def test_a_full_crtsh_pool_is_asked_again_before_falling_back():
+    tries, slept = [], []
+    conn = Conn([("mcp.gorgias.com", datetime(2026, 9, 17))])
+
+    def connect(**kw):
+        tries.append(1)
+        if len(tries) < 3:
+            raise RuntimeError('ERROR:  no more connections allowed (max_client_conn)')
+        return conn
+    r = B.read_subdomains(ctx(hooks={"crt_connect": connect, "sleep": slept.append}))
+    assert r["payload"]["source"] == "crt.sh" and len(tries) == 3 and slept == [4, 12]
+    tries.clear(); slept.clear()
+    web = Web({"https://api.certspotter.com/": certspotter({None: []})})
+    always = lambda **kw: tries.append(1) or (_ for _ in ()).throw(RuntimeError("max_client_conn"))  # noqa: E731
+    r = B.read_subdomains(ctx(web, hooks={"crt_connect": always, "sleep": slept.append}))
+    assert len(tries) == 3 and r["payload"]["source"] == "Cert Spotter"
+    tries.clear(); slept.clear()
+    other = lambda **kw: tries.append(1) or (_ for _ in ()).throw(OSError("unreachable"))  # noqa: E731
+    B.read_subdomains(ctx(web, hooks={"crt_connect": other, "sleep": slept.append}))
+    assert len(tries) == 1 and slept == []          # only a full pool is worth waiting for
+
+
 def test_both_logs_failing_is_a_failure_with_both_reasons():
     web = Web({"https://api.certspotter.com/": miss()})
     r = B.read_subdomains(ctx(web, hooks={"crt_connect": lambda **kw: (_ for _ in ()).throw(OSError("x"))}))
@@ -458,3 +480,25 @@ def test_a_b2b_clients_collection_runs_every_detector_and_stores_their_moves(pg,
     out = mc.collect_client(dent, OWNER, io=io2, store=pg, now=now)
     assert {r["detector"] for r in out["companies"][0]["rows"]} == set(mc.NAMES) - {"subdomains", "headcount", "linkedin"}
     assert {l["detector"] for l in out["coverage"]} == set(mc.NAMES) - {"subdomains", "headcount", "linkedin"}
+
+
+def test_linkedin_is_read_for_a_few_companies_per_collection(pg, monkeypatch):
+    from test_market_radar_collect import world
+    monkeypatch.setattr(L, "PER_COLLECTION", 2)
+    me = pg.upsert_entity("client.example", name="Client", archetype="b2b_services")
+    pg.set_profile(me, {"name": "Client", "archetype": "b2b_services"})
+    client = pg.upsert_client(OWNER, me)
+    for i in range(4):
+        pg.propose_competitor(client, OWNER, pg.upsert_entity("rival%d.example" % i), "direct",
+                              confidence=0.9 - i / 10)
+    io, _ = world([], [], [])
+    orig = io["read_site"]
+    io["read_site"] = lambda url: dict(orig(url), signals=dict(orig(url)["signals"], socials={"linkedin": "x"}))
+    read = []
+    io.update(linkedin_collect=lambda h: read.append(h) or ([], {"page": "p"}), linkedin_available=lambda: True,
+              crt_connect=lambda **kw: Conn([]), apollo_enrich=apollo(10))
+    out = mc.collect_client(client, OWNER, io=io, store=pg, parallel=1)
+    assert len(read) == 2
+    rows = [next(r for r in c["rows"] if r["detector"] == "linkedin") for c in out["companies"]]
+    assert [r["status"] for r in rows] == ["empty", "empty", "skipped", "skipped"]
+    assert "at most 2 companies per collection" in rows[-1]["note"]

@@ -71,6 +71,10 @@ CRT_TIMEOUT_S = 100
 # crt.sh is a free public service with a small connection limit: never more
 # than two of our queries at a time, from this process.
 _crt_gate = threading.BoundedSemaphore(2)
+# Its guest pool is often full ("no more connections allowed
+# (max_client_conn)" from Railway, 2026-10-10): a refused connection is
+# asked again after these pauses before Cert Spotter is used.
+CRT_RETRY_S = (4, 12)
 CERTSPOTTER = "https://api.certspotter.com/v1/issuances?domain=%s&include_subdomains=true" \
               "&expand=dns_names"
 CERTSPOTTER_PAGES = 5
@@ -118,14 +122,28 @@ def worth_reporting(name, domain):
     return not TEST_LABEL.search(".".join(labels))
 
 
-def crtsh_names(domain, *, connect=None):
+def _connect_with_retry(connect, sleep):
+    for pause in CRT_RETRY_S + (None,):
+        try:
+            return connect(**CRT)
+        except Exception as e:
+            if pause is None or "max_client_conn" not in str(e) and \
+                    "too many" not in str(e).lower():
+                raise
+            sleep(pause)
+
+
+def crtsh_names(domain, *, connect=None, sleep=None):
     """{name: first certified (YYYY-MM-DD)} from crt.sh's full history.
     Raises when crt.sh cannot answer."""
     if connect is None:
         import psycopg2
         connect = psycopg2.connect
+    if sleep is None:
+        import time
+        sleep = time.sleep
     with _crt_gate:
-        conn = connect(**CRT)
+        conn = _connect_with_retry(connect, sleep)
         try:
             conn.autocommit = True
             cur = conn.cursor()
@@ -163,13 +181,14 @@ def certspotter_names(domain, get):
     return _names(raw, domain), pages
 
 
-def read_subdomains(ctx, *, connect=None):
+def read_subdomains(ctx, *, connect=None, sleep=None):
     connect = connect or (ctx.get("hooks") or {}).get("crt_connect")
+    sleep = sleep or (ctx.get("hooks") or {}).get("sleep")
     domain = ctx["entity"]["domain"]
     now = ctx["now"]
     tried = []
     try:
-        names = crtsh_names(domain, connect=connect)
+        names = crtsh_names(domain, connect=connect, sleep=sleep)
         source, history = "crt.sh", True
     except Exception as e:
         tried.append("crt.sh did not answer (%s)" % type(e).__name__)
