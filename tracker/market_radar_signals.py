@@ -391,6 +391,32 @@ def recency(day, now):
     return max(0.25, math.exp(-age / 45.0))
 
 
+def _as_date(v):
+    if v is None:
+        return None
+    if isinstance(v, datetime):
+        return v.date()
+    if isinstance(v, date):
+        return v
+    try:
+        return date.fromisoformat(str(v)[:10])
+    except ValueError:
+        return None
+
+
+def news_day(e):
+    """The day freshness is measured from: when the move happened, or, for
+    a move dated ahead ("grand opening October 17"), when it became news.
+    A planned date ahead is not fresher than this week's news (a franchise
+    opening dated a week ahead ranked first for Orangetheory, 2026-10-10)."""
+    seen = _as_date(e.get("first_seen_at"))
+    day = _as_date(e.get("event_date")) or seen
+    if day and seen and day > seen:
+        published = [d for d in (_as_date(s.get("date")) for s in e.get("sources") or []) if d]
+        day = min(published) if published else seen
+    return day
+
+
 def distance_factor(km):
     if km is None:
         return 1.0
@@ -427,10 +453,7 @@ def score_events(events, *, tiers, now, point=None, local=False, feedback=None, 
     for e in events:
         if e.get("hidden_reason"):
             continue
-        day = e.get("event_date") or (e.get("first_seen_at").date() if e.get("first_seen_at")
-                                      else None)
-        if isinstance(day, str):
-            day = date.fromisoformat(day[:10])
+        day = news_day(e)
         km = None
         loc = e.get("location") or {}
         if point and loc.get("lat") is not None:

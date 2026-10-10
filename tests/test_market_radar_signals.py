@@ -428,3 +428,15 @@ def test_for_a_chain_one_more_rival_branch_is_routine():
     chain, _ = S.score_events(evs, tiers={}, now=NOW, chain=True)
     assert by_id(chain)[1]["score"] == pytest.approx(by_id(single)[1]["score"] * 0.6)
     assert by_id(chain)[2]["score"] == pytest.approx(by_id(single)[2]["score"])
+
+
+def test_a_move_dated_ahead_is_as_fresh_as_its_news_not_fresher():
+    ahead = event(1, "new_location", day="2026-10-17",
+                  sources=[{"url": "u", "detector": "news", "date": "2026-09-20"}])
+    same_news = event(2, "new_location", entity=11, day="2026-09-20")
+    rows, _ = S.score_events([ahead, same_news], tiers={}, now=NOW)
+    assert by_id(rows)[1]["score"] == pytest.approx(by_id(rows)[2]["score"])
+    # With no dated source, the day it was first seen.
+    undated = event(3, "new_location", entity=12, day="2026-12-01")
+    assert S.news_day(undated) == NOW.date()
+    assert S.news_day(event(4, "funding", day=None)) == NOW.date()
