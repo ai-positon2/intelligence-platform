@@ -302,8 +302,8 @@ WRITER_SYSTEM = """You write a market-intelligence brief for the business named 
 Use only the evidence pack. Every statement cites the references it rests on (M3, T2, N1, H4, C2...). Never state a fact (a name, number, date, place, or what a company did) that is not in the evidence you cite. Do not invent figures, motives or outcomes. A move marked planned or announced has not happened yet: say "plans to", "will", "announced".
 
 Write:
-- summary: two or three sentences on what matters most this period for the client.
-- top: the 3 to 5 developments that matter most to THIS client, most important first. Rank by consequence for the client, using severity as a guide, not by how often something was reported. Each has:
+- summary: two or three sentences on what matters most this period for the client. It cites every reference whose facts it uses.
+- top: the 1 to 5 developments that matter most to THIS client, most important first. In a quiet period list fewer: a website wording change, a routine product colour or a single small promotion is not a development unless it shows a new service, price, offer or market. Rank by consequence for the client, using severity as a guide, not by how often something was reported. Each has:
   - title: at most 10 words.
   - what_happened: one or two sentences of fact.
   - so_what: one or two sentences on what it means for the client specifically (its location, its offer, its customers).
@@ -314,6 +314,11 @@ Write:
 - industry: for each industry theme that matters to the client (at most 5), a title and one sentence on its implication for the client.
 - opportunities, threats: two to four each, one sentence each, specific to the client.
 - watch: two or three things to check in the coming weeks (a planned opening's date, a pending deal).
+
+Rules for facts:
+- Facts about the client itself (its location, offer, size) come only from the CLIENT line. Do not assume anything else about the client (ownership, payment model, history).
+- Give a price only with the currency the evidence states; if it states none, leave the price out.
+- Do not claim that something did not happen or was not found; say only what the evidence shows.
 
 Plain English, short sentences, no jargon, no marketing tone. Never use em dashes or en dashes. If the evidence is thin, write less: an empty section is better than padding."""
 
@@ -385,16 +390,20 @@ def clean_brief(data, refs):
 CHECK_SCHEMA = {
     "type": "object", "additionalProperties": False, "required": ["verdicts"],
     "properties": {"verdicts": {"type": "array", "items": {
-        "type": "object", "additionalProperties": False, "required": ["id", "supported", "problem"],
-        "properties": {"id": {"type": "string"}, "supported": {"type": "boolean"},
-                       "problem": {"type": "string"}}}}}}
+        "type": "object", "additionalProperties": False,
+        "required": ["id", "reasoning", "unsupported_facts", "supported"],
+        "properties": {"id": {"type": "string"}, "reasoning": {"type": "string"},
+                       "unsupported_facts": {"type": "array", "items": {"type": "string"}},
+                       "supported": {"type": "boolean"}}}}}}
 CHECK_SYSTEM = """You check a market-intelligence brief against its evidence. For each numbered statement you get the statement and the evidence it cites.
 
 A statement is SUPPORTED when every fact in it is in its cited evidence: company names, numbers, dates, places, what a company did, and whether it has happened (a move the evidence calls planned or announced must not be stated as done). Advice, interpretation and implications for the client are allowed when they follow from the cited facts; do not mark a statement unsupported for giving advice.
 
 A statement is NOT SUPPORTED when it states a fact that is not in its cited evidence, contradicts it, or turns a plan into a done deal.
 
-Return one verdict per statement id. For an unsupported statement, problem says in a few words which fact is not supported; otherwise problem is ""."""
+Facts about the client itself are checked against the CLIENT line given with each statement.
+
+Return one verdict per statement id, in this order: reasoning (one short sentence, checking the facts one by one), unsupported_facts (each fact that is not in the evidence, quoted briefly; empty when all are), then supported (false only when unsupported_facts is not empty)."""
 
 
 def statements(brief):
@@ -424,8 +433,12 @@ def check_brief(brief, pack, *, run_id=None, client=None, llm=None):
     stmts = statements(brief)
     if not stmts:
         return brief, [], None
-    user = "\n\n".join("STATEMENT %s: %s\nEVIDENCE:\n%s" % (
-        sid, text, "\n".join(evidence_text(refs[r]) for r in cites)) for sid, text, cites in stmts)
+    client_line = pack_text({"client": pack["client"], "competitors": [], "moves": [],
+                             "nearby": [], "entrants": [], "themes": [], "rules": [], "hiring": [],
+                             "coverage": []})
+    user = "\n\n".join("STATEMENT %s: %s\nEVIDENCE:\n%s\n%s" % (
+        sid, text, client_line, "\n".join(evidence_text(refs[r]) for r in cites))
+        for sid, text, cites in stmts)
     try:
         data, _meta = llm.call_json(CHECK_SYSTEM, user, CHECK_SCHEMA, model=CHECK_MODEL,
                                     max_tokens=min(12000, 600 + 120 * len(stmts)),
@@ -435,8 +448,15 @@ def check_brief(brief, pack, *, run_id=None, client=None, llm=None):
             "were not checked against their evidence." % getattr(e, "kind", type(e).__name__)
     verdicts = {str(v.get("id")): v for v in data.get("verdicts") or []}
     unchecked = [sid for sid, _t, _c in stmts if sid not in verdicts]
-    bad = {sid: verdicts[sid].get("problem") or "not supported by its evidence"
-           for sid, _t, _c in stmts if sid in verdicts and verdicts[sid].get("supported") is False}
+    # Removed only when the check names a fact it could not find: a "false"
+    # with nothing named was the checker contradicting its own reasoning
+    # (live, 2026-10-10: "supported on its face ... so supported", false).
+    bad = {}
+    for sid, _t, _c in stmts:
+        v = verdicts.get(sid) or {}
+        facts = [_clean(f, 120) for f in v.get("unsupported_facts") or [] if str(f).strip()]
+        if v.get("supported") is False and facts:
+            bad[sid] = "; ".join(facts)
     removed = [{"where": sid, "text": _clean(text, 300), "why": _clean(bad[sid], 200)}
                for sid, text, _c in stmts if sid in bad]
     out = dict(brief)

@@ -367,7 +367,10 @@ WEIGHTS = {
     "legal_regulatory": 6, "hiring_surge": 6, "hiring_slowdown": 6, "hiring_push": 5,
     "new_job_location": 6, "location_list_shrank": 5, "product_launch": 5, "partnership": 5,
     "financial_results": 5, "rebrand": 5, "senior_hire_search": 4, "promotion": 4,
-    "sale_started": 4, "other_move": 3, "marketing_campaign": 3, "page_changed": 3, "product_removed": 3,
+    "sale_started": 4, "other_move": 3, "marketing_campaign": 3, "product_removed": 3,
+    # A key page's wording changed: worth listing, rarely worth a report's
+    # top five (McFarlane Dental's swapped blog link ranked second, 2026-10-10).
+    "page_changed": 2,
     "promotion_ended": 2, "review_growth": 2, "sold_out": 2, "site_restructured": 2,
     "announcement": 2,
 }

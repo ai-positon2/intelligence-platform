@@ -189,16 +189,19 @@ class ModelError(Exception):
 
 
 def test_the_check_removes_unsupported_statements_and_says_why():
-    llm = LLM({"verdicts": [{"id": "summary", "supported": True, "problem": ""},
-                            {"id": "top.0", "supported": True, "problem": ""},
-                            {"id": "top.1", "supported": False, "problem": "the evidence says planned"},
-                            {"id": "competitors.0", "supported": True, "problem": ""},
-                            {"id": "industry.0", "supported": False, "problem": "no such theme"}]})
+    def v(i, ok, facts=()):
+        return {"id": i, "reasoning": "r", "unsupported_facts": list(facts), "supported": ok}
+    llm = LLM({"verdicts": [v("summary", True), v("top.0", True),
+                            v("top.1", False, ["opened (the evidence says planned)"]),
+                            v("competitors.0", False),          # false, but no fact named: kept
+                            v("industry.0", False, ["no such theme", " "])]})
     out, removed, note = R.check_brief(statements_brief(), pack(), llm=llm)
     assert [t["title"] for t in out["top"]] == ["Bought"] and out["industry"] == []
-    assert [(r["where"], r["why"]) for r in removed] == [("top.1", "the evidence says planned"),
+    assert len(out["competitors"]) == 1
+    assert [(r["where"], r["why"]) for r in removed] == [("top.1", "opened (the evidence says planned)"),
                                                          ("industry.0", "no such theme")]
     assert note == "1 statements got no verdict from the check and are shown unchecked."
+    assert "CLIENT: Acme Dental (acme.example)" in llm.calls[0]["user"]
     assert out["watch"] and "STATEMENT top.1: Opened. Small Smiles opened" in llm.calls[0]["user"]
     assert "M2 | Small Smiles | New location" in llm.calls[0]["user"]
     assert llm.calls[0]["stage"] == "report_check" and llm.calls[0]["model"] == R.CHECK_MODEL
@@ -211,7 +214,7 @@ def test_a_check_that_could_not_run_keeps_the_brief_and_says_it_is_unchecked():
 
 
 def test_an_unsupported_summary_is_removed_too():
-    llm = LLM({"verdicts": [{"id": "summary", "supported": False, "problem": "x"}]})
+    llm = LLM({"verdicts": [{"id": "summary", "reasoning": "r", "unsupported_facts": ["x"], "supported": False}]})
     out, removed, _ = R.check_brief(statements_brief(), pack(), llm=llm)
     assert out["summary"] is None and removed[0]["where"] == "summary"
 
@@ -228,8 +231,8 @@ def good_writer():
 def test_a_report_is_written_checked_and_stored_with_its_pack():
     s = Store()
     llm = LLM({"report_write": good_writer(),
-               "report_check": {"verdicts": [{"id": "summary", "supported": True, "problem": ""},
-                                             {"id": "top.0", "supported": True, "problem": ""}]}})
+               "report_check": {"verdicts": [{"id": "summary", "reasoning": "", "unsupported_facts": [], "supported": True},
+                                             {"id": "top.0", "reasoning": "", "unsupported_facts": [], "supported": True}]}})
     out = R.write_report(1, "o", store=s, now=NOW, llm=llm, collection=COLLECTION, run_id=7)
     assert out == {"report_id": 1, "status": "ok", "note": None, "top": 1, "removed": 0, "dropped": 0,
                    "check_note": None}
@@ -273,6 +276,8 @@ def test_a_report_that_breaks_does_not_lose_the_collection():
 
 def test_the_prompts_hold_the_rules():
     assert "Never state a fact" in R.WRITER_SYSTEM and "plans to" in R.WRITER_SYSTEM
+    for rule in ("1 to 5", "only from the CLIENT line", "currency", "did not happen"):
+        assert rule in R.WRITER_SYSTEM, rule
     assert "turns a plan into a done deal" in R.CHECK_SYSTEM
     for t in (R.WRITER_SYSTEM, R.CHECK_SYSTEM):
         assert chr(0x2014) not in t and chr(0x2013) not in t
