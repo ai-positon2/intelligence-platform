@@ -683,3 +683,53 @@ def test_the_signal_reset_forgets_only_what_the_engine_made(client_with_reading,
     left = {e["id"]: e for e in store.recent_events([rival])}
     assert set(left) == {p, l} and left[p]["hidden_reason"] is None
     assert store.latest_snapshot(rival, "newsroom") is not None
+
+
+def test_the_report_routes_read_export_and_take_feedback(client_with_reading, monkeypatch):
+    import app as appmod
+    from tracker import market_radar_store as store
+    monkeypatch.setattr(appmod, "ADMIN_EMAILS", set(appmod.ADMIN_EMAILS) | {OWNER, OTHER})
+    w = client_with_reading
+    c = _client(OWNER)
+    assert c.get(BASE + "/report/%d" % w["client"]).status_code == 200
+    r = c.get(BASE + "/api/clients/%d/report" % w["client"])
+    assert r.status_code == 200 and r.get_json()["status"] == "none"
+    assert c.post(BASE + "/api/clients/%d/report/pdf" % w["client"], json={"html": "<p>x</p>"}).status_code == 409
+
+    rival = store.upsert_entity("rival.example", name="Rival")
+    store.propose_competitor(w["client"], OWNER, rival, "direct", confidence=0.8)
+    eid, _ = store.record_event(rival, "news:n1", type="acquisition", title="Rival buys X",
+                                source={"url": "https://news.example/a", "detector": "news"})
+    store.link_client_events(w["client"], [(eid, 9.0, "HIGH", None)])
+    store.save_report(w["client"], {"status": "ok", "brief": {"top": []}, "removed": [],
+                                     "pack": {"moves": [{"ref": "M1", "event_id": eid}]},
+                                     "models": {"writer": "w", "check": "c"}}, run_id=w["run"])
+    v = c.get(BASE + "/api/clients/%d/report" % w["client"]).get_json()
+    assert v["status"] == "ok" and v["pack"]["moves"][0]["feedback"] is None and v["cost"]["total_usd"] == 0
+    assert _client(OTHER).get(BASE + "/api/clients/%d/report" % w["client"]).status_code == 404
+
+    r = c.post(BASE + "/api/clients/%d/events/%d/feedback" % (w["client"], eid), json={"feedback": "down"})
+    assert r.status_code == 200
+    v = c.get(BASE + "/api/clients/%d/report" % w["client"]).get_json()
+    assert v["pack"]["moves"][0]["feedback"] == "down"
+    assert c.post(BASE + "/api/clients/%d/events/%d/feedback" % (w["client"], eid),
+                  json={"feedback": "maybe"}).status_code == 400
+    assert c.post(BASE + "/api/clients/%d/events/999999/feedback" % w["client"],
+                  json={"feedback": "up"}).status_code == 404
+    assert _client(OTHER).post(BASE + "/api/clients/%d/events/%d/feedback" % (w["client"], eid),
+                               json={"feedback": "up"}).status_code == 404
+
+    r = c.post(BASE + "/api/clients/%d/report/pdf" % w["client"],
+               json={"html": "<section><h2>What matters most</h2><p>Rival buys X</p></section>",
+                     "title": "Market Radar: Acme Dental", "subtitle": "Written 10 Oct 2026"})
+    assert r.status_code == 200 and r.headers["Content-Type"] == "application/pdf"
+    assert r.data[:4] == b"%PDF" and "market-radar-acme-dental.pdf" in r.headers["Content-Disposition"]
+    assert b"Market Radar" in r.data or len(r.data) > 1000
+    assert _client(OTHER).post(BASE + "/api/clients/%d/report/pdf" % w["client"],
+                               json={"html": "<p>x</p>"}).status_code == 404
+
+
+def test_the_report_routes_are_admin_only(client_with_reading):
+    w = client_with_reading
+    for path in ("/report/%d", "/api/clients/%d/report"):
+        assert _client("someone@else.example").get(BASE + path % w["client"]).status_code in (302, 403)

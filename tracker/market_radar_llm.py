@@ -42,10 +42,10 @@ def default_client():
     return Anthropic(api_key=key, timeout=240, max_retries=2)
 
 
-def _request(client, model, max_tokens, system, user, schema, use_fallbacks):
+def _request(client, model, max_tokens, system, user, schema, use_fallbacks, effort="low"):
     kwargs = dict(model=model, max_tokens=max_tokens, system=system,
                   messages=[{"role": "user", "content": user}],
-                  output_config={"effort": "low",
+                  output_config={"effort": effort,
                                  "format": {"type": "json_schema", "schema": schema}})
     if use_fallbacks:
         # If the model declines, the API re-runs the request on a fallback
@@ -54,21 +54,23 @@ def _request(client, model, max_tokens, system, user, schema, use_fallbacks):
     return client.messages.create(**kwargs)
 
 
-def call_json(system, user, schema, *, model, max_tokens, run_id=None, stage, client=None):
-    """Returns (parsed, meta). Raises ModelError."""
+def call_json(system, user, schema, *, model, max_tokens, run_id=None, stage, client=None,
+              effort="low"):
+    """Returns (parsed, meta). Raises ModelError. `effort` is "low" for
+    every reading step; the report writer asks for more."""
     client = client or default_client()
     meta = {"model_requested": model, "prompt_chars": len(system) + len(user)}
 
     def call():
         started = time.monotonic()
         try:
-            resp = _request(client, model, max_tokens, system, user, schema, True)
+            resp = _request(client, model, max_tokens, system, user, schema, True, effort)
         except Exception as e:
             # A fallback configuration this API version rejects must not cost
             # the step: ask again without it, and say so.
             if "fallback" in str(e).lower() and getattr(e, "status_code", None) == 400:
                 meta["fallbacks"] = "rejected by the API; asked without them"
-                resp = _request(client, model, max_tokens, system, user, schema, False)
+                resp = _request(client, model, max_tokens, system, user, schema, False, effort)
             else:
                 raise
         meta["elapsed_ms"] = int((time.monotonic() - started) * 1000)

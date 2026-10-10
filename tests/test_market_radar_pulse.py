@@ -475,7 +475,7 @@ def test_a_pulse_that_breaks_does_not_lose_the_collection():
     try:
         def boom(*a, **k):
             raise RuntimeError("google down")
-        mrun.collect_job(1, 2, "o", collect=lambda *a, **k: {"companies": []},
+        mrun.collect_job(1, 2, "o", collect=lambda *a, **k: {"companies": []}, report=lambda *a, **k: {},
                          radar=lambda *a, **k: {"local": None}, pulse=boom)
     finally:
         real.update_run = orig

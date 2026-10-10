@@ -103,7 +103,8 @@ def test_no_template_carries_its_own_copy_of_the_page_tracker():
 
 def test_every_previously_tracked_page_loads_the_shared_tracker():
     tracked = [n for n, s in _templates().items() if "js/page_track.js" in s]
-    assert len(tracked) == 24, sorted(tracked)      # 24th: market_radar.html (2026-10-09)
+    # 24th: market_radar.html (2026-10-09); 25th: market_radar_report.html (2026-10-10)
+    assert len(tracked) == 25, sorted(tracked)
 
 
 def test_hub_renders_the_tracker_with_this_pages_title_and_the_users_email():

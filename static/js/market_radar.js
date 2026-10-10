@@ -366,7 +366,8 @@
     var text = m ? 'Read ' + m[1] + ' of ' + m[2] + ' competitors'
       : stage === 'radar' ? 'Looking for new businesses nearby and new brands'
       : stage === 'pulse' ? 'Reading the industry news'
-      : stage === 'signals' ? 'Reading competitor headlines and ranking the moves' : 'Starting';
+      : stage === 'signals' ? 'Reading competitor headlines and ranking the moves'
+      : stage === 'report' ? 'Writing the report' : 'Starting';
     return '<div class="mr-callout">' + esc(text) + '… This runs in the background; you can leave the page.</div>';
   }
 
@@ -569,7 +570,8 @@
       (href ? '<a href="' + esc(href) + '" target="_blank" rel="noopener noreferrer">' + esc(c.domain) + '</a>' : esc(c.domain)) +
       (f.archetype ? '<span class="mr-chip">' + esc(label(ARCHETYPES, f.archetype)) + '</span>' : '') +
       (f['hq.city'] ? '<span>' + esc([f['hq.city'], f['hq.country_code']].filter(Boolean).join(', ')) + '</span>' : '') +
-      '</div></div><div class="mr-actions"><button type="button" class="mr-btn" data-act="run"' + (running ? ' disabled' : '') + '>' +
+      '</div></div><div class="mr-actions"><a class="mr-btn primary" href="/p2/admin/market-radar/report/' + encodeURIComponent(c.id) + '">Open the report</a>' +
+      '<button type="button" class="mr-btn" data-act="run"' + (running ? ' disabled' : '') + '>' +
       (running ? 'Running…' : 'Search again') + '</button></div></div>';
   }
 

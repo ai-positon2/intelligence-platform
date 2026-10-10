@@ -556,3 +556,37 @@ def pulse_view(client_id, owner_email, *, conn=None):
             "noise_dropped": cov.get("noise_dropped"),
             "off_topic_dropped": cov.get("off_topic_dropped")})
     return {"industry_key": key, "markets": out}
+
+
+def report_view(client_id, owner_email, *, conn=None):
+    """The client's latest report for the report page: the brief, the
+    evidence it cites, what the check removed, the collection's cost, and
+    the client's current thumbs on each move. None when the client is not
+    this person's; {"status": "none"} when no report has been written."""
+    c = store.get_client(client_id, owner_email, conn=conn)
+    if c is None:
+        return None
+    row = store.latest_report(client_id, owner_email, conn=conn)
+    head = {"client_id": client_id, "domain": c["domain"],
+            "name": (effective_profile(c["profile"] or {}, c["settings"]).get("name")
+                     or c.get("name") or c["domain"])}
+    if not row:
+        return dict(head, status="none")
+    p = row["payload"] or {}
+    out = dict(head, report_id=row["id"], created_at=_iso(row["created_at"]),
+               status=p.get("status"), note=p.get("note"), brief=p.get("brief"),
+               pack=p.get("pack"), removed=p.get("removed") or [], dropped=p.get("dropped") or [],
+               check_note=p.get("check_note"), models=p.get("models"))
+    # Thumbs given since the report was written.
+    scores = store.client_scores(client_id, conn=conn)
+    for m in (out.get("pack") or {}).get("moves") or []:
+        m["feedback"] = (scores.get(m.get("event_id")) or {}).get("feedback")
+    if row.get("run_id"):
+        try:
+            from . import market_radar_ledger as ledger
+            led = ledger.summary(row["run_id"], conn=conn)
+            out["cost"] = {"total_usd": led["total_usd"], "partial": led["partial"],
+                           "by_stage": led["by_stage"]}
+        except Exception:
+            out["cost"] = None
+    return out

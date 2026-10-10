@@ -33,7 +33,8 @@ logger = logging.getLogger(__name__)
 _TABLES_READY = False
 
 TABLES = ("mr_entities", "mr_clients", "mr_competitors", "mr_runs", "mr_provider_calls",
-          "mr_snapshots", "mr_events", "mr_client_events", "mr_industry_sources", "mr_geocodes", "mr_pulses")
+          "mr_snapshots", "mr_events", "mr_client_events", "mr_industry_sources", "mr_geocodes", "mr_pulses",
+          "mr_reports")
 
 COMPETITOR_KINDS = ("direct", "indirect", "local", "aspirational")
 COMPETITOR_STATUSES = ("proposed", "confirmed", "removed")
@@ -270,6 +271,15 @@ SCHEMA = [
     # move (a blog post about a charity day) or folded into a typed event
     # keeps its row, with the reason, and is left off the list.
     "ALTER TABLE mr_events ADD COLUMN IF NOT EXISTS hidden_reason TEXT",
+    # Phase 7 (2026-10-10): the written report for a client, with the
+    # evidence it was written from and what the citation check removed.
+    """CREATE TABLE IF NOT EXISTS mr_reports (
+        id BIGSERIAL PRIMARY KEY,
+        client_id BIGINT NOT NULL REFERENCES mr_clients(id) ON DELETE CASCADE,
+        run_id BIGINT REFERENCES mr_runs(id) ON DELETE SET NULL,
+        payload JSONB NOT NULL,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp())""",
+    "CREATE INDEX IF NOT EXISTS idx_mr_reports_client ON mr_reports (client_id, created_at DESC)",
 ]
 
 
@@ -869,6 +879,28 @@ def latest_pulse(industry_key, country, *, conn=None):
                        ORDER BY created_at DESC, id DESC LIMIT 1""", (industry_key, country))
         row = cur.fetchone()
     return dict(zip(("id", "payload", "created_at", "run_id"), row)) if row else None
+
+
+# -- reports -------------------------------------------------------------------
+
+def save_report(client_id, payload, *, run_id=None, conn=None):
+    with _tx(conn) as cur:
+        cur.execute("""INSERT INTO mr_reports (client_id, run_id, payload)
+                       VALUES (%s,%s,%s::jsonb) RETURNING id""",
+                    (client_id, run_id, json.dumps(payload, default=str)))
+        return cur.fetchone()[0]
+
+
+def latest_report(client_id, owner_email, *, conn=None):
+    """The client's newest report, or None. PermissionError when the client
+    is not this person's."""
+    with _tx(conn) as cur:
+        _owned_client(cur, client_id, owner_email)
+        cur.execute("""SELECT id, run_id, payload, created_at FROM mr_reports
+                       WHERE client_id=%s ORDER BY created_at DESC, id DESC LIMIT 1""",
+                    (client_id,))
+        row = cur.fetchone()
+    return dict(zip(("id", "run_id", "payload", "created_at"), row)) if row else None
 
 
 def cached_geocode(query, *, conn=None):

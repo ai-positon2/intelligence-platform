@@ -546,8 +546,11 @@ class _Numbered:
         return NumberedCanvas
 
 
+PRODUCT = "Event & Conference Intelligence"
+
+
 def build(report_html: str, title: str, subtitle: str = "", generated: datetime | None = None,
-          _tables_as_lists: bool = False) -> bytes:
+          _tables_as_lists: bool = False, product: str = PRODUCT) -> bytes:
     """The PDF for one report. Raises ValueError on input it will not take."""
     if not isinstance(report_html, str) or not report_html.strip():
         raise ValueError("The report was empty.")
@@ -568,14 +571,14 @@ def build(report_html: str, title: str, subtitle: str = "", generated: datetime 
     story = [Paragraph(text_markup(title or "Report"), conv.st["h1"])]
     if subtitle:
         story.append(Paragraph(text_markup(subtitle), conv.st["sub"]))
-    story.append(Paragraph(text_markup("Event & Conference Intelligence · exported " + when), conv.st["meta"]))
+    story.append(Paragraph(text_markup(product + " · exported " + when), conv.st["meta"]))
     story.append(HRFlowable(width="100%", thickness=1.2, color=ACCENT, spaceBefore=6, spaceAfter=8))
     story.extend(conv.blocks(root, conv.st["body"]))
 
     buf = io.BytesIO()
     doc = SimpleDocTemplate(buf, pagesize=A4, leftMargin=margin, rightMargin=margin,
                             topMargin=15 * mm, bottomMargin=16 * mm,
-                            title=title or "Report", author="Event & Conference Intelligence")
+                            title=title or "Report", author=product)
     try:
         doc.build(story, canvasmaker=_Numbered(title or "Report").make())
     except LayoutError:
@@ -583,7 +586,8 @@ def build(report_html: str, title: str, subtitle: str = "", generated: datetime 
         # Rather than lose it, lay every table out as plain stacked text.
         if _tables_as_lists:
             raise
-        return build(report_html, title, subtitle, generated, _tables_as_lists=True)
+        return build(report_html, title, subtitle, generated, _tables_as_lists=True,
+                     product=product)
     return buf.getvalue()
 
 

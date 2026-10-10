@@ -27,6 +27,7 @@ STALE_AFTER_S = 600
 RADAR_STAGE = "radar"
 PULSE_STAGE = "pulse"
 SIGNALS_STAGE = "signals"
+REPORT_STAGE = "report"
 
 
 def start(url, owner_email, *, reuse_profile=False, spawn=None):
@@ -153,8 +154,13 @@ def _signals(client_id, owner_email, *, run_id=None):
     return ms.run_for_client(client_id, owner_email, run_id=run_id)
 
 
+def _report(client_id, owner_email, *, run_id=None, collection=None):
+    from . import market_radar_report as mrep
+    return mrep.write_report(client_id, owner_email, run_id=run_id, collection=collection)
+
+
 def collect_job(run_id, client_id, owner_email, *, collect=None, radar=None, pulse=None,
-                signals=None):
+                signals=None, report=None):
     from . import market_radar_store as store
     from . import market_radar_collect as mc
     collect = collect or mc.collect_client
@@ -191,6 +197,14 @@ def collect_job(run_id, client_id, owner_email, *, collect=None, radar=None, pul
         except Exception as e:
             logger.exception("market_radar_run signals %s failed", run_id)
             result["signals"] = {"error": "%s: %s" % (type(e).__name__, str(e)[:300])}
+        # Phase 7: the written report, from everything above.
+        stage(REPORT_STAGE)
+        try:
+            result["report"] = (report or _report)(client_id, owner_email, run_id=run_id,
+                                                   collection=result)
+        except Exception as e:
+            logger.exception("market_radar_run report %s failed", run_id)
+            result["report"] = {"error": "%s: %s" % (type(e).__name__, str(e)[:300])}
         store.update_run(run_id, status="complete", stage="done", summary=result,
                          coverage={"lines": result.get("coverage")})
     except Exception as e:

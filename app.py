@@ -9167,6 +9167,87 @@ def admin_market_radar_moves(client_id):
     return jsonify(view)
 
 
+@app.route("/p2/admin/market-radar/report/<int:client_id>")
+@admin_required
+def admin_market_radar_report_page(client_id):
+    """The client report (tracker/market_radar_report), rendered by
+    static/js/market_radar_report.js from the JSON route below."""
+    return render_template("market_radar_report.html", user=_get_user(), client_id=client_id)
+
+
+@app.route("/p2/admin/market-radar/api/clients/<int:client_id>/report")
+@admin_required
+def admin_market_radar_report(client_id):
+    from tracker import market_radar_store as mr_store, market_radar_views as views
+    try:
+        view = views.report_view(client_id, _mr_email())
+    except mr_store.StoreUnavailable as e:
+        return jsonify(error="The database is unavailable (%s)." % e), 503
+    if view is None:
+        return jsonify(error="No such company of yours."), 404
+    response = jsonify(view)
+    response.headers["Cache-Control"] = "private, no-store"
+    return response
+
+
+@app.route("/p2/admin/market-radar/api/clients/<int:client_id>/report/pdf", methods=["POST"])
+@admin_required
+def admin_market_radar_report_pdf(client_id):
+    """The report as the reader sees it, as a PDF: the page sends the HTML
+    it rendered with every folded part open, laid out by the same builder as
+    Event Intelligence's reports (tracker/event_intel_pdf.py)."""
+    refused = _mr_guard_post()
+    if refused:
+        return refused
+    from tracker import event_intel_pdf, market_radar_store as mr_store
+    try:
+        report = mr_store.latest_report(client_id, _mr_email())
+    except PermissionError:
+        return jsonify(error="No such company of yours."), 404
+    if not report or (report["payload"] or {}).get("status") != "ok":
+        return jsonify(error="There is no finished report to export yet."), 409
+    payload = request.get_json(silent=True) or {}
+    title = str(payload.get("title") or "Market Radar report")[:200]
+    subtitle = str(payload.get("subtitle") or "")[:400]
+    try:
+        data = event_intel_pdf.build(payload.get("html"), title, subtitle, product="Market Radar")
+    except ValueError as e:
+        return jsonify(error=str(e)), 400
+    except Exception:
+        app.logger.exception("market radar: PDF export failed for client %s", client_id)
+        return jsonify(error="The PDF could not be built. Please try again."), 500
+    slug = re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-")[:60] or "report"
+    response = make_response(data)
+    response.headers["Content-Type"] = "application/pdf"
+    response.headers["Content-Disposition"] = 'attachment; filename="%s.pdf"' % slug
+    response.headers["Cache-Control"] = "private, no-store"
+    return response
+
+
+@app.route("/p2/admin/market-radar/api/clients/<int:client_id>/events/<int:event_id>/feedback",
+           methods=["POST"])
+@admin_required
+def admin_market_radar_event_feedback(client_id, event_id):
+    """Thumbs up or down on one move for one client. The next scoring of
+    that client weighs moves of the same type by it."""
+    refused = _mr_guard_post()
+    if refused:
+        return refused
+    from tracker import market_radar_store as mr_store
+    body = request.get_json(silent=True) or {}
+    feedback = body.get("feedback")
+    if feedback not in ("up", "down", None):
+        return jsonify(error="feedback must be up, down or null"), 400
+    reason = str(body.get("reason") or "")[:500] or None
+    try:
+        mr_store.set_feedback(client_id, _mr_email(), event_id, feedback, reason)
+    except PermissionError:
+        return jsonify(error="No such company of yours."), 404
+    except KeyError:
+        return jsonify(error="That move is not on this company's report."), 404
+    return jsonify(ok=True, feedback=feedback)
+
+
 @app.route("/p2/admin/market-radar/api/tidy-events", methods=["POST"])
 @admin_required
 def admin_market_radar_tidy_events():

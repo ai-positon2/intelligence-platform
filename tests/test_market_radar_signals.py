@@ -360,7 +360,7 @@ def test_signals_that_break_do_not_lose_the_collection():
     try:
         def boom(*a, **k):
             raise RuntimeError("model down")
-        mrun.collect_job(1, 2, "o", collect=lambda *a, **k: {"companies": []},
+        mrun.collect_job(1, 2, "o", collect=lambda *a, **k: {"companies": []}, report=lambda *a, **k: {},
                          radar=lambda *a, **k: {}, pulse=lambda *a, **k: {}, signals=boom)
     finally:
         real.update_run = orig
