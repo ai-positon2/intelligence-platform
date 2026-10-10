@@ -419,7 +419,8 @@
         moves.hidden.map(function (h) {
           var href = safeUrl(h.url);
           var t = href ? '<a href="' + esc(href) + '" target="_blank" rel="noopener noreferrer">' + esc(h.title) + '</a>' : esc(h.title);
-          return '<li><b>' + esc(h.name) + '</b>: ' + t + ' <span class="mr-hint">' + esc(h.why) + '</span></li>';
+          return '<li><b>' + esc(h.name) + '</b>: ' + t + ' <span class="mr-hint">' +
+            esc([h.publisher, h.date, h.why].filter(Boolean).join(', ')) + '</span></li>';
         }).join('') + '</ul></details>';
     }
     if (last && last.companies && last.companies.length) {

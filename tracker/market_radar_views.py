@@ -481,10 +481,26 @@ def moves_view(client_id, owner_email, *, conn=None):
             for k in ("skipped", "error"):
                 if r.get(k):
                     radar[k] = r[k]
+    # Headlines the signal engine judged not to be moves, with its reason,
+    # so what was dropped can be checked, not only counted.
+    from .market_radar_signals import LEFT_OUT
+    for eid in ids:
+        memo = ((store.latest_snapshot(eid, "signals", conn=conn) or {}).get("payload") or {}) \
+            .get("triaged") or {}
+        if not memo:
+            continue
+        snap = store.latest_snapshot(eid, "news", conn=conn) or {}
+        for it in (snap.get("payload") or {}).get("items") or []:
+            verdict = memo.get(it.get("id")) or ""
+            if verdict.startswith("left_out:"):
+                hidden.append({"name": names[eid][0], "title": it.get("title"),
+                               "why": "not a move: " + LEFT_OUT.get(verdict[9:], "other"),
+                               "url": it.get("link"), "publisher": it.get("publisher"),
+                               "date": it.get("date")})
     ranked = sorted((e for e in events if e["score"] is not None),
                     key=lambda e: -e["score"])
     top = [e["id"] for e in ranked if e["severity"] in ("HIGH", "MEDIUM")][:5]
-    return {"events": events, "top": top, "hidden": hidden[:200], "hidden_count": len(hidden),
+    return {"events": events, "top": top, "hidden": hidden[:400], "hidden_count": len(hidden),
             "last_collect": last, "radar": radar,
             "pulse": pulse_view(client_id, owner_email, conn=conn),
             "competitors": [{"entity_id": i, "name": names[i][0], "domain": names[i][1],

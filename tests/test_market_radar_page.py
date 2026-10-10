@@ -630,8 +630,11 @@ def test_signals_on_postgres_type_the_news_score_it_and_the_view_ranks_it(client
     e, old = sorted(m["events"], key=lambda x: x["title"] != "Rival Dental buys Smile Co")
     assert e["label"] == "Acquisition" and e["articles"] == 3 and e["severity"] == "HIGH"
     assert old["severity"] == "LOW"
-    assert m["top"] == [e["id"]] and m["hidden_count"] == 1
-    assert m["hidden"][0]["why"].startswith("not a move: charity")
+    assert m["top"] == [e["id"]] and m["hidden_count"] == 2
+    why = {h["title"]: h["why"] for h in m["hidden"]}
+    assert why["Our charity run"].startswith("not a move: charity")
+    assert why["Best Rival Dental deals"].startswith("not a move: a product review")
+    assert next(h for h in m["hidden"] if h["title"] == "Best Rival Dental deals")["publisher"] == "Deals"
     assert store.latest_snapshot(rival, "signals")["payload"]["triaged"]["n9"] == "left_out:review_or_deal"
     first = store.first_snapshot(rival, "news")
     assert first["payload"]["items"][0]["id"] == "n0"
