@@ -309,6 +309,7 @@ def run_view(run):
            # Names the ranking returned that matched no checked candidate.
            "rank_dropped": ((result.get("coverage") or {}).get("rank_dropped") or {}).get("domains")
            or [],
+           "rank_input": (result.get("coverage") or {}).get("rank_input"),
            "sources": {}}
     labels = {"site": "Named on the company's own site", "model": "Known competitors (checked)",
               "search": "Google search", "places": "Map of nearby businesses",

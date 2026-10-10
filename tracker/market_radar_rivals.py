@@ -881,6 +881,8 @@ def discover(profile, *, run_id=None, client=None, token=None, progress=None, se
 
     limit = LIMITS.get(archetype, DEFAULT_LIMIT)
     lines = [_rank_line(i, verdicts[i["domain"]], briefs[i["domain"]]) for i in survivors]
+    # What the ranking chose from, so a short list can be explained.
+    coverage["rank_input"] = {"count": len(lines), "domains": [l["domain"] for l in lines][:80]}
     competitors, gaps, left_out = [], [], []
     if lines:
         say("rivals_rank")
