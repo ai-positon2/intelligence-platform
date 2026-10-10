@@ -455,6 +455,11 @@ def test_a_client_reuses_a_fresh_pulse_of_its_industry_and_country(monkeypatch):
     P.run_for_client(2, "o", store=store, io=io, now=NOW + timedelta(hours=P.REUSE_HOURS + 2),
                      llm=llm, breaker=breaker())
     assert len(store.pulses) == 3
+    # A pulse read before the way pulses are read changed is read again.
+    store.pulses[-1]["payload"]["version"] = P.PULSE_VERSION - 1
+    P.run_for_client(2, "o", store=store, io=io, now=NOW + timedelta(hours=P.REUSE_HOURS + 3),
+                     llm=llm, breaker=breaker())
+    assert len(store.pulses) == 4 and store.pulses[-1]["payload"]["version"] == P.PULSE_VERSION
     store.clients[3] = {"profile": dict(PROFILE, industry={}), "settings": {}}
     assert "industry is not known" in P.run_for_client(3, "o", store=store, io=io, now=NOW)["skipped"]
     with pytest.raises(PermissionError):
@@ -490,3 +495,9 @@ def test_a_one_word_headline_is_news_but_googles_placeholder_is_not():
     assert not P.is_noise({"title": "Fresh", "publisher_site": "https://a.example"})
     assert not P.is_noise({"title": "NHS", "publisher_site": "https://a.example"})
     assert P.is_noise({"title": "META_TITLE_SECTORS", "publisher_site": "https://a.example"})
+
+
+def test_the_prompts_ask_for_short_searches_and_english_themes():
+    assert "1 to 3 words" in P.PLAN_SYSTEM and "product brand" in P.PLAN_SYSTEM
+    assert "plain English even when the headlines are in another language" in P.THEMES_SYSTEM
+    assert "shopping guides" in P.THEMES_SYSTEM and "share-price moves" in P.THEMES_SYSTEM

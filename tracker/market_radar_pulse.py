@@ -66,6 +66,9 @@ FEED_RETRY_DAYS = 30
 TRADE_SHARE = 0.3              # a feed this much about the industry is a trade feed
 MIN_PUBLISHER_ITEMS = 2
 REUSE_HOURS = 24
+# Raised when the way a pulse is read changes, so a pulse read the old way
+# is read again rather than reused for the rest of its day.
+PULSE_VERSION = 2
 PLAN_MODEL = os.environ.get("MR_PULSE_PLAN_MODEL", "claude-haiku-5-5")
 THEME_MODEL = os.environ.get("MR_PULSE_THEME_MODEL", "claude-sonnet-5-5")
 FEDREG_URL = "https://www.federalregister.gov/api/v1/documents.json"
@@ -184,8 +187,8 @@ PLAN_SCHEMA = {
         "regulator_terms": {"type": "array", "items": {"type": "string"}}}}
 PLAN_SYSTEM = """You plan news searches that follow an INDUSTRY in one country, for the owner of a business in that industry. The searches run in that country's Google News edition.
 
-- queries: 4 to 6 searches, written in the edition's language, each 1 to 5 words (Google News syntax: OR, quotes). Together they cover the industry as a whole, its regulation or public policy, costs and prices (or reimbursement), staffing, customer demand, and deals or new entrants. Name the industry the way that country's press does (in the UK, dentistry news is mostly about the NHS).
-- Never name a company, not the business described and not a competitor.
+- queries: 4 to 6 searches, written in the edition's language. Keep each one short: 1 to 3 words, because every word must appear in a headline and a longer search returns nothing ("Zahnärzte Kassen Honorare OR Vergütung" found no article on 2026-10-10). Use OR only between alternatives for the same idea ("Zahnarztpraxis OR Zahnarztpraxen"). Together they cover the industry as a whole, its regulation or public policy, costs and prices (or reimbursement), staffing, customer demand, and deals or new entrants. Name the industry the way that country's press does (in the UK, dentistry news is mostly about the NHS).
+- Never name a company or a product brand (not the business described, not a competitor, not a brand such as Invisalign).
 - Avoid words that pull in market-research adverts ("market size", "forecast", "CAGR").
 - match_terms: 6 to 20 lowercase words or word beginnings that a headline about this industry contains, in the edition's language AND in English (for dentists in Germany: zahnarzt, zahnärzt, zahnmedizin, dental, dentist). Each at least 4 letters. Never a generic word such as market, business, health, price, store, brand.
 - regulator_terms: 1 to 3 plain English words a US federal rule about this industry would contain in its title (dental, dentist; footwear). Empty when no federal rule would name the industry."""
@@ -473,9 +476,11 @@ Use only the numbered headlines. Do not add facts, numbers or names that are not
 - kind: the closest of the listed kinds.
 - items: the numbers of the headlines the theme rests on. At least 2. A headline belongs to at most one theme.
 
-Leave out headlines that are market-research adverts, listicles, awards, stock tips, celebrity or human-interest stories, a single company's product news that says nothing about the industry, and news from other countries that does not affect this one.
+Leave out headlines that are market-research adverts, listicles and shopping guides ("the best leggings to buy", gift guides, product roundups), awards, stock tips and one company's share-price moves, celebrity, crime or human-interest stories, a single company's product news that says nothing about the industry, and news from other countries that does not affect this one. A company whose name contains the industry's word ("Gildan Activewear") is not industry news for that reason alone.
 
-Return 3 to 8 themes, strongest first: more headlines, more recent, more consequence for the business. Fewer strong themes are better than more weak ones; return none if the headlines do not support any. Write plain English. Never use em dashes or en dashes."""
+Return 3 to 8 themes, strongest first: more headlines, more recent, more consequence for the business. Fewer strong themes are better than more weak ones; return none if the headlines do not support any.
+
+Write title, summary and why_it_matters in plain English even when the headlines are in another language: translate, and keep a local name (an agency, a law) in its own language only where it has no English form. Never use em dashes or en dashes."""
 
 
 DASHES = re.compile(r"\s*[%s%s]\s*" % (chr(0x2014), chr(0x2013)))
@@ -562,6 +567,7 @@ def build_pulse(profile, key, country, *, store, get, get_json, fetch, breaker, 
                                                 get_json=get_json, now=now)
     read_ok = sum(1 for q in per_query if q["status"] == "ok")
     payload = {
+        "version": PULSE_VERSION,
         "industry_key": key, "country": country, "edition": edition, "label": label,
         "plan": plan, "window_days": WINDOW_DAYS, "read_at": now.isoformat(timespec="seconds"),
         "articles": [{k: a.get(k) for k in ("id", "title", "publisher", "publisher_site", "date",
@@ -619,7 +625,8 @@ def run_for_client(client_id, owner_email, *, run_id=None, store=None, io=None, 
     for country in markets(profile):
         last = store.latest_pulse(key, country)
         if last and now - last["created_at"] < timedelta(hours=REUSE_HOURS) and \
-                (last["payload"] or {}).get("status") == "ok":
+                (last["payload"] or {}).get("status") == "ok" and \
+                (last["payload"] or {}).get("version") == PULSE_VERSION:
             p = last["payload"]
             out.append({"country": country, "industry_key": key, "status": p["status"],
                         "note": p.get("note"), "themes": len(p.get("themes") or []),
