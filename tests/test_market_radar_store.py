@@ -306,6 +306,25 @@ def test_industry_source_remembers_last_success_and_last_error(pg):
         assert cur.fetchone() == (None,)        # a success clears the old error
 
 
+def test_pulses_are_shared_by_industry_and_country_and_the_registry_reads_back(pg):
+    a = pg.save_pulse("naics:621210", "GB", {"status": "ok", "themes": [1]}, run_id=None)
+    b = pg.save_pulse("naics:621210", "GB", {"status": "failed", "themes": []})
+    pg.save_pulse("naics:621210", "US", {"status": "ok", "themes": [2]})
+    last = pg.latest_pulse("naics:621210", "GB")
+    assert last["id"] == b > a and last["payload"]["status"] == "failed"
+    assert last["created_at"].tzinfo is not None
+    assert pg.latest_pulse("naics:621210", "DE") is None
+    pg.save_industry_source("naics:621210", "https://dentistry.co.uk/feed/", country="GB",
+                            site_domain="dentistry.co.uk", kind="trade", discovered_from="Dentistry.co.uk",
+                            ok=True, item_count=9)
+    pg.save_industry_source("naics:621210", "https://www.bbc.co.uk/", country="GB",
+                            site_domain="bbc.co.uk", kind="none", ok=False, error="no feed found")
+    rows = pg.industry_sources("naics:621210", "GB")
+    assert [(r["kind"], r["item_count"], r["last_error"]) for r in rows] == [
+        ("trade", 9, None), ("none", None, "no feed found")]
+    assert rows[0]["created_at"].tzinfo is not None and pg.industry_sources("naics:621210", "US") == []
+
+
 # == the ledger ================================================================
 
 from tracker import market_radar_ledger as ledger  # noqa: E402

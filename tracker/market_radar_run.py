@@ -25,6 +25,7 @@ STALE_AFTER_S = 600
 # A collection's stage after its competitors, shown by the moves card. Not a
 # step of the competitor search's progress bar (STAGE_STEP in the page script).
 RADAR_STAGE = "radar"
+PULSE_STAGE = "pulse"
 
 
 def start(url, owner_email, *, reuse_profile=False, spawn=None):
@@ -141,7 +142,12 @@ def _radar(client_id, owner_email, *, run_id=None):
     return mr.run_for_client(client_id, owner_email, run_id=run_id)
 
 
-def collect_job(run_id, client_id, owner_email, *, collect=None, radar=None):
+def _pulse(client_id, owner_email, *, run_id=None):
+    from . import market_radar_pulse as mp
+    return mp.run_for_client(client_id, owner_email, run_id=run_id)
+
+
+def collect_job(run_id, client_id, owner_email, *, collect=None, radar=None, pulse=None):
     from . import market_radar_store as store
     from . import market_radar_collect as mc
     collect = collect or mc.collect_client
@@ -162,6 +168,14 @@ def collect_job(run_id, client_id, owner_email, *, collect=None, radar=None):
         except Exception as e:
             logger.exception("market_radar_run radar %s failed", run_id)
             result["radar"] = {"error": "%s: %s" % (type(e).__name__, str(e)[:300])}
+        # Phase 5: the industry's news in the client's markets, grouped into
+        # themes. Shared with every client in the same industry and country.
+        stage(PULSE_STAGE)
+        try:
+            result["pulse"] = (pulse or _pulse)(client_id, owner_email, run_id=run_id)
+        except Exception as e:
+            logger.exception("market_radar_run pulse %s failed", run_id)
+            result["pulse"] = {"error": "%s: %s" % (type(e).__name__, str(e)[:300])}
         store.update_run(run_id, status="complete", stage="done", summary=result,
                          coverage={"lines": result.get("coverage")})
     except Exception as e:

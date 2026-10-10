@@ -1,7 +1,7 @@
 """Market Radar, Phase 3: the live self-test of every detector.
 
-Each check runs one detector against a public source known to have what
-it reads (Aspen Dental's ~1,100 offices in its sitemap and its Phenom
+Each check runs one detector (and, since Phase 5, each industry-pulse
+source) against a public source known to have what it reads (Aspen Dental's ~1,100 offices in its sitemap and its Phenom
 careers site, Allbirds' Shopify catalog and review scores, NutriBullet's
 WooCommerce store, known job boards) and says whether the answer looks
 right. It writes nothing: the database rules are covered by the tests, and
@@ -71,6 +71,35 @@ def run(budget_s=BUDGET_S):
                     "payload": {"complete": complete}}
         return check
 
+    def pulse_news():
+        from . import market_radar_pulse as mp
+        plan = {"queries": ["NHS dentistry"], "match_terms": ["dental", "dentist", "dentistry"],
+                "regulator_terms": []}
+        items, per_query, failures, dropped = mp.read_google(plan, "GB", get=http.get,
+                                                             breaker=news.Breaker())
+        if failures:
+            return {"status": "failed", "note": "; ".join(failures), "items": 0}
+        return {"status": "ok", "items": len(items), "note": "%d of %d headlines kept; %d adverts "
+                "and %d off topic left out" % (len(items), per_query[0]["items"],
+                                               dropped["noise"], dropped["off_topic"])}
+
+    def federal_register():
+        from . import market_radar_pulse as mp
+        docs, note = mp.federal_register(["medicare"], [], get_json=http.get_json,
+                                         now=datetime.now(timezone.utc))
+        if docs is None:
+            return {"status": "failed", "note": note, "items": 0}
+        return {"status": "ok", "items": len(docs), "note": note}
+
+    def trade_feed():
+        from . import market_radar_pulse as mp
+        from . import market_radar_site as site
+        feed, items, note = mp.find_feed("https://www.dentistrytoday.com/", fetch=site.fetch,
+                                         get=http.get)
+        if not feed:
+            return {"status": "failed", "note": note, "items": 0}
+        return {"status": "ok", "items": len(items), "note": "%d items from %s" % (len(items), feed)}
+
     # (name, what it proves, function, minimum items to pass)
     checks = [
         ("news", "Google News, US edition, Aspen Dental",
@@ -92,6 +121,12 @@ def run(budget_s=BUDGET_S):
         ("jobs_greenhouse", "Greenhouse board: airbnb", board("greenhouse", "airbnb"), 1),
         ("jobs_lever", "Lever board: palantir", board("lever", "palantir"), 1),
         ("jobs_ashby", "Ashby board: ramp", board("ashby", "ramp"), 1),
+        ("pulse_news", "Google News, UK edition, industry search with the advert filter",
+         pulse_news, 10),
+        ("federal_register", "Federal Register rules naming Medicare, last 90 days",
+         federal_register, 1),
+        ("trade_feed", "Feed discovery on a trade publication (dentistrytoday.com)",
+         trade_feed, 5),
     ]
     results = []
     pool = concurrent.futures.ThreadPoolExecutor(max_workers=6)

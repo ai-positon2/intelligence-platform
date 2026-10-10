@@ -33,7 +33,7 @@ logger = logging.getLogger(__name__)
 _TABLES_READY = False
 
 TABLES = ("mr_entities", "mr_clients", "mr_competitors", "mr_runs", "mr_provider_calls",
-          "mr_snapshots", "mr_events", "mr_client_events", "mr_industry_sources", "mr_geocodes")
+          "mr_snapshots", "mr_events", "mr_client_events", "mr_industry_sources", "mr_geocodes", "mr_pulses")
 
 COMPETITOR_KINDS = ("direct", "indirect", "local", "aspirational")
 COMPETITOR_STATUSES = ("proposed", "confirmed", "removed")
@@ -255,6 +255,17 @@ SCHEMA = [
         END IF;
     END $$""",
     "CREATE INDEX IF NOT EXISTS idx_mr_events_recent ON mr_events (entity_id, updated_at DESC)",
+    # Phase 5 (2026-10-10): an industry's news in one country, grouped into
+    # themes. Public and about no one client, so every client in the same
+    # industry and country reads the same row.
+    """CREATE TABLE IF NOT EXISTS mr_pulses (
+        id BIGSERIAL PRIMARY KEY,
+        industry_key TEXT NOT NULL,
+        country TEXT NOT NULL,
+        payload JSONB NOT NULL,
+        run_id BIGINT REFERENCES mr_runs(id) ON DELETE SET NULL,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp())""",
+    "CREATE INDEX IF NOT EXISTS idx_mr_pulses_latest ON mr_pulses (industry_key, country, created_at DESC)",
 ]
 
 
@@ -763,6 +774,37 @@ def save_industry_source(industry_key, feed_url, *, country="", site_domain=None
                      ok is True, None if ok else error, item_count,
                      ok is True, ok, None if ok else error))
         return cur.fetchone()[0]
+
+
+def industry_sources(industry_key, country="", *, conn=None):
+    """Every feed remembered for an industry in a country, read or not."""
+    with _tx(conn) as cur:
+        cur.execute("""SELECT id, feed_url, site_domain, kind, discovered_from, last_ok_at,
+                              last_error, item_count, created_at
+                       FROM mr_industry_sources WHERE industry_key=%s AND country=%s
+                       ORDER BY id""", (industry_key, country or ""))
+        keys = ("id", "feed_url", "site_domain", "kind", "discovered_from", "last_ok_at",
+                "last_error", "item_count", "created_at")
+        return [dict(zip(keys, row)) for row in cur.fetchall()]
+
+
+# -- industry pulses -----------------------------------------------------------
+
+def save_pulse(industry_key, country, payload, *, run_id=None, conn=None):
+    with _tx(conn) as cur:
+        cur.execute("""INSERT INTO mr_pulses (industry_key, country, payload, run_id)
+                       VALUES (%s,%s,%s::jsonb,%s) RETURNING id""",
+                    (industry_key, country, json.dumps(payload), run_id))
+        return cur.fetchone()[0]
+
+
+def latest_pulse(industry_key, country, *, conn=None):
+    with _tx(conn) as cur:
+        cur.execute("""SELECT id, payload, created_at, run_id FROM mr_pulses
+                       WHERE industry_key=%s AND country=%s
+                       ORDER BY created_at DESC, id DESC LIMIT 1""", (industry_key, country))
+        row = cur.fetchone()
+    return dict(zip(("id", "payload", "created_at", "run_id"), row)) if row else None
 
 
 def cached_geocode(query, *, conn=None):

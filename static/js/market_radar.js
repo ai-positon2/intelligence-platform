@@ -355,7 +355,8 @@
     var stage = (run && run.stage) || '';
     var m = /collect (\d+)\/(\d+)/.exec(stage);
     var text = m ? 'Read ' + m[1] + ' of ' + m[2] + ' competitors'
-      : stage === 'radar' ? 'Looking for new businesses nearby and new brands' : 'Starting';
+      : stage === 'radar' ? 'Looking for new businesses nearby and new brands'
+      : stage === 'pulse' ? 'Reading the industry news' : 'Starting';
     return '<div class="mr-callout">' + esc(text) + '… This runs in the background; you can leave the page.</div>';
   }
 
@@ -466,6 +467,73 @@
       '<div class="mr-card-b">' + body + '</div></div>';
   }
 
+  // == industry pulse (Phase 5) =======================================================
+
+  var COUNTRY_NAME = { US: 'United States', GB: 'United Kingdom', DE: 'Germany', IN: 'India', AU: 'Australia',
+    CA: 'Canada', IE: 'Ireland', FR: 'France', ES: 'Spain', IT: 'Italy', NL: 'Netherlands', BR: 'Brazil' };
+
+  function renderArticle(a) {
+    var href = safeUrl(a.link);
+    var t = href ? '<a href="' + esc(href) + '" target="_blank" rel="noopener noreferrer">' + esc(a.title) + '</a>' : esc(a.title);
+    return '<li>' + t + ' <span class="mr-hint">' + esc([a.publisher, a.date].filter(Boolean).join(', ')) + '</span></li>';
+  }
+
+  function renderTheme(t) {
+    var n = (t.articles || []).length + (t.more || 0);
+    return '<li class="mr-theme"><div class="mr-move-t"><span class="mr-chip">' + esc(t.kind_label) + '</span><b>' + esc(t.title) + '</b></div>' +
+      '<p class="mr-theme-sum">' + esc(t.summary) + '</p>' +
+      (t.why_it_matters ? '<p class="mr-theme-why"><b>Why it matters:</b> ' + esc(t.why_it_matters) + '</p>' : '') +
+      '<details class="mr-more"><summary>' + esc(n) + ' articles from ' + esc(t.publishers) + ' publisher' + (t.publishers === 1 ? '' : 's') +
+      (t.latest ? ', latest ' + esc(t.latest) : '') + '</summary><ul class="mr-list">' +
+      (t.articles || []).map(renderArticle).join('') + '</ul>' +
+      (t.more ? '<p class="mr-hint">and ' + esc(t.more) + ' more</p>' : '') + '</details></li>';
+  }
+
+  function renderPulseMarket(m) {
+    var name = COUNTRY_NAME[m.country] || m.country;
+    var head = '<h4 class="mr-sub">' + esc(name) + (m.label ? ': ' + esc(m.label) : '') + '</h4>';
+    if (m.status === 'not_read') return head + '<p class="mr-hint">Not read yet. It is read with the next collection.</p>';
+    var body = '<p class="mr-hint">' + esc(m.note || '') + (m.read_at ? ' Read ' + esc(when(m.read_at)) + '.' : '') + '</p>';
+    if (m.status === 'failed') return head + '<div class="mr-callout bad">The industry news could not be read. ' + esc(m.note || '') + '</div>';
+    var themes = m.themes || [];
+    body += themes.length ? '<ul class="mr-themes">' + themes.map(renderTheme).join('') + '</ul>'
+      : '<div class="mr-empty"><b>No themes</b>' + (m.status === 'partial' ? 'The headlines were read but could not be grouped this time; they are listed below.'
+        : 'The headlines of the last ' + esc(m.window_days || 30) + ' days did not add up to a theme.') + '</div>';
+    if (m.regulation && m.regulation.length) {
+      body += '<details class="mr-more" open><summary>US federal rules naming this industry (' + esc(m.regulation.length) + ')</summary><ul class="mr-list">' +
+        m.regulation.map(function (d) {
+          return renderArticle({ title: d.type + ': ' + d.title, link: d.link, publisher: d.agency, date: d.date });
+        }).join('') + '</ul></details>';
+    } else if (m.regulation_note) {
+      body += '<p class="mr-hint">Federal Register: ' + esc(m.regulation_note) + '.</p>';
+    }
+    if (m.other_headlines && m.other_headlines.length) {
+      body += '<details class="mr-more"><summary>Other headlines (' + esc(m.other_headlines.length) + ')</summary><ul class="mr-list">' +
+        m.other_headlines.map(renderArticle).join('') + '</ul></details>';
+    }
+    if (m.queries && m.queries.length) {
+      body += '<details class="mr-more"><summary>What was searched</summary><ul class="mr-list">' +
+        m.queries.map(function (q) {
+          return '<li>' + esc(q.query) + ': ' + (q.status === 'ok' ? esc(q.kept) + ' kept of ' + esc(q.items)
+            : '<span class="mr-st failed">not read</span> ' + esc(q.note || '')) + '</li>';
+        }).join('') + '</ul>' +
+        (m.feeds && m.feeds.length ? '<p class="mr-hint">Trade publications read directly: ' + esc(m.feeds.join(', ')) + '.</p>' : '') +
+        '</details>';
+    }
+    return head + body;
+  }
+
+  function renderPulse(pulse) {
+    if (!pulse) return '';
+    var body = '';
+    if (pulse.skipped) body += '<p class="mr-hint">' + esc(pulse.skipped) + '</p>';
+    body += (pulse.markets || []).map(renderPulseMarket).join('');
+    return '<div class="card mr-card" id="mrPulse"><div class="mr-card-h"><div><h3>Industry pulse</h3>' +
+      '<p>What the news says about this industry in each market this month, grouped into themes. ' +
+      'Every theme rests on at least two articles, listed under it.</p></div></div>' +
+      '<div class="mr-card-b">' + body + '</div></div>';
+  }
+
   function renderHead(view, running) {
     var c = view.client || {}, p = view.profile || {}, f = p.fields || {};
     var href = siteUrl(c.domain);
@@ -484,6 +552,7 @@
     return renderHead(v, running) + (running ? renderProgress(state.run) : '') +
       renderProfile(v, state.editing, state.errors) + renderCompetitors(v.competitors, state.filter) +
       renderMoves(state.moves, state.collect) + renderRadar(state.moves && state.moves.radar) +
+        renderPulse(state.moves && state.moves.pulse) +
       (running ? '' : renderRun(v.last_run));
   }
 
@@ -510,7 +579,7 @@
   var MR = { esc: esc, safeUrl: safeUrl, siteUrl: siteUrl, renderClientList: renderClientList,
     renderProgress: renderProgress, renderProfile: renderProfile, renderCompetitors: renderCompetitors,
     renderRow: renderRow, renderRun: renderRun, renderDetail: renderDetail, formChanges: formChanges,
-    renderMoves: renderMoves, renderMoveRow: renderMoveRow, renderRadar: renderRadar,
+    renderMoves: renderMoves, renderMoveRow: renderMoveRow, renderRadar: renderRadar, renderPulse: renderPulse,
     FIELDS: FIELDS, STAGE_STEP: STAGE_STEP };
   root.MR = MR;
 

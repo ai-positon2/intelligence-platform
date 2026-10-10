@@ -462,5 +462,57 @@ def moves_view(client_id, owner_email, *, conn=None):
                 if r.get(k):
                     radar[k] = r[k]
     return {"events": events, "last_collect": last, "radar": radar,
+            "pulse": pulse_view(client_id, owner_email, conn=conn),
             "competitors": [{"entity_id": i, "name": names[i][0], "domain": names[i][1],
                              "tracked": tracked.get(i, {})} for i in ids]}
+
+
+THEME_LABELS = {"regulation": "Regulation", "costs_and_prices": "Costs and prices",
+                "workforce": "Staffing", "demand": "Demand", "competition_and_deals":
+                "Competition and deals", "technology": "Technology", "supply": "Supply",
+                "other": "Other"}
+
+
+def pulse_view(client_id, owner_email, *, conn=None):
+    """The latest industry pulse for each of the client's markets
+    (tracker/market_radar_pulse), or why there is none. Pulses are shared
+    by industry and country, so one may come from another client's run."""
+    from . import market_radar_pulse as mp
+    c = store.get_client(client_id, owner_email, conn=conn)
+    if c is None:
+        return None
+    profile = effective_profile(c["profile"] or {}, c["settings"])
+    key = mp.industry_key(profile)
+    if not key:
+        return {"skipped": "the industry is not known; set it on the profile first", "markets": []}
+    out = []
+    for country in mp.markets(profile):
+        row = store.latest_pulse(key, country, conn=conn)
+        if not row:
+            out.append({"country": country, "status": "not_read"})
+            continue
+        p = row["payload"] or {}
+        in_themes = {a.get("link") for t in p.get("themes") or [] for a in t.get("articles") or []}
+        cov = p.get("coverage") or {}
+        out.append({
+            "country": country, "status": p.get("status"), "note": p.get("note"),
+            "edition": p.get("edition"), "label": p.get("label"), "read_at": p.get("read_at"),
+            "window_days": p.get("window_days"),
+            "themes": [dict({k: t.get(k) for k in ("title", "summary", "why_it_matters", "kind",
+                                                    "publishers", "latest")},
+                            kind_label=THEME_LABELS.get(t.get("kind"), "Other"),
+                            articles=(t.get("articles") or [])[:8],
+                            more=max(0, len(t.get("articles") or []) - 8))
+                       for t in p.get("themes") or []],
+            "regulation": (p.get("regulation") or [])[:12],
+            "regulation_note": p.get("regulation_note"),
+            "other_headlines": [{k: a.get(k) for k in ("title", "publisher", "date", "link")}
+                                for a in p.get("articles") or []
+                                if a.get("link") not in in_themes][:30],
+            "articles": len(p.get("articles") or []),
+            "feeds": [f.get("publisher") for f in (p.get("feeds") or {}).get("read") or []],
+            "queries": [{k: q.get(k) for k in ("query", "items", "kept", "status", "note")}
+                        for q in cov.get("queries") or []],
+            "noise_dropped": cov.get("noise_dropped"),
+            "off_topic_dropped": cov.get("off_topic_dropped")})
+    return {"industry_key": key, "markets": out}

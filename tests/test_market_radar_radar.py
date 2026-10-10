@@ -364,7 +364,8 @@ def test_a_radar_that_breaks_does_not_lose_the_collection():
     try:
         def boom(*a, **k):
             raise RuntimeError("overture down")
-        mrun.collect_job(1, 2, OWNER, collect=lambda *a, **k: {"companies": []}, radar=boom)
+        mrun.collect_job(1, 2, OWNER, collect=lambda *a, **k: {"companies": []}, radar=boom,
+                         pulse=lambda *a, **k: {"pulses": []})
     finally:
         real.update_run = orig
     assert saved["status"] == "complete" and "overture down" in saved["summary"]["radar"]["error"]

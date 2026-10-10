@@ -533,3 +533,54 @@ def test_script_shows_the_radar_and_escapes_it():
     assert "1.2 km away" in out[0] and "Local opening news (1)" in out[0]
     assert "Considered and left out (1)" in out[0]
     assert "b2b" in out[1] and out[2] == "" and "Nothing new found" in out[3]
+
+
+def test_script_shows_the_industry_pulse_and_escapes_it():
+    art = {"title": EVIL, "publisher": EVIL, "date": "2026-10-08", "link": "javascript:alert(1)"}
+    pulse = {"industry_key": "naics:621210", "markets": [
+        {"country": "GB", "status": "ok", "note": EVIL, "label": EVIL, "read_at": "2026-10-10T09:00:00+00:00",
+         "window_days": 30, "themes": [{"title": EVIL, "summary": EVIL, "why_it_matters": EVIL,
+                                        "kind": "regulation", "kind_label": "Regulation", "publishers": 1,
+                                        "latest": "2026-10-08", "articles": [art, art], "more": 3}],
+         "regulation": [], "regulation_note": None, "other_headlines": [art],
+         "queries": [{"query": EVIL, "items": 50, "kept": 20, "status": "ok"},
+                     {"query": "dental contract", "items": 0, "kept": 0, "status": "failed",
+                      "note": "refused (HTTP 429)"}], "feeds": [EVIL]},
+        {"country": "US", "status": "partial", "note": "n", "themes": [], "window_days": 30,
+         "regulation": [{"title": EVIL, "type": "Proposed rule", "agency": EVIL, "date": "2026-09-30",
+                         "link": "https://www.federalregister.gov/d/1"}]},
+        {"country": "DE", "status": "failed", "note": "no news could be read: x"},
+        {"country": "IE", "status": "not_read"}]}
+    out = run_js("return [MR.renderPulse(%s), MR.renderPulse(null), MR.renderPulse({skipped: 'no industry', markets: []})];"
+                 % json.dumps(pulse))
+    _no_markup_from(out[0])
+    import re
+    assert not [h for h in re.findall(r'href="([^"]*)"', out[0]) if "javascript" in h]
+    assert "Industry pulse" in out[0] and "United Kingdom" in out[0] and "Why it matters:" in out[0]
+    assert "5 articles from 1 publisher," in out[0] and "and 3 more" in out[0]
+    assert "not read</span> refused (HTTP 429)" in out[0] and "Other headlines (1)" in out[0]
+    assert "could not be grouped this time" in out[0] and "US federal rules naming this industry (1)" in out[0]
+    assert "The industry news could not be read." in out[0] and "Not read yet." in out[0]
+    assert out[1] == "" and "no industry" in out[2]
+
+
+def test_the_pulse_view_reads_the_shared_pulse_and_lists_headlines_outside_themes_once(client_with_reading):
+    from tracker import market_radar_store as store
+    w = client_with_reading
+    assert views.pulse_view(w["client"], OWNER)["markets"] == [{"country": "DE", "status": "not_read"}]
+    a = {"title": "Zahnärzte streiken", "publisher": "SWR", "date": "2026-10-08", "link": "https://swr.example/1"}
+    b = {"title": "Neue Praxis", "publisher": "NW", "date": "2026-10-07", "link": "https://nw.example/2"}
+    c = {"title": "Kassen kürzen", "publisher": "zm", "date": "2026-10-06", "link": "https://zm.example/3"}
+    store.save_pulse("label:dentist", "DE", {
+        "status": "ok", "note": "n", "edition": "DE:de", "label": "Dentist", "window_days": 30,
+        "themes": [{"title": "T", "summary": "s", "why_it_matters": "w", "kind": "workforce",
+                    "articles": [a, c], "publishers": 2, "latest": "2026-10-08"}],
+        "articles": [a, b, c], "regulation": None,
+        "coverage": {"queries": [{"query": "Zahnärzte", "items": 9, "kept": 3, "status": "ok"}],
+                     "noise_dropped": 2, "off_topic_dropped": 4},
+        "feeds": {"read": [{"publisher": "zm-online"}]}})
+    (m,) = views.pulse_view(w["client"], OWNER)["markets"]
+    assert [h["title"] for h in m["other_headlines"]] == ["Neue Praxis"]
+    assert m["themes"][0]["kind_label"] == "Staffing" and m["feeds"] == ["zm-online"]
+    assert m["articles"] == 3 and m["noise_dropped"] == 2
+    assert views.pulse_view(w["client"], OTHER) is None
