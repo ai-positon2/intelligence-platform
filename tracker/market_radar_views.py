@@ -381,7 +381,11 @@ EVENT_LABELS = {
     "announcement": "Announcement", "hiring_surge": "Hiring up",
     "hiring_slowdown": "Hiring down", "new_job_location": "Hiring in a new place",
     "senior_hire_search": "Senior role open", "nearby_opening": "Opening nearby",
-    "new_entrant": "New brand",
+    "new_entrant": "New brand", "relocation": "Moved", "acquisition": "Acquisition",
+    "funding": "Funding", "leadership_change": "Leadership", "layoffs": "Job cuts",
+    "hiring_push": "Hiring drive", "pricing_change": "Pricing", "partnership": "Partnership",
+    "new_market": "New market", "legal_regulatory": "Legal", "financial_results": "Results",
+    "rebrand": "Rebrand", "other_move": "Move",
 }
 def _detector_labels():
     from .market_radar_collect import DETECTORS
@@ -400,9 +404,16 @@ def moves_view(client_id, owner_email, *, conn=None):
     rows = store.competitors(client_id, owner_email, conn=conn)
     names = {r["entity_id"]: (r.get("name") or r["domain"], r["domain"]) for r in rows}
     ids = list(names)
-    events = []
+    events, hidden = [], []
+    scores = store.client_scores(client_id, conn=conn)
     for e in store.recent_events(ids, conn=conn):
         sources = e.get("sources") or []
+        if e.get("hidden_reason"):
+            hidden.append({"name": names.get(e["entity_id"], ("?",))[0], "title": e["title"],
+                           "why": e["hidden_reason"], "url": next((s.get("url") for s in sources
+                                                                   if s.get("url")), None)})
+            continue
+        sc = scores.get(e["id"]) or {}
         name, domain = names.get(e["entity_id"], ("?", "?"))
         events.append({
             "id": e["id"], "entity_id": e["entity_id"], "name": name, "domain": domain,
@@ -412,7 +423,11 @@ def moves_view(client_id, owner_email, *, conn=None):
                                                       if s.get("url")), None),
             "detectors": sorted({DETECTOR_LABELS.get(s.get("detector"), s.get("detector"))
                                  for s in sources if s.get("detector")}),
-            "evidence": e["evidence_count"], "seen": _iso(e["first_seen_at"])})
+            "evidence": e["evidence_count"], "seen": _iso(e["first_seen_at"]),
+            "articles": sum(1 for s in sources if s.get("detector") == "news"),
+            "place": (e.get("location") or {}).get("label"),
+            "score": sc.get("score"), "severity": sc.get("severity"),
+            "feedback": sc.get("feedback")})
     tracked = {}
     for s in store.snapshot_summaries(ids, conn=conn):
         tracked.setdefault(s["entity_id"], {})[s["detector"]] = {
@@ -428,6 +443,11 @@ def moves_view(client_id, owner_email, *, conn=None):
                 "seconds": summary.get("seconds"), "new_events": summary.get("new_events"),
                 "left_out": summary.get("left_out"),
                 "news_breaker_open": summary.get("news_breaker_open"),
+                "signals_note": (summary.get("signals") or {}).get("note") or
+                ((summary.get("signals") or {}).get("error") and
+                 "Reading the headlines failed: " + summary["signals"]["error"]),
+                "severity": ((summary.get("signals") or {}).get("scored") or {}).get("severity"),
+                "demoted": ((summary.get("signals") or {}).get("scored") or {}).get("demoted"),
                 "coverage": [{"label": c["label"], "text": c["text"], "read": c["read"],
                               "total": c["total"]} for c in summary.get("coverage") or []],
                 "companies": [{"entity_id": c["entity_id"], "domain": c["domain"],
@@ -461,7 +481,11 @@ def moves_view(client_id, owner_email, *, conn=None):
             for k in ("skipped", "error"):
                 if r.get(k):
                     radar[k] = r[k]
-    return {"events": events, "last_collect": last, "radar": radar,
+    ranked = sorted((e for e in events if e["score"] is not None),
+                    key=lambda e: -e["score"])
+    top = [e["id"] for e in ranked if e["severity"] in ("HIGH", "MEDIUM")][:5]
+    return {"events": events, "top": top, "hidden": hidden[:200], "hidden_count": len(hidden),
+            "last_collect": last, "radar": radar,
             "pulse": pulse_view(client_id, owner_email, conn=conn),
             "competitors": [{"entity_id": i, "name": names[i][0], "domain": names[i][1],
                              "tracked": tracked.get(i, {})} for i in ids]}

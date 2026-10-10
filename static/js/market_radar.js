@@ -340,15 +340,24 @@
     promotion: 'warn', sale_started: 'warn', price_cut: 'warn', price_increase: 'warn',
     closed_location: 'bad', product_removed: 'bad', hiring_slowdown: 'bad', location_list_shrank: 'bad' };
 
+  var SEVERITY = { HIGH: ['bad', 'High'], MEDIUM: ['warn', 'Medium'], LOW: ['', 'Low'] };
+  var STATUS_SAYS = { planned: 'Planned', announced: 'Announced', rumored: 'Rumoured' };
+
   function renderMoveRow(e) {
     var href = safeUrl(e.url);
     var title = href ? '<a href="' + esc(href) + '" target="_blank" rel="noopener noreferrer">' + esc(e.title) + '</a>' : esc(e.title);
+    var sev = SEVERITY[e.severity];
     return '<li class="mr-move"><div class="mr-move-when">' + esc(e.date || when(e.seen)) + '</div>' +
-      '<div class="mr-move-b"><div class="mr-move-t"><span class="mr-chip ' + esc(TONE[e.type] || '') + '">' + esc(e.label) + '</span>' +
-      '<b>' + esc(e.name) + '</b></div><div class="mr-move-title">' + title + '</div>' +
+      '<div class="mr-move-b"><div class="mr-move-t">' +
+      (sev ? '<span class="mr-chip mr-sev ' + sev[0] + '" title="How much this matters to this client">' + sev[1] + '</span>' : '') +
+      '<span class="mr-chip ' + esc(TONE[e.type] || '') + '">' + esc(e.label) + '</span>' +
+      (STATUS_SAYS[e.status] ? '<span class="mr-chip">' + STATUS_SAYS[e.status] + '</span>' : '') +
+      '<b>' + esc(e.name) + '</b>' + (e.place ? ' <span class="mr-hint">' + esc(e.place) + '</span>' : '') +
+      '</div><div class="mr-move-title">' + title + '</div>' +
       (e.summary ? '<div class="mr-move-sum">' + esc(e.summary) + '</div>' : '') +
       '<div class="mr-move-src">Seen in: ' + esc((e.detectors || []).join(', ') || 'unknown') +
-      (e.evidence > 1 ? ' (' + esc(e.evidence) + ' independent sources)' : '') + '</div></div></li>';
+      (e.articles > 1 ? ' (' + esc(e.articles) + ' articles)' : '') +
+      (e.evidence > 1 ? '; ' + esc(e.evidence) + ' independent sources' : '') + '</div></div></li>';
   }
 
   function renderCollectProgress(run) {
@@ -356,7 +365,8 @@
     var m = /collect (\d+)\/(\d+)/.exec(stage);
     var text = m ? 'Read ' + m[1] + ' of ' + m[2] + ' competitors'
       : stage === 'radar' ? 'Looking for new businesses nearby and new brands'
-      : stage === 'pulse' ? 'Reading the industry news' : 'Starting';
+      : stage === 'pulse' ? 'Reading the industry news'
+      : stage === 'signals' ? 'Reading competitor headlines and ranking the moves' : 'Starting';
     return '<div class="mr-callout">' + esc(text) + '… This runs in the background; you can leave the page.</div>';
   }
 
@@ -377,6 +387,13 @@
     }
     if (last && last.status === 'failed') body += '<div class="mr-callout bad">The last collection failed: ' + esc(last.error || 'no reason given') + '</div>';
     var events = moves.events || [];
+    var byId = {};
+    events.forEach(function (e) { byId[e.id] = e; });
+    var top = (moves.top || []).map(function (id) { return byId[id]; }).filter(Boolean);
+    if (top.length) {
+      body += '<h4 class="mr-sub">Most important</h4><ul class="mr-moves mr-top">' + top.map(renderMoveRow).join('') + '</ul>' +
+        '<h4 class="mr-sub">All moves, newest first</h4>';
+    }
     if (events.length) {
       body += '<ul class="mr-moves">' + events.slice(0, MOVES_SHOWN).map(renderMoveRow).join('') + '</ul>';
       if (events.length > MOVES_SHOWN) {
@@ -393,7 +410,17 @@
         last.coverage.map(function (c) { return '<li>' + esc(c.text) + '</li>'; }).join('') + '</ul>' +
         (last.left_out ? '<p class="mr-hint">' + esc(last.left_out) + ' more competitors were not collected: at most 12 are, confirmed ones first.</p>' : '') +
         (last.news_breaker_open ? '<p class="mr-hint">Google News stopped answering during this collection; some news was not read.</p>' : '') +
+        (last.signals_note ? '<p class="mr-hint">' + esc(last.signals_note) + '.</p>' : '') +
+        (last.demoted ? '<p class="mr-hint">' + esc(last.demoted) + ' moves scored High were shown as Medium, so High stays for the few that matter most.</p>' : '') +
         '</details>';
+    }
+    if (moves.hidden && moves.hidden.length) {
+      body += '<details class="mr-more"><summary>Left out as not moves (' + esc(moves.hidden_count || moves.hidden.length) + ')</summary><ul class="mr-list">' +
+        moves.hidden.map(function (h) {
+          var href = safeUrl(h.url);
+          var t = href ? '<a href="' + esc(href) + '" target="_blank" rel="noopener noreferrer">' + esc(h.title) + '</a>' : esc(h.title);
+          return '<li><b>' + esc(h.name) + '</b>: ' + t + ' <span class="mr-hint">' + esc(h.why) + '</span></li>';
+        }).join('') + '</ul></details>';
     }
     if (last && last.companies && last.companies.length) {
       body += '<details class="mr-more"><summary>Per competitor</summary>' + last.companies.map(function (c) {

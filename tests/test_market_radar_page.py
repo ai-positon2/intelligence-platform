@@ -584,3 +584,78 @@ def test_the_pulse_view_reads_the_shared_pulse_and_lists_headlines_outside_theme
     assert m["themes"][0]["kind_label"] == "Staffing" and m["feeds"] == ["zm-online"]
     assert m["articles"] == 3 and m["noise_dropped"] == 2
     assert views.pulse_view(w["client"], OTHER) is None
+
+
+def test_signals_on_postgres_type_the_news_score_it_and_the_view_ranks_it(client_with_reading):
+    """The signal engine against the real store: headline verdicts, merged
+    sources, a hidden blog post, scores and the moves view."""
+    from datetime import datetime, timezone
+    from tracker import market_radar_signals as S
+    from tracker import market_radar_store as store
+    w = client_with_reading
+    rival = store.upsert_entity("rival.example", name="Rival Dental")
+    store.propose_competitor(w["client"], OWNER, rival, "direct", confidence=0.8,
+                             details={"sells": "dental care"})
+    today = datetime.now(timezone.utc).date().isoformat()
+    heads = [{"id": "n%d" % i, "title": "Rival Dental buys Smile Co, take %d" % i, "date": today,
+              "publisher": "Pub %d" % i, "link": "https://pub%d.example/a" % i, "copies": 1}
+             for i in range(3)]
+    heads.append({"id": "n9", "title": "Best Rival Dental deals", "date": today, "publisher": "Deals",
+                  "link": "https://deals.example/a", "copies": 1})
+    store.save_snapshot(rival, "news", {"items": heads}, item_count=4)
+    store.record_event(rival, "newsroom:post:x", type="announcement", title="Our charity run",
+                       source={"url": "https://rival.example/blog/run", "detector": "newsroom"},
+                       event_date=today)
+
+    def answer(user):
+        lines = user.split("HEADLINES:\n")[1].splitlines()
+        num = {l.split(" | ")[-1]: int(l.split(" | ")[0]) for l in lines if l.strip()}
+        return {"events": [{"existing": "", "type": "acquisition", "status": "completed",
+                            "title": "Rival Dental buys Smile Co", "place": "", "date": "",
+                            "items": [num["Rival Dental buys Smile Co, take %d" % i] for i in range(3)]}],
+                "left_out": [{"item": num["Best Rival Dental deals"], "reason": "review_or_deal"},
+                             {"item": num["Our charity run"], "reason": "community"}]}
+
+    class LLM:
+        def call_json(self, *a, **k):
+            return answer(a[1]), {}
+
+    # A small, old page change scores Low and stays out of "Most important".
+    store.record_event(rival, "pages:page:old", type="page_changed", title="Pricing page changed",
+                       source={"url": "https://rival.example/pricing", "detector": "pages"},
+                       event_date="2026-07-20")
+    out = S.run_for_client(w["client"], OWNER, llm=LLM(), geocode=lambda q: None)
+    assert out["scored"]["scored"] == 2 and "5 headlines and posts read for 1 companies: 1 events, 2 left out" in out["note"]
+    m = views.moves_view(w["client"], OWNER)
+    e, old = sorted(m["events"], key=lambda x: x["title"] != "Rival Dental buys Smile Co")
+    assert e["label"] == "Acquisition" and e["articles"] == 3 and e["severity"] == "HIGH"
+    assert old["severity"] == "LOW"
+    assert m["top"] == [e["id"]] and m["hidden_count"] == 1
+    assert m["hidden"][0]["why"].startswith("not a move: charity")
+    assert store.latest_snapshot(rival, "signals")["payload"]["triaged"]["n9"] == "left_out:review_or_deal"
+    first = store.first_snapshot(rival, "news")
+    assert first["payload"]["items"][0]["id"] == "n0"
+    # Scoring again keeps the client's feedback.
+    store.set_feedback(w["client"], OWNER, e["id"], "down")
+    S.score_client(w["client"], OWNER, store=store, now=datetime.now(timezone.utc), geocode=None)
+    assert store.client_scores(w["client"])[e["id"]]["feedback"] == "down"
+
+
+def test_script_shows_severity_the_most_important_moves_and_what_was_left_out():
+    ev = {"id": 5, "type": "acquisition", "label": "Acquisition", "status": "planned", "date": "2026-10-08",
+          "name": EVIL, "title": EVIL, "summary": EVIL, "url": "javascript:alert(1)", "detectors": ["News"],
+          "evidence": 2, "articles": 13, "place": EVIL, "severity": "HIGH"}
+    low = dict(ev, id=6, severity="LOW", status="opened", articles=1, evidence=1)
+    moves = {"events": [ev, low], "top": [5], "hidden": [{"name": EVIL, "title": EVIL, "why": EVIL,
+                                                          "url": "javascript:x"}], "hidden_count": 4,
+             "competitors": [], "last_collect": {"status": "complete", "signals_note": EVIL,
+                                                 "coverage": [{"label": "News", "text": "News read for 1 of 1.",
+                                                               "read": 1, "total": 1}],
+                                                 "demoted": 3}}
+    out = run_js("return MR.renderMoves(%s, null);" % json.dumps(moves))
+    _no_markup_from(out)
+    import re
+    assert not [h for h in re.findall(r'href="([^"]*)"', out) if "javascript" in h]
+    assert "Most important" in out and out.count(">High<") == 2 and ">Low<" in out
+    assert "(13 articles); 2 independent sources" in out and ">Planned<" in out
+    assert "Left out as not moves (4)" in out and "3 moves scored High were shown as Medium" in out

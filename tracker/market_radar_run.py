@@ -26,6 +26,7 @@ STALE_AFTER_S = 600
 # step of the competitor search's progress bar (STAGE_STEP in the page script).
 RADAR_STAGE = "radar"
 PULSE_STAGE = "pulse"
+SIGNALS_STAGE = "signals"
 
 
 def start(url, owner_email, *, reuse_profile=False, spawn=None):
@@ -147,7 +148,13 @@ def _pulse(client_id, owner_email, *, run_id=None):
     return mp.run_for_client(client_id, owner_email, run_id=run_id)
 
 
-def collect_job(run_id, client_id, owner_email, *, collect=None, radar=None, pulse=None):
+def _signals(client_id, owner_email, *, run_id=None):
+    from . import market_radar_signals as ms
+    return ms.run_for_client(client_id, owner_email, run_id=run_id)
+
+
+def collect_job(run_id, client_id, owner_email, *, collect=None, radar=None, pulse=None,
+                signals=None):
     from . import market_radar_store as store
     from . import market_radar_collect as mc
     collect = collect or mc.collect_client
@@ -176,6 +183,14 @@ def collect_job(run_id, client_id, owner_email, *, collect=None, radar=None, pul
         except Exception as e:
             logger.exception("market_radar_run pulse %s failed", run_id)
             result["pulse"] = {"error": "%s: %s" % (type(e).__name__, str(e)[:300])}
+        # Phase 6: competitor headlines read into typed events, and every
+        # event scored for this client. Last, so the radar's finds are scored.
+        stage(SIGNALS_STAGE)
+        try:
+            result["signals"] = (signals or _signals)(client_id, owner_email, run_id=run_id)
+        except Exception as e:
+            logger.exception("market_radar_run signals %s failed", run_id)
+            result["signals"] = {"error": "%s: %s" % (type(e).__name__, str(e)[:300])}
         store.update_run(run_id, status="complete", stage="done", summary=result,
                          coverage={"lines": result.get("coverage")})
     except Exception as e:

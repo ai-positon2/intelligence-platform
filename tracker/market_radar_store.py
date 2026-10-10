@@ -266,6 +266,10 @@ SCHEMA = [
         run_id BIGINT REFERENCES mr_runs(id) ON DELETE SET NULL,
         created_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp())""",
     "CREATE INDEX IF NOT EXISTS idx_mr_pulses_latest ON mr_pulses (industry_key, country, created_at DESC)",
+    # Phase 6 (2026-10-10): an event the signal engine judged not to be a
+    # move (a blog post about a charity day) or folded into a typed event
+    # keeps its row, with the reason, and is left off the list.
+    "ALTER TABLE mr_events ADD COLUMN IF NOT EXISTS hidden_reason TEXT",
 ]
 
 
@@ -674,14 +678,43 @@ def recent_events(entity_ids, *, days=120, limit=400, conn=None):
     with _tx(conn) as cur:
         cur.execute("""
             SELECT id, entity_id, type, status, event_date, title, summary, location, sources,
-                   evidence_count, first_seen_at
+                   evidence_count, first_seen_at, dedupe_key, hidden_reason
             FROM mr_events WHERE entity_id = ANY(%s)
               AND first_seen_at > now() - make_interval(days => %s)
             ORDER BY COALESCE(event_date, first_seen_at::date) DESC, first_seen_at DESC, id DESC
             LIMIT %s""", (ids, int(days), int(limit)))
         keys = ("id", "entity_id", "type", "status", "event_date", "title", "summary",
-                "location", "sources", "evidence_count", "first_seen_at")
+                "location", "sources", "evidence_count", "first_seen_at", "dedupe_key",
+                "hidden_reason")
         return [dict(zip(keys, r)) for r in cur.fetchall()]
+
+
+def hide_event(event_id, reason, *, conn=None):
+    """Leave an event off the lists, keeping the row and why."""
+    with _tx(conn) as cur:
+        cur.execute("UPDATE mr_events SET hidden_reason=%s, updated_at=now() WHERE id=%s",
+                    (reason[:300], event_id))
+
+
+def first_snapshot(entity_id, detector, *, conn=None):
+    """The earliest stored read of a detector on a company."""
+    with _tx(conn) as cur:
+        cur.execute("""SELECT payload, first_seen_at FROM mr_snapshots
+                       WHERE entity_id=%s AND detector=%s
+                       ORDER BY first_seen_at ASC, id ASC LIMIT 1""", (entity_id, detector))
+        row = cur.fetchone()
+    return dict(zip(("payload", "first_seen_at"), row)) if row else None
+
+
+def client_scores(client_id, *, conn=None):
+    """event_id -> how it was scored for this client, and the client's
+    thumbs up or down."""
+    with _tx(conn) as cur:
+        cur.execute("""SELECT event_id, score, severity, distance_km, feedback
+                       FROM mr_client_events WHERE client_id=%s""", (client_id,))
+        return {r[0]: {"score": float(r[1]) if r[1] is not None else None, "severity": r[2],
+                       "distance_km": float(r[3]) if r[3] is not None else None,
+                       "feedback": r[4]} for r in cur.fetchall()}
 
 
 def drop_product_announcements(*, conn=None):
@@ -739,6 +772,21 @@ def link_client_event(client_id, event_id, *, score=None, severity=None, distanc
                 score = EXCLUDED.score, severity = EXCLUDED.severity,
                 distance_km = EXCLUDED.distance_km, updated_at = now()""",
                     (client_id, event_id, score, severity, distance_km, run_id))
+
+
+def link_client_events(client_id, rows, *, run_id=None, conn=None):
+    """link_client_event for many events in one transaction. rows are
+    (event_id, score, severity, distance_km)."""
+    if not rows:
+        return
+    with _tx(conn) as cur:
+        cur.executemany("""
+            INSERT INTO mr_client_events (client_id, event_id, score, severity, distance_km, first_run_id)
+            VALUES (%s,%s,%s,%s,%s,%s)
+            ON CONFLICT (client_id, event_id) DO UPDATE SET
+                score = EXCLUDED.score, severity = EXCLUDED.severity,
+                distance_km = EXCLUDED.distance_km, updated_at = now()""",
+                        [(client_id, e, sc, sev, km, run_id) for e, sc, sev, km in rows])
 
 
 def set_feedback(client_id, owner_email, event_id, feedback, reason=None, *, conn=None):
