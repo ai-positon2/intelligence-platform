@@ -389,7 +389,7 @@ def test_a_left_out_verdict_cannot_overrule_an_event():
 
 def test_the_rules_learnt_from_the_first_live_reads_are_in_the_prompt():
     sysp = S._system()
-    for rule in ("Alo Drink", "acquisition only when ownership changes", "leadership_change only for",
+    for rule in ("Alo Drink", "Spur Intelligence", "acquisition only when ownership changes", "leadership_change only for",
                  "partnership only when a partnership begins", "plans to open", "marketing_campaign",
                  "discount-code", "earnings date"):
         assert rule in sysp, rule

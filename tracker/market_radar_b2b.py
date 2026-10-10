@@ -191,7 +191,9 @@ def read_subdomains(ctx, *, connect=None, sleep=None):
         names = crtsh_names(domain, connect=connect, sleep=sleep)
         source, history = "crt.sh", True
     except Exception as e:
-        tried.append("crt.sh did not answer (%s)" % type(e).__name__)
+        tried.append("crt.sh did not answer (%s)" % (
+            "too many certificates to read in time" if type(e).__name__ == "QueryCanceled"
+            else type(e).__name__))
         try:
             names, _pages = certspotter_names(domain, ctx["get"])
             source, history = "Cert Spotter", False
@@ -370,6 +372,11 @@ def read_filings(ctx):
     except Exception as e:
         return _fail("failed", str(e)[:200])
     filings = _filings(d, ctx["now"])
+    last = max(((d.get("filings") or {}).get("recent") or {}).get("filingDate") or [""])
+    if last and last < (ctx["now"] - timedelta(days=FILING_DAYS)).date().isoformat():
+        # Zendesk went private in 2022: its old reports still name its domain.
+        return {"status": "none", "note": "%s no longer files with the SEC (last filing %s)" % (
+            d.get("name") or name, last), "payload": None, "items": 0, "complete": True}
     payload = {"cik": cik, "name": d.get("name") or name, "tickers": d.get("tickers") or [],
                "filings": filings}
     note = "%s (CIK %d%s): %d material filings in the last %d days" % (
@@ -487,7 +494,10 @@ def read_headcount(ctx, *, enrich=None):
 
 def _growth_event(cur, day):
     g6 = cur.get("growth_6m")
-    if g6 is None:
+    if g6 is None or g6 <= -1:
+        return []
+    # People, not percentages: +33% at GTM 8020 was 6 people becoming 8.
+    if abs(cur["employees"] - cur["employees"] / (1 + g6)) < CHANGE_MIN / 2:
         return []
     if g6 >= HEADCOUNT_UP:
         typ, word = "hiring_surge", "up"

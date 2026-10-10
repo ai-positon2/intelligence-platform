@@ -234,6 +234,21 @@ def test_unlisted_unknown_or_unreachable_says_which(answer, status, words):
     assert r["status"] == status and words in r["note"]
 
 
+def test_a_company_that_stopped_filing_is_not_called_listed():
+    web = sec_web(fts(("0001463172", "Zendesk, Inc.")),
+                  submissions("Zendesk, Inc.", [("10-Q", "2022-08-04", "", "0001-22-1", "q.htm")]))
+    r = B.read_filings(ctx(web, entity={"id": 4, "domain": "zendesk.com", "name": "Zendesk"}))
+    assert r["status"] == "none" and r["note"] == "Zendesk, Inc. no longer files with the SEC (last filing 2022-08-04)"
+
+
+def test_a_certificate_log_timeout_says_why():
+    class QueryCanceled(Exception):
+        pass
+    web = Web({"https://api.certspotter.com/": miss()})
+    r = B.read_subdomains(ctx(web, hooks={"crt_connect": lambda **kw: Conn(fail=QueryCanceled("cancel"))}))
+    assert "crt.sh did not answer (too many certificates to read in time)" in r["note"]
+
+
 def test_a_known_company_is_not_searched_again_and_only_new_filings_are_news():
     prev_payload = {"cik": 1653909, "name": "Smartbird, Inc.", "filings": [
         {"form": "8-K", "date": "2026-08-01", "items": ["2.01"], "acc": "0001437749-26-019000", "doc": "deal.htm"}]}
@@ -289,6 +304,9 @@ def test_headcount_and_its_growth_become_a_line_once():
     (ev,) = B.compare_headcount({"employees": 400, "read": "2026-09-10"}, {"employees": 460}, NOW)
     assert ev["title"] == "Headcount up from about 400 to 460 since 2026-09-10 (Apollo estimate)"
     assert B.compare_headcount({"employees": 400}, {"employees": 415}, NOW) == []     # under 10%
+    # +33% of a company of 8 is two people, not a hiring surge
+    assert B.baseline_headcount({"employees": 8, "growth_6m": 0.33}, NOW) == []
+    assert B.baseline_headcount({"employees": 80, "growth_6m": 0.33}, NOW)
 
 
 @pytest.mark.parametrize("answer,status", [({"organization": {}}, "none"), ({}, "none"),

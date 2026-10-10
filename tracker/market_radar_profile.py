@@ -312,6 +312,7 @@ def assemble(site, parsed, meta):
         "hints": site.get("hints", []),
         "shopify_store": site.get("shopify_store"),
         "read_from_archive": bool(site.get("via_archive")),
+        "read_from_apollo": bool(site.get("via_apollo")),
     }
     p["checks"] = checks(site, p)
     p["coverage"] = {
@@ -423,14 +424,73 @@ def locate_hq(profile, *, conn=None):
 
 # == the whole step =============================================================
 
-def build_profile(url, *, run_id=None, client=None, save=True, conn=None):
+APOLLO_LABEL = "Apollo company record (the website refused our reader)"
+
+
+def apollo_reading(site, *, run_id=None, enrich=None):
+    """When a company's own site refuses us (lincolnelectric.com, weg.net and
+    personio.com answered 403 or 429 even to a browser from a home address,
+    2026-10-10), Apollo's record of it stands in: what it does, its
+    industry, keywords, head office and LinkedIn page. One Apollo credit,
+    booked in the ledger. Returns a site reading built from it, or None."""
+    key = os.environ.get("APOLLO_API_KEY", "")
+    if enrich is None:
+        if not key:
+            return None
+        from . import apollo_client
+
+        def enrich(domain):
+            return apollo_client._post("organizations/enrich", {"domain": domain}, key)
+    domain = site.get("domain")
+    if not domain:
+        return None
+    try:
+        if run_id:
+            from . import market_radar_ledger as ledger
+            with ledger.track(run_id, "profile", "apollo", units=1) as call:
+                data = enrich(domain)
+                call.record(units=1)
+        else:
+            data = enrich(domain)
+    except Exception:
+        return None
+    org = (data or {}).get("organization") or {}
+    if not org.get("name") or not (org.get("short_description") or org.get("industry")):
+        return None
+    lines = ["Name: %s" % org["name"]]
+    for label, k in (("What it does", "short_description"), ("Industry", "industry"),
+                     ("Founded", "founded_year"), ("Employees (estimate)", "estimated_num_employees"),
+                     ("Street", "street_address"), ("City", "city"), ("Region", "state"),
+                     ("Postal code", "postal_code"), ("Country", "country"),
+                     ("Phone", "phone"), ("LinkedIn", "linkedin_url")):
+        if org.get(k):
+            lines.append("%s: %s" % (label, org[k]))
+    if org.get("keywords"):
+        lines.append("Keywords: " + ", ".join(str(k) for k in org["keywords"][:30]))
+    text = "\n".join(lines)
+    socials = dict((site.get("signals") or {}).get("socials") or {})
+    li = re.search(r"linkedin\.com/(?:company|school|showcase)/([^/?#\s]+)", org.get("linkedin_url") or "")
+    if li:
+        socials["linkedin"] = li.group(1)
+    return dict(site, status="ok", via_apollo=True, texts={APOLLO_LABEL: text},
+                signals=dict(site.get("signals") or {}, socials=socials, title=org["name"],
+                             description=org.get("short_description")),
+                home_notes=list(site.get("home_notes") or []) +
+                ["the website refused this server, so the profile was read from Apollo's "
+                 "company record instead"])
+
+
+def build_profile(url, *, run_id=None, client=None, save=True, conn=None, apollo_enrich=None):
     """Read the site, ask the model, check, locate, store. Returns
     {"status": "ok"|"unreadable"|"failed", "profile", "entity_id", "error"}."""
     from . import market_radar_store as store
     site = site_reader.read_site(url)
     if site["status"] != "ok" or not site.get("texts"):
-        return {"status": "unreadable", "profile": None, "entity_id": None,
-                "error": "the homepage could not be read", "pages": site.get("pages")}
+        stand_in = apollo_reading(site, run_id=run_id, enrich=apollo_enrich)
+        if stand_in is None:
+            return {"status": "unreadable", "profile": None, "entity_id": None,
+                    "error": "the homepage could not be read", "pages": site.get("pages")}
+        site = stand_in
     try:
         parsed, meta = ask_model(facts_for_model(site), build_corpus(site), run_id=run_id,
                                  client=client)

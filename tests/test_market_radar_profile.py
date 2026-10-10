@@ -622,11 +622,54 @@ def test_build_profile_end_to_end_saves_the_company(world, monkeypatch):
 
 
 def test_build_profile_reports_an_unreadable_site_without_calling_the_model(monkeypatch):
+    monkeypatch.delenv("APOLLO_API_KEY", raising=False)
     monkeypatch.setattr(prof.site_reader, "read_site", lambda url: {"status": "blocked", "pages": [],
                                                                    "texts": {}})
     client = FakeClient()
     out = prof.build_profile("https://x.example/", client=client, save=False)
     assert out["status"] == "unreadable" and client.calls == []
+
+
+BLOCKED = {"status": "blocked", "domain": "weg.net", "home_url": "https://www.weg.net/", "texts": {},
+           "pages": [{"kind": "home", "url": "https://www.weg.net/", "status": "blocked", "note": "refused (HTTP 403)"}],
+           "signals": {}, "home_notes": ["the site refused this server (HTTP 403)"]}
+WEG = {"organization": {"name": "WEG", "short_description": "WEG makes electric motors, drives and transformers.",
+                        "industry": "electrical/electronic manufacturing", "keywords": ["electric motors", "drives"],
+                        "city": "Jaragua do Sul", "country": "Brazil", "estimated_num_employees": 40000,
+                        "linkedin_url": "http://www.linkedin.com/company/weg"}}
+
+
+def test_a_site_that_refuses_us_is_read_from_apollos_record_instead(world, monkeypatch):
+    from tracker import market_radar_ledger as ledger
+    monkeypatch.setattr(prof.site_reader, "read_site", lambda url: dict(BLOCKED))
+    monkeypatch.setattr(prof, "geocode", lambda q, conn=None: None)
+    asked = []
+    client = FakeClient(reply())
+    out = prof.build_profile("https://www.weg.net/", client=client, run_id=world["run"],
+                             apollo_enrich=lambda d: asked.append(d) or WEG)
+    assert out["status"] == "ok" and asked == ["weg.net"]
+    user = client.calls[0][1]["messages"][0]["content"]
+    assert "=== Apollo company record (the website refused our reader) ===" in user
+    assert "What it does: WEG makes electric motors" in user and "Keywords: electric motors, drives" in user
+    p = out["profile"]
+    assert p["facts"]["read_from_apollo"] is True and p["facts"]["socials"]["linkedin"] == "weg"
+    assert any("read from Apollo's company record" in n for n in p["coverage"]["home_notes"])
+    calls = ledger.summary(world["run"])
+    assert calls["by_provider"].get("apollo") == 0 and calls["calls_by_status"]["done"] == 2   # Apollo + model
+
+
+@pytest.mark.parametrize("record", [{}, {"organization": {"name": "WEG"}}, None])
+def test_an_apollo_record_with_nothing_to_read_leaves_the_site_unreadable(monkeypatch, record):
+    monkeypatch.setattr(prof.site_reader, "read_site", lambda url: dict(BLOCKED))
+    client = FakeClient()
+    out = prof.build_profile("https://www.weg.net/", client=client, save=False,
+                             apollo_enrich=lambda d: record)
+    assert out["status"] == "unreadable" and client.calls == []
+
+    def boom(d):
+        raise ConnectionError("down")
+    assert prof.build_profile("https://www.weg.net/", client=client, save=False,
+                              apollo_enrich=boom)["status"] == "unreadable"
 
 
 def test_geocode_is_cached_and_survives_a_failure(pg, monkeypatch):

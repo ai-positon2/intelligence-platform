@@ -261,7 +261,8 @@ def profile_view(client):
         "unknowns": reading.get("unknowns") or [],
         "confidence": reading.get("confidence") or {},
         "facts": {k: facts.get(k) for k in ("website", "platforms", "socials", "jobs_boards",
-                                            "store_locator", "read_from_archive")},
+                                            "store_locator", "read_from_archive",
+                                            "read_from_apollo")},
         "read_at": reading.get("read_at"),
         "model": reading.get("model"),
     }
@@ -300,6 +301,11 @@ def run_view(run):
            "seconds": summary.get("seconds"), "profile_note": summary.get("profile_note"),
            "unread": result.get("unread") or [], "gaps": result.get("gaps") or [],
            "left_out": (result.get("left_out") or [])[:15],
+           # Candidates the homepage check turned down, with its reason: without
+           # these a search keeping 1 of 83 read sites could not be explained
+           # (freshworks.com, 2026-10-10).
+           "rejected": [{"domain": r.get("domain"), "why": r.get("why")}
+                        for r in (result.get("rejected") or [])[:40]],
            "sources": {}}
     labels = {"site": "Named on the company's own site", "model": "Known competitors (checked)",
               "search": "Google search", "places": "Map of nearby businesses",
