@@ -312,6 +312,7 @@ def assemble(site, parsed, meta):
         "hints": site.get("hints", []),
         "shopify_store": site.get("shopify_store"),
         "read_from_archive": bool(site.get("via_archive")),
+        "read_in_browser": bool(site.get("via_browser")),
         "read_from_apollo": bool(site.get("via_apollo")),
     }
     p["checks"] = checks(site, p)
@@ -480,11 +481,21 @@ def apollo_reading(site, *, run_id=None, enrich=None):
                  "company record instead"])
 
 
-def build_profile(url, *, run_id=None, client=None, save=True, conn=None, apollo_enrich=None):
+BROWSER_PAGES = 4
+
+
+def build_profile(url, *, run_id=None, client=None, save=True, conn=None, apollo_enrich=None,
+                  browser=None):
     """Read the site, ask the model, check, locate, store. Returns
     {"status": "ok"|"unreadable"|"failed", "profile", "entity_id", "error"}."""
     from . import market_radar_store as store
-    site = site_reader.read_site(url)
+    if browser is None:
+        from . import market_radar_browser
+        browser = market_radar_browser.for_run(run_id)
+    # The profile is worth its other pages: up to BROWSER_PAGES more in the
+    # same paid browser run when the site refuses this server.
+    site = (site_reader.read_site(url, browser=browser, browser_pages=BROWSER_PAGES)
+            if browser else site_reader.read_site(url))
     if site["status"] != "ok" or not site.get("texts"):
         stand_in = apollo_reading(site, run_id=run_id, enrich=apollo_enrich)
         if stand_in is None:

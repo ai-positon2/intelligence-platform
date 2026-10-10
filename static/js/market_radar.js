@@ -148,6 +148,8 @@
     var head = '<div class="mr-card-h"><div><h3>Profile</h3><p>' +
       ((p.facts || {}).read_from_apollo ? 'The website refused our reader, so this was read from Apollo\'s company record' +
         (p.read_at ? ' ' + esc(when(p.read_at)) : '') + '. Check it more carefully than usual'
+        : (p.facts || {}).read_in_browser ? 'The website refuses our usual reader, so it was read in a real browser' +
+          (p.read_at ? ' ' + esc(when(p.read_at)) : '')
         : p.read_at ? 'Read from the website ' + esc(when(p.read_at)) : 'Read from the website') +
       (edited.length ? '; ' + esc(edited.length) + ' field' + (edited.length > 1 ? 's' : '') + ' corrected by you' : '') +
       '</p></div>' + (editing ? '' : '<button type="button" class="mr-btn small" data-act="edit">Edit profile</button>') + '</div>';

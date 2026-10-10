@@ -117,8 +117,14 @@ def collect_entity(entity, *, run_id=None, client_country=None, breaker=None, de
     from . import market_radar_site as site
     if store is None:
         from . import market_radar_store as store
-    io = dict({"read_site": site.read_site, "get": http.get, "get_json": http.get_json,
-               "fetch": site.fetch}, **(io or {}))
+    io = dict(io or {})
+    if "read_site" not in io:
+        # A site that refuses this server is opened in a real browser,
+        # the homepage only, while the collection's allowance lasts.
+        from . import market_radar_browser as browser_mod
+        browser = io.get("browser") or browser_mod.for_run(run_id, io.get("browser_allowance"))
+        io["read_site"] = lambda url: site.read_site(url, browser=browser)
+    io = dict({"get": http.get, "get_json": http.get_json, "fetch": site.fetch}, **io)
     now = now or datetime.now(timezone.utc)
     started = time.monotonic()
     wanted = [d for d in DETECTORS if (only is None or d[0] in only) and applies(d[0], archetype)]
@@ -137,6 +143,7 @@ def collect_entity(entity, *, run_id=None, client_country=None, breaker=None, de
         rs = io["read_site"]("https://" + entity["domain"])
         ctx["site"] = rs
         out["site"] = {"status": rs.get("status"), "via_archive": bool(rs.get("via_archive")),
+                       "via_browser": bool(rs.get("via_browser")),
                        "note": None if rs.get("status") == "ok" else _site_note(rs),
                        "pages": sum(1 for p in rs.get("pages") or [] if p["status"] == "ok")}
         # Phase 2 stores a competitor by name only. Its own site says which
@@ -287,6 +294,8 @@ def collect_client(client_id, owner_email, *, run_id=None, progress=None, store=
 
     io = dict(io or {})
     io.setdefault("linkedin_allowance", li.Allowance())
+    from . import market_radar_browser as browser_mod
+    io.setdefault("browser_allowance", browser_mod.Allowance())
 
     def one(entity):
         return collect_entity(entity, run_id=run_id, client_country=client_country,

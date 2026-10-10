@@ -969,13 +969,20 @@ def page_head(doc):
     return "".join(line + "\n" for line in lines)
 
 
-def read_site(url):
+def read_site(url, browser=None, browser_pages=0):
     """Read a company's homepage and up to MAX_EXTRA_PAGES of its own pages.
     Returns {"home_url", "domain", "pages", "signals", "country", ...}.
     Never raises; an unreadable site comes back with status and reasons,
-    and a page that breaks the reader itself is one of those reasons."""
+    and a page that breaks the reader itself is one of those reasons.
+
+    `browser` (tracker/market_radar_browser.for_run) opens pages in a real
+    browser when the site refuses this server or builds its page in the
+    browser; it is tried before the Wayback Machine, whose copy is not
+    today's page. `browser_pages` of the site's other pages are opened the
+    same way (each read is a paid run, so a collection opens the homepage
+    only)."""
     try:
-        return _read_site(url)
+        return _read_site(url, browser, browser_pages)
     except Exception as e:
         logger.exception("market_radar_site: reading %s broke", url)
         home = str(url).strip()
@@ -991,10 +998,25 @@ def read_site(url):
                            "note": note, "words": 0, "via": None}],
                 "texts": {}, "signals": {}, "country": None, "needs_browser": False,
                 "geo_redirect": None, "home_notes": [note], "robots": None, "status": "failed",
-                "via_archive": False}
+                "via_archive": False, "via_browser": False}
 
 
-def _read_site(url):
+def _browse(browser, urls, more=False):
+    """{url: page} for the pages a real browser could open, and {url: why}
+    for the rest; ({}, {}) when no browser may be used."""
+    if browser is None or not urls:
+        return {}, {}
+    got = browser(urls, more) if more else browser(urls)
+    if not got:
+        return {}, {}
+    missed = dict(got.get("missed") or {})
+    if got.get("error") and not got.get("pages"):
+        missed = {u: missed.get(u) or "the browser failed (%s)" % str(got["error"])[:120]
+                  for u in urls}
+    return dict(got.get("pages") or {}), missed
+
+
+def _read_site(url, browser=None, browser_pages=0):
     started = datetime.now(timezone.utc)
     url = url.strip()
     if "://" not in url:
@@ -1010,16 +1032,35 @@ def _read_site(url):
            "needs_browser": False, "geo_redirect": home.get("geo_redirect"),
            "home_notes": notes, "robots": None, "status": home["status"]}
     refused = refuses_us(home)
+    browsed = False
     if refused:
-        archived = fetch_archived(home_url)
         notes.append("the site refused this server (HTTP %s)" % home["http_status"])
-        if archived["status"] == "ok":
-            home = archived
+        seen, missed = _browse(browser, [home_url])
+        if seen.get(home_url):
+            home, browsed = seen[home_url], True
             out["status"] = "ok"
         else:
-            # Say we tried: "refused" alone reads as if no fallback existed.
-            home["note"] = "; ".join(x for x in (home["note"], archived["note"]) if x)
-    out["via_archive"] = bool(home.get("via"))
+            archived = fetch_archived(home_url)
+            if archived["status"] == "ok":
+                home = archived
+                out["status"] = "ok"
+            else:
+                # Say we tried: "refused" alone reads as if no fallback existed.
+                home["note"] = "; ".join(x for x in (home["note"], missed.get(home_url),
+                                                     archived["note"]) if x)
+            if missed.get(home_url):
+                notes.append("a real browser could not read it either: " + missed[home_url])
+    elif home["status"] == "ok" and len(home["text"].split()) < MIN_WORDS and browser is not None:
+        # Built in the browser: what a visitor sees is only there after
+        # the page's scripts run.
+        seen, missed = _browse(browser, [home_url])
+        page = seen.get(home_url)
+        if page and len(page["text"].split()) > len(home["text"].split()):
+            home, browsed = dict(page, note="read in a real browser: the page is built there"), True
+        elif missed.get(home_url):
+            notes.append("a real browser could not read it either: " + missed[home_url])
+    out["via_archive"] = str(home.get("via") or "").startswith("wayback")
+    out["via_browser"] = browsed
     out["pages"].append({"kind": "home", "url": home_url, "status": home["status"],
                          "http_status": home["http_status"], "note": home["note"],
                          "words": len(home["text"].split()), "via": home.get("via")})
@@ -1038,21 +1079,32 @@ def _read_site(url):
 
     home_doc = parse_html(home["html"])
     words = len(home["text"].split())
-    if words < MIN_WORDS:
+    if words < MIN_WORDS and not browsed:
         out["needs_browser"] = True
         out["pages"][0]["note"] = (home["note"] + "; " if home["note"] else "") + \
             "only %d readable words: the site is built in the browser (%s)" % (
                 words, client_render_marker(home["html"]) or "no framework marker")
 
     extra = pick_pages(home_doc.links, home_url, rules)
-    if refused:
-        # The live site already refused us; its other pages come from the
-        # archive too, a few only, since each archive read is slow.
-        extra = extra[:MAX_ARCHIVE_PAGES]
+    if browsed and refused and not browser_pages:
+        extra = []      # the site refuses us, and this read pays for one page only
+    if browsed and browser_pages:
+        # The homepage needed a browser, so its other pages do too: as many
+        # as this read may pay for, opened together in one run.
+        extra = extra[:browser_pages]
+        seen, missed = _browse(browser, [u for _, u in extra], more=True)
+        results = [(kind, seen.get(u) or dict(fetch_failed(u), note=missed.get(u) or
+                                              "the browser did not open it"))
+                   for kind, u in extra]
+    else:
+        if refused:
+            # The live site already refused us; its other pages come from the
+            # archive too, a few only, since each archive read is slow.
+            extra = extra[:MAX_ARCHIVE_PAGES]
+        reader = fetch_archived if refused else fetch
+        with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:
+            results = list(pool.map(lambda kv: (kv[0], reader(kv[1])), extra))
     docs = [("home", home, home_doc)]
-    reader = fetch_archived if refused else fetch
-    with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:
-        results = list(pool.map(lambda kv: (kv[0], reader(kv[1])), extra))
     for kind, page in results:
         out["pages"].append({"kind": kind, "url": page["final_url"], "status": page["status"],
                              "http_status": page["http_status"], "note": page["note"],
