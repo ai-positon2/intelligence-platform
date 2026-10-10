@@ -434,3 +434,26 @@ def test_the_weekly_update_card_escapes_and_warns():
                                               (10, 14, False), (0, 5, True), (60, 40, True)])
 def test_only_a_real_change_in_open_roles_is_news(before, now, moved):
     assert D.hiring_moved(before, now) is moved
+
+
+def test_a_gmail_refusal_falls_back_to_smtp_and_says_what_to_fix(monkeypatch):
+    import types
+    for k in ("SMTP_HOST", "SMTP_USER", "SMTP_PASS"):
+        monkeypatch.delenv(k, raising=False)
+    monkeypatch.setenv("GMAIL_SENDER", "reports@x.example")
+    monkeypatch.setenv("GOOGLE_SA_JSON", "{}")
+    from google.oauth2 import service_account
+
+    def refuse(*a, **k):
+        raise RuntimeError("('unauthorized_client: Client is unauthorized to retrieve access tokens', {})")
+    monkeypatch.setattr(service_account.Credentials, "from_service_account_info", refuse)
+    got = DL.attempt(lambda: DL.send_email("s", "t", "<p>h</p>", ["a@x.example"]))
+    assert got["status"] == "failed" and "domain-wide delegation" in got["error"]
+    assert "reports@x.example" in got["error"] and "SMTP is not set up" in got["error"]
+    sent = []
+    monkeypatch.setenv("SMTP_HOST", "smtp.x.example")
+    monkeypatch.setenv("SMTP_USER", "u")
+    monkeypatch.setenv("SMTP_PASS", "p")
+    monkeypatch.setattr(DL, "_smtp", lambda *a: sent.append(a))
+    assert DL.attempt(lambda: DL.send_email("s", "t", "<p>h</p>", ["a@x.example"])) == {"status": "sent"}
+    assert sent[0][3] == ["a@x.example"]

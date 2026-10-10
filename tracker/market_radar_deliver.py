@@ -16,6 +16,8 @@ from __future__ import annotations
 import base64
 import json
 import os
+import socket
+from contextlib import contextmanager
 from email.message import EmailMessage
 
 import requests
@@ -53,22 +55,71 @@ def _message(subject, text, html_body, to, sender):
     return msg
 
 
+def _gmail_reason(e):
+    """The Gmail API's refusal, in words someone can act on."""
+    text = str(e)
+    if "unauthorized_client" in text:
+        return ("Google refused the service account: it is not allowed to send mail as %s. A "
+                "Google Workspace admin has to grant its client id the scope "
+                "https://www.googleapis.com/auth/gmail.send under domain-wide delegation "
+                "(Admin console, Security, API controls)." % os.environ.get("GMAIL_SENDER", "the sender"))
+    return "%s: %s" % (type(e).__name__, text[:200])
+
+
 def send_email(subject, text, html_body, to):
+    """Gmail API first; SMTP when that is not set up or refuses (as the
+    platform's own access-request email does). Raises with both reasons
+    when neither sends."""
     sender = os.environ.get("GMAIL_SENDER", "")
     sa = os.environ.get("GOOGLE_SA_JSON", "")
+    gmail_error = None
     if sender and sa:
-        from google.oauth2 import service_account
-        from googleapiclient.discovery import build
-        creds = service_account.Credentials.from_service_account_info(
-            json.loads(sa), scopes=["https://www.googleapis.com/auth/gmail.send"]).with_subject(sender)
-        svc = build("gmail", "v1", credentials=creds, cache_discovery=False)
-        raw = base64.urlsafe_b64encode(_message(subject, text, html_body, to, sender).as_bytes()).decode()
-        svc.users().messages().send(userId="me", body={"raw": raw}).execute()
-        return
+        try:
+            from google.oauth2 import service_account
+            from googleapiclient.discovery import build
+            creds = service_account.Credentials.from_service_account_info(
+                json.loads(sa), scopes=["https://www.googleapis.com/auth/gmail.send"]).with_subject(sender)
+            svc = build("gmail", "v1", credentials=creds, cache_discovery=False)
+            raw = base64.urlsafe_b64encode(_message(subject, text, html_body, to, sender).as_bytes()).decode()
+            svc.users().messages().send(userId="me", body={"raw": raw}).execute()
+            return
+        except Exception as e:
+            gmail_error = _gmail_reason(e)
     host, user, pwd = (os.environ.get(k, "") for k in ("SMTP_HOST", "SMTP_USER", "SMTP_PASS"))
     if not (host and user and pwd):
+        if gmail_error:
+            raise RuntimeError(gmail_error + " SMTP is not set up as a fallback.")
         raise NotConfigured("no email sender is set up (GMAIL_SENDER with GOOGLE_SA_JSON, "
                             "or SMTP_HOST/SMTP_USER/SMTP_PASS)")
+    try:
+        _smtp(subject, text, html_body, to, host, user, pwd)
+    except Exception as e:
+        raise RuntimeError(((gmail_error + " ") if gmail_error else "") +
+                           "SMTP failed too: %s: %s" % (type(e).__name__, str(e)[:150]))
+
+
+@contextmanager
+def _ipv4():
+    """Railway containers have no IPv6 route: SMTP to a host with an IPv6
+    address fails with "Network is unreachable" (as app._force_ipv4 says)."""
+    orig = socket.getaddrinfo
+
+    def v4(host, port, family=0, type=0, proto=0, flags=0):
+        return orig(host, port, socket.AF_INET, type, proto, flags) or \
+            orig(host, port, family, type, proto, flags)
+    socket.getaddrinfo = v4
+    try:
+        yield
+    finally:
+        socket.getaddrinfo = orig
+
+
+def _smtp(subject, text, html_body, to, host, user, pwd):
+    with _ipv4():
+        _smtp_send(subject, text, html_body, to, host, user, pwd)
+
+
+def _smtp_send(subject, text, html_body, to, host, user, pwd):
     import smtplib
     import ssl
     port = int(os.environ.get("SMTP_PORT", "587") or 587)
