@@ -514,11 +514,12 @@ class Converter:
 class _Numbered:
     """Page footer: what this is and which page of how many."""
 
-    def __init__(self, title):
+    def __init__(self, title, product=None):
         self.title = title
+        self.product = product or PRODUCT
 
     def make(self):
-        title = self.title
+        title, product = self.title, self.product
 
         from reportlab.pdfgen.canvas import Canvas
 
@@ -538,7 +539,7 @@ class _Numbered:
                     self.setFont(BODY, 7.5)
                     self.setFillColor(INK3)
                     w, _h = A4
-                    self.drawString(16 * mm, 9 * mm, ("Event & Conference Intelligence · " + title)[:110])
+                    self.drawString(16 * mm, 9 * mm, (product + " · " + title)[:110])
                     self.drawRightString(w - 16 * mm, 9 * mm, "Page %d of %d" % (self._pageNumber, n))
                     super().showPage()
                 super().save()
@@ -580,7 +581,7 @@ def build(report_html: str, title: str, subtitle: str = "", generated: datetime 
                             topMargin=15 * mm, bottomMargin=16 * mm,
                             title=title or "Report", author=product)
     try:
-        doc.build(story, canvasmaker=_Numbered(title or "Report").make())
+        doc.build(story, canvasmaker=_Numbered(title or "Report", product).make())
     except LayoutError:
         # A single table row taller than a page cannot be split by reportlab.
         # Rather than lose it, lay every table out as plain stacked text.

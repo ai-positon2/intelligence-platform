@@ -25,7 +25,8 @@
 .rr-lead2{font-size:15px;line-height:1.55;margin:0 0 6px}
 
 /* top five */
-.rr-top{list-style:none;margin:0;padding:0;display:grid;gap:14px}
+.rr-top{display:grid;gap:14px}
+.rr-pn{display:none}  /* the number, for the printed report only */
 .rr-topi{display:grid;grid-template-columns:44px 1fr;gap:14px;padding:18px 20px;border-radius:14px;
   background:var(--mr-surface);border:1px solid var(--mr-line)}
 .rr-n{width:36px;height:36px;border-radius:50%;display:grid;place-items:center;font-weight:700;

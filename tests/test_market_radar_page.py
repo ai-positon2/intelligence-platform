@@ -733,3 +733,18 @@ def test_the_report_routes_are_admin_only(client_with_reading):
     w = client_with_reading
     for path in ("/report/%d", "/api/clients/%d/report"):
         assert _client("someone@else.example").get(BASE + path % w["client"]).status_code in (302, 403)
+
+
+def test_a_market_radar_pdf_is_labelled_market_radar_on_every_page(monkeypatch):
+    from reportlab.pdfgen import canvas
+    from tracker import event_intel_pdf
+    drawn = []
+    real = canvas.Canvas.drawString
+    monkeypatch.setattr(canvas.Canvas, "drawString",
+                        lambda self, x, y, text, *a, **k: (drawn.append(text), real(self, x, y, text, *a, **k))[1])
+    event_intel_pdf.build("<p>x</p>", "Market Radar: Acme", product="Market Radar")
+    assert drawn and all("Event & Conference" not in t for t in drawn)
+    assert any(t.startswith("Market Radar · Market Radar: Acme") for t in drawn)
+    drawn.clear()
+    event_intel_pdf.build("<p>x</p>", "Report")             # Event Intelligence keeps its label
+    assert any(t.startswith("Event & Conference Intelligence · Report") for t in drawn)

@@ -149,17 +149,17 @@
 
   function renderTop(top) {
     if (!top || !top.length) return '';
-    return '<ol class="rr-top">' + top.map(function (t, i) {
+    return '<div class="rr-top">' + top.map(function (t, i) {
       var conf = CONF[t.confidence] || CONF.low;
       var moves = movesOf(t.cites);
-      return '<li class="rr-topi"><div class="rr-n">' + (i + 1) + '</div><div class="rr-topb">' +
-        '<div class="rr-toph"><h3>' + esc(t.title) + '</h3><span class="mr-chip ' + conf[0] + '">' + conf[1] + '</span>' +
+      return '<article class="rr-topi"><div class="rr-n" data-noprint>' + (i + 1) + '</div><div class="rr-topb">' +
+        '<div class="rr-toph"><h3><span class="rr-pn">' + (i + 1) + '. </span>' + esc(t.title) + '</h3><span class="mr-chip ' + conf[0] + '">' + conf[1] + '</span>' +
         thumbs(moves.map(function (m) { return m.event_id; }), commonFeedback(moves)) + '</div>' +
         '<p class="rr-what">' + esc(t.what_happened) + '</p>' +
         '<div class="rr-pair"><div class="rr-so"><div class="rr-lab">So what for you</div><p>' + esc(t.so_what) + '</p></div>' +
         '<div class="rr-act"><div class="rr-lab">Suggested action</div><p>' + esc(t.action) + '</p></div></div>' +
-        based(t.cites) + '</div></li>';
-    }).join('') + '</ol>';
+        based(t.cites) + '</div></article>';
+    }).join('') + '</div>';
   }
 
   function renderCompany(pack) {
@@ -388,11 +388,23 @@
     });
   }
 
-  // The report as printed: every folded part open, no controls, no map.
+  // The report as printed: every folded part open, no controls, no map,
+  // and the company's facts as "Label: value" lines rather than a grid.
   function printable() {
     var doc = document.getElementById('rrDoc').cloneNode(true);
     doc.querySelectorAll('[data-noprint]').forEach(function (n) { n.parentNode.removeChild(n); });
     doc.querySelectorAll('details').forEach(function (d) { d.setAttribute('open', ''); });
+    doc.querySelectorAll('.rr-dl').forEach(function (dl) {
+      var out = document.createElement('div');
+      dl.querySelectorAll('div').forEach(function (row) {
+        var p = document.createElement('p'), b = document.createElement('b');
+        b.textContent = row.querySelector('dt').textContent + ': ';
+        p.appendChild(b);
+        p.appendChild(document.createTextNode(row.querySelector('dd').textContent));
+        out.appendChild(p);
+      });
+      dl.parentNode.replaceChild(out, dl);
+    });
     var h1 = doc.querySelector('h1');
     if (h1) h1.parentNode.removeChild(h1);
     return doc.innerHTML;
