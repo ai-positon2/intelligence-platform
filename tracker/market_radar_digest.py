@@ -119,6 +119,35 @@ def nothing_new(pack):
     return not (pack["moves"] or pack["nearby"] or pack["entrants"] or pack["hiring"])
 
 
+def read_gaps(collection):
+    """What this week's collection could not read, as (gaps, read_nothing).
+    gaps: the coverage lines where a source failed or was skipped (a
+    competitor with no jobs board is not a gap). read_nothing: there were
+    competitors and not one source answered for any of them. Without this a
+    week whose every read failed was announced as "No new competitor
+    moves" (found with the network switched off, 2026-10-10)."""
+    if not collection:
+        return [], False
+    lines = collection.get("coverage") or []
+    gaps = [str(l.get("text") or "") for l in lines
+            if (l.get("counts") or {}).get("failed") or (l.get("counts") or {}).get("skipped")]
+    companies = collection.get("companies") or []
+    read_any = any(r.get("status") in ("ok", "empty")
+                   for c in companies for r in c.get("rows") or [])
+    if collection.get("news_breaker_open"):
+        gaps.append("Google News stopped answering during the collection; some news was not read.")
+    return [g for g in gaps if g], bool(companies) and not read_any
+
+
+QUIET = "No new competitor moves, openings or hiring changes since the last update."
+QUIET_WITH_GAPS = ("No new competitor moves, openings or hiring changes were found since the "
+                   "last update, but some sources could not be read this week (listed below), so "
+                   "this is not a full all-clear.")
+UNREAD = ("This week's collection could not read any competitor's website, shop, jobs board or "
+          "news, so there is nothing to report. This is not an all-clear: the next collection "
+          "will try again.")
+
+
 # == the words ============================================================================
 
 CITED = rep.CITED
@@ -182,8 +211,10 @@ def check(words, pack, *, run_id=None, client=None, llm=None):
 # == one update ===========================================================================
 
 def make_digest(client_id, owner_email, *, run_id=None, store=None, now=None, llm=None,
-                client=None):
-    """Build and store the update. Returns (digest_id, payload)."""
+                client=None, collection=None):
+    """Build and store the update. Returns (digest_id, payload). `collection`
+    is this run's collection result, so the update can say what it could
+    not read."""
     if store is None:
         from . import market_radar_store as store
     now = now or datetime.now(timezone.utc)
@@ -193,11 +224,13 @@ def make_digest(client_id, owner_email, *, run_id=None, store=None, now=None, ll
     payload = {"status": "ok", "since": since.isoformat(timespec="seconds"),
                "written_at": now.isoformat(timespec="seconds"), "pack": pack,
                "first": last is None, "client_name": pack["client"]["name"]}
+    gaps, read_nothing = read_gaps(collection)
+    payload["gaps"] = gaps[:8]
     if nothing_new(pack):
-        payload.update(status="quiet", words={"headline": {"text": "No new competitor moves, "
-                                                           "openings or hiring changes since the "
-                                                           "last update.", "cites": []},
-                                              "items": []}, removed=[])
+        headline = UNREAD if read_nothing else QUIET_WITH_GAPS if gaps else QUIET
+        payload.update(status="unread" if read_nothing else "quiet",
+                       words={"headline": {"text": headline, "cites": []}, "items": []},
+                       removed=[])
     else:
         try:
             words = write(pack, run_id=run_id, client=client, llm=llm)
@@ -263,6 +296,8 @@ def render_text(payload, client_id):
                 name, url = _ref_line(refs[r])
                 lines.append("   - %s%s" % (name, " (%s)" % url if url else ""))
         lines.append("")
+    if payload.get("gaps"):
+        lines += ["Not read this week:"] + ["- " + g for g in payload["gaps"]] + [""]
     lines += ["Full report: " + report_url(client_id), "",
               "Every line above was checked against its sources; %d were removed." %
               len(payload.get("removed") or [])]
@@ -304,6 +339,10 @@ def render_html(payload, client_id):
                          i + 1, e(it["text"]),
                          '<div style="margin-top:4px"><b>So what:</b> %s</div>' % e(it["so_what"])
                          if it.get("so_what") else "", "".join(srcs)))
+    if payload.get("gaps"):
+        parts.append('<div style="margin-top:16px;font-size:13px;color:#45507a"><b>Not read this '
+                     'week:</b><ul style="margin:4px 0 0;padding-left:18px">%s</ul></div>' %
+                     "".join("<li>%s</li>" % e(g) for g in payload["gaps"]))
     parts.append('<p style="margin-top:20px">%s</p>' % link(report_url(client_id),
                                                             "Open the full report"))
     parts.append('<p style="font-size:12px;color:#6b7598">Every line was checked against its '
@@ -340,6 +379,9 @@ def render_slack(payload, client_id):
         if srcs:
             text += "\n" + " · ".join(srcs)
         blocks.append({"type": "section", "text": {"type": "mrkdwn", "text": text[:2900]}})
+    if payload.get("gaps"):
+        blocks.append({"type": "context", "elements": [{"type": "mrkdwn", "text": (
+            "*Not read this week:* " + " ".join(esc(g) for g in payload["gaps"]))[:2900]}]})
     blocks.append({"type": "context", "elements": [{"type": "mrkdwn", "text": "<%s|Open the full "
                                                     "report>" % report_url(client_id)}]})
     fallback = "Market Radar update for %s: %s" % (

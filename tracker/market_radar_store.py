@@ -902,13 +902,16 @@ def save_report(client_id, payload, *, run_id=None, conn=None):
         return cur.fetchone()[0]
 
 
-def latest_report(client_id, owner_email, *, conn=None):
-    """The client's newest report, or None. PermissionError when the client
-    is not this person's."""
+def latest_report(client_id, owner_email, *, written=False, conn=None):
+    """The client's newest report (`written`: the newest one with a brief),
+    or None. PermissionError when the client is not this person's."""
     with _tx(conn) as cur:
         _owned_client(cur, client_id, owner_email)
         cur.execute("""SELECT id, run_id, payload, created_at FROM mr_reports
-                       WHERE client_id=%s ORDER BY created_at DESC, id DESC LIMIT 1""",
+                       WHERE client_id=%s""" + (""" AND payload->>'status' = 'ok'
+                         AND payload->'brief' IS NOT NULL
+                         AND jsonb_typeof(payload->'brief') = 'object'""" if written else "") + """
+                       ORDER BY created_at DESC, id DESC LIMIT 1""",
                     (client_id,))
         row = cur.fetchone()
     return dict(zip(("id", "run_id", "payload", "created_at"), row)) if row else None

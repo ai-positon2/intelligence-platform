@@ -408,7 +408,15 @@ def test_a_pulse_reads_news_and_groups_it_and_only_the_us_reads_federal_rules():
                       fetch=net.fetch, breaker=breaker(), now=NOW, llm=llm)
     assert p["status"] == "ok" and p["themes"][0]["title"] == "Access to NHS dentistry"
     assert p["regulation"] is None and not any("federalregister" in u for u in net.asked)
-    assert p["note"].startswith("3 headlines about Dentist in the GB:en edition from 2 of 2 searches")
+    assert p["note"].startswith("3 headlines about Dentist from Google News in English, "
+                                "2 of 2 searches answered")
+
+
+@pytest.mark.parametrize("edition,words", [("GB:en", "English"), ("BR:pt-419", "Portuguese"),
+                                           ("DE:de", "German"), ("XX:xx", "the XX:xx edition"),
+                                           ("", "the default edition"), (None, "the default edition")])
+def test_an_edition_reads_as_its_language_in_words(edition, words):
+    assert P.edition_words(edition) == words
     net, llm = pulse_world()
     p = P.build_pulse(PROFILE, "naics:621210", "US", store=Store(), get=net.get, get_json=net.get_json,
                       fetch=net.fetch, breaker=breaker(), now=NOW, llm=llm)

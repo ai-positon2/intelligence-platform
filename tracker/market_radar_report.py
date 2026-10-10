@@ -485,6 +485,22 @@ def check_brief(brief, pack, *, run_id=None, client=None, llm=None):
 
 # == one report =========================================================================
 
+def empty_note(pack, collection):
+    """Why there is nothing to write about, as it happened: never collected,
+    or collected and nothing found, with what could and could not be read
+    (a collection whose every read failed is not "nothing collected yet":
+    found with the network switched off, 2026-10-10)."""
+    if collection is None:
+        return "Nothing has been collected yet for this client, so there is nothing to write about."
+    lines = [_clean(l, 200) for l in pack.get("coverage") or [] if l and str(l).strip()]
+    note = ("This collection found nothing to write about: no competitor moves, nearby openings, "
+            "new brands or industry themes.")
+    if lines:
+        note += " What was and was not read: " + " ".join(
+            l if l.endswith(".") else l + "." for l in lines[:6])
+    return note
+
+
 def write_report(client_id, owner_email, *, run_id=None, store=None, now=None, llm=None,
                  client=None, collection=None):
     """Build the pack, write and check the brief, store the report. Returns
@@ -497,8 +513,7 @@ def write_report(client_id, owner_email, *, run_id=None, store=None, now=None, l
     report = {"status": "ok", "pack": pack, "written_at": now.isoformat(timespec="seconds"),
               "models": {"writer": WRITER_MODEL, "check": CHECK_MODEL}}
     if not (pack["moves"] or pack["themes"] or pack["nearby"] or pack["entrants"]):
-        report.update(status="empty", brief=None, note="Nothing has been collected yet for this "
-                      "client, so there is nothing to write about.")
+        report.update(status="empty", brief=None, note=empty_note(pack, collection))
     else:
         try:
             (brief, dropped), _meta = write_brief(pack, run_id=run_id, client=client, llm=llm)

@@ -543,6 +543,21 @@ def themes(articles, regulation, *, label, country, run_id=None, client=None, ll
 
 # == one pulse ========================================================================
 
+LANGUAGES = {"en": "English", "de": "German", "fr": "French", "es": "Spanish",
+             "pt": "Portuguese", "it": "Italian", "nl": "Dutch", "sv": "Swedish",
+             "no": "Norwegian", "da": "Danish", "fi": "Finnish", "pl": "Polish",
+             "ja": "Japanese", "ko": "Korean", "zh": "Chinese", "hi": "Hindi", "ar": "Arabic",
+             "tr": "Turkish", "id": "Indonesian", "he": "Hebrew", "cs": "Czech"}
+
+
+def edition_words(edition):
+    """A Google News edition code as words for the page: "GB:en" ->
+    "English", "BR:pt-419" -> "Portuguese" (the country is the section's
+    heading already)."""
+    lang = (str(edition or "").split(":")[-1].split("-")[0] or "").lower()
+    return LANGUAGES.get(lang, "the %s edition" % (edition or "default"))
+
+
 def build_pulse(profile, key, country, *, store, get, get_json, fetch, breaker, now=None,
                 run_id=None, client=None, llm=None):
     now = now or _now()
@@ -586,8 +601,8 @@ def build_pulse(profile, key, country, *, store, get, get_json, fetch, breaker, 
         notes.append(theme_note)
     payload["themes"] = found or []
     payload["status"] = "ok" if found is not None else "partial"
-    parts = ["%d headlines about %s in the %s edition from %d of %d searches" % (
-        len(articles), label, edition, read_ok, len(per_query))]
+    parts = ["%d headlines about %s from Google News in %s, %d of %d searches answered" % (
+        len(articles), label, edition_words(edition), read_ok, len(per_query))]
     if feeds["read"]:
         parts.append("%d from %d trade publication feeds" % (
             sum(f["items"] for f in feeds["read"]), len(feeds["read"])))

@@ -416,7 +416,11 @@ def _read_woo(ctx):
             break
     else:
         complete, note = False, "stopped at %d products" % len(products)
-    return {"source": "woocommerce", "products": products, "complete": complete}, note
+    cur = next((str((p.get("prices") or {}).get("currency_code") or "") for p in data
+                if isinstance(p, dict) and (p.get("prices") or {}).get("currency_code")), "") \
+        if isinstance(data, list) else ""
+    return {"source": "woocommerce", "products": products, "complete": complete,
+            "currency": cur[:3].upper()}, note
 
 
 def read_catalog(ctx):
@@ -440,11 +444,19 @@ def read_catalog(ctx):
                 sm.get("product_like", 0) < 20 and not s.get("product_schema"):
             continue
         if payload is not None:
+            # Prices mean nothing without their currency ("Priced 22.8" on a
+            # UK shop, 2026-10-10). Shopify's products.json carries none: the
+            # store's own record (/meta.json) does, then the site's prices.
+            if not payload.get("currency"):
+                payload["currency"] = shop_currency(rs)
             prices = [p[2] for p in payload["products"].values() if p[2] is not None]
             on_sale = sum(1 for p in payload["products"].values() if p[4] and p[2] and p[4] > p[2])
             text = "%d products from %s" % (len(payload["products"]), platform)
             if prices:
-                text += ", prices %s to %s, %d on sale" % (min(prices), max(prices), on_sale)
+                text += ", prices %s to %s%s, %d on sale" % (
+                    money(min(prices), payload["currency"]),
+                    money(max(prices), payload["currency"]),
+                    no_currency(payload["currency"]), on_sale)
             if note:
                 text += "; " + note + ", so removals are not reported"
             return {"status": "ok" if payload["products"] else "empty", "note": text,
@@ -471,6 +483,33 @@ def read_catalog(ctx):
             "payload": None, "items": 0, "complete": False}
 
 
+def shop_currency(rs):
+    """The currency a shop prices in: its Shopify store record, else the
+    most frequent currency on its pages, else "" (unknown)."""
+    cur = ((rs.get("shopify_store") or {}).get("currency") or "").strip().upper()
+    if re.fullmatch(r"[A-Z]{3}", cur):
+        return cur
+    seen = ((rs.get("signals") or {}).get("currencies") or [])
+    return seen[0] if seen and re.fullmatch(r"[A-Z]{3}", str(seen[0])) else ""
+
+
+def money(x, currency):
+    """22.8, "GBP" -> "GBP 22.80"; with no currency just "22.80", and the
+    line carries NO_CURRENCY once (see no_currency) so no reader takes the
+    number for dollars."""
+    if x is None:
+        return "?"
+    amount = ("%.2f" % x) if isinstance(x, (int, float)) else str(x)
+    return "%s %s" % (currency, amount) if currency else amount
+
+
+NO_CURRENCY = " (currency not stated)"
+
+
+def no_currency(currency):
+    return "" if currency else NO_CURRENCY
+
+
 def _family(title):
     """Colourways are one product: "Tree Runner - Dusty Pink" and
     "Tree Runner - Navy" launch as one line."""
@@ -490,9 +529,9 @@ def _launch_events(rows, day, currency=""):
         dates = sorted(_launched(p) for _, p in items if _launched(p))
         summary = None
         if prices:
-            summary = "Priced %s%s" % (prices[0], " to %s" % prices[-1] if prices[-1] != prices[0]
-                                       else "")
-            summary += (" " + currency) if currency else ""
+            summary = "Priced %s%s" % (money(prices[0], currency),
+                                       " to %s" % money(prices[-1], currency)
+                                       if prices[-1] != prices[0] else "") + no_currency(currency)
         title = "New product: " + _family(first[0])
         if len(items) > 1:
             title += " (%d versions)" % len(items)
@@ -518,7 +557,8 @@ def baseline_catalog(cur, now):
             if p[0] and _recent(_launched(p), now)
             and (not p[7] or _recent(p[7], now, days=365))]
     day = now.strftime("%Y-%m-%d")
-    return _capped(_launch_events(rows, day), "new products", "prod+many:baseline", date=day)
+    return _capped(_launch_events(rows, day, cur.get("currency") or ""), "new products",
+                   "prod+many:baseline", date=day)
 
 
 def compare_catalog(prev, cur, now):
@@ -526,7 +566,9 @@ def compare_catalog(prev, cur, now):
     a, b = prev.get("products") or {}, cur.get("products") or {}
     if prev.get("source") != cur.get("source"):
         return []       # read a different way; the two lists are not comparable
-    events = _capped(_launch_events([(k, b[k]) for k in b if k not in a and b[k][0]], day),
+    currency = cur.get("currency") or prev.get("currency") or ""
+    events = _capped(_launch_events([(k, b[k]) for k in b if k not in a and b[k][0]], day,
+                                    currency),
                      "new products", "prod+many:%s" % day, date=day)
     if prev.get("complete") and cur.get("complete"):
         gone = [_event("prod-:%s:%s" % (k, day), "product_removed",
@@ -541,14 +583,17 @@ def compare_catalog(prev, cur, now):
             pct = round(100 * (new[2] - old[2]) / old[2], 1)
             ev = _event("price:%s:%s" % (k, new[2]), "price_increase" if pct > 0 else "price_cut",
                         "%s: price %s from %s to %s (%+.1f%%)" % (
-                            name, "up" if pct > 0 else "down", old[2], new[2], pct),
+                            name, "up" if pct > 0 else "down", money(old[2], currency),
+                            money(new[2], currency), pct) + no_currency(currency),
                         status="completed", date=day, url=new[1] or None)
             (ups if pct > 0 else downs).append(ev)
         on_sale_now = bool(new[4] and new[2] and new[4] > new[2])
         on_sale_before = bool(old[4] and old[2] and old[4] > old[2])
         if on_sale_now and not on_sale_before:
             sales.append(_event("sale:%s:%s" % (k, new[2]), "sale_started",
-                                "%s on sale: %s, was %s" % (name, new[2], new[4]),
+                                "%s on sale: %s, was %s%s" % (name, money(new[2], currency),
+                                                             money(new[4], currency),
+                                                             no_currency(currency)),
                                 status="announced", date=day, url=new[1] or None))
         if old[5] is True and new[5] is False:
             soldout.append(_event("soldout:%s:%s" % (k, day), "sold_out", "Sold out: " + name,

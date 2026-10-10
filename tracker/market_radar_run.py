@@ -163,11 +163,12 @@ def _report(client_id, owner_email, *, run_id=None, collection=None):
     return mrep.write_report(client_id, owner_email, run_id=run_id, collection=collection)
 
 
-def _digest(client_id, owner_email, *, run_id=None, send=True):
+def _digest(client_id, owner_email, *, run_id=None, send=True, collection=None):
     """Phase 8: the "what changed" update, stored, and sent when `send`."""
     from . import market_radar_digest as md
     from . import market_radar_store as store
-    digest_id, payload = md.make_digest(client_id, owner_email, run_id=run_id)
+    digest_id, payload = md.make_digest(client_id, owner_email, run_id=run_id,
+                                        collection=collection)
     out = {"digest_id": digest_id, "status": payload["status"],
            "items": len((payload.get("words") or {}).get("items") or [])}
     if send:
@@ -227,7 +228,7 @@ def collect_job(run_id, client_id, owner_email, *, collect=None, radar=None, pul
             stage(DIGEST_STAGE)
             try:
                 result["digest"] = (digest or _digest)(client_id, owner_email, run_id=run_id,
-                                                       send=monitor == "send")
+                                                       send=monitor == "send", collection=result)
             except Exception as e:
                 logger.exception("market_radar_run digest %s failed", run_id)
                 result["digest"] = {"error": "%s: %s" % (type(e).__name__, str(e)[:300])}

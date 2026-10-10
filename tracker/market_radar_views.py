@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import copy
 import re
+from datetime import datetime, timezone
 
 from . import market_radar_store as store
 
@@ -501,6 +502,7 @@ def moves_view(client_id, owner_email, *, conn=None):
                     key=lambda e: -e["score"])
     top = [e["id"] for e in ranked if e["severity"] in ("HIGH", "MEDIUM")][:5]
     return {"events": events, "top": top, "hidden": hidden[:400], "hidden_count": len(hidden),
+            "today": datetime.now(timezone.utc).date().isoformat(),
             "last_collect": last, "radar": radar,
             "pulse": pulse_view(client_id, owner_email, conn=conn),
             "competitors": [{"entity_id": i, "name": names[i][0], "domain": names[i][1],
@@ -572,11 +574,22 @@ def report_view(client_id, owner_email, *, conn=None):
                      or c.get("name") or c["domain"])}
     if not row:
         return dict(head, status="none")
+    attempt = None
+    if (row["payload"] or {}).get("status") != "ok" or not (row["payload"] or {}).get("brief"):
+        # A collection whose report failed or had nothing to say does not
+        # take the last written report away: that one is shown, with a line
+        # saying what happened since.
+        good = store.latest_report(client_id, owner_email, written=True, conn=conn)
+        if good:
+            attempt = {"created_at": _iso(row["created_at"]),
+                       "status": (row["payload"] or {}).get("status"),
+                       "note": (row["payload"] or {}).get("note")}
+            row = good
     p = row["payload"] or {}
     out = dict(head, report_id=row["id"], created_at=_iso(row["created_at"]),
                status=p.get("status"), note=p.get("note"), brief=p.get("brief"),
                pack=p.get("pack"), removed=p.get("removed") or [], dropped=p.get("dropped") or [],
-               check_note=p.get("check_note"), models=p.get("models"))
+               check_note=p.get("check_note"), models=p.get("models"), latest_attempt=attempt)
     # Thumbs given since the report was written.
     scores = store.client_scores(client_id, conn=conn)
     for m in (out.get("pack") or {}).get("moves") or []:
@@ -685,6 +698,6 @@ def monitor_view(client_id, owner_email, *, now=None, conn=None):
             "status": p.get("status"), "note": p.get("note"),
             "headline": (w.get("headline") or {}).get("text"),
             "items": [{"text": i["text"], "so_what": i.get("so_what")} for i in w.get("items") or []],
-            "removed": len(p.get("removed") or []),
+            "removed": len(p.get("removed") or []), "gaps": p.get("gaps") or [],
             "delivery": {k: v for k, v in (d["delivery"] or {}).items() if k in ("email", "slack", "at")}})
     return out

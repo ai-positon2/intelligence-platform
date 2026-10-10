@@ -356,6 +356,17 @@ def test_a_missing_or_failed_report_says_so():
     assert "could not be written (refused: x)" in out[1] and "mr-callout bad" in out[1]
 
 
+def test_a_newer_collection_without_a_report_is_said_above_the_last_written_one():
+    v = dict(view(), latest_attempt={"created_at": "2026-10-17T07:00:00+00:00", "status": "failed",
+                                     "note": EVIL})
+    html = run_js("MRR.render(%s); return document.getElementById('rrBody').innerHTML;" % json.dumps(v))
+    assert "A newer collection on" in html and "produced no report" in html
+    assert "This is the last report that was written." in html and "<img" not in html
+    assert 'mr-callout bad" data-noprint' in html and "What matters most" in html
+    html = run_js("MRR.render(%s); return document.getElementById('rrBody').innerHTML;" % json.dumps(view()))
+    assert "produced no report" not in html
+
+
 def test_the_map_places_points_by_direction_and_needs_a_location():
     out = run_js("""
       const p = {client: {name: 'A', point: {lat: 30, lon: -97}, radius_km: 5},

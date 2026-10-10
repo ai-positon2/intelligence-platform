@@ -194,6 +194,57 @@ def test_the_slack_message_escapes_its_markup():
     assert text.startswith("Market Radar update for Acme <Dental>:")
 
 
+def coverage_line(detector, read, total, **counts):
+    return {"detector": detector, "read": read, "total": total, "counts": counts,
+            "text": "%s read for %d of %d competitors." % (detector, read, total)}
+
+
+def test_a_week_that_could_not_be_read_is_never_announced_as_quiet():
+    rows_ok = [{"detector": "news", "status": "ok"}, {"detector": "jobs", "status": "none"}]
+    rows_bad = [{"detector": "news", "status": "failed"}, {"detector": "jobs", "status": "skipped"}]
+    some = {"companies": [{"rows": rows_ok}, {"rows": rows_bad}],
+            "coverage": [coverage_line("news", 1, 2, ok=1, failed=1),
+                         coverage_line("jobs", 0, 2, none=1, skipped=1),
+                         coverage_line("catalog", 2, 2, ok=2), coverage_line("pages", 0, 2, none=2)]}
+    gaps, nothing = D.read_gaps(some)
+    assert gaps == ["news read for 1 of 2 competitors.", "jobs read for 0 of 2 competitors."]
+    assert nothing is False
+    none = {"companies": [{"rows": rows_bad}],
+            "coverage": [coverage_line("news", 0, 1, failed=1)], "news_breaker_open": True}
+    gaps, nothing = D.read_gaps(none)
+    assert nothing is True and gaps[-1].startswith("Google News stopped answering")
+    assert D.read_gaps(None) == ([], False)
+    assert D.read_gaps({"companies": [], "coverage": []}) == ([], False)   # no competitors yet
+
+    class St:
+        def latest_digest(self, cid):
+            return None
+
+        def save_digest(self, cid, payload, **kw):
+            self.saved = payload
+            return 1, NOW
+
+    for collection, status, words in ((None, "quiet", D.QUIET), (some, "quiet", D.QUIET_WITH_GAPS),
+                                      (none, "unread", D.UNREAD)):
+        st = St()
+        orig = D.changes
+        D.changes = lambda *a, **k: pack_with()
+        try:
+            _id, p = D.make_digest(6, "o", store=st, now=NOW, collection=collection,
+                                   llm=LLM({}))
+        finally:
+            D.changes = orig
+        assert (p["status"], p["words"]["headline"]["text"]) == (status, words)
+    assert "not an all-clear" in D.UNREAD and "not a full all-clear" in D.QUIET_WITH_GAPS
+    p = dict(payload({"headline": {"text": D.QUIET_WITH_GAPS, "cites": []}, "items": []},
+                     status="quiet"), gaps=["<b>news</b> read for 1 of 2 competitors."])
+    assert "Not read this week:\n- <b>news</b> read for 1 of 2" in D.render_text(p, 6)
+    h = D.render_html(p, 6)
+    assert "Not read this week" in h and "&lt;b&gt;news&lt;/b&gt;" in h and "<b>news</b>" not in h
+    body = json.dumps(D.render_slack(p, 6)[1])
+    assert "Not read this week" in body and "&lt;b&gt;news" in body
+
+
 # == delivery =============================================================================
 
 class DStore:
@@ -253,7 +304,8 @@ def test_a_weekly_run_ends_with_the_update_and_a_failing_update_keeps_the_collec
     try:
         mrun.collect_job(1, 2, "o", monitor="preview",
                          digest=lambda *a, **k: calls.append(k) or {"digest_id": 3}, **stubs)
-        assert calls == [{"run_id": 1, "send": False}] and saved["summary"]["digest"] == {"digest_id": 3}
+        assert calls == [{"run_id": 1, "send": False, "collection": saved["summary"]}]
+        assert saved["summary"]["digest"] == {"digest_id": 3}
         mrun.collect_job(1, 2, "o", digest=lambda *a, **k: calls.append("no"), **stubs)
         assert calls[-1] != "no"                       # a plain collection writes no update
 
@@ -416,6 +468,8 @@ def test_the_weekly_update_card_escapes_and_warns():
                       "delivery": {"email": {"status": "sent", "to": ["a@x.example"]},
                                    "slack": {"status": "failed", "error": EVIL}, "at": "x"}},
                      {"id": 2, "created_at": "2026-10-03T07:05:00+00:00", "status": "quiet", "items": [],
+                      "delivery": {}, "gaps": [EVIL]},
+                     {"id": 3, "created_at": "2026-09-26T07:05:00+00:00", "status": "unread", "items": [],
                       "delivery": {}}]}
     prog = ("globalThis.window = globalThis; require(%s); process.stdout.write(JSON.stringify("
             "globalThis.MR.renderMonitor(%s, null)));") % (json.dumps(JS), json.dumps(m))
@@ -426,7 +480,8 @@ def test_the_weekly_update_card_escapes_and_warns():
     for frag in ("schedule is switched off on this server", "Email is not set up on the server",
                  "Slack is not set up on the server", "did not start", "Email: Sent", "Slack: Failed",
                  "2 lines were removed by the fact check", "Quiet week", "Preview, not sent",
-                 'name="enabled" checked', "Send an update now"):
+                 'name="enabled" checked', "Send an update now", "Not read: &lt;img",
+                 "Nothing could be read"):
         assert frag in html, frag
 
 

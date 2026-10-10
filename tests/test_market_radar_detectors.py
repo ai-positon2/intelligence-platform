@@ -271,7 +271,23 @@ def test_shopify_catalog_pages_until_a_short_page(monkeypatch):
     assert r["status"] == "ok" and r["complete"] and r["items"] == 3
     assert r["payload"]["products"]["2"] == ["B", "/products/h2", 20.0, 20.0, 25.0, True, 1,
                                              "2026-01-01", "Shoes", None]
-    assert "prices 5.0 to 20.0, 1 on sale" in r["note"]
+    assert "prices 5.00 to 20.00 (currency not stated), 1 on sale" in r["note"]
+    assert r["payload"]["currency"] == ""
+
+
+def test_a_shop_prices_in_its_store_records_currency_else_the_one_its_pages_show():
+    net = Net({"https://acme.com/products.json?limit=250&page=1":
+               {"products": [shop_product(1, "A", 22.8)]}})
+    rs = site(signals={"platforms": [{"name": "shopify", "kind": "commerce"}],
+                       "currencies": ["USD"]}, shopify_store={"currency": "gbp"})
+    r = det.read_catalog(ctx(net, rs))
+    assert r["payload"]["currency"] == "GBP" and "prices GBP 22.80 to GBP 22.80" in r["note"]
+    rs = site(signals={"platforms": [{"name": "shopify", "kind": "commerce"}],
+                       "currencies": ["EUR", "USD"]})
+    assert det.read_catalog(ctx(net, rs))["payload"]["currency"] == "EUR"
+    rs = site(signals={"platforms": [{"name": "shopify", "kind": "commerce"}],
+                       "currencies": ["<b>"]}, shopify_store={"currency": "pounds"})
+    assert det.read_catalog(ctx(net, rs))["payload"]["currency"] == ""
 
 
 def test_a_catalog_cut_at_the_page_limit_is_incomplete(monkeypatch):
@@ -290,6 +306,10 @@ def test_woocommerce_prices_are_read_in_minor_units():
          "prices": {"price": "1299", "regular_price": "1599", "currency_minor_unit": 2}}]})
     r = det.read_catalog(ctx(net, rs))
     assert r["payload"]["products"]["7"][:6] == ["Mug & Lid", "/p/mug", 12.99, 12.99, 15.99, True]
+    assert r["payload"]["currency"] == ""
+    net.pages["https://acme.com/wp-json/wc/store/v1/products?per_page=100&page=1"][0]["prices"][
+        "currency_code"] = "brl"
+    assert det.read_catalog(ctx(net, rs))["payload"]["currency"] == "BRL"
 
 
 def test_no_shop_is_none_and_a_dead_feed_is_failed():
@@ -313,7 +333,10 @@ def test_first_read_reports_only_products_the_shop_dates_recent_grouped_by_famil
         "3": ["Old Shoe", "/products/c", 50.0, 50.0, None, True, 1, "2024-01-01", ""]}}
     (ev,) = det.baseline_catalog(payload, NOW)
     assert ev["title"] == "New product: Tree Runner (2 versions)"
-    assert ev["summary"] == "Priced 98.0 to 110.0" and ev["date"] == "2026-09-25"
+    assert ev["summary"] == "Priced 98.00 to 110.00 (currency not stated)" and ev["date"] == "2026-09-25"
+    payload["currency"] = "USD"
+    (ev,) = det.baseline_catalog(payload, NOW)
+    assert ev["summary"] == "Priced USD 98.00 to USD 110.00"
 
 
 def test_a_launch_is_dated_by_publishing_and_an_old_product_put_back_is_not_one():
@@ -338,7 +361,16 @@ def test_catalog_changes_become_typed_events():
     assert types == ["price_cut", "price_increase", "product_launch", "product_removed",
                      "sale_started", "sold_out"]
     up = next(e for e in det.compare_catalog(prev, cur, NOW) if e["type"] == "price_increase")
-    assert up["title"] == "A: price up from 100.0 to 110.0 (+10.0%)"
+    assert up["title"] == "A: price up from 100.00 to 110.00 (+10.0%) (currency not stated)"
+    cur["currency"] = "GBP"
+    evs = {e["type"]: e for e in det.compare_catalog(prev, cur, NOW)}
+    assert evs["price_increase"]["title"] == "A: price up from GBP 100.00 to GBP 110.00 (+10.0%)"
+    assert evs["sale_started"]["title"] == "B on sale: GBP 40.00, was GBP 50.00"
+    assert evs["product_launch"]["summary"] == "Priced GBP 5.00"
+    # an older snapshot, read before currencies were kept, still names the new one's
+    del cur["currency"]; prev["currency"] = "GBP"
+    assert {e["type"]: e for e in det.compare_catalog(prev, cur, NOW)}[
+        "product_launch"]["summary"] == "Priced GBP 5.00"
 
 
 def test_removed_products_need_two_complete_reads():

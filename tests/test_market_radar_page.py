@@ -664,6 +664,23 @@ def test_script_shows_severity_the_most_important_moves_and_what_was_left_out():
     assert "Left out as not moves (4)" in out and "3 moves scored High were shown as Medium" in out
 
 
+def test_moves_dated_ahead_are_listed_as_coming_up_soonest_first():
+    def ev(i, date, title):
+        return {"id": i, "type": "product_launch", "label": "New product", "status": "announced",
+                "date": date, "name": "Puma", "title": title, "detectors": ["News"], "severity": "LOW"}
+    moves = {"today": "2026-10-10", "top": [], "competitors": [],
+             "events": [ev(1, "2026-10-23", "Late launch"), ev(2, "2026-10-16", "Soon launch"),
+                        ev(3, "2026-10-10", "Today move"), ev(4, None, "Undated move")],
+             "last_collect": {"status": "complete", "coverage": []}}
+    out = run_js("return MR.renderMoves(%s, null);" % json.dumps(moves))
+    assert out.index("Coming up") < out.index("Soon launch") < out.index("Late launch") \
+        < out.index("All moves, newest first") < out.index("Today move") < out.index("Undated move")
+    # only moves ahead: no empty "newest first" heading and no "No moves yet"
+    moves["events"] = moves["events"][:2]
+    out = run_js("return MR.renderMoves(%s, null);" % json.dumps(moves))
+    assert "Coming up" in out and "newest first" not in out and "No moves yet" not in out
+
+
 def test_the_signal_reset_forgets_only_what_the_engine_made(client_with_reading, monkeypatch):
     from tracker import market_radar_store as store
     rival = store.upsert_entity("rival.example", name="Rival")

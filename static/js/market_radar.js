@@ -392,17 +392,26 @@
     var byId = {};
     events.forEach(function (e) { byId[e.id] = e; });
     var top = (moves.top || []).map(function (id) { return byId[id]; }).filter(Boolean);
+    // A launch or opening the news dates ahead ("releases 23 October") is
+    // not the newest move: it gets its own list, soonest first.
+    var today = moves.today || new Date().toISOString().slice(0, 10);
+    var ahead = events.filter(function (e) { return e.date && e.date > today; })
+      .sort(function (a, b) { return a.date < b.date ? -1 : a.date > b.date ? 1 : 0; });
+    events = events.filter(function (e) { return !(e.date && e.date > today); });
     if (top.length) {
-      body += '<h4 class="mr-sub">Most important</h4><ul class="mr-moves mr-top">' + top.map(renderMoveRow).join('') + '</ul>' +
-        '<h4 class="mr-sub">All moves, newest first</h4>';
+      body += '<h4 class="mr-sub">Most important</h4><ul class="mr-moves mr-top">' + top.map(renderMoveRow).join('') + '</ul>';
     }
+    if (ahead.length) {
+      body += '<h4 class="mr-sub">Coming up</h4><ul class="mr-moves">' + ahead.map(renderMoveRow).join('') + '</ul>';
+    }
+    if ((top.length || ahead.length) && events.length) body += '<h4 class="mr-sub">All moves, newest first</h4>';
     if (events.length) {
       body += '<ul class="mr-moves">' + events.slice(0, MOVES_SHOWN).map(renderMoveRow).join('') + '</ul>';
       if (events.length > MOVES_SHOWN) {
         body += '<details class="mr-more"><summary>' + esc(events.length - MOVES_SHOWN) + ' earlier moves</summary>' +
           '<ul class="mr-moves">' + events.slice(MOVES_SHOWN).map(renderMoveRow).join('') + '</ul></details>';
       }
-    } else if (last && last.status === 'complete') {
+    } else if (last && last.status === 'complete' && !ahead.length) {
       body += '<div class="mr-empty"><b>No moves yet</b>' + (moves.competitors || []).length + ' competitors are tracked. ' +
         'A move appears when something differs from the previous collection, or when a source dates it in the last 90 days.</div>';
     }
@@ -576,12 +585,14 @@
   }
 
   function renderUpdate(u) {
-    var st = u.status === 'quiet' ? 'Quiet week' : u.status === 'failed' ? 'Not written' : (u.items || []).length + ' changes';
+    var st = u.status === 'quiet' ? 'Quiet week' : u.status === 'failed' ? 'Not written'
+      : u.status === 'unread' ? 'Nothing could be read' : (u.items || []).length + ' changes';
     return '<li class="mr-move"><div class="mr-move-when">' + esc(when(u.created_at)) + '</div><div class="mr-move-b">' +
       '<div class="mr-move-t"><b>' + esc(st) + '</b>' + deliveryChip('Email', (u.delivery || {}).email) + deliveryChip('Slack', (u.delivery || {}).slack) +
       (u.delivery && u.delivery.at ? '' : '<span class="mr-chip">Preview, not sent</span>') + '</div>' +
       (u.headline ? '<div class="mr-move-title">' + esc(u.headline) + '</div>' : '') +
       (u.note ? '<div class="mr-move-sum">' + esc(u.note) + '</div>' : '') +
+      ((u.gaps || []).length ? '<div class="mr-move-sum">Not read: ' + u.gaps.map(esc).join(' ') + '</div>' : '') +
       ((u.items || []).length ? '<details class="mr-more"><summary>What it said</summary><ol class="mr-list">' + u.items.map(function (i) {
         return '<li>' + esc(i.text) + (i.so_what ? ' <span class="mr-hint">So what: ' + esc(i.so_what) + '</span>' : '') + '</li>';
       }).join('') + '</ol>' + (u.removed ? '<p class="mr-hint">' + esc(u.removed) + ' lines were removed by the fact check.</p>' : '') + '</details>' : '') +

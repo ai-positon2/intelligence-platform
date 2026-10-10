@@ -340,6 +340,11 @@
       '<p class="rr-meta">Written ' + esc(day(v.created_at)) + (pack.collected_at ? ' from the collection of ' + esc(day(pack.collected_at)) : '') +
       '. ' + esc((pack.competitors || []).length) + ' competitors tracked.</p>' +
       '<div class="rr-actions" data-noprint><button type="button" class="mr-btn primary" id="rrPdf">Download PDF</button>' + back + '</div></header>';
+    var la = v.latest_attempt;
+    if (la) {
+      html += '<div class="mr-callout' + (la.status === 'failed' ? ' bad' : '') + '" data-noprint>A newer collection on ' + esc(day(la.created_at)) +
+        ' produced no report: ' + esc(la.note || 'no reason was given') + ' This is the last report that was written.</div>';
+    }
     if (b.summary) html += '<div class="rr-summary"><p>' + esc(b.summary.text) + '</p>' + based(b.summary.cites) + '</div>';
     html += section('rr-top', 'What matters most', 'The developments that matter most to this business, most important first.', renderTop(b.top));
     html += section('rr-you', 'Your company, as we read it', 'From its own website. Corrections made on the edit page are used.', renderCompany(pack));

@@ -9345,6 +9345,19 @@ def admin_market_radar_tidy():
     return jsonify(dropped=views.tidy_suggestions(_mr_email()))
 
 
+@app.route("/p2/admin/market-radar/api/cost-report")
+@admin_required
+def admin_market_radar_cost_report():
+    """Free and read-only: what this person's runs really cost, by kind of
+    run and by stage, against the plan's estimates
+    (tracker/market_radar_costreport)."""
+    from tracker import market_radar_costreport as cr, market_radar_store as mr_store
+    try:
+        return jsonify(cr.report(_mr_email()))
+    except mr_store.StoreUnavailable as e:
+        return jsonify(error="The database is unavailable (%s)." % e), 503
+
+
 @app.route("/p2/admin/market-radar/api/runs/<int:run_id>")
 @admin_required
 def admin_market_radar_run(run_id):
