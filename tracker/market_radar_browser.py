@@ -50,15 +50,6 @@ SETTLE_SECONDS = 3
 PER_COLLECTION = 3
 MIN_WORDS = 40
 
-# A page the browser was given instead of the site's own: a bot wall, a
-# challenge, a consent wall. WEG answered "Access Denied" with HTTP 200.
-WALL = re.compile(
-    r"\b(access denied|just a moment|attention required|request unsuccessful|"
-    r"pardon our interruption|are you a robot|verify you are (a )?human|"
-    r"checking your browser|enable javascript and cookies|captcha|"
-    r"you don't have permission to access|request blocked|bot detection)\b", re.I)
-
-
 class Allowance:
     """How many sites a collection may still open in the browser, shared by
     its threads."""
@@ -116,9 +107,9 @@ def page_from_item(item):
     final = crawl.get("loadedUrl") or item.get("url")
     text = site.html_to_linked_text(html, final) if html else str(item.get("text") or "")
     title = str((item.get("metadata") or {}).get("title") or "")
-    head = title + "\n" + " ".join(text.split()[:80])
-    if WALL.search(head):
-        return None, "the site showed the browser a block page (%s)" % (title or "no title")[:60]
+    wall = site.wall_reason(html or "<title>%s</title>" % title, text)
+    if wall:
+        return None, "the site showed the browser " + wall
     if len(text.split()) < MIN_WORDS:
         return None, "the browser saw only %d words" % len(text.split())
     return {"url": item.get("url"), "final_url": final, "status": "ok", "http_status": code or 200,

@@ -347,3 +347,63 @@ def test_a_browser_run_that_never_started_says_why(web, monkeypatch):
     rs = site.read_site("https://acme.example/", browser=lambda urls, more=False: {
         "pages": {}, "missed": {}, "error": "Apify refused the run: HTTP 402"})
     assert "the browser failed (Apify refused the run: HTTP 402)" in rs["pages"][0]["note"]
+
+
+# -- block pages anywhere -----------------------------------------------------------
+
+AKAMAI = ('<html><head><title>Access Denied</title></head><body><h1>Access Denied</h1>'
+          "You don't have permission to access \"http://www.weg.net/\" on this server.<p>"
+          'Reference #18.6f2d3417.1760099087.1a2b3c</p></body></html>')
+
+
+def fake_public_get(markup, code=200):
+    class Resp:
+        status_code = code
+        headers = {"Content-Type": "text/html; charset=utf-8"}
+        url = "https://www.weg.net/"
+        encoding = "utf-8"
+
+        def iter_content(self, n):
+            yield markup.encode()
+
+        def close(self):
+            pass
+
+    return lambda url, **kw: Resp()
+
+
+def test_a_block_page_served_with_200_is_a_refusal(monkeypatch):
+    monkeypatch.setattr(site, "public_get", fake_public_get(AKAMAI))
+    got = site.fetch("https://www.weg.net/")
+    assert got["status"] == "blocked" and got["wall"] and got["text"] == ""
+    assert "block page (Access Denied)" in got["note"]
+    assert site.refuses_us(got)
+
+
+def test_an_archived_block_page_is_not_the_site(monkeypatch):
+    """The Wayback Machine's latest weg.net is Akamai's notice; the profile
+    was read from it and came out empty."""
+    monkeypatch.setattr(site, "wayback_latest", lambda url: ("20260901000000", url))
+    monkeypatch.setattr(site, "public_get", fake_public_get(AKAMAI))
+    got = site.fetch_archived("https://www.weg.net/")
+    assert got["status"] != "ok" and not got.get("wall")
+    assert "latest copy is the site's block page" in got["note"]
+
+
+def test_a_real_page_that_mentions_a_captcha_is_still_the_page(monkeypatch):
+    body = "<title>Acme | Bot protection</title><p>Our captcha stops bots. %s</p>" % words(400)
+    monkeypatch.setattr(site, "public_get", fake_public_get(body))
+    assert site.fetch("https://acme.example/")["status"] == "ok"
+    short = "<title>Acme</title><p>Our captcha stops bots. %s</p>" % words(120)
+    monkeypatch.setattr(site, "public_get", fake_public_get(short))
+    assert site.fetch("https://acme.example/")["status"] == "blocked"
+
+
+def test_a_site_that_serves_a_block_page_goes_to_the_browser(web, monkeypatch):
+    web.pages["https://acme.example/"] = dict(page("https://acme.example/", "", status="blocked",
+                                                   http=200), wall=True)
+    monkeypatch.setattr(site, "fetch_archived", lambda url: pytest.fail("the archive was read"))
+    home = browsed("https://acme.example/")
+    rs = site.read_site("https://acme.example/", browser=browser_with({"https://acme.example/": home}))
+    assert rs["status"] == "ok" and rs["via_browser"]
+    assert "the site refused this server (it served a block page)" in rs["home_notes"]

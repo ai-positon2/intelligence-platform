@@ -603,6 +603,29 @@ def tls_context():
     return _TLS[0]
 
 
+# A page an edge serves instead of the site's own: a bot wall, a challenge.
+# Some answer with HTTP 200 (weg.net to a real browser, 2026-10-10), and the
+# Wayback Machine keeps such a page as the site's latest copy (weg.net
+# again: its profile was read from an Akamai notice), so the words decide.
+WALL = re.compile(
+    r"\b(access denied|just a moment|attention required|request unsuccessful|"
+    r"pardon our interruption|are you a robot|verify you are (a )?human|"
+    r"checking your browser|enable javascript and cookies|captcha|"
+    r"you don't have permission to access|request blocked|bot detection)\b", re.I)
+WALL_MAX_WORDS = 300         # a wall is a notice; a real page that names a captcha is longer
+_TITLE = re.compile(r"<title[^>]*>(.*?)</title>", re.I | re.S)
+
+
+def wall_reason(markup, text):
+    """"a block page (its title)" when this is a wall rather than the site, or None."""
+    m = _TITLE.search(markup or "")
+    title = " ".join(m.group(1).split())[:60] if m else ""
+    head = title + "\n" + " ".join((text or "").split()[:80])
+    if len((text or "").split()) <= WALL_MAX_WORDS and WALL.search(head):
+        return "a block page (%s)" % (title or "no title")
+    return None
+
+
 def fetch(url):
     """One page, raw HTML and readable text, classified. Never raises."""
     out = {"url": url, "final_url": url, "status": "error", "http_status": None,
@@ -651,6 +674,11 @@ def fetch(url):
         r.close()
     out["html"] = markup
     out["text"] = html_to_linked_text(markup, out["final_url"])
+    wall = wall_reason(markup, out["text"])
+    if wall:
+        out.update(status="blocked", wall=True, html="", text="",
+                   note="the site served %s instead of its page" % wall)
+        return out
     out["status"] = "ok"
     if out["truncated"]:
         out["note"] = "page was larger than 3 MB and was cut"
@@ -776,6 +804,9 @@ def fetch_archived(url):
         return dict(fetch_failed(url), note="the Wayback Machine has no readable copy")
     stamp, original = found
     page = fetch("https://web.archive.org/web/%sid_/%s" % (stamp, original))
+    if page.get("wall"):
+        return dict(page, final_url=url, wall=False,
+                    note="the Wayback Machine's latest copy is the site's block page, not the site")
     if page["status"] != "ok":
         return dict(page, final_url=url, note="the Wayback Machine copy could not be read (%s)"
                     % (page["note"] or page["status"]))
@@ -792,7 +823,8 @@ def fetch_failed(url):
 
 
 def refuses_us(page):
-    return page["status"] == "blocked" and page.get("http_status") in (401, 403, 429)
+    return page["status"] == "blocked" and (page.get("http_status") in (401, 403, 429)
+                                            or bool(page.get("wall")))
 
 
 # == robots.txt =====================================================================
@@ -1034,7 +1066,8 @@ def _read_site(url, browser=None, browser_pages=0):
     refused = refuses_us(home)
     browsed = False
     if refused:
-        notes.append("the site refused this server (HTTP %s)" % home["http_status"])
+        notes.append("the site refused this server (%s)" % (
+            "it served a block page" if home.get("wall") else "HTTP %s" % home["http_status"]))
         seen, missed = _browse(browser, [home_url])
         if seen.get(home_url):
             home, browsed = seen[home_url], True
