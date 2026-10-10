@@ -100,6 +100,47 @@ def run(budget_s=BUDGET_S):
             return {"status": "failed", "note": note, "items": 0}
         return {"status": "ok", "items": len(items), "note": "%d items from %s" % (len(items), feed)}
 
+    # Phase 10: B2B sources. crt.sh's full query takes 70 to 80 s, more than
+    # this budget allows, so the check proves its Postgres port answers from
+    # here; a collection proves the query.
+    def crtsh():
+        import psycopg2
+        from . import market_radar_b2b as b2b
+        conn = psycopg2.connect(**b2b.CRT)
+        try:
+            cur = conn.cursor()
+            cur.execute("SELECT 1")
+            return {"status": "ok", "items": cur.fetchone()[0], "note": "connected"}
+        finally:
+            conn.close()
+
+    def certspotter():
+        from . import market_radar_b2b as b2b
+        names, pages = b2b.certspotter_names("gorgias.com", http.get)
+        return {"status": "ok", "items": len(names), "note": "%d host names in %d pages" % (
+            len(names), pages)}
+
+    def sec():
+        from . import market_radar_b2b as b2b
+        r = b2b.read_filings(_ctx(allbirds, None))
+        return dict(r, items=1 if r["status"] in ("ok", "empty") else 0)
+
+    def linkedin_account():
+        from . import unipile_transport
+        acct = unipile_transport.account_for_platform("linkedin")
+        return {"status": "ok" if acct else "failed", "items": 1 if acct else 0,
+                "note": "a connected LinkedIn account" if acct else
+                "no connected LinkedIn account on Unipile"}
+
+    def key(var, what):
+        import os
+
+        def check():
+            got = bool(os.environ.get(var))
+            return {"status": "ok" if got else "skipped", "items": 1 if got else 0,
+                    "note": "%s is %s (%s)" % (var, "set" if got else "not set", what)}
+        return check
+
     # (name, what it proves, function, minimum items to pass)
     checks = [
         ("news", "Google News, US edition, Aspen Dental",
@@ -127,6 +168,15 @@ def run(budget_s=BUDGET_S):
          federal_register, 1),
         ("trade_feed", "Feed discovery on a trade publication (dentistrytoday.com)",
          trade_feed, 5),
+        ("crtsh", "crt.sh certificate-log database answers on port 5432", crtsh, 1),
+        ("certspotter", "Cert Spotter certificate log, gorgias.com", certspotter, 10),
+        ("sec_filings", "SEC EDGAR: allbirds.com found by its own filings", sec, 1),
+        ("linkedin_account", "Unipile: a connected LinkedIn account for company posts",
+         linkedin_account, 1),
+        ("apollo_key", "Apollo key for headcount (checked, no credit spent)",
+         key("APOLLO_API_KEY", "headcount"), 1),
+        ("companies_house_key", "Companies House key for the UK company register",
+         key("COMPANIES_HOUSE_API_KEY", "UK company register"), 1),
     ]
     results = []
     pool = concurrent.futures.ThreadPoolExecutor(max_workers=6)

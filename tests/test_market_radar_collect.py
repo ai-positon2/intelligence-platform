@@ -77,6 +77,8 @@ def world(products, jobs_list, sitemap_locs, home="Welcome\n20% off everything")
     def get(url, **kw):
         if url.startswith("https://news.google.com/"):
             return ok("<rss><channel></channel></rss>")
+        if url.startswith("https://efts.sec.gov/"):          # not a US-listed company
+            return ok('{"hits": {"hits": []}}')
         return net.get(url, **kw)
     io = {"read_site": lambda url: shop_site(home), "get": get, "get_json": net.get_json,
           "fetch": lambda u: {"status": "ok", "html": "<html></html>", "final_url": u, "note": ""}}

@@ -30,8 +30,10 @@ import logging
 import time
 from datetime import datetime, timedelta, timezone
 
+from . import market_radar_b2b as b2b
 from . import market_radar_detectors as det
 from . import market_radar_jobs as jobs
+from . import market_radar_linkedin as li
 from . import market_radar_news as news
 
 logger = logging.getLogger(__name__)
@@ -52,21 +54,52 @@ DETECTORS = [
     ("pages", det.read_pages, det.compare_pages, None, "Key page changes"),
     ("newsroom", det.read_newsroom, det.compare_newsroom, det.baseline_newsroom, "Own news and blog"),
     ("jobs", jobs.read_jobs, jobs.compare_jobs, None, "Hiring"),
+    # Phase 10: B2B companies and manufacturers (tracker/market_radar_b2b,
+    # tracker/market_radar_linkedin).
+    ("filings", b2b.read_filings, b2b.compare_filings, b2b.baseline_filings, "Stock-market filings"),
+    ("registry", b2b.read_registry, b2b.compare_registry, b2b.baseline_registry,
+     "UK company register"),
+    ("subdomains", b2b.read_subdomains, b2b.compare_subdomains, b2b.baseline_subdomains,
+     "New subdomains"),
+    ("headcount", b2b.read_headcount, b2b.compare_headcount, b2b.baseline_headcount, "Headcount"),
+    ("linkedin", li.read_linkedin, li.compare_linkedin, li.baseline_linkedin, "LinkedIn posts"),
 ]
 NAMES = [d[0] for d in DETECTORS]
+B2B = {"b2b_services", "b2b_product"}
+# Which kinds of client each specialist detector runs for (the plan's
+# module table); a detector not listed runs for every client. A dentist's
+# rivals have no certificate-log story to tell, and every Apollo read or
+# LinkedIn read spends a credit or a person's session.
+FOR_ARCHETYPES = {
+    "subdomains": B2B | {"ecommerce"},
+    "headcount": B2B | {"manufacturer"},
+    "linkedin": B2B | {"manufacturer"},
+}
+# How long a read stays good, in hours, where 12 is too often: headcount
+# costs a credit and moves slowly, certificate logs take a minute to query.
+REUSE = {"subdomains": 7 * 24, "headcount": 30 * 24, "linkedin": 7 * 24}
+
+
+HOOKS = ("crt_connect", "apollo_enrich", "linkedin_collect", "linkedin_available")
+
+
+def applies(name, archetype):
+    return name not in FOR_ARCHETYPES or archetype in FOR_ARCHETYPES[name]
 # Detectors that read the live page text: an archived copy of a page is not
 # this week's page, so these are skipped when the site refuses us.
 LIVE_TEXT = {"promotions", "pages"}
-SITELESS = {"news"}
+# Detectors that do not need the company's own website to answer. The
+# registry and LinkedIn take an identifier from it, but remember it.
+SITELESS = {"news", "filings", "subdomains", "headcount", "linkedin", "registry"}
 
 
 def _iso(dt):
     return dt.isoformat(timespec="seconds") if dt else None
 
 
-def _fresh(snap, now):
+def _fresh(snap, now, name=None):
     seen = (snap or {}).get("last_seen_at")
-    return bool(seen and now - seen < timedelta(hours=REUSE_HOURS))
+    return bool(seen and now - seen < timedelta(hours=REUSE.get(name, REUSE_HOURS)))
 
 
 def _site_note(rs):
@@ -75,7 +108,7 @@ def _site_note(rs):
 
 
 def collect_entity(entity, *, run_id=None, client_country=None, breaker=None, deadline=None,
-                   now=None, only=None, io=None, store=None):
+                   now=None, only=None, io=None, store=None, archetype=None):
     """Run every detector on one company. `io` replaces the network
     (read_site, get, get_json, fetch) and `store` the database, for tests.
     Never raises for a detector's failure: it becomes that detector's row."""
@@ -87,11 +120,13 @@ def collect_entity(entity, *, run_id=None, client_country=None, breaker=None, de
                "fetch": site.fetch}, **(io or {}))
     now = now or datetime.now(timezone.utc)
     started = time.monotonic()
-    wanted = [d for d in DETECTORS if only is None or d[0] in only]
+    wanted = [d for d in DETECTORS if (only is None or d[0] in only) and applies(d[0], archetype)]
     latest = {d[0]: store.latest_snapshot(entity["id"], d[0]) for d in wanted}
-    stale = [d for d in wanted if not _fresh(latest[d[0]], now)]
+    stale = [d for d in wanted if not _fresh(latest[d[0]], now, d[0])]
     ctx = {"entity": entity, "get": io["get"], "get_json": io["get_json"], "fetch": io["fetch"],
-           "now": now, "client_country": client_country,
+           "now": now, "client_country": client_country, "run_id": run_id,
+           # Phase 10's outside services, replaceable in tests like the network.
+           "hooks": {k: v for k, v in io.items() if k in HOOKS},
            "news_breaker": breaker or news.Breaker(),
            "prev": {k: (v or {}).get("payload") for k, v in latest.items()},
            "results": {}, "site": None}
@@ -240,6 +275,9 @@ def collect_client(client_id, owner_email, *, run_id=None, progress=None, store=
     if not client:
         raise PermissionError("client %s is not yours or does not exist" % client_id)
     client_country = client.get("country") or "US"
+    from . import market_radar_views as views
+    archetype = views.effective_profile(client.get("profile") or {}, client.get("settings")
+                                        ).get("archetype") or client.get("archetype")
     companies, left_out = targets(client_id, owner_email, store=store)
     deadline = time.monotonic() + budget_s
     breaker = news.Breaker()
@@ -248,7 +286,8 @@ def collect_client(client_id, owner_email, *, run_id=None, progress=None, store=
 
     def one(entity):
         return collect_entity(entity, run_id=run_id, client_country=client_country,
-                              breaker=breaker, deadline=deadline, now=now, io=io, store=store)
+                              breaker=breaker, deadline=deadline, now=now, io=io, store=store,
+                              archetype=archetype)
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=parallel) as pool:
         futures = {pool.submit(one, e): e for e in companies}
@@ -263,7 +302,7 @@ def collect_client(client_id, owner_email, *, run_id=None, progress=None, store=
                                                                        str(ex)[:200]),
                      "rows": [{"detector": d, "status": "failed", "note": "not run: the "
                                "collection for this company broke", "items": 0, "events": 0}
-                              for d in NAMES]}
+                              for d in NAMES if applies(d, archetype)]}
             r["status"], r["kind"] = e["status"], e["kind"]
             results.append(r)
             done += 1
@@ -296,7 +335,10 @@ WHY = {"none": "have none", "empty": "had nothing listed", "failed": "could not 
 NONE_WORDS = {"news": "no articles", "locations": "no location pages or addresses",
               "catalog": "no shop", "reviews": "no public review count",
               "promotions": "no offer on the homepage", "pages": "no readable key page",
-              "newsroom": "no news page or feed", "jobs": "no public jobs board"}
+              "newsroom": "no news page or feed", "jobs": "no public jobs board",
+              "filings": "no US stock-market listing", "registry": "no UK company number on its site",
+              "subdomains": "no certificates logged", "headcount": "no Apollo employee estimate",
+              "linkedin": "no LinkedIn page linked from its site"}
 
 
 def coverage(results):
@@ -308,6 +350,9 @@ def coverage(results):
         return []
     lines = []
     for name, _r, _c, _b, label in DETECTORS:
+        # A detector this client's kind of business does not run gets no line.
+        if not any(x["detector"] == name for r in results for x in r["rows"]):
+            continue
         counts = {}
         for r in results:
             row = next((x for x in r["rows"] if x["detector"] == name), None)

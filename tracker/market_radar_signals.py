@@ -188,9 +188,13 @@ def items_to_read(news_items, posts, triaged, now):
     for p in posts or []:
         pid = "post:%d" % p["id"]
         if pid not in triaged and not p.get("hidden_reason"):
+            det = next((s.get("detector") for s in p.get("sources") or [] if s.get("detector")),
+                       "newsroom")
             out.append({"id": pid, "title": p["title"], "date": _iso_day(p.get("event_date")),
-                        "publisher": "its own site", "link": _source_url(p), "copies": 1,
-                        "detector": "newsroom", "event_id": p["id"]})
+                        "publisher": "its LinkedIn page" if det == "linkedin" else "its own site",
+                        "link": _source_url(p), "copies": 1,
+                        "detector": "linkedin" if det == "linkedin" else "newsroom",
+                        "event_id": p["id"]})
     out.sort(key=lambda i: i.get("date") or "", reverse=True)
     return out[:MAX_ITEMS], max(0, len(out) - MAX_ITEMS)
 
@@ -373,6 +377,8 @@ WEIGHTS = {
     "page_changed": 2,
     "promotion_ended": 2, "review_growth": 2, "sold_out": 2, "site_restructured": 2,
     "announcement": 2,
+    # A host name first certified: a hint of a product or region to come.
+    "new_subdomain": 3,
 }
 TIER = {"direct": 1.0, "local": 1.0, "indirect": 0.7, "aspirational": 0.5}
 HIGH, MEDIUM = 6.0, 2.5
