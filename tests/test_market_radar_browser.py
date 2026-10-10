@@ -424,3 +424,26 @@ def test_an_almost_empty_archived_copy_is_not_the_site(monkeypatch):
     full = "<html><head><title>WEG</title></head><body><p>%s</p></body></html>" % words(60)
     monkeypatch.setattr(site, "public_get", fake_public_get(full))
     assert site.fetch_archived("https://www.weg.net/")["status"] == "ok"
+
+
+def test_a_page_that_redirected_in_the_browser_is_found_by_the_detectors(web, monkeypatch):
+    """hobartwelders.com was read in the browser after a redirect, and every
+    detector reported its homepage unreadable."""
+    from tracker import market_radar_detectors as det
+    web.pages["https://acme.example/"] = page("https://acme.example/", "", **REFUSED)
+    monkeypatch.setattr(site, "fetch_archived", lambda url: pytest.fail("the archive was read"))
+    p, _ = B.page_from_item(item("https://acme.example/", loaded="https://www.acme.example/en/",
+                                 body="Spring sale: 20% off all welders. " + words(200),
+                                 links=[("about", "About us")]))
+    log = []
+    rs = site.read_site("https://acme.example/",
+                        browser=browser_with({"https://acme.example/": dict(p, url="https://acme.example/")},
+                                             log=log), browser_pages=1)
+    assert rs["home_url"] == "https://www.acme.example/en/"
+    assert rs["pages"][0]["url"] in rs["texts"]
+    url, text = det._page_text(rs, "home")
+    assert url == "https://www.acme.example/en/" and "Spring sale" in text
+    # its relative links resolve against where the browser ended
+    assert log[1][0] == ["https://www.acme.example/en/about"]
+    assert det.read_promotions({"site": rs})["status"] != "failed"
+    assert det.read_pages({"site": rs})["status"] == "ok"

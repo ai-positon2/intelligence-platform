@@ -1103,6 +1103,13 @@ def _read_site(url, browser=None, browser_pages=0):
             notes.append("a real browser could not read it either: " + missed[home_url])
     out["via_archive"] = str(home.get("via") or "").startswith("wayback")
     out["via_browser"] = browsed
+    if browsed:
+        # The browser's page is keyed, linked and listed under the address
+        # it ended on, as a plain read after a redirect is: hobartwelders.com
+        # redirected in the browser, its text was kept under the final
+        # address and the page list named the first, so every detector
+        # found "the homepage was not readable" (2026-10-10).
+        home_url = out["home_url"] = home["final_url"] or home_url
     out["pages"].append({"kind": "home", "url": home_url, "status": home["status"],
                          "http_status": home["http_status"], "note": home["note"],
                          "words": len(home["text"].split()), "via": home.get("via")})
