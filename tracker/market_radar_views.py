@@ -306,6 +306,9 @@ def run_view(run):
            # (freshworks.com, 2026-10-10).
            "rejected": [{"domain": r.get("domain"), "why": r.get("why")}
                         for r in (result.get("rejected") or [])[:40]],
+           # Names the ranking returned that matched no checked candidate.
+           "rank_dropped": ((result.get("coverage") or {}).get("rank_dropped") or {}).get("domains")
+           or [],
            "sources": {}}
     labels = {"site": "Named on the company's own site", "model": "Known competitors (checked)",
               "search": "Google search", "places": "Map of nearby businesses",
