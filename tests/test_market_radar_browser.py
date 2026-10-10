@@ -407,3 +407,20 @@ def test_a_site_that_serves_a_block_page_goes_to_the_browser(web, monkeypatch):
     rs = site.read_site("https://acme.example/", browser=browser_with({"https://acme.example/": home}))
     assert rs["status"] == "ok" and rs["via_browser"]
     assert "the site refused this server (it served a block page)" in rs["home_notes"]
+
+
+def test_an_almost_empty_archived_copy_is_not_the_site(monkeypatch):
+    """weg.net's latest Wayback copy: Akamai's interstitial, 7 words, no title."""
+    monkeypatch.setattr(site, "wayback_latest", lambda url: ("20261007233906", url))
+    akamai = ('<html><body><div>Powered and protected by <a href="https://www.akamai.com/">'
+              'Akamai</a></div><a href="https://www.akamai.com/privacy">Privacy</a></body></html>')
+    monkeypatch.setattr(site, "public_get", fake_public_get(akamai))
+    got = site.fetch_archived("https://www.weg.net/")
+    assert got["status"] != "ok" and "block page" in got["note"]
+    tiny = "<html><body><p>%s</p></body></html>" % words(20)
+    monkeypatch.setattr(site, "public_get", fake_public_get(tiny))
+    got = site.fetch_archived("https://www.weg.net/")
+    assert got["status"] != "ok" and "only 20 words" in got["note"]
+    full = "<html><head><title>WEG</title></head><body><p>%s</p></body></html>" % words(60)
+    monkeypatch.setattr(site, "public_get", fake_public_get(full))
+    assert site.fetch_archived("https://www.weg.net/")["status"] == "ok"

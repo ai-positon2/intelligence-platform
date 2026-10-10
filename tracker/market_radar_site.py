@@ -611,7 +611,8 @@ WALL = re.compile(
     r"\b(access denied|just a moment|attention required|request unsuccessful|"
     r"pardon our interruption|are you a robot|verify you are (a )?human|"
     r"checking your browser|enable javascript and cookies|captcha|"
-    r"you don't have permission to access|request blocked|bot detection)\b", re.I)
+    r"you don't have permission to access|request blocked|bot detection|"
+    r"powered and protected by)\b", re.I)
 WALL_MAX_WORDS = 300         # a wall is a notice; a real page that names a captcha is longer
 _TITLE = re.compile(r"<title[^>]*>(.*?)</title>", re.I | re.S)
 
@@ -737,6 +738,7 @@ def fetch_json(url):
 
 WAYBACK_CDX = "https://web.archive.org/cdx/search/cdx"
 MAX_ARCHIVE_PAGES = 4
+MIN_ARCHIVE_WORDS = 40
 
 
 WAYBACK_AVAILABLE = "https://archive.org/wayback/available"
@@ -807,6 +809,13 @@ def fetch_archived(url):
     if page.get("wall"):
         return dict(page, final_url=url, wall=False,
                     note="the Wayback Machine's latest copy is the site's block page, not the site")
+    n = len(page["text"].split()) if page["status"] == "ok" else None
+    if n is not None and n < MIN_ARCHIVE_WORDS:
+        # weg.net's latest copy is Akamai's 7-word interstitial ("Powered
+        # and protected by Akamai"), no title, no wall words: a profile was
+        # written from it. Whatever an almost empty copy is, it is not the site.
+        return dict(fetch_failed(url), note="the Wayback Machine's latest copy has only %d "
+                    "words: it is not the site's page" % n)
     if page["status"] != "ok":
         return dict(page, final_url=url, note="the Wayback Machine copy could not be read (%s)"
                     % (page["note"] or page["status"]))
