@@ -749,9 +749,22 @@ def _rank_line(item, verdict, brief):
                 else "its own homepage")}
 
 
-def rank(profile, survivors, *, limit, run_id=None, client=None):
+def _usable(ranked, lines):
+    """How many of a ranking's choices are checked candidates scoring at
+    least MIN_SCORE."""
+    known = {l["domain"] for l in lines}
+    return len({(c.get("domain") or "").lower() for c in ranked.get("competitors") or []
+                if (c.get("domain") or "").lower() in known
+                and int(c.get("score") or 0) >= MIN_SCORE})
+
+
+def rank(profile, survivors, *, limit, run_id=None, client=None, again=False):
     user = ("CLIENT:\n" + json.dumps(client_brief(profile), ensure_ascii=False, indent=1)
             + "\n\nCANDIDATES (checked):\n" + json.dumps(survivors, ensure_ascii=False, indent=1))
+    if again:
+        user += ("\n\nA first answer chose only a few of these %d checked candidates. Choose up to "
+                 "%d: every candidate that sells what the client sells to the same kind of "
+                 "customer belongs on the list." % (len(survivors), limit))
     parsed, meta = llm.call_json(RANK_SYSTEM.replace("{limit}", str(limit)), user, RANK_SCHEMA,
                                  model=RANK_MODEL, max_tokens=6000, run_id=run_id,
                                  stage="rivals_rank", client=client)
@@ -888,6 +901,20 @@ def discover(profile, *, run_id=None, client=None, token=None, progress=None, se
         say("rivals_rank")
         try:
             ranked, _ = rank(profile, lines, limit=limit, run_id=run_id, client=client)
+            # A ranking that keeps 2 of 64 good candidates is a bad answer, not
+            # a small market (freshworks.com, 2026-10-10: Zendesk alone, then 10
+            # on the next run). Ask once more and keep the longer list.
+            want = min(limit, len(lines)) // 2
+            if want and _usable(ranked, lines) < want:
+                try:
+                    second, _ = rank(profile, lines, limit=limit, run_id=run_id, client=client,
+                                     again=True)
+                    coverage["rank_retried"] = {"first": _usable(ranked, lines),
+                                                "second": _usable(second, lines)}
+                    if _usable(second, lines) > _usable(ranked, lines):
+                        ranked = second
+                except llm.ModelError:
+                    coverage["rank_retried"] = {"first": _usable(ranked, lines), "second": None}
         except llm.ModelError as e:
             return {"status": "failed", "error": {"stage": "rank", "kind": e.kind,
                                                    "detail": e.detail},

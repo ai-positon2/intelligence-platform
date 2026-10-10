@@ -64,9 +64,10 @@ class Scripted:
             asked = json.loads(kw["messages"][0]["content"].split("CANDIDATES:\n", 1)[1])
             return reply({"verdicts": [self.verdicts.get(c["domain"], verdict(c["domain"]))
                                        for c in asked]}, model="claude-haiku-5-5")
-        body = self.ranked
+        body = self.ranked.pop(0) if isinstance(self.ranked, list) else self.ranked
         if body is None:
-            asked = json.loads(kw["messages"][0]["content"].split("CANDIDATES (checked):\n", 1)[1])
+            asked = json.loads(kw["messages"][0]["content"].split("CANDIDATES (checked):\n", 1)[1]
+                               .split("\n\nA first answer", 1)[0])
             body = {"competitors": [{"domain": c["domain"], "kind": "direct", "score": 70,
                                      "reason": "Sells the same — nearby."} for c in asked],
                     "left_out": [], "gaps": []}
@@ -461,6 +462,29 @@ def test_discover_end_to_end_ranks_only_checked_candidates():
     assert got["rival.example"]["checked_on"] == "its own homepage"
     assert any(r["domain"] == "mag.example" for r in out["rejected"])
     assert {"site", "model", "search", "places"} <= set(out["coverage"])
+
+
+def test_a_ranking_that_keeps_almost_none_of_many_good_candidates_is_asked_again():
+    found = [place("P%d" % i, "https://p%d.example" % i, i / 10) for i in range(12)]
+    short = {"competitors": [{"domain": "p0.example", "kind": "direct", "score": 90, "reason": "x"},
+                             {"domain": "p1.example", "kind": "direct", "score": 30, "reason": "weak"}],
+             "left_out": [], "gaps": []}
+    c = Scripted(ranked=[short, None])
+    out = run_discover(c, found=found)
+    assert c.steps().count("rank") == 2
+    assert "A first answer chose only a few of these" in c.calls[-1]["messages"][0]["content"]
+    assert len(out["competitors"]) >= 12          # the longer second answer was kept
+    assert out["coverage"]["rank_retried"]["first"] == 1 and out["coverage"]["rank_retried"]["second"] >= 6
+    # a second answer no better than the first: the first stands
+    worse = {"competitors": [{"domain": "p2.example", "kind": "direct", "score": 20, "reason": "weak"}],
+             "left_out": [], "gaps": []}
+    c = Scripted(ranked=[short, worse])
+    out = run_discover(c, found=found)
+    assert [x["domain"] for x in out["competitors"]] == ["p0.example"]
+    # a full first answer is never asked again
+    c = Scripted()
+    run_discover(c, found=found)
+    assert c.steps().count("rank") == 1
 
 
 def test_discover_keeps_unreadable_sites_visible_and_drops_self_redirects():
