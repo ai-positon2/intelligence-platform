@@ -368,3 +368,25 @@ def test_the_map_places_points_by_direction_and_needs_a_location():
     assert ny < 170 and abs(nx - 170) < 1          # north is up
     assert ex > 170 and abs(ey - 170) < 1          # east is right
     assert out[1] == ""
+
+
+def test_a_shop_price_without_currency_never_reaches_the_writer():
+    m = {"ref": "M9", "company": "AYBL", "label": "New product", "type": "product_launch",
+         "status": "announced", "date": "2026-10-01", "title": "New product: Tank", "summary": "Priced 30.0 to 30.0",
+         "sources": []}
+    assert "Priced" not in R.evidence_text(m)
+    assert "Priced" in R.evidence_text(dict(m, type="price_cut", summary="Priced 30.0 to 24.0"))
+
+
+def test_the_checker_reads_what_was_checked_and_the_writer_skips_routine_competitors():
+    llm = LLM({"verdicts": []})
+    R.check_brief(statements_brief(), pack(), llm=llm)
+    assert "News read for 2 of 2 competitors." in llm.calls[0]["user"]
+    assert "Skip a competitor whose only moves are routine" in R.WRITER_SYSTEM
+
+
+def test_a_long_move_summary_is_clipped_on_the_page():
+    v = view()
+    v["pack"]["moves"][0]["summary"] = "Added: 77 products | " + "Leggings (9) " * 60
+    html = run_js("MRR.render(%s); return document.getElementById('rrBody').innerHTML;" % json.dumps(v))
+    assert "Leggings (9) " * 30 not in html and "…" in html

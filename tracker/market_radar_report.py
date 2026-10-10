@@ -183,17 +183,23 @@ def build_pack(client_id, owner_email, *, store, now, collection=None, run_id=No
     return pack
 
 
+NO_CURRENCY_TYPES = {"product_launch", "product_removed", "sold_out"}
+
+
 def evidence_text(item):
     """One pack item as the writer and the checker read it."""
     ref = item["ref"]
     if ref[0] == "M":
+        # A shop's product prices come without a currency (Shopify's
+        # products.json has none), and "a hoodie at 62.0" reached a report.
+        summary = None if item.get("type") in NO_CURRENCY_TYPES else item.get("summary")
         src = "; ".join("%s%s: %s" % (s.get("publisher") or s.get("detector") or "",
                                       " (%s)" % s["date"] if s.get("date") else "",
                                       s.get("headline") or "") for s in item["sources"])
         return "%s | %s | %s | %s | %s | %s%s%s | sources: %s" % (
             ref, item["company"], item["label"], item["status"], item["date"] or "undated",
             item["title"], " | " + item["place"] if item.get("place") else "",
-            " | " + item["summary"] if item.get("summary") else "", src)
+            " | " + summary if summary else "", src)
     if ref[0] == "N":
         return "%s | %s, %s, %s km away | %s | %s" % (
             ref, item["name"], (item.get("category") or "").replace("_", " "),
@@ -309,7 +315,7 @@ Write:
   - so_what: one or two sentences on what it means for the client specifically (its location, its offer, its customers).
   - action: one concrete thing the client could do in the next weeks. Practical, specific, modest. Not "monitor the situation".
   - confidence: high when several independent sources or the company itself confirm it and it has happened; medium for one solid source or a planned move; low for a rumour, a single weak source or an inference.
-- competitors: for each competitor that did something worth knowing (skip the rest), two or three sentences on what it is doing, citing its moves. company_ref is its C reference.
+- competitors: for each competitor that did something worth knowing, two or three sentences on what it is doing, citing its moves. company_ref is its C reference. Skip a competitor whose only moves are routine: new colours or products in its shop, a page wording change, a small promotion.
 - local: for a business that serves customers at a place, one or two statements on new businesses nearby. Empty for others or when there is nothing.
 - industry: for each industry theme that matters to the client (at most 5), a title and one sentence on its implication for the client.
 - opportunities, threats: two to four each, one sentence each, specific to the client.
@@ -401,7 +407,7 @@ A statement is SUPPORTED when every fact in it is in its cited evidence: company
 
 A statement is NOT SUPPORTED when it states a fact that is not in its cited evidence, contradicts it, or turns a plan into a done deal.
 
-Facts about the client itself are checked against the CLIENT line given with each statement.
+Facts about the client itself are checked against the CLIENT line given with each statement, and facts about what was searched or found against the WHAT WAS AND WAS NOT CHECKED lines.
 
 Return one verdict per statement id, in this order: reasoning (one short sentence, checking the facts one by one), unsupported_facts (each fact that is not in the evidence, quoted briefly; empty when all are), then supported (false only when unsupported_facts is not empty)."""
 
@@ -433,9 +439,12 @@ def check_brief(brief, pack, *, run_id=None, client=None, llm=None):
     stmts = statements(brief)
     if not stmts:
         return brief, [], None
+    # The client and what was checked: the writer may state both, so the
+    # checker reads both (a true "18 other new map listings" was removed
+    # for want of the coverage line, 2026-10-10).
     client_line = pack_text({"client": pack["client"], "competitors": [], "moves": [],
                              "nearby": [], "entrants": [], "themes": [], "rules": [], "hiring": [],
-                             "coverage": []})
+                             "coverage": pack.get("coverage") or []})
     user = "\n\n".join("STATEMENT %s: %s\nEVIDENCE:\n%s\n%s" % (
         sid, text, client_line, "\n".join(evidence_text(refs[r]) for r in cites))
         for sid, text, cites in stmts)

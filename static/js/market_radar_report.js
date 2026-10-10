@@ -37,6 +37,13 @@
     return href ? '<a href="' + esc(href) + '" target="_blank" rel="noopener noreferrer">' + esc(text) + '</a>' : esc(text);
   }
 
+  // A page change's summary can be a whole filter list ("Leggings (9)Coats
+  // + Jackets (4)..."): the first lines say enough.
+  function clip(t, n) {
+    t = String(t || '');
+    return t.length > n ? t.slice(0, n).replace(/\s+\S*$/, '') + '…' : t;
+  }
+
   var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   function day(iso) {
     var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso || ''));
@@ -175,7 +182,7 @@
       '<div class="rr-mvd">' + esc(day(m.date)) + '</div><div class="rr-mvb"><div class="rr-mvt">' +
       '<span class="mr-chip">' + esc(m.label) + '</span>' + (STATUS[m.status] && m.status !== 'unknown' ? '<span class="mr-chip">' + esc(STATUS[m.status]) + '</span>' : '') +
       link(first.url, m.title) + thumbs([m.event_id], m.feedback || null) + '</div>' +
-      (m.summary ? '<div class="rr-q">' + esc(m.summary) + '</div>' : '') +
+      (m.summary ? '<div class="rr-q">' + esc(clip(m.summary, 220)) + '</div>' : '') +
       '<div class="rr-q">' + esc([m.place, (m.articles > 1 ? m.articles + ' articles' : (first.publisher || DETECTOR[first.detector] || '')),
         m.evidence > 1 ? m.evidence + ' independent sources' : '', sev[1] + ' for you'].filter(Boolean).join(' · ')) + '</div></div></li>';
   }
