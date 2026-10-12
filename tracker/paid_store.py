@@ -9,7 +9,8 @@ pm_ prefix so they never collide with that service's own tables.
                         rollup (meta), as pushed by the engine
   pm_pacing_clients     that day's per-client detail (accounts, campaigns,
                         categories, moves)
-  pm_pacing_meta        key/value; 'latest' -> {"date": ...}
+  pm_pacing_meta        key/value; 'latest' -> {"date": ...}, 'refresh' -> the
+                        Refresh button's current or last run
   pm_pacing_moves       the shared "applied" tick on a recommended move, and
                         who ticked it
   pm_oauth_tokens       the ONE shared Slack grant and ONE shared Google grant
@@ -210,6 +211,42 @@ def latest_clients():
             "FROM pm_pacing_clients WHERE date = %s ORDER BY data->>'name'", (date,))
         rows = cur.fetchall()
     return date, [{"name": r[0], "accounts": int(r[1] or 0), "offTarget": int(r[2] or 0)} for r in rows if r[0]]
+
+
+def claim_refresh(by, stale_s):
+    """Start a Refresh unless one is already running. True when this caller
+    now owns it. A run older than stale_s does not block: its worker is gone.
+    The row is locked for the check, so two clicks on two workers cannot
+    both win."""
+    state = {"state": "running", "by": by, "startedAt": _now().isoformat(), "step": "Starting"}
+    with _tx() as cur:
+        cur.execute("INSERT INTO pm_pacing_meta (key, value) VALUES ('refresh', '{}'::jsonb) "
+                    "ON CONFLICT (key) DO NOTHING")
+        cur.execute("SELECT value FROM pm_pacing_meta WHERE key = 'refresh' FOR UPDATE")
+        cur_state = cur.fetchone()[0] or {}
+        if cur_state.get("state") == "running":
+            try:
+                started = datetime.fromisoformat(cur_state.get("startedAt") or "")
+            except ValueError:
+                started = None
+            if started and (_now() - started).total_seconds() < stale_s:
+                return False
+        cur.execute("UPDATE pm_pacing_meta SET value = %s WHERE key = 'refresh'", (json.dumps(state),))
+    return True
+
+
+def update_refresh(**fields):
+    """Merge fields into the Refresh state."""
+    with _tx() as cur:
+        cur.execute("UPDATE pm_pacing_meta SET value = value || %s::jsonb WHERE key = 'refresh'",
+                    (json.dumps(fields),))
+
+
+def get_refresh():
+    with _tx() as cur:
+        cur.execute("SELECT value FROM pm_pacing_meta WHERE key = 'refresh'")
+        row = cur.fetchone()
+    return (row[0] or {}) if row else {}
 
 
 def list_moves(date):

@@ -14,7 +14,15 @@
   </section>
 
   <div class="pm-panel pd-cmd" id="pickers" hidden></div>
-  <p class="pd-fresh stale" id="fresh"><span class="live"></span>Loading the latest run…</p>
+  <div class="pd-freshrow">
+    <p class="pd-fresh stale" id="fresh"><span class="live"></span>Loading the latest run…</p>
+    <div class="pd-refresh" id="refreshBox">
+      <button type="button" class="pd-refresh-btn" id="refreshBtn" title="Rebuild today’s run from the spend sheet and the Budget Tracker">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/></svg><span id="refreshLabel">Refresh</span>
+      </button>
+    </div>
+  </div>
+  <div class="pd-refresh-note" id="refreshNote" hidden></div>
   <div class="pd-strip" id="strip"></div>
   <div class="pm-panel pd-trend" id="trend" hidden></div>
 
@@ -30,5 +38,5 @@
 {% endblock %}
 {% block scripts %}
 <script src="{{ url_for('static', filename='js/pm_picker.js') }}?v=1"></script>
-<script src="{{ url_for('static', filename='js/pacing_desk.js') }}?v=4"></script>
+<script src="{{ url_for('static', filename='js/pacing_desk.js') }}?v=5"></script>
 {% endblock %}

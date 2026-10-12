@@ -4340,6 +4340,25 @@ def paid_pacing_set_move(move_id):
         return _pm_store_error(e)
 
 
+@app.route("/p2/paid-marketing/api/pacing/refresh", methods=["GET", "POST"])
+@position2_required
+def paid_pacing_refresh():
+    """The Refresh button. POST starts a rebuild from the two Google Sheets
+    (tracker/paid_refresh.py); GET is its progress, which the page polls."""
+    from tracker import paid_pacing, paid_refresh, paid_store
+    try:
+        if request.method == "POST":
+            problem = paid_refresh.config_problem()
+            if problem:
+                return jsonify(error=problem, **paid_refresh.status(paid_store)), 409
+            if not paid_refresh.start(paid_store, paid_pacing, _pm_user_email()):
+                return jsonify(error="A refresh is already running.", **paid_refresh.status(paid_store)), 409
+            return jsonify(paid_refresh.status(paid_store)), 202
+        return jsonify(paid_refresh.status(paid_store))
+    except paid_store.StoreUnavailable as e:
+        return _pm_store_error(e)
+
+
 @app.route("/p2/paid-marketing/api/pacing/seed", methods=["POST"])
 def paid_pacing_seed():
     """The engine's daily push. No session: a shared secret in X-Seed-Secret,

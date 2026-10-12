@@ -6,9 +6,17 @@ The budget-pacing engine behind **Paid Marketing Agents › Pacing Desk**
 team. `HANDOFF.md` is the full design and the domain rules; `ENGINE_NOTES.md`
 covers ranking weights, guardrails and adding a client.
 
-It runs on the PPC team's machine, not on the platform: it needs that day's
-Google Ads export and the Budget Tracker workbook in `raw/`, which hold client
-spend and are deliberately **not committed** (this repository is public).
+Two ways a run reaches the page:
+
+1. **The Refresh button** on the Pacing Desk. The platform reads the
+   "All Accounts Spend Data" sheet and the Budget Tracker with its service
+   account, runs this engine in a throwaway folder, and publishes the result
+   (`tracker/paid_refresh.py`). Needs `PACING_SPEND_SHEET_ID` set on Railway
+   and both sheets shared (Viewer) with the service account in
+   `GOOGLE_SA_JSON`. `PACING_BUDGET_SHEET_ID` overrides the Budget Tracker.
+2. **A push from the PPC team's machine**, below. The inputs in `raw/` hold
+   client spend and are deliberately **not committed** (this repository is
+   public).
 
 ```bash
 pip install pandas numpy openpyxl

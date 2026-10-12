@@ -723,3 +723,39 @@ details.sq-ref>summary{cursor:pointer;font-size:12.5px;font-weight:600;color:var
 .pl-dots i{width:6px;height:6px;border-radius:50%;background:var(--pm-faint)}
 .pl-dots .on{color:var(--pm-ink2)}
 .pl-dots .on i{background:var(--ok);box-shadow:0 0 6px var(--ok)}
+
+/* Pacing Desk: the Refresh button and its result line */
+.pd-freshrow{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:0 0 16px}
+.pd-freshrow .pd-fresh{margin:0}
+.pd-refresh{position:relative;border-radius:999px;padding:1px;
+  background:linear-gradient(120deg,var(--pm-a),var(--pm-a2));box-shadow:0 6px 22px -10px var(--pm-a-g)}
+.pd-refresh-btn{display:inline-flex;align-items:center;gap:8px;cursor:pointer;border:0;border-radius:999px;
+  padding:8px 16px 8px 13px;font:600 13px/1 inherit;font-family:inherit;color:var(--pm-ink);background:#0c0f1c;
+  transition:background .2s,color .2s}
+.pd-refresh-btn:hover:not(:disabled){background:transparent;color:#1a1206}
+.pd-refresh-btn:focus-visible{outline:2px solid var(--pm-a);outline-offset:3px}
+.pd-refresh-btn svg{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round;transition:transform .5s cubic-bezier(.16,1,.3,1)}
+.pd-refresh-btn:hover:not(:disabled) svg{transform:rotate(-120deg)}
+.pd-refresh-btn:disabled{cursor:progress}
+.pd-refresh.busy{background:conic-gradient(from var(--pd-rf-a,0deg),var(--pm-a),var(--pm-a2),transparent 60%,var(--pm-a));animation:pdRfSpin 1.6s linear infinite}
+.pd-refresh.busy svg{animation:pdRfIcon 1s linear infinite}
+@property --pd-rf-a{syntax:"<angle>";inherits:false;initial-value:0deg}
+@keyframes pdRfSpin{to{--pd-rf-a:360deg}}
+@keyframes pdRfIcon{to{transform:rotate(-360deg)}}
+.pd-refresh-note{font-size:12.5px;line-height:1.55;color:var(--pm-muted);margin:-6px 0 16px;padding:10px 14px;border-radius:12px;
+  border:1px solid var(--pm-line);background:var(--pm-panel)}
+.pd-refresh-note.ok{border-color:color-mix(in srgb,var(--ok) 40%,transparent)}
+.pd-refresh-note.ok b{color:var(--ok)}
+.pd-refresh-note.bad{border-color:color-mix(in srgb,#fb7185 45%,transparent)}
+.pd-refresh-note.bad b{color:#fb7185}
+.pd-refresh-note .warn{color:#fbbf24}
+.pd-refresh-note .t{color:var(--pm-faint)}
+.pd-refresh-note code{font-size:12px;padding:1px 6px;border-radius:6px;background:var(--pm-line);color:var(--pm-ink);word-break:break-all}
+.pd-refresh-note details{margin-top:6px}
+.pd-refresh-note summary{cursor:pointer;color:var(--pm-ink)}
+.pd-refresh-note ul{margin:6px 0 0 18px;padding:0}
+@media (prefers-reduced-motion:reduce){.pd-refresh.busy,.pd-refresh.busy svg{animation:none}}
+[data-theme="light"] .pd-refresh-btn{background:#fff}
+[data-theme="light"] .pd-refresh-btn:hover:not(:disabled){background:transparent;color:#fff}
+[data-theme="light"] .pd-refresh-note.bad b{color:#be123c}
+[data-theme="light"] .pd-refresh-note .warn{color:#b45309}

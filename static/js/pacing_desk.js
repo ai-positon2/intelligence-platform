@@ -1,7 +1,9 @@
 /* Pacing Desk (Paid Marketing Agents).
  *
  * Ported from Agent Holmes' landing/pacing_desk.html. The engine's daily run
- * is pushed to /p2/paid-marketing/api/pacing/seed; this page reads it back,
+ * is pushed to /p2/paid-marketing/api/pacing/seed, or rebuilt on the platform
+ * from the two Google Sheets by the Refresh button (api/pacing/refresh,
+ * tracker/paid_refresh.py); this page reads it back,
  * lets anyone switch to an earlier day, and keeps a shared "applied" tick on
  * each recommended move (who ticked it is recorded server-side).
  *
@@ -138,7 +140,7 @@ function paintFresh(){
   var when = D.seededAt ? new Date(D.seededAt).toLocaleString([], {dateStyle:"medium", timeStyle:"short"}) : "";
   el.innerHTML='<span class="live"></span>'+(stale
     ? 'Viewing an earlier run, <b>'+esc(D.asOf)+'</b>. Pick the latest date in “As of” for today’s numbers.'
-    : 'Live: the <b>'+esc(D.asOf)+'</b> run'+(when?', pushed '+esc(when):'')+'. Each morning’s run replaces this for everyone.');
+    : 'Live: the <b>'+esc(D.asOf)+'</b> run'+(when?', built '+esc(when):'')+'. A refresh replaces this for everyone.');
 }
 
 function inScope(a){
@@ -564,20 +566,83 @@ $("#controls").addEventListener("click",function(e){
 });
 $("#exportAccounts").addEventListener("click",exportAccountsCsv);
 
+/* ── Refresh ─────────────────────────────────────────────────
+ * Rebuilds the run on the server from the spend sheet and the Budget
+ * Tracker. The job lives in Postgres, so the page polls for it and a second
+ * tab (or a second person) sees the same run in progress. */
+var RF = {timer:null, seen:null};
+function rfNote(kind, html){
+  var n=$("#refreshNote");
+  if(!html){n.hidden=true;n.innerHTML="";return;}
+  n.hidden=false; n.className="pd-refresh-note "+kind; n.innerHTML=html;
+}
+function ago(iso){
+  var s=(Date.now()-new Date(iso).getTime())/1000; if(!(s>=0)) return "";
+  return s<60?"just now":s<3600?Math.round(s/60)+" min ago":s<86400?Math.round(s/3600)+" h ago":new Date(iso).toLocaleDateString();
+}
+function paintRefresh(st){
+  var b=$("#refreshBtn"), box=$("#refreshBox"), running=st.state==="running";
+  box.classList.toggle("busy",running); b.disabled=running;
+  $("#refreshLabel").textContent=running?(st.step||"Refreshing")+"…":"Refresh";
+  if(running){ rfNote("", ""); return; }
+  if(st.state==="failed" && st.error){
+    rfNote("bad",'<b>Refresh failed.</b> '+esc(st.error)+(st.finishedAt?' <span class="t">'+esc(ago(st.finishedAt))+'</span>':''));
+  } else if(st.state==="done" && st.result && RF.seen==="running"){
+    var r=st.result, f=r.issueCount||0;
+    rfNote("ok",'<b>Updated.</b> The '+esc(r.date)+' run, data through '+esc(r.dataThrough||"?")+', '+r.clients+' clients, '+r.accounts+' accounts.'+
+      (r.notes||[]).map(function(x){return ' <span class="warn">'+esc(x)+'</span>'}).join("")+
+      (f?' <details><summary>'+f+' engine self-check flag'+(f===1?'':'s')+'</summary><ul>'+
+        (r.issues||[]).map(function(x){return '<li>'+esc(x)+'</li>'}).join("")+'</ul></details>':''));
+  }
+  if(st.configProblem) b.title=st.configProblem;
+}
+function pollRefresh(){
+  clearTimeout(RF.timer);
+  getJson(API+"/refresh").then(function(st){
+    st=st||{};
+    var was=RF.seen; paintRefresh(st); RF.seen=st.state;
+    if(st.state==="running"){ RF.timer=setTimeout(pollRefresh, 2000); return; }
+    if(was==="running" && st.state==="done") loadLatest(true);
+  }).catch(function(){ RF.timer=setTimeout(pollRefresh, 5000); });
+}
+$("#refreshBtn").addEventListener("click",function(){
+  var b=$("#refreshBtn"); b.disabled=true; $("#refreshBox").classList.add("busy"); $("#refreshLabel").textContent="Starting…";
+  rfNote("","");
+  fetch(API+"/refresh",{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json"},body:"{}"})
+  .then(function(r){return r.json().catch(function(){return {}}).then(function(j){return {r:r,j:j}})})
+  .then(function(x){
+    if(x.r.status===202 || (x.j && x.j.state==="running")){ RF.seen="running"; paintRefresh(x.j); pollRefresh(); return; }
+    paintRefresh(x.j||{});
+    var msg=(x.j&&x.j.error)||("the server answered "+x.r.status);
+    if(x.j && x.j.configProblem){
+      rfNote("bad",'<b>Refresh is not set up yet.</b> '+esc(x.j.error)+(x.j.serviceEmail?' Share both Google Sheets with <code>'+esc(x.j.serviceEmail)+'</code> (Viewer), then set PACING_SPEND_SHEET_ID on Railway.':''));
+    } else rfNote("bad",'<b>Refresh did not start.</b> '+esc(msg));
+  })
+  .catch(function(e){ paintRefresh({}); rfNote("bad",'<b>Refresh did not start.</b> '+esc(e.message)); });
+});
+
 /* ── Boot ────────────────────────────────────────────────────── */
-getJson(API+"/snapshots").then(function(j){
+var PICKERS_BUILT=false;
+function loadLatest(again){
+  return getJson(API+"/snapshots").then(function(j){
   ROLLUPS=(j&&j.snapshots)||[];
   DATES=ROLLUPS.map(function(r){return r.id}).sort().reverse();
   LIVE_DATE=(j&&j.latest)||DATES[0]||null;
   if(!LIVE_DATE){
-    $("#list").innerHTML='<div class="pm-panel"><p class="pm-empty" style="padding:26px 0">No run has been pushed yet. '+
-      'The pacing engine sends each morning’s result here once its push is pointed at this page.</p></div>';
+    $("#list").innerHTML='<div class="pm-panel"><p class="pm-empty" style="padding:26px 0">No run yet. '+
+      'Press <b>Refresh</b> to build one from the spend sheet and the Budget Tracker.</p></div>';
     showError("Waiting for the first run.");
     return;
   }
   return getJson(API+"/snapshots/"+encodeURIComponent(LIVE_DATE)).then(function(snap){
     if(!snap) throw new Error("the latest run ("+LIVE_DATE+") is missing");
-    buildPickers(); setD(snap,"live");
+    if(!PICKERS_BUILT){ buildPickers(); PICKERS_BUILT=true; }
+    if(again){
+      // Keep the reader's selection if it still exists in the new run.
+      if(pickClient && !snap.clients.some(function(c){return c.name===pickClient})){pickClient="";pickAccount="";}
+      setD(snap,"live"); flashList(); return;
+    }
+    setD(snap,"live");
     // A link from the launcher: ?client=<name> (and optionally &account=).
     var qs=new URLSearchParams(location.search), qc=qs.get("client"), qa=qs.get("account");
     if(qc&&D.clients.some(function(c){return c.name===qc})){
@@ -591,4 +656,7 @@ getJson(API+"/snapshots").then(function(j){
   $("#list").innerHTML='<div class="pm-err">Could not load the Pacing Desk: '+esc(e.message)+'</div>';
   showError("Not connected.");
 });
+}
+loadLatest(false);
+pollRefresh();
 })();
