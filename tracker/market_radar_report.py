@@ -479,7 +479,9 @@ def check_brief(brief, pack, *, run_id=None, client=None, llm=None):
         out[key] = [x for i, x in enumerate(brief[key]) if "%s.%d" % (key, i) not in bad]
     note = None
     if unchecked:
-        note = "%d statements got no verdict from the check and are shown unchecked." % len(unchecked)
+        n = len(unchecked)
+        note = ("1 statement got no verdict from the check and is shown unchecked." if n == 1 else
+                "%d statements got no verdict from the check and are shown unchecked." % n)
     return out, removed, note
 
 

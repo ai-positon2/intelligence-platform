@@ -188,6 +188,15 @@ class ModelError(Exception):
     detail = "hit the limit"
 
 
+def test_several_unchecked_statements_are_counted_in_the_plural():
+    llm = LLM({"verdicts": [{"id": "summary", "reasoning": "r", "unsupported_facts": [],
+                             "supported": True}]})
+    _out, _removed, note = R.check_brief(statements_brief(), pack(), llm=llm)
+    n = len(R.statements(statements_brief())) - 1
+    assert n > 1 and note == "%d statements got no verdict from the check and are shown " \
+        "unchecked." % n
+
+
 def test_the_check_removes_unsupported_statements_and_says_why():
     def v(i, ok, facts=()):
         return {"id": i, "reasoning": "r", "unsupported_facts": list(facts), "supported": ok}
@@ -200,7 +209,7 @@ def test_the_check_removes_unsupported_statements_and_says_why():
     assert len(out["competitors"]) == 1
     assert [(r["where"], r["why"]) for r in removed] == [("top.1", "opened (the evidence says planned)"),
                                                          ("industry.0", "no such theme")]
-    assert note == "1 statements got no verdict from the check and are shown unchecked."
+    assert note == "1 statement got no verdict from the check and is shown unchecked."
     assert "CLIENT: Acme Dental (acme.example)" in llm.calls[0]["user"]
     assert out["watch"] and "STATEMENT top.1: Opened. Small Smiles opened" in llm.calls[0]["user"]
     assert "M2 | Small Smiles | New location" in llm.calls[0]["user"]
