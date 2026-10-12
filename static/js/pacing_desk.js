@@ -578,6 +578,14 @@ getJson(API+"/snapshots").then(function(j){
   return getJson(API+"/snapshots/"+encodeURIComponent(LIVE_DATE)).then(function(snap){
     if(!snap) throw new Error("the latest run ("+LIVE_DATE+") is missing");
     buildPickers(); setD(snap,"live");
+    // A link from the launcher: ?client=<name> (and optionally &account=).
+    var qs=new URLSearchParams(location.search), qc=qs.get("client"), qa=qs.get("account");
+    if(qc&&D.clients.some(function(c){return c.name===qc})){
+      pickClient=qc;
+      if(qa&&D.clients.some(function(c){return c.name===qc&&c.accounts.some(function(a){return a.name===qa})})) pickAccount=qc+"||"+qa;
+      fillClients(); fillAccounts(); paintStrip(); render();
+      if(pickAccount) focusAccount(pickAccount);
+    }
   });
 }).catch(function(e){
   $("#list").innerHTML='<div class="pm-err">Could not load the Pacing Desk: '+esc(e.message)+'</div>';

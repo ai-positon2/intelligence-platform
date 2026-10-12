@@ -684,3 +684,42 @@ details.sq-ref>summary{cursor:pointer;font-size:12.5px;font-weight:600;color:var
    messages); the conversation scrolls inside its own panel instead. */
 .pd-cmd.cf-cmd{position:relative;top:auto}
 .cf-chat .cf-stream{max-height:calc(100vh - 250px);min-height:440px;overflow-y:auto;overscroll-behavior:contain}
+
+/* ═══ Section page: client launcher, live status, card readouts ═══ */
+.pm-launch{position:relative;z-index:6;margin:-12px 0 26px}
+.pl-panel{padding:18px 20px 14px}
+.pl-top{display:grid;grid-template-columns:minmax(260px,.9fr) minmax(0,2fr);gap:16px;align-items:end}
+@media (max-width:1100px){.pl-top{grid-template-columns:1fr}}
+.pl-acts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+@media (max-width:760px){.pl-acts{grid-template-columns:1fr}}
+.pl-act{--c:#fbbf24;display:flex;align-items:center;gap:12px;height:56px;padding:0 14px 0 10px;border-radius:14px;text-decoration:none;color:inherit;
+  background:var(--pm-panel2);border:1px solid var(--pm-line2);position:relative;overflow:hidden;
+  transition:transform .25s var(--ease),border-color .2s,box-shadow .25s}
+.pl-act.pl-sq{--c:#22d3ee}.pl-act.pl-cf{--c:#e879f9}
+.pl-act::after{content:"→";position:absolute;right:14px;top:50%;transform:translate(-6px,-50%);opacity:0;color:var(--c);font-weight:700;transition:all .25s var(--ease)}
+.pl-act:hover{transform:translateY(-2px);border-color:color-mix(in srgb,var(--c) 55%,transparent);box-shadow:0 16px 40px -22px var(--c)}
+.pl-act:hover::after{opacity:1;transform:translate(0,-50%)}
+.pl-act.aimed{border-color:color-mix(in srgb,var(--c) 40%,transparent);background:color-mix(in srgb,var(--c) 8%,transparent)}
+.pl-act .ic{width:36px;height:36px;border-radius:11px;display:flex;align-items:center;justify-content:center;flex:none;color:var(--c);
+  background:color-mix(in srgb,var(--c) 14%,transparent);border:1px solid color-mix(in srgb,var(--c) 30%,transparent)}
+.pl-act .ic svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.pl-act .t{display:block;font-weight:700;font-size:13.5px;color:var(--pm-ink)}
+.pl-act .s{display:block;font-size:11.5px;color:var(--pm-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:200px}
+.pl-status{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;padding-top:12px;border-top:1px solid var(--pm-line)}
+.pl-st{display:inline-flex;align-items:center;gap:7px;font-size:12px;color:var(--pm-muted);padding:5px 11px;border-radius:var(--radius-pill);
+  background:var(--pm-panel2);border:1px solid var(--pm-line);animation:cfIn .4s var(--ease) both}
+.pl-st b{color:var(--pm-ink);font-weight:600}
+.pl-st .b{width:7px;height:7px;border-radius:50%;background:var(--pm-faint)}
+.pl-st.on .b{background:var(--ok);box-shadow:0 0 8px var(--ok)}
+.pl-st.warn .b{background:var(--over);box-shadow:0 0 8px var(--over)}
+.pl-live{margin:2px 0 14px;min-height:24px}
+.pl-bar{position:relative;height:8px;border-radius:8px;background:rgba(255,255,255,.06);overflow:hidden}
+.pl-bar i{position:absolute;inset:0 auto 0 0;border-radius:8px;transform-origin:left;animation:pdFill 1.1s var(--ease) both}
+.pl-bar .pr{background:rgba(251,113,133,.3)}
+.pl-bar .sp{background:linear-gradient(90deg,#fbbf24,#fb7185);box-shadow:0 0 12px -2px #fbbf24;animation-delay:.15s}
+.pl-cap{display:flex;justify-content:space-between;font-size:11.5px;color:var(--pm-muted);margin-top:6px}
+.pl-dots{display:flex;gap:6px;flex-wrap:wrap}
+.pl-dots span{display:inline-flex;align-items:center;gap:6px;font-size:11px;color:var(--pm-faint);padding:3px 9px;border-radius:var(--radius-pill);background:rgba(255,255,255,.04);border:1px solid var(--pm-line)}
+.pl-dots i{width:6px;height:6px;border-radius:50%;background:var(--pm-faint)}
+.pl-dots .on{color:var(--pm-ink2)}
+.pl-dots .on i{background:var(--ok);box-shadow:0 0 6px var(--ok)}

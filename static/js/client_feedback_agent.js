@@ -303,9 +303,15 @@ import("/static/js/thinking-orb.js").then(function(m){
 }).catch(function(){});
 loadStatus();
 try{client=localStorage.getItem("cfa_client")||"";}catch(e){}
+var qClient=new URLSearchParams(location.search).get("client");
+if(qClient){
+  client=qClient;
+  // A client the built-in list doesn't have still gets a row, so a link never loses its aim.
+  if(FALLBACK_CLIENTS.indexOf(qClient)<0) FALLBACK_CLIENTS.push(qClient);
+}
 setClients(FALLBACK_CLIENTS.map(function(n){return {name:n}}));
 fetch("/p2/paid-marketing/api/pacing/clients",{credentials:"same-origin"}).then(function(r){return r.ok?r.json():null})
-  .then(function(j){ if(j&&j.clients&&j.clients.length) setClients(j.clients); }).catch(function(){});
+  .then(function(j){ if(j&&j.clients&&j.clients.length){ var l=j.clients; if(qClient&&!l.some(function(c){return c.name===qClient})) l=l.concat([{name:qClient}]); setClients(l); } }).catch(function(){});
 paintWhen();
 if(location.search) history.replaceState(null,"",location.pathname);
 })();

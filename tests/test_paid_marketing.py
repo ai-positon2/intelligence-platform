@@ -423,3 +423,11 @@ def test_the_chat_page_sends_its_context_with_the_question():
     assert 'turns.push({role:"user",content:message}' in js    # and follow-ups keep it
     assert "pm_picker.js" in open(os.path.join(ROOT, "templates", "client_feedback_agent.html")).read()
     assert "pm_picker.js" in open(os.path.join(ROOT, "templates", "pacing_desk.html")).read()
+
+
+def test_the_launcher_only_links_to_rulesets_the_sqr_page_has():
+    js = open(os.path.join(ROOT, "static", "js", "paid_marketing.js")).read()
+    linked = set(re.findall(r'/i,"([a-z0-9_]+)",', js))
+    assert linked and linked <= set(sqr.RULESETS), linked - set(sqr.RULESETS)
+    for page, param in (("pacing_desk.js", '"client"'), ("client_feedback_agent.js", '"client"'), ("sqr_agent.js", '"account"')):
+        assert ".get(" + param + ")" in open(os.path.join(ROOT, "static", "js", page)).read(), page

@@ -554,6 +554,8 @@ function avatar(rs){ return '<span class="sq-av" style="--h:' + (ACCT_HUE[rs.id]
 const dd = $id("dd"), ddBtn = $id("ddBtn"), ddMenu = $id("ddMenu"), ddList = $id("ddList"), ddSearch = $id("ddSearch");
 let hl = 0, shown = [];
 try { const saved = localStorage.getItem("sqr_account"); if (saved && RULESETS[saved]) current = saved; } catch (e) {}
+const qAccount = new URLSearchParams(location.search).get("account");
+if (qAccount && RULESETS[qAccount]) current = qAccount;
 
 function paintButton(){
   const rs = RULESETS[current];
