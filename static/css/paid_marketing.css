@@ -613,3 +613,74 @@ details.sq-ref>summary{cursor:pointer;font-size:12.5px;font-weight:600;color:var
 .pd-swap>*:nth-child(2){animation-delay:.05s}.pd-swap>*:nth-child(3){animation-delay:.1s}.pd-swap>*:nth-child(4){animation-delay:.15s}
 .pd-loading{opacity:.45;filter:saturate(.6);transition:opacity .2s;pointer-events:none}
 .pd-acct{scroll-margin-top:190px}
+
+/* ═══ Client Feedback Agent: context bar, starters, chips ═══ */
+.cf-cmd{display:block}
+.cf-cmd-grid{display:grid;grid-template-columns:minmax(0,1.3fr) auto auto;gap:16px;align-items:end}
+@media (max-width:1100px){.cf-cmd-grid{grid-template-columns:1fr}.cf-cmd{position:relative;top:0}}
+.cf-seg{position:relative;display:inline-flex;gap:4px;padding:4px;border-radius:14px;background:var(--pm-panel2);border:1px solid var(--pm-line2);height:54px;align-items:center}
+.cf-seg button{position:relative;z-index:1;display:inline-flex;align-items:center;gap:7px;height:44px;padding:0 14px;border:0;border-radius:10px;cursor:pointer;
+  background:none;color:var(--pm-muted);font:600 12.5px 'Space Grotesk',sans-serif;white-space:nowrap;transition:color .2s}
+.cf-seg button:hover{color:var(--pm-ink)}
+.cf-seg button[aria-checked="true"]{color:var(--pm-ink)}
+.cf-seg .dot{width:7px;height:7px;border-radius:50%;background:var(--pm-line2);transition:background .2s,box-shadow .2s}
+.cf-seg button[aria-checked="true"] .dot{background:var(--pm-a);box-shadow:0 0 10px var(--pm-a)}
+.cf-seg-glow{position:absolute;left:4px;top:4px;height:44px;border-radius:10px;z-index:0;pointer-events:none;
+  background:var(--pm-a-d);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--pm-a) 45%,transparent),0 8px 24px -14px var(--pm-a-g);
+  transition:transform .35s var(--ease),width .35s var(--ease)}
+.cf-srcs-wrap{position:relative}
+.cf-srcs{display:flex;gap:6px;height:54px;align-items:center}
+.cf-src-chip{display:inline-flex;align-items:center;gap:7px;height:38px;padding:0 13px;border-radius:12px;cursor:pointer;
+  font:600 12.5px 'Space Grotesk',sans-serif;color:var(--pm-muted);background:var(--pm-panel2);border:1px solid var(--pm-line2);transition:all .15s}
+.cf-src-chip:hover{color:var(--pm-ink);border-color:var(--pm-a)}
+.cf-src-chip .b{width:8px;height:8px;border-radius:50%;background:var(--pm-faint)}
+.cf-src-chip.on{color:var(--pm-ink)}
+.cf-src-chip.on .b{background:var(--ok);box-shadow:0 0 0 3px var(--ok-d),0 0 10px var(--ok);animation:pmPulse 2.6s infinite}
+.cf-src-chip.bad .b{background:var(--over)}
+.cf-src-pop{position:absolute;right:0;top:calc(100% + 10px);z-index:40;width:360px;max-width:90vw;padding:8px 16px;border-radius:18px;
+  background:#0c0f1c;border:1px solid var(--pm-line2);box-shadow:0 40px 100px -30px rgba(0,0,0,.85);animation:sqMenu .22s var(--ease) both}
+[data-theme="light"] .cf-src-pop{background:#fff}
+.cf-pop-note{font-size:11.5px;color:var(--pm-faint);line-height:1.5;padding:8px 0 6px;border-top:1px solid var(--pm-line)}
+
+.cf-chat{min-height:calc(100vh - 260px)}
+.cf-stream{max-height:none;min-height:420px}
+.cf-hello{display:flex;align-items:center;gap:20px;margin-bottom:22px}
+.cf-orb{width:64px;height:64px;flex:none;display:flex;align-items:center;justify-content:center}
+.cf-hello h2{font-family:'Bricolage Grotesque','Space Grotesk',sans-serif;font-size:26px;font-weight:700;letter-spacing:-.02em;color:var(--pm-ink);margin-bottom:6px}
+.cf-hello p{color:var(--pm-muted);font-size:14px;line-height:1.6;max-width:62ch}
+.cf-starters{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px}
+.cf-starter{position:relative;overflow:hidden;min-height:132px;justify-content:space-between;animation:cfIn .4s var(--ease) both}
+.cf-starter::after{content:"";position:absolute;inset:auto -30% -60% auto;width:160px;height:160px;border-radius:50%;
+  background:radial-gradient(circle,var(--pm-a-d),transparent 70%);opacity:0;transition:opacity .3s}
+.cf-starter:hover::after{opacity:1}
+.cf-starter .src{display:inline-flex;align-items:center;gap:8px}
+.cf-starter .src .ico{width:24px;height:24px;border-radius:8px;display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:700}
+.cf-starter .q{font-size:14px;line-height:1.45;color:var(--pm-ink)}
+.cf-starter .go{font-size:12px;font-weight:600;color:var(--pm-a);opacity:0;transform:translateX(-6px);transition:all .2s var(--ease)}
+.cf-starter:hover .go{opacity:1;transform:none}
+.cf-slack{background:rgba(54,197,240,.14);color:#36c5f0}
+.cf-gmail{background:rgba(251,113,133,.14);color:#fb7185}
+.cf-drive{background:rgba(52,211,153,.14);color:#34d399}
+.cf-sheet{background:rgba(251,191,36,.14);color:#fbbf24}
+
+.cf-input{position:relative}
+.cf-ctx{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:9px 12px 0}
+.cf-ctx .lbl{font-size:10px;font-weight:700;letter-spacing:var(--ls-caps);text-transform:uppercase;color:var(--pm-faint);margin-right:2px}
+.cf-ctx .x{margin-left:auto;width:22px;height:22px;border-radius:7px;border:0;cursor:pointer;background:var(--pm-raise);color:var(--pm-muted);font-size:13px;line-height:1}
+.cf-ctx .x:hover{color:var(--over);background:var(--over-d)}
+.cf-chip{display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 9px 0 4px;border-radius:8px;font-size:12px;font-weight:600;
+  color:var(--pm-ink);background:var(--pm-a-d);border:1px solid color-mix(in srgb,var(--pm-a) 30%,transparent);animation:sqPop .35s var(--ease) both}
+.cf-chip:not(:has(.av)){padding-left:9px}
+.cf-chip .av{width:18px;height:18px;border-radius:6px;display:inline-flex;align-items:center;justify-content:center;font-size:9px;color:#fff;
+  background:linear-gradient(135deg,hsl(var(--h) 85% 58%),hsl(calc(var(--h) + 40) 80% 52%))}
+.cf-ucol{display:flex;flex-direction:column;align-items:flex-end;gap:6px;max-width:78%}
+.cf-ucol .cf-bubble{max-width:100%}
+.cf-uctx{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.cf-actions{display:flex;align-items:center;gap:12px;margin-top:12px;padding-top:10px;border-top:1px solid var(--pm-line);font-size:11.5px;color:var(--pm-faint)}
+.cf-copy{border:1px solid var(--pm-line2);background:var(--pm-raise);color:var(--pm-muted);border-radius:8px;padding:4px 10px;cursor:pointer;font:600 11.5px 'Space Grotesk',sans-serif}
+.cf-copy:hover{color:var(--pm-ink);border-color:var(--pm-a)}
+.cf-orb .thinking-orb-label{display:none}
+/* On the chat page the bar does not pin (it would sit over the newest
+   messages); the conversation scrolls inside its own panel instead. */
+.pd-cmd.cf-cmd{position:relative;top:auto}
+.cf-chat .cf-stream{max-height:calc(100vh - 250px);min-height:440px;overflow-y:auto;overscroll-behavior:contain}

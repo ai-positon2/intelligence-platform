@@ -14,45 +14,49 @@
   {% if connected %}<div class="cf-banner ok">{{ connected|title }} is connected. Everyone's questions now read through it.</div>{% endif %}
   {% if connect_error %}<div class="cf-banner bad">{{ connect_error }}</div>{% endif %}
 
-  <div class="cf-shell">
-    <section class="pm-panel cf-chat">
-      <div class="cf-stream" id="stream">
-        <div class="cf-welcome" id="welcome">
-          <h2>Ask about a client, a meeting, a budget.</h2>
-          <p>Each question takes a few searches, so give it up to a minute. You'll see every step as it happens.</p>
-          <div class="cf-starters" id="starters">
-            <button class="cf-starter" type="button"><span class="src">Meetings</span><span class="q">Give me a summary of the last Riccobene meeting</span></button>
-            <button class="cf-starter" type="button"><span class="src">Budget</span><span class="q">What's the latest budget for Eventgroove?</span></button>
-            <button class="cf-starter" type="button"><span class="src">Slack</span><span class="q">What's been said in Slack about Beta Bionics this week?</span></button>
-            <button class="cf-starter" type="button"><span class="src">Email</span><span class="q">Has OIA emailed us about anything open this month?</span></button>
-          </div>
+  <!-- Context bar: who and when, plus where it reads from -->
+  <section class="pm-panel pd-cmd cf-cmd" id="cmd">
+    <div class="cf-cmd-grid">
+      <div id="clientPick"></div>
+      <div class="cf-when">
+        <span class="pd-dd-k">Timeframe</span>
+        <div class="cf-seg" id="when" role="radiogroup" aria-label="Timeframe">
+          <button type="button" role="radio" data-when="week" aria-checked="false"><span class="dot"></span>This week</button>
+          <button type="button" role="radio" data-when="month" aria-checked="false"><span class="dot"></span>Last 30 days</button>
+          <button type="button" role="radio" data-when="any" aria-checked="true"><span class="dot"></span>Any time</button>
+          <i class="cf-seg-glow" aria-hidden="true"></i>
         </div>
       </div>
-      <div class="cf-composer">
-        <label class="cf-input"><textarea id="input" rows="1" placeholder="Ask about a client, a meeting, a budget…" aria-label="Your question"></textarea></label>
-        <button class="pm-btn cf-send" id="sendBtn" aria-label="Send"><svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+      <div class="cf-srcs-wrap">
+        <span class="pd-dd-k">Reads from</span>
+        <div class="cf-srcs" id="sources"><span class="cf-src-chip"><span class="b"></span>Checking…</span></div>
+        <div class="cf-src-pop" id="srcPop" hidden></div>
       </div>
-      <p class="cf-foot">Answers can quote private Slack and email. Only you (and admins) can read your answers back.</p>
-    </section>
+    </div>
+  </section>
 
-    <aside class="cf-side">
-      <div class="pm-panel">
-        <div class="pm-panel-h"><span class="pm-panel-t">Sources</span><span class="pm-panel-s" id="srcNote"></span></div>
-        <div id="sources"><div class="cf-src"><span class="st">Checking…</span></div></div>
+  <section class="pm-panel cf-chat">
+    <div class="cf-stream" id="stream">
+      <div class="cf-welcome" id="welcome">
+        <div class="cf-hello"><span class="cf-orb" id="helloOrb"></span>
+          <div><h2 id="helloTitle">Ask about a client, a meeting, a budget.</h2>
+          <p id="helloSub">Pick a client above to aim every question at them, or just ask. Each answer takes a few searches; you'll see every one as it happens.</p></div>
+        </div>
+        <div class="cf-starters" id="starters"></div>
       </div>
-      <div class="pm-panel">
-        <div class="pm-panel-h"><span class="pm-panel-t">How it reads</span></div>
-        <ul class="cf-howto">
-          <li>One shared Slack and Google account, connected by an admin.</li>
-          <li>Meeting transcripts come from Zoom first when it's set up, then the daily Meeting Notes folder.</li>
-          <li>Up to 10 rounds of searching per question, then it answers from what it found.</li>
-          <li>Follow-up questions keep the conversation's context.</li>
-        </ul>
+    </div>
+    <div class="cf-composer">
+      <div class="cf-input">
+        <div class="cf-ctx" id="ctx" hidden></div>
+        <textarea id="input" rows="1" placeholder="Ask about a client, a meeting, a budget…" aria-label="Your question"></textarea>
       </div>
-    </aside>
-  </div>
+      <button class="pm-btn cf-send" id="sendBtn" aria-label="Send"><svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+    </div>
+    <p class="cf-foot">Enter to send · Shift+Enter for a new line · Answers can quote private Slack and email, and only you (and admins) can read yours back.</p>
+  </section>
 </div>
 {% endblock %}
 {% block scripts %}
-<script src="{{ url_for('static', filename='js/client_feedback_agent.js') }}?v=1"></script>
+<script src="{{ url_for('static', filename='js/pm_picker.js') }}?v=1"></script>
+<script src="{{ url_for('static', filename='js/client_feedback_agent.js') }}?v=3"></script>
 {% endblock %}

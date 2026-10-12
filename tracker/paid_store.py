@@ -195,6 +195,23 @@ def latest_date():
     return (row[0] or {}).get("date") if row else None
 
 
+def latest_clients():
+    """(date, [{name, accounts, offTarget}]) from the latest run, without
+    shipping its campaign detail. (None, []) before the first push."""
+    date = latest_date()
+    if not date:
+        return None, []
+    with _tx() as cur:
+        cur.execute(
+            "SELECT data->>'name', "
+            "jsonb_array_length(COALESCE(data->'accounts','[]'::jsonb)), "
+            "(SELECT count(*) FROM jsonb_array_elements(COALESCE(data->'accounts','[]'::jsonb)) a "
+            " WHERE a->>'landing' IN ('WILL OVERSPEND','WILL UNDERSPEND')) "
+            "FROM pm_pacing_clients WHERE date = %s ORDER BY data->>'name'", (date,))
+        rows = cur.fetchall()
+    return date, [{"name": r[0], "accounts": int(r[1] or 0), "offTarget": int(r[2] or 0)} for r in rows if r[0]]
+
+
 def list_moves(date):
     with _tx() as cur:
         cur.execute(

@@ -4286,6 +4286,18 @@ def paid_pacing_snapshots():
         return _pm_store_error(e)
 
 
+@app.route("/p2/paid-marketing/api/pacing/clients")
+@position2_required
+def paid_pacing_clients():
+    """Client names from the latest run (the Client Feedback Agent's picker)."""
+    from tracker import paid_store
+    try:
+        date, clients = paid_store.latest_clients()
+    except paid_store.StoreUnavailable as e:
+        return _pm_store_error(e)
+    return jsonify(date=date, clients=clients)
+
+
 @app.route("/p2/paid-marketing/api/pacing/snapshots/<date>")
 @position2_required
 def paid_pacing_snapshot(date):

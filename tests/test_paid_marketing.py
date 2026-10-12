@@ -408,3 +408,18 @@ def test_hub_paid_card_counts_match_the_section_page():
     assert stats == {"dashboards": len(cards), "live": cards.count("active")}
     order = [m.group(1) for m in re.finditer(r'<a href="(/p2/[a-z-]+)" class="hub-card', hub)]
     assert order == ["/p2/strategic-agents", "/p2/paid-marketing", "/p2/seo-aeo"]
+
+
+def test_clients_route_lists_the_latest_run_for_the_chat_picker(monkeypatch):
+    monkeypatch.setattr(store, "latest_clients", lambda: ("2026-09-30", [{"name": "OIA", "accounts": 6, "offTarget": 2}]))
+    r = client_as(STAFF).get("/p2/paid-marketing/api/pacing/clients")
+    assert r.get_json() == {"date": "2026-09-30", "clients": [{"name": "OIA", "accounts": 6, "offTarget": 2}]}
+    assert client_as(None).get("/p2/paid-marketing/api/pacing/clients").status_code == 302
+
+
+def test_the_chat_page_sends_its_context_with_the_question():
+    js = open(os.path.join(ROOT, "static", "js", "client_feedback_agent.js")).read()
+    assert "message=ctx?ctx+\"\\n\\n\"+text:text" in js        # the model reads the context line
+    assert 'turns.push({role:"user",content:message}' in js    # and follow-ups keep it
+    assert "pm_picker.js" in open(os.path.join(ROOT, "templates", "client_feedback_agent.html")).read()
+    assert "pm_picker.js" in open(os.path.join(ROOT, "templates", "pacing_desk.html")).read()
