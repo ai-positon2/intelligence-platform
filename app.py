@@ -4331,10 +4331,11 @@ def paid_pacing_set_move(move_id):
 @app.route("/p2/paid-marketing/api/pacing/seed", methods=["POST"])
 def paid_pacing_seed():
     """The engine's daily push. No session: a shared secret in X-Seed-Secret,
-    and with PACING_SEED_SECRET unset every push is refused."""
+    and with neither PACING_SEED_SECRET nor SEED_SECRET (Agent Holmes' own
+    name for it, which is what Railway was given) set, every push is refused."""
     import hmac
     from tracker import paid_pacing, paid_store
-    secret = os.environ.get("PACING_SEED_SECRET", "")
+    secret = os.environ.get("PACING_SEED_SECRET", "") or os.environ.get("SEED_SECRET", "")
     given = request.headers.get("X-Seed-Secret", "")
     if not secret or not hmac.compare_digest(given.encode("utf-8"), secret.encode("utf-8")):
         return jsonify(error="Forbidden."), 403

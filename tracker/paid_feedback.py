@@ -63,8 +63,17 @@ MAX_QUESTION_CHARS = 4000
 PROVIDERS = ("slack", "google")
 
 
+# Slack's credentials also answer to Holmes' own unprefixed names
+# (SLACK_CLIENT_ID / SLACK_CLIENT_SECRET), which nothing else here uses.
+# Google's cannot: GOOGLE_CLIENT_ID is the platform's sign-in client.
+_HOLMES_NAMES = ("SLACK_CLIENT_ID", "SLACK_CLIENT_SECRET")
+
+
 def env(name):
-    return os.environ.get("FEEDBACK_" + name, "").strip()
+    value = os.environ.get("FEEDBACK_" + name, "").strip()
+    if not value and name in _HOLMES_NAMES:
+        value = os.environ.get(name, "").strip()
+    return value
 
 
 def configured():

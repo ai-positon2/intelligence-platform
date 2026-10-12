@@ -310,6 +310,7 @@ def test_seed_is_refused_without_the_secret(monkeypatch):
     c = client_as(None)
     url = "/p2/paid-marketing/api/pacing/seed"
     monkeypatch.delenv("PACING_SEED_SECRET", raising=False)
+    monkeypatch.delenv("SEED_SECRET", raising=False)
     assert c.post(url, json=dashboard(), headers={"X-Seed-Secret": ""}).status_code == 403
     monkeypatch.setenv("PACING_SEED_SECRET", "s3cret")
     assert c.post(url, json=dashboard(), headers={"X-Seed-Secret": "nope"}).status_code == 403
@@ -318,6 +319,28 @@ def test_seed_is_refused_without_the_secret(monkeypatch):
     r = c.post(url, json=dashboard(), headers={"X-Seed-Secret": "s3cret"})
     assert r.status_code == 200 and r.get_json()["accounts"] == 3
     assert stored[0][0]["asOf"] == "2026-10-12" and stored[0][2] == "2026-10-12"
+
+
+def test_holmes_env_names_are_accepted(monkeypatch, tmp_path):
+    for n in ("FEEDBACK_SLACK_CLIENT_ID", "FEEDBACK_SLACK_CLIENT_SECRET", "FEEDBACK_GOOGLE_CLIENT_ID"):
+        monkeypatch.delenv(n, raising=False)
+    monkeypatch.setenv("SLACK_CLIENT_ID", "cid")
+    monkeypatch.setenv("SLACK_CLIENT_SECRET", "sec")
+    monkeypatch.setenv("GOOGLE_CLIENT_ID", "the-sign-in-client")
+    assert fb.configured()["slack"] is True
+    assert fb.env("GOOGLE_CLIENT_ID") == ""          # never the sign-in client
+    monkeypatch.setenv("FEEDBACK_SLACK_CLIENT_ID", "prefixed")
+    assert fb.env("SLACK_CLIENT_ID") == "prefixed"   # the prefixed name wins
+
+
+def test_seed_accepts_holmes_secret_name(monkeypatch):
+    monkeypatch.setattr(store, "save_snapshot", lambda *a: None)
+    monkeypatch.delenv("PACING_SEED_SECRET", raising=False)
+    monkeypatch.setenv("SEED_SECRET", "h0lmes")
+    c = client_as(None)
+    url = "/p2/paid-marketing/api/pacing/seed"
+    assert c.post(url, json=dashboard(), headers={"X-Seed-Secret": "nope"}).status_code == 403
+    assert c.post(url, json=dashboard(), headers={"X-Seed-Secret": "h0lmes"}).status_code == 200
 
 
 def test_state_changes_must_come_from_this_site_as_json(monkeypatch):

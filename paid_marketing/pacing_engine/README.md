@@ -15,7 +15,7 @@ pip install pandas numpy openpyxl
 python3 run.py --as-of 2026-10-12
 python3 validate.py 2026-10-12          # 12 self-checks, must print 0 issues
 python3 export_dashboard.py 2026-10-12  # out/dashboard.json
-PACING_SEED_SECRET=... python3 push.py  # makes it the run everyone sees
+SEED_SECRET=... python3 push.py         # makes it the run everyone sees
 ```
 
 Holmes' own `dashboard/seed_live.js` works too:

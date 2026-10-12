@@ -3,8 +3,8 @@
     python3 push.py                       # sends out/dashboard.json
     python3 push.py --file other.json --url https://.../api/pacing/seed
 
-Needs PACING_SEED_SECRET in the environment: the same value set on the
-platform's Railway service. The platform checks the payload, recomputes the
+Needs PACING_SEED_SECRET (or SEED_SECRET) in the environment: the same
+value set on the platform's Railway service. The platform checks the payload, recomputes the
 portfolio rollup itself, and makes this run the one everyone sees.
 
 The daily routine is unchanged otherwise:
@@ -32,7 +32,7 @@ def main() -> int:
     ap.add_argument("--file", default=str(Path(__file__).parent / "out" / "dashboard.json"))
     ap.add_argument("--url", default=DEFAULT_URL)
     args = ap.parse_args()
-    secret = os.environ.get("PACING_SEED_SECRET", "")
+    secret = os.environ.get("PACING_SEED_SECRET", "") or os.environ.get("SEED_SECRET", "")
     if not secret:
         print("PACING_SEED_SECRET is not set (it must match the platform's).", file=sys.stderr)
         return 1
