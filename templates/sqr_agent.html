@@ -15,45 +15,63 @@
     </div>
   </section>
 
-  <div class="sq-steps">
-    <section class="pm-panel sq-step">
-      <h2><span class="sq-num">1</span>Choose the account</h2>
-      <p class="lede">Each account classifies differently. Pick the one you're reviewing.</p>
-      <div class="sq-accts" id="accts"></div>
-      <div class="sq-note" id="rulesetNote"></div>
-    </section>
+  <!-- 1 · Account -->
+  <section class="pm-panel sq-bar">
+    <div class="sq-bar-l">
+      <span class="sq-num">1</span>
+      <div class="sq-dd" id="dd">
+        <button type="button" class="sq-dd-btn" id="ddBtn" aria-haspopup="listbox" aria-expanded="false" aria-label="Account"></button>
+        <div class="sq-dd-menu" id="ddMenu" hidden>
+          <input class="sq-dd-search" id="ddSearch" placeholder="Filter accounts…" autocomplete="off" aria-label="Filter accounts">
+          <div role="listbox" id="ddList" aria-label="Accounts"></div>
+        </div>
+      </div>
+    </div>
+    <button type="button" class="sq-rules-btn" id="rulesBtn" aria-expanded="false" aria-controls="rulesetNote"><span class="i">i</span>How this account is judged</button>
+  </section>
+  <div class="sq-note" id="rulesetNote" hidden></div>
 
-    <section class="pm-panel sq-step">
-      <h2><span class="sq-num">2</span>Upload the exports</h2>
-      <p class="lede">Standard Google Ads UI exports as CSV. The keyword and negative lists stop the agent from
-        suggesting what the account already has. Files are read in your browser; only the unsettled terms are sent to the model.</p>
-      <div class="sq-drops">
-        <label class="sq-drop" id="drop-terms">
-          <input type="file" accept=".csv,text/csv" id="file-terms">
-          <span class="ic"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg></span>
-          <span class="ttl">Search terms report</span><span class="req">Required</span>
-          <span class="file" id="file-terms-name"></span>
-        </label>
-        <label class="sq-drop" id="drop-keywords">
-          <input type="file" accept=".csv,text/csv" id="file-keywords">
-          <span class="ic"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h10M4 17h7"/></svg></span>
-          <span class="ttl">Keyword report</span><span class="req">Recommended</span>
-          <span class="file" id="file-keywords-name"></span>
-        </label>
-        <label class="sq-drop" id="drop-negs">
-          <input type="file" accept=".csv,text/csv" id="file-negs">
-          <span class="ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8 12h8"/></svg></span>
-          <span class="ttl">Negative keyword report</span><span class="req">Recommended</span>
-          <span class="file" id="file-negs-name"></span>
-        </label>
-      </div>
-      <div class="sq-actions">
-        <button class="pm-btn" id="runBtn" disabled>Run analysis</button>
-        <button class="pm-btn-ghost" id="dlBtn" disabled><svg viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>Workbook (.xlsx)</button>
-        <span class="sq-status" id="statusLine"></span>
-      </div>
-    </section>
+  <!-- 2 · Exports -->
+  <div class="sq-head"><span class="sq-num">2</span><h2>Drop in the exports</h2>
+    <span class="hint">Google Ads UI exports, as CSV. Read in your browser.</span></div>
+  <div class="sq-drops">
+    <label class="sq-drop main" id="drop-terms">
+      <input type="file" accept=".csv,text/csv" id="file-terms">
+      <span class="ic"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/><path d="M8 11h6"/></svg></span>
+      <span class="ttl">Search terms report</span>
+      <span class="req">Required</span>
+      <span class="sub">Drag it here, or <span class="browse">browse</span>. Every term gets a verdict: relevant, competitor, not relevant, or client review.</span>
+      <span class="sq-file" id="file-terms-name"></span>
+    </label>
+    <label class="sq-drop" id="drop-keywords">
+      <input type="file" accept=".csv,text/csv" id="file-keywords">
+      <span class="ic"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h10M4 17h7"/></svg></span>
+      <span class="body"><span class="ttl">Keyword report</span><span class="req">Optional</span>
+        <span class="sub">So it never suggests a keyword you already bid on.</span>
+        <span class="sq-file" id="file-keywords-name"></span></span>
+    </label>
+    <label class="sq-drop" id="drop-negs">
+      <input type="file" accept=".csv,text/csv" id="file-negs">
+      <span class="ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8 12h8"/></svg></span>
+      <span class="body"><span class="ttl">Negative keyword report</span><span class="req">Optional</span>
+        <span class="sub">So it never re-suggests a negative that's already in place.</span>
+        <span class="sq-file" id="file-negs-name"></span></span>
+    </label>
   </div>
+
+  <!-- 3 · Run -->
+  <section class="pm-panel sq-run">
+    <span class="sq-num">3</span>
+    <div class="sq-meter">
+      <div class="top"><span id="readyText">Add the search terms report to start.</span><b id="readyCount">0 / 3</b></div>
+      <div class="sq-track" id="track"><i></i><i></i><i></i></div>
+    </div>
+    <div class="sq-actions">
+      <button class="pm-btn sq-go" id="runBtn" disabled>Run analysis <kbd>⌘↵</kbd></button>
+      <button class="pm-btn-ghost" id="dlBtn" disabled><svg viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>Workbook (.xlsx)</button>
+    </div>
+    <span class="sq-status" id="statusLine" style="flex-basis:100%"></span>
+  </section>
 
   <div id="results"></div>
 
@@ -68,5 +86,5 @@
 </div>
 {% endblock %}
 {% block scripts %}
-<script src="{{ url_for('static', filename='js/sqr_agent.js') }}?v=1"></script>
+<script src="{{ url_for('static', filename='js/sqr_agent.js') }}?v=2"></script>
 {% endblock %}

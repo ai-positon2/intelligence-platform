@@ -542,32 +542,149 @@ let current = "riccobene", orb = null;
 
 const ACCT_HINT = { riccobene: "Dental · 20 locations", oia: "Imaging · 12 facilities", eventgroove: "Event printing",
   gentledental_42north: "Dental", mchale: "Landscaping · DC metro", beta_bionics: "Medical device · placeholder", generic: "Any account, no rules" };
+const ACCT_HUE = { riccobene: 190, oia: 255, eventgroove: 320, gentledental_42north: 160, mchale: 120, beta_bionics: 280, generic: 220 };
 function initials(label){ return label.replace(/\(.*?\)/g, "").split(/\s+/).filter(w => /^[A-Za-z0-9]/.test(w)).slice(0, 2).map(w => w[0]).join("").toUpperCase(); }
-
-function paintAccounts(){
-  $id("accts").innerHTML = Object.values(RULESETS).map(rs =>
-    '<button type="button" class="sq-acct' + (rs.id === current ? " on" : "") + '" data-id="' + rs.id + '" aria-pressed="' + (rs.id === current) + '">' +
-      '<span class="ic">' + esc(initials(rs.label)) + '</span><span><span class="nm">' + esc(rs.label) + '</span><br><span class="ds">' + esc(ACCT_HINT[rs.id] || "") + '</span></span>' +
-      (rs.id === "generic" ? '<span class="badge pm-pill mute">Model only</span>' : rs.id === "beta_bionics" ? '<span class="badge pm-pill unclear">Partial</span>' : '<span class="badge pm-pill ok">Rules</span>') +
-    '</button>').join("");
-  $id("rulesetNote").innerHTML = RULESETS[current].note;
+function badge(id){
+  return id === "generic" ? '<span class="badge pm-pill mute">Model only</span>'
+    : id === "beta_bionics" ? '<span class="badge pm-pill unclear">Partial</span>' : '<span class="badge pm-pill ok">Rules</span>';
 }
-$id("accts").addEventListener("click", e => { const b = e.target.closest(".sq-acct"); if (!b) return; current = b.dataset.id; paintAccounts(); });
+function avatar(rs){ return '<span class="sq-av" style="--h:' + (ACCT_HUE[rs.id] || 200) + '">' + esc(initials(rs.label)) + '</span>'; }
 
+/* ── Account dropdown ───────────────────────────────────────────── */
+const dd = $id("dd"), ddBtn = $id("ddBtn"), ddMenu = $id("ddMenu"), ddList = $id("ddList"), ddSearch = $id("ddSearch");
+let hl = 0, shown = [];
+try { const saved = localStorage.getItem("sqr_account"); if (saved && RULESETS[saved]) current = saved; } catch (e) {}
+
+function paintButton(){
+  const rs = RULESETS[current];
+  ddBtn.innerHTML = avatar(rs) + '<span class="sq-dd-txt"><span class="nm">' + esc(rs.label) + '</span><span class="ds">' +
+    esc(ACCT_HINT[rs.id] || "") + '</span></span>' + badge(rs.id) +
+    '<span class="sq-chev"><svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></span>';
+  $id("rulesetNote").innerHTML = rs.note;
+}
+function paintList(){
+  const q = ddSearch.value.trim().toLowerCase();
+  shown = Object.values(RULESETS).filter(rs => !q || (rs.label + " " + (ACCT_HINT[rs.id] || "")).toLowerCase().includes(q));
+  if (hl >= shown.length) hl = Math.max(0, shown.length - 1);
+  ddList.innerHTML = shown.length ? shown.map((rs, i) =>
+    '<button type="button" role="option" class="sq-opt' + (i === hl ? " hl" : "") + '" data-id="' + rs.id + '" aria-selected="' + (rs.id === current) +
+      '" style="animation-delay:' + (i * 25) + 'ms">' + avatar(rs) + '<span class="sq-dd-txt"><span class="nm" style="font-size:13.5px">' + esc(rs.label) +
+      '</span><span class="ds">' + esc(ACCT_HINT[rs.id] || "") + '</span></span>' + badge(rs.id) + '<span class="tick">✓</span></button>').join("")
+    : '<div class="sq-none">No account matches “' + esc(q) + '”.</div>';
+}
+function openMenu(){
+  dd.classList.add("open"); ddMenu.hidden = false; ddBtn.setAttribute("aria-expanded", "true");
+  ddSearch.value = ""; hl = Math.max(0, Object.keys(RULESETS).indexOf(current)); paintList();
+  setTimeout(() => ddSearch.focus(), 20);
+}
+function closeMenu(focus){
+  dd.classList.remove("open"); ddMenu.hidden = true; ddBtn.setAttribute("aria-expanded", "false");
+  if (focus) ddBtn.focus();
+}
+function choose(id){
+  if (!RULESETS[id]) return;
+  current = id; try { localStorage.setItem("sqr_account", id); } catch (e) {}
+  paintButton(); closeMenu(true);
+  ddBtn.animate([{ transform: "scale(.98)" }, { transform: "scale(1.01)" }, { transform: "none" }], { duration: 320, easing: "ease-out" });
+}
+ddBtn.addEventListener("click", () => ddMenu.hidden ? openMenu() : closeMenu());
+ddList.addEventListener("click", e => { const o = e.target.closest(".sq-opt"); if (o) choose(o.dataset.id); });
+ddSearch.addEventListener("input", () => { hl = 0; paintList(); });
+ddSearch.addEventListener("keydown", e => {
+  if (e.key === "ArrowDown") { e.preventDefault(); hl = Math.min(shown.length - 1, hl + 1); paintList(); }
+  else if (e.key === "ArrowUp") { e.preventDefault(); hl = Math.max(0, hl - 1); paintList(); }
+  else if (e.key === "Enter") { e.preventDefault(); if (shown[hl]) choose(shown[hl].id); }
+  else if (e.key === "Escape") { e.preventDefault(); closeMenu(true); }
+});
+ddBtn.addEventListener("keydown", e => { if (e.key === "ArrowDown" && ddMenu.hidden) { e.preventDefault(); openMenu(); } });
+document.addEventListener("click", e => { if (!dd.contains(e.target) && !ddMenu.hidden) closeMenu(); });
+$id("rulesBtn").addEventListener("click", () => {
+  const n = $id("rulesetNote"), open = n.hidden;
+  n.hidden = !open; $id("rulesBtn").setAttribute("aria-expanded", String(open));
+});
+
+/* ── Drop zones ────────────────────────────────────────────────── */
+const meta = { terms: null, keywords: null, negs: null };
+function countRows(text, key){
+  const p = parseCSV(text);
+  if (!p.headerFound) return { ok: false, n: 0 };
+  const name = key === "terms" ? ["Search term", "Search Term"] : key === "negs" ? ["Negative keyword", "Keyword"] : ["Keyword"];
+  const n = p.rows.filter(r => { const v = String(pick(r, ...name)).trim(); return v && !/^total:/i.test(v); }).length;
+  return { ok: n > 0, n };
+}
+function sparkle(el){
+  if (window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  const r = el.getBoundingClientRect(), colors = ["#22d3ee", "#818cf8", "#34d399", "#fbbf24"];
+  for (let i = 0; i < 14; i++){
+    const s = document.createElement("span"); s.className = "sq-spark";
+    const a = Math.PI * 2 * i / 14, d = 60 + Math.random() * 60;
+    s.style.left = (r.width / 2) + "px"; s.style.top = (r.height / 2) + "px";
+    s.style.setProperty("--dx", Math.cos(a) * d + "px"); s.style.setProperty("--dy", Math.sin(a) * d + "px");
+    s.style.setProperty("--c", colors[i % colors.length]);
+    el.appendChild(s); setTimeout(() => s.remove(), 900);
+  }
+}
+const UNIT = { terms: "search terms", keywords: "keywords", negs: "negatives" };
 function wireDrop(key){
-  const input = $id("file-" + key), drop = $id("drop-" + key), nameEl = $id("file-" + key + "-name");
+  const input = $id("file-" + key), drop = $id("drop-" + key), chip = $id("file-" + key + "-name");
   const take = f => {
     if (!f) return;
     const reader = new FileReader();
-    reader.onload = () => { files[key] = reader.result; nameEl.textContent = f.name + " · " + Math.max(1, Math.round(f.size / 1024)).toLocaleString() + " KB"; drop.classList.add("filled"); $id("runBtn").disabled = !files.terms; };
+    reader.onload = () => {
+      const c = countRows(reader.result, key);
+      drop.classList.remove("bad");
+      if (!c.ok){
+        files[key] = null; meta[key] = null;
+        drop.classList.add("filled", "bad");
+        chip.innerHTML = '<span class="fn">' + esc(f.name) + '</span><span class="fm">no ' + UNIT[key] + ' column found</span><button type="button" class="x" aria-label="Remove file">×</button>';
+      } else {
+        files[key] = reader.result; meta[key] = c.n;
+        drop.classList.add("filled");
+        chip.innerHTML = '<span class="fn">' + esc(f.name) + '</span><span class="fm">' + c.n.toLocaleString() + ' ' + UNIT[key] + '</span><button type="button" class="x" aria-label="Remove file">×</button>';
+        sparkle(drop);
+      }
+      refreshReady();
+    };
     reader.readAsText(f);
   };
   input.addEventListener("change", () => take(input.files[0]));
-  ["dragenter", "dragover"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add("drag"); }));
-  ["dragleave", "drop"].forEach(ev => drop.addEventListener(ev, () => drop.classList.remove("drag")));
-  drop.addEventListener("drop", e => { e.preventDefault(); take(e.dataTransfer.files[0]); });
+  drop.addEventListener("dragover", e => { e.preventDefault(); drop.classList.add("drag"); });
+  drop.addEventListener("dragleave", e => { if (!drop.contains(e.relatedTarget)) drop.classList.remove("drag"); });
+  drop.addEventListener("drop", e => { e.preventDefault(); drop.classList.remove("drag"); document.body.classList.remove("sq-dragging"); take(e.dataTransfer.files[0]); });
+  chip.addEventListener("click", e => {
+    if (!e.target.closest(".x")) return;
+    e.preventDefault(); e.stopPropagation();
+    files[key] = null; meta[key] = null; input.value = ""; chip.innerHTML = "";
+    drop.classList.remove("filled", "bad"); refreshReady();
+  });
 }
 ["terms", "keywords", "negs"].forEach(wireDrop);
+let dragDepth = 0;
+document.addEventListener("dragenter", e => { if (e.dataTransfer && [...e.dataTransfer.types].includes("Files")) { dragDepth++; document.body.classList.add("sq-dragging"); } });
+document.addEventListener("dragleave", () => { if (--dragDepth <= 0) { dragDepth = 0; document.body.classList.remove("sq-dragging"); } });
+document.addEventListener("dragover", e => e.preventDefault());
+document.addEventListener("drop", e => { e.preventDefault(); dragDepth = 0; document.body.classList.remove("sq-dragging"); });
+
+function refreshReady(){
+  const have = ["terms", "keywords", "negs"].filter(k => files[k]);
+  document.querySelectorAll("#track i").forEach((t, i) => t.classList.toggle("on", i < have.length));
+  $id("readyCount").textContent = have.length + " / 3";
+  let txt;
+  if (!files.terms) txt = "Add the search terms report to start.";
+  else {
+    txt = meta.terms.toLocaleString() + " search terms ready";
+    const skip = [];
+    if (files.keywords) skip.push(meta.keywords.toLocaleString() + " keywords");
+    if (files.negs) skip.push(meta.negs.toLocaleString() + " negatives");
+    txt += skip.length ? ", skipping " + skip.join(" and ") + " you already have." : ". Add the other two to skip what the account already has.";
+  }
+  $id("readyText").textContent = txt;
+  $id("runBtn").disabled = !files.terms;
+  $id("runBtn").classList.toggle("ready", !!files.terms);
+}
+document.addEventListener("keydown", e => {
+  if ((e.metaKey || e.ctrlKey) && e.key === "Enter" && !$id("runBtn").disabled && $id("overlay").hidden) { e.preventDefault(); $id("runBtn").click(); }
+});
 
 function setStatus(t, frac){
   $id("statusLine").textContent = t; $id("ovStatus").textContent = t;
@@ -588,7 +705,7 @@ $id("runBtn").addEventListener("click", async () => {
     setStatus("Failed.");
   } finally {
     $id("overlay").hidden = true; if (orb) { orb.destroy(); orb = null; }
-    $id("runBtn").disabled = !files.terms;
+    refreshReady();
   }
 });
 
@@ -668,5 +785,6 @@ $id("dlBtn").addEventListener("click", () => {
   setStatus("Saved " + filename);
 });
 
-paintAccounts();
+paintButton();
+refreshReady();
 })();
