@@ -320,3 +320,18 @@ def test_the_one_off_tidy_drops_product_announcements_only(pg):
     assert pg.drop_product_announcements() == (1, 1)
     assert sorted(x["title"] for x in pg.recent_events([e])) == ["New product: Runner", "We open in Leeds"]
     assert pg.latest_snapshot(e, "newsroom") is None and pg.latest_snapshot(e, "catalog")
+
+
+def test_the_clients_kind_of_business_decides_whether_news_is_also_read_in_english():
+    """A Berlin dentist's competitor is read in German only; a
+    manufacturer's German competitor in US English too."""
+    for archetype, editions in (("local_single", 1), ("manufacturer", 2)):
+        io, _ = world([], [], [])
+        asked = []
+        get = io["get"]
+        io["get"] = lambda url, **kw: (asked.append(url) if "news.google" in url else None,
+                                      get(url, **kw))[1]
+        store = MemStore()
+        mc.collect_entity(dict(ENTITY, country="DE"), now=NOW, io=io, store=store,
+                          only={"news"}, archetype=archetype)
+        assert len(asked) == editions, archetype

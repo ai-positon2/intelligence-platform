@@ -9320,6 +9320,10 @@ def admin_market_radar_tidy_events():
         return refused
     from tracker import market_radar_store as mr_store
     body = request.get_json(silent=True) or {}
+    if body.get("noise"):
+        # 2026-10-12: hide machine subdomains and old products stored as launches.
+        from tracker import market_radar_collect
+        return jsonify(hidden=market_radar_collect.tidy_noise())
     if body.get("signals"):
         # 2026-10-10: forget the first signal-engine reads (made before its
         # rules were tightened), and nothing else: the product-page tidy

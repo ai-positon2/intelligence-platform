@@ -570,8 +570,13 @@ def compare_catalog(prev, cur, now):
     if prev.get("source") != cur.get("source"):
         return []       # read a different way; the two lists are not comparable
     currency = cur.get("currency") or prev.get("currency") or ""
-    events = _capped(_launch_events([(k, b[k]) for k in b if k not in a and b[k][0]], day,
-                                    currency),
+    # New to our list is not new to the shop: a product the shop dates
+    # more than 90 days back was there before and our earlier read did not
+    # reach it (ALO, a Gymshark competitor: products of 2026-02-26 reported
+    # as launches on 2026-10-10). The first read's rule, applied every time.
+    fresh = [(k, b[k]) for k in b if k not in a and b[k][0]
+             and (not _launched(b[k]) or _recent(_launched(b[k]), now))]
+    events = _capped(_launch_events(fresh, day, currency),
                      "new products", "prod+many:%s" % day, date=day)
     if prev.get("complete") and cur.get("complete"):
         gone = [_event("prod-:%s:%s" % (k, day), "product_removed",

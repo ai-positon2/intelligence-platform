@@ -717,6 +717,16 @@ def hide_event(event_id, reason, *, conn=None):
                     (reason[:300], event_id))
 
 
+def shown_events_of_type(types, *, conn=None):
+    """(id, company domain, dedupe_key, title, event_date, first_seen_at) for
+    every event of these types still on the lists."""
+    with _tx(conn) as cur:
+        cur.execute("""SELECT e.id, n.domain, e.dedupe_key, e.title, e.event_date, e.first_seen_at
+                       FROM mr_events e JOIN mr_entities n ON n.id = e.entity_id
+                       WHERE e.type = ANY(%s) AND e.hidden_reason IS NULL""", (list(types),))
+        return cur.fetchall()
+
+
 def first_snapshot(entity_id, detector, *, conn=None):
     """The earliest stored read of a detector on a company."""
     with _tx(conn) as cur:

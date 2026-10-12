@@ -387,6 +387,22 @@ def test_catalog_changes_become_typed_events():
         "product_launch"]["summary"] == "Priced GBP 5.00"
 
 
+
+def test_a_product_new_to_our_list_but_dated_months_back_is_not_a_launch():
+    """ALO: products the shop dates 2026-02-26 appeared in a later, fuller
+    read and were reported as launches."""
+    prev = {"source": "shopify", "complete": False, "products": {"1": row("A", 1.0)}}
+    old = row("Alosoft Skirt", 80.0); old[7] = "2026-02-26"
+    put_back = row("Classic", 90.0); put_back[7] = "2022-01-01"; put_back.append("2026-10-01")
+    new = row("Airlift Tank", 60.0); new[7] = "2026-10-01"
+    undated = row("Mystery", 10.0)
+    cur = {"source": "shopify", "complete": True, "products": {
+        "1": row("A", 1.0), "2": old, "3": new, "4": undated, "5": put_back}}
+    titles = sorted(e["title"] for e in det.compare_catalog(prev, cur, NOW)
+                    if e["type"] == "product_launch")
+    assert titles == ["New product: Airlift Tank", "New product: Classic", "New product: Mystery"]
+
+
 def test_removed_products_need_two_complete_reads():
     prev = {"source": "shopify", "complete": True, "products": {"1": row("A", 1.0)}}
     cur = {"source": "shopify", "complete": False, "products": {}}
@@ -761,12 +777,42 @@ def test_news_reads_the_edition_of_the_company_country_and_folds_copies():
 
 def test_a_full_english_feed_asks_again_and_a_full_other_language_one_says_it_was_cut():
     full = gnews(*[("Acme story %d" % i, "P", "Thu, 01 Oct 2026 07:00:00 GMT") for i in range(95)])
-    for country, calls, complete in (("US", 2, True), ("DE", 1, False)):
+    # a German company is read in German, cut, then in US English too
+    for country, calls, complete in (("US", 2, True), ("DE", 2, False)):
         asked = []
         c = ctx(Net(), entity={"id": 1, "domain": "acme.com", "name": "Acme", "country": country})
         c["get"] = lambda url, **kw: (asked.append(url), ok(full))[1]
         r = news.read_news(c)
         assert len(asked) == calls and r["complete"] is complete
+
+
+def test_country_and_storefront_words_come_off_the_name():
+    """Each found 0 articles as an exact phrase, and dozens without it."""
+    for given, want in (("Bupa UK", "Bupa"), ("ADP Deutschland", "ADP"), ("Lupo Oficial", "Lupo"),
+                        ("Women's Best US", "Women's Best"), ("LIVE! Loja Online", "LIVE!"),
+                        ("Acme Global Ltd", "Acme"), ("The Body Shop", "The Body Shop"),
+                        ("US", "US"), ("Usha", "Usha")):
+        assert news.clean_name(given, "x.com") == want, given
+
+
+def test_a_company_read_in_another_language_is_read_in_us_english_too():
+    """Hypertherm (stored as Mexican), Yaskawa Motoman (Japanese): nothing
+    in their own editions, articles in the US English one."""
+    def run(country, archetype):
+        asked = []
+        c = ctx(Net(), entity={"id": 1, "domain": "acme.com", "name": "Acme", "country": country})
+        c["archetype"] = archetype
+        c["get"] = lambda url, **kw: (asked.append(url), ok(gnews(
+            ("Acme story %s" % ("US" if "ceid=US" in url else "local"), "P",
+             "Thu, 01 Oct 2026 07:00:00 GMT"))))[1]
+        return asked, news.read_news(c)
+    asked, r = run("MX", "manufacturer")
+    assert len(asked) == 2 and "ceid=MX" in asked[0] and "ceid=US%3Aen" in asked[1]
+    assert r["items"] == 2 and r["note"].endswith("(MX:es-419 edition and US English)")
+    asked, r = run("DE", "local_single")          # a dentist in Berlin: German news only
+    assert len(asked) == 1 and r["items"] == 1
+    asked, r = run("GB", "manufacturer")          # already English
+    assert len(asked) == 1
 
 
 def test_news_that_did_not_answer_is_failed_and_the_breaker_stops_asking():

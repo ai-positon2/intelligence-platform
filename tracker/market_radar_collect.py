@@ -132,6 +132,7 @@ def collect_entity(entity, *, run_id=None, client_country=None, breaker=None, de
     stale = [d for d in wanted if not _fresh(latest[d[0]], now, d[0])]
     ctx = {"entity": entity, "get": io["get"], "get_json": io["get_json"], "fetch": io["fetch"],
            "now": now, "client_country": client_country, "run_id": run_id,
+           "archetype": archetype,
            # Phase 10's outside services, replaceable in tests like the network.
            "hooks": {k: v for k, v in io.items() if k in HOOKS},
            "news_breaker": breaker or news.Breaker(),
@@ -391,3 +392,35 @@ def coverage(results):
         lines.append({"detector": name, "label": label, "read": read, "total": total,
                       "counts": counts, "text": text + "."})
     return lines
+
+
+def tidy_noise(*, store=None):
+    """One-off, free (2026-10-12): hide the events stored before two rules
+    were tightened, keeping the rows and why. New subdomains that are
+    machines or plumbing, or part of a numbered fleet; and products new to
+    our list that the shop dates more than 90 days before we saw them.
+    Returns how many of each were hidden."""
+    import re
+    from datetime import timedelta
+    from . import market_radar_b2b as b2b
+    from .market_radar_detectors import BASELINE_DAYS
+    if store is None:
+        from . import market_radar_store as store
+    out = {"subdomains": 0, "old_launches": 0}
+    by_company = {}
+    for eid, domain, key, _title, _date, _seen in store.shown_events_of_type(["new_subdomain"]):
+        m = re.search(r"sub\+:(.+)$", key or "")
+        if m:
+            by_company.setdefault(domain, {})[m.group(1)] = eid
+    for domain, names in by_company.items():
+        kept = b2b._no_fleets({n: "" for n in names if b2b.worth_reporting(n, domain)})
+        for n, eid in names.items():
+            if n not in kept:
+                store.hide_event(eid, "a machine or plumbing host name, not a move")
+                out["subdomains"] += 1
+    for eid, _domain, _key, _title, day, seen in store.shown_events_of_type(["product_launch"]):
+        if day and seen and day < seen.date() - timedelta(days=BASELINE_DAYS):
+            store.hide_event(eid, "the shop dates this product more than %d days before we "
+                                  "first saw it: an older product, not a launch" % BASELINE_DAYS)
+            out["old_launches"] += 1
+    return out

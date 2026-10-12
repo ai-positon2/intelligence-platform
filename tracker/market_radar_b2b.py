@@ -89,6 +89,15 @@ NOISE_LABEL = re.compile(
 TEST_LABEL = re.compile(r"(^|[-_.])(dev|develop|stg|stage|staging|test|testing|qa|uat|sandbox|"
                         r"preprod|pre-prod|demo|tmp|temp|old|backup|local)\d*($|[-_.])")
 HASHY = re.compile(r"^[0-9a-f]{8,}$|^[a-z0-9]{24,}$|\d{4,}")
+# Machines and plumbing, seen live on 2026-10-12: polar.sh's worker-drain,
+# worker-high-priority and scheduler; seven edge-* hosts at stripe.com;
+# wpp.com's gandalf-int and everyone-int; xero.com's
+# example-service-config-use2. Real names, nothing about the business.
+INFRA_LABEL = re.compile(
+    r"^(workers?|scheduler|cron|queues?|edge|origin|lb|proxy|gw|xgw|runbot|runner|jenkins|ci|"
+    r"build|metrics|grafana|prometheus|kibana|sentry|monitoring|logs?|example|internal)"
+    r"\d*($|[-_])|[-_](int|internal|worker|cdn)\d*$|(^|[-_])(use|usw|euw|euc|eun|apse|apne)\d($|[-_])")
+FLEET = 3            # this many new names that differ only in their numbers: a machine fleet
 
 
 def _names(raw, domain):
@@ -117,7 +126,8 @@ def worth_reporting(name, domain):
     labels = name[:-len(domain) - 1].split(".")
     if len(labels) > 2:
         return False
-    if any(NOISE_LABEL.match(l) or HASHY.search(l) or len(l) > 40 for l in labels):
+    if any(NOISE_LABEL.match(l) or HASHY.search(l) or INFRA_LABEL.search(l) or len(l) > 40
+           for l in labels):
         return False
     return not TEST_LABEL.search(".".join(labels))
 
@@ -214,7 +224,19 @@ def read_subdomains(ctx, *, connect=None, sleep=None):
             "items": len(names), "complete": complete}
 
 
+def _no_fleets(fresh):
+    """Without names that come as a numbered fleet: odoo.com certified
+    runbot330 to runbot344 in one week, one CI machine each. A name with
+    its own number (identity360) stays."""
+    groups = {}
+    for n in fresh:
+        groups.setdefault(re.sub(r"\d+", "#", n), []).append(n)
+    # A name without a number is a group of one.
+    return {n: d for n, d in fresh.items() if len(groups[re.sub(r"\d+", "#", n)]) < FLEET}
+
+
 def _subdomain_events(domain, fresh, day):
+    fresh = _no_fleets(fresh)
     events = [_event("sub+:" + n, "new_subdomain", "New subdomain: " + n, status="announced",
                      date=first, url="https://" + n,
                      summary="First certified %s; a new host name often comes before a new "

@@ -161,9 +161,45 @@ def test_a_name_is_new_when_it_is_missing_before_and_certified_since():
         # missing before only because the earlier read was the current-only log
         "legacy.gorgias.com": "2021-05-01", "mail2.gorgias.com": "2026-10-06"}}
     assert [e["title"] for e in B.compare_subdomains(prev, cur, NOW)] == ["New subdomain: mcp.gorgias.com"]
-    many = dict(cur, names={"n%d.gorgias.com" % i: "2026-10-07" for i in range(12)})
+    words = "alpha bravo charlie delta echo foxtrot golf hotel india juliet kilo lima".split()
+    many = dict(cur, names={"%s.gorgias.com" % w: "2026-10-07" for w in words})
     ev = B.compare_subdomains(prev, many, NOW)
     assert len(ev) == B.MAX_NEW_EVENTS + 1 and ev[-1]["title"] == "4 more new subdomains"
+
+
+
+@pytest.mark.parametrize("name", [
+    # seen live on 2026-10-12, each a machine or plumbing, not a move
+    "worker-drain.polar.sh", "worker-high-priority.polar.sh", "scheduler.polar.sh",
+    "edge-api.stripe.com", "edge-gator.stripe.com", "gandalf-int.es.wpp.com",
+    "everyone-int.es.wpp.com", "example-service-config-use2.xgw.xero.com",
+    "recurring-api.xgw.xero.com", "events-cdn.dodopayments.com", "api-use2.xero.com",
+    "ingest-euw1.xero.com"])
+def test_machines_and_plumbing_are_not_reported(name):
+    assert not B.worth_reporting(name, ".".join(name.split(".")[-2:]))
+
+
+@pytest.mark.parametrize("name", [
+    "gmail.mcp.intercom.com", "identity360.manageengine.com", "proposals.factorialhr.com",
+    "auto-bank-reconciliation.xero.com", "cbextensions.eu.chargebee.com", "trust.sysaid.com",
+    "everyone.es.wpp.com", "uploads.stripe.com", "webinars-zuddl.rippling.com"])
+def test_names_that_say_something_are_still_reported(name):
+    assert B.worth_reporting(name, ".".join(name.split(".")[-2:]))
+
+
+def test_a_numbered_fleet_is_one_machine_each_not_news():
+    """odoo.com certified runbot330 to runbot344 in one week."""
+    prev = {"domain": "odoo.com", "read_at": "2026-10-01", "names": {}}
+    # "box" is no machine word, so only the fleet rule can catch these
+    names = {"box%d.odoo.com" % i: "2026-10-05" for i in (330, 332, 333, 335)}
+    names.update({"identity360.odoo.com": "2026-10-05", "app2.odoo.com": "2026-10-05",
+                  "app3.odoo.com": "2026-10-05"})
+    titles = sorted(e["title"] for e in B.compare_subdomains(prev, dict(prev, names=names), NOW))
+    assert titles == ["New subdomain: app2.odoo.com", "New subdomain: app3.odoo.com",
+                      "New subdomain: identity360.odoo.com"]
+    # the same fleet on a first read
+    cur = {"domain": "odoo.com", "history": True, "names": names}
+    assert not any("box" in e["title"] for e in B.baseline_subdomains(cur, NOW))
 
 
 # == SEC EDGAR ========================================================================
@@ -526,3 +562,24 @@ def test_linkedin_is_read_for_a_few_companies_per_collection(pg, monkeypatch):
     rows = [next(r for r in c["rows"] if r["detector"] == "linkedin") for c in out["companies"]]
     assert [r["status"] for r in rows] == ["empty", "empty", "skipped", "skipped"]
     assert "at most 2 companies per collection" in rows[-1]["note"]
+
+
+def test_tidy_hides_stored_machine_names_and_old_launches(pg):
+    from datetime import date, timedelta
+    from tracker import market_radar_collect as mc
+    odoo = pg.upsert_entity("odoo.com", name="Odoo")
+    src = {"url": "https://odoo.com", "detector": "subdomains"}
+    for n in ("box330", "box332", "box335", "worker-drain", "app"):
+        pg.record_event(odoo, "subdomains:sub+:%s.odoo.com" % n, type="new_subdomain",
+                        title="New subdomain: %s.odoo.com" % n, source=src,
+                        event_date="2026-10-05")
+    alo = pg.upsert_entity("aloyoga.com", name="ALO")
+    psrc = {"url": "https://aloyoga.com", "detector": "catalog"}
+    pg.record_event(alo, "catalog:prod+:skirt", type="product_launch", title="New product: Skirt",
+                    source=psrc, event_date=(date.today() - timedelta(days=200)).isoformat())
+    pg.record_event(alo, "catalog:prod+:tank", type="product_launch", title="New product: Tank",
+                    source=psrc, event_date=(date.today() - timedelta(days=10)).isoformat())
+    assert mc.tidy_noise(store=pg) == {"subdomains": 4, "old_launches": 1}
+    shown = [e["title"] for e in pg.recent_events([odoo, alo]) if not e.get("hidden_reason")]
+    assert sorted(shown) == ["New product: Tank", "New subdomain: app.odoo.com"]
+    assert mc.tidy_noise(store=pg) == {"subdomains": 0, "old_launches": 0}     # once is enough

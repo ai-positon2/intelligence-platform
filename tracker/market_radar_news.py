@@ -62,6 +62,16 @@ MOVES = ("opens OR opening OR launches OR launch OR expands OR acquires OR acqui
 LEGAL = re.compile(r"[,\s]+(inc|llc|ltd|limited|plc|gmbh|ag|sa|s\.a\.|ltda|corp|corporation|"
                    r"co|company|group|holdings|pvt|private|pty)\.?$", re.I)
 
+# A country or storefront word a company puts after its name on its own
+# site but a headline leaves off: "Bupa UK", "ADP Deutschland", "Lupo
+# Oficial", "Women's Best US" each found 0 articles as an exact phrase on
+# 2026-10-12, and 109, 67, 39 and 1 without it.
+REGION = re.compile(r"\s+(uk|u\.k\.|us|usa|deutschland|germany|brasil|brazil|india|"
+                    r"oficial|official|loja online|online shop|online store|global)$", re.I)
+# Kinds of business whose news is local: a second, English edition adds
+# nothing for a dentist in Berlin.
+LOCAL = ("local_single", "multi_location")
+
 
 class Breaker:
     """Shared by every news read in one collection: after BREAKER_AFTER
@@ -100,6 +110,7 @@ def clean_name(name, domain):
     n = " ".join((name or "").split())
     for _ in range(2):
         n = LEGAL.sub("", n).strip(" ,.")
+        n = REGION.sub("", n).strip(" ,.")
     return n or domain.split(".")[0]
 
 
@@ -156,16 +167,23 @@ def read_news(ctx):
     country = entity.get("country") or ctx.get("client_country") or "US"
     name = clean_name(entity.get("name"), entity["domain"])
     english = EDITIONS.get(country.upper(), EDITIONS["US"])[0].startswith("en")
-    queries = ['"%s" when:%dd' % (name, DAYS)]
-    stories, failures, cut = {}, [], False
-    for i in range(2):
+    queries = [('"%s" when:%dd' % (name, DAYS), country)]
+    # A company read in a language other than English is also read in the
+    # US English edition, where the trade press is: Hypertherm (stored as
+    # Mexican), Yaskawa Motoman (Japanese) and Meidensha found nothing in
+    # their own editions and 3, 2 and 1 articles there (2026-10-12).
+    also = not english and ctx.get("archetype") not in LOCAL
+    if also:
+        queries.append(('"%s" when:%dd' % (name, DAYS), "US"))
+    stories, failures, cut, counted = {}, [], False, set()
+    for i in range(2):          # at most: the edition, then either more of it or US English
         if i >= len(queries):
             break
         if breaker.open:
             failures.append("Google News stopped answering earlier in this collection")
             break
         breaker.wait_turn()
-        read = get(feed_url(queries[i], country), limit=3_000_000, timeout=12)
+        read = get(feed_url(*queries[i]), limit=3_000_000, timeout=12)
         ok = read["status"] == "ok" and "<rss" in read["body"][:500]
         breaker.record(ok)
         if not ok:
@@ -176,13 +194,18 @@ def read_news(ctx):
             if not it["title"] or not names_company(it["title"], name, entity["domain"]):
                 continue
             key = _story_key(it["title"])
+            # The same article in two editions is one copy, not two.
+            seen_here = (key, it.get("publisher"), it.get("date"))
+            if seen_here in counted:
+                continue
+            counted.add(seen_here)
             if key in stories:
                 stories[key]["copies"] += 1
                 continue
             stories[key] = dict(it, id=key, copies=1)
         if i == 0 and len(items) >= FULL:
             if english:
-                queries.append('"%s" (%s) when:%dd' % (name, MOVES, DAYS))
+                queries.append(('"%s" (%s) when:%dd' % (name, MOVES, DAYS), country))
             else:
                 cut = True
     if failures and not stories and len(failures) >= len(queries):
@@ -191,8 +214,8 @@ def read_news(ctx):
     items = sorted(stories.values(), key=lambda s: s.get("date") or "", reverse=True)
     complete = not failures and not cut
     edition = EDITIONS.get(country.upper(), EDITIONS["US"])[2]
-    note = "%d articles naming %s in the last %d days (%s edition)" % (
-        len(items), name, DAYS, edition)
+    note = "%d articles naming %s in the last %d days (%s edition%s)" % (
+        len(items), name, DAYS, edition, " and US English" if also else "")
     if cut:
         note += "; the feed was full, so older articles may be missing"
     if failures:
