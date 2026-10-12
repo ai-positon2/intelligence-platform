@@ -1059,3 +1059,12 @@ def test_site_root_keeps_country_second_levels():
     assert site.site_root("www.mydentist.co.uk") == "mydentist.co.uk"
     assert site.site_root("careers.aspendental.com") == "aspendental.com"
     assert site.site_root("shop.brand.com.br") == "brand.com.br"
+
+
+def test_a_quote_from_lines_a_browser_ran_together_is_on_the_page():
+    """ridge.com, read in a browser: "Your bag is emptyYou haven't added
+    anything to your bag yet." The model quoted it with a space."""
+    text = "Cart 0 items\nYour bag is emptyYou haven’t added anything to your bag yet.\n"
+    assert prof._quote_on_page("Your bag is empty. You haven’t added anything to your bag yet.", text)
+    assert not prof._quote_on_page("bag is em ptyY", text)          # short quotes stay exact
+    assert not prof._quote_on_page("Your basket is empty. Nothing added yet at all.", text)

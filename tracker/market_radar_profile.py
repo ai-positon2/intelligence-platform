@@ -263,7 +263,12 @@ def _quote_on_page(quote, text):
     removed (a quote can run across a link's label) and kept (the model may
     quote a link itself: gymshark.com's "uk.linkedin.com/company/gymshark")."""
     q = _norm(quote)
-    return q in _norm(text) or q in _norm(text, keep_links=True)
+    if q in _norm(text) or q in _norm(text, keep_links=True):
+        return True
+    # A page drawn in a browser can run two lines together with no space
+    # (ridge.com's cart: "Your bag is emptyYou haven't added anything"), so
+    # a long quote is also matched with the spaces taken out.
+    return len(q) >= 20 and q.replace(" ", "") in _norm(text).replace(" ", "")
 
 
 def _norm(text, keep_links=False):

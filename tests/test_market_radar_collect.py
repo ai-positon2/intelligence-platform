@@ -64,6 +64,11 @@ def shop_site(home="Welcome\n20% off everything"):
                          "ats": [{"vendor": "greenhouse", "board": "acme", "url": ""}]})
 
 
+CANARY_FEED = "<rss><channel>" + "".join(
+    "<item><title>Story %d - P</title><pubDate>Thu, 01 Oct 2026 07:00:00 GMT</pubDate></item>" % i
+    for i in range(6)) + "</channel></rss>"
+
+
 def world(products, jobs_list, sitemap_locs, home="Welcome\n20% off everything"):
     net = Net({
         "https://acme.com/products.json?limit=250&page=1": {"products": products},
@@ -75,6 +80,8 @@ def world(products, jobs_list, sitemap_locs, home="Welcome\n20% off everything")
         pass
 
     def get(url, **kw):
+        if url.startswith("https://news.google.com/") and "q=google+when" in url:
+            return ok(CANARY_FEED)        # Google answers: an empty search is believed
         if url.startswith("https://news.google.com/"):
             return ok("<rss><channel></channel></rss>")
         if url.startswith("https://efts.sec.gov/"):          # not a US-listed company
@@ -329,7 +336,8 @@ def test_the_clients_kind_of_business_decides_whether_news_is_also_read_in_engli
         io, _ = world([], [], [])
         asked = []
         get = io["get"]
-        io["get"] = lambda url, **kw: (asked.append(url) if "news.google" in url else None,
+        io["get"] = lambda url, **kw: (asked.append(url) if "news.google" in url
+                                      and "q=google+when" not in url else None,
                                       get(url, **kw))[1]
         store = MemStore()
         mc.collect_entity(dict(ENTITY, country="DE"), now=NOW, io=io, store=store,

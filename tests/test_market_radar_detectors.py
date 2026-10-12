@@ -826,12 +826,77 @@ def test_news_that_did_not_answer_is_failed_and_the_breaker_stops_asking():
     assert r["status"] == "failed" and "stopped answering" in r["note"]
 
 
+CANARY = gnews(*[("Story %d" % i, "P", "Thu, 01 Oct 2026 07:00:00 GMT") for i in range(6)])
+
+
+def answering_google(asked, feed=None):
+    """A Google News that has nothing on the company but answers the canary."""
+    def get(url, **kw):
+        asked.append(url)
+        return ok(CANARY if "q=google+when" in url else (feed or gnews()))
+    return get
+
+
 def test_a_company_without_a_country_reads_the_client_country_edition():
     asked = []
     c = ctx(Net(), entity={"id": 1, "domain": "acme.in", "name": "Acme", "country": None})
     c["client_country"] = "IN"
-    c["get"] = lambda url, **kw: (asked.append(url), ok(gnews()))[1]
+    c["get"] = answering_google(asked)
     assert news.read_news(c)["status"] == "empty" and "ceid=IN%3Aen" in asked[0]
+
+
+def test_an_empty_feed_is_believed_only_while_google_still_answers():
+    """Throttled, Google News answers 200 with empty feeds: a whole
+    collection read "0 articles" for every competitor (2026-10-12)."""
+    b = news.Breaker(gap=0, sleep=lambda s: None)
+    asked = []
+    c = ctx(Net(), entity={"id": 1, "domain": "acme.com", "name": "Acme", "country": "US"})
+    c["news_breaker"] = b
+    c["get"] = lambda url, **kw: (asked.append(url), ok(gnews()))[1]      # empty, canary too
+    r = news.read_news(c)
+    assert r["status"] == "failed" and "withholding results" in r["note"]
+    assert b.open and sum("q=google+when" in u for u in asked) == 1
+    # asked of the US English edition whatever the company's edition
+    assert any("q=google+when" in u and "ceid=US%3Aen" in u for u in asked)
+    # the next company is not asked at all
+    r = news.read_news(c)
+    assert r["status"] == "failed" and "stopped answering" in r["note"]
+
+
+def test_the_check_is_asked_once_for_many_quiet_companies_and_again_later():
+    t = [0.0]
+    b = news.Breaker(gap=0, sleep=lambda s: None, clock=lambda: t[0])
+    asked = []
+    c = ctx(Net(), entity={"id": 1, "domain": "acme.com", "name": "Acme", "country": "US"})
+    c["news_breaker"] = b
+    c["get"] = answering_google(asked)
+    for _ in range(4):
+        assert news.read_news(c)["status"] == "empty"
+    assert sum("q=google+when" in u for u in asked) == 1
+    t[0] += news.CANARY_TTL_S + 1
+    news.read_news(c)
+    assert sum("q=google+when" in u for u in asked) == 2
+    # a company with articles needs no check
+    asked.clear()
+    c["get"] = answering_google(asked, gnews(("Acme opens", "P", "Thu, 01 Oct 2026 07:00:00 GMT")))
+    t[0] += news.CANARY_TTL_S + 1
+    assert news.read_news(c)["status"] == "ok" and not any("q=google+when" in u for u in asked)
+
+
+def test_one_query_failed_and_the_other_empty_is_still_checked():
+    b = news.Breaker(gap=0, sleep=lambda s: None)
+    c = ctx(Net(), entity={"id": 1, "domain": "acme.de", "name": "Acme", "country": "DE"})
+    c["news_breaker"] = b
+    c["get"] = lambda url, **kw: miss("blocked", "refused (HTTP 429)") if "ceid=DE" in url \
+        else ok(gnews())
+    r = news.read_news(c)
+    assert r["status"] == "failed" and "withholding" in r["note"]
+
+
+def test_a_canary_with_too_few_stories_is_not_an_answer():
+    b = news.Breaker(gap=0, sleep=lambda s: None)
+    few = gnews(*[("Story %d" % i, "P", "Thu, 01 Oct 2026 07:00:00 GMT") for i in range(news.CANARY_MIN - 1)])
+    assert not b.google_answers(lambda url, **kw: ok(few)) and b.open
 
 
 # == false failures found in the first live collections (2026-10-09) ==================

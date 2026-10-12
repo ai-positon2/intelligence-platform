@@ -243,6 +243,20 @@ def test_a_query_google_refused_is_a_failure_and_an_open_breaker_reads_nothing_m
     assert [q["status"] for q in per_query] == ["not_read", "not_read"] and len(failures) == 2
 
 
+def test_feeds_that_are_all_empty_are_believed_only_while_google_answers():
+    """Throttled, Google News answers 200 with empty feeds: that is not an
+    industry with no news."""
+    canary = gnews(*[headline("Story %d" % i) for i in range(6)])
+
+    def get(answers):
+        return lambda url, **kw: (canary if answers and "q=google+when" in url else gnews())
+    items, per_query, failures, _ = P.read_google(PLAN, "GB", get=get(False), breaker=breaker())
+    assert items == [] and [q["status"] for q in per_query] == ["failed", "failed"]
+    assert all("withheld" in f for f in failures) and len(failures) == 2
+    items, per_query, failures, _ = P.read_google(PLAN, "GB", get=get(True), breaker=breaker())
+    assert [q["status"] for q in per_query] == ["ok", "ok"] and failures == []
+
+
 # == trade publications =================================================================
 
 # The comments feed is announced first, as WordPress themes often do.

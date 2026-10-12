@@ -282,6 +282,14 @@ def read_google(plan, country, *, get, breaker, now=None):
                 continue
             row["kept"] += 1
             stories[key] = dict(it, id=key, copies=1, source="google_news", query=q)
+    answered = [r for r in per_query if r["status"] == "ok"]
+    if answered and not any(r["items"] for r in answered) and not breaker.google_answers(get):
+        # Every feed empty, and the search that always has results too:
+        # Google News is withholding results, not an industry gone quiet
+        # (tracker/market_radar_news.CANARY).
+        for r in answered:
+            r["status"], r["note"] = "failed", "Google News withheld results from this server"
+            failures.append("%s: Google News withheld results from this server" % r["query"])
     items = sorted(stories.values(), key=lambda s: s.get("date") or "", reverse=True)
     return items, per_query, failures, {"noise": noise, "off_topic": off_topic}
 

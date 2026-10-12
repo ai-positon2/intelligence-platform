@@ -73,6 +73,18 @@ REGION = re.compile(r"\s+(uk|u\.k\.|us|usa|deutschland|germany|brasil|brazil|ind
 LOCAL = ("local_single", "multi_location")
 
 
+# A search that always has results. Google News, throttling this server,
+# answers "200 OK" with an empty feed (the 2026-10-12 sources check: Bombas,
+# Sweetgreen, Planet Fitness all empty mid-burst); a Lincoln Electric
+# collection that day read 0 articles for every competitor, Miller Electric
+# included (155 two days before), and called each "0 articles". An empty
+# read is believed only when this search, asked from the same server, is
+# not empty too.
+CANARY = "google when:1d"
+CANARY_MIN = 5
+CANARY_TTL_S = 180
+
+
 class Breaker:
     """Shared by every news read in one collection: after BREAKER_AFTER
     failures in a row, stop asking Google and say so."""
@@ -81,7 +93,23 @@ class Breaker:
         self.after, self.gap, self.sleep, self.clock = after, gap, sleep, clock
         self.fails, self.open, self.requests = 0, False, 0
         self._lock = threading.Lock()
+        self._canary_lock = threading.Lock()
+        self._canary = None          # (answered, at)
         self._last = 0.0
+
+    def google_answers(self, get):
+        """Does Google News still return results to this server? Asked at
+        most every CANARY_TTL_S seconds per collection."""
+        with self._canary_lock:
+            if self._canary and self.clock() - self._canary[1] < CANARY_TTL_S:
+                return self._canary[0]
+            self.wait_turn()
+            read = get(feed_url(CANARY, "US"), limit=3_000_000, timeout=12)
+            answered = read["status"] == "ok" and len(parse_items(read["body"])) >= CANARY_MIN
+            self._canary = (answered, self.clock())
+            if not answered:
+                self.open = True
+            return answered
 
     def wait_turn(self):
         with self._lock:
@@ -211,6 +239,11 @@ def read_news(ctx):
     if failures and not stories and len(failures) >= len(queries):
         return {"status": "failed", "note": "; ".join(failures), "payload": None, "items": 0,
                 "complete": False}
+    if not stories and not breaker.google_answers(get):
+        return {"status": "failed", "note": "Google News answered with an empty feed, and with "
+                "an empty one for a search that always has results: it is withholding results "
+                "from this server, so this company's news was not read", "payload": None,
+                "items": 0, "complete": False}
     items = sorted(stories.values(), key=lambda s: s.get("date") or "", reverse=True)
     complete = not failures and not cut
     edition = EDITIONS.get(country.upper(), EDITIONS["US"])[2]
