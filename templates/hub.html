@@ -100,6 +100,35 @@
         </div>
       </a>
 
+      <!-- Paid Marketing Agents (2026-10-12): the PPC team's three agents from
+           Agent Holmes. Sits between the other two on purpose. Its counts are
+           the cards on /p2/paid-marketing; tests/test_hub_card_counts.py
+           checks they agree. -->
+      <a href="/p2/paid-marketing" class="hub-card card-paid">
+        <div class="card-preview">
+          <div class="card-preview-icon"><svg class="au-ic" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M3 20h18"/><path d="M6 16v-4"/><path d="M11 16V8"/><path d="M16 16v-6"/><path d="M4 9l5-4 4 3 7-5"/></svg></div>
+          <div class="card-status-badge badge-live">
+            <span class="badge-dot pulse"></span> Active
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="card-category">Paid Media</div>
+          <div class="card-title">Paid Marketing Agents</div>
+          <div class="card-desc">
+            Daily budget pacing with the moves to make today, search-term triage with
+            priority negatives and keywords, and a client feedback chat over Slack, Gmail
+            and meeting transcripts.
+          </div>
+          <div class="card-footer">
+            <div class="card-meta">
+              <div class="card-stat"><span>3</span> dashboards</div>
+              <div class="card-stat"><span>3</span> live</div>
+            </div>
+            <div class="card-cta">Open <span class="card-arrow">→</span></div>
+          </div>
+        </div>
+      </a>
+
       <!-- SEO + AEO (card-seo is the CSS hook, not the name) -->
       <a href="/p2/seo-aeo" class="hub-card card-seo">
         <div class="card-preview">
@@ -138,13 +167,15 @@
         <div><b data-lxn="{{ tracked_companies }}" data-lxs="+">0</b><span>companies tracked</span></div>
         {% endif %}
         <div><b data-lxn="300" data-lxs="+">0</b><span>live signals</span></div>
-        {# Live dashboards across both workspaces: 11 on /p2/strategic-agents
+        {# Live dashboards across all three workspaces: 11 on /p2/strategic-agents,
+           3 on /p2/paid-marketing (added 2026-10-12) and 16 SEO + AEO tools,
+           so 30. Before Paid Marketing Agents: 11 on /p2/strategic-agents
            (Thought Leader Intelligence added 2026-09-17, Phase 0 only) + 16
            SEO + AEO tools. Was 26 before this (Event & Conference Intelligence
            added 2026-08-31), 25 before that, 24 before Social Media
            Intelligence, 23 before the Slot Checker, and 22 before LinkedIn
            Strategy Researcher. #}
-        <div><b data-lxn="27">0</b><span>dashboards</span></div>
+        <div><b data-lxn="30">0</b><span>dashboards</span></div>
         <div><b class="grad-k">Vimi</b><span>ai on every page</span></div>
       </div>
     </section>
@@ -184,6 +215,7 @@
   var BASE=[
     {t:'Hub',d:'Platform home',u:'/p2/hub',i:'⌂'},
     {t:'Strategic Agents',d:'Go-to-market intelligence',u:'/p2/strategic-agents',i:'◎'},
+    {t:'Paid Marketing Agents',d:'Pacing, search terms & client feedback',u:'/p2/paid-marketing',i:'◆'},
     {t:'SEO + AEO Tools',d:'Organic intelligence',u:'/p2/seo-aeo',i:'⌕'},
     {t:'ABM Signal Tracker — Healthcare',d:'Company signals & insights',u:'/p2/abm-signal-tracker/healthcare',i:'☆'},
     {t:'ABM Signal Tracker — CSG',d:'Company signals & insights',u:'/p2/abm-signal-tracker/csg',i:'☆'},

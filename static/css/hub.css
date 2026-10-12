@@ -393,3 +393,17 @@ html.lenis,html.lenis body{height:auto}
 [data-theme="light"] .card-thumb{background:linear-gradient(160deg,#f3f5fb,#e9edf7) !important}
 [data-theme="light"] .card-footer{border-color:rgba(18,26,54,.08) !important}
 [data-theme="light"] .card-tags .tag,[data-theme="light"] .tag,[data-theme="light"] .chip{background:rgba(18,26,54,.05) !important;border-color:rgba(18,26,54,.12) !important;color:#4d5680 !important}
+
+/* ════ Three workspaces (2026-10-12) ════
+   Paid Marketing Agents joined Strategic Agents and SEO + AEO, in the middle.
+   Three across from ~1100px, two then one below; the cards keep the same
+   minimum width they had as a pair. */
+.hub-grid{grid-template-columns:repeat(auto-fit,minmax(min(100%,340px),1fr));max-width:1320px}
+.card-paid{
+  --card-bg:linear-gradient(135deg,#2a1203 0%,#5c2a07 45%,#4a0f22 75%,#2a1203 100%);
+  --card-accent:#fbbf24;
+  --card-glow:rgba(251,191,36,0.24);
+}
+.card-paid .card-category{background:linear-gradient(90deg,#fbbf24,#fb7185);
+  -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+.hub-grid .card-paid::after{background:radial-gradient(420px circle at var(--mx,50%) var(--my,50%),rgba(251,191,36,.14),transparent 45%)}

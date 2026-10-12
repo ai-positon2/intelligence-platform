@@ -1,0 +1,72 @@
+{% extends "_paid_base.html" %}
+{% block title %}Search Query Analysis{% endblock %}
+{% block head %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" defer></script>
+{% endblock %}
+{% block content %}
+<div class="pm pm-sqr">
+  <section class="pm-hero">
+    <div class="pm-hero-l">
+      <span class="pm-eyebrow"><span class="d"></span>Paid Marketing · Search terms</span>
+      <h1 class="pm-title">Every search term, <span class="pm-grad">sorted.</span></h1>
+      <p class="pm-sub">Drop in a Google Ads search terms export. Each account's own rules (brand, competitors,
+        territories, insurance) settle most terms instantly; <b>Claude reads only the ones the rules can't</b>.
+        Out come priority negatives, new keywords and a 7-sheet workbook.</p>
+    </div>
+  </section>
+
+  <div class="sq-steps">
+    <section class="pm-panel sq-step">
+      <h2><span class="sq-num">1</span>Choose the account</h2>
+      <p class="lede">Each account classifies differently. Pick the one you're reviewing.</p>
+      <div class="sq-accts" id="accts"></div>
+      <div class="sq-note" id="rulesetNote"></div>
+    </section>
+
+    <section class="pm-panel sq-step">
+      <h2><span class="sq-num">2</span>Upload the exports</h2>
+      <p class="lede">Standard Google Ads UI exports as CSV. The keyword and negative lists stop the agent from
+        suggesting what the account already has. Files are read in your browser; only the unsettled terms are sent to the model.</p>
+      <div class="sq-drops">
+        <label class="sq-drop" id="drop-terms">
+          <input type="file" accept=".csv,text/csv" id="file-terms">
+          <span class="ic"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg></span>
+          <span class="ttl">Search terms report</span><span class="req">Required</span>
+          <span class="file" id="file-terms-name"></span>
+        </label>
+        <label class="sq-drop" id="drop-keywords">
+          <input type="file" accept=".csv,text/csv" id="file-keywords">
+          <span class="ic"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h10M4 17h7"/></svg></span>
+          <span class="ttl">Keyword report</span><span class="req">Recommended</span>
+          <span class="file" id="file-keywords-name"></span>
+        </label>
+        <label class="sq-drop" id="drop-negs">
+          <input type="file" accept=".csv,text/csv" id="file-negs">
+          <span class="ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8 12h8"/></svg></span>
+          <span class="ttl">Negative keyword report</span><span class="req">Recommended</span>
+          <span class="file" id="file-negs-name"></span>
+        </label>
+      </div>
+      <div class="sq-actions">
+        <button class="pm-btn" id="runBtn" disabled>Run analysis</button>
+        <button class="pm-btn-ghost" id="dlBtn" disabled><svg viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>Workbook (.xlsx)</button>
+        <span class="sq-status" id="statusLine"></span>
+      </div>
+    </section>
+  </div>
+
+  <div id="results"></div>
+
+  <div class="sq-overlay" id="overlay" hidden>
+    <div class="sq-ov-card">
+      <div id="ovOrb" style="display:flex;justify-content:center"></div>
+      <div class="ttl">Analysing search terms</div>
+      <div class="st" id="ovStatus">Starting…</div>
+      <div class="sq-prog"><i id="ovBar"></i></div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/sqr_agent.js') }}?v=1"></script>
+{% endblock %}

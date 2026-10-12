@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{% block title %}{% endblock %} · Paid Marketing Agents</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=4">
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-tokens.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-components.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/gtm.css') }}">
+  <script src="/static/js/theme.js"></script>
+  <link rel="stylesheet" href="/static/css/aurora-app.css?v=3">
+  <script src="/static/js/aurora.js?v=1" defer></script>
+  <link rel="stylesheet" href="/static/css/thinking-orb.css">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/paid_marketing.css') }}?v=1">
+  {% block head %}{% endblock %}
+</head>
+<body>
+  <div class="bg-grid"></div>
+
+  <div class="topbar">
+    <div class="topbar-left">
+      <a href="/p2/hub" class="brand">
+        <div class="brand-icon" style="background:#151b2e;box-shadow:none;border-radius:var(--radius-md);overflow:hidden;display:inline-flex;align-items:center;justify-content:center;padding:5px 8px;width:auto;height:auto"><img src="/static/logo-lockup.svg?v=1" alt="arena by Position2" style="display:block;width:auto;height:36px;object-fit:contain"></div>
+      </a>
+      <div class="breadcrumb">
+        <a href="/p2/hub" class="bc-link">Hub</a>
+        <span class="bc-sep">›</span>
+        <a href="/p2/paid-marketing" class="bc-link">Paid Marketing Agents</a>
+        <span class="bc-sep">›</span>
+        <span class="bc-cur" style="color:#fbbf24">{{ self.title() }}</span>
+      </div>
+    </div>
+    <div class="topbar-right">
+      <div class="user-menu" id="userMenu">
+        <div class="user-pill" id="userPill" onclick="toggleMenu()">
+          <div class="user-avatar">
+            {% if user.picture %}<img src="{{ user.picture }}" alt="" />
+            {% else %}{{ (user.name or 'U')[:2]|upper }}{% endif %}
+          </div>
+          <span class="user-name">{{ user.given_name or user.name or 'User' }}</span>
+          <span class="pill-chevron">▼</span>
+        </div>
+        <div class="user-dropdown" id="userDropdown">
+          <div class="dd-header">
+            <div class="dd-name">{{ user.name or 'User' }}</div>
+            <div class="dd-email">{{ user.email }}</div>
+          </div>
+          <div class="dd-items">{% include "_admin_menu.html" %}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="main">
+    {% block content %}{% endblock %}
+    <p class="footer-note">Position2 · Internal use only</p>
+  </div>
+
+  {% include 'ppc_chat_widget.html' %}
+
+  <script>
+    function toggleMenu() {
+      var pill=document.getElementById('userPill'), dd=document.getElementById('userDropdown');
+      var open=dd.classList.contains('open');
+      pill.classList.toggle('open',!open); dd.classList.toggle('open',!open);
+    }
+    document.addEventListener('click',function(e){ var m=document.getElementById('userMenu'); if(m&&!m.contains(e.target)){document.getElementById('userPill').classList.remove('open');document.getElementById('userDropdown').classList.remove('open');} });
+    document.addEventListener('keydown',function(e){ if(e.key==='Escape'){document.getElementById('userPill').classList.remove('open');document.getElementById('userDropdown').classList.remove('open');} });
+  </script>
+  {% block scripts %}{% endblock %}
+  <script src="{{ url_for('static', filename='js/page_track.js') }}?v=1" data-title="{{ self.title() }}" data-email="{{ user.email if user else '' }}"></script>
+  {% include '_paid_kpal.html' %}
+  <script>(function(){if(window.__amb)return;window.__amb=1;
+  var a=document.createElement('div');a.className='amb-aurora';
+  a.innerHTML='<div class="amb-b amb-b1"></div><div class="amb-b amb-b2"></div><div class="amb-b amb-b3"></div>';
+  var g=document.createElement('div');g.className='amb-grain';
+  function mt(){var b=document.body;if(!b){return setTimeout(mt,40);}b.insertBefore(g,b.firstChild);b.insertBefore(a,b.firstChild);}
+  mt();})();</script>
+</body>
+</html>

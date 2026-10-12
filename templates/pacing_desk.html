@@ -1,0 +1,33 @@
+{% extends "_paid_base.html" %}
+{% block title %}Pacing Desk{% endblock %}
+{% block content %}
+<div class="pm pm-pd" id="pd">
+  <section class="pm-hero">
+    <div class="pm-hero-l">
+      <span class="pm-eyebrow"><span class="d"></span>Paid Marketing · Budget pacing</span>
+      <h1 class="pm-title">Land every account <span class="pm-grad">on budget.</span></h1>
+      <p class="pm-sub">Each morning's run reads the Google Ads export and the Budget Tracker, projects every
+        account to month end from what it actually spends, and says <b>where to move budget today</b>.
+        Moves stay inside one location and net to zero.</p>
+    </div>
+    <div class="pd-ring" id="ring" hidden></div>
+  </section>
+
+  <p class="pd-fresh stale" id="fresh"><span class="live"></span>Loading the latest run…</p>
+  <div class="pd-strip" id="strip"></div>
+  <div class="pm-panel pd-trend" id="trend" hidden></div>
+
+  <div class="pd-toolbar" id="pickers" hidden></div>
+  <div class="pd-controls" id="controlsRow" hidden>
+    <div class="pm-chips" id="controls"></div>
+    <button class="pm-btn-ghost" id="exportAccounts" type="button"><svg viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>Accounts CSV</button>
+  </div>
+  <p class="pd-crumb" id="crumb"></p>
+  <div id="list"><div class="pd-skel"></div><div class="pd-skel"></div><div class="pd-skel"></div></div>
+  <div id="orphans" class="pd-outside"></div>
+  <p class="pd-foot" id="foot"></p>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/pacing_desk.js') }}?v=1"></script>
+{% endblock %}

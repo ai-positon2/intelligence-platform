@@ -4186,6 +4186,317 @@ def seo_aeo_legacy_redirect(rest=""):
     return redirect(target, code=308)
 
 
+# ── Paid Marketing Agents ───────────────────────────────────────────────────────
+# The third hub section, 2026-10-12: the PPC team's three agents from Agent
+# Holmes (github.com/ai-positon2/Agent_Holmes), which ran as a separate Node
+# service on Railway with no sign-in. Here they are Python, behind the
+# Position2 login, and keep their data in pm_* tables (tracker/paid_store.py).
+#
+#   Pacing Desk            where to move budget today so every account lands
+#                          the month on budget (tracker/paid_pacing.py; the
+#                          engine itself runs on the PPC team's machine and
+#                          pushes each day's result to .../api/pacing/seed)
+#   Search Query Analysis  classifies a Google Ads search-terms export per
+#                          account (rules in static/js/sqr_agent.js, the
+#                          model step in tracker/paid_sqr.py)
+#   Client Feedback Agent  answers questions from live Slack, Gmail, meeting
+#                          transcripts and the Budget Tracker, through ONE
+#                          shared Slack and Google account an admin connects
+#                          (tracker/paid_feedback.py)
+_PM_PREFIX = "/p2/paid-marketing"
+
+
+def _pm_refuse_cross_site():
+    """None when a state-changing request is same-origin JSON, else the
+    refusal. Same reasoning as _evi_state_change_guard."""
+    if not _evi_same_origin():
+        app.logger.warning("paid marketing: refused cross-site %s to %s", request.method, request.path)
+        return jsonify(error="This request came from another site and was refused."), 403
+    if not request.is_json:
+        return jsonify(error="This action needs a JSON request."), 415
+    return None
+
+
+@app.before_request
+def _pm_state_change_guard():
+    """Every state-changing request a signed-in Position2 user sends under
+    Paid Marketing Agents goes through _pm_refuse_cross_site. Two exceptions:
+    the engine's seed push carries no session and has its own secret, and the
+    admin-only disconnect runs the check itself AFTER admin_required, so a
+    non-admin is told "forbidden", not "send JSON"."""
+    if request.method not in ("POST", "PUT", "DELETE") or not (
+            request.path == _PM_PREFIX or request.path.startswith(_PM_PREFIX + "/")):
+        return None
+    if request.path.startswith(_PM_PREFIX + "/api/feedback/disconnect/"):
+        return None
+    user = _get_user() or {}
+    if not (user.get("email") or "").lower().endswith("@position2.com"):
+        return None
+    return _pm_refuse_cross_site()
+
+
+def _pm_user_email():
+    return ((_get_user() or {}).get("email") or "").lower()
+
+
+def _pm_is_admin():
+    return _pm_user_email() in ADMIN_EMAILS
+
+
+def _pm_store_error(e):
+    return jsonify(error="The Paid Marketing store is unavailable: %s" % e), 503
+
+
+@app.route("/p2/paid-marketing")
+@position2_required
+def paid_marketing():
+    return render_template("paid_marketing.html", user=_get_user())
+
+
+@app.route("/p2/paid-marketing/pacing-desk")
+@position2_required
+def paid_pacing_desk():
+    return render_template("pacing_desk.html", user=_get_user())
+
+
+@app.route("/p2/paid-marketing/search-query-analysis")
+@position2_required
+def paid_sqr_agent():
+    return render_template("sqr_agent.html", user=_get_user())
+
+
+@app.route("/p2/paid-marketing/client-feedback-agent")
+@position2_required
+def paid_client_feedback():
+    return render_template("client_feedback_agent.html", user=_get_user(),
+                           is_admin=_pm_is_admin(),
+                           connected=request.args.get("connected", ""),
+                           connect_error=request.args.get("error", "")[:300])
+
+
+# Pacing Desk data ------------------------------------------------------------
+
+@app.route("/p2/paid-marketing/api/pacing/snapshots")
+@position2_required
+def paid_pacing_snapshots():
+    from tracker import paid_store
+    try:
+        return jsonify(snapshots=paid_store.list_snapshots(), latest=paid_store.latest_date())
+    except paid_store.StoreUnavailable as e:
+        return _pm_store_error(e)
+
+
+@app.route("/p2/paid-marketing/api/pacing/snapshots/<date>")
+@position2_required
+def paid_pacing_snapshot(date):
+    from tracker import paid_pacing, paid_store
+    if not paid_pacing.DATE_RE.match(date):
+        abort(404)
+    try:
+        snap = paid_store.get_snapshot(date)
+    except paid_store.StoreUnavailable as e:
+        return _pm_store_error(e)
+    if not snap:
+        return jsonify(error="No Pacing Desk snapshot for %s." % date), 404
+    return jsonify(snap)
+
+
+@app.route("/p2/paid-marketing/api/pacing/moves")
+@position2_required
+def paid_pacing_moves():
+    from tracker import paid_pacing, paid_store
+    date = request.args.get("date", "")
+    if not paid_pacing.DATE_RE.match(date):
+        return jsonify(error="date should be YYYY-MM-DD"), 400
+    try:
+        return jsonify(moves=paid_store.list_moves(date))
+    except paid_store.StoreUnavailable as e:
+        return _pm_store_error(e)
+
+
+@app.route("/p2/paid-marketing/api/pacing/moves/<move_id>", methods=["PUT"])
+@position2_required
+def paid_pacing_set_move(move_id):
+    from tracker import paid_pacing, paid_store
+    try:
+        f = paid_pacing.check_move(move_id, request.get_json(silent=True))
+    except paid_pacing.BadPayload as e:
+        return jsonify(error=str(e)), 400
+    try:
+        return jsonify(move=paid_store.set_move(move_id, by=_pm_user_email(), **f))
+    except paid_store.StoreUnavailable as e:
+        return _pm_store_error(e)
+
+
+@app.route("/p2/paid-marketing/api/pacing/seed", methods=["POST"])
+def paid_pacing_seed():
+    """The engine's daily push. No session: a shared secret in X-Seed-Secret,
+    and with PACING_SEED_SECRET unset every push is refused."""
+    import hmac
+    from tracker import paid_pacing, paid_store
+    secret = os.environ.get("PACING_SEED_SECRET", "")
+    given = request.headers.get("X-Seed-Secret", "")
+    if not secret or not hmac.compare_digest(given.encode("utf-8"), secret.encode("utf-8")):
+        return jsonify(error="Forbidden."), 403
+    if (request.content_length or 0) > 16 * 1024 * 1024:
+        return jsonify(error="That payload is over 16 MB."), 413
+    try:
+        meta, clients, latest = paid_pacing.build_seed(request.get_json(silent=True))
+    except paid_pacing.BadPayload as e:
+        return jsonify(error=str(e)), 400
+    try:
+        paid_store.save_snapshot(meta, clients, latest)
+    except paid_store.StoreUnavailable as e:
+        return _pm_store_error(e)
+    app.logger.info("paid marketing: Pacing Desk snapshot %s stored (%d clients, %d accounts)",
+                    meta["asOf"], meta["clientCount"], meta["accountCount"])
+    return jsonify(ok=True, date=meta["asOf"], clients=meta["clientCount"],
+                   accounts=meta["accountCount"], latest=latest)
+
+
+# Search Query Analysis -------------------------------------------------------
+
+@app.route("/p2/paid-marketing/api/sqr/classify", methods=["POST"])
+@position2_required
+def paid_sqr_classify():
+    from tracker import paid_sqr
+    from tracker.market_radar_llm import ModelError
+    body = request.get_json(silent=True) or {}
+    try:
+        results = paid_sqr.classify(body.get("ruleset"), body.get("terms"))
+    except paid_sqr.BadRequest as e:
+        return jsonify(error=str(e)), 400
+    except ModelError as e:
+        app.logger.warning("paid marketing: SQR classify failed: %s", e)
+        return jsonify(error="The model could not classify this batch (%s)." % e.kind), 502
+    return jsonify(results=results)
+
+
+# Client Feedback Agent -------------------------------------------------------
+
+FEEDBACK_DAILY_CAP = 150
+
+
+@app.route("/p2/paid-marketing/api/feedback/status")
+@position2_required
+def paid_feedback_status():
+    from tracker import paid_feedback
+    out = paid_feedback.status()
+    out["isAdmin"] = _pm_is_admin()
+    return jsonify(out)
+
+
+@app.route("/p2/paid-marketing/api/feedback/chat", methods=["POST"])
+@position2_required
+def paid_feedback_chat():
+    from tracker import paid_feedback, paid_store
+    body = request.get_json(silent=True) or {}
+    question = body.get("message")
+    if not isinstance(question, str) or not question.strip():
+        return jsonify(error="Ask a question first."), 400
+    if len(question) > paid_feedback.MAX_QUESTION_CHARS:
+        return jsonify(error="That question is over %d characters." % paid_feedback.MAX_QUESTION_CHARS), 400
+    if not os.environ.get("ANTHROPIC_API_KEY"):
+        return jsonify(error="ANTHROPIC_API_KEY is not set on this server."), 503
+    email = _pm_user_email()
+    try:
+        running, today = paid_store.job_counts(email, paid_feedback.JOB_STALE_S)
+        if running:
+            return jsonify(error="Your previous question is still being answered."), 429
+        if today >= FEEDBACK_DAILY_CAP:
+            return jsonify(error="That is %d questions in a day, the most this allows." % today), 429
+        job_id = paid_feedback.start(question.strip(), body.get("history"), email)
+    except paid_store.StoreUnavailable as e:
+        return _pm_store_error(e)
+    return jsonify(job_id=job_id), 202
+
+
+@app.route("/p2/paid-marketing/api/feedback/jobs/<job_id>")
+@position2_required
+def paid_feedback_job(job_id):
+    from tracker import paid_feedback, paid_store
+    if not re.fullmatch(r"[0-9a-f]{32}", job_id or ""):
+        abort(404)
+    try:
+        job = paid_feedback.read_job(job_id)
+    except paid_store.StoreUnavailable as e:
+        return _pm_store_error(e)
+    # An answer can quote the shared inbox: only the person who asked (or an
+    # admin) reads it back.
+    if not job or (job["createdBy"] != _pm_user_email() and not _pm_is_admin()):
+        abort(404)
+    return jsonify(job)
+
+
+def _pm_callback_url(provider):
+    """The redirect URI registered with Slack/Google: https, this host."""
+    return "https://%s%s/auth/%s/callback" % (request.host, _PM_PREFIX, provider)
+
+
+@app.route("/p2/paid-marketing/auth/<provider>/start")
+@admin_required
+def paid_feedback_connect(provider):
+    from tracker import paid_feedback
+    if provider not in paid_feedback.PROVIDERS:
+        abort(404)
+    if not paid_feedback.configured()[provider]:
+        return redirect("%s/client-feedback-agent?error=%s" % (
+            _PM_PREFIX, "FEEDBACK_%s_CLIENT_ID and _SECRET are not set on the server." % provider.upper()))
+    state = paid_feedback.new_state()
+    session["pm_oauth_state"] = {"provider": provider, "state": state, "ts": time.time()}
+    return redirect(paid_feedback.authorize_url(provider, _pm_callback_url(provider), state))
+
+
+@app.route("/p2/paid-marketing/auth/<provider>/callback")
+@admin_required
+def paid_feedback_callback(provider):
+    from urllib.parse import quote
+    from tracker import paid_feedback, paid_store
+    if provider not in paid_feedback.PROVIDERS:
+        abort(404)
+    page = _PM_PREFIX + "/client-feedback-agent"
+    expected = session.pop("pm_oauth_state", None) or {}
+    state = request.args.get("state", "")
+    if (expected.get("provider") != provider or not state
+            or not _pm_same_secret(state, expected.get("state") or "")
+            or time.time() - float(expected.get("ts") or 0) > 900):
+        return redirect(page + "?error=" + quote("That sign-in link expired or did not start here. Try Connect again."))
+    if request.args.get("error"):
+        return redirect(page + "?error=" + quote("%s said: %s" % (provider.title(), request.args.get("error")[:200])))
+    code = request.args.get("code", "")
+    if not code:
+        return redirect(page + "?error=" + quote("%s sent no authorisation code." % provider.title()))
+    try:
+        paid_feedback.exchange_code(provider, code, _pm_callback_url(provider), by=_pm_user_email())
+    except paid_feedback.OAuthFailed as e:
+        return redirect(page + "?error=" + quote(str(e)[:300]))
+    except (paid_store.StoreUnavailable, requests.RequestException, ValueError) as e:
+        app.logger.warning("paid marketing: %s connect failed: %s", provider, e)
+        return redirect(page + "?error=" + quote("Connecting %s failed: %s" % (provider.title(), str(e)[:200])))
+    return redirect(page + "?connected=" + provider)
+
+
+def _pm_same_secret(a, b):
+    import hmac
+    return hmac.compare_digest(str(a).encode("utf-8"), str(b).encode("utf-8"))
+
+
+@app.route("/p2/paid-marketing/api/feedback/disconnect/<provider>", methods=["POST"])
+@admin_required
+def paid_feedback_disconnect(provider):
+    from tracker import paid_feedback, paid_store
+    if provider not in paid_feedback.PROVIDERS:
+        abort(404)
+    refused = _pm_refuse_cross_site()
+    if refused:
+        return refused
+    try:
+        paid_store.delete_token(provider)
+    except paid_store.StoreUnavailable as e:
+        return _pm_store_error(e)
+    return jsonify(ok=True)
+
+
 # ── Embedded dashboards ─────────────────────────────────────────────────────────
 _SERP_BASE = "https://seo-apps-production-37a6.up.railway.app"
 
@@ -18134,6 +18445,19 @@ DATA section below when available — use those numbers, never a memorised figur
 
 AD INTELLIGENCE (/p2/strategic-agents/ad-intelligence): tracks competitors' running ads (headline, CTA, format,
 keywords, messaging angle, first/last seen) pulled from a shared Google Sheet.
+
+PAID MARKETING AGENTS (/p2/paid-marketing): the PPC team's three agents, from Agent Holmes.
+Pacing Desk (/p2/paid-marketing/pacing-desk): reads each morning's Google Ads export and the Budget Tracker,
+projects every account to month end from actual spend per active day (never from the daily cap), labels it
+over/under/on target against ideal pacing ((today-1)/days in month, +2pp tolerance), and recommends budget
+moves between categories inside one location that net to zero; anyone can tick a move as applied. The
+engine runs on the PPC team's machine and pushes its result to the platform. Search Query Analysis
+(/p2/paid-marketing/search-query-analysis): upload a search terms CSV; each account's rules (Riccobene, OIA,
+Eventgroove, 42 North, McHale, Beta Bionics placeholder, or generic) settle most terms, Claude classifies the
+rest, and it outputs priority negatives, new keywords, client-review items and a 7-sheet workbook. Client
+Feedback Agent (/p2/paid-marketing/client-feedback-agent): a chat that answers from live Slack, Gmail, meeting
+transcripts (Zoom first when configured, else the Meeting Notes Drive folder) and the Budget Tracker, through
+one shared Slack and Google account an admin connects.
 
 SEO STUDIO (/p2/seo-aeo/<tool>) and the /app agents: a suite of SEO/GEO tools (Keyword Finder, Content Brief
 Generator, Content Enhancer, SEO & GEO Audit, Agentic Readiness Audit, Competitor Analysis, and more).
