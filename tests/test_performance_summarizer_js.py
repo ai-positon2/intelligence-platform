@@ -140,3 +140,68 @@ def test_index_to_100_starts_at_the_first_real_value():
     assert run("P.indexTo100([0,0,50,100,25])") == [0, 0, 100, 200, 50]
     assert run("P.indexTo100([0,0,0])") == [None, None, None]
     assert run("[P.initials('Gentle Dental'),P.initials('1369614 B.C. LTD. (BD Engine Brake)'),P.fmtId('2497090182')]") == ["GD", "1B", "249-709-0182"]
+
+
+# ── Charts a reader can build ──────────────────────────────────────────────
+
+def test_every_kind_of_chart_says_why_it_cannot_draw_a_grouping():
+    got = run("Object.fromEntries(['line','stacked','radar','pie','hbar'].map(t=>[t,['day','dow','hour','campaign'].map(d=>P.typeBlock(d,t,false)?1:0)]))")
+    assert got == {"line": [0, 0, 0, 1],            # a line over campaigns means nothing
+                   "stacked": [0, 0, 1, 1],         # stacking needs a time or weekday axis
+                   "radar": [1, 0, 0, 0],           # thirty days make an unreadable radar
+                   "pie": [0, 0, 0, 0], "hbar": [0, 0, 0, 0]}
+    assert "weeks" in run("P.typeBlock('campaign','area',false)") and "lines" in run("P.typeBlock('day','pie',true)")
+    assert run("[P.typeBlock('day','line',true),P.typeBlock('day','stacked',true)]")[0] == ""
+
+
+def test_changing_the_grouping_keeps_the_kind_when_it_still_works_else_picks_a_natural_one():
+    assert run("[P.fixType('week','area',false),P.fixType('campaign','area',false),P.fixType('campaign','pie',false),"
+               "P.fixType('device','combo',false),P.fixType('day','radar',false),P.fixType('dow','radar',false)]") \
+        == ["area", "hbar", "pie", "hbar", "line", "radar"]
+    assert run("P.fixType('campaign','pie',true)") == "line"                  # comparing accounts only draws lines
+
+
+def test_metrics_that_cannot_fill_a_chart_are_told_so_before_it_draws_nothing():
+    assert run("P.typeNeeds('pie',['cpa'])").startswith("A pie shows a share of a total")
+    assert run("[P.typeNeeds('donut',['clicks']),P.typeNeeds('pie',['conversions','cpa']),P.typeNeeds('line',['cpa'])]") == ["", "", ""]
+    assert run("P.typeNeeds('stacked',['roas'])").startswith("Stacking adds parts")
+    assert run("[P.typeNeeds('scatter',['cost']),P.typeNeeds('scatter',['cost','clicks'])]")[1] == ""
+    assert "at least two metrics" in run("P.typeNeeds('scatter',['cost'])")
+
+
+def test_break_down_by_only_applies_to_kinds_and_groupings_that_can_show_it():
+    assert run("[P.seriesAllowed('day','stacked',false),P.seriesAllowed('dow','line',false),P.seriesAllowed('campaign','bar',false),"
+               "P.seriesAllowed('day','pie',false),P.seriesAllowed('day','line',true),P.seriesAllowed('hour','area',false)]") \
+        == [True, True, False, False, False, False]
+
+
+def test_metrics_of_different_sizes_share_an_axis_as_a_share_of_their_own_peak():
+    assert run("P.relative([0,25,50,null])") == [0, 50, 100, None]
+    assert run("P.relative([0,0])") == [0, 0] and run("P.relative([])") == []
+
+
+def test_a_pie_folds_the_small_slices_into_other_but_not_a_single_one():
+    out = run("(()=>{const it=n=>Array.from({length:n},(_,i)=>({label:'c'+i,t:[0,0,10-i,0,0],ids:['id'+i]}));"
+              "return [P.foldTop(it(3),8,i=>i.t[2]).map(i=>i.label),P.foldTop(it(9),8,i=>i.t[2]).map(i=>i.label),"
+              "P.foldTop(it(11),8,i=>i.t[2]).map(i=>[i.label,i.t[2],i.ids&&i.ids.length])]})()")
+    assert out[0] == ["c0", "c1", "c2"] and out[1] == ["c%d" % i for i in range(9)]       # 9 is within 8 + 1: nothing to fold
+    assert out[2][-1] == ["Other (3)", 2 + 1 + 0, 3]                          # c8, c9 and c10 folded together, ids kept for the click
+    assert [r[0] for r in out[2][:8]] == ["c%d" % i for i in range(8)]
+
+
+def test_break_down_groups_campaigns_by_type_or_by_top_spenders():
+    d = ("{days:['2026-10-01'],campaigns:[{id:'1',name:'A',type:'SEARCH'},{id:'2',name:'B',type:'SEARCH'},"
+         "{id:'3',name:'C',type:'DISPLAY'},{id:'4',name:'D',type:'SEARCH'}],"
+         "rows:[[0,0,10,1,50,0,0],[1,0,10,1,30,0,0],[2,0,10,1,90,0,0],[3,0,0,0,0,0,0]]}")
+    by_type = run("P.seriesGroups(%s,null,'type').map(g=>[g.name,[...g.idx]])" % d)
+    assert by_type == [["Display", [2]], ["Search", [0, 1]]]            # biggest spender first; D has no activity and is left out
+    top = run("P.seriesGroups(%s,null,'campaign',2).map(g=>[g.name,[...g.idx]])" % d)
+    assert top == [["C", [2]], ["A", [0]], ["Other (1)", [1]]]
+    assert run("P.seriesGroups(%s,new Set([0,2]),'type').map(g=>g.name)" % d) == ["Display", "Search"]      # honours the campaign filter
+    assert run("P.seriesGroups(%s,null,'').length" % d) == 0
+
+
+def test_choosing_a_stack_starts_with_something_to_stack_and_keeps_a_choice_already_made():
+    assert run("P.withType({type:'line',series:''},'stacked')") == {"type": "stacked", "series": "type"}
+    assert run("P.withType({type:'line',series:'campaign'},'stackedarea')") == {"type": "stackedarea", "series": "campaign"}
+    assert run("P.withType({type:'line',series:''},'pie')") == {"type": "pie", "series": ""}

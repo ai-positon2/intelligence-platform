@@ -1,7 +1,7 @@
 {% extends "_paid_base.html" %}
 {% block title %}Performance Summarizer{% endblock %}
 {% block head %}
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/performance_summarizer.css') }}?v=4">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/performance_summarizer.css') }}?v=6">
 {% endblock %}
 {% block content %}
 <div class="pm pm-ps" id="ps">
@@ -39,6 +39,8 @@
       </div>
       <p class="ps-range-note" id="rangeNote"></p>
       <div class="ps-cmd-tools">
+        <button type="button" class="pm-btn-ghost ps-cta" id="studioBtn" title="Build your own chart: pick the kind, the metrics and how to slice it">
+          <svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg><span>Create a chart</span></button>
         <button type="button" class="pm-btn-ghost" id="shareBtn" title="Copy a link to exactly this view">
           <svg viewBox="0 0 24 24"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg><span>Share view</span></button>
         <button type="button" class="pm-btn-ghost" id="exportBtn" title="Download the numbers on this page">
@@ -61,6 +63,15 @@
       <aside class="ps-insights" id="insights"></aside>
     </div>
 
+    <!-- Chart studio: build any chart, then keep it -->
+    <div class="ps-sec-h" id="studioSec"><div><h2>Chart studio</h2><span class="ps-hint ps-hint-b">Pick a chart, choose your metrics, slice it your way. It draws as you go.</span></div></div>
+    <section id="studio"></section>
+
+    <div class="ps-sec-h"><h2>Your charts</h2>
+      <button type="button" class="pm-btn-ghost" id="addChart"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg><span>Blank chart</span></button></div>
+    <p class="ps-hint ps-board-hint" id="boardHint"></p>
+    <section class="ps-board" id="board"></section>
+
     <!-- Splits -->
     <div class="ps-sec-h"><h2>Where the money goes</h2>
       <div class="ps-seg ps-seg-s" id="splitSeg" role="radiogroup" aria-label="Split by"></div></div>
@@ -75,17 +86,12 @@
     <div class="ps-sec-h"><h2>Campaigns</h2><span class="ps-hint" id="campHint"></span></div>
     <section class="pm-panel ps-card ps-tablecard" id="camps"></section>
 
-    <!-- Charts the reader keeps -->
-    <div class="ps-sec-h"><h2>Your charts</h2>
-      <button type="button" class="pm-btn-ghost" id="addChart"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg><span>New chart</span></button></div>
-    <p class="ps-hint ps-board-hint" id="boardHint"></p>
-    <section class="ps-board" id="board"></section>
   </div>
 </div>
 {% endblock %}
 {% block scripts %}
 <script src="{{ url_for('static', filename='vendor/chart.umd.js') }}"></script>
 <script src="{{ url_for('static', filename='js/pm_picker.js') }}?v=1"></script>
-<script src="{{ url_for('static', filename='js/ps_data.js') }}?v=1"></script>
-<script src="{{ url_for('static', filename='js/performance_summarizer.js') }}?v=4"></script>
+<script src="{{ url_for('static', filename='js/ps_data.js') }}?v=3"></script>
+<script src="{{ url_for('static', filename='js/performance_summarizer.js') }}?v=6"></script>
 {% endblock %}

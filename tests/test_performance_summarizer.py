@@ -407,3 +407,19 @@ def test_no_em_dash_in_what_this_agent_shows():
     for p in (("static", "js", "performance_summarizer.js"), ("static", "js", "ps_data.js"),
               ("templates", "performance_summarizer.html"), ("static", "css", "performance_summarizer.css")):
         assert "—" not in _read(*p), p
+
+
+def test_every_chart_kind_has_a_picture_and_the_studio_is_on_the_page():
+    js = _read("static", "js", "performance_summarizer.js")
+    kinds = re.findall(r'\{k:"([a-z]+)",l:"[^"]+",hint:', _read("static", "js", "ps_data.js"))
+    assert len(kinds) == 11 and {"line", "area", "bar", "hbar", "combo", "stacked", "stackedarea", "pie", "donut", "radar", "scatter"} == set(kinds)
+    icons = js.split("var TYPE_ICON={", 1)[1].split("};", 1)[0]
+    assert all(re.search(r"\b%s:'<" % k, icons) for k in kinds), [k for k in kinds if not re.search(r"\b%s:'<" % k, icons)]
+    html = _read("templates", "performance_summarizer.html")
+    assert 'id="studio"' in html and 'id="studioSec"' in html and 'id="studioBtn"' in html
+    assert html.index('id="studio"') < html.index('id="board"') < html.index('id="splits"')      # build it, keep it, then the fixed panels
+
+
+def test_a_saved_or_linked_chart_can_only_use_kinds_and_groupings_that_exist():
+    js = _read("static", "js", "performance_summarizer.js")
+    assert "P.TYPE[s.type]" in js and "P.DIM[s.dim]" in js and 'P.TYPE[h.t]' in js and 'P.DIM[h.g]' in js

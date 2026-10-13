@@ -368,6 +368,98 @@ function insights(ctx){
   return out.slice(0,7);
 }
 
+
+/* ── Charts a reader can build ──
+   What each grouping is, which chart kinds can draw it, and what a kind needs
+   from the metrics. The page greys out what cannot work and says why, and
+   switches to a kind that can when a grouping is changed under it. */
+var DIMS = [
+  {k:"day",l:"Day",time:1},{k:"week",l:"Week",time:1},{k:"month",l:"Month",time:1},
+  {k:"dow",l:"Day of week"},{k:"hour",l:"Hour of day",ex:1},
+  {k:"campaign",l:"Campaign",rank:1},{k:"type",l:"Campaign type",rank:1},
+  {k:"device",l:"Device",ex:1,rank:1},{k:"network",l:"Network",ex:1,rank:1}
+];
+var DIM = {}; DIMS.forEach(function(d){DIM[d.k]=d;});
+var TYPES = [
+  {k:"line",l:"Line",hint:"Trends over time"},
+  {k:"area",l:"Area",hint:"Trends, with weight"},
+  {k:"bar",l:"Bars",hint:"Compare sizes side by side"},
+  {k:"hbar",l:"Horizontal bars",hint:"Rankings, and long names"},
+  {k:"combo",l:"Bars + lines",hint:"The first metric as bars, the rest as lines"},
+  {k:"stacked",l:"Stacked bars",hint:"Parts that add up (use Break down by)"},
+  {k:"stackedarea",l:"Stacked area",hint:"Parts of the whole over time (use Break down by)"},
+  {k:"pie",l:"Pie",hint:"Share of a total"},
+  {k:"donut",l:"Donut",hint:"Share of a total, with the total inside"},
+  {k:"radar",l:"Radar",hint:"Shape across many categories"},
+  {k:"scatter",l:"Scatter",hint:"One metric against another"}
+];
+var TYPE = {}; TYPES.forEach(function(t){TYPE[t.k]=t;});
+var ADDITIVE = {cost:1,impressions:1,clicks:1,conversions:1,value:1};     // totals that can be summed, shared out or stacked
+var SERIES_TYPES = {line:1,area:1,bar:1,stacked:1,stackedarea:1};         // kinds that can draw one line or bar per campaign / type
+var SERIES_KINDS = [{k:"",l:"Nothing"},{k:"type",l:"Campaign type"},{k:"campaign",l:"Campaign (top 8)"}];
+
+/* Why this kind of chart cannot draw this grouping, or "" when it can. */
+function typeBlock(dim,type,hasAccounts){
+  var d=DIM[dim]||{};
+  if(hasAccounts) return type==="line"?"":"Comparing accounts draws lines";
+  switch(type){
+    case "line": case "area": case "combo": return d.rank?"Needs days, weeks, months, weekdays or hours":"";
+    case "stacked": case "stackedarea": return (d.time||dim==="dow")?"":"Stacking needs days, weeks, months or weekdays";
+    case "radar": return dim==="day"?"Too many days for a radar. Try weeks or weekdays":"";
+  }
+  return "";
+}
+function defaultType(dim){return (DIM[dim]&&DIM[dim].rank)?"hbar":"line";}
+/* The kind to use after the grouping changed: the same one if it still works, else the natural one. */
+function fixType(dim,type,hasAccounts){return typeBlock(dim,type,hasAccounts)?(hasAccounts?"line":defaultType(dim)):type;}
+/* What the chosen metrics must be for this kind of chart, or "" when they are fine. */
+function typeNeeds(type,metrics){
+  if((type==="pie"||type==="donut")&&!ADDITIVE[metrics[0]]) return "A pie shows a share of a total, so start with spend, impressions, clicks, conversions or value.";
+  if((type==="stacked"||type==="stackedarea")&&!ADDITIVE[metrics[0]]) return "Stacking adds parts together, so start with spend, impressions, clicks, conversions or value.";
+  if(type==="scatter"&&metrics.length<2) return "Pick at least two metrics. The first goes across, the second up, and an optional third sets the size.";
+  return "";
+}
+/* Choose a kind of chart. A stack needs something to stack, so it starts by splitting on campaign type. */
+function withType(spec,type){
+  spec.type=type;
+  if((type==="stacked"||type==="stackedarea")&&!spec.series) spec.series="type";
+  return spec;
+}
+function seriesAllowed(dim,type,hasAccounts){
+  return !hasAccounts&&!!SERIES_TYPES[type]&&!!((DIM[dim]||{}).time||dim==="dow");
+}
+/* Each value as a percentage of the series' own peak, so metrics of different sizes can share one axis. */
+function relative(vals){
+  var mx=0; vals.forEach(function(v){if(v!=null&&v>mx)mx=v;});
+  return vals.map(function(v){return v==null?null:(mx?v/mx*100:0);});
+}
+/* The n biggest items by value(), the rest folded into one "Other (k)". Items are {label, t, ids}. */
+function foldTop(items,n,value){
+  var s=items.slice().sort(function(a,b){return (value(b)||0)-(value(a)||0);});
+  if(s.length<=n+1) return s;
+  var rest=zero(), ids=[];
+  s.slice(n).forEach(function(i){addTo(rest,i.t); if(i.ids) ids=ids.concat(i.ids);});
+  return s.slice(0,n).concat([{label:"Other ("+(s.length-n)+")",t:rest,ids:ids,rest:true}]);
+}
+/* The groups of campaigns a "break down by" draws: one per campaign type, or the top campaigns by spend and the rest as "Other". */
+function seriesGroups(data,set,kind,top){
+  var per=perCampaign(data), idx=[];
+  data.campaigns.forEach(function(c,i){if(sel(set,i)&&(per[i][COST]||per[i][IMPR]))idx.push(i);});
+  var out=[];
+  if(kind==="type"){
+    var by={}, order=[];
+    idx.forEach(function(i){var k=data.campaigns[i].type; if(!by[k]){by[k]=[];order.push(k);} by[k].push(i);});
+    order.sort(function(a,b){return sumCost(per,by[b])-sumCost(per,by[a]);});
+    order.forEach(function(k){out.push({name:label(TYPE_LABEL,k),idx:new Set(by[k])});});
+  }else if(kind==="campaign"){
+    idx.sort(function(a,b){return per[b][COST]-per[a][COST];});
+    idx.slice(0,top||8).forEach(function(i){out.push({name:data.campaigns[i].name,idx:new Set([i])});});
+    if(idx.length>(top||8)) out.push({name:"Other ("+(idx.length-(top||8))+")",idx:new Set(idx.slice(top||8))});
+  }
+  return out;
+}
+function sumCost(per,idx){return idx.reduce(function(a,i){return a+per[i][COST];},0);}
+
 /* ── Misc ── */
 function csvCell(v){
   if(v==null) return "";
@@ -397,6 +489,8 @@ var api = {
   zero:zero,addTo:addTo,filterSet:filterSet,total:total,daily:daily,perCampaign:perCampaign,campaignDaily:campaignDaily,byType:byType,
   bucket:bucket,byWeekday:byWeekday,hourGrid:hourGrid,byHour:byHour,DOW:DOW,
   TYPE_LABEL:TYPE_LABEL,DEVICE_LABEL:DEVICE_LABEL,NETWORK_LABEL:NETWORK_LABEL,label:label,
+  DIMS:DIMS,DIM:DIM,TYPES:TYPES,TYPE:TYPE,ADDITIVE:ADDITIVE,SERIES_TYPES:SERIES_TYPES,SERIES_KINDS:SERIES_KINDS,
+  typeBlock:typeBlock,withType:withType,defaultType:defaultType,fixType:fixType,typeNeeds:typeNeeds,seriesAllowed:seriesAllowed,relative:relative,foldTop:foldTop,seriesGroups:seriesGroups,
   insights:insights,toCsv:toCsv,csvCell:csvCell,hueOf:hueOf,initials:initials,fmtId:fmtId,indexTo100:indexTo100
 };
 root.PSData = api;
