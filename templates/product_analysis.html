@@ -1,0 +1,105 @@
+{% extends "_paid_base.html" %}
+{% block title %}Product Analysis{% endblock %}
+{% block head %}
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/performance_summarizer.css') }}?v=8">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/product_analysis.css') }}?v=1">
+{% endblock %}
+{% block content %}
+<div class="pm pm-ps pm-pa" id="pa">
+  <section class="pm-hero">
+    <div class="pm-hero-l">
+      <span class="pm-eyebrow"><span class="d"></span>Paid Marketing · Ecommerce</span>
+      <h1 class="pm-title">Know which products <span class="pm-grad">earn their ad spend.</span></h1>
+      <p class="pm-sub">Live from Google Ads Shopping and Performance Max. Every product sorted into stars, steady sellers, drags and
+        money pits, with the few clear things to do about each. <b>Change the rules</b> to match the client's margin and click any product to dig in.</p>
+    </div>
+    <div class="ps-live" id="live" aria-live="polite"><span class="ps-live-dot"></span><span id="liveText">Connecting to Google Ads…</span></div>
+  </section>
+
+  <!-- Command bar: which account, which days, compared with what -->
+  <section class="pm-panel ps-cmd" id="cmd">
+    <div class="ps-cmd-grid">
+      <div id="acctPick" class="ps-cmd-acct"></div>
+      <div class="ps-cmd-block">
+        <span class="pd-dd-k">Date range</span>
+        <div class="ps-ranges" id="ranges" role="group" aria-label="Date range"></div>
+        <div class="ps-custom" id="custom" hidden>
+          <input type="date" id="cStart" aria-label="Start date"><span>to</span><input type="date" id="cEnd" aria-label="End date">
+          <button type="button" class="pm-chip on" id="cApply">Apply</button>
+        </div>
+      </div>
+    </div>
+    <div class="ps-cmd-foot">
+      <div class="ps-cmd-cmp">
+        <span class="pd-dd-k">Compare with</span>
+        <div class="ps-seg" id="cmpSeg" role="radiogroup" aria-label="Compare with">
+          <button type="button" role="radio" data-c="prev" aria-checked="true">Previous period</button>
+          <button type="button" role="radio" data-c="yoy" aria-checked="false">Last year</button>
+          <button type="button" role="radio" data-c="none" aria-checked="false">Nothing</button>
+        </div>
+      </div>
+      <p class="ps-range-note" id="rangeNote"></p>
+      <div class="ps-cmd-tools">
+        <button type="button" class="pm-btn-ghost ps-cta" id="tuneBtn" aria-expanded="false" aria-controls="tune" title="Set the target and the thresholds that decide which group a product falls in">
+          <svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg><span>Rules</span></button>
+        <button type="button" class="pm-btn-ghost" id="shareBtn" title="Copy a link to exactly this view">
+          <svg viewBox="0 0 24 24"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg><span>Share view</span></button>
+        <button type="button" class="pm-btn-ghost" id="exportBtn" title="Download the products in the table below as a CSV">
+          <svg viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg><span>Export</span></button>
+      </div>
+    </div>
+    <div class="pa-tune" id="tune" hidden></div>
+  </section>
+
+  <div id="notice"></div>
+  <div class="ps-stale" id="staleBar" hidden></div>
+
+  <div id="dash" hidden>
+    <!-- Key numbers -->
+    <div class="ps-sec-h"><div><h2>Key numbers</h2><span class="ps-hint ps-hint-b" id="kpiHint"></span></div></div>
+    <section class="ps-kpis" id="kpis"></section>
+
+    <!-- What to do -->
+    <div class="ps-sec-h"><div><h2>What to do</h2><span class="ps-hint ps-hint-b">Each one opens the products behind it in the table below.</span></div></div>
+    <section class="pa-actions" id="actions"></section>
+
+    <!-- The 80/20 curve and what stands out -->
+    <div class="ps-main">
+      <section class="pm-panel ps-card" id="paretoCard"></section>
+      <aside class="ps-insights" id="insights"></aside>
+    </div>
+
+    <!-- Groups: where the money goes and what comes back -->
+    <div class="ps-sec-h"><div><h2>Where the money goes, and what comes back</h2><span class="ps-hint ps-hint-b">Click a group to see its products.</span></div></div>
+    <div class="ps-two pa-two">
+      <section class="pm-panel ps-card" id="groups"></section>
+      <section class="pm-panel ps-card" id="bubble"></section>
+    </div>
+
+    <!-- By brand and type, and the daily trend -->
+    <div class="ps-sec-h"><h2>Brands, types and trend</h2></div>
+    <div class="ps-two pa-two">
+      <section class="pm-panel ps-card" id="rollup"></section>
+      <section class="pm-panel ps-card" id="trend"></section>
+    </div>
+
+    <!-- Movers -->
+    <div id="moversSec">
+      <div class="ps-sec-h"><div><h2>What moved</h2><span class="ps-hint ps-hint-b" id="moversHint"></span></div></div>
+      <section class="ps-two pa-movers" id="movers"></section>
+    </div>
+
+    <!-- Every product -->
+    <div class="ps-sec-h"><div><h2>Every product</h2><span class="ps-hint" id="prodHint"></span></div></div>
+    <section class="pm-panel ps-card ps-tablecard" id="prods"></section>
+  </div>
+  <div class="pa-drawer" id="drawer" hidden aria-hidden="true"></div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='vendor/chart.umd.js') }}"></script>
+<script src="{{ url_for('static', filename='js/pm_picker.js') }}?v=1"></script>
+<script src="{{ url_for('static', filename='js/ps_data.js') }}?v=4"></script>
+<script src="{{ url_for('static', filename='js/pa_data.js') }}?v=1"></script>
+<script src="{{ url_for('static', filename='js/product_analysis.js') }}?v=1"></script>
+{% endblock %}

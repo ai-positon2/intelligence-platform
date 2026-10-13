@@ -65,7 +65,7 @@
       <div class="hb-cue"><span></span></div>
     </div>
 
-    <!-- Client launcher: one client, all four agents (static/js/paid_marketing.js) -->
+    <!-- Client launcher: one client, all five agents (static/js/paid_marketing.js) -->
     <section class="pm pm-launch" id="launch">
       <div class="pm-panel pl-panel">
         <div class="pl-top">
@@ -74,6 +74,9 @@
             <a class="pl-act pl-pf" data-act="perf" href="/p2/paid-marketing/performance-summarizer">
               <span class="ic"><svg viewBox="0 0 24 24"><path d="M4 19V9"/><path d="M10 19V5"/><path d="M16 19v-7"/><path d="M22 19H2"/></svg></span>
               <span><span class="t">See performance</span><span class="s" data-s="perf">Live from Google Ads</span></span></a>
+            <a class="pl-act pl-pa" data-act="prod" href="/p2/paid-marketing/product-analysis">
+              <span class="ic"><svg viewBox="0 0 24 24"><path d="M5 7h14l-1.5 9a2 2 0 0 1-2 1.7H8.5a2 2 0 0 1-2-1.7z"/><path d="M9 7a3 3 0 0 1 6 0"/></svg></span>
+              <span><span class="t">Analyze products</span><span class="s" data-s="prod">Which items earn their spend</span></span></a>
             <a class="pl-act pl-pd" data-act="pacing" href="/p2/paid-marketing/pacing-desk">
               <span class="ic"><svg viewBox="0 0 24 24"><path d="M3 20h18"/><path d="M6 16v-4"/><path d="M11 16V8"/><path d="M16 16v-6"/></svg></span>
               <span><span class="t">Check pacing</span><span class="s" data-s="pacing">Every account, today</span></span></a>
@@ -117,6 +120,26 @@
           <div class="pm pl-live" data-live="perf"></div>
           <div class="card-footer">
             <div class="card-tags"><span class="tag">Live</span><span class="tag">Charts</span></div>
+            <span class="card-arrow">→</span>
+          </div>
+        </div>
+      </a>
+
+      <!-- Product Analysis (2026-10-13): per-product Shopping and Performance Max, read from the Google Ads API -->
+      <a href="/p2/paid-marketing/product-analysis" class="dash-card active c-prod">
+        <div class="card-band"></div>
+        <div class="card-thumb">
+          <div class="card-thumb-icon"><svg class="au-ic" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 7h14l-1.5 9a2 2 0 0 1-2 1.7H8.5a2 2 0 0 1-2-1.7z"/><path d="M9 7a3 3 0 0 1 6 0"/><path d="M9 12h6"/></svg></div>
+          <div class="card-thumb-badge tb-live"><span class="tb-dot live"></span> Live</div>
+        </div>
+        <div class="card-body">
+          <div class="card-name">Product Analysis</div>
+          <div class="card-desc">
+            For ecommerce accounts. Sorts every product into stars, steady sellers, drags and money pits,
+            shows which few products carry the account, and lists what to cut, fix or push, with the spend behind each.
+          </div>
+          <div class="card-footer">
+            <div class="card-tags"><span class="tag">Live</span><span class="tag">Ecommerce</span></div>
             <span class="card-arrow">→</span>
           </div>
         </div>
@@ -236,6 +259,7 @@
     {t:'Paid Marketing Agents',d:'Performance, pacing, search terms, segments & client feedback',u:'/p2/paid-marketing',i:'◆'},
     {t:'SEO + AEO Tools',d:'Organic intelligence',u:'/p2/seo-aeo',i:'⌕'},
     {t:'Performance Summarizer',d:'Live Google Ads, chart anything',u:'/p2/paid-marketing/performance-summarizer',i:'◈'},
+    {t:'Product Analysis',d:'Which products earn their ad spend',u:'/p2/paid-marketing/product-analysis',i:'▣'},
     {t:'Pacing Desk',d:'Where to move budget today',u:'/p2/paid-marketing/pacing-desk',i:'▥'},
     {t:'Search Query Analysis',d:'Classify a search terms report',u:'/p2/paid-marketing/search-query-analysis',i:'⌕'},
     {t:'Client Feedback Agent',d:'Ask Slack, Gmail & meeting notes',u:'/p2/paid-marketing/client-feedback-agent',i:'✦'},

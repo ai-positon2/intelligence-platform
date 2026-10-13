@@ -2,6 +2,7 @@
  *
  * Pick a client and the five actions become deep links aimed at them:
  *   Performance Summarizer #a=<Google Ads account id> (matched to the client by name)
+ *   Product Analysis       the same #a=<Google Ads account id>
  *   Pacing Desk            ?client=<name>
  *   Client Feedback Agent  ?client=<name>
  *   Search Query Analysis  ?account=<ruleset id> (the client's own rules,
@@ -43,7 +44,7 @@ var picker = window.PMPicker(document.getElementById("launchPick"), {label:"Jump
 
 function paintPicker(){
   byName={}; clients.forEach(function(c){byName[c.name]=c});
-  var items=[{value:"",label:"All clients",sub:clients.length+" clients across the three agents",icon:ALL,hue:36}];
+  var items=[{value:"",label:"All clients",sub:clients.length+" clients across the agents",icon:ALL,hue:36}];
   clients.forEach(function(c){
     var r=rulesFor(c.name);
     items.push({value:c.name,label:c.name,avatar:inits(c.name),hue:hueOf(c.name),
@@ -58,11 +59,12 @@ function paintPicker(){
 function paintActions(bump){
   var c=byName[chosen], r=chosen?rulesFor(chosen):null, q=chosen?"?client="+encodeURIComponent(chosen):"";
   var ads=chosen?adsFor(chosen):null;
-  var acts={perf:BASE+"/performance-summarizer"+(ads?"#a="+ads.id:""),pacing:BASE+"/pacing-desk"+q, feedback:BASE+"/client-feedback-agent"+q,
+  var acts={perf:BASE+"/performance-summarizer"+(ads?"#a="+ads.id:""),prod:BASE+"/product-analysis"+(ads?"#a="+ads.id:""),pacing:BASE+"/pacing-desk"+q, feedback:BASE+"/client-feedback-agent"+q,
     sqr:BASE+"/search-query-analysis"+(chosen?"?account="+(r?r[1]:"generic"):""),
     segments:BASE+"/segment-analysis"+q};
   var subs={
     perf:chosen?(ads?"Live: "+ads.name:"Pick an account inside"):"Live from Google Ads",
+    prod:chosen?(ads?"Live: "+ads.name:"Pick an account inside"):"Which items earn their spend",
     pacing:chosen?(c&&c.accounts!=null?c.offTarget+" of "+c.accounts+" account"+(c.accounts===1?"":"s")+" off target":"Their accounts, today"):"Every account, today",
     feedback:chosen?"Aimed at "+chosen:"Slack, Gmail, meetings",
     sqr:chosen?(r?"With "+r[2]+" rules":"With the generic rules"):"Pick an account's rules",

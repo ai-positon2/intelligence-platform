@@ -4195,6 +4195,8 @@ def seo_aeo_legacy_redirect(rest=""):
 #   Performance Summarizer live Google Ads numbers for any account under the
 #                          Position2 manager account, charted any way the
 #                          reader likes (tracker/paid_gads.py, read-only)
+#   Product Analysis       which products earn their ad spend, per Google Ads
+#                          account (tracker/paid_products.py, read-only)
 #   Pacing Desk            where to move budget today so every account lands
 #                          the month on budget (tracker/paid_pacing.py; the
 #                          engine itself runs on the PPC team's machine and
@@ -4483,6 +4485,35 @@ def paid_gads_extras():
         out = dict(paid_gads.extras(paid_store, acct["id"], start, end, notes=saved))
         out["stale"] = min(saved) if saved else None
         return jsonify(out)
+    return _gads_guard(run)
+
+
+# Product Analysis (Ecommerce) -------------------------------------------------
+# Per-product Shopping and Performance Max numbers from the same read-only
+# Google Ads sign-in (tracker/paid_products.py). Both routes are GETs behind the
+# Position2 login and share the Performance Summarizer's quota handling.
+
+@app.route("/p2/paid-marketing/product-analysis")
+@position2_required
+def paid_product_analysis():
+    return render_template("product_analysis.html", user=_get_user())
+
+
+@app.route("/p2/paid-marketing/api/gads/products")
+@position2_required
+def paid_gads_products():
+    from tracker import paid_gads, paid_products, paid_store
+
+    def run():
+        acct = _gads_account(paid_store)
+        start, end = paid_gads.check_range(request.args.get("start", ""), request.args.get("end", ""), "the range")
+        cmp = None
+        cs, ce = request.args.get("compare_start", ""), request.args.get("compare_end", "")
+        if cs or ce:
+            cmp = paid_gads.check_range(cs, ce, "the comparison range")
+        current, compare, saved = paid_products.analysis(paid_store, acct["id"], (start, end), cmp)
+        return jsonify(account=acct, current=current, compare=compare, stale=min(saved) if saved else None,
+                       blockedUntil=paid_gads.blocked_until(paid_store) or None)
     return _gads_guard(run)
 
 
@@ -18669,7 +18700,10 @@ moves between categories inside one location that net to zero; anyone can tick a
 engine runs on the PPC team's machine, or the Refresh button rebuilds it from the two Google Sheets. Performance
 Summarizer (/p2/paid-marketing/performance-summarizer): live Google Ads numbers for any of the ~50 accounts under
 the Position2 manager account, chartable by any metric against any other, split by day, week, month, weekday, hour,
-campaign, campaign type, device or network, compared with the previous period or last year. Search Query Analysis
+campaign, campaign type, device or network, compared with the previous period or last year. Product Analysis
+(/p2/paid-marketing/product-analysis): for ecommerce accounts, every Shopping and Performance Max product sorted into
+stars, steady sellers, below target and spend with no sales, the products that carry the account, and a list of what
+to cut, fix or push. Search Query Analysis
 (/p2/paid-marketing/search-query-analysis): upload a search terms CSV; each account's rules (Riccobene, OIA,
 Eventgroove, 42 North, McHale, Beta Bionics placeholder, or generic) settle most terms, Claude classifies the
 rest, and it outputs priority negatives, new keywords, client-review items and a 7-sheet workbook. Client
