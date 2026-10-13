@@ -15,6 +15,11 @@ pm_ prefix so they never collide with that service's own tables.
                         who ticked it
   pm_oauth_tokens       the ONE shared Slack grant and ONE shared Google grant
                         the Client Feedback Agent reads with, encrypted
+  pm_gads_cache         Google Ads results the Performance Summarizer already
+                        fetched (tracker/paid_gads.py), so a repeat view costs
+                        no API request
+  pm_gads_usage         Google Ads requests made per day, against the
+                        developer token's daily allowance
   pm_feedback_jobs      one Client Feedback Agent question: its live tool
                         steps while it runs, then its answer
 """
@@ -73,6 +78,15 @@ CREATE TABLE IF NOT EXISTS pm_oauth_tokens (
     meta           JSONB,
     connected_by   TEXT,
     connected_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS pm_gads_cache (
+    key         TEXT PRIMARY KEY,
+    value       JSONB NOT NULL,
+    fetched_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS pm_gads_usage (
+    day    TEXT PRIMARY KEY,
+    calls  INTEGER NOT NULL DEFAULT 0
 );
 CREATE TABLE IF NOT EXISTS pm_feedback_jobs (
     id           TEXT PRIMARY KEY,
@@ -276,6 +290,41 @@ def set_move(move_id, *, date, loc, from_campaign, to_campaign, amt, applied, by
     return {"id": move_id, "date": date, "loc": loc, "from": from_campaign, "to": to_campaign,
             "amt": amt, "applied": bool(applied), "appliedAt": applied_at,
             "appliedBy": by if applied else None}
+
+
+# ── Google Ads cache and request tally (Performance Summarizer) ────────────
+
+def get_gads_cache(key, ttl_s):
+    """The cached value for `key` if it is younger than ttl_s seconds, else None."""
+    with _tx() as cur:
+        cur.execute("SELECT value FROM pm_gads_cache WHERE key = %s "
+                    "AND fetched_at > now() - %s * interval '1 second'", (key, ttl_s))
+        row = cur.fetchone()
+    return row[0] if row else None
+
+
+def put_gads_cache(key, value):
+    with _tx() as cur:
+        cur.execute("INSERT INTO pm_gads_cache (key, value, fetched_at) VALUES (%s, %s, now()) "
+                    "ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, fetched_at = now()",
+                    (key, json.dumps(value)))
+        # Old entries are never read again; keep the table small.
+        cur.execute("DELETE FROM pm_gads_cache WHERE fetched_at < now() - interval '2 days'")
+
+
+def bump_gads_calls(day):
+    """Add one request to `day`'s tally and return the new total."""
+    with _tx() as cur:
+        cur.execute("INSERT INTO pm_gads_usage (day, calls) VALUES (%s, 1) "
+                    "ON CONFLICT (day) DO UPDATE SET calls = pm_gads_usage.calls + 1 RETURNING calls", (day,))
+        return int(cur.fetchone()[0])
+
+
+def gads_calls(day):
+    with _tx() as cur:
+        cur.execute("SELECT calls FROM pm_gads_usage WHERE day = %s", (day,))
+        row = cur.fetchone()
+    return int(row[0]) if row else 0
 
 
 # ── The shared Slack / Google grant (encrypted at rest) ─────────────────────

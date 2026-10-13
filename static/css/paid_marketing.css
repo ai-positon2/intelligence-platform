@@ -545,6 +545,11 @@ details.sq-ref>summary{cursor:pointer;font-size:12.5px;font-weight:600;color:var
 /* ═══════════════ Section page (/p2/paid-marketing) ═══════════════
    The dash-card hooks gtm.css reads, one per agent, plus the section's warm
    title. */
+.c-perf{--card-accent:#a3e635;
+  --band:linear-gradient(90deg,#a3e635,#34d399,#22d3ee);
+  --thumb:linear-gradient(135deg,#0b1a05 0%,#04161a 100%);
+  --icon-glow:rgba(163,230,53,.5);--card-border:rgba(163,230,53,.35);
+  --card-glow:0 0 40px rgba(163,230,53,.10);--arrow-color:#d9f99d}
 .c-pacing{--card-accent:#fbbf24;
   --band:linear-gradient(90deg,#fbbf24,#f97316,#fb7185);
   --thumb:linear-gradient(135deg,#1f1300 0%,#2a0c12 100%);
@@ -564,7 +569,7 @@ details.sq-ref>summary{cursor:pointer;font-size:12.5px;font-weight:600;color:var
 .pm-sec-grad{background:linear-gradient(110deg,#fbbf24 10%,#fb7185 90%);
   -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
   font-family:'Instrument Serif',serif;font-style:italic;font-weight:400;padding-right:.06em}
-.pm-sec-grid{grid-template-columns:repeat(auto-fill,minmax(320px,1fr))}
+.pm-sec-grid{grid-template-columns:repeat(auto-fit,minmax(270px,1fr))}
 @media (max-width:640px){
   .sq-bar{padding:14px}
   .sq-bar-l{gap:10px}
@@ -688,14 +693,15 @@ details.sq-ref>summary{cursor:pointer;font-size:12.5px;font-weight:600;color:var
 /* ═══ Section page: client launcher, live status, card readouts ═══ */
 .pm-launch{position:relative;z-index:6;margin:-12px 0 26px}
 .pl-panel{padding:18px 20px 14px}
-.pl-top{display:grid;grid-template-columns:minmax(260px,.9fr) minmax(0,2fr);gap:16px;align-items:end}
+.pl-top{display:grid;grid-template-columns:minmax(290px,.85fr) minmax(0,2.3fr);gap:16px;align-items:end}
 @media (max-width:1100px){.pl-top{grid-template-columns:1fr}}
-.pl-acts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.pl-acts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+@media (max-width:1280px){.pl-acts{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media (max-width:760px){.pl-acts{grid-template-columns:1fr}}
 .pl-act{--c:#fbbf24;display:flex;align-items:center;gap:12px;height:56px;padding:0 14px 0 10px;border-radius:14px;text-decoration:none;color:inherit;
   background:var(--pm-panel2);border:1px solid var(--pm-line2);position:relative;overflow:hidden;
   transition:transform .25s var(--ease),border-color .2s,box-shadow .25s}
-.pl-act.pl-sq{--c:#22d3ee}.pl-act.pl-cf{--c:#e879f9}
+.pl-act.pl-sq{--c:#22d3ee}.pl-act.pl-cf{--c:#e879f9}.pl-act.pl-pf{--c:#a3e635}
 .pl-act::after{content:"→";position:absolute;right:14px;top:50%;transform:translate(-6px,-50%);opacity:0;color:var(--c);font-weight:700;transition:all .25s var(--ease)}
 .pl-act:hover{transform:translateY(-2px);border-color:color-mix(in srgb,var(--c) 55%,transparent);box-shadow:0 16px 40px -22px var(--c)}
 .pl-act:hover::after{opacity:1;transform:translate(0,-50%)}

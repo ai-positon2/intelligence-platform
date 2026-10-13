@@ -4192,6 +4192,9 @@ def seo_aeo_legacy_redirect(rest=""):
 # service on Railway with no sign-in. Here they are Python, behind the
 # Position2 login, and keep their data in pm_* tables (tracker/paid_store.py).
 #
+#   Performance Summarizer live Google Ads numbers for any account under the
+#                          Position2 manager account, charted any way the
+#                          reader likes (tracker/paid_gads.py, read-only)
 #   Pacing Desk            where to move budget today so every account lands
 #                          the month on budget (tracker/paid_pacing.py; the
 #                          engine itself runs on the PPC team's machine and
@@ -4384,6 +4387,92 @@ def paid_pacing_seed():
                     meta["asOf"], meta["clientCount"], meta["accountCount"])
     return jsonify(ok=True, date=meta["asOf"], clients=meta["clientCount"],
                    accounts=meta["accountCount"], latest=latest)
+
+
+# Performance Summarizer ------------------------------------------------------
+# Live Google Ads numbers for the Position2 manager account, read-only
+# (tracker/paid_gads.py). Every route is a GET behind the Position2 login.
+
+@app.route("/p2/paid-marketing/performance-summarizer")
+@position2_required
+def paid_performance_summarizer():
+    return render_template("performance_summarizer.html", user=_get_user())
+
+
+def _gads_guard(fn):
+    """Run fn() and turn the ways a Google Ads read can fail into answers the
+    page can show: not connected, over the day's budget, Google refusing, or
+    the cache store being down (reads still work without it)."""
+    from tracker import paid_gads
+    problem = paid_gads.config_problem()
+    if problem:
+        return jsonify(error=problem, configProblem=problem), 409
+    try:
+        return fn()
+    except ValueError as e:
+        return jsonify(error=str(e)), 400
+    except paid_gads.OverQuota as e:
+        return jsonify(error=str(e)), 429
+    except paid_gads.AdsError as e:
+        app.logger.warning("paid marketing: google ads read failed: %s", e)
+        return jsonify(error=str(e)), 502
+
+
+def _gads_account(store):
+    from tracker import paid_gads
+    cid = request.args.get("account", "")
+    if not paid_gads.ID_RE.match(cid):
+        raise ValueError("account should be a 10-digit Google Ads customer id")
+    accounts = {a["id"]: a for a in paid_gads.list_accounts(store)}
+    if cid not in accounts:
+        raise ValueError("that account is not under Position2's Google Ads manager account")
+    return accounts[cid]
+
+
+@app.route("/p2/paid-marketing/api/gads/accounts")
+@position2_required
+def paid_gads_accounts():
+    from tracker import paid_gads, paid_store
+
+    def run():
+        accounts = paid_gads.list_accounts(paid_store)
+        try:
+            used = paid_store.gads_calls(paid_gads._pacific_day())
+        except Exception:
+            used = None
+        return jsonify(accounts=accounts, usage={"calls": used, "limit": paid_gads.DAILY_LIMIT} if _pm_is_admin() else None)
+    return _gads_guard(run)
+
+
+@app.route("/p2/paid-marketing/api/gads/performance")
+@position2_required
+def paid_gads_performance():
+    from tracker import paid_gads, paid_store
+
+    def run():
+        acct = _gads_account(paid_store)
+        start, end = paid_gads.check_range(request.args.get("start", ""), request.args.get("end", ""), "the range")
+        cmp = None
+        cs, ce = request.args.get("compare_start", ""), request.args.get("compare_end", "")
+        if cs or ce:
+            cmp = paid_gads.check_range(cs, ce, "the comparison range")
+        current, compare = paid_gads.performance_pair(paid_store, acct["id"], (start, end), cmp,
+                                                      with_sis=request.args.get("sis", "1") != "0")
+        out = {"account": acct, "current": current, "compare": compare}
+        return jsonify(out)
+    return _gads_guard(run)
+
+
+@app.route("/p2/paid-marketing/api/gads/extras")
+@position2_required
+def paid_gads_extras():
+    from tracker import paid_gads, paid_store
+
+    def run():
+        acct = _gads_account(paid_store)
+        start, end = paid_gads.check_range(request.args.get("start", ""), request.args.get("end", ""), "the range")
+        return jsonify(paid_gads.extras(paid_store, acct["id"], start, end))
+    return _gads_guard(run)
 
 
 # Search Query Analysis -------------------------------------------------------
@@ -18478,12 +18567,15 @@ DATA section below when available — use those numbers, never a memorised figur
 AD INTELLIGENCE (/p2/strategic-agents/ad-intelligence): tracks competitors' running ads (headline, CTA, format,
 keywords, messaging angle, first/last seen) pulled from a shared Google Sheet.
 
-PAID MARKETING AGENTS (/p2/paid-marketing): the PPC team's three agents, from Agent Holmes.
+PAID MARKETING AGENTS (/p2/paid-marketing): the PPC team's four agents (three came from Agent Holmes).
 Pacing Desk (/p2/paid-marketing/pacing-desk): reads each morning's Google Ads export and the Budget Tracker,
 projects every account to month end from actual spend per active day (never from the daily cap), labels it
 over/under/on target against ideal pacing ((today-1)/days in month, +2pp tolerance), and recommends budget
 moves between categories inside one location that net to zero; anyone can tick a move as applied. The
-engine runs on the PPC team's machine and pushes its result to the platform. Search Query Analysis
+engine runs on the PPC team's machine, or the Refresh button rebuilds it from the two Google Sheets. Performance
+Summarizer (/p2/paid-marketing/performance-summarizer): live Google Ads numbers for any of the ~50 accounts under
+the Position2 manager account, chartable by any metric against any other, split by day, week, month, weekday, hour,
+campaign, campaign type, device or network, compared with the previous period or last year. Search Query Analysis
 (/p2/paid-marketing/search-query-analysis): upload a search terms CSV; each account's rules (Riccobene, OIA,
 Eventgroove, 42 North, McHale, Beta Bionics placeholder, or generic) settle most terms, Claude classifies the
 rest, and it outputs priority negatives, new keywords, client-review items and a 7-sheet workbook. Client

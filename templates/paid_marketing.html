@@ -12,7 +12,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-tokens.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-components.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/gtm.css') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/paid_marketing.css') }}?v=7">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/paid_marketing.css') }}?v=9">
   <script src="/static/js/theme.js"></script>
   <link rel="stylesheet" href="/static/css/aurora-app.css?v=3">
   <script src="/static/js/aurora.js?v=1" defer></script>
@@ -61,16 +61,19 @@
     <div class="page-header pm-section-head">
       <div class="au-eyebrow"><span class="d"></span>Paid media · Live</div>
       <h1 class="page-title">Every dollar, <span class="pm-sec-grad">accounted for.</span></h1>
-      <p class="page-sub">Budget pacing, search-term triage and client memory for the PPC team. Select an agent to open it.</p>
+      <p class="page-sub">Live performance from Google Ads, budget pacing, search-term triage and client memory for the PPC team. Select an agent to open it.</p>
       <div class="hb-cue"><span></span></div>
     </div>
 
-    <!-- Client launcher: one client, all three agents (static/js/paid_marketing.js) -->
+    <!-- Client launcher: one client, all four agents (static/js/paid_marketing.js) -->
     <section class="pm pm-launch" id="launch">
       <div class="pm-panel pl-panel">
         <div class="pl-top">
           <div class="pl-pick" id="launchPick"></div>
           <div class="pl-acts" id="launchActs">
+            <a class="pl-act pl-pf" data-act="perf" href="/p2/paid-marketing/performance-summarizer">
+              <span class="ic"><svg viewBox="0 0 24 24"><path d="M4 19V9"/><path d="M10 19V5"/><path d="M16 19v-7"/><path d="M22 19H2"/></svg></span>
+              <span><span class="t">See performance</span><span class="s" data-s="perf">Live from Google Ads</span></span></a>
             <a class="pl-act pl-pd" data-act="pacing" href="/p2/paid-marketing/pacing-desk">
               <span class="ic"><svg viewBox="0 0 24 24"><path d="M3 20h18"/><path d="M6 16v-4"/><path d="M11 16V8"/><path d="M16 16v-6"/></svg></span>
               <span><span class="t">Check pacing</span><span class="s" data-s="pacing">Every account, today</span></span></a>
@@ -93,6 +96,27 @@
       <!-- Paid Marketing Agents, from Agent Holmes (2026-10-12). The hub card's
            "N dashboards / N live" counts these; tests/test_hub_card_counts.py
            checks the two agree. -->
+
+      <!-- 0. Performance Summarizer (2026-10-13): live Google Ads, the first agent that reads the API directly -->
+      <a href="/p2/paid-marketing/performance-summarizer" class="dash-card active c-perf">
+        <div class="card-band"></div>
+        <div class="card-thumb">
+          <div class="card-thumb-icon"><svg class="au-ic" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M3 20h18"/><path d="M5 16l4-5 4 3 6-8"/><circle cx="9" cy="11" r="1.2"/><circle cx="13" cy="14" r="1.2"/><circle cx="19" cy="6" r="1.2"/></svg></div>
+          <div class="card-thumb-badge tb-live"><span class="tb-dot live"></span> Live</div>
+        </div>
+        <div class="card-body">
+          <div class="card-name">Performance Summarizer</div>
+          <div class="card-desc">
+            Live Google Ads numbers for any account. Chart any metric against any other, split by day,
+            campaign, device or hour, compare with last period or last year, and click anything to dig in.
+          </div>
+          <div class="pm pl-live" data-live="perf"></div>
+          <div class="card-footer">
+            <div class="card-tags"><span class="tag">Live</span><span class="tag">Charts</span></div>
+            <span class="card-arrow">→</span>
+          </div>
+        </div>
+      </a>
 
       <!-- 1. Pacing Desk -->
       <a href="/p2/paid-marketing/pacing-desk" class="dash-card active c-pacing">
@@ -175,7 +199,7 @@
     
   </script>
 <script src="{{ url_for('static', filename='js/pm_picker.js') }}?v=1"></script>
-<script src="{{ url_for('static', filename='js/paid_marketing.js') }}?v=1"></script>
+<script src="{{ url_for('static', filename='js/paid_marketing.js') }}?v=2"></script>
 <script src="{{ url_for('static', filename='js/page_track.js') }}?v=1" data-title="Paid Marketing Agents Dashboards" data-email="{{ user.email if user else '' }}"></script>
 <script>
 /* ════ Platform command palette — Ctrl/Cmd+K ════ */
@@ -184,8 +208,9 @@
   var BASE=[
     {t:'Hub',d:'Platform home',u:'/p2/hub',i:'⌂'},
     {t:'Strategic Agents',d:'Go-to-market intelligence',u:'/p2/strategic-agents',i:'◎'},
-    {t:'Paid Marketing Agents',d:'Pacing, search terms & client feedback',u:'/p2/paid-marketing',i:'◆'},
+    {t:'Paid Marketing Agents',d:'Performance, pacing, search terms & client feedback',u:'/p2/paid-marketing',i:'◆'},
     {t:'SEO + AEO Tools',d:'Organic intelligence',u:'/p2/seo-aeo',i:'⌕'},
+    {t:'Performance Summarizer',d:'Live Google Ads, chart anything',u:'/p2/paid-marketing/performance-summarizer',i:'◈'},
     {t:'Pacing Desk',d:'Where to move budget today',u:'/p2/paid-marketing/pacing-desk',i:'▥'},
     {t:'Search Query Analysis',d:'Classify a search terms report',u:'/p2/paid-marketing/search-query-analysis',i:'⌕'},
     {t:'Client Feedback Agent',d:'Ask Slack, Gmail & meeting notes',u:'/p2/paid-marketing/client-feedback-agent',i:'✦'}
@@ -273,7 +298,7 @@
 </script>
 <script>(function(){document.querySelectorAll('.dash-card').forEach(function(c){c.addEventListener('mousemove',function(e){var r=c.getBoundingClientRect();c.style.setProperty('--mx',((e.clientX-r.left)/r.width*100)+'%');c.style.setProperty('--my',((e.clientY-r.top)/r.height*100)+'%');});});})();</script>
 <script>
-window.__LUX_CFG={kinetic:'.page-title',ghost:'PAID MARKETING',marquee:'PACING DESK ✦ SEARCH QUERY ANALYSIS ✦ CLIENT FEEDBACK ✦ BUDGET MOVES ✦ NEGATIVE KEYWORDS ✦ VIMI AI ✦',marqueeHost:'.main',tilt:'.dash-card',tiltDeg:3.5,reveal:['.dash-card'],status:1,statusHost:'.topbar-right'};
+window.__LUX_CFG={kinetic:'.page-title',ghost:'PAID MARKETING',marquee:'PERFORMANCE ✦ PACING DESK ✦ SEARCH QUERY ANALYSIS ✦ CLIENT FEEDBACK ✦ BUDGET MOVES ✦ NEGATIVE KEYWORDS ✦ VIMI AI ✦',marqueeHost:'.main',tilt:'.dash-card',tiltDeg:3.5,reveal:['.dash-card'],status:1,statusHost:'.topbar-right'};
 </script>
 <script>
 /* ════ LUX kit — kinetic type, scroll reveals, tilt, halo, ghost, marquee, status ════ */
