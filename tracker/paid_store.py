@@ -303,13 +303,35 @@ def get_gads_cache(key, ttl_s):
     return row[0] if row else None
 
 
+def get_gads_cache_any(key):
+    """(value, saved-at as ISO text) for `key` whatever its age, or None. Served when Google cannot answer."""
+    with _tx() as cur:
+        cur.execute("SELECT value, fetched_at FROM pm_gads_cache WHERE key = %s", (key,))
+        row = cur.fetchone()
+    return (row[0], row[1].isoformat()) if row else None
+
+
+def get_gads_block():
+    """Epoch seconds until which Google said not to ask again (0 if it did not)."""
+    with _tx() as cur:
+        cur.execute("SELECT value FROM pm_pacing_meta WHERE key = 'gads_block'")
+        row = cur.fetchone()
+    return float((row[0] or {}).get("until") or 0) if row else 0.0
+
+
+def set_gads_block(until):
+    with _tx() as cur:
+        cur.execute("INSERT INTO pm_pacing_meta (key, value) VALUES ('gads_block', %s) "
+                    "ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value", (json.dumps({"until": until}),))
+
+
 def put_gads_cache(key, value):
     with _tx() as cur:
         cur.execute("INSERT INTO pm_gads_cache (key, value, fetched_at) VALUES (%s, %s, now()) "
                     "ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, fetched_at = now()",
                     (key, json.dumps(value)))
-        # Old entries are never read again; keep the table small.
-        cur.execute("DELETE FROM pm_gads_cache WHERE fetched_at < now() - interval '2 days'")
+        # Old copies are only read when Google cannot answer; a week is plenty.
+        cur.execute("DELETE FROM pm_gads_cache WHERE fetched_at < now() - interval '7 days'")
 
 
 def bump_gads_calls(day):

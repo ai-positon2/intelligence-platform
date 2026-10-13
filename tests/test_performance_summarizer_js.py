@@ -40,13 +40,17 @@ def test_the_comparison_range_is_the_same_length_just_before_or_a_year_back():
     assert run("P.compareRange({start:'2026-10-01',end:'2026-10-07'},'none')") is None
 
 
+ORIGINAL = ["cost", "impressions", "clicks", "ctr", "cpc", "cpm", "conversions", "cvr", "cpa", "value", "roas", "aov"]
+
+
 def test_a_metric_is_a_function_of_a_total_and_never_divides_by_zero():
     t = "[1000, 50, 200, 10, 900]"           # impressions, clicks, cost, conversions, value
-    got = run("Object.fromEntries(P.METRIC_ORDER.map(k=>[k,P.mval(k,%s)]))" % t)
+    got = run("Object.fromEntries(%s.map(k=>[k,P.mval(k,%s)]))" % (json.dumps(ORIGINAL), t))
     assert got == {"cost": 200, "impressions": 1000, "clicks": 50, "ctr": 0.05, "cpc": 4, "cpm": 200, "conversions": 10,
                    "cvr": 0.2, "cpa": 20, "value": 900, "roas": 4.5, "aov": 90}
-    nothing = run("Object.fromEntries(P.METRIC_ORDER.map(k=>[k,P.mval(k,[0,0,0,0,0])]))")
+    nothing = run("Object.fromEntries(P.METRIC_ORDER.map(k=>[k,P.mval(k,P.zero())]))")
     assert nothing["cost"] == 0 and all(nothing[k] is None for k in ("ctr", "cpc", "cpm", "cvr", "cpa", "roas", "aov"))
+    assert not [k for k, v in nothing.items() if v is not None and v != 0], "a metric of an empty total must be nothing or zero"
 
 
 def test_numbers_are_formatted_for_the_currency_and_never_show_nan():
@@ -74,14 +78,14 @@ DATA = ("{days:['2026-10-01','2026-10-02','2026-10-03','2026-10-04'],"
 
 
 def test_totals_filters_and_groupings_agree_with_each_other():
-    assert run("P.total(%s,null)" % DATA) == [700, 70, 350, 4, 200]
-    assert run("P.total(%s,P.filterSet(%s,['2']))" % (DATA, DATA)) == [500, 50, 250, 0, 0]
+    assert run("P.total(%s,null).slice(0,5)" % DATA) == [700, 70, 350, 4, 200]
+    assert run("P.total(%s,P.filterSet(%s,['2'])).slice(0,5)" % (DATA, DATA)) == [500, 50, 250, 0, 0]
     assert run("P.daily(%s,null).map(t=>t[2])" % DATA) == [50, 50, 100, 150]
     assert run("P.perCampaign(%s).map(t=>t[2])" % DATA) == [100, 250]
     assert run("P.filterSet(%s,[])" % DATA) is None and run("P.filterSet(%s,null)" % DATA) is None    # no filter = the whole account
-    assert run("P.total(%s,P.filterSet(%s,[]))" % (DATA, DATA)) == [700, 70, 350, 4, 200]
+    assert run("P.total(%s,P.filterSet(%s,[])).slice(0,5)" % (DATA, DATA)) == [700, 70, 350, 4, 200]
     # a filter that matches nothing keeps nothing (not the whole account)
-    assert run("P.total(%s,P.filterSet(%s,['9']))" % (DATA, DATA)) == [0, 0, 0, 0, 0]
+    assert run("P.total(%s,P.filterSet(%s,['9'])).every(v=>v===0)" % (DATA, DATA)) is True
     sums = run("(()=>{const d=P.daily(%s,null);return [P.bucket(%s.days,d,'week').totals,P.byWeekday(%s.days,d)].map(a=>a.reduce((s,t)=>s+t[2],0))})()" % (DATA, DATA, DATA))
     assert sums == [350, 350]                                    # regrouping never creates or loses spend
     assert run("P.bucket(%s.days,P.daily(%s,null),'week').labels" % (DATA, DATA)) == ["Wk Sep 28"]      # Oct 1 2026 is a Thursday
@@ -94,7 +98,7 @@ def test_weeks_start_on_monday_and_months_are_labelled():
 
 
 def test_the_hour_grid_totals_every_weekday_hour():
-    r = run("(()=>{const g=P.hourGrid([[0,9,10,2,5,1,3],[2,9,1,1,1,0,0]]);const h=P.byHour(g);return [g[0][9],h[9],h[10]]})()")
+    r = run("(()=>{const g=P.hourGrid([[0,9,10,2,5,1,3],[2,9,1,1,1,0,0]]);const h=P.byHour(g);return [g[0][9],h[9],h[10]].map(t=>t.slice(0,5))})()")
     assert r == [[10, 2, 5, 1, 3], [11, 3, 6, 1, 3], [0, 0, 0, 0, 0]]
 
 
@@ -205,3 +209,61 @@ def test_choosing_a_stack_starts_with_something_to_stack_and_keeps_a_choice_alre
     assert run("P.withType({type:'line',series:''},'stacked')") == {"type": "stacked", "series": "type"}
     assert run("P.withType({type:'line',series:'campaign'},'stackedarea')") == {"type": "stackedarea", "series": "campaign"}
     assert run("P.withType({type:'line',series:''},'pie')") == {"type": "pie", "series": ""}
+
+
+# ── The full list of Google metrics and the cards ──────────────────────────
+
+FULL = "[1000, 50, 200, 10, 900, 12, 1080, 3, 80, 25, 400, 1, 2, 6, 300, 600, 800]"       # one value per column, in server order
+
+
+def test_every_metric_is_described_and_the_chartable_ones_are_exactly_those_that_can_be_added_up():
+    got = run("(()=>{const o=[];for(const k of P.METRIC_ALL){const m=P.METRICS[k];"
+              "o.push([k,!!m.label,['money','money2','int','num','pct','x'].includes(m.kind),P.GROUPS.includes(m.group),!!m.hint,!!P.METRIC_COLOR[k],!!m.period,typeof m.get]);}return o;})()")
+    assert len(got) >= 50
+    assert all(r[1] and r[2] and r[3] and r[4] and r[5] for r in got), [r[0] for r in got if not all(r[1:6])]
+    chartable = run("P.METRIC_ORDER")
+    assert set(chartable) == {r[0] for r in got if not r[6]} and not {r[0] for r in got if r[6]} & set(chartable)   # shares never chart
+    assert all(r[7] == "function" for r in got if not r[6]) and all(r[7] == "object" for r in got if r[6])
+
+
+def test_the_new_metrics_work_out_what_google_defines():
+    got = run("Object.fromEntries(['allConv','interactionRate','costPerInteraction','allConvRate','costPerAllConv','allRoas','valuePerAllConv','invalidClickRate',"
+              "'engagementRate','videoViewRate','cpv','phoneThroughRate','avViewRate','avMeasureRate','avCpm','profit','crossDevice','viewThrough']"
+              ".map(k=>[k,P.mval(k,%s)]))" % FULL)
+    assert got == {"allConv": 12, "interactionRate": 0.08, "costPerInteraction": 2.5, "allConvRate": 0.15, "costPerAllConv": 200 / 12,
+                   "allRoas": 5.4, "valuePerAllConv": 90, "invalidClickRate": 0.04, "engagementRate": 0.025, "videoViewRate": 0.4, "cpv": 0.5,
+                   "phoneThroughRate": 0.02, "avViewRate": 800 / 600 if False else 600 / 800, "avMeasureRate": 0.8, "avCpm": 200 / 600 * 1000,
+                   "profit": 700, "crossDevice": 1, "viewThrough": 3}
+
+
+def test_a_metric_says_why_an_account_has_nothing_for_it():
+    base = "[1000, 50, 200, 10, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]"          # no value, no video, no interactions
+    assert run("[P.noData('clicks',%s,[],null),P.noData('ctr',%s,[],null)]" % (base, base)) == ["", ""]
+    assert run("P.noData('videoViews',%s,[],null)" % base) == "No data in this range"
+    assert run("P.noData('roas',%s,[],null)" % base) == "This account does not report conversion value"
+    assert run("P.noData('allConv',%s,[5],null)" % FULL) == "Google did not return this for the account"     # pruned columns outrank the data
+    assert run("[P.noData('sis',P.zero(),[],null),P.noData('sis',P.zero(),[],{search_impression_share:0.2}),P.noData('sis',P.zero(),[],{search_impression_share:null})]") \
+        == ["Google has no figure for this account and range", "", "Google has no figure for this account and range"]
+
+
+def test_a_tiny_or_huge_share_reads_the_way_google_writes_it():
+    assert run("[P.fmtMetric('sis',0.0999,'USD'),P.fmtMetric('sis',0.9001,'USD'),P.fmtMetric('sis',0.4321,'USD'),P.fmtMetric('rankLost',0.0999,'USD'),P.fmtMetric('ctr',0.0999,'USD')]") \
+        == ["< 10%", "> 90%", "43.2%", "< 10%", "9.99%"]               # only a share is "< 10%": a CTR of 9.99% is a number
+
+
+def test_cards_are_laid_out_in_even_rows():
+    assert run("[1,2,3,4,5,6,7,8,9,10,12,15,16,20].map(P.kpiCols)") == [1, 2, 3, 4, 5, 3, 5, 4, 3, 5, 4, 5, 4, 5]
+    assert run("P.KPI_DEFAULT.length") == 10 and run("P.KPI_DEFAULT.every(k=>P.METRICS[k]&&!P.METRICS[k].period)") is True
+
+
+def test_a_row_with_fewer_columns_than_the_page_expects_still_adds_up():
+    """Ranges saved before the extra metrics existed have seven numbers per row; they must read as zero, not NaN."""
+    got = run("(()=>{const d={days:['2026-10-01'],campaigns:[{id:'1',name:'A',type:'SEARCH'}],rows:[[0,0,100,10,50,2,100]]};"
+              "const t=P.total(d,null);return [t.length,t.some(v=>Number.isNaN(v)),P.mval('cpa',t),P.mval('interactionRate',t),P.noData('interactions',t,[],null)]})()")
+    assert got == [17, False, 25, 0, "No data in this range"]      # the number is 0; it is noData that tells the card to show a dash instead
+
+
+def test_every_column_a_row_carries_is_added_up_not_just_the_first_five():
+    got = run("(()=>{const row=[0,0,"+FULL[1:-1]+"];const d={days:['2026-10-01','2026-10-02'],campaigns:[{id:'1',name:'A',type:'VIDEO'}],rows:[row,[0,1,"+FULL[1:-1]+"]]};"
+              "return [P.total(d,null),P.daily(d,null)[1],P.perCampaign(d)[0],P.byType(d,null)[0].t,P.campaignDaily(d)[0][0]]})()")
+    assert got[0][8] == 160 and got[1][16] == 800 and got[2][10] == 800 and got[3][15] == 1200 and got[4][5] == 12        # interactions, measurable, video, viewable, all conversions (two days summed where it says total)

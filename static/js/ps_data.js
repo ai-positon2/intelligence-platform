@@ -6,15 +6,23 @@
  * catalog, totals, grouping by day / week / month / weekday / campaign, the
  * way a change is worded and coloured, and the "what stands out" insights.
  *
- * A total is five numbers: [impressions, clicks, cost, conversions, value].
- * Every metric on the page is one function of a total, so a metric can be
- * charted at any grouping without the server knowing about it.
+ * A total is NB numbers, one per column the server sends: [impressions, clicks,
+ * cost, conversions, conversion value, all conversions, all conversion value,
+ * view-through conversions, interactions, engagements, video views, cross-device
+ * conversions, invalid clicks, phone calls, phone impressions, viewable
+ * impressions, measurable impressions]. Every metric on the page is one function
+ * of a total, so a metric can be charted at any grouping without the server
+ * knowing about it. The auction-share metrics (impression share and its lost
+ * parts) cannot be added up over days, so they are read once per range and are
+ * flagged `period`: tiles can show them, charts cannot.
  */
 (function(root){
 "use strict";
 
 var DAY = 864e5;
-var IMPR = 0, CLK = 1, COST = 2, CONV = 3, VAL = 4;
+var IMPR = 0, CLK = 1, COST = 2, CONV = 3, VAL = 4, ALLC = 5, ALLV = 6, VTC = 7, INT = 8, ENG = 9, VID = 10, XDV = 11,
+    INV = 12, PCALL = 13, PIMPR = 14, AVV = 15, AVM = 16;
+var NB = 17;
 
 /* ── Dates (all as YYYY-MM-DD strings, arithmetic in UTC so DST never shifts a day) ── */
 function pad(n){return n<10?"0"+n:""+n;}
@@ -74,26 +82,105 @@ function compareRange(range,mode){
 
 /* ── Metric catalog ── */
 function ratio(a,b,k){return b?a/b*(k||1):null;}
+function col(i){return function(t){return t[i];};}
+function M(label,kind,better,group,get,hint,extra){
+  var o={label:label,kind:kind,better:better,group:group,get:get,hint:hint};
+  if(extra) for(var k in extra) o[k]=extra[k];
+  return o;
+}
+/* `need` lists the columns that must be above zero for the metric to mean anything (otherwise the account simply
+   has no such data); `value` marks metrics that need the account to report conversion value. */
 var METRICS = {
-  cost:       {label:"Spend",           kind:"money",  better:0,  group:"Cost",       get:function(t){return t[COST];},   hint:"What you paid Google"},
-  impressions:{label:"Impressions",     kind:"int",    better:1,  group:"Volume",     get:function(t){return t[IMPR];},   hint:"Times an ad was shown"},
-  clicks:     {label:"Clicks",          kind:"int",    better:1,  group:"Volume",     get:function(t){return t[CLK];},    hint:"Times an ad was clicked"},
-  conversions:{label:"Conversions",     kind:"num",    better:1,  group:"Results",    get:function(t){return t[CONV];},   hint:"Actions you counted as a win"},
-  value:      {label:"Conv. value",     kind:"money",  better:1,  group:"Results",    get:function(t){return t[VAL];},    hint:"Value of those conversions"},
-  ctr:        {label:"CTR",             kind:"pct",    better:1,  group:"Efficiency", get:function(t){return ratio(t[CLK],t[IMPR]);}, hint:"Clicks per impression"},
-  cpc:        {label:"Avg. CPC",        kind:"money2", better:-1, group:"Efficiency", get:function(t){return ratio(t[COST],t[CLK]);}, hint:"Cost per click"},
-  cpm:        {label:"CPM",             kind:"money2", better:0,  group:"Efficiency", get:function(t){return ratio(t[COST],t[IMPR],1000);}, hint:"Cost per 1,000 impressions"},
-  cvr:        {label:"Conv. rate",      kind:"pct",    better:1,  group:"Efficiency", get:function(t){return ratio(t[CONV],t[CLK]);}, hint:"Conversions per click"},
-  cpa:        {label:"Cost / conv.",    kind:"money2", better:-1, group:"Efficiency", get:function(t){return ratio(t[COST],t[CONV]);}, hint:"What one conversion costs"},
-  roas:       {label:"ROAS",            kind:"x",      better:1,  group:"Efficiency", get:function(t){return ratio(t[VAL],t[COST]);}, hint:"Value returned per $1 spent"},
-  aov:        {label:"Value / conv.",   kind:"money2", better:1,  group:"Efficiency", get:function(t){return ratio(t[VAL],t[CONV]);}, hint:"Average value of a conversion"}
+  cost:        M("Spend","money",0,"Cost",col(COST),"What you paid Google"),
+  profit:      M("Net value","money",1,"Cost",function(t){return t[VAL]-t[COST];},"Conversion value minus spend",{value:true}),
+  cpm:         M("CPM","money2",0,"Cost",function(t){return ratio(t[COST],t[IMPR],1000);},"Cost per 1,000 impressions"),
+  impressions: M("Impressions","int",1,"Volume",col(IMPR),"Times an ad was shown"),
+  clicks:      M("Clicks","int",1,"Volume",col(CLK),"Times an ad was clicked"),
+  interactions:M("Interactions","int",1,"Volume",col(INT),"Clicks plus other ad actions, such as video views",{need:[INT]}),
+  engagements: M("Engagements","int",1,"Volume",col(ENG),"Times people engaged with an expandable ad",{need:[ENG]}),
+  invalidClicks:M("Invalid clicks","int",-1,"Volume",col(INV),"Clicks Google filtered out as not genuine"),
+  conversions: M("Conversions","num",1,"Results",col(CONV),"Actions you counted as a win"),
+  value:       M("Conv. value","money",1,"Results",col(VAL),"Value of those conversions",{value:true}),
+  allConv:     M("All conversions","num",1,"Results",col(ALLC),"Every conversion action, including ones not counted in Conversions",{need:[ALLC]}),
+  allValue:    M("All conv. value","money",1,"Results",col(ALLV),"Value of all conversions",{need:[ALLV],value:true}),
+  viewThrough: M("View-through conv.","num",1,"Results",col(VTC),"Conversions after seeing, not clicking, an ad",{need:[VTC]}),
+  crossDevice: M("Cross-device conv.","num",1,"Results",col(XDV),"Conversions that began on another device",{need:[XDV]}),
+  ctr:         M("CTR","pct",1,"Efficiency",function(t){return ratio(t[CLK],t[IMPR]);},"Clicks per impression"),
+  cpc:         M("Avg. CPC","money2",-1,"Efficiency",function(t){return ratio(t[COST],t[CLK]);},"Cost per click"),
+  cvr:         M("Conv. rate","pct",1,"Efficiency",function(t){return ratio(t[CONV],t[CLK]);},"Conversions per click"),
+  cpa:         M("Cost / conv.","money2",-1,"Efficiency",function(t){return ratio(t[COST],t[CONV]);},"What one conversion costs"),
+  roas:        M("ROAS","x",1,"Efficiency",function(t){return ratio(t[VAL],t[COST]);},"Value returned per $1 spent",{value:true}),
+  aov:         M("Value / conv.","money2",1,"Efficiency",function(t){return ratio(t[VAL],t[CONV]);},"Average value of a conversion",{value:true}),
+  interactionRate:M("Interaction rate","pct",1,"Efficiency",function(t){return ratio(t[INT],t[IMPR]);},"Interactions per impression",{need:[INT]}),
+  costPerInteraction:M("Avg. cost","money2",-1,"Efficiency",function(t){return ratio(t[COST],t[INT]);},"Cost per interaction",{need:[INT]}),
+  allConvRate: M("All conv. rate","pct",1,"Efficiency",function(t){return ratio(t[ALLC],t[INT]);},"All conversions per interaction",{need:[ALLC,INT]}),
+  costPerAllConv:M("Cost / all conv.","money2",-1,"Efficiency",function(t){return ratio(t[COST],t[ALLC]);},"What one conversion of any kind costs",{need:[ALLC]}),
+  allRoas:     M("All conv. value / cost","x",1,"Efficiency",function(t){return ratio(t[ALLV],t[COST]);},"All-conversion value per $1 spent",{need:[ALLV],value:true}),
+  valuePerAllConv:M("Value / all conv.","money2",1,"Efficiency",function(t){return ratio(t[ALLV],t[ALLC]);},"Average value of a conversion of any kind",{need:[ALLC,ALLV],value:true}),
+  invalidClickRate:M("Invalid click rate","pct",-1,"Efficiency",function(t){return ratio(t[INV],t[CLK]);},"Share of clicks Google filtered out"),
+  engagementRate:M("Engagement rate","pct",1,"Engagement",function(t){return ratio(t[ENG],t[IMPR]);},"Engagements per impression",{need:[ENG]}),
+  videoViews:  M("Video views","int",1,"Video",col(VID),"Times a video ad was watched",{need:[VID]}),
+  videoViewRate:M("Video view rate","pct",1,"Video",function(t){return ratio(t[VID],t[IMPR]);},"Views per impression",{need:[VID]}),
+  cpv:         M("Avg. CPV","money2",-1,"Video",function(t){return ratio(t[COST],t[VID]);},"Cost per video view",{need:[VID]}),
+  phoneCalls:  M("Phone calls","int",1,"Calls",col(PCALL),"Calls placed from your ads",{need:[PCALL]}),
+  phoneImpr:   M("Phone impressions","int",1,"Calls",col(PIMPR),"Times a call button was shown",{need:[PIMPR]}),
+  phoneThroughRate:M("Phone-through rate","pct",1,"Calls",function(t){return ratio(t[PCALL],t[PIMPR]);},"Calls per phone impression",{need:[PIMPR]}),
+  avViewable:  M("Viewable impr.","int",1,"Viewability",col(AVV),"Impressions that could be seen",{need:[AVV]}),
+  avMeasurable:M("Measurable impr.","int",1,"Viewability",col(AVM),"Impressions Google could measure for viewability",{need:[AVM]}),
+  avViewRate:  M("Viewable rate","pct",1,"Viewability",function(t){return ratio(t[AVV],t[AVM]);},"Viewable per measurable impression",{need:[AVM]}),
+  avMeasureRate:M("Measurable rate","pct",1,"Viewability",function(t){return ratio(t[AVM],t[IMPR]);},"Measurable per impression",{need:[AVM]}),
+  avCpm:       M("Viewable CPM","money2",-1,"Viewability",function(t){return ratio(t[COST],t[AVV],1000);},"Cost per 1,000 viewable impressions",{need:[AVV]}),
+  sis:         M("Search impr. share","pct",1,"Auction share",null,"Searches your ads showed for, out of those they could",{period:true,share:"search_impression_share"}),
+  topSis:      M("Search top impr. share","pct",1,"Auction share",null,"Share of impressions shown above organic results",{period:true,share:"search_top_impression_share"}),
+  absTopSis:   M("Search abs. top impr. share","pct",1,"Auction share",null,"Share of impressions shown in the very first position",{period:true,share:"search_absolute_top_impression_share"}),
+  budgetLost:  M("Search lost IS (budget)","pct",-1,"Auction share",null,"Impression share lost because the budget ran out",{period:true,share:"search_budget_lost_impression_share"}),
+  rankLost:    M("Search lost IS (rank)","pct",-1,"Auction share",null,"Impression share lost to a low ad rank",{period:true,share:"search_rank_lost_impression_share"}),
+  budgetLostTop:M("Lost top IS (budget)","pct",-1,"Auction share",null,"Top impression share lost to budget",{period:true,share:"search_budget_lost_top_impression_share"}),
+  rankLostTop: M("Lost top IS (rank)","pct",-1,"Auction share",null,"Top impression share lost to ad rank",{period:true,share:"search_rank_lost_top_impression_share"}),
+  contentSis:  M("Display impr. share","pct",1,"Auction share",null,"Display impressions won, out of those you could",{period:true,share:"content_impression_share"}),
+  contentBudgetLost:M("Display lost IS (budget)","pct",-1,"Auction share",null,"Display share lost to budget",{period:true,share:"content_budget_lost_impression_share"}),
+  contentRankLost:M("Display lost IS (rank)","pct",-1,"Auction share",null,"Display share lost to ad rank",{period:true,share:"content_rank_lost_impression_share"}),
+  topPct:      M("Top of page rate","pct",1,"Auction share",null,"Impressions shown above organic results",{period:true,share:"top_impression_percentage"}),
+  absTopPct:   M("Abs. top of page rate","pct",1,"Auction share",null,"Impressions shown in the very first position",{period:true,share:"absolute_top_impression_percentage"}),
+  clickShare:  M("Search click share","pct",1,"Auction share",null,"Clicks you got out of those you could have",{period:true,share:"search_click_share"}),
+  exactSis:    M("Search exact-match IS","pct",1,"Auction share",null,"Impression share on exact-match searches",{period:true,share:"search_exact_match_impression_share"})
 };
-var METRIC_ORDER = ["cost","impressions","clicks","ctr","cpc","cpm","conversions","cvr","cpa","value","roas","aov"];
+var GROUPS = ["Cost","Volume","Results","Efficiency","Engagement","Video","Calls","Viewability","Auction share"];
+/* All metrics, grouped; the chartable ones (everything that can be added up over days) are METRIC_ORDER. */
+var METRIC_ALL = Object.keys(METRICS).sort(function(a,b){return GROUPS.indexOf(METRICS[a].group)-GROUPS.indexOf(METRICS[b].group);});
+var METRIC_ORDER = METRIC_ALL.filter(function(k){return !METRICS[k].period;});
+/* How many columns lay n cards out in even rows (5 across for ten, 4 for eight, 3 for nine ...). */
+function kpiCols(n){return n<=5?Math.max(1,n):n%5===0?5:n%4===0?4:n%3===0?3:5;}
+var KPI_DEFAULT = ["cost","impressions","clicks","ctr","cpc","conversions","cvr","cpa","value","roas"];
+function hsl(h,s,l){
+  s/=100; l/=100;
+  var a=s*Math.min(l,1-l), f=function(n){var k=(n+h/30)%12, c=l-a*Math.max(-1,Math.min(k-3,9-k,1)); return Math.round(255*c).toString(16).padStart(2,"0");};
+  return "#"+f(0)+f(8)+f(4);
+}
+var GROUP_HUE = {"Cost":42,"Volume":232,"Results":92,"Efficiency":190,"Engagement":322,"Video":2,"Calls":160,"Viewability":268,"Auction share":206};
 var METRIC_COLOR = {cost:"#fbbf24",impressions:"#818cf8",clicks:"#22d3ee",ctr:"#2dd4bf",cpc:"#fb923c",cpm:"#a78bfa",
   conversions:"#a3e635",cvr:"#e879f9",cpa:"#fb7185",value:"#34d399",roas:"#38bdf8",aov:"#f472b6"};
+(function(){   // every other metric: its group's hue, shifted a little per metric so neighbours differ
+  var seen={};
+  METRIC_ALL.forEach(function(k){
+    var g=METRICS[k].group, i=seen[g]=(seen[g]||0)+1;
+    if(!METRIC_COLOR[k]) METRIC_COLOR[k]=hsl((GROUP_HUE[g]+i*23)%360,78,64);
+  });
+})();
 var SERIES = ["#fbbf24","#22d3ee","#e879f9","#a3e635","#fb7185","#818cf8","#fb923c","#2dd4bf"];
 
-function mval(key,t){return METRICS[key].get(t);}
+function mval(key,t){var m=METRICS[key]; return m.get?m.get(t):null;}
+/* Why a metric has nothing to show for this account and range, or "" when it does. `missing` are the columns Google
+   would not return; `shares` the whole-period auction shares. */
+function noData(key,tc,missing,shares){
+  var m=METRICS[key];
+  if(m.period) return shares&&shares[m.share]!=null?"":"Google has no figure for this account and range";
+  var miss=(m.need||[]).filter(function(i){return missing&&missing.indexOf(i)>=0;});
+  if(miss.length) return "Google did not return this for the account";
+  if(m.need&&m.need.some(function(i){return !tc[i];})) return "No data in this range";
+  if(m.value&&!tc[VAL]) return "This account does not report conversion value";
+  return "";
+}
 
 /* ── Formatting ── */
 var _cur = {};
@@ -142,7 +229,13 @@ function fmt(kind,v,cur,small){
   }
   return String(v);
 }
-function fmtMetric(key,v,cur,small){return fmt(METRICS[key].kind,v,cur,small);}
+function fmtMetric(key,v,cur,small){
+  if(METRICS[key].period&&v!=null){            // Google reports a tiny share as 0.0999 ("< 10%") and a huge one as 0.9001 ("> 90%")
+    if(Math.abs(v-0.0999)<0.00005) return "< 10%";
+    if(Math.abs(v-0.9001)<0.00005) return "> 90%";
+  }
+  return fmt(METRICS[key].kind,v,cur,small);
+}
 
 /* ── Changes ── */
 /* How a change from prev to cur reads, and whether it is good news for that metric. */
@@ -167,8 +260,9 @@ function change(key,cur,prev){
 }
 
 /* ── Totals ── */
-function zero(){return [0,0,0,0,0];}
-function addTo(a,b){a[0]+=b[0];a[1]+=b[1];a[2]+=b[2];a[3]+=b[3];a[4]+=b[4];return a;}
+function zero(){var a=new Array(NB);for(var i=0;i<NB;i++)a[i]=0;return a;}
+function addTo(a,b){for(var i=0;i<NB;i++)a[i]+=b[i]||0;return a;}
+function addRow(t,r){for(var i=0;i<NB;i++)t[i]+=r[2+i]||0;}      // a row is [campaign, day, ...one number per column]
 function sel(set,idx){return !set||set.has(idx);}
 
 /* The campaigns a filter keeps, as a Set of indexes into data.campaigns (null = all). */
@@ -181,36 +275,32 @@ function filterSet(data,ids){
 }
 function total(data,set){
   var t=zero();
-  data.rows.forEach(function(r){if(sel(set,r[0]))t[0]+=r[2],t[1]+=r[3],t[2]+=r[4],t[3]+=r[5],t[4]+=r[6];});
+  data.rows.forEach(function(r){if(sel(set,r[0]))addRow(t,r);});
   return t;
 }
 /* One total per day in the range. */
 function daily(data,set){
   var out=data.days.map(zero);
-  data.rows.forEach(function(r){
-    if(!sel(set,r[0])) return;
-    var t=out[r[1]]; t[0]+=r[2];t[1]+=r[3];t[2]+=r[4];t[3]+=r[5];t[4]+=r[6];
-  });
+  data.rows.forEach(function(r){if(sel(set,r[0]))addRow(out[r[1]],r);});
   return out;
 }
 /* One total per campaign, same order as data.campaigns. */
 function perCampaign(data){
   var out=data.campaigns.map(zero);
-  data.rows.forEach(function(r){var t=out[r[0]];t[0]+=r[2];t[1]+=r[3];t[2]+=r[4];t[3]+=r[5];t[4]+=r[6];});
+  data.rows.forEach(function(r){addRow(out[r[0]],r);});
   return out;
 }
 /* Per campaign, per day (for row sparklines): index by campaign -> array over days of a total. */
 function campaignDaily(data){
   var out=data.campaigns.map(function(){return data.days.map(zero);});
-  data.rows.forEach(function(r){var t=out[r[0]][r[1]];t[0]+=r[2];t[1]+=r[3];t[2]+=r[4];t[3]+=r[5];t[4]+=r[6];});
+  data.rows.forEach(function(r){addRow(out[r[0]][r[1]],r);});
   return out;
 }
 function byType(data,set){
   var acc={};
   data.rows.forEach(function(r){
     if(!sel(set,r[0])) return;
-    var k=data.campaigns[r[0]].type, t=acc[k]||(acc[k]=zero());
-    t[0]+=r[2];t[1]+=r[3];t[2]+=r[4];t[3]+=r[5];t[4]+=r[6];
+    addRow(acc[data.campaigns[r[0]].type]||(acc[data.campaigns[r[0]].type]=zero()),r);
   });
   return Object.keys(acc).map(function(k){return {key:k,t:acc[k]};});
 }
@@ -241,7 +331,7 @@ function byWeekday(days,totals){
 /* Per-hour totals (24) and a 7x24 grid from the server's weekday-hour rows. */
 function hourGrid(rows){
   var grid=[];for(var d=0;d<7;d++){grid.push([]);for(var h=0;h<24;h++)grid[d].push(zero());}
-  (rows||[]).forEach(function(r){if(grid[r[0]]&&grid[r[0]][r[1]]) addTo(grid[r[0]][r[1]],r.slice(2,7));});
+  (rows||[]).forEach(function(r){if(grid[r[0]]&&grid[r[0]][r[1]]) addTo(grid[r[0]][r[1]],r.slice(2,2+NB));});
   return grid;
 }
 function byHour(grid){
@@ -480,11 +570,11 @@ function indexTo100(vals){
 }
 
 var api = {
-  IMPR:IMPR,CLK:CLK,COST:COST,CONV:CONV,VAL:VAL,
+  IMPR:IMPR,CLK:CLK,COST:COST,CONV:CONV,VAL:VAL,ALLC:ALLC,ALLV:ALLV,VTC:VTC,INT:INT,ENG:ENG,VID:VID,XDV:XDV,INV:INV,PCALL:PCALL,PIMPR:PIMPR,AVV:AVV,AVM:AVM,NB:NB,
   parseD:parseD,fmtD:fmtD,addDays:addDays,diffDays:diffDays,localToday:localToday,dowOf:dowOf,mondayOf:mondayOf,
   monthStart:monthStart,addMonths:addMonths,shiftYear:shiftYear,dayLabel:dayLabel,monthLabel:monthLabel,
   PRESETS:PRESETS,presetRange:presetRange,compareRange:compareRange,
-  METRICS:METRICS,METRIC_ORDER:METRIC_ORDER,METRIC_COLOR:METRIC_COLOR,SERIES:SERIES,mval:mval,
+  METRICS:METRICS,METRIC_ORDER:METRIC_ORDER,METRIC_ALL:METRIC_ALL,GROUPS:GROUPS,KPI_DEFAULT:KPI_DEFAULT,kpiCols:kpiCols,METRIC_COLOR:METRIC_COLOR,SERIES:SERIES,mval:mval,noData:noData,
   fmt:fmt,fmtMetric:fmtMetric,sym:sym,compact:compact,change:change,
   zero:zero,addTo:addTo,filterSet:filterSet,total:total,daily:daily,perCampaign:perCampaign,campaignDaily:campaignDaily,byType:byType,
   bucket:bucket,byWeekday:byWeekday,hourGrid:hourGrid,byHour:byHour,DOW:DOW,

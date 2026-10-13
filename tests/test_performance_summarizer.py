@@ -33,9 +33,19 @@ ADMIN = "reporting@position2.com"
 
 
 class FakeStore:
-    """The three store calls paid_gads makes, in memory."""
+    """The store calls paid_gads makes, in memory."""
     def __init__(self, calls=0):
-        self.calls, self.cache = calls, {}
+        self.calls, self.cache, self.old, self.block = calls, {}, {}, 0.0
+
+    def get_gads_cache_any(self, key):
+        v = self.cache.get(key, self.old.get(key))
+        return (v, "2026-10-10T08:00:00+00:00") if v is not None else None
+
+    def get_gads_block(self):
+        return self.block
+
+    def set_gads_block(self, until):
+        self.block = until
 
     def bump_gads_calls(self, day):
         self.calls += 1
@@ -66,6 +76,7 @@ def ads_env(monkeypatch):
         monkeypatch.setenv(k, v)
     monkeypatch.delenv("GOOGLE_ADS_LOGIN_CUSTOMER_ID", raising=False)
     g.reset_token_cache()
+    g.reset_state()
     monkeypatch.setitem(g._TOKEN, "value", "tok")
     monkeypatch.setitem(g._TOKEN, "exp", 9e18)
 
@@ -121,15 +132,19 @@ def test_a_range_becomes_compact_rows_and_keeps_quiet_days():
     assert out["days"] == ["2026-10-01", "2026-10-02", "2026-10-03", "2026-10-04"]    # 10-02 and 10-04 had no rows
     assert [c["name"] for c in out["campaigns"]] == ["Brand", "PMax"]
     assert out["campaigns"][0]["budget"] == 50.0 and out["campaigns"][1]["type"] == "PERFORMANCE_MAX"
-    assert out["rows"][0] == [0, 0, 100, 10, 12.34, 2.5, 300.0]        # micros become currency units
-    assert out["rows"][2] == [1, 2, 70, 7, 1.5, 1.0, 80.5] and len(out["rows"]) == 3
+    pad = [0.0] * (g.NB - 5)                                           # the optional metrics Google did not send
+    assert out["rows"][0] == [0, 0, 100, 10, 12.34, 2.5, 300.0] + pad       # micros become currency units
+    assert out["rows"][2] == [1, 2, 70, 7, 1.5, 1.0, 80.5] + pad and len(out["rows"]) == 3
+    assert out["missing"] == []                                        # none were dropped
 
 
 def test_search_impression_share_is_kept_only_where_google_gave_one():
     camp = [{"campaign": {"id": "1"}, "metrics": {"searchImpressionShare": 0.43211}},
             {"campaign": {"id": "2"}, "metrics": {}}]
-    assert g.parse_sis(camp, [{"metrics": {"searchImpressionShare": 0.3}}]) == {"account": 0.3, "campaigns": {"1": 0.4321}}
-    assert g.parse_sis([], []) == {"account": None, "campaigns": {}}
+    assert g.parse_sis(camp) == {"1": 0.4321} and g.parse_sis([]) == {}
+    acct = [{"metrics": {"searchImpressionShare": 0.3, "searchBudgetLostImpressionShare": "0.0999"}}]
+    got = g.parse_shares(acct, ["search_impression_share", "search_budget_lost_impression_share", "content_impression_share"])
+    assert got == {"search_impression_share": 0.3, "search_budget_lost_impression_share": 0.0999, "content_impression_share": None}
 
 
 def test_device_network_and_hour_rows_are_summed_by_segment():
@@ -141,9 +156,10 @@ def test_device_network_and_hour_rows_are_summed_by_segment():
             {"segments": {"dayOfWeek": "SUNDAY", "hour": 0}, "metrics": m(1, 0, 0, 0, 0)},
             {"segments": {"dayOfWeek": "NOTADAY", "hour": 3}, "metrics": m(9, 9, 9, 9, 9)}]       # unknown weekday: dropped
     out = g.parse_extras(dev, [], heat)
-    assert out["device"] == [["DESKTOP", 1, 1, 0.1, 0.0, 0.0], ["MOBILE", 15, 3, 1.5, 1.0, 5.0]]
+    pad = [0.0] * (g.NB - 5)
+    assert out["device"] == [["DESKTOP", 1, 1, 0.1, 0.0, 0.0] + pad, ["MOBILE", 15, 3, 1.5, 1.0, 5.0] + pad]
     assert out["network"] == []
-    assert out["dowHour"] == [[0, 9, 10, 2, 2.0, 1.0, 5.0], [6, 0, 1, 0, 0.0, 0.0, 0.0]]       # Monday is 0, Sunday 6
+    assert out["dowHour"] == [[0, 9, 10, 2, 2.0, 1.0, 5.0] + pad, [6, 0, 1, 0, 0.0, 0.0, 0.0] + pad]       # Monday is 0, Sunday 6
 
 
 # ── Ranges ─────────────────────────────────────────────────────────────────
@@ -278,14 +294,15 @@ def test_a_cache_outage_falls_back_to_asking_google():
         def put_gads_cache(self, key, value):
             raise RuntimeError("db down")
     out = g.extras(NoCache(), "1234567890", "2026-10-01", "2026-10-02", http=lambda *a, **k: Resp(200, {"results": []}))
-    assert out == {"device": [], "network": [], "dowHour": []}
+    assert out == {"device": [], "network": [], "dowHour": [], "missing": []}
 
 
 def test_the_main_range_and_its_comparison_are_fetched_together():
     s = FakeStore()
     http = lambda url, headers=None, data=None, **k: Resp(200, {"results": []})
-    cur, cmp = g.performance_pair(s, "1234567890", ("2026-10-01", "2026-10-07"), ("2026-09-24", "2026-09-30"), http=http)
-    assert cur["start"] == "2026-10-01" and "sis" in cur and cmp["start"] == "2026-09-24" and "sis" not in cmp
+    cur, cmp, saved = g.performance_pair(s, "1234567890", ("2026-10-01", "2026-10-07"), ("2026-09-24", "2026-09-30"), http=http)
+    assert cur["start"] == "2026-10-01" and "sis" in cur and "shares" in cur and cmp["start"] == "2026-09-24"
+    assert "sis" not in cmp and "shares" in cmp and saved == []                 # the comparison needs the shares, not the campaign ones
     assert g.performance_pair(s, "1234567890", ("2026-10-01", "2026-10-07"), None, http=http)[1] is None
 
 
@@ -311,7 +328,7 @@ def wired(monkeypatch):
 
     def pair(st, cid, cur, cmp, with_sis=True, **k):
         calls.append((cid, cur, cmp, with_sis))
-        return {"start": cur[0], "end": cur[1], "days": [], "campaigns": [], "rows": []}, ({"start": cmp[0]} if cmp else None)
+        return {"start": cur[0], "end": cur[1], "days": [], "campaigns": [], "rows": []}, ({"start": cmp[0]} if cmp else None), []
     monkeypatch.setattr(g, "performance_pair", pair)
     monkeypatch.setattr(g, "extras", lambda st, cid, a, b, **k: {"device": [], "network": [], "dowHour": []})
     return calls
@@ -347,6 +364,7 @@ def test_performance_checks_the_account_and_both_ranges(wired):
     j = r.get_json()
     assert r.status_code == 200 and j["account"]["name"] == "Acme" and j["compare"]["start"] == "2026-09-24"
     assert wired == [("1234567890", ("2026-10-01", "2026-10-07"), ("2026-09-24", "2026-09-30"), False)]
+    assert j["stale"] is None
     assert c.get(BASE + "performance?" + q).get_json()["compare"] is None
 
 
@@ -417,9 +435,185 @@ def test_every_chart_kind_has_a_picture_and_the_studio_is_on_the_page():
     assert all(re.search(r"\b%s:'<" % k, icons) for k in kinds), [k for k in kinds if not re.search(r"\b%s:'<" % k, icons)]
     html = _read("templates", "performance_summarizer.html")
     assert 'id="studio"' in html and 'id="studioSec"' in html and 'id="studioBtn"' in html
-    assert html.index('id="studio"') < html.index('id="board"') < html.index('id="splits"')      # build it, keep it, then the fixed panels
+    assert html.index('id="splits"') < html.index('id="camps"') < html.index('id="studio"') < html.index('id="board"')   # the studio and what it keeps are last
 
 
 def test_a_saved_or_linked_chart_can_only_use_kinds_and_groupings_that_exist():
     js = _read("static", "js", "performance_summarizer.js")
     assert "P.TYPE[s.type]" in js and "P.DIM[s.dim]" in js and 'P.TYPE[h.t]' in js and 'P.DIM[h.g]' in js
+
+
+# ── Quota, saved copies and metrics Google refuses ─────────────────────────
+
+def quota_body(delay):
+    return {"error": {"code": 429, "status": "RESOURCE_EXHAUSTED", "details": [{"errors": [{
+        "message": "Too many requests. Retry in %s seconds." % delay,
+        "details": {"quotaErrorDetails": {"rateName": "Number of operations for explorer access", "retryDelay": "%ss" % delay}}}]}]}}
+
+
+def test_googles_daily_allowance_is_remembered_and_no_request_is_sent_until_it_returns(monkeypatch):
+    s, sent = FakeStore(), []
+
+    def http(*a, **k):
+        sent.append(1)
+        return Resp(429, quota_body(61458))
+    with pytest.raises(g.OverQuota, match="about 17 hours") as e:
+        g._post("/x", {}, s, http=http)
+    assert len(sent) == 1 and e.value.until and s.block == e.value.until        # remembered in memory and in the database
+    with pytest.raises(g.OverQuota, match="about 17 hours"):
+        g._post("/x", {}, s, http=http)
+    assert len(sent) == 1                                                       # nothing went to Google the second time
+    g.reset_state()                                                             # another worker that never saw the 429 ...
+    s.block = e.value.until
+    with pytest.raises(g.OverQuota):
+        g._post("/x", {}, s, http=http)
+    assert len(sent) == 1                                                       # ... learns it from the database
+    s.block = 0.0
+    g.reset_state()
+    seq = iter([Resp(200, {"ok": 1})])
+    assert g._post("/x", {}, s, http=lambda *a, **k: next(seq)) == {"ok": 1}     # and asks again once it has passed
+
+
+def test_a_short_retry_delay_is_waited_out_not_treated_as_the_daily_allowance(monkeypatch):
+    slept = []
+    monkeypatch.setattr(g.time, "sleep", lambda x: slept.append(x))
+    seq = iter([Resp(429, quota_body(5)), Resp(200, {"ok": 1})])
+    s = FakeStore()
+    assert g._post("/x", {}, s, http=lambda *a, **k: next(seq)) == {"ok": 1}
+    assert slept == [5.0] and not s.block
+
+
+def ok_rows(q):
+    return Resp(200, {"results": [day_row("1", "Brand", "2026-10-01", 5, 1, 1_000_000, 0, 0)]})
+
+
+def test_a_metric_google_refuses_is_dropped_and_remembered_and_the_page_is_told():
+    queries = []
+
+    def http(url, headers=None, data=None, **k):
+        q = json.loads(data)["query"]
+        queries.append(q)
+        if "metrics.video_views" in q:
+            return Resp(400, {"error": {"details": [{"errors": [{"message": "Unrecognized field in the query: 'metrics.video_views'."}]}]}})
+        return ok_rows(q)
+    out = g.performance(FakeStore(), "1234567890", "2026-10-01", "2026-10-02", with_sis=False, with_shares=False, http=http)
+    assert len(out["rows"]) == 1 and out["missing"] == [g.NB - 12 + [o[0] for o in g.OPTIONAL].index("video_views")]
+    assert "video_views" in g._BAD and "metrics.all_conversions," in queries[-1] and "video_views" not in queries[-1]
+    n = len(queries)
+    g.performance(FakeStore(), "1234567890", "2026-10-03", "2026-10-04", with_sis=False, with_shares=False, http=http)
+    assert len(queries) == n + 1 and "video_views" not in queries[-1]          # the next range does not ask for it again
+
+
+def test_a_refusal_naming_one_metric_does_not_take_out_its_shorter_cousin():
+    def http(url, headers=None, data=None, **k):
+        q = json.loads(data)["query"]
+        if re.search(r"metrics\.all_conversions_value(?![a-z_])", q):
+            return Resp(400, {"error": {"details": [{"errors": [{"message": "metrics.all_conversions_value cannot be selected with segments.date"}]}]}})
+        return ok_rows(q)
+    out = g.performance(FakeStore(), "1234567890", "2026-10-01", "2026-10-02", with_sis=False, with_shares=False, http=http)
+    assert g._BAD == {"all_conversions_value"} and len(out["rows"]) == 1             # all_conversions is a different metric and stays
+
+
+def test_a_400_that_names_no_metric_falls_back_to_the_core_five_and_blames_nothing():
+    seen = []
+
+    def http(url, headers=None, data=None, **k):
+        q = json.loads(data)["query"]
+        seen.append(q)
+        if "metrics.all_conversions" in q:
+            return Resp(400, {"error": {"message": "something else is wrong with this request"}})
+        return ok_rows(q)
+    out = g.performance(FakeStore(), "1234567890", "2026-10-01", "2026-10-02", with_sis=False, with_shares=False, http=http)
+    assert len(out["rows"]) == 1 and not g._BAD                                 # the cause might be the range, so nothing is remembered
+    assert len(out["missing"]) == g.NB - 5                                       # but this answer says every optional metric is missing
+
+
+def test_a_400_on_the_core_query_is_still_an_error():
+    with pytest.raises(g.AdsError, match="400"):
+        g.performance(FakeStore(), "1234567890", "2026-10-01", "2026-10-02", with_sis=False, with_shares=False,
+                      http=lambda *a, **k: Resp(400, {"error": {"message": "bad"}}))
+
+
+def test_when_google_cannot_answer_the_last_saved_copy_stands_in_and_says_when_it_was_saved():
+    s = FakeStore()
+    key = g.CACHE_V + "days:1234567890:2026-10-01:2026-10-02"
+    s.old[key] = {"start": "2026-10-01", "days": ["2026-10-01"], "rows": [], "campaigns": [], "missing": []}
+    notes = []
+    out = g._cached(s, key, 60, lambda: (_ for _ in ()).throw(g.OverQuota("spent")), notes)
+    assert out["start"] == "2026-10-01" and notes == ["2026-10-10T08:00:00+00:00"]
+    with pytest.raises(g.OverQuota):
+        g._cached(s, g.CACHE_V + "days:other", 60, lambda: (_ for _ in ()).throw(g.OverQuota("spent")), [])     # nothing saved: say so
+    with pytest.raises(g.AdsError, match="bad"):
+        g._cached(s, key, 60, lambda: (_ for _ in ()).throw(g.AdsError("bad", status=400)), [])                 # a refusal of the request is not hidden
+
+
+def test_ranges_saved_before_the_shape_changed_still_beat_showing_nothing():
+    s = FakeStore()
+    s.old["days:1234567890:2026-10-01:2026-10-02"] = {"start": "legacy", "rows": [[0, 0, 5, 1, 2.0, 0, 0]]}
+    s.old["sis:1234567890:2026-10-01:2026-10-02"] = {"account": 0.3, "campaigns": {}}
+    boom = lambda: (_ for _ in ()).throw(g.OverQuota("spent"))
+    assert g._cached(s, g.CACHE_V + "days:1234567890:2026-10-01:2026-10-02", 60, boom, [])["start"] == "legacy"
+    with pytest.raises(g.OverQuota):                      # the old share shape is not reused: it would be read as the wrong thing
+        g._cached(s, g.CACHE_V + "sis:1234567890:2026-10-01:2026-10-02", 60, boom, [])
+
+
+def test_the_shares_failing_never_loses_the_range_even_with_no_saved_copy():
+    def http(url, headers=None, data=None, **k):
+        q = json.loads(data)["query"]
+        if "FROM campaign WHERE" in q and "segments.date," in q.split("FROM")[0]:
+            return ok_rows(q)
+        return Resp(429, quota_body(5))              # shares and impression share: rate limited, twice
+    import tracker.paid_gads as mod
+    orig = mod.time.sleep
+    mod.time.sleep = lambda x: None
+    try:
+        out = g.performance(FakeStore(), "1234567890", "2026-10-01", "2026-10-02", http=http)
+    finally:
+        mod.time.sleep = orig
+    assert len(out["rows"]) == 1 and out["sis"] == {"account": None, "campaigns": {}}
+    assert set(out["shares"]) == set(g.SHARES) and all(v is None for v in out["shares"].values())
+
+
+def test_a_share_google_refuses_is_dropped_the_rest_still_arrive():
+    def http(url, headers=None, data=None, **k):
+        q = json.loads(data)["query"]
+        if "metrics.top_impression_percentage" in q:
+            return Resp(400, {"error": {"details": [{"errors": [{"message": "Cannot select top_impression_percentage here"}]}]}})
+        return Resp(200, {"results": [{"metrics": {"searchImpressionShare": 0.4, "contentImpressionShare": 0.0999}}]})
+    out = g.performance(FakeStore(), "1234567890", "2026-10-01", "2026-10-02", with_sis=False, http=http, notes=[])
+    assert out["shares"]["search_impression_share"] == 0.4 and out["shares"]["content_impression_share"] == 0.0999
+    assert out["shares"]["top_impression_percentage"] is None and g._BAD_SHARES == {"top_impression_percentage"}
+
+
+def test_the_routes_say_how_old_a_saved_copy_is_and_when_google_returns(monkeypatch):
+    monkeypatch.setattr(g, "list_accounts", lambda st, **k: ACCTS)
+    monkeypatch.setattr(store, "gads_calls", lambda day: 0)
+    until = 1_900_000_000.0
+    monkeypatch.setattr(g, "blocked_until", lambda st=None: until)
+    monkeypatch.setattr(g, "performance_pair", lambda *a, **k: ({"days": [], "campaigns": [], "rows": []}, None, ["2026-10-09T10:00:00+00:00", "2026-10-10T10:00:00+00:00"]))
+    c = client_as(STAFF)
+    j = c.get(BASE + "performance?account=1234567890&start=2026-10-01&end=2026-10-07").get_json()
+    assert j["stale"] == "2026-10-09T10:00:00+00:00" and j["blockedUntil"] == until          # the oldest copy is the one to admit to
+    assert c.get(BASE + "accounts").get_json()["blockedUntil"] == until
+    monkeypatch.setattr(g, "performance_pair", lambda *a, **k: (_ for _ in ()).throw(g.OverQuota("spent", until=until)))
+    r = c.get(BASE + "performance?account=1234567890&start=2026-10-01&end=2026-10-07")
+    assert r.status_code == 429 and r.get_json()["blockedUntil"] == until
+
+
+def test_the_server_and_the_page_agree_on_the_columns_and_the_shares():
+    import subprocess
+    js = os.path.join(ROOT, "static", "js", "ps_data.js")
+    names = {"IMPR": "impressions", "CLK": "clicks", "COST": "cost_micros", "CONV": "conversions", "VAL": "conversions_value",
+             "ALLC": "all_conversions", "ALLV": "all_conversions_value", "VTC": "view_through_conversions", "INT": "interactions",
+             "ENG": "engagements", "VID": "video_views", "XDV": "cross_device_conversions", "INV": "invalid_clicks",
+             "PCALL": "phone_calls", "PIMPR": "phone_impressions", "AVV": "active_view_impressions",
+             "AVM": "active_view_measurable_impressions"}
+    code = "const P=require(%s);console.log(JSON.stringify({nb:P.NB,idx:%s,shares:P.METRIC_ALL.filter(k=>P.METRICS[k].period).map(k=>P.METRICS[k].share)}))" % (
+        json.dumps(js), "{" + ",".join("%s:P.%s" % (k, k) for k in names) + "}")
+    r = subprocess.run(["node", "-e", code], capture_output=True, text=True, timeout=30)
+    if r.returncode:
+        pytest.skip("node is not installed")
+    got = json.loads(r.stdout)
+    assert got["nb"] == g.NB
+    assert {g.BASE[i][0]: k for k, i in got["idx"].items()} == {v: k for k, v in names.items()}
+    assert sorted(got["shares"]) == sorted(g.SHARES)           # every share the page can show is one the server reads, and back

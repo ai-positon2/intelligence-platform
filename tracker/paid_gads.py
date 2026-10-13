@@ -12,11 +12,25 @@ Environment (Railway):
   GOOGLE_ADS_REFRESH_TOKEN                          one sign-in that can see the MCC
   GOOGLE_ADS_LOGIN_CUSTOMER_ID                      the manager account (default below)
 
-The developer token has Explorer access, which allows roughly 2,880 requests
-a day. Two things keep a busy team inside that: every result is cached in
-Postgres (15 minutes for a range that includes today, 6 hours for one that
-ended earlier), and a daily counter refuses new requests past DAILY_LIMIT
-with a message instead of letting Google start rejecting them.
+The developer token has Explorer access, a small daily allowance that Google
+counts in its own way (the 429 says "Number of operations for explorer
+access"). What keeps a busy team inside it:
+
+  * every result is cached in Postgres, and when Google refuses (allowance
+    spent, or Google unreachable) the last saved copy is served and the page
+    says how old it is;
+  * Google's own "retry in N seconds" is remembered (in memory and in the
+    database, so every worker knows) and no request is sent until it passes;
+  * a daily tally refuses new requests past DAILY_LIMIT.
+
+Metrics: five core ones (impressions, clicks, cost, conversions, conversion
+value) are always fetched. A dozen more ("optional": all conversions,
+interactions, video views, phone calls, viewability ...) ride along in the same
+query, and if Google refuses one of them for any reason it is dropped and
+remembered, so one unsupported metric can never take the page down. The
+auction-share metrics (impression share and its lost-to-budget and
+lost-to-rank parts) cannot be summed over days, so they are read once per
+range for the whole account.
 """
 from __future__ import annotations
 
@@ -34,20 +48,46 @@ API_VERSION = "v24"
 API = "https://googleads.googleapis.com/" + API_VERSION
 TOKEN_URL = "https://oauth2.googleapis.com/token"
 DEFAULT_LOGIN = "9923720096"
-DAILY_LIMIT = 2400            # Explorer allows ~2,880; keep a margin
+DAILY_LIMIT = 2400            # our own ceiling, below what we believe Google allows
 MAX_RANGE_DAYS = 800
 MAX_ROWS = 250_000
-TTL_OPEN = 15 * 60            # a range that includes today
-TTL_CLOSED = 6 * 3600         # a range that has ended
+TTL_OPEN = 30 * 60            # a range that includes today
+TTL_CLOSED = 12 * 3600        # a range that has ended
 TTL_ACCOUNTS = 3600
+DAILY_BLOCK_S = 300           # a retry delay longer than this is the daily allowance, not a hiccup
+CACHE_V = "v2:"               # bump when the shape of a cached range changes
 
 ID_RE = re.compile(r"^\d{10}$")
 DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 DOW = ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"]
 
+# The numbers every row carries, in column order: (GAQL metric, scale to the unit shown).
+CORE = [("impressions", 1), ("clicks", 1), ("cost_micros", 1e-6), ("conversions", 1), ("conversions_value", 1)]
+OPTIONAL = [("all_conversions", 1), ("all_conversions_value", 1), ("view_through_conversions", 1), ("interactions", 1),
+            ("engagements", 1), ("video_views", 1), ("cross_device_conversions", 1), ("invalid_clicks", 1),
+            ("phone_calls", 1), ("phone_impressions", 1), ("active_view_impressions", 1),
+            ("active_view_measurable_impressions", 1)]
+BASE = CORE + OPTIONAL
+NB = len(BASE)
+# Whole-period shares: not additive, so read per range for the whole account.
+SHARES = ["search_impression_share", "search_top_impression_share", "search_absolute_top_impression_share",
+          "search_budget_lost_impression_share", "search_rank_lost_impression_share",
+          "search_budget_lost_top_impression_share", "search_rank_lost_top_impression_share",
+          "content_impression_share", "content_budget_lost_impression_share", "content_rank_lost_impression_share",
+          "top_impression_percentage", "absolute_top_impression_percentage", "search_click_share",
+          "search_exact_match_impression_share"]
+
+_BAD = set()                  # optional metrics Google named in a refusal (per worker, until restart)
+_BAD_SHARES = set()           # the same for the auction-share metrics
+_BLOCK = {"until": 0.0, "checked": 0.0}
+
 
 class AdsError(RuntimeError):
     """A Google Ads call failed; the message is safe to show staff."""
+
+    def __init__(self, message, status=None, detail=""):
+        super().__init__(message)
+        self.status, self.detail = status, detail or message
 
 
 class NotConfigured(AdsError):
@@ -55,7 +95,9 @@ class NotConfigured(AdsError):
 
 
 class OverQuota(AdsError):
-    pass
+    def __init__(self, message, status=429, until=None):
+        super().__init__(message, status=status)
+        self.until = until            # epoch seconds when Google says it will answer again, if it said
 
 
 def _env(name, default=""):
@@ -124,6 +166,45 @@ def _pacific_day():
         return dt.datetime.utcnow().date().isoformat()
 
 
+def _block_message(until):
+    hrs = max(1, int((until - time.time()) / 3600 + 0.5))
+    return ("Google has used up this app's daily Google Ads allowance. Live numbers return in about %d hour%s; "
+            "views already saved still open." % (hrs, "" if hrs == 1 else "s"))
+
+
+def blocked_until(store=None):
+    """Epoch seconds until which Google will not answer (0 if it will), asking the database at most once a minute
+    so a worker that never saw the 429 still knows."""
+    now = time.time()
+    if _BLOCK["until"] > now:
+        return _BLOCK["until"]
+    if store is not None and now - _BLOCK["checked"] > 60:
+        _BLOCK["checked"] = now
+        try:
+            u = float(store.get_gads_block() or 0)
+        except Exception:
+            u = 0.0
+        if u > now:
+            _BLOCK["until"] = u
+            return u
+    return 0.0
+
+
+def _set_block(store, until):
+    _BLOCK["until"] = until
+    try:
+        store.set_gads_block(until)
+    except Exception as e:
+        log.warning("gads: could not remember the block (%s)", e)
+
+
+def reset_state():
+    """For tests: forget what was learned about Google's refusals."""
+    _BAD.clear()
+    _BAD_SHARES.clear()
+    _BLOCK.update(until=0.0, checked=0.0)
+
+
 def _count_call(store):
     """Add one request to today's tally; raise OverQuota past the limit.
     A store outage must not stop reads, so it is logged and skipped."""
@@ -134,29 +215,46 @@ def _count_call(store):
         return
     if n > DAILY_LIMIT:
         raise OverQuota("Today's Google Ads request budget (%d) is used up. It resets at midnight "
-                        "Pacific time; cached views still work." % DAILY_LIMIT)
+                        "Pacific time; views already saved still open." % DAILY_LIMIT)
 
 
-def _google_message(r):
+def _google_message(r, limit=300):
     try:
         e = r.json()
         e = e[0] if isinstance(e, list) and e else e
         err = (e or {}).get("error", {})
-        details = err.get("details") or []
-        for d in details:
+        for d in err.get("details") or []:
             for x in d.get("errors", []) or []:
                 if x.get("message"):
-                    return x["message"][:300]
-        return (err.get("message") or "")[:300]
+                    return x["message"][:limit]
+        return (err.get("message") or "")[:limit]
     except Exception:
         return ""
 
 
+def _retry_seconds(r):
+    """How long Google says to wait, from its quota error ("retryDelay": "61458s"), or None."""
+    try:
+        e = r.json()
+        e = e[0] if isinstance(e, list) and e else e
+        for d in ((e or {}).get("error", {}).get("details")) or []:
+            for x in d.get("errors", []) or []:
+                v = ((x.get("details") or {}).get("quotaErrorDetails") or {}).get("retryDelay")
+                if v:
+                    return float(str(v).rstrip("s"))
+    except Exception:
+        pass
+    return None
+
+
 def _post(path, body, store, *, http=None):
-    """One Google Ads request. Counted, retried once on a rate limit."""
+    """One Google Ads request. Counted, never sent while Google has said to wait, retried once on a short rate limit."""
     import requests
     http = http or requests.post
     for attempt in (0, 1):
+        until = blocked_until(store)
+        if until:
+            raise OverQuota(_block_message(until), until=until)
         _count_call(store)
         headers = {"Authorization": "Bearer " + _access_token(),
                    "developer-token": _env("GOOGLE_ADS_DEVELOPER_TOKEN"),
@@ -170,13 +268,22 @@ def _post(path, body, store, *, http=None):
         if r.status_code == 401 and attempt == 0:
             reset_token_cache()
             continue
-        if r.status_code in (429, 503) and attempt == 0:
+        if r.status_code == 429:
+            delay = _retry_seconds(r)
+            if delay and delay > DAILY_BLOCK_S:
+                until = time.time() + delay
+                _set_block(store, until)
+                raise OverQuota(_block_message(until), until=until)
+            if attempt == 0:
+                time.sleep(min(delay or 2.0, 8.0))
+                continue
+            raise OverQuota("Google Ads is rate limiting this app right now. Try again in a minute.")
+        if r.status_code == 503 and attempt == 0:
             time.sleep(2.0)
             continue
         msg = _google_message(r)
-        if r.status_code == 429:
-            raise OverQuota("Google Ads is rate limiting this app right now. Try again in a minute.")
-        raise AdsError("Google Ads answered %s%s" % (r.status_code, (": " + msg) if msg else "."))
+        raise AdsError("Google Ads answered %s%s" % (r.status_code, (": " + msg) if msg else "."),
+                       status=r.status_code, detail=_google_message(r, 1500))
     raise AdsError("Google Ads did not answer.")
 
 
@@ -196,6 +303,35 @@ def search(customer_id, gaql, store, *, http=None):
             raise AdsError("That range is too large to chart (over %d rows). Pick a shorter range." % MAX_ROWS)
 
 
+def _names(text, fields):
+    """Which of `fields` a Google error message names (whole words, so all_conversions is not all_conversions_value)."""
+    return [f for f in fields if re.search(r"(?<![a-z_])%s(?![a-z_])" % re.escape(f), text or "")]
+
+
+def search_pruned(customer_id, build, optional, bad, store, *, http=None):
+    """Run build(fields) with every optional field not known to be refused. If Google answers 400 naming some of
+    them, drop those (and remember them) and try again; if it names none, try once with none of them (and
+    remember nothing, because the cause may be the range or the account). Returns (rows, fields_used)."""
+    fields = [f for f in optional if f not in bad]
+    for _ in range(4):
+        try:
+            return search(customer_id, build(fields), store, http=http), fields
+        except OverQuota:
+            raise
+        except AdsError as e:
+            if e.status != 400 or not fields:
+                raise
+            named = _names(e.detail, fields)
+            if named:
+                bad.update(named)
+                log.warning("gads: Google refused %s (%s); dropping them", named, e.detail[:200])
+                fields = [f for f in fields if f not in named]
+            else:
+                log.warning("gads: 400 naming no optional metric (%s); retrying with the core five", e.detail[:200])
+                fields = []
+    raise AdsError("Google Ads refused the metric list.")
+
+
 # ── Queries ─────────────────────────────────────────────────────────────────
 
 def q_accounts():
@@ -204,11 +340,14 @@ def q_accounts():
             "customer_client.status, customer_client.test_account FROM customer_client")
 
 
-def q_campaign_days(start, end):
+def _metrics(fields):
+    return ", ".join("metrics." + f for f in [c[0] for c in CORE] + list(fields))
+
+
+def q_campaign_days(start, end, fields=()):
     return ("SELECT campaign.id, campaign.name, campaign.status, campaign.advertising_channel_type, "
-            "campaign_budget.amount_micros, segments.date, metrics.impressions, metrics.clicks, "
-            "metrics.cost_micros, metrics.conversions, metrics.conversions_value "
-            "FROM campaign WHERE segments.date BETWEEN '%s' AND '%s'" % (start, end))
+            "campaign_budget.amount_micros, segments.date, %s "
+            "FROM campaign WHERE segments.date BETWEEN '%s' AND '%s'" % (_metrics(fields), start, end))
 
 
 def q_campaign_sis(start, end):
@@ -217,26 +356,23 @@ def q_campaign_sis(start, end):
             % (start, end))
 
 
-def q_account_sis(start, end):
-    return ("SELECT metrics.search_impression_share FROM customer "
-            "WHERE segments.date BETWEEN '%s' AND '%s'" % (start, end))
+def q_shares(start, end, fields):
+    return ("SELECT %s FROM customer WHERE segments.date BETWEEN '%s' AND '%s'"
+            % (", ".join("metrics." + f for f in fields), start, end))
 
 
-_M = "metrics.impressions, metrics.clicks, metrics.cost_micros, metrics.conversions, metrics.conversions_value"
+def q_device(start, end, fields=()):
+    return "SELECT segments.device, %s FROM customer WHERE segments.date BETWEEN '%s' AND '%s'" % (_metrics(fields), start, end)
 
 
-def q_device(start, end):
-    return "SELECT segments.device, %s FROM customer WHERE segments.date BETWEEN '%s' AND '%s'" % (_M, start, end)
-
-
-def q_network(start, end):
+def q_network(start, end, fields=()):
     return ("SELECT segments.ad_network_type, %s FROM customer WHERE segments.date BETWEEN '%s' AND '%s'"
-            % (_M, start, end))
+            % (_metrics(fields), start, end))
 
 
-def q_dow_hour(start, end):
+def q_dow_hour(start, end, fields=()):
     return ("SELECT segments.day_of_week, segments.hour, %s FROM customer WHERE segments.date BETWEEN '%s' AND '%s'"
-            % (_M, start, end))
+            % (_metrics(fields), start, end))
 
 
 # ── Parsing ─────────────────────────────────────────────────────────────────
@@ -248,12 +384,28 @@ def _f(v):
         return 0.0
 
 
+def _camel(field):
+    head, *rest = field.split("_")
+    return head + "".join(w.title() for w in rest)
+
+
+_KEYS = [(_camel(f), k) for f, k in BASE]
+
+
 def _base(m):
-    """[impressions, clicks, cost, conversions, conversion value] from a metrics block."""
+    """One value per column in BASE (impressions, clicks, cost, conversions, value, then the optional ones; 0 where
+    Google sent nothing) from a metrics block."""
     m = m or {}
-    return [int(_f(m.get("impressions"))), int(_f(m.get("clicks"))),
-            round(_f(m.get("costMicros")) / 1e6, 4), round(_f(m.get("conversions")), 4),
-            round(_f(m.get("conversionsValue")), 4)]
+    out = []
+    for i, (key, scale) in enumerate(_KEYS):
+        v = _f(m.get(key)) * scale
+        out.append(int(v) if i < 2 else round(v, 4))
+    return out
+
+
+def missing_columns(fields):
+    """Indexes (into BASE) of the optional metrics that were NOT fetched, so the page can say so instead of showing 0."""
+    return [len(CORE) + i for i, (f, _) in enumerate(OPTIONAL) if f not in fields]
 
 
 def parse_accounts(rows):
@@ -274,12 +426,12 @@ def parse_accounts(rows):
     return out
 
 
-def parse_campaign_days(rows, start, end):
+def parse_campaign_days(rows, start, end, fields=None):
     """The compact shape the page charts from.
 
-    campaigns: [{id, name, type, status, budget}], days: ['YYYY-MM-DD', ...] every day
-    in range (so a day with no spend still plots as zero), rows: [[campaign index,
-    day index, impressions, clicks, cost, conversions, value], ...]."""
+    campaigns: [{id, name, type, status, budget}], days: ['YYYY-MM-DD', ...] every day in range (so a day with no
+    spend still plots as zero), rows: [[campaign index, day index, <one number per BASE column>], ...], and
+    missing: the BASE columns Google would not give."""
     d0, d1 = dt.date.fromisoformat(start), dt.date.fromisoformat(end)
     days = [(d0 + dt.timedelta(days=i)).isoformat() for i in range((d1 - d0).days + 1)]
     didx = {d: i for i, d in enumerate(days)}
@@ -296,32 +448,44 @@ def parse_campaign_days(rows, start, end):
                           "type": c.get("advertisingChannelType") or "UNKNOWN",
                           "budget": round(_f((r.get("campaignBudget") or {}).get("amountMicros")) / 1e6, 2)})
         out.append([cidx[cid], didx[d]] + _base(r.get("metrics")))
-    return {"start": start, "end": end, "days": days, "campaigns": camps, "rows": out}
+    return {"start": start, "end": end, "days": days, "campaigns": camps, "rows": out,
+            "missing": missing_columns([f for f, _ in OPTIONAL] if fields is None else fields)}
 
 
-def parse_sis(campaign_rows, account_rows):
+def parse_sis(campaign_rows):
     camp = {}
     for r in campaign_rows:
         v = (r.get("metrics") or {}).get("searchImpressionShare")
         cid = str((r.get("campaign") or {}).get("id") or "")
         if cid and v not in (None, ""):
             camp[cid] = round(_f(v), 4)
-    acct = None
-    for r in account_rows:
-        v = (r.get("metrics") or {}).get("searchImpressionShare")
-        if v not in (None, ""):
-            acct = round(_f(v), 4)
-    return {"account": acct, "campaigns": camp}
+    return camp
 
 
-def parse_extras(device_rows, network_rows, dow_hour_rows):
+def parse_shares(rows, fields):
+    """{metric: share between 0 and 1, or None} for the whole account over the range. Google reports a share as
+    "< 10%" when it is tiny; that comes back as the number 0.0999 and is kept as it is."""
+    out = {f: None for f in fields}
+    for r in rows:
+        m = r.get("metrics") or {}
+        for f in fields:
+            v = m.get(_camel(f))
+            if v not in (None, ""):
+                try:
+                    out[f] = round(float(v), 4)
+                except (TypeError, ValueError):
+                    pass
+    return out
+
+
+def parse_extras(device_rows, network_rows, dow_hour_rows, missing=()):
     def seg(rows, key):
         acc = {}
         for r in rows:
             k = (r.get("segments") or {}).get(key) or "UNKNOWN"
             b = _base(r.get("metrics"))
-            a = acc.setdefault(k, [0, 0, 0.0, 0.0, 0.0])
-            for i in range(5):
+            a = acc.setdefault(k, [0] * NB)
+            for i in range(NB):
                 a[i] += b[i]
         return [[k] + [round(x, 4) if isinstance(x, float) else x for x in v] for k, v in sorted(acc.items())]
     heat = {}
@@ -331,15 +495,13 @@ def parse_extras(device_rows, network_rows, dow_hour_rows):
             continue
         key = (DOW.index(s["dayOfWeek"]), int(s["hour"]))
         b = _base(r.get("metrics"))
-        a = heat.setdefault(key, [0, 0, 0.0, 0.0, 0.0])
-        for i in range(5):
+        a = heat.setdefault(key, [0] * NB)
+        for i in range(NB):
             a[i] += b[i]
     return {"device": seg(device_rows, "device"), "network": seg(network_rows, "adNetworkType"),
             "dowHour": [[d, h] + [round(x, 4) if isinstance(x, float) else x for x in v]
-                        for (d, h), v in sorted(heat.items())]}
+                        for (d, h), v in sorted(heat.items())], "missing": sorted(set(missing))}
 
-
-# ── Validation ──────────────────────────────────────────────────────────────
 
 def check_range(start, end, label="range"):
     """(start, end) as date strings, or raises ValueError saying what is wrong."""
@@ -375,7 +537,31 @@ def _par(fns):
         return [f.result() for f in futs]
 
 
-def _cached(store, key, ttl, make):
+def _can_serve_stale(e):
+    return isinstance(e, OverQuota) or e.status in (None, 429, 500, 502, 503)
+
+
+def _saved_copy(store, key):
+    """(value, saved-at) of the newest saved copy of `key`, or None. Before CACHE_V changed the stored shape the same
+    ranges were saved without the prefix; their rows lack the newer columns, which the page reads as "no data", so
+    they still beat showing nothing when Google cannot answer."""
+    keys = [key]
+    base = key[len(CACHE_V):] if key.startswith(CACHE_V) else ""
+    if base.split(":")[0] in ("days", "extras", "accounts"):
+        keys.append(base)
+    for k in keys:
+        try:
+            old = store.get_gads_cache_any(k)
+        except Exception:
+            old = None
+        if old is not None:
+            return old
+    return None
+
+
+def _cached(store, key, ttl, make, notes=None):
+    """The saved copy if it is fresh; else ask Google. If Google cannot answer (allowance spent, unreachable), the
+    last saved copy of any age is served and its time added to `notes` so the page can say so."""
     try:
         hit = store.get_gads_cache(key, ttl)
     except Exception as e:
@@ -383,7 +569,18 @@ def _cached(store, key, ttl, make):
         hit = None
     if hit is not None:
         return hit
-    value = make()
+    try:
+        value = make()
+    except AdsError as e:
+        if not _can_serve_stale(e):
+            raise
+        old = _saved_copy(store, key)
+        if old is None:
+            raise
+        if notes is not None:
+            notes.append(old[1])
+        log.warning("gads: serving the saved copy of %s (%s)", key, e)
+        return old[0]
     try:
         store.put_gads_cache(key, value)
     except Exception as e:
@@ -394,54 +591,100 @@ def _cached(store, key, ttl, make):
 def list_accounts(store, *, http=None):
     def make():
         return parse_accounts(search(login_customer(), q_accounts(), store, http=http))
-    return _cached(store, "accounts", TTL_ACCOUNTS, make)
+    return _cached(store, CACHE_V + "accounts", TTL_ACCOUNTS, make)
 
 
 def account_ids(store, *, http=None):
     return {a["id"] for a in list_accounts(store, http=http)}
 
 
-def performance(store, customer_id, start, end, *, with_sis=True, http=None):
-    """One range of campaign-by-day rows (and, for the main range, the period's
-    search impression share)."""
+def performance(store, customer_id, start, end, *, with_sis=True, with_shares=True, notes=None, http=None):
+    """One range of campaign-by-day rows, plus (for the main range) each Search campaign's impression share and
+    (for the main range and its comparison) the whole account's auction shares."""
     def make_days():
-        return parse_campaign_days(search(customer_id, q_campaign_days(start, end), store, http=http), start, end)
+        rows, used = search_pruned(customer_id, lambda f: q_campaign_days(start, end, f), [o[0] for o in OPTIONAL], _BAD,
+                                   store, http=http)
+        return parse_campaign_days(rows, start, end, used)
 
     def days():
-        return _cached(store, "days:%s:%s:%s" % (customer_id, start, end), _ttl(end), make_days)
+        return _cached(store, CACHE_V + "days:%s:%s:%s" % (customer_id, start, end), _ttl(end), make_days, notes)
 
     def make_sis():
         try:
-            c, a = _par([lambda: search(customer_id, q_campaign_sis(start, end), store, http=http),
-                         lambda: search(customer_id, q_account_sis(start, end), store, http=http)])
-            return parse_sis(c, a)
+            return parse_sis(search(customer_id, q_campaign_sis(start, end), store, http=http))
         except OverQuota:
             raise
         except AdsError as e:       # share is a nicety; the range still charts without it
-            log.warning("gads: impression share unavailable for %s (%s)", customer_id, e)
-            return {"account": None, "campaigns": {}}
+            if _can_serve_stale(e):
+                raise
+            log.warning("gads: campaign impression share unavailable for %s (%s)", customer_id, e)
+            return {}
 
-    def sis():
-        return _cached(store, "sis:%s:%s:%s" % (customer_id, start, end), _ttl(end), make_sis)
+    def make_shares():
+        out = {f: None for f in SHARES}
+        try:
+            rows, used = search_pruned(customer_id, lambda f: q_shares(start, end, f), SHARES, _BAD_SHARES, store, http=http)
+            out.update(parse_shares(rows, used))
+        except OverQuota:
+            raise
+        except AdsError as e:
+            if _can_serve_stale(e):
+                raise
+            log.warning("gads: auction shares unavailable for %s (%s)", customer_id, e)
+        return out
 
-    if not with_sis:
-        return days()
-    d, sh = _par([days, sis])
-    return dict(d, sis=sh)
+    def soft(fn, empty):
+        """The shares are extras: if Google cannot give them (and no saved copy exists) the range still draws."""
+        def run():
+            try:
+                return fn()
+            except AdsError as e:
+                log.warning("gads: leaving out an optional read for %s (%s)", customer_id, e)
+                return empty
+        return run
 
-
-def performance_pair(store, customer_id, cur, cmp, *, with_sis=True, http=None):
-    """The main range and (if given) its comparison range, fetched together."""
-    jobs = [lambda: performance(store, customer_id, cur[0], cur[1], with_sis=with_sis, http=http)]
-    if cmp:
-        jobs.append(lambda: performance(store, customer_id, cmp[0], cmp[1], with_sis=False, http=http))
+    jobs = [days]
+    if with_sis:
+        jobs.append(soft(lambda: _cached(store, CACHE_V + "sis:%s:%s:%s" % (customer_id, start, end), _ttl(end), make_sis, notes), {}))
+    if with_shares:
+        jobs.append(soft(lambda: _cached(store, CACHE_V + "shares:%s:%s:%s" % (customer_id, start, end), _ttl(end), make_shares, notes),
+                         {f: None for f in SHARES}))
     res = _par(jobs)
-    return res[0], (res[1] if cmp else None)
+    out = dict(res[0])
+    i = 1
+    if with_sis:
+        out["sis"] = {"account": None, "campaigns": res[i]}
+        i += 1
+    if with_shares:
+        out["shares"] = res[i]
+        if with_sis:
+            out["sis"]["account"] = res[i].get("search_impression_share")
+    return out
 
 
-def extras(store, customer_id, start, end, *, http=None):
+
+def performance_pair(store, customer_id, cur, cmp, *, with_sis=True, with_shares=True, http=None):
+    """The main range and (if given) its comparison range, fetched together. Returns (current, compare, saved) where
+    `saved` lists the times of any saved copies served because Google could not answer."""
+    notes = []
+    jobs = [lambda: performance(store, customer_id, cur[0], cur[1], with_sis=with_sis, with_shares=with_shares, notes=notes, http=http)]
+    if cmp:
+        jobs.append(lambda: performance(store, customer_id, cmp[0], cmp[1], with_sis=False, with_shares=with_shares, notes=notes, http=http))
+    res = _par(jobs)
+    return res[0], (res[1] if cmp else None), notes
+
+
+def extras(store, customer_id, start, end, *, notes=None, http=None):
+    used = []
+
+    def one(build):
+        rows, f = search_pruned(customer_id, build, [o[0] for o in OPTIONAL], _BAD, store, http=http)
+        used.append(f)
+        return rows
+
     def make():
-        return parse_extras(*_par([lambda: search(customer_id, q_device(start, end), store, http=http),
-                                   lambda: search(customer_id, q_network(start, end), store, http=http),
-                                   lambda: search(customer_id, q_dow_hour(start, end), store, http=http)]))
-    return _cached(store, "extras:%s:%s:%s" % (customer_id, start, end), _ttl(end), make)
+        d, n, h = _par([lambda: one(lambda f: q_device(start, end, f)), lambda: one(lambda f: q_network(start, end, f)),
+                        lambda: one(lambda f: q_dow_hour(start, end, f))])
+        have = set(used[0]).intersection(*[set(u) for u in used[1:]]) if used else set()
+        return parse_extras(d, n, h, missing_columns(have))
+    return _cached(store, CACHE_V + "extras:%s:%s:%s" % (customer_id, start, end), _ttl(end), make, notes)
