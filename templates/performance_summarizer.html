@@ -1,7 +1,7 @@
 {% extends "_paid_base.html" %}
 {% block title %}Performance Summarizer{% endblock %}
 {% block head %}
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/performance_summarizer.css') }}?v=6">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/performance_summarizer.css') }}?v=8">
 {% endblock %}
 {% block content %}
 <div class="pm pm-ps" id="ps">
@@ -50,11 +50,15 @@
   </section>
 
   <div id="notice"></div>
+  <div class="ps-stale" id="staleBar" hidden></div>
   <div class="ps-filterbar" id="filterbar" hidden></div>
 
   <div id="dash" hidden>
     <!-- Key numbers -->
-    <div class="ps-sec-h"><h2>Key numbers</h2><span class="ps-hint">Click a tile to chart it. Shift-click to add it to the chart.</span></div>
+    <div class="ps-sec-h"><div><h2>Key numbers</h2><span class="ps-hint ps-hint-b">Click a card to chart it, shift-click to add it. The dots on a card change what it shows.</span></div>
+      <div class="ps-sec-tools"><span class="ps-hint" id="kpiCount"></span>
+        <button type="button" class="pm-btn-ghost" id="kpiCustom" title="Choose which metrics the cards show, from everything Google reports">
+          <svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg><span>Customize cards</span></button></div></div>
     <section class="ps-kpis" id="kpis"></section>
 
     <!-- The explorer and what stands out -->
@@ -62,15 +66,6 @@
       <div id="explorer" class="ps-explorer"></div>
       <aside class="ps-insights" id="insights"></aside>
     </div>
-
-    <!-- Chart studio: build any chart, then keep it -->
-    <div class="ps-sec-h" id="studioSec"><div><h2>Chart studio</h2><span class="ps-hint ps-hint-b">Pick a chart, choose your metrics, slice it your way. It draws as you go.</span></div></div>
-    <section id="studio"></section>
-
-    <div class="ps-sec-h"><h2>Your charts</h2>
-      <button type="button" class="pm-btn-ghost" id="addChart"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg><span>Blank chart</span></button></div>
-    <p class="ps-hint ps-board-hint" id="boardHint"></p>
-    <section class="ps-board" id="board"></section>
 
     <!-- Splits -->
     <div class="ps-sec-h"><h2>Where the money goes</h2>
@@ -86,12 +81,21 @@
     <div class="ps-sec-h"><h2>Campaigns</h2><span class="ps-hint" id="campHint"></span></div>
     <section class="pm-panel ps-card ps-tablecard" id="camps"></section>
 
+    <!-- Chart studio: build any chart, then keep it -->
+    <div class="ps-sec-h" id="studioSec"><div><h2>Chart studio</h2><span class="ps-hint ps-hint-b">Pick a chart, choose your metrics, slice it your way. It draws as you go.</span></div></div>
+    <section id="studio"></section>
+
+    <div class="ps-sec-h"><h2>Your charts</h2>
+      <button type="button" class="pm-btn-ghost" id="addChart"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg><span>Blank chart</span></button></div>
+    <p class="ps-hint ps-board-hint" id="boardHint"></p>
+    <section class="ps-board" id="board"></section>
+
   </div>
 </div>
 {% endblock %}
 {% block scripts %}
 <script src="{{ url_for('static', filename='vendor/chart.umd.js') }}"></script>
 <script src="{{ url_for('static', filename='js/pm_picker.js') }}?v=1"></script>
-<script src="{{ url_for('static', filename='js/ps_data.js') }}?v=3"></script>
-<script src="{{ url_for('static', filename='js/performance_summarizer.js') }}?v=6"></script>
+<script src="{{ url_for('static', filename='js/ps_data.js') }}?v=4"></script>
+<script src="{{ url_for('static', filename='js/performance_summarizer.js') }}?v=7"></script>
 {% endblock %}

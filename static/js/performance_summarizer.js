@@ -25,7 +25,7 @@ var SPLITS = ["cost","impressions","clicks","conversions","value"];
 
 var S = {
   accounts:[], acct:null, preset:"last30", range:null, compare:"prev", cmpRange:null,
-  cur:null, cmp:null, sis:null, extras:null,
+  cur:null, cmp:null, sis:null, extras:null, shares:{cur:null,cmp:null}, missing:[], kpis:P.KPI_DEFAULT.slice(),
   filter:[],
   ex:{metrics:["cost","conversions"],dim:"day",type:"area",compare:true,accounts:[],index:false,series:""},
   studio:{metrics:["conversions","cost"],dim:"campaign",type:"hbar",compare:false,accounts:[],index:false,series:""},
@@ -109,12 +109,14 @@ function popMenu(anchor,o){
         (it.color?'<i class="sw" style="background:'+it.color+'"></i>':'<i class="ck"></i>')+
         '<span class="t"><b>'+esc(it.label)+'</b>'+(it.sub?'<small>'+esc(it.sub)+'</small>':'')+'</span>'+
         (it.checked?'<svg class="tick" viewBox="0 0 24 24"><path d="m5 12 5 5L20 7"/></svg>':'')+'</button>';
-    }).join("")+'</div>';
+    }).join("")+'</div>'+(o.footer?'<div class="ps-pop-f">'+o.footer.map(function(f){return '<button type="button" class="ps-pop-fb" data-f="'+esc(f.key)+'">'+esc(f.label)+'</button>';}).join("")+'</div>':"");
     var q=$(".ps-pop-q",m);
     if(q){q.oninput=function(){var t=q.value.trim().toLowerCase();$$(".ps-pop-i",m).forEach(function(b){b.hidden=!!t&&b.textContent.toLowerCase().indexOf(t)<0;});};}
   }
   paint();
   m.addEventListener("click",function(e){
+    var fb=e.target.closest(".ps-pop-fb");
+    if(fb){o.onFooter(fb.dataset.f); if(o.multi){var y0=$(".ps-pop-list",m).scrollTop; paint(); $(".ps-pop-list",m).scrollTop=y0;} else closeMenu(); return;}
     var b=e.target.closest(".ps-pop-i"); if(!b||b.disabled) return;
     o.onPick(b.dataset.k);
     if(o.multi){var y=$(".ps-pop-list",m).scrollTop; paint(); $(".ps-pop-list",m).scrollTop=y;} else closeMenu();
@@ -131,13 +133,21 @@ function popMenu(anchor,o){
 function notice(kind,title,html){
   $("#notice").innerHTML=title?'<div class="ps-notice '+kind+'"><b>'+esc(title)+'</b><p>'+html+'</p></div>':"";
 }
+/* Google's daily allowance spent: say when live numbers return, and when a saved copy stands in for them. */
+function paintStale(stale,blockedUntil){
+  var el=$("#staleBar"), t=function(x){return new Date(x).toLocaleString([], {weekday:"short",hour:"numeric",minute:"2-digit"});};
+  if(!stale&&!blockedUntil){el.hidden=true;el.innerHTML="";return;}
+  el.hidden=false;
+  el.innerHTML='<b>'+(stale?"Showing the copy saved "+esc(t(stale)):"Saved views still open")+'.</b> Google has used up this app\u2019s daily Google Ads allowance'+
+    (blockedUntil?', so fresh numbers come back around <b>'+esc(t(blockedUntil*1000))+'</b>':'')+'.';
+}
 function showError(err){
   $("#dash").hidden=true;
   $("#liveText").textContent="Google Ads is not reachable";
   $("#live").classList.add("off");
   if(err.status===409) notice("setup","Google Ads is not connected yet",
     esc(err.message)+' An admin sets these on Railway (they are named <code>GOOGLE_ADS_*</code>), then reloads this page.');
-  else if(err.status===429) notice("warn","Google Ads is busy",esc(err.message));
+  else if(err.status===429) notice("warn","Google Ads is not answering right now",esc(err.message));
   else notice("bad","Could not load Google Ads",esc(err.message));
 }
 
@@ -243,6 +253,8 @@ function load(){
   getJson(BASE+"/performance?"+q).then(function(j){
     if(seq!==S.seq) return;
     S.cur=j.current; S.cmp=j.compare; S.sis=j.current.sis||null; S.extras=null; S.cd=null;
+    S.shares={cur:j.current.shares||null,cmp:(j.compare&&j.compare.shares)||null}; S.missing=j.current.missing||[];
+    paintStale(j.stale,j.blockedUntil);
     var ids={}; S.cur.campaigns.forEach(function(c){ids[c.id]=1;});
     S.filter=S.filter.filter(function(i){return ids[i];});
     $("#live").classList.remove("off");
@@ -329,39 +341,118 @@ function countUp(el,from,to,key){
     if(k<1) requestAnimationFrame(step);
   })(t0);
 }
-var KPI_KEYS = ["cost","impressions","clicks","ctr","cpc","conversions","cvr","cpa","value","roas"];
-function paintKpis(){
-  var set=setCur(), cset=setCmp(), tc=P.total(S.cur,set), tp=S.cmp?P.total(S.cmp,cset):null, days=P.daily(S.cur,set), val=hasValue(), h="";
-  KPI_KEYS.forEach(function(k){
-    if(!val&&(k==="value"||k==="roas")) return;
-    var m=P.METRICS[k], v=m.get(tc), pv=tp?m.get(tp):null, ch=tp?P.change(k,v,pv):null, on=S.ex.metrics.indexOf(k)>=0, col=mcol(k);
-    h+='<button type="button" class="ps-kpi'+(on?" on":"")+'" data-m="'+k+'" style="--kc:'+col+'" title="'+esc(m.hint)+'">'+
-      '<span class="k">'+esc(m.label)+'</span><span class="v" data-v>'+fm(k,v,true)+'</span>'+
-      (ch?'<span class="d '+ch.tone+'">'+(ch.dir>0?'<i>▲</i>':ch.dir<0?'<i>▼</i>':'')+esc(ch.text)+'<em>vs '+esc(fm(k,pv,true))+'</em></span>':'<span class="d flat"><em>'+esc(m.hint)+'</em></span>')+
-      sparkSvg(days.map(function(t){return m.get(t);}),col)+'</button>';
+/* ── Key number cards ─────────────────────────────────────────────
+   Ten by default, any of the 50-odd metrics Google gives, in any order. The
+   choice lives in this browser (ps_kpis_v1). A card is a metric: click it to
+   chart it, shift-click to add it to the chart, the corner button changes
+   which metric the card shows, and "Customize cards" lists them all. */
+var KKEY="ps_kpis_v1", KMAX=20;
+function loadKpis(){
+  try{
+    var v=JSON.parse(localStorage.getItem(KKEY)||"null");
+    if(Array.isArray(v)){v=v.filter(function(k,i){return P.METRICS[k]&&v.indexOf(k)===i;}).slice(0,KMAX); if(v.length) S.kpis=v;}
+  }catch(e){}
+}
+function saveKpis(){try{localStorage.setItem(KKEY,JSON.stringify(S.kpis));}catch(e){}}
+function usable(k){return !P.METRICS[k].value||hasValue();}
+var GROUP_ICON={
+  "Cost":'<path d="M12 3v18"/><path d="M16.5 7.5C16.5 5.8 14.5 4.5 12 4.5S7.5 5.8 7.5 7.5 9.5 10 12 10.5s4.5 1.3 4.5 3S14.5 19.5 12 19.5 7.5 18.2 7.5 16.5"/>',
+  "Volume":'<path d="M5 20v-8M12 20V5M19 20v-5" class="th"/>',
+  "Results":'<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r=".8"/>',
+  "Efficiency":'<path d="M4 17a8 8 0 1 1 16 0"/><path d="m12 17 4-6"/>',
+  "Engagement":'<path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/>',
+  "Video":'<rect x="3" y="5" width="18" height="14" rx="3.5"/><path d="m10 9 5 3-5 3z"/>',
+  "Calls":'<path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2z"/>',
+  "Viewability":'<path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
+  "Auction share":'<path d="M12 3a9 9 0 1 0 9 9h-9z"/><path d="M14.5 3.4A9 9 0 0 1 20.6 9.5H14.5z"/>'
+};
+/* Every metric as menu items, grouped, for the card pickers and the chart pickers. chart=true leaves out the
+   whole-period shares, which cannot be drawn over time. */
+function metricItems(opts){
+  var tc=P.total(S.cur,null), sh=S.shares.cur, items=[], last=null;
+  (opts.chart?P.METRIC_ORDER:P.METRIC_ALL).forEach(function(k){
+    if(!usable(k)) return;
+    var def=P.METRICS[k]; if(def.group!==last){items.push({head:def.group});last=def.group;}
+    var why=P.noData(k,tc,S.missing,sh);
+    items.push({key:k,label:def.label,sub:why?"No figures here: "+why.toLowerCase():def.hint,color:mcol(k),checked:opts.checked(k),disabled:opts.disabled?opts.disabled(k):false});
   });
-  if(S.sis&&S.sis.account!=null&&!S.filter.length){
-    h+='<div class="ps-kpi ps-kpi-static" style="--kc:#38bdf8" title="How often your Search ads showed, out of the times they could have"><span class="k">Search impr. share</span>'+
-      '<span class="v">'+P.fmt("pct",S.sis.account)+'</span><span class="d flat"><em>of the searches you could match</em></span>'+
-      '<span class="ps-meter"><i style="width:'+Math.round(S.sis.account*100)+'%"></i></span></div>';
-  }
-  var old={}; $$("#kpis .ps-kpi[data-m] [data-v]").forEach(function(e){old[e.parentNode.dataset.m]=e._n;});
-  $("#kpis").innerHTML=h;
+  return items;
+}
+function paintKpis(){
+  var set=setCur(), cset=setCmp(), tc=P.total(S.cur,set), tp=S.cmp?P.total(S.cmp,cset):null, days=P.daily(S.cur,set), h="", shown=0;
+  var shCur=S.shares.cur, shCmp=S.shares.cmp, whole=P.total(S.cur,null);
+  S.kpis.forEach(function(k,i){
+    if(!P.METRICS[k]||!usable(k)) return;
+    shown++;
+    var m=P.METRICS[k], col=mcol(k), on=S.ex.metrics.indexOf(k)>=0, v, pv=null, ch=null, body="", why;
+    if(m.period){
+      v=shCur?shCur[m.share]:null; pv=shCmp?shCmp[m.share]:null; why=P.noData(k,whole,S.missing,shCur);
+      if(S.filter.length) body='<span class="d flat"><em>Whole account</em></span>';
+      else if(v!=null&&pv!=null) ch=P.change(k,v,pv);
+      else body='<span class="d flat"><em>'+esc(v==null?why:m.hint)+'</em></span>';
+    }else{
+      v=m.get(tc); pv=tp?m.get(tp):null; why=P.noData(k,whole,S.missing,null);
+      if(why) v=null;                               // an account with no such data reads "-", not a made-up zero
+      if(tp&&!why) ch=P.change(k,v,pv);
+      else body='<span class="d flat"><em>'+esc(why||m.hint)+'</em></span>';
+    }
+    var delta=ch?'<span class="d '+ch.tone+'">'+(ch.dir>0?'<i>▲</i>':ch.dir<0?'<i>▼</i>':'')+esc(ch.text)+'<em>vs '+esc(fm(k,pv,true))+'</em></span>':body;
+    var foot=m.period?(v!=null?'<span class="ps-meter"><i style="width:'+Math.min(100,Math.round(v*100))+'%"></i></span>':''):sparkSvg(days.map(function(t){return m.get(t);}),col);
+    h+='<div class="ps-kpi'+(on?" on":"")+(m.period?" ps-kpi-static":"")+(why&&!m.period?" nodata":"")+'" role="button" tabindex="0" data-m="'+k+'" data-i="'+i+'" style="--kc:'+col+'" title="'+esc(m.hint)+'">'+
+      '<div class="ps-kpi-h"><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true">'+GROUP_ICON[m.group]+'</svg></span><span class="k">'+esc(m.label)+'</span>'+
+      '<button type="button" class="sw" data-sw="'+i+'" aria-label="Change what this card shows" title="Change this card"><svg viewBox="0 0 24 24"><path d="M5 12h.01M12 12h.01M19 12h.01" class="th"/></svg></button></div>'+
+      '<span class="v" data-v>'+esc(fm(k,v,true))+'</span>'+delta+'<div class="ps-kpi-f">'+foot+'</div></div>';
+  });
+  var old={}; $$("#kpis .ps-kpi[data-m] [data-v]").forEach(function(e){old[e.closest(".ps-kpi").dataset.m]=e._n;});
+  var box=$("#kpis"); box.style.setProperty("--cols",P.kpiCols(shown)); box.innerHTML=h;
   $$("#kpis .ps-kpi[data-m]").forEach(function(b,i){
-    var k=b.dataset.m, e=$("[data-v]",b), to=P.METRICS[k].get(tc); e._n=to;
-    countUp(e,old[k]==null?0:old[k],to,k);
+    var k=b.dataset.m, e=$("[data-v]",b), m=P.METRICS[k], to=m.period?(shCur?shCur[m.share]:null):(b.classList.contains("nodata")?null:m.get(tc)); e._n=to;
+    if(!m.period) countUp(e,old[k]==null?0:old[k],to,k);
     if(!reduceMotion&&!document.hidden) b.animate([{opacity:0,transform:"translateY(8px)"},{opacity:1,transform:"none"}],{duration:380,delay:i*35,easing:"cubic-bezier(.16,1,.3,1)",fill:"backwards"});
   });
+  $("#kpiCount").textContent=shown+(shown===1?" card":" cards");
 }
-$("#kpis").addEventListener("click",function(e){
-  var b=e.target.closest(".ps-kpi[data-m]"); if(!b) return;
-  var k=b.dataset.m, ms=S.ex.metrics.slice();
-  if(e.shiftKey||e.metaKey||e.ctrlKey){
+function chartFromCard(card,shift){
+  var k=card.dataset.m, m=P.METRICS[k];
+  if(m.period){toast(m.label+" is a figure for the whole period, so it cannot be drawn over time");return;}
+  var ms=S.ex.metrics.slice();
+  if(shift){
     var i=ms.indexOf(k);
     if(i>=0&&ms.length>1) ms.splice(i,1); else if(i<0){ms.push(k); if(ms.length>4) ms.shift();}
   }else ms=[k];
   S.ex.metrics=ms; explorer.spec.metrics=ms; explorer.update(); paintKpiState();
   $("#explorer").scrollIntoView({behavior:document.hidden||reduceMotion?"auto":"smooth",block:"nearest"}); writeHash();
+}
+$("#kpis").addEventListener("click",function(e){
+  var sw=e.target.closest("[data-sw]");
+  if(sw){
+    e.stopPropagation(); var idx=+sw.dataset.sw;
+    popMenu(sw,{search:"Find a metric…",items:function(){return metricItems({checked:function(k){return S.kpis[idx]===k;}});},
+      onPick:function(k){
+        var at=S.kpis.indexOf(k);
+        if(at>=0&&at!==idx){S.kpis[at]=S.kpis[idx];}     // already on another card: the two swap places
+        S.kpis[idx]=k; saveKpis(); paintKpis();}});
+    return;
+  }
+  var b=e.target.closest(".ps-kpi[data-m]"); if(b) chartFromCard(b,e.shiftKey||e.metaKey||e.ctrlKey);
+});
+$("#kpis").addEventListener("keydown",function(e){
+  if(e.key!=="Enter"&&e.key!==" ") return;
+  var b=e.target.closest(".ps-kpi[data-m]"); if(!b||e.target.closest("[data-sw]")) return;
+  e.preventDefault(); chartFromCard(b,e.shiftKey);
+});
+$("#kpiCustom").addEventListener("click",function(){
+  popMenu(this,{multi:true,search:"Find a metric…",
+    items:function(){
+      return [{head:S.kpis.length+" of "+KMAX+" cards. Tick to add, untick to remove."}].concat(metricItems({
+        checked:function(k){return S.kpis.indexOf(k)>=0;},
+        disabled:function(k){return S.kpis.indexOf(k)<0&&S.kpis.length>=KMAX;}}));},
+    footer:[{key:"reset",label:"Back to the default ten"}],
+    onFooter:function(){S.kpis=P.KPI_DEFAULT.slice(); saveKpis(); paintKpis();},
+    onPick:function(k){
+      var i=S.kpis.indexOf(k);
+      if(i>=0){if(S.kpis.length>1) S.kpis.splice(i,1);} else if(S.kpis.length<KMAX) S.kpis.push(k);
+      saveKpis(); paintKpis();}});
 });
 function paintKpiState(){$$("#kpis .ps-kpi[data-m]").forEach(function(b){b.classList.toggle("on",S.ex.metrics.indexOf(b.dataset.m)>=0);});}
 
@@ -453,7 +544,7 @@ function buildPlan(spec){
     });
   }else{
     var map=dim==="device"?P.DEVICE_LABEL:P.NETWORK_LABEL;
-    (S.extras[dim]||[]).forEach(function(r){items.push({label:P.label(map,r[0]),t:r.slice(1,6),c:null});});
+    (S.extras[dim]||[]).forEach(function(r){items.push({label:P.label(map,r[0]),t:r.slice(1,1+P.NB),c:null});});
   }
   items.sort(function(a,b){var x=P.mval(m0,a.t),y=P.mval(m0,b.t);return (y==null?-Infinity:y)-(x==null?-Infinity:x);});
   var cap=spec.type==="radar"?8:spec.type==="scatter"?60:12;
@@ -799,14 +890,9 @@ function ChartCard(host,spec,o){
     if(gt&&!gt.disabled){setType(gt.dataset.gt); return;}
     if(!act) return;
     var a=act.dataset.act;
-    if(a==="addm") popMenu(act,{multi:true,items:function(){
-      var items=[], last=null;
-      P.METRIC_ORDER.forEach(function(k){
-        if(!hasValue()&&(k==="value"||k==="roas"||k==="aov")) return;
-        var def=P.METRICS[k]; if(def.group!==last){items.push({head:def.group});last=def.group;}
-        items.push({key:k,label:def.label,sub:def.hint,color:mcol(k),checked:spec.metrics.indexOf(k)>=0,disabled:spec.metrics.indexOf(k)<0&&spec.metrics.length>=4});
-      });
-      return items;},
+    if(a==="addm") popMenu(act,{multi:true,search:"Find a metric\u2026",items:function(){
+      return metricItems({chart:true,checked:function(k){return spec.metrics.indexOf(k)>=0;},
+        disabled:function(k){return spec.metrics.indexOf(k)<0&&spec.metrics.length>=4;}});},
       onPick:function(k){
         var i=spec.metrics.indexOf(k);
         if(i>=0){if(spec.metrics.length>1) spec.metrics.splice(i,1);} else if(spec.metrics.length<4) spec.metrics.push(k);
@@ -964,7 +1050,7 @@ function paintSplits(){
 }
 function extraRows(k,map){
   if(!S.extras||S.extras.error) return [];
-  return (S.extras[k]||[]).map(function(r){return {label:P.label(map,r[0]),t:r.slice(1,6)};}).sort(function(a,b){return (P.METRICS[S.split].get(b.t)||0)-(P.METRICS[S.split].get(a.t)||0);});
+  return (S.extras[k]||[]).map(function(r){return {label:P.label(map,r[0]),t:r.slice(1,1+P.NB)};}).sort(function(a,b){return (P.METRICS[S.split].get(b.t)||0)-(P.METRICS[S.split].get(a.t)||0);});
 }
 
 /* ── Heatmap: when it happens ─────────────────────────────────── */
@@ -1041,7 +1127,7 @@ function paintScatter(){
     '<div class="ps-ctrl-row">'+sel("x","Across")+sel("y","Up")+sel("size","Size")+'</div><div class="ps-wrap ps-wrap-sm"><canvas role="img" aria-label="Campaign map"></canvas></div><div class="ps-tlegend"></div>';
   ["x","y","size"].forEach(function(k){
     var b=$("[data-act=sc-"+k+"]",el);
-    b.onclick=function(){popMenu(b,{items:function(){return P.METRIC_ORDER.filter(function(m){return hasValue()||(m!=="value"&&m!=="roas"&&m!=="aov");}).map(function(m){return {key:m,label:P.METRICS[m].label,sub:P.METRICS[m].hint,color:mcol(m),checked:sc[k]===m};});},
+    b.onclick=function(){popMenu(b,{search:"Find a metric\u2026",items:function(){return metricItems({chart:true,checked:function(m){return sc[k]===m;}});},
       onPick:function(m){sc[k]=m;paintScatter();writeHash();}});};
   });
   if(!pts.length){$(".ps-wrap",el).innerHTML='<p class="ps-msg-inline">No campaigns to place for these metrics.</p>';return;}
@@ -1193,7 +1279,7 @@ new MutationObserver(function(){if(S.cur) refresh();}).observe(document.document
 
 function boot(){
   var h=readHash(); applyHash(h);
-  S.board=loadBoard(); loadStudio();
+  S.board=loadBoard(); loadStudio(); loadKpis();
   picker=window.PMPicker($("#acctPick"),{label:"Account",search:true,onChange:function(id){
     var a=S.accounts.filter(function(x){return x.id===id;})[0]; if(!a||(S.acct&&a.id===S.acct.id)) return;
     S.acct=a; S.filter=[]; S.ex.accounts=S.ex.accounts.filter(function(x){return x!==a.id;});
