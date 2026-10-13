@@ -1,10 +1,12 @@
 /* Paid Marketing Agents landing page: the client launcher and live readouts.
  *
- * Pick a client and the three actions become deep links aimed at them:
+ * Pick a client and the four actions become deep links aimed at them:
  *   Pacing Desk            ?client=<name>
  *   Client Feedback Agent  ?client=<name>
  *   Search Query Analysis  ?account=<ruleset id> (the client's own rules,
  *                          or the generic ruleset when it has none)
+ *   Segment Analysis       ?client=<name> (opens the Google Ads account whose
+ *                          name matches)
  * Each agent page reads its parameter on load.
  */
 (function(){
@@ -46,11 +48,13 @@ function paintPicker(){
 function paintActions(bump){
   var c=byName[chosen], r=chosen?rulesFor(chosen):null, q=chosen?"?client="+encodeURIComponent(chosen):"";
   var acts={pacing:BASE+"/pacing-desk"+q, feedback:BASE+"/client-feedback-agent"+q,
-    sqr:BASE+"/search-query-analysis"+(chosen?"?account="+(r?r[1]:"generic"):"")};
+    sqr:BASE+"/search-query-analysis"+(chosen?"?account="+(r?r[1]:"generic"):""),
+    segments:BASE+"/segment-analysis"+q};
   var subs={
     pacing:chosen?(c&&c.accounts!=null?c.offTarget+" of "+c.accounts+" account"+(c.accounts===1?"":"s")+" off target":"Their accounts, today"):"Every account, today",
     feedback:chosen?"Aimed at "+chosen:"Slack, Gmail, meetings",
-    sqr:chosen?(r?"With "+r[2]+" rules":"With the generic rules"):"Pick an account's rules"};
+    sqr:chosen?(r?"With "+r[2]+" rules":"With the generic rules"):"Pick an account's rules",
+    segments:chosen?"For "+chosen:"Any Google Ads account"};
   document.querySelectorAll("#launchActs .pl-act").forEach(function(a,i){
     var k=a.dataset.act; a.href=acts[k];
     a.querySelector('[data-s]').textContent=subs[k];
@@ -89,6 +93,8 @@ function paintStatus(snaps, latest, fb){
     var s=fb.sources[p]||{}, on=s.state==="connected"||s.state==="configured";
     return '<span class="'+(on?"on":"")+'"><i></i>'+(p==="slack"?"Slack":p==="google"?"Google":"Zoom")+'</span>';
   }).join("")+'</div>';
+  document.querySelector('[data-live="segments"]').innerHTML='<div class="pl-dots">'+["Day","Hour","Age","Gender","City","Device","Network"].map(function(n){
+    return '<span class="on"><i></i>'+n+'</span>';}).join("")+'</div>';
   document.querySelector('[data-live="sqr"]').innerHTML='<div class="pl-dots">'+SQR_RULES.map(function(r){
     return '<span class="on"><i></i>'+esc(r[2].replace(/ \(.*\)/,""))+'</span>';}).join("")+'</div>';
 }

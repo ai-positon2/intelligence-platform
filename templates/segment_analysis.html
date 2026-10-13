@@ -1,0 +1,73 @@
+{% extends "_paid_base.html" %}
+{% block title %}Segment Analysis{% endblock %}
+{% block content %}
+<div class="pm pm-seg" id="sg">
+  <section class="pm-hero">
+    <div class="pm-hero-l">
+      <span class="pm-eyebrow"><span class="d"></span>Paid Marketing · Segments</span>
+      <h1 class="pm-title">Where the account <span class="pm-grad">really performs.</span></h1>
+      <p class="pm-sub">Pick an account and a date range. The agent reads <b>Google Ads live</b> and lays out
+        day of the week, hour, age, gender, city, device and network, then tells you <b>what to change</b>:
+        where to push, where spend is leaking, and how far each table can be trusted.</p>
+    </div>
+  </section>
+
+  <!-- The two filters -->
+  <section class="pm-panel pd-cmd sg-cmd" id="cmd">
+    <div class="sg-cmd-grid">
+      <div id="acctPick"></div>
+      <div class="sg-when">
+        <span class="pd-dd-k">Date range</span>
+        <div class="cf-seg" id="presets" role="radiogroup" aria-label="Date range">
+          <button type="button" role="radio" data-p="7" aria-checked="false"><span class="dot"></span>Last 7 days</button>
+          <button type="button" role="radio" data-p="30" aria-checked="true"><span class="dot"></span>Last 30 days</button>
+          <button type="button" role="radio" data-p="mtd" aria-checked="false"><span class="dot"></span>This month</button>
+          <button type="button" role="radio" data-p="last" aria-checked="false"><span class="dot"></span>Last month</button>
+          <button type="button" role="radio" data-p="custom" aria-checked="false"><span class="dot"></span>Custom</button>
+          <i class="cf-seg-glow" aria-hidden="true"></i>
+        </div>
+      </div>
+      <div class="sg-custom" id="custom" hidden>
+        <label><span class="pd-dd-k">From</span><input type="date" id="from" aria-label="From date"></label>
+        <label><span class="pd-dd-k">To</span><input type="date" id="to" aria-label="To date"></label>
+        <button type="button" class="pm-btn sg-go" id="go">Run</button>
+      </div>
+    </div>
+  </section>
+
+  <div id="msg"></div>
+
+  <div id="empty" class="pm-panel sg-empty">
+    <div class="sg-empty-ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 20h18"/><path d="M6 16v-5"/><path d="M11 16V6"/><path d="M16 16v-8"/><path d="M20 4l-4 4"/></svg></div>
+    <h2>Choose an account to begin</h2>
+    <p>The report builds in a few seconds. Insights come with the numbers beside them, so you can check every one.</p>
+  </div>
+  <div id="skel" hidden><div class="pd-skel"></div><div class="pd-skel"></div><div class="pd-skel"></div></div>
+
+  <div id="out" hidden>
+    <div class="sg-head">
+      <p class="pd-fresh" id="fresh"></p>
+      <button class="pm-btn-ghost" id="exportBtn" type="button"><svg viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>Export CSV</button>
+    </div>
+    <div class="pd-strip" id="kpis"></div>
+
+    <section class="pm-panel sg-ins" id="insights">
+      <div class="pm-panel-h"><span class="pm-panel-t">What to do</span>
+        <span class="pm-panel-s" id="insNote"></span></div>
+      <div class="sg-sum" id="sum"></div>
+      <div id="insList"></div>
+    </section>
+
+    <div class="sg-tools">
+      <div><span class="pd-dd-k">Campaign type</span><div class="pm-chips" id="types"></div></div>
+      <nav class="sg-jump" id="jump" aria-label="Jump to a segment"></nav>
+    </div>
+    <div id="tables"></div>
+    <p class="pd-foot" id="foot"></p>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/pm_picker.js') }}?v=1"></script>
+<script src="{{ url_for('static', filename='js/segment_analysis.js') }}?v=4"></script>
+{% endblock %}
