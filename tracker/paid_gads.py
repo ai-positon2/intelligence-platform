@@ -1,294 +1,447 @@
-"""Paid Marketing Agents: the platform's read-only Google Ads connection.
+"""Paid Marketing Agents: live Google Ads data.
 
-Segment Analysis is the first agent that reads Google Ads itself rather than a
-sheet or an upload, so the transport lives here, apart from any one agent.
-Plain REST (no client library): an OAuth refresh-token exchange, then
-`googleAds:search`. Everything is read-only; nothing here can change an account.
+Reads Position2's manager (MCC) account through the Google Ads REST API with
+one shared sign-in, and hands the Performance Summarizer compact, ready-to-
+chart rows. Read-only: only `googleAds:search` and the account list are ever
+called, nothing here can change an ad account.
 
-  GOOGLE_ADS_DEVELOPER_TOKEN       the Google Ads API developer token
-  GOOGLE_ADS_CLIENT_ID / _SECRET   the OAuth client the refresh token belongs to
-  GOOGLE_ADS_REFRESH_TOKEN         a refresh token for a user with access to the MCC
-  GOOGLE_ADS_LOGIN_CUSTOMER_ID     the manager account, defaults to Position2's
-                                   root MCC (also the account list's root)
-  GOOGLE_ADS_API_VERSION           defaults to v24
+Environment (Railway):
 
-The Cloud project is on Explorer access (2,880 operations a day), so callers
-cache what they fetch (tracker/paid_segments.py does).
+  GOOGLE_ADS_CLIENT_ID / GOOGLE_ADS_CLIENT_SECRET   the OAuth client
+  GOOGLE_ADS_DEVELOPER_TOKEN                        the API developer token
+  GOOGLE_ADS_REFRESH_TOKEN                          one sign-in that can see the MCC
+  GOOGLE_ADS_LOGIN_CUSTOMER_ID                      the manager account (default below)
+
+The developer token has Explorer access, which allows roughly 2,880 requests
+a day. Two things keep a busy team inside that: every result is cached in
+Postgres (15 minutes for a range that includes today, 6 hours for one that
+ended earlier), and a daily counter refuses new requests past DAILY_LIMIT
+with a message instead of letting Google start rejecting them.
 """
 from __future__ import annotations
 
+import datetime as dt
+import json
 import logging
 import os
 import re
 import threading
 import time
 
-import requests
-
 log = logging.getLogger(__name__)
 
-DEFAULT_LOGIN_CUSTOMER = "9923720096"
-DEFAULT_API_VERSION = "v24"
-HTTP_TIMEOUT = 60
-ACCOUNTS_TTL_S = 10 * 60
-CUSTOMER_ID_RE = re.compile(r"^\d{10}$")
+API_VERSION = "v24"
+API = "https://googleads.googleapis.com/" + API_VERSION
+TOKEN_URL = "https://oauth2.googleapis.com/token"
+DEFAULT_LOGIN = "9923720096"
+DAILY_LIMIT = 2400            # Explorer allows ~2,880; keep a margin
+MAX_RANGE_DAYS = 800
+MAX_ROWS = 250_000
+TTL_OPEN = 15 * 60            # a range that includes today
+TTL_CLOSED = 6 * 3600         # a range that has ended
+TTL_ACCOUNTS = 3600
 
-_ENV = ("GOOGLE_ADS_DEVELOPER_TOKEN", "GOOGLE_ADS_CLIENT_ID", "GOOGLE_ADS_CLIENT_SECRET",
-        "GOOGLE_ADS_REFRESH_TOKEN")
-
-
-class GadsError(RuntimeError):
-    """kind: not_configured, auth, permission, quota, bad_request, api."""
-
-    def __init__(self, kind, detail):
-        self.kind, self.detail = kind, detail
-        super().__init__(detail)
+ID_RE = re.compile(r"^\d{10}$")
+DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+DOW = ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"]
 
 
-def _env(name):
-    return os.environ.get(name, "").strip()
+class AdsError(RuntimeError):
+    """A Google Ads call failed; the message is safe to show staff."""
 
 
-def login_customer_id():
-    return re.sub(r"\D", "", _env("GOOGLE_ADS_LOGIN_CUSTOMER_ID")) or DEFAULT_LOGIN_CUSTOMER
+class NotConfigured(AdsError):
+    pass
 
 
-def api_version():
-    return _env("GOOGLE_ADS_API_VERSION") or DEFAULT_API_VERSION
+class OverQuota(AdsError):
+    pass
+
+
+def _env(name, default=""):
+    return (os.environ.get(name) or default).strip()
+
+
+def login_customer():
+    v = re.sub(r"\D", "", _env("GOOGLE_ADS_LOGIN_CUSTOMER_ID", DEFAULT_LOGIN))
+    return v or DEFAULT_LOGIN
 
 
 def config_problem():
-    """None when Google Ads can be queried, else what is missing, in words."""
-    missing = [n for n in _ENV if not _env(n)]
+    """None when the API can be called, else what is missing."""
+    missing = [n for n in ("GOOGLE_ADS_CLIENT_ID", "GOOGLE_ADS_CLIENT_SECRET",
+                           "GOOGLE_ADS_DEVELOPER_TOKEN", "GOOGLE_ADS_REFRESH_TOKEN")
+               if not _env(n)]
     if missing:
-        return "Google Ads is not connected on this server (%s not set)." % ", ".join(missing)
+        return "Google Ads is not connected yet: %s not set." % ", ".join(missing)
     return None
 
 
-# ── OAuth ───────────────────────────────────────────────────────────────────
+# ── Access token ────────────────────────────────────────────────────────────
 
-_token = {"value": None, "exp": 0.0}
-_token_lock = threading.Lock()
+_TOKEN = {"value": None, "exp": 0.0}
+_TOKEN_LOCK = threading.Lock()
 
 
-def access_token(post=requests.post):
-    with _token_lock:
-        if _token["value"] and _token["exp"] > time.time() + 60:
-            return _token["value"]
-        problem = config_problem()
-        if problem:
-            raise GadsError("not_configured", problem)
-        r = post("https://oauth2.googleapis.com/token", data={
-            "client_id": _env("GOOGLE_ADS_CLIENT_ID"), "client_secret": _env("GOOGLE_ADS_CLIENT_SECRET"),
-            "refresh_token": _env("GOOGLE_ADS_REFRESH_TOKEN"), "grant_type": "refresh_token"},
-            timeout=HTTP_TIMEOUT)
+def _access_token(post=None):
+    with _TOKEN_LOCK:
+        if _TOKEN["value"] and _TOKEN["exp"] > time.time() + 60:
+            return _TOKEN["value"]
+        import requests
+        post = post or requests.post
         try:
-            data = r.json()
-        except ValueError:
-            data = {}
-        if r.status_code != 200 or not data.get("access_token"):
-            raise GadsError("auth", "Google refused the Google Ads sign-in (%s). The refresh token may "
-                                    "have been revoked." % (data.get("error_description") or data.get("error")
-                                                            or r.status_code))
-        _token.update(value=data["access_token"], exp=time.time() + int(data.get("expires_in") or 3600))
-        return _token["value"]
-
-
-def reset_token():
-    with _token_lock:
-        _token.update(value=None, exp=0.0)
-
-
-# ── The query call ──────────────────────────────────────────────────────────
-
-def _reason(status, body):
-    """The API's own message, shortened, and the kind it implies."""
-    err = (body or {}).get("error") or {}
-    detail = ""
-    for d in err.get("details") or []:
-        for e in d.get("errors") or []:
-            detail = e.get("message") or detail
-            if detail:
-                break
-        if detail:
-            break
-    detail = (detail or err.get("message") or "HTTP %s" % status)[:300]
-    if status == 429 or "RESOURCE_EXHAUSTED" in str(err.get("status")):
-        return "quota", "Google Ads is rate limiting this server (%s). Try again in a few minutes." % detail
-    if status in (401,):
-        return "auth", "Google Ads rejected the sign-in: %s" % detail
-    if status == 403:
-        return "permission", "Google Ads denied access: %s" % detail
-    if status == 400:
-        return "bad_request", "Google Ads rejected the request: %s" % detail
-    return "api", "Google Ads answered an error: %s" % detail
-
-
-def search(customer_id, gaql, *, post=requests.post):
-    """Every row of a GAQL query, following the page tokens. Rows are the
-    API's own camelCase JSON."""
-    customer_id = re.sub(r"\D", "", str(customer_id))
-    if not CUSTOMER_ID_RE.match(customer_id):
-        raise GadsError("bad_request", "That is not a Google Ads customer id.")
-    url = "https://googleads.googleapis.com/%s/customers/%s/googleAds:search" % (api_version(), customer_id)
-    rows, page_token = [], None
-    for _page in range(200):
-        body = {"query": gaql}
-        if page_token:
-            body["pageToken"] = page_token
-        data = None
-        for attempt in (0, 1):
-            headers = {"Authorization": "Bearer " + access_token(post),
-                       "developer-token": _env("GOOGLE_ADS_DEVELOPER_TOKEN"),
-                       "login-customer-id": login_customer_id()}
-            r = post(url, headers=headers, json=body, timeout=HTTP_TIMEOUT)
-            try:
-                data = r.json()
-            except ValueError:
-                data = {}
-            if r.status_code == 401 and attempt == 0:
-                reset_token()          # the cached token expired early: sign in once more
-                continue
-            if r.status_code >= 500 and attempt == 0:
-                time.sleep(1.0)
-                continue
-            break
+            r = post(TOKEN_URL, data={
+                "client_id": _env("GOOGLE_ADS_CLIENT_ID"), "client_secret": _env("GOOGLE_ADS_CLIENT_SECRET"),
+                "refresh_token": _env("GOOGLE_ADS_REFRESH_TOKEN"), "grant_type": "refresh_token"}, timeout=20)
+        except Exception as e:  # network
+            raise AdsError("Could not reach Google to sign in (%s)." % type(e).__name__) from e
         if r.status_code != 200:
-            kind, msg = _reason(r.status_code, data)
-            log.warning("paid_gads: %s on customer %s: %s", r.status_code, customer_id, msg)
-            raise GadsError(kind, msg)
-        rows.extend(data.get("results") or [])
-        page_token = data.get("nextPageToken")
-        if not page_token:
+            try:
+                err = r.json().get("error", "")
+            except ValueError:
+                err = ""
+            if err in ("invalid_grant", "invalid_client", "unauthorized_client"):
+                raise AdsError("The Google Ads sign-in was rejected (%s). An admin needs to refresh "
+                               "GOOGLE_ADS_REFRESH_TOKEN." % err)
+            raise AdsError("Google would not sign in (HTTP %s)." % r.status_code)
+        d = r.json()
+        _TOKEN.update(value=d["access_token"], exp=time.time() + float(d.get("expires_in", 3000)))
+        return _TOKEN["value"]
+
+
+def reset_token_cache():
+    with _TOKEN_LOCK:
+        _TOKEN.update(value=None, exp=0.0)
+
+
+# ── Calls ───────────────────────────────────────────────────────────────────
+
+def _pacific_day():
+    try:
+        from zoneinfo import ZoneInfo
+        return dt.datetime.now(ZoneInfo("America/Los_Angeles")).date().isoformat()
+    except Exception:
+        return dt.datetime.utcnow().date().isoformat()
+
+
+def _count_call(store):
+    """Add one request to today's tally; raise OverQuota past the limit.
+    A store outage must not stop reads, so it is logged and skipped."""
+    try:
+        n = store.bump_gads_calls(_pacific_day())
+    except Exception as e:
+        log.warning("gads: could not count a request (%s)", e)
+        return
+    if n > DAILY_LIMIT:
+        raise OverQuota("Today's Google Ads request budget (%d) is used up. It resets at midnight "
+                        "Pacific time; cached views still work." % DAILY_LIMIT)
+
+
+def _google_message(r):
+    try:
+        e = r.json()
+        e = e[0] if isinstance(e, list) and e else e
+        err = (e or {}).get("error", {})
+        details = err.get("details") or []
+        for d in details:
+            for x in d.get("errors", []) or []:
+                if x.get("message"):
+                    return x["message"][:300]
+        return (err.get("message") or "")[:300]
+    except Exception:
+        return ""
+
+
+def _post(path, body, store, *, http=None):
+    """One Google Ads request. Counted, retried once on a rate limit."""
+    import requests
+    http = http or requests.post
+    for attempt in (0, 1):
+        _count_call(store)
+        headers = {"Authorization": "Bearer " + _access_token(),
+                   "developer-token": _env("GOOGLE_ADS_DEVELOPER_TOKEN"),
+                   "login-customer-id": login_customer(), "Content-Type": "application/json"}
+        try:
+            r = http(API + path, headers=headers, data=json.dumps(body), timeout=90)
+        except Exception as e:
+            raise AdsError("Could not reach Google Ads (%s)." % type(e).__name__) from e
+        if r.status_code == 200:
+            return r.json()
+        if r.status_code == 401 and attempt == 0:
+            reset_token_cache()
+            continue
+        if r.status_code in (429, 503) and attempt == 0:
+            time.sleep(2.0)
+            continue
+        msg = _google_message(r)
+        if r.status_code == 429:
+            raise OverQuota("Google Ads is rate limiting this app right now. Try again in a minute.")
+        raise AdsError("Google Ads answered %s%s" % (r.status_code, (": " + msg) if msg else "."))
+    raise AdsError("Google Ads did not answer.")
+
+
+def search(customer_id, gaql, store, *, http=None):
+    """Every row of one GAQL query (follows pages)."""
+    rows, token = [], None
+    while True:
+        body = {"query": gaql}          # v24 refuses a pageSize: pages are a fixed 10,000 rows
+        if token:
+            body["pageToken"] = token
+        d = _post("/customers/%s/googleAds:search" % customer_id, body, store, http=http)
+        rows.extend(d.get("results") or [])
+        token = d.get("nextPageToken")
+        if not token:
             return rows
-    raise GadsError("api", "That query returned more than 2,000,000 rows, which this will not read.")
+        if len(rows) > MAX_ROWS:
+            raise AdsError("That range is too large to chart (over %d rows). Pick a shorter range." % MAX_ROWS)
 
 
-# ── Accounts, and the MCCs that hold them ───────────────────────────────────
-# Position2's accounts sit under sub-MCCs (Eventgroove, OIA, Tealium, Workato).
-# A report can be run for one account or for every account of one MCC together,
-# so the inventory is both: the accounts, and a group per MCC that holds at
-# least two accounts in the same currency (spend in different currencies cannot
-# be added, so an MCC with mixed currencies becomes one group per currency).
+# ── Queries ─────────────────────────────────────────────────────────────────
 
-_inv = {"at": 0.0, "data": None}
-_inv_lock = threading.Lock()
-
-_ACCOUNTS_GAQL = (
-    "SELECT customer_client.id, customer_client.descriptive_name, customer_client.currency_code, "
-    "customer_client.time_zone FROM customer_client "
-    "WHERE customer_client.manager = FALSE AND customer_client.status = 'ENABLED'")
-_MANAGERS_GAQL = (
-    "SELECT customer_client.id, customer_client.descriptive_name FROM customer_client "
-    "WHERE customer_client.manager = TRUE AND customer_client.status = 'ENABLED' AND customer_client.level > 0")
-GROUP_ID_RE = re.compile(r"^mcc-(\d{10})(?:-([A-Z]{3}))?$")
+def q_accounts():
+    return ("SELECT customer_client.id, customer_client.descriptive_name, customer_client.currency_code, "
+            "customer_client.time_zone, customer_client.manager, customer_client.level, "
+            "customer_client.status, customer_client.test_account FROM customer_client")
 
 
-def _clients(rows):
-    out = {}
+def q_campaign_days(start, end):
+    return ("SELECT campaign.id, campaign.name, campaign.status, campaign.advertising_channel_type, "
+            "campaign_budget.amount_micros, segments.date, metrics.impressions, metrics.clicks, "
+            "metrics.cost_micros, metrics.conversions, metrics.conversions_value "
+            "FROM campaign WHERE segments.date BETWEEN '%s' AND '%s'" % (start, end))
+
+
+def q_campaign_sis(start, end):
+    return ("SELECT campaign.id, metrics.search_impression_share FROM campaign "
+            "WHERE segments.date BETWEEN '%s' AND '%s' AND campaign.advertising_channel_type = 'SEARCH'"
+            % (start, end))
+
+
+def q_account_sis(start, end):
+    return ("SELECT metrics.search_impression_share FROM customer "
+            "WHERE segments.date BETWEEN '%s' AND '%s'" % (start, end))
+
+
+_M = "metrics.impressions, metrics.clicks, metrics.cost_micros, metrics.conversions, metrics.conversions_value"
+
+
+def q_device(start, end):
+    return "SELECT segments.device, %s FROM customer WHERE segments.date BETWEEN '%s' AND '%s'" % (_M, start, end)
+
+
+def q_network(start, end):
+    return ("SELECT segments.ad_network_type, %s FROM customer WHERE segments.date BETWEEN '%s' AND '%s'"
+            % (_M, start, end))
+
+
+def q_dow_hour(start, end):
+    return ("SELECT segments.day_of_week, segments.hour, %s FROM customer WHERE segments.date BETWEEN '%s' AND '%s'"
+            % (_M, start, end))
+
+
+# ── Parsing ─────────────────────────────────────────────────────────────────
+
+def _f(v):
+    try:
+        return float(v)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _base(m):
+    """[impressions, clicks, cost, conversions, conversion value] from a metrics block."""
+    m = m or {}
+    return [int(_f(m.get("impressions"))), int(_f(m.get("clicks"))),
+            round(_f(m.get("costMicros")) / 1e6, 4), round(_f(m.get("conversions")), 4),
+            round(_f(m.get("conversionsValue")), 4)]
+
+
+def parse_accounts(rows):
+    """Enabled, non-manager, non-test client accounts under the MCC, name order."""
+    out, seen = [], set()
     for r in rows:
         c = r.get("customerClient") or {}
-        cid = re.sub(r"\D", "", str(c.get("id") or ""))
-        if CUSTOMER_ID_RE.match(cid):
-            out[cid] = {"id": cid, "name": (c.get("descriptiveName") or "").strip() or ("Account " + cid),
-                        "currency": c.get("currencyCode") or "USD", "timeZone": c.get("timeZone") or ""}
+        cid = str(c.get("id") or "")
+        if not ID_RE.match(cid) or cid in seen or c.get("manager") or c.get("testAccount"):
+            continue
+        if c.get("status") != "ENABLED":
+            continue
+        seen.add(cid)
+        out.append({"id": cid, "name": (c.get("descriptiveName") or "Account " + cid).strip(),
+                    "currency": c.get("currencyCode") or "USD", "tz": c.get("timeZone") or "",
+                    "level": int(c.get("level") or 1)})
+    out.sort(key=lambda a: a["name"].lower())
     return out
 
 
-def _mcc_name(name):
-    return re.sub(r"\s*MCC\s*$", "", name or "", flags=re.I).strip() or name or "MCC"
+def parse_campaign_days(rows, start, end):
+    """The compact shape the page charts from.
+
+    campaigns: [{id, name, type, status, budget}], days: ['YYYY-MM-DD', ...] every day
+    in range (so a day with no spend still plots as zero), rows: [[campaign index,
+    day index, impressions, clicks, cost, conversions, value], ...]."""
+    d0, d1 = dt.date.fromisoformat(start), dt.date.fromisoformat(end)
+    days = [(d0 + dt.timedelta(days=i)).isoformat() for i in range((d1 - d0).days + 1)]
+    didx = {d: i for i, d in enumerate(days)}
+    camps, cidx, out = [], {}, []
+    for r in rows:
+        c = r.get("campaign") or {}
+        cid = str(c.get("id") or "")
+        d = (r.get("segments") or {}).get("date")
+        if not cid or d not in didx:
+            continue
+        if cid not in cidx:
+            cidx[cid] = len(camps)
+            camps.append({"id": cid, "name": c.get("name") or cid, "status": c.get("status") or "",
+                          "type": c.get("advertisingChannelType") or "UNKNOWN",
+                          "budget": round(_f((r.get("campaignBudget") or {}).get("amountMicros")) / 1e6, 2)})
+        out.append([cidx[cid], didx[d]] + _base(r.get("metrics")))
+    return {"start": start, "end": end, "days": days, "campaigns": camps, "rows": out}
 
 
-def inventory(*, search_fn=None, now=None):
-    """{accounts: [{id, name, currency, timeZone, group}], groups: [{id,
-    managerId, name, currency, accountIds, timeZones}]}, cached for
-    ACCOUNTS_TTL_S. An account's `group` is the id of the smallest group that
-    holds it, or "". A manager this server cannot read is skipped, not fatal."""
-    now = time.time() if now is None else now
-    with _inv_lock:
-        if _inv["data"] is not None and now - _inv["at"] < ACCOUNTS_TTL_S:
-            return _inv["data"]
-    run = search_fn or search
-    everyone = _clients(run(login_customer_id(), _ACCOUNTS_GAQL))
-    managers = _clients(run(login_customer_id(), _MANAGERS_GAQL))
+def parse_sis(campaign_rows, account_rows):
+    camp = {}
+    for r in campaign_rows:
+        v = (r.get("metrics") or {}).get("searchImpressionShare")
+        cid = str((r.get("campaign") or {}).get("id") or "")
+        if cid and v not in (None, ""):
+            camp[cid] = round(_f(v), 4)
+    acct = None
+    for r in account_rows:
+        v = (r.get("metrics") or {}).get("searchImpressionShare")
+        if v not in (None, ""):
+            acct = round(_f(v), 4)
+    return {"account": acct, "campaigns": camp}
 
-    def members(mid):
-        try:
-            return mid, _clients(run(mid, _ACCOUNTS_GAQL))
-        except GadsError as e:
-            log.warning("paid_gads: could not read the accounts of manager %s: %s", mid, e)
-            return mid, {}
+
+def parse_extras(device_rows, network_rows, dow_hour_rows):
+    def seg(rows, key):
+        acc = {}
+        for r in rows:
+            k = (r.get("segments") or {}).get(key) or "UNKNOWN"
+            b = _base(r.get("metrics"))
+            a = acc.setdefault(k, [0, 0, 0.0, 0.0, 0.0])
+            for i in range(5):
+                a[i] += b[i]
+        return [[k] + [round(x, 4) if isinstance(x, float) else x for x in v] for k, v in sorted(acc.items())]
+    heat = {}
+    for r in dow_hour_rows:
+        s = r.get("segments") or {}
+        if s.get("dayOfWeek") not in DOW or s.get("hour") is None:
+            continue
+        key = (DOW.index(s["dayOfWeek"]), int(s["hour"]))
+        b = _base(r.get("metrics"))
+        a = heat.setdefault(key, [0, 0, 0.0, 0.0, 0.0])
+        for i in range(5):
+            a[i] += b[i]
+    return {"device": seg(device_rows, "device"), "network": seg(network_rows, "adNetworkType"),
+            "dowHour": [[d, h] + [round(x, 4) if isinstance(x, float) else x for x in v]
+                        for (d, h), v in sorted(heat.items())]}
+
+
+# ── Validation ──────────────────────────────────────────────────────────────
+
+def check_range(start, end, label="range"):
+    """(start, end) as date strings, or raises ValueError saying what is wrong."""
+    if not (isinstance(start, str) and isinstance(end, str) and DATE_RE.match(start) and DATE_RE.match(end)):
+        raise ValueError("%s should be two YYYY-MM-DD dates" % label)
+    try:
+        a, b = dt.date.fromisoformat(start), dt.date.fromisoformat(end)
+    except ValueError:
+        raise ValueError("%s has a date that does not exist" % label)
+    if a > b:
+        raise ValueError("%s starts after it ends" % label)
+    if (b - a).days + 1 > MAX_RANGE_DAYS:
+        raise ValueError("%s is longer than %d days" % (label, MAX_RANGE_DAYS))
+    if b > dt.date.today() + dt.timedelta(days=1):
+        raise ValueError("%s ends in the future" % label)
+    return start, end
+
+
+def _ttl(end):
+    return TTL_OPEN if end >= (dt.date.today() - dt.timedelta(days=1)).isoformat() else TTL_CLOSED
+
+
+# ── Cached fetches ──────────────────────────────────────────────────────────
+
+def _par(fns):
+    """Run independent reads at once (each is a network wait) and return their
+    results in order; the first failure is raised."""
+    if len(fns) == 1:
+        return [fns[0]()]
     from concurrent.futures import ThreadPoolExecutor
-    with ThreadPoolExecutor(max_workers=4) as ex:
-        under = dict(ex.map(members, list(managers)))
-    groups = []
-    for mid, kids in under.items():
-        kept = [a for a in kids.values() if a["id"] in everyone]
-        by_cur = {}
-        for a in kept:
-            by_cur.setdefault(a["currency"], []).append(a)
-        for cur, accts in by_cur.items():
-            if len(accts) < 2:
-                continue
-            split = len(by_cur) > 1
-            name = _mcc_name(managers[mid]["name"])
-            groups.append({
-                "id": "mcc-%s-%s" % (mid, cur) if split else "mcc-%s" % mid, "managerId": mid,
-                "name": "%s (%s)" % (name, cur) if split else name, "currency": cur,
-                "accountIds": sorted(a["id"] for a in accts),
-                "timeZones": sorted({a["timeZone"] for a in accts if a["timeZone"]})})
-    groups.sort(key=lambda g: (g["name"].lower(), g["id"]))
-    accounts = []
-    for a in sorted(everyone.values(), key=lambda a: (a["name"].lower(), a["id"])):
-        holding = [g for g in groups if a["id"] in g["accountIds"]]
-        home = min(holding, key=lambda g: len(g["accountIds"]), default=None)
-        accounts.append(dict(a, group=home["id"] if home else ""))
-    data = {"accounts": accounts, "groups": groups}
-    with _inv_lock:
-        _inv.update(at=now, data=data)
-    return data
+    with ThreadPoolExecutor(max_workers=len(fns)) as ex:
+        futs = [ex.submit(f) for f in fns]
+        return [f.result() for f in futs]
 
 
-def list_accounts(**kw):
-    """[{id, name, currency, timeZone, group}] for every enabled, non-manager
-    account under the root MCC, by name."""
-    return list(inventory(**kw)["accounts"])
+def _cached(store, key, ttl, make):
+    try:
+        hit = store.get_gads_cache(key, ttl)
+    except Exception as e:
+        log.warning("gads: cache read failed (%s)", e)
+        hit = None
+    if hit is not None:
+        return hit
+    value = make()
+    try:
+        store.put_gads_cache(key, value)
+    except Exception as e:
+        log.warning("gads: cache write failed (%s)", e)
+    return value
 
 
-def list_groups(**kw):
-    return list(inventory(**kw)["groups"])
+def list_accounts(store, *, http=None):
+    def make():
+        return parse_accounts(search(login_customer(), q_accounts(), store, http=http))
+    return _cached(store, "accounts", TTL_ACCOUNTS, make)
 
 
-def reset_accounts():
-    with _inv_lock:
-        _inv.update(at=0.0, data=None)
+def account_ids(store, *, http=None):
+    return {a["id"] for a in list_accounts(store, http=http)}
 
 
-# ── Place names (a city is only an id in a report row) ──────────────────────
+def performance(store, customer_id, start, end, *, with_sis=True, http=None):
+    """One range of campaign-by-day rows (and, for the main range, the period's
+    search impression share)."""
+    def make_days():
+        return parse_campaign_days(search(customer_id, q_campaign_days(start, end), store, http=http), start, end)
 
-_geo_names = {}
-_geo_lock = threading.Lock()
-_GEO_CHUNK = 120
+    def days():
+        return _cached(store, "days:%s:%s:%s" % (customer_id, start, end), _ttl(end), make_days)
+
+    def make_sis():
+        try:
+            c, a = _par([lambda: search(customer_id, q_campaign_sis(start, end), store, http=http),
+                         lambda: search(customer_id, q_account_sis(start, end), store, http=http)])
+            return parse_sis(c, a)
+        except OverQuota:
+            raise
+        except AdsError as e:       # share is a nicety; the range still charts without it
+            log.warning("gads: impression share unavailable for %s (%s)", customer_id, e)
+            return {"account": None, "campaigns": {}}
+
+    def sis():
+        return _cached(store, "sis:%s:%s:%s" % (customer_id, start, end), _ttl(end), make_sis)
+
+    if not with_sis:
+        return days()
+    d, sh = _par([days, sis])
+    return dict(d, sis=sh)
 
 
-def geo_names(resource_names, *, search_fn=None):
-    """{'geoTargetConstants/1014897': {'name': 'Annapolis', 'canonical': ...}}
-    for the ones that resolve. Place names never change, so they are kept for
-    the life of the process."""
-    wanted = [r for r in dict.fromkeys(resource_names) if re.fullmatch(r"geoTargetConstants/\d+", r or "")]
-    with _geo_lock:
-        missing = [r for r in wanted if r not in _geo_names]
-    for i in range(0, len(missing), _GEO_CHUNK):
-        chunk = missing[i:i + _GEO_CHUNK]
-        gaql = ("SELECT geo_target_constant.resource_name, geo_target_constant.name, "
-                "geo_target_constant.canonical_name FROM geo_target_constant "
-                "WHERE geo_target_constant.resource_name IN (%s)" % ", ".join("'%s'" % r for r in chunk))
-        rows = (search_fn or search)(login_customer_id(), gaql)
-        with _geo_lock:
-            for row in rows:
-                g = row.get("geoTargetConstant") or {}
-                if g.get("resourceName"):
-                    _geo_names[g["resourceName"]] = {"name": g.get("name") or "",
-                                                     "canonical": g.get("canonicalName") or ""}
-    with _geo_lock:
-        return {r: _geo_names[r] for r in wanted if r in _geo_names}
+def performance_pair(store, customer_id, cur, cmp, *, with_sis=True, http=None):
+    """The main range and (if given) its comparison range, fetched together."""
+    jobs = [lambda: performance(store, customer_id, cur[0], cur[1], with_sis=with_sis, http=http)]
+    if cmp:
+        jobs.append(lambda: performance(store, customer_id, cmp[0], cmp[1], with_sis=False, http=http))
+    res = _par(jobs)
+    return res[0], (res[1] if cmp else None)
+
+
+def extras(store, customer_id, start, end, *, http=None):
+    def make():
+        return parse_extras(*_par([lambda: search(customer_id, q_device(start, end), store, http=http),
+                                   lambda: search(customer_id, q_network(start, end), store, http=http),
+                                   lambda: search(customer_id, q_dow_hour(start, end), store, http=http)]))
+    return _cached(store, "extras:%s:%s:%s" % (customer_id, start, end), _ttl(end), make)

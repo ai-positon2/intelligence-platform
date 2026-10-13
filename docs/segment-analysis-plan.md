@@ -112,8 +112,9 @@ The filters only work if the platform can query by account and date range.
 
 ## Phase 1 result (done)
 
-`tracker/paid_gads.py` (read-only Google Ads REST: OAuth refresh, `googleAds:search`
-with page tokens, account list under the MCC, place-name lookup) and
+`tracker/paid_gads_segments.py` (a layer over the Performance Summarizer's
+`tracker/paid_gads.py`: the account list plus the MCCs that hold them, place names, and
+its errors in this agent's terms) and
 `tracker/paid_segments.py` (queries, campaign-type mapping, the sheet's metric
 rules, per-campaign-type views, coverage, 15-minute cache). 37 tests, synthetic data.
 
@@ -165,4 +166,12 @@ The Explorer allowance is 2,880 calls a day, which is roughly 30 cold views of a
 
 Not built: picking a subset of an MCC's accounts.
 
-Nothing is pushed or merged without an explicit go-ahead.
+## Sharing the Google Ads transport (found while merging to main)
+
+The Performance Summarizer (Krishna Ladha, same day) landed on `main` with its own
+`tracker/paid_gads.py`. Rather than keep two Google Ads clients, Segment Analysis now
+calls Google only through that module, so it uses the same sign-in, retries, Postgres
+cache and the **shared daily request budget** (Explorer access is one pool of about
+2,880 calls a day for the whole developer token). A cold view of a 13-account MCC costs
+about 95 of those calls, which is worth knowing before opening several in a row.
+Which accounts sit under which MCC is cached in Postgres for an hour.

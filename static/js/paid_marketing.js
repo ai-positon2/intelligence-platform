@@ -1,6 +1,7 @@
 /* Paid Marketing Agents landing page: the client launcher and live readouts.
  *
- * Pick a client and the four actions become deep links aimed at them:
+ * Pick a client and the five actions become deep links aimed at them:
+ *   Performance Summarizer #a=<Google Ads account id> (matched to the client by name)
  *   Pacing Desk            ?client=<name>
  *   Client Feedback Agent  ?client=<name>
  *   Search Query Analysis  ?account=<ruleset id> (the client's own rules,
@@ -24,6 +25,15 @@ var FALLBACK = ["BD Diesel","Beta Bionics","Brian Tooley Racing","D&J Precision 
 var SQR_RULES = [[/riccobene/i,"riccobene","Riccobene"],[/\boia\b|outpatient imaging/i,"oia","OIA"],[/eventgroove/i,"eventgroove","Eventgroove"],
   [/gentle dental|42 north|\bgd\b/i,"gentledental_42north","42 North (Gentle Dental)"],[/mchale/i,"mchale","McHale"],[/beta bionics/i,"beta_bionics","Beta Bionics (partial)"]];
 function rulesFor(name){for(var i=0;i<SQR_RULES.length;i++)if(SQR_RULES[i][0].test(name))return SQR_RULES[i];return null;}
+var norm=function(n){return String(n||"").toLowerCase().replace(/\(.*?\)/g,"").replace(/[^a-z0-9]/g,"");};
+var adsAccounts=[];
+/* The Google Ads account for a Budget Tracker client name: same name, or one contains the other. */
+function adsFor(name){
+  var n=norm(name); if(n.length<3) return null;
+  for(var i=0;i<adsAccounts.length;i++) if(norm(adsAccounts[i].name)===n) return adsAccounts[i];
+  for(var j=0;j<adsAccounts.length;j++){var a=norm(adsAccounts[j].name); if(a.length>=4&&(a.indexOf(n)>=0||n.indexOf(a)>=0)) return adsAccounts[j];}
+  return null;
+}
 var ALL='<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><rect x="4" y="4" width="7" height="7" rx="2"/><rect x="13" y="4" width="7" height="7" rx="2"/><rect x="4" y="13" width="7" height="7" rx="2"/><rect x="13" y="13" width="7" height="7" rx="2"/></svg>';
 
 var clients = FALLBACK.map(function(n){return {name:n}}), byName = {}, chosen = "";
@@ -47,10 +57,12 @@ function paintPicker(){
 
 function paintActions(bump){
   var c=byName[chosen], r=chosen?rulesFor(chosen):null, q=chosen?"?client="+encodeURIComponent(chosen):"";
-  var acts={pacing:BASE+"/pacing-desk"+q, feedback:BASE+"/client-feedback-agent"+q,
+  var ads=chosen?adsFor(chosen):null;
+  var acts={perf:BASE+"/performance-summarizer"+(ads?"#a="+ads.id:""),pacing:BASE+"/pacing-desk"+q, feedback:BASE+"/client-feedback-agent"+q,
     sqr:BASE+"/search-query-analysis"+(chosen?"?account="+(r?r[1]:"generic"):""),
     segments:BASE+"/segment-analysis"+q};
   var subs={
+    perf:chosen?(ads?"Live: "+ads.name:"Pick an account inside"):"Live from Google Ads",
     pacing:chosen?(c&&c.accounts!=null?c.offTarget+" of "+c.accounts+" account"+(c.accounts===1?"":"s")+" off target":"Their accounts, today"):"Every account, today",
     feedback:chosen?"Aimed at "+chosen:"Slack, Gmail, meetings",
     sqr:chosen?(r?"With "+r[2]+" rules":"With the generic rules"):"Pick an account's rules",
@@ -65,7 +77,7 @@ function paintActions(bump){
 
 /* ── Live status + card readouts ───────────────────────────── */
 function chip(state,html){return '<span class="pl-st '+state+'"><span class="b"></span>'+html+'</span>';}
-function paintStatus(snaps, latest, fb){
+function paintStatus(snaps, latest, fb, ga){
   var out=[], meta=null;
   if(snaps&&snaps.snapshots&&snaps.snapshots.length){
     meta=snaps.snapshots.filter(function(s){return s.id===snaps.latest})[0]||snaps.snapshots[snaps.snapshots.length-1];
@@ -79,6 +91,7 @@ function paintStatus(snaps, latest, fb){
     var live=["slack","google"].filter(function(p){return fb.sources[p]&&fb.sources[p].state==="connected"});
     out.push(chip(live.length?"on":"off",live.length?"Feedback reads <b>"+live.map(function(p){return p==="slack"?"Slack":"Google"}).join(" + ")+"</b>":"Feedback sources not connected"));
   }
+  out.push(ga&&ga.accounts?chip("on","Google Ads live · <b>"+ga.accounts.length+"</b> accounts"):chip("off","Google Ads not connected yet"));
   out.push(chip("on","<b>"+SQR_RULES.length+"</b> accounts with their own SQR rules"));
   document.getElementById("launchStatus").innerHTML=out.join("");
 
@@ -95,15 +108,19 @@ function paintStatus(snaps, latest, fb){
   }).join("")+'</div>';
   document.querySelector('[data-live="segments"]').innerHTML='<div class="pl-dots">'+["Day","Hour","Age","Gender","City","Device","Network"].map(function(n){
     return '<span class="on"><i></i>'+n+'</span>';}).join("")+'</div>';
+  var lg=document.querySelector('[data-live="perf"]');
+  if(lg) lg.innerHTML=ga&&ga.accounts?'<div class="pl-dots"><span class="on"><i></i>'+ga.accounts.length+' accounts</span><span class="on"><i></i>12 metrics</span><span class="on"><i></i>9 splits</span></div>'
+    :'<div class="pl-cap"><span>Waiting for the Google Ads connection</span></div>';
   document.querySelector('[data-live="sqr"]').innerHTML='<div class="pl-dots">'+SQR_RULES.map(function(r){
     return '<span class="on"><i></i>'+esc(r[2].replace(/ \(.*\)/,""))+'</span>';}).join("")+'</div>';
 }
 
 try{chosen=localStorage.getItem("pm_launch_client")||"";}catch(e){}
 paintPicker();
-Promise.all([getJson(BASE+"/api/pacing/snapshots"), getJson(BASE+"/api/pacing/clients"), getJson(BASE+"/api/feedback/status")])
+Promise.all([getJson(BASE+"/api/pacing/snapshots"), getJson(BASE+"/api/pacing/clients"), getJson(BASE+"/api/feedback/status"), getJson(BASE+"/api/gads/accounts")])
   .then(function(r){
-    if(r[1]&&r[1].clients&&r[1].clients.length){ clients=r[1].clients; paintPicker(); }
-    paintStatus(r[0], r[1], r[2]);
+    if(r[3]&&r[3].accounts) adsAccounts=r[3].accounts;
+    if(r[1]&&r[1].clients&&r[1].clients.length){ clients=r[1].clients; paintPicker(); } else paintActions(false);
+    paintStatus(r[0], r[1], r[2], r[3]);
   });
 })();

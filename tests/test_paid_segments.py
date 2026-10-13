@@ -20,7 +20,9 @@ os.environ.setdefault("FLASK_SECRET_KEY", "test")
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 
-from tracker import paid_gads as gads  # noqa: E402
+from tracker import paid_gads as base  # noqa: E402
+from tracker import paid_gads_segments as gads  # noqa: E402
+from tracker import paid_store  # noqa: E402
 from tracker import paid_segments as seg  # noqa: E402
 
 ACCOUNT = {"id": "1234567890", "name": "Acme Landscaping", "currency": "USD"}
@@ -223,100 +225,73 @@ def test_the_same_account_and_range_is_fetched_once():
     seg.clear_cache()
 
 
-# ── The Google Ads connection ───────────────────────────────────────────────
-
-class Resp:
-    def __init__(self, status, body):
-        self.status_code, self._body = status, body
-
-    def json(self):
-        return self._body
-
+# ── The Google Ads connection (a layer over paid_gads, which owns the transport) ──
 
 @pytest.fixture
-def gads_env(monkeypatch):
-    for k in ("GOOGLE_ADS_DEVELOPER_TOKEN", "GOOGLE_ADS_CLIENT_ID", "GOOGLE_ADS_CLIENT_SECRET",
-              "GOOGLE_ADS_REFRESH_TOKEN"):
-        monkeypatch.setenv(k, "x")
-    gads.reset_token()
+def clean_gads(monkeypatch):
+    """No Postgres, empty caches: every test starts from nothing."""
+    monkeypatch.setattr(paid_store, "get_gads_cache", lambda key, ttl: None)
+    monkeypatch.setattr(paid_store, "put_gads_cache", lambda key, value: None)
     gads.reset_accounts()
+    gads._geo_names.clear()
     yield
-    gads.reset_token()
     gads.reset_accounts()
+    gads._geo_names.clear()
 
 
 def test_unconfigured_says_what_is_missing(monkeypatch):
     for k in ("GOOGLE_ADS_DEVELOPER_TOKEN", "GOOGLE_ADS_CLIENT_ID", "GOOGLE_ADS_CLIENT_SECRET",
               "GOOGLE_ADS_REFRESH_TOKEN"):
         monkeypatch.delenv(k, raising=False)
-    gads.reset_token()
     assert "GOOGLE_ADS_REFRESH_TOKEN" in gads.config_problem()
-    with pytest.raises(gads.GadsError) as e:
-        gads.search("1234567890", "SELECT 1")
-    assert e.value.kind == "not_configured"
 
 
-def test_search_follows_page_tokens_and_signs_every_call(gads_env):
-    seen = []
-
-    def post(url, **kw):
-        if "oauth2" in url:
-            return Resp(200, {"access_token": "tok", "expires_in": 3600})
-        seen.append((kw["headers"], kw["json"]))
-        first = "pageToken" not in kw["json"]
-        return Resp(200, {"results": [{"n": 1 if first else 2}], **({"nextPageToken": "p2"} if first else {})})
-    rows = gads.search("123-456-7890", "SELECT x", post=post)
-    assert rows == [{"n": 1}, {"n": 2}] and len(seen) == 2
-    h = seen[0][0]
-    assert h["Authorization"] == "Bearer tok" and h["developer-token"] == "x"
-    assert h["login-customer-id"] == gads.DEFAULT_LOGIN_CUSTOMER
-
-
-def test_search_refuses_a_malformed_customer_id(gads_env):
-    with pytest.raises(gads.GadsError) as e:
-        gads.search("12345; DROP", "SELECT x", post=lambda *a, **k: pytest.fail("no call expected"))
-    assert e.value.kind == "bad_request"
-
-
-def test_an_expired_token_is_refreshed_once_then_retried(gads_env):
-    tokens, calls = iter(["old", "new"]), []
-
-    def post(url, **kw):
-        if "oauth2" in url:
-            return Resp(200, {"access_token": next(tokens), "expires_in": 3600})
-        calls.append(kw["headers"]["Authorization"])
-        return Resp(401, {"error": {"message": "expired"}}) if len(calls) == 1 else Resp(200, {"results": []})
-    assert gads.search("1234567890", "SELECT x", post=post) == []
-    assert calls == ["Bearer old", "Bearer new"]
-
-
-@pytest.mark.parametrize("status, body, kind", [
-    (429, {"error": {"status": "RESOURCE_EXHAUSTED", "message": "quota"}}, "quota"),
-    (403, {"error": {"message": "no access"}}, "permission"),
-    (400, {"error": {"details": [{"errors": [{"message": "bad field"}]}]}}, "bad_request"),
+@pytest.mark.parametrize("err, kind", [
+    (base.NotConfigured("Google Ads is not connected yet: X not set."), "not_configured"),
+    (base.OverQuota("Today's Google Ads request budget (2400) is used up."), "quota"),
+    (base.AdsError("The Google Ads sign-in was rejected (invalid_grant). An admin needs to refresh it."), "auth"),
+    (base.AdsError("Google would not sign in (HTTP 400)."), "auth"),
+    (base.AdsError("Google Ads answered 401: expired"), "auth"),
+    (base.AdsError("Google Ads answered 403: the project is only approved for test accounts"), "permission"),
+    (base.AdsError("Google Ads answered 400: bad field"), "bad_request"),
+    (base.AdsError("Google Ads answered 500."), "api"),
+    (base.AdsError("Could not reach Google Ads (ConnectionError)."), "api"),
 ])
-def test_api_errors_are_classified_and_carry_googles_reason(gads_env, status, body, kind):
-    def post(url, **kw):
-        if "oauth2" in url:
-            return Resp(200, {"access_token": "t", "expires_in": 3600})
-        return Resp(status, body)
+def test_paid_gads_errors_become_gads_errors_with_their_own_words(err, kind):
+    out = gads.translate(err)
+    assert isinstance(out, gads.GadsError) and out.kind == kind and str(out) == str(err)
+
+
+def test_a_query_goes_through_paid_gads_with_the_shared_store_and_budget(monkeypatch):
+    seen = {}
+
+    def fake_search(cid, gaql, store, *, http=None):
+        seen.update(cid=cid, gaql=gaql, store=store)
+        return [{"row": 1}]
+    monkeypatch.setattr(base, "search", fake_search)
+    assert gads.search("123-456-7890", "SELECT x") == [{"row": 1}]
+    # paid_store is what counts the call against the day's shared request budget
+    assert seen == {"cid": "1234567890", "gaql": "SELECT x", "store": paid_store}
+
+
+def test_a_failure_in_paid_gads_reaches_the_caller_as_a_gads_error(monkeypatch):
+    def over(*a, **k):
+        raise base.OverQuota("Today's Google Ads request budget (2400) is used up.")
+    monkeypatch.setattr(base, "search", over)
     with pytest.raises(gads.GadsError) as e:
-        gads.search("1234567890", "SELECT x", post=post)
-    assert e.value.kind == kind
+        gads.search("1234567890", "SELECT x")
+    assert e.value.kind == "quota" and "used up" in str(e.value)
 
 
-def test_a_revoked_refresh_token_is_an_auth_error(gads_env):
-    def post(url, **kw):
-        return Resp(400, {"error": "invalid_grant", "error_description": "Token has been revoked."})
-    with pytest.raises(gads.GadsError) as e:
-        gads.search("1234567890", "SELECT x", post=post)
-    assert e.value.kind == "auth" and "revoked" in str(e.value)
+def test_a_malformed_customer_id_never_reaches_google(monkeypatch):
+    monkeypatch.setattr(base, "search", lambda *a, **k: pytest.fail("no call expected"))
+    for bad in ("12345; DROP", "", None, "123"):
+        with pytest.raises(gads.GadsError) as e:
+            gads.search(bad, "SELECT x")
+        assert e.value.kind == "bad_request"
 
 
-
-
-def test_geo_names_are_looked_up_once_and_only_for_real_ids(gads_env):
-    gads._geo_names.clear()
+def test_geo_names_are_looked_up_once_and_only_for_real_ids(clean_gads):
     calls = []
 
     def fake(_cid, q):
@@ -328,7 +303,6 @@ def test_geo_names_are_looked_up_once_and_only_for_real_ids(gads_env):
     assert "'; --" not in calls[0]
     gads.geo_names(["geoTargetConstants/5"], search_fn=fake)
     assert len(calls) == 1
-    gads._geo_names.clear()
 
 
 def test_the_queries_ask_for_what_the_sheet_reports():
@@ -479,65 +453,98 @@ def _acct(i, name, cur="USD", tz="America/New_York"):
     return {"customerClient": {"id": i, "descriptiveName": name, "currencyCode": cur, "timeZone": tz}}
 
 
-EVERYONE = [_acct("1111111111", "Acme East"), _acct("1111111112", "Acme West", "USD", "America/Chicago"),
-            _acct("2222222221", "Euro One", "EUR", "Europe/Paris"), _acct("2222222222", "Euro Two", "EUR", "Europe/Paris"),
-            _acct("2222222223", "Au One", "AUD", "Australia/Sydney"), _acct("3333333333", "Solo")]
+ACCT_LIST = [{"id": c["id"], "name": c["descriptiveName"], "currency": c["currencyCode"], "timeZone": c["timeZone"]}
+             for c in (x["customerClient"] for x in [
+                 _acct("1111111111", "Acme East"), _acct("1111111112", "Acme West", "USD", "America/Chicago"),
+                 _acct("2222222221", "Euro One", "EUR", "Europe/Paris"), _acct("2222222222", "Euro Two", "EUR", "Europe/Paris"),
+                 _acct("2222222223", "Au One", "AUD", "Australia/Sydney"), _acct("3333333333", "Solo")])]
 MANAGERS = [{"customerClient": {"id": "9000000001", "descriptiveName": "Acme MCC"}},
             {"customerClient": {"id": "9000000002", "descriptiveName": "Multi MCC"}}]
-UNDER = {"9000000001": EVERYONE[0:2], "9000000002": EVERYONE[2:5]}
+UNDER = {"9000000001": ["1111111111", "1111111112"], "9000000002": ["2222222221", "2222222222", "2222222223"]}
 
 
-def fake_mcc(calls=None, unreadable=()):
+def fake_mcc(calls=None, unreadable=(), fail_with=None):
+    """Answers the two kinds of query the inventory makes: the managers under the
+    root, and the accounts under one manager."""
     def search(cid, q):
         if calls is not None:
             calls.append((cid, q))
         if "manager = TRUE" in q:
             return MANAGERS
         if cid in unreadable:
-            raise gads.GadsError("permission", "no access to that manager")
-        if cid in UNDER:
-            return UNDER[cid]
-        return EVERYONE                              # the root MCC's own clients
+            raise fail_with or gads.GadsError("permission", "no access to that manager")
+        return [_acct(i, "x") for i in UNDER[cid]]
     return search
 
 
 @pytest.fixture
-def clean_inventory():
-    gads.reset_accounts()
+def clean_inventory(clean_gads):
     yield
-    gads.reset_accounts()
 
 
-def test_list_accounts_keeps_clients_only_sorted_and_cached(clean_inventory):
+def inv(**kw):
+    return gads.inventory(search_fn=kw.pop("search_fn", fake_mcc()), accounts_fn=lambda: ACCT_LIST, now=0, **kw)
+
+
+def test_the_inventory_lists_every_account_sorted_and_is_kept(clean_inventory):
     calls = []
-    out = gads.list_accounts(search_fn=fake_mcc(calls) , now=0)
+    out = gads.list_accounts(search_fn=fake_mcc(calls), accounts_fn=lambda: ACCT_LIST, now=0)
     assert [a["name"] for a in out] == ["Acme East", "Acme West", "Au One", "Euro One", "Euro Two", "Solo"]
-    assert any("manager = FALSE" in q for _c, q in calls)
     n = len(calls)
-    gads.list_accounts(search_fn=fake_mcc(calls), now=60)
-    assert len(calls) == n
-    gads.list_accounts(search_fn=fake_mcc(calls), now=gads.ACCOUNTS_TTL_S + 1)
+    assert n == 1 + len(MANAGERS)                     # the managers, then each manager's accounts
+    gads.list_accounts(search_fn=fake_mcc(calls), accounts_fn=lambda: ACCT_LIST, now=60)
+    assert len(calls) == n                            # from memory
+    gads.list_accounts(search_fn=fake_mcc(calls), accounts_fn=lambda: ACCT_LIST, now=gads.ACCOUNTS_TTL_S + 1)
     assert len(calls) == 2 * n
 
 
 def test_an_mcc_becomes_a_group_and_a_mixed_currency_mcc_one_group_per_currency(clean_inventory):
-    inv = gads.inventory(search_fn=fake_mcc(), now=0)
-    groups = {g["id"]: g for g in inv["groups"]}
+    data = inv()
+    groups = {g["id"]: g for g in data["groups"]}
     # Acme: two USD accounts, so one group named without the " MCC" suffix.
     assert groups["mcc-9000000001"]["name"] == "Acme" and groups["mcc-9000000001"]["accountIds"] == ["1111111111", "1111111112"]
     assert groups["mcc-9000000001"]["currency"] == "USD" and groups["mcc-9000000001"]["timeZones"] == ["America/Chicago", "America/New_York"]
     # Multi: EUR x2 can be added; the lone AUD account cannot form a group.
     assert groups["mcc-9000000002-EUR"]["name"] == "Multi (EUR)" and len(groups["mcc-9000000002-EUR"]["accountIds"]) == 2
     assert set(groups) == {"mcc-9000000001", "mcc-9000000002-EUR"}
-    homes = {a["name"]: a["group"] for a in inv["accounts"]}
+    homes = {a["name"]: a["group"] for a in data["accounts"]}
     assert homes == {"Acme East": "mcc-9000000001", "Acme West": "mcc-9000000001", "Euro One": "mcc-9000000002-EUR",
                      "Euro Two": "mcc-9000000002-EUR", "Au One": "", "Solo": ""}
 
 
 def test_a_manager_this_server_cannot_read_is_skipped_not_fatal(clean_inventory):
-    inv = gads.inventory(search_fn=fake_mcc(unreadable=("9000000002",)), now=0)
-    assert [g["id"] for g in inv["groups"]] == ["mcc-9000000001"]
-    assert len(inv["accounts"]) == 6
+    data = inv(search_fn=fake_mcc(unreadable=("9000000002",)))
+    assert [g["id"] for g in data["groups"]] == ["mcc-9000000001"]
+    assert len(data["accounts"]) == 6
+
+
+def test_but_a_quota_or_sign_in_failure_is_not_swallowed(clean_inventory):
+    for kind in ("quota", "auth", "not_configured"):
+        gads.reset_accounts()
+        with pytest.raises(gads.GadsError) as e:
+            inv(search_fn=fake_mcc(unreadable=("9000000001", "9000000002"), fail_with=gads.GadsError(kind, "stop")))
+        assert e.value.kind == kind
+
+
+def test_which_accounts_sit_under_which_mcc_is_kept_in_postgres(clean_inventory, monkeypatch):
+    stored = {}
+    monkeypatch.setattr(paid_store, "get_gads_cache", lambda key, ttl: stored.get(key))
+    monkeypatch.setattr(paid_store, "put_gads_cache", lambda key, value: stored.update({key: value}))
+    calls = []
+    inv(search_fn=fake_mcc(calls))
+    first = len(calls)
+    assert "mcc-members" in stored and stored["mcc-members"]["9000000001"]["ids"] == ["1111111111", "1111111112"]
+    gads.reset_accounts()                              # another worker, empty memory
+    inv(search_fn=fake_mcc(calls))
+    assert len(calls) == first                          # no Google calls: the groups came from the cache
+
+
+def test_a_cache_outage_costs_calls_not_the_page(clean_inventory, monkeypatch):
+    def down(*a):
+        raise paid_store.StoreUnavailable("no database")
+    monkeypatch.setattr(paid_store, "get_gads_cache", down)
+    monkeypatch.setattr(paid_store, "put_gads_cache", down)
+    assert [g["id"] for g in inv()["groups"]] == ["mcc-9000000001", "mcc-9000000002-EUR"]
 
 
 def test_group_ids_have_a_fixed_shape():
@@ -627,9 +634,7 @@ def test_when_every_account_fails_the_failure_is_raised():
 
 GROUPS = [{"id": "mcc-9000000001", "managerId": "9000000001", "name": "Acme", "currency": "USD",
            "accountIds": ["1111111111", "1111111112"], "timeZones": []}]
-ACCOUNTS = [dict(a["customerClient"], name=a["customerClient"]["descriptiveName"], currency=a["customerClient"]["currencyCode"])
-            for a in EVERYONE]
-ACCOUNTS = [{"id": a["id"], "name": a["name"], "currency": a["currency"], "timeZone": a["timeZone"]} for a in ACCOUNTS]
+ACCOUNTS = ACCT_LIST
 
 
 def test_resolve_target_finds_accounts_and_groups_and_refuses_the_rest():

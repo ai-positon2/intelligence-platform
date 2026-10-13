@@ -30,7 +30,7 @@ import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 
-from . import paid_gads as gads
+from . import paid_gads_segments as gads
 
 MAX_DAYS = 400
 MIN_DATE = dt.date(2015, 1, 1)

@@ -287,7 +287,7 @@ def mcc_report(per_account, fail=None, zones=("America/New_York",)):
 
     def search(cid, q):
         if fail and cid in fail:
-            from tracker import paid_gads as gads
+            from tracker import paid_gads_segments as gads
             raise gads.GadsError("permission", "Google Ads denied access: no")
         return by_id[cid] if seg.DIM_BY_KEY["day"]["select"] in q else []
     return seg.build_report(account, START, END, search_fn=search, geo_fn=lambda k: {})
