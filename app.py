@@ -4206,6 +4206,11 @@ def seo_aeo_legacy_redirect(rest=""):
 #                          transcripts and the Budget Tracker, through ONE
 #                          shared Slack and Google account an admin connects
 #                          (tracker/paid_feedback.py)
+#   Segment Analysis       the seven-segment report (day, hour, age, gender,
+#                          city, device, network) for one Google Ads account
+#                          and date range, read live from Google Ads, with
+#                          computed insights (tracker/paid_segments.py,
+#                          paid_segment_insights.py, paid_gads_segments.py)
 _PM_PREFIX = "/p2/paid-marketing"
 
 
@@ -4622,6 +4627,89 @@ def paid_feedback_disconnect(provider):
     except paid_store.StoreUnavailable as e:
         return _pm_store_error(e)
     return jsonify(ok=True)
+
+
+# Segment Analysis ------------------------------------------------------------
+# Pick a Google Ads account and a date range, get the seven-segment report the
+# PPC team used to build by hand, plus the insights computed from it. Reads
+# Google Ads live (tracker/paid_gads_segments.py, on the Performance Summarizer's
+# tracker/paid_gads.py); the numbers are tracker/paid_segments.py
+# and the insights tracker/paid_segment_insights.py.
+
+SEGMENT_SUMMARY_DAILY_CAP = 100
+_SEGMENT_SUMMARY_USES = {}
+
+
+@app.route("/p2/paid-marketing/segment-analysis")
+@position2_required
+def paid_segment_analysis():
+    return render_template("segment_analysis.html", user=_get_user())
+
+
+def _pm_gads_error(e):
+    """A Google Ads failure, as the page shows it. 429 is Google rate limiting
+    this server; 503 is Google Ads not being connected here at all."""
+    status = {"not_configured": 503, "quota": 429}.get(e.kind, 502)
+    return jsonify(error=str(e), kind=e.kind), status
+
+
+@app.route("/p2/paid-marketing/api/segments/accounts")
+@position2_required
+def paid_segment_accounts():
+    from tracker import paid_gads_segments as paid_gads
+    problem = paid_gads.config_problem()
+    if problem:
+        return jsonify(error=problem, kind="not_configured", accounts=[]), 503
+    try:
+        inv = paid_gads.inventory()
+        return jsonify(accounts=inv["accounts"], groups=inv["groups"])
+    except paid_gads.GadsError as e:
+        return _pm_gads_error(e)
+
+
+def _pm_segment_report():
+    """(report, None) for the account and dates in the query string (GET) or
+    the JSON body (POST), or (None, the error response)."""
+    from tracker import paid_gads_segments as paid_gads, paid_segments
+    src = request.args if request.method == "GET" else (request.get_json(silent=True) or {})
+    try:
+        return paid_segments.report_for(src.get("account"), src.get("from"), src.get("to")), None
+    except paid_segments.BadRequest as e:
+        return None, (jsonify(error=str(e)), 400)
+    except paid_gads.GadsError as e:
+        return None, _pm_gads_error(e)
+
+
+@app.route("/p2/paid-marketing/api/segments/report")
+@position2_required
+def paid_segment_report():
+    from tracker import paid_segment_insights
+    report, err = _pm_segment_report()
+    if err:
+        return err
+    return jsonify(dict(report, insights=paid_segment_insights.build(report)))
+
+
+@app.route("/p2/paid-marketing/api/segments/summary", methods=["POST"])
+@position2_required
+def paid_segment_summary():
+    """The Claude-written summary of one report's insights. The page sends only
+    the account and dates; the report and insights are rebuilt here, so the
+    model can only ever be shown what the rules found."""
+    from tracker import paid_segment_insights
+    email, today = _pm_user_email(), datetime.now(timezone.utc).date().isoformat()
+    day, used = _SEGMENT_SUMMARY_USES.get(email, (today, 0))
+    if day != today:
+        used = 0
+    if used >= SEGMENT_SUMMARY_DAILY_CAP:
+        return jsonify(error="That is %d summaries in a day, the most this allows." % used), 429
+    report, err = _pm_segment_report()
+    if err:
+        return err
+    _SEGMENT_SUMMARY_USES[email] = (today, used + 1)
+    key =(report["account"]["id"], report["range"]["from"], report["range"]["to"])
+    out = paid_segment_insights.cached_summary(key, report, paid_segment_insights.build(report))
+    return jsonify(out)
 
 
 # ── Embedded dashboards ─────────────────────────────────────────────────────────
@@ -18573,7 +18661,7 @@ DATA section below when available — use those numbers, never a memorised figur
 AD INTELLIGENCE (/p2/strategic-agents/ad-intelligence): tracks competitors' running ads (headline, CTA, format,
 keywords, messaging angle, first/last seen) pulled from a shared Google Sheet.
 
-PAID MARKETING AGENTS (/p2/paid-marketing): the PPC team's four agents (three came from Agent Holmes).
+PAID MARKETING AGENTS (/p2/paid-marketing): the PPC team's five agents (three came from Agent Holmes).
 Pacing Desk (/p2/paid-marketing/pacing-desk): reads each morning's Google Ads export and the Budget Tracker,
 projects every account to month end from actual spend per active day (never from the daily cap), labels it
 over/under/on target against ideal pacing ((today-1)/days in month, +2pp tolerance), and recommends budget
@@ -18587,7 +18675,17 @@ Eventgroove, 42 North, McHale, Beta Bionics placeholder, or generic) settle most
 rest, and it outputs priority negatives, new keywords, client-review items and a 7-sheet workbook. Client
 Feedback Agent (/p2/paid-marketing/client-feedback-agent): a chat that answers from live Slack, Gmail, meeting
 transcripts (Zoom first when configured, else the Meeting Notes Drive folder) and the Budget Tracker, through
-one shared Slack and Google account an admin connects.
+one shared Slack and Google account an admin connects. Segment Analysis (/p2/paid-marketing/segment-analysis):
+pick a Google Ads account, or a whole MCC (OIA, Eventgroove, Tealium, Workato: all of its accounts together), and
+a date range and it reads Google Ads live to build the PPC team's segment report: day of the week, hour of the
+day, age, gender, city, device and network, each with impressions, clicks, cost, % cost, CTR, CPC, conversions and
+cost per conversion (CPL, shown as Na when there are no conversions), and each cut by campaign type (Brand, Non
+Brand, Performance Max, Demand Gen). An MCC view adds an Account table. Each table shows its coverage, because
+Google Ads does not report every segment for every campaign type (Performance Max has no age or gender). Insights
+are computed by rules from the tables, not guessed: the cheapest segments to push, groups of segments that spend
+with no conversions, segments converting at 1.5x the average cost, and caveats on how far to trust a table; each
+carries its evidence, a recommended action and a high or directional confidence. A short summary is written by
+Claude from those insights only.
 
 SEO STUDIO (/p2/seo-aeo/<tool>) and the /app agents: a suite of SEO/GEO tools (Keyword Finder, Content Brief
 Generator, Content Enhancer, SEO & GEO Audit, Agentic Readiness Audit, Competitor Analysis, and more).

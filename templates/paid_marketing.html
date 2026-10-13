@@ -12,7 +12,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-tokens.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-components.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/gtm.css') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/paid_marketing.css') }}?v=9">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/paid_marketing.css') }}?v=12">
   <script src="/static/js/theme.js"></script>
   <link rel="stylesheet" href="/static/css/aurora-app.css?v=3">
   <script src="/static/js/aurora.js?v=1" defer></script>
@@ -61,7 +61,7 @@
     <div class="page-header pm-section-head">
       <div class="au-eyebrow"><span class="d"></span>Paid media · Live</div>
       <h1 class="page-title">Every dollar, <span class="pm-sec-grad">accounted for.</span></h1>
-      <p class="page-sub">Live performance from Google Ads, budget pacing, search-term triage and client memory for the PPC team. Select an agent to open it.</p>
+      <p class="page-sub">Live performance from Google Ads, budget pacing, search-term triage, segment analysis and client memory for the PPC team. Select an agent to open it.</p>
       <div class="hb-cue"><span></span></div>
     </div>
 
@@ -83,6 +83,9 @@
             <a class="pl-act pl-sq" data-act="sqr" href="/p2/paid-marketing/search-query-analysis">
               <span class="ic"><svg viewBox="0 0 24 24"><circle cx="10" cy="10" r="6"/><path d="m20 20-5.6-5.6"/></svg></span>
               <span><span class="t">Triage search terms</span><span class="s" data-s="sqr">Pick an account's rules</span></span></a>
+            <a class="pl-act pl-sg" data-act="segments" href="/p2/paid-marketing/segment-analysis">
+              <span class="ic"><svg viewBox="0 0 24 24"><path d="M21 12A9 9 0 1 1 12 3v9z"/><path d="M15.5 3.6A9 9 0 0 1 20.4 8.5H15.5z"/></svg></span>
+              <span><span class="t">Analyse segments</span><span class="s" data-s="segments">Any Google Ads account</span></span></a>
           </div>
         </div>
         <div class="pl-status" id="launchStatus">
@@ -93,7 +96,8 @@
 
     <div class="dash-grid pm-sec-grid">
 
-      <!-- Paid Marketing Agents, from Agent Holmes (2026-10-12). The hub card's
+      <!-- Paid Marketing Agents. 1 to 3 are from Agent Holmes (2026-10-12); 4,
+           Segment Analysis, is new on the platform. The hub card's
            "N dashboards / N live" counts these; tests/test_hub_card_counts.py
            checks the two agree. -->
 
@@ -181,6 +185,27 @@
         </div>
       </a>
 
+      <!-- 4. Segment Analysis -->
+      <a href="/p2/paid-marketing/segment-analysis" class="dash-card active c-seg">
+        <div class="card-band"></div>
+        <div class="card-thumb">
+          <div class="card-thumb-icon"><svg class="au-ic" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M21 12A9 9 0 1 1 12 3v9z"/><path d="M15.5 3.6A9 9 0 0 1 20.4 8.5H15.5z"/></svg></div>
+          <div class="card-thumb-badge tb-live"><span class="tb-dot live"></span> Live</div>
+        </div>
+        <div class="card-body">
+          <div class="card-name">Segment Analysis</div>
+          <div class="card-desc">
+            Pick a Google Ads account and a date range. See day, hour, age, gender, city, device and
+            network side by side, with the insights to act on: where to push, where spend leaks.
+          </div>
+          <div class="pm pl-live" data-live="segments"></div>
+          <div class="card-footer">
+            <div class="card-tags"><span class="tag">Segments</span><span class="tag">Insights</span></div>
+            <span class="card-arrow">→</span>
+          </div>
+        </div>
+      </a>
+
     </div>
 
     <p class="footer-note">Position2 · Internal use only</p>
@@ -208,12 +233,13 @@
   var BASE=[
     {t:'Hub',d:'Platform home',u:'/p2/hub',i:'⌂'},
     {t:'Strategic Agents',d:'Go-to-market intelligence',u:'/p2/strategic-agents',i:'◎'},
-    {t:'Paid Marketing Agents',d:'Performance, pacing, search terms & client feedback',u:'/p2/paid-marketing',i:'◆'},
+    {t:'Paid Marketing Agents',d:'Performance, pacing, search terms, segments & client feedback',u:'/p2/paid-marketing',i:'◆'},
     {t:'SEO + AEO Tools',d:'Organic intelligence',u:'/p2/seo-aeo',i:'⌕'},
     {t:'Performance Summarizer',d:'Live Google Ads, chart anything',u:'/p2/paid-marketing/performance-summarizer',i:'◈'},
     {t:'Pacing Desk',d:'Where to move budget today',u:'/p2/paid-marketing/pacing-desk',i:'▥'},
     {t:'Search Query Analysis',d:'Classify a search terms report',u:'/p2/paid-marketing/search-query-analysis',i:'⌕'},
-    {t:'Client Feedback Agent',d:'Ask Slack, Gmail & meeting notes',u:'/p2/paid-marketing/client-feedback-agent',i:'✦'}
+    {t:'Client Feedback Agent',d:'Ask Slack, Gmail & meeting notes',u:'/p2/paid-marketing/client-feedback-agent',i:'✦'},
+    {t:'Segment Analysis',d:'Day, hour, age, gender, city, device & network',u:'/p2/paid-marketing/segment-analysis',i:'◔'}
   ];
   var ITEMS=(window.__KP_ITEMS||[]).concat(BASE);
   var css=document.createElement('style');
