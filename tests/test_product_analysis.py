@@ -342,9 +342,7 @@ def test_the_script_reads_only_routes_that_exist():
 def test_the_agent_is_listed_wherever_the_others_are():
     section = _read("templates", "paid_marketing.html")
     assert 'class="dash-card active c-prod"' in section and "product-analysis" in section.split("var BASE=[", 1)[1]
-    assert 'data-act="prod"' in section
     assert "product-analysis" in _read("templates", "_paid_kpal.html")
-    assert "product-analysis" in _read("static", "js", "paid_marketing.js")
     assert ".c-prod{" in _read("static", "css", "paid_marketing.css")
     assert "Product Analysis" in _read("app.py")
 

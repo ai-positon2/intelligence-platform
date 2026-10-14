@@ -389,7 +389,6 @@ def test_the_agent_is_listed_wherever_the_others_are():
     assert "performance-summarizer" in section and 'class="dash-card active c-perf"' in section
     assert "performance-summarizer" in _read("templates", "_paid_kpal.html")
     assert "performance-summarizer" in section.split("var BASE=[", 1)[1]          # the section page carries its own copy of the palette
-    assert "performance-summarizer" in _read("static", "js", "paid_marketing.js")
     assert "Performance Summarizer" in _read("app.py")
 
 

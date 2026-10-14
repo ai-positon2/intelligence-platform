@@ -441,12 +441,17 @@ def test_the_chat_page_sends_its_context_with_the_question():
     assert "pm_picker.js" in open(os.path.join(ROOT, "templates", "pacing_desk.html")).read()
 
 
-def test_the_launcher_only_links_to_rulesets_the_sqr_page_has():
-    js = open(os.path.join(ROOT, "static", "js", "paid_marketing.js")).read()
-    linked = set(re.findall(r'/i,"([a-z0-9_]+)",', js))
-    assert linked and linked <= set(sqr.RULESETS), linked - set(sqr.RULESETS)
+def test_each_agent_reads_the_param_the_old_deep_links_used():
     for page, param in (("pacing_desk.js", '"client"'), ("client_feedback_agent.js", '"client"'), ("sqr_agent.js", '"account"')):
         assert ".get(" + param + ")" in open(os.path.join(ROOT, "static", "js", page)).read(), page
+
+
+def test_the_section_page_has_no_client_launcher():
+    html = open(os.path.join(ROOT, "templates", "paid_marketing.html")).read()
+    for gone in ('id="launch"', "launchPick", "launchActs", "launchStatus"):
+        assert gone not in html, gone
+    assert 'data-live="pacing"' in html            # the card readouts stay
+    assert "launchPick" not in open(os.path.join(ROOT, "static", "js", "paid_marketing.js")).read()
 
 
 # ── Pacing: the Refresh button ─────────────────────────────────────────────

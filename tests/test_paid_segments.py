@@ -442,7 +442,6 @@ def test_the_section_page_and_the_hub_list_the_new_agent():
     c = client_as(STAFF)
     page = c.get("/p2/paid-marketing").get_data(as_text=True)
     assert 'href="/p2/paid-marketing/segment-analysis" class="dash-card active c-seg"' in page
-    assert 'data-act="segments"' in page
     assert "segment analysis" in c.get("/p2/hub").get_data(as_text=True).lower()
 
 
