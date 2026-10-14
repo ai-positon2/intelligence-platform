@@ -1,105 +1,89 @@
 # QA Agent plan (Campaign Launch QC)
 
 Branch: `Divith`. Section: Paid Marketing Agents (`/p2/paid-marketing/qa-agent`).
-Status: **Phases 1 to 4 built. Phase 5 (review, push) waits for a go-ahead.**
+Status: **v2 built and checked against a live account. Not yet run on the real Postgres.**
 
 ## What it is
 
-Pick a Google Ads account, and the agent builds the launch QC checklist for it. Each
-check has a box to tick when it is done. If a check fails, a comment box beside it takes
-the reason. The page keeps the verdict ("can this launch?") up to date as the boxes are
-ticked, and the QC is saved, so it can be resumed and shared.
+Pick a Google Ads **account**, then one of its **live campaigns**. The QC starts at once on the PPC
+team's Campaign Launch QC Checklist (155 checks, 15 sections). Every check is a row:
 
-Source: the PPC team's "Campaign Launch QC Checklist" workbook (155 checks, 15 sections).
+- a box that is **right or wrong** (the cross needs a reason),
+- **what the agent found**, printed, for the checks Google Ads can answer
+  (check 1.7 prints the account and campaign tracking template, final URL suffix and custom parameters),
+- a **comment box beside it**.
+
+The verdict ("can this launch?") follows the workbook and is computed on the server only.
+
+v1 asked you to describe a launch so that it could "build a checklist". That was not the ask, and it is gone.
 
 ## The workbook, as read
 
-Columns: ID, Section, Check, Expected Setting / How to Verify, Campaign Types, Client Types,
-Severity, Status (Pass / Fail / N/A), Notes / Fix Required, Checked By.
+Columns: ID, Section, Check, Expected Setting / How to Verify, Campaign Types, Client Types, Severity,
+Status (Pass / Fail / N/A), Notes / Fix Required, Checked By.
 
-- **Severity:** Critical (launch blocker), Major (fix before launch or within 24h with a
-  note), Minor (best practice).
-- **Applies to:** Campaign Types (All, Search, Search (DSA), PMax, Shopping, Display,
-  Demand Gen, Video, App) and Client Types (All, Ecommerce, Lead Gen, B2B, B2C, Local, App,
-  Regulated). A row marked All always applies; a row for other values applies when the
-  launch has one of them.
-- **Notes are required for every Fail** (exact campaign / ad group and the fix needed).
-- **Verdict (the workbook's rule):** NOT READY if any Critical check is Fail; else
-  INCOMPLETE if any Critical check is still unchecked; else READY TO LAUNCH. Critical
-  checks that are N/A count as done.
-- Summary tab also counts Pass / Fail / N/A / Not checked by severity and by section, and
-  holds the launch details: client, Customer ID, campaigns launching, campaign types,
-  client type, planned launch date, QC done by, reviewed / approved by.
+- **Severity:** Critical (launch blocker), Major (fix before launch or within 24h with a note), Minor (best practice).
+- **Verdict (the workbook's rule):** NOT READY if any Critical check is Fail; else INCOMPLETE if any Critical check
+  is still unchecked; else READY TO LAUNCH. A Critical N/A counts as done.
+- **Notes are required for every Fail.**
 
-## Decisions made (defaults, tell me if you want any changed)
+## Decisions
 
-1. **Manual checks first.** The reviewer ticks each check. Automatic checks from the Google
-   Ads API (auto-apply, auto-tagging, conversion status, campaign settings) are a possible
-   later phase, not built now: they would use the shared Google Ads quota.
-2. **Launch details narrow the list**, as in the workbook: after choosing the account you
-   set the client type and the campaign types launching, and only the rows that apply show.
-   Leaving a choice empty shows every row for it.
-3. **Saved per launch** in Postgres: who ticked what and when, with fail reasons.
-4. **The tick is Pass.** Beside it: a red cross (error, opens the comment box, reason
-   required) and N/A. The workbook's Pass / Fail / N/A, in the shape you described.
-5. **The account list reuses** the Performance Summarizer's `api/gads/accounts` route and its
-   quota guard; no second Google Ads path. If it cannot load, the account can be typed in.
+1. **The agent runs the checks it can, and ticks only what is exact.** 65 checks have a rule. It ticks or crosses a
+   box itself only when the answer is objective (Display Network off, auto-tagging on, Presence targeting, enough
+   sitelinks). Where the right answer depends on the plan (budget, locations, bid target, naming) it prints the
+   value and leaves the box to the reviewer. Where it saw only part of what the check asks (it reads ads and keywords,
+   not every asset) it does not tick; it says what it saw. A false tick is worse than an empty box.
+   The other 90 checks (landing pages, client sign-off, tag firing, policy, copy quality) are manual.
+2. **A person always wins.** Their box and comment beat the agent's reading. Clicking their answer again removes it
+   and the box returns to the agent's reading. The finding stays printed either way.
+3. **Which rows show** follows the campaign's own type, read from Google Ads (Search, PMax, Shopping, Display,
+   Demand Gen, Video, App). **Checks that exist only for a type of client** (Ecommerce, Lead Gen, Regulated...) wait
+   until the client type is chosen on the page (optional chips) and are not counted until then, so a Lead Gen client
+   is not held up by Ecommerce checks. The page says how many are waiting.
+4. **One live QC per campaign.** Opening the campaign again resumes it (a database rule, not a check-then-insert).
+5. **Re-run checks** reads the campaign again (about 18 Google Ads calls, 20 seconds apart at most). A new QC reads
+   once. If Google Ads cannot be read (quota, sign-in) the QC still opens and every check can be done by hand.
+6. The account list reuses the Performance Summarizer's `api/gads/accounts`; Google Ads is read through
+   `tracker/paid_gads_segments.py`, so every read counts against the shared daily budget.
+
+## What the agent reads
+
+Per campaign, about 16 to 18 reads: account (auto-tagging, tracking template and suffix, currency, time zone, EU
+political ads, enhanced conversions for leads), billing setup, auto-apply subscriptions, the campaign (status, serving
+status, dates, budget, bid strategy, networks, location options, asset automation, AI Max, shopping setting),
+campaign criteria (locations, languages, ad schedule, negatives), negative lists, labels, conversion actions, 30 days of
+conversions, 7 days of spend, campaign and account assets. Search adds ad groups, ads and keywords. Performance Max
+adds asset groups, their assets and signals. Every GAQL field was proven against the live API before it went in.
+
+Not readable from the API, so printed as "not available" and never ticked: billing balance and credit cover, whether
+a conversion action is actually recording, advertiser verification, user access, linked accounts, experiments.
 
 ## Phases
 
-1. **Checklist data**: the 155 rows as `tracker/qa_checklist.json`, checked against the
-   workbook (counts by section and severity).
-2. **Engine and storage**: `tracker/paid_qa.py` (applicability, validation, progress,
-   verdict) and `pm_qc_*` tables in `paid_store`; routes under `/p2/paid-marketing/api/qa/`.
-   Tests: the verdict rule, applicability, validation (a Fail needs a reason), permissions.
-3. **The page**: account picker, launch details, the checklist with tick / cross / N/A and
-   comment box, the verdict banner, progress by section, filters.
-4. **Wiring**: hub card and counts (7 agents, band 34), section card, command palettes,
-   assistant context, tests of the counts.
-5. **Review and push**: nothing is pushed or merged without a go-ahead.
-
-Not built: automatic checks from Google Ads; exporting a finished QC to xlsx or PDF; Slack
-notification of a failed Critical check. Each is a natural next step.
-
-## Result
-
-- **Checklist data** (`tracker/qa_checklist.json`): all 155 checks, 15 sections (45 Critical,
-  78 Major, 32 Minor), converted from the workbook with a script that refuses any value it does
-  not recognise. It found one: check 2.10 (Consent Mode v2) is "All (EEA/UK traffic)", so it is
-  kept as All with a separate `condition`, shown on the row as "If EEA/UK traffic".
-- **Engine and storage** (`tracker/paid_qa.py`, `tracker/paid_qa_store.py`): applicability, the
-  workbook's verdict, validation (a Fail needs a reason of at least 3 characters), and two tables
-  (`pm_qc_launches`, `pm_qc_checks`). The store has its own module so the shared `paid_store.py`
-  is untouched.
-- **Page** (`/p2/paid-marketing/qa-agent`): account dropdown (same picker as Segment Analysis),
-  the launch's QCs as chips, a new-launch form with a live count of the checks it would build,
-  and the checklist with a tick, an error cross (opens a comment box) and N/A on every row.
-  Every change saves at once and the server's verdict is what the banner shows.
-- **Account list** reuses the Performance Summarizer's route. If Google Ads cannot list accounts
-  (not connected, or the daily quota is used up), the page says so and takes the account name and
-  customer ID typed in, so the QC is never blocked on Google.
-- Wiring: hub card 7/7 and band 34, section card, palettes, assistant context.
+1. Plan. 2. Campaign list (`GET api/qa/campaigns`). 3. Auto-check engine `tracker/paid_qa_auto.py`.
+4. Storage and routes (`pm_qc_launches` now holds account + campaign and the agent's findings; `pm_qc_checks` holds
+people's answers). 5. Page. 6. Tests, browser run, review.
 
 ## How it was verified
 
-- Tests (`tests/test_paid_qa.py`): the data, applicability, every verdict case, validation, all
-  routes on an in-memory store (staff-only, cross-site refused, ids checked, a store outage is a 503).
-- Every SQL statement the store runs is parsed by Postgres's own parser (`pglast`, a dev-only
-  dependency; the test skips without it).
-- The page was driven in a real browser against an in-memory store: build a launch, tick all
-  Critical checks (READY), a Major error (still READY), a Critical error (NOT READY), clear it,
-  reload (state restored). That run found and fixed two real bugs (the autosave stealing the
-  caret from the comment box, and the comment box not opening on an already-passed check).
+- **Tests:** `tests/test_paid_qa.py` (55) for the checklist data, applicability, the verdict, how the agent's reading and a
+  person's answer combine, validation, SQL, and every route on an in-memory store and a fake Google Ads (staff-only,
+  cross-site refused, ids checked, store and Google outages handled); `tests/test_paid_qa_auto.py` (53) for every kind of
+  rule on made-up rows, the "only exact answers tick" rule, which reads each campaign type makes, one refused read not sinking
+  the rest, quota and sign-in errors stopping the run, and campaign ids being digits only.
+- **Every SQL statement** is parsed by Postgres's own parser (`pglast`, dev-only; the test skips without it).
+- **Live Google Ads:** the engine was run on real Search and Performance Max campaigns of a real account (read only).
+- **Real browser:** pick account, pick campaign, the agent's 24 ticks appear with their findings, mark 1.7 wrong with a
+  reason (verdict NOT READY, campaign dropdown shows it), reload (restored), pick a client type (7 more checks wait,
+  then join), Re-run (the person's answer and comment kept).
 
 ## Not verified, and not built
 
-- **Not run against a real Postgres.** No Postgres was available here. The SQL is valid and the
-  functions run against a recording cursor, but the first real run is on Railway: the tables are
-  created on first use (`CREATE TABLE IF NOT EXISTS`).
-- Not built: automatic checks from Google Ads, export to xlsx or PDF, a Slack alert on a failed
-  Critical check, editing the checklist itself from the page.
-- The checklist is Position2's internal QC document and this repository is public. Its wording
-  is generic Google Ads practice, but say so if you would rather keep it out of the repo.
-
-Nothing is pushed or merged without an explicit go-ahead.
-
+- **Not run against a real Postgres.** None was available here; the SQL is valid and runs on a recording cursor. The tables
+  are created on first use (`CREATE TABLE IF NOT EXISTS`). Please do one test QC after it deploys.
+- Not built: export of a finished QC to xlsx or PDF, a Slack alert on a wrong Critical check, opening the landing page to
+  see that it loads (6.3 only checks HTTPS), reading asset policy status.
+- The checklist is Position2's internal QC document and this repository is public. Its wording is generic Google Ads practice,
+  but say so if you would rather keep it out of the repo.
+- A first read of a campaign costs about 18 of the shared daily Google Ads allowance (about 2,880).

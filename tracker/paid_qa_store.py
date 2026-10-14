@@ -3,14 +3,17 @@
 Two tables, in the platform's Postgres, prefixed pm_ like the rest of Paid
 Marketing's:
 
-  pm_qc_launches   one launch QC: the account, what is launching, who started it
-  pm_qc_checks     the ticks: one row per (launch, check), its status, the
-                   reason for a Fail, and who set it and when
+  pm_qc_launches   one QC: an account and one of its campaigns, the client type
+                   if one was chosen, and what the agent read from Google Ads
+                   (the `auto` findings and when). One live QC per campaign.
+  pm_qc_checks     what people clicked: one row per (QC, check), its status,
+                   the comment, and who set it and when
 
-A check that has not been ticked has no row. Clearing a tick deletes its row.
-The rules (what a row may hold, the verdict) are tracker/paid_qa.py; this file
-only reads and writes. It borrows the connection from tracker/paid_store.py
-and raises its StoreUnavailable, so the routes handle both the same way.
+A check nobody has answered has no row; clearing an answer deletes its row, and
+the check shows the agent's reading again. The rules (what a row may hold, how
+the two combine, the verdict) are tracker/paid_qa.py; this file only reads and
+writes. It borrows the connection from tracker/paid_store.py and raises its
+StoreUnavailable, so the routes handle both the same way.
 """
 from __future__ import annotations
 
@@ -28,18 +31,20 @@ CREATE TABLE IF NOT EXISTS pm_qc_launches (
     id              TEXT PRIMARY KEY,
     account_id      TEXT NOT NULL,
     account_name    TEXT NOT NULL,
-    name            TEXT NOT NULL,
+    campaign_id     TEXT NOT NULL,
+    campaign_name   TEXT NOT NULL,
+    channel         TEXT NOT NULL DEFAULT '',
     client_types    JSONB NOT NULL DEFAULT '[]'::jsonb,
     campaign_types  JSONB NOT NULL DEFAULT '[]'::jsonb,
-    planned_date    TEXT NOT NULL DEFAULT '',
-    qc_by           TEXT NOT NULL DEFAULT '',
-    approved_by     TEXT NOT NULL DEFAULT '',
+    auto            JSONB NOT NULL DEFAULT '{}'::jsonb,
+    auto_at         TIMESTAMPTZ,
     created_by      TEXT,
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
     archived        BOOLEAN NOT NULL DEFAULT false
 );
 CREATE INDEX IF NOT EXISTS pm_qc_launches_account ON pm_qc_launches (account_id, created_at DESC);
+CREATE UNIQUE INDEX IF NOT EXISTS pm_qc_launches_one_live ON pm_qc_launches (account_id, campaign_id) WHERE NOT archived;
 CREATE TABLE IF NOT EXISTS pm_qc_checks (
     launch_id   TEXT NOT NULL REFERENCES pm_qc_launches(id) ON DELETE CASCADE,
     check_id    TEXT NOT NULL,
@@ -51,8 +56,8 @@ CREATE TABLE IF NOT EXISTS pm_qc_checks (
 );
 """
 
-_LAUNCH_COLS = ("id, account_id, account_name, name, client_types, campaign_types, planned_date, "
-                "qc_by, approved_by, created_by, created_at, updated_at, archived")
+_LAUNCH_COLS = ("id, account_id, account_name, campaign_id, campaign_name, channel, client_types, "
+                "campaign_types, auto, auto_at, created_by, created_at, updated_at, archived")
 _READY = False
 _READY_LOCK = threading.Lock()
 
@@ -94,25 +99,29 @@ def _iso(v):
 
 
 def _launch(r):
-    return {"id": r[0], "account_id": r[1], "account_name": r[2], "name": r[3],
-            "client_types": r[4] or [], "campaign_types": r[5] or [], "planned_date": r[6] or "",
-            "qc_by": r[7] or "", "approved_by": r[8] or "", "created_by": r[9],
-            "created_at": _iso(r[10]), "updated_at": _iso(r[11]), "archived": bool(r[12])}
+    return {"id": r[0], "account_id": r[1], "account_name": r[2], "campaign_id": r[3], "campaign_name": r[4],
+            "channel": r[5] or "", "client_types": r[6] or [], "campaign_types": r[7] or [], "auto": r[8] or {},
+            "auto_at": _iso(r[9]), "created_by": r[10], "created_at": _iso(r[11]), "updated_at": _iso(r[12]),
+            "archived": bool(r[13])}
 
 
-# ── Launches ────────────────────────────────────────────────────────────────
+# ── QCs ─────────────────────────────────────────────────────────────────────
 
-def create_launch(*, account_id, account_name, name, client_types, campaign_types, planned_date,
-                  qc_by, approved_by, by):
-    launch_id = uuid.uuid4().hex
+def start_launch(*, account_id, account_name, campaign_id, campaign_name, channel, campaign_types, by):
+    """The live QC for this campaign, started if there is none. Returns
+    (launch, created). Two people opening the same campaign at once get the one
+    QC: the unique index decides, not a check-then-insert."""
     with _tx() as cur:
         cur.execute(
-            "INSERT INTO pm_qc_launches (id, account_id, account_name, name, client_types, campaign_types, "
-            "planned_date, qc_by, approved_by, created_by) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s) "
-            "RETURNING " + _LAUNCH_COLS,
-            (launch_id, account_id, account_name, name, json.dumps(client_types), json.dumps(campaign_types),
-             planned_date, qc_by, approved_by, by))
-        return _launch(cur.fetchone())
+            "INSERT INTO pm_qc_launches (id, account_id, account_name, campaign_id, campaign_name, channel, "
+            "campaign_types, created_by) VALUES (%s, %s, %s, %s, %s, %s, %s, %s) "
+            "ON CONFLICT (account_id, campaign_id) WHERE NOT archived DO NOTHING RETURNING id",
+            (uuid.uuid4().hex, account_id, account_name, campaign_id, campaign_name, channel,
+             json.dumps(campaign_types), by))
+        created = cur.fetchone() is not None
+        cur.execute("SELECT " + _LAUNCH_COLS + " FROM pm_qc_launches WHERE account_id = %s AND campaign_id = %s "
+                    "AND NOT archived", (account_id, campaign_id))
+        return _launch(cur.fetchone()), created
 
 
 def get_launch(launch_id):
@@ -122,34 +131,36 @@ def get_launch(launch_id):
     return _launch(row) if row else None
 
 
-def list_launches(account_id, limit=40):
-    """An account's launches, newest first, archived ones left out."""
+def list_launches(account_id, limit=200):
+    """An account's live QCs, newest first."""
     with _tx() as cur:
         cur.execute("SELECT " + _LAUNCH_COLS + " FROM pm_qc_launches WHERE account_id = %s AND NOT archived "
                     "ORDER BY created_at DESC LIMIT %s", (account_id, limit))
         return [_launch(r) for r in cur.fetchall()]
 
 
-_UPDATABLE = {"name": None, "client_types": json.dumps, "campaign_types": json.dumps, "planned_date": None,
-              "qc_by": None, "approved_by": None}
-
-
-def update_launch(launch_id, **fields):
-    """Change the launch's details. Only the fields given change; anything else
-    is ignored. Returns the launch, or None if there is none."""
-    sets, args = [], []
-    for k, v in fields.items():
-        if k in _UPDATABLE:
-            sets.append("%s = %%s" % k)
-            args.append(_UPDATABLE[k](v) if _UPDATABLE[k] else v)
+def set_client_types(launch_id, client_types):
     with _tx() as cur:
-        cur.execute("UPDATE pm_qc_launches SET " + ", ".join(sets + ["updated_at = now()"]) +
-                    " WHERE id = %s RETURNING " + _LAUNCH_COLS, tuple(args) + (launch_id,))
+        cur.execute("UPDATE pm_qc_launches SET client_types = %s, updated_at = now() WHERE id = %s AND NOT archived "
+                    "RETURNING " + _LAUNCH_COLS, (json.dumps(client_types), launch_id))
+        row = cur.fetchone()
+    return _launch(row) if row else None
+
+
+def save_auto(launch_id, findings, *, campaign_name, channel, campaign_types):
+    """Keep what the agent read: the findings, when, and the campaign's own
+    name and type as Google Ads reports them now."""
+    with _tx() as cur:
+        cur.execute("UPDATE pm_qc_launches SET auto = %s, auto_at = now(), campaign_name = %s, channel = %s, "
+                    "campaign_types = %s, updated_at = now() WHERE id = %s AND NOT archived RETURNING " + _LAUNCH_COLS,
+                    (json.dumps(findings), campaign_name, channel, json.dumps(campaign_types), launch_id))
         row = cur.fetchone()
     return _launch(row) if row else None
 
 
 def archive_launch(launch_id):
+    """Remove a QC from the lists. Its answers are kept, and the campaign can
+    start a fresh QC."""
     with _tx() as cur:
         cur.execute("UPDATE pm_qc_launches SET archived = true, updated_at = now() WHERE id = %s", (launch_id,))
         return cur.rowcount > 0

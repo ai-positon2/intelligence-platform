@@ -1,21 +1,25 @@
 """Paid Marketing Agents: QA Agent, the checklist and its verdict.
 
 The PPC team's "Campaign Launch QC Checklist" (155 checks in 15 sections), run
-inside the platform: pick an account, set what is launching, tick each check
-Pass, Fail or N/A, and read off whether the launch can go. This module is the
-rules, with no database in it (tracker/paid_qa_store.py keeps what was ticked):
+on a live campaign: pick an account, pick a campaign, and the QC starts on the
+shared checklist. Each check is right or wrong, with a comment beside it. For
+the checks Google Ads can answer, tracker/paid_qa_auto.py reads the campaign and
+prints what it found; this module is the rules, with no database in it
+(tracker/paid_qa_store.py keeps what was saved):
 
-  * which checks apply to a launch;
-  * what a ticked check may look like (a Fail must say why);
-  * the workbook's verdict, which is a rule over the Critical checks only:
+  * which checks show for a campaign (its own type, and the client type if one
+    is chosen: checks that exist only for Ecommerce or Lead Gen clients wait
+    until that is said, rather than blocking a verdict they do not belong to);
+  * what a person's answer may look like (wrong needs a reason);
+  * how the agent's reading and a person's answer combine (a person wins);
+  * the workbook's verdict, a rule over the Critical checks only:
 
-        any Critical check Fail                  NOT READY: Critical check failed
-        else any Critical check not yet ticked   INCOMPLETE: Critical checks pending
+        any Critical check wrong                 NOT READY: Critical check failed
+        else any Critical check not yet done     INCOMPLETE: Critical checks pending
         else                                     READY TO LAUNCH
 
     A Critical check marked N/A counts as done. Major and Minor failures never
-    block the verdict; they are counted and listed so they are fixed (Major
-    before launch or within 24 hours with a note).
+    block the verdict; they are counted and listed.
 
 The checklist itself is tracker/qa_checklist.json, converted from the workbook.
 """
@@ -66,17 +70,26 @@ def item(check_id):
 # ── Which checks apply ──────────────────────────────────────────────────────
 
 def applies(it, client_types, campaign_types):
-    """A check applies when its Campaign Types and its Client Types each either
-    say All, or share a value with the launch. An empty choice (nothing picked
-    yet) does not narrow that side, so the full list shows until you say what
-    is launching."""
-    def side(have, want):
-        return "All" in have or not want or bool(set(have) & set(want))
-    return side(it["campaignTypes"], campaign_types) and side(it["clientTypes"], client_types)
+    """A check shows when its Campaign Types say All or share a value with the
+    campaign (an unknown campaign type narrows nothing), and its Client Types
+    say All or share a value with the client types chosen. Until a client type
+    is chosen, only the checks for every client show."""
+    camp = "All" in it["campaignTypes"] or not campaign_types or bool(set(it["campaignTypes"]) & set(campaign_types))
+    client = "All" in it["clientTypes"] or bool(set(it["clientTypes"]) & set(client_types or []))
+    return camp and client
 
 
 def applicable(client_types, campaign_types):
     return [i for i in items() if applies(i, client_types, campaign_types)]
+
+
+def campaign_types_for(channel, dsa=False):
+    """The checklist's campaign types for a Google Ads channel type."""
+    label = {"SEARCH": "Search", "PERFORMANCE_MAX": "PMax", "SHOPPING": "Shopping", "DISPLAY": "Display",
+             "DEMAND_GEN": "Demand Gen", "VIDEO": "Video", "MULTI_CHANNEL": "App"}.get(channel or "")
+    if not label:
+        return []
+    return [label] + (["Search (DSA)"] if dsa and label == "Search" else [])
 
 
 # ── Validation ──────────────────────────────────────────────────────────────
@@ -113,34 +126,31 @@ def customer_id(value):
     return digits
 
 
-def clean_details(body, *, creating):
-    """The launch fields in a request, checked. On create the account and a
-    launch name are required; on update only what is sent changes."""
+CHANNELS = ("SEARCH", "PERFORMANCE_MAX", "SHOPPING", "DISPLAY", "DEMAND_GEN", "VIDEO", "MULTI_CHANNEL")
+CAMPAIGN_ID_RE = re.compile(r"^\d{1,20}$")
+
+
+def clean_start(body):
+    """The account and campaign a QC is started on, checked."""
     if not isinstance(body, dict):
         raise BadPayload("the body should be a JSON object")
-    cl = checklist()
-    out = {}
-    if creating:
-        out["account_id"] = customer_id(body.get("accountId"))
-        out["account_name"] = _text(body.get("accountName"), "The account name", MAX_NAME, required=True)
-    if creating or "name" in body:
-        out["name"] = _text(body.get("name"), "The launch name", MAX_NAME, required=True)
-    if "clientTypes" in body or creating:
-        out["client_types"] = _pick(body.get("clientTypes"), cl["clientTypes"], "Client types")
-    if "campaignTypes" in body or creating:
-        out["campaign_types"] = _pick(body.get("campaignTypes"), cl["campaignTypes"], "Campaign types")
-    if "plannedDate" in body or creating:
-        d = _text(body.get("plannedDate"), "The planned launch date", 10)
-        if d:
-            try:
-                dt.date.fromisoformat(d)
-            except ValueError:
-                raise BadPayload("The planned launch date should be YYYY-MM-DD")
-        out["planned_date"] = d
-    for key, field, label in (("qcBy", "qc_by", "QC done by"), ("approvedBy", "approved_by", "Reviewed / approved by")):
-        if key in body or creating:
-            out[field] = _text(body.get(key), label, MAX_NAME)
-    return out
+    campaign = re.sub(r"\D", "", str(body.get("campaignId") or ""))
+    if not CAMPAIGN_ID_RE.match(campaign):
+        raise BadPayload("Pick a campaign")
+    channel = body.get("channel") or ""
+    if channel and channel not in CHANNELS:
+        channel = ""                                    # a type this list does not map: no narrowing
+    return {"account_id": customer_id(body.get("accountId")),
+            "account_name": _text(body.get("accountName"), "The account name", MAX_NAME, required=True),
+            "campaign_id": campaign,
+            "campaign_name": _text(body.get("campaignName"), "The campaign name", MAX_NAME, required=True),
+            "channel": channel}
+
+
+def clean_client_types(body):
+    if not isinstance(body, dict):
+        raise BadPayload("the body should be a JSON object")
+    return _pick(body.get("clientTypes"), checklist()["clientTypes"], "Client types")
 
 
 def clean_check(launch, check_id, body):
@@ -211,30 +221,57 @@ def summarize(launch, checks):
     }
 
 
+# ── A person's answer and the agent's reading, together ─────────────────────
+
+def effective(launch, people, auto, auto_at=None):
+    """What each check shows and counts as. `people` is {check_id: {status,
+    note, by, at}} (what was clicked), `auto` is {check_id: {result, found}}
+    (what the agent read). A person's answer always wins; clearing it returns
+    the check to the agent's reading. The agent only ever supplies pass or fail,
+    and only for the checks that apply."""
+    out = {}
+    for it in applicable(launch["client_types"], launch["campaign_types"]):
+        cid = it["id"]
+        mine, read = people.get(cid) or {}, (auto or {}).get(cid) or {}
+        row = {"status": None, "note": "", "by": None, "at": None, "source": None, "found": read.get("found") or ""}
+        if mine.get("status") in STATUSES:
+            row.update(status=mine["status"], note=mine.get("note") or "", by=mine.get("by"), at=mine.get("at"), source="person")
+        elif read.get("result") in ("pass", "fail"):
+            row.update(status=read["result"], by="QA Agent", at=auto_at, source="agent")
+        if row["status"] or row["found"]:
+            out[cid] = row
+    return out
+
+
+def hidden_by_client(launch):
+    """The checks this campaign has that wait on a client type being chosen."""
+    shown = {i["id"] for i in applicable(launch["client_types"], launch["campaign_types"])}
+    rest = [i for i in applicable(checklist()["clientTypes"], launch["campaign_types"]) if i["id"] not in shown]
+    return {"count": len(rest), "critical": sum(1 for i in rest if i["severity"] == "Critical"),
+            "types": sorted({t for i in rest for t in i["clientTypes"]})}
+
+
 # ── What the page is sent ───────────────────────────────────────────────────
 
 def public_launch(l):
     """A stored launch with the page's field names."""
-    return {"id": l["id"], "accountId": l["account_id"], "accountName": l["account_name"], "name": l["name"],
-            "clientTypes": l["client_types"], "campaignTypes": l["campaign_types"],
-            "plannedDate": l["planned_date"], "qcBy": l["qc_by"], "approvedBy": l["approved_by"],
-            "createdBy": l["created_by"], "createdAt": l["created_at"], "updatedAt": l["updated_at"]}
+    return {"id": l["id"], "accountId": l["account_id"], "accountName": l["account_name"],
+            "campaignId": l["campaign_id"], "campaignName": l["campaign_name"], "channel": l["channel"],
+            "campaignTypes": l["campaign_types"], "clientTypes": l["client_types"],
+            "readAt": l.get("auto_at"), "createdBy": l["created_by"],
+            "createdAt": l["created_at"], "updatedAt": l["updated_at"]}
 
 
 def brief(summary):
-    """The part of a summary a list of launches needs."""
+    """The part of a summary a list of QCs needs."""
     return {"verdict": summary["verdict"], "percent": summary["percent"], "checked": summary["checked"],
             "total": summary["total"], "failedCount": len(summary["failed"]),
             "failedCritical": len(summary["failedCritical"])}
 
 
-def preview(client_csv, campaign_csv):
-    """How many checks a launch with these details would have, before it is
-    created: the new-launch form shows it as you pick."""
-    cl = checklist()
-    split = lambda s: [v.strip() for v in (s or "").split(",") if v.strip()]
-    rows = applicable(_pick(split(client_csv), cl["clientTypes"], "Client types"),
-                      _pick(split(campaign_csv), cl["campaignTypes"], "Campaign types"))
-    return {"count": len(rows),
-            "bySeverity": {s: sum(1 for i in rows if i["severity"] == s) for s in cl["severities"]},
-            "applicable": [i["id"] for i in rows]}
+def payload(launch, people):
+    """Everything the page needs for one QC: the launch, every check's state,
+    and the verdict."""
+    rows = effective(launch, people, launch.get("auto") or {}, launch.get("auto_at"))
+    return {"launch": public_launch(launch), "checks": rows, "summary": summarize(launch, rows),
+            "needsClientType": hidden_by_client(launch)}
