@@ -30,11 +30,12 @@ import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 
+from . import paid_gads as base
 from . import paid_gads_segments as gads
 
 MAX_DAYS = 400
 MIN_DATE = dt.date(2015, 1, 1)
-CACHE_TTL_S = 15 * 60
+CACHE_TTL_S = 60                  # in memory, in front of Postgres (tracker/paid_gads.py holds the real copy)
 CACHE_MAX = 64
 ALL = "All"
 
@@ -384,8 +385,11 @@ def build_report(account, start, end, *, search_fn=None, geo_fn=None, workers=12
 
 # ── Cache + the entry point the route uses ──────────────────────────────────
 # Explorer access is 2,880 operations a day and one report is about eight, so
-# the same account and range is fetched once per CACHE_TTL_S, however many
-# people ask.
+# a report is saved in Postgres (shared by every worker, and kept across
+# restarts) and read from Google again only when it is older than
+# paid_gads._ttl(end) or someone presses Refresh. A minute in memory sits in
+# front of that. When Google cannot answer, the last saved report is served
+# with its date in `stale`.
 
 _cache = {}
 _cache_lock = threading.Lock()
@@ -418,23 +422,53 @@ def resolve_target(target, *, accounts_fn=None, groups_fn=None):
     return account
 
 
-def report_for(account_id, start, end, *, accounts_fn=None, groups_fn=None, search_fn=None, geo_fn=None, now=None):
-    """build_report for an account or MCC the root MCC actually holds, cached."""
+def report_for(account_id, start, end, *, accounts_fn=None, groups_fn=None, search_fn=None, geo_fn=None, now=None,
+               force=False, store=None):
+    """build_report for an account or MCC the root MCC actually holds, cached. `force` (the Refresh button) skips the
+    saved copy, at most once per paid_gads.REFRESH_COOLDOWN_S for the account."""
+    from . import paid_store
     s, e = parse_range(start, end)
     account = resolve_target(account_id, accounts_fn=accounts_fn, groups_fn=groups_fn)
     key = (account["id"], s, e)
+    pkey = base.CACHE_V + "seg:%s:%s:%s" % (account["id"], s.isoformat(), e.isoformat())
+    ttl = base._ttl(e.isoformat())
+    store = store or paid_store
     clock = time.time() if now is None else now
-    with _cache_lock:
-        hit = _cache.get(key)
-        if hit and clock - hit[0] < CACHE_TTL_S:
-            return hit[1]
-        lock = _inflight.setdefault(key, threading.Lock())
-    with lock:                       # two people asking at once share one fetch
+    if force:
+        base.refresh_guard(store, "seg:" + account["id"])
+        with _cache_lock:
+            _cache.pop(key, None)
+        base.forget(pkey)
+    else:
         with _cache_lock:
             hit = _cache.get(key)
             if hit and clock - hit[0] < CACHE_TTL_S:
                 return hit[1]
-        report = build_report(account, s, e, search_fn=search_fn, geo_fn=geo_fn)
+    lock = _inflight.setdefault(key, threading.Lock())
+    with lock:                       # two people asking at once share one fetch
+        if not force:
+            with _cache_lock:
+                hit = _cache.get(key)
+                if hit and clock - hit[0] < CACHE_TTL_S:
+                    return hit[1]
+            saved = base._entry(store, pkey, ttl)
+            if saved is not None:
+                report = saved[0]
+                with _cache_lock:
+                    _cache[key] = (clock, report)
+                return report
+        try:
+            report = build_report(account, s, e, search_fn=search_fn, geo_fn=geo_fn)
+        except gads.GadsError as err:
+            old = base._saved_copy(store, pkey) if err.kind == "quota" else None
+            if old is None:
+                raise
+            return dict(old[0], stale=old[1])
+        try:
+            store.put_gads_cache(pkey, report)
+        except Exception as err:
+            base.log.warning("segments: could not save the report (%s)", err)
+        base._mem_put(pkey, report, report.get("generatedAt"))
         with _cache_lock:
             _cache[key] = (clock, report)
             while len(_cache) > CACHE_MAX:

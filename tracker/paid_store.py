@@ -18,6 +18,10 @@ pm_ prefix so they never collide with that service's own tables.
   pm_gads_cache         Google Ads results the Performance Summarizer already
                         fetched (tracker/paid_gads.py), so a repeat view costs
                         no API request
+  pm_gads_days          Google Ads campaign numbers one day at a time, kept
+                        until Refresh replaces them, so any date range is
+                        built from days already stored and only days never
+                        read (or old enough to have changed) are asked for
   pm_gads_usage         Google Ads requests made per day, against the
                         developer token's daily allowance
   pm_feedback_jobs      one Client Feedback Agent question: its live tool
@@ -83,6 +87,13 @@ CREATE TABLE IF NOT EXISTS pm_gads_cache (
     key         TEXT PRIMARY KEY,
     value       JSONB NOT NULL,
     fetched_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS pm_gads_days (
+    customer_id  TEXT NOT NULL,
+    day          DATE NOT NULL,
+    data         JSONB NOT NULL,
+    fetched_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (customer_id, day)
 );
 CREATE TABLE IF NOT EXISTS pm_gads_usage (
     day    TEXT PRIMARY KEY,
@@ -303,6 +314,35 @@ def get_gads_cache(key, ttl_s):
     return row[0] if row else None
 
 
+def get_gads_entry(key, ttl_s):
+    """(value, saved-at as ISO text) for `key` if it is younger than ttl_s seconds, else None."""
+    with _tx() as cur:
+        cur.execute("SELECT value, fetched_at FROM pm_gads_cache WHERE key = %s "
+                    "AND fetched_at > now() - %s * interval '1 second'", (key, ttl_s))
+        row = cur.fetchone()
+    return (row[0], row[1].isoformat()) if row else None
+
+
+def get_gads_days(customer_id, start, end):
+    """{day (YYYY-MM-DD): (data, saved-at as ISO text)} for every stored day of the account from start to end."""
+    with _tx() as cur:
+        cur.execute("SELECT day, data, fetched_at FROM pm_gads_days WHERE customer_id = %s AND day BETWEEN %s AND %s",
+                    (customer_id, start, end))
+        rows = cur.fetchall()
+    return {r[0].isoformat(): (r[1], r[2].isoformat()) for r in rows}
+
+
+def put_gads_days(customer_id, days):
+    """Store {day: data}, replacing any copy of the same day."""
+    if not days:
+        return
+    with _tx() as cur:
+        for day, data in days.items():
+            cur.execute("INSERT INTO pm_gads_days (customer_id, day, data, fetched_at) VALUES (%s, %s, %s, now()) "
+                        "ON CONFLICT (customer_id, day) DO UPDATE SET data = EXCLUDED.data, fetched_at = now()",
+                        (customer_id, day, json.dumps(data)))
+
+
 def get_gads_cache_any(key):
     """(value, saved-at as ISO text) for `key` whatever its age, or None. Served when Google cannot answer."""
     with _tx() as cur:
@@ -330,8 +370,8 @@ def put_gads_cache(key, value):
         cur.execute("INSERT INTO pm_gads_cache (key, value, fetched_at) VALUES (%s, %s, now()) "
                     "ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, fetched_at = now()",
                     (key, json.dumps(value)))
-        # Old copies are only read when Google cannot answer; a week is plenty.
-        cur.execute("DELETE FROM pm_gads_cache WHERE fetched_at < now() - interval '7 days'")
+        # Old copies are only read when Google cannot answer, or when someone opens a range again.
+        cur.execute("DELETE FROM pm_gads_cache WHERE fetched_at < now() - interval '90 days'")
 
 
 def bump_gads_calls(day):

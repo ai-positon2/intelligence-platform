@@ -1297,7 +1297,7 @@ ACCOUNTS = {
 }
 
 # ── Auth helpers ────────────────────────────────────────────────────────────────
-ADMIN_EMAILS = {"krishna.ladha@position2.com", "sudheer.d@position2.com", "reporting@position2.com", "sparikh@position2.com", "abhilash.dg@position2.com", "pushpendra.k@position2.com", "sangeeta@position2.com", "nikhil.ashok@position2.com", "sajjan@position2.com"}
+ADMIN_EMAILS = {"krishna.ladha@position2.com", "sudheer.d@position2.com", "reporting@position2.com", "sparikh@position2.com", "abhilash.dg@position2.com", "pushpendra.k@position2.com", "sangeeta@position2.com", "nikhil.ashok@position2.com", "sajjan@position2.com", "divith.k@position2.com"}
 
 def _get_user():
     """Return current user dict or None."""
@@ -4195,6 +4195,8 @@ def seo_aeo_legacy_redirect(rest=""):
 #   Performance Summarizer live Google Ads numbers for any account under the
 #                          Position2 manager account, charted any way the
 #                          reader likes (tracker/paid_gads.py, read-only)
+#   Product Analysis       which products earn their ad spend, per Google Ads
+#                          account (tracker/paid_products.py, read-only)
 #   Pacing Desk            where to move budget today so every account lands
 #                          the month on budget (tracker/paid_pacing.py; the
 #                          engine itself runs on the PPC team's machine and
@@ -4416,6 +4418,8 @@ def _gads_guard(fn):
         return fn()
     except ValueError as e:
         return jsonify(error=str(e)), 400
+    except paid_gads.RefreshTooSoon as e:
+        return jsonify(error=str(e), cooldown=True, retryIn=e.retry_in), 429
     except paid_gads.OverQuota as e:
         return jsonify(error=str(e), blockedUntil=e.until), 429
     except paid_gads.AdsError as e:
@@ -4445,8 +4449,10 @@ def paid_gads_accounts():
             used = paid_store.gads_calls(paid_gads._pacific_day())
         except Exception:
             used = None
-        return jsonify(accounts=accounts, blockedUntil=paid_gads.blocked_until(paid_store) or None,
+        resp = jsonify(accounts=accounts, blockedUntil=paid_gads.blocked_until(paid_store) or None,
                        usage={"calls": used, "limit": paid_gads.DAILY_LIMIT} if _pm_is_admin() else None)
+        resp.headers["Cache-Control"] = "private, max-age=300"          # the account list changes rarely
+        return resp
     return _gads_guard(run)
 
 
@@ -4463,11 +4469,16 @@ def paid_gads_performance():
         if cs or ce:
             cmp = paid_gads.check_range(cs, ce, "the comparison range")
         main = request.args.get("sis", "1") != "0"            # the other accounts of a side-by-side chart skip the shares
+        force = request.args.get("refresh") == "1"            # the Refresh button: ask Google again, at most every 2 minutes
+        if force:
+            paid_gads.refresh_guard(paid_store, "perf:" + acct["id"])
+        stamps = []
         current, compare, saved = paid_gads.performance_pair(paid_store, acct["id"], (start, end), cmp,
-                                                             with_sis=main, with_shares=main)
-        # `stale` is the oldest saved copy that stood in for Google (it was spent or unreachable), else null.
+                                                             with_sis=main, with_shares=main, force=force, stamps=stamps)
+        # `stale` is the oldest saved copy that stood in for Google (it was spent or unreachable), else null;
+        # `fetchedAt` is when the numbers on screen were last read from Google.
         return jsonify(account=acct, current=current, compare=compare, stale=min(saved) if saved else None,
-                       blockedUntil=paid_gads.blocked_until(paid_store) or None)
+                       fetchedAt=paid_gads.oldest(stamps), blockedUntil=paid_gads.blocked_until(paid_store) or None)
     return _gads_guard(run)
 
 
@@ -4479,10 +4490,47 @@ def paid_gads_extras():
     def run():
         acct = _gads_account(paid_store)
         start, end = paid_gads.check_range(request.args.get("start", ""), request.args.get("end", ""), "the range")
-        saved = []
-        out = dict(paid_gads.extras(paid_store, acct["id"], start, end, notes=saved))
+        saved, stamps = [], []
+        force = request.args.get("refresh") == "1"
+        if force:
+            paid_gads.refresh_guard(paid_store, "extras:" + acct["id"])
+        out = dict(paid_gads.extras(paid_store, acct["id"], start, end, notes=saved, force=force, stamps=stamps))
         out["stale"] = min(saved) if saved else None
+        out["fetchedAt"] = paid_gads.oldest(stamps)
         return jsonify(out)
+    return _gads_guard(run)
+
+
+# Product Analysis (Ecommerce) -------------------------------------------------
+# Per-product Shopping and Performance Max numbers from the same read-only
+# Google Ads sign-in (tracker/paid_products.py). Both routes are GETs behind the
+# Position2 login and share the Performance Summarizer's quota handling.
+
+@app.route("/p2/paid-marketing/product-analysis")
+@position2_required
+def paid_product_analysis():
+    return render_template("product_analysis.html", user=_get_user())
+
+
+@app.route("/p2/paid-marketing/api/gads/products")
+@position2_required
+def paid_gads_products():
+    from tracker import paid_gads, paid_products, paid_store
+
+    def run():
+        acct = _gads_account(paid_store)
+        start, end = paid_gads.check_range(request.args.get("start", ""), request.args.get("end", ""), "the range")
+        cmp = None
+        cs, ce = request.args.get("compare_start", ""), request.args.get("compare_end", "")
+        if cs or ce:
+            cmp = paid_gads.check_range(cs, ce, "the comparison range")
+        force = request.args.get("refresh") == "1"            # the Refresh button: ask Google again, at most every 2 minutes
+        if force:
+            paid_gads.refresh_guard(paid_store, "prod:" + acct["id"])
+        stamps = []
+        current, compare, saved = paid_products.analysis(paid_store, acct["id"], (start, end), cmp, force=force, stamps=stamps)
+        return jsonify(account=acct, current=current, compare=compare, stale=min(saved) if saved else None,
+                       fetchedAt=paid_gads.oldest(stamps), blockedUntil=paid_gads.blocked_until(paid_store) or None)
     return _gads_guard(run)
 
 
@@ -4670,12 +4718,15 @@ def paid_segment_accounts():
 def _pm_segment_report():
     """(report, None) for the account and dates in the query string (GET) or
     the JSON body (POST), or (None, the error response)."""
-    from tracker import paid_gads_segments as paid_gads, paid_segments
+    from tracker import paid_gads as paid_gads_base, paid_gads_segments as paid_gads, paid_segments
     src = request.args if request.method == "GET" else (request.get_json(silent=True) or {})
     try:
-        return paid_segments.report_for(src.get("account"), src.get("from"), src.get("to")), None
+        extra = {"force": True} if str(src.get("refresh") or "") in ("1", "true") else {}      # the Refresh button
+        return paid_segments.report_for(src.get("account"), src.get("from"), src.get("to"), **extra), None
     except paid_segments.BadRequest as e:
         return None, (jsonify(error=str(e)), 400)
+    except paid_gads_base.RefreshTooSoon as e:
+        return None, (jsonify(error=str(e), kind="cooldown", retryIn=e.retry_in), 429)
     except paid_gads.GadsError as e:
         return None, _pm_gads_error(e)
 
@@ -18669,7 +18720,10 @@ moves between categories inside one location that net to zero; anyone can tick a
 engine runs on the PPC team's machine, or the Refresh button rebuilds it from the two Google Sheets. Performance
 Summarizer (/p2/paid-marketing/performance-summarizer): live Google Ads numbers for any of the ~50 accounts under
 the Position2 manager account, chartable by any metric against any other, split by day, week, month, weekday, hour,
-campaign, campaign type, device or network, compared with the previous period or last year. Search Query Analysis
+campaign, campaign type, device or network, compared with the previous period or last year. Product Analysis
+(/p2/paid-marketing/product-analysis): for ecommerce accounts, every Shopping and Performance Max product sorted into
+stars, steady sellers, below target and spend with no sales, the products that carry the account, and a list of what
+to cut, fix or push. Search Query Analysis
 (/p2/paid-marketing/search-query-analysis): upload a search terms CSV; each account's rules (Riccobene, OIA,
 Eventgroove, 42 North, McHale, Beta Bionics placeholder, or generic) settle most terms, Claude classifies the
 rest, and it outputs priority negatives, new keywords, client-review items and a 7-sheet workbook. Client

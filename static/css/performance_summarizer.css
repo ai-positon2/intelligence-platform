@@ -380,3 +380,11 @@
   .ps-kpi .sw{width:22px}
   .ps-spark{width:calc(100% + 24px);margin:0 -12px}
 }
+
+/* ── Refresh and "updated" ── */
+.ps-upd{color:var(--pm-faint);font-weight:500}
+.ps-upd:empty{display:none}
+#refreshBtn.busy{opacity:.7;cursor:progress}
+#refreshBtn.busy svg{animation:psSpin .9s linear infinite}
+@keyframes psSpin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){#refreshBtn.busy svg{animation:none}}

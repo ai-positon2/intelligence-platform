@@ -12,7 +12,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-tokens.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-components.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/gtm.css') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/paid_marketing.css') }}?v=12">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/paid_marketing.css') }}?v=13">
   <script src="/static/js/theme.js"></script>
   <link rel="stylesheet" href="/static/css/aurora-app.css?v=3">
   <script src="/static/js/aurora.js?v=1" defer></script>
@@ -65,35 +65,6 @@
       <div class="hb-cue"><span></span></div>
     </div>
 
-    <!-- Client launcher: one client, all four agents (static/js/paid_marketing.js) -->
-    <section class="pm pm-launch" id="launch">
-      <div class="pm-panel pl-panel">
-        <div class="pl-top">
-          <div class="pl-pick" id="launchPick"></div>
-          <div class="pl-acts" id="launchActs">
-            <a class="pl-act pl-pf" data-act="perf" href="/p2/paid-marketing/performance-summarizer">
-              <span class="ic"><svg viewBox="0 0 24 24"><path d="M4 19V9"/><path d="M10 19V5"/><path d="M16 19v-7"/><path d="M22 19H2"/></svg></span>
-              <span><span class="t">See performance</span><span class="s" data-s="perf">Live from Google Ads</span></span></a>
-            <a class="pl-act pl-pd" data-act="pacing" href="/p2/paid-marketing/pacing-desk">
-              <span class="ic"><svg viewBox="0 0 24 24"><path d="M3 20h18"/><path d="M6 16v-4"/><path d="M11 16V8"/><path d="M16 16v-6"/></svg></span>
-              <span><span class="t">Check pacing</span><span class="s" data-s="pacing">Every account, today</span></span></a>
-            <a class="pl-act pl-cf" data-act="feedback" href="/p2/paid-marketing/client-feedback-agent">
-              <span class="ic"><svg viewBox="0 0 24 24"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12Z"/></svg></span>
-              <span><span class="t">Ask what they said</span><span class="s" data-s="feedback">Slack, Gmail, meetings</span></span></a>
-            <a class="pl-act pl-sq" data-act="sqr" href="/p2/paid-marketing/search-query-analysis">
-              <span class="ic"><svg viewBox="0 0 24 24"><circle cx="10" cy="10" r="6"/><path d="m20 20-5.6-5.6"/></svg></span>
-              <span><span class="t">Triage search terms</span><span class="s" data-s="sqr">Pick an account's rules</span></span></a>
-            <a class="pl-act pl-sg" data-act="segments" href="/p2/paid-marketing/segment-analysis">
-              <span class="ic"><svg viewBox="0 0 24 24"><path d="M21 12A9 9 0 1 1 12 3v9z"/><path d="M15.5 3.6A9 9 0 0 1 20.4 8.5H15.5z"/></svg></span>
-              <span><span class="t">Analyse segments</span><span class="s" data-s="segments">Any Google Ads account</span></span></a>
-          </div>
-        </div>
-        <div class="pl-status" id="launchStatus">
-          <span class="pl-st"><span class="b"></span>Checking the Pacing Desk…</span>
-        </div>
-      </div>
-    </section>
-
     <div class="dash-grid pm-sec-grid">
 
       <!-- Paid Marketing Agents. 1 to 3 are from Agent Holmes (2026-10-12); 4,
@@ -117,6 +88,26 @@
           <div class="pm pl-live" data-live="perf"></div>
           <div class="card-footer">
             <div class="card-tags"><span class="tag">Live</span><span class="tag">Charts</span></div>
+            <span class="card-arrow">→</span>
+          </div>
+        </div>
+      </a>
+
+      <!-- Product Analysis (2026-10-13): per-product Shopping and Performance Max, read from the Google Ads API -->
+      <a href="/p2/paid-marketing/product-analysis" class="dash-card active c-prod">
+        <div class="card-band"></div>
+        <div class="card-thumb">
+          <div class="card-thumb-icon"><svg class="au-ic" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 7h14l-1.5 9a2 2 0 0 1-2 1.7H8.5a2 2 0 0 1-2-1.7z"/><path d="M9 7a3 3 0 0 1 6 0"/><path d="M9 12h6"/></svg></div>
+          <div class="card-thumb-badge tb-live"><span class="tb-dot live"></span> Live</div>
+        </div>
+        <div class="card-body">
+          <div class="card-name">Product Analysis</div>
+          <div class="card-desc">
+            For ecommerce accounts. Sorts every product into stars, steady sellers, drags and money pits,
+            shows which few products carry the account, and lists what to cut, fix or push, with the spend behind each.
+          </div>
+          <div class="card-footer">
+            <div class="card-tags"><span class="tag">Live</span><span class="tag">Ecommerce</span></div>
             <span class="card-arrow">→</span>
           </div>
         </div>
@@ -223,8 +214,7 @@
     document.addEventListener('keydown',function(e){ if(e.key==='Escape'){document.getElementById('userPill').classList.remove('open');document.getElementById('userDropdown').classList.remove('open');} });
     
   </script>
-<script src="{{ url_for('static', filename='js/pm_picker.js') }}?v=1"></script>
-<script src="{{ url_for('static', filename='js/paid_marketing.js') }}?v=2"></script>
+<script src="{{ url_for('static', filename='js/paid_marketing.js') }}?v=3"></script>
 <script src="{{ url_for('static', filename='js/page_track.js') }}?v=1" data-title="Paid Marketing Agents Dashboards" data-email="{{ user.email if user else '' }}"></script>
 <script>
 /* ════ Platform command palette — Ctrl/Cmd+K ════ */
@@ -236,6 +226,7 @@
     {t:'Paid Marketing Agents',d:'Performance, pacing, search terms, segments & client feedback',u:'/p2/paid-marketing',i:'◆'},
     {t:'SEO + AEO Tools',d:'Organic intelligence',u:'/p2/seo-aeo',i:'⌕'},
     {t:'Performance Summarizer',d:'Live Google Ads, chart anything',u:'/p2/paid-marketing/performance-summarizer',i:'◈'},
+    {t:'Product Analysis',d:'Which products earn their ad spend',u:'/p2/paid-marketing/product-analysis',i:'▣'},
     {t:'Pacing Desk',d:'Where to move budget today',u:'/p2/paid-marketing/pacing-desk',i:'▥'},
     {t:'Search Query Analysis',d:'Classify a search terms report',u:'/p2/paid-marketing/search-query-analysis',i:'⌕'},
     {t:'Client Feedback Agent',d:'Ask Slack, Gmail & meeting notes',u:'/p2/paid-marketing/client-feedback-agent',i:'✦'},
