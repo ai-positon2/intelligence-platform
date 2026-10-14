@@ -327,10 +327,26 @@ def test_holmes_env_names_are_accepted(monkeypatch, tmp_path):
     monkeypatch.setenv("SLACK_CLIENT_ID", "cid")
     monkeypatch.setenv("SLACK_CLIENT_SECRET", "sec")
     monkeypatch.setenv("GOOGLE_CLIENT_ID", "the-sign-in-client")
+    monkeypatch.delenv("FEEDBACK_GOOGLE_CLIENT_SECRET", raising=False)
+    monkeypatch.delenv("GOOGLE_ADS_CLIENT_ID", raising=False)
+    monkeypatch.delenv("GOOGLE_ADS_CLIENT_SECRET", raising=False)
     assert fb.configured()["slack"] is True
     assert fb.env("GOOGLE_CLIENT_ID") == ""          # never the sign-in client
     monkeypatch.setenv("FEEDBACK_SLACK_CLIENT_ID", "prefixed")
     assert fb.env("SLACK_CLIENT_ID") == "prefixed"   # the prefixed name wins
+
+
+def test_google_falls_back_to_the_ads_client(monkeypatch):
+    for n in ("FEEDBACK_GOOGLE_CLIENT_ID", "FEEDBACK_GOOGLE_CLIENT_SECRET"):
+        monkeypatch.delenv(n, raising=False)
+    monkeypatch.setenv("GOOGLE_CLIENT_ID", "the-sign-in-client")
+    monkeypatch.setenv("GOOGLE_ADS_CLIENT_ID", "ads-cid")
+    monkeypatch.setenv("GOOGLE_ADS_CLIENT_SECRET", "ads-sec")
+    assert fb.env("GOOGLE_CLIENT_ID") == "ads-cid"   # the Ads client, never the sign-in one
+    assert fb.env("GOOGLE_CLIENT_SECRET") == "ads-sec"
+    assert fb.configured()["google"] is True
+    monkeypatch.setenv("FEEDBACK_GOOGLE_CLIENT_ID", "own-cid")
+    assert fb.env("GOOGLE_CLIENT_ID") == "own-cid"   # a prefixed name still wins
 
 
 def test_seed_accepts_holmes_secret_name(monkeypatch):

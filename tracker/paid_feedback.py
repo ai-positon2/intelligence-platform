@@ -68,11 +68,19 @@ PROVIDERS = ("slack", "google")
 # Google's cannot: GOOGLE_CLIENT_ID is the platform's sign-in client.
 _HOLMES_NAMES = ("SLACK_CLIENT_ID", "SLACK_CLIENT_SECRET")
 
+# Google falls back to the Google Ads OAuth client when no FEEDBACK_GOOGLE_*
+# pair is set: it is the same Google Cloud client Holmes uses for Gmail and
+# Drive, so one set of credentials serves both without a second copy.
+_GOOGLE_FALLBACKS = {"GOOGLE_CLIENT_ID": "GOOGLE_ADS_CLIENT_ID",
+                     "GOOGLE_CLIENT_SECRET": "GOOGLE_ADS_CLIENT_SECRET"}
+
 
 def env(name):
     value = os.environ.get("FEEDBACK_" + name, "").strip()
     if not value and name in _HOLMES_NAMES:
         value = os.environ.get(name, "").strip()
+    if not value and name in _GOOGLE_FALLBACKS:
+        value = os.environ.get(_GOOGLE_FALLBACKS[name], "").strip()
     return value
 
 
