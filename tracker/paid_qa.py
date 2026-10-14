@@ -36,6 +36,7 @@ STATUSES = ("pass", "fail", "na")
 MAX_NAME = 120
 MAX_NOTE = 2000
 MIN_REASON = 3
+STALE_REVIEW_S = 600
 VERDICTS = {
     "not_ready": "NOT READY: Critical check failed",
     "incomplete": "INCOMPLETE: Critical checks pending",
@@ -189,7 +190,7 @@ def summarize(launch, checks):
     rows = applicable(launch["client_types"], launch["campaign_types"])
     by_sev = {s: _blank() for s in cl["severities"]}
     by_sec = {s: _blank() for s in cl["sections"]}
-    failed, pending_critical, failed_critical = [], [], []
+    failed, pending_critical, failed_critical, unverified = [], [], [], []
     for it in rows:
         st = (checks.get(it["id"]) or {}).get("status")
         key = st if st in STATUSES else "pending"
@@ -202,6 +203,8 @@ def summarize(launch, checks):
                 failed_critical.append(it["id"])
         elif key == "pending" and it["severity"] == "Critical":
             pending_critical.append(it["id"])
+        if key == "pending":
+            unverified.append(it["id"])
     total = len(rows)
     pending = sum(b["pending"] for b in by_sev.values())
     if failed_critical:
@@ -217,7 +220,7 @@ def summarize(launch, checks):
         "bySeverity": by_sev,
         "bySection": [dict(section=s, **by_sec[s]) for s in cl["sections"] if by_sec[s]["total"]],
         "failed": failed, "failedCritical": failed_critical, "pendingCritical": pending_critical,
-        "applicable": [i["id"] for i in rows],
+        "needsHuman": unverified, "applicable": [i["id"] for i in rows],
     }
 
 
@@ -233,11 +236,13 @@ def effective(launch, people, auto, auto_at=None):
     for it in applicable(launch["client_types"], launch["campaign_types"]):
         cid = it["id"]
         mine, read = people.get(cid) or {}, (auto or {}).get(cid) or {}
-        row = {"status": None, "note": "", "by": None, "at": None, "source": None, "found": read.get("found") or ""}
+        row = {"status": None, "note": "", "by": None, "at": None, "source": None, "found": read.get("found") or "",
+               "fix": read.get("fix") or "", "evidence": read.get("evidence") or "", "facts": read.get("facts") or "",
+               "by_what": read.get("source"), "unverified": bool(read.get("unverified"))}
         if mine.get("status") in STATUSES:
             row.update(status=mine["status"], note=mine.get("note") or "", by=mine.get("by"), at=mine.get("at"), source="person")
         elif read.get("result") in ("pass", "fail"):
-            row.update(status=read["result"], by="QA Agent", at=auto_at, source="agent")
+            row.update(status=read["result"], by="QA Agent", at=auto_at, source=read.get("source") or "ai")
         if row["status"] or row["found"]:
             out[cid] = row
     return out
@@ -258,8 +263,23 @@ def public_launch(l):
     return {"id": l["id"], "accountId": l["account_id"], "accountName": l["account_name"],
             "campaignId": l["campaign_id"], "campaignName": l["campaign_name"], "channel": l["channel"],
             "campaignTypes": l["campaign_types"], "clientTypes": l["client_types"],
-            "readAt": l.get("auto_at"), "createdBy": l["created_by"],
+            "readAt": l.get("auto_at"), "review": review_view(l), "createdBy": l["created_by"],
             "createdAt": l["created_at"], "updatedAt": l["updated_at"]}
+
+
+def review_view(l, now=None):
+    """Where the AI's review of this QC stands, for the page: status (running, done,
+    error or empty), what it is doing, how far, and anything it could not do."""
+    status = l.get("review_status") or ""
+    prog = l.get("review_progress") or {}
+    err = l.get("review_error") or ""
+    if status == "running" and l.get("review_started"):
+        started = dt.datetime.fromisoformat(l["review_started"])
+        age = ((now or dt.datetime.now(dt.timezone.utc)) - started).total_seconds()
+        if age > STALE_REVIEW_S:
+            status, err = "error", "The review stopped before it finished (the server restarted). Run it again."
+    return {"status": status, "phase": prog.get("phase") or "", "done": prog.get("done") or 0, "total": prog.get("total") or 0,
+            "error": err, "note": l.get("review_note") or ""}
 
 
 def brief(summary):

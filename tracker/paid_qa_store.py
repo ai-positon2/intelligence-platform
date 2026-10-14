@@ -38,6 +38,11 @@ CREATE TABLE IF NOT EXISTS pm_qc_launches (
     campaign_types  JSONB NOT NULL DEFAULT '[]'::jsonb,
     auto            JSONB NOT NULL DEFAULT '{}'::jsonb,
     auto_at         TIMESTAMPTZ,
+    review_status   TEXT NOT NULL DEFAULT '',
+    review_progress JSONB NOT NULL DEFAULT '{}'::jsonb,
+    review_error    TEXT NOT NULL DEFAULT '',
+    review_note     TEXT NOT NULL DEFAULT '',
+    review_started  TIMESTAMPTZ,
     created_by      TEXT,
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -50,6 +55,11 @@ ALTER TABLE pm_qc_launches ADD COLUMN IF NOT EXISTS campaign_name TEXT NOT NULL 
 ALTER TABLE pm_qc_launches ADD COLUMN IF NOT EXISTS channel TEXT NOT NULL DEFAULT '';
 ALTER TABLE pm_qc_launches ADD COLUMN IF NOT EXISTS auto JSONB NOT NULL DEFAULT '{}'::jsonb;
 ALTER TABLE pm_qc_launches ADD COLUMN IF NOT EXISTS auto_at TIMESTAMPTZ;
+ALTER TABLE pm_qc_launches ADD COLUMN IF NOT EXISTS review_status TEXT NOT NULL DEFAULT '';
+ALTER TABLE pm_qc_launches ADD COLUMN IF NOT EXISTS review_progress JSONB NOT NULL DEFAULT '{}'::jsonb;
+ALTER TABLE pm_qc_launches ADD COLUMN IF NOT EXISTS review_error TEXT NOT NULL DEFAULT '';
+ALTER TABLE pm_qc_launches ADD COLUMN IF NOT EXISTS review_note TEXT NOT NULL DEFAULT '';
+ALTER TABLE pm_qc_launches ADD COLUMN IF NOT EXISTS review_started TIMESTAMPTZ;
 DO $$ BEGIN
     IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'pm_qc_launches' AND column_name = 'name') THEN
         ALTER TABLE pm_qc_launches ALTER COLUMN name DROP NOT NULL;
@@ -70,7 +80,9 @@ CREATE TABLE IF NOT EXISTS pm_qc_checks (
 """
 
 _LAUNCH_COLS = ("id, account_id, account_name, campaign_id, campaign_name, channel, client_types, "
-                "campaign_types, auto, auto_at, created_by, created_at, updated_at, archived")
+                "campaign_types, auto, auto_at, created_by, created_at, updated_at, archived, "
+                "review_status, review_progress, review_error, review_note, review_started")
+STALE_AFTER_S = 600          # a review still "running" after this died with its process (a deploy, a crash)
 _READY = False
 _READY_LOCK = threading.Lock()
 
@@ -115,7 +127,8 @@ def _launch(r):
     return {"id": r[0], "account_id": r[1], "account_name": r[2], "campaign_id": r[3], "campaign_name": r[4],
             "channel": r[5] or "", "client_types": r[6] or [], "campaign_types": r[7] or [], "auto": r[8] or {},
             "auto_at": _iso(r[9]), "created_by": r[10], "created_at": _iso(r[11]), "updated_at": _iso(r[12]),
-            "archived": bool(r[13])}
+            "archived": bool(r[13]), "review_status": r[14] or "", "review_progress": r[15] or {},
+            "review_error": r[16] or "", "review_note": r[17] or "", "review_started": _iso(r[18])}
 
 
 # ── QCs ─────────────────────────────────────────────────────────────────────
@@ -160,15 +173,41 @@ def set_client_types(launch_id, client_types):
     return _launch(row) if row else None
 
 
-def save_auto(launch_id, findings, *, campaign_name, channel, campaign_types):
-    """Keep what the agent read: the findings, when, and the campaign's own
-    name and type as Google Ads reports them now."""
+def begin_review(launch_id):
+    """Claim the right to review this QC. True if this caller now owns a fresh
+    review; False if one is already running (and has not gone stale), so two
+    people opening the same campaign do not both start the AI."""
+    with _tx() as cur:
+        cur.execute("UPDATE pm_qc_launches SET review_status = 'running', "
+                    "review_progress = '{\"phase\": \"Starting\", \"done\": 0, \"total\": 0}'::jsonb, "
+                    "review_error = '', review_started = now(), updated_at = now() "
+                    "WHERE id = %s AND NOT archived AND (review_status <> 'running' OR review_started IS NULL "
+                    "OR review_started < now() - make_interval(secs => %s)) RETURNING id", (launch_id, STALE_AFTER_S))
+        return cur.fetchone() is not None
+
+
+def set_progress(launch_id, phase, done, total):
+    with _tx() as cur:
+        cur.execute("UPDATE pm_qc_launches SET review_progress = %s WHERE id = %s AND review_status = 'running'",
+                    (json.dumps({"phase": phase, "done": done, "total": total}), launch_id))
+
+
+def finish_review(launch_id, findings, *, campaign_name, channel, campaign_types, note=""):
+    """Keep the review: every check's finding, when, any note about what the AI
+    could not do, and the campaign's own name and type as Google Ads reports them."""
     with _tx() as cur:
         cur.execute("UPDATE pm_qc_launches SET auto = %s, auto_at = now(), campaign_name = %s, channel = %s, "
-                    "campaign_types = %s, updated_at = now() WHERE id = %s AND NOT archived RETURNING " + _LAUNCH_COLS,
-                    (json.dumps(findings), campaign_name, channel, json.dumps(campaign_types), launch_id))
+                    "campaign_types = %s, review_status = 'done', review_error = '', review_note = %s, "
+                    "review_progress = '{}'::jsonb, updated_at = now() WHERE id = %s AND NOT archived RETURNING " + _LAUNCH_COLS,
+                    (json.dumps(findings), campaign_name, channel, json.dumps(campaign_types), note, launch_id))
         row = cur.fetchone()
     return _launch(row) if row else None
+
+
+def fail_review(launch_id, error):
+    with _tx() as cur:
+        cur.execute("UPDATE pm_qc_launches SET review_status = 'error', review_error = %s, review_progress = '{}'::jsonb, "
+                    "updated_at = now() WHERE id = %s", (error[:500], launch_id))
 
 
 def archive_launch(launch_id):
