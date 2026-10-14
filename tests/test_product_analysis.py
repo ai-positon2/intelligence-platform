@@ -26,36 +26,9 @@ import app as appmod  # noqa: E402
 from tracker import paid_gads as g  # noqa: E402
 from tracker import paid_products as pp  # noqa: E402
 from tracker import paid_store as store  # noqa: E402
+from tests.gads_fakes import FakeStore  # noqa: E402
 
 STAFF = "someone@position2.com"
-
-
-class FakeStore:
-    def __init__(self):
-        self.cache, self.old, self.block, self.calls = {}, {}, 0.0, 0
-
-    def get_gads_cache_any(self, key):
-        v = self.cache.get(key, self.old.get(key))
-        return (v, "2026-10-10T08:00:00+00:00") if v is not None else None
-
-    def get_gads_block(self):
-        return self.block
-
-    def set_gads_block(self, until):
-        self.block = until
-
-    def bump_gads_calls(self, day):
-        self.calls += 1
-        return self.calls
-
-    def get_gads_cache(self, key, ttl):
-        return self.cache.get(key)
-
-    def put_gads_cache(self, key, value):
-        self.cache[key] = value
-
-    def gads_calls(self, day):
-        return self.calls
 
 
 class Resp:
@@ -179,6 +152,9 @@ def make_http(log, refuse=None, stock_error=None, quota=None):
             return Resp(200, {"results": [{"shoppingProduct": {"itemId": "SKU-2"}}]})
         if refuse and any(("metrics." + f) in q for f in refuse):
             return Resp(400, {"error": {"details": [{"errors": [{"message": "Unrecognized field %s" % refuse[0]}]}]}})
+        if "product_item_id IN (" in q:                # one product's days: the top products, day by day
+            return Resp(200, {"results": [{"segments": {"productItemId": "SKU-1", "date": "2026-10-02"},
+                                           "metrics": {"impressions": "40", "clicks": "4", "costMicros": "5000000", "conversions": 1, "conversionsValue": 30.0}}]})
         if "segments.product_item_id" not in q:        # the day-by-day read (the products read also filters on dates)
             return Resp(200, {"results": [{"segments": {"date": "2026-10-01"}, "metrics": {"impressions": "5", "clicks": "1", "costMicros": "2000000"}}]})
         return Resp(200, {"results": [row("SKU-1", "One", 10, 5, 100, 1, 50.0), row("SKU-2", "Two", 3)]})
@@ -189,19 +165,39 @@ def test_a_range_reads_products_days_and_stock_and_a_repeat_view_costs_nothing()
     s, log = FakeStore(), []
     http = make_http(log)
     out = pp.fetch(s, "1234567890", "2026-10-01", "2026-10-07", http=http)
-    assert len(log) == 3 and [p[0] for p in out["products"]] == ["sku-1", "sku-2"]
+    assert len(log) == 4 and [p[0] for p in out["products"]] == ["sku-1", "sku-2"]
     assert out["daily"]["days"][0] == "2026-10-01" and out["outOfStock"] == ["sku-2"]
+    assert out["series"]["ids"] == ["sku-1", "sku-2"] and out["series"]["rows"]["sku-1"][1][2] == 5.0
     pp.fetch(s, "1234567890", "2026-10-01", "2026-10-07", http=lambda *a, **k: pytest.fail("a repeat view went to Google"))
-    assert len(log) == 3
+    assert len(log) == 4
+
+
+def test_only_the_twenty_top_spenders_get_their_days():
+    log = []
+
+    def http(url, headers=None, data=None, **k):
+        q = json.loads(data)["query"]
+        log.append(q)
+        if "product_item_id IN (" in q:
+            return Resp(200, {"results": []})
+        if "shopping_product" in q:
+            return Resp(200, {"results": []})
+        if "product_item_id" not in q:
+            return Resp(200, {"results": []})
+        return Resp(200, {"results": [row("SKU-%02d" % i, "P%d" % i, 100 - i) for i in range(25)]})
+    out = pp.fetch(FakeStore(), "1234567890", "2026-10-01", "2026-10-07", http=http)
+    ask = next(q for q in log if "IN (" in q)
+    assert len(out["products"]) == 25 and len(out["series"]["ids"]) == pp.SERIES_TOP == 20 and ask.count("'sku-") == 20
+    assert "'sku-19'" in ask and "'sku-20'" not in ask                      # the 21st spender is not asked about
 
 
 def test_a_metric_google_refuses_is_dropped_remembered_and_never_fails_the_page():
     s, log = FakeStore(), []
-    out = pp.fetch(s, "1234567890", "2026-10-01", "2026-10-07", with_stock=False, http=make_http(log, refuse=["orders"]))
+    out = pp.fetch(s, "1234567890", "2026-10-01", "2026-10-07", with_stock=False, with_series=False, http=make_http(log, refuse=["orders"]))
     assert out["products"] and "orders" in pp._BAD and pp.COLS.index("orders") in out["missing"]
     assert "units" not in [pp.COLS[i] for i in out["missing"]]               # only the refused one is gone
     log.clear()
-    pp.fetch(FakeStore(), "1234567890", "2026-10-08", "2026-10-09", with_stock=False, http=make_http(log, refuse=["orders"]))
+    pp.fetch(FakeStore(), "1234567890", "2026-10-08", "2026-10-09", with_stock=False, with_series=False, http=make_http(log, refuse=["orders"]))
     assert not any("metrics.orders" in q for q in log)                      # remembered: not asked for again
 
 
@@ -215,7 +211,7 @@ def test_the_comparison_needs_no_stock_check():
     s, log = FakeStore(), []
     cur, cmp, saved = pp.analysis(s, "1234567890", ("2026-10-01", "2026-10-07"), ("2026-09-24", "2026-09-30"), http=make_http(log))
     assert "outOfStock" in cur and "outOfStock" not in cmp and saved == []
-    assert sum("shopping_product" in q for q in log) == 1 and len(log) == 5
+    assert sum("shopping_product" in q for q in log) == 1 and sum("IN (" in q for q in log) == 1 and len(log) == 6      # the series and the stock are for the main range only
     assert pp.analysis(s, "1234567890", ("2026-10-01", "2026-10-07"), None, http=make_http([]))[1] is None
 
 
@@ -228,6 +224,7 @@ def test_when_googles_allowance_is_spent_the_saved_copy_is_served_and_dated():
     pp.fetch(s, "1234567890", "2026-10-01", "2026-10-07", http=make_http([]))
     saved = dict(s.cache)
     s.cache.clear()
+    g.forget()
     s.old.update(saved)                                                     # saved long ago: no longer fresh
     notes = []
     out = pp.fetch(s, "1234567890", "2026-10-01", "2026-10-07", notes=notes, http=make_http([], quota=QUOTA))
@@ -325,7 +322,7 @@ def _read(*p):
 def test_the_script_only_reaches_for_elements_the_template_has():
     js, html = _read("static", "js", "product_analysis.js"), _read("templates", "product_analysis.html")
     made_by_script = {"psToast", "pq", "moreRows", "bLog", "rbBy", "rbM", "rTarget", "rClicks", "rSpend", "rApply", "rReset", "drCopy", "cvPareto",
-                      "cvGroups", "cvBubble", "cvRollup", "cvTrend"}
+                      "cvGroups", "cvBubble", "cvRollup", "cvTrend", "cvPerf", "cvDr", "pmSeg", "pnSeg"}
     used = set(re.findall(r'\$\("#([A-Za-z]+)"\)', js))
     have = set(re.findall(r'id="([A-Za-z]+)"', html))
     assert not (used - have - made_by_script), sorted(used - have - made_by_script)

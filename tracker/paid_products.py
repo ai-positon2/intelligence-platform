@@ -13,6 +13,8 @@ more than 10,000 products):
     numbers (impressions, clicks, cost, conversions, conversion value);
   * the same range one day at a time for the whole product feed, so the page
     can draw a trend;
+  * the same range one day at a time for each of the SERIES_TOP products that
+    spent the most, so the page can show how each one performed;
   * the product ids Merchant Center says are out of stock (soft: a missing
     Merchant Center link just means that section says so).
 
@@ -28,12 +30,15 @@ from __future__ import annotations
 
 import datetime as dt
 import logging
+import re
 
 from tracker import paid_gads as g
 
 log = logging.getLogger(__name__)
 
 MAX_PRODUCTS = 3000
+SERIES_TOP = 20                       # products whose day-by-day numbers are sent
+ID_SAFE = re.compile(r"^[a-z0-9][a-z0-9._~+:/-]{0,126}$")
 
 CORE = [("impressions", 1), ("clicks", 1), ("cost_micros", 1e-6), ("conversions", 1), ("conversions_value", 1)]
 OPTIONAL = [("all_conversions", 1), ("all_conversions_value", 1), ("orders", 1), ("units_sold", 1),
@@ -68,6 +73,14 @@ def q_products(start, end, fields=()):
 def q_daily(start, end, fields=()):
     return ("SELECT segments.date, %s FROM shopping_performance_view WHERE segments.date BETWEEN '%s' AND '%s'"
             % (_metrics(fields), start, end))
+
+
+def q_product_days(start, end, ids, fields=()):
+    """One row per product per day for the products in `ids` (item ids made only of safe characters)."""
+    ids = [i for i in ids if ID_SAFE.match(i)]
+    return ("SELECT segments.product_item_id, segments.date, %s FROM shopping_performance_view "
+            "WHERE segments.date BETWEEN '%s' AND '%s' AND segments.product_item_id IN (%s)"
+            % (_metrics(fields), start, end, ", ".join("'%s'" % i for i in ids)))
 
 
 def q_out_of_stock():
@@ -158,6 +171,22 @@ def parse_daily(rows, start, end):
     return {"days": days, "rows": [[round(x, 4) if isinstance(x, float) else x for x in n] for n in out]}
 
 
+def parse_series(rows, start, end, ids):
+    """{"days": [...], "ids": [...], "rows": {item id: [NP numbers for each day]}} for the products in `ids`, a quiet day
+    as zeros. Ids are matched in lower case."""
+    d0, d1 = dt.date.fromisoformat(start), dt.date.fromisoformat(end)
+    days = [(d0 + dt.timedelta(days=i)).isoformat() for i in range((d1 - d0).days + 1)]
+    at = {d: i for i, d in enumerate(days)}
+    want = [i.lower() for i in ids]
+    out = {i: [[0] * NP for _ in days] for i in want}
+    for r in rows:
+        s = r.get("segments") or {}
+        pid, d = _clean(s.get("productItemId")).lower(), s.get("date")
+        if pid in out and d in at:
+            _add(out[pid][at[d]], _nums(r.get("metrics")))
+    return {"days": days, "ids": want, "rows": {i: [[round(x, 4) if isinstance(x, float) else x for x in n] for n in v] for i, v in out.items()}}
+
+
 def parse_out_of_stock(rows):
     return sorted({_clean((r.get("shoppingProduct") or {}).get("itemId")).lower() for r in rows} - {""})
 
@@ -168,8 +197,8 @@ def _read(store, customer_id, build, http):
     return g.search_pruned(customer_id, build, [o[0] for o in OPTIONAL], _BAD, store, http=http)
 
 
-def fetch(store, customer_id, start, end, *, with_stock=True, notes=None, http=None):
-    """One range: the products, the days, and (for the main range) the out-of-stock ids."""
+def fetch(store, customer_id, start, end, *, with_stock=True, with_series=True, notes=None, force=False, stamps=None, http=None):
+    """One range: the products, the days, (for the main range) the out-of-stock ids and each top product's days."""
     def make_products():
         rows, used = _read(store, customer_id, lambda f: q_products(start, end, f), http)
         return parse_products(rows, start, end, used)
@@ -191,28 +220,36 @@ def fetch(store, customer_id, start, end, *, with_stock=True, notes=None, http=N
             try:
                 return fn()
             except g.AdsError as e:
-                log.warning("products: leaving out the stock check for %s (%s)", customer_id, e)
+                log.warning("products: leaving out an optional read for %s (%s)", customer_id, e)
                 return empty
         return run
 
-    jobs = [lambda: g._cached(store, key("prod"), ttl, make_products, notes),
-            lambda: g._cached(store, key("pday"), ttl, make_daily, notes)]
+    jobs = [lambda: g._cached(store, key("prod"), ttl, make_products, notes, force=force, stamps=stamps),
+            lambda: g._cached(store, key("pday"), ttl, make_daily, notes, force=force, stamps=stamps)]
     if with_stock:
-        jobs.append(soft(lambda: g._cached(store, key("oos"), ttl, make_stock, notes), None))
+        jobs.append(soft(lambda: g._cached(store, key("oos"), ttl, make_stock, notes, force=force, stamps=stamps), None))
     res = g._par(jobs)
     out = dict(res[0])
     out["daily"] = res[1]
     if with_stock:
         out["outOfStock"] = res[2]          # None: could not be read
+    if with_series:                         # needs the products first: it asks for the ones that spent the most
+        top = [p[0] for p in out["products"][:SERIES_TOP] if ID_SAFE.match(p[0])]
+
+        def make_series():
+            rows, _ = _read(store, customer_id, lambda f: q_product_days(start, end, top, f), http)
+            return parse_series(rows, start, end, top)
+        out["series"] = soft(lambda: g._cached(store, key("pser"), ttl, make_series, notes, force=force, stamps=stamps), None)() if top else None
     return out
 
 
-def analysis(store, customer_id, cur, cmp, *, http=None):
+def analysis(store, customer_id, cur, cmp, *, force=False, stamps=None, http=None):
     """The main range and (if given) its comparison, fetched together. Returns (current, compare, saved) where
-    `saved` lists the times of any saved copies served because Google could not answer."""
+    `saved` lists the times of any saved copies served because Google could not answer; `stamps`, if given, is filled
+    with the times the numbers were read from Google (see paid_gads.oldest)."""
     notes = []
-    jobs = [lambda: fetch(store, customer_id, cur[0], cur[1], with_stock=True, notes=notes, http=http)]
+    jobs = [lambda: fetch(store, customer_id, cur[0], cur[1], with_stock=True, with_series=True, notes=notes, force=force, stamps=stamps, http=http)]
     if cmp:
-        jobs.append(lambda: fetch(store, customer_id, cmp[0], cmp[1], with_stock=False, notes=notes, http=http))
+        jobs.append(lambda: fetch(store, customer_id, cmp[0], cmp[1], with_stock=False, with_series=False, notes=notes, force=force, stamps=stamps, http=http))
     res = g._par(jobs)
     return res[0], (res[1] if cmp else None), notes

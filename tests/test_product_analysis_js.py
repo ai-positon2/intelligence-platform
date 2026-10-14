@@ -397,3 +397,50 @@ def test_biggest_gain_and_drop_are_named_against_the_comparison():
     prev = [prod("up", title="Big Winner", conv=1, val=100), prod("down", title="Sad Loser", conv=4, val=400)]
     text = " ".join(x["text"] for x in lines(cur, cur=prev))
     assert "Biggest gain: Big Winner, +$400" in text and "Biggest drop: Sad Loser, −$350" in text
+
+
+# ── How each product is performing ────────────────────────────────────────
+
+def board(products, cmp=None, key="value", n=20):
+    expr = "(()=>{const it=A.items(D);A.classify(it,A.totals(D),{});const pv=P?A.items(P):null;return A.leaderboard(it,pv,K,N)})()"
+    out = run(expr, D=wire(products), P=wire(cmp) if cmp else None, K=key, N=n)
+    return out
+
+
+def test_products_are_ranked_best_first_by_the_measure_chosen_with_their_share():
+    ps = [prod("a", cost=50, conv=1, val=100), prod("b", cost=20, conv=5, val=400), prod("c", cost=30, conv=2, val=250), prod("zero", cost=5)]
+    rev = board(ps, key="value")
+    assert [r["it"]["id"] for r in rev["rows"]] == ["b", "c", "a"] and [r["rank"] for r in rev["rows"]] == [1, 2, 3]   # a product earning nothing is not ranked
+    assert rev["additive"] is True and abs(rev["rows"][0]["share"] - 400 / 750) < 1e-9 and rev["total"] == 750
+    spend = board(ps, key="cost")
+    assert [r["it"]["id"] for r in spend["rows"]] == ["a", "c", "b", "zero"]
+    roas = board(ps, key="roas")
+    assert [r["it"]["id"] for r in roas["rows"]] == ["b", "c", "a", "zero"] and roas["additive"] is False and roas["rows"][0]["share"] is None
+    assert abs(roas["rows"][0]["v"] - 20.0) < 1e-9
+
+
+def test_the_board_is_capped_and_a_rate_needs_spend_to_mean_anything():
+    ps = [prod("p%d" % i, cost=10 + i, conv=1, val=100 + i) for i in range(30)] + [prod("free", cost=0, clicks=5, conv=0)]
+    assert len(board(ps, n=20)["rows"]) == 20 and board(ps, n=20)["rows"][0]["it"]["id"] == "p29"
+    assert "free" not in [r["it"]["id"] for r in board(ps, key="roas", n=50)["rows"]]       # no spend: a ROAS of nothing
+    assert board([], key="value")["rows"] == [] and board([prod("a")], key="value")["rows"] == []
+    for rate in ("roas", "cpc", "ctr"):
+        assert "free" not in [r["it"]["id"] for r in board(ps, key=rate, n=50)["rows"]], rate      # nothing was spent: a rate of it means nothing
+    default = run("(()=>{const it=A.items(D);A.classify(it,A.totals(D),{});return A.leaderboard(it,null,'cost').rows.length})()", D=wire(ps))
+    assert default == 20                                                    # twenty when no count is asked for
+
+
+def test_each_product_carries_what_it_was_before_and_how_that_changed():
+    cur = [prod("up", cost=10, conv=2, val=300), prod("new", cost=10, conv=1, val=50)]
+    prev = [prod("up", cost=10, conv=1, val=100)]
+    rows = {r["it"]["id"]: r for r in board(cur, prev, key="value")["rows"]}
+    assert rows["up"]["prev"] == 100 and rows["up"]["change"]["text"] == "+200%" and rows["up"]["change"]["tone"] == "good"
+    assert rows["new"]["prev"] is None and rows["new"]["change"] is None
+
+
+def test_a_days_series_is_read_by_item_id_in_any_case_and_missing_means_not_read():
+    ser = {"days": ["2026-10-01", "2026-10-02"], "ids": ["sku-1"], "rows": {"sku-1": [[100, 10, 5.0, 1.0, 50.0] + [0] * 6, [0] * 11]}}
+    got = lambda key, pid="SKU-1": run("A.seriesValues(S,ID,K)", S=ser, ID=pid, K=key)
+    assert got("cost") == [5.0, 0] and got("value") == [50.0, 0] and got("roas") == [10.0, None] and got("ctr") == [0.1, None]
+    assert got("cost", "other") is None
+    assert run("A.seriesValues(null,'a','cost')") is None and run("A.seriesValues({},'a','cost')") is None

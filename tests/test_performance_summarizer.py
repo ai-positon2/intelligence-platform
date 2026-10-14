@@ -27,38 +27,10 @@ sys.path.insert(0, ROOT)
 import app as appmod  # noqa: E402
 from tracker import paid_gads as g  # noqa: E402
 from tracker import paid_store as store  # noqa: E402
+from tests.gads_fakes import FakeStore  # noqa: E402
 
 STAFF = "someone@position2.com"
 ADMIN = "reporting@position2.com"
-
-
-class FakeStore:
-    """The store calls paid_gads makes, in memory."""
-    def __init__(self, calls=0):
-        self.calls, self.cache, self.old, self.block = calls, {}, {}, 0.0
-
-    def get_gads_cache_any(self, key):
-        v = self.cache.get(key, self.old.get(key))
-        return (v, "2026-10-10T08:00:00+00:00") if v is not None else None
-
-    def get_gads_block(self):
-        return self.block
-
-    def set_gads_block(self, until):
-        self.block = until
-
-    def bump_gads_calls(self, day):
-        self.calls += 1
-        return self.calls
-
-    def get_gads_cache(self, key, ttl):
-        return self.cache.get(key)
-
-    def put_gads_cache(self, key, value):
-        self.cache[key] = value
-
-    def gads_calls(self, day):
-        return self.calls
 
 
 class Resp:
@@ -493,15 +465,15 @@ def test_a_metric_google_refuses_is_dropped_and_remembered_and_the_page_is_told(
     def http(url, headers=None, data=None, **k):
         q = json.loads(data)["query"]
         queries.append(q)
-        if "metrics.video_views" in q:
-            return Resp(400, {"error": {"details": [{"errors": [{"message": "Unrecognized field in the query: 'metrics.video_views'."}]}]}})
+        if "metrics.video_trueview_views" in q:
+            return Resp(400, {"error": {"details": [{"errors": [{"message": "Unrecognized field in the query: 'metrics.video_trueview_views'."}]}]}})
         return ok_rows(q)
     out = g.performance(FakeStore(), "1234567890", "2026-10-01", "2026-10-02", with_sis=False, with_shares=False, http=http)
-    assert len(out["rows"]) == 1 and out["missing"] == [g.NB - 12 + [o[0] for o in g.OPTIONAL].index("video_views")]
-    assert "video_views" in g._BAD and "metrics.all_conversions," in queries[-1] and "video_views" not in queries[-1]
+    assert len(out["rows"]) == 1 and out["missing"] == [g.NB - 12 + [o[0] for o in g.OPTIONAL].index("video_trueview_views")]
+    assert "video_trueview_views" in g._BAD and "metrics.all_conversions," in queries[-1] and "video_trueview_views" not in queries[-1]
     n = len(queries)
     g.performance(FakeStore(), "1234567890", "2026-10-03", "2026-10-04", with_sis=False, with_shares=False, http=http)
-    assert len(queries) == n + 1 and "video_views" not in queries[-1]          # the next range does not ask for it again
+    assert len(queries) == n + 1 and "video_trueview_views" not in queries[-1]          # the next range does not ask for it again
 
 
 def test_a_refusal_naming_one_metric_does_not_take_out_its_shorter_cousin():
@@ -605,7 +577,7 @@ def test_the_server_and_the_page_agree_on_the_columns_and_the_shares():
     js = os.path.join(ROOT, "static", "js", "ps_data.js")
     names = {"IMPR": "impressions", "CLK": "clicks", "COST": "cost_micros", "CONV": "conversions", "VAL": "conversions_value",
              "ALLC": "all_conversions", "ALLV": "all_conversions_value", "VTC": "view_through_conversions", "INT": "interactions",
-             "ENG": "engagements", "VID": "video_views", "XDV": "cross_device_conversions", "INV": "invalid_clicks",
+             "ENG": "engagements", "VID": "video_trueview_views", "XDV": "cross_device_conversions", "INV": "invalid_clicks",
              "PCALL": "phone_calls", "PIMPR": "phone_impressions", "AVV": "active_view_impressions",
              "AVM": "active_view_measurable_impressions"}
     code = "const P=require(%s);console.log(JSON.stringify({nb:P.NB,idx:%s,shares:P.METRIC_ALL.filter(k=>P.METRICS[k].period).map(k=>P.METRICS[k].share)}))" % (

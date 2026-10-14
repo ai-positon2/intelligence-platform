@@ -16,9 +16,17 @@ The developer token has Explorer access, a small daily allowance that Google
 counts in its own way (the 429 says "Number of operations for explorer
 access"). What keeps a busy team inside it:
 
-  * every result is cached in Postgres, and when Google refuses (allowance
-    spent, or Google unreachable) the last saved copy is served and the page
-    says how old it is;
+  * campaign numbers are stored one day at a time in Postgres (pm_gads_days),
+    so a range is built from days already read and only the days never read,
+    or old enough to have changed, are asked for: last 7 days, last 30, last
+    90 and the comparison range share the same stored days;
+  * every other result (shares, device and hour splits, products, segment
+    reports) is saved whole in Postgres (pm_gads_cache) and kept in memory
+    for a minute, and when Google refuses (allowance spent, or Google
+    unreachable) the last saved copy is served and the page says how old it is;
+  * a Refresh button asks Google again for the view on screen (`force`), at
+    most once every REFRESH_COOLDOWN_S per account, and says when the numbers
+    were last read from Google;
   * Google's own "retry in N seconds" is remembered (in memory and in the
     database, so every worker knows) and no request is sent until it passes;
   * a daily tally refuses new requests past DAILY_LIMIT.
@@ -51,8 +59,13 @@ DEFAULT_LOGIN = "9923720096"
 DAILY_LIMIT = 2400            # our own ceiling, below what we believe Google allows
 MAX_RANGE_DAYS = 800
 MAX_ROWS = 250_000
-TTL_OPEN = 30 * 60            # a range that includes today
-TTL_CLOSED = 12 * 3600        # a range that has ended
+TTL_OPEN = 3600               # a range that includes today or yesterday
+TTL_CLOSED = 24 * 3600        # a range that has ended
+TTL_DAY_RECENT = 3600         # a stored day, yesterday or today
+TTL_DAY_MONTH = 24 * 3600     # a stored day in the last 30 days (conversions still arrive late)
+TTL_DAY_OLD = 7 * 24 * 3600   # anything older
+REFRESH_COOLDOWN_S = 120      # the Refresh button, per account
+MEM_TTL_S = 60                # the in-memory copy in front of Postgres
 TTL_ACCOUNTS = 3600
 DAILY_BLOCK_S = 300           # a retry delay longer than this is the daily allowance, not a hiccup
 CACHE_V = "v2:"               # bump when the shape of a cached range changes
@@ -64,7 +77,7 @@ DOW = ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUND
 # The numbers every row carries, in column order: (GAQL metric, scale to the unit shown).
 CORE = [("impressions", 1), ("clicks", 1), ("cost_micros", 1e-6), ("conversions", 1), ("conversions_value", 1)]
 OPTIONAL = [("all_conversions", 1), ("all_conversions_value", 1), ("view_through_conversions", 1), ("interactions", 1),
-            ("engagements", 1), ("video_views", 1), ("cross_device_conversions", 1), ("invalid_clicks", 1),
+            ("engagements", 1), ("video_trueview_views", 1), ("cross_device_conversions", 1), ("invalid_clicks", 1),
             ("phone_calls", 1), ("phone_impressions", 1), ("active_view_impressions", 1),
             ("active_view_measurable_impressions", 1)]
 BASE = CORE + OPTIONAL
@@ -92,6 +105,14 @@ class AdsError(RuntimeError):
 
 class NotConfigured(AdsError):
     pass
+
+
+class RefreshTooSoon(AdsError):
+    """The Refresh button was pressed again before REFRESH_COOLDOWN_S passed."""
+
+    def __init__(self, message, retry_in=0):
+        super().__init__(message, status=429)
+        self.retry_in = retry_in
 
 
 class OverQuota(AdsError):
@@ -203,6 +224,7 @@ def reset_state():
     _BAD.clear()
     _BAD_SHARES.clear()
     _BLOCK.update(until=0.0, checked=0.0)
+    forget()
 
 
 def _count_call(store):
@@ -524,6 +546,33 @@ def _ttl(end):
     return TTL_OPEN if end >= (dt.date.today() - dt.timedelta(days=1)).isoformat() else TTL_CLOSED
 
 
+def _day_ttl(day, today=None):
+    """How long a stored day stays good: yesterday and today change by the hour, the last month's conversions still
+    arrive late, anything older has settled."""
+    age = ((today or dt.date.today()) - dt.date.fromisoformat(day)).days
+    return TTL_DAY_RECENT if age <= 1 else TTL_DAY_MONTH if age <= 30 else TTL_DAY_OLD
+
+
+def _age_s(iso):
+    try:
+        t = dt.datetime.fromisoformat(iso)
+    except (TypeError, ValueError):
+        return 1e12
+    if t.tzinfo is None:
+        t = t.replace(tzinfo=dt.timezone.utc)
+    return (dt.datetime.now(dt.timezone.utc) - t).total_seconds()
+
+
+def _now_iso():
+    return dt.datetime.now(dt.timezone.utc).isoformat()
+
+
+def oldest(stamps):
+    """The oldest of the times data was read from Google (ISO text), or None."""
+    st = [x for x in (stamps or []) if x]
+    return min(st, key=lambda x: -_age_s(x)) if st else None      # compared as times: the database and this process write different UTC offsets
+
+
 # ── Cached fetches ──────────────────────────────────────────────────────────
 
 def _par(fns):
@@ -559,16 +608,64 @@ def _saved_copy(store, key):
     return None
 
 
-def _cached(store, key, ttl, make, notes=None):
-    """The saved copy if it is fresh; else ask Google. If Google cannot answer (allowance spent, unreachable), the
-    last saved copy of any age is served and its time added to `notes` so the page can say so."""
+_MEM = {}                      # key -> (read at, value, saved-at): a minute in front of Postgres, per worker
+_MEM_LOCK = threading.Lock()
+_MEM_MAX = 400
+
+
+def _mem_get(key, ttl):
+    with _MEM_LOCK:
+        hit = _MEM.get(key)
+    if hit and time.time() - hit[0] < min(ttl, MEM_TTL_S):
+        return hit
+    return None
+
+
+def _mem_put(key, value, saved):
+    with _MEM_LOCK:
+        _MEM[key] = (time.time(), value, saved)
+        if len(_MEM) > _MEM_MAX:
+            for k in sorted(_MEM, key=lambda x: _MEM[x][0])[:len(_MEM) - _MEM_MAX]:
+                _MEM.pop(k, None)
+
+
+def forget(prefix=""):
+    """Drop the in-memory copies (all, or those whose key starts with `prefix`): the next read goes to Postgres."""
+    with _MEM_LOCK:
+        for k in [k for k in _MEM if k.startswith(prefix)]:
+            _MEM.pop(k, None)
+
+
+def _entry(store, key, ttl):
+    """(value, saved-at or None) if a copy younger than ttl is saved, else None."""
+    hit = _mem_get(key, ttl)
+    if hit:
+        return hit[1], hit[2]
     try:
-        hit = store.get_gads_cache(key, ttl)
+        getter = getattr(store, "get_gads_entry", None)
+        if getter:
+            got = getter(key, ttl)
+        else:
+            v = store.get_gads_cache(key, ttl)
+            got = (v, None) if v is not None else None
     except Exception as e:
         log.warning("gads: cache read failed (%s)", e)
-        hit = None
-    if hit is not None:
-        return hit
+        return None
+    if got is not None:
+        _mem_put(key, got[0], got[1])
+    return got
+
+
+def _cached(store, key, ttl, make, notes=None, force=False, stamps=None):
+    """The saved copy if it is fresh; else ask Google. With `force` the saved copy is skipped and Google is asked
+    again. If Google cannot answer (allowance spent, unreachable), the last saved copy of any age is served and its
+    time added to `notes` so the page can say so. `stamps` collects when each result was read from Google."""
+    if not force:
+        hit = _entry(store, key, ttl)
+        if hit is not None:
+            if stamps is not None:
+                stamps.append(hit[1])
+            return hit[0]
     try:
         value = make()
     except AdsError as e:
@@ -579,35 +676,154 @@ def _cached(store, key, ttl, make, notes=None):
             raise
         if notes is not None:
             notes.append(old[1])
+        if stamps is not None:
+            stamps.append(old[1])
         log.warning("gads: serving the saved copy of %s (%s)", key, e)
         return old[0]
+    saved = _now_iso()
     try:
         store.put_gads_cache(key, value)
     except Exception as e:
         log.warning("gads: cache write failed (%s)", e)
+    _mem_put(key, value, saved)
+    if stamps is not None:
+        stamps.append(saved)
     return value
 
 
-def list_accounts(store, *, http=None):
+def refresh_guard(store, scope):
+    """Called when someone presses Refresh: raises RefreshTooSoon if `scope` (an account, say) was refreshed in the
+    last REFRESH_COOLDOWN_S seconds, else notes that it is being refreshed now. The Explorer allowance is shared by
+    everyone, so a button that can be pressed over and over would spend it."""
+    key = "rl:" + scope
+    try:
+        last = store.get_gads_entry(key, REFRESH_COOLDOWN_S) if hasattr(store, "get_gads_entry") else None
+    except Exception:
+        last = None
+    if last is not None:
+        left = max(1, int(REFRESH_COOLDOWN_S - _age_s(last[1])))
+        raise RefreshTooSoon("This account was refreshed moments ago, so these numbers are current. You can refresh it "
+                             "again in %d second%s." % (left, "" if left == 1 else "s"), retry_in=left)
+    try:
+        store.put_gads_cache(key, {"t": _now_iso()})
+    except Exception as e:
+        log.warning("gads: could not note a refresh (%s)", e)
+
+
+def list_accounts(store, *, http=None, force=False):
     def make():
         return parse_accounts(search(login_customer(), q_accounts(), store, http=http))
-    return _cached(store, CACHE_V + "accounts", TTL_ACCOUNTS, make)
+    return _cached(store, CACHE_V + "accounts", TTL_ACCOUNTS, make, force=force)
 
 
 def account_ids(store, *, http=None):
     return {a["id"] for a in list_accounts(store, http=http)}
 
 
-def performance(store, customer_id, start, end, *, with_sis=True, with_shares=True, notes=None, http=None):
+# ── Campaign numbers, one day at a time ─────────────────────────────────────
+
+def _runs(days):
+    """Split a sorted list of YYYY-MM-DD days into runs of consecutive days: [(first, last), ...]."""
+    out = []
+    for d in days:
+        if out and (dt.date.fromisoformat(d) - dt.date.fromisoformat(out[-1][1])).days == 1:
+            out[-1][1] = d
+        else:
+            out.append([d, d])
+    return [tuple(r) for r in out]
+
+
+def split_days(parsed):
+    """A parsed run (parse_campaign_days) as {day: {"m": columns Google would not give, "r": [[campaign id, name,
+    status, type, budget, <one number per column>], ...]}}, one entry for every day of the run, quiet ones too."""
+    out = {d: {"m": parsed["missing"], "r": []} for d in parsed["days"]}
+    for ci, di, *nums in parsed["rows"]:
+        c = parsed["campaigns"][ci]
+        out[parsed["days"][di]]["r"].append([c["id"], c["name"], c["status"], c["type"], c["budget"]] + nums)
+    return out
+
+
+def assemble_days(days, per_day):
+    """The shape the page charts from, built from stored days: campaigns in the order first seen, rows
+    [campaign index, day index, <numbers>], and `missing`, the columns any of those days could not get from Google."""
+    camps, cidx, rows, missing = [], {}, [], set()
+    for di, d in enumerate(days):
+        entry = per_day[d]
+        missing.update(entry.get("m") or [])
+        for r in entry["r"]:
+            cid = r[0]
+            if cid not in cidx:
+                cidx[cid] = len(camps)
+                camps.append({"id": cid, "name": r[1], "status": r[2], "type": r[3], "budget": r[4]})
+            rows.append([cidx[cid], di] + r[5:])
+    return {"start": days[0], "end": days[-1], "days": list(days), "campaigns": camps, "rows": rows, "missing": sorted(missing)}
+
+
+def campaign_days(store, customer_id, start, end, *, force=False, notes=None, stamps=None, http=None):
+    """Campaign-by-day numbers for the range, from the days already stored; only days never read, or older than their
+    time-to-live (or all of them, with `force`), are asked for, one query per run of consecutive days. If Google cannot
+    answer, stored days of any age stand in (their times go to `notes`); a day that was never stored cannot."""
+    d0, d1 = dt.date.fromisoformat(start), dt.date.fromisoformat(end)
+    days = [(d0 + dt.timedelta(days=i)).isoformat() for i in range((d1 - d0).days + 1)]
+    try:
+        stored = store.get_gads_days(customer_id, start, end)
+    except Exception as e:
+        log.warning("gads: stored days could not be read (%s)", e)
+        stored = {}
+    today = dt.date.today()
+    need = [d for d in days if force or d not in stored or _age_s(stored[d][1]) > _day_ttl(d, today)]
+    per_day = {d: stored[d][0] for d in days if d in stored}
+    stamp = {d: stored[d][1] for d in days if d in stored}
+    for first, last in _runs(need):
+        try:
+            rows, used = search_pruned(customer_id, lambda f: q_campaign_days(first, last, f), [o[0] for o in OPTIONAL],
+                                       _BAD, store, http=http)
+        except AdsError as e:
+            if not _can_serve_stale(e):
+                raise
+            lost = [d for d in _span(first, last) if d not in per_day]
+            if lost:
+                legacy = _legacy_range(store, customer_id, start, end)
+                if legacy is not None:
+                    if notes is not None:
+                        notes.append(legacy[1])
+                    if stamps is not None:
+                        stamps.append(legacy[1])
+                    return legacy[0]
+                raise
+            if notes is not None:
+                notes.append(oldest([stamp[d] for d in _span(first, last)]))
+            log.warning("gads: serving stored days %s to %s (%s)", first, last, e)
+            continue
+        fresh = split_days(parse_campaign_days(rows, first, last, used))
+        try:
+            store.put_gads_days(customer_id, fresh)
+        except Exception as e:
+            log.warning("gads: could not store days (%s)", e)
+        now = _now_iso()
+        for d, entry in fresh.items():
+            per_day[d], stamp[d] = entry, now
+    if stamps is not None:
+        stamps.append(oldest(list(stamp.values())))
+    return assemble_days(days, per_day)
+
+
+def _span(first, last):
+    a, b = dt.date.fromisoformat(first), dt.date.fromisoformat(last)
+    return [(a + dt.timedelta(days=i)).isoformat() for i in range((b - a).days + 1)]
+
+
+def _legacy_range(store, customer_id, start, end):
+    """A whole-range copy saved before days were stored one by one, if one exists: better than nothing when Google
+    cannot answer and no day of the range was ever stored."""
+    return _saved_copy(store, CACHE_V + "days:%s:%s:%s" % (customer_id, start, end))
+
+
+def performance(store, customer_id, start, end, *, with_sis=True, with_shares=True, notes=None, force=False, stamps=None, http=None):
     """One range of campaign-by-day rows, plus (for the main range) each Search campaign's impression share and
     (for the main range and its comparison) the whole account's auction shares."""
-    def make_days():
-        rows, used = search_pruned(customer_id, lambda f: q_campaign_days(start, end, f), [o[0] for o in OPTIONAL], _BAD,
-                                   store, http=http)
-        return parse_campaign_days(rows, start, end, used)
-
     def days():
-        return _cached(store, CACHE_V + "days:%s:%s:%s" % (customer_id, start, end), _ttl(end), make_days, notes)
+        return campaign_days(store, customer_id, start, end, force=force, notes=notes, stamps=stamps, http=http)
 
     def make_sis():
         try:
@@ -645,10 +861,11 @@ def performance(store, customer_id, start, end, *, with_sis=True, with_shares=Tr
 
     jobs = [days]
     if with_sis:
-        jobs.append(soft(lambda: _cached(store, CACHE_V + "sis:%s:%s:%s" % (customer_id, start, end), _ttl(end), make_sis, notes), {}))
+        jobs.append(soft(lambda: _cached(store, CACHE_V + "sis:%s:%s:%s" % (customer_id, start, end), _ttl(end), make_sis, notes,
+                                         force=force, stamps=stamps), {}))
     if with_shares:
-        jobs.append(soft(lambda: _cached(store, CACHE_V + "shares:%s:%s:%s" % (customer_id, start, end), _ttl(end), make_shares, notes),
-                         {f: None for f in SHARES}))
+        jobs.append(soft(lambda: _cached(store, CACHE_V + "shares:%s:%s:%s" % (customer_id, start, end), _ttl(end), make_shares, notes,
+                                         force=force, stamps=stamps), {f: None for f in SHARES}))
     res = _par(jobs)
     out = dict(res[0])
     i = 1
@@ -662,19 +879,21 @@ def performance(store, customer_id, start, end, *, with_sis=True, with_shares=Tr
     return out
 
 
-
-def performance_pair(store, customer_id, cur, cmp, *, with_sis=True, with_shares=True, http=None):
+def performance_pair(store, customer_id, cur, cmp, *, with_sis=True, with_shares=True, force=False, stamps=None, http=None):
     """The main range and (if given) its comparison range, fetched together. Returns (current, compare, saved) where
-    `saved` lists the times of any saved copies served because Google could not answer."""
+    `saved` lists the times of any saved copies served because Google could not answer; `stamps`, if given, is filled
+    with the times the numbers were read from Google (see oldest())."""
     notes = []
-    jobs = [lambda: performance(store, customer_id, cur[0], cur[1], with_sis=with_sis, with_shares=with_shares, notes=notes, http=http)]
+    jobs = [lambda: performance(store, customer_id, cur[0], cur[1], with_sis=with_sis, with_shares=with_shares, notes=notes,
+                                force=force, stamps=stamps, http=http)]
     if cmp:
-        jobs.append(lambda: performance(store, customer_id, cmp[0], cmp[1], with_sis=False, with_shares=with_shares, notes=notes, http=http))
+        jobs.append(lambda: performance(store, customer_id, cmp[0], cmp[1], with_sis=False, with_shares=with_shares, notes=notes,
+                                        force=force, stamps=stamps, http=http))
     res = _par(jobs)
     return res[0], (res[1] if cmp else None), notes
 
 
-def extras(store, customer_id, start, end, *, notes=None, http=None):
+def extras(store, customer_id, start, end, *, notes=None, force=False, stamps=None, http=None):
     used = []
 
     def one(build):
@@ -687,4 +906,4 @@ def extras(store, customer_id, start, end, *, notes=None, http=None):
                         lambda: one(lambda f: q_dow_hour(start, end, f))])
         have = set(used[0]).intersection(*[set(u) for u in used[1:]]) if used else set()
         return parse_extras(d, n, h, missing_columns(have))
-    return _cached(store, CACHE_V + "extras:%s:%s:%s" % (customer_id, start, end), _ttl(end), make, notes)
+    return _cached(store, CACHE_V + "extras:%s:%s:%s" % (customer_id, start, end), _ttl(end), make, notes, force=force, stamps=stamps)

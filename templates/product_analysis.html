@@ -1,8 +1,8 @@
 {% extends "_paid_base.html" %}
 {% block title %}Product Analysis{% endblock %}
 {% block head %}
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/performance_summarizer.css') }}?v=8">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/product_analysis.css') }}?v=1">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/performance_summarizer.css') }}?v=9">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/product_analysis.css') }}?v=2">
 {% endblock %}
 {% block content %}
 <div class="pm pm-ps pm-pa" id="pa">
@@ -13,7 +13,7 @@
       <p class="pm-sub">Live from Google Ads Shopping and Performance Max. Every product sorted into stars, steady sellers, drags and
         money pits, with the few clear things to do about each. <b>Change the rules</b> to match the client's margin and click any product to dig in.</p>
     </div>
-    <div class="ps-live" id="live" aria-live="polite"><span class="ps-live-dot"></span><span id="liveText">Connecting to Google Ads…</span></div>
+    <div class="ps-live" id="live" aria-live="polite"><span class="ps-live-dot"></span><span id="liveText">Connecting to Google Ads…</span><span class="ps-upd" id="upd"></span></div>
   </section>
 
   <!-- Command bar: which account, which days, compared with what -->
@@ -42,6 +42,8 @@
       <div class="ps-cmd-tools">
         <button type="button" class="pm-btn-ghost ps-cta" id="tuneBtn" aria-expanded="false" aria-controls="tune" title="Set the target and the thresholds that decide which group a product falls in">
           <svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg><span>Rules</span></button>
+        <button type="button" class="pm-btn-ghost" id="refreshBtn" title="Read this view from Google Ads again. The numbers are saved, so this is only needed when you want the very latest.">
+          <svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.3-5.6M20 4v5h-5"/></svg><span>Refresh</span></button>
         <button type="button" class="pm-btn-ghost" id="shareBtn" title="Copy a link to exactly this view">
           <svg viewBox="0 0 24 24"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg><span>Share view</span></button>
         <button type="button" class="pm-btn-ghost" id="exportBtn" title="Download the products in the table below as a CSV">
@@ -68,6 +70,10 @@
       <section class="pm-panel ps-card" id="paretoCard"></section>
       <aside class="ps-insights" id="insights"></aside>
     </div>
+
+    <!-- How each product is performing -->
+    <div class="ps-sec-h"><div><h2>How each product is performing</h2><span class="ps-hint ps-hint-b" id="perfHint"></span></div></div>
+    <section class="pm-panel ps-card" id="perf"></section>
 
     <!-- Groups: where the money goes and what comes back -->
     <div class="ps-sec-h"><div><h2>Where the money goes, and what comes back</h2><span class="ps-hint ps-hint-b">Click a group to see its products.</span></div></div>
@@ -101,5 +107,5 @@
 <script src="{{ url_for('static', filename='js/pm_picker.js') }}?v=1"></script>
 <script src="{{ url_for('static', filename='js/ps_data.js') }}?v=4"></script>
 <script src="{{ url_for('static', filename='js/pa_data.js') }}?v=1"></script>
-<script src="{{ url_for('static', filename='js/product_analysis.js') }}?v=1"></script>
+<script src="{{ url_for('static', filename='js/product_analysis.js') }}?v=2"></script>
 {% endblock %}

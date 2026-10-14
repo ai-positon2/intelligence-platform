@@ -129,6 +129,45 @@ function popMenu(anchor,o){
   var first=$(".ps-pop-q",m)||$(".ps-pop-i",m); if(first&&o.focus!==false) first.focus();
 }
 
+
+/* ── Updated, and Refresh ─────────────────────────────────────── */
+function relTime(iso){
+  var t=new Date(iso).getTime(); if(isNaN(t)) return "";
+  var m=Math.max(0,Math.round((Date.now()-t)/60000));
+  return m<1?"just now":m<60?m+" min ago":m<1440?Math.round(m/60)+" h ago":Math.round(m/1440)+" days ago";
+}
+function paintUpdated(iso){
+  S.fetchedAt=iso||null;
+  var el=$("#upd"); if(!el) return;
+  el.textContent=iso&&relTime(iso)?" · Updated "+relTime(iso):"";
+  el.title=iso?"Last read from Google Ads "+new Date(iso).toLocaleString():"";
+}
+setInterval(function(){if(S.fetchedAt) paintUpdated(S.fetchedAt);},30000);
+/* The same request as getJson, but asking Google again (the server allows it once every two minutes per account); the answer
+   replaces the saved one in S.memo so the next load() paints it. */
+function refreshJson(url){
+  var p=fetch(url+(url.indexOf("?")<0?"?":"&")+"refresh=1",{credentials:"same-origin"}).then(function(r){
+    return r.json().catch(function(){return {};}).then(function(j){
+      if(!r.ok){var e=new Error(j.error||("The server answered "+r.status)); e.status=r.status; e.cooldown=!!j.cooldown; throw e;}
+      return j;
+    });
+  });
+  S.memo[url]=p; p.catch(function(){delete S.memo[url];});
+  return p;
+}
+function doRefresh(urls){
+  var btn=$("#refreshBtn"); if(!S.acct||btn.classList.contains("busy")) return;
+  btn.classList.add("busy"); btn.disabled=true;
+  var main=refreshJson(urls[0]), rest=urls.slice(1).map(function(u){return refreshJson(u).catch(function(){return null;});});
+  Promise.all([main].concat(rest)).then(function(){
+    btn.classList.remove("busy"); btn.disabled=false; load(); toast("Read from Google Ads just now");
+  }).catch(function(err){
+    btn.classList.remove("busy"); btn.disabled=false;
+    toast(err.cooldown?err.message:"Could not refresh: "+err.message);
+    if(!err.cooldown) load();
+  });
+}
+
 /* ── Notices and states ───────────────────────────────────────── */
 function notice(kind,title,html){
   $("#notice").innerHTML=title?'<div class="ps-notice '+kind+'"><b>'+esc(title)+'</b><p>'+html+'</p></div>':"";
@@ -254,7 +293,7 @@ function load(){
     if(seq!==S.seq) return;
     S.cur=j.current; S.cmp=j.compare; S.sis=j.current.sis||null; S.extras=null; S.cd=null;
     S.shares={cur:j.current.shares||null,cmp:(j.compare&&j.compare.shares)||null}; S.missing=j.current.missing||[];
-    paintStale(j.stale,j.blockedUntil);
+    paintStale(j.stale,j.blockedUntil); paintUpdated(j.fetchedAt);
     var ids={}; S.cur.campaigns.forEach(function(c){ids[c.id]=1;});
     S.filter=S.filter.filter(function(i){return ids[i];});
     $("#live").classList.remove("off");
@@ -264,6 +303,12 @@ function load(){
     loadExtras(seq);
   }).catch(function(err){if(seq===S.seq) showError(err);});
 }
+$("#refreshBtn").addEventListener("click",function(){
+  if(!S.acct||!S.range) return;
+  var q="account="+S.acct.id+"&start="+S.range.start+"&end="+S.range.end, pq=q;
+  if(S.cmpRange) pq+="&compare_start="+S.cmpRange.start+"&compare_end="+S.cmpRange.end;
+  doRefresh([BASE+"/performance?"+pq,BASE+"/extras?"+q]);
+});
 function loadExtras(seq){
   getJson(BASE+"/extras?account="+S.acct.id+"&start="+S.range.start+"&end="+S.range.end).then(function(x){
     if(seq!==S.seq) return; S.extras=x; paintExtras();

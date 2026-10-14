@@ -131,7 +131,8 @@ function show(which){
   $("#empty").hidden=which!=="empty"; $("#skel").hidden=which!=="skel"; $("#out").hidden=which!=="out";
 }
 
-function run(){
+function run(refresh){
+  var force=refresh===true;
   if(!S.account){show("empty");setMsg("");return;}
   if(!S.from||!S.to){setMsg("Pick a start and an end date.");return;}
   if(S.from>S.to){setMsg("The start date is after the end date.");return;}
@@ -140,11 +141,12 @@ function run(){
   var g=groupOf(S.account);
   setMsg(g?"Reading all "+g.accountIds.length+" accounts of "+esc(g.name)+" together. This takes a little longer, about 10 to 20 seconds.":"",g?"pm-note":"");
   show("skel");
-  getJson(API+"/report"+q).then(function(r){
+  getJson(API+"/report"+q+(force?"&refresh=1":"")).then(function(r){
     if(seq!==S.seq) return;
     if(g) setMsg("");
     if(!r.ok){
       show(S.report?"out":"empty");
+      if(r.j&&r.j.kind==="cooldown"){setMsg(esc(r.j.error),"pm-note");return;}
       var hint=r.j&&r.j.kind==="quota"?" The daily Google Ads allowance is shared, so this clears on its own.":"";
       setMsg(esc((r.j&&r.j.error)||("The report could not be built (HTTP "+r.status+")."))+hint);
       return;
@@ -178,9 +180,10 @@ function render(){
   $("#fresh").innerHTML='<span class="live"></span><b>'+esc(rep.account.name)+'</b>'+
     (rep.account.isGroup?' <span class="sg-mcc">MCC · '+rep.account.accountCount+' accounts combined</span>':"")+'&nbsp;· '+esc(longDate(rep.range.from))+
     ' to '+esc(longDate(rep.range.to))+' ('+rep.range.days+' day'+(rep.range.days===1?"":"s")+') · read from Google Ads '+
-    esc(new Date(rep.generatedAt).toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"}));
+    esc(ago(rep.generatedAt))+(rep.stale?' <span class="sg-mcc">Google Ads is not answering, so this is the copy saved '+esc(ago(rep.stale))+'</span>':"");
   paintKpis(); paintTypes(); paintInsights(); paintTables();
-  $("#foot").innerHTML="Source: Google Ads, read live and kept for up to 15 minutes. CPL is cost divided by conversions, and <b>Na</b> means "+
+  $("#foot").innerHTML="Source: Google Ads, saved so the same report opens instantly: a report that includes recent days is read again after an hour, "+
+    "a finished range after a day, or when you press <b>Refresh</b>. CPL is cost divided by conversions, and <b>Na</b> means "+
     "there were none. Google Ads does not report every segment for every campaign type (Performance Max has no age or gender, for "+
     "example), so each table shows its <b>coverage</b>: the share of the account's spend it accounts for. Do not compare totals across tables "+
     "that cover different amounts. Insights always use all campaign types."+
@@ -188,6 +191,13 @@ function render(){
     "and the Account table shows each one's share.":"");
 }
 
+/* "4:05 PM, 12 minutes ago" for an ISO time. */
+function ago(iso){
+  var t=new Date(iso), ms=Date.now()-t.getTime();
+  if(isNaN(t.getTime())) return "";
+  var m=Math.max(0,Math.round(ms/60000)), rel=m<1?"just now":m<60?m+" min ago":m<1440?Math.round(m/60)+" h ago":Math.round(m/1440)+" days ago";
+  return t.toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"})+" ("+rel+")";
+}
 function typeTotal(){
   var day=S.report.segments.filter(function(s){return s.key==="day"})[0];
   var v=day&&day.views&&day.views[S.type];
@@ -330,6 +340,7 @@ $("#tables").addEventListener("click",function(e){
 
 /* ── CSV ──────────────────────────────────────────────────── */
 function csv(v){v=v==null?"":String(v);return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v;}
+$("#refreshBtn").addEventListener("click",function(){run(true);});
 $("#exportBtn").addEventListener("click",function(){
   var rep=S.report; if(!rep) return;
   var lines=[["Account",rep.account.name],["Date range",rep.range.from+" to "+rep.range.to],["Campaign type",S.type],[]];

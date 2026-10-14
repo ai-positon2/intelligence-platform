@@ -29,7 +29,7 @@ var S = {
   accounts:[], acct:null, preset:"last30", range:null, compare:"prev", cmpRange:null,
   data:null, cmpData:null, items:[], cmpItems:[], total:null, cmpTotal:null, cls:null, cmpCls:null, oos:null, oosKnown:false,
   rules:{target:null,minClicks:A.DEFAULTS.minClicks,minSpend:null},
-  seg:"all", q:"", sort:"cost", dir:-1, shown:PAGE, by:"brand", rm:"cost", log:null, open:"",
+  seg:"all", q:"", sort:"cost", dir:-1, shown:PAGE, by:"brand", rm:"cost", log:null, open:"", pm:"value", pn:5, fetchedAt:null,
   seq:0, memo:{}
 };
 var charts = {}, picker = null, hashTimer = null;
@@ -95,6 +95,45 @@ function axes(o){
   };
 }
 
+
+function relTime(iso){
+  var t=new Date(iso).getTime(); if(isNaN(t)) return "";
+  var m=Math.max(0,Math.round((Date.now()-t)/60000));
+  return m<1?"just now":m<60?m+" min ago":m<1440?Math.round(m/60)+" h ago":Math.round(m/1440)+" days ago";
+}
+function paintUpdated(iso){
+  S.fetchedAt=iso||null;
+  var el=$("#upd"); if(!el) return;
+  el.textContent=iso&&relTime(iso)?" · Updated "+relTime(iso):"";
+  el.title=iso?"Last read from Google Ads "+new Date(iso).toLocaleString():"";
+}
+setInterval(function(){if(S.fetchedAt) paintUpdated(S.fetchedAt);},30000);
+/* The same request as getJson, but asking Google again (the server allows it once every two minutes per account); the answer
+   replaces the saved one in S.memo so the next load() paints it. */
+function refreshJson(url){
+  var p=fetch(url+(url.indexOf("?")<0?"?":"&")+"refresh=1",{credentials:"same-origin"}).then(function(r){
+    return r.json().catch(function(){return {};}).then(function(j){
+      if(!r.ok){var e=new Error(j.error||("The server answered "+r.status)); e.status=r.status; e.cooldown=!!j.cooldown; throw e;}
+      return j;
+    });
+  });
+  S.memo[url]=p; p.catch(function(){delete S.memo[url];});
+  return p;
+}
+function doRefresh(urls){
+  var btn=$("#refreshBtn"); if(!S.acct||btn.classList.contains("busy")) return;
+  btn.classList.add("busy"); btn.disabled=true;
+  var main=refreshJson(urls[0]), rest=urls.slice(1).map(function(u){return refreshJson(u).catch(function(){return null;});});
+  Promise.all([main].concat(rest)).then(function(){
+    btn.classList.remove("busy"); btn.disabled=false; load(); toast("Read from Google Ads just now");
+  }).catch(function(err){
+    btn.classList.remove("busy"); btn.disabled=false;
+    toast(err.cooldown?err.message:"Could not refresh: "+err.message);
+    if(!err.cooldown) load();
+  });
+}
+
+
 /* ── Notices and states ───────────────────────────────────────── */
 function notice(kind,title,html){
   $("#notice").innerHTML=title?'<div class="ps-notice '+kind+'"><b>'+esc(title)+'</b><p>'+html+'</p></div>':"";
@@ -139,7 +178,7 @@ function writeHash(){
     q.push(["c",S.compare]);
     if(S.seg!=="all") q.push(["seg",S.seg]);
     if(S.q) q.push(["q",S.q]);
-    q.push(["so",S.sort],["sd",S.dir<0?"d":"a"],["by",S.by],["rm",S.rm]);
+    q.push(["so",S.sort],["sd",S.dir<0?"d":"a"],["by",S.by],["rm",S.rm],["pm",S.pm],["pn",S.pn]);
     if(S.log!=null) q.push(["lg",S.log?1:0]);
     if(S.rules.target!=null) q.push(["tr",S.rules.target]);
     if(S.rules.minClicks!==A.DEFAULTS.minClicks) q.push(["mc",S.rules.minClicks]);
@@ -166,6 +205,8 @@ function applyHash(h){
   if(A.BY[h.by]) S.by=h.by;
   if(["cost","value","roas","conv"].indexOf(h.rm)>=0) S.rm=h.rm;
   if(h.lg==="1") S.log=true; else if(h.lg==="0") S.log=false;
+  if(A.PERF[h.pm]) S.pm=h.pm;
+  if(["5","10","20"].indexOf(h.pn)>=0) S.pn=+h.pn;
   if(h.tr||h.mc||h.ms) S.rules=cleanRules({target:h.tr||S.rules.target,minClicks:h.mc!=null?h.mc:S.rules.minClicks,minSpend:h.ms!=null?h.ms:S.rules.minSpend});
 }
 
@@ -207,6 +248,12 @@ $("#shareBtn").addEventListener("click",function(){
     (navigator.clipboard?navigator.clipboard.writeText(location.href):Promise.reject()).then(function(){toast("Link to this exact view copied");},
       function(){toast("Copy the address bar to share this view");});
   },300);
+});
+$("#refreshBtn").addEventListener("click",function(){
+  if(!S.acct||!S.range) return;
+  var q="account="+S.acct.id+"&start="+S.range.start+"&end="+S.range.end;
+  if(S.cmpRange) q+="&compare_start="+S.cmpRange.start+"&compare_end="+S.cmpRange.end;
+  doRefresh([BASE+"/products?"+q]);
 });
 $("#exportBtn").addEventListener("click",function(){
   if(!S.items.length){toast("Nothing to export yet");return;}
@@ -257,7 +304,7 @@ function load(){
   getJson(BASE+"/products?"+q).then(function(j){
     if(seq!==S.seq) return;
     S.data=j.current; S.cmpData=j.compare;
-    paintStale(j.stale,j.blockedUntil);
+    paintStale(j.stale,j.blockedUntil); paintUpdated(j.fetchedAt);
     $("#live").classList.remove("off");
     $("#liveText").textContent="Live from Google Ads · "+S.accounts.length+" accounts · "+S.acct.name+" in "+S.acct.currency;
     $("#dash").hidden=false;
@@ -284,11 +331,11 @@ function paintAll(){
   if(none){
     notice("info","No product activity in this range","<b>"+esc(S.acct.name)+"</b> had no Shopping or Performance Max product impressions from "+esc(fmtRange(S.range))+
       ". Try a longer range, or another account. Accounts without a product feed will always be empty here.");
-    ["pareto","groups","bubble","rollup","trend"].forEach(destroyChart);
+    ["pareto","perf","groups","bubble","rollup","trend"].forEach(destroyChart);
     writeHash(); return;
   }
   notice("");
-  paintKpis(); paintActions(); paintPareto(); paintInsights(); paintGroups(); paintBubble(); paintRollup(); paintTrend(); paintMovers(); paintTable();
+  paintKpis(); paintActions(); paintPareto(); paintInsights(); paintPerf(); paintGroups(); paintBubble(); paintRollup(); paintTrend(); paintMovers(); paintTable();
   if(!$("#tune").hidden) paintTune();
   writeHash();
 }
@@ -395,6 +442,77 @@ function paintInsights(){
       var tone=x.tone==="bad"?"bad":x.tone==="mute"||x.tone==="flat"?"info":x.tone;
       return '<div class="ps-in '+tone+'" style="--i:'+i+'"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true">'+(TIC[x.tone]||TIC.info)+'</svg><div><p>'+esc(x.text)+'</p></div></div>';}).join("")
      :'<p class="ps-msg-inline">Nothing stands out yet.</p>')+'</div></div>';
+}
+
+
+/* How each product is performing: the products ranked by one measure, with each top spender's days drawn as a line */
+var PERF_COLORS=["#ff7a59","#38bdf8","#a3e635","#e879f9","#fbbf24","#2dd4bf","#fb7185","#818cf8","#f97316","#22d3ee"];
+function pcol(i){
+  if(i<PERF_COLORS.length) return col(PERF_COLORS[i]);
+  return "hsl("+((i*53+20)%360)+",70%,"+(light()?"42%":"62%")+")";
+}
+function sparkSvg(vals,color){
+  var v=vals.filter(function(x){return x!=null&&isFinite(x);});
+  if(v.length<2||Math.max.apply(null,v)===Math.min.apply(null,v)&&!v[0]) return '<span class="pa-nospark">no daily data</span>';
+  var mn=Math.min.apply(null,v), mx=Math.max.apply(null,v), w=130, h=34, pad=3, n=vals.length, pts=[];
+  vals.forEach(function(x,i){
+    if(x==null||!isFinite(x)) return;
+    pts.push([n===1?0:i/(n-1)*w, mx===mn?h/2:h-pad-(x-mn)/(mx-mn)*(h-pad*2)]);
+  });
+  var d="M"+pts.map(function(p){return p[0].toFixed(1)+","+p[1].toFixed(1);}).join("L");
+  return '<svg class="pa-spark" viewBox="0 0 '+w+' '+h+'" preserveAspectRatio="none" aria-hidden="true"><path d="'+d+'" fill="none" stroke="'+color+'" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/></svg>';
+}
+function pmOptions(){
+  var c=S.cls.ctx, o=[];
+  o.push(c.hasValue?["value","Revenue"]:["conversions","Conversions"]);
+  o.push(["cost","Spend"]);
+  if(c.hasValue){o.push(["roas","ROAS"]);o.push(["conversions","Conversions"]);}
+  o.push(["clicks","Clicks"],["impressions","Impressions"],["ctr","CTR"],["cpc","Avg. CPC"]);
+  return o;
+}
+function pFmt(key,v,small){var m=P.METRICS[key]; return fmtK(m.kind,v,small&&(m.kind==="money"||m.kind==="int"));}
+function paintPerf(){
+  var el=$("#perf"), opts=pmOptions(), t=theme(), ser=S.data.series;
+  if(!opts.some(function(o){return o[0]===S.pm;})) S.pm=opts[0][0];
+  var lb=A.leaderboard(S.items,S.cmpItems,S.pm,20), have=lb.rows.filter(function(r){return A.seriesValues(ser,r.it.id,S.pm);});
+  var nLines=Math.min(S.pn,have.length);
+  $("#perfHint").textContent=ser?"Pick a measure. The lines are each of the "+(ser.ids.length)+" products that spent the most, day by day; the list ranks every product."
+    :"Daily lines are not available for this view, so only the ranking is shown.";
+  var meta=A.PERF[S.pm];
+  var top='<div class="ps-card-h"><div class="ps-card-t"><span class="ps-title">'+esc(meta.label)+' by product</span>'+
+    '<span class="ps-sub">'+(ser&&nLines?"Top "+nLines+" of those that spent the most, day by day":"Ranked across all "+S.items.filter(function(i){return !i.other;}).length.toLocaleString("en-US")+" products")+'</span></div>'+
+    '<div class="ps-card-actions"><div class="ps-seg ps-seg-s" id="pmSeg" role="radiogroup" aria-label="Measure">'+opts.map(function(o){return '<button type="button" role="radio" data-m="'+o[0]+'" aria-checked="'+(S.pm===o[0])+'">'+o[1]+'</button>';}).join("")+'</div>'+
+    (ser&&have.length>5?'<div class="ps-seg ps-seg-s" id="pnSeg" role="radiogroup" aria-label="Lines">'+[5,10,20].filter(function(n){return n<=Math.max(5,have.length);}).map(function(n){return '<button type="button" role="radio" data-n="'+n+'" aria-checked="'+(S.pn===n)+'">Top '+n+'</button>';}).join("")+'</div>':"")+'</div></div>';
+  var chart=ser&&nLines?'<div class="ps-wrap"><canvas id="cvPerf" aria-label="'+esc(meta.label)+' by product, day by day"></canvas></div>':"";
+  var maxV=lb.rows.length?lb.rows[0].v:0;
+  var body='<div class="ps-tscroll"><table class="ps-table pa-table pa-lb"><thead><tr><th class="num">#</th><th class="name">Product</th><th class="trend">Daily</th>'+
+    '<th class="num">'+esc(meta.label)+'</th><th class="num">'+(lb.additive?"Share":"Against best")+'</th><th class="num">Vs before</th><th class="grp">Group</th></tr></thead><tbody>'+
+    (lb.rows.length?lb.rows.map(function(r,i){
+      var it=r.it, vals=A.seriesValues(ser,it.id,S.pm), seg=it.seg?A.SEG[it.seg]:null, share=lb.additive?r.share:(maxV?r.v/maxV:0);
+      var ch=r.change?'<span class="d '+r.change.tone+'">'+(r.change.dir>0?'<i>▲</i>':r.change.dir<0?'<i>▼</i>':'')+esc(r.change.text)+'</span>':'<span class="d flat">–</span>';
+      var li=have.indexOf(r);
+      return '<tr data-id="'+esc(it.id)+'"><td class="num pa-rank">'+r.rank+'</td><td class="name"><span class="cn">'+esc(trunc(it.title,80))+'</span><span class="cm">'+esc(it.id)+(it.brand?' · '+esc(it.brand):"")+'</span></td>'+
+        '<td class="trend">'+(vals?sparkSvg(vals,li>=0&&li<nLines?pcol(li):col("#8b94be")):'<span class="pa-nospark">daily not read</span>')+'</td>'+
+        '<td class="num"><b>'+esc(pFmt(S.pm,r.v,false))+'</b></td>'+
+        '<td class="num"><span class="sbar pa-sbar"><s style="width:'+Math.min(100,share*100).toFixed(1)+'%"></s></span>'+(lb.additive?'<small class="d flat">'+pctStr(r.share,1)+'</small>':'')+'</td>'+
+        '<td class="num">'+ch+'</td>'+
+        '<td class="grp">'+(seg?'<span class="pa-badge" style="--cc:'+col(SEG_COLOR[seg.key])+'">'+esc(seg.label)+(it.gem?" ★":"")+'</span>':"")+'</td></tr>';
+    }).join(""):'<tr><td colspan="7" class="empty">No product has any '+esc(meta.label.toLowerCase())+' in this range.</td></tr>')+'</tbody></table></div>';
+  el.innerHTML=top+chart+body;
+  destroyChart("perf");
+  if(chart){
+    var rows=have.slice(0,nLines), days=ser.days.map(P.dayLabel), kind=P.METRICS[S.pm].kind;
+    var ds=rows.map(function(r,i){
+      return {label:trunc(r.it.title,34),data:A.seriesValues(ser,r.it.id,S.pm),borderColor:pcol(i),backgroundColor:pcol(i),borderWidth:2,pointRadius:0,pointHoverRadius:4,tension:.28,spanGaps:true};});
+    mkChart("perf",$("#cvPerf"),{type:"line",data:{labels:days,datasets:ds},options:{responsive:true,maintainAspectRatio:false,interaction:{mode:"nearest",intersect:false},
+      onClick:function(e,els,ch){if(els.length){var r=rows[els[0].datasetIndex]; if(r) openDrawer(r.it);}},
+      plugins:{legend:{display:true,position:"bottom",labels:{color:t.muted,usePointStyle:true,boxWidth:8,padding:12}},
+        tooltip:Object.assign(tip(),{callbacks:{title:function(i){return i[0].dataset.label;},label:function(i){return i.label+": "+pFmt(S.pm,i.parsed.y,false);}}})},
+      scales:{x:axes({xTicks:9}).x,y:Object.assign(axes({yFmt:function(v){return pFmt(S.pm,v,true);}}).y,{beginAtZero:kind!=="x"&&kind!=="pct"})}}});
+  }
+  $("#pmSeg").onclick=function(e){var b=e.target.closest("[data-m]"); if(b&&b.dataset.m!==S.pm){S.pm=b.dataset.m;paintPerf();writeHash();}};
+  var pn=$("#pnSeg"); if(pn) pn.onclick=function(e){var b=e.target.closest("[data-n]"); if(b){S.pn=+b.dataset.n;paintPerf();writeHash();}};
+  $$("#perf tbody tr[data-id]").forEach(function(r){r.onclick=function(){var it=S.items.filter(function(i){return i.id===r.dataset.id&&!i.other;})[0]; if(it) openDrawer(it);};});
 }
 
 /* Groups: where the money goes and what comes back */
@@ -609,14 +727,28 @@ function openDrawer(it){
       var t=A.asTotal(n), v=x[1]==="value"?n[VAL]:P.mval(x[1],t), pv=pn?(x[1]==="value"?pn[VAL]:P.mval(x[1],A.asTotal(pn))):null;
       var ch=pn&&v!=null&&pv!=null?P.change(x[1],v,pv):null;
       return '<div class="pa-dr-t"><span>'+esc(x[0])+'</span><b>'+esc(fmtK(x[2],v,x[1]==="cost"||x[1]==="value"))+'</b>'+(ch?'<small class="d '+ch.tone+'">'+esc(ch.text)+'</small>':'<small>&nbsp;</small>')+'</div>';}).join("")+'</div>'+
+    (A.seriesValues(S.data.series,it.id,"cost")?'<div class="pa-dr-ch"><span class="pa-dr-h">Day by day</span><div class="pa-dr-cw"><canvas id="cvDr" aria-label="Spend and '+(c.hasValue?"revenue":"conversions")+' by day for this product"></canvas></div></div>':
+      '<p class="pa-dr-f">Daily numbers are read for the 20 products that spend the most.</p>')+
     '<p class="pa-dr-f">'+(pn?"Changes are against the comparison period.":"No comparison data for this product.")+'</p>'+
     '<button type="button" class="pm-btn-ghost" id="drCopy"><span>Copy item id</span></button></aside>';
   el.hidden=false; el.setAttribute("aria-hidden","false"); document.body.classList.add("pa-lock");
   $$("[data-close]",el).forEach(function(b){b.onclick=closeDrawer;});
   $("#drCopy").onclick=function(){(navigator.clipboard?navigator.clipboard.writeText(it.id):Promise.reject()).then(function(){toast("Item id copied");},function(){toast(it.id);});};
   var x=$(".pa-dr-x",el); if(x) x.focus();
+  destroyChart("drawer");
+  var dc=$("#cvDr"), sp=A.seriesValues(S.data.series,it.id,"cost");
+  if(dc&&sp){
+    var rv=A.seriesValues(S.data.series,it.id,c.hasValue?"value":"conversions"), t=theme();
+    mkChart("drawer",dc,{data:{labels:S.data.series.days.map(P.dayLabel),datasets:[
+      {type:"bar",label:"Spend",data:sp,backgroundColor:alpha("#fbbf24",.6),borderRadius:3,borderWidth:0,yAxisID:"y"},
+      {type:"line",label:c.hasValue?"Revenue":"Conversions",data:rv,borderColor:col("#34d399"),backgroundColor:"transparent",borderWidth:2,pointRadius:0,tension:.3,yAxisID:"y2"}]},
+      options:{responsive:true,maintainAspectRatio:false,interaction:{mode:"index",intersect:false},
+        plugins:{legend:{display:true,position:"bottom",labels:{color:t.muted,usePointStyle:true,boxWidth:8,padding:10}},tooltip:tip()},
+        scales:{x:axes({xTicks:6}).x,y:Object.assign(axes({yFmt:function(v){return money(v,true);}}).y,{position:"left"}),
+          y2:{position:"right",beginAtZero:true,grid:{display:false},border:{display:false},ticks:{color:t.muted,callback:function(v){return c.hasValue?money(v,true):v;}}}}}});
+  }
 }
-function closeDrawer(){var el=$("#drawer"); el.hidden=true; el.setAttribute("aria-hidden","true"); el.innerHTML=""; document.body.classList.remove("pa-lock"); S.open="";}
+function closeDrawer(){destroyChart("drawer"); var el=$("#drawer"); el.hidden=true; el.setAttribute("aria-hidden","true"); el.innerHTML=""; document.body.classList.remove("pa-lock"); S.open="";}
 document.addEventListener("keydown",function(e){if(e.key==="Escape"&&!$("#drawer").hidden) closeDrawer();});
 
 /* ── Boot ─────────────────────────────────────────────────────── */

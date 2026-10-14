@@ -113,3 +113,19 @@ body.pa-lock{overflow:hidden}
 @media (prefers-reduced-motion:reduce){
   .pa-act,.pa-dr,.pa-dr-bg{animation:none!important;transition:none}
 }
+
+/* ── How each product is performing ── */
+.pa-lb th.trend,.pa-lb td.trend{width:150px;text-align:left;padding:4px 12px}
+.pa-lb .pa-rank{width:34px;color:var(--pm-faint);font-weight:700}
+.pa-spark{display:block;width:130px;height:34px}
+.pa-nospark{font-size:11px;color:var(--pm-faint)}
+.pa-sbar{width:84px}
+.pa-lb td.num small.d{display:block;font-size:11px;font-weight:700;margin-top:2px;color:var(--pm-faint)}
+.pa-lb td .d{font-size:12px;font-weight:700;font-variant-numeric:tabular-nums}
+.pa-lb td .d i{font-style:normal;font-size:8px;margin-right:3px}
+.pa-lb td .d.good{color:var(--ok)}.pa-lb td .d.bad{color:var(--ps-bad)}.pa-lb td .d.flat{color:var(--pm-faint)}
+#perf .ps-wrap{height:340px;margin-bottom:14px}
+#perf .ps-card-actions{justify-content:flex-end}
+.pa-dr-ch{margin-top:16px}
+.pa-dr-h{display:block;font-size:10px;font-weight:700;letter-spacing:var(--ls-caps);text-transform:uppercase;color:var(--pm-faint);margin-bottom:8px}
+.pa-dr-cw{position:relative;height:190px}

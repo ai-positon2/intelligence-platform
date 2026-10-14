@@ -227,6 +227,42 @@ function kpis(total,prev,cls){
     waste:waste,wastePct:total[COST]?waste/total[COST]:null,selling:selling,products:selling+by.waste.length+by.thin.length,prev:prev||null};
 }
 
+/* ── How each product is performing ── */
+/* The measures the page ranks and draws products by. `additive` ones add up across products, so each product has a
+   share of the account's total; the rest are rates. */
+var PERF = {
+  value:{label:"Revenue",additive:true}, cost:{label:"Spend",additive:true}, conversions:{label:"Conversions",additive:true},
+  clicks:{label:"Clicks",additive:true}, impressions:{label:"Impressions",additive:true},
+  roas:{label:"ROAS",additive:false,needsValue:true}, ctr:{label:"CTR",additive:false}, cpc:{label:"Avg. CPC",additive:false}
+};
+function metricValue(n,key){return key==="value"?n[VAL]:P.mval(key,asTotal(n));}
+/* One value per day for a product, or null when its days were not read (only the top spenders' days are). */
+function seriesValues(series,id,key){
+  var rows=series&&series.rows&&series.rows[String(id).toLowerCase()];
+  return rows?rows.map(function(n){return metricValue(n,key);}):null;
+}
+/* The products ranked by `key`, best first: each with its value, its share of the account (adding measures), what it was in
+   the comparison period and how that changed. A product with nothing to measure (no spend for a rate, a zero for an
+   adding measure) is left out. */
+function leaderboard(its,cmp,key,n){
+  var pm={}, total=zero(), meta=PERF[key]||PERF.cost;
+  (cmp||[]).forEach(function(p){if(!p.other)pm[p.id]=p;});
+  its.forEach(function(i){addTo(total,i.n);});
+  var all=metricValue(total,key), rows=[];
+  its.forEach(function(it){
+    if(it.other) return;
+    var v=metricValue(it.n,key);
+    if(v==null||!isFinite(v)||(meta.additive?v<=0:!it.n[COST])) return;
+    var p=pm[it.id], pv=p?metricValue(p.n,key):null;
+    rows.push({it:it,v:v,prev:pv,change:pv!=null&&isFinite(pv)?P.change(key,v,pv):null,
+               share:meta.additive&&all>0?v/all:null});
+  });
+  rows.sort(function(a,b){return b.v-a.v||b.it.n[COST]-a.it.n[COST]||(a.it.id<b.it.id?-1:1);});
+  rows=rows.slice(0,n||20);
+  rows.forEach(function(r,i){r.rank=i+1;});
+  return {rows:rows,total:all,additive:meta.additive};
+}
+
 /* ── Table: search, filter, sort ── */
 var COLS = [
   {key:"title",label:"Product",kind:"text"},{key:"cost",label:"Spend",kind:"money"},{key:"value",label:"Revenue",kind:"money"},
@@ -319,6 +355,7 @@ var api = {
   SEGS:SEGS,SEG:SEG,DEFAULTS:DEFAULTS,BY:BY,COLS:COLS,FILTERS:FILTERS,
   zero:zero,addTo:addTo,asTotal:asTotal,rate:rate,items:items,totals:totals,context:context,efficiency:efficiency,segOf:segOf,classify:classify,
   segTotals:segTotals,pareto:pareto,rollup:rollup,movers:movers,filterItems:filterItems,actions:actions,kpis:kpis,
+  PERF:PERF,metricValue:metricValue,seriesValues:seriesValues,leaderboard:leaderboard,
   colValue:colValue,sortItems:sortItems,search:search,insights:insights,csv:csv
 };
 root.PAData = api;
