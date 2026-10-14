@@ -19,12 +19,18 @@ daily request budget with the other agents.
 """
 from __future__ import annotations
 
+import datetime as dt
 import logging
 import re
 from collections import Counter, defaultdict
 from concurrent.futures import ThreadPoolExecutor
 
 log = logging.getLogger(__name__)
+
+
+def _today():
+    return dt.datetime.now(dt.timezone.utc).date()
+
 
 ID_RE = re.compile(r"^\d{1,20}$")
 MAX_FOUND = 1500
@@ -97,32 +103,63 @@ def _queries(cid, channel):
                     "campaign_budget.amount_micros, campaign_budget.explicitly_shared, "
                     "campaign.asset_automation_settings, campaign.shopping_setting.merchant_id, "
                     "campaign.shopping_setting.feed_label, campaign.shopping_setting.campaign_priority, "
-                    "campaign.dynamic_search_ads_setting.domain_name, campaign.ai_max_setting.enable_ai_max "
+                    "campaign.dynamic_search_ads_setting.domain_name, campaign.ai_max_setting.enable_ai_max, "
+                    "campaign.experiment_type, campaign.targeting_setting.target_restrictions "
                     "FROM campaign WHERE %s" % w,
         "criteria": "SELECT campaign_criterion.type, campaign_criterion.negative, "
                     "campaign_criterion.location.geo_target_constant, campaign_criterion.language.language_constant, "
                     "campaign_criterion.ad_schedule.day_of_week, campaign_criterion.ad_schedule.start_hour, "
                     "campaign_criterion.ad_schedule.end_hour, campaign_criterion.keyword.text, "
                     "campaign_criterion.keyword.match_type, campaign_criterion.proximity.radius, "
-                    "campaign_criterion.proximity.radius_units FROM campaign_criterion WHERE %s" % w,
+                    "campaign_criterion.proximity.radius_units, campaign_criterion.bid_modifier, campaign_criterion.device.type, "
+                    "campaign_criterion.age_range.type, campaign_criterion.gender.type, campaign_criterion.income_range.type, "
+                    "campaign_criterion.parental_status.type, campaign_criterion.user_list.user_list, "
+                    "campaign_criterion.user_interest.user_interest_category, campaign_criterion.custom_audience.custom_audience, "
+                    "campaign_criterion.placement.url FROM campaign_criterion WHERE %s" % w,
         "shared": "SELECT shared_set.name, shared_set.type, shared_set.member_count, campaign_shared_set.status "
                   "FROM campaign_shared_set WHERE %s" % w,
         "labels": "SELECT label.name FROM campaign_label WHERE %s" % w,
         "conv": "SELECT conversion_action.name, conversion_action.status, conversion_action.primary_for_goal, "
-                "conversion_action.counting_type, conversion_action.attribution_model_settings.attribution_model "
+                "conversion_action.counting_type, conversion_action.type, conversion_action.include_in_conversions_metric, "
+                "conversion_action.attribution_model_settings.attribution_model "
                 "FROM conversion_action WHERE conversion_action.status != 'REMOVED'",
         "camp_conv": "SELECT segments.conversion_action_name, metrics.conversions FROM campaign WHERE %s "
                      "AND segments.date DURING LAST_30_DAYS" % w,
         "days": "SELECT segments.date, metrics.cost_micros, metrics.conversions FROM campaign WHERE %s "
                 "AND segments.date DURING LAST_7_DAYS" % w,
-        "camp_assets": "SELECT campaign.id, campaign_asset.field_type, campaign_asset.status, asset.type "
+        "camp_assets": "SELECT campaign.id, campaign_asset.field_type, campaign_asset.status, asset.type, asset.name, asset.final_urls, "
+                       "asset.sitelink_asset.link_text, asset.sitelink_asset.description1, asset.sitelink_asset.description2, "
+                       "asset.callout_asset.callout_text, asset.structured_snippet_asset.header, asset.structured_snippet_asset.values, "
+                       "asset.call_asset.phone_number, asset.text_asset.text "
                        "FROM campaign_asset WHERE %s AND campaign_asset.status != 'REMOVED'" % w,
-        "cust_assets": "SELECT customer_asset.field_type, customer_asset.status, asset.type FROM customer_asset "
+        "cust_assets": "SELECT customer_asset.field_type, customer_asset.status, asset.type, asset.final_urls, "
+                       "asset.sitelink_asset.link_text, asset.sitelink_asset.description1, asset.callout_asset.callout_text, "
+                       "asset.structured_snippet_asset.header, asset.structured_snippet_asset.values, "
+                       "asset.call_asset.phone_number, asset.text_asset.text FROM customer_asset "
                        "WHERE customer_asset.status != 'REMOVED'",
+        "search_terms": "SELECT search_term_view.search_term, search_term_view.status, metrics.clicks, metrics.impressions, "
+                        "metrics.cost_micros, metrics.conversions FROM search_term_view WHERE %s "
+                        "AND segments.date DURING LAST_30_DAYS ORDER BY metrics.cost_micros DESC LIMIT 50" % w,
+        "changes": "SELECT change_event.change_date_time, change_event.user_email, change_event.change_resource_type, "
+                   "change_event.resource_change_operation, change_event.campaign FROM change_event WHERE "
+                   "change_event.change_date_time >= '%s' AND change_event.change_date_time <= '%s 23:59:59' "
+                   "ORDER BY change_event.change_date_time DESC LIMIT 200" % (
+                       (_today() - dt.timedelta(days=28)).isoformat(), _today().isoformat()),
+        "shared_all": "SELECT shared_set.name, shared_set.type, shared_set.member_count FROM shared_set "
+                      "WHERE shared_set.status = 'ENABLED'",
+        "user_access": "SELECT customer_user_access.email_address, customer_user_access.access_role FROM customer_user_access",
+        "user_lists": "SELECT user_list.name, user_list.type, user_list.size_for_search, user_list.size_for_display "
+                      "FROM user_list WHERE user_list.membership_status = 'OPEN' LIMIT 100",
+        "exclusions": "SELECT bidding_data_exclusion.name, bidding_data_exclusion.status, bidding_data_exclusion.start_date_time, "
+                      "bidding_data_exclusion.end_date_time FROM bidding_data_exclusion",
+        "seasonality": "SELECT bidding_seasonality_adjustment.name, bidding_seasonality_adjustment.status, "
+                       "bidding_seasonality_adjustment.start_date_time, bidding_seasonality_adjustment.end_date_time "
+                       "FROM bidding_seasonality_adjustment",
     }
     if channel in ("SEARCH", "SHOPPING"):
         q["adgroups"] = ("SELECT ad_group.id, ad_group.name, ad_group.status, ad_group.type, ad_group.ad_rotation_mode, "
-                         "ad_group.cpc_bid_micros FROM ad_group WHERE %s AND ad_group.status != 'REMOVED'" % w)
+                         "ad_group.cpc_bid_micros, ad_group.targeting_setting.target_restrictions "
+                         "FROM ad_group WHERE %s AND ad_group.status != 'REMOVED'" % w)
         q["ads"] = ("SELECT ad_group.id, ad_group_ad.status, ad_group_ad.ad.type, ad_group_ad.ad.final_urls, "
                     "ad_group_ad.ad_strength, ad_group_ad.policy_summary.approval_status, "
                     "ad_group_ad.ad.responsive_search_ad.headlines, ad_group_ad.ad.responsive_search_ad.descriptions, "
@@ -137,14 +174,15 @@ def _queries(cid, channel):
     if channel == "PERFORMANCE_MAX":
         q["asset_groups"] = ("SELECT asset_group.id, asset_group.name, asset_group.status, asset_group.final_urls, "
                              "asset_group.ad_strength FROM asset_group WHERE %s AND asset_group.status != 'REMOVED'" % w)
-        q["asset_group_assets"] = ("SELECT asset_group.id, asset_group_asset.field_type, asset_group_asset.status "
-                                   "FROM asset_group_asset WHERE %s AND asset_group_asset.status != 'REMOVED'" % w)
+        q["asset_group_assets"] = ("SELECT asset_group.id, asset_group_asset.field_type, asset_group_asset.status, "
+                                   "asset.text_asset.text, asset.name FROM asset_group_asset "
+                                   "WHERE %s AND asset_group_asset.status != 'REMOVED'" % w)
         q["asset_group_signals"] = ("SELECT asset_group.id, asset_group_signal.audience.audience, "
                                     "asset_group_signal.search_theme.text FROM asset_group_signal WHERE %s" % w)
     return q
 
 
-def gather(account_id, campaign_id, search, *, geo_fn=None, channel=None):
+def gather(account_id, campaign_id, search, *, geo_fn=None, channel=None, web_fn=None):
     """Everything the rules read, as {name: rows}. A read Google refuses (400)
     is left out and noted in data['_errors'], so one odd account cannot sink the
     run; running out of quota or being signed out raises, because nothing after
@@ -171,6 +209,20 @@ def gather(account_id, campaign_id, search, *, geo_fn=None, channel=None):
                 errors[name] = err
     data["_errors"] = errors
     data["_channel"] = channel
+    data["_pages"] = []
+    if web_fn:
+        urls = []
+        for r in data.get("ads") or []:
+            ad = (r.get("adGroupAd") or {})
+            if ad.get("status") == "ENABLED":
+                urls += (ad.get("ad") or {}).get("finalUrls") or []
+        for r in data.get("asset_groups") or []:
+            urls += (r.get("assetGroup") or {}).get("finalUrls") or []
+        try:
+            data["_pages"] = web_fn(urls) if urls else []
+        except Exception as e:                              # noqa: BLE001 (the pages are evidence, never a reason to stop)
+            log.warning("qa auto: landing pages failed: %s", str(e)[:200])
+            errors["pages"] = "landing pages could not be read (%s)" % type(e).__name__
     data["_geo"], data["_lang"] = {}, {}
     crit = data.get("criteria") or []
     geo = [((r.get("campaignCriterion") or {}).get("location") or {}).get("geoTargetConstant") for r in crit]
@@ -768,7 +820,14 @@ def r_final_urls(c):
     text = "%d final URL%s: %s." % (len(urls), "" if len(urls) == 1 else "s", _list(urls, 4))
     if http:
         return F("fail", "Not HTTPS: %s. %s" % (_list(http), text))
-    return F(None, text + " All HTTPS. Open them to confirm they load and match the geo.")
+    pages = c.d.get("_pages") or []
+    broken = ["%s (%s)" % (p["url"], p.get("status") or p.get("error", "unreadable")[:60]) for p in pages
+              if p.get("error") or (p.get("status") or 0) >= 400]
+    if broken:
+        return F("fail", "These pages do not load: %s. %s" % (_list(broken, 4), text))
+    if pages:
+        return F(None, text + " All HTTPS and %d of them loaded." % len(pages))
+    return F(None, text + " All HTTPS. The pages could not be opened to confirm they load.")
 
 
 @rule("6.5")
@@ -1007,6 +1066,47 @@ def r_kw_serving(c):
     return F("pass", "No enabled keyword is marked rarely shown.")
 
 
+def _pages(c):
+    return c.d.get("_pages") or []
+
+
+@rule("13.1")
+def r_page_live(c):
+    pages = _pages(c)
+    if not pages:
+        return c.unread("ads") or F(None, "No landing page was available to open.")
+    bad, notes = [], []
+    for p in pages:
+        if p.get("error"):
+            bad.append("%s could not be opened (%s)" % (p["url"], p["error"][:80]))
+            continue
+        if p.get("status", 0) >= 400:
+            bad.append("%s answered %s" % (p["url"], p["status"]))
+        if p.get("stagingHost"):
+            bad.append("%s looks like a staging address" % p["url"])
+        if (p.get("robots") or {}).get("adsbotAllowed") is False:
+            bad.append("robots.txt blocks AdsBot on %s" % p["url"])
+        notes.append("%s: %s, %d ms%s" % (p["url"], p.get("status"), p.get("loadMs", 0),
+                                          ", marked noindex (fine for ads, it only keeps the page out of organic search)" if p.get("noindex") else ""))
+    if bad:
+        return F("fail", _list(bad, 4) + ".")
+    return F("pass", "Open and not blocked to AdsBot: " + _list(notes, 4) + ".")
+
+
+@rule("13.2")
+def r_params_survive(c):
+    pages = [p for p in _pages(c) if "paramsSurvive" in p]
+    if not pages:
+        return F(None, "No landing page could be tested for parameters.")
+    lost = [p["url"] for p in pages if p["paramsSurvive"] is False]
+    ok = [p["url"] for p in pages if p["paramsSurvive"]]
+    if lost:
+        return F("fail", "gclid or utm_source did not reach the final page after the redirect on: %s." % _list(lost, 4))
+    if ok and len(ok) == len(pages):
+        return F("pass", "A test gclid and UTM parameters were still on the final URL for: %s." % _list(ok, 4))
+    return F(None, "Parameters could not be tested on every page.")
+
+
 # ── Run ─────────────────────────────────────────────────────────────────────
 
 def evaluate(data):
@@ -1032,7 +1132,7 @@ def campaign_summary(data):
             "status": c.camp.get("status") or ""}
 
 
-def run(account_id, campaign_id, search, *, geo_fn=None):
+def run(account_id, campaign_id, search, *, geo_fn=None, web_fn=None):
     """Read one campaign and run every rule on it. One small read first says
     whether the campaign is in this account and what type it is, so only the
     reads that type can answer are made."""
@@ -1044,5 +1144,5 @@ def run(account_id, campaign_id, search, *, geo_fn=None):
         return {"findings": {}, "campaign": {"id": "", "name": "", "channel": "", "type": "", "dsa": False, "status": ""},
                 "errors": {}}
     channel = (rows[0].get("campaign") or {}).get("advertisingChannelType") or ""
-    data = gather(account_id, campaign_id, search, geo_fn=geo_fn, channel=channel)
-    return {"findings": evaluate(data), "campaign": campaign_summary(data), "errors": data.get("_errors") or {}}
+    data = gather(account_id, campaign_id, search, geo_fn=geo_fn, channel=channel, web_fn=web_fn)
+    return {"data": data, "findings": evaluate(data), "campaign": campaign_summary(data), "errors": data.get("_errors") or {}}

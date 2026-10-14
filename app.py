@@ -4213,11 +4213,11 @@ def seo_aeo_legacy_redirect(rest=""):
 #                          and date range, read live from Google Ads, with
 #                          computed insights (tracker/paid_segments.py,
 #                          paid_segment_insights.py, paid_gads_segments.py)
-#   QA Agent               the Campaign Launch QC run on a live campaign: pick
-#                          an account and a campaign, each check is right or
-#                          wrong with a comment, the agent prints what it read
-#                          from Google Ads (tracker/paid_qa.py, paid_qa_auto.py,
-#                          paid_qa_store.py, tracker/qa_checklist.json)
+#   QA Agent               the Campaign Launch QC done by the AI on a live
+#                          campaign: it reads Google Ads and the landing pages
+#                          and flags what is wrong (tracker/paid_qa.py,
+#                          paid_qa_auto.py, paid_qa_web.py, paid_qa_ai.py,
+#                          paid_qa_job.py, paid_qa_store.py, qa_checklist.json)
 _PM_PREFIX = "/p2/paid-marketing"
 
 
@@ -4769,17 +4769,19 @@ def paid_segment_summary():
 
 
 # QA Agent --------------------------------------------------------------------
-# The PPC team's Campaign Launch QC checklist, run on a live campaign: pick an
-# account, pick one of its live campaigns, and the QC starts on the shared
-# checklist. Every check is right or wrong with a comment beside it; for the
-# checks Google Ads can answer, tracker/paid_qa_auto.py reads the campaign and
-# prints what it found. The rules and the verdict are tracker/paid_qa.py, what
+# The PPC team's Campaign Launch QC checklist, done by the AI: pick an account,
+# pick one of its live campaigns, and the AI reviews every check and flags what
+# is wrong. The evidence is read from Google Ads (tracker/paid_qa_auto.py) and
+# from the campaign's landing pages (tracker/paid_qa_web.py); exact rules settle
+# what Google Ads answers exactly, and Claude (tracker/paid_qa_ai.py) reviews the
+# rest. The review runs in a background thread (tracker/paid_qa_job.py) with its
+# progress in Postgres; the page polls. The verdict is tracker/paid_qa.py, what
 # was saved is tracker/paid_qa_store.py. The account list is the Performance
 # Summarizer's (api/gads/accounts); Google Ads is read through
 # tracker/paid_gads_segments.py, so every read shares the one daily budget.
 
 _QC_ID = re.compile(r"[0-9a-f]{32}")
-_QC_RUN_GAP_S = 20
+_QC_RUN_GAP_S = 60
 _QC_LAST_RUN = {}
 
 
@@ -4812,17 +4814,33 @@ def _qc_payload(store, launch, **extra):
     return dict(paid_qa.payload(launch, store.checks_for([launch["id"]])[launch["id"]]), **extra)
 
 
-def _qc_read(store, launch):
-    """Read the campaign from Google Ads, keep what the checks found, and return
-    the saved launch. Raises GadsError (Google unavailable) or LookupError (the
-    campaign is not in this account)."""
-    from tracker import paid_gads_segments as gads, paid_qa, paid_qa_auto
-    out = paid_qa_auto.run(launch["account_id"], launch["campaign_id"], gads.search, geo_fn=gads.geo_names)
-    camp = out["campaign"]
-    if not camp["id"]:
-        raise LookupError("That campaign was not found in this account.")
-    return store.save_auto(launch["id"], out["findings"], campaign_name=camp["name"] or launch["campaign_name"],
-                           channel=camp["channel"], campaign_types=paid_qa.campaign_types_for(camp["channel"], camp["dsa"]))
+_QC_AI_DAILY_CAP = 40
+_QC_AI_USES = {}
+
+
+def _qc_spawn(fn):
+    """Run a review in the background. (Tests run it inline by replacing this.)"""
+    import threading
+    threading.Thread(target=fn, daemon=True, name="qa-review").start()
+
+
+def _qc_start_review(store, launch):
+    """Start the AI review of this QC unless one is already running. Returns
+    (started, why_not): why_not is words for the page when the daily cap is hit."""
+    from tracker import paid_gads_segments as gads, paid_qa_job, paid_qa_web
+    email, today = _pm_user_email(), datetime.now(timezone.utc).date().isoformat()
+    day, used = _QC_AI_USES.get(email, (today, 0))
+    if day != today:
+        used = 0
+    if used >= _QC_AI_DAILY_CAP:
+        return False, "That is %d AI reviews in a day, the most this allows." % used
+    if not store.begin_review(launch["id"]):
+        return False, ""
+    _QC_AI_USES[email] = (today, used + 1)
+    lid = launch["id"]
+    _qc_spawn(lambda: paid_qa_job.run_review(lid, store=store, search=gads.search, geo_fn=gads.geo_names,
+                                             web_fn=paid_qa_web.audit_pages))
+    return True, ""
 
 
 @app.route("/p2/paid-marketing/api/qa/campaigns")
@@ -4857,9 +4875,8 @@ def paid_qa_campaigns():
 @position2_required
 def paid_qa_start():
     """Start the QC for a campaign, or open the one already started. A new QC
-    reads the campaign at once; if Google Ads cannot be read the QC still opens
-    (every check can be done by hand) and says why."""
-    from tracker import paid_gads_segments as gads, paid_qa, paid_qa_store as store
+    starts the AI review at once; the page polls the QC until it is done."""
+    from tracker import paid_qa, paid_qa_store as store
     try:
         fields = paid_qa.clean_start(request.get_json(silent=True))
     except paid_qa.BadPayload as e:
@@ -4868,14 +4885,11 @@ def paid_qa_start():
         launch, created = store.start_launch(by=_pm_user_email(), campaign_types=paid_qa.campaign_types_for(fields["channel"]),
                                              **fields)
         extra = {}
-        if not launch["auto_at"]:
-            try:
-                launch = _qc_read(store, launch)
-            except gads.GadsError as e:
-                extra["readError"] = {"error": str(e), "kind": e.kind}
-            except LookupError as e:
-                store.archive_launch(launch["id"])
-                return jsonify(error=str(e)), 404
+        if not launch["auto_at"] and not launch["review_status"]:
+            _started, why = _qc_start_review(store, launch)
+            if why:
+                extra["reviewError"] = why
+            launch = store.get_launch(launch["id"])
         return jsonify(_qc_payload(store, launch, **extra)), (201 if created else 200)
     except store.StoreUnavailable as e:
         return _pm_store_error(e)
@@ -4910,24 +4924,23 @@ def paid_qa_launch(launch_id):
 @app.route("/p2/paid-marketing/api/qa/launches/<launch_id>/run", methods=["POST"])
 @position2_required
 def paid_qa_run(launch_id):
-    """Read the campaign again (the Re-run button). About 18 Google Ads reads,
-    so a short gap is kept between runs of one QC."""
+    """Run the AI review again (the Re-run button). A short gap is kept between
+    runs of one QC, and only one review of a QC runs at a time."""
     import time
-    from tracker import paid_gads_segments as gads, paid_qa_store as store
+    from tracker import paid_qa_store as store
     try:
         launch = _qc_launch_or_404(store, launch_id)
         wait = _QC_RUN_GAP_S - (time.time() - _QC_LAST_RUN.get(launch_id, 0))
         if wait > 0:
-            return jsonify(error="That campaign was read a moment ago. Try again in %d seconds." % (wait + 1),
+            return jsonify(error="That campaign was reviewed a moment ago. Try again in %d seconds." % (wait + 1),
                            kind="cooldown", retryIn=int(wait) + 1), 429
+        started, why = _qc_start_review(store, launch)
+        if why:
+            return jsonify(error=why, kind="cap"), 429
+        if not started:
+            return jsonify(error="A review of this campaign is already running."), 409
         _QC_LAST_RUN[launch_id] = time.time()
-        try:
-            launch = _qc_read(store, launch)
-        except gads.GadsError as e:
-            return _pm_gads_error(e)
-        except LookupError as e:
-            return jsonify(error=str(e)), 404
-        return jsonify(_qc_payload(store, launch))
+        return jsonify(_qc_payload(store, store.get_launch(launch_id)))
     except store.StoreUnavailable as e:
         return _pm_store_error(e)
 
@@ -18932,18 +18945,17 @@ Google Ads does not report every segment for every campaign type (Performance Ma
 are computed by rules from the tables, not guessed: the cheapest segments to push, groups of segments that spend
 with no conversions, segments converting at 1.5x the average cost, and caveats on how far to trust a table; each
 carries its evidence, a recommended action and a high or directional confidence. A short summary is written by
-Claude from those insights only. QA Agent (/p2/paid-marketing/qa-agent): the PPC team's Campaign Launch QC
-checklist (155 checks in 15 sections, from account setup and conversion tracking to campaign settings, ads, assets,
-Performance Max, shopping, landing pages, policy and the final pre-launch review). Pick an account, then one of
-its live campaigns, and the QC starts on the checklist. Each check is right or wrong with a comment box beside it
-(a reason is required for wrong). For the checks Google Ads can answer (auto-tagging, URL tracking template and
-parameters, network settings, location option, status, budget, bid strategy, ads and keywords per ad group, assets,
-Performance Max asset groups, disapprovals and more) the agent reads the campaign and prints what it found; it
-ticks or crosses a box itself only when the answer is exact, and a person's click always wins. Checks are Critical,
-Major or Minor. The verdict follows the workbook: NOT READY if any Critical check is wrong, INCOMPLETE if any
-Critical check is still open, otherwise READY TO LAUNCH (a Critical N/A counts as done). Major and Minor failures do
-not block the verdict but are listed. Checks that exist only for a type of client (Ecommerce, Lead Gen...) join
-once the client type is chosen. Each QC is saved per campaign with who answered what and when.
+Claude from those insights only. QA Agent (/p2/paid-marketing/qa-agent): the PPC team's Campaign Launch QC checklist (155 checks in 15 sections, from
+account setup and conversion tracking to campaign settings, ads, assets, Performance Max, shopping, landing pages,
+policy and the final pre-launch review), done by the AI. Pick an account, then one of its live campaigns, and the AI
+reviews every check: it reads the campaign in Google Ads and opens the landing pages, runs exact rules where Google Ads
+gives an exact answer (auto-tagging, URL tracking parameters, network settings, location options, status and more),
+and has Claude judge the rest from that evidence. It flags what is wrong with the fix and the evidence, and lists the
+checks it cannot verify for itself (the client's sign-off, the media plan, a test conversion) as needing a human; it
+never guesses a pass. A person can confirm or overrule any check with a comment. Checks are Critical, Major or Minor.
+The verdict follows the workbook: NOT READY if any Critical check is flagged, INCOMPLETE if any Critical check could
+not be verified, otherwise READY TO LAUNCH. Checks that exist only for a type of client (Ecommerce, Lead Gen...) count
+once the client type is chosen. Each QC is saved per campaign.
 
 SEO STUDIO (/p2/seo-aeo/<tool>) and the /app agents: a suite of SEO/GEO tools (Keyword Finder, Content Brief
 Generator, Content Enhancer, SEO & GEO Audit, Agentic Readiness Audit, Competitor Analysis, and more).

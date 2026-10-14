@@ -273,7 +273,7 @@ def test_ad_copy_counts_pass_only_when_good_and_fail_below_the_minimum():
 def test_final_urls_are_printed_and_http_is_a_cross():
     g = [ad_group()]
     ok = find("6.3", adgroups=g, ads=[rsa()])
-    assert ok["result"] is None and "https://example.com/" in ok["found"] and "Open them" in ok["found"]   # loading is not checked
+    assert ok["result"] is None and "https://example.com/" in ok["found"] and "could not be opened" in ok["found"]   # no page evidence: not ticked
     assert find("6.3", adgroups=g, ads=[rsa(urls=("http://example.com/",))])["result"] == "fail"
 
 
@@ -443,10 +443,10 @@ def test_only_the_reads_a_campaign_type_can_answer_are_made():
     assert len(Google().queries) == 0
 
 
-def test_a_read_costs_about_eighteen_calls_for_a_search_campaign():
+def test_a_read_costs_about_two_dozen_calls_for_a_search_campaign():
     g = Google()
     auto.run("2133861213", "1", g)
-    assert 14 <= len(g.queries) <= 22
+    assert 18 <= len(g.queries) <= 28
 
 
 def test_one_refused_read_is_noted_and_the_rest_still_run():
@@ -501,3 +501,51 @@ def test_a_found_text_is_kept_to_a_readable_length():
     f = auto.Finding("pass", "word " * 1000)
     assert len(f["found"]) <= auto.MAX_FOUND and f["found"].endswith("...")
     assert auto.Finding(None, "a\n  b\t c")["found"] == "a b c"
+
+
+# ── Landing pages ───────────────────────────────────────────────────────────
+
+def page(**k):
+    base = {"url": "https://example.com/", "https": True, "status": 200, "finalUrl": "https://example.com/", "loadMs": 300,
+            "paramsSurvive": True, "stagingHost": False, "noindex": False, "robots": {"adsbotAllowed": True}}
+    base.update(k)
+    return base
+
+
+def with_pages(*pages, **data):
+    d = rows(**data)
+    d["_pages"] = list(pages)
+    return auto.evaluate(d)
+
+
+def test_a_page_that_is_open_and_not_blocked_to_adsbot_passes_13_1():
+    out = with_pages(page())["13.1"]
+    assert out["result"] == "pass" and "https://example.com/: 200" in out["found"]
+
+
+def test_noindex_is_a_note_not_a_failure_because_it_does_not_matter_to_ads():
+    out = with_pages(page(noindex=True))["13.1"]
+    assert out["result"] == "pass" and "noindex" in out["found"] and "fine for ads" in out["found"]
+
+
+def test_a_missing_staging_or_adsbot_blocked_page_fails_13_1():
+    for bad, says in ((page(status=404), "answered 404"), (page(stagingHost=True), "staging"),
+                      (page(robots={"adsbotAllowed": False}), "blocks AdsBot"), (page(error="TimeoutError: slow", status=None), "could not be opened")):
+        assert with_pages(bad)["13.1"]["result"] == "fail" and says in with_pages(bad)["13.1"]["found"], says
+    assert with_pages()["13.1"]["result"] is None                                           # no page to open: no tick
+
+
+def test_parameters_surviving_the_redirect_is_a_pass_and_losing_them_is_a_fail_for_13_2():
+    assert with_pages(page())["13.2"]["result"] == "pass"
+    lost = with_pages(page(paramsSurvive=False, url="https://example.com/old"))["13.2"]
+    assert lost["result"] == "fail" and "https://example.com/old" in lost["found"]
+    assert with_pages(page(paramsSurvive=None))["13.2"]["result"] is None                   # could not be tested
+    assert with_pages(page(), page(url="https://example.com/b", paramsSurvive=None))["13.2"]["result"] is None   # not every page tested
+
+
+def test_final_urls_that_do_not_load_are_a_cross_for_6_3():
+    ads = dict(adgroups=[ad_group()], ads=[rsa()])
+    assert with_pages(page(status=404), **ads)["6.3"]["result"] == "fail"
+    ok = with_pages(page(), **ads)["6.3"]
+    assert ok["result"] is None and "loaded" in ok["found"]                                 # loading is only part of the check
+

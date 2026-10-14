@@ -189,20 +189,22 @@ def test_answers_on_checks_that_no_longer_show_do_not_count():
 AT = "2026-10-14T10:00:00+00:00"
 
 
-def test_the_agents_pass_and_fail_become_the_checks_state_with_its_finding():
+def test_the_ais_and_the_rules_pass_and_fail_become_the_checks_state_with_their_finding():
     L = launch(campaign_types=["Search"])
-    rows = qa.effective(L, {}, {"1.6": {"result": "pass", "found": "Auto-tagging is ON"},
-                                "3.6": {"result": None, "found": "Daily budget 30.00 USD"},
-                                "4.2": {"result": "fail", "found": "Search partners are ON"}}, AT)
-    assert rows["1.6"] == {"status": "pass", "note": "", "by": "QA Agent", "at": AT, "source": "agent", "found": "Auto-tagging is ON"}
-    assert rows["4.2"]["status"] == "fail" and rows["4.2"]["source"] == "agent"
-    assert rows["3.6"]["status"] is None and rows["3.6"]["found"] == "Daily budget 30.00 USD"     # printed, left to the reviewer
+    rows = qa.effective(L, {}, {"1.6": {"result": "pass", "found": "Auto-tagging is ON", "source": "rule"},
+                                "3.6": {"result": None, "found": "Cannot see the plan", "source": "ai", "unverified": True},
+                                "6.2": {"result": "fail", "found": "Headline 3 shouts", "fix": "Remove the !!", "evidence": "Headline 3",
+                                        "source": "ai"}}, AT)
+    assert rows["1.6"]["status"] == "pass" and rows["1.6"]["source"] == "rule" and rows["1.6"]["by"] == "QA Agent" and rows["1.6"]["at"] == AT
+    assert rows["6.2"]["status"] == "fail" and rows["6.2"]["source"] == "ai" and rows["6.2"]["fix"] == "Remove the !!"
+    assert rows["6.2"]["evidence"] == "Headline 3"
+    assert rows["3.6"]["status"] is None and rows["3.6"]["unverified"] is True and rows["3.6"]["found"] == "Cannot see the plan"
     assert "1.1" not in rows                                                                      # nothing read, nothing answered
 
 
 def test_a_persons_answer_always_beats_the_agent_and_clearing_it_brings_the_agent_back():
     L = launch(campaign_types=["Search"])
-    auto = {"4.2": {"result": "fail", "found": "Search partners are ON"}}
+    auto = {"4.2": {"result": "fail", "found": "Search partners are ON", "source": "rule"}}
     mine = {"4.2": {"status": "pass", "note": "Client approved partners in writing", "by": STAFF, "at": AT}}
     row = qa.effective(L, mine, auto, AT)["4.2"]
     assert row["status"] == "pass" and row["source"] == "person" and row["note"].startswith("Client approved")
@@ -224,6 +226,28 @@ def test_an_agent_fail_on_a_critical_check_makes_the_launch_not_ready_until_a_pe
     fixed = qa.effective(L, {"4.1": {"status": "pass", "note": "turned off", "by": STAFF, "at": AT}},
                          {"4.1": {"result": "fail", "found": "Google Display Network is ON"}}, AT)
     assert qa.summarize(L, {**done, **fixed})["verdict"]["code"] == "ready"
+
+
+def test_a_critical_check_the_ai_could_not_verify_keeps_the_launch_incomplete_until_a_person_confirms_it():
+    L = launch(campaign_types=["Search"])
+    done = {c: {"status": "pass"} for c in CRITICAL if c != "14.4"}
+    rows = qa.effective(L, {}, {"14.4": {"result": None, "found": "Cannot see the client's sign-off", "source": "ai", "unverified": True}}, AT)
+    s = qa.summarize(L, {**done, **rows})
+    assert s["verdict"]["code"] == "incomplete" and s["pendingCritical"] == ["14.4"] and "14.4" in s["needsHuman"]
+    mine = qa.effective(L, {"14.4": {"status": "pass", "note": "Signed off by email", "by": STAFF, "at": AT}},
+                        {"14.4": {"result": None, "found": "Cannot see the client's sign-off", "source": "ai", "unverified": True}}, AT)
+    assert qa.summarize(L, {**done, **mine})["verdict"]["code"] == "ready"
+
+
+def test_the_review_view_says_what_the_ai_is_doing_and_notices_a_dead_one():
+    base = {"review_status": "running", "review_progress": {"phase": "Reading", "done": 2, "total": 9}, "review_error": "", "review_note": "",
+            "review_started": "2026-10-14T10:00:00+00:00"}
+    now = qa.dt.datetime.fromisoformat("2026-10-14T10:03:00+00:00")
+    assert qa.review_view(base, now) == {"status": "running", "phase": "Reading", "done": 2, "total": 9, "error": "", "note": ""}
+    later = qa.dt.datetime.fromisoformat("2026-10-14T10:20:00+00:00")
+    dead = qa.review_view(base, later)
+    assert dead["status"] == "error" and "stopped before it finished" in dead["error"]
+    assert qa.review_view({"review_status": ""}, now)["status"] == ""
 
 
 def test_the_page_payload_has_the_launch_every_state_and_the_verdict():
@@ -294,7 +318,7 @@ def test_client_types_are_checked_against_the_checklists():
 
 # ── The storage SQL is Postgres ─────────────────────────────────────────────
 
-LAUNCH_ROW = ("a" * 32, ACCOUNT, "A", CAMPAIGN, "C", "SEARCH", [], ["Search"], {}, None, "u", None, None, False)
+LAUNCH_ROW = ("a" * 32, ACCOUNT, "A", CAMPAIGN, "C", "SEARCH", [], ["Search"], {}, None, "u", None, None, False, "", {}, "", "", None)
 
 
 class RecordingCursor:
@@ -356,12 +380,16 @@ def test_every_statement_the_store_runs_is_valid_postgres(monkeypatch):
     store.get_launch("a" * 32)
     store.list_launches(ACCOUNT)
     store.set_client_types("a" * 32, ["B2B"])
-    store.save_auto("a" * 32, {"1.6": {"result": "pass", "found": "ON"}}, campaign_name="C", channel="SEARCH", campaign_types=["Search"])
+    assert store.begin_review("a" * 32) is True
+    store.set_progress("a" * 32, "The AI is reviewing the checklist", 2, 9)
+    store.finish_review("a" * 32, {"1.6": {"result": "pass", "found": "ON", "source": "rule"}}, campaign_name="C", channel="SEARCH",
+                        campaign_types=["Search"], note="")
+    store.fail_review("a" * 32, "Google Ads says the daily limit is used up.")
     store.archive_launch("a" * 32)
     store.checks_for(["a" * 32, "b" * 32])
     store.set_check("a" * 32, "1.1", "fail", "why", "u")
     store.clear_check("a" * 32, "1.1")
-    assert len(log) >= 14
+    assert len(log) >= 17
     for sql in log:
         n = iter(range(1, 100))
         pglast.parse_sql(re.sub(r"%s", lambda m: "$%d" % next(n), sql))
@@ -376,9 +404,10 @@ def test_the_schema_has_the_tables_a_cascade_and_one_live_qc_per_campaign():
     # and only then is the one-live-QC-per-campaign index built (old rows all have an empty campaign id)
     assert s.index("ADD COLUMN IF NOT EXISTS campaign_id") < s.index("SET archived = true WHERE campaign_id = ''") < s.index("UNIQUE INDEX")
     assert "ALTER COLUMN name DROP NOT NULL" in s
+    assert "review_status" in s and "ADD COLUMN IF NOT EXISTS review_started" in s
 
 
-# ── Routes, on an in-memory store and a fake Google Ads ─────────────────────
+# ── Routes, on an in-memory store, a fake Google Ads, fake landing pages and a fake AI ──
 
 class MemoryStore:
     """What tracker/paid_qa_store.py keeps, in a dict."""
@@ -393,7 +422,8 @@ class MemoryStore:
         lid = "%032x" % self.n
         self.launches[lid] = dict(f, id=lid, account_id=account_id, campaign_id=campaign_id, campaign_types=campaign_types,
                                   client_types=[], auto={}, auto_at=None, created_by=by, created_at="2026-10-14T10:00:00+00:00",
-                                  updated_at="2026-10-14T10:00:00+00:00", archived=False)
+                                  updated_at="2026-10-14T10:00:00+00:00", archived=False, review_status="", review_progress={},
+                                  review_error="", review_note="", review_started=None)
         self.checks[lid] = {}
         return copy.deepcopy(self.launches[lid]), True
 
@@ -408,10 +438,25 @@ class MemoryStore:
         self.launches[lid]["client_types"] = types
         return copy.deepcopy(self.launches[lid])
 
-    def save_auto(self, lid, findings, *, campaign_name, channel, campaign_types):
-        self.launches[lid].update(auto=findings, auto_at="2026-10-14T10:01:00+00:00", campaign_name=campaign_name,
-                                  channel=channel, campaign_types=campaign_types)
+    def begin_review(self, lid):
+        l = self.launches[lid]
+        if l["review_status"] == "running":
+            return False
+        l.update(review_status="running", review_error="", review_started=qa.dt.datetime.now(qa.dt.timezone.utc).isoformat(),
+                 review_progress={"phase": "Starting", "done": 0, "total": 0})
+        return True
+
+    def set_progress(self, lid, phase, done, total):
+        self.launches[lid]["review_progress"] = {"phase": phase, "done": done, "total": total}
+
+    def finish_review(self, lid, findings, *, campaign_name, channel, campaign_types, note=""):
+        self.launches[lid].update(auto=findings, auto_at=qa.dt.datetime.now(qa.dt.timezone.utc).isoformat(), campaign_name=campaign_name, channel=channel,
+                                  campaign_types=campaign_types, review_status="done", review_error="", review_note=note,
+                                  review_progress={})
         return copy.deepcopy(self.launches[lid])
+
+    def fail_review(self, lid, error):
+        self.launches[lid].update(review_status="error", review_error=error, review_progress={})
 
     def archive_launch(self, lid):
         self.launches[lid]["archived"] = True
@@ -436,11 +481,11 @@ def fake_google(**over):
         return k
     headlines = [{"text": "Headline %d" % i} for i in range(15)]
     data = {
+        "FROM customer WHERE": [],
         "FROM customer": [row(customer={"autoTaggingEnabled": True, "trackingUrlTemplate": "{lpurl}?utm_source=google&utm_medium=cpc",
                                         "currencyCode": "USD", "timeZone": "America/New_York",
                                         "containsEuPoliticalAdvertising": "DOES_NOT_CONTAIN_EU_POLITICAL_ADVERTISING"})],
         "FROM billing_setup": [row(billingSetup={"status": "APPROVED", "paymentsAccountInfo": {"paymentsAccountName": "Example Co"}})],
-        "FROM recommendation_subscription": [],
         "FROM campaign WHERE campaign.id": [row(campaign={"id": CAMPAIGN, "name": "Example_Brand_Search", "status": "ENABLED",
                                                          "servingStatus": "SERVING", "advertisingChannelType": "SEARCH",
                                                          "networkSettings": {"targetGoogleSearch": True, "targetSearchNetwork": False,
@@ -450,10 +495,8 @@ def fake_google(**over):
                                                          "startDateTime": "2026-03-11 04:38:47", "aiMaxSetting": {"enableAiMax": False},
                                                          "biddingStrategyType": "MAXIMIZE_CONVERSIONS"},
                                                  campaignBudget={"amountMicros": "30000000", "explicitlyShared": False})],
-        "FROM campaign_criterion": [], "FROM campaign_label": [],
         "FROM campaign_shared_set": [row(sharedSet={"name": "Generic Negatives", "type": "NEGATIVE_KEYWORDS", "memberCount": "60"},
-                                         campaignSharedSet={"status": "ENABLED"})], "FROM conversion_action": [],
-        "FROM campaign_asset": [], "FROM customer_asset": [],
+                                         campaignSharedSet={"status": "ENABLED"})],
         "FROM ad_group WHERE": [row(adGroup={"id": "11", "name": "Brand", "status": "ENABLED", "type": "SEARCH_STANDARD"})],
         "FROM ad_group_ad": [row(adGroup={"id": "11"}, adGroupAd={"status": "ENABLED", "adStrength": "GOOD",
                                                                   "policySummary": {"approvalStatus": "APPROVED"},
@@ -490,15 +533,60 @@ def fake_google(**over):
     return search
 
 
+PAGE = {"url": "https://example.com/", "https": True, "status": 200, "finalUrl": "https://example.com/", "redirected": False, "loadMs": 300,
+        "paramsSurvive": True, "title": "Example Co landscaping", "text": "Landscaping in Annapolis. Free estimates. Call 410-555-0100.",
+        "forms": [{"fields": ["name", "email"], "method": "post"}], "hasCaptcha": False, "telLinks": [], "phonesInText": ["410-555-0100"],
+        "privacyLink": {"href": "/privacy", "text": "Privacy"}, "consentBanner": True, "googleTags": ["AW-123456"],
+        "robots": {"adsbotAllowed": True}, "viewport": "width=device-width", "noindex": False, "stagingHost": False}
+
+
+class FakeModel:
+    """Stands in for Claude: answers the checks it was told to, from evidence it was really given, and says
+    cannot_verify to everything else. Records what it was asked."""
+    def __init__(self, answers=None, boom=None):
+        self.answers, self.boom, self.asked = answers or {}, boom, []
+
+    def __call__(self, system, user, *, max_tokens):
+        import json
+        if self.boom:
+            raise self.boom
+        req = json.loads(user)
+        self.asked.append(req)
+        out = []
+        for c in req["checks"]:
+            a = self.answers.get(c["id"])
+            if a:
+                out.append({"id": c["id"], "verdict": a[0], "finding": a[1], "evidence": a[2], "fix": a[3] if len(a) > 3 else ""})
+            else:
+                out.append({"id": c["id"], "verdict": "cannot_verify", "finding": "Nothing in the evidence answers this.", "evidence": "", "fix": ""})
+        return {"results": out}
+
+
+DEFAULT_ANSWERS = {
+    "3.2": ("pass", "The campaign is named Example_Brand_Search, which follows Client_Type_Theme.", "Example_Brand_Search"),
+    "6.2": ("flag", "Headline 3 has a double exclamation mark.", "Headline 3", "Remove the exclamation marks from headline 3 in ad group Brand."),
+    "6.4": ("pass", "The offer in the ad matches the page.", "Free estimates"),
+    "13.6": ("flag", "The ad promises a free estimate but the page says nothing about it.", "Landscaping in Annapolis",
+             "Add the free estimate offer to the landing page or remove it from the ads."),
+}
+
+
 @pytest.fixture
 def mem(monkeypatch):
+    from tracker import paid_qa_ai, paid_qa_web
     m = MemoryStore()
-    for name in ("start_launch", "get_launch", "list_launches", "set_client_types", "save_auto", "archive_launch",
-                 "checks_for", "set_check", "clear_check"):
+    for name in ("start_launch", "get_launch", "list_launches", "set_client_types", "begin_review", "set_progress", "finish_review",
+                 "fail_review", "archive_launch", "checks_for", "set_check", "clear_check"):
         monkeypatch.setattr(store, name, getattr(m, name))
     monkeypatch.setattr(gads, "search", fake_google())
     monkeypatch.setattr(gads, "geo_names", lambda names, **k: {})
+    monkeypatch.setattr(paid_qa_web, "audit_pages", lambda urls, *a, **k: [dict(PAGE, url=u) for u in urls[:1]])
+    model = FakeModel(DEFAULT_ANSWERS)
+    monkeypatch.setattr(paid_qa_ai, "default_call", model)
+    m.model = model
+    monkeypatch.setattr(appmod, "_qc_spawn", lambda fn: fn())                  # the review runs inline, so a test sees its result
     monkeypatch.setattr(appmod, "_QC_LAST_RUN", {})
+    monkeypatch.setattr(appmod, "_QC_AI_USES", {})
     return m
 
 
@@ -555,10 +643,9 @@ def test_the_campaign_list_is_the_live_campaigns_of_the_account(mem):
 
 def test_the_campaign_list_asks_google_only_for_enabled_campaigns_and_says_which_have_a_qc(mem):
     c, lid, _ = start()
-    c.put("%s/launches/%s/checks/1.1" % (API, lid), json={"status": "pass"}, headers=SAME)
     out = c.get(API + "/campaigns?account=" + ACCOUNT).get_json()["campaigns"]
     qc = out[0]["qc"]
-    assert qc["id"] == lid and qc["verdict"]["code"] == "incomplete" and qc["checked"] >= 1 and out[1]["qc"] is None
+    assert qc["id"] == lid and qc["verdict"]["code"] in ("not_ready", "incomplete") and qc["checked"] >= 1 and out[1]["qc"] is None
     assert any("campaign.status = 'ENABLED'" in q for q in gads.search.calls)
 
 
@@ -570,67 +657,129 @@ def test_the_campaign_list_says_when_google_ads_cannot_be_read(monkeypatch, mem)
     assert r.status_code == 429 and r.get_json()["kind"] == "quota"
 
 
-def test_picking_a_campaign_starts_the_qc_and_the_agent_reads_it_at_once(mem):
+def test_picking_a_campaign_starts_the_ai_review_which_flags_what_is_wrong(mem):
     c, lid, body = start()
-    assert body["launch"]["campaignName"] == "Example_Brand_Search" and body["launch"]["campaignTypes"] == ["Search"]
-    assert body["launch"]["readAt"] and "readError" not in body
+    assert body["launch"]["review"]["status"] == "done" and body["launch"]["readAt"]
     checks = body["checks"]
-    assert checks["1.6"]["status"] == "pass" and checks["1.6"]["source"] == "agent" and checks["1.6"]["by"] == "QA Agent"
-    assert "ON" in checks["1.6"]["found"]
-    assert checks["1.7"]["status"] == "pass" and "utm_source=google" in checks["1.7"]["found"]      # the URL parameters, printed
-    assert checks["3.6"]["status"] is None and "30.00 USD" in checks["3.6"]["found"]                   # plan-dependent: printed only
-    assert body["summary"]["checked"] > 0 and body["summary"]["verdict"]["code"] == "incomplete"
+    assert checks["1.6"]["status"] == "pass" and checks["1.6"]["source"] == "rule"                 # exact rule, from Google Ads
+    flagged = checks["6.2"]
+    assert flagged["status"] == "fail" and flagged["source"] == "ai" and flagged["by"] == "QA Agent"
+    assert "double exclamation" in flagged["found"] and "exclamation marks" in flagged["fix"] and flagged["evidence"] == "Headline 3"
+    assert checks["13.6"]["status"] == "fail" and checks["3.2"]["status"] == "pass"
+    assert body["summary"]["failed"] and set(body["summary"]["failed"]) >= {"6.2", "13.6"}
     assert mem.launches[lid]["created_by"] == STAFF and mem.launches[lid]["auto_at"]
 
 
-def test_opening_the_same_campaign_again_resumes_the_one_qc_without_reading_again(mem):
-    c, lid, _ = start()
-    calls = len(gads.search.calls)
-    c2, lid2, body = start(client_as(OTHER))
-    assert lid2 == lid and len(mem.launches) == 1 and len(gads.search.calls) == calls
-    r = c.post(API + "/start", json=NEW, headers=SAME)
-    assert r.status_code == 200                                                                      # resumed, not created
+def test_what_the_ai_cannot_see_is_left_for_a_person_not_passed(mem):
+    c, lid, body = start()
+    row = body["checks"]["14.4"]                                      # the client's written sign-off
+    assert row["status"] is None and row["unverified"] is True and "Nothing in the evidence" in row["found"]
+    assert "14.4" in body["summary"]["needsHuman"] and "14.4" in body["summary"]["pendingCritical"]
+    assert body["summary"]["verdict"]["code"] in ("not_ready", "incomplete")
 
 
-def test_if_google_ads_cannot_be_read_the_qc_still_opens_for_manual_checks(monkeypatch, mem):
-    def refused(cid, gaql):
-        raise gads.GadsError("quota", "Google Ads says the daily limit is used up.")
-    monkeypatch.setattr(gads, "search", refused)
+def test_a_critical_flag_makes_the_launch_not_ready_and_an_unverified_critical_makes_it_incomplete(mem):
+    mem.model.answers = dict(DEFAULT_ANSWERS, **{"6.3": ("flag", "The final URL redirects to another country site.", "https://example.com/",
+                                                         "Point the final URL at the US page.")})
+    c, lid, body = start()
+    s = body["summary"]
+    assert "6.3" in s["failedCritical"] and s["verdict"]["code"] == "not_ready"
+    c.put("%s/launches/%s/checks/6.3" % (API, lid), json={"status": "pass", "note": "Checked: it is the US page"}, headers=SAME)
+    out = c.get(API + "/launches/" + lid).get_json()["summary"]
+    assert "6.3" not in out["failedCritical"] and out["verdict"]["code"] in ("not_ready", "incomplete")
+
+
+def test_the_ai_is_asked_only_what_the_exact_rules_did_not_settle(mem):
+    start()
+    asked = {c["id"] for req in mem.model.asked for c in req["checks"]}
+    assert "1.6" not in asked and "4.1" not in asked and "5.1" not in asked          # settled by exact rules
+    assert {"6.2", "13.6", "14.4"} <= asked
+    sample = mem.model.asked[0]
+    assert sample["campaign"]["type"] == "Search" and "evidence" in sample and sample["today"]
+    assert not any(c["id"].startswith("8.") for req in mem.model.asked for c in req["checks"])     # PMax checks are not for a Search campaign
+
+
+def test_the_ai_sees_the_evidence_it_needs_for_each_section(mem):
+    start()
+    by_section = {req["section"]: req for req in mem.model.asked}
+    ads = by_section["6. Ad Copy"] if "6. Ad Copy" in by_section else next(r for k, r in by_section.items() if k.startswith("6."))
+    assert "adGroups" in ads["evidence"] and ads["evidence"]["adGroups"][0]["ads"][0]["headlines"][0]["text"] == "Headline 0"
+    page = next(r for k, r in by_section.items() if k.startswith("13."))
+    assert page["evidence"]["landingPages"][0]["text"].startswith("Landscaping in Annapolis")
+
+
+def test_if_the_ai_is_unavailable_the_exact_rules_still_run_and_everything_else_waits_for_a_person(monkeypatch, mem):
+    from tracker import paid_qa_ai
+    from tracker.market_radar_llm import ModelError
+    monkeypatch.setattr(paid_qa_ai, "default_call", FakeModel(boom=ModelError("not_configured", "ANTHROPIC_API_KEY is not set")))
+    c, lid, body = start()
+    assert body["checks"]["1.6"]["status"] == "pass" and body["checks"]["6.2"]["status"] is None
+    assert "no Anthropic key" in body["launch"]["review"]["note"] and body["launch"]["review"]["status"] == "done"
+    assert body["summary"]["verdict"]["code"] in ("not_ready", "incomplete")                 # never READY on rules alone
+
+
+def test_if_google_ads_cannot_be_read_the_review_says_so_and_the_qc_still_opens(monkeypatch, mem):
+    monkeypatch.setattr(gads, "search", lambda cid, gaql: (_ for _ in ()).throw(gads.GadsError("quota", "Google Ads says the daily limit is used up.")))
     c = client_as(STAFF)
     r = c.post(API + "/start", json=NEW, headers=SAME)
     body = r.get_json()
-    assert r.status_code == 201 and body["readError"]["kind"] == "quota" and body["launch"]["readAt"] is None
-    assert body["checks"] == {} and body["summary"]["total"] > 0                                      # every check can be done by hand
+    assert r.status_code == 201 and body["launch"]["review"]["status"] == "error" and "daily limit" in body["launch"]["review"]["error"]
+    assert body["checks"] == {} and body["summary"]["total"] > 0
     lid = body["launch"]["id"]
     assert c.put("%s/launches/%s/checks/1.1" % (API, lid), json={"status": "pass"}, headers=SAME).status_code == 200
 
 
-def test_a_campaign_that_is_not_in_the_account_is_refused_and_leaves_no_qc(monkeypatch, mem):
+def test_a_campaign_that_is_not_in_the_account_is_reported(monkeypatch, mem):
     monkeypatch.setattr(gads, "search", fake_google(**{"FROM campaign WHERE campaign.id": []}))
     r = client_as(STAFF).post(API + "/start", json=NEW, headers=SAME)
-    assert r.status_code == 404 and "not found in this account" in r.get_json()["error"]
-    assert all(l["archived"] for l in mem.launches.values())
+    assert r.get_json()["launch"]["review"]["status"] == "error" and "not found in this account" in r.get_json()["launch"]["review"]["error"]
 
 
-def test_a_bad_start_is_refused_in_words(mem):
-    c = client_as(STAFF)
-    for patch, says in (({"accountId": "12"}, "10 digits"), ({"campaignId": ""}, "Pick a campaign"), ({"campaignName": ""}, "campaign name")):
-        r = c.post(API + "/start", json=dict(NEW, **patch), headers=SAME)
-        assert r.status_code == 400 and says in r.get_json()["error"]
-    assert not mem.launches
-
-
-def test_a_person_answering_saves_who_and_beats_the_agent(mem):
+def test_opening_the_same_campaign_again_resumes_the_one_qc_without_reviewing_again(mem):
     c, lid, _ = start()
-    url = "%s/launches/%s/checks/1.6" % (API, lid)
-    r = c.put(url, json={"status": "fail", "note": "Auto-tagging is off in the GA4 link"}, headers=SAME)
+    calls, asked = len(gads.search.calls), len(mem.model.asked)
+    c2, lid2, body = start(client_as(OTHER))
+    assert lid2 == lid and len(mem.launches) == 1 and len(gads.search.calls) == calls and len(mem.model.asked) == asked
+    assert c.post(API + "/start", json=NEW, headers=SAME).status_code == 200                # resumed, not created
+
+
+def test_a_review_in_progress_reports_its_progress_and_is_not_started_twice(mem):
+    c, lid, _ = start()
+    mem.launches[lid].update(review_status="running", review_started="2026-10-14T10:00:30+00:00",
+                             review_progress={"phase": "The AI is reviewing the checklist", "done": 3, "total": 14})
+    body = c.get(API + "/launches/" + lid).get_json()
+    assert body["launch"]["review"]["status"] in ("running", "error")                       # error only once it has gone stale
+    mem.launches[lid]["review_started"] = "2999-01-01T00:00:00+00:00"                        # not stale
+    body = c.get(API + "/launches/" + lid).get_json()
+    assert body["launch"]["review"] == {"status": "running", "phase": "The AI is reviewing the checklist", "done": 3, "total": 14,
+                                        "error": "", "note": ""}
+    assert c.post("%s/launches/%s/run" % (API, lid), json={}, headers=SAME).status_code in (409, 429)
+
+
+def test_a_review_that_died_with_its_server_is_shown_as_stopped(mem):
+    c, lid, _ = start()
+    mem.launches[lid].update(review_status="running", review_started="2026-10-14T09:00:00+00:00")
+    r = c.get(API + "/launches/" + lid).get_json()["launch"]["review"]
+    assert r["status"] == "error" and "stopped before it finished" in r["error"]
+
+
+def test_a_person_confirming_or_overruling_beats_the_ai(mem):
+    c, lid, _ = start()
+    url = "%s/launches/%s/checks/6.2" % (API, lid)
+    r = c.put(url, json={"status": "pass", "note": "That is our style, approved by the client"}, headers=SAME)
     body = r.get_json()
-    assert r.status_code == 200 and body["check"]["status"] == "fail" and body["check"]["source"] == "person"
-    assert body["check"]["by"] == STAFF and "ON" in body["check"]["found"]                            # the finding stays printed
-    assert body["summary"]["verdict"]["code"] == "not_ready"                                          # 1.6 is Critical
-    r = c.put(url, json={"status": None}, headers=SAME)                                               # undo: back to the agent
-    assert r.get_json()["check"]["status"] == "pass" and r.get_json()["check"]["source"] == "agent"
-    assert "1.6" not in mem.checks[lid]
+    assert r.status_code == 200 and body["check"]["status"] == "pass" and body["check"]["source"] == "person" and body["check"]["by"] == STAFF
+    assert "double exclamation" in body["check"]["found"]                                  # the AI's finding stays visible
+    r = c.put(url, json={"status": None}, headers=SAME)                                    # undo: back to the AI's flag
+    assert r.get_json()["check"]["status"] == "fail" and r.get_json()["check"]["source"] == "ai"
+    assert "6.2" not in mem.checks[lid]
+
+
+def test_confirming_what_the_ai_could_not_verify_clears_it_from_the_needs_a_human_list(mem):
+    c, lid, first = start()
+    assert "14.4" in first["summary"]["needsHuman"]
+    r = c.put("%s/launches/%s/checks/14.4" % (API, lid), json={"status": "pass", "note": "Signed off by email on 2026-10-10"}, headers=SAME)
+    assert "14.4" not in r.get_json()["summary"]["needsHuman"] and "14.4" not in r.get_json()["summary"]["pendingCritical"]
 
 
 def test_wrong_needs_its_reason_and_keeps_it(mem):
@@ -639,14 +788,8 @@ def test_wrong_needs_its_reason_and_keeps_it(mem):
     r = c.put(url, json={"status": "fail"}, headers=SAME)
     assert r.status_code == 400 and "needs a reason" in r.get_json()["error"] and "1.2" not in mem.checks[lid]
     r = c.put(url, json={"status": "fail", "note": "Prepay balance is $0: add funds"}, headers=SAME)
-    assert r.status_code == 200 and r.get_json()["summary"]["failedCritical"] == ["1.2"]
+    assert r.status_code == 200 and "1.2" in r.get_json()["summary"]["failedCritical"]
     assert c.get(API + "/launches/" + lid).get_json()["checks"]["1.2"]["note"] == "Prepay balance is $0: add funds"
-
-
-def test_a_comment_can_sit_beside_a_right_answer(mem):
-    c, lid, _ = start()
-    r = c.put("%s/launches/%s/checks/3.2" % (API, lid), json={"status": "pass", "note": "Matches the convention"}, headers=SAME)
-    assert r.get_json()["check"]["status"] == "pass" and r.get_json()["check"]["note"] == "Matches the convention"
 
 
 def test_a_check_that_does_not_show_or_does_not_exist_cannot_be_answered(mem):
@@ -656,25 +799,26 @@ def test_a_check_that_does_not_show_or_does_not_exist_cannot_be_answered(mem):
     assert mem.checks[lid] == {}
 
 
-def test_choosing_a_client_type_adds_the_checks_that_exist_only_for_it(mem):
+def test_choosing_a_client_type_adds_the_checks_that_exist_only_for_it_and_the_ai_already_answered_them(mem):
     c, lid, first = start()
-    assert "8.5" not in first["summary"]["applicable"] and first["needsClientType"]["count"] > 0
+    assert "7.9" not in first["summary"]["applicable"] and first["needsClientType"]["count"] > 0
     r = c.put("%s/launches/%s" % (API, lid), json={"clientTypes": ["Lead Gen"]}, headers=SAME)
     body = r.get_json()
     assert r.status_code == 200 and body["summary"]["total"] > first["summary"]["total"]
-    assert "7.9" in body["summary"]["applicable"] and body["launch"]["clientTypes"] == ["Lead Gen"]
+    assert "7.9" in body["summary"]["applicable"] and "7.9" in body["checks"]               # reviewed in the first pass: no second review
     assert c.put("%s/launches/%s" % (API, lid), json={"clientTypes": ["Bogus"]}, headers=SAME).status_code == 400
 
 
-def test_rerunning_reads_the_campaign_again_and_a_persons_answers_stay(mem, monkeypatch):
+def test_rerunning_reviews_again_and_a_persons_answers_stay(mem, monkeypatch):
     c, lid, _ = start()
-    c.put("%s/launches/%s/checks/1.6" % (API, lid), json={"status": "na", "note": "client has none"}, headers=SAME)
-    changed = {"FROM customer": [{"customer": {"autoTaggingEnabled": False, "currencyCode": "USD", "timeZone": "America/New_York"}}]}
-    monkeypatch.setattr(gads, "search", fake_google(**changed))
+    c.put("%s/launches/%s/checks/6.2" % (API, lid), json={"status": "na", "note": "no ads yet"}, headers=SAME)
+    mem.model.answers = {"6.2": ("pass", "Headlines now read fine.", "Headline 3")}
+    monkeypatch.setattr(appmod, "_QC_LAST_RUN", {})
     r = c.post("%s/launches/%s/run" % (API, lid), json={}, headers=SAME)
     body = r.get_json()
-    assert r.status_code == 200 and body["checks"]["1.6"]["status"] == "na" and body["checks"]["1.6"]["source"] == "person"
-    assert body["checks"]["1.6"]["found"].endswith("OFF on the account.")                              # the new reading is printed
+    assert r.status_code == 200 and body["checks"]["6.2"]["status"] == "na" and body["checks"]["6.2"]["source"] == "person"
+    assert body["checks"]["6.2"]["found"].startswith("Headlines now read fine")             # the new finding is printed
+    assert "13.6" not in body["summary"]["failed"]                                          # the old flag is gone with the old review
 
 
 def test_rerunning_too_soon_is_asked_to_wait(mem):
@@ -684,11 +828,12 @@ def test_rerunning_too_soon_is_asked_to_wait(mem):
     assert first.status_code == 200 and again.status_code == 429 and again.get_json()["kind"] == "cooldown"
 
 
-def test_rerunning_says_when_google_ads_is_down(mem, monkeypatch):
+def test_there_is_a_daily_cap_on_ai_reviews_per_person(mem, monkeypatch):
+    monkeypatch.setattr(appmod, "_QC_AI_DAILY_CAP", 1)
     c, lid, _ = start()
-    monkeypatch.setattr(gads, "search", lambda cid, gaql: (_ for _ in ()).throw(gads.GadsError("auth", "Google would not sign in.")))
+    monkeypatch.setattr(appmod, "_QC_LAST_RUN", {})
     r = c.post("%s/launches/%s/run" % (API, lid), json={}, headers=SAME)
-    assert r.status_code == 502 and r.get_json()["kind"] == "auth"
+    assert r.status_code == 429 and r.get_json()["kind"] == "cap" and "AI reviews in a day" in r.get_json()["error"]
 
 
 def test_only_whoever_started_a_qc_or_an_admin_can_remove_it(mem):
@@ -721,10 +866,17 @@ def test_cross_site_and_non_json_writes_are_refused(mem):
     assert "3.2" not in mem.checks[lid]
 
 
+def test_a_bad_start_is_refused_in_words(mem):
+    c = client_as(STAFF)
+    for patch, says in (({"accountId": "12"}, "10 digits"), ({"campaignId": ""}, "Pick a campaign"), ({"campaignName": ""}, "campaign name")):
+        r = c.post(API + "/start", json=dict(NEW, **patch), headers=SAME)
+        assert r.status_code == 400 and says in r.get_json()["error"]
+    assert not mem.launches
+
+
 def test_a_store_outage_is_a_503_with_a_reason(monkeypatch):
     def down(*a, **k):
         raise store.StoreUnavailable("DATABASE_URL is not set")
-    monkeypatch.setattr(gads, "search", fake_google())
     monkeypatch.setattr(store, "start_launch", down)
     r = client_as(STAFF).post(API + "/start", json=NEW, headers=SAME)
     assert r.status_code == 503 and "DATABASE_URL" in r.get_json()["error"]
@@ -741,4 +893,4 @@ def test_the_server_never_trusts_a_verdict_from_the_page(mem):
     c, lid, _ = start()
     r = c.put("%s/launches/%s/checks/3.2" % (API, lid), json={"status": "pass", "verdict": "ready", "summary": {"verdict": {"code": "ready"}}},
               headers=SAME)
-    assert r.get_json()["summary"]["verdict"]["code"] == "incomplete"
+    assert r.get_json()["summary"]["verdict"]["code"] != "ready"
