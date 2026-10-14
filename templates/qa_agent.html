@@ -1,0 +1,87 @@
+{% extends "_paid_base.html" %}
+{% block title %}QA Agent{% endblock %}
+{% block content %}
+<div class="pm pm-qa" id="qa" data-user="{{ (user.name or '') if user else '' }}" data-email="{{ user.email if user else '' }}">
+  <section class="pm-hero">
+    <div class="pm-hero-l">
+      <span class="pm-eyebrow"><span class="d"></span>Paid Marketing · Launch QC</span>
+      <h1 class="pm-title">Is this launch <span class="pm-grad">ready to go?</span></h1>
+      <p class="pm-sub">Pick the account and say what is launching. The agent builds the <b>launch QC checklist</b> for it.
+        Tick each check as you do it. If one is wrong, mark the error and say why: the verdict updates as you go, and
+        <b>nothing is "ready" while a Critical check is failed or still unchecked</b>.</p>
+    </div>
+  </section>
+
+  <!-- Account, and which of its launch QCs to work on -->
+  <section class="pm-panel qa-cmd" id="cmd">
+    <div class="qa-cmd-top">
+      <div id="acctPick" class="qa-acct"></div>
+      <div class="qa-manual" id="manual" hidden>
+        <label><span class="pd-dd-k">Account name</span><input type="text" id="mName" maxlength="120" placeholder="e.g. McHale Landscaping" autocomplete="off"></label>
+        <label><span class="pd-dd-k">Google Ads customer ID</span><input type="text" id="mId" maxlength="14" placeholder="123-456-7890" autocomplete="off" inputmode="numeric"></label>
+        <button type="button" class="pm-btn qa-go" id="mGo">Use this account</button>
+      </div>
+    </div>
+    <div class="qa-launches" id="launches" hidden>
+      <span class="pd-dd-k">Launch QCs for this account</span>
+      <div class="pm-chips" id="launchChips"></div>
+    </div>
+  </section>
+
+  <div id="msg"></div>
+
+  <div id="empty" class="pm-panel qa-empty">
+    <div class="qa-empty-ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 11l3 3 8-8"/><path d="M20 12v6a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h9"/></svg></div>
+    <h2>Choose an account to begin</h2>
+    <p>The checklist is the PPC team's Campaign Launch QC: 155 checks across account setup, tracking, campaign settings, ads, assets, policy and the final pre-launch review. Only the ones that apply to your launch are shown.</p>
+  </div>
+  <div id="skel" hidden><div class="pd-skel"></div><div class="pd-skel"></div></div>
+
+  <!-- New launch QC / edit its details -->
+  <section class="pm-panel qa-form" id="form" hidden>
+    <div class="pm-panel-h"><span class="pm-panel-t" id="formTitle">New launch QC</span>
+      <span class="pm-panel-s" id="formAcct"></span></div>
+    <div class="qa-grid">
+      <label class="qa-f wide"><span class="pd-dd-k">Campaign(s) launching</span>
+        <input type="text" id="fName" maxlength="120" placeholder="e.g. Fall promo: Brand_Search_US, PMax_Leads" autocomplete="off"></label>
+      <div class="qa-f"><span class="pd-dd-k">Client type <i>(pick any that apply)</i></span><div class="pm-chips" id="fClient"></div></div>
+      <div class="qa-f"><span class="pd-dd-k">Campaign types launching</span><div class="pm-chips" id="fCamp"></div></div>
+      <label class="qa-f"><span class="pd-dd-k">Planned launch date</span><input type="date" id="fDate"></label>
+      <label class="qa-f"><span class="pd-dd-k">QC done by</span><input type="text" id="fQc" maxlength="120" autocomplete="off"></label>
+      <label class="qa-f"><span class="pd-dd-k">Reviewed / approved by</span><input type="text" id="fAppr" maxlength="120" autocomplete="off"></label>
+    </div>
+    <p class="qa-preview" id="fPreview"></p>
+    <p class="qa-warn" id="fWarn" hidden>Changing what is launching changes which checks apply. Ticks on checks that stop applying are kept, just hidden and not counted.</p>
+    <div class="qa-form-btns">
+      <button type="button" class="pm-btn" id="fSave">Build the checklist</button>
+      <button type="button" class="pm-btn-ghost" id="fCancel">Cancel</button>
+    </div>
+  </section>
+
+  <!-- The checklist -->
+  <div id="work" hidden>
+    <div class="qa-head">
+      <div class="qa-title"><h2 id="wName"></h2><p id="wMeta"></p></div>
+      <div class="qa-actions">
+        <button type="button" class="pm-btn-ghost" id="copyBtn"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/></svg><span>Copy summary</span></button>
+        <button type="button" class="pm-btn-ghost" id="editBtn"><svg viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16z"/></svg>Edit details</button>
+        <button type="button" class="pm-btn-ghost qa-danger" id="removeBtn"><svg viewBox="0 0 24 24"><path d="M5 7h14M10 11v6M14 11v6M6 7l1 12h10l1-12M9 7V4h6v3"/></svg>Remove</button>
+      </div>
+    </div>
+
+    <section class="qa-verdict" id="verdict" aria-live="polite"></section>
+
+    <div class="qa-tools">
+      <div><span class="pd-dd-k">Show</span><div class="pm-chips" id="fStatus"></div></div>
+      <div><span class="pd-dd-k">Severity</span><div class="pm-chips" id="fSev"></div></div>
+    </div>
+
+    <div id="sections"></div>
+    <p class="pd-foot" id="foot"></p>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/pm_picker.js') }}?v=1"></script>
+<script src="{{ url_for('static', filename='js/qa_agent.js') }}?v=3"></script>
+{% endblock %}

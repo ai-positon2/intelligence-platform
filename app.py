@@ -4213,6 +4213,10 @@ def seo_aeo_legacy_redirect(rest=""):
 #                          and date range, read live from Google Ads, with
 #                          computed insights (tracker/paid_segments.py,
 #                          paid_segment_insights.py, paid_gads_segments.py)
+#   QA Agent               the Campaign Launch QC checklist for an account:
+#                          tick each check, give a reason for an error, read
+#                          the launch verdict; saved per launch (tracker/
+#                          paid_qa.py, paid_qa_store.py, tracker/qa_checklist.json)
 _PM_PREFIX = "/p2/paid-marketing"
 
 
@@ -4761,6 +4765,134 @@ def paid_segment_summary():
     key =(report["account"]["id"], report["range"]["from"], report["range"]["to"])
     out = paid_segment_insights.cached_summary(key, report, paid_segment_insights.build(report))
     return jsonify(out)
+
+
+# QA Agent --------------------------------------------------------------------
+# The PPC team's Campaign Launch QC checklist, run in the platform: pick an
+# account, say what is launching, tick each check Pass / Fail / N/A (a Fail needs
+# a reason), read the verdict. The rules and the verdict are tracker/paid_qa.py,
+# what was ticked is kept by tracker/paid_qa_store.py. The account list is the
+# Performance Summarizer's (api/gads/accounts), not a second Google Ads path.
+
+_QC_ID = re.compile(r"[0-9a-f]{32}")
+
+
+@app.route("/p2/paid-marketing/qa-agent")
+@position2_required
+def paid_qa_agent():
+    return render_template("qa_agent.html", user=_get_user())
+
+
+@app.route("/p2/paid-marketing/api/qa/checklist")
+@position2_required
+def paid_qa_checklist():
+    from tracker import paid_qa
+    resp = jsonify(paid_qa.checklist())
+    resp.headers["Cache-Control"] = "private, max-age=3600"
+    return resp
+
+
+@app.route("/p2/paid-marketing/api/qa/applicable")
+@position2_required
+def paid_qa_applicable():
+    """How many checks a launch with these details would have, for the form."""
+    from tracker import paid_qa
+    try:
+        return jsonify(paid_qa.preview(request.args.get("clientTypes"), request.args.get("campaignTypes")))
+    except paid_qa.BadPayload as e:
+        return jsonify(error=str(e)), 400
+
+
+def _qc_payload(launch, checks):
+    from tracker import paid_qa
+    return {"launch": paid_qa.public_launch(launch), "checks": checks,
+            "summary": paid_qa.summarize(launch, checks)}
+
+
+def _qc_launch_or_404(store, launch_id):
+    if not _QC_ID.fullmatch(launch_id or ""):
+        abort(404)
+    launch = store.get_launch(launch_id)
+    if not launch or launch["archived"]:
+        abort(404)
+    return launch
+
+
+@app.route("/p2/paid-marketing/api/qa/launches", methods=["GET", "POST"])
+@position2_required
+def paid_qa_launches():
+    """GET ?account=<customer id>: that account's launches, newest first, each
+    with its verdict. POST: start a launch QC."""
+    from tracker import paid_qa, paid_qa_store as store
+    try:
+        if request.method == "POST":
+            try:
+                fields = paid_qa.clean_details(request.get_json(silent=True), creating=True)
+            except paid_qa.BadPayload as e:
+                return jsonify(error=str(e)), 400
+            launch = store.create_launch(by=_pm_user_email(), **fields)
+            return jsonify(_qc_payload(launch, {})), 201
+        try:
+            account = paid_qa.customer_id(request.args.get("account"))
+        except paid_qa.BadPayload as e:
+            return jsonify(error=str(e)), 400
+        launches = store.list_launches(account)
+        checks = store.checks_for([l["id"] for l in launches])
+        return jsonify(launches=[dict(paid_qa.public_launch(l), summary=paid_qa.brief(paid_qa.summarize(l, checks[l["id"]])))
+                                 for l in launches])
+    except store.StoreUnavailable as e:
+        return _pm_store_error(e)
+
+
+@app.route("/p2/paid-marketing/api/qa/launches/<launch_id>", methods=["GET", "PUT", "DELETE"])
+@position2_required
+def paid_qa_launch(launch_id):
+    """GET: the launch, every tick and the verdict. PUT: change its details
+    (what is launching, the planned date, who did the QC); the verdict follows
+    because the checks that apply follow. DELETE: archive it (whoever started it,
+    or an admin); its ticks are kept."""
+    from tracker import paid_qa, paid_qa_store as store
+    try:
+        launch = _qc_launch_or_404(store, launch_id)
+        if request.method == "PUT":
+            try:
+                fields = paid_qa.clean_details(request.get_json(silent=True), creating=False)
+            except paid_qa.BadPayload as e:
+                return jsonify(error=str(e)), 400
+            launch = store.update_launch(launch_id, **fields) or abort(404)
+        elif request.method == "DELETE":
+            if launch["created_by"] != _pm_user_email() and not _pm_is_admin():
+                return jsonify(error="Only whoever started this QC, or an admin, can remove it."), 403
+            store.archive_launch(launch_id)
+            return jsonify(ok=True)
+        return jsonify(_qc_payload(launch, store.checks_for([launch_id])[launch_id]))
+    except store.StoreUnavailable as e:
+        return _pm_store_error(e)
+
+
+@app.route("/p2/paid-marketing/api/qa/launches/<launch_id>/checks/<check_id>", methods=["PUT"])
+@position2_required
+def paid_qa_set_check(launch_id, check_id):
+    """Tick one check: {status: pass|fail|na, note}, or {status: null} to clear
+    it. A fail needs a reason. Returns what was stored and the new verdict."""
+    from tracker import paid_qa, paid_qa_store as store
+    try:
+        launch = _qc_launch_or_404(store, launch_id)
+        try:
+            status, note = paid_qa.clean_check(launch, check_id, request.get_json(silent=True))
+        except paid_qa.BadPayload as e:
+            return jsonify(error=str(e)), 400
+        if status is None:
+            ok = store.clear_check(launch_id, check_id)
+            stored = None
+        else:
+            stored = store.set_check(launch_id, check_id, status, note, _pm_user_email())
+            ok = stored is not None
+        if not ok:
+            abort(404)
+        return jsonify(check=stored, summary=paid_qa.summarize(launch, store.checks_for([launch_id])[launch_id]))
+    except store.StoreUnavailable as e:
+        return _pm_store_error(e)
 
 
 # ── Embedded dashboards ─────────────────────────────────────────────────────────
@@ -18739,7 +18871,14 @@ Google Ads does not report every segment for every campaign type (Performance Ma
 are computed by rules from the tables, not guessed: the cheapest segments to push, groups of segments that spend
 with no conversions, segments converting at 1.5x the average cost, and caveats on how far to trust a table; each
 carries its evidence, a recommended action and a high or directional confidence. A short summary is written by
-Claude from those insights only.
+Claude from those insights only. QA Agent (/p2/paid-marketing/qa-agent): the PPC team's Campaign Launch QC
+checklist (155 checks in 15 sections, from account setup and conversion tracking to campaign settings, ads, assets,
+Performance Max, shopping, landing pages, policy and the final pre-launch review). Pick an account, say the client
+type and campaign types launching, and the checks that apply are listed. Each check has a tick (done, Pass), an
+error toggle that opens a comment box (a reason is required), and N/A. Checks are Critical, Major or Minor. The
+verdict follows the workbook: NOT READY if any Critical check has failed, INCOMPLETE if any Critical check is still
+unchecked, otherwise READY TO LAUNCH (a Critical N/A counts as done). Major and Minor failures do not block the
+verdict but are listed. Each QC is saved per launch with who ticked what and when.
 
 SEO STUDIO (/p2/seo-aeo/<tool>) and the /app agents: a suite of SEO/GEO tools (Keyword Finder, Content Brief
 Generator, Content Enhancer, SEO & GEO Audit, Agentic Readiness Audit, Competitor Analysis, and more).

@@ -12,7 +12,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-tokens.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-components.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/gtm.css') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/paid_marketing.css') }}?v=13">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/paid_marketing.css') }}?v=14">
   <script src="/static/js/theme.js"></script>
   <link rel="stylesheet" href="/static/css/aurora-app.css?v=3">
   <script src="/static/js/aurora.js?v=1" defer></script>
@@ -61,7 +61,7 @@
     <div class="page-header pm-section-head">
       <div class="au-eyebrow"><span class="d"></span>Paid media · Live</div>
       <h1 class="page-title">Every dollar, <span class="pm-sec-grad">accounted for.</span></h1>
-      <p class="page-sub">Live performance from Google Ads, budget pacing, search-term triage, segment analysis and client memory for the PPC team. Select an agent to open it.</p>
+      <p class="page-sub">Live performance from Google Ads, budget pacing, search-term triage, segment analysis, launch QC and client memory for the PPC team. Select an agent to open it.</p>
       <div class="hb-cue"><span></span></div>
     </div>
 
@@ -197,6 +197,26 @@
         </div>
       </a>
 
+      <!-- 7. QA Agent (2026-10-14): the Campaign Launch QC checklist -->
+      <a href="/p2/paid-marketing/qa-agent" class="dash-card active c-qa">
+        <div class="card-band"></div>
+        <div class="card-thumb">
+          <div class="card-thumb-icon"><svg class="au-ic" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M9 11l3 3 8-8"/><path d="M20 12v6a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h9"/></svg></div>
+          <div class="card-thumb-badge tb-live"><span class="tb-dot live"></span> Live</div>
+        </div>
+        <div class="card-body">
+          <div class="card-name">QA Agent</div>
+          <div class="card-desc">
+            Pick an account and the checklist is built for what is launching. Tick each check as it is
+            done; mark an error and say why. The verdict says whether the launch can go.
+          </div>
+          <div class="card-footer">
+            <div class="card-tags"><span class="tag">Launch QC</span><span class="tag">Checklist</span></div>
+            <span class="card-arrow">→</span>
+          </div>
+        </div>
+      </a>
+
     </div>
 
     <p class="footer-note">Position2 · Internal use only</p>
@@ -223,14 +243,15 @@
   var BASE=[
     {t:'Hub',d:'Platform home',u:'/p2/hub',i:'⌂'},
     {t:'Strategic Agents',d:'Go-to-market intelligence',u:'/p2/strategic-agents',i:'◎'},
-    {t:'Paid Marketing Agents',d:'Performance, pacing, search terms, segments & client feedback',u:'/p2/paid-marketing',i:'◆'},
+    {t:'Paid Marketing Agents',d:'Performance, pacing, search terms, segments, launch QC & client feedback',u:'/p2/paid-marketing',i:'◆'},
     {t:'SEO + AEO Tools',d:'Organic intelligence',u:'/p2/seo-aeo',i:'⌕'},
     {t:'Performance Summarizer',d:'Live Google Ads, chart anything',u:'/p2/paid-marketing/performance-summarizer',i:'◈'},
     {t:'Product Analysis',d:'Which products earn their ad spend',u:'/p2/paid-marketing/product-analysis',i:'▣'},
     {t:'Pacing Desk',d:'Where to move budget today',u:'/p2/paid-marketing/pacing-desk',i:'▥'},
     {t:'Search Query Analysis',d:'Classify a search terms report',u:'/p2/paid-marketing/search-query-analysis',i:'⌕'},
     {t:'Client Feedback Agent',d:'Ask Slack, Gmail & meeting notes',u:'/p2/paid-marketing/client-feedback-agent',i:'✦'},
-    {t:'Segment Analysis',d:'Day, hour, age, gender, city, device & network',u:'/p2/paid-marketing/segment-analysis',i:'◔'}
+    {t:'Segment Analysis',d:'Day, hour, age, gender, city, device & network',u:'/p2/paid-marketing/segment-analysis',i:'◔'},
+    {t:'QA Agent',d:'Campaign launch QC checklist',u:'/p2/paid-marketing/qa-agent',i:'✓'}
   ];
   var ITEMS=(window.__KP_ITEMS||[]).concat(BASE);
   var css=document.createElement('style');

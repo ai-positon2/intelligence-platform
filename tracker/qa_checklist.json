@@ -1,0 +1,2116 @@
+{
+ "source": "Campaign Launch QC Checklist (Position2 PPC team)",
+ "campaignTypes": [
+  "Search",
+  "Search (DSA)",
+  "PMax",
+  "Shopping",
+  "Display",
+  "Demand Gen",
+  "Video",
+  "App"
+ ],
+ "clientTypes": [
+  "Ecommerce",
+  "Lead Gen",
+  "B2B",
+  "B2C",
+  "Local",
+  "App",
+  "Regulated"
+ ],
+ "severities": [
+  "Critical",
+  "Major",
+  "Minor"
+ ],
+ "sections": [
+  "1. Account Setup & Access",
+  "2. Conversion Tracking & Measurement",
+  "3. Campaign Settings (All Types)",
+  "4. Search Campaign Settings",
+  "5. Ad Group & Keywords",
+  "6. Ads & Copy (RSA / Text)",
+  "7. Assets (Extensions)",
+  "8. Performance Max",
+  "9. Shopping",
+  "10. Display & Demand Gen",
+  "11. Video (YouTube)",
+  "12. App Campaigns",
+  "13. Landing Page & Website",
+  "14. Policy, Compliance & Approvals",
+  "15. Final Pre-Launch & Post-Launch (24 to 72 hrs)"
+ ],
+ "items": [
+  {
+   "id": "1.1",
+   "section": "1. Account Setup & Access",
+   "check": "Correct account and MCC",
+   "verify": "Confirm account name and Customer ID match the client before any change. Check you are not in a test or old account.",
+   "campaignTypes": [
+    "All"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Critical"
+  },
+  {
+   "id": "1.2",
+   "section": "1. Account Setup & Access",
+   "check": "Billing active",
+   "verify": "Payment method valid, no billing errors, prepay balance or credit line covers the full flight budget.",
+   "campaignTypes": [
+    "All"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Critical"
+  },
+  {
+   "id": "1.3",
+   "section": "1. Account Setup & Access",
+   "check": "Advertiser verification",
+   "verify": "Verification complete or in progress with no ads-limited warning. Business name matches the verified entity.",
+   "campaignTypes": [
+    "All"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Major"
+  },
+  {
+   "id": "1.4",
+   "section": "1. Account Setup & Access",
+   "check": "Time zone and currency",
+   "verify": "Match the media plan. These cannot be changed later and drive ad schedules and budget reporting.",
+   "campaignTypes": [
+    "All"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Major"
+  },
+  {
+   "id": "1.5",
+   "section": "1. Account Setup & Access",
+   "check": "Auto-apply recommendations OFF",
+   "verify": "Recommendations > Auto-apply: every option unchecked. Google must not make unsupervised changes.",
+   "campaignTypes": [
+    "All"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Critical"
+  },
+  {
+   "id": "1.6",
+   "section": "1. Account Setup & Access",
+   "check": "Auto-tagging ON",
+   "verify": "Admin > Account settings > Auto-tagging enabled so GCLID passes to the site, GA4 and CRM.",
+   "campaignTypes": [
+    "All"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Critical"
+  },
+  {
+   "id": "1.7",
+   "section": "1. Account Setup & Access",
+   "check": "Tracking template / final URL suffix",
+   "verify": "Present at account or campaign level (never missing at both). Test it: parameters resolve and the page still loads.",
+   "campaignTypes": [
+    "All"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Critical"
+  },
+  {
+   "id": "1.8",
+   "section": "1. Account Setup & Access",
+   "check": "Account-level automatically created assets OFF",
+   "verify": "Account settings > Automatically created assets: off unless the client approved it in writing.",
+   "campaignTypes": [
+    "All"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Major"
+  },
+  {
+   "id": "1.9",
+   "section": "1. Account Setup & Access",
+   "check": "Inventory type set to Limited",
+   "verify": "Content suitability > Inventory type = Limited inventory (or the level agreed with the client).",
+   "campaignTypes": [
+    "PMax",
+    "Display",
+    "Demand Gen",
+    "Video"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Minor"
+  },
+  {
+   "id": "1.10",
+   "section": "1. Account Setup & Access",
+   "check": "Excluded content types and sensitive categories",
+   "verify": "Content suitability: exclude embedded videos, live streaming, and sensitive categories per brand safety needs.",
+   "campaignTypes": [
+    "PMax",
+    "Display",
+    "Demand Gen",
+    "Video"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Minor"
+  },
+  {
+   "id": "1.11",
+   "section": "1. Account Setup & Access",
+   "check": "Account-level placement exclusion list",
+   "verify": "Exclusion list applied (mobile app games, kids content, parked domains, known low-quality sites).",
+   "campaignTypes": [
+    "PMax",
+    "Display",
+    "Demand Gen",
+    "Video"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Major"
+  },
+  {
+   "id": "1.12",
+   "section": "1. Account Setup & Access",
+   "check": "Account-level negative keyword list",
+   "verify": "Account negatives applied (jobs, careers, free, DIY, salary, login, support, etc. as relevant to the client).",
+   "campaignTypes": [
+    "Search",
+    "PMax",
+    "Shopping"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Major"
+  },
+  {
+   "id": "1.13",
+   "section": "1. Account Setup & Access",
+   "check": "Brand lists created",
+   "verify": "Brand list(s) built for the client brand (and competitors if needed) for brand inclusion/exclusion in PMax and Search.",
+   "campaignTypes": [
+    "Search",
+    "PMax"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Major"
+  },
+  {
+   "id": "1.14",
+   "section": "1. Account Setup & Access",
+   "check": "IP exclusions",
+   "verify": "Client office and agency IPs excluded where practical.",
+   "campaignTypes": [
+    "All"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Minor"
+  },
+  {
+   "id": "1.15",
+   "section": "1. Account Setup & Access",
+   "check": "EU political ads declaration",
+   "verify": "Declaration completed in account settings (required to avoid serving restrictions).",
+   "campaignTypes": [
+    "All"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Minor"
+  },
+  {
+   "id": "1.16",
+   "section": "1. Account Setup & Access",
+   "check": "Customer data terms",
+   "verify": "Customer Match terms accepted if customer lists are used for signals or targeting.",
+   "campaignTypes": [
+    "All"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Minor"
+  },
+  {
+   "id": "1.17",
+   "section": "1. Account Setup & Access",
+   "check": "User access",
+   "verify": "Client and agency users have correct access levels; no ex-employees; account linked to the agency MCC.",
+   "campaignTypes": [
+    "All"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Minor"
+  },
+  {
+   "id": "1.18",
+   "section": "1. Account Setup & Access",
+   "check": "Linked accounts",
+   "verify": "GA4, Merchant Center (ecom), YouTube channel (video/PMax/DG), Google Business Profile (local), Firebase (app), CRM (lead gen) linked and active.",
+   "campaignTypes": [
+    "All"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Major"
+  },
+  {
+   "id": "2.1",
+   "section": "2. Conversion Tracking & Measurement",
+   "check": "Google tag installed sitewide",
+   "verify": "Google tag or GTM fires on every landing page and the conversion page. Verify with Tag Assistant.",
+   "campaignTypes": [
+    "All"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Critical"
+  },
+  {
+   "id": "2.2",
+   "section": "2. Conversion Tracking & Measurement",
+   "check": "Primary vs secondary actions",
+   "verify": "Only real business outcomes are Primary (purchase, qualified lead, booked call). Micro actions (page view, scroll, add to cart, clicks) are Secondary.",
+   "campaignTypes": [
+    "All"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Critical"
+  },
+  {
+   "id": "2.3",
+   "section": "2. Conversion Tracking & Measurement",
+   "check": "Conversion action status",
+   "verify": "Each primary action shows Recording conversions or Active. No Inactive, Unverified or No recent conversions.",
+   "campaignTypes": [
+    "All"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Critical"
+  },
+  {
+   "id": "2.4",
+   "section": "2. Conversion Tracking & Measurement",
+   "check": "End-to-end test conversion",
+   "verify": "Submit a test form or place a test order. Confirm it fires the tag and appears in Google Ads and GA4.",
+   "campaignTypes": [
+    "All"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Critical"
+  },
+  {
+   "id": "2.5",
+   "section": "2. Conversion Tracking & Measurement",
+   "check": "No double counting",
+   "verify": "Same action is not counted twice (for example GA4 import and Google tag both set as Primary).",
+   "campaignTypes": [
+    "All"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Critical"
+  },
+  {
+   "id": "2.6",
+   "section": "2. Conversion Tracking & Measurement",
+   "check": "Count setting",
+   "verify": "Leads = One. Purchases = Every.",
+   "campaignTypes": [
+    "All"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Major"
+  },
+  {
+   "id": "2.7",
+   "section": "2. Conversion Tracking & Measurement",
+   "check": "Conversion values",
+   "verify": "Ecom: dynamic order value and currency passing correctly. Lead gen: values reflect lead worth if value-based bidding is used.",
+   "campaignTypes": [
+    "All"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Major"
+  },
+  {
+   "id": "2.8",
+   "section": "2. Conversion Tracking & Measurement",
+   "check": "Transaction ID for deduplication",
+   "verify": "transaction_id passed with every purchase so duplicates are removed.",
+   "campaignTypes": [
+    "Search",
+    "PMax",
+    "Shopping",
+    "Demand Gen"
+   ],
+   "clientTypes": [
+    "Ecommerce"
+   ],
+   "severity": "Major"
+  },
+  {
+   "id": "2.9",
+   "section": "2. Conversion Tracking & Measurement",
+   "check": "Enhanced conversions",
+   "verify": "Enabled and diagnostics show healthy match rate (enhanced conversions for web, and for leads where applicable).",
+   "campaignTypes": [
+    "All"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Major"
+  },
+  {
+   "id": "2.10",
+   "section": "2. Conversion Tracking & Measurement",
+   "check": "Consent Mode v2",
+   "verify": "Implemented and passing consent signals if serving users in the EEA, UK or Switzerland.",
+   "campaignTypes": [
+    "All"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Critical",
+   "condition": "EEA/UK traffic"
+  },
+  {
+   "id": "2.11",
+   "section": "2. Conversion Tracking & Measurement",
+   "check": "Campaign goals = Account default",
+   "verify": "Campaign uses account-default goals unless a campaign-specific goal is intended and documented.",
+   "campaignTypes": [
+    "All"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Major"
+  },
+  {
+   "id": "2.12",
+   "section": "2. Conversion Tracking & Measurement",
+   "check": "Offline conversion import / CRM",
+   "verify": "GCLID, GBRAID and WBRAID captured in hidden form fields and stored in the CRM. Offline import (or Data Manager connection) mapped and tested.",
+   "campaignTypes": [
+    "All"
+   ],
+   "clientTypes": [
+    "Lead Gen",
+    "B2B"
+   ],
+   "severity": "Major"
+  },
+  {
+   "id": "2.13",
+   "section": "2. Conversion Tracking & Measurement",
+   "check": "Call tracking",
+   "verify": "Google forwarding numbers on call assets. Call conversion minimum duration set (for example 60 seconds).",
+   "campaignTypes": [
+    "Search",
+    "PMax"
+   ],
+   "clientTypes": [
+    "Lead Gen",
+    "Local"
+   ],
+   "severity": "Major"
+  },
+  {
+   "id": "2.14",
+   "section": "2. Conversion Tracking & Measurement",
+   "check": "Attribution and conversion window",
+   "verify": "Data-driven attribution. Window matches the sales cycle (longer for B2B and high-ticket).",
+   "campaignTypes": [
+    "All"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Minor"
+  },
+  {
+   "id": "2.15",
+   "section": "2. Conversion Tracking & Measurement",
+   "check": "Audiences populating",
+   "verify": "Remarketing and GA4 audiences are collecting users and meet minimum size for use.",
+   "campaignTypes": [
+    "All"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Minor"
+  },
+  {
+   "id": "2.16",
+   "section": "2. Conversion Tracking & Measurement",
+   "check": "Data exclusions, seasonality, value rules",
+   "verify": "No leftover data exclusions, seasonality adjustments or value rules that would distort the new campaign.",
+   "campaignTypes": [
+    "All"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Minor"
+  },
+  {
+   "id": "3.1",
+   "section": "3. Campaign Settings (All Types)",
+   "check": "Campaign type and goal",
+   "verify": "Campaign type, subtype and marketing objective match the media plan.",
+   "campaignTypes": [
+    "All"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Major"
+  },
+  {
+   "id": "3.2",
+   "section": "3. Campaign Settings (All Types)",
+   "check": "Naming convention",
+   "verify": "Follows the agency convention (for example Client_Channel_Type_Geo_Theme).",
+   "campaignTypes": [
+    "All"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Minor"
+  },
+  {
+   "id": "3.3",
+   "section": "3. Campaign Settings (All Types)",
+   "check": "Status at launch",
+   "verify": "Enabled at go-live, or paused with a clear launch time. No campaign left paused or removed by mistake.",
+   "campaignTypes": [
+    "All"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Critical"
+  },
+  {
+   "id": "3.4",
+   "section": "3. Campaign Settings (All Types)",
+   "check": "Start date",
+   "verify": "Correct start date per plan.",
+   "campaignTypes": [
+    "All"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Major"
+  },
+  {
+   "id": "3.5",
+   "section": "3. Campaign Settings (All Types)",
+   "check": "End date",
+   "verify": "No end date unless intentional (flight-based campaign).",
+   "campaignTypes": [
+    "All"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Major"
+  },
+  {
+   "id": "3.6",
+   "section": "3. Campaign Settings (All Types)",
+   "check": "Budget",
+   "verify": "Daily budget matches the plan (monthly budget / 30.4). Check for misplaced decimals and unintended shared budgets.",
+   "campaignTypes": [
+    "All"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Critical"
+  },
+  {
+   "id": "3.7",
+   "section": "3. Campaign Settings (All Types)",
+   "check": "Bid strategy and targets",
+   "verify": "Strategy matches plan and data maturity. tCPA / tROAS targets realistic and not copied from another account. Max CPC limits intended.",
+   "campaignTypes": [
+    "All"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Critical"
+  },
+  {
+   "id": "3.8",
+   "section": "3. Campaign Settings (All Types)",
+   "check": "Locations targeted",
+   "verify": "Countries, states, cities or radius exactly match the plan. No missing or extra locations. Exclusions added.",
+   "campaignTypes": [
+    "All"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Critical"
+  },
+  {
+   "id": "3.9",
+   "section": "3. Campaign Settings (All Types)",
+   "check": "Location option: Presence",
+   "verify": "Target = Presence: people in or regularly in your locations. Not Presence or interest (unless travel/relocation client).",
+   "campaignTypes": [
+    "All"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Critical"
+  },
+  {
+   "id": "3.10",
+   "section": "3. Campaign Settings (All Types)",
+   "check": "Location exclusion option",
+   "verify": "Exclude = Presence: people in your excluded locations.",
+   "campaignTypes": [
+    "All"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Minor"
+  },
+  {
+   "id": "3.11",
+   "section": "3. Campaign Settings (All Types)",
+   "check": "Languages",
+   "verify": "Match the ad language and audience. All languages only if intentional.",
+   "campaignTypes": [
+    "All"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Major"
+  },
+  {
+   "id": "3.12",
+   "section": "3. Campaign Settings (All Types)",
+   "check": "Ad schedule",
+   "verify": "Matches business hours where it matters (B2B weekdays, call campaigns during call-center hours). Uses account time zone.",
+   "campaignTypes": [
+    "All"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Major"
+  },
+  {
+   "id": "3.13",
+   "section": "3. Campaign Settings (All Types)",
+   "check": "Customer acquisition",
+   "verify": "Bid equally for new and existing customers unless the plan says otherwise. Not Bid for new customers only by default.",
+   "campaignTypes": [
+    "Search",
+    "PMax",
+    "Shopping"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Major"
+  },
+  {
+   "id": "3.14",
+   "section": "3. Campaign Settings (All Types)",
+   "check": "Audiences: Observation vs Targeting",
+   "verify": "Search and Shopping audiences set to Observation unless deliberately narrowing. Display/Video targeting correct.",
+   "campaignTypes": [
+    "All"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Major"
+  },
+  {
+   "id": "3.15",
+   "section": "3. Campaign Settings (All Types)",
+   "check": "Devices and demographics",
+   "verify": "Device and demographic bid adjustments or exclusions match the plan; nothing left over from a copied campaign.",
+   "campaignTypes": [
+    "All"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Minor"
+  },
+  {
+   "id": "3.16",
+   "section": "3. Campaign Settings (All Types)",
+   "check": "Campaign-level tracking",
+   "verify": "Campaign tracking template, final URL suffix and custom parameters resolve correctly (use Test).",
+   "campaignTypes": [
+    "All"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Critical"
+  },
+  {
+   "id": "3.17",
+   "section": "3. Campaign Settings (All Types)",
+   "check": "No stray drafts or experiments",
+   "verify": "No running experiment or unintended draft splitting traffic.",
+   "campaignTypes": [
+    "All"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Major"
+  },
+  {
+   "id": "3.18",
+   "section": "3. Campaign Settings (All Types)",
+   "check": "Labels",
+   "verify": "Campaign labels applied for reporting.",
+   "campaignTypes": [
+    "All"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Minor"
+  },
+  {
+   "id": "4.1",
+   "section": "4. Search Campaign Settings",
+   "check": "Display Network OFF",
+   "verify": "Networks: Include Google Display Network unchecked.",
+   "campaignTypes": [
+    "Search"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Critical"
+  },
+  {
+   "id": "4.2",
+   "section": "4. Search Campaign Settings",
+   "check": "Search Partners OFF",
+   "verify": "Networks: Search partners off unless the client approved it.",
+   "campaignTypes": [
+    "Search"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Major"
+  },
+  {
+   "id": "4.3",
+   "section": "4. Search Campaign Settings",
+   "check": "AI Max for Search OFF",
+   "verify": "AI Max toggle off (this covers search term matching, text customization and final URL expansion).",
+   "campaignTypes": [
+    "Search"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Critical"
+  },
+  {
+   "id": "4.4",
+   "section": "4. Search Campaign Settings",
+   "check": "Campaign automatically created assets OFF",
+   "verify": "Asset optimization / automatically created assets off unless approved.",
+   "campaignTypes": [
+    "Search"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Major"
+  },
+  {
+   "id": "4.5",
+   "section": "4. Search Campaign Settings",
+   "check": "Broad match campaign setting",
+   "verify": "Use broad match keywords setting off unless intended.",
+   "campaignTypes": [
+    "Search"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Major"
+  },
+  {
+   "id": "4.6",
+   "section": "4. Search Campaign Settings",
+   "check": "Ad rotation",
+   "verify": "Optimize: prefer best performing ads.",
+   "campaignTypes": [
+    "Search"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Major"
+  },
+  {
+   "id": "4.7",
+   "section": "4. Search Campaign Settings",
+   "check": "Negative keywords and lists attached",
+   "verify": "Account list, campaign negatives and shared lists (competitor, irrelevant, brand for non-brand) attached.",
+   "campaignTypes": [
+    "Search"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Critical"
+  },
+  {
+   "id": "4.8",
+   "section": "4. Search Campaign Settings",
+   "check": "Brand vs non-brand separation",
+   "verify": "Brand terms negated or excluded from non-brand campaigns. Competitor bidding policy confirmed with client.",
+   "campaignTypes": [
+    "Search"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Major"
+  },
+  {
+   "id": "4.9",
+   "section": "4. Search Campaign Settings",
+   "check": "Negative conflicts",
+   "verify": "No negative blocks an active keyword (check conflicting negatives).",
+   "campaignTypes": [
+    "Search"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Major"
+  },
+  {
+   "id": "4.10",
+   "section": "4. Search Campaign Settings",
+   "check": "Dynamic Search Ads targets",
+   "verify": "DSA page feeds or URL rules correct. Careers, blog, login, policy and thank-you pages excluded.",
+   "campaignTypes": [
+    "Search (DSA)"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Major"
+  },
+  {
+   "id": "5.1",
+   "section": "5. Ad Group & Keywords",
+   "check": "Every ad group has ads",
+   "verify": "At least 1 (ideally 2) enabled RSA per ad group. No empty ad groups.",
+   "campaignTypes": [
+    "Search"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Critical"
+  },
+  {
+   "id": "5.2",
+   "section": "5. Ad Group & Keywords",
+   "check": "Every ad group has keywords",
+   "verify": "No ad group with zero keywords or all keywords paused.",
+   "campaignTypes": [
+    "Search"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Critical"
+  },
+  {
+   "id": "5.3",
+   "section": "5. Ad Group & Keywords",
+   "check": "Single theme per ad group",
+   "verify": "Tight theme; ad group name matches its keywords and ads.",
+   "campaignTypes": [
+    "Search"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Minor"
+  },
+  {
+   "id": "5.4",
+   "section": "5. Ad Group & Keywords",
+   "check": "Match types per plan",
+   "verify": "Match types follow the plan. No broad match on Manual CPC unless intended.",
+   "campaignTypes": [
+    "Search"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Major"
+  },
+  {
+   "id": "5.5",
+   "section": "5. Ad Group & Keywords",
+   "check": "Keyword hygiene",
+   "verify": "No spelling errors, no duplicates across ad groups or campaigns, no keyword that is also a negative.",
+   "campaignTypes": [
+    "Search"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Major"
+  },
+  {
+   "id": "5.6",
+   "section": "5. Ad Group & Keywords",
+   "check": "Default bids",
+   "verify": "Ad group default bids set (Manual CPC / eCPC) and not left at a placeholder.",
+   "campaignTypes": [
+    "Search",
+    "Shopping"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Major"
+  },
+  {
+   "id": "5.7",
+   "section": "5. Ad Group & Keywords",
+   "check": "Location in ad group name vs copy",
+   "verify": "Location named in the ad group / asset group matches the location in the ad copy and the geo targeted.",
+   "campaignTypes": [
+    "All"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Major"
+  },
+  {
+   "id": "6.1",
+   "section": "6. Ads & Copy (RSA / Text)",
+   "check": "Headline and description count",
+   "verify": "Ideally 15 headlines and 4 descriptions (minimum 3 and 2). Ad strength Good or Excellent.",
+   "campaignTypes": [
+    "Search"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Major"
+  },
+  {
+   "id": "6.2",
+   "section": "6. Ads & Copy (RSA / Text)",
+   "check": "Spelling, grammar, capitalisation",
+   "verify": "Consistent case per client style. No typos, no double spaces, no exclamation marks in headlines, correct punctuation.",
+   "campaignTypes": [
+    "All"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Critical"
+  },
+  {
+   "id": "6.3",
+   "section": "6. Ads & Copy (RSA / Text)",
+   "check": "Final URLs",
+   "verify": "Correct page, HTTPS, loads (no 404 or redirect chain), correct geo and language version.",
+   "campaignTypes": [
+    "All"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Critical"
+  },
+  {
+   "id": "6.4",
+   "section": "6. Ads & Copy (RSA / Text)",
+   "check": "Offers, prices and dates current",
+   "verify": "Prices, discounts and promo dates in copy match the landing page and are not expired.",
+   "campaignTypes": [
+    "All"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Critical"
+  },
+  {
+   "id": "6.5",
+   "section": "6. Ads & Copy (RSA / Text)",
+   "check": "Display paths filled",
+   "verify": "Path 1 and Path 2 populated.",
+   "campaignTypes": [
+    "Search"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Major"
+  },
+  {
+   "id": "6.6",
+   "section": "6. Ads & Copy (RSA / Text)",
+   "check": "Display paths relevant",
+   "verify": "Paths are specific to the ad group, not generic.",
+   "campaignTypes": [
+    "Search"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Minor"
+  },
+  {
+   "id": "6.7",
+   "section": "6. Ads & Copy (RSA / Text)",
+   "check": "Claims and trademarks",
+   "verify": "No unverifiable superlatives (#1, best) without proof. Trademark use authorised. Required disclaimers present.",
+   "campaignTypes": [
+    "All"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Major"
+  },
+  {
+   "id": "6.8",
+   "section": "6. Ads & Copy (RSA / Text)",
+   "check": "Customizers and keyword insertion",
+   "verify": "Default text set; renders correctly within limits.",
+   "campaignTypes": [
+    "Search"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Major"
+  },
+  {
+   "id": "6.9",
+   "section": "6. Ads & Copy (RSA / Text)",
+   "check": "Pinning",
+   "verify": "Pins only where needed; enough unpinned variants for rotation.",
+   "campaignTypes": [
+    "Search"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Minor"
+  },
+  {
+   "id": "6.10",
+   "section": "6. Ads & Copy (RSA / Text)",
+   "check": "Keyword and brand in copy",
+   "verify": "Core keyword in 2 to 3 headlines; brand in at least one headline or via business name asset.",
+   "campaignTypes": [
+    "Search"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Minor"
+  },
+  {
+   "id": "6.11",
+   "section": "6. Ads & Copy (RSA / Text)",
+   "check": "Clear CTA",
+   "verify": "At least one strong call to action.",
+   "campaignTypes": [
+    "All"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Minor"
+  },
+  {
+   "id": "7.1",
+   "section": "7. Assets (Extensions)",
+   "check": "Sitelinks",
+   "verify": "Minimum 4 (ideally 6 to 8), unique and working URLs, descriptions filled.",
+   "campaignTypes": [
+    "Search",
+    "PMax"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Major"
+  },
+  {
+   "id": "7.2",
+   "section": "7. Assets (Extensions)",
+   "check": "Callouts",
+   "verify": "Minimum 4, relevant, no duplication of headlines.",
+   "campaignTypes": [
+    "Search",
+    "PMax"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Major"
+  },
+  {
+   "id": "7.3",
+   "section": "7. Assets (Extensions)",
+   "check": "Structured snippets",
+   "verify": "At least 1 with the correct header.",
+   "campaignTypes": [
+    "Search",
+    "PMax"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Minor"
+  },
+  {
+   "id": "7.4",
+   "section": "7. Assets (Extensions)",
+   "check": "Business name and logo",
+   "verify": "Added, correct and approved.",
+   "campaignTypes": [
+    "Search",
+    "PMax",
+    "Demand Gen"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Major"
+  },
+  {
+   "id": "7.5",
+   "section": "7. Assets (Extensions)",
+   "check": "Image assets",
+   "verify": "Square and landscape images added and approved.",
+   "campaignTypes": [
+    "Search"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Minor"
+  },
+  {
+   "id": "7.6",
+   "section": "7. Assets (Extensions)",
+   "check": "Call asset",
+   "verify": "Correct number, call reporting on, scheduled to call-center hours.",
+   "campaignTypes": [
+    "Search",
+    "PMax"
+   ],
+   "clientTypes": [
+    "Lead Gen",
+    "Local"
+   ],
+   "severity": "Major"
+  },
+  {
+   "id": "7.7",
+   "section": "7. Assets (Extensions)",
+   "check": "Location assets",
+   "verify": "Business Profile linked; correct locations showing.",
+   "campaignTypes": [
+    "Search",
+    "PMax"
+   ],
+   "clientTypes": [
+    "Local"
+   ],
+   "severity": "Major"
+  },
+  {
+   "id": "7.8",
+   "section": "7. Assets (Extensions)",
+   "check": "Price and promotion assets",
+   "verify": "Prices correct; promotion start and end dates set.",
+   "campaignTypes": [
+    "Search",
+    "PMax"
+   ],
+   "clientTypes": [
+    "Ecommerce",
+    "B2C"
+   ],
+   "severity": "Major"
+  },
+  {
+   "id": "7.9",
+   "section": "7. Assets (Extensions)",
+   "check": "Lead form asset",
+   "verify": "Questions approved, privacy policy URL added, leads delivered to CRM/email via webhook (tested).",
+   "campaignTypes": [
+    "Search",
+    "PMax",
+    "Demand Gen"
+   ],
+   "clientTypes": [
+    "Lead Gen"
+   ],
+   "severity": "Critical"
+  },
+  {
+   "id": "7.10",
+   "section": "7. Assets (Extensions)",
+   "check": "Asset level and inheritance",
+   "verify": "No irrelevant account-level assets inherited (for example another brand's or geo's sitelinks).",
+   "campaignTypes": [
+    "Search",
+    "PMax"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Major"
+  },
+  {
+   "id": "7.11",
+   "section": "7. Assets (Extensions)",
+   "check": "Asset URLs and scheduling",
+   "verify": "Asset final URLs work; any asset schedules are correct.",
+   "campaignTypes": [
+    "Search",
+    "PMax"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Major"
+  },
+  {
+   "id": "8.1",
+   "section": "8. Performance Max",
+   "check": "Final URL expansion OFF",
+   "verify": "Final URL expansion off. If approved ON: URL exclusions for careers, blog, login, policy and thank-you pages.",
+   "campaignTypes": [
+    "PMax"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Critical"
+  },
+  {
+   "id": "8.2",
+   "section": "8. Performance Max",
+   "check": "Asset optimization OFF",
+   "verify": "Text customization, image enhancement, video enhancement and auto-generated assets off unless approved.",
+   "campaignTypes": [
+    "PMax"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Major"
+  },
+  {
+   "id": "8.3",
+   "section": "8. Performance Max",
+   "check": "Brand exclusions",
+   "verify": "Brand list excluded on non-brand PMax so it does not take brand search traffic.",
+   "campaignTypes": [
+    "PMax"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Major"
+  },
+  {
+   "id": "8.4",
+   "section": "8. Performance Max",
+   "check": "Campaign negative keywords",
+   "verify": "Account negative list and campaign negatives applied.",
+   "campaignTypes": [
+    "PMax"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Major"
+  },
+  {
+   "id": "8.5",
+   "section": "8. Performance Max",
+   "check": "Merchant Center feed linked",
+   "verify": "Correct Merchant Center account and feed label selected.",
+   "campaignTypes": [
+    "PMax"
+   ],
+   "clientTypes": [
+    "Ecommerce"
+   ],
+   "severity": "Critical"
+  },
+  {
+   "id": "8.6",
+   "section": "8. Performance Max",
+   "check": "Listing groups",
+   "verify": "Only the intended products/brands/categories included. No All products unless intended.",
+   "campaignTypes": [
+    "PMax"
+   ],
+   "clientTypes": [
+    "Ecommerce"
+   ],
+   "severity": "Critical"
+  },
+  {
+   "id": "8.7",
+   "section": "8. Performance Max",
+   "check": "Asset group minimums",
+   "verify": "Headlines, long headlines, descriptions (incl. one 60 characters or fewer), landscape, square and portrait images, logo and business name all present.",
+   "campaignTypes": [
+    "PMax"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Critical"
+  },
+  {
+   "id": "8.8",
+   "section": "8. Performance Max",
+   "check": "Videos",
+   "verify": "At least 5 videos (horizontal, vertical, square) so Google does not auto-generate. YouTube videos public or unlisted.",
+   "campaignTypes": [
+    "PMax"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Major"
+  },
+  {
+   "id": "8.9",
+   "section": "8. Performance Max",
+   "check": "Audience signals",
+   "verify": "Each asset group has an approved signal (customer lists, custom segments, website visitors).",
+   "campaignTypes": [
+    "PMax"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Major"
+  },
+  {
+   "id": "8.10",
+   "section": "8. Performance Max",
+   "check": "Search themes",
+   "verify": "Aligned to the asset group intent.",
+   "campaignTypes": [
+    "PMax"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Minor"
+  },
+  {
+   "id": "8.11",
+   "section": "8. Performance Max",
+   "check": "Asset group structure and URLs",
+   "verify": "One theme or product category per asset group; asset group final URL matches the theme.",
+   "campaignTypes": [
+    "PMax"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Major"
+  },
+  {
+   "id": "8.12",
+   "section": "8. Performance Max",
+   "check": "Brand guidelines",
+   "verify": "Business name and logo set at campaign level; brand colours/fonts if used.",
+   "campaignTypes": [
+    "PMax"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Major"
+  },
+  {
+   "id": "8.13",
+   "section": "8. Performance Max",
+   "check": "Image and creative quality",
+   "verify": "No cropped logos, blurry images or text-heavy images that break policy.",
+   "campaignTypes": [
+    "PMax"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Major"
+  },
+  {
+   "id": "8.14",
+   "section": "8. Performance Max",
+   "check": "Device and age exclusions",
+   "verify": "Set per plan if needed.",
+   "campaignTypes": [
+    "PMax"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Minor"
+  },
+  {
+   "id": "9.1",
+   "section": "9. Shopping",
+   "check": "Merchant Center health",
+   "verify": "Products approved, disapprovals reviewed, feed recently updated.",
+   "campaignTypes": [
+    "Shopping",
+    "PMax"
+   ],
+   "clientTypes": [
+    "Ecommerce"
+   ],
+   "severity": "Critical"
+  },
+  {
+   "id": "9.2",
+   "section": "9. Shopping",
+   "check": "Country of sale and feed label",
+   "verify": "Feed country/label matches campaign targeting.",
+   "campaignTypes": [
+    "Shopping",
+    "PMax"
+   ],
+   "clientTypes": [
+    "Ecommerce"
+   ],
+   "severity": "Critical"
+  },
+  {
+   "id": "9.3",
+   "section": "9. Shopping",
+   "check": "Price and availability match",
+   "verify": "Feed price and stock match the website.",
+   "campaignTypes": [
+    "Shopping",
+    "PMax"
+   ],
+   "clientTypes": [
+    "Ecommerce"
+   ],
+   "severity": "Major"
+  },
+  {
+   "id": "9.4",
+   "section": "9. Shopping",
+   "check": "Shipping, tax and returns",
+   "verify": "Configured in Merchant Center.",
+   "campaignTypes": [
+    "Shopping",
+    "PMax"
+   ],
+   "clientTypes": [
+    "Ecommerce"
+   ],
+   "severity": "Major"
+  },
+  {
+   "id": "9.5",
+   "section": "9. Shopping",
+   "check": "Inventory filter and product groups",
+   "verify": "Correct products included; no product targeted by two campaigns unintentionally.",
+   "campaignTypes": [
+    "Shopping"
+   ],
+   "clientTypes": [
+    "Ecommerce"
+   ],
+   "severity": "Critical"
+  },
+  {
+   "id": "9.6",
+   "section": "9. Shopping",
+   "check": "Campaign priority",
+   "verify": "Low/Medium/High set deliberately when running multiple Shopping campaigns.",
+   "campaignTypes": [
+    "Shopping"
+   ],
+   "clientTypes": [
+    "Ecommerce"
+   ],
+   "severity": "Major"
+  },
+  {
+   "id": "9.7",
+   "section": "9. Shopping",
+   "check": "Product group bids",
+   "verify": "Bids set per product group (manual bidding).",
+   "campaignTypes": [
+    "Shopping"
+   ],
+   "clientTypes": [
+    "Ecommerce"
+   ],
+   "severity": "Major"
+  },
+  {
+   "id": "9.8",
+   "section": "9. Shopping",
+   "check": "Shopping negatives",
+   "verify": "Negative keywords applied.",
+   "campaignTypes": [
+    "Shopping"
+   ],
+   "clientTypes": [
+    "Ecommerce"
+   ],
+   "severity": "Major"
+  },
+  {
+   "id": "9.9",
+   "section": "9. Shopping",
+   "check": "Local inventory and promotions",
+   "verify": "Local inventory only if a local feed exists. Merchant promotions approved.",
+   "campaignTypes": [
+    "Shopping",
+    "PMax"
+   ],
+   "clientTypes": [
+    "Ecommerce"
+   ],
+   "severity": "Minor"
+  },
+  {
+   "id": "10.1",
+   "section": "10. Display & Demand Gen",
+   "check": "Optimized targeting",
+   "verify": "Off unless approved.",
+   "campaignTypes": [
+    "Display"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Major"
+  },
+  {
+   "id": "10.2",
+   "section": "10. Display & Demand Gen",
+   "check": "Targeting not too broad",
+   "verify": "Audiences or placements set; no campaign running with no targeting by mistake.",
+   "campaignTypes": [
+    "Display",
+    "Demand Gen"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Major"
+  },
+  {
+   "id": "10.3",
+   "section": "10. Display & Demand Gen",
+   "check": "Channel controls",
+   "verify": "Only the intended channels selected (YouTube, Discover, Gmail, Display).",
+   "campaignTypes": [
+    "Demand Gen"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Major"
+  },
+  {
+   "id": "10.4",
+   "section": "10. Display & Demand Gen",
+   "check": "Lookalike segments",
+   "verify": "Seed list and reach level as planned.",
+   "campaignTypes": [
+    "Demand Gen"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Minor"
+  },
+  {
+   "id": "10.5",
+   "section": "10. Display & Demand Gen",
+   "check": "Placement and content exclusions",
+   "verify": "Exclusion lists and sensitive content exclusions applied.",
+   "campaignTypes": [
+    "Display",
+    "Demand Gen"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Major"
+  },
+  {
+   "id": "10.6",
+   "section": "10. Display & Demand Gen",
+   "check": "Frequency cap",
+   "verify": "Set where applicable.",
+   "campaignTypes": [
+    "Display",
+    "Demand Gen"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Minor"
+  },
+  {
+   "id": "10.7",
+   "section": "10. Display & Demand Gen",
+   "check": "Creative specs",
+   "verify": "All required sizes/ratios; correct logo; images sharp and policy compliant.",
+   "campaignTypes": [
+    "Display",
+    "Demand Gen"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Major"
+  },
+  {
+   "id": "10.8",
+   "section": "10. Display & Demand Gen",
+   "check": "Product feed",
+   "verify": "Feed attached if running product ads.",
+   "campaignTypes": [
+    "Demand Gen"
+   ],
+   "clientTypes": [
+    "Ecommerce"
+   ],
+   "severity": "Minor"
+  },
+  {
+   "id": "11.1",
+   "section": "11. Video (YouTube)",
+   "check": "Video partners OFF",
+   "verify": "Video partners on the Display Network off unless approved.",
+   "campaignTypes": [
+    "Video"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Major"
+  },
+  {
+   "id": "11.2",
+   "section": "11. Video (YouTube)",
+   "check": "Campaign subtype and goal",
+   "verify": "Correct subtype (views, reach, action / conversions).",
+   "campaignTypes": [
+    "Video"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Major"
+  },
+  {
+   "id": "11.3",
+   "section": "11. Video (YouTube)",
+   "check": "Correct video linked",
+   "verify": "Right video, public or unlisted (not private).",
+   "campaignTypes": [
+    "Video",
+    "Demand Gen"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Critical"
+  },
+  {
+   "id": "11.4",
+   "section": "11. Video (YouTube)",
+   "check": "Final URL, headline and CTA",
+   "verify": "Filled and correct.",
+   "campaignTypes": [
+    "Video"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Major"
+  },
+  {
+   "id": "11.5",
+   "section": "11. Video (YouTube)",
+   "check": "Content suitability and placements",
+   "verify": "Inventory type Limited, embedded/live excluded, made-for-kids excluded.",
+   "campaignTypes": [
+    "Video"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Major"
+  },
+  {
+   "id": "11.6",
+   "section": "11. Video (YouTube)",
+   "check": "Frequency cap and companion banner",
+   "verify": "Set where applicable.",
+   "campaignTypes": [
+    "Video"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Minor"
+  },
+  {
+   "id": "12.1",
+   "section": "12. App Campaigns",
+   "check": "App linked and tracking",
+   "verify": "Firebase / SDK / MMP linked; in-app events importing.",
+   "campaignTypes": [
+    "App"
+   ],
+   "clientTypes": [
+    "App"
+   ],
+   "severity": "Critical"
+  },
+  {
+   "id": "12.2",
+   "section": "12. App Campaigns",
+   "check": "Correct app and store",
+   "verify": "Right app, platform and country store.",
+   "campaignTypes": [
+    "App"
+   ],
+   "clientTypes": [
+    "App"
+   ],
+   "severity": "Critical"
+  },
+  {
+   "id": "12.3",
+   "section": "12. App Campaigns",
+   "check": "Optimisation event",
+   "verify": "Correct install or in-app action selected.",
+   "campaignTypes": [
+    "App"
+   ],
+   "clientTypes": [
+    "App"
+   ],
+   "severity": "Major"
+  },
+  {
+   "id": "12.4",
+   "section": "12. App Campaigns",
+   "check": "Deep links",
+   "verify": "Working where used.",
+   "campaignTypes": [
+    "App"
+   ],
+   "clientTypes": [
+    "App"
+   ],
+   "severity": "Minor"
+  },
+  {
+   "id": "13.1",
+   "section": "13. Landing Page & Website",
+   "check": "Page live and crawlable",
+   "verify": "No staging URL, password or robots.txt blocking AdsBot (causes disapprovals).",
+   "campaignTypes": [
+    "All"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Critical"
+  },
+  {
+   "id": "13.2",
+   "section": "13. Landing Page & Website",
+   "check": "Parameters survive redirects",
+   "verify": "GCLID and UTMs are not stripped by redirects.",
+   "campaignTypes": [
+    "All"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Critical"
+  },
+  {
+   "id": "13.3",
+   "section": "13. Landing Page & Website",
+   "check": "Forms and lead delivery",
+   "verify": "Form submits, confirmation shows, conversion fires and the lead reaches the CRM/inbox.",
+   "campaignTypes": [
+    "All"
+   ],
+   "clientTypes": [
+    "Lead Gen",
+    "B2B",
+    "B2C",
+    "Local"
+   ],
+   "severity": "Critical"
+  },
+  {
+   "id": "13.4",
+   "section": "13. Landing Page & Website",
+   "check": "Checkout and stock",
+   "verify": "Products in stock, prices match ads/feed, cart and checkout work.",
+   "campaignTypes": [
+    "All"
+   ],
+   "clientTypes": [
+    "Ecommerce"
+   ],
+   "severity": "Critical"
+  },
+  {
+   "id": "13.5",
+   "section": "13. Landing Page & Website",
+   "check": "Form spam protection",
+   "verify": "reCAPTCHA or honeypot in place, especially with PMax, Display or Demand Gen.",
+   "campaignTypes": [
+    "All"
+   ],
+   "clientTypes": [
+    "Lead Gen",
+    "B2B",
+    "B2C"
+   ],
+   "severity": "Major"
+  },
+  {
+   "id": "13.6",
+   "section": "13. Landing Page & Website",
+   "check": "Message match",
+   "verify": "Headline and offer on the page match the ad and keyword theme.",
+   "campaignTypes": [
+    "All"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Major"
+  },
+  {
+   "id": "13.7",
+   "section": "13. Landing Page & Website",
+   "check": "Mobile experience and speed",
+   "verify": "Mobile-friendly, CTA above the fold, acceptable load speed.",
+   "campaignTypes": [
+    "All"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Major"
+  },
+  {
+   "id": "13.8",
+   "section": "13. Landing Page & Website",
+   "check": "Geo and language version",
+   "verify": "Correct regional / language page for the targeted location.",
+   "campaignTypes": [
+    "All"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Major"
+  },
+  {
+   "id": "13.9",
+   "section": "13. Landing Page & Website",
+   "check": "Privacy policy and consent banner",
+   "verify": "Privacy policy, cookie consent and contact info present.",
+   "campaignTypes": [
+    "All"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Major"
+  },
+  {
+   "id": "13.10",
+   "section": "13. Landing Page & Website",
+   "check": "Phone numbers",
+   "verify": "Click-to-call works; number correct.",
+   "campaignTypes": [
+    "All"
+   ],
+   "clientTypes": [
+    "Lead Gen",
+    "Local"
+   ],
+   "severity": "Minor"
+  },
+  {
+   "id": "14.1",
+   "section": "14. Policy, Compliance & Approvals",
+   "check": "Restricted vertical certification",
+   "verify": "Required certification in place (healthcare, financial services, gambling, addiction, etc.).",
+   "campaignTypes": [
+    "All"
+   ],
+   "clientTypes": [
+    "Regulated"
+   ],
+   "severity": "Critical"
+  },
+  {
+   "id": "14.2",
+   "section": "14. Policy, Compliance & Approvals",
+   "check": "Personalised ads restrictions",
+   "verify": "US/Canada housing, employment, credit: no age, gender, parental status or ZIP targeting. Health: no sensitive remarketing.",
+   "campaignTypes": [
+    "All"
+   ],
+   "clientTypes": [
+    "Regulated"
+   ],
+   "severity": "Critical"
+  },
+  {
+   "id": "14.3",
+   "section": "14. Policy, Compliance & Approvals",
+   "check": "Required disclaimers",
+   "verify": "Legal disclaimers present in copy or on the page where required.",
+   "campaignTypes": [
+    "All"
+   ],
+   "clientTypes": [
+    "Regulated"
+   ],
+   "severity": "Major"
+  },
+  {
+   "id": "14.4",
+   "section": "14. Policy, Compliance & Approvals",
+   "check": "Client sign-off",
+   "verify": "Copy, creative, keywords, budget and targeting approved by the client in writing.",
+   "campaignTypes": [
+    "All"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Critical"
+  },
+  {
+   "id": "15.1",
+   "section": "15. Final Pre-Launch & Post-Launch (24 to 72 hrs)",
+   "check": "Ad preview check",
+   "verify": "Ad Preview & Diagnosis: ads eligible for core terms in the target geo.",
+   "campaignTypes": [
+    "Search",
+    "Shopping"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Major"
+  },
+  {
+   "id": "15.2",
+   "section": "15. Final Pre-Launch & Post-Launch (24 to 72 hrs)",
+   "check": "Disapprovals and limited status",
+   "verify": "All ads, assets and keywords Approved after review.",
+   "campaignTypes": [
+    "All"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Critical"
+  },
+  {
+   "id": "15.3",
+   "section": "15. Final Pre-Launch & Post-Launch (24 to 72 hrs)",
+   "check": "Live conversions recording",
+   "verify": "Conversions recording from real traffic, not only the test.",
+   "campaignTypes": [
+    "All"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Critical"
+  },
+  {
+   "id": "15.4",
+   "section": "15. Final Pre-Launch & Post-Launch (24 to 72 hrs)",
+   "check": "Spend pacing",
+   "verify": "Spend after 24 hours on track with the daily budget.",
+   "campaignTypes": [
+    "All"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Major"
+  },
+  {
+   "id": "15.5",
+   "section": "15. Final Pre-Launch & Post-Launch (24 to 72 hrs)",
+   "check": "Search terms review",
+   "verify": "Irrelevant terms added as negatives.",
+   "campaignTypes": [
+    "Search",
+    "Shopping",
+    "PMax"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Major"
+  },
+  {
+   "id": "15.6",
+   "section": "15. Final Pre-Launch & Post-Launch (24 to 72 hrs)",
+   "check": "PMax channel and placement review",
+   "verify": "Channel performance, search term insights and placements checked.",
+   "campaignTypes": [
+    "PMax"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Major"
+  },
+  {
+   "id": "15.7",
+   "section": "15. Final Pre-Launch & Post-Launch (24 to 72 hrs)",
+   "check": "Keyword status",
+   "verify": "No Low search volume or Rarely shown issues on core keywords.",
+   "campaignTypes": [
+    "Search"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Minor"
+  },
+  {
+   "id": "15.8",
+   "section": "15. Final Pre-Launch & Post-Launch (24 to 72 hrs)",
+   "check": "Change history and recommendations",
+   "verify": "No accidental bulk edits; nothing auto-applied.",
+   "campaignTypes": [
+    "All"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Minor"
+  },
+  {
+   "id": "15.9",
+   "section": "15. Final Pre-Launch & Post-Launch (24 to 72 hrs)",
+   "check": "Alerts and documentation",
+   "verify": "Budget / disapproval alerts set; QC sheet saved and client informed of launch.",
+   "campaignTypes": [
+    "All"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Minor"
+  }
+ ]
+}

@@ -101,7 +101,7 @@
       </a>
 
       <!-- Paid Marketing Agents (2026-10-12): the PPC team's agents (three from
-           Agent Holmes, plus the Performance Summarizer, Segment Analysis and Product Analysis). Sits between the other two on purpose. Its counts are
+           Agent Holmes, plus the Performance Summarizer, Segment Analysis, Product Analysis and QA Agent). Sits between the other two on purpose. Its counts are
            the cards on /p2/paid-marketing; tests/test_hub_card_counts.py
            checks they agree. -->
       <a href="/p2/paid-marketing" class="hub-card card-paid">
@@ -118,13 +118,14 @@
             Live Google Ads performance you can chart any way, daily budget pacing with the
             moves to make today, search-term triage with priority negatives and keywords,
             segment analysis of any Google Ads account with the insights to act on, a
-            product-by-product read of which items earn their ecommerce ad spend, and a
-            client feedback chat over Slack, Gmail and meeting transcripts.
+            product-by-product read of which items earn their ecommerce ad spend, a launch
+            QC checklist with a ready-to-launch verdict, and a client feedback chat over
+            Slack, Gmail and meeting transcripts.
           </div>
           <div class="card-footer">
             <div class="card-meta">
-              <div class="card-stat"><span>6</span> dashboards</div>
-              <div class="card-stat"><span>6</span> live</div>
+              <div class="card-stat"><span>7</span> dashboards</div>
+              <div class="card-stat"><span>7</span> live</div>
             </div>
             <div class="card-cta">Open <span class="card-arrow">→</span></div>
           </div>
@@ -170,15 +171,16 @@
         {% endif %}
         <div><b data-lxn="300" data-lxs="+">0</b><span>live signals</span></div>
         {# Live dashboards across all three workspaces: 11 on /p2/strategic-agents,
-           6 on /p2/paid-marketing (3 added 2026-10-12, Performance Summarizer
-           2026-10-13, Segment Analysis and Product Analysis after) and 16 SEO + AEO tools, so 33. Was 31 before those two.
+           7 on /p2/paid-marketing (3 added 2026-10-12, Performance Summarizer
+           2026-10-13, Segment Analysis and Product Analysis after, QA Agent 2026-10-14) and 16 SEO + AEO tools, so 34.
+           Was 33 before the QA Agent, 31 before Segment Analysis and Product Analysis.
            Before Paid Marketing Agents: 11 on /p2/strategic-agents
            (Thought Leader Intelligence added 2026-09-17, Phase 0 only) + 16
            SEO + AEO tools. Was 26 before this (Event & Conference Intelligence
            added 2026-08-31), 25 before that, 24 before Social Media
            Intelligence, 23 before the Slot Checker, and 22 before LinkedIn
            Strategy Researcher. #}
-        <div><b data-lxn="33">0</b><span>dashboards</span></div>
+        <div><b data-lxn="34">0</b><span>dashboards</span></div>
         <div><b class="grad-k">Vimi</b><span>ai on every page</span></div>
       </div>
     </section>
@@ -218,7 +220,7 @@
   var BASE=[
     {t:'Hub',d:'Platform home',u:'/p2/hub',i:'⌂'},
     {t:'Strategic Agents',d:'Go-to-market intelligence',u:'/p2/strategic-agents',i:'◎'},
-    {t:'Paid Marketing Agents',d:'Performance, pacing, search terms, segments & client feedback',u:'/p2/paid-marketing',i:'◆'},
+    {t:'Paid Marketing Agents',d:'Performance, pacing, search terms, segments, launch QC & client feedback',u:'/p2/paid-marketing',i:'◆'},
     {t:'SEO + AEO Tools',d:'Organic intelligence',u:'/p2/seo-aeo',i:'⌕'},
     {t:'ABM Signal Tracker — Healthcare',d:'Company signals & insights',u:'/p2/abm-signal-tracker/healthcare',i:'☆'},
     {t:'ABM Signal Tracker — CSG',d:'Company signals & insights',u:'/p2/abm-signal-tracker/csg',i:'☆'},
