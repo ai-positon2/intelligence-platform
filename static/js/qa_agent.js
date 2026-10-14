@@ -5,7 +5,7 @@
  * Google Ads and its landing pages, and flags what is wrong with the fix. This page leads
  * with those flags, then the few checks the AI could not verify for itself ("needs a
  * human"), then what passed. A person can confirm or overrule any check with one click and
- * an optional comment, but nothing has to be ticked for the review to be complete.
+ * (a wrong mark is saved with the AI's finding as its reason); nothing has to be ticked for the review to be complete.
  *
  * The review runs on the server in the background (about a minute); this page polls its
  * progress. The server also works out the verdict, which is what the banner shows: this
@@ -32,8 +32,8 @@ var VNAME = {ready:"Ready",incomplete:"Incomplete",not_ready:"Not ready"};
 
 var root = $("#qa");
 var S = {list:null, items:{}, accounts:[], account:null, campaigns:[], campaignId:"", launchId:"", launch:null,
-         checks:{}, summary:null, needs:null, review:null, fStatus:"all", fSev:"all", closed:{}, text:{}, pend:{}, rowMsg:{},
-         inflight:{}, queued:{}, timers:{}, seq:0, manual:false, poll:null, startError:""};
+         checks:{}, summary:null, needs:null, review:null, fStatus:"all", fSev:"all", closed:{}, rowMsg:{},
+         inflight:{}, queued:{}, seq:0, manual:false, poll:null, startError:""};
 
 /* ── Requests ─────────────────────────────────────────────── */
 function call(method, url, body){
@@ -134,7 +134,7 @@ function load(j){
   var first=S.launchId!==j.launch.id;
   S.launch=j.launch; S.launchId=j.launch.id; S.campaignId=j.launch.campaignId; S.checks=j.checks||{}; S.summary=j.summary; S.needs=j.needsClientType;
   S.review=j.launch.review||{status:""};
-  if(first){ S.text={}; S.pend={}; S.rowMsg={}; S.fSev="all"; S.fStatus=defaultFilter(); }
+  if(first){ S.rowMsg={}; S.fSev="all"; S.fStatus=defaultFilter(); }
 }
 function defaultFilter(){
   var s=S.summary; if(!s) return "all";
@@ -168,13 +168,9 @@ var VERDICT_SUB = {
   not_ready:function(s){return "The AI flagged "+s.failedCritical.length+" Critical check"+(s.failedCritical.length===1?"":"s")+" ("+s.failedCritical.join(", ")+"). Do not launch until "+(s.failedCritical.length===1?"it is":"they are")+" fixed.";}
 };
 function rowState(id){
-  // A wrong mark with no reason yet ("draft") wins over a saved right or N/A: it is what the reviewer is doing now,
-  // and the saved answer stands until the reason is written. A saved wrong stays wrong while its text is edited.
   var c=S.checks[id];
-  if(S.pend[id]&&(!c||c.status!=="fail")) return "draft";
   return c&&c.status?c.status:"todo";
 }
-function noteOf(id){var c=S.checks[id]; return S.text.hasOwnProperty(id)?S.text[id]:(c&&c.source==="person"?c.note:"");}
 function paintHead(){
   var L=S.launch, bits=[];
   bits.push(esc(L.accountName)+" · "+dashed(L.accountId));
@@ -215,7 +211,7 @@ function paintVerdict(){
 }
 function paintFilters(){
   var ids=S.summary.applicable, n={all:ids.length,todo:0,pass:0,fail:0,na:0};
-  ids.forEach(function(id){var st=rowState(id); if(st==="todo"||st==="draft"){n.todo++;} if(st==="draft"){n.fail++;} if(n[st]!=null&&st!=="todo")n[st]++;});
+  ids.forEach(function(id){var st=rowState(id); n[st]++;});
   var st=[["fail","Flagged"],["todo","Needs a human"],["pass","Passed"],["na","N/A"],["all","All"]];
   $("#fStatus").innerHTML=st.map(function(x){return '<button type="button" class="pm-chip'+(S.fStatus===x[0]?" on":"")+(x[0]==="fail"&&n.fail?" warn":"")+'" data-f="'+x[0]+'" aria-pressed="'+(S.fStatus===x[0])+'">'+x[1]+' <span class="n">'+n[x[0]]+'</span></button>';}).join("");
   var sv=[["all","All"],["Critical","Critical"],["Major","Major"],["Minor","Minor"]];
@@ -248,8 +244,8 @@ function byLine(c,st){
 }
 function rowHtml(it){
   var id=it.id, c=S.checks[id], st=rowState(id);
-  var pass=st==="pass", isFail=st==="fail"||st==="draft", na=st==="na";
-  var note=noteOf(id), found=c&&c.found?c.found:"", mine=c&&c.source==="person";
+  var pass=st==="pass", isFail=st==="fail", na=st==="na";
+  var found=c&&c.found?c.found:"", mine=c&&c.source==="person";
   var tags="";
   if(it.campaignTypes[0]!=="All") tags+=tag(it.campaignTypes.join(" · "));
   if(it.clientTypes[0]!=="All") tags+=tag(it.clientTypes.join(" · "),"cl");
@@ -258,10 +254,9 @@ function rowHtml(it){
   if(c&&c.status&&!mine&&c.source==="rule") tags+=tag("Rule "+(c.status==="fail"?"flagged":"passed"),c.status==="fail"?"ai bad":"ai");
   if(st==="todo") tags+=tag("Needs a human","need");
   var msg=S.rowMsg[id]||"", by=byLine(c,st);
-  var ph=isFail?"Why is this wrong? What needs fixing, and where?":(st==="todo"?"Your comment (optional)":"Comment");
   var label=st==="todo"?"Could not verify":(isFail&&!mine?"AI found":"Found");
   if(c&&c.source==="rule") label="Google Ads";
-  return '<div class="qa-row st-'+(st==="draft"?"fail draft":st)+'" data-id="'+esc(id)+'" id="chk-'+esc(id)+'">'+
+  return '<div class="qa-row st-'+st+'" data-id="'+esc(id)+'" id="chk-'+esc(id)+'">'+
     '<div class="qa-ctl">'+
       '<button type="button" class="qa-box" role="checkbox" aria-checked="'+pass+'" data-act="pass" title="'+(pass&&!mine?"The AI passed this. Click to confirm it yourself":pass?"Confirmed right. Click to undo":"Mark right")+'" aria-label="Right: '+esc(it.check)+'"><svg viewBox="0 0 24 24"><path d="M5 12l4 4 10-10"/></svg></button>'+
       '<button type="button" class="qa-x" aria-pressed="'+isFail+'" data-act="fail" title="'+(isFail&&!mine?"Flagged. Click if you agree and add why":isFail?"Marked wrong. Click to undo":"Mark wrong")+'" aria-label="Wrong: '+esc(it.check)+'"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>'+
@@ -277,7 +272,6 @@ function rowHtml(it){
       '<div class="qa-foot"><span class="qa-st">'+esc(msg)+'</span>'+(by?'<span class="qa-by" title="'+esc(c&&c.by||"")+'">'+by+'</span>':"")+
         '<button type="button" class="qa-na" aria-pressed="'+na+'" data-act="na" title="Does not apply to this campaign">N/A</button></div>'+
     '</div>'+
-    '<div class="qa-why"><textarea rows="3" maxlength="2000" data-why="'+esc(id)+'" placeholder="'+esc(ph)+'" aria-label="Comment on '+esc(it.check)+'">'+esc(note)+'</textarea></div>'+
   '</div>';
 }
 function paintSections(){
@@ -290,8 +284,6 @@ function paintSections(){
       if(it.section!==sec||!ok[it.id]) return false;
       if(S.fSev!=="all"&&it.severity!==S.fSev) return false;
       var st=rowState(it.id);
-      if(S.fStatus==="todo") return st==="todo"||st==="draft";
-      if(S.fStatus==="fail") return st==="fail"||st==="draft";
       if(S.fStatus!=="all") return st===S.fStatus;
       return true;
     });
@@ -317,10 +309,8 @@ function render(){
 }
 function refresh(id){
   // After one check changes: repaint that row, the verdict, the section headers and the filter counts.
-  var el=document.getElementById("chk-"+id), it=S.items[id], ae=document.activeElement;
-  var keep=ae&&ae.matches&&ae.matches("textarea[data-why]")&&ae.dataset.why===id?{s:ae.selectionStart,e:ae.selectionEnd}:null;
+  var el=document.getElementById("chk-"+id), it=S.items[id];
   if(el&&it){var t=document.createElement("div");t.innerHTML=rowHtml(it);el.replaceWith(t.firstChild);}
-  if(keep){var ta=document.querySelector('textarea[data-why="'+CSS.escape(id)+'"]'); if(ta){ta.focus();try{ta.setSelectionRange(keep.s,keep.e);}catch(e){}}}
   paintVerdict(); paintFilters(); paintHeads();
 }
 function paintHeads(){
@@ -348,8 +338,6 @@ function save(id,status,note){
     }
     if(r.j.check){S.checks[id]=r.j.check;} else {delete S.checks[id];}
     S.summary=r.j.summary; S.rowMsg[id]="Saved";
-    if(!S.text.hasOwnProperty(id)||S.text[id].trim()===(note||"")) delete S.text[id];       // keep anything typed since
-    delete S.pend[id];
     if(q){ refresh(id); return save(id,q.status,q.note); }
     refresh(id); paintCampaignBadge();
     setTimeout(function(){ if(S.rowMsg[id]==="Saved"){S.rowMsg[id]="";setMsg(id);} },1800);
@@ -367,47 +355,24 @@ function paintCampaignBadge(){
         failedCount:S.summary.failed.length,failedCritical:S.summary.failedCritical.length};
   paintCampaigns();
 }
-function commit(id){
-  // Save what the row now says: its answer and its comment.
-  var st=rowState(id), note=noteOf(id).trim();
-  if(st==="fail"||st==="draft"){
-    if(note.length<3){ S.rowMsg[id]="Add the reason to record this as wrong."; setMsg(id,true); return; }
-    return save(id,"fail",note);
-  }
-  if(st==="pass"||st==="na") return save(id,st,note);
-  S.rowMsg[id]="Mark it right or wrong and your comment is saved with it."; setMsg(id);
+function wrongNote(id){
+  // A wrong mark is saved with its reason: the AI's own finding where there is one.
+  var c=S.checks[id], f=c&&c.found?c.found.replace(/^The AI's answer could not be tied to the evidence[^.]*\. It said: /,""):"";
+  return ("Marked wrong"+(f?": "+f:"")).slice(0,400);
 }
 $("#sections").addEventListener("click",function(e){
   var head=e.target.closest("[data-toggle]");
   if(head){var k=head.dataset.toggle; S.closed[k]=!S.closed[k]; return paintSections();}
   var b=e.target.closest("[data-act]"); if(!b) return;
-  var id=b.closest(".qa-row").dataset.id, st=rowState(id), act=b.dataset.act, c=S.checks[id], mine=c&&c.source==="person", note=noteOf(id).trim();
+  var id=b.closest(".qa-row").dataset.id, st=rowState(id), act=b.dataset.act, c=S.checks[id], mine=c&&c.source==="person";
   if(act==="pass"){
-    delete S.pend[id];
-    if(st==="pass"&&mine){ delete S.text[id]; save(id,null,""); }              // undo my answer: back to the AI's
-    else save(id,"pass",note);                                                  // confirm it right (or overrule a flag)
+    if(st==="pass"&&mine) save(id,null,"");                 // undo my answer: back to the AI's
+    else save(id,"pass","");                                // confirm it right (or overrule a flag)
   }else if(act==="na"){
-    delete S.pend[id];
-    if(st==="na"&&mine){ delete S.text[id]; save(id,null,""); } else save(id,"na",note);
+    if(st==="na"&&mine) save(id,null,""); else save(id,"na","");
   }else if(act==="fail"){
-    if(st==="fail"&&mine){ delete S.pend[id]; delete S.text[id]; save(id,null,""); }
-    else if(st==="draft"){ delete S.pend[id]; refresh(id); }
-    else if(note.length>=3) save(id,"fail",note);                              // a reason is already written
-    else if(st==="fail"){ save(id,"fail",(c&&c.found||"Flagged by the AI").slice(0,400)); }   // agree with the flag as it stands
-    else{ S.pend[id]=true; S.rowMsg[id]=""; refresh(id);
-      var ta=document.querySelector('textarea[data-why="'+CSS.escape(id)+'"]'); if(ta) ta.focus(); }
+    if(st==="fail"&&mine) save(id,null,""); else save(id,"fail",wrongNote(id));
   }
-});
-$("#sections").addEventListener("input",function(e){
-  var ta=e.target.closest("textarea[data-why]"); if(!ta) return; var id=ta.dataset.why;
-  S.text[id]=ta.value; S.rowMsg[id]=""; setMsg(id);
-  clearTimeout(S.timers[id]); S.timers[id]=setTimeout(function(){ commit(id); },900);
-});
-$("#sections").addEventListener("focusout",function(e){
-  var ta=e.target.closest("textarea[data-why]"); if(!ta) return; var id=ta.dataset.why;
-  clearTimeout(S.timers[id]);
-  var c=S.checks[id], saved=c&&c.source==="person"&&c.note===ta.value.trim();
-  if(!saved&&S.text.hasOwnProperty(id)) commit(id);
 });
 
 /* ── Header actions ───────────────────────────────────────── */
@@ -416,7 +381,7 @@ function run(){
   $("#runBtn").disabled=true; say("");
   call("POST",API+"/launches/"+S.launchId+"/run",{}).then(function(r){
     if(!r.ok){ $("#runBtn").disabled=false; return say(fail(r,"The review could not be started.")); }
-    var keepText=S.text, keepPend=S.pend; S.startError=""; open(r.j); S.text=keepText; S.pend=keepPend;
+    S.startError=""; open(r.j);
   }).catch(function(){$("#runBtn").disabled=false;say("The server could not be reached. Try again.");});
 }
 $("#runBtn").addEventListener("click",run);
