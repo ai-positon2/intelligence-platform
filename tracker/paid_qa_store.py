@@ -43,6 +43,19 @@ CREATE TABLE IF NOT EXISTS pm_qc_launches (
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
     archived        BOOLEAN NOT NULL DEFAULT false
 );
+-- The first version of this table (a QC for an account, not a campaign) may already exist: bring it up to this
+-- shape and retire its rows, which belong to no campaign.
+ALTER TABLE pm_qc_launches ADD COLUMN IF NOT EXISTS campaign_id TEXT NOT NULL DEFAULT '';
+ALTER TABLE pm_qc_launches ADD COLUMN IF NOT EXISTS campaign_name TEXT NOT NULL DEFAULT '';
+ALTER TABLE pm_qc_launches ADD COLUMN IF NOT EXISTS channel TEXT NOT NULL DEFAULT '';
+ALTER TABLE pm_qc_launches ADD COLUMN IF NOT EXISTS auto JSONB NOT NULL DEFAULT '{}'::jsonb;
+ALTER TABLE pm_qc_launches ADD COLUMN IF NOT EXISTS auto_at TIMESTAMPTZ;
+DO $$ BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'pm_qc_launches' AND column_name = 'name') THEN
+        ALTER TABLE pm_qc_launches ALTER COLUMN name DROP NOT NULL;
+    END IF;
+END $$;
+UPDATE pm_qc_launches SET archived = true WHERE campaign_id = '' AND NOT archived;
 CREATE INDEX IF NOT EXISTS pm_qc_launches_account ON pm_qc_launches (account_id, created_at DESC);
 CREATE UNIQUE INDEX IF NOT EXISTS pm_qc_launches_one_live ON pm_qc_launches (account_id, campaign_id) WHERE NOT archived;
 CREATE TABLE IF NOT EXISTS pm_qc_checks (

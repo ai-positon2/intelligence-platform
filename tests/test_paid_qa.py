@@ -372,6 +372,10 @@ def test_the_schema_has_the_tables_a_cascade_and_one_live_qc_per_campaign():
     assert "pm_qc_launches" in s and "pm_qc_checks" in s and "ON DELETE CASCADE" in s
     assert "PRIMARY KEY (launch_id, check_id)" in s
     assert "UNIQUE INDEX" in s and "(account_id, campaign_id) WHERE NOT archived" in s
+    # the first version's table may exist on a deployed database: it is brought up to shape, its rows retired,
+    # and only then is the one-live-QC-per-campaign index built (old rows all have an empty campaign id)
+    assert s.index("ADD COLUMN IF NOT EXISTS campaign_id") < s.index("SET archived = true WHERE campaign_id = ''") < s.index("UNIQUE INDEX")
+    assert "ALTER COLUMN name DROP NOT NULL" in s
 
 
 # ── Routes, on an in-memory store and a fake Google Ads ─────────────────────
