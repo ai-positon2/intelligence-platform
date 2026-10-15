@@ -1,7 +1,8 @@
 /* QA Agent (Paid Marketing Agents): the Campaign Launch QC, done by the AI.
  *
- * Pick an account (the Performance Summarizer's account list), then one of its live
- * campaigns. The AI reviews every check on the shared checklist, reading the campaign in
+ * Pick an account (the Performance Summarizer's account list), then one or more of its live
+ * campaigns (a multiple choice: each gets its own QC, shown as tabs). The AI reviews every check
+ * on the shared checklist, reading each campaign in
  * Google Ads and its landing pages, and flags what is wrong with the fix. This page leads
  * with those flags, then the few checks the AI could not verify for itself ("needs a
  * human"), then what passed. A person can confirm or overrule any check with one click and
@@ -34,9 +35,10 @@ function rel(iso){
 var VNAME = {ready:"Ready",incomplete:"Incomplete",not_ready:"Not ready"};
 
 var root = $("#qa");
-var S = {list:null, items:{}, accounts:[], account:null, campaigns:[], campaignId:"", launchId:"", launch:null,
+var MAX_SEL = 10;
+var S = {list:null, items:{}, accounts:[], account:null, campaigns:[], meta:{}, sel:[], qcs:{}, campaignId:"", launchId:"", launch:null,
          checks:{}, summary:null, needs:null, review:null, fStatus:"all", fSev:"all", closed:{}, rowMsg:{},
-         inflight:{}, queued:{}, seq:0, manual:false, poll:null, startError:""};
+         inflight:{}, queued:{}, seq:0, manual:false, poll:null, startError:"", bookAll:true, bookBusy:""};
 
 /* ── Requests ─────────────────────────────────────────────── */
 function call(method, url, body){
@@ -50,24 +52,88 @@ function say(html,kind){$("#msg").innerHTML=html?'<div class="'+(kind||"pm-err")
 function view(which,title,text){
   $("#empty").hidden=which!=="empty"; $("#skel").hidden=which!=="skel"; $("#work").hidden=which!=="work";
   if(which==="empty"){ $("#emptyT").textContent=title||"Choose an account to begin";
-    $("#emptyP").textContent=text||"Then pick one of its live campaigns. The AI reviews the PPC team's Campaign Launch QC: 155 checks across account setup, tracking, campaign settings, ads, assets, policy, landing pages and the final pre-launch review."; }
+    $("#emptyP").textContent=text||"Then pick one or more of its live campaigns. The AI reviews the PPC team's Campaign Book checks: the campaign's own settings, the automation switches and the auto-apply recommendations."; }
 }
 function fail(r,fallback){return esc((r.j&&r.j.error)||fallback||("Something went wrong (HTTP "+r.status+")."));}
 function stopPoll(){ if(S.poll){clearTimeout(S.poll);S.poll=null;} }
 
-/* ── Account, then campaign ───────────────────────────────── */
+/* ── A multiple-choice campaign picker (same look as the shared searchable dropdown) ─── */
+function MultiPick(host,opts){
+  var wrap=document.createElement("div"); wrap.className="sq-dd pd-dd qa-ms";
+  wrap.innerHTML='<span class="pd-dd-k">'+esc(opts.label)+'</span>'+
+    '<button type="button" class="sq-dd-btn" aria-haspopup="listbox" aria-expanded="false" aria-label="'+esc(opts.label)+'"></button>'+
+    '<div class="sq-dd-menu" hidden><input class="sq-dd-search" placeholder="Filter campaigns…" autocomplete="off">'+
+    '<div class="qa-ms-bar"><button type="button" data-a="all">Select all</button><button type="button" data-a="none">Clear</button><span class="qa-ms-n"></span></div>'+
+    '<div role="listbox" aria-multiselectable="true" class="pd-dd-list"></div>'+
+    '<div class="qa-ms-foot"><button type="button" class="pm-btn qa-ms-go"></button></div></div>';
+  host.appendChild(wrap);
+  var btn=wrap.querySelector(".sq-dd-btn"), menu=wrap.querySelector(".sq-dd-menu"), list=wrap.querySelector(".pd-dd-list"),
+      q=wrap.querySelector(".sq-dd-search"), nEl=wrap.querySelector(".qa-ms-n"), go=wrap.querySelector(".qa-ms-go");
+  var items=[], applied=[], draft=[], disabled=false, offLabel=null, shown=[];
+  function av(it){return '<span class="sq-av" style="--h:'+(it.hue==null?40:it.hue)+'">'+esc(it.avatar||"·")+'</span>';}
+  function byId(id){return items.filter(function(i){return i.value===id;})[0];}
+  function paintBtn(){
+    var h;
+    if(offLabel) h=av({avatar:"…",hue:200})+'<span class="sq-dd-txt"><span class="nm">'+esc(offLabel.label)+'</span><span class="ds">'+esc(offLabel.sub||"")+'</span></span>';
+    else if(!applied.length) h=av({avatar:"?",hue:200})+'<span class="sq-dd-txt"><span class="nm">Choose campaigns</span><span class="ds">'+items.length+' live · pick one or more</span></span>';
+    else if(applied.length===1){ var it=byId(applied[0])||{label:applied[0],sub:""}; h=av(it)+'<span class="sq-dd-txt"><span class="nm">'+esc(it.label)+'</span><span class="ds">'+esc(it.sub||"")+'</span></span>'+(it.badge||""); }
+    else h=av({avatar:String(applied.length),hue:260})+'<span class="sq-dd-txt"><span class="nm">'+applied.length+' campaigns selected</span><span class="ds">'+
+      esc(applied.slice(0,2).map(function(id){return (byId(id)||{label:id}).label;}).join(", ")+(applied.length>2?" and "+(applied.length-2)+" more":""))+'</span></span>';
+    btn.innerHTML=h+'<span class="sq-chev"><svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></span>'; btn.disabled=disabled;
+  }
+  function paintList(){
+    var term=q.value.trim().toLowerCase();
+    shown=items.filter(function(i){return !term||(i.label+" "+(i.sub||"")).toLowerCase().indexOf(term)>=0;});
+    list.innerHTML=shown.map(function(it,i){
+      var on=draft.indexOf(it.value)>=0;
+      return '<button type="button" role="option" class="sq-opt" data-i="'+i+'" aria-selected="'+on+'">'+av(it)+'<span class="sq-dd-txt"><span class="nm" style="font-size:13.5px">'+esc(it.label)+
+        '</span><span class="ds">'+esc(it.sub||"")+'</span></span>'+(it.badge||"")+'<span class="tick">✓</span></button>';
+    }).join("")||'<div class="sq-none">Nothing matches “'+esc(term)+'”.</div>';
+    nEl.textContent=draft.length+" selected"+(draft.length>=MAX_SEL?" (the most at once)":"");
+    go.textContent=draft.length?"Run the QC on "+draft.length+" campaign"+(draft.length===1?"":"s"):"Pick a campaign"; go.disabled=!draft.length;
+  }
+  function open(){
+    if(disabled) return;
+    document.querySelectorAll(".pd-dd.open").forEach(function(o){if(o!==wrap&&o.__close)o.__close();});
+    draft=applied.slice(); wrap.classList.add("open"); menu.hidden=false; btn.setAttribute("aria-expanded","true"); q.value=""; paintList(); setTimeout(function(){q.focus();},20);
+  }
+  function close(focus){wrap.classList.remove("open"); menu.hidden=true; btn.setAttribute("aria-expanded","false"); if(focus) btn.focus();}
+  wrap.__close=close;
+  btn.addEventListener("click",function(){menu.hidden?open():close();});
+  list.addEventListener("click",function(e){
+    var o=e.target.closest(".sq-opt"); if(!o) return; var id=shown[+o.dataset.i].value, i=draft.indexOf(id);
+    if(i>=0) draft.splice(i,1); else if(draft.length<MAX_SEL) draft.push(id); paintList();
+  });
+  wrap.querySelector(".qa-ms-bar").addEventListener("click",function(e){
+    var b=e.target.closest("button"); if(!b) return;
+    if(b.dataset.a==="none") draft=[];
+    else shown.forEach(function(it){ if(draft.indexOf(it.value)<0&&draft.length<MAX_SEL) draft.push(it.value); });
+    paintList();
+  });
+  q.addEventListener("input",paintList);
+  q.addEventListener("keydown",function(e){ if(e.key==="Escape"){e.preventDefault();close(true);} });
+  go.addEventListener("click",function(){ if(!draft.length) return; applied=draft.slice(); paintBtn(); close(true); opts.onApply(applied.slice()); });
+  document.addEventListener("click",function(e){ if(menu.hidden) return; var path=e.composedPath?e.composedPath():[]; if(path.indexOf(wrap)<0&&!wrap.contains(e.target)) close(); });   // the list is repainted by a click, so ask where the click began
+  return {
+    set:function(newItems,newApplied){items=newItems; applied=newApplied.slice(); offLabel=null; disabled=false; paintBtn(); if(!menu.hidden) paintList();},
+    off:function(label,sub){items=[]; applied=[]; offLabel={label:label,sub:sub}; disabled=true; paintBtn();}
+  };
+}
+
+/* ── Account, then campaigns ──────────────────────────────── */
 var acctPicker = window.PMPicker($("#acctPick"),{label:"Google Ads account",search:true,onChange:function(v){pickAccount(v);}});
-var campPicker = window.PMPicker($("#campPick"),{label:"Live campaign",search:true,onChange:function(v){pickCampaign(v);}});
+var campPicker = MultiPick($("#campPick"),{label:"Live campaigns",onApply:function(ids){applySelection(ids);}});
 function setAccounts(list){
   S.accounts=list;
   var items=[{value:"",label:"Choose an account",sub:list.length+" accounts",avatar:"?",hue:200}];
   list.forEach(function(a){items.push({value:a.id,label:a.name,avatar:inits(a.name),hue:hueOf(a.name),sub:dashed(a.id)+(a.currency?" · "+a.currency:"")});});
   acctPicker.set(items,S.account?S.account.id:"");
 }
-function campaignsOff(label,sub){campPicker.set([{value:"",label:label,sub:sub||"",avatar:"…",hue:200}],"",true);}
+function campaignsOff(label,sub){campPicker.off(label,sub);}
+function resetQcs(){ stopPoll(); S.sel=[]; S.qcs={}; S.campaignId=""; S.launchId=""; S.launch=null; paintTabs(); }
 function pickAccount(id){
   var a=S.accounts.filter(function(x){return x.id===id;})[0];
-  stopPoll(); S.campaignId=""; S.launchId=""; S.launch=null; S.campaigns=[];
+  resetQcs(); S.campaigns=[];
   if(!a){S.account=null; campaignsOff("Choose an account first"); view("empty"); sync(); return;}
   S.account={id:a.id,name:a.name}; try{localStorage.setItem("qa_account",a.id);}catch(e){}
   loadCampaigns();
@@ -75,8 +141,9 @@ function pickAccount(id){
 function badgeFor(q){
   return q?'<span class="qa-dot '+q.verdict.code+'" title="'+esc(VNAME[q.verdict.code]||"")+'"></span>':"";
 }
+var CHOOSE="The AI review starts as soon as you apply your choice. Pick one campaign or several.";
 function loadCampaigns(keep){
-  var seq=++S.seq; say(""); view("skel"); campaignsOff("Loading live campaigns…");
+  var seq=++S.seq; say(""); if(!(keep&&S.sel.length)) view("skel"); campaignsOff("Loading live campaigns…");
   call("GET",API+"/campaigns?account="+S.account.id).then(function(r){
     if(seq!==S.seq) return;
     if(!r.ok){
@@ -84,51 +151,110 @@ function loadCampaigns(keep){
       campaignsOff("Campaigns unavailable","Google Ads could not be read");
       return say(fail(r,"The campaigns could not be loaded.")+" You can still run a QC: <a href=\"#\" id=\"goManual\">type the campaign in</a>.");
     }
-    S.campaigns=r.j.campaigns||[]; paintCampaigns(); sync();
-    if(keep&&S.campaignId) return;
+    S.campaigns=r.j.campaigns||[]; S.campaigns.forEach(function(c){S.meta[c.id]={name:c.name,channel:c.channel};}); paintCampaigns(); sync();
+    if(keep&&S.sel.length) return;
     if(!S.campaigns.length) return view("empty","No live campaigns","This account has no enabled campaign to QC. Enable the campaign you are launching, or pick another account.");
-    view("empty","Choose a campaign","The AI review starts as soon as you pick one.");
-    if(S.wantCampaign&&S.campaigns.some(function(c){return c.id===S.wantCampaign;})){var w=S.wantCampaign; S.wantCampaign=""; pickCampaign(w);}
+    view("empty","Choose campaigns",CHOOSE);
+    if(S.wantCampaign){
+      var want=S.wantCampaign.split(",").filter(function(id){return S.campaigns.some(function(c){return c.id===id;});}); S.wantCampaign="";
+      if(want.length) applySelection(want);
+    }
   }).catch(function(){ if(seq===S.seq){view("empty");say("The server could not be reached. Try again.");} });
 }
 function paintCampaigns(){
-  var items=[{value:"",label:"Choose a campaign",sub:S.campaigns.length+" live",avatar:"?",hue:200}];
-  S.campaigns.forEach(function(c){
-    items.push({value:c.id,label:c.name,avatar:inits(c.name),hue:hueOf(c.name),badge:badgeFor(c.qc),
-      sub:(c.type||"Campaign")+(c.qc?" · QC "+c.qc.percent+"% · "+(VNAME[c.qc.verdict.code]||""):"")});
+  var items=S.campaigns.map(function(c){
+    return {value:c.id,label:c.name,avatar:inits(c.name),hue:hueOf(c.name),badge:badgeFor(c.qc),
+      sub:(c.type||"Campaign")+(c.qc?" · QC "+c.qc.percent+"% · "+(VNAME[c.qc.verdict.code]||""):"")};
   });
-  campPicker.set(items,S.campaignId);
+  campPicker.set(items,S.sel);
 }
-function pickCampaign(id){
-  var c=S.campaigns.filter(function(x){return x.id===id;})[0];
-  stopPoll();
-  if(!c){S.campaignId="";S.launchId="";S.launch=null;view("empty","Choose a campaign","The AI review starts as soon as you pick one.");sync();return;}
-  S.campaignId=c.id; start({campaignId:c.id,campaignName:c.name,channel:c.channel});
+function startOne(id){
+  var m=S.meta[id]||{name:id,channel:""};
+  return call("POST",API+"/start",{accountId:S.account.id,accountName:S.account.name,campaignId:id,campaignName:m.name,channel:m.channel||""}).then(function(r){
+    if(!r.ok) return {error:(r.j&&r.j.error)||("HTTP "+r.status)};
+    return r.j;
+  }).catch(function(){return {error:"The server could not be reached."};});
 }
-function start(c){
-  var seq=++S.seq; say(""); view("skel"); stopPoll();
-  call("POST",API+"/start",{accountId:S.account.id,accountName:S.account.name,campaignId:c.campaignId,campaignName:c.campaignName,channel:c.channel||""}).then(function(r){
-    if(seq!==S.seq) return;
-    if(!r.ok){view("empty");return say(fail(r,"The QC could not be started."));}
-    S.startError=(r.j.reviewError)||""; open(r.j,seq); sync(); refreshCampaignList();
-  }).catch(function(){ if(seq===S.seq){view("empty");say("The server could not be reached. Try again.");} });
-}
-function open(j,seq){
-  load(j); view("work"); render();
-  if(S.review&&S.review.status==="running") poll(seq||S.seq);
-}
-function poll(seq){
-  stopPoll();
-  S.poll=setTimeout(function(){
-    if(seq!==S.seq||!S.launchId) return;
-    call("GET",API+"/launches/"+S.launchId).then(function(r){
+function applySelection(ids){
+  stopPoll(); var seq=++S.seq;
+  ids=ids.filter(function(id,i){return ids.indexOf(id)===i;}).slice(0,MAX_SEL);
+  S.sel=ids; Object.keys(S.qcs).forEach(function(k){ if(ids.indexOf(k)<0) delete S.qcs[k]; });
+  if(!ids.length){ S.campaignId=""; S.launchId=""; S.launch=null; paintTabs(); paintCampaigns(); view("empty","Choose campaigns",CHOOSE); sync(); return; }
+  say(""); paintTabs(); paintCampaigns(); sync();
+  var active=ids.indexOf(S.campaignId)>=0?S.campaignId:ids[0], shownActive=false;
+  if(S.qcs[active]&&!S.qcs[active].error){ activate(active); shownActive=true; } else view("skel");
+  var queue=ids.filter(function(id){return !S.qcs[id];}), errors=[];
+  function worker(){
+    var id=queue.shift(); if(!id) return Promise.resolve();
+    return startOne(id).then(function(j){
       if(seq!==S.seq) return;
-      if(!r.ok){ S.poll=null; return say(fail(r,"The review could not be followed.")); }
-      load(r.j); renderReview();
-      if(S.review.status==="running"){ poll(seq); } else { S.fStatus=defaultFilter(); render(); refreshCampaignList(); }
-    }).catch(function(){ if(seq===S.seq) poll(seq); });
+      S.qcs[id]=j;
+      if(j.error) errors.push((S.meta[id]||{}).name+": "+j.error);
+      else if(j.reviewError&&errors.indexOf(j.reviewError)<0) errors.push(j.reviewError);
+      if(id===active&&!shownActive&&!j.error){ shownActive=true; activate(active); }
+      paintTabs();
+    }).then(worker);
+  }
+  Promise.all([worker(),worker(),worker()]).then(function(){
+    if(seq!==S.seq) return;
+    if(!shownActive){                                       // the active one failed: show the first that opened
+      var ok=ids.filter(function(id){return S.qcs[id]&&!S.qcs[id].error;})[0];
+      if(ok) activate(ok); else view("empty");
+    }
+    if(errors.length) say(errors.map(esc).join("<br>"), "pm-err");
+    paintTabs(); pollAll(seq); refreshCampaignList(); sync();
+  });
+}
+function activate(cid){
+  var j=S.qcs[cid]; if(!j||j.error) return;
+  S.campaignId=cid; S.startError=j.reviewError||""; load(j); view("work"); render(); paintTabs(); sync(); pollAll(S.seq);
+}
+function open(j){
+  // a payload that came back from an action on the active QC (re-run, a book): keep it and show it
+  S.qcs[j.launch.campaignId]=j; if(S.sel.indexOf(j.launch.campaignId)<0) S.sel.push(j.launch.campaignId);
+  activate(j.launch.campaignId); pollAll(S.seq);
+}
+function isRunning(j){return j&&j.launch&&j.launch.review&&j.launch.review.status==="running";}
+function pollAll(seq){
+  stopPoll();
+  var running=S.sel.filter(function(id){return isRunning(S.qcs[id]);});
+  if(!running.length) return;
+  S.poll=setTimeout(function(){
+    if(seq!==S.seq) return;
+    Promise.all(running.map(function(id){
+      return call("GET",API+"/launches/"+S.qcs[id].launch.id).then(function(r){return {id:id,r:r};}).catch(function(){return {id:id,r:null};});
+    })).then(function(rs){
+      if(seq!==S.seq) return;
+      var finished=false;
+      rs.forEach(function(x){ if(x.r&&x.r.ok){ S.qcs[x.id]=x.r.j; if(!isRunning(x.r.j)) finished=true; } });
+      if(running.indexOf(S.campaignId)>=0&&S.qcs[S.campaignId]){
+        var was=S.review&&S.review.status==="running"; load(S.qcs[S.campaignId]);
+        if(was&&!isRunning(S.qcs[S.campaignId])){ S.fStatus=defaultFilter(); render(); } else renderReview();
+      }
+      paintTabs(); if(finished) refreshCampaignList();
+      pollAll(seq);
+    });
   },2500);
 }
+/* ── Tabs: one per selected campaign ─────────────────────── */
+function tabState(cid){
+  var j=S.qcs[cid], m=S.meta[cid]||{name:cid};
+  if(!j) return {name:m.name,state:"starting"};
+  if(j.error) return {name:m.name,state:"error"};
+  var act=cid===S.campaignId, rev=act?S.review:(j.launch.review||{}), sum=act?S.summary:j.summary;
+  return {name:j.launch.campaignName||m.name, state:rev.status==="running"?"running":rev.status==="error"?"error":"done",
+          verdict:sum.verdict.code, flagged:sum.failed.length, human:(sum.needsHuman||[]).length};
+}
+function paintTabs(){
+  var el=$("#qcTabs"); el.hidden=S.sel.length<2; if(el.hidden){el.innerHTML="";return;}
+  el.innerHTML=S.sel.map(function(cid){
+    var t=tabState(cid), ic=(t.state==="running"||t.state==="starting")?'<span class="qa-spin sm"></span>':t.state==="error"?'<span class="qa-dot not_ready"></span>':'<span class="qa-dot '+t.verdict+'"></span>';
+    var sub=t.state==="starting"?"Starting":t.state==="running"?"Reviewing":t.state==="error"?"Did not finish":(t.flagged?t.flagged+" flagged":"nothing flagged")+(t.human?" · "+t.human+" for a human":"");
+    return '<button type="button" class="qa-tab'+(cid===S.campaignId?" on":"")+'" data-c="'+esc(cid)+'" aria-pressed="'+(cid===S.campaignId)+'">'+ic+
+      '<span class="qa-tab-t"><span class="qa-tab-n">'+esc(t.name)+'</span><span class="qa-tab-s">'+esc(sub)+'</span></span></button>';
+  }).join("");
+}
+$("#qcTabs").addEventListener("click",function(e){ var b=e.target.closest("button"); if(!b) return; if(b.dataset.c!==S.campaignId) activate(b.dataset.c); });
 function refreshCampaignList(){
   if(S.manual||!S.account) return;
   call("GET",API+"/campaigns?account="+S.account.id).then(function(r){ if(r.ok){S.campaigns=r.j.campaigns||[];paintCampaigns();} });
@@ -146,7 +272,7 @@ function defaultFilter(){
   return "all";
 }
 function sync(){
-  try{var q=S.account?"?account="+S.account.id+(S.campaignId?"&campaign="+S.campaignId:""):"";history.replaceState(null,"",location.pathname+q);}catch(e){}
+  try{var q=S.account?"?account="+S.account.id+(S.sel.length?"&campaign="+S.sel.join(","):""):"";history.replaceState(null,"",location.pathname+q);}catch(e){}
 }
 /* The account list is read from Google Ads, which may be rate limited or not connected. */
 function manualMode(why){
@@ -159,7 +285,7 @@ $("#mGo").addEventListener("click",function(){
   if(!name) return say("Add the account name.");
   if(!cid) return say("Add the campaign ID (digits only).");
   if(!cname) return say("Add the campaign name.");
-  S.account={id:id,name:name}; start({campaignId:cid,campaignName:cname,channel:$("#mType").value});
+  S.account={id:id,name:name}; S.meta[cid]={name:cname,channel:$("#mType").value}; applySelection([cid]);
 });
 document.addEventListener("click",function(e){ if(e.target&&e.target.id==="goManual"){e.preventDefault();manualMode("Google Ads could not be read.");
   if(S.account){$("#mId").value=S.account.id;$("#mName").value=S.account.name;} } });
@@ -352,8 +478,9 @@ function save(id,status,note){
     }
     if(r.j.check){S.checks[id]=r.j.check;} else {delete S.checks[id];}
     S.summary=r.j.summary; S.rowMsg[id]="Saved";
+    if(S.qcs[S.campaignId]) S.qcs[S.campaignId].summary=S.summary;                     // the tabs and a later switch back read this
     if(q){ refresh(id); return save(id,q.status,q.note); }
-    refresh(id); paintCampaignBadge();
+    refresh(id); paintCampaignBadge(); paintTabs();
     setTimeout(function(){ if(S.rowMsg[id]==="Saved"){S.rowMsg[id]="";setMsg(id);} },1800);
   }).catch(function(){
     S.inflight[id]=false; S.rowMsg[id]="The server could not be reached. Try again."; setMsg(id,true);
@@ -395,6 +522,7 @@ function renderBook(){
   var status=busy?'<span class="qa-book-s">'+esc(busy)+'</span>':
     b?'<span class="qa-book-s ok"><b>'+esc(b.filename||"Campaign book")+'</b> · '+b.fields+' field'+(b.fields===1?"":"s")+' read'+(b.uploadedBy?' · added by '+esc(who(b.uploadedBy)):"")+(b.uploadedAt?' · '+esc(rel(b.uploadedAt)):"")+'</span>':
     '<span class="qa-book-s">Not added</span>';
+  var all=S.sel.length>1?'<label class="qa-book-all"><input type="checkbox" id="bookAll"'+(S.bookAll?" checked":"")+(busy?" disabled":"")+'> Apply to all '+S.sel.length+' selected campaigns</label>':"";
   $("#bookBox").innerHTML='<section class="pm-panel qa-book"><div class="qa-book-t"><b>Campaign book</b>'+status+'</div>'+
     '<p>'+(b?'The AI compares the campaign with this book on bid strategy, devices, genders, household income, locations, age and ad schedule.':
       'Some checks depend on the client\'s plan: bid strategy, devices, genders, household income, locations, age and ad schedule. Add the campaign book as an Excel file or a Google Sheet link and the AI reviews the campaign against it.')+'</p>'+
@@ -402,14 +530,25 @@ function renderBook(){
     '<input type="file" id="bookFile" accept=".xlsx,.csv" hidden>'+
     '<input type="text" id="bookLink" maxlength="400" placeholder="or paste a Google Sheet link (shared as anyone with the link can view)" autocomplete="off"'+(busy?" disabled":"")+'>'+
     '<button type="button" class="pm-btn-ghost" id="bookLinkGo"'+(busy?" disabled":"")+'>Add link</button>'+
-    (b?'<button type="button" class="pm-btn-ghost qa-danger" id="bookRemove"'+(busy?" disabled":"")+'>Remove</button>':"")+'</div></section>';
+    (b?'<button type="button" class="pm-btn-ghost qa-danger" id="bookRemove"'+(busy?" disabled":"")+'>Remove</button>':"")+'</div>'+all+'</section>';
 }
 function sendBook(body){
+  var ids=(S.bookAll&&S.sel.length>1?S.sel:[S.campaignId]).map(function(c){return S.qcs[c]&&S.qcs[c].launch&&S.qcs[c].launch.id;}).filter(Boolean);
+  if(!ids.length) ids=[S.launchId];
   S.bookBusy="Reading the book…"; renderBook(); say("");
-  call("POST",API+"/launches/"+S.launchId+"/book",body).then(function(r){
-    S.bookBusy=""; if(!r.ok){ renderBook(); return say(fail(r,"The book could not be added.")); }
-    S.startError=r.j.reviewError||""; if(S.startError) say(esc(S.startError),"pm-note");
-    open(r.j);
+  var notes=[], i=0;
+  function next(){
+    if(i>=ids.length) return Promise.resolve(true);
+    return call("POST",API+"/launches/"+ids[i++]+"/book",body).then(function(r){
+      if(!r.ok){ say(fail(r,"The book could not be added.")); return false; }
+      S.qcs[r.j.launch.campaignId]=r.j; if(r.j.reviewError&&notes.indexOf(r.j.reviewError)<0) notes.push(r.j.reviewError);
+      return next();
+    });
+  }
+  next().then(function(){
+    S.bookBusy=""; S.startError=notes[0]||""; if(notes.length) say(notes.map(esc).join("<br>"),"pm-note");
+    var cur=S.qcs[S.campaignId]; if(cur&&cur.launch) activate(S.campaignId); else renderBook();
+    paintTabs(); pollAll(S.seq);
   }).catch(function(){S.bookBusy=""; renderBook(); say("The server could not be reached. Try again.");});
 }
 document.addEventListener("click",function(e){
@@ -423,6 +562,7 @@ document.addEventListener("click",function(e){
   }
 });
 document.addEventListener("change",function(e){
+  if(e.target&&e.target.id==="bookAll"){ S.bookAll=e.target.checked; return; }
   if(!e.target||e.target.id!=="bookFile"||!e.target.files||!e.target.files[0]) return;
   var f=e.target.files[0];
   if(f.size>3000000) return say("That file is over 3 MB. Save a smaller copy, or add the Google Sheet link instead.");
@@ -445,10 +585,14 @@ $("#runBtn").addEventListener("click",run);
 document.addEventListener("click",function(e){ if(e.target&&e.target.id==="tryRead"){e.preventDefault();run();} });
 $("#removeBtn").addEventListener("click",function(){
   if(!S.launch||!confirm('Remove the QC for "'+S.launch.campaignName+'"? It disappears from the list; its answers are kept in the records.')) return;
-  stopPoll();
+  var gone=S.campaignId;
   call("DELETE",API+"/launches/"+S.launchId,{}).then(function(r){
     if(!r.ok) return say(fail(r,"That could not be removed."));
-    S.launchId=""; S.launch=null; S.campaignId=""; view("empty","Choose a campaign","The AI review starts as soon as you pick one."); loadCampaigns();
+    delete S.qcs[gone]; S.sel=S.sel.filter(function(id){return id!==gone;}); S.launchId=""; S.launch=null; S.campaignId="";
+    stopPoll(); paintTabs(); paintCampaigns(); sync();
+    var next=S.sel.filter(function(id){return S.qcs[id]&&!S.qcs[id].error;})[0];
+    if(next){ activate(next); pollAll(S.seq); } else view("empty","Choose campaigns",CHOOSE);
+    refreshCampaignList();
   });
 });
 $("#copyBtn").addEventListener("click",function(){
@@ -466,7 +610,7 @@ $("#copyBtn").addEventListener("click",function(){
 /* ── Start ────────────────────────────────────────────────── */
 (function init(){
   var p=new URLSearchParams(location.search), want=p.get("account")||"";
-  S.wantCampaign=p.get("campaign")||"";
+  S.wantCampaign=(p.get("campaign")||"").replace(/[^0-9,]/g,"");
   if(!want){try{want=localStorage.getItem("qa_account")||"";}catch(e){}}
   view("empty"); acctPicker.set([{value:"",label:"Loading accounts…",sub:"",avatar:"…",hue:200}],"",true); campaignsOff("Choose an account first");
   Promise.all([call("GET",API+"/checklist"),call("GET",BASE+"/api/gads/accounts")]).then(function(rs){
