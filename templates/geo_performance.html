@@ -1,0 +1,109 @@
+{% extends "_paid_base.html" %}
+{% block title %}Geo Performance{% endblock %}
+{% block content %}
+<div class="pm pm-geo" id="gp">
+  <section class="pm-hero">
+    <div class="pm-hero-l">
+      <span class="pm-eyebrow"><span class="d"></span>Paid Marketing · Geography</span>
+      <h1 class="pm-title">Where the account <span class="pm-grad">earns its spend.</span></h1>
+      <p class="pm-sub">Pick an account, a date range and how finely to cut it: country, region, metro area, city or postal code.
+        The agent reads <b>Google Ads and Meta Ads live</b>, charts every place, judges each against the account's own average,
+        and tells you <b>where to raise bids, where to cut them, and where spend is leaking</b>.</p>
+    </div>
+  </section>
+
+  <!-- Account, dates, and how finely to cut the map -->
+  <section class="pm-panel pd-cmd sg-cmd" id="cmd">
+    <div class="sg-cmd-grid">
+      <div class="sg-plat">
+        <div id="platPick"></div>
+        <div id="acctPick"></div>
+        <div id="metaPick"></div>
+      </div>
+      <div class="sg-when">
+        <span class="pd-dd-k">Date range</span>
+        <div class="cf-seg" id="presets" role="radiogroup" aria-label="Date range">
+          <button type="button" role="radio" data-p="7" aria-checked="false"><span class="dot"></span>Last 7 days</button>
+          <button type="button" role="radio" data-p="30" aria-checked="true"><span class="dot"></span>Last 30 days</button>
+          <button type="button" role="radio" data-p="mtd" aria-checked="false"><span class="dot"></span>This month</button>
+          <button type="button" role="radio" data-p="last" aria-checked="false"><span class="dot"></span>Last month</button>
+          <button type="button" role="radio" data-p="custom" aria-checked="false"><span class="dot"></span>Custom</button>
+          <i class="cf-seg-glow" aria-hidden="true"></i>
+        </div>
+      </div>
+      <div class="sg-custom" id="custom" hidden>
+        <label><span class="pd-dd-k">From</span><input type="date" id="from" aria-label="From date"></label>
+        <label><span class="pd-dd-k">To</span><input type="date" id="to" aria-label="To date"></label>
+        <button type="button" class="pm-btn sg-go" id="go">Run</button>
+      </div>
+    </div>
+    <div class="gp-levels">
+      <span class="pd-dd-k">Cut by</span>
+      <div class="pm-chips" id="levels" role="radiogroup" aria-label="Location level"></div>
+    </div>
+  </section>
+
+  <div id="msg"></div>
+
+  <div id="empty" class="pm-panel sg-empty">
+    <div class="sg-empty-ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s7-6.2 7-11a7 7 0 1 0-14 0c0 4.8 7 11 7 11z"/><circle cx="12" cy="10" r="2.5"/></svg></div>
+    <h2>Choose an account to begin</h2>
+    <p>The report builds in a few seconds. Every suggestion comes with the numbers beside it, and a place with too little data is never judged.</p>
+  </div>
+  <div id="skel" hidden><div class="pd-skel"></div><div class="pd-skel"></div><div class="pd-skel"></div></div>
+
+  <div id="out" hidden>
+    <div class="sg-head">
+      <p class="pd-fresh" id="fresh"></p>
+      <button class="pm-btn-ghost" id="refreshBtn" type="button" title="Read this report again"><svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.3-5.6M20 4v5h-5"/></svg>Refresh</button>
+      <button class="pm-btn-ghost" id="exportBtn" type="button"><svg viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>Export CSV</button>
+    </div>
+    <div class="pd-strip" id="kpis"></div>
+
+    <div class="sg-tools">
+      <div><span class="pd-dd-k">Campaign type</span><div class="pm-chips" id="types"></div></div>
+    </div>
+
+    <section class="pm-panel sg-ins" id="insights">
+      <div class="pm-panel-h"><span class="pm-panel-t">Where to adjust</span>
+        <span class="pm-panel-s" id="insNote"></span></div>
+      <div class="sg-sum" id="sum"></div>
+      <div id="insList"></div>
+    </section>
+
+    <section class="pm-panel gp-chart-card" id="chartCard">
+      <div class="pm-panel-h"><span class="pm-panel-t">Charts</span>
+        <span class="pm-panel-s" id="chartNote"></span></div>
+      <div class="gp-chart-tools">
+        <div><span class="pd-dd-k">Chart</span><div class="pm-chips" id="chartKind" role="radiogroup" aria-label="Chart type"></div></div>
+        <label id="metricWrap"><span class="pd-dd-k" id="metricLab">Metric</span><select id="metric" aria-label="Metric"></select></label>
+        <label><span class="pd-dd-k">Show</span><select id="topN" aria-label="How many places">
+          <option value="10">Top 10</option><option value="15" selected>Top 15</option><option value="25">Top 25</option><option value="50">Top 50</option></select></label>
+        <label id="orderWrap"><span class="pd-dd-k">Order</span><select id="order" aria-label="Order">
+          <option value="desc">Highest first</option><option value="asc">Lowest first</option></select></label>
+        <button type="button" class="pm-btn-ghost" id="pngBtn" title="Save this chart as an image"><svg viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>Save PNG</button>
+      </div>
+      <p class="gp-chart-help" id="chartHelp"></p>
+      <div class="gp-chart"><canvas id="chart" role="img" aria-label="Chart of performance by location"></canvas></div>
+      <div class="gp-legend" id="legend"></div>
+    </section>
+
+    <section class="pm-panel gp-table-card" id="tableCard">
+      <div class="pm-panel-h"><span class="pm-panel-t" id="tableT">All places</span><span class="pm-panel-s" id="covNote"></span></div>
+      <div class="gp-table-tools">
+        <input type="text" id="filter" placeholder="Filter places…" aria-label="Filter places" autocomplete="off">
+        <div class="pm-chips" id="verdicts"></div>
+      </div>
+      <div class="pm-scroll"><table id="tbl"></table></div>
+      <button type="button" class="pm-btn-ghost sg-more" id="more" hidden></button>
+    </section>
+    <p class="pd-foot" id="foot"></p>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='vendor/chart.umd.js') }}"></script>
+<script src="{{ url_for('static', filename='js/pm_picker.js') }}?v=1"></script>
+<script src="{{ url_for('static', filename='js/pm_platform.js') }}?v=4"></script>
+<script src="{{ url_for('static', filename='js/geo_performance.js') }}?v=4"></script>
+{% endblock %}

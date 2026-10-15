@@ -4218,6 +4218,11 @@ def seo_aeo_legacy_redirect(rest=""):
 #                          and flags what is wrong (tracker/paid_qa.py,
 #                          paid_qa_auto.py, paid_qa_web.py, paid_qa_ai.py,
 #                          paid_qa_job.py, paid_qa_store.py, qa_checklist.json)
+#   Geo Performance        performance by location (country down to postal code)
+#                          for a Google or Meta account or both, judged against
+#                          the account's own average, with suggested geo bid
+#                          adjustments (tracker/paid_geo.py, paid_geo_insights.py,
+#                          paid_geo_summary.py)
 _PM_PREFIX = "/p2/paid-marketing"
 
 
@@ -4836,6 +4841,70 @@ def paid_segment_summary():
     key =(report["account"]["id"], report["range"]["from"], report["range"]["to"])
     out = paid_segment_insights.cached_summary(key, report, paid_segment_insights.build(report))
     return jsonify(out)
+
+
+# Geo Performance -------------------------------------------------------------
+# Performance by location for a Google Ads account or MCC, a Meta ad account, or a Google and a
+# Meta account together, at one location level: which places earn their spend, which leak it, and
+# what geo bid adjustment each deserves. The numbers are tracker/paid_geo.py, their meaning
+# tracker/paid_geo_insights.py, the Claude briefing tracker/paid_geo_summary.py. The account lists
+# are Segment Analysis's (api/segments/accounts for Google and its MCCs, api/gads/accounts?platform=meta).
+
+GEO_SUMMARY_DAILY_CAP = 100
+_GEO_SUMMARY_USES = {}
+
+
+@app.route("/p2/paid-marketing/geo-performance")
+@position2_required
+def paid_geo_performance():
+    return render_template("geo_performance.html", user=_get_user())
+
+
+def _pm_geo_report():
+    """(report, None) for the account, level and dates in the query string, or (None, the error response)."""
+    from tracker import paid_gads as paid_gads_base, paid_gads_segments as paid_gads, paid_geo
+    src = request.args if request.method == "GET" else (request.get_json(silent=True) or {})
+    try:
+        extra = {"force": True} if str(src.get("refresh") or "") in ("1", "true") else {}      # the Refresh button
+        return paid_geo.report_for(src.get("account"), str(src.get("level") or "region"), src.get("from"), src.get("to"), **extra), None
+    except paid_geo.BadRequest as e:
+        return None, (jsonify(error=str(e)), 400)
+    except paid_gads_base.RefreshTooSoon as e:
+        return None, (jsonify(error=str(e), kind="cooldown", retryIn=e.retry_in), 429)
+    except paid_gads.GadsError as e:
+        return None, _pm_gads_error(e)
+
+
+@app.route("/p2/paid-marketing/api/geo/report")
+@position2_required
+def paid_geo_report():
+    report, err = _pm_geo_report()
+    return err if err else jsonify(report)
+
+
+@app.route("/p2/paid-marketing/api/geo/summary", methods=["POST"])
+@position2_required
+def paid_geo_summary():
+    """The Claude-written briefing for one table. The page sends only the account, level, dates and campaign type; the report and
+    its insights are rebuilt here, so the model can only ever be shown what the rules found."""
+    from tracker import paid_geo_summary
+    body = request.get_json(silent=True) or {}
+    ctype = str(body.get("type") or "All")
+    email, today = _pm_user_email(), datetime.now(timezone.utc).date().isoformat()
+    day, used = _GEO_SUMMARY_USES.get(email, (today, 0))
+    if day != today:
+        used = 0
+    if used >= GEO_SUMMARY_DAILY_CAP:
+        return jsonify(error="That is %d summaries in a day, the most this allows." % used), 429
+    report, err = _pm_geo_report()
+    if err:
+        return err
+    view = report["views"].get(ctype)
+    if view is None:
+        return jsonify(error="That campaign type is not in this report."), 400
+    _GEO_SUMMARY_USES[email] = (today, used + 1)
+    key = (report["account"]["id"], report["level"], ctype, report["range"]["from"], report["range"]["to"])
+    return jsonify(paid_geo_summary.cached_summary(key, report, view, ctype))
 
 
 # QA Agent --------------------------------------------------------------------
@@ -19061,7 +19130,7 @@ lists, goals, final URL loading and more), and Claude judges the rest from that 
 book. It flags what is wrong with the fix and the evidence, and lists as needing a human anything it cannot verify, such as the
 account's automatically created asset switches, which Google Ads does not show to the API; it never guesses a pass. A person
 can confirm or overrule any check. The verdict: NOT READY if any check is flagged, INCOMPLETE if any check could not be
-verified, otherwise READY TO LAUNCH. Each QC is saved per campaign.
+verified, otherwise READY TO LAUNCH. Each QC is saved per campaign. Geo Performance (/p2/paid-marketing/geo-performance): pick a Google Ads account or MCC, a Meta ad account, or a Google and a Meta account together, a date range and a location level (country, region, metro area, city, county or postal code; Meta has country, region and DMA), and it reads the platform live to show performance by place. Each place is judged against the account's own average (an efficiency index of 100 is average, from return on ad spend when the account has conversion value, otherwise cost per conversion) as strong, above average, on par, below average, weak, leaking spend, or too little data to judge, and where there are at least 5 conversions it suggests a geo bid adjustment (80% of the gap, in 5% steps, capped at +40% and -50%), a starting point to apply gradually. Places are where people were when they saw the ad, so a place can appear that is not targeted. Charts to choose from: ranked bars, spend against results, share of spend against conversions, share of a total, and efficiency against spend, with a table and CSV export. A short summary is written by Claude from the computed insights only.
 
 SEO STUDIO (/p2/seo-aeo/<tool>) and the /app agents: a suite of SEO/GEO tools (Keyword Finder, Content Brief
 Generator, Content Enhancer, SEO & GEO Audit, Agentic Readiness Audit, Competitor Analysis, and more).
