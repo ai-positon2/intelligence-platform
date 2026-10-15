@@ -353,6 +353,7 @@ def test_a_range_is_stored_one_day_at_a_time_and_built_from_the_stored_days():
     assert len(inserts) == 1 and json.loads(inserts[0]["params"]["time_range"]) == {"since": d(10), "until": d(4)}
     assert len(out["days"]) == 7 and len(out["rows"]) == 14
     assert sorted(day for (_, day) in s.days) == days_between(d(10), d(4))
+    assert {c for (c, _) in s.days} == {mt.day_key(ACT)}
     assert out["missing"] == mt.MISSING
     log.clear()
     again = mt.campaign_days(s, ACT, d(8), d(5), http=lambda *a, **k: pytest.fail("a stored range went to Meta"))
@@ -379,7 +380,7 @@ def test_a_wider_range_asks_only_for_the_days_it_does_not_have():
 def test_a_quiet_day_is_stored_as_quiet_and_not_asked_for_again():
     s, log = FakeStore(), []
     out = mt.campaign_days(s, ACT, d(12), d(10), http=meta_http(log, quiet={d(11)}))
-    assert s.days[(ACT, d(11))]["r"] == [] and len(out["rows"]) == 4
+    assert s.days[(mt.day_key(ACT), d(11))]["r"] == [] and len(out["rows"]) == 4
     log.clear()
     mt.campaign_days(s, ACT, d(12), d(10), http=meta_http(log))
     assert log == []
@@ -994,3 +995,21 @@ def test_the_probe_route_is_admin_only_and_a_bad_id_is_a_400(routes, monkeypatch
     assert r.status_code == 200 and r.get_json() == {"account": ACT, "days": 90}                 # capped
     monkeypatch.undo()
     assert client_as(ADMIN).get("/p2/paid-marketing/api/meta/status?probe=nonsense").status_code == 400
+
+
+def test_days_and_copies_saved_under_an_older_mapping_are_never_read():
+    s, log = FakeStore(), []
+    old = "%s@%d" % (ACT, int(mt.MAPPING) - 1)
+    s.days[(old, d(5))] = {"m": [], "r": [["11", "Camp 11", "ENABLED", "META_LEADS", 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]]}
+    s.dayat[(old, d(5))] = __import__("time").time()
+    out = mt.campaign_days(s, ACT, d(5), d(5), http=meta_http(log))
+    assert any(c["url"].endswith("/insights") for c in log)                # the old day was not trusted: Meta was asked
+    assert {c["type"] for c in out["campaigns"]} == {"META_SALES"} and len(out["rows"]) == 2        # the fresh read, not the old day's META_LEADS row
+    assert mt.KEY.endswith("meta%s:" % mt.MAPPING) and mt.KEY.startswith(g.CACHE_V)
+
+
+def test_a_saved_segment_report_carries_the_mapping_version(monkeypatch):
+    fs = FakeStore()
+    monkeypatch.setattr(mt, "list_accounts", lambda st, **k: META_ACCTS)
+    seg.report_for(ACT, "2026-09-01", "2026-09-30", store=fs, meta_fetch=lambda a, dim, p: seg_rows().get(dim["breakdown"] or "day", []))
+    assert any(k.startswith(g.CACHE_V + "seg:" + mt.day_key(ACT)) for k in fs.cache)

@@ -77,7 +77,7 @@ def _daily_from_days(days):
 def fetch(store, act, start, end, *, currency="USD", with_series=True, notes=None, force=False, stamps=None, http=None):
     """One range of products for a Meta ad account, in paid_products.fetch's shape."""
     ttl = g._ttl(end)
-    key = lambda k: g.CACHE_V + "meta:%s:%s:%s:%s" % (k, act, start, end)
+    key = lambda k: meta.KEY + "%s:%s:%s:%s" % (k, act, start, end)
 
     def make_products():
         rows = meta._pages(act + "/insights", _query(start, end), store, http=http)

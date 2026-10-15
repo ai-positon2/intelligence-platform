@@ -492,7 +492,8 @@ def report_for(account_id, start, end, *, accounts_fn=None, groups_fn=None, sear
         def build():
             return build_report(account, s, e, search_fn=search_fn, geo_fn=geo_fn)
     key = (account["id"], s, e)
-    pkey = base.CACHE_V + "seg:%s:%s:%s" % (account["id"], s.isoformat(), e.isoformat())
+    saved_id = paid_meta.day_key(account["id"]) if paid_meta.is_meta(account["id"]) else account["id"]      # Meta's saved numbers carry the mapping version
+    pkey = base.CACHE_V + "seg:%s:%s:%s" % (saved_id, s.isoformat(), e.isoformat())
     ttl = base._ttl(e.isoformat())
     clock = time.time() if now is None else now
     if force:

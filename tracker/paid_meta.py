@@ -64,6 +64,15 @@ TTL_ACCOUNTS = 3600
 TTL_CAMPAIGNS = 3600
 WAIT_BLOCK_S = 300               # a wait longer than this is "come back later", not a hiccup
 NB = g.NB
+# Everything saved from Meta is numbers already mapped into the page's columns. When that mapping changes (the way a campaign's
+# result is chosen, say) bump this, and every saved copy and stored day made under the old mapping is simply never read again.
+MAPPING = "2"
+KEY = g.CACHE_V + "meta" + MAPPING + ":"
+
+
+def day_key(act):
+    """The id days are stored under (pm_gads_days.customer_id): the account and the mapping version."""
+    return "%s@%s" % (act, MAPPING)
 
 # Meta has no such numbers; the page is told so instead of being shown zeros.
 MISSING = [7, 9, 11, 12, 13, 14, 15, 16]
@@ -140,7 +149,7 @@ _BLOCK = {"until": 0.0, "checked": 0.0}
 def reset_state():
     """For tests: forget what was learned about Meta's rate limits."""
     _BLOCK.update(until=0.0, checked=0.0)
-    g.forget(g.CACHE_V + "meta:")
+    g.forget(g.CACHE_V + "meta")
 
 
 def _wait_message(until):
@@ -292,7 +301,7 @@ def list_accounts(store, *, http=None, force=False):
                 except AdsError as e:       # the business edges are a bonus; /me/adaccounts already answered
                     log.warning("meta: could not read %s of business %s (%s)", edge, biz, e)
         return parse_accounts(rows)
-    return g._cached(store, g.CACHE_V + "meta:accounts", TTL_ACCOUNTS, make, force=force)
+    return g._cached(store, KEY + "accounts", TTL_ACCOUNTS, make, force=force)
 
 
 def account_by_id(store, act, *, http=None):
@@ -315,7 +324,7 @@ def campaign_meta(store, act, currency="USD", *, http=None, force=False):
                       store, http=http)
         return {str(c.get("id")): {"status": STATUS.get(c.get("effective_status"), "ENABLED"), "budget": _budget(c, currency)}
                 for c in rows if c.get("id")}
-    return g._cached(store, g.CACHE_V + "meta:camps:" + act, TTL_CAMPAIGNS, make, force=force)
+    return g._cached(store, KEY + "camps:" + act, TTL_CAMPAIGNS, make, force=force)
 
 
 # ── Reading insights rows ───────────────────────────────────────────────────
@@ -424,7 +433,7 @@ def campaign_days(store, act, start, end, *, currency="USD", force=False, notes=
     d0, d1 = dt.date.fromisoformat(start), dt.date.fromisoformat(end)
     days = [(d0 + dt.timedelta(days=i)).isoformat() for i in range((d1 - d0).days + 1)]
     try:
-        stored = store.get_gads_days(act, start, end)
+        stored = store.get_gads_days(day_key(act), start, end)
     except Exception as e:
         log.warning("meta: stored days could not be read (%s)", e)
         stored = {}
@@ -458,7 +467,7 @@ def campaign_days(store, act, start, end, *, currency="USD", force=False, notes=
             continue
         fresh = g.split_days(parse_campaign_days(rows, first, last, meta))
         try:
-            store.put_gads_days(act, fresh)
+            store.put_gads_days(day_key(act), fresh)
         except Exception as e:
             log.warning("meta: could not store days (%s)", e)
         now = g._now_iso()
@@ -491,7 +500,7 @@ def performance(store, act, start, end, *, currency="USD", with_shares=True, not
     def shares():
         def run():
             try:
-                return g._cached(store, g.CACHE_V + "meta:shares:%s:%s:%s" % (act, start, end), g._ttl(end),
+                return g._cached(store, KEY + "shares:%s:%s:%s" % (act, start, end), g._ttl(end),
                                  lambda: make_shares(store, act, start, end, http=http), notes, force=force, stamps=stamps)
             except AdsError as e:
                 log.warning("meta: reach unavailable for %s (%s)", act, e)
@@ -569,7 +578,7 @@ def extras(store, act, start, end, *, notes=None, force=False, stamps=None, http
         d, p, h = g._par([lambda: read("device_platform"), lambda: read("publisher_platform"),
                           lambda: read("hourly_stats_aggregated_by_advertiser_time_zone")])
         return parse_extras(d, p, h)
-    return g._cached(store, g.CACHE_V + "meta:extras:%s:%s:%s" % (act, start, end), g._ttl(end), make, notes, force=force, stamps=stamps)
+    return g._cached(store, KEY + "extras:%s:%s:%s" % (act, start, end), g._ttl(end), make, notes, force=force, stamps=stamps)
 
 
 # ── A short report for the admin check ──────────────────────────────────────
