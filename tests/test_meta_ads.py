@@ -135,6 +135,21 @@ def test_a_sales_campaigns_result_is_purchases_counted_once_not_under_both_names
     assert only_plain[3] == 3 and only_plain[4] == 99
 
 
+def test_a_lead_gen_campaign_optimised_for_a_custom_pixel_event_counts_that_event_and_has_no_value():
+    # real shape: no "lead" at all, only the custom event, whose "value" is just its count
+    n = mt.numbers(insight("1", d(2), objective="OUTCOME_LEADS", actions=[{"action_type": "offsite_conversion.fb_pixel_custom", "value": "12"}],
+                           values=[{"action_type": "offsite_conversion.fb_pixel_custom", "value": "12"}]))
+    assert n[3] == 12 and n[4] == 0 and n[5] == 12 and n[6] == 0          # a result and a conversion event, but no revenue
+    both = mt.numbers(insight("1", d(2), objective="OUTCOME_LEADS", actions=[{"action_type": "lead", "value": "5"}, {"action_type": "offsite_conversion.fb_pixel_custom", "value": "12"}], values=[]))
+    assert both[3] == 5 and both[5] == 17                                   # the standard lead is the result; a different custom event still counts as a conversion
+
+
+def test_a_pixel_purchase_with_no_omni_name_still_counts():
+    n = mt.numbers(insight("1", d(2), actions=[{"action_type": "offsite_conversion.fb_pixel_purchase", "value": "4"}],
+                           values=[{"action_type": "offsite_conversion.fb_pixel_purchase", "value": "320"}]))
+    assert n[3] == 4 and n[4] == 320
+
+
 def test_a_leads_campaigns_result_is_leads_and_has_no_value():
     n = mt.numbers(insight("1", d(2), objective="OUTCOME_LEADS", actions=[{"action_type": "lead", "value": "9"}, {"action_type": "onsite_conversion.lead_grouped", "value": "9"}], values=[]))
     assert n[3] == 9 and n[4] == 0
@@ -144,7 +159,7 @@ def test_traffic_awareness_and_engagement_have_no_conversions_but_all_conversion
     for obj in ("OUTCOME_TRAFFIC", "OUTCOME_AWARENESS", "OUTCOME_ENGAGEMENT", "LINK_CLICKS", "REACH"):
         n = mt.numbers(insight("1", d(2), objective=obj))
         assert n[3] == 0 and n[4] == 0
-        assert n[5] == 2 and n[6] == 150.5          # a purchase that happened under a traffic campaign is still a conversion event
+        assert n[5] == 2 and n[6] == 150.5          # a purchase that happened under a traffic campaign is still a conversion event, with its revenue
 
 
 def test_an_objective_nobody_has_heard_of_falls_back_to_purchases_then_leads():
@@ -963,7 +978,7 @@ def test_the_probe_sums_every_action_type_per_objective():
     sales = out["objectives"]["OUTCOME_SALES"]
     assert out["account"] == ACT and set(out["objectives"]) == {"OUTCOME_SALES"}
     assert sales["actions"]["lead"] == 7 and sales["actions"]["offsite_conversion.fb_pixel_custom"] == 15 and sales["actions"]["omni_purchase"] == 2
-    assert list(sales["actions"])[:2] == ["link_click", "offsite_conversion.fb_pixel_custom"]          # biggest first
+    assert list(sales["actions"])[:2] == ["offsite_conversion.fb_pixel_custom", "lead"] and "link_click" not in sales["actions"]      # biggest first, engagement noise left out
     assert sales["spend"] == 30.0 and len(sales["campaigns"]) == 3
 
 

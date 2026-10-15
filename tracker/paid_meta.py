@@ -83,10 +83,14 @@ ACCOUNT_STATUS = {1: "ACTIVE", 2: "DISABLED", 3: "UNSETTLED", 7: "PENDING_REVIEW
 ZERO_DECIMAL = {"JPY", "KRW", "VND", "CLP", "ISK", "UGX", "PYG", "XAF", "XOF", "XPF", "RWF", "KMF", "GNF", "DJF", "BIF", "VUV"}
 # The conversion events counted as "all conversions" (each is read from its own first-present action type, so the
 # same event is never counted twice under two names).
-ALL_EVENTS = [("omni_purchase", "purchase"), ("lead", "onsite_conversion.lead_grouped"), ("omni_complete_registration", "complete_registration"),
+PURCHASE = ("omni_purchase", "purchase", "offsite_conversion.fb_pixel_purchase", "onsite_web_purchase")
+STD_LEAD = ("lead", "onsite_conversion.lead_grouped", "offsite_conversion.fb_pixel_lead")
+CUSTOM = ("offsite_conversion.fb_pixel_custom",)
+# A lead-gen campaign optimised for a custom pixel event reports no "lead" at all, only that custom event (seen on a real
+# account: 2,672 offsite_conversion.fb_pixel_custom, 0 lead), so for Leads the first standard lead type wins and the custom event stands in.
+LEAD = STD_LEAD + CUSTOM
+ALL_EVENTS = [PURCHASE, STD_LEAD, CUSTOM, ("omni_complete_registration", "complete_registration"),
               ("subscribe",), ("start_trial",), ("submit_application",), ("schedule",), ("contact",), ("donate",)]
-PURCHASE = ("omni_purchase", "purchase")
-LEAD = ("lead", "onsite_conversion.lead_grouped")
 INSTALL = ("omni_app_install", "mobile_app_install", "app_install")
 
 INSIGHT_FIELDS = ["campaign_id", "campaign_name", "objective", "spend", "impressions", "inline_link_clicks",
@@ -346,12 +350,12 @@ def result_of(kind, actions, values):
     if kind == "SALES":
         return _first(actions, PURCHASE), _first(values, PURCHASE)
     if kind == "LEADS":
-        return _first(actions, LEAD), _first(values, LEAD)
+        return _first(actions, LEAD), 0.0            # a lead has no revenue: a custom event's "value" is only its count
     if kind == "APP":
         return _first(actions, INSTALL), 0.0
     if kind == "OTHER":                                  # an objective we do not know: purchases if any, else leads
         p = _first(actions, PURCHASE)
-        return (p, _first(values, PURCHASE)) if p else (_first(actions, LEAD), _first(values, LEAD))
+        return (p, _first(values, PURCHASE)) if p else (_first(actions, LEAD), 0.0)
     return 0.0, 0.0
 
 
@@ -361,7 +365,7 @@ def numbers(row):
     kind = objective_kind(row.get("objective"))
     conv, val = result_of(kind, actions, values)
     allc = sum(_first(actions, t) for t in ALL_EVENTS)
-    allv = sum(_first(values, t) for t in ALL_EVENTS)
+    allv = _first(values, PURCHASE)                      # only a purchase carries revenue; other events' "value" is their count
     video = _first(row.get("video_play_actions"), ("video_view",))
     out = [int(_f(row.get("impressions"))), int(_f(row.get("inline_link_clicks"))), round(_f(row.get("spend")), 4),
            round(conv, 4), round(val, 4), round(allc, 4), round(allv, 4), 0, int(_f(row.get("inline_post_engagement"))),
@@ -597,6 +601,9 @@ def status(store, *, http=None):
     return out
 
 
+NOISE = re.compile(r"^(post|page_engagement|link_click|landing_page_view|like|comment|photo_view|video|omni_landing|omni_view|onsite_conversion\.(post|messaging|video)|post_)", re.I)
+
+
 def probe(store, act, *, days=30, http=None):
     """What an account's insights actually report, for the admin check: every action type (with its count and value) summed
     over the last `days` days and over the account's campaigns, per objective. This is how to see which action type a
@@ -617,9 +624,11 @@ def probe(store, act, *, days=30, http=None):
         for k, bucket in (("actions", "actions"), ("action_values", "values")):
             for a in r.get(k) or []:
                 t = a.get("action_type")
+                if NOISE.search(str(t)):
+                    continue
                 o[bucket][t] = round(o[bucket].get(t, 0) + _f(a.get("value")), 2)
     for o in by.values():
         o["campaigns"] = sorted(set(o["campaigns"]))[:6]
         for b in ("actions", "values"):
-            o[b] = dict(sorted(o[b].items(), key=lambda kv: -kv[1])[:25])
+            o[b] = dict(sorted(o[b].items(), key=lambda kv: -kv[1])[:80])
     return {"account": act, "from": start.isoformat(), "to": end.isoformat(), "objectives": by}
