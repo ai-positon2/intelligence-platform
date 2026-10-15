@@ -66,7 +66,7 @@ WAIT_BLOCK_S = 300               # a wait longer than this is "come back later",
 NB = g.NB
 # Everything saved from Meta is numbers already mapped into the page's columns. When that mapping changes (the way a campaign's
 # result is chosen, say) bump this, and every saved copy and stored day made under the old mapping is simply never read again.
-MAPPING = "2"
+MAPPING = "3"
 KEY = g.CACHE_V + "meta" + MAPPING + ":"
 
 
@@ -92,13 +92,16 @@ ACCOUNT_STATUS = {1: "ACTIVE", 2: "DISABLED", 3: "UNSETTLED", 7: "PENDING_REVIEW
 ZERO_DECIMAL = {"JPY", "KRW", "VND", "CLP", "ISK", "UGX", "PYG", "XAF", "XOF", "XPF", "RWF", "KMF", "GNF", "DJF", "BIF", "VUV"}
 # The conversion events counted as "all conversions" (each is read from its own first-present action type, so the
 # same event is never counted twice under two names).
-PURCHASE = ("omni_purchase", "purchase", "offsite_conversion.fb_pixel_purchase", "onsite_web_purchase")
+# The same purchases under different names. Which of them carries the number varies: at the campaign level omni_purchase is the full
+# count, but in the product_id breakdown Meta fills only the on-site names and leaves omni_purchase at 0, so a purchase is the LARGEST
+# of these, never the first one present.
+PURCHASE = ("omni_purchase", "purchase", "offsite_conversion.fb_pixel_purchase", "onsite_web_purchase", "onsite_web_app_purchase", "web_in_store_purchase")
 STD_LEAD = ("lead", "onsite_conversion.lead_grouped", "offsite_conversion.fb_pixel_lead")
 CUSTOM = ("offsite_conversion.fb_pixel_custom",)
 # A lead-gen campaign optimised for a custom pixel event reports no "lead" at all, only that custom event (seen on a real
 # account: 2,672 offsite_conversion.fb_pixel_custom, 0 lead), so for Leads the first standard lead type wins and the custom event stands in.
 LEAD = STD_LEAD + CUSTOM
-ALL_EVENTS = [PURCHASE, STD_LEAD, CUSTOM, ("omni_complete_registration", "complete_registration"),
+ALL_EVENTS = [STD_LEAD, CUSTOM, ("omni_complete_registration", "complete_registration"),
               ("subscribe",), ("start_trial",), ("submit_application",), ("schedule",), ("contact",), ("donate",)]
 INSTALL = ("omni_app_install", "mobile_app_install", "app_install")
 
@@ -345,6 +348,17 @@ def _first(items, types):
     return 0.0
 
 
+def _max(items, types):
+    """The largest value among the action types in `types` (0 if none appears): the same event under several names."""
+    by = {i.get("action_type"): i.get("value") for i in (items or []) if isinstance(i, dict)}
+    return max([_f(by[t]) for t in types if t in by] or [0.0])
+
+
+def purchases(actions, values):
+    """(count, value) of purchases, however Meta named them."""
+    return _max(actions, PURCHASE), _max(values, PURCHASE)
+
+
 def objective_kind(objective):
     o = str(objective or "").upper()
     return OBJECTIVE_LABEL.get(o) or LEGACY.get(o) or "OTHER"
@@ -357,14 +371,14 @@ def campaign_type(objective):
 def result_of(kind, actions, values):
     """(count, value) of what this campaign objective counts as a result."""
     if kind == "SALES":
-        return _first(actions, PURCHASE), _first(values, PURCHASE)
+        return purchases(actions, values)
     if kind == "LEADS":
         return _first(actions, LEAD), 0.0            # a lead has no revenue: a custom event's "value" is only its count
     if kind == "APP":
         return _first(actions, INSTALL), 0.0
     if kind == "OTHER":                                  # an objective we do not know: purchases if any, else leads
-        p = _first(actions, PURCHASE)
-        return (p, _first(values, PURCHASE)) if p else (_first(actions, LEAD), 0.0)
+        p, v = purchases(actions, values)
+        return (p, v) if p else (_first(actions, LEAD), 0.0)
     return 0.0, 0.0
 
 
@@ -373,8 +387,8 @@ def numbers(row):
     actions, values = row.get("actions"), row.get("action_values")
     kind = objective_kind(row.get("objective"))
     conv, val = result_of(kind, actions, values)
-    allc = sum(_first(actions, t) for t in ALL_EVENTS)
-    allv = _first(values, PURCHASE)                      # only a purchase carries revenue; other events' "value" is their count
+    allc = _max(actions, PURCHASE) + sum(_first(actions, t) for t in ALL_EVENTS)
+    allv = _max(values, PURCHASE)                        # only a purchase carries revenue; other events' "value" is their count
     video = _first(row.get("video_play_actions"), ("video_view",))
     out = [int(_f(row.get("impressions"))), int(_f(row.get("inline_link_clicks"))), round(_f(row.get("spend")), 4),
            round(conv, 4), round(val, 4), round(allc, 4), round(allv, 4), 0, int(_f(row.get("inline_post_engagement"))),

@@ -902,41 +902,56 @@ def test_a_combined_account_cannot_add_two_currencies(monkeypatch):
 
 # ── Product Analysis ────────────────────────────────────────────────────────
 
-def product_http(log, fail_series=False):
+def product_http(log):
     def http(url, headers=None, params=None, timeout=None):
         log.append(params or {})
         p = params or {}
         if url.endswith("/campaigns"):
             return Resp(200, {"data": [{"id": "11", "effective_status": "ACTIVE", "daily_budget": "5000"}]})
         if p.get("breakdowns") == "product_id":
-            if p.get("filtering"):
-                if fail_series:
-                    return error(100, "product_id cannot be filtered", 400)
-                ids = json.loads(p["filtering"])[0]["value"]
-                rng = json.loads(p["time_range"])
-                return Resp(200, {"data": [dict(insight("11", day), product_id=i, impressions="10", inline_link_clicks="2", spend="1.00")
-                                           for i in ids for day in days_between(rng["since"], rng["until"])]})
-            return Resp(200, {"data": [dict(insight("11", d(3), impressions="900", spend="9.00", link="30"), product_id="SKU-1"),
-                                       dict(insight("11", d(3), impressions="100", spend="1.00", link="3", actions=[], values=[]), product_id="sku-2")]})
+            # the real shape: "<id>, <title>", and only the on-site purchase names carry a number (omni_purchase is 0)
+            return Resp(200, {"data": [
+                dict(insight("11", d(3), impressions="900", spend="9.00", link="30",
+                             actions=[{"action_type": "omni_purchase", "value": "0"}, {"action_type": "onsite_web_purchase", "value": "2"}],
+                             values=[{"action_type": "omni_purchase", "value": "0"}, {"action_type": "onsite_web_purchase", "value": "150"}]),
+                     product_id="SKU-1, Blue Widget, Large"),
+                dict(insight("11", d(3), impressions="100", spend="1.00", link="3", actions=[], values=[]), product_id="sku-2")]})
         rng = json.loads(p["time_range"])
         return Resp(200, {"data": [insight("11", day) for day in days_between(rng["since"], rng["until"])]})
     return http
 
 
+def test_the_product_id_meta_sends_is_split_into_an_id_and_a_title():
+    assert mp.split_id("50585477906741, chevy 350 engine & 4l60e") == ("50585477906741", "chevy 350 engine & 4l60e")
+    assert mp.split_id("SKU-1, Blue Widget, Large") == ("SKU-1", "Blue Widget, Large")        # only the first comma splits
+    assert mp.split_id("sku-2") == ("sku-2", "") and mp.split_id("") == ("", "") and mp.split_id(None) == ("", "")
+    assert mp.split_id(", no id") == (", no id", "")
+
+
 def test_a_product_row_is_the_google_row_the_parser_already_reads():
-    row = mp.to_google_row(dict(insight("11", d(3)), product_id="SKU-9"))
-    assert row["segments"]["productItemId"] == "SKU-9" and row["metrics"]["costMicros"] == "10000000"
-    assert row["metrics"]["clicks"] == "50" and row["metrics"]["conversions"] == 2 and row["metrics"]["conversionsValue"] == 150.5
+    row = mp.to_google_row(dict(insight("11", d(3)), product_id="SKU-9, Nine"))
+    assert row["segments"]["productItemId"] == "SKU-9" and row["segments"]["productTitle"] == "Nine"
+    assert row["metrics"]["costMicros"] == "10000000" and row["metrics"]["clicks"] == "50"
+    assert row["metrics"]["conversions"] == 2 and row["metrics"]["conversionsValue"] == 150.5
 
 
-def test_meta_products_are_listed_with_their_ids_and_say_what_meta_does_not_give():
+def test_a_purchase_is_the_largest_of_its_names_because_meta_zeroes_omni_purchase_by_product():
+    row = mp.to_google_row(dict(insight("11", d(3), actions=[{"action_type": "omni_purchase", "value": "0"}, {"action_type": "onsite_web_purchase", "value": "2"}],
+                                        values=[{"action_type": "omni_purchase", "value": "0"}, {"action_type": "onsite_web_purchase", "value": "150"}]),
+                                product_id="a, A"))
+    assert row["metrics"]["conversions"] == 2 and row["metrics"]["conversionsValue"] == 150
+    assert mt.purchases([{"action_type": "omni_purchase", "value": "5"}, {"action_type": "purchase", "value": "5"}], [])[0] == 5          # the same event is not added up
+    assert mt.purchases([], []) == (0.0, 0.0) and mt.purchases(None, None) == (0.0, 0.0)
+
+
+def test_meta_products_are_listed_and_say_what_meta_does_not_give():
     s, log = FakeStore(), []
     out = mp.fetch(s, ACT, d(5), d(1), http=product_http(log))
     ids = [p[0] for p in out["products"]]
-    assert ids == ["sku-1", "sku-2"] and out["products"][0][1] == "sku-1"            # the id is the title; ids match in lower case
-    assert out["missing"] == [8, 9, 10] and out["outOfStock"] is None
+    assert ids == ["sku-1", "sku-2"] and out["products"][0][1] == "Blue Widget, Large" and out["products"][1][1] == "sku-2"
+    assert out["missing"] == [8, 9, 10] and out["outOfStock"] is None and out["series"] is None
     assert out["total"][2] == 10.0 and out["total"][3] == 2                          # spend, purchases (the second product had none)
-    assert out["series"]["ids"] == ["sku-1", "sku-2"] and len(out["series"]["days"]) == 5
+    assert "only in part" in out["note"]
 
 
 def test_the_trend_is_the_accounts_sales_campaigns_by_day():
@@ -945,10 +960,10 @@ def test_the_trend_is_the_accounts_sales_campaigns_by_day():
     assert len(out["daily"]["days"]) == 5 and out["daily"]["rows"][0][2] == 10.0 and out["daily"]["rows"][0][3] == 2
 
 
-def test_a_product_trend_meta_will_not_filter_leaves_the_products_standing():
+def test_no_per_product_days_are_asked_for_so_no_call_is_wasted():
     s, log = FakeStore(), []
-    out = mp.fetch(s, ACT, d(5), d(1), http=product_http(log, fail_series=True))
-    assert out["series"] is None and len(out["products"]) == 2
+    mp.fetch(s, ACT, d(5), d(1), http=product_http(log))
+    assert not any(p.get("filtering") or p.get("time_increment") and p.get("breakdowns") for p in log)
 
 
 def test_products_are_saved_and_a_second_look_costs_nothing():
@@ -959,15 +974,26 @@ def test_products_are_saved_and_a_second_look_costs_nothing():
     assert log == []
 
 
-def test_the_comparison_range_does_not_ask_for_per_product_days():
+def test_the_comparison_range_is_read_too():
     s, log = FakeStore(), []
     cur, cmp, notes = mp.analysis(s, ACT, (d(5), d(1)), (d(15), d(10)), http=product_http(log))
-    assert cur["series"] and cmp["series"] is None and notes == []
-    parsed = pp.parse_products([], d(5), d(1), [])
-    assert set(cmp) >= set(parsed) - {"missing"} | {"missing"}
+    assert cur["products"] and cmp["products"] and notes == [] and cur["note"] and cmp["note"]
 
 
 # ── The probe: which action types an account really reports ─────────────────
+
+def test_all_conversions_count_a_purchase_once_whatever_its_names_and_the_other_events_besides():
+    n = mt.numbers(insight("1", d(2), actions=[{"action_type": "omni_purchase", "value": "2"}, {"action_type": "onsite_web_purchase", "value": "2"},
+                                                {"action_type": "lead", "value": "3"}, {"action_type": "offsite_conversion.fb_pixel_custom", "value": "4"}],
+                           values=[{"action_type": "omni_purchase", "value": "150"}, {"action_type": "onsite_web_purchase", "value": "150"}]))
+    assert n[5] == 2 + 3 + 4 and n[6] == 150
+
+
+def test_an_unknown_objective_counts_a_purchase_under_any_of_its_names():
+    n = mt.numbers(insight("1", d(2), objective="SOMETHING_NEW", actions=[{"action_type": "omni_purchase", "value": "0"}, {"action_type": "onsite_web_purchase", "value": "3"}],
+                           values=[{"action_type": "onsite_web_purchase", "value": "90"}]))
+    assert n[3] == 3 and n[4] == 90
+
 
 def test_the_probe_sums_every_action_type_per_objective():
     s, log = FakeStore(), []

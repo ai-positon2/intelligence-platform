@@ -197,6 +197,13 @@ def test_each_products_days_are_added_where_both_platforms_have_the_product():
     assert only["ids"] == ["a"]
 
 
+def test_a_note_on_either_feed_reaches_the_merged_one():
+    g = feed([("a", "A", "", ["", "", ""], nums(1, 1, 1.0))])
+    m = dict(feed([("a", "a", "", ["", "", ""], nums(1, 1, 1.0))]), note="Meta credits purchases only in part")
+    assert run("P.mergeProducts(g,m).note", "const g=%s,m=%s" % (json.dumps(g), json.dumps(m))) == "Meta credits purchases only in part"
+    assert run("(P.mergeProducts(g,g).note===undefined?null:1)", "const g=%s" % json.dumps(g)) is None
+
+
 def test_the_folded_other_products_add_up():
     g = feed([], other={"count": 3, "n": nums(0, 0, 10.0)})
     m = feed([], other={"count": 2, "n": nums(0, 0, 5.0)})

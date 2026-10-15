@@ -138,12 +138,13 @@ function doRefresh(urls){
 function notice(kind,title,html){
   $("#notice").innerHTML=title?'<div class="ps-notice '+kind+'"><b>'+esc(title)+'</b><p>'+html+'</p></div>':"";
 }
-function paintStale(stale,blockedUntil,partial){
+function paintStale(stale,blockedUntil,partial,note){
   var el=$("#staleBar"), t=function(x){return new Date(x).toLocaleString([], {weekday:"short",hour:"numeric",minute:"2-digit"});};
-  if(!stale&&!blockedUntil&&!partial){el.hidden=true;el.innerHTML="";return;}
+  if(!stale&&!blockedUntil&&!partial&&!note){el.hidden=true;el.innerHTML="";return;}
   el.hidden=false;
   var h="";
   if(partial) h+='<b>Showing part of this account.</b> '+esc(partial);
+  if(note) h+=(h?' ':'')+'<b>Good to know.</b> '+esc(note);
   if(stale||blockedUntil) h+=(h?' ':'')+'<b>'+(stale?"Showing the copy saved "+esc(t(stale)):"Saved views still open")+'.</b> The platform has limited this app’s reads'+
     (blockedUntil?', so fresh numbers come back around <b>'+esc(t(blockedUntil*1000))+'</b>':'')+'.';
   el.innerHTML=h;
@@ -309,7 +310,7 @@ function load(){
   getJson(BASE+"/products?"+q).then(function(j){
     if(seq!==S.seq) return;
     S.data=j.current; S.cmpData=j.compare;
-    paintStale(j.stale,j.blockedUntil,j.partial); paintUpdated(j.fetchedAt);
+    paintStale(j.stale,j.blockedUntil,j.partial,j.current&&j.current.note); paintUpdated(j.fetchedAt);
     $("#live").classList.remove("off");
     $("#liveText").textContent="Live from "+plat()+" · "+S.accounts.length+" accounts · "+S.acct.name+" in "+S.acct.currency;
     $("#dash").hidden=false;

@@ -120,7 +120,7 @@ function mergeProducts(a,b){
     total:sum(a.total,b.total).map(r4),missing:(a.missing||[]).filter(function(i){return (b.missing||[]).indexOf(i)>=0;}),
     daily:a.daily&&b.daily?{days:a.daily.days,rows:a.daily.rows.map(function(r,i){return addN(r,b.daily.rows[i]||[]).map(r4);})}:(a.daily||b.daily),
     outOfStock:a.outOfStock||b.outOfStock?Array.from(new Set((a.outOfStock||[]).concat(b.outOfStock||[]))).sort():(a.outOfStock===null&&b.outOfStock===null?null:[]),
-    series:mergeSeries(a.series,b.series)};
+    series:mergeSeries(a.series,b.series),note:a.note||b.note||undefined};
 }
 function mergeSeries(a,b){
   if(!a||!b) return a||b||null;

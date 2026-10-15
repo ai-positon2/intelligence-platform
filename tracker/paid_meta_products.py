@@ -7,14 +7,15 @@ already reads), so the page needs no Meta-specific table.
 
 What Meta does not give, and what that means on the page:
 
-  * a product's title, brand and type: Meta sends only the catalog's product id, so the id is the title. Product Analysis
-    for Both fills these in from Google when the two feeds share ids (a Shopify feed usually does);
+  * a product's brand and type (the product_id it sends is "<id>, <title>", which is split). Product Analysis for Both fills
+    brand and type in from Google when the two feeds share ids (a Shopify feed usually does);
+  * a product's sales: Meta credits purchases to individual products only in part (the on-site ones it can tie to a product;
+    omni_purchase is 0 there), so a note says the product figures understate Meta's delivery. NOTE is sent with the data;
   * units sold, cost of goods and profit: sent as missing, so the page says so instead of showing zero;
   * stock status: not read (the page says the stock check is unavailable);
   * the whole-feed trend: it is the account's Sales campaigns by day (from the Performance Summarizer's stored days),
     because `product_id` with a daily split would be one row per product per day;
-  * each top product's own days: asked for with a filter on the product id; if Meta will not filter that breakdown the
-    page simply has no per-product trend for this account.
+  * each top product's own days: not read (see `series` in fetch), so a product's drawer has no day-by-day chart for Meta;
 
 An account that runs no catalog sales ads has no rows here, and the page says so.
 """
@@ -33,17 +34,29 @@ log = logging.getLogger(__name__)
 MISSING = [8, 9, 10]            # units sold, cost of goods, gross profit: Meta has none
 
 
+NOTE = ("Meta credits purchases to individual products only in part (it counts the on-site purchases it can tie to a product), so "
+        "a product's sales, ROAS and \"spend, no sales\" here understate what Meta delivered. The account totals in the Performance "
+        "Summarizer are complete.")
+
+
+def split_id(raw):
+    """(item id, title) from the product_id Meta sends, which is "<id>, <title>" (just the id when there is no title)."""
+    raw = str(raw or "").strip()
+    head, sep, tail = raw.partition(", ")
+    return (head.strip(), tail.strip()) if sep and head.strip() else (raw, "")
+
+
 def _purchase(row):
-    actions, values = row.get("actions"), row.get("action_values")
-    return meta._first(actions, meta.PURCHASE), meta._first(values, meta.PURCHASE)
+    return meta.purchases(row.get("actions"), row.get("action_values"))
 
 
 def to_google_row(row, day=None):
     """A product insights row as the Google row paid_products reads."""
     n, v = _purchase(row)
-    allc = sum(meta._first(row.get("actions"), t) for t in meta.ALL_EVENTS)
-    allv = sum(meta._first(row.get("action_values"), t) for t in meta.ALL_EVENTS)
-    s = {"productItemId": str(row.get("product_id") or ""), "productTitle": "", "productBrand": "",
+    allc = n + sum(meta._first(row.get("actions"), t) for t in meta.ALL_EVENTS)
+    allv = v
+    pid, title = split_id(row.get("product_id"))
+    s = {"productItemId": pid, "productTitle": title, "productBrand": "",
          "productTypeL1": "", "productTypeL2": "", "productTypeL3": ""}
     if day:
         s["date"] = day
@@ -83,6 +96,7 @@ def fetch(store, act, start, end, *, currency="USD", with_series=True, notes=Non
         rows = meta._pages(act + "/insights", _query(start, end), store, http=http)
         out = pp.parse_products([to_google_row(r) for r in rows], start, end, [])
         out["missing"] = list(MISSING)
+        out["note"] = NOTE
         return out
 
     def days():
@@ -92,19 +106,7 @@ def fetch(store, act, start, end, *, currency="USD", with_series=True, notes=Non
     out = dict(res[0])
     out["daily"] = _daily_from_days(res[1])
     out["outOfStock"] = None
-    out["series"] = None
-    top = [p[0] for p in out["products"][:pp.SERIES_TOP] if pp.ID_SAFE.match(p[0])]
-    if with_series and top:
-        def make_series():
-            flt = json.dumps([{"field": "product_id", "operator": "IN", "value": top}])
-            rows = meta._pages(act + "/insights", _query(start, end, {"time_increment": 1, "filtering": flt}), store, http=http)
-            return pp.parse_series([to_google_row(r, r.get("date_start")) for r in rows], start, end, top)
-        try:
-            out["series"] = g._cached(store, key("pser"), ttl, make_series, notes, force=force, stamps=stamps)
-        except g.AdsError as e:          # a nicety: without it the page has no per-product trend
-            if g._can_serve_stale(e):
-                raise
-            log.warning("meta products: no per-product days for %s (%s)", act, e)
+    out["series"] = None          # Meta cannot filter a product breakdown by id, and a daily split of every product is one row per product per day
     return out
 
 
