@@ -587,4 +587,5 @@ def test_the_server_and_the_page_agree_on_the_columns_and_the_shares():
     got = json.loads(r.stdout)
     assert got["nb"] == g.NB
     assert {g.BASE[i][0]: k for k, i in got["idx"].items()} == {v: k for k, v in names.items()}
-    assert sorted(got["shares"]) == sorted(g.SHARES)           # every share the page can show is one the server reads, and back
+    from tracker import paid_meta as _mt
+    assert sorted(got["shares"]) == sorted(g.SHARES + _mt.SHARE_KEYS)           # every share the page can show is one a server reads (Google's, and Meta's reach and frequency), and back

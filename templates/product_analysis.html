@@ -1,7 +1,7 @@
 {% extends "_paid_base.html" %}
 {% block title %}Product Analysis{% endblock %}
 {% block head %}
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/performance_summarizer.css') }}?v=9">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/performance_summarizer.css') }}?v=10">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/product_analysis.css') }}?v=2">
 {% endblock %}
 {% block content %}
@@ -10,10 +10,10 @@
     <div class="pm-hero-l">
       <span class="pm-eyebrow"><span class="d"></span>Paid Marketing · Ecommerce</span>
       <h1 class="pm-title">Know which products <span class="pm-grad">earn their ad spend.</span></h1>
-      <p class="pm-sub">Live from Google Ads Shopping and Performance Max. Every product sorted into stars, steady sellers, drags and
+      <p class="pm-sub">Live from Google Ads Shopping and Performance Max, and Meta catalog ads. Every product sorted into stars, steady sellers, drags and
         money pits, with the few clear things to do about each. <b>Change the rules</b> to match the client's margin and click any product to dig in.</p>
     </div>
-    <div class="ps-live" id="live" aria-live="polite"><span class="ps-live-dot"></span><span id="liveText">Connecting to Google Ads…</span><span class="ps-upd" id="upd"></span></div>
+    <div class="ps-live" id="live" aria-live="polite"><span class="ps-live-dot"></span><span id="liveText">Connecting to your ad accounts…</span><span class="ps-upd" id="upd"></span></div>
   </section>
 
   <!-- Command bar: which account, which days, compared with what -->
@@ -105,7 +105,8 @@
 {% block scripts %}
 <script src="{{ url_for('static', filename='vendor/chart.umd.js') }}"></script>
 <script src="{{ url_for('static', filename='js/pm_picker.js') }}?v=1"></script>
-<script src="{{ url_for('static', filename='js/ps_data.js') }}?v=4"></script>
+<script src="{{ url_for('static', filename='js/pm_platform.js') }}?v=4"></script>
+<script src="{{ url_for('static', filename='js/ps_data.js') }}?v=5"></script>
 <script src="{{ url_for('static', filename='js/pa_data.js') }}?v=1"></script>
-<script src="{{ url_for('static', filename='js/product_analysis.js') }}?v=2"></script>
+<script src="{{ url_for('static', filename='js/product_analysis.js') }}?v=4"></script>
 {% endblock %}

@@ -422,17 +422,79 @@ def resolve_target(target, *, accounts_fn=None, groups_fn=None):
     return account
 
 
+def _meta_target(act, store):
+    """{id, name, currency, tz, platform} for a Meta ad account the connected token can read."""
+    from . import paid_meta
+    problem = paid_meta.config_problem()
+    if problem:
+        raise gads.GadsError("not_configured", problem)
+    try:
+        account = paid_meta.account_by_id(store, act)
+    except base.AdsError as e:
+        raise gads.translate(e) from e
+    if not account:
+        raise BadRequest("That account is not one of the Meta ad accounts the connected token can read.")
+    return account
+
+
+def _combined_report(raw, start, end, *, force, store, **kw):
+    """One report for "<google id>+<act_ id>": each half is read (and saved) on its own, then added. A half that cannot be read
+    is left out and the report says so; both failing is an error."""
+    from . import paid_meta, paid_meta_segments
+    parts = raw.split("+")
+    if len(parts) != 2 or not base.ID_RE.match(parts[0]) or not paid_meta.is_meta(parts[1]):
+        raise BadRequest("A combined account is one Google Ads account and one Meta ad account.")
+    def one(acct):
+        try:
+            return report_for(acct, start, end, force=force, store=store, **kw), None
+        except base.RefreshTooSoon:
+            return report_for(acct, start, end, force=False, store=store, **kw), None      # this half was just refreshed: it is current
+        except gads.GadsError as e:
+            return None, e
+    (g, ge), (m, me) = one(parts[0]), one(parts[1])
+    if g is None and m is None:
+        raise ge
+    name = {"google": "Google Ads", "meta": "Meta Ads"}
+    if g is None or m is None:
+        ok, bad, who = (m, ge, "google") if g is None else (g, me, "meta")
+        ok = dict(ok)
+        ok["warnings"] = list(ok.get("warnings") or []) + ["%s could not be read: %s Showing the other platform only." % (name[who], bad)]
+        return ok
+    if (g["account"].get("currency") or "USD") != (m["account"].get("currency") or "USD"):
+        raise BadRequest("The two accounts bill in different currencies, so they cannot be added together.")
+    account = {"id": raw, "name": g["account"]["name"] + " + " + m["account"]["name"], "currency": g["account"]["currency"]}
+    return paid_meta_segments.merge_reports(g, m, account)
+
+
 def report_for(account_id, start, end, *, accounts_fn=None, groups_fn=None, search_fn=None, geo_fn=None, now=None,
-               force=False, store=None):
-    """build_report for an account or MCC the root MCC actually holds, cached. `force` (the Refresh button) skips the
-    saved copy, at most once per paid_gads.REFRESH_COOLDOWN_S for the account."""
-    from . import paid_store
-    s, e = parse_range(start, end)
-    account = resolve_target(account_id, accounts_fn=accounts_fn, groups_fn=groups_fn)
-    key = (account["id"], s, e)
-    pkey = base.CACHE_V + "seg:%s:%s:%s" % (account["id"], s.isoformat(), e.isoformat())
-    ttl = base._ttl(e.isoformat())
+               force=False, store=None, meta_fetch=None):
+    """build_report for an account or MCC the root MCC actually holds, a Meta ad account (act_...), or a Google and a Meta
+    account together ("<google id>+<act_ id>"), cached. `force` (the Refresh button) skips the saved copy, at most once per
+    paid_gads.REFRESH_COOLDOWN_S for the account."""
+    from . import paid_store, paid_meta, paid_meta_segments
+    raw = str(account_id or "").strip()
     store = store or paid_store
+    if "+" in raw:
+        return _combined_report(raw, start, end, force=force, store=store, accounts_fn=accounts_fn, groups_fn=groups_fn,
+                                search_fn=search_fn, geo_fn=geo_fn, now=now, meta_fetch=meta_fetch)
+    s, e = parse_range(start, end)
+    if paid_meta.is_meta(raw):
+        account = _meta_target(raw, store)
+
+        def build():
+            try:
+                return paid_meta_segments.build_report(account, s, e, fetch=meta_fetch, store=store)
+            except base.AdsError as err:
+                raise gads.translate(err) from err
+    else:
+        account = resolve_target(account_id, accounts_fn=accounts_fn, groups_fn=groups_fn)
+
+        def build():
+            return build_report(account, s, e, search_fn=search_fn, geo_fn=geo_fn)
+    key = (account["id"], s, e)
+    saved_id = paid_meta.day_key(account["id"]) if paid_meta.is_meta(account["id"]) else account["id"]      # Meta's saved numbers carry the mapping version
+    pkey = base.CACHE_V + "seg:%s:%s:%s" % (saved_id, s.isoformat(), e.isoformat())
+    ttl = base._ttl(e.isoformat())
     clock = time.time() if now is None else now
     if force:
         base.refresh_guard(store, "seg:" + account["id"])
@@ -458,7 +520,7 @@ def report_for(account_id, start, end, *, accounts_fn=None, groups_fn=None, sear
                     _cache[key] = (clock, report)
                 return report
         try:
-            report = build_report(account, s, e, search_fn=search_fn, geo_fn=geo_fn)
+            report = build()
         except gads.GadsError as err:
             old = base._saved_copy(store, pkey) if err.kind == "quota" else None
             if old is None:

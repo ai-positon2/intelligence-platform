@@ -1,7 +1,7 @@
 {% extends "_paid_base.html" %}
 {% block title %}Performance Summarizer{% endblock %}
 {% block head %}
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/performance_summarizer.css') }}?v=9">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/performance_summarizer.css') }}?v=10">
 {% endblock %}
 {% block content %}
 <div class="pm pm-ps" id="ps">
@@ -9,10 +9,10 @@
     <div class="pm-hero-l">
       <span class="pm-eyebrow"><span class="d"></span>Paid Marketing · Performance</span>
       <h1 class="pm-title">See how every account <span class="pm-grad">is really doing.</span></h1>
-      <p class="pm-sub">Live from Google Ads. Pick an account and a date range, then <b>chart any metric against any other</b>,
+      <p class="pm-sub">Live from Google Ads and Meta Ads. Pick a platform, an account and a date range, then <b>chart any metric against any other</b>,
         split it any way you like, and click anything to dig in. Nothing is pre-baked.</p>
     </div>
-    <div class="ps-live" id="live" aria-live="polite"><span class="ps-live-dot"></span><span id="liveText">Connecting to Google Ads…</span><span class="ps-upd" id="upd"></span></div>
+    <div class="ps-live" id="live" aria-live="polite"><span class="ps-live-dot"></span><span id="liveText">Connecting to your ad accounts…</span><span class="ps-upd" id="upd"></span></div>
   </section>
 
   <!-- Command bar: which account, which days, compared with what -->
@@ -41,7 +41,7 @@
       <div class="ps-cmd-tools">
         <button type="button" class="pm-btn-ghost ps-cta" id="studioBtn" title="Build your own chart: pick the kind, the metrics and how to slice it">
           <svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg><span>Create a chart</span></button>
-        <button type="button" class="pm-btn-ghost" id="refreshBtn" title="Read this view from Google Ads again. The numbers are saved, so this is only needed when you want the very latest.">
+        <button type="button" class="pm-btn-ghost" id="refreshBtn" title="Read this view from the ad platform again. The numbers are saved, so this is only needed when you want the very latest.">
           <svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.3-5.6M20 4v5h-5"/></svg><span>Refresh</span></button>
         <button type="button" class="pm-btn-ghost" id="shareBtn" title="Copy a link to exactly this view">
           <svg viewBox="0 0 24 24"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg><span>Share view</span></button>
@@ -59,7 +59,7 @@
     <!-- Key numbers -->
     <div class="ps-sec-h"><div><h2>Key numbers</h2><span class="ps-hint ps-hint-b">Click a card to chart it, shift-click to add it. The dots on a card change what it shows.</span></div>
       <div class="ps-sec-tools"><span class="ps-hint" id="kpiCount"></span>
-        <button type="button" class="pm-btn-ghost" id="kpiCustom" title="Choose which metrics the cards show, from everything Google reports">
+        <button type="button" class="pm-btn-ghost" id="kpiCustom" title="Choose which metrics the cards show, from everything the platform reports">
           <svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg><span>Customize cards</span></button></div></div>
     <section class="ps-kpis" id="kpis"></section>
 
@@ -98,6 +98,7 @@
 {% block scripts %}
 <script src="{{ url_for('static', filename='vendor/chart.umd.js') }}"></script>
 <script src="{{ url_for('static', filename='js/pm_picker.js') }}?v=1"></script>
-<script src="{{ url_for('static', filename='js/ps_data.js') }}?v=4"></script>
-<script src="{{ url_for('static', filename='js/performance_summarizer.js') }}?v=8"></script>
+<script src="{{ url_for('static', filename='js/pm_platform.js') }}?v=4"></script>
+<script src="{{ url_for('static', filename='js/ps_data.js') }}?v=5"></script>
+<script src="{{ url_for('static', filename='js/performance_summarizer.js') }}?v=11"></script>
 {% endblock %}

@@ -32,17 +32,18 @@ var S = {
   seg:"all", q:"", sort:"cost", dir:-1, shown:PAGE, by:"brand", rm:"cost", log:null, open:"", pm:"value", pn:5, fetchedAt:null,
   seq:0, memo:{}
 };
-var charts = {}, picker = null, hashTimer = null;
+var charts = {}, accts = null, hashTimer = null;
+var PL = window.PMPlatform;
 
 /* ── Small helpers ───────────────────────────────────────────── */
+/* One request; a combined account (`account=<google id>+<act_ id>`, Both) is two, merged by pm_platform.js: products are matched
+   on the item id, which a shared Merchant Center feed keeps the same on Meta. */
+function fetchJson(url,refresh){
+  return PL.fetchJson(url,refresh,{acct:S.acct,merge:function(u,g,m){return PL.mergeProductsResponse(S.acct,g,m);}});
+}
 function getJson(url){
   if(S.memo[url]) return S.memo[url];
-  var p = fetch(url,{credentials:"same-origin"}).then(function(r){
-    return r.json().catch(function(){return {};}).then(function(j){
-      if(!r.ok){var e=new Error(j.error||("The server answered "+r.status)); e.status=r.status; e.config=j.configProblem; throw e;}
-      return j;
-    });
-  });
+  var p=fetchJson(url,false);
   S.memo[url] = p;
   p.catch(function(){delete S.memo[url];});
   return p;
@@ -101,22 +102,21 @@ function relTime(iso){
   var m=Math.max(0,Math.round((Date.now()-t)/60000));
   return m<1?"just now":m<60?m+" min ago":m<1440?Math.round(m/60)+" h ago":Math.round(m/1440)+" days ago";
 }
+function plat(){
+  var p=S.acct?S.acct.platform:(accts?accts.platform():"google");
+  return p==="meta"?"Meta Ads":p==="both"?"Google Ads and Meta Ads":"Google Ads";
+}
 function paintUpdated(iso){
   S.fetchedAt=iso||null;
   var el=$("#upd"); if(!el) return;
   el.textContent=iso&&relTime(iso)?" · Updated "+relTime(iso):"";
-  el.title=iso?"Last read from Google Ads "+new Date(iso).toLocaleString():"";
+  el.title=iso?"Last read from "+plat()+" "+new Date(iso).toLocaleString():"";
 }
 setInterval(function(){if(S.fetchedAt) paintUpdated(S.fetchedAt);},30000);
 /* The same request as getJson, but asking Google again (the server allows it once every two minutes per account); the answer
    replaces the saved one in S.memo so the next load() paints it. */
 function refreshJson(url){
-  var p=fetch(url+(url.indexOf("?")<0?"?":"&")+"refresh=1",{credentials:"same-origin"}).then(function(r){
-    return r.json().catch(function(){return {};}).then(function(j){
-      if(!r.ok){var e=new Error(j.error||("The server answered "+r.status)); e.status=r.status; e.cooldown=!!j.cooldown; throw e;}
-      return j;
-    });
-  });
+  var p=fetchJson(url,true);
   S.memo[url]=p; p.catch(function(){delete S.memo[url];});
   return p;
 }
@@ -125,7 +125,7 @@ function doRefresh(urls){
   btn.classList.add("busy"); btn.disabled=true;
   var main=refreshJson(urls[0]), rest=urls.slice(1).map(function(u){return refreshJson(u).catch(function(){return null;});});
   Promise.all([main].concat(rest)).then(function(){
-    btn.classList.remove("busy"); btn.disabled=false; load(); toast("Read from Google Ads just now");
+    btn.classList.remove("busy"); btn.disabled=false; load(); toast("Read from "+plat()+" just now");
   }).catch(function(err){
     btn.classList.remove("busy"); btn.disabled=false;
     toast(err.cooldown?err.message:"Could not refresh: "+err.message);
@@ -138,21 +138,27 @@ function doRefresh(urls){
 function notice(kind,title,html){
   $("#notice").innerHTML=title?'<div class="ps-notice '+kind+'"><b>'+esc(title)+'</b><p>'+html+'</p></div>':"";
 }
-function paintStale(stale,blockedUntil){
+function paintStale(stale,blockedUntil,partial,note){
   var el=$("#staleBar"), t=function(x){return new Date(x).toLocaleString([], {weekday:"short",hour:"numeric",minute:"2-digit"});};
-  if(!stale&&!blockedUntil){el.hidden=true;el.innerHTML="";return;}
+  if(!stale&&!blockedUntil&&!partial&&!note){el.hidden=true;el.innerHTML="";return;}
   el.hidden=false;
-  el.innerHTML='<b>'+(stale?"Showing the copy saved "+esc(t(stale)):"Saved views still open")+'.</b> Google has used up this app’s daily Google Ads allowance'+
+  var h="";
+  if(partial) h+='<b>Showing part of this account.</b> '+esc(partial);
+  if(note) h+=(h?' ':'')+'<b>Good to know.</b> '+esc(note);
+  if(stale||blockedUntil) h+=(h?' ':'')+'<b>'+(stale?"Showing the copy saved "+esc(t(stale)):"Saved views still open")+'.</b> The platform has limited this app’s reads'+
     (blockedUntil?', so fresh numbers come back around <b>'+esc(t(blockedUntil*1000))+'</b>':'')+'.';
+  el.innerHTML=h;
 }
 function showError(err){
+  var n=plat();
   $("#dash").hidden=true;
-  $("#liveText").textContent="Google Ads is not reachable";
+  $("#liveText").textContent=n+" is not reachable";
   $("#live").classList.add("off");
-  if(err.status===409) notice("setup","Google Ads is not connected yet",
-    esc(err.message)+' An admin sets these on Railway (they are named <code>GOOGLE_ADS_*</code>), then reloads this page.');
-  else if(err.status===429) notice("warn","Google Ads is not answering right now",esc(err.message));
-  else notice("bad","Could not load Google Ads",esc(err.message));
+  var meta=n==="Meta Ads";
+  if(err.status===409) notice("setup",n+" is not connected yet",
+    esc(err.message)+' An admin sets these on Railway (they are named <code>'+(meta?"META_ADS_*":"GOOGLE_ADS_*")+'</code>), then reloads this page.');
+  else if(err.status===429) notice("warn",n+" is not answering right now",esc(err.message));
+  else notice("bad","Could not load "+n,esc(err.message));
 }
 
 /* ── Rules (kept in this browser) ─────────────────────────────── */
@@ -173,7 +179,7 @@ function writeHash(){
   clearTimeout(hashTimer);
   hashTimer=setTimeout(function(){
     if(!S.acct) return;
-    var q=[["a",S.acct.id],["p",S.preset]];
+    var q=[["pf",accts?accts.platform():"google"],["a",S.acct.id],["p",S.preset]];
     if(S.preset==="custom") q.push(["s",S.range.start],["e",S.range.end]);
     q.push(["c",S.compare]);
     if(S.seg!=="all") q.push(["seg",S.seg]);
@@ -300,13 +306,13 @@ function load(){
   if(S.cmpRange) q+="&compare_start="+S.cmpRange.start+"&compare_end="+S.cmpRange.end;
   notice("");
   skeleton();
-  $("#liveText").textContent="Reading "+S.acct.name+" products from Google Ads…";
+  $("#liveText").textContent="Reading "+S.acct.name+" products from "+plat()+"…";
   getJson(BASE+"/products?"+q).then(function(j){
     if(seq!==S.seq) return;
     S.data=j.current; S.cmpData=j.compare;
-    paintStale(j.stale,j.blockedUntil); paintUpdated(j.fetchedAt);
+    paintStale(j.stale,j.blockedUntil,j.partial,j.current&&j.current.note); paintUpdated(j.fetchedAt);
     $("#live").classList.remove("off");
-    $("#liveText").textContent="Live from Google Ads · "+S.accounts.length+" accounts · "+S.acct.name+" in "+S.acct.currency;
+    $("#liveText").textContent="Live from "+plat()+" · "+S.accounts.length+" accounts · "+S.acct.name+" in "+S.acct.currency;
     $("#dash").hidden=false;
     S.shown=PAGE; S.open="";
     recompute();
@@ -329,8 +335,8 @@ function paintAll(){
   var none=empty();
   $("#dash").classList.toggle("is-empty",none);
   if(none){
-    notice("info","No product activity in this range","<b>"+esc(S.acct.name)+"</b> had no Shopping or Performance Max product impressions from "+esc(fmtRange(S.range))+
-      ". Try a longer range, or another account. Accounts without a product feed will always be empty here.");
+    notice("info","No product activity in this range","<b>"+esc(S.acct.name)+"</b> had no "+(S.acct.platform==="meta"?"catalog sales (product) ad":S.acct.platform==="both"?"Shopping, Performance Max or catalog sales ad":"Shopping or Performance Max product")+" impressions from "+esc(fmtRange(S.range))+
+      ". Try a longer range, or another account. "+(S.acct.platform==="meta"?"Meta reports products only for catalog sales ads (Advantage+ catalog), so accounts without them will always be empty here.":"Accounts without a product feed will always be empty here."));
     ["pareto","perf","groups","bubble","rollup","trend"].forEach(destroyChart);
     writeHash(); return;
   }
@@ -388,7 +394,7 @@ function paintKpis(){
 /* What to do */
 function paintActions(){
   var acts=A.actions(S.items,S.cls,S.oos), el=$("#actions");
-  var stockNote=!S.oosKnown?'<p class="pa-stocknote">Stock status could not be read, so out-of-stock products are not checked. This needs a Merchant Center link on the Google Ads account.</p>':"";
+  var stockNote=!S.oosKnown?'<p class="pa-stocknote">Stock status could not be read, so out-of-stock products are not checked. This needs a Merchant Center link on the Google Ads account, and Meta does not report stock.</p>':"";
   if(!acts.length){
     el.innerHTML='<div class="pa-all-good"><b>Nothing urgent.</b><p>No product is wasting money, none are out of stock and still advertised, and no clear gaps stand out. Try a longer date range or tighten the rules.</p></div>'+stockNote;
     return;
@@ -754,25 +760,26 @@ document.addEventListener("keydown",function(e){if(e.key==="Escape"&&!$("#drawer
 /* ── Boot ─────────────────────────────────────────────────────── */
 new MutationObserver(function(){if(S.data&&!empty()) paintAll();}).observe(document.documentElement,{attributes:true,attributeFilter:["data-theme"]});
 
+function lastAccount(){try{return localStorage.getItem("ps_account")||"";}catch(e){return "";}}
 function boot(){
   loadRules();
   var h=readHash(); applyHash(h);
-  picker=window.PMPicker($("#acctPick"),{label:"Account",search:true,onChange:function(id){
-    var a=S.accounts.filter(function(x){return x.id===id;})[0]; if(!a||(S.acct&&a.id===S.acct.id)) return;
-    S.acct=a;
-    try{localStorage.setItem("ps_account",a.id);}catch(e){}
-    load();
-  }});
-  getJson(BASE+"/accounts").then(function(j){
-    S.accounts=j.accounts||[];
-    if(!S.accounts.length){notice("warn","No accounts found","The Google Ads manager account has no enabled client accounts this sign-in can read.");$("#liveText").textContent="No accounts";return;}
-    var last=""; try{last=localStorage.getItem("ps_account")||"";}catch(e){}
-    var want=h.a||last;
-    S.acct=S.accounts.filter(function(a){return a.id===want;})[0]||S.accounts[0];
-    picker.set(S.accounts.map(function(a){return {value:a.id,label:a.name,sub:P.fmtId(a.id)+" · "+a.currency,avatar:P.initials(a.name),hue:P.hueOf(a.name)};}),S.acct.id);
-    paintRanges(); computeRanges();
-    load();
-  }).catch(showError);
+  var firstLoad=true;
+  accts=PL.accounts($("#acctPick"),{url:BASE+"/accounts",allow:["google","meta","both"],platform:h.pf,account:h.a||lastAccount(),
+    onLoaded:function(list,j){S.accounts=accts.accounts(); paintRanges(); computeRanges();},
+    onChange:function(a,platform){
+      S.accounts=accts.accounts();
+      if(!a){
+        S.acct=null; $("#dash").hidden=true; $("#liveText").textContent="No account chosen";
+        notice("warn","No account chosen",(platform==="meta"?"There are no Meta ad accounts this token can read yet.":"There are no accounts to show for this platform.")+" Pick another platform or account above."); return;
+      }
+      if(S.acct&&a.id===S.acct.id&&!firstLoad) return;
+      firstLoad=false;
+      S.acct=a; S.data=S.cmpData=null;
+      try{localStorage.setItem("ps_account",a.id);}catch(e){}
+      load();
+    },
+    onError:showError});
   paintRanges();
 }
 S.range=P.presetRange(S.preset);
