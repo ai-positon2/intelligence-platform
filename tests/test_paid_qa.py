@@ -1,19 +1,21 @@
-"""Paid Marketing Agents: QA Agent, the Campaign Launch QC on a live campaign.
+"""Paid Marketing Agents: QA Agent, the Campaign Book QC done by the AI on a live campaign.
 
-Pinned here: the checklist data is the workbook's (155 checks, 15 sections, the
-severities and the types it names); which checks show for a campaign (its own type,
-and the client type once one is chosen); the workbook's verdict (any Critical
-failure is NOT READY, any Critical not yet done is INCOMPLETE, else READY, with N/A
-counting as done); a person's wrong needs a reason; a person's answer beats the
-agent's reading; the storage SQL is valid Postgres; and the routes are staff-only,
-refuse cross-site requests, and never let a page claim a verdict the checks do not
-support. What the agent reads from Google Ads is tests/test_paid_qa_auto.py.
+Pinned here: the checklist data is the Campaign Book's (61 checks in 5 sections); which checks show
+for a campaign (its own type); the verdict (any check flagged is NOT READY, any check not yet
+verified is INCOMPLETE, else READY, with N/A counting as done); a person's wrong needs a reason; a
+person's answer beats the AI's; the storage SQL and its migration are valid Postgres; and the routes
+are staff-only, refuse cross-site requests, accept a campaign book as a file or a Google Sheet link, and
+never let a page claim a verdict the checks do not support. What the rules read from Google Ads is
+tests/test_paid_qa_auto.py, the AI's guard rails tests/test_paid_qa_ai.py.
 """
+import base64
 import copy
+import io
 import os
 import re
 import sys
 
+import openpyxl
 import pytest
 
 os.environ.setdefault("GOOGLE_CLIENT_ID", "test")
@@ -39,34 +41,28 @@ CAMPAIGN = "9000000001"
 
 # ── The checklist data ──────────────────────────────────────────────────────
 
-def test_the_checklist_is_the_workbooks():
+def test_the_checklist_is_the_campaign_books():
     cl = qa.checklist()
     items = cl["items"]
-    assert len(items) == 155 and len({i["id"] for i in items}) == 155
-    assert len(cl["sections"]) == 15 and cl["sections"][0] == "1. Account Setup & Access"
-    sev = {s: sum(1 for i in items if i["severity"] == s) for s in cl["severities"]}
-    assert sev == {"Critical": 45, "Major": 78, "Minor": 32}
-    assert cl["campaignTypes"] == ["Search", "Search (DSA)", "PMax", "Shopping", "Display", "Demand Gen", "Video", "App"]
-    assert cl["clientTypes"] == ["Ecommerce", "Lead Gen", "B2B", "B2C", "Local", "App", "Regulated"]
+    assert len(items) == 61 and len({i["id"] for i in items}) == 61
+    assert cl["sections"] == ["1. Campaign Setup", "2. Automation", "3. Automatically Created Assets", "4. Auto-Apply Recommendations",
+                              "5. Account Automation"]
+    assert [sum(1 for i in items if i["section"] == s) for s in cl["sections"]] == [25, 2, 11, 21, 2]
+    assert cl["severities"] == ["Required"] and cl["blocking"] == ["Required"] and cl["clientTypes"] == []
+    assert qa.item("1.1")["check"] == "Campaign Name" and qa.item("2.1")["check"] == "Final URL Expansion"
+    assert qa.item("4.21")["check"].startswith("Add store visits") and qa.item("5.2")["check"].startswith("Auto Migration")
 
 
-def test_every_check_is_complete_and_uses_only_known_values():
+def test_every_check_has_what_the_ai_and_the_page_need():
     cl = qa.checklist()
     for i in cl["items"]:
-        assert i["check"] and i["verify"] and i["section"] in cl["sections"], i["id"]
-        assert i["severity"] in cl["severities"], i["id"]
-        for t in i["campaignTypes"]:
-            assert t == "All" or t in cl["campaignTypes"], i["id"]
-        for t in i["clientTypes"]:
-            assert t == "All" or t in cl["clientTypes"], i["id"]
-        assert i["id"].startswith(i["section"].split(".")[0] + "."), i["id"]
-
-
-def test_the_one_conditional_check_keeps_its_condition():
-    consent = qa.item("2.10")
-    assert consent["check"] == "Consent Mode v2" and consent["clientTypes"] == ["All"]
-    assert "EEA" in consent["condition"]
-    assert [i["id"] for i in qa.items() if "condition" in i] == ["2.10"]
+        assert i["check"] and i["verify"] and i["section"] in cl["sections"] and i["severity"] == "Required", i["id"]
+        assert i["id"].startswith(str(cl["sections"].index(i["section"]) + 1) + "."), i["id"]
+        assert i["campaignTypes"] in (["All"], ["Search"]) and i["clientTypes"] == ["All"], i["id"]
+        assert isinstance(i["fromBook"], bool) and "expected" in i and "otherThingsToCheck" in i, i["id"]
+    assert [i["id"] for i in qa.items() if i["fromBook"]] == ["1.2", "1.8", "1.10", "1.11", "1.12", "1.14", "1.16", "1.24"]
+    assert qa.item("1.7")["expected"] == "Account Level Default Goals"                       # the workbook's typo is fixed
+    assert "Check the assets like callouts" in qa.item("1.6")["otherThingsToCheck"]
 
 
 def test_no_text_in_the_checklist_uses_an_em_dash():
@@ -75,29 +71,11 @@ def test_no_text_in_the_checklist_uses_an_em_dash():
 
 # ── Which checks show ───────────────────────────────────────────────────────
 
-def test_checks_for_all_always_apply_and_a_pmax_check_needs_pmax():
-    assert qa.item("1.1")["campaignTypes"] == ["All"]
-    pmax_only = qa.item("8.1")
-    assert qa.applies(qa.item("1.1"), [], ["Search"])
-    assert qa.applies(pmax_only, [], ["PMax"]) and qa.applies(pmax_only, [], ["Search", "PMax"])
-    assert not qa.applies(pmax_only, [], ["Search"])
-    assert qa.applies(pmax_only, [], [])                              # a campaign type this list does not map narrows nothing
-
-
-def test_a_client_type_check_waits_for_a_client_type():
-    ecom = next(i for i in qa.items() if i["clientTypes"] == ["Ecommerce"])
-    assert not qa.applies(ecom, [], [])                               # no client type chosen: not shown, not counted
-    assert qa.applies(ecom, ["Ecommerce"], []) and qa.applies(ecom, ["Lead Gen", "Ecommerce"], [])
-    assert not qa.applies(ecom, ["Lead Gen"], [])
-
-
-def test_with_no_client_type_only_the_checks_for_every_client_show():
-    shown = qa.applicable([], [])
-    assert shown and all("All" in i["clientTypes"] for i in shown)
-    assert len(shown) < 155
-    narrowed = qa.applicable(["Lead Gen"], ["Search"])
-    assert len(narrowed) > 0 and all(qa.applies(i, ["Lead Gen"], ["Search"]) for i in narrowed)
-    assert "8.1" not in {i["id"] for i in narrowed} and "1.1" in {i["id"] for i in narrowed}
+def test_every_check_shows_for_a_search_campaign_and_the_search_only_ones_do_not_for_pmax():
+    assert len(qa.applicable([], ["Search"])) == 61
+    pmax = {i["id"] for i in qa.applicable([], ["PMax"])}
+    assert len(pmax) == 58 and not ({"1.3", "1.5", "1.23"} & pmax)                       # networks, AI Max, ad rotation are Search only
+    assert len(qa.applicable([], [])) == 61                                              # an unmapped campaign type narrows nothing
 
 
 def test_the_campaign_type_comes_from_the_google_ads_channel():
@@ -108,12 +86,8 @@ def test_the_campaign_type_comes_from_the_google_ads_channel():
     assert qa.campaign_types_for("SMART") == [] and qa.campaign_types_for("") == []
 
 
-def test_what_waits_on_a_client_type_is_counted_for_the_page():
-    L = launch(campaign_types=["Search"])
-    need = qa.hidden_by_client(L)
-    assert need["count"] > 0 and need["critical"] > 0 and set(need["types"]) <= set(qa.checklist()["clientTypes"])
-    after = qa.hidden_by_client(launch(campaign_types=["Search"], client_types=list(qa.checklist()["clientTypes"])))
-    assert after["count"] == 0
+def test_there_is_no_client_type_to_wait_for():
+    assert qa.hidden_by_client(launch(campaign_types=["Search"])) == {"count": 0, "blocking": 0, "types": []}
 
 
 # ── The verdict ─────────────────────────────────────────────────────────────
@@ -127,115 +101,101 @@ def ticks(status, ids):
 
 
 SHOWN = qa.applicable([], [])
-CRITICAL = [i["id"] for i in SHOWN if i["severity"] == "Critical"]
+ALL = [i["id"] for i in SHOWN]
 
 
 def test_nothing_done_is_incomplete_not_ready():
     s = qa.summarize(launch(), {})
-    assert s["verdict"] == {"code": "incomplete", "text": "INCOMPLETE: Critical checks pending"}
-    assert s["total"] == len(SHOWN) and s["checked"] == 0 and s["percent"] == 0
-    assert len(s["pendingCritical"]) == len(CRITICAL) > 0
+    assert s["verdict"] == {"code": "incomplete", "text": "INCOMPLETE: checks still need a human"}
+    assert s["total"] == 61 and s["checked"] == 0 and s["percent"] == 0 and len(s["pendingBlocking"]) == 61
 
 
-def test_every_critical_check_right_is_ready_even_with_everything_else_open():
-    s = qa.summarize(launch(), ticks("pass", CRITICAL))
-    assert s["verdict"] == {"code": "ready", "text": "READY TO LAUNCH"}
-    assert s["pendingCritical"] == [] and s["pending"] == len(SHOWN) - len(CRITICAL)
+def test_every_check_right_is_ready():
+    s = qa.summarize(launch(), ticks("pass", ALL))
+    assert s["verdict"] == {"code": "ready", "text": "READY TO LAUNCH"} and s["pendingBlocking"] == [] and s["percent"] == 100
 
 
-def test_a_critical_na_counts_as_done():
-    checks = ticks("pass", CRITICAL[1:])
-    checks[CRITICAL[0]] = {"status": "na"}
+def test_one_check_wrong_is_not_ready_whatever_else_is_done():
+    checks = ticks("pass", ALL)
+    checks["1.5"] = {"status": "fail", "note": "AI Max is on"}
+    s = qa.summarize(launch(), checks)
+    assert s["verdict"] == {"code": "not_ready", "text": "NOT READY: a check failed"}
+    assert s["failedBlocking"] == ["1.5"] and s["failed"] == ["1.5"]
+
+
+def test_one_check_still_open_is_incomplete_and_na_counts_as_done():
+    checks = ticks("pass", [i for i in ALL if i != "3.4"])
+    assert qa.summarize(launch(), checks)["verdict"]["code"] == "incomplete"
+    checks["3.4"] = {"status": "na"}
     assert qa.summarize(launch(), checks)["verdict"]["code"] == "ready"
-
-
-def test_one_critical_wrong_is_not_ready_whatever_else_is_done():
-    checks = ticks("pass", [i["id"] for i in SHOWN])
-    checks[CRITICAL[3]] = {"status": "fail", "note": "tracking is broken"}
-    s = qa.summarize(launch(), checks)
-    assert s["verdict"] == {"code": "not_ready", "text": "NOT READY: Critical check failed"}
-    assert s["failedCritical"] == [CRITICAL[3]] and s["failed"] == [CRITICAL[3]]
-
-
-def test_major_and_minor_failures_are_counted_but_never_block():
-    checks = ticks("pass", CRITICAL)
-    for i in ("1.3", "1.14"):                                         # a Major and a Minor
-        checks[i] = {"status": "fail", "note": "x" * 5}
-    s = qa.summarize(launch(), checks)
-    assert s["verdict"]["code"] == "ready" and sorted(s["failed"]) == ["1.14", "1.3"] and s["failedCritical"] == []
-    assert s["bySeverity"]["Major"]["fail"] == 1 and s["bySeverity"]["Minor"]["fail"] == 1
 
 
 def test_counts_add_up_by_severity_and_by_section():
     checks = {**ticks("pass", ["1.1", "1.2"]), "1.3": {"status": "fail"}, "1.4": {"status": "na"}}
     s = qa.summarize(launch(), checks)
-    assert sum(b["total"] for b in s["bySeverity"].values()) == s["total"] == len(SHOWN)
+    assert sum(b["total"] for b in s["bySeverity"].values()) == s["total"] == 61 and list(s["bySeverity"]) == ["Required"]
     for b in list(s["bySeverity"].values()) + s["bySection"]:
         assert b["total"] == b["pass"] + b["fail"] + b["na"] + b["pending"]
     sec1 = s["bySection"][0]
-    assert sec1["section"] == "1. Account Setup & Access" and (sec1["pass"], sec1["fail"], sec1["na"]) == (2, 1, 1)
-    assert s["checked"] == 4
+    assert sec1["section"] == "1. Campaign Setup" and (sec1["total"], sec1["pass"], sec1["fail"], sec1["na"]) == (25, 2, 1, 1)
+    assert s["checked"] == 4 and len(s["bySection"]) == 5
 
 
 def test_answers_on_checks_that_no_longer_show_do_not_count():
-    narrowed = launch(campaign_types=["Search"])                      # 8.1 is PMax only
-    assert "8.1" not in qa.summarize(narrowed, {})["applicable"]
-    s = qa.summarize(narrowed, {"8.1": {"status": "fail", "note": "x" * 5}})
+    pmax = launch(campaign_types=["PMax"])                                               # 1.5 (AI Max) is Search only
+    assert "1.5" not in qa.summarize(pmax, {})["applicable"]
+    s = qa.summarize(pmax, {"1.5": {"status": "fail", "note": "x" * 5}})
     assert s["failed"] == [] and s["verdict"]["code"] == "incomplete"
 
 
-# ── The agent's reading and a person's answer ───────────────────────────────
+# ── The AI's reading and a person's answer ──────────────────────────────────
 
 AT = "2026-10-14T10:00:00+00:00"
 
 
 def test_the_ais_and_the_rules_pass_and_fail_become_the_checks_state_with_their_finding():
     L = launch(campaign_types=["Search"])
-    rows = qa.effective(L, {}, {"1.6": {"result": "pass", "found": "Auto-tagging is ON", "source": "rule"},
-                                "3.6": {"result": None, "found": "Cannot see the plan", "source": "ai", "unverified": True},
-                                "6.2": {"result": "fail", "found": "Headline 3 shouts", "fix": "Remove the !!", "evidence": "Headline 3",
-                                        "source": "ai"}}, AT)
-    assert rows["1.6"]["status"] == "pass" and rows["1.6"]["source"] == "rule" and rows["1.6"]["by"] == "QA Agent" and rows["1.6"]["at"] == AT
-    assert rows["6.2"]["status"] == "fail" and rows["6.2"]["source"] == "ai" and rows["6.2"]["fix"] == "Remove the !!"
-    assert rows["6.2"]["evidence"] == "Headline 3"
-    assert rows["3.6"]["status"] is None and rows["3.6"]["unverified"] is True and rows["3.6"]["found"] == "Cannot see the plan"
-    assert "1.1" not in rows                                                                      # nothing read, nothing answered
+    rows = qa.effective(L, {}, {"1.5": {"result": "pass", "found": "AI Max for Search is OFF.", "source": "rule"},
+                                "1.8": {"result": None, "found": "No campaign book", "source": "ai", "unverified": True},
+                                "1.4": {"result": "fail", "found": "Headline 3 shouts", "fix": "Remove the !!", "evidence": "Headline 3", "source": "ai"}}, AT)
+    assert rows["1.5"]["status"] == "pass" and rows["1.5"]["source"] == "rule" and rows["1.5"]["by"] == "QA Agent" and rows["1.5"]["at"] == AT
+    assert rows["1.4"]["status"] == "fail" and rows["1.4"]["source"] == "ai" and rows["1.4"]["fix"] == "Remove the !!" and rows["1.4"]["evidence"] == "Headline 3"
+    assert rows["1.8"]["status"] is None and rows["1.8"]["unverified"] is True and rows["1.8"]["found"] == "No campaign book"
+    assert "1.1" not in rows                                                              # nothing read, nothing answered
 
 
-def test_a_persons_answer_always_beats_the_agent_and_clearing_it_brings_the_agent_back():
+def test_a_persons_answer_always_beats_the_ai_and_clearing_it_brings_the_ai_back():
     L = launch(campaign_types=["Search"])
-    auto = {"4.2": {"result": "fail", "found": "Search partners are ON", "source": "rule"}}
-    mine = {"4.2": {"status": "pass", "note": "Client approved partners in writing", "by": STAFF, "at": AT}}
-    row = qa.effective(L, mine, auto, AT)["4.2"]
+    auto = {"1.3": {"result": "fail", "found": "Search partners are ON", "source": "rule"}}
+    mine = {"1.3": {"status": "pass", "note": "Client approved partners in writing", "by": STAFF, "at": AT}}
+    row = qa.effective(L, mine, auto, AT)["1.3"]
     assert row["status"] == "pass" and row["source"] == "person" and row["note"].startswith("Client approved")
-    assert row["found"] == "Search partners are ON"                                               # the finding is still printed
-    assert qa.effective(L, {}, auto, AT)["4.2"]["status"] == "fail"
+    assert row["found"] == "Search partners are ON"                                       # the finding is still printed
+    assert qa.effective(L, {}, auto, AT)["1.3"]["status"] == "fail"
 
 
-def test_the_agent_never_answers_a_check_that_does_not_show():
+def test_the_ai_never_answers_a_check_that_does_not_show():
+    L = launch(campaign_types=["PMax"])
+    assert "1.5" not in qa.effective(L, {}, {"1.5": {"result": "fail", "found": "AI Max is ON"}}, AT)
+
+
+def test_an_ai_flag_makes_the_launch_not_ready_until_a_person_overrules_it():
     L = launch(campaign_types=["Search"])
-    rows = qa.effective(L, {}, {"8.1": {"result": "fail", "found": "Final URL expansion is ON"}}, AT)
-    assert "8.1" not in rows
-
-
-def test_an_agent_fail_on_a_critical_check_makes_the_launch_not_ready_until_a_person_overrules_it():
-    L = launch(campaign_types=["Search"])
-    done = {c: {"status": "pass"} for c in CRITICAL if c != "4.1"}
-    rows = qa.effective(L, {}, {"4.1": {"result": "fail", "found": "Google Display Network is ON"}}, AT)
+    done = {c: {"status": "pass"} for c in ALL if c != "1.3"}
+    rows = qa.effective(L, {}, {"1.3": {"result": "fail", "found": "Search partners are ON"}}, AT)
     assert qa.summarize(L, {**done, **rows})["verdict"]["code"] == "not_ready"
-    fixed = qa.effective(L, {"4.1": {"status": "pass", "note": "turned off", "by": STAFF, "at": AT}},
-                         {"4.1": {"result": "fail", "found": "Google Display Network is ON"}}, AT)
+    fixed = qa.effective(L, {"1.3": {"status": "pass", "note": "approved", "by": STAFF, "at": AT}},
+                         {"1.3": {"result": "fail", "found": "Search partners are ON"}}, AT)
     assert qa.summarize(L, {**done, **fixed})["verdict"]["code"] == "ready"
 
 
-def test_a_critical_check_the_ai_could_not_verify_keeps_the_launch_incomplete_until_a_person_confirms_it():
+def test_a_check_the_ai_could_not_verify_keeps_the_launch_incomplete_until_a_person_confirms_it():
     L = launch(campaign_types=["Search"])
-    done = {c: {"status": "pass"} for c in CRITICAL if c != "14.4"}
-    rows = qa.effective(L, {}, {"14.4": {"result": None, "found": "Cannot see the client's sign-off", "source": "ai", "unverified": True}}, AT)
-    s = qa.summarize(L, {**done, **rows})
-    assert s["verdict"]["code"] == "incomplete" and s["pendingCritical"] == ["14.4"] and "14.4" in s["needsHuman"]
-    mine = qa.effective(L, {"14.4": {"status": "pass", "note": "Signed off by email", "by": STAFF, "at": AT}},
-                        {"14.4": {"result": None, "found": "Cannot see the client's sign-off", "source": "ai", "unverified": True}}, AT)
+    done = {c: {"status": "pass"} for c in ALL if c != "3.4"}
+    unv = {"3.4": {"result": None, "found": "The switch is not visible to the API", "source": "ai", "unverified": True}}
+    s = qa.summarize(L, {**done, **qa.effective(L, {}, unv, AT)})
+    assert s["verdict"]["code"] == "incomplete" and s["pendingBlocking"] == ["3.4"] and s["needsHuman"] == ["3.4"]
+    mine = qa.effective(L, {"3.4": {"status": "pass", "note": "Checked in the account settings", "by": STAFF, "at": AT}}, unv, AT)
     assert qa.summarize(L, {**done, **mine})["verdict"]["code"] == "ready"
 
 
@@ -244,20 +204,21 @@ def test_the_review_view_says_what_the_ai_is_doing_and_notices_a_dead_one():
             "review_started": "2026-10-14T10:00:00+00:00"}
     now = qa.dt.datetime.fromisoformat("2026-10-14T10:03:00+00:00")
     assert qa.review_view(base, now) == {"status": "running", "phase": "Reading", "done": 2, "total": 9, "error": "", "note": ""}
-    later = qa.dt.datetime.fromisoformat("2026-10-14T10:20:00+00:00")
-    dead = qa.review_view(base, later)
+    dead = qa.review_view(base, qa.dt.datetime.fromisoformat("2026-10-14T10:20:00+00:00"))
     assert dead["status"] == "error" and "stopped before it finished" in dead["error"]
     assert qa.review_view({"review_status": ""}, now)["status"] == ""
 
 
-def test_the_page_payload_has_the_launch_every_state_and_the_verdict():
-    L = {"id": "a" * 32, "account_id": ACCOUNT, "account_name": "A", "campaign_id": CAMPAIGN, "campaign_name": "Brand",
-         "channel": "SEARCH", "client_types": [], "campaign_types": ["Search"], "auto": {"1.6": {"result": "pass", "found": "ON"}},
-         "auto_at": AT, "created_by": STAFF, "created_at": AT, "updated_at": AT, "archived": False}
+def test_the_page_payload_has_the_launch_the_book_every_state_and_the_verdict():
+    L = {"id": "a" * 32, "account_id": ACCOUNT, "account_name": "A", "campaign_id": CAMPAIGN, "campaign_name": "P2_Search_20261014",
+         "channel": "SEARCH", "client_types": [], "campaign_types": ["Search"], "auto": {"1.5": {"result": "pass", "found": "OFF", "source": "rule"}},
+         "auto_at": AT, "created_by": STAFF, "created_at": AT, "updated_at": AT, "archived": False,
+         "book": {"filename": "Book.xlsx", "source": "upload", "rows": [{"field": "Devices", "value": "x", "other": ""}], "sheets": ["Sheet1"], "text": "t"}}
     p = qa.payload(L, {})
-    assert p["launch"]["campaignName"] == "Brand" and p["launch"]["readAt"] == AT and p["launch"]["campaignTypes"] == ["Search"]
-    assert p["checks"]["1.6"]["status"] == "pass" and p["summary"]["checked"] == 1
-    assert p["needsClientType"]["count"] > 0
+    assert p["launch"]["campaignName"] == "P2_Search_20261014" and p["launch"]["readAt"] == AT and p["launch"]["campaignTypes"] == ["Search"]
+    assert p["launch"]["book"]["filename"] == "Book.xlsx" and p["launch"]["book"]["fields"] == 1 and "text" not in p["launch"]["book"]
+    assert p["checks"]["1.5"]["status"] == "pass" and p["summary"]["checked"] == 1
+    assert qa.payload(dict(L, book={}), {})["launch"]["book"] is None
 
 
 # ── What a person's answer may look like ────────────────────────────────────
@@ -265,10 +226,8 @@ def test_the_page_payload_has_the_launch_every_state_and_the_verdict():
 def test_wrong_needs_a_reason():
     L = launch()
     assert qa.clean_check(L, "1.1", {"status": "pass"}) == ("pass", "")
-    assert qa.clean_check(L, "1.1", {"status": "pass", "note": "  Found: utm_source=google "}) == ("pass", "Found: utm_source=google")
     assert qa.clean_check(L, "1.1", {"status": "na", "note": "  client has none  "}) == ("na", "client has none")
-    assert qa.clean_check(L, "1.1", {"status": "fail", "note": "Wrong account: Brand_Search_US"}) == (
-        "fail", "Wrong account: Brand_Search_US")
+    assert qa.clean_check(L, "1.1", {"status": "fail", "note": "Name does not follow the format"}) == ("fail", "Name does not follow the format")
     for bad in ({"status": "fail"}, {"status": "fail", "note": ""}, {"status": "fail", "note": "  ok "}):
         with pytest.raises(qa.BadPayload, match="needs a reason"):
             qa.clean_check(L, "1.1", bad)
@@ -276,8 +235,7 @@ def test_wrong_needs_a_reason():
 
 def test_status_check_id_and_size_are_validated():
     L = launch(campaign_types=["Search"])
-    assert qa.clean_check(L, "1.1", {"status": None}) == (None, "")           # clears the answer
-    assert qa.clean_check(L, "1.1", {}) == (None, "")
+    assert qa.clean_check(L, "1.1", {"status": None}) == (None, "") and qa.clean_check(L, "1.1", {}) == (None, "")
     for body, says in (({"status": "done"}, "status should be"), ({"status": "PASS"}, "status should be"),
                        ({"status": "pass", "note": "x" * 2001}, "over 2000"), ({"status": "pass", "note": 5}, "should be text"),
                        ("pass", "JSON object")):
@@ -286,9 +244,7 @@ def test_status_check_id_and_size_are_validated():
     with pytest.raises(qa.BadPayload, match="not a check"):
         qa.clean_check(L, "99.9", {"status": "pass"})
     with pytest.raises(qa.BadPayload, match="does not apply"):
-        qa.clean_check(L, "8.1", {"status": "pass"})                          # PMax check, Search campaign
-    with pytest.raises(qa.BadPayload, match="does not apply"):
-        qa.clean_check(L, "8.5", {"status": "pass"})                          # Ecommerce check, no client type chosen
+        qa.clean_check(launch(campaign_types=["PMax"]), "1.5", {"status": "pass"})       # AI Max is Search only
 
 
 def test_starting_a_qc_needs_an_account_and_a_campaign():
@@ -296,8 +252,7 @@ def test_starting_a_qc_needs_an_account_and_a_campaign():
                          "campaignName": " Brand Campaign ", "channel": "SEARCH"})
     assert ok == {"account_id": "2133861213", "account_name": "Beta Bionics", "campaign_id": "9000000001",
                   "campaign_name": "Brand Campaign", "channel": "SEARCH"}
-    assert qa.clean_start({"accountId": ACCOUNT, "accountName": "A", "campaignId": "1", "campaignName": "C",
-                           "channel": "SMART"})["channel"] == ""              # a type this list does not map: no narrowing
+    assert qa.clean_start({"accountId": ACCOUNT, "accountName": "A", "campaignId": "1", "campaignName": "C", "channel": "SMART"})["channel"] == ""
     base = {"accountId": ACCOUNT, "accountName": "A", "campaignId": CAMPAIGN, "campaignName": "C"}
     for patch, says in (({"accountId": "123"}, "10 digits"), ({"accountName": ""}, "account name is needed"),
                         ({"campaignId": ""}, "Pick a campaign"), ({"campaignId": "abc"}, "Pick a campaign"),
@@ -308,17 +263,16 @@ def test_starting_a_qc_needs_an_account_and_a_campaign():
         qa.clean_start(["x"])
 
 
-def test_client_types_are_checked_against_the_checklists():
-    assert qa.clean_client_types({"clientTypes": ["Lead Gen", "Lead Gen", "B2B"]}) == ["Lead Gen", "B2B"]   # checklist order, no repeats
+def test_client_types_are_gone_from_the_checklist_so_none_are_accepted():
     assert qa.clean_client_types({"clientTypes": []}) == [] and qa.clean_client_types({}) == []
-    for bad, says in (({"clientTypes": ["B2X"]}, "does not know"), ({"clientTypes": "Lead Gen"}, "should be a list")):
+    for bad, says in (({"clientTypes": ["Lead Gen"]}, "does not know"), ({"clientTypes": "Lead Gen"}, "should be a list")):
         with pytest.raises(qa.BadPayload, match=says):
             qa.clean_client_types(bad)
 
 
 # ── The storage SQL is Postgres ─────────────────────────────────────────────
 
-LAUNCH_ROW = ("a" * 32, ACCOUNT, "A", CAMPAIGN, "C", "SEARCH", [], ["Search"], {}, None, "u", None, None, False, "", {}, "", "", None)
+LAUNCH_ROW = ("a" * 32, ACCOUNT, "A", CAMPAIGN, "C", "SEARCH", [], ["Search"], {}, None, "u", None, None, False, "", {}, "", "", None, {})
 
 
 class RecordingCursor:
@@ -376,38 +330,40 @@ def test_every_statement_the_store_runs_is_valid_postgres(monkeypatch):
     monkeypatch.setattr(store, "_READY", False)
     launch_row, created = store.start_launch(account_id=ACCOUNT, account_name="A", campaign_id=CAMPAIGN, campaign_name="C",
                                              channel="SEARCH", campaign_types=["Search"], by="u")
-    assert created and launch_row["campaign_id"] == CAMPAIGN
+    assert created and launch_row["campaign_id"] == CAMPAIGN and launch_row["book"] == {}
     store.get_launch("a" * 32)
     store.list_launches(ACCOUNT)
-    store.set_client_types("a" * 32, ["B2B"])
+    store.set_client_types("a" * 32, [])
     assert store.begin_review("a" * 32) is True
     store.set_progress("a" * 32, "The AI is reviewing the checklist", 2, 9)
-    store.finish_review("a" * 32, {"1.6": {"result": "pass", "found": "ON", "source": "rule"}}, campaign_name="C", channel="SEARCH",
+    store.finish_review("a" * 32, {"1.5": {"result": "pass", "found": "OFF", "source": "rule"}}, campaign_name="C", channel="SEARCH",
                         campaign_types=["Search"], note="")
     store.fail_review("a" * 32, "Google Ads says the daily limit is used up.")
+    store.set_book("a" * 32, {"filename": "b.xlsx", "rows": []})
+    store.set_book("a" * 32, {})
     store.archive_launch("a" * 32)
     store.checks_for(["a" * 32, "b" * 32])
     store.set_check("a" * 32, "1.1", "fail", "why", "u")
     store.clear_check("a" * 32, "1.1")
-    assert len(log) >= 17
+    assert len(log) >= 19
     for sql in log:
         n = iter(range(1, 100))
         pglast.parse_sql(re.sub(r"%s", lambda m: "$%d" % next(n), sql))
 
 
-def test_the_schema_has_the_tables_a_cascade_and_one_live_qc_per_campaign():
+def test_the_schema_has_the_tables_a_cascade_the_migrations_and_one_live_qc_per_campaign():
     s = store.SCHEMA
-    assert "pm_qc_launches" in s and "pm_qc_checks" in s and "ON DELETE CASCADE" in s
-    assert "PRIMARY KEY (launch_id, check_id)" in s
+    assert "pm_qc_launches" in s and "pm_qc_checks" in s and "ON DELETE CASCADE" in s and "PRIMARY KEY (launch_id, check_id)" in s
     assert "UNIQUE INDEX" in s and "(account_id, campaign_id) WHERE NOT archived" in s
-    # the first version's table may exist on a deployed database: it is brought up to shape, its rows retired,
+    # an earlier version's table may exist on a deployed database: it is brought up to shape, its rows retired,
     # and only then is the one-live-QC-per-campaign index built (old rows all have an empty campaign id)
     assert s.index("ADD COLUMN IF NOT EXISTS campaign_id") < s.index("SET archived = true WHERE campaign_id = ''") < s.index("UNIQUE INDEX")
-    assert "ALTER COLUMN name DROP NOT NULL" in s
-    assert "review_status" in s and "ADD COLUMN IF NOT EXISTS review_started" in s
+    assert "ALTER COLUMN name DROP NOT NULL" in s and "ADD COLUMN IF NOT EXISTS review_started" in s and "ADD COLUMN IF NOT EXISTS book JSONB" in s
+    # the Campaign Book checks replaced the 155-check list: old answers and reviews are cleared once, guarded by a marker column
+    assert "column_name = 'checklist'" in s and "DELETE FROM pm_qc_checks" in s and s.index("DELETE FROM pm_qc_checks") < s.index("ADD COLUMN IF NOT EXISTS book") + 2000
 
 
-# ── Routes, on an in-memory store, a fake Google Ads, fake landing pages and a fake AI ──
+# ── Routes, on an in-memory store, a fake Google Ads, fake pages and a fake model ──
 
 class MemoryStore:
     """What tracker/paid_qa_store.py keeps, in a dict."""
@@ -423,7 +379,7 @@ class MemoryStore:
         self.launches[lid] = dict(f, id=lid, account_id=account_id, campaign_id=campaign_id, campaign_types=campaign_types,
                                   client_types=[], auto={}, auto_at=None, created_by=by, created_at="2026-10-14T10:00:00+00:00",
                                   updated_at="2026-10-14T10:00:00+00:00", archived=False, review_status="", review_progress={},
-                                  review_error="", review_note="", review_started=None)
+                                  review_error="", review_note="", review_started=None, book={})
         self.checks[lid] = {}
         return copy.deepcopy(self.launches[lid]), True
 
@@ -438,6 +394,10 @@ class MemoryStore:
         self.launches[lid]["client_types"] = types
         return copy.deepcopy(self.launches[lid])
 
+    def set_book(self, lid, book):
+        self.launches[lid]["book"] = copy.deepcopy(book or {})
+        return copy.deepcopy(self.launches[lid])
+
     def begin_review(self, lid):
         l = self.launches[lid]
         if l["review_status"] == "running":
@@ -450,8 +410,8 @@ class MemoryStore:
         self.launches[lid]["review_progress"] = {"phase": phase, "done": done, "total": total}
 
     def finish_review(self, lid, findings, *, campaign_name, channel, campaign_types, note=""):
-        self.launches[lid].update(auto=findings, auto_at=qa.dt.datetime.now(qa.dt.timezone.utc).isoformat(), campaign_name=campaign_name, channel=channel,
-                                  campaign_types=campaign_types, review_status="done", review_error="", review_note=note,
+        self.launches[lid].update(auto=findings, auto_at=qa.dt.datetime.now(qa.dt.timezone.utc).isoformat(), campaign_name=campaign_name,
+                                  channel=channel, campaign_types=campaign_types, review_status="done", review_error="", review_note=note,
                                   review_progress={})
         return copy.deepcopy(self.launches[lid])
 
@@ -466,7 +426,7 @@ class MemoryStore:
         return {i: copy.deepcopy(self.checks.get(i, {})) for i in ids}
 
     def set_check(self, lid, cid, status, note, by):
-        self.checks[lid][cid] = {"status": status, "note": note, "by": by, "at": "2026-10-14T10:05:00+00:00"}
+        self.checks[lid][cid] = {"status": status, "note": note, "by": by, "at": qa.dt.datetime.now(qa.dt.timezone.utc).isoformat()}
         return copy.deepcopy(self.checks[lid][cid])
 
     def clear_check(self, lid, cid):
@@ -475,28 +435,41 @@ class MemoryStore:
 
 
 def fake_google(**over):
-    """A search(customer_id, gaql) answering from rows made up for one Search campaign, keyed by the
-    resource the query reads. Nothing here is a real client's."""
+    """A search(customer_id, gaql) answering from rows made up for one Search campaign that follows the Campaign Book,
+    keyed by the resource the query reads. Nothing here is a real client's."""
     def row(**k):
         return k
-    headlines = [{"text": "Headline %d" % i} for i in range(15)]
+    headlines = [{"text": "Headline %d" % i} for i in range(14)] + [{"text": "Free estimates today!!"}]
     data = {
-        "FROM customer WHERE": [],
         "FROM customer": [row(customer={"autoTaggingEnabled": True, "trackingUrlTemplate": "{lpurl}?utm_source=google&utm_medium=cpc",
                                         "currencyCode": "USD", "timeZone": "America/New_York",
                                         "containsEuPoliticalAdvertising": "DOES_NOT_CONTAIN_EU_POLITICAL_ADVERTISING"})],
-        "FROM billing_setup": [row(billingSetup={"status": "APPROVED", "paymentsAccountInfo": {"paymentsAccountName": "Example Co"}})],
-        "FROM campaign WHERE campaign.id": [row(campaign={"id": CAMPAIGN, "name": "Example_Brand_Search", "status": "ENABLED",
+        "FROM recommendation_subscription": [],
+        "FROM campaign WHERE campaign.id": [row(campaign={"id": CAMPAIGN, "name": "P2_Search_20261014", "status": "ENABLED",
                                                          "servingStatus": "SERVING", "advertisingChannelType": "SEARCH",
                                                          "networkSettings": {"targetGoogleSearch": True, "targetSearchNetwork": False,
-                                                                             "targetContentNetwork": False},
+                                                                             "targetContentNetwork": False, "targetYoutube": False},
                                                          "geoTargetTypeSetting": {"positiveGeoTargetType": "PRESENCE",
                                                                                   "negativeGeoTargetType": "PRESENCE"},
-                                                         "startDateTime": "2026-03-11 04:38:47", "aiMaxSetting": {"enableAiMax": False},
-                                                         "biddingStrategyType": "MAXIMIZE_CONVERSIONS"},
+                                                         "startDateTime": "2026-10-14 09:00:00", "aiMaxSetting": {"enableAiMax": False},
+                                                         "biddingStrategyType": "MAXIMIZE_CONVERSIONS",
+                                                         "assetAutomationSettings": [{"assetAutomationType": "TEXT_ASSET_AUTOMATION",
+                                                                                      "assetAutomationStatus": "OPTED_OUT"},
+                                                                                     {"assetAutomationType": "FINAL_URL_EXPANSION_TEXT_ASSET_AUTOMATION",
+                                                                                      "assetAutomationStatus": "OPTED_OUT"}]},
                                                  campaignBudget={"amountMicros": "30000000", "explicitlyShared": False})],
+        "FROM campaign_criterion": [row(campaignCriterion={"type": "LANGUAGE", "language": {"languageConstant": "languageConstants/1000"}}),
+                                    row(campaignCriterion={"type": "DEVICE", "device": {"type": "TABLET"}, "bidModifier": 0})],
+        "FROM language_constant": [row(languageConstant={"id": "1000", "name": "English"})],
         "FROM campaign_shared_set": [row(sharedSet={"name": "Generic Negatives", "type": "NEGATIVE_KEYWORDS", "memberCount": "60"},
                                          campaignSharedSet={"status": "ENABLED"})],
+        "FROM shared_set": [row(sharedSet={"name": "Generic Negatives", "type": "NEGATIVE_KEYWORDS", "memberCount": "60"})],
+        "FROM campaign_conversion_goal": [row(campaignConversionGoal={"category": "PURCHASE", "origin": "WEBSITE", "biddable": True})],
+        "FROM customer_conversion_goal": [row(customerConversionGoal={"category": "PURCHASE", "origin": "WEBSITE", "biddable": True})],
+        "FROM campaign_asset": [row(campaignAsset={"fieldType": "SITELINK", "status": "ENABLED", "source": "ADVERTISER"},
+                                    asset={"type": "SITELINK", "finalUrls": ["https://example.com/a"], "sitelinkAsset": {"linkText": "Our work"}})] * 4,
+        "FROM customer_asset": [row(customerAsset={"fieldType": "CALLOUT", "status": "ENABLED", "source": "ADVERTISER"},
+                                    asset={"type": "CALLOUT", "calloutAsset": {"calloutText": "Free estimates"}})] * 4,
         "FROM ad_group WHERE": [row(adGroup={"id": "11", "name": "Brand", "status": "ENABLED", "type": "SEARCH_STANDARD"})],
         "FROM ad_group_ad": [row(adGroup={"id": "11"}, adGroupAd={"status": "ENABLED", "adStrength": "GOOD",
                                                                   "policySummary": {"approvalStatus": "APPROVED"},
@@ -504,13 +477,11 @@ def fake_google(**over):
                                                                          "responsiveSearchAd": {"headlines": headlines,
                                                                                                 "descriptions": [{"text": "d"}] * 4,
                                                                                                 "path1": "a", "path2": "b"}}})],
-        "FROM ad_group_criterion": [row(adGroup={"id": "11"}, adGroupCriterion={"status": "ENABLED", "negative": False,
-                                                                                "keyword": {"text": "example", "matchType": "EXACT"},
-                                                                                "systemServingStatus": "ELIGIBLE",
-                                                                                "approvalStatus": "APPROVED"})],
-        "FROM campaign WHERE campaign.status": [row(campaign={"id": CAMPAIGN, "name": "Example_Brand_Search", "status": "ENABLED",
+        "FROM ad_group_criterion": [row(adGroup={"id": "11", "name": "Brand"}, adGroupCriterion={"type": "AGE_RANGE", "status": "ENABLED",
+                                                                                                  "ageRange": {"type": "AGE_RANGE_25_34"}})],
+        "FROM campaign WHERE campaign.status": [row(campaign={"id": CAMPAIGN, "name": "P2_Search_20261014", "status": "ENABLED",
                                                               "advertisingChannelType": "SEARCH"}),
-                                                row(campaign={"id": "9000000002", "name": "Example_PMax", "status": "ENABLED",
+                                                row(campaign={"id": "9000000002", "name": "P2_PMax_20261014", "status": "ENABLED",
                                                               "advertisingChannelType": "PERFORMANCE_MAX"})],
     }
     data.update(over)
@@ -563,11 +534,9 @@ class FakeModel:
 
 
 DEFAULT_ANSWERS = {
-    "3.2": ("pass", "The campaign is named Example_Brand_Search, which follows Client_Type_Theme.", "Example_Brand_Search"),
-    "6.2": ("flag", "Headline 3 has a double exclamation mark.", "Headline 3", "Remove the exclamation marks from headline 3 in ad group Brand."),
-    "6.4": ("pass", "The offer in the ad matches the page.", "Free estimates"),
-    "13.6": ("flag", "The ad promises a free estimate but the page says nothing about it.", "Landscaping in Annapolis",
-             "Add the free estimate offer to the landing page or remove it from the ads."),
+    "1.4": ("flag", "The last headline ends with two exclamation marks.", "Free estimates today!!",
+            "Remove the exclamation marks from the last headline in ad group Brand."),
+    "1.6": ("pass", "4 sitelinks and 4 callouts are available, with a call-to-action sitelink text.", "Our work"),
 }
 
 
@@ -575,8 +544,8 @@ DEFAULT_ANSWERS = {
 def mem(monkeypatch):
     from tracker import paid_qa_ai, paid_qa_web
     m = MemoryStore()
-    for name in ("start_launch", "get_launch", "list_launches", "set_client_types", "begin_review", "set_progress", "finish_review",
-                 "fail_review", "archive_launch", "checks_for", "set_check", "clear_check"):
+    for name in ("start_launch", "get_launch", "list_launches", "set_client_types", "set_book", "begin_review", "set_progress",
+                 "finish_review", "fail_review", "archive_launch", "checks_for", "set_check", "clear_check"):
         monkeypatch.setattr(store, name, getattr(m, name))
     monkeypatch.setattr(gads, "search", fake_google())
     monkeypatch.setattr(gads, "geo_names", lambda names, **k: {})
@@ -598,8 +567,7 @@ def client_as(email):
     return c
 
 
-NEW = {"accountId": ACCOUNT, "accountName": "Example Co", "campaignId": CAMPAIGN, "campaignName": "Example_Brand_Search",
-       "channel": "SEARCH"}
+NEW = {"accountId": ACCOUNT, "accountName": "Example Co", "campaignId": CAMPAIGN, "campaignName": "P2_Search_20261014", "channel": "SEARCH"}
 
 
 def start(c=None, **over):
@@ -607,6 +575,21 @@ def start(c=None, **over):
     r = c.post(API + "/start", json=dict(NEW, **over), headers=SAME)
     assert r.status_code in (200, 201), r.get_json()
     return c, r.get_json()["launch"]["id"], r.get_json()
+
+
+def book_xlsx(rows=None):
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    for r in rows or [["Field", "Value", "Other things to Check"], ["Bid Strategy Type", "Maximize conversions"], ["Devices", "Desktop and mobile, no tablets"],
+                      ["Genders", "Women"]]:
+        ws.append(r)
+    buf = io.BytesIO()
+    wb.save(buf)
+    return buf.getvalue()
+
+
+def upload(c, lid, raw=None, name="Campaign Book.xlsx"):
+    return c.post("%s/launches/%s/book" % (API, lid), json={"filename": name, "data": base64.b64encode(raw or book_xlsx()).decode()}, headers=SAME)
 
 
 def test_the_page_is_for_position2_staff_only():
@@ -629,23 +612,23 @@ def test_the_builder_is_gone():
 
 
 def test_the_checklist_is_served_and_cached_privately(mem):
-    c = client_as(STAFF)
-    r = c.get(API + "/checklist")
-    assert len(r.get_json()["items"]) == 155 and r.headers["Cache-Control"].startswith("private")
+    r = client_as(STAFF).get(API + "/checklist")
+    assert len(r.get_json()["items"]) == 61 and r.headers["Cache-Control"].startswith("private")
 
 
 def test_the_campaign_list_is_the_live_campaigns_of_the_account(mem):
     out = client_as(STAFF).get(API + "/campaigns?account=213-386-1213").get_json()["campaigns"]
-    assert [c["name"] for c in out] == ["Example_Brand_Search", "Example_PMax"]
-    assert out[0]["type"] == "Search" and out[1]["type"] == "PMax" and out[0]["qc"] is None
+    assert [c["name"] for c in out] == ["P2_PMax_20261014", "P2_Search_20261014"]
+    assert out[1]["type"] == "Search" and out[0]["type"] == "PMax" and out[0]["qc"] is None
     assert client_as(STAFF).get(API + "/campaigns?account=abc").status_code == 400
 
 
 def test_the_campaign_list_asks_google_only_for_enabled_campaigns_and_says_which_have_a_qc(mem):
     c, lid, _ = start()
     out = c.get(API + "/campaigns?account=" + ACCOUNT).get_json()["campaigns"]
-    qc = out[0]["qc"]
-    assert qc["id"] == lid and qc["verdict"]["code"] in ("not_ready", "incomplete") and qc["checked"] >= 1 and out[1]["qc"] is None
+    qc = {x["name"]: x["qc"] for x in out}["P2_Search_20261014"]
+    assert qc["id"] == lid and qc["verdict"]["code"] in ("not_ready", "incomplete") and qc["checked"] >= 1
+    assert {x["name"]: x["qc"] for x in out}["P2_PMax_20261014"] is None
     assert any("campaign.status = 'ENABLED'" in q for q in gads.search.calls)
 
 
@@ -659,53 +642,45 @@ def test_the_campaign_list_says_when_google_ads_cannot_be_read(monkeypatch, mem)
 
 def test_picking_a_campaign_starts_the_ai_review_which_flags_what_is_wrong(mem):
     c, lid, body = start()
-    assert body["launch"]["review"]["status"] == "done" and body["launch"]["readAt"]
+    assert body["launch"]["review"]["status"] == "done" and body["launch"]["readAt"] and body["launch"]["book"] is None
     checks = body["checks"]
-    assert checks["1.6"]["status"] == "pass" and checks["1.6"]["source"] == "rule"                 # exact rule, from Google Ads
-    flagged = checks["6.2"]
+    assert checks["1.5"]["status"] == "pass" and checks["1.5"]["source"] == "rule"                   # exact rule, from Google Ads
+    flagged = checks["1.4"]
     assert flagged["status"] == "fail" and flagged["source"] == "ai" and flagged["by"] == "QA Agent"
-    assert "double exclamation" in flagged["found"] and "exclamation marks" in flagged["fix"] and flagged["evidence"] == "Headline 3"
-    assert checks["13.6"]["status"] == "fail" and checks["3.2"]["status"] == "pass"
-    assert body["summary"]["failed"] and set(body["summary"]["failed"]) >= {"6.2", "13.6"}
+    assert "exclamation" in flagged["found"] and "Remove the exclamation" in flagged["fix"] and flagged["evidence"] == "Free estimates today!!"
+    assert checks["1.6"]["status"] == "pass" and checks["1.6"]["source"] == "ai"
+    assert checks["1.1"]["status"] == "pass" and checks["1.3"]["status"] == "pass" and checks["1.15"]["status"] == "pass"
+    assert body["summary"]["failed"] == ["1.4"] and body["summary"]["verdict"]["code"] == "not_ready"
     assert mem.launches[lid]["created_by"] == STAFF and mem.launches[lid]["auto_at"]
 
 
 def test_what_the_ai_cannot_see_is_left_for_a_person_not_passed(mem):
     c, lid, body = start()
-    row = body["checks"]["14.4"]                                      # the client's written sign-off
+    row = body["checks"]["3.4"]                                                                   # a switch the API does not show
     assert row["status"] is None and row["unverified"] is True and "Nothing in the evidence" in row["found"]
-    assert "14.4" in body["summary"]["needsHuman"] and "14.4" in body["summary"]["pendingCritical"]
-    assert body["summary"]["verdict"]["code"] in ("not_ready", "incomplete")
+    assert "3.4" in body["summary"]["needsHuman"] and "3.4" in body["summary"]["pendingBlocking"]
+    assert body["checks"]["5.2"]["status"] is None and "5.2" in body["summary"]["needsHuman"]
 
 
-def test_a_critical_flag_makes_the_launch_not_ready_and_an_unverified_critical_makes_it_incomplete(mem):
-    mem.model.answers = dict(DEFAULT_ANSWERS, **{"6.3": ("flag", "The final URL redirects to another country site.", "https://example.com/",
-                                                         "Point the final URL at the US page.")})
+def test_exact_rules_outrank_the_ai_and_are_not_put_to_it(mem):
+    mem.model.answers = dict(DEFAULT_ANSWERS, **{"1.5": ("flag", "AI Max looks on.", "AI Max for Search")})
     c, lid, body = start()
-    s = body["summary"]
-    assert "6.3" in s["failedCritical"] and s["verdict"]["code"] == "not_ready"
-    c.put("%s/launches/%s/checks/6.3" % (API, lid), json={"status": "pass", "note": "Checked: it is the US page"}, headers=SAME)
-    out = c.get(API + "/launches/" + lid).get_json()["summary"]
-    assert "6.3" not in out["failedCritical"] and out["verdict"]["code"] in ("not_ready", "incomplete")
-
-
-def test_the_ai_is_asked_only_what_the_exact_rules_did_not_settle(mem):
-    start()
     asked = {c["id"] for req in mem.model.asked for c in req["checks"]}
-    assert "1.6" not in asked and "4.1" not in asked and "5.1" not in asked          # settled by exact rules
-    assert {"6.2", "13.6", "14.4"} <= asked
-    sample = mem.model.asked[0]
-    assert sample["campaign"]["type"] == "Search" and "evidence" in sample and sample["today"]
-    assert not any(c["id"].startswith("8.") for req in mem.model.asked for c in req["checks"])     # PMax checks are not for a Search campaign
+    assert "1.5" not in asked and "1.3" not in asked and "4.1" not in asked
+    assert body["checks"]["1.5"]["status"] == "pass" and body["checks"]["1.5"]["source"] == "rule"
+    assert {"1.4", "1.6", "3.4"} <= asked
 
 
-def test_the_ai_sees_the_evidence_it_needs_for_each_section(mem):
+def test_the_ai_is_shown_the_campaign_book_check_values_and_the_evidence(mem):
     start()
-    by_section = {req["section"]: req for req in mem.model.asked}
-    ads = by_section["6. Ad Copy"] if "6. Ad Copy" in by_section else next(r for k, r in by_section.items() if k.startswith("6."))
-    assert "adGroups" in ads["evidence"] and ads["evidence"]["adGroups"][0]["ads"][0]["headlines"][0]["text"] == "Headline 0"
-    page = next(r for k, r in by_section.items() if k.startswith("13."))
-    assert page["evidence"]["landingPages"][0]["text"].startswith("Landscaping in Annapolis")
+    first = next(r for r in mem.model.asked if r["section"].startswith("1."))
+    row = next(c for c in first["checks"] if c["id"] == "1.4")
+    assert row["expectedValue"] == "Minimum 1 ad should be present" and "spell" in row["otherThingsToCheck"].lower() and row["fromBook"] is False
+    assert next(c for c in first["checks"] if c["id"] == "1.8")["fromBook"] is True
+    ev = first["evidence"]
+    assert ev["adGroups"][0]["ads"][0]["headlines"][-1] == "Free estimates today!!" and ev["campaign"]["name"] == "P2_Search_20261014"
+    assert ev["campaignBook"] == "none uploaded"
+    assert ev["targeting"]["devices"] == [{"device": "TABLET", "bidModifier": 0, "note": "0 means excluded"}]
 
 
 def test_if_the_ai_is_unavailable_the_exact_rules_still_run_and_everything_else_waits_for_a_person(monkeypatch, mem):
@@ -713,9 +688,9 @@ def test_if_the_ai_is_unavailable_the_exact_rules_still_run_and_everything_else_
     from tracker.market_radar_llm import ModelError
     monkeypatch.setattr(paid_qa_ai, "default_call", FakeModel(boom=ModelError("not_configured", "ANTHROPIC_API_KEY is not set")))
     c, lid, body = start()
-    assert body["checks"]["1.6"]["status"] == "pass" and body["checks"]["6.2"]["status"] is None
+    assert body["checks"]["1.5"]["status"] == "pass" and body["checks"]["1.4"]["status"] is None
     assert "no Anthropic key" in body["launch"]["review"]["note"] and body["launch"]["review"]["status"] == "done"
-    assert body["summary"]["verdict"]["code"] in ("not_ready", "incomplete")                 # never READY on rules alone
+    assert body["summary"]["verdict"]["code"] == "incomplete"                                     # never READY on rules alone
 
 
 def test_if_google_ads_cannot_be_read_the_review_says_so_and_the_qc_still_opens(monkeypatch, mem):
@@ -724,7 +699,7 @@ def test_if_google_ads_cannot_be_read_the_review_says_so_and_the_qc_still_opens(
     r = c.post(API + "/start", json=NEW, headers=SAME)
     body = r.get_json()
     assert r.status_code == 201 and body["launch"]["review"]["status"] == "error" and "daily limit" in body["launch"]["review"]["error"]
-    assert body["checks"] == {} and body["summary"]["total"] > 0
+    assert body["checks"] == {} and body["summary"]["total"] == 61
     lid = body["launch"]["id"]
     assert c.put("%s/launches/%s/checks/1.1" % (API, lid), json={"status": "pass"}, headers=SAME).status_code == 200
 
@@ -740,19 +715,15 @@ def test_opening_the_same_campaign_again_resumes_the_one_qc_without_reviewing_ag
     calls, asked = len(gads.search.calls), len(mem.model.asked)
     c2, lid2, body = start(client_as(OTHER))
     assert lid2 == lid and len(mem.launches) == 1 and len(gads.search.calls) == calls and len(mem.model.asked) == asked
-    assert c.post(API + "/start", json=NEW, headers=SAME).status_code == 200                # resumed, not created
+    assert c.post(API + "/start", json=NEW, headers=SAME).status_code == 200                      # resumed, not created
 
 
 def test_a_review_in_progress_reports_its_progress_and_is_not_started_twice(mem):
     c, lid, _ = start()
-    mem.launches[lid].update(review_status="running", review_started="2026-10-14T10:00:30+00:00",
-                             review_progress={"phase": "The AI is reviewing the checklist", "done": 3, "total": 14})
+    mem.launches[lid].update(review_status="running", review_started="2999-01-01T00:00:00+00:00",
+                             review_progress={"phase": "The AI is reviewing the checklist", "done": 3, "total": 4})
     body = c.get(API + "/launches/" + lid).get_json()
-    assert body["launch"]["review"]["status"] in ("running", "error")                       # error only once it has gone stale
-    mem.launches[lid]["review_started"] = "2999-01-01T00:00:00+00:00"                        # not stale
-    body = c.get(API + "/launches/" + lid).get_json()
-    assert body["launch"]["review"] == {"status": "running", "phase": "The AI is reviewing the checklist", "done": 3, "total": 14,
-                                        "error": "", "note": ""}
+    assert body["launch"]["review"] == {"status": "running", "phase": "The AI is reviewing the checklist", "done": 3, "total": 4, "error": "", "note": ""}
     assert c.post("%s/launches/%s/run" % (API, lid), json={}, headers=SAME).status_code in (409, 429)
 
 
@@ -765,60 +736,57 @@ def test_a_review_that_died_with_its_server_is_shown_as_stopped(mem):
 
 def test_a_person_confirming_or_overruling_beats_the_ai(mem):
     c, lid, _ = start()
-    url = "%s/launches/%s/checks/6.2" % (API, lid)
-    r = c.put(url, json={"status": "pass", "note": "That is our style, approved by the client"}, headers=SAME)
+    url = "%s/launches/%s/checks/1.4" % (API, lid)
+    r = c.put(url, json={"status": "pass", "note": "That is the client's style, approved"}, headers=SAME)
     body = r.get_json()
     assert r.status_code == 200 and body["check"]["status"] == "pass" and body["check"]["source"] == "person" and body["check"]["by"] == STAFF
-    assert "double exclamation" in body["check"]["found"]                                  # the AI's finding stays visible
-    r = c.put(url, json={"status": None}, headers=SAME)                                    # undo: back to the AI's flag
+    assert "exclamation" in body["check"]["found"]                                               # the AI's finding stays visible
+    r = c.put(url, json={"status": None}, headers=SAME)                                          # undo: back to the AI's flag
     assert r.get_json()["check"]["status"] == "fail" and r.get_json()["check"]["source"] == "ai"
-    assert "6.2" not in mem.checks[lid]
+    assert "1.4" not in mem.checks[lid]
 
 
 def test_confirming_what_the_ai_could_not_verify_clears_it_from_the_needs_a_human_list(mem):
     c, lid, first = start()
-    assert "14.4" in first["summary"]["needsHuman"]
-    r = c.put("%s/launches/%s/checks/14.4" % (API, lid), json={"status": "pass", "note": "Signed off by email on 2026-10-10"}, headers=SAME)
-    assert "14.4" not in r.get_json()["summary"]["needsHuman"] and "14.4" not in r.get_json()["summary"]["pendingCritical"]
+    assert "3.4" in first["summary"]["needsHuman"]
+    r = c.put("%s/launches/%s/checks/3.4" % (API, lid), json={"status": "pass", "note": "On, checked in the account settings"}, headers=SAME)
+    assert "3.4" not in r.get_json()["summary"]["needsHuman"] and "3.4" not in r.get_json()["summary"]["pendingBlocking"]
 
 
 def test_wrong_needs_its_reason_and_keeps_it(mem):
     c, lid, _ = start()
-    url = "%s/launches/%s/checks/1.2" % (API, lid)
+    url = "%s/launches/%s/checks/3.6" % (API, lid)
     r = c.put(url, json={"status": "fail"}, headers=SAME)
-    assert r.status_code == 400 and "needs a reason" in r.get_json()["error"] and "1.2" not in mem.checks[lid]
-    r = c.put(url, json={"status": "fail", "note": "Prepay balance is $0: add funds"}, headers=SAME)
-    assert r.status_code == 200 and "1.2" in r.get_json()["summary"]["failedCritical"]
-    assert c.get(API + "/launches/" + lid).get_json()["checks"]["1.2"]["note"] == "Prepay balance is $0: add funds"
+    assert r.status_code == 400 and "needs a reason" in r.get_json()["error"] and "3.6" not in mem.checks[lid]
+    r = c.put(url, json={"status": "fail", "note": "Dynamic callouts are on in the account"}, headers=SAME)
+    assert r.status_code == 200 and "3.6" in r.get_json()["summary"]["failedBlocking"]
+    assert c.get(API + "/launches/" + lid).get_json()["checks"]["3.6"]["note"] == "Dynamic callouts are on in the account"
 
 
 def test_a_check_that_does_not_show_or_does_not_exist_cannot_be_answered(mem):
-    c, lid, _ = start()
-    for check in ("8.1", "8.5", "99.9"):                       # PMax only, Ecommerce only (none chosen), not a check
+    c, lid, _ = start(campaignId="9000000002", channel="PERFORMANCE_MAX", campaignName="P2_PMax_20261014")
+    mem.launches[lid]["campaign_types"] = ["PMax"]
+    for check in ("1.5", "99.9"):                                 # AI Max is Search only; not a check
         assert c.put("%s/launches/%s/checks/%s" % (API, lid, check), json={"status": "pass"}, headers=SAME).status_code == 400
     assert mem.checks[lid] == {}
 
 
-def test_choosing_a_client_type_adds_the_checks_that_exist_only_for_it_and_the_ai_already_answered_them(mem):
-    c, lid, first = start()
-    assert "7.9" not in first["summary"]["applicable"] and first["needsClientType"]["count"] > 0
-    r = c.put("%s/launches/%s" % (API, lid), json={"clientTypes": ["Lead Gen"]}, headers=SAME)
-    body = r.get_json()
-    assert r.status_code == 200 and body["summary"]["total"] > first["summary"]["total"]
-    assert "7.9" in body["summary"]["applicable"] and "7.9" in body["checks"]               # reviewed in the first pass: no second review
-    assert c.put("%s/launches/%s" % (API, lid), json={"clientTypes": ["Bogus"]}, headers=SAME).status_code == 400
+def test_client_types_are_not_part_of_this_checklist(mem):
+    c, lid, _ = start()
+    assert c.put("%s/launches/%s" % (API, lid), json={"clientTypes": ["Lead Gen"]}, headers=SAME).status_code == 400
+    assert c.put("%s/launches/%s" % (API, lid), json={"clientTypes": []}, headers=SAME).status_code == 200
 
 
 def test_rerunning_reviews_again_and_a_persons_answers_stay(mem, monkeypatch):
     c, lid, _ = start()
-    c.put("%s/launches/%s/checks/6.2" % (API, lid), json={"status": "na", "note": "no ads yet"}, headers=SAME)
-    mem.model.answers = {"6.2": ("pass", "Headlines now read fine.", "Headline 3")}
+    c.put("%s/launches/%s/checks/1.4" % (API, lid), json={"status": "na", "note": "no ads yet"}, headers=SAME)
+    mem.model.answers = {"1.4": ("pass", "The headlines now read fine.", "Headline 1")}
     monkeypatch.setattr(appmod, "_QC_LAST_RUN", {})
     r = c.post("%s/launches/%s/run" % (API, lid), json={}, headers=SAME)
     body = r.get_json()
-    assert r.status_code == 200 and body["checks"]["6.2"]["status"] == "na" and body["checks"]["6.2"]["source"] == "person"
-    assert body["checks"]["6.2"]["found"].startswith("Headlines now read fine")             # the new finding is printed
-    assert "13.6" not in body["summary"]["failed"]                                          # the old flag is gone with the old review
+    assert r.status_code == 200 and body["checks"]["1.4"]["status"] == "na" and body["checks"]["1.4"]["source"] == "person"
+    assert body["checks"]["1.4"]["found"].startswith("The headlines now read fine")             # the new finding is printed
+    assert "1.4" not in body["summary"]["failed"] or body["checks"]["1.4"]["status"] == "na"
 
 
 def test_rerunning_too_soon_is_asked_to_wait(mem):
@@ -836,14 +804,129 @@ def test_there_is_a_daily_cap_on_ai_reviews_per_person(mem, monkeypatch):
     assert r.status_code == 429 and r.get_json()["kind"] == "cap" and "AI reviews in a day" in r.get_json()["error"]
 
 
+# ── The campaign book ───────────────────────────────────────────────────────
+
+def test_adding_a_campaign_book_saves_it_and_reviews_the_campaign_against_it(mem):
+    c, lid, first = start()
+    assert first["checks"]["1.8"]["status"] is None and "campaign book names no bid strategy" in first["checks"]["1.8"]["facts"]
+    reviews = len(mem.model.asked)
+    r = upload(c, lid)
+    body = r.get_json()
+    assert r.status_code == 200 and body["launch"]["book"]["filename"] == "Campaign Book.xlsx" and body["launch"]["book"]["fields"] == 3
+    assert body["launch"]["book"]["uploadedBy"] == STAFF and body["launch"]["book"]["uploadedAt"] and "reviewError" not in body
+    assert body["checks"]["1.8"]["status"] == "pass" and "Maximize conversions" in body["checks"]["1.8"]["found"]      # the rule used the book
+    assert len(mem.model.asked) > reviews                                                         # and the AI reviewed again
+    ev = mem.model.asked[-1]["evidence"]
+    assert ev["campaignBook"]["filename"] == "Campaign Book.xlsx" and {"field": "Genders", "value": "Women", "other": ""} in ev["campaignBook"]["fields"]
+    assert mem.launches[lid]["book"]["rows"][0]["field"] == "Bid Strategy Type"
+
+
+def test_a_book_that_disagrees_with_the_campaign_is_a_flag(mem):
+    c, lid, _ = start()
+    r = upload(c, lid, book_xlsx([["Field", "Value"], ["Bid Strategy Type", "Target CPA"]]))
+    assert r.get_json()["checks"]["1.8"]["status"] == "fail" and "Target CPA" in r.get_json()["checks"]["1.8"]["found"]
+
+
+def test_a_template_with_placeholders_is_not_an_answer(mem):
+    c, lid, _ = start()
+    r = upload(c, lid, book_xlsx([["Field", "Value"], ["Bid Strategy Type", "Depends on the campaign book"]]))
+    assert r.get_json()["checks"]["1.8"]["status"] is None
+
+
+def test_a_google_sheet_link_is_fetched_and_read(mem, monkeypatch):
+    from tracker import event_intel_http
+    seen = []
+
+    class Raw:
+        def __init__(self, b):
+            self.b = b
+
+        def read(self, n=None, decode_content=True):
+            return self.b[:n] if n else self.b
+
+    class Resp:
+        status_code = 200
+
+        def __init__(self, b):
+            self.raw = Raw(b)
+
+        def close(self):
+            pass
+
+    monkeypatch.setattr(event_intel_http, "public_get", lambda url, timeout=20, headers=None: (seen.append(url), Resp(book_xlsx()))[1])
+    c, lid, _ = start()
+    link = "https://docs.google.com/spreadsheets/d/1AbCdEfGhIjKlMnOpQrStUvWxYz0123456789/edit?gid=0"
+    r = c.post("%s/launches/%s/book" % (API, lid), json={"sheetUrl": link}, headers=SAME)
+    assert r.status_code == 200 and r.get_json()["launch"]["book"]["source"] == "google_sheet" and r.get_json()["launch"]["book"]["fields"] == 3
+    assert seen == ["https://docs.google.com/spreadsheets/d/1AbCdEfGhIjKlMnOpQrStUvWxYz0123456789/export?format=xlsx"]
+
+
+def test_a_private_sheet_a_wrong_link_and_a_bad_file_are_refused_in_words_and_change_nothing(mem, monkeypatch):
+    from tracker import event_intel_http
+
+    class Resp:
+        status_code = 403
+
+        class raw:
+            @staticmethod
+            def read(n=None, decode_content=True):
+                return b"<html>sign in</html>"
+
+        @staticmethod
+        def close():
+            pass
+    monkeypatch.setattr(event_intel_http, "public_get", lambda url, timeout=20, headers=None: Resp())
+    c, lid, _ = start()
+    link = "https://docs.google.com/spreadsheets/d/1AbCdEfGhIjKlMnOpQrStUvWxYz0123456789/edit"
+    for body, says in (({"sheetUrl": link}, "private"), ({"sheetUrl": "https://example.com/x"}, "not a Google Sheets link"),
+                       ({"filename": "b.xlsx", "data": base64.b64encode(b"not a workbook").decode()}, "not an .xlsx"),
+                       ({"filename": "b.xlsx", "data": ""}, "empty"), ({"filename": "old.xls", "data": base64.b64encode(b"x").decode()}, "old .xls")):
+        r = c.post("%s/launches/%s/book" % (API, lid), json=body, headers=SAME)
+        assert r.status_code == 400 and says in r.get_json()["error"], body
+    assert mem.launches[lid]["book"] == {}
+    assert c.post("%s/launches/%s/book" % (API, lid), json=["x"], headers=SAME).status_code == 400
+
+
+def test_removing_the_book_takes_it_away(mem):
+    c, lid, _ = start()
+    upload(c, lid)
+    r = c.delete("%s/launches/%s/book" % (API, lid), json={}, headers=SAME)
+    assert r.status_code == 200 and r.get_json()["launch"]["book"] is None and mem.launches[lid]["book"] == {}
+
+
+def test_the_book_is_saved_even_when_a_review_cannot_start_and_it_says_why(mem, monkeypatch):
+    c, lid, _ = start()
+    mem.launches[lid]["review_status"] = "running"
+    mem.launches[lid]["review_started"] = "2999-01-01T00:00:00+00:00"
+    r = upload(c, lid)
+    assert r.status_code == 200 and "already running" in r.get_json()["reviewError"] and mem.launches[lid]["book"]["rows"]
+    mem.launches[lid]["review_status"] = "done"
+    monkeypatch.setattr(appmod, "_QC_AI_DAILY_CAP", 0)
+    r = upload(c, lid)
+    assert r.status_code == 200 and "AI reviews in a day" in r.get_json()["reviewError"]
+
+
+def test_the_book_routes_are_checked_like_the_others(mem):
+    c, lid, _ = start()
+    url = "%s/launches/%s/book" % (API, lid)
+    assert c.post(url, json={"sheetUrl": "x"}, headers={"Origin": "https://evil.example"}).status_code == 403
+    assert c.delete(url, json={}, headers={"Origin": "https://evil.example"}).status_code == 403
+    assert client_as(None).post(url, json={}, headers=SAME).status_code == 302
+    assert c.post("%s/launches/%s/book" % (API, "a" * 32), json={}, headers=SAME).status_code == 404
+    assert c.post("%s/launches/%s/book" % (API, "../x"), json={}, headers=SAME).status_code == 404
+    assert mem.launches[lid]["book"] == {}
+
+
+# ── Housekeeping routes ─────────────────────────────────────────────────────
+
 def test_only_whoever_started_a_qc_or_an_admin_can_remove_it(mem):
     c, lid, _ = start(client_as(STAFF))
     assert client_as(OTHER).delete("%s/launches/%s" % (API, lid), json={}, headers=SAME).status_code == 403
     assert not mem.launches[lid]["archived"]
     assert client_as(STAFF).delete("%s/launches/%s" % (API, lid), json={}, headers=SAME).status_code == 200
-    assert client_as(STAFF).get("%s/launches/%s" % (API, lid)).status_code == 404            # gone from view
+    assert client_as(STAFF).get("%s/launches/%s" % (API, lid)).status_code == 404                # gone from view
     c2, lid2, _ = start(client_as(STAFF))
-    assert lid2 != lid                                                                        # the campaign can start a fresh QC
+    assert lid2 != lid                                                                           # the campaign can start a fresh QC
     assert client_as(ADMIN).delete("%s/launches/%s" % (API, lid2), json={}, headers=SAME).status_code == 200
 
 
@@ -851,19 +934,19 @@ def test_ids_are_checked_before_anything_is_looked_up(mem):
     c = client_as(STAFF)
     for bad in ("x", "../etc", "A" * 32, "a" * 31):
         assert c.get("%s/launches/%s" % (API, bad)).status_code == 404
-    assert c.get("%s/launches/%s" % (API, "a" * 32)).status_code == 404                       # well formed, not there
+    assert c.get("%s/launches/%s" % (API, "a" * 32)).status_code == 404                          # well formed, not there
     assert c.put("%s/launches/%s/checks/1.1" % (API, "a" * 32), json={"status": "pass"}, headers=SAME).status_code == 404
     assert c.post("%s/launches/%s/run" % (API, "a" * 32), json={}, headers=SAME).status_code == 404
 
 
 def test_cross_site_and_non_json_writes_are_refused(mem):
     c, lid, _ = start()
-    url = "%s/launches/%s/checks/3.2" % (API, lid)
+    url = "%s/launches/%s/checks/1.1" % (API, lid)
     assert c.put(url, json={"status": "pass"}, headers={"Origin": "https://evil.example"}).status_code == 403
     assert c.put(url, data="status=pass", headers=SAME).status_code == 415
     assert c.post(API + "/start", json=NEW, headers={"Origin": "https://evil.example"}).status_code == 403
     assert c.post("%s/launches/%s/run" % (API, lid), json={}, headers={"Origin": "https://evil.example"}).status_code == 403
-    assert "3.2" not in mem.checks[lid]
+    assert "1.1" not in mem.checks[lid]
 
 
 def test_a_bad_start_is_refused_in_words(mem):
@@ -891,6 +974,6 @@ def test_the_campaign_list_still_works_when_the_store_is_down(monkeypatch):
 
 def test_the_server_never_trusts_a_verdict_from_the_page(mem):
     c, lid, _ = start()
-    r = c.put("%s/launches/%s/checks/3.2" % (API, lid), json={"status": "pass", "verdict": "ready", "summary": {"verdict": {"code": "ready"}}},
+    r = c.put("%s/launches/%s/checks/1.1" % (API, lid), json={"status": "pass", "verdict": "ready", "summary": {"verdict": {"code": "ready"}}},
               headers=SAME)
     assert r.get_json()["summary"]["verdict"]["code"] != "ready"

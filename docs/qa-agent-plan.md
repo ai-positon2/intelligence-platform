@@ -1,93 +1,103 @@
-# QA Agent plan (Campaign Launch QC)
+# QA Agent plan (Campaign Book QC)
 
 Branch: `Divith`. Section: Paid Marketing Agents (`/p2/paid-marketing/qa-agent`).
-Status: **v3 built. The AI does the QC. Checked end to end except the real model call and the real Postgres (see the end).**
+Status: **v4 built. The AI does the QC against the PPC team's Campaign Book checks; the team can add the client's
+campaign book. Checked end to end except the real model call and the real Postgres (see the end).**
 
 ## The ask
 
 **Nobody sits and ticks checks. The AI does the QC and flags what it catches.** Pick an account and one of its
-live campaigns; the AI goes through every check on the PPC team's Campaign Launch QC Checklist (155 checks,
-15 sections) and flags what is wrong. People read the flags.
+live campaigns; the AI goes through every Campaign Book check and flags what is wrong. People read the flags.
+Then (v4): the checks are the ones in `Campaign Book.xlsx`, and the team can add the client's campaign book
+(Excel or Google Sheet) to compare the campaign with.
 
-History: v1 asked people to describe a launch so it could "build a checklist". v2 had the agent tick only the
-~65 checks that have an exact Google Ads rule and left about 90 for a person to tick. Both missed the point.
+History: v1 asked people to describe a launch so it could "build a checklist". v2 left about 90 of 155 checks for
+a person to tick. v3 made the AI do all 155. v4 replaces that list with the team's own Campaign Book checks.
 
-## The flow
+## The checks (from `Campaign Book.xlsx`: Field | Value | Other things to Check)
 
-1. Pick the **account**, then a **live campaign** (enabled campaigns only). The review starts at once, as a
-   background job; the page shows its progress and opens on the result.
-2. **Evidence is gathered, read only:**
-   - Google Ads (about 25 reads): account settings, billing, auto-apply, the campaign and budget, locations,
-     languages, schedule, device and demographic modifiers, audiences, negatives and lists, conversion actions
-     and 30 days of conversions, ads (all headlines and descriptions), keywords, sitelinks and other assets with
-     their text, Performance Max asset groups with their texts and signals, search terms, 28 days of change
-     history, user access, audience lists, data exclusions and seasonality.
-   - The campaign's **landing pages** (up to 4), fetched like a visitor: status, redirects, whether a test gclid
-     and UTM survive, title, headings and visible text, forms, phone numbers, privacy link, consent banner, tags
-     found, robots.txt for AdsBot. Only public addresses on ports 80 and 443 are ever fetched.
-3. **Exact rules** (65) settle what Google Ads or the page answers exactly: auto-tagging, tracking parameters, Display
-   Network and Search Partners, AI Max, location options, status, ad group coverage, sitelink counts, PMax asset
-   minimums, page loads, parameters surviving redirects, and more. Their result stands; the AI cannot overturn it.
-4. **Claude reviews the rest**, section by section (parallel), against the evidence. Per check it answers `pass`,
-   `flag` (what is wrong, the evidence, the fix) or `cannot_verify` (what is missing).
-5. The page leads with **Flagged**, then **Needs a human** (what the AI could not verify), then Passed.
-   A person can confirm or overrule any check with one click and a comment; none of it is required.
+61 checks in 5 sections, all blocking (any flag is NOT READY):
 
-## Rules the AI is held to (enforced in code, not just asked for)
+1. **Campaign Setup (25):** name (`P2_<Search or PMax>_<launch date>`), type, networks (none), ad copies (at least 1;
+   spelling, Start Case, brand), AI Max off, other assets, campaign goal (account default), bid strategy, optimisation
+   goal, devices, genders, household income, audience exclusion (none), locations, language (English), age, no dynamic
+   keyword insertion, negative keyword lists, EU political ads off, campaign URL (tracking, campaign or account level),
+   location option (Presence), start and end date (no end), ad rotation (optimise), ad scheduling, final URL (working).
+2. **Automation (2):** final URL expansion off, asset automation off.
+3. **Automatically Created Assets (11):** apps, locations, promotions, business logos (on), business names (on),
+   callouts, images, sitelinks, structured snippets, longer headlines, seller ratings.
+4. **Auto-Apply Recommendations (21):** every auto-apply type off.
+5. **Account Automation (2):** automatically generated assets off, auto migration and upgrades off.
 
-- **Evidence only.** The prompt says: use only the evidence, never guess a pass, `cannot_verify` for anything it
-  cannot see (the media plan, the client's sign-off, a test conversion, a balance).
-- **A pass or flag must quote evidence, and the quote must really be in the evidence it was shown**
-  (`paid_qa_ai.grounded`). An answer that cannot be tied to it is turned into `cannot_verify` and shown as such.
-- A skipped check, an unknown id, a bad verdict or a reply that is not a list never becomes a pass.
-- **Exact rules beat the AI.**
-- A section that fails (model down, no key, refusal, truncation) leaves its checks for a person; the page says why.
-  The verdict is never READY on rules alone.
-- Each section gets only its own checks and the evidence relevant to it.
+The workbook's typos are fixed in the checklist ("Aaccount", "Shceduling", "Should a working"). The old 155-check
+checklist is replaced (it is in git history).
 
-## The verdict (the workbook's rule, from these answers)
+## What Google Ads can and cannot answer
 
-NOT READY if a Critical check is flagged; INCOMPLETE if a Critical check could not be verified (a person confirming
-it clears it); else READY TO LAUNCH. A Critical N/A counts as done. Major and Minor flags do not block but are listed.
-Checks that exist only for a client type (Ecommerce, Lead Gen, Regulated...) count once the client type is chosen on the
-page (optional chips); the AI has already reviewed them, so choosing never needs another review.
+- **Exact rules (61, one per check)** settle what Google Ads gives exactly: name format, networks, AI Max, goals,
+  language, negative lists, EU political ads, URL tracking, location option, end date, ad rotation, final URL loading,
+  automation settings, auto-apply subscriptions. Their result stands; the AI cannot overturn it.
+- **Depends on the campaign book** (campaign type, bid strategy, devices, genders, household income, locations, age, ad
+  schedule): the rules print what is set (devices with bid adjustments, ages and genders at campaign and ad group level,
+  locations by name, schedule). The bid strategy and campaign type are compared with the book when it names an
+  unambiguous value; the rest go to the AI with the book.
+- **Not shown to the API, so never ticked:** the account's "automatically created assets" switches (apps, locations,
+  promotions, logos, names, callouts, images, sitelinks, snippets, longer headlines, seller ratings), the
+  "automatically generated assets" switch, auto migration and upgrades. An automatically created asset found in the
+  account PROVES its switch is on (a flag); finding none proves nothing. These stay under "Needs a human".
+- **Auto-apply recommendations:** Google lists a subscription only for types that were subscribed. No subscription
+  means every recommendation is off (pass). Some enabled means the matching checks fail and the rest are left for a person.
+  This reading of "no subscription" has not been confirmed against an account that has auto-apply on: spot check it.
 
-## What it costs and limits
+## The campaign book
 
-- About 25 Google Ads reads per review from the shared daily allowance (about 2,880).
-- About 55,000 tokens of prompts across about 10 sections for a Search campaign (measured on a real campaign), on
-  `claude-sonnet-5-5`, effort low. Roughly a few tenths of a dollar per review (estimate, not measured).
-- A review takes about a minute. One review of a QC runs at a time; re-runs are at least a minute apart; 40 reviews a
-  person a day.
-- The AI does not know the media plan: it flags inconsistencies (budget far from spend, locations against the ad copy
-  or page) but cannot check a value against a plan it was not given.
+Added per QC as an `.xlsx` or `.csv` file (read in the browser and sent as base64, up to 3 MB) or a Google Sheet link
+shared as "anyone with the link can view" (fetched as an export from docs.google.com only, through the public-address
+guard). Read into Field | Value | Other rows plus a text dump of every sheet, because a client's book will not always
+keep the template layout. A placeholder ("Depends on the campaign book") is not an answer. Adding or replacing the book
+starts a fresh review against it; removing it does not. The AI sees the rows and the text.
 
-## Phases (all done)
+## The flow, and the rules the AI is held to
 
-1. Plan. 2. More Google Ads evidence, every field proven on a live account. 3. Landing page fetcher and its rules.
-4. The AI reviewer. 5. Background job, storage, routes. 6. The page. 7. Tests, browser run, commit.
+Same as v3: the review runs in a background thread with progress in Postgres; the page opens on Flagged, then Needs a
+human, then Passed. The AI answers `pass`, `flag` (what is wrong, evidence, fix) or `cannot_verify`; a pass or flag must
+quote evidence that is really in what it was shown or it becomes `cannot_verify`; a failed section leaves its checks for
+a person; exact rules outrank the AI; a person's click outranks both; the verdict is computed on the server only.
+Per campaign: about 16 Google Ads reads, up to 4 landing pages, a few small model calls (2 to 5 sections instead of 15).
+
+## Verdict
+
+NOT READY if any check is flagged; INCOMPLETE if any check could not be verified (a person confirming it clears it, or
+adding the campaign book if that is why); else READY TO LAUNCH. N/A counts as done. Because the account switches cannot
+be read, a campaign is READY only after a person confirms them.
+
+## Migration
+
+The tables from v1 to v3 may exist on the deployed database. `SCHEMA` brings them up to shape (adds the campaign,
+review and book columns) and, once, clears the old per-check answers and reviews (they were for check ids that no longer
+exist), guarded by a marker column. QCs themselves are kept and review again when opened.
 
 ## How it was verified
 
-- **Tests** (about 290 for this agent): `test_paid_qa.py` (the checklist data, applicability, the verdict, how a person's
-  answer and the AI's combine, validation, SQL, every route on an in-memory store, a fake Google Ads, fake pages and a fake
-  model); `test_paid_qa_auto.py` (every rule, which reads each campaign type makes, one refused read not sinking the rest);
-  `test_paid_qa_ai.py` (the guard rails above, including that removing the grounding check fails tests);
-  `test_paid_qa_web.py` (page parsing, parameter survival, robots, private addresses refused); `test_paid_qa_job.py`.
-- **Every SQL statement and the migration** parse with Postgres's own parser (`pglast`, dev-only).
-- **Live Google Ads and live landing pages**: the full evidence pipeline was run on a real Search and a real Performance Max
-  campaign (read only). It found a real landing page marked noindex, which showed that noindex must be a note, not a failure.
-- **Real browser**: pick an account and campaign, watch the progress, the page opens on the flags with the verdict, the
-  evidence and fix per flag, a person confirming a flag, reload (restored).
+- **Tests** (about 290 for this agent): `test_paid_qa.py` (checklist data, verdict, AI/person combination, validation,
+  SQL and migration, every route including the campaign book upload, a Google Sheet link, private sheet, bad files);
+  `test_paid_qa_auto.py` (every rule, including book comparisons and the switches the API cannot show);
+  `test_paid_qa_ai.py` (the guard rails; removing the grounding check fails tests); `test_paid_qa_book.py` (reading
+  workbooks, CSV, uploads, links, size limits); `test_paid_qa_web.py`; `test_paid_qa_job.py`.
+- **Live Google Ads:** every GAQL field was proven on a real account before it went in (a first guess at the account-level
+  automation fields was rejected by the API, which is why those checks are "needs a human"). The rules ran on a real Search
+  campaign: they flagged its name (not `P2_<type>_<date>`) and Search Partners being on, passed AI Max off, English, negative
+  lists, Presence, goals equal to the account's, and read its devices, ages and household-income settings.
+- **Real browser** with the team's real `Campaign Book.xlsx`: progress, the result opening on flags, the book panel (60 fields read).
 
 ## Not verified
 
-- **The real model has not been called.** There is no Anthropic key on this machine. The prompt, the schema, the grounding
-  and everything around the call are tested with a stand-in; the browser run used a stand-in that flagged a few checks so the
-  page could be seen (its answers are marked DEMO). How good Claude's judgments are on real campaigns is not known yet. The
-  first real run is on Railway, which has the key. Read the first few reviews critically, check a few flags and passes against
-  Google Ads by hand, and tell me what it gets wrong.
-- **Not run against a real Postgres.** The tables are created on first use; a v1 table is migrated.
-- Not built: export of a finished QC to xlsx or PDF, a Slack alert on a flagged Critical check, giving the AI the media plan,
-  asset policy status, Merchant Center health.
-- The checklist is Position2's internal QC document and this repository is public.
+- **The real model has not been called** (no Anthropic key on the dev machine). The prompt, schema, grounding and everything
+  around the call are tested with a stand-in; the browser run used a stand-in marked DEMO. First real run is on Railway.
+  Check a few flags and passes against Google Ads by hand and tell me what it gets wrong.
+- **Not run against a real Postgres.** The tables are created on first use; the migration was parsed, not run.
+- A real filled-in client campaign book has not been seen: only the blank template. Whether clients' books keep that layout
+  is unknown; the AI also gets the raw text of every sheet for that reason.
+- Not built: reading a screenshot of the account's automation settings (the one way to verify the switches the API hides),
+  export of a finished QC, a Slack alert, account-level confirmation so the same switches need not be confirmed per campaign.
+- The checklist is Position2's internal document and this repository is public.

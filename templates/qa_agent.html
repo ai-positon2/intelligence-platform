@@ -6,9 +6,9 @@
     <div class="pm-hero-l">
       <span class="pm-eyebrow"><span class="d"></span>Paid Marketing · Launch QC</span>
       <h1 class="pm-title">The AI does the QC, <span class="pm-grad">you read the flags</span></h1>
-      <p class="pm-sub">Pick the account, then one of its live campaigns. The AI goes through the team's whole launch checklist for you,
-        reading the campaign in Google Ads and the landing pages it sends people to. It <b>flags what is wrong</b>, says how to fix it,
-        and lists the few things it cannot see for itself, such as the client's sign-off.</p>
+      <p class="pm-sub">Pick the account, then one of its live campaigns. The AI goes through the team's Campaign Book checks for you,
+        reading the campaign in Google Ads, the landing pages it sends people to, and the campaign book you add. It <b>flags what is wrong</b>,
+        says how to fix it, and lists what it cannot see for itself.</p>
     </div>
   </section>
 
@@ -38,7 +38,7 @@
   <div id="empty" class="pm-panel qa-empty">
     <div class="qa-empty-ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 11l3 3 8-8"/><path d="M20 12v6a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h9"/></svg></div>
     <h2 id="emptyT">Choose an account to begin</h2>
-    <p id="emptyP">Then pick one of its live campaigns. The AI reviews the PPC team's Campaign Launch QC: 155 checks across account setup, tracking, campaign settings, ads, assets, policy, landing pages and the final pre-launch review.</p>
+    <p id="emptyP">Then pick one of its live campaigns. The AI reviews the PPC team's Campaign Book checks: the campaign's own settings, the automation switches and the auto-apply recommendations.</p>
   </div>
   <div id="skel" hidden><div class="pd-skel"></div><div class="pd-skel"></div></div>
 
@@ -53,14 +53,15 @@
       </div>
     </div>
 
+    <div id="bookBox"></div>
     <div id="reviewBox"></div>
     <div id="results">
       <section class="qa-verdict" id="verdict" aria-live="polite"></section>
 
       <div class="qa-tools">
         <div><span class="pd-dd-k">Show</span><div class="pm-chips" id="fStatus"></div></div>
-        <div><span class="pd-dd-k">Severity</span><div class="pm-chips" id="fSev"></div></div>
-        <div><span class="pd-dd-k">Client type <i>(optional)</i></span><div class="pm-chips" id="fClient"></div></div>
+        <div id="grpSev" hidden><span class="pd-dd-k">Severity</span><div class="pm-chips" id="fSev"></div></div>
+        <div id="grpClient" hidden><span class="pd-dd-k">Client type <i>(optional)</i></span><div class="pm-chips" id="fClient"></div></div>
       </div>
       <p class="qa-client-note" id="clientNote" hidden></p>
 
@@ -72,5 +73,5 @@
 {% endblock %}
 {% block scripts %}
 <script src="{{ url_for('static', filename='js/pm_picker.js') }}?v=1"></script>
-<script src="{{ url_for('static', filename='js/qa_agent.js') }}?v=7"></script>
+<script src="{{ url_for('static', filename='js/qa_agent.js') }}?v=8"></script>
 {% endblock %}

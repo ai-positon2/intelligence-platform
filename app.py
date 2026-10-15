@@ -4945,6 +4945,42 @@ def paid_qa_run(launch_id):
         return _pm_store_error(e)
 
 
+@app.route("/p2/paid-marketing/api/qa/launches/<launch_id>/book", methods=["POST", "DELETE"])
+@position2_required
+def paid_qa_book(launch_id):
+    """POST {filename, data} (an .xlsx or .csv, base64) or {sheetUrl} (a Google Sheet shared as anyone with the link
+    can view): add the campaign book the AI compares the campaign with, and start a fresh review against it.
+    DELETE: remove the book. The book only ever supplies what the checks "depend on the campaign book" for."""
+    from tracker import paid_qa_book as books, paid_qa_store as store
+    try:
+        launch = _qc_launch_or_404(store, launch_id)
+        if request.method == "DELETE":
+            store.set_book(launch_id, {})
+            return jsonify(_qc_payload(store, store.get_launch(launch_id)))
+        body = request.get_json(silent=True)
+        if not isinstance(body, dict):
+            return jsonify(error="the body should be a JSON object"), 400
+        try:
+            if body.get("sheetUrl"):
+                book = books.from_google_sheet(str(body["sheetUrl"]))
+            else:
+                book = books.from_upload(body.get("filename"), body.get("data"))
+        except books.BookError as e:
+            return jsonify(error=str(e)), 400
+        book["uploadedBy"] = _pm_user_email()
+        book["uploadedAt"] = datetime.now(timezone.utc).isoformat()
+        store.set_book(launch_id, book)
+        extra = {}
+        started, why = _qc_start_review(store, store.get_launch(launch_id))
+        if why:
+            extra["reviewError"] = why
+        elif not started:
+            extra["reviewError"] = "The book is saved. A review is already running; run the review again when it finishes to compare against the book."
+        return jsonify(_qc_payload(store, store.get_launch(launch_id), **extra))
+    except store.StoreUnavailable as e:
+        return _pm_store_error(e)
+
+
 @app.route("/p2/paid-marketing/api/qa/launches/<launch_id>/checks/<check_id>", methods=["PUT"])
 @position2_required
 def paid_qa_set_check(launch_id, check_id):
@@ -18945,17 +18981,17 @@ Google Ads does not report every segment for every campaign type (Performance Ma
 are computed by rules from the tables, not guessed: the cheapest segments to push, groups of segments that spend
 with no conversions, segments converting at 1.5x the average cost, and caveats on how far to trust a table; each
 carries its evidence, a recommended action and a high or directional confidence. A short summary is written by
-Claude from those insights only. QA Agent (/p2/paid-marketing/qa-agent): the PPC team's Campaign Launch QC checklist (155 checks in 15 sections, from
-account setup and conversion tracking to campaign settings, ads, assets, Performance Max, shopping, landing pages,
-policy and the final pre-launch review), done by the AI. Pick an account, then one of its live campaigns, and the AI
-reviews every check: it reads the campaign in Google Ads and opens the landing pages, runs exact rules where Google Ads
-gives an exact answer (auto-tagging, URL tracking parameters, network settings, location options, status and more),
-and has Claude judge the rest from that evidence. It flags what is wrong with the fix and the evidence, and lists the
-checks it cannot verify for itself (the client's sign-off, the media plan, a test conversion) as needing a human; it
-never guesses a pass. A person can confirm or overrule any check with a comment. Checks are Critical, Major or Minor.
-The verdict follows the workbook: NOT READY if any Critical check is flagged, INCOMPLETE if any Critical check could
-not be verified, otherwise READY TO LAUNCH. Checks that exist only for a type of client (Ecommerce, Lead Gen...) count
-once the client type is chosen. Each QC is saved per campaign.
+Claude from those insights only. QA Agent (/p2/paid-marketing/qa-agent): the PPC team's Campaign Book checks (61 checks in 5 sections: the campaign's own
+settings such as its P2_<type>_<launch date> name, networks, AI Max, conversion goals, bid strategy, devices, genders, age,
+household income, locations, language, negative keyword lists, EU political ads, URL tracking, location option, dates, ad
+rotation and final URL; then the automation switches, the automatically created assets and the auto-apply recommendations),
+done by the AI. Pick an account, then one of its live campaigns, and optionally add the client's campaign book as an Excel
+file or a Google Sheet link. The AI reviews every check: exact rules read Google Ads (AI Max, networks, language, negative
+lists, goals, final URL loading and more), and Claude judges the rest from that evidence, the landing pages and the campaign
+book. It flags what is wrong with the fix and the evidence, and lists as needing a human anything it cannot verify, such as the
+account's automatically created asset switches, which Google Ads does not show to the API; it never guesses a pass. A person
+can confirm or overrule any check. The verdict: NOT READY if any check is flagged, INCOMPLETE if any check could not be
+verified, otherwise READY TO LAUNCH. Each QC is saved per campaign.
 
 SEO STUDIO (/p2/seo-aeo/<tool>) and the /app agents: a suite of SEO/GEO tools (Keyword Finder, Content Brief
 Generator, Content Enhancer, SEO & GEO Audit, Agentic Readiness Audit, Competitor Analysis, and more).
