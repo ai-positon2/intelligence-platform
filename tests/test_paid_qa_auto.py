@@ -1,11 +1,12 @@
-"""Paid Marketing Agents: QA Agent, what the agent reads from Google Ads.
+"""Paid Marketing Agents: QA Agent, what Google Ads can answer exactly.
 
-Pinned here: the one rule that matters (the agent ticks or crosses a box only when the
-answer is objective, and otherwise prints what it found and leaves the box to the
-reviewer), each rule on rows made up for the purpose (nothing here is a real client's),
-that only the reads a campaign's type can answer are made, that one refused read
-cannot sink the rest while a spent quota or a sign-in failure stops the run, and that a
-campaign id can never become anything but digits in a query.
+Pinned here: the one rule that matters (a rule ticks or crosses a box only when the answer is
+exact, and otherwise prints what it found), each rule on rows made up for the purpose (nothing
+here is a real client's), what the campaign book changes (and that a placeholder is never an
+answer), which switches the API cannot show and so are never ticked, that only the reads a
+campaign's type can answer are made, that one refused read cannot sink the rest while a spent
+quota or a sign-in failure stops the run, and that a campaign id can never become anything but
+digits in a query.
 """
 import os
 import sys
@@ -17,68 +18,76 @@ sys.path.insert(0, ROOT)
 
 from tracker import paid_qa as qa  # noqa: E402
 from tracker import paid_qa_auto as auto  # noqa: E402
+from tracker import paid_qa_book  # noqa: E402
+
+NAMES = ("customer", "recs", "campaign", "criteria", "shared", "shared_all", "goals", "cust_goals", "camp_assets", "cust_assets",
+         "adgroups", "ads", "ag_criteria", "asset_groups", "asset_group_assets")
 
 
 def rows(**named):
     """gather()-shaped data from {name: rows}; everything not given is an empty answer."""
-    names = ("customer", "billing", "recs", "campaign", "criteria", "shared", "labels", "conv", "camp_conv", "days",
-             "camp_assets", "cust_assets", "adgroups", "ads", "keywords", "asset_groups", "asset_group_assets",
-             "asset_group_signals")
-    d = {n: [] for n in names}
+    d = {n: [] for n in NAMES}
     d.update(named)
     d.setdefault("_errors", {})
     d.setdefault("_channel", "SEARCH")
     d.setdefault("_geo", {})
     d.setdefault("_lang", {})
+    d.setdefault("_pages", [])
+    d.setdefault("_book", None)
     return d
 
 
 def campaign(**k):
-    base = {"id": "1", "name": "Example_Search", "status": "ENABLED", "servingStatus": "SERVING", "advertisingChannelType": "SEARCH",
-            "networkSettings": {"targetGoogleSearch": True, "targetSearchNetwork": False, "targetContentNetwork": False},
-            "geoTargetTypeSetting": {"positiveGeoTargetType": "PRESENCE", "negativeGeoTargetType": "PRESENCE"}}
+    base = {"id": "1", "name": "P2_Search_20261014", "status": "ENABLED", "servingStatus": "SERVING", "advertisingChannelType": "SEARCH",
+            "networkSettings": {"targetGoogleSearch": True, "targetSearchNetwork": False, "targetContentNetwork": False,
+                                "targetYoutube": False, "targetGoogleTvNetwork": False},
+            "geoTargetTypeSetting": {"positiveGeoTargetType": "PRESENCE", "negativeGeoTargetType": "PRESENCE"},
+            "biddingStrategyType": "MAXIMIZE_CONVERSIONS", "startDateTime": "2026-10-14 09:00:00"}
     base.update(k)
     return [{"campaign": base, "campaignBudget": {"amountMicros": "30000000", "explicitlyShared": False}}]
 
 
 def customer(**k):
-    return [{"customer": dict({"autoTaggingEnabled": True, "currencyCode": "USD", "timeZone": "America/New_York"}, **k)}]
+    return [{"customer": dict({"autoTaggingEnabled": True, "currencyCode": "USD", "timeZone": "America/New_York",
+                               "containsEuPoliticalAdvertising": "DOES_NOT_CONTAIN_EU_POLITICAL_ADVERTISING"}, **k)}]
 
 
 def find(check, **data):
     return auto.evaluate(rows(**data))[check]
 
 
+def book_of(**fields):
+    return {"filename": "book.xlsx", "rows": [{"field": k.replace("_", " "), "value": v, "other": ""} for k, v in fields.items()], "text": ""}
+
+
 # ── The rules are the checklist's ───────────────────────────────────────────
 
-def test_every_rule_belongs_to_a_real_check():
+def test_every_check_in_the_campaign_book_has_a_rule_and_every_rule_a_check():
     ids = {i["id"] for i in qa.items()}
-    assert set(auto.RULES) <= ids
-    assert len(auto.RULES) >= 60
+    assert set(auto.RULES) == ids and len(ids) == 61
 
 
 def test_every_rule_survives_an_empty_answer_and_says_so_instead_of_ticking():
     out = auto.evaluate({"_errors": {"customer": "refused"}, "_channel": "SEARCH"})
     assert set(out) == set(auto.RULES)
     for cid, f in out.items():
-        assert f["result"] is None and f["found"], cid
-    assert out["1.6"] == {"result": None, "found": "Could not read this from Google Ads (refused)."}      # never a tick on nothing
+        assert f["found"], cid
+    assert out["1.20"] == {"result": None, "found": "Could not read this from Google Ads (refused)."}      # never a tick on nothing
 
 
 def test_a_rule_that_breaks_cannot_sink_the_others(monkeypatch):
-    monkeypatch.setitem(auto.RULES, "1.6", lambda c: 1 / 0)
+    monkeypatch.setitem(auto.RULES, "1.5", lambda c: 1 / 0)
     out = auto.evaluate(rows(customer=customer(), campaign=campaign()))
-    assert out["1.6"]["result"] is None and "could not be read automatically" in out["1.6"]["found"]
-    assert out["1.4"]["found"].startswith("Time zone")
+    assert out["1.5"]["result"] is None and "could not be read automatically" in out["1.5"]["found"]
+    assert out["1.21"]["result"] == "pass"
 
 
-def test_the_agent_never_decides_what_depends_on_the_plan():
-    out = auto.evaluate(rows(customer=customer(), campaign=campaign(biddingStrategyType="TARGET_CPA",
-                                                                    targetCpa={"targetCpaMicros": "40000000"}),
+def test_the_agent_never_decides_what_depends_on_the_campaign_book():
+    out = auto.evaluate(rows(customer=customer(), campaign=campaign(),
                              criteria=[{"campaignCriterion": {"type": "LOCATION", "location": {"geoTargetConstant": "geoTargetConstants/1"}}}]))
-    for cid in ("1.4", "3.1", "3.2", "3.4", "3.6", "3.7", "3.8", "3.11", "3.12", "3.18", "5.4"):
+    for cid in ("1.2", "1.8", "1.10", "1.11", "1.12", "1.14", "1.16", "1.24"):
         assert out[cid]["result"] is None, cid
-    assert "30.00 USD" in out["3.6"]["found"] and "target CPA 40.00 USD" in out["3.7"]["found"]
+    assert "campaign book names no bid strategy" in out["1.8"]["found"]
 
 
 def test_nothing_printed_uses_an_em_dash():
@@ -86,329 +95,364 @@ def test_nothing_printed_uses_an_em_dash():
     assert not any("—" in f["found"] for f in out.values())
 
 
-# ── Account and tracking ────────────────────────────────────────────────────
+# ── 1. Campaign setup ───────────────────────────────────────────────────────
 
-def test_auto_tagging_is_a_tick_when_on_and_a_cross_when_off():
-    assert find("1.6", customer=customer())["result"] == "pass"
-    f = find("1.6", customer=customer(autoTaggingEnabled=False))
-    assert f["result"] == "fail" and "OFF" in f["found"]
+@pytest.mark.parametrize("name,channel,result", [
+    ("P2_Search_20261014", "SEARCH", "pass"), ("P2_PMax_2026-10-14", "PERFORMANCE_MAX", "pass"), ("p2_pmax_14102026", "PERFORMANCE_MAX", "pass"),
+    ("P2_Brand_McH_Set-A", "SEARCH", "fail"), ("Search_20261014", "SEARCH", "fail"), ("P2_PMax_20261014", "SEARCH", "fail"),
+    ("P2_Search_20261014", "PERFORMANCE_MAX", "fail"), ("P2_Search_", "SEARCH", "fail"), ("P2_Search_launch", "SEARCH", "fail")])
+def test_the_campaign_name_must_be_p2_type_and_a_launch_date(name, channel, result):
+    f = find("1.1", campaign=campaign(name=name, advertisingChannelType=channel), _channel=channel)
+    assert f["result"] == result and name in f["found"]
+
+
+def test_campaign_type_is_compared_with_the_book_only_when_the_book_names_one():
+    assert find("1.2", campaign=campaign())["result"] is None
+    assert find("1.2", campaign=campaign(), _book=book_of(campaign_type="Search"))["result"] == "pass"
+    assert find("1.2", campaign=campaign(), _book=book_of(campaign_type="Performance Max"))["result"] == "fail"
+    pm = campaign(advertisingChannelType="PERFORMANCE_MAX")
+    assert find("1.2", campaign=pm, _channel="PERFORMANCE_MAX", _book=book_of(campaign_type="PMax"))["result"] == "pass"
+    assert find("1.2", campaign=campaign(), _book=book_of(campaign_type="Depends on the campaign book"))["result"] is None
+
+
+def test_every_extra_network_must_be_off():
+    assert find("1.3", campaign=campaign())["result"] == "pass"
+    wide = campaign(networkSettings={"targetSearchNetwork": True, "targetContentNetwork": True, "targetYoutube": True, "targetGoogleTvNetwork": True})
+    f = find("1.3", campaign=wide)
+    assert f["result"] == "fail" and all(x in f["found"] for x in ("Search partners", "Display network", "YouTube", "Google TV"))
+    assert find("1.3", campaign=campaign(networkSettings={"targetContentNetwork": True}))["found"].count("Display") == 1
+
+
+def test_a_search_campaign_needs_an_enabled_ad_and_a_pmax_one_an_asset_group():
+    assert find("1.4")["result"] == "fail" and "No enabled ad" in find("1.4")["found"]
+    assert find("1.4", ads=[rsa()], adgroups=[ad_group()])["result"] is None                  # spelling and wording are the AI's
+    assert find("1.4", ads=[rsa(status="PAUSED")], adgroups=[ad_group()])["result"] == "fail"
+    assert find("1.4", _channel="PERFORMANCE_MAX", asset_groups=[group()])["result"] is None
+    assert find("1.4", _channel="PERFORMANCE_MAX")["result"] == "fail"
+
+
+def test_ai_max_must_be_off():
+    assert find("1.5", campaign=campaign())["result"] == "pass"
+    assert find("1.5", campaign=campaign(aiMaxSetting={"enableAiMax": False}))["result"] == "pass"
+    assert find("1.5", campaign=campaign(aiMaxSetting={"enableAiMax": True}))["result"] == "fail"
+
+
+def goal(cat, origin, biddable, kind):
+    return {kind: {"category": cat, "origin": origin, "biddable": biddable}}
+
+
+def goals(*pairs, kind="campaignConversionGoal"):
+    return [goal(c, o, b, kind) for c, o, b in pairs]
+
+
+def test_the_campaign_must_use_the_account_level_default_goals():
+    same = [("PURCHASE", "WEBSITE", True), ("PAGE_VIEW", "WEBSITE", False)]
+    ok = find("1.7", goals=goals(*same), cust_goals=goals(*same, kind="customerConversionGoal"))
+    assert ok["result"] == "pass" and "PURCHASE/WEBSITE" in ok["found"] and "PAGE_VIEW" not in ok["found"]
+    changed = [("PURCHASE", "WEBSITE", False), ("PAGE_VIEW", "WEBSITE", False)]
+    bad = find("1.7", goals=goals(*changed), cust_goals=goals(*same, kind="customerConversionGoal"))
+    assert bad["result"] == "fail" and "PURCHASE/WEBSITE is optimised on the account but not optimised on the campaign" in bad["found"]
+    assert find("1.7")["result"] is None                                                       # no goals came back: no tick
+
+
+def test_optimization_goal_is_conversions_on_the_default_goals():
+    same = [("PURCHASE", "WEBSITE", True)]
+    kw = dict(goals=goals(*same), cust_goals=goals(*same, kind="customerConversionGoal"))
+    assert find("1.9", campaign=campaign(biddingStrategyType="MAXIMIZE_CONVERSIONS"), **kw)["result"] == "pass"
+    assert find("1.9", campaign=campaign(biddingStrategyType="TARGET_CPA"), **kw)["result"] == "pass"
+    assert find("1.9", campaign=campaign(biddingStrategyType="TARGET_SPEND"), **kw)["result"] == "fail"       # maximize clicks
+    assert find("1.9", campaign=campaign(biddingStrategyType="MANUAL_CPC"), **kw)["result"] == "fail"
+    other = find("1.9", campaign=campaign(), goals=goals(("PURCHASE", "WEBSITE", False)), cust_goals=goals(*same, kind="customerConversionGoal"))
+    assert other["result"] is None                                                             # conversion-based, but goals differ: 1.7 says so
+
+
+@pytest.mark.parametrize("book,strategy,extra,result", [
+    ("Maximize conversions", "MAXIMIZE_CONVERSIONS", {}, "pass"), ("maximise conversion value", "MAXIMIZE_CONVERSION_VALUE", {}, "pass"),
+    ("Target CPA", "TARGET_CPA", {}, "pass"), ("tCPA", "MAXIMIZE_CONVERSIONS", {"maximizeConversions": {"targetCpaMicros": "40000000"}}, "pass"),
+    ("Target ROAS", "MAXIMIZE_CONVERSION_VALUE", {"maximizeConversionValue": {"targetRoas": 4.0}}, "pass"),
+    ("Maximize clicks", "TARGET_SPEND", {}, "pass"), ("Manual CPC", "MANUAL_CPC", {}, "pass"),
+    ("Target CPA", "MAXIMIZE_CONVERSIONS", {}, "fail"), ("Maximize conversion value", "MAXIMIZE_CONVERSIONS", {}, "fail"),
+    ("Maximize clicks", "MAXIMIZE_CONVERSIONS", {}, "fail"), ("Maximize conversions with a target CPA", "MAXIMIZE_CONVERSIONS", {}, "fail"),
+    ("Maximize conversions with a target CPA", "MAXIMIZE_CONVERSIONS", {"maximizeConversions": {"targetCpaMicros": "9000000"}}, "pass")])
+def test_the_bid_strategy_is_compared_with_the_book_in_the_books_own_words(book, strategy, extra, result):
+    f = find("1.8", campaign=campaign(biddingStrategyType=strategy, **extra), _book=book_of(bid_strategy_type=book))
+    assert f["result"] == result and book in f["found"]
+
+
+def test_devices_and_demographics_are_printed_for_the_ai_and_the_book():
+    crit = [{"campaignCriterion": {"type": "DEVICE", "device": {"type": "DESKTOP"}}},
+            {"campaignCriterion": {"type": "DEVICE", "device": {"type": "TABLET"}, "bidModifier": 0}},
+            {"campaignCriterion": {"type": "DEVICE", "device": {"type": "MOBILE"}, "bidModifier": 0.8}},
+            {"campaignCriterion": {"type": "GENDER", "gender": {"type": "FEMALE"}}},
+            {"campaignCriterion": {"type": "AGE_RANGE", "negative": True, "ageRange": {"type": "AGE_RANGE_18_24"}}}]
+    ag = [{"adGroup": {"name": "Brand"}, "adGroupCriterion": {"type": "AGE_RANGE", "status": "ENABLED", "ageRange": {"type": "AGE_RANGE_25_34"}}},
+          {"adGroup": {"name": "Brand"}, "adGroupCriterion": {"type": "INCOME_RANGE", "status": "ENABLED", "negative": True, "incomeRange": {"type": "INCOME_RANGE_0_50"}}}]
+    out = auto.evaluate(rows(campaign=campaign(), criteria=crit, ag_criteria=ag))
+    assert out["1.10"]["found"] == "Devices: desktop all traffic, tablet excluded (-100%), mobile bid -20%."
+    assert out["1.11"]["found"] == "Genders: female; excluded: none."
+    assert out["1.16"]["found"] == "Ages targeted: 25-34; excluded: 18-24."
+    assert out["1.12"]["found"] == "Household income: no income setting, so all; excluded: 0-50."
+    for cid in ("1.10", "1.11", "1.12", "1.16"):
+        assert out[cid]["result"] is None
+
+
+def test_no_audience_may_be_excluded_on_the_campaign_or_its_ad_groups():
+    assert find("1.13", ag_criteria=[])["result"] == "pass"
+    camp = [{"campaignCriterion": {"type": "USER_LIST", "negative": True}}]
+    ag = [{"adGroup": {"name": "Brand"}, "adGroupCriterion": {"type": "USER_INTEREST", "negative": True}}]
+    f = find("1.13", criteria=camp, ag_criteria=ag)
+    assert f["result"] == "fail" and "2 audience exclusions" in f["found"] and "Brand" in f["found"] and "user list on campaign" in f["found"]
+    kept = [{"campaignCriterion": {"type": "USER_LIST", "negative": False}}]
+    assert find("1.13", criteria=kept)["result"] == "pass"                                     # an included audience is not an exclusion
+    unread = rows(ag_criteria=None)
+    assert auto.evaluate(unread)["1.13"]["result"] is None                                     # ad groups not read: no tick
+
+
+def lang(*ids):
+    return [{"campaignCriterion": {"type": "LANGUAGE", "language": {"languageConstant": "languageConstants/%s" % i}}} for i in ids]
+
+
+def test_language_targeting_must_be_english_only():
+    d = rows(campaign=campaign(), criteria=lang("1000"))
+    d["_lang"] = {"1000": "English"}
+    assert auto.evaluate(d)["1.15"]["result"] == "pass"
+    d = rows(campaign=campaign(), criteria=lang("1000", "1003"))
+    d["_lang"] = {"1000": "English", "1003": "Spanish"}
+    f = auto.evaluate(d)["1.15"]
+    assert f["result"] == "fail" and "English, Spanish" in f["found"]
+    d = rows(campaign=campaign(), criteria=lang("1003"))
+    d["_lang"] = {"1003": "Spanish"}
+    assert auto.evaluate(d)["1.15"]["result"] == "fail"
+    none = find("1.15", campaign=campaign())
+    assert none["result"] == "fail" and "all languages" in none["found"]
+
+
+def test_dynamic_keyword_insertion_is_found_in_headlines_descriptions_and_paths():
+    g = [ad_group()]
+    ok = find("1.17", adgroups=g, ads=[rsa()])
+    assert ok["result"] == "pass" and "No dynamic keyword insertion" in ok["found"]
+    for where in ("headline", "description", "path"):
+        ad = rsa(inject=(where, "Buy {KeyWord:Shoes} today"))
+        f = find("1.17", adgroups=g, ads=[ad])
+        assert f["result"] == "fail" and "{KeyWord:Shoes}" in f["found"], where
+    assert find("1.17", adgroups=g, ads=[rsa(inject=("headline", "Great {keyword: shoes}"))])["result"] == "fail"
+    assert find("1.17", _channel="PERFORMANCE_MAX")["result"] == "pass"
+    assert find("1.17", adgroups=g, ads=[])["result"] is None                                  # no ad text to scan
+
+
+def test_a_negative_keyword_list_must_be_on_the_campaign():
+    lst = [{"sharedSet": {"name": "Generic", "type": "NEGATIVE_KEYWORDS", "memberCount": "60"}, "campaignSharedSet": {"status": "ENABLED"}}]
+    acct = [{"sharedSet": {"name": "Generic", "type": "NEGATIVE_KEYWORDS", "memberCount": "60"}},
+            {"sharedSet": {"name": "Competitors", "type": "NEGATIVE_KEYWORDS", "memberCount": "300"}},
+            {"sharedSet": {"name": "Places", "type": "NEGATIVE_PLACEMENTS", "memberCount": "5"}}]
+    f = find("1.18", shared=lst, shared_all=acct)
+    assert f["result"] == "pass" and "Generic (60 terms)" in f["found"] and "not on this campaign: Competitors" in f["found"]
+    assert find("1.18", shared_all=acct)["result"] == "fail"                                   # lists exist but none is on the campaign
+    own = [{"campaignCriterion": {"type": "KEYWORD", "negative": True}}]
+    assert find("1.18", criteria=own)["result"] == "fail"                                      # the book wants a list, not loose negatives
+    placement = [{"sharedSet": {"name": "Places", "type": "NEGATIVE_PLACEMENTS"}, "campaignSharedSet": {"status": "ENABLED"}}]
+    assert find("1.18", shared=placement)["result"] == "fail"                                  # a placement list is not a keyword list
+    paused = [{"sharedSet": {"name": "Generic", "type": "NEGATIVE_KEYWORDS"}, "campaignSharedSet": {"status": "REMOVED"}}]
+    assert find("1.18", shared=paused)["result"] == "fail"
+    acct_level = [{"sharedSet": {"name": "Account list", "type": "ACCOUNT_LEVEL_NEGATIVE_KEYWORDS", "memberCount": "40"}, "campaignSharedSet": {"status": "ENABLED"}}]
+    assert find("1.18", shared=acct_level)["result"] == "pass"
+
+
+def test_eu_political_ads_must_be_declared_as_off():
+    assert find("1.19", customer=customer())["result"] == "pass"
+    assert find("1.19", customer=customer(containsEuPoliticalAdvertising="CONTAINS_EU_POLITICAL_ADVERTISING"))["result"] == "fail"
+    for v in ("UNSPECIFIED", None):
+        f = find("1.19", customer=customer(containsEuPoliticalAdvertising=v))
+        assert f["result"] == "fail" and "not been made" in f["found"]
 
 
 def test_url_parameters_are_printed_and_ticked_when_set_at_either_level():
-    f = find("1.7", customer=customer(trackingUrlTemplate="{lpurl}?utm_source=google"), campaign=campaign())
+    f = find("1.20", customer=customer(trackingUrlTemplate="{lpurl}?utm_source=google"), campaign=campaign())
     assert f["result"] == "pass" and "utm_source=google" in f["found"]
-    f = find("1.7", customer=customer(), campaign=campaign(finalUrlSuffix="utm_medium=cpc&gclid={gclid}",
+    f = find("1.20", customer=customer(), campaign=campaign(finalUrlSuffix="utm_medium=cpc&gclid={gclid}",
                                                            urlCustomParameters=[{"key": "campaignname", "value": "Brand"}]))
     assert f["result"] == "pass" and "utm_medium=cpc" in f["found"] and "{_campaignname}=Brand" in f["found"]
-    f = find("1.7", customer=customer(), campaign=campaign())
-    assert f["result"] == "fail" and "none" in f["found"]                                   # missing at both levels
+    f = find("1.20", customer=customer(), campaign=campaign())
+    assert f["result"] == "fail" and "none" in f["found"]                                      # missing at both levels
 
 
-def test_campaign_level_tracking_needs_the_campaign_to_have_its_own_otherwise_it_only_prints():
-    own = find("3.16", customer=customer(), campaign=campaign(trackingUrlTemplate="{lpurl}?utm_source=google"))
-    assert own["result"] == "pass" and "Test in Google Ads" in own["found"]
-    inherited = find("3.16", customer=customer(trackingUrlTemplate="{lpurl}?a=b"), campaign=campaign())
-    assert inherited["result"] is None and "account's template applies" in inherited["found"]
-    nothing = find("3.16", customer=customer(), campaign=campaign())
-    assert nothing["result"] is None and "no account template either" in nothing["found"]
+def test_the_location_option_must_be_presence():
+    assert find("1.21", campaign=campaign())["result"] == "pass"
+    both = campaign(geoTargetTypeSetting={"positiveGeoTargetType": "PRESENCE_OR_INTEREST", "negativeGeoTargetType": "PRESENCE"})
+    f = find("1.21", campaign=both)
+    assert f["result"] == "fail" and "Presence or interest" in f["found"]
 
 
-def test_auto_apply_is_off_only_when_no_recommendation_type_is_enabled():
-    assert find("1.5")["result"] == "pass"
-    on = find("1.5", recs=[{"recommendationSubscription": {"type": "KEYWORD", "status": "ENABLED"}},
-                           {"recommendationSubscription": {"type": "SITELINK_ASSET", "status": "PAUSED"}}])
-    assert on["result"] == "fail" and "KEYWORD" in on["found"] and "SITELINK" not in on["found"]
+def test_there_must_be_no_end_date_and_the_start_date_is_printed():
+    f = find("1.22", campaign=campaign())
+    assert f["result"] is None and "Start date 2026-10-14; no end date" in f["found"]
+    assert find("1.22", campaign=campaign(endDateTime="2037-12-30 00:00:00"))["result"] is None          # Google's "no end"
+    ends = find("1.22", campaign=campaign(endDateTime="2026-12-31 23:59:59"))
+    assert ends["result"] == "fail" and "2026-12-31" in ends["found"]
 
 
-def test_billing_is_never_ticked_because_the_balance_cannot_be_read():
-    ok = find("1.2", billing=[{"billingSetup": {"status": "APPROVED", "paymentsAccountInfo": {"paymentsAccountName": "Example Co"}}}])
-    assert ok["result"] is None and "Balance or credit" in ok["found"]
-    assert find("1.2", billing=[{"billingSetup": {"status": "CANCELLED"}}])["result"] == "fail"
-    assert find("1.2")["result"] is None
+def test_ad_rotation_must_be_optimize_and_the_schedule_is_printed():
+    assert find("1.23", adgroups=[ad_group(adRotationMode="OPTIMIZE")])["result"] == "pass"
+    assert find("1.23", adgroups=[ad_group()])["result"] == "pass"                            # Google leaves the default out
+    assert find("1.23", adgroups=[ad_group(adRotationMode="ROTATE_FOREVER")])["result"] == "fail"
+    sched = [{"campaignCriterion": {"type": "AD_SCHEDULE", "adSchedule": {"dayOfWeek": "MONDAY", "startHour": 8, "endHour": 18}}}]
+    f = find("1.24", criteria=sched)
+    assert f["result"] is None and "Mon 8-18" in f["found"]
+    assert "none (runs at all hours)" in find("1.24")["found"]
 
 
-def test_the_eu_political_ads_declaration_must_have_been_made():
-    assert find("1.15", customer=customer(containsEuPoliticalAdvertising="DOES_NOT_CONTAIN_EU_POLITICAL_ADVERTISING"))["result"] == "pass"
-    assert find("1.15", customer=customer(containsEuPoliticalAdvertising="UNSPECIFIED"))["result"] == "fail"
-    assert find("1.15", customer=customer())["result"] == "fail"
+def test_final_urls_must_be_https_and_load():
+    g = dict(adgroups=[ad_group()], ads=[rsa()])
+    ok = find("1.25", _pages=[page()], **g)
+    assert ok["result"] == "pass" and "All HTTPS and all load" in ok["found"]
+    assert find("1.25", _pages=[page(status=404)], **g)["result"] == "fail"
+    assert find("1.25", _pages=[page(error="TimeoutError: slow", status=None)], **g)["result"] == "fail"
+    assert find("1.25", _pages=[], adgroups=[ad_group()], ads=[rsa(urls=("http://example.com/",))])["result"] == "fail"
+    none = find("1.25", **g)
+    assert none["result"] is None and "could not be opened" in none["found"]                  # no page evidence: not ticked
+    few = find("1.25", _pages=[page()], adgroups=[ad_group()], ads=[rsa(urls=("https://a.com/", "https://b.com/"))])
+    assert few["result"] is None and "1 of 2" in few["found"]
+    assert find("1.25", _channel="PERFORMANCE_MAX", asset_groups=[group()], _pages=[page()])["result"] == "pass"
 
 
-def test_conversion_actions_are_listed_and_a_primary_one_that_is_off_is_a_cross():
-    conv = [{"conversionAction": {"name": "Leads", "status": "ENABLED", "primaryForGoal": True, "countingType": "ONE_PER_CLICK"}},
-            {"conversionAction": {"name": "Page view", "status": "ENABLED", "primaryForGoal": False}}]
-    assert "1 primary conversion action: Leads" in find("2.2", conv=conv)["found"]
-    assert find("2.3", conv=conv)["result"] is None and "1 enabled" in find("2.3", conv=conv)["found"]
-    assert "Leads = one per click" in find("2.6", conv=conv)["found"]
-    off = conv + [{"conversionAction": {"name": "Calls", "status": "HIDDEN", "primaryForGoal": True}}]
-    assert find("2.3", conv=off)["result"] == "fail" and "Calls" in find("2.3", conv=off)["found"]
+# ── 2. Automation ───────────────────────────────────────────────────────────
+
+def automation(**k):
+    return campaign(assetAutomationSettings=[{"assetAutomationType": t, "assetAutomationStatus": s} for t, s in k.items()])
 
 
-def test_live_conversions_pass_only_when_the_campaign_recorded_some():
-    got = [{"segments": {"conversionActionName": "Leads"}, "metrics": {"conversions": 3}}]
-    assert find("15.3", camp_conv=got)["result"] == "pass" and "Leads 3" in find("15.3", camp_conv=got)["found"]
-    none = find("15.3", camp_conv=[])
-    assert none["result"] is None and "No conversions" in none["found"]                      # a new campaign is not a failure
+def test_final_url_expansion_and_asset_automation_must_be_off():
+    off = automation(TEXT_ASSET_AUTOMATION="OPTED_OUT", FINAL_URL_EXPANSION_TEXT_ASSET_AUTOMATION="OPTED_OUT")
+    assert find("2.1", campaign=off)["result"] == "pass" and find("2.2", campaign=off)["result"] == "pass"
+    on = automation(TEXT_ASSET_AUTOMATION="OPTED_IN", FINAL_URL_EXPANSION_TEXT_ASSET_AUTOMATION="OPTED_IN")
+    a, b = find("2.1", campaign=on), find("2.2", campaign=on)
+    assert a["result"] == "fail" and "Final URL expansion is ON" in a["found"]
+    assert b["result"] == "fail" and "text customization ON" in b["found"]
+    assert find("2.2", campaign=campaign())["result"] is None                                  # no setting returned: no tick
 
 
-# ── Campaign settings ───────────────────────────────────────────────────────
-
-def test_status_ticks_only_a_campaign_that_is_enabled_and_serving():
-    assert find("3.3", campaign=campaign())["result"] == "pass"
-    assert find("3.3", campaign=campaign(status="PAUSED"))["result"] == "fail"
-    assert find("3.3", campaign=campaign(servingStatus="PENDING"))["result"] is None
-
-
-def test_end_date_passes_with_none_and_is_printed_when_there_is_one():
-    assert find("3.5", campaign=campaign())["result"] == "pass"
-    assert find("3.5", campaign=campaign(endDateTime="2037-12-30 00:00:00"))["result"] == "pass"       # Google's "no end"
-    f = find("3.5", campaign=campaign(endDateTime="2026-12-31 23:59:59"))
-    assert f["result"] is None and "2026-12-31" in f["found"]
+def test_final_url_expansion_is_not_in_use_on_a_search_campaign_with_ai_max_off():
+    f = find("2.1", campaign=campaign(aiMaxSetting={"enableAiMax": False}))
+    assert f["result"] == "pass" and "AI Max is off" in f["found"]
+    assert find("2.1", campaign=campaign(aiMaxSetting={"enableAiMax": True}))["result"] is None
+    assert find("2.1", _channel="PERFORMANCE_MAX", campaign=campaign(advertisingChannelType="PERFORMANCE_MAX"))["result"] is None
 
 
-def test_the_location_options_are_exact_answers():
-    assert find("3.9", campaign=campaign())["result"] == "pass" and find("3.10", campaign=campaign())["result"] == "pass"
-    both = campaign(geoTargetTypeSetting={"positiveGeoTargetType": "PRESENCE_OR_INTEREST", "negativeGeoTargetType": "PRESENCE_OR_INTEREST"})
-    assert find("3.9", campaign=both)["result"] == "fail" and find("3.10", campaign=both)["result"] == "fail"
+# ── 3. Automatically created assets: the switches are not in the API ────────
+
+def made(field, level="campaign", source="AUTOMATICALLY_CREATED"):
+    if level == "campaign":
+        return {"campaignAsset": {"fieldType": field, "status": "ENABLED", "source": source}, "asset": {"type": field}}
+    return {"customerAsset": {"fieldType": field, "status": "ENABLED", "source": source}, "asset": {"type": field}}
 
 
-def test_locations_are_named_and_the_exclusions_too():
-    crit = [{"campaignCriterion": {"type": "LOCATION", "location": {"geoTargetConstant": "geoTargetConstants/10"}}},
-            {"campaignCriterion": {"type": "LOCATION", "negative": True, "location": {"geoTargetConstant": "geoTargetConstants/11"}}}]
-    d = rows(campaign=campaign(), criteria=crit)
-    d["_geo"] = {"geoTargetConstants/10": {"name": "Annapolis", "canonical": "Annapolis,Maryland,United States"},
-                 "geoTargetConstants/11": {"name": "Baltimore", "canonical": ""}}
-    f = auto.evaluate(d)["3.8"]
-    assert f["result"] is None and "1 location targeted: Annapolis,Maryland,United States" in f["found"] and "Excluded: Baltimore" in f["found"]
+def test_an_automatically_created_asset_proves_its_switch_is_on_and_its_absence_proves_nothing():
+    cases = {"3.1": "MOBILE_APP", "3.2": "LOCATION", "3.3": "PROMOTION", "3.6": "CALLOUT", "3.7": "AD_IMAGE", "3.8": "SITELINK",
+             "3.9": "STRUCTURED_SNIPPET", "3.11": "SELLER_RATING"}
+    for cid, field in cases.items():
+        none = find(cid, campaign=campaign())
+        assert none["result"] is None and "does not show this switch to the API" in none["found"] and "does not prove it" in none["found"], cid
+        f = find(cid, campaign=campaign(), camp_assets=[made(field)])
+        assert f["result"] == "fail" and "automatically created" in f["found"] and "should be off" in f["found"], cid
+        assert find(cid, campaign=campaign(), cust_assets=[made(field, "account")])["result"] == "fail", cid
+        assert find(cid, campaign=campaign(), camp_assets=[made(field, source="ADVERTISER")])["result"] is None, cid   # the team's own asset is fine
 
 
-def test_languages_and_ad_schedule_are_printed():
-    crit = [{"campaignCriterion": {"type": "LANGUAGE", "language": {"languageConstant": "languageConstants/1000"}}},
-            {"campaignCriterion": {"type": "AD_SCHEDULE", "adSchedule": {"dayOfWeek": "MONDAY", "startHour": 8, "endHour": 18}}}]
-    d = rows(campaign=campaign(), criteria=crit)
-    d["_lang"] = {"1000": "English"}
-    out = auto.evaluate(d)
-    assert out["3.11"]["found"] == "Languages: English." and "Mon 8-18" in out["3.12"]["found"]
-    assert "all languages" in find("3.11", campaign=campaign())["found"]
+def test_the_switches_that_should_be_on_or_have_no_asset_are_never_ticked_or_crossed():
+    for cid in ("3.4", "3.5", "3.10"):
+        f = find(cid, campaign=campaign(), camp_assets=[made("BUSINESS_LOGO"), made("BUSINESS_NAME")])
+        assert f["result"] is None and "does not show this switch to the API" in f["found"], cid
+    assert "does not prove it" not in find("3.4", campaign=campaign())["found"]
 
 
-def test_search_campaign_network_and_ai_settings():
-    assert find("4.1", campaign=campaign())["result"] == "pass" and find("4.2", campaign=campaign())["result"] == "pass"
-    wide = campaign(networkSettings={"targetContentNetwork": True, "targetSearchNetwork": True})
-    assert find("4.1", campaign=wide)["result"] == "fail" and find("4.2", campaign=wide)["result"] == "fail"
-    assert find("4.3", campaign=campaign())["result"] == "pass"
-    assert find("4.3", campaign=campaign(aiMaxSetting={"enableAiMax": True}))["result"] == "fail"
+def test_automatically_generated_assets_and_auto_migration():
+    assert find("5.1", campaign=campaign())["result"] is None
+    f = find("5.1", campaign=campaign(), camp_assets=[made("SITELINK"), made("CALLOUT")])
+    assert f["result"] == "fail" and "2 automatically created assets" in f["found"]
+    g = find("5.1", campaign=automation(TEXT_ASSET_AUTOMATION="OPTED_IN"))
+    assert g["result"] == "fail" and "text customization automation ON" in g["found"]
+    m = find("5.2")
+    assert m["result"] is None and "does not show" in m["found"]
 
 
-def test_automatically_created_assets_are_off_only_when_every_setting_is_opted_out():
-    off = campaign(assetAutomationSettings=[{"assetAutomationType": "TEXT_ASSET_AUTOMATION", "assetAutomationStatus": "OPTED_OUT"},
-                                            {"assetAutomationType": "FINAL_URL_EXPANSION_TEXT_ASSET_AUTOMATION", "assetAutomationStatus": "OPTED_OUT"}])
-    assert find("4.4", campaign=off)["result"] == "pass" and find("8.1", campaign=off)["result"] == "pass"
-    on = campaign(assetAutomationSettings=[{"assetAutomationType": "TEXT_ASSET_AUTOMATION", "assetAutomationStatus": "OPTED_IN"},
-                                           {"assetAutomationType": "FINAL_URL_EXPANSION_TEXT_ASSET_AUTOMATION", "assetAutomationStatus": "OPTED_IN"}])
-    a, b = find("4.4", campaign=on), find("8.1", campaign=on)
-    assert a["result"] == "fail" and "text customization ON" in a["found"] and b["result"] == "fail" and "Final URL expansion is ON" in b["found"]
-    assert find("4.4", campaign=campaign())["result"] is None                               # no setting returned: no tick
+# ── 4. Auto-apply recommendations ───────────────────────────────────────────
+
+def sub(type_, status="ENABLED"):
+    return {"recommendationSubscription": {"type": type_, "status": status}}
 
 
-def test_negative_keywords_pass_with_a_list_or_campaign_negatives_and_fail_with_none():
-    lst = [{"sharedSet": {"name": "Generic", "type": "NEGATIVE_KEYWORDS", "memberCount": "60"}, "campaignSharedSet": {"status": "ENABLED"}}]
-    a = find("4.7", shared=lst)
-    assert a["result"] == "pass" and "Generic (60)" in a["found"]
-    own = [{"campaignCriterion": {"type": "KEYWORD", "negative": True}}]
-    assert find("4.7", criteria=own)["result"] == "pass"
-    assert find("4.7")["result"] == "fail" and find("8.4", shared=lst)["result"] == "pass"
-    placement = [{"sharedSet": {"name": "Places", "type": "NEGATIVE_PLACEMENTS"}, "campaignSharedSet": {"status": "ENABLED"}}]
-    assert find("4.7", shared=placement)["result"] == "fail"                                # a placement list is not a keyword list
+def test_with_no_auto_apply_subscription_every_recommendation_is_off():
+    for i in range(1, 22):
+        f = find("4.%d" % i)
+        assert f["result"] == "pass" and "none is subscribed" in f["found"], i
+    paused = [sub("OPTIMIZE_AD_ROTATION", "PAUSED")]
+    assert find("4.1", recs=paused)["result"] == "pass"                                       # paused is off
 
 
-# ── Ad groups, ads and keywords ─────────────────────────────────────────────
+def test_an_enabled_subscription_fails_the_matching_check_and_leaves_the_rest_for_a_person():
+    recs = [sub("OPTIMIZE_AD_ROTATION"), sub("USE_BROAD_MATCH_KEYWORD"), sub("MAXIMIZE_CONVERSIONS_OPT_IN"), sub("DISPLAY_EXPANSION_OPT_IN")]
+    assert find("4.1", recs=recs)["result"] == "fail" and "OPTIMIZE_AD_ROTATION" in find("4.1", recs=recs)["found"]
+    assert find("4.9", recs=recs)["result"] == "fail"                                          # add broad match keywords
+    assert find("4.10", recs=recs)["result"] == "fail"                                         # display expansion
+    assert find("4.13", recs=recs)["result"] == "fail"                                         # maximize conversions
+    assert find("4.14", recs=recs)["result"] is None                                           # maximize conversion VALUE is not maximize conversions
+    assert find("4.8", recs=recs)["result"] is None                                            # add new keywords is not broad match
+    other = find("4.21", recs=recs)
+    assert other["result"] is None and "none of which clearly matches" in other["found"]
+
+
+def test_an_unread_subscription_list_is_never_a_pass():
+    d = rows()
+    d["recs"] = None
+    d["_errors"] = {"recs": "403 not allowed"}
+    assert auto.evaluate(d)["4.1"]["result"] is None and "403 not allowed" in auto.evaluate(d)["4.1"]["found"]
+
+
+# ── Landing pages and the helpers ───────────────────────────────────────────
 
 def ad_group(i="11", name="Brand", status="ENABLED", type_="SEARCH_STANDARD", **k):
     return {"adGroup": dict({"id": i, "name": name, "status": status, "type": type_}, **k)}
 
 
-def rsa(group="11", headlines=15, descriptions=4, strength="GOOD", path1="a", path2="b", status="ENABLED", urls=("https://example.com/",),
-        approval="APPROVED", pinned=0):
-    heads = [{"text": "H%d" % i, **({"pinnedField": "HEADLINE_1"} if i < pinned else {})} for i in range(headlines)]
-    r = {"headlines": heads, "descriptions": [{"text": "d"}] * descriptions}
-    if path1:
-        r["path1"] = path1
-    if path2:
-        r["path2"] = path2
-    return {"adGroup": {"id": group}, "adGroupAd": {"status": status, "adStrength": strength, "policySummary": {"approvalStatus": approval},
+def rsa(group="11", headlines=15, descriptions=4, status="ENABLED", urls=("https://example.com/",), inject=None):
+    heads = [{"text": "Headline %d" % i} for i in range(headlines)]
+    descs = [{"text": "Description %d" % i} for i in range(descriptions)]
+    r = {"headlines": heads, "descriptions": descs, "path1": "a", "path2": "b"}
+    if inject:
+        where, text = inject
+        if where == "headline":
+            heads[0]["text"] = text
+        elif where == "description":
+            descs[0]["text"] = text
+        else:
+            r["path1"] = text
+    return {"adGroup": {"id": group}, "adGroupAd": {"status": status, "adStrength": "GOOD", "policySummary": {"approvalStatus": "APPROVED"},
                                                     "ad": {"type": "RESPONSIVE_SEARCH_AD", "finalUrls": list(urls), "responsiveSearchAd": r}}}
 
-
-def kw(group="11", text="example", match="EXACT", status="ENABLED", negative=False, serving="ELIGIBLE", approval="APPROVED"):
-    return {"adGroup": {"id": group}, "adGroupCriterion": {"status": status, "negative": negative, "keyword": {"text": text, "matchType": match},
-                                                           "systemServingStatus": serving, "approvalStatus": approval}}
-
-
-def test_every_ad_group_needs_an_enabled_ad_and_a_live_keyword():
-    groups = [ad_group("11", "Brand"), ad_group("12", "Generic")]
-    ok = auto.evaluate(rows(adgroups=groups, ads=[rsa("11"), rsa("12")], keywords=[kw("11"), kw("12")]))
-    assert ok["5.1"]["result"] == "pass" and ok["5.2"]["result"] == "pass"
-    bad = auto.evaluate(rows(adgroups=groups, ads=[rsa("11"), rsa("12", status="PAUSED")], keywords=[kw("11"), kw("12", status="PAUSED"), kw("12", negative=True)]))
-    assert bad["5.1"]["result"] == "fail" and "Generic" in bad["5.1"]["found"]
-    assert bad["5.2"]["result"] == "fail" and "Generic" in bad["5.2"]["found"]              # a paused or negative keyword is not coverage
-    assert auto.evaluate(rows())["5.1"]["result"] == "fail"                                  # a campaign with no ad group at all
-
-
-def test_dynamic_search_ad_groups_need_no_keywords():
-    d = rows(adgroups=[ad_group("11", "DSA", type_="SEARCH_DYNAMIC_ADS")], ads=[rsa("11")], keywords=[])
-    assert auto.evaluate(d)["5.2"]["result"] is None
-
-
-def test_ad_copy_counts_pass_only_when_good_and_fail_below_the_minimum():
-    g = [ad_group()]
-    good = find("6.1", adgroups=g, ads=[rsa()])
-    assert good["result"] == "pass" and "15 headlines, 4 descriptions, strength good" in good["found"]
-    avg = find("6.1", adgroups=g, ads=[rsa(strength="AVERAGE")])
-    assert avg["result"] is None and "below Good" in avg["found"]                            # printed, left to the reviewer
-    thin = find("6.1", adgroups=g, ads=[rsa(headlines=2, descriptions=1)])
-    assert thin["result"] == "fail" and "Below the minimum" in thin["found"]
-    assert find("6.1", adgroups=g, ads=[])["result"] == "fail"
-
-
-def test_final_urls_are_printed_and_http_is_a_cross():
-    g = [ad_group()]
-    ok = find("6.3", adgroups=g, ads=[rsa()])
-    assert ok["result"] is None and "https://example.com/" in ok["found"] and "could not be opened" in ok["found"]   # no page evidence: not ticked
-    assert find("6.3", adgroups=g, ads=[rsa(urls=("http://example.com/",))])["result"] == "fail"
-
-
-def test_display_paths_and_pins():
-    g = [ad_group()]
-    assert find("6.5", adgroups=g, ads=[rsa()])["result"] == "pass"
-    assert find("6.5", adgroups=g, ads=[rsa(path2="")])["result"] == "fail"
-    assert "3 pinned assets across 1 enabled ads" in find("6.9", adgroups=g, ads=[rsa(pinned=3)])["found"]
-
-
-def test_duplicate_keywords_across_ad_groups_are_a_cross_and_no_duplicates_is_not_a_tick():
-    d = [kw("11", "Shoes", "EXACT"), kw("12", "shoes", "EXACT"), kw("12", "shoes", "PHRASE")]
-    f = find("5.5", keywords=d)
-    assert f["result"] == "fail" and "shoes [exact]" in f["found"] and "phrase" not in f["found"]
-    clean = find("5.5", keywords=[kw("11", "a"), kw("12", "b")])
-    assert clean["result"] is None and "Spelling" in clean["found"]
-
-
-def test_keywords_rarely_shown_and_disapprovals():
-    f = find("15.7", keywords=[kw(text="obscure term", serving="RARELY_SERVED"), kw(text="fine")])
-    assert f["result"] == "fail" and "obscure term" in f["found"] and "fine" not in f["found"]
-    assert find("15.7", keywords=[kw()])["result"] == "pass"
-    dis = find("15.2", ads=[rsa(approval="DISAPPROVED")], keywords=[kw(approval="DISAPPROVED"), kw()])
-    assert dis["result"] == "fail" and "1 ad and 1 keyword disapproved" in dis["found"]
-    clean = find("15.2", ads=[rsa()], keywords=[kw()])
-    assert clean["result"] is None and "Assets are not read" in clean["found"]               # only part of the check was seen
-
-
-def test_ad_rotation_and_default_bids():
-    assert find("4.6", adgroups=[ad_group(adRotationMode="OPTIMIZE")])["result"] == "pass"
-    assert find("4.6", adgroups=[ad_group()])["result"] == "pass"                            # Google leaves the default out
-    assert find("4.6", adgroups=[ad_group(adRotationMode="ROTATE_FOREVER")])["result"] == "fail"
-    assert "automated" in find("5.6", campaign=campaign(biddingStrategyType="MAXIMIZE_CONVERSIONS"), adgroups=[ad_group()])["found"]
-    manual = find("5.6", campaign=campaign(biddingStrategyType="MANUAL_CPC"), adgroups=[ad_group(cpcBidMicros="2000000")])
-    assert "Brand 2.00" in manual["found"]
-
-
-# ── Assets ──────────────────────────────────────────────────────────────────
-
-def asset(level, field, status="ENABLED"):
-    if level == "campaign":
-        return {"campaignAsset": {"fieldType": field, "status": status}, "asset": {"type": field}}
-    return {"customerAsset": {"fieldType": field, "status": status}, "asset": {"type": field}}
-
-
-def test_sitelinks_callouts_and_snippets_are_counted_with_the_campaigns_overriding_the_accounts():
-    camp = [asset("campaign", "SITELINK")] * 4
-    acct = [asset("account", "SITELINK")] * 2 + [asset("account", "CALLOUT")] * 5 + [asset("account", "STRUCTURED_SNIPPET")]
-    f = find("7.1", camp_assets=camp, cust_assets=acct)
-    assert f["result"] == "pass" and "4 on the campaign, 2 on the account" in f["found"]
-    assert find("7.1", camp_assets=[asset("campaign", "SITELINK")] * 3, cust_assets=acct)["result"] == "fail"     # 3 on the campaign overrides
-    assert find("7.1", cust_assets=[asset("account", "SITELINK")] * 4)["result"] == "pass"                         # inherited from the account
-    assert find("7.2", cust_assets=acct)["result"] == "pass" and find("7.3", cust_assets=acct)["result"] == "pass"
-    assert find("7.1", camp_assets=[asset("campaign", "SITELINK", status="PAUSED")] * 4)["result"] == "fail"      # paused does not count
-
-
-def test_business_name_and_logo_pass_only_with_both():
-    both = [asset("campaign", "BUSINESS_NAME"), asset("campaign", "LOGO")]
-    assert find("7.4", camp_assets=both)["result"] == "pass" and find("8.12", camp_assets=both)["result"] == "pass"
-    one = find("7.4", camp_assets=[asset("campaign", "BUSINESS_NAME")])
-    assert one["result"] is None and "Logo: not set" in one["found"]
-
-
-def test_optional_assets_are_ticked_when_present_and_only_printed_when_not():
-    assert find("7.6", camp_assets=[asset("campaign", "CALL")])["result"] == "pass"
-    assert find("7.6")["result"] is None and find("7.9")["result"] is None and find("7.8")["result"] is None
-
-
-# ── Performance Max ─────────────────────────────────────────────────────────
 
 def group(i="g1", name="Design"):
     return {"assetGroup": {"id": i, "name": name, "status": "ENABLED", "finalUrls": ["https://example.com/design/"]}}
 
 
-def group_assets(i="g1", headline=15, long=5, desc=5, land=5, square=5, video=5):
-    out = []
-    for field, n in (("HEADLINE", headline), ("LONG_HEADLINE", long), ("DESCRIPTION", desc), ("MARKETING_IMAGE", land),
-                     ("SQUARE_MARKETING_IMAGE", square), ("YOUTUBE_VIDEO", video)):
-        out += [{"assetGroup": {"id": i}, "assetGroupAsset": {"fieldType": field, "status": "ENABLED"}} for _ in range(n)]
-    return out
+def page(**k):
+    base = {"url": "https://example.com/", "https": True, "status": 200, "finalUrl": "https://example.com/", "loadMs": 300}
+    base.update(k)
+    return base
 
 
-def pmax(**data):
-    return rows(_channel="PERFORMANCE_MAX", campaign=campaign(advertisingChannelType="PERFORMANCE_MAX"), **data)
-
-
-def test_asset_group_minimums_video_count_and_audience_signals():
-    logo = [asset("campaign", "LOGO")]
-    out = auto.evaluate(pmax(asset_groups=[group()], asset_group_assets=group_assets(),
-                             asset_group_signals=[{"assetGroup": {"id": "g1"}, "assetGroupSignal": {"audience": {"audience": "customers/1/audiences/2"}}}],
-                             camp_assets=logo))
-    assert out["8.7"]["result"] == "pass" and out["8.8"]["result"] == "pass" and out["8.9"]["result"] == "pass"
-    thin = auto.evaluate(pmax(asset_groups=[group()], asset_group_assets=group_assets(headline=2, square=0, video=1), camp_assets=logo))
-    assert thin["8.7"]["result"] == "fail" and "headlines 2 of 3" in thin["8.7"]["found"] and "square images 0 of 1" in thin["8.7"]["found"]
-    assert thin["8.8"]["result"] == "fail" and thin["8.9"]["result"] == "fail"
-    assert auto.evaluate(pmax(asset_groups=[group()], asset_group_assets=group_assets()))["8.7"]["result"] is None   # no logo found: not ticked
-
-
-def test_a_removed_asset_groups_leftover_assets_are_ignored():
-    # Google can still return asset rows of a removed group; only groups the campaign has count.
-    leftovers = group_assets("gone", headline=30)
-    out = auto.evaluate(pmax(asset_groups=[group()], asset_group_assets=group_assets() + leftovers, camp_assets=[asset("campaign", "LOGO")]))
-    assert "30" not in out["8.7"]["found"] and out["8.7"]["result"] == "pass"
-    themes = [{"assetGroup": {"id": "gone"}, "assetGroupSignal": {"searchTheme": {"text": "stale theme"}}},
-              {"assetGroup": {"id": "g1"}, "assetGroupSignal": {"searchTheme": {"text": "fresh theme"}}}]
-    f = auto.evaluate(pmax(asset_groups=[group()], asset_group_signals=themes))["8.10"]
-    assert "fresh theme" in f["found"] and "stale theme" not in f["found"]
-
-
-def test_a_campaign_with_no_asset_group_is_a_cross():
-    assert auto.evaluate(pmax())["8.7"]["result"] == "fail"
-
-
-def test_merchant_center_must_be_linked_on_a_shopping_style_campaign():
-    linked = campaign(shoppingSetting={"merchantId": "12345", "feedLabel": "US"})
-    f = find("8.5", campaign=linked)
-    assert f["result"] == "pass" and "12345" in f["found"] and "feed label US" in f["found"]
-    assert find("8.5", campaign=campaign())["result"] == "fail"
-
-
-# ── Pacing ──────────────────────────────────────────────────────────────────
-
-def test_spend_pacing_prints_yesterday_against_the_daily_budget():
-    days = [{"segments": {"date": "2026-10-12"}, "metrics": {"costMicros": "1000000"}},
-            {"segments": {"date": "2026-10-13"}, "metrics": {"costMicros": "7500000"}}]
-    f = find("15.4", campaign=campaign(), days=days)
-    assert f["result"] is None and "2026-10-13" in f["found"] and "7.50 " in f["found"] and "25%" in f["found"]
+def test_other_assets_are_counted_for_the_ai():
+    camp = [{"campaignAsset": {"fieldType": "SITELINK", "status": "ENABLED"}, "asset": {}}] * 4
+    acct = [{"customerAsset": {"fieldType": "CALLOUT", "status": "ENABLED"}, "asset": {}}] * 7
+    f = find("1.6", camp_assets=camp, cust_assets=acct)
+    assert f["result"] is None and "sitelinks 4 on the campaign, 0 on the account" in f["found"] and "callouts 0 on the campaign, 7 on the account" in f["found"]
 
 
 # ── Reading a campaign ──────────────────────────────────────────────────────
 
 class Google:
     """search(customer_id, gaql) that records what it was asked and can refuse some reads."""
-    def __init__(self, refuse=None, error=None):
-        self.queries, self.refuse, self.error = [], refuse or {}, error
+    def __init__(self, refuse=None, channel="SEARCH"):
+        self.queries, self.refuse, self.channel = [], refuse or {}, channel
 
     def __call__(self, customer_id, gaql):
         self.queries.append(gaql)
@@ -416,7 +460,7 @@ class Google:
             if needle in gaql:
                 raise exc
         if "advertising_channel_type FROM campaign WHERE campaign.id" in gaql:
-            return [{"campaign": {"id": "1", "advertisingChannelType": self.error or "SEARCH"}}]
+            return [{"campaign": {"id": "1", "advertisingChannelType": self.channel}}]
         return []
 
 
@@ -433,9 +477,9 @@ def tables(g):
 
 def test_only_the_reads_a_campaign_type_can_answer_are_made():
     for channel, present, absent in (("SEARCH", {"ad_group", "ad_group_ad", "ad_group_criterion"}, {"asset_group"}),
-                                     ("PERFORMANCE_MAX", {"asset_group", "asset_group_asset", "asset_group_signal"}, {"ad_group", "ad_group_ad"}),
+                                     ("PERFORMANCE_MAX", {"asset_group", "asset_group_asset"}, {"ad_group", "ad_group_ad", "ad_group_criterion"}),
                                      ("DEMAND_GEN", set(), {"ad_group", "asset_group", "ad_group_criterion"})):
-        g = Google(error=channel)
+        g = Google(channel=channel)
         out = auto.run("2133861213", "1", g)
         t = tables(g)
         assert present <= t and not (absent & t), (channel, t)
@@ -443,23 +487,29 @@ def test_only_the_reads_a_campaign_type_can_answer_are_made():
     assert len(Google().queries) == 0
 
 
-def test_a_read_costs_about_two_dozen_calls_for_a_search_campaign():
+def test_a_read_costs_about_sixteen_calls_for_a_search_campaign():
     g = Google()
     auto.run("2133861213", "1", g)
-    assert 18 <= len(g.queries) <= 28
+    assert 14 <= len(g.queries) <= 20
+
+
+def test_the_book_travels_with_the_read_to_the_rules():
+    b = book_of(bid_strategy_type="Target CPA")
+    out = auto.run("2133861213", "1", Google(), book=b)
+    assert out["data"]["_book"] is b
 
 
 def test_one_refused_read_is_noted_and_the_rest_still_run():
-    g = Google(refuse={"FROM billing_setup": Refused("", "400 unrecognized field")})
+    g = Google(refuse={"FROM recommendation_subscription": Refused("", "400 unrecognized field")})
     out = auto.run("2133861213", "1", g)
-    assert "billing" in out["errors"] and "400 unrecognized field" in out["errors"]["billing"]
-    assert out["findings"]["1.2"]["found"].startswith("Could not read this from Google Ads (400")
-    assert "1.4" in out["findings"]
+    assert "recs" in out["errors"] and "400 unrecognized field" in out["errors"]["recs"]
+    assert out["findings"]["4.1"]["found"].startswith("Could not read this from Google Ads (400")
+    assert "1.5" in out["findings"]
 
 
 @pytest.mark.parametrize("kind", ["quota", "auth", "not_configured", "permission"])
 def test_a_spent_quota_or_a_sign_in_failure_stops_the_run(kind):
-    g = Google(refuse={"FROM customer": Refused(kind, "stop")})
+    g = Google(refuse={"FROM customer WHERE": Refused(kind, "stop"), "FROM customer\n": Refused(kind, "stop"), "customer.descriptive_name": Refused(kind, "stop")})
     with pytest.raises(Refused):
         auto.run("2133861213", "1", g)
 
@@ -501,51 +551,3 @@ def test_a_found_text_is_kept_to_a_readable_length():
     f = auto.Finding("pass", "word " * 1000)
     assert len(f["found"]) <= auto.MAX_FOUND and f["found"].endswith("...")
     assert auto.Finding(None, "a\n  b\t c")["found"] == "a b c"
-
-
-# ── Landing pages ───────────────────────────────────────────────────────────
-
-def page(**k):
-    base = {"url": "https://example.com/", "https": True, "status": 200, "finalUrl": "https://example.com/", "loadMs": 300,
-            "paramsSurvive": True, "stagingHost": False, "noindex": False, "robots": {"adsbotAllowed": True}}
-    base.update(k)
-    return base
-
-
-def with_pages(*pages, **data):
-    d = rows(**data)
-    d["_pages"] = list(pages)
-    return auto.evaluate(d)
-
-
-def test_a_page_that_is_open_and_not_blocked_to_adsbot_passes_13_1():
-    out = with_pages(page())["13.1"]
-    assert out["result"] == "pass" and "https://example.com/: 200" in out["found"]
-
-
-def test_noindex_is_a_note_not_a_failure_because_it_does_not_matter_to_ads():
-    out = with_pages(page(noindex=True))["13.1"]
-    assert out["result"] == "pass" and "noindex" in out["found"] and "fine for ads" in out["found"]
-
-
-def test_a_missing_staging_or_adsbot_blocked_page_fails_13_1():
-    for bad, says in ((page(status=404), "answered 404"), (page(stagingHost=True), "staging"),
-                      (page(robots={"adsbotAllowed": False}), "blocks AdsBot"), (page(error="TimeoutError: slow", status=None), "could not be opened")):
-        assert with_pages(bad)["13.1"]["result"] == "fail" and says in with_pages(bad)["13.1"]["found"], says
-    assert with_pages()["13.1"]["result"] is None                                           # no page to open: no tick
-
-
-def test_parameters_surviving_the_redirect_is_a_pass_and_losing_them_is_a_fail_for_13_2():
-    assert with_pages(page())["13.2"]["result"] == "pass"
-    lost = with_pages(page(paramsSurvive=False, url="https://example.com/old"))["13.2"]
-    assert lost["result"] == "fail" and "https://example.com/old" in lost["found"]
-    assert with_pages(page(paramsSurvive=None))["13.2"]["result"] is None                   # could not be tested
-    assert with_pages(page(), page(url="https://example.com/b", paramsSurvive=None))["13.2"]["result"] is None   # not every page tested
-
-
-def test_final_urls_that_do_not_load_are_a_cross_for_6_3():
-    ads = dict(adgroups=[ad_group()], ads=[rsa()])
-    assert with_pages(page(status=404), **ads)["6.3"]["result"] == "fail"
-    ok = with_pages(page(), **ads)["6.3"]
-    assert ok["result"] is None and "loaded" in ok["found"]                                 # loading is only part of the check
-

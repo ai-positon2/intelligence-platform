@@ -43,6 +43,7 @@ CREATE TABLE IF NOT EXISTS pm_qc_launches (
     review_error    TEXT NOT NULL DEFAULT '',
     review_note     TEXT NOT NULL DEFAULT '',
     review_started  TIMESTAMPTZ,
+    book            JSONB NOT NULL DEFAULT '{}'::jsonb,
     created_by      TEXT,
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -60,6 +61,16 @@ ALTER TABLE pm_qc_launches ADD COLUMN IF NOT EXISTS review_progress JSONB NOT NU
 ALTER TABLE pm_qc_launches ADD COLUMN IF NOT EXISTS review_error TEXT NOT NULL DEFAULT '';
 ALTER TABLE pm_qc_launches ADD COLUMN IF NOT EXISTS review_note TEXT NOT NULL DEFAULT '';
 ALTER TABLE pm_qc_launches ADD COLUMN IF NOT EXISTS review_started TIMESTAMPTZ;
+ALTER TABLE pm_qc_launches ADD COLUMN IF NOT EXISTS book JSONB NOT NULL DEFAULT '{}'::jsonb;
+-- The checklist changed (the Campaign Book checks replaced the 155-check list): answers given against the old
+-- check ids mean nothing now, and the old reviews are for checks that no longer exist.
+DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'pm_qc_launches' AND column_name = 'checklist') THEN
+        ALTER TABLE pm_qc_launches ADD COLUMN checklist TEXT NOT NULL DEFAULT 'campaign-book';
+        DELETE FROM pm_qc_checks;
+        UPDATE pm_qc_launches SET auto = '{}'::jsonb, auto_at = NULL, review_status = '', review_error = '', review_note = '';
+    END IF;
+END $$;
 DO $$ BEGIN
     IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'pm_qc_launches' AND column_name = 'name') THEN
         ALTER TABLE pm_qc_launches ALTER COLUMN name DROP NOT NULL;
@@ -81,7 +92,7 @@ CREATE TABLE IF NOT EXISTS pm_qc_checks (
 
 _LAUNCH_COLS = ("id, account_id, account_name, campaign_id, campaign_name, channel, client_types, "
                 "campaign_types, auto, auto_at, created_by, created_at, updated_at, archived, "
-                "review_status, review_progress, review_error, review_note, review_started")
+                "review_status, review_progress, review_error, review_note, review_started, book")
 STALE_AFTER_S = 600          # a review still "running" after this died with its process (a deploy, a crash)
 _READY = False
 _READY_LOCK = threading.Lock()
@@ -128,7 +139,7 @@ def _launch(r):
             "channel": r[5] or "", "client_types": r[6] or [], "campaign_types": r[7] or [], "auto": r[8] or {},
             "auto_at": _iso(r[9]), "created_by": r[10], "created_at": _iso(r[11]), "updated_at": _iso(r[12]),
             "archived": bool(r[13]), "review_status": r[14] or "", "review_progress": r[15] or {},
-            "review_error": r[16] or "", "review_note": r[17] or "", "review_started": _iso(r[18])}
+            "review_error": r[16] or "", "review_note": r[17] or "", "review_started": _iso(r[18]), "book": r[19] or {}}
 
 
 # ── QCs ─────────────────────────────────────────────────────────────────────
@@ -208,6 +219,15 @@ def fail_review(launch_id, error):
     with _tx() as cur:
         cur.execute("UPDATE pm_qc_launches SET review_status = 'error', review_error = %s, review_progress = '{}'::jsonb, "
                     "updated_at = now() WHERE id = %s", (error[:500], launch_id))
+
+
+def set_book(launch_id, book):
+    """Keep the campaign book the team added (or {} to remove it). Returns the launch, or None."""
+    with _tx() as cur:
+        cur.execute("UPDATE pm_qc_launches SET book = %s, updated_at = now() WHERE id = %s AND NOT archived RETURNING " + _LAUNCH_COLS,
+                    (json.dumps(book or {}), launch_id))
+        row = cur.fetchone()
+    return _launch(row) if row else None
 
 
 def archive_launch(launch_id):

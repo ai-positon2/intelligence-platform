@@ -7,6 +7,9 @@
  * human"), then what passed. A person can confirm or overrule any check with one click and
  * (a wrong mark is saved with the AI's finding as its reason); nothing has to be ticked for the review to be complete.
  *
+ * The checks that "depend on the campaign book" are compared with the book the team adds here
+ * as an Excel file or a Google Sheet link; adding it starts a fresh review against it.
+ *
  * The review runs on the server in the background (about a minute); this page polls its
  * progress. The server also works out the verdict, which is what the banner shows: this
  * page never decides "ready" for itself. The rules are tracker/paid_qa.py, the evidence
@@ -163,9 +166,9 @@ document.addEventListener("click",function(e){ if(e.target&&e.target.id==="goMan
 
 /* ── The QC ───────────────────────────────────────────────── */
 var VERDICT_SUB = {
-  ready:function(s){return "The AI found no Critical problem, and every Critical check is passed or confirmed."+(s.failed.length?" "+s.failed.length+" smaller issue"+(s.failed.length===1?" was":"s were")+" flagged: fix Major ones before launch, or within 24 hours with a note.":"");},
-  incomplete:function(s){return s.pendingCritical.length+" Critical check"+(s.pendingCritical.length===1?"":"s")+" the AI could not verify from what it can see ("+s.pendingCritical.join(", ")+"). A person has to look; confirm each below.";},
-  not_ready:function(s){return "The AI flagged "+s.failedCritical.length+" Critical check"+(s.failedCritical.length===1?"":"s")+" ("+s.failedCritical.join(", ")+"). Do not launch until "+(s.failedCritical.length===1?"it is":"they are")+" fixed.";}
+  ready:function(s){return "The AI found nothing wrong, and every check is passed or confirmed.";},
+  incomplete:function(s){return s.pendingBlocking.length+" check"+(s.pendingBlocking.length===1?"":"s")+" the AI could not verify from what it can see ("+s.pendingBlocking.join(", ")+"). A person has to look: confirm each below"+(S.launch&&!S.launch.book?", or add the campaign book, which some of them need":"")+".";},
+  not_ready:function(s){return "The AI flagged "+s.failedBlocking.length+" check"+(s.failedBlocking.length===1?"":"s")+" ("+s.failedBlocking.join(", ")+"). Do not launch until "+(s.failedBlocking.length===1?"it is":"they are")+" fixed.";}
 };
 function rowState(id){
   var c=S.checks[id];
@@ -199,7 +202,11 @@ function renderReview(){
 }
 function paintVerdict(){
   var s=S.summary, v=s.verdict, sev=s.bySeverity, human=(s.needsHuman||[]).length;
-  var stat=function(name){var b=sev[name];return '<span class="qa-stat"><b>'+(b.pass+b.na)+'/'+b.total+'</b> '+name+' passed</span>';};
+  var stats=function(){
+    var names=Object.keys(sev);
+    if(names.length>1) return names.map(function(n){var b=sev[n];return '<span class="qa-stat"><b>'+(b.pass+b.na)+'/'+b.total+'</b> '+n+' passed</span>';}).join("");
+    var b=sev[names[0]]; return '<span class="qa-stat"><b>'+(b.pass+b.na)+'/'+b.total+'</b> passed</span>';
+  };
   $("#verdict").className="qa-verdict "+v.code;
   $("#verdict").innerHTML=
     '<div class="qa-v-main"><span class="qa-v-ic">'+(v.code==="ready"?'<svg viewBox="0 0 24 24"><path d="M5 12l4 4 10-10"/></svg>':v.code==="not_ready"?'<svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>':'<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/></svg>')+'</span>'+
@@ -207,22 +214,30 @@ function paintVerdict(){
     '<div class="qa-v-bar"><i style="width:'+s.percent+'%"></i></div>'+
     '<div class="qa-v-stats"><span class="qa-stat big"><b>'+s.checked+'/'+s.total+'</b> checks answered ('+s.percent+'%)</span>'+
     (s.failed.length?'<span class="qa-stat bad"><b>'+s.failed.length+'</b> flagged</span>':'<span class="qa-stat"><b>0</b> flagged</span>')+
-    (human?'<span class="qa-stat"><b>'+human+'</b> need a human</span>':"")+stat("Critical")+stat("Major")+stat("Minor")+'</div>';
+    (human?'<span class="qa-stat"><b>'+human+'</b> need a human</span>':"")+stats()+'</div>';
 }
 function paintFilters(){
   var ids=S.summary.applicable, n={all:ids.length,todo:0,pass:0,fail:0,na:0};
   ids.forEach(function(id){var st=rowState(id); n[st]++;});
   var st=[["fail","Flagged"],["todo","Needs a human"],["pass","Passed"],["na","N/A"],["all","All"]];
   $("#fStatus").innerHTML=st.map(function(x){return '<button type="button" class="pm-chip'+(S.fStatus===x[0]?" on":"")+(x[0]==="fail"&&n.fail?" warn":"")+'" data-f="'+x[0]+'" aria-pressed="'+(S.fStatus===x[0])+'">'+x[1]+' <span class="n">'+n[x[0]]+'</span></button>';}).join("");
-  var sv=[["all","All"],["Critical","Critical"],["Major","Major"],["Minor","Minor"]];
-  $("#fSev").innerHTML=sv.map(function(x){return '<button type="button" class="pm-chip'+(S.fSev===x[0]?" on":"")+'" data-s="'+x[0]+'" aria-pressed="'+(S.fSev===x[0])+'">'+x[1]+'</button>';}).join("");
-  var have=S.launch.clientTypes;
-  $("#fClient").innerHTML=S.list.clientTypes.filter(function(t){return t!=="All";}).map(function(t){
-    var on=have.indexOf(t)>=0; return '<button type="button" class="pm-chip'+(on?" on":"")+'" data-c="'+esc(t)+'" aria-pressed="'+on+'">'+esc(t)+'</button>';}).join("");
-  var nc=S.needs, el=$("#clientNote");
-  el.hidden=!(nc&&nc.count);
-  if(nc&&nc.count) el.innerHTML='<b>'+nc.count+' more check'+(nc.count===1?"":"s")+'</b> ('+nc.critical+' Critical) only apply to a type of client: '+esc(nc.types.join(", "))+
-    '. Pick the client type above and the AI\'s answers for '+(nc.count===1?"it":"them")+' count. Until then they are not in the verdict.';
+  var several=S.list.severities.length>1;
+  $("#grpSev").hidden=!several;
+  if(several){
+    var sv=[["all","All"]].concat(S.list.severities.map(function(x){return [x,x];}));
+    $("#fSev").innerHTML=sv.map(function(x){return '<button type="button" class="pm-chip'+(S.fSev===x[0]?" on":"")+'" data-s="'+x[0]+'" aria-pressed="'+(S.fSev===x[0])+'">'+x[1]+'</button>';}).join("");
+  }
+  var types=S.list.clientTypes.filter(function(t){return t!=="All";});
+  $("#grpClient").hidden=!types.length; $("#clientNote").hidden=true;
+  if(types.length){
+    var have=S.launch.clientTypes;
+    $("#fClient").innerHTML=types.map(function(t){
+      var on=have.indexOf(t)>=0; return '<button type="button" class="pm-chip'+(on?" on":"")+'" data-c="'+esc(t)+'" aria-pressed="'+on+'">'+esc(t)+'</button>';}).join("");
+    var nc=S.needs, el=$("#clientNote");
+    el.hidden=!(nc&&nc.count);
+    if(nc&&nc.count) el.innerHTML='<b>'+nc.count+' more check'+(nc.count===1?"":"s")+'</b> only apply to a type of client: '+esc(nc.types.join(", "))+
+      '. Pick the client type above and the AI\'s answers for '+(nc.count===1?"it":"them")+' count. Until then they are not in the verdict.';
+  }
 }
 $("#fStatus").addEventListener("click",function(e){var b=e.target.closest("button");if(!b)return;S.fStatus=b.dataset.f;paintFilters();paintSections();});
 $("#fSev").addEventListener("click",function(e){var b=e.target.closest("button");if(!b)return;S.fSev=b.dataset.s;paintFilters();paintSections();});
@@ -263,7 +278,7 @@ function rowHtml(it){
     '</div>'+
     '<div class="qa-main">'+
       '<div class="qa-line"><span class="qa-id">'+esc(id)+'</span><b class="qa-check">'+esc(it.check)+'</b>'+
-        '<span class="qa-sev '+it.severity.toLowerCase()+'">'+it.severity+'</span>'+tags+'</div>'+
+        (S.list.severities.length>1?'<span class="qa-sev '+it.severity.toLowerCase()+'">'+it.severity+'</span>':"")+tags+'</div>'+
       (found?'<div class="qa-found'+(c.status==="fail"&&c.source!=="person"?" bad":st==="todo"?" need":"")+'"><span class="qa-found-k">'+label+'</span><span class="qa-found-v">'+esc(found)+'</span></div>':"")+
       (c&&c.fix&&(c.status==="fail")?'<div class="qa-fix"><span class="qa-found-k">Fix</span><span>'+esc(c.fix)+'</span></div>':"")+
       (c&&c.evidence&&c.source==="ai"?'<div class="qa-ev"><span class="qa-found-k">Evidence</span><span>'+esc(c.evidence)+'</span></div>':"")+
@@ -300,12 +315,11 @@ function paintSections(){
   $("#sections").innerHTML=html||'<div class="pm-panel"><p class="pm-empty">'+(S.fSev==="all"&&none?none:"Nothing matches this filter.")+'</p></div>';
 }
 function render(){
-  paintHead(); renderReview();
+  paintHead(); renderBook(); renderReview();
   if(S.review&&S.review.status==="running") return;
   paintVerdict(); paintFilters(); paintSections();
-  $("#foot").innerHTML="Source: the PPC team's Campaign Launch QC Checklist, reviewed by the AI. <b>Critical</b> checks are launch blockers; <b>Major</b> should be fixed before launch, "+
-    "or within 24 hours with a note; <b>Minor</b> is best practice. The AI answers only from what it can read in Google Ads and on the landing pages; it cannot see the media plan or the client's approvals, "+
-    "so those stay for a person. Exact Google Ads rules outrank the AI, and your click outranks both.";
+  $("#foot").innerHTML="Source: the PPC team's Campaign Book checks, reviewed by the AI. The AI answers only from what it can read in Google Ads, on the landing pages and in the campaign book you add; "+
+    "Google Ads does not show some account switches to the API, so those stay for a person. Exact Google Ads rules outrank the AI, and your click outranks both.";
 }
 function refresh(id){
   // After one check changes: repaint that row, the verdict, the section headers and the filter counts.
@@ -352,7 +366,7 @@ function setMsg(id,bad){
 function paintCampaignBadge(){
   var c=S.campaigns.filter(function(x){return x.id===S.campaignId;})[0]; if(!c) return;
   c.qc={id:S.launchId,verdict:S.summary.verdict,percent:S.summary.percent,checked:S.summary.checked,total:S.summary.total,
-        failedCount:S.summary.failed.length,failedCritical:S.summary.failedCritical.length};
+        failedCount:S.summary.failed.length,failedBlocking:S.summary.failedBlocking.length};
   paintCampaigns();
 }
 function wrongNote(id){
@@ -373,6 +387,49 @@ $("#sections").addEventListener("click",function(e){
   }else if(act==="fail"){
     if(st==="fail"&&mine) save(id,null,""); else save(id,"fail",wrongNote(id));
   }
+});
+
+/* ── The campaign book ────────────────────────────────────── */
+function renderBook(){
+  var b=S.launch&&S.launch.book, busy=S.bookBusy;
+  var status=busy?'<span class="qa-book-s">'+esc(busy)+'</span>':
+    b?'<span class="qa-book-s ok"><b>'+esc(b.filename||"Campaign book")+'</b> · '+b.fields+' field'+(b.fields===1?"":"s")+' read'+(b.uploadedBy?' · added by '+esc(who(b.uploadedBy)):"")+(b.uploadedAt?' · '+esc(rel(b.uploadedAt)):"")+'</span>':
+    '<span class="qa-book-s">Not added</span>';
+  $("#bookBox").innerHTML='<section class="pm-panel qa-book"><div class="qa-book-t"><b>Campaign book</b>'+status+'</div>'+
+    '<p>'+(b?'The AI compares the campaign with this book on bid strategy, devices, genders, household income, locations, age and ad schedule.':
+      'Some checks depend on the client\'s plan: bid strategy, devices, genders, household income, locations, age and ad schedule. Add the campaign book as an Excel file or a Google Sheet link and the AI reviews the campaign against it.')+'</p>'+
+    '<div class="qa-book-row"><button type="button" class="pm-btn-ghost" id="bookPick"'+(busy?" disabled":"")+'>'+(b?"Replace with a file":"Upload Excel or CSV")+'</button>'+
+    '<input type="file" id="bookFile" accept=".xlsx,.csv" hidden>'+
+    '<input type="text" id="bookLink" maxlength="400" placeholder="or paste a Google Sheet link (shared as anyone with the link can view)" autocomplete="off"'+(busy?" disabled":"")+'>'+
+    '<button type="button" class="pm-btn-ghost" id="bookLinkGo"'+(busy?" disabled":"")+'>Add link</button>'+
+    (b?'<button type="button" class="pm-btn-ghost qa-danger" id="bookRemove"'+(busy?" disabled":"")+'>Remove</button>':"")+'</div></section>';
+}
+function sendBook(body){
+  S.bookBusy="Reading the book…"; renderBook(); say("");
+  call("POST",API+"/launches/"+S.launchId+"/book",body).then(function(r){
+    S.bookBusy=""; if(!r.ok){ renderBook(); return say(fail(r,"The book could not be added.")); }
+    S.startError=r.j.reviewError||""; if(S.startError) say(esc(S.startError),"pm-note");
+    open(r.j);
+  }).catch(function(){S.bookBusy=""; renderBook(); say("The server could not be reached. Try again.");});
+}
+document.addEventListener("click",function(e){
+  var id=e.target&&e.target.id;
+  if(id==="bookPick"){ $("#bookFile").click(); }
+  else if(id==="bookLinkGo"){ var v=($("#bookLink").value||"").trim(); if(!v) return say("Paste the Google Sheet link first."); sendBook({sheetUrl:v}); }
+  else if(id==="bookRemove"){
+    if(!confirm("Remove the campaign book from this QC? The checks that depend on it go back to needing it.")) return;
+    S.bookBusy="Removing…"; renderBook();
+    call("DELETE",API+"/launches/"+S.launchId+"/book",{}).then(function(r){ S.bookBusy=""; if(!r.ok){renderBook();return say(fail(r,"That could not be removed."));} open(r.j); });
+  }
+});
+document.addEventListener("change",function(e){
+  if(!e.target||e.target.id!=="bookFile"||!e.target.files||!e.target.files[0]) return;
+  var f=e.target.files[0];
+  if(f.size>3000000) return say("That file is over 3 MB. Save a smaller copy, or add the Google Sheet link instead.");
+  var rd=new FileReader();
+  rd.onload=function(){ var m=String(rd.result).split(","); sendBook({filename:f.name,data:m.length>1?m[1]:""}); };
+  rd.onerror=function(){ say("That file could not be read."); };
+  rd.readAsDataURL(f);
 });
 
 /* ── Header actions ───────────────────────────────────────── */
@@ -396,10 +453,10 @@ $("#removeBtn").addEventListener("click",function(){
 });
 $("#copyBtn").addEventListener("click",function(){
   var s=S.summary, L=S.launch, lines=["Launch QC (AI review): "+L.campaignName+" | "+L.accountName+" ("+dashed(L.accountId)+")","Verdict: "+s.verdict.text,
-    "Answered: "+s.checked+"/"+s.total+" checks | Critical passed "+(s.bySeverity.Critical.pass+s.bySeverity.Critical.na)+"/"+s.bySeverity.Critical.total];
+    "Answered: "+s.checked+"/"+s.total+" checks"];
   if(s.failed.length){lines.push("","Flagged:"); s.failed.forEach(function(id){var it=S.items[id],c=S.checks[id]||{};
     lines.push("- "+id+" "+it.check+" ("+it.severity+"): "+(c.note||c.found||"")+(c.fix?" Fix: "+c.fix:""));});}
-  if(s.pendingCritical.length){lines.push("","Critical checks the AI could not verify (a person must look): "+s.pendingCritical.join(", "));}
+  if(s.pendingBlocking.length){lines.push("","Checks the AI could not verify (a person must look): "+s.pendingBlocking.join(", "));}
   var text=lines.join("\n"), label=$("#copyBtn span");
   var done=function(){label.textContent="Copied";setTimeout(function(){label.textContent="Copy summary";},1600);};
   if(navigator.clipboard&&navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done,function(){say("Copying was blocked by the browser.");});

@@ -42,23 +42,21 @@ def run_review(launch_id, *, store, search, geo_fn=None, web_fn=None, call=None,
         if not launch or launch["archived"]:
             return
         store.set_progress(launch_id, "Reading the campaign from Google Ads", 0, 0)
-        out = paid_qa_auto.run(launch["account_id"], launch["campaign_id"], search, geo_fn=geo_fn, web_fn=web_fn)
+        out = paid_qa_auto.run(launch["account_id"], launch["campaign_id"], search, geo_fn=geo_fn, web_fn=web_fn,
+                               book=launch.get("book") or None)
         camp = out["campaign"]
         if not camp["id"]:
             store.fail_review(launch_id, "That campaign was not found in this account.")
             return
         data, rules = out["data"], out["findings"]
         types = paid_qa.campaign_types_for(camp["channel"], camp["dsa"])
-        # Every check that fits this campaign's type, whatever the client type: choosing one later only changes
-        # which of them count, so it never needs another review.
-        checks = paid_qa.applicable(paid_qa.checklist()["clientTypes"], types)
+        checks = paid_qa.applicable([], types)
         ids = [i["id"] for i in checks]
         settled = {c for c in ids if rules.get(c) and rules[c]["result"] in ("pass", "fail")}
         ask = [i for i in checks if i["id"] not in settled]
         sections = len({i["section"] for i in ask})
         ev = paid_qa_ai.evidence_bundle(data, paid_qa_auto.Ctx(data))
-        meta = {"name": camp["name"] or launch["campaign_name"], "type": camp["type"], "clientTypes": launch["client_types"],
-                "today": (today or dt.date.today()).isoformat()}
+        meta = {"name": camp["name"] or launch["campaign_name"], "type": camp["type"], "today": (today or dt.date.today()).isoformat()}
         store.set_progress(launch_id, "The AI is reviewing the checklist", 0, sections)
         ai, problems = paid_qa_ai.review(
             ask, ev, rules, meta, call=call,

@@ -39,10 +39,10 @@ def test_a_review_reads_runs_the_rules_asks_the_ai_and_saves_one_finding_per_che
     run(mem, lid)
     l = mem.launches[lid]
     assert l["review_status"] == "done" and l["auto_at"] and l["review_error"] == "" and l["review_note"] == ""
-    ids = {i["id"] for i in qa.applicable(qa.checklist()["clientTypes"], ["Search"])}
-    assert set(l["auto"]) == ids                                                              # every check that fits, client type or not
-    assert l["auto"]["1.6"]["source"] == "rule" and l["auto"]["6.2"]["source"] == "ai" and l["auto"]["6.2"]["result"] == "fail"
-    assert l["auto"]["13.1"]["source"] == "rule" and l["auto"]["13.1"]["result"] == "pass"    # the page rules ran on the fetched page
+    ids = {i["id"] for i in qa.applicable([], ["Search"])}
+    assert set(l["auto"]) == ids and len(ids) == 61                                           # every check that fits the campaign
+    assert l["auto"]["1.5"]["source"] == "rule" and l["auto"]["1.4"]["source"] == "ai" and l["auto"]["1.4"]["result"] == "fail"
+    assert l["auto"]["1.25"]["source"] == "rule" and l["auto"]["1.25"]["result"] == "pass"    # the page rules ran on the fetched page
 
 
 def test_checks_the_exact_rules_settled_are_not_put_to_the_ai():
@@ -56,14 +56,23 @@ def test_checks_the_exact_rules_settled_are_not_put_to_the_ai():
     assert settled and not (settled & asked)
 
 
-def test_every_check_that_fits_the_campaign_type_is_reviewed_even_the_client_type_ones():
+def test_every_check_that_fits_the_campaign_type_is_reviewed_and_the_search_only_ones_are_not_asked_of_pmax():
     mem = MemoryStore()
     lid = new_qc(mem)
     model = FakeModel(DEFAULT_ANSWERS)
     run(mem, lid, model)
     asked = {c["id"] for req in model.asked for c in req["checks"]}
-    assert "7.9" in asked and "13.4" in asked                                                  # Lead Gen and Ecommerce checks
-    assert not any(i.startswith("8.") for i in asked)                                          # PMax checks are not asked of a Search campaign
+    assert {"1.4", "1.6", "3.4", "5.2"} <= asked
+    mem2 = MemoryStore()
+    launch, _ = mem2.start_launch(by="u", account_id=ACCOUNT, account_name="E", campaign_id=CAMPAIGN, campaign_name="P2_PMax_20261014",
+                                  channel="PERFORMANCE_MAX", campaign_types=["PMax"])
+    mem2.begin_review(launch["id"])
+    model2 = FakeModel(DEFAULT_ANSWERS)
+    pm = fake_google(**{"FROM campaign WHERE campaign.id": [{"campaign": {"id": CAMPAIGN, "name": "P2_PMax_20261014", "status": "ENABLED",
+                                                                         "advertisingChannelType": "PERFORMANCE_MAX"}}]})
+    run(mem2, launch["id"], model2, search=pm)
+    asked2 = {c["id"] for req in model2.asked for c in req["checks"]}
+    assert not ({"1.3", "1.5", "1.23"} & asked2) and "1.6" in asked2 and not ({"1.3", "1.5", "1.23"} & set(mem2.launches[launch["id"]]["auto"]))
 
 
 def test_progress_is_saved_as_the_review_goes():
@@ -76,7 +85,7 @@ def test_progress_is_saved_as_the_review_goes():
     phases = [p for p, _, _ in seen]
     assert phases[0] == "Reading the campaign from Google Ads" and phases[1] == "The AI is reviewing the checklist"
     sections = seen[1][2]
-    assert seen[-1] == ("The AI is reviewing the checklist", sections, sections) and sections >= 10
+    assert seen[-1] == ("The AI is reviewing the checklist", sections, sections) and sections >= 2
 
 
 def test_google_ads_failing_is_saved_on_the_qc_not_lost():
@@ -106,7 +115,7 @@ def test_landing_pages_failing_does_not_stop_the_review():
         raise RuntimeError("DNS is down")
     run(mem, lid, web_fn=down)
     l = mem.launches[lid]
-    assert l["review_status"] == "done" and l["auto"]["13.1"]["result"] is None                # no page, so no tick
+    assert l["review_status"] == "done" and l["auto"]["1.25"]["result"] is None                # no page, so no tick
 
 
 def test_a_model_that_fails_for_every_section_is_said_so_and_nothing_passes_on_its_word():

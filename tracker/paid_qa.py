@@ -1,27 +1,25 @@
 """Paid Marketing Agents: QA Agent, the checklist and its verdict.
 
-The PPC team's "Campaign Launch QC Checklist" (155 checks in 15 sections), run
-on a live campaign: pick an account, pick a campaign, and the QC starts on the
-shared checklist. Each check is right or wrong, with a comment beside it. For
-the checks Google Ads can answer, tracker/paid_qa_auto.py reads the campaign and
-prints what it found; this module is the rules, with no database in it
-(tracker/paid_qa_store.py keeps what was saved):
+The PPC team's Campaign Book checks (61 checks in 5 sections: the campaign's own
+settings, the automation switches and the auto-apply recommendations), done by the AI
+on a live campaign: pick an account, pick a campaign, and the AI reviews every check.
+For the checks Google Ads can answer exactly, tracker/paid_qa_auto.py has rules; the
+rest are judged by the AI (tracker/paid_qa_ai.py) against the evidence and the campaign
+book the team uploads. This module is the rules of the QC itself, with no database in
+it (tracker/paid_qa_store.py keeps what was saved):
 
-  * which checks show for a campaign (its own type, and the client type if one
-    is chosen: checks that exist only for Ecommerce or Lead Gen clients wait
-    until that is said, rather than blocking a verdict they do not belong to);
+  * which checks show for a campaign (its own type);
   * what a person's answer may look like (wrong needs a reason);
-  * how the agent's reading and a person's answer combine (a person wins);
-  * the workbook's verdict, a rule over the Critical checks only:
+  * how the AI's reading and a person's answer combine (a person wins);
+  * the verdict, a rule over the blocking checks (all of them, in this checklist):
 
-        any Critical check wrong                 NOT READY: Critical check failed
-        else any Critical check not yet done     INCOMPLETE: Critical checks pending
+        any check flagged                        NOT READY: a check failed
+        else any check not yet verified          INCOMPLETE: checks need a human
         else                                     READY TO LAUNCH
 
-    A Critical check marked N/A counts as done. Major and Minor failures never
-    block the verdict; they are counted and listed.
+    A check marked N/A counts as done.
 
-The checklist itself is tracker/qa_checklist.json, converted from the workbook.
+The checklist itself is tracker/qa_checklist.json, converted from the Campaign Book.
 """
 from __future__ import annotations
 
@@ -31,6 +29,8 @@ import re
 from functools import lru_cache
 from pathlib import Path
 
+from . import paid_qa_book
+
 CHECKLIST_PATH = Path(__file__).resolve().parent / "qa_checklist.json"
 STATUSES = ("pass", "fail", "na")
 MAX_NAME = 120
@@ -38,8 +38,8 @@ MAX_NOTE = 2000
 MIN_REASON = 3
 STALE_REVIEW_S = 600
 VERDICTS = {
-    "not_ready": "NOT READY: Critical check failed",
-    "incomplete": "INCOMPLETE: Critical checks pending",
+    "not_ready": "NOT READY: a check failed",
+    "incomplete": "INCOMPLETE: checks still need a human",
     "ready": "READY TO LAUNCH",
 }
 CUSTOMER_ID_RE = re.compile(r"^\d{10}$")
@@ -190,7 +190,8 @@ def summarize(launch, checks):
     rows = applicable(launch["client_types"], launch["campaign_types"])
     by_sev = {s: _blank() for s in cl["severities"]}
     by_sec = {s: _blank() for s in cl["sections"]}
-    failed, pending_critical, failed_critical, unverified = [], [], [], []
+    blocking = set(cl.get("blocking") or cl["severities"])
+    failed, pending_blocking, failed_blocking, unverified = [], [], [], []
     for it in rows:
         st = (checks.get(it["id"]) or {}).get("status")
         key = st if st in STATUSES else "pending"
@@ -199,17 +200,17 @@ def summarize(launch, checks):
             bucket[key] += 1
         if key == "fail":
             failed.append(it["id"])
-            if it["severity"] == "Critical":
-                failed_critical.append(it["id"])
-        elif key == "pending" and it["severity"] == "Critical":
-            pending_critical.append(it["id"])
+            if it["severity"] in blocking:
+                failed_blocking.append(it["id"])
+        elif key == "pending" and it["severity"] in blocking:
+            pending_blocking.append(it["id"])
         if key == "pending":
             unverified.append(it["id"])
     total = len(rows)
     pending = sum(b["pending"] for b in by_sev.values())
-    if failed_critical:
+    if failed_blocking:
         code = "not_ready"
-    elif pending_critical:
+    elif pending_blocking:
         code = "incomplete"
     else:
         code = "ready"
@@ -219,7 +220,7 @@ def summarize(launch, checks):
         "percent": int(round(100.0 * (total - pending) / total)) if total else 0,
         "bySeverity": by_sev,
         "bySection": [dict(section=s, **by_sec[s]) for s in cl["sections"] if by_sec[s]["total"]],
-        "failed": failed, "failedCritical": failed_critical, "pendingCritical": pending_critical,
+        "failed": failed, "failedBlocking": failed_blocking, "pendingBlocking": pending_blocking,
         "needsHuman": unverified, "applicable": [i["id"] for i in rows],
     }
 
@@ -252,7 +253,7 @@ def hidden_by_client(launch):
     """The checks this campaign has that wait on a client type being chosen."""
     shown = {i["id"] for i in applicable(launch["client_types"], launch["campaign_types"])}
     rest = [i for i in applicable(checklist()["clientTypes"], launch["campaign_types"]) if i["id"] not in shown]
-    return {"count": len(rest), "critical": sum(1 for i in rest if i["severity"] == "Critical"),
+    return {"count": len(rest), "blocking": len(rest),
             "types": sorted({t for i in rest for t in i["clientTypes"]})}
 
 
@@ -263,7 +264,8 @@ def public_launch(l):
     return {"id": l["id"], "accountId": l["account_id"], "accountName": l["account_name"],
             "campaignId": l["campaign_id"], "campaignName": l["campaign_name"], "channel": l["channel"],
             "campaignTypes": l["campaign_types"], "clientTypes": l["client_types"],
-            "readAt": l.get("auto_at"), "review": review_view(l), "createdBy": l["created_by"],
+            "readAt": l.get("auto_at"), "review": review_view(l), "book": paid_qa_book.public(l.get("book") or None),
+            "createdBy": l["created_by"],
             "createdAt": l["created_at"], "updatedAt": l["updated_at"]}
 
 
@@ -286,7 +288,7 @@ def brief(summary):
     """The part of a summary a list of QCs needs."""
     return {"verdict": summary["verdict"], "percent": summary["percent"], "checked": summary["checked"],
             "total": summary["total"], "failedCount": len(summary["failed"]),
-            "failedCritical": len(summary["failedCritical"])}
+            "failedBlocking": len(summary["failedBlocking"])}
 
 
 def payload(launch, people):
