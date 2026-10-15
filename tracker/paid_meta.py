@@ -610,10 +610,11 @@ def status(store, *, http=None):
     return out
 
 
+PROBE_BREAKDOWNS = {"product_id", "age", "gender", "region", "device_platform", "publisher_platform", "platform_position", "impression_device"}
 NOISE = re.compile(r"^(post|page_engagement|link_click|landing_page_view|like|comment|photo_view|video|omni_landing|omni_view|onsite_conversion\.(post|messaging|video)|post_)", re.I)
 
 
-def probe(store, act, *, days=30, http=None):
+def probe(store, act, *, days=30, breakdown="", http=None):
     """What an account's insights actually report, for the admin check: every action type (with its count and value) summed
     over the last `days` days and over the account's campaigns, per objective. This is how to see which action type a
     campaign's results really are when the page shows no conversions for money that was clearly spent."""
@@ -622,9 +623,13 @@ def probe(store, act, *, days=30, http=None):
         raise ValueError("that is not a Meta ad account id")
     end = dt.date.today() - dt.timedelta(days=1)
     start = end - dt.timedelta(days=days - 1)
-    rows = _pages(act + "/insights", {"level": "campaign", "time_range": json.dumps({"since": start.isoformat(), "until": end.isoformat()}),
-                                      "fields": "campaign_name,objective,spend,impressions,inline_link_clicks,actions,action_values", "limit": PAGE_LIMIT},
-                  store, http=http)
+    params = {"level": "campaign", "time_range": json.dumps({"since": start.isoformat(), "until": end.isoformat()}),
+              "fields": "campaign_name,objective,spend,impressions,inline_link_clicks,actions,action_values", "limit": PAGE_LIMIT}
+    if breakdown:
+        if breakdown not in PROBE_BREAKDOWNS:
+            raise ValueError("breakdown should be one of " + ", ".join(sorted(PROBE_BREAKDOWNS)))
+        params["breakdowns"] = breakdown
+    rows = _pages(act + "/insights", params, store, http=http)
     by = {}
     for r in rows:
         o = by.setdefault(str(r.get("objective") or ""), {"campaigns": [], "spend": 0.0, "actions": {}, "values": {}})
@@ -640,4 +645,8 @@ def probe(store, act, *, days=30, http=None):
         o["campaigns"] = sorted(set(o["campaigns"]))[:6]
         for b in ("actions", "values"):
             o[b] = dict(sorted(o[b].items(), key=lambda kv: -kv[1])[:80])
-    return {"account": act, "from": start.isoformat(), "to": end.isoformat(), "objectives": by}
+    out = {"account": act, "from": start.isoformat(), "to": end.isoformat(), "objectives": by}
+    if breakdown:                    # a few raw rows, so the shape Meta really sends can be read
+        out["breakdown"], out["rowCount"] = breakdown, len(rows)
+        out["sample"] = [{k: v for k, v in r.items() if k != "campaign_name"} for r in rows[:3]]
+    return out

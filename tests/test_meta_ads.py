@@ -989,10 +989,10 @@ def test_the_probe_refuses_anything_that_is_not_an_account_id():
 
 
 def test_the_probe_route_is_admin_only_and_a_bad_id_is_a_400(routes, monkeypatch):
-    monkeypatch.setattr(mt, "probe", lambda store, act, days=30, **k: {"account": act, "days": days})
+    monkeypatch.setattr(mt, "probe", lambda store, act, days=30, breakdown="", **k: {"account": act, "days": days, "breakdown": breakdown})
     assert client_as(STAFF).get("/p2/paid-marketing/api/meta/status?probe=" + ACT).status_code == 403
     r = client_as(ADMIN).get("/p2/paid-marketing/api/meta/status?probe=%s&days=500" % ACT)
-    assert r.status_code == 200 and r.get_json() == {"account": ACT, "days": 90}                 # capped
+    assert r.status_code == 200 and r.get_json() == {"account": ACT, "days": 90, "breakdown": ""}                 # capped
     monkeypatch.undo()
     assert client_as(ADMIN).get("/p2/paid-marketing/api/meta/status?probe=nonsense").status_code == 400
 
@@ -1013,3 +1013,18 @@ def test_a_saved_segment_report_carries_the_mapping_version(monkeypatch):
     monkeypatch.setattr(mt, "list_accounts", lambda st, **k: META_ACCTS)
     seg.report_for(ACT, "2026-09-01", "2026-09-30", store=fs, meta_fetch=lambda a, dim, p: seg_rows().get(dim["breakdown"] or "day", []))
     assert any(k.startswith(g.CACHE_V + "seg:" + mt.day_key(ACT)) for k in fs.cache)
+
+
+def test_the_probe_can_show_a_breakdown_and_a_few_raw_rows_and_refuses_an_unknown_one():
+    rows = [dict(insight("11", d(2)), product_id="123, Blue Widget"), dict(insight("11", d(2)), product_id="456, Red Widget")]
+    seen = []
+
+    def http(url, headers=None, params=None, timeout=None):
+        seen.append(params)
+        return Resp(200, {"data": rows})
+    out = mt.probe(FakeStore(), ACT, breakdown="product_id", http=http)
+    assert seen[0]["breakdowns"] == "product_id" and out["rowCount"] == 2 and out["sample"][0]["product_id"] == "123, Blue Widget"
+    assert "campaign_name" not in out["sample"][0]
+    with pytest.raises(ValueError):
+        mt.probe(FakeStore(), ACT, breakdown="anything; drop")
+    assert "sample" not in mt.probe(FakeStore(), ACT, http=http)

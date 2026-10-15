@@ -4562,7 +4562,8 @@ def paid_meta_status():
     from tracker import paid_meta, paid_store
     try:
         if request.args.get("probe"):
-            return jsonify(paid_meta.probe(paid_store, request.args.get("probe"), days=min(max(int(request.args.get("days", "30") or 30), 1), 90)))
+            return jsonify(paid_meta.probe(paid_store, request.args.get("probe"), days=min(max(int(request.args.get("days", "30") or 30), 1), 90),
+                                                breakdown=request.args.get("breakdown", "")))
         return jsonify(paid_meta.status(paid_store))
     except ValueError as e:
         return jsonify(error=str(e)), 400
