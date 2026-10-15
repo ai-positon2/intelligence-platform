@@ -949,3 +949,33 @@ def test_the_comparison_range_does_not_ask_for_per_product_days():
     assert cur["series"] and cmp["series"] is None and notes == []
     parsed = pp.parse_products([], d(5), d(1), [])
     assert set(cmp) >= set(parsed) - {"missing"} | {"missing"}
+
+
+# ── The probe: which action types an account really reports ─────────────────
+
+def test_the_probe_sums_every_action_type_per_objective():
+    s, log = FakeStore(), []
+    rows = [insight("11", d(2), actions=[{"action_type": "lead", "value": "3"}, {"action_type": "offsite_conversion.fb_pixel_custom", "value": "10"}], values=[]),
+            insight("12", d(3), actions=[{"action_type": "lead", "value": "4"}, {"action_type": "offsite_conversion.fb_pixel_custom", "value": "5"}], values=[]),
+            insight("13", d(3), objective="OUTCOME_SALES")]
+    http = lambda url, headers=None, params=None, timeout=None: Resp(200, {"data": rows})
+    out = mt.probe(s, "1000000001", http=http)
+    sales = out["objectives"]["OUTCOME_SALES"]
+    assert out["account"] == ACT and set(out["objectives"]) == {"OUTCOME_SALES"}
+    assert sales["actions"]["lead"] == 7 and sales["actions"]["offsite_conversion.fb_pixel_custom"] == 15 and sales["actions"]["omni_purchase"] == 2
+    assert list(sales["actions"])[:2] == ["link_click", "offsite_conversion.fb_pixel_custom"]          # biggest first
+    assert sales["spend"] == 30.0 and len(sales["campaigns"]) == 3
+
+
+def test_the_probe_refuses_anything_that_is_not_an_account_id():
+    with pytest.raises(ValueError):
+        mt.probe(FakeStore(), "1112223334; drop table")
+
+
+def test_the_probe_route_is_admin_only_and_a_bad_id_is_a_400(routes, monkeypatch):
+    monkeypatch.setattr(mt, "probe", lambda store, act, days=30, **k: {"account": act, "days": days})
+    assert client_as(STAFF).get("/p2/paid-marketing/api/meta/status?probe=" + ACT).status_code == 403
+    r = client_as(ADMIN).get("/p2/paid-marketing/api/meta/status?probe=%s&days=500" % ACT)
+    assert r.status_code == 200 and r.get_json() == {"account": ACT, "days": 90}                 # capped
+    monkeypatch.undo()
+    assert client_as(ADMIN).get("/p2/paid-marketing/api/meta/status?probe=nonsense").status_code == 400

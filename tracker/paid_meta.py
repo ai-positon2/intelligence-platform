@@ -595,3 +595,31 @@ def status(store, *, http=None):
         out["read"] = {"account": live["name"], "from": start.isoformat(), "to": end.isoformat(), "rows": len(rows),
                        "impressions": tot[0], "linkClicks": tot[1], "spend": round(tot[2], 2), "results": round(tot[3], 2)}
     return out
+
+
+def probe(store, act, *, days=30, http=None):
+    """What an account's insights actually report, for the admin check: every action type (with its count and value) summed
+    over the last `days` days and over the account's campaigns, per objective. This is how to see which action type a
+    campaign's results really are when the page shows no conversions for money that was clearly spent."""
+    act = norm_id(act)
+    if not act:
+        raise ValueError("that is not a Meta ad account id")
+    end = dt.date.today() - dt.timedelta(days=1)
+    start = end - dt.timedelta(days=days - 1)
+    rows = _pages(act + "/insights", {"level": "campaign", "time_range": json.dumps({"since": start.isoformat(), "until": end.isoformat()}),
+                                      "fields": "campaign_name,objective,spend,impressions,inline_link_clicks,actions,action_values", "limit": PAGE_LIMIT},
+                  store, http=http)
+    by = {}
+    for r in rows:
+        o = by.setdefault(str(r.get("objective") or ""), {"campaigns": [], "spend": 0.0, "actions": {}, "values": {}})
+        o["campaigns"].append(r.get("campaign_name"))
+        o["spend"] = round(o["spend"] + _f(r.get("spend")), 2)
+        for k, bucket in (("actions", "actions"), ("action_values", "values")):
+            for a in r.get(k) or []:
+                t = a.get("action_type")
+                o[bucket][t] = round(o[bucket].get(t, 0) + _f(a.get("value")), 2)
+    for o in by.values():
+        o["campaigns"] = sorted(set(o["campaigns"]))[:6]
+        for b in ("actions", "values"):
+            o[b] = dict(sorted(o[b].items(), key=lambda kv: -kv[1])[:25])
+    return {"account": act, "from": start.isoformat(), "to": end.isoformat(), "objectives": by}

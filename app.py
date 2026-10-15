@@ -4561,7 +4561,11 @@ def paid_meta_status():
         return jsonify(error="Only an admin can run the Meta connection check."), 403
     from tracker import paid_meta, paid_store
     try:
+        if request.args.get("probe"):
+            return jsonify(paid_meta.probe(paid_store, request.args.get("probe"), days=min(max(int(request.args.get("days", "30") or 30), 1), 90)))
         return jsonify(paid_meta.status(paid_store))
+    except ValueError as e:
+        return jsonify(error=str(e)), 400
     except paid_meta.AdsError as e:
         return jsonify(error=str(e), configured=paid_meta.config_problem() is None), 502
 
