@@ -49,6 +49,14 @@ checklist is replaced (it is in git history).
   means every recommendation is off (pass). Some enabled means the matching checks fail and the rest are left for a person.
   This reading of "no subscription" has not been confirmed against an account that has auto-apply on: spot check it.
 
+## Choosing several campaigns
+
+The campaign dropdown is a multiple choice (up to 10 at once, with Select all and a filter). Applying the choice starts one QC per
+campaign (three starting at a time); each runs its own review in the background. Tabs, one per campaign, show each one's state
+(reviewing, how many flagged, how many need a person) and switch between them; the page polls every running review together. The
+campaign book panel has "Apply to all N selected campaigns" (on by default), which adds the same book to each QC and starts a fresh
+review on each. Remove takes away the QC being viewed. The address keeps the selection (`?campaign=id1,id2`).
+
 ## The campaign book
 
 Added per QC as an `.xlsx` or `.csv` file (read in the browser and sent as base64, up to 3 MB) or a Google Sheet link

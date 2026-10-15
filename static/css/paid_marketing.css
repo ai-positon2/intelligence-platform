@@ -997,3 +997,26 @@ details.sq-ref>summary{cursor:pointer;font-size:12.5px;font-weight:600;color:var
 .sg-plat>div{min-width:0}
 .sg-plat>#acctPick,.sg-plat>#metaPick{flex:1 1 250px}
 .sg-plat>[hidden]{display:none}
+
+/* QA Agent: choosing several campaigns, and a tab for each */
+.qa-ms .sq-dd-menu{display:flex;flex-direction:column}
+.qa-ms .pd-dd-list{flex:1;overflow:auto;min-height:0;max-height:300px}
+.qa-ms-bar{display:flex;align-items:center;gap:8px;padding:2px 4px 8px}
+.qa-ms-bar button{border:0;background:none;cursor:pointer;color:var(--pm-a);font:600 12px 'Space Grotesk',sans-serif;padding:4px 8px;border-radius:8px}
+.qa-ms-bar button:hover{background:var(--pm-a-d)}
+.qa-ms-n{margin-left:auto;font-size:11.5px;color:var(--pm-muted)}
+.qa-ms-foot{padding:8px 4px 2px;border-top:1px solid var(--pm-line);margin-top:6px}
+.qa-ms-foot .pm-btn{width:100%}
+.qa-ms-foot .pm-btn:disabled{opacity:.5;cursor:default}
+.qa-tabs{display:flex;gap:10px;flex-wrap:wrap;margin:0 0 16px}
+.qa-tabs[hidden]{display:none}
+.qa-tab{display:flex;align-items:center;gap:10px;min-width:0;max-width:300px;padding:10px 14px;border-radius:14px;cursor:pointer;text-align:left;font:inherit;color:inherit;
+  background:var(--pm-panel);border:1px solid var(--pm-line2);transition:border-color .15s,background .15s}
+.qa-tab:hover{border-color:color-mix(in srgb,var(--pm-a) 55%,transparent)}
+.qa-tab.on{border-color:var(--pm-a);background:var(--pm-a-d);box-shadow:0 0 0 3px var(--pm-a-d)}
+.qa-tab-t{display:flex;flex-direction:column;min-width:0}
+.qa-tab-n{font:600 13px 'Space Grotesk',sans-serif;color:var(--pm-ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.qa-tab-s{font-size:11.5px;color:var(--pm-muted);white-space:nowrap}
+.qa-spin.sm{width:12px;height:12px;border-width:2px}
+.qa-book-all{display:flex;align-items:center;gap:8px;margin-top:10px;font-size:12.5px;color:var(--pm-ink2);cursor:pointer}
+.qa-book-all input{width:auto;height:auto}
