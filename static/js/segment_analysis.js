@@ -29,8 +29,10 @@ var COLS = [["label",""],["impressions","Impressions"],["clicks","Clicks"],["cos
 var CITY_ROWS = 15;
 var SEG_NAV = {account:"Account",day:"Day",hour:"Hour",age:"Age",gender:"Gender",city:"City",device:"Device",network:"Network"};
 
+var PL = window.PMPlatform;
 var S = {accounts:[], groups:[], account:"", preset:"30", from:"", to:"", type:"All", report:null,
-         seq:0, sort:{}, open:{}, currency:"USD"};
+         seq:0, sort:{}, open:{}, currency:"USD",
+         platform:"google", g:"", m:"", metaAccounts:[], metaProblem:""};
 
 /* ── Number formats (the sheet's) ─────────────────────────── */
 var nfCache = {};
@@ -59,6 +61,8 @@ function cell(col, row, total){
   }
   return "";
 }
+
+function platName(p){return p==="meta"?"Meta Ads":p==="both"?"Google Ads and Meta Ads":"Google Ads";}
 
 /* ── Dates ────────────────────────────────────────────────── */
 function ymd(d){var z=d.getTimezoneOffset()*60000;return new Date(d-z).toISOString().slice(0,10);}
@@ -92,17 +96,57 @@ $("#from").addEventListener("change",function(){S.from=this.value;});
 $("#to").addEventListener("change",function(){S.to=this.value;});
 $("#go").addEventListener("click",run);
 
+/* Google | Meta | Both. The Google picker keeps its MCCs; the Meta picker lists the ad accounts the Meta token can read. In Both
+   the two choices make one combined account ("<google id>+<act_ id>"), or just the one that is chosen. */
 var picker = window.PMPicker($("#acctPick"),{label:"Google Ads account",search:true,onChange:function(v){
-  S.account=v; try{localStorage.setItem("sg_account",v)}catch(e){} run();
+  S.g=v; if(S.platform==="google") S.m=""; if(S.platform==="both"&&v&&!S.m) autoMeta(); recompute();
 }});
+var mpicker = window.PMPicker($("#metaPick"),{label:"Meta ad account",search:true,onChange:function(v){
+  S.m=v; if(S.platform==="meta") S.g=""; recompute();
+}});
+var switcher = PL.switcher($("#platPick"),{allow:["google","meta","both"],value:"google",onChange:function(p){
+  S.platform=p; if(p!=="meta"&&!S.g&&S.m) autoGoogle(); if(p!=="google"&&!S.m&&S.g) autoMeta(); paintPickers(); recompute();
+}});
+function googleAcct(id){return S.accounts.filter(function(a){return a.id===id;})[0]||null;}
+function metaAcct(id){return S.metaAccounts.filter(function(a){return a.id===id;})[0]||null;}
+function autoMeta(){var g=googleAcct(S.g), c=g?PL.counterpart(g,S.metaAccounts):null; if(c) S.m=c.id;}
+function autoGoogle(){var m=metaAcct(S.m), c=m?PL.counterpart(m,S.accounts):null; if(c) S.g=c.id;}
+/* The account the choices mean: one account, or a Google and a Meta one together when they bill in the same currency. */
+function chosenAccount(){
+  var p=S.platform;
+  if(p==="google") return S.g;
+  if(p==="meta") return S.m;
+  if(S.g&&S.m&&googleAcct(S.g)&&metaAcct(S.m)&&googleAcct(S.g).currency===metaAcct(S.m).currency) return S.g+"+"+S.m;
+  return S.g||S.m;
+}
+function recompute(){
+  S.account=chosenAccount()||"";
+  try{localStorage.setItem("sg_account",S.account);}catch(e){}
+  var note="";
+  if(S.platform==="both"&&S.g&&S.m&&googleAcct(S.g)&&metaAcct(S.m)&&googleAcct(S.g).currency!==metaAcct(S.m).currency)
+    note="These two accounts bill in different currencies, so they cannot be added together. Showing the Google account.";
+  if(S.platform!=="google"&&S.metaProblem) note=S.metaProblem+(S.platform==="both"?" Showing Google only.":"");
+  S.pickNote=note;
+  run();
+}
+function paintPickers(){
+  $("#acctPick").hidden=S.platform==="meta"; $("#metaPick").hidden=S.platform==="google";
+  var both=S.platform==="both";
+  var items=[{value:"",label:both?"None":"Choose an account",sub:both?"Leave Google out":S.metaAccounts.length+" accounts",avatar:both?"–":"?",hue:200}];
+  S.metaAccounts.forEach(function(a){items.push({value:a.id,label:a.name,avatar:inits(a.name),hue:hueOf(a.name),sub:a.id+" · "+a.currency});});
+  if(!metaAcct(S.m)) S.m="";
+  mpicker.set(items,S.m,!S.metaAccounts.length);
+  setAccounts(S.accounts,S.groups);
+}
 /* An MCC with two or more accounts in one currency is offered whole ("All of OIA"),
    followed by its own accounts; everything else is listed under "Other accounts". */
 var MCC_BADGE='<span class="badge pm-pill ok">MCC</span>';
 function setAccounts(list, groups){
   S.accounts=list; S.groups=groups||[];
-  var items=[{value:"",label:"Choose an account",sub:list.length+" accounts"+(S.groups.length?" · "+S.groups.length+" MCCs to combine":""),avatar:"?",hue:200}];
+  var both=S.platform==="both";
+  var items=[{value:"",label:both?"None":"Choose an account",sub:both?"Leave Meta out":list.length+" accounts"+(S.groups.length?" · "+S.groups.length+" MCCs to combine":""),avatar:both?"–":"?",hue:200}];
   var seen={};
-  S.groups.forEach(function(g){
+  (S.platform==="both"?[]:S.groups).forEach(function(g){
     var head=g.name+" MCC";
     items.push({value:g.id,label:"All of "+g.name,avatar:inits(g.name),hue:hueOf(g.name),group:head,badge:MCC_BADGE,
       sub:g.accountIds.length+" accounts combined · "+g.currency});
@@ -115,8 +159,8 @@ function setAccounts(list, groups){
     items.push({value:a.id,label:a.name,avatar:inits(a.name),hue:hueOf(a.name),group:S.groups.length?"Other accounts":"",
       sub:dashed(a.id)+" · "+a.currency});
   });
-  if(!list.some(function(a){return a.id===S.account;})&&!S.groups.some(function(g){return g.id===S.account;})) S.account="";
-  picker.set(items,S.account);
+  if(!list.some(function(a){return a.id===S.g;})&&!S.groups.some(function(g){return g.id===S.g;})) S.g="";
+  picker.set(items,S.g);
 }
 function groupOf(id){return S.groups.filter(function(g){return g.id===id;})[0]||null;}
 
@@ -147,7 +191,7 @@ function run(refresh){
     if(!r.ok){
       show(S.report?"out":"empty");
       if(r.j&&r.j.kind==="cooldown"){setMsg(esc(r.j.error),"pm-note");return;}
-      var hint=r.j&&r.j.kind==="quota"?" The daily Google Ads allowance is shared, so this clears on its own.":"";
+      var hint=r.j&&r.j.kind==="quota"?" The platform limits how fast this app can read, so this clears on its own.":"";
       setMsg(esc((r.j&&r.j.error)||("The report could not be built (HTTP "+r.status+")."))+hint);
       return;
     }
@@ -176,17 +220,20 @@ function marks(rep){
 
 function render(){
   var rep=S.report;
-  setMsg(rep.warnings&&rep.warnings.length?esc(rep.warnings.join(" · "))+" The totals below are short by what those accounts spent.":"");
+  var warn=rep.warnings&&rep.warnings.length?esc(rep.warnings.join(" · "))+" The totals below are short by what those accounts spent.":"";
+  setMsg(warn||esc(S.pickNote||""),warn?"":"pm-note");
+  var plat=platName(rep.account.platform);
   $("#fresh").innerHTML='<span class="live"></span><b>'+esc(rep.account.name)+'</b>'+
     (rep.account.isGroup?' <span class="sg-mcc">MCC · '+rep.account.accountCount+' accounts combined</span>':"")+'&nbsp;· '+esc(longDate(rep.range.from))+
-    ' to '+esc(longDate(rep.range.to))+' ('+rep.range.days+' day'+(rep.range.days===1?"":"s")+') · read from Google Ads '+
-    esc(ago(rep.generatedAt))+(rep.stale?' <span class="sg-mcc">Google Ads is not answering, so this is the copy saved '+esc(ago(rep.stale))+'</span>':"");
+    ' to '+esc(longDate(rep.range.to))+' ('+rep.range.days+' day'+(rep.range.days===1?"":"s")+') · read from '+plat+' '+
+    esc(ago(rep.generatedAt))+(rep.stale?' <span class="sg-mcc">'+plat+' is not answering, so this is the copy saved '+esc(ago(rep.stale))+'</span>':"");
   paintKpis(); paintTypes(); paintInsights(); paintTables();
-  $("#foot").innerHTML="Source: Google Ads, saved so the same report opens instantly: a report that includes recent days is read again after an hour, "+
+  $("#foot").innerHTML="Source: "+plat+", saved so the same report opens instantly: a report that includes recent days is read again after an hour, "+
     "a finished range after a day, or when you press <b>Refresh</b>. CPL is cost divided by conversions, and <b>Na</b> means "+
-    "there were none. Google Ads does not report every segment for every campaign type (Performance Max has no age or gender, for "+
+    "there were none. A platform does not report every segment for every campaign type (Google's Performance Max has no age or gender, for "+
     "example), so each table shows its <b>coverage</b>: the share of the account's spend it accounts for. Do not compare totals across tables "+
     "that cover different amounts. Insights always use all campaign types."+
+    (rep.account.platform==="meta"||rep.account.platform==="both"?" On Meta, conversions are the campaign objective's results (purchases for Sales, leads for Leads), clicks are link clicks, and the location table is by region because Meta has no city breakdown.":"")+
     (rep.account.isGroup?" This is an MCC view: the "+rep.account.accountCount+" accounts are read one by one and their rows added together, "+
     "and the Account table shows each one's share.":"");
 }
@@ -361,27 +408,44 @@ $("#exportBtn").addEventListener("click",function(){
 /* ── Start ────────────────────────────────────────────────── */
 (function init(){
   var p=new URLSearchParams(location.search);
-  try{S.account=localStorage.getItem("sg_account")||"";}catch(e){}
-  if(p.get("account")) S.account=p.get("account");
+  var fromUrl=p.get("account"), saved="";
+  try{saved=localStorage.getItem("sg_account")||"";}catch(e){}
+  var want=fromUrl||saved;
+  var pf=p.get("platform");
+  if(!PL.validPlatform(pf)) pf=want?PL.platformOfId(want):(switcher.saved()||"google");
+  S.platform=pf; switcher.set(pf);
+  var ps=want?PL.partsOf(want):[];
+  ps.forEach(function(id){if(PL.isMeta(id)) S.m=id; else S.g=id;});
   if(p.get("from")&&p.get("to")){S.preset="custom";S.from=p.get("from");S.to=p.get("to");}
   else{var r=rangeFor(S.preset);S.from=r[0];S.to=r[1];}
   $("#from").value=S.from; $("#to").value=S.to; paintPresets();
   picker.set([{value:"",label:"Loading accounts…",sub:"",avatar:"…",hue:200}],"",true);
+  mpicker.set([{value:"",label:"Loading accounts…",sub:"",avatar:"…",hue:200}],"",true);
+  var metaReq=getJson("/p2/paid-marketing/api/gads/accounts?platform=meta").then(function(r){
+    if(r.ok) S.metaAccounts=(r.j.accounts||[]); else S.metaProblem=(r.j&&r.j.error)||"Meta Ads could not be read.";
+  }).catch(function(){S.metaProblem="Meta Ads could not be reached.";});
   getJson(API+"/accounts").then(function(r){
     if(!r.ok){
       picker.set([{value:"",label:"Accounts unavailable",sub:"",avatar:"!",hue:20}],"",true);
-      setMsg(esc((r.j&&r.j.error)||"The account list could not be loaded."));
-      return;
+      if(S.platform==="google") setMsg(esc((r.j&&r.j.error)||"The account list could not be loaded."));
+      return metaReq;
     }
     var list=r.j.accounts||[];
-    var groups=r.j.groups||[], want=(p.get("client")||"").toLowerCase();
-    if(want&&!p.get("account")){
+    var groups=r.j.groups||[], client=(p.get("client")||"").toLowerCase();
+    S.accounts=list; S.groups=groups;
+    if(client&&!fromUrl){
       // A client that is a whole MCC opens all of its accounts together.
-      var hit=groups.filter(function(g){return g.name.toLowerCase()===want;})[0]||
-        list.filter(function(a){return a.name.toLowerCase().indexOf(want)>=0||want.indexOf(a.name.toLowerCase())>=0;})[0];
-      if(hit) S.account=hit.id;
+      var hit=groups.filter(function(g){return g.name.toLowerCase()===client;})[0]||
+        list.filter(function(a){return a.name.toLowerCase().indexOf(client)>=0||client.indexOf(a.name.toLowerCase())>=0;})[0];
+      if(hit) S.g=hit.id;
     }
-    setAccounts(list,groups); run();
+    return metaReq;
+  }).then(function(){
+    if(S.platform==="meta"&&!S.m&&!S.g) S.m="";
+    if(S.platform!=="meta"&&!S.g&&S.m) autoGoogle();
+    if(S.platform!=="google"&&!S.m&&S.g) autoMeta();
+    if(S.platform==="meta"&&!S.m&&S.g) autoMeta();
+    paintPickers(); recompute();
   }).catch(function(){
     picker.set([{value:"",label:"Accounts unavailable",sub:"",avatar:"!",hue:20}],"",true);
     setMsg("The server could not be reached. Reload to try again.");

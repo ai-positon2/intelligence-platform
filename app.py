@@ -4412,11 +4412,15 @@ def paid_performance_summarizer():
 
 
 def _gads_guard(fn):
-    """Run fn() and turn the ways a Google Ads read can fail into answers the
-    page can show: not connected, over the day's budget, Google refusing, or
-    the cache store being down (reads still work without it)."""
-    from tracker import paid_gads
-    problem = paid_gads.config_problem()
+    """Run fn() and turn the ways an ad-platform read can fail into answers the
+    page can show: not connected, over the day's budget, the platform refusing,
+    or the cache store being down (reads still work without it). A request for
+    a Meta account (`account=act_...`, or `platform=meta`) is held to Meta's
+    connection, anything else to Google's."""
+    from tracker import paid_gads, paid_meta
+    meta = paid_meta.is_meta(request.args.get("account", "")) or request.args.get("platform") == "meta"
+    both = request.args.get("platform") == "both"
+    problem = None if both else (paid_meta.config_problem() if meta else paid_gads.config_problem())
     if problem:
         return jsonify(error=problem, configProblem=problem), 409
     try:
@@ -4428,33 +4432,67 @@ def _gads_guard(fn):
     except paid_gads.OverQuota as e:
         return jsonify(error=str(e), blockedUntil=e.until), 429
     except paid_gads.AdsError as e:
-        app.logger.warning("paid marketing: google ads read failed: %s", e)
+        app.logger.warning("paid marketing: %s read failed: %s", "meta ads" if meta else "google ads", e)
         return jsonify(error=str(e)), 502
 
 
 def _gads_account(store):
-    from tracker import paid_gads
+    """The Google Ads or Meta account named by ?account=, as {id, name, currency, platform, ...}."""
+    from tracker import paid_gads, paid_meta
     cid = request.args.get("account", "")
+    if paid_meta.is_meta(cid):
+        found = {a["id"]: a for a in paid_meta.list_accounts(store)}.get(cid)
+        if not found:
+            raise ValueError("that account is not one of the Meta ad accounts the connected token can read")
+        return found
     if not paid_gads.ID_RE.match(cid):
-        raise ValueError("account should be a 10-digit Google Ads customer id")
+        raise ValueError("account should be a 10-digit Google Ads customer id or a Meta ad account id (act_...)")
     accounts = {a["id"]: a for a in paid_gads.list_accounts(store)}
     if cid not in accounts:
         raise ValueError("that account is not under Position2's Google Ads manager account")
-    return accounts[cid]
+    return dict(accounts[cid], platform="google")
+
+
+def _platform_blocked(acct, store):
+    from tracker import paid_gads, paid_meta
+    return (paid_meta if acct.get("platform") == "meta" else paid_gads).blocked_until(store) or None
 
 
 @app.route("/p2/paid-marketing/api/gads/accounts")
 @position2_required
 def paid_gads_accounts():
-    from tracker import paid_gads, paid_store
+    """The ad accounts the pages can read. ?platform=google (the default), meta, or both. With `both`, one platform
+    being unconnected or failing does not hide the other's accounts: it is reported in `googleProblem` / `metaProblem`."""
+    from tracker import paid_gads, paid_meta, paid_store
+    platform = request.args.get("platform", "google")
+    if platform not in ("google", "meta", "both"):
+        return jsonify(error="platform should be google, meta or both"), 400
+
+    def half(module, tag):
+        """(accounts, problem text or None) for one platform."""
+        problem = module.config_problem()
+        if problem:
+            return [], problem
+        try:
+            return [dict(a, platform=tag) for a in module.list_accounts(paid_store)], None
+        except paid_gads.AdsError as e:
+            if platform != "both":
+                raise
+            app.logger.warning("paid marketing: %s account list failed: %s", tag, e)
+            return [], str(e)
 
     def run():
-        accounts = paid_gads.list_accounts(paid_store)
+        gacc, gprob = half(paid_gads, "google") if platform in ("google", "both") else ([], None)
+        macc, mprob = half(paid_meta, "meta") if platform in ("meta", "both") else ([], None)
+        if platform == "both" and gprob and mprob:
+            return jsonify(error=gprob, configProblem=gprob, googleProblem=gprob, metaProblem=mprob), 409
         try:
             used = paid_store.gads_calls(paid_gads._pacific_day())
         except Exception:
             used = None
-        resp = jsonify(accounts=accounts, blockedUntil=paid_gads.blocked_until(paid_store) or None,
+        resp = jsonify(accounts=gacc + macc, platform=platform, googleProblem=gprob if platform == "both" else None,
+                       metaProblem=mprob if platform == "both" else None,
+                       blockedUntil=paid_gads.blocked_until(paid_store) or None,
                        usage={"calls": used, "limit": paid_gads.DAILY_LIMIT} if _pm_is_admin() else None)
         resp.headers["Cache-Control"] = "private, max-age=300"          # the account list changes rarely
         return resp
@@ -4478,12 +4516,17 @@ def paid_gads_performance():
         if force:
             paid_gads.refresh_guard(paid_store, "perf:" + acct["id"])
         stamps = []
-        current, compare, saved = paid_gads.performance_pair(paid_store, acct["id"], (start, end), cmp,
-                                                             with_sis=main, with_shares=main, force=force, stamps=stamps)
-        # `stale` is the oldest saved copy that stood in for Google (it was spent or unreachable), else null;
-        # `fetchedAt` is when the numbers on screen were last read from Google.
+        if acct["platform"] == "meta":
+            from tracker import paid_meta
+            current, compare, saved = paid_meta.performance_pair(paid_store, acct["id"], (start, end), cmp, currency=acct["currency"],
+                                                                 with_shares=main, force=force, stamps=stamps)
+        else:
+            current, compare, saved = paid_gads.performance_pair(paid_store, acct["id"], (start, end), cmp,
+                                                                 with_sis=main, with_shares=main, force=force, stamps=stamps)
+        # `stale` is the oldest saved copy that stood in for the platform (it was spent or unreachable), else null;
+        # `fetchedAt` is when the numbers on screen were last read from it.
         return jsonify(account=acct, current=current, compare=compare, stale=min(saved) if saved else None,
-                       fetchedAt=paid_gads.oldest(stamps), blockedUntil=paid_gads.blocked_until(paid_store) or None)
+                       fetchedAt=paid_gads.oldest(stamps), blockedUntil=_platform_blocked(acct, paid_store))
     return _gads_guard(run)
 
 
@@ -4499,11 +4542,28 @@ def paid_gads_extras():
         force = request.args.get("refresh") == "1"
         if force:
             paid_gads.refresh_guard(paid_store, "extras:" + acct["id"])
-        out = dict(paid_gads.extras(paid_store, acct["id"], start, end, notes=saved, force=force, stamps=stamps))
+        if acct["platform"] == "meta":
+            from tracker import paid_meta
+            out = dict(paid_meta.extras(paid_store, acct["id"], start, end, notes=saved, force=force, stamps=stamps))
+        else:
+            out = dict(paid_gads.extras(paid_store, acct["id"], start, end, notes=saved, force=force, stamps=stamps))
         out["stale"] = min(saved) if saved else None
         out["fetchedAt"] = paid_gads.oldest(stamps)
         return jsonify(out)
     return _gads_guard(run)
+
+
+@app.route("/p2/paid-marketing/api/meta/status")
+@position2_required
+def paid_meta_status():
+    """Admin only: is the Meta connection working, and which ad accounts does it read? Never returns the token."""
+    if not _pm_is_admin():
+        return jsonify(error="Only an admin can run the Meta connection check."), 403
+    from tracker import paid_meta, paid_store
+    try:
+        return jsonify(paid_meta.status(paid_store))
+    except paid_meta.AdsError as e:
+        return jsonify(error=str(e), configured=paid_meta.config_problem() is None), 502
 
 
 # Product Analysis (Ecommerce) -------------------------------------------------
@@ -4533,9 +4593,14 @@ def paid_gads_products():
         if force:
             paid_gads.refresh_guard(paid_store, "prod:" + acct["id"])
         stamps = []
-        current, compare, saved = paid_products.analysis(paid_store, acct["id"], (start, end), cmp, force=force, stamps=stamps)
+        if acct["platform"] == "meta":
+            from tracker import paid_meta_products
+            current, compare, saved = paid_meta_products.analysis(paid_store, acct["id"], (start, end), cmp, currency=acct["currency"],
+                                                                  force=force, stamps=stamps)
+        else:
+            current, compare, saved = paid_products.analysis(paid_store, acct["id"], (start, end), cmp, force=force, stamps=stamps)
         return jsonify(account=acct, current=current, compare=compare, stale=min(saved) if saved else None,
-                       fetchedAt=paid_gads.oldest(stamps), blockedUntil=paid_gads.blocked_until(paid_store) or None)
+                       fetchedAt=paid_gads.oldest(stamps), blockedUntil=_platform_blocked(acct, paid_store))
     return _gads_guard(run)
 
 

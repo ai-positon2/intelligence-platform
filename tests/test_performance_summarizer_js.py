@@ -241,9 +241,9 @@ def test_a_metric_says_why_an_account_has_nothing_for_it():
     assert run("[P.noData('clicks',%s,[],null),P.noData('ctr',%s,[],null)]" % (base, base)) == ["", ""]
     assert run("P.noData('videoViews',%s,[],null)" % base) == "No data in this range"
     assert run("P.noData('roas',%s,[],null)" % base) == "This account does not report conversion value"
-    assert run("P.noData('allConv',%s,[5],null)" % FULL) == "Google did not return this for the account"     # pruned columns outrank the data
+    assert run("P.noData('allConv',%s,[5],null)" % FULL) == "This platform does not report this for the account"     # pruned columns outrank the data
     assert run("[P.noData('sis',P.zero(),[],null),P.noData('sis',P.zero(),[],{search_impression_share:0.2}),P.noData('sis',P.zero(),[],{search_impression_share:null})]") \
-        == ["Google has no figure for this account and range", "", "Google has no figure for this account and range"]
+        == ["This platform has no figure for this account and range", "", "This platform has no figure for this account and range"]
 
 
 def test_a_tiny_or_huge_share_reads_the_way_google_writes_it():
@@ -267,3 +267,25 @@ def test_every_column_a_row_carries_is_added_up_not_just_the_first_five():
     got = run("(()=>{const row=[0,0,"+FULL[1:-1]+"];const d={days:['2026-10-01','2026-10-02'],campaigns:[{id:'1',name:'A',type:'VIDEO'}],rows:[row,[0,1,"+FULL[1:-1]+"]]};"
               "return [P.total(d,null),P.daily(d,null)[1],P.perCampaign(d)[0],P.byType(d,null)[0].t,P.campaignDaily(d)[0][0]]})()")
     assert got[0][8] == 160 and got[1][16] == 800 and got[2][10] == 800 and got[3][15] == 1200 and got[4][5] == 12        # interactions, measurable, video, viewable, all conversions (two days summed where it says total)
+
+
+# ── Meta ────────────────────────────────────────────────────────────────────
+
+def test_reach_and_frequency_are_whole_period_tiles_not_chartable_over_days():
+    assert run("[P.METRICS.reach.period,P.METRICS.reach.share,P.METRICS.frequency.period,P.METRICS.frequency.share]") == [True, "reach", True, "frequency"]
+    assert run("P.METRIC_ORDER.indexOf('reach')") == -1 and run("P.METRIC_ORDER.indexOf('frequency')") == -1
+    assert run("P.METRIC_ALL.indexOf('reach')>=0") is True and run("P.GROUPS.indexOf('Reach')>=0") is True
+    assert run("P.noData('reach',[0],[],{reach:5000})") == ""
+    assert "no figure" in run("P.noData('reach',[0],[],{reach:null})")
+
+
+def test_meta_campaign_types_and_placements_read_as_words():
+    assert run("P.label(P.TYPE_LABEL,'META_SALES')") == "Meta · Sales"
+    assert run("P.label(P.TYPE_LABEL,'META_APP')") == "Meta · App promotion"
+    assert run("P.label(P.NETWORK_LABEL,'INSTAGRAM')") == "Instagram" and run("P.label(P.NETWORK_LABEL,'AUDIENCE_NETWORK')") == "Meta Audience Network"
+    assert run("P.label(P.TYPE_LABEL,'SEARCH')") == "Search"                    # Google's are untouched
+
+
+def test_the_reason_a_metric_is_empty_does_not_blame_google_for_a_meta_account():
+    why = run("P.noData('allConv',[0,0,0,0,0,5,0,0,0,0,0,0,0,0,0,0,0],[5],null)")
+    assert "Google" not in why and "platform" in why

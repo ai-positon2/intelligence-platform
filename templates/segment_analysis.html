@@ -6,7 +6,7 @@
     <div class="pm-hero-l">
       <span class="pm-eyebrow"><span class="d"></span>Paid Marketing · Segments</span>
       <h1 class="pm-title">Where the account <span class="pm-grad">really performs.</span></h1>
-      <p class="pm-sub">Pick an account and a date range. The agent reads <b>Google Ads live</b> and lays out
+      <p class="pm-sub">Pick an account and a date range. The agent reads <b>Google Ads and Meta Ads live</b> and lays out
         day of the week, hour, age, gender, city, device and network, then tells you <b>what to change</b>:
         where to push, where spend is leaking, and how far each table can be trusted.</p>
     </div>
@@ -15,7 +15,11 @@
   <!-- The two filters -->
   <section class="pm-panel pd-cmd sg-cmd" id="cmd">
     <div class="sg-cmd-grid">
-      <div id="acctPick"></div>
+      <div class="sg-plat">
+        <div id="platPick"></div>
+        <div id="acctPick"></div>
+        <div id="metaPick"></div>
+      </div>
       <div class="sg-when">
         <span class="pd-dd-k">Date range</span>
         <div class="cf-seg" id="presets" role="radiogroup" aria-label="Date range">
@@ -47,7 +51,7 @@
   <div id="out" hidden>
     <div class="sg-head">
       <p class="pd-fresh" id="fresh"></p>
-      <button class="pm-btn-ghost" id="refreshBtn" type="button" title="Read this report from Google Ads again"><svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.3-5.6M20 4v5h-5"/></svg>Refresh</button>
+      <button class="pm-btn-ghost" id="refreshBtn" type="button" title="Read this report again"><svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.3-5.6M20 4v5h-5"/></svg>Refresh</button>
       <button class="pm-btn-ghost" id="exportBtn" type="button"><svg viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>Export CSV</button>
     </div>
     <div class="pd-strip" id="kpis"></div>
@@ -70,5 +74,6 @@
 {% endblock %}
 {% block scripts %}
 <script src="{{ url_for('static', filename='js/pm_picker.js') }}?v=1"></script>
-<script src="{{ url_for('static', filename='js/segment_analysis.js') }}?v=4"></script>
+<script src="{{ url_for('static', filename='js/pm_platform.js') }}?v=3"></script>
+<script src="{{ url_for('static', filename='js/segment_analysis.js') }}?v=5"></script>
 {% endblock %}

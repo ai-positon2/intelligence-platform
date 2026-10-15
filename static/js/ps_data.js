@@ -91,7 +91,7 @@ function M(label,kind,better,group,get,hint,extra){
 /* `need` lists the columns that must be above zero for the metric to mean anything (otherwise the account simply
    has no such data); `value` marks metrics that need the account to report conversion value. */
 var METRICS = {
-  cost:        M("Spend","money",0,"Cost",col(COST),"What you paid Google"),
+  cost:        M("Spend","money",0,"Cost",col(COST),"What you paid"),
   profit:      M("Net value","money",1,"Cost",function(t){return t[VAL]-t[COST];},"Conversion value minus spend",{value:true}),
   cpm:         M("CPM","money2",0,"Cost",function(t){return ratio(t[COST],t[IMPR],1000);},"Cost per 1,000 impressions"),
   impressions: M("Impressions","int",1,"Volume",col(IMPR),"Times an ad was shown"),
@@ -143,9 +143,11 @@ var METRICS = {
   topPct:      M("Top of page rate","pct",1,"Auction share",null,"Impressions shown above organic results",{period:true,share:"top_impression_percentage"}),
   absTopPct:   M("Abs. top of page rate","pct",1,"Auction share",null,"Impressions shown in the very first position",{period:true,share:"absolute_top_impression_percentage"}),
   clickShare:  M("Search click share","pct",1,"Auction share",null,"Clicks you got out of those you could have",{period:true,share:"search_click_share"}),
-  exactSis:    M("Search exact-match IS","pct",1,"Auction share",null,"Impression share on exact-match searches",{period:true,share:"search_exact_match_impression_share"})
+  exactSis:    M("Search exact-match IS","pct",1,"Auction share",null,"Impression share on exact-match searches",{period:true,share:"search_exact_match_impression_share"}),
+  reach:       M("Reach","int",1,"Reach",null,"People who saw an ad at least once (Meta)",{period:true,share:"reach"}),
+  frequency:   M("Frequency","num",0,"Reach",null,"Times the average person saw an ad (Meta)",{period:true,share:"frequency"})
 };
-var GROUPS = ["Cost","Volume","Results","Efficiency","Engagement","Video","Calls","Viewability","Auction share"];
+var GROUPS = ["Cost","Volume","Results","Efficiency","Engagement","Video","Calls","Viewability","Auction share","Reach"];
 /* All metrics, grouped; the chartable ones (everything that can be added up over days) are METRIC_ORDER. */
 var METRIC_ALL = Object.keys(METRICS).sort(function(a,b){return GROUPS.indexOf(METRICS[a].group)-GROUPS.indexOf(METRICS[b].group);});
 var METRIC_ORDER = METRIC_ALL.filter(function(k){return !METRICS[k].period;});
@@ -157,7 +159,7 @@ function hsl(h,s,l){
   var a=s*Math.min(l,1-l), f=function(n){var k=(n+h/30)%12, c=l-a*Math.max(-1,Math.min(k-3,9-k,1)); return Math.round(255*c).toString(16).padStart(2,"0");};
   return "#"+f(0)+f(8)+f(4);
 }
-var GROUP_HUE = {"Cost":42,"Volume":232,"Results":92,"Efficiency":190,"Engagement":322,"Video":2,"Calls":160,"Viewability":268,"Auction share":206};
+var GROUP_HUE = {"Cost":42,"Volume":232,"Results":92,"Efficiency":190,"Engagement":322,"Video":2,"Calls":160,"Viewability":268,"Auction share":206,"Reach":300};
 var METRIC_COLOR = {cost:"#fbbf24",impressions:"#818cf8",clicks:"#22d3ee",ctr:"#2dd4bf",cpc:"#fb923c",cpm:"#a78bfa",
   conversions:"#a3e635",cvr:"#e879f9",cpa:"#fb7185",value:"#34d399",roas:"#38bdf8",aov:"#f472b6"};
 (function(){   // every other metric: its group's hue, shifted a little per metric so neighbours differ
@@ -174,9 +176,9 @@ function mval(key,t){var m=METRICS[key]; return m.get?m.get(t):null;}
    would not return; `shares` the whole-period auction shares. */
 function noData(key,tc,missing,shares){
   var m=METRICS[key];
-  if(m.period) return shares&&shares[m.share]!=null?"":"Google has no figure for this account and range";
+  if(m.period) return shares&&shares[m.share]!=null?"":"This platform has no figure for this account and range";
   var miss=(m.need||[]).filter(function(i){return missing&&missing.indexOf(i)>=0;});
-  if(miss.length) return "Google did not return this for the account";
+  if(miss.length) return "This platform does not report this for the account";
   if(m.need&&m.need.some(function(i){return !tc[i];})) return "No data in this range";
   if(m.value&&!tc[VAL]) return "This account does not report conversion value";
   return "";
@@ -341,11 +343,14 @@ function byHour(grid){
 
 var TYPE_LABEL = {SEARCH:"Search",PERFORMANCE_MAX:"Performance Max",DISPLAY:"Display",SHOPPING:"Shopping",VIDEO:"Video",
   DEMAND_GEN:"Demand Gen",DISCOVERY:"Demand Gen",SMART:"Smart",LOCAL:"Local",LOCAL_SERVICES:"Local Services",
-  MULTI_CHANNEL:"App",TRAVEL:"Travel",HOTEL:"Hotel",UNKNOWN:"Other",UNSPECIFIED:"Other"};
+  MULTI_CHANNEL:"App",TRAVEL:"Travel",HOTEL:"Hotel",UNKNOWN:"Other",UNSPECIFIED:"Other",
+  META_SALES:"Meta · Sales",META_LEADS:"Meta · Leads",META_TRAFFIC:"Meta · Traffic",META_AWARENESS:"Meta · Awareness",
+  META_ENGAGEMENT:"Meta · Engagement",META_APP:"Meta · App promotion",META_OTHER:"Meta · Other"};
 var DEVICE_LABEL = {MOBILE:"Mobile",DESKTOP:"Desktop",TABLET:"Tablet",CONNECTED_TV:"Connected TV",OTHER:"Other",UNKNOWN:"Other",UNSPECIFIED:"Other"};
 var NETWORK_LABEL = {SEARCH:"Google Search",SEARCH_PARTNERS:"Search partners",CONTENT:"Display network",YOUTUBE:"YouTube",
   YOUTUBE_SEARCH:"YouTube search",YOUTUBE_WATCH:"YouTube videos",MIXED:"Cross-network",GOOGLE_TV:"Google TV",
-  GOOGLE_OWNED_CHANNELS:"Google-owned",UNKNOWN:"Other",UNSPECIFIED:"Other"};
+  GOOGLE_OWNED_CHANNELS:"Google-owned",UNKNOWN:"Other",UNSPECIFIED:"Other",
+  FACEBOOK:"Facebook",INSTAGRAM:"Instagram",AUDIENCE_NETWORK:"Meta Audience Network",MESSENGER:"Messenger",THREADS:"Threads"};
 function label(map,k){return map[k]||String(k||"Other").toLowerCase().replace(/_/g," ").replace(/^./,function(c){return c.toUpperCase();});}
 
 /* ── Insights ──
