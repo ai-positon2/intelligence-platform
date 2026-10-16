@@ -102,6 +102,11 @@ def test_the_rules_list_says_it_is_not_a_list_of_accounts_and_nothing_is_called_
 
 def test_automatic_sends_the_account_profile_and_an_empty_range_offers_a_longer_one():
     js = read(PAGE)
-    assert "Core.autoRuleset({ name: inp.account, keywords: inp.keywords })" in js and "const profile = auto ? accountProfile(inp) : null;" in js
+    assert "Core.autoRuleset({ name: inp.account, keywords: inp.keywords })" in js and "const profile = accountProfile(inp);" in js
     assert "0.32 + 0.6 * d / n), profile);" in js                          # and it is what the batches are sent with
     assert 'id="tryLonger"' in js and 'S.preset = "last90"' in js
+
+
+def test_every_ruleset_gets_the_profile_and_the_account_name_for_its_brand():
+    js = read(PAGE)
+    assert "accountName: inp.account" in js and "const profile = accountProfile(inp);" in js

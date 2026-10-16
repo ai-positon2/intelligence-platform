@@ -377,3 +377,9 @@ def test_an_account_with_no_rulebook_is_told_it_is_judged_from_its_own_data():
     rid, why = D.suggest_ruleset("Tealium - ENG - NAM")
     assert rid == "generic" and "its own Google Ads data" in why
     assert "model alone" not in D.suggest_ruleset("Eventgroove Fundraising")[1]
+
+
+def test_the_model_is_told_to_recognise_the_accounts_own_brand_in_any_spelling():
+    seen = []
+    sqr.classify("oia", ["idi fwb"], account="IDI-FL", profile={"keywords": ["idi fort walton beach"]}, call=lambda s, u: seen.append(u) or {"results": []})
+    assert "variant, abbreviation, nickname or misspelling of the account's name" in seen[0] and "Keywords it bids on: idi fort walton beach" in seen[0]

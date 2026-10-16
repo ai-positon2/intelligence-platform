@@ -365,11 +365,11 @@ function accountProfile(inp){
 async function runAnalysis(){
   const inp = inputs();
   const auto = current === "generic";
-  const profile = auto ? accountProfile(inp) : null;
+  const profile = accountProfile(inp);
   const ruleset = auto ? Core.autoRuleset({ name: inp.account, keywords: inp.keywords }) : RULESETS[current];
   S.ran = { from: inp.from, account: inp.account, range: files.terms ? null : S.data.range, warnings: files.terms ? [] : (S.data.warnings || []), notes: files.terms ? [] : (S.data.notes || []) };
   const classify = terms => classifyPending(ruleset, inp.account, terms, (d, n) => setStatus("Model: " + d.toLocaleString() + " / " + n.toLocaleString() + " terms the rules couldn't settle", 0.32 + 0.6 * d / n), profile);
-  return Core.analyze(ruleset, inp.rows, { keywords: inp.keywords, negatives: inp.negatives, classify, status: setStatus });
+  return Core.analyze(ruleset, inp.rows, { keywords: inp.keywords, negatives: inp.negatives, accountName: inp.account, classify, status: setStatus });
 }
 document.addEventListener("keydown", e => {
   if ((e.metaKey || e.ctrlKey) && e.key === "Enter" && !$id("runBtn").disabled && $id("overlay").hidden) { e.preventDefault(); $id("runBtn").click(); }
