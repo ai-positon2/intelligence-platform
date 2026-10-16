@@ -122,7 +122,7 @@ def test_the_keyword_tables_show_what_each_term_spent():
         assert m, name + " not found in the page script"
         return m.group(0)
 
-    src = "\n".join(grab(n) for n in ("esc", "money", "num", "none", "hint", "tbl", "paneKws"))
+    src = "\n".join(grab(n) for n in ("esc", "money", "num", "convRate", "none", "hint", "tbl", "paneKws"))
     harness = (
         "const S = { currency: 'USD' }; const fmtConv = v => String(v); const PRIORITY_N = 1; const Core = {};\n" + src + "\n"
         "const k = { term: 'beta bionic ilet pump', assetType: 'Keyword', matchType: 'Exact Match', whereToAdd: 'Brand / Branded', conversions: 5, cost: 73.7, cpa: 14.74, ctr: 0.336, clicks: 43, tier: 1 };\n"
@@ -133,17 +133,18 @@ def test_the_keyword_tables_show_what_each_term_spent():
     assert out.returncode == 0, out.stderr
     html = out.stdout
     heads = re.findall(r"<th(?: [^>]*)?>(.*?)</th>", html)
-    assert heads[:9] == ["Term", "Type", "Match", "Where to add", "Conv", "Cost", "Cost / conv", "CTR", "Clicks"], heads
-    assert heads[9] == "Tier" and heads[10:] == ["Term", "Type", "Conv", "Cost"], heads
+    assert heads[:10] == ["Term", "Type", "Match", "Where to add", "Conv", "Cost", "Cost / conv", "CTR", "Clicks", "Conv rate"], heads
+    assert heads[10] == "Tier" and heads[11:] == ["Term", "Type", "Conv", "Cost", "Conv rate"], heads
     first = re.findall(r"<td[^>]*>(.*?)</td>", html.split("<tbody>")[1].split("</tbody>")[0])
     assert first[4:7] == ["5", "$73.70", "$14.74"], first                     # Conv, Cost, Cost / conv
+    assert first[9] == "11.6%" and first[10].startswith("<span"), first        # 5 conversions from 43 clicks
     assert "$1,234.50" in html and "$617.25" in html
-    assert re.findall(r"<td[^>]*>(.*?)</td>", html.split("<tbody>")[2])[:4] == ["ilet pump cost", "Keyword", "2", "$1,234.50"]   # the list past the priority rows
+    assert re.findall(r"<td[^>]*>(.*?)</td>", html.split("<tbody>")[2])[:5] == ["ilet pump cost", "Keyword", "2", "$1,234.50", "22.2%"]   # the list past the priority rows
 
 
 def test_the_workbook_keeps_cost_on_both_keyword_sheets():
     js = read(PAGE)
-    assert '"Clicks", "Cost"], ...r.allKeywords.map(' in js and "k.clicks, k.cost.toFixed(2)])" in js
+    assert '"Clicks", "Cost", "Conv Rate"], ...r.allKeywords.map(' in js and "k.clicks, k.cost.toFixed(2), convRate(k.conversions, k.clicks)])" in js
 
 
 @pytest.mark.skipif(not shutil.which("node"), reason="node is not installed")
@@ -199,3 +200,10 @@ def test_every_table_calls_the_money_column_cost():
     assert "$42.50" in check and "$99.25" in review
     assert '"Issue Type", "Rows", "Cost", "Conversions"' in js                     # and the workbook sheet says the same
     assert not re.search(r'\["Spend"|"Spend"', js)
+
+
+def test_conversion_rate_is_conversions_per_click_and_a_dash_without_clicks():
+    js = read(PAGE)
+    assert "const convRate = (conv, clicks) => clicks > 0 ? (Number(conv) / clicks * 100).toFixed(1)" in js
+    assert '"Cost", "Conv Rate"], ...r.allKeywords' in js and 'k.cost.toFixed(2), convRate(k.conversions, k.clicks)])' in js   # both workbook sheets carry it
+    assert js.count("convRate(k.conversions, k.clicks)") == 4                   # the two page tables and the two sheets
