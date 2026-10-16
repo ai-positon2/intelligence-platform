@@ -467,7 +467,7 @@ function paneCheck(r){
     (n.collateral.n ? '<small class="sq-ex">would also stop ' + esc(n.collateral.ex.join(", ")) + (n.collateral.n > n.collateral.ex.length ? " and " + (n.collateral.n - n.collateral.ex.length) + " more" : "") + '</small>' : '') +
     (n.conflicts.length ? '<small class="sq-ex">stops keyword ' + esc(n.conflicts.join(", ")) + '</small>' : '') + '</td><td class="r num">' + money(n.cost, false) + '</td><td class="r num">' + fmtConv(n.conversions) + '</td></tr>').join("");
   return '<div class="pane" id="pane-check" hidden>' + hint("These look like negatives, but a person should look first: the terms converted, or the negative would also stop terms judged relevant or a keyword the account bids on.") +
-    (rows ? tbl([["Negative"], ["Match"], ["Where"], ["Why"], ["Check"], ["Spend", 1], ["Conv", 1]], rows) : none()) + '</div>';
+    (rows ? tbl([["Negative"], ["Match"], ["Where"], ["Why"], ["Check"], ["Cost", 1], ["Conv", 1]], rows) : none()) + '</div>';
 }
 function paneKws(r){
   const rows = r.priorityKeywords.map(k => '<tr><td class="sq-term">' + esc(k.term) + '</td><td>' + esc(k.assetType) + '</td><td>' + esc(k.matchType) + '</td><td>' + esc(k.whereToAdd) + '</td><td class="r num">' + fmtConv(k.conversions) +
@@ -479,7 +479,7 @@ function paneKws(r){
 }
 function paneReview(r){
   const rows = r.clientReview.map(c => '<tr><td>' + esc(c.subtype) + '</td><td class="r num">' + c.count + '</td><td class="r num">' + money(c.cost, false) + '</td><td class="r num">' + fmtConv(c.conversions) + '</td><td class="sq-term">' + esc(c.examples.join(", ")) + '</td></tr>').join("");
-  return '<div class="pane" id="pane-review" hidden>' + (rows ? tbl([["Issue"], ["Rows", 1], ["Spend", 1], ["Conv", 1], ["Costliest examples"]], rows) : none()) + '</div>';
+  return '<div class="pane" id="pane-review" hidden>' + (rows ? tbl([["Issue"], ["Rows", 1], ["Cost", 1], ["Conv", 1], ["Costliest examples"]], rows) : none()) + '</div>';
 }
 function paneAll(r){
   const sorted = r.rows.slice().sort((a, b) => b.cost - a.cost || b.clicks - a.clicks);
@@ -508,7 +508,7 @@ $id("dlBtn").addEventListener("click", () => {
   add("Negatives to Check First", [[...negHead, "Why check", "Would also stop", "Stops keyword"], ...r.reviewNegatives.map(n => [...negRowX(n), n.risks.join("; "), n.collateral.ex.join("; "), n.conflicts.join("; ")])]);
   add("New Keywords to Add (Priority)", [["Term", "Asset Type", "Suggested Match Type", "Add To Level", "Where To Add", "Tier", "Conversions", "Cost / Conv", "CTR", "Clicks", "Cost"],
     ...r.priorityKeywords.map(k => [k.term, k.assetType, k.matchType, k.addLevel, k.whereToAdd, k.tier, fmtConv(k.conversions), k.cpa == null ? "" : k.cpa.toFixed(2), (k.ctr * 100).toFixed(2) + "%", k.clicks, k.cost.toFixed(2)])]);
-  add("Client Review Required", [["Issue Type", "Rows", "Spend", "Conversions", "Costliest Example Terms"], ...r.clientReview.map(c => [c.subtype, c.count, c.cost.toFixed(2), fmtConv(c.conversions), c.examples.join("; ")])]);
+  add("Client Review Required", [["Issue Type", "Rows", "Cost", "Conversions", "Costliest Example Terms"], ...r.clientReview.map(c => [c.subtype, c.count, c.cost.toFixed(2), fmtConv(c.conversions), c.examples.join("; ")])]);
   add("All Negatives (Reference)", [[...negHead, "Check"], ...r.allNegatives.map(n => [...negRowX(n), n.risks.join("; ")])]);
   add("All Keywords (Reference)", [["Term", "Asset Type", "Match Type", "Where To Add", "Tier", "Conversions", "CTR", "Clicks", "Cost"], ...r.allKeywords.map(k => [k.term, k.assetType, k.matchType, k.whereToAdd, k.tier, fmtConv(k.conversions), (k.ctr * 100).toFixed(2) + "%", k.clicks, k.cost.toFixed(2)])]);
   const blob = new Blob([XLSX.write(wb, { bookType: "xlsx", type: "array" })], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });

@@ -171,3 +171,31 @@ def test_the_negative_tables_show_total_cost_next_to_the_wasted_part():
     first = re.findall(r"<td[^>]*>(.*?)</td>", html.split("<tbody>")[1].split("</tbody>")[0])
     assert first[4:8] == ["$121", "$80.25", "30", "4"], first             # the priority table rounds 100 and over, like Wasted did
     assert re.findall(r"<td[^>]*>(.*?)</td>", html.split("<tbody>")[2])[3:5] == ["$120.50", "$80.25"]
+
+
+@pytest.mark.skipif(not shutil.which("node"), reason="node is not installed")
+def test_every_table_calls_the_money_column_cost():
+    """Check before blocking and Client review used to say Spend while every other table said Cost; run their drawing code and read the headers."""
+    js = read(PAGE)
+
+    def grab(name):
+        m = re.search(r"^(?:function " + name + r"\b[^\n]*\}$|function " + name + r"\b.*?^\}|const " + name + r" = [^\n]*;$)", js, re.S | re.M)
+        assert m, name + " not found in the page script"
+        return m.group(0)
+
+    src = "\n".join(grab(n) for n in ("esc", "money", "num", "none", "hint", "tbl", "paneCheck", "paneReview"))
+    harness = (
+        "const S = { currency: 'USD' }; const fmtConv = v => String(v); const where = n => 'Account';\n" + src + "\n"
+        "const n = { text: 'free trial', matchType: 'Phrase', reason: 'r', risks: ['converted'], collateral: { n: 0, ex: [] }, conflicts: [], cost: 42.5, conversions: 2 };\n"
+        "const c = { subtype: 'Medicaid', count: 3, cost: 99.25, conversions: 1, examples: ['a'] };\n"
+        "process.stdout.write(paneCheck({ reviewNegatives: [n] }) + '|||' + paneReview({ clientReview: [c] }));"
+    )
+    out = subprocess.run(["node", "-e", harness], capture_output=True, text=True, timeout=30)
+    assert out.returncode == 0, out.stderr
+    check, review = out.stdout.split("|||")
+    heads = lambda h: re.findall(r"<th(?: [^>]*)?>(.*?)</th>", h)
+    assert heads(check) == ["Negative", "Match", "Where", "Why", "Check", "Cost", "Conv"], heads(check)
+    assert heads(review) == ["Issue", "Rows", "Cost", "Conv", "Costliest examples"], heads(review)
+    assert "$42.50" in check and "$99.25" in review
+    assert '"Issue Type", "Rows", "Cost", "Conversions"' in js                     # and the workbook sheet says the same
+    assert not re.search(r'\["Spend"|"Spend"', js)
