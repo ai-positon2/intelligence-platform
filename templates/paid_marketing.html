@@ -12,7 +12,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-tokens.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-components.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/gtm.css') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/paid_marketing.css') }}?v=24">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/paid_marketing.css') }}?v=27">
   <script src="/static/js/theme.js"></script>
   <link rel="stylesheet" href="/static/css/aurora-app.css?v=3">
   <script src="/static/js/aurora.js?v=1" defer></script>
@@ -144,8 +144,9 @@
         <div class="card-body">
           <div class="card-name">Search Query Analysis</div>
           <div class="card-desc">
-            Upload a search terms report. Each account's own rules settle most terms, Claude reads
-            the rest, and you get priority negatives, new keywords and a 7-sheet workbook.
+            Pick a Google Ads account: its search terms, keywords and negatives are read live. The
+            account's own rules settle most terms, Claude reads the rest, and you get priority negatives,
+            new keywords and a workbook.
           </div>
           <div class="pm pl-live" data-live="sqr"></div>
           <div class="card-footer">
@@ -308,7 +309,7 @@
     {t:'Performance Summarizer',d:'Live Google Ads, chart anything',u:'/p2/paid-marketing/performance-summarizer',i:'◈'},
     {t:'Product Analysis',d:'Which products earn their ad spend',u:'/p2/paid-marketing/product-analysis',i:'▣'},
     {t:'Pacing Desk',d:'Where to move budget today',u:'/p2/paid-marketing/pacing-desk',i:'▥'},
-    {t:'Search Query Analysis',d:'Classify a search terms report',u:'/p2/paid-marketing/search-query-analysis',i:'⌕'},
+    {t:'Search Query Analysis',d:'Classify an account\'s search terms',u:'/p2/paid-marketing/search-query-analysis',i:'⌕'},
     {t:'Client Feedback Agent',d:'Ask Slack, Gmail & meeting notes',u:'/p2/paid-marketing/client-feedback-agent',i:'✦'},
     {t:'Segment Analysis',d:'Day, hour, age, gender, city, device & network',u:'/p2/paid-marketing/segment-analysis',i:'◔'},
     {t:'Geo Performance',d:'Performance by location, with geo bid adjustments',u:'/p2/paid-marketing/geo-performance',i:'◍'},

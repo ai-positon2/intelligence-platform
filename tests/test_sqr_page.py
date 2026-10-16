@@ -1,0 +1,79 @@
+"""Search Query Analysis: the page script checked against its template and the rest of the wiring.
+
+The rules and the arithmetic are in sqr_core.js (tests/test_sqr_core_js.py runs them); the page script only wires controls and draws. It is
+syntax-checked, every element it reaches for must exist in the template, the scripts load in the order they depend on, the page needs no
+export to start (Google Ads is read), and none of the copy has an em dash in it.
+"""
+import os
+import re
+import shutil
+import subprocess
+import sys
+
+import pytest
+
+os.environ.setdefault("GOOGLE_CLIENT_ID", "test")
+os.environ.setdefault("GOOGLE_CLIENT_SECRET", "test")
+os.environ.setdefault("FLASK_SECRET_KEY", "test")
+
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, ROOT)
+JS = os.path.join(ROOT, "static", "js")
+PAGE, CORE = os.path.join(JS, "sqr_agent.js"), os.path.join(JS, "sqr_core.js")
+TEMPLATE = os.path.join(ROOT, "templates", "sqr_agent.html")
+FILES = [PAGE, CORE, TEMPLATE, os.path.join(ROOT, "tracker", "paid_sqr_data.py"), os.path.join(ROOT, "tracker", "paid_sqr.py")]
+
+
+def read(p):
+    return open(p, encoding="utf-8").read()
+
+
+@pytest.mark.skipif(not shutil.which("node"), reason="node is not installed")
+@pytest.mark.parametrize("path", [PAGE, CORE])
+def test_the_scripts_parse(path):
+    r = subprocess.run(["node", "--check", path], capture_output=True, text=True, timeout=30)
+    assert r.returncode == 0, r.stderr
+
+
+def test_every_element_the_page_reaches_for_is_in_the_template():
+    html, js = read(TEMPLATE), read(PAGE)
+    ids = set(re.findall(r'\$id\("([A-Za-z0-9_\-]+)"\)', js)) | set(re.findall(r'getElementById\("([A-Za-z0-9_\-]+)"\)', js))
+    ids |= {"file-" + k for k in ("terms", "keywords", "negs")} | {"drop-" + k for k in ("terms", "keywords", "negs")} | {"file-" + k + "-name" for k in ("terms", "keywords", "negs")}
+    made_by_the_page = {"sqToast", "pane-negs", "pane-check", "pane-kws", "pane-review", "pane-all", "panes"}
+    missing = sorted(i for i in ids if i not in made_by_the_page and 'id="%s"' % i not in html)
+    assert missing == []
+
+
+def test_the_scripts_load_in_the_order_they_depend_on():
+    html = read(TEMPLATE)
+    order = [html.index(n) for n in ("pm_picker.js", "pm_platform.js", "ps_data.js", "sqr_core.js", "sqr_agent.js")]
+    assert order == sorted(order)
+    assert "?v=" in html[html.index("sqr_core.js"):html.index("sqr_core.js") + 80]
+
+
+def test_the_page_reads_google_ads_and_keeps_the_csv_as_a_fallback():
+    html, js = read(TEMPLATE), read(PAGE)
+    assert 'id="acctPick"' in html and "/sqr/data?account=" in js and 'allow: ["google"]' in js
+    assert 'id="csvFallback"' in html and "Can't read Google Ads?" in html
+    assert 'class="req">Required</span>' in html          # the search terms CSV is required only inside the fallback
+    assert ".get(\"account\")" in js                        # an old link names a ruleset, a new one a Google Ads account
+
+
+def test_the_page_never_asks_the_model_anything_but_the_ruleset_account_and_terms():
+    js = read(PAGE)
+    assert "JSON.stringify({ ruleset: rulesetId, account: account, terms: batch })" in js
+
+
+def test_the_page_opens_for_staff_and_the_scripts_are_served():
+    import app as appmod
+    c = appmod.app.test_client()
+    with c.session_transaction() as sess:
+        sess["google_user"] = {"email": "someone@position2.com", "name": "T"}
+    page = c.get("/p2/paid-marketing/search-query-analysis")
+    assert page.status_code == 200 and b"sqr_core.js" in page.data and b"sqr_agent.js" in page.data
+    assert c.get("/static/js/sqr_core.js").status_code == 200
+
+
+def test_there_is_no_em_dash_in_any_of_it():
+    for p in FILES:
+        assert "—" not in read(p), p

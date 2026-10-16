@@ -4201,9 +4201,10 @@ def seo_aeo_legacy_redirect(rest=""):
 #                          the month on budget (tracker/paid_pacing.py; the
 #                          engine itself runs on the PPC team's machine and
 #                          pushes each day's result to .../api/pacing/seed)
-#   Search Query Analysis  classifies a Google Ads search-terms export per
-#                          account (rules in static/js/sqr_agent.js, the
-#                          model step in tracker/paid_sqr.py)
+#   Search Query Analysis  classifies a Google Ads account's search terms
+#                          (read live: tracker/paid_sqr_data.py; the rules
+#                          and ranking in static/js/sqr_core.js, the model
+#                          step in tracker/paid_sqr.py)
 #   Client Feedback Agent  answers questions from live Slack, Gmail, meeting
 #                          transcripts and the Budget Tracker, through ONE
 #                          shared Slack and Google account an admin connects
@@ -4625,6 +4626,29 @@ def paid_gads_products():
 
 # Search Query Analysis -------------------------------------------------------
 
+@app.route("/p2/paid-marketing/api/sqr/data")
+@position2_required
+def paid_sqr_read():
+    """One Google Ads account's search terms, keywords and negative keywords for a range (what used to be three CSV exports), and which of
+    the agent's rulesets the account's name points to. Google only: Meta has no search terms."""
+    from tracker import paid_gads, paid_sqr_data, paid_store
+
+    def run():
+        acct = _gads_account(paid_store)
+        if acct.get("platform") != "google":
+            raise ValueError("Search terms are read from Google Ads: pick a Google Ads account")
+        start, end = paid_sqr_data.check_range(request.args.get("start", ""), request.args.get("end", ""))
+        force = request.args.get("refresh") == "1"
+        if force:
+            paid_gads.refresh_guard(paid_store, "sqr:" + acct["id"])
+        notes, stamps = [], []
+        out = paid_sqr_data.read(paid_store, acct, start, end, force=force, notes=notes, stamps=stamps)
+        rid, why = paid_sqr_data.suggest_ruleset(acct["name"])
+        return jsonify(account=acct, range=[start, end], ruleset={"id": rid, "why": why}, stale=min(notes) if notes else None,
+                       fetchedAt=paid_gads.oldest(stamps), blockedUntil=_platform_blocked(acct, paid_store), **out)
+    return _gads_guard(run)
+
+
 @app.route("/p2/paid-marketing/api/sqr/classify", methods=["POST"])
 @position2_required
 def paid_sqr_classify():
@@ -4632,7 +4656,7 @@ def paid_sqr_classify():
     from tracker.market_radar_llm import ModelError
     body = request.get_json(silent=True) or {}
     try:
-        results = paid_sqr.classify(body.get("ruleset"), body.get("terms"))
+        results = paid_sqr.classify(body.get("ruleset"), body.get("terms"), account=body.get("account") or "")
     except paid_sqr.BadRequest as e:
         return jsonify(error=str(e)), 400
     except ModelError as e:
@@ -19298,9 +19322,13 @@ campaign, campaign type, device or network, compared with the previous period or
 (/p2/paid-marketing/product-analysis): for ecommerce accounts, every Shopping and Performance Max product sorted into
 stars, steady sellers, below target and spend with no sales, the products that carry the account, and a list of what
 to cut, fix or push. Search Query Analysis
-(/p2/paid-marketing/search-query-analysis): upload a search terms CSV; each account's rules (Riccobene, OIA,
-Eventgroove, 42 North, McHale, Beta Bionics placeholder, or generic) settle most terms, Claude classifies the
-rest, and it outputs priority negatives, new keywords, client-review items and a 7-sheet workbook. Client
+(/p2/paid-marketing/search-query-analysis): pick a Google Ads account and a date range (up to 92 days); the search
+terms, the account's keywords and its negative keywords are read live from Google Ads (a CSV upload is still
+offered as a fallback). The account's rules (Riccobene, OIA, Eventgroove, 42 North, McHale, Beta Bionics
+placeholder, or generic, chosen from the account name) settle most terms, Claude classifies the rest that were
+clicked, and it outputs priority negatives (ranked by money spent on terms that never converted; ones that
+converted or would block relevant terms or a keyword the account bids on are held back for review), new keywords
+(never one already bid on or already blocked), client-review items and a workbook. Client
 Feedback Agent (/p2/paid-marketing/client-feedback-agent): a chat that answers from live Slack, Gmail, meeting
 transcripts (Zoom first when configured, else the Meeting Notes Drive folder) and the Budget Tracker, through
 one shared Slack and Google account an admin connects. Segment Analysis (/p2/paid-marketing/segment-analysis):

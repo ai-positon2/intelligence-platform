@@ -5,7 +5,7 @@ var BASE = "/p2/paid-marketing";
 function esc(s){return String(s==null?"":s).replace(/[&<>"']/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]})}
 function getJson(u){return fetch(u,{credentials:"same-origin"}).then(function(r){return r.ok?r.json():null}).catch(function(){return null});}
 
-// Clients whose search terms have their own rules (static/js/sqr_agent.js).
+// Clients whose search terms have their own rules (static/js/sqr_core.js).
 var SQR_RULES = [[/riccobene/i,"riccobene","Riccobene"],[/\boia\b|outpatient imaging/i,"oia","OIA"],[/eventgroove/i,"eventgroove","Eventgroove"],
   [/gentle dental|42 north|\bgd\b/i,"gentledental_42north","42 North (Gentle Dental)"],[/mchale/i,"mchale","McHale"],[/beta bionics/i,"beta_bionics","Beta Bionics (partial)"]];
 
