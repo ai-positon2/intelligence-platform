@@ -435,7 +435,7 @@ BB_VERDICTS = [
     ("type 2 diabetes insulin pump", "Client Review", "Off-label: type 2 (label expansion pending)"), ("medicaid insulin pump", "Client Review", "Medicaid: state coverage"),
     ("unitedhealthcare insulin pump", "Client Review", "Insurance network / formulary"), ("ilet duo", "Client Review", "Pipeline product (not yet available)"),
     ("mint insulin pump", "Client Review", "Pipeline product (not yet available)"), ("beta bionics mint", "Client Review", "Pipeline product (not yet available)"), ("mint tea", None, None),
-    ("smartguard insulin pump", "Competitor", "Named insulin delivery competitor"), ("medtronic", "Competitor", "Named insulin delivery competitor"), ("eversense sensor price", "Not Relevant", "Partner product only"),
+    ("smartguard insulin pump", "Competitor", "Named insulin delivery competitor"), ("medtronic", "Competitor", "Named insulin delivery competitor"), ("mobi insulin pump", "Competitor", "Named insulin delivery competitor"), ("eversense sensor price", "Not Relevant", "Partner product only"),
     ("mint patch pump", "Client Review", "Pipeline product (not yet available)"), ("clinical trial insulin pump", "Client Review", "Clinical trial recruitment"),
     ("puerto rico insulin pump", "Client Review", "US territory: distribution unconfirmed"), ("bomba de insulina", "Client Review", "Bilingual: confirm Spanish support"),
     ("bomba de insulina gratis", "Not Relevant", "Price-seeking (freebie)"),

@@ -496,7 +496,7 @@ const BETA_BIONICS = {
   brandRe: /(ilet|i-let|beta\s*bionics|betabionics|bionic\s+pancreas)/i,
   routeCampaignRe: /non[\s_-]?brand/i,
   forbiddenNegatives: ["pump", "pumps", "loop", "patch", "trial", "bionic", "insulin", "free", "dexcom", "libre", "freestyle", "cgm", "medicare", "cost", "price", "baby", "mexico"],
-  competitors: ["omnipod 5", "omnipod dash", "omnipod go", "omnipod5", "omnipod", "omni pod", "insulet", "tslim", "t:slim", "t slim", "tandem mobi", "tandem diabetes", "tandem insulin pump", "tandem pump",
+  competitors: ["omnipod 5", "omnipod dash", "omnipod go", "omnipod5", "omnipod", "omni pod", "insulet", "tslim", "t:slim", "t slim", "tandem mobi", "mobi insulin pump", "mobi pump", "tandem diabetes", "tandem insulin pump", "tandem pump",
     "tandem t:slim", "control-iq", "control iq", "minimed", "medtronic minimed", "medtronic pump", "medtronic insulin pump", "medtronic diabetes", "780g", "770g", "inpen", "twiist", "sequel med tech",
     "cequr", "mannkind", "medtronic", "smartguard", "simplera", "v-go", "ypsomed", "ypsopump", "camaps", "camaps fx", "sigi patch", "sigi pump", "eoflow", "eopatch", "bigfoot unity", "bigfoot biomedical", "accu-chek insight", "accu-chek combo",
     "accu-chek spirit", "accu chek insight", "accu chek combo", "accu chek spirit"],
