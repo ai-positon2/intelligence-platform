@@ -1256,3 +1256,10 @@ details.sq-fallback .sq-drops{margin-top:10px}
 .au-prob{font-size:12px;line-height:1.5;color:var(--pm-muted);white-space:normal!important;min-width:260px}
 .au-no{color:var(--over);font-weight:700}
 #excl{min-width:560px}
+
+/* ═══ Asset Coverage Audit card ═══ */
+.c-assetcov{--card-accent:#38bdf8;
+  --band:linear-gradient(90deg,#38bdf8,#818cf8,#a78bfa);
+  --thumb:linear-gradient(135deg,#00131f 0%,#12082a 100%);
+  --icon-glow:rgba(56,189,248,.5);--card-border:rgba(56,189,248,.35);
+  --card-glow:0 0 40px rgba(56,189,248,.10);--arrow-color:#bae6fd}

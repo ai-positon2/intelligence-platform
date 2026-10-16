@@ -1,0 +1,70 @@
+{% extends "_paid_base.html" %}
+{% block title %}Asset Coverage Audit{% endblock %}
+{% block head %}
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/asset_coverage.css') }}?v=2">
+{% endblock %}
+{% block content %}
+<div class="pm pm-ac" id="ac">
+  <section class="pm-hero">
+    <div class="pm-hero-l">
+      <span class="pm-eyebrow"><span class="d"></span>Paid Marketing · Assets</span>
+      <h1 class="pm-title">What every campaign is missing, <span class="pm-grad">and what to add.</span></h1>
+      <p class="pm-sub">Pick an account. The agent reads every <b>asset</b> its live campaigns carry (sitelinks, callouts, structured snippets, calls,
+        images, logos, videos, headlines and more) and holds each campaign, Performance Max asset group and Display or Demand Gen ad against what its kind
+        should have. You get the gaps, busiest campaign first, with exactly how many to add, plus what is disapproved, paused, past its end date or never shown.</p>
+    </div>
+  </section>
+
+  <section class="pm-panel pd-cmd ac-cmd" id="cmd">
+    <div class="ac-cmd-row">
+      <div id="acctPick"></div>
+      <p class="ac-scope">Google Ads only. Live, enabled campaigns. Assets can sit on an ad group, a campaign or the account, and the lowest level that has a live one is the one that serves.
+        The last 30 days decide which campaigns come first.</p>
+    </div>
+  </section>
+
+  <div id="msg"></div>
+
+  <div id="empty" class="pm-panel sg-empty">
+    <div class="sg-empty-ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v14H4zM4 10h16M9 10v9"/></svg></div>
+    <h2>Choose an account to begin</h2>
+    <p>Everything is read straight from Google Ads. Nothing is changed there: the agent only recommends.</p>
+  </div>
+  <div id="skel" hidden><div class="pd-skel"></div><div class="pd-skel"></div><div class="pd-skel"></div></div>
+
+  <div id="out" hidden>
+    <div class="sg-head">
+      <p class="pd-fresh" id="fresh"></p>
+      <button class="pm-btn-ghost" id="refreshBtn" type="button" title="Read this account again"><svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.3-5.6M20 4v5h-5"/></svg>Refresh</button>
+      <button class="pm-btn-ghost" id="exportBtn" type="button"><svg viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>Export CSV</button>
+    </div>
+    <div class="pd-strip" id="kpis"></div>
+
+    <section class="pm-panel" id="covCard">
+      <div class="pm-panel-h"><span class="pm-panel-t">Coverage by kind of asset</span><span class="pm-panel-s">Search and Performance Max campaigns</span></div>
+      <div id="cov"></div>
+    </section>
+
+    <section class="pm-panel" id="listCard">
+      <div class="pm-panel-h"><span class="pm-panel-t">Campaigns to work on</span><span class="pm-panel-s" id="listNote"></span></div>
+      <div class="ac-tools">
+        <div><span class="pd-dd-k">Show</span><div class="pm-chips" id="sevs" role="radiogroup" aria-label="Which gaps"></div></div>
+        <div><span class="pd-dd-k">Kind of campaign</span><div class="pm-chips" id="kinds" role="radiogroup" aria-label="Kind of campaign"></div></div>
+        <label class="ac-find"><span class="pd-dd-k">Find</span><input type="text" id="filter" placeholder="Campaign, account or asset…" aria-label="Find a campaign" autocomplete="off"></label>
+      </div>
+      <div id="list"></div>
+      <button type="button" class="pm-btn-ghost sg-more" id="more" hidden></button>
+    </section>
+
+    <section class="pm-panel" id="acctCard" hidden>
+      <div class="pm-panel-h"><span class="pm-panel-t">Account-wide assets</span><span class="pm-panel-s">Linked to the whole account: a campaign with none of its own uses these</span></div>
+      <div id="acctAssets"></div>
+    </section>
+    <p class="pd-foot" id="foot"></p>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/pm_picker.js') }}?v=1"></script>
+<script src="{{ url_for('static', filename='js/asset_coverage.js') }}?v=2"></script>
+{% endblock %}
