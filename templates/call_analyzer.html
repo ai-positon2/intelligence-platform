@@ -1,0 +1,83 @@
+{% extends "_paid_base.html" %}
+{% block title %}Call Transcript Analyzer{% endblock %}
+{% block head %}
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/performance_summarizer.css') }}?v=10">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/call_analyzer.css') }}?v=3">
+{% endblock %}
+{% block content %}
+<div class="pm pm-ps pm-ca" id="ca">
+  <section class="pm-hero">
+    <div class="pm-hero-l">
+      <span class="pm-eyebrow"><span class="d"></span>Paid Marketing · Calls</span>
+      <h1 class="pm-title">Hear what your ad calls are <span class="pm-grad">really about.</span></h1>
+      <p class="pm-sub">Every call CallRail tracked, counted by source, campaign, keyword and location, plus a read of the transcribed ones: what callers wanted,
+        how many ended in an appointment, and the likeliest reason when one did not. <b>Open any call in CallRail</b> to hear it.</p>
+    </div>
+    <div class="ps-live" id="live" aria-live="polite"><span class="ps-live-dot"></span><span id="liveText">Connecting to CallRail…</span><span class="ps-upd" id="upd"></span></div>
+  </section>
+
+  <section class="pm-panel ps-cmd" id="cmd">
+    <div class="ps-cmd-grid ca-grid">
+      <label class="ca-fld"><span class="pd-dd-k">CallRail account</span><select class="ps-sel" id="acctSel" aria-label="CallRail account"></select></label>
+      <label class="ca-fld"><span class="pd-dd-k">Location</span><select class="ps-sel" id="locSel" aria-label="Location"><option value="">All locations</option></select></label>
+      <label class="ca-fld"><span class="pd-dd-k">Source</span><select class="ps-sel" id="srcSel" aria-label="Source"><option value="">All sources</option></select></label>
+      <div class="ps-cmd-block">
+        <span class="pd-dd-k">Date range</span>
+        <div class="ps-ranges" id="ranges" role="group" aria-label="Date range"></div>
+        <div class="ps-custom" id="custom" hidden>
+          <input type="date" id="cStart" aria-label="Start date"><span>to</span><input type="date" id="cEnd" aria-label="End date">
+          <button type="button" class="pm-chip on" id="cApply">Apply</button>
+        </div>
+      </div>
+    </div>
+    <div class="ps-cmd-foot">
+      <p class="ps-range-note" id="rangeNote"></p>
+      <div class="ps-cmd-tools">
+        <button type="button" class="pm-btn-ghost" id="refreshBtn" title="Ask CallRail again. The numbers are saved for 15 minutes.">
+          <svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.3-5.6M20 4v5h-5"/></svg><span>Refresh</span></button>
+        <button type="button" class="pm-btn-ghost" id="shareBtn" title="Copy a link to exactly this view">
+          <svg viewBox="0 0 24 24"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg><span>Share view</span></button>
+        <button type="button" class="pm-btn-ghost" id="exportBtn" title="Download the tables as a CSV">
+          <svg viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg><span>Export</span></button>
+      </div>
+    </div>
+  </section>
+
+  <p class="ca-privacy"><b>Private by design.</b> These are HIPAA accounts. This page shows counts and call details only: no caller name, number, summary or transcript is
+    shown, kept or sent to an AI model. Open a call in CallRail to read it there.</p>
+
+  <div id="notice"></div>
+  <div class="ps-stale" id="staleBar" hidden></div>
+
+  <div id="dash" hidden>
+    <div class="ps-sec-h"><div><h2>Key numbers</h2><span class="ps-hint ps-hint-b" id="kpiHint"></span></div></div>
+    <section class="ps-kpis" id="kpis"></section>
+
+    <div class="ps-sec-h"><div><h2>Where the calls come from</h2><span class="ps-hint ps-hint-b">Click a source to look at it alone. Paid sources are marked.</span></div></div>
+    <div class="ps-two ca-split">
+      <section class="pm-panel ps-card" id="srcChart"></section>
+      <section class="pm-panel ps-card ps-tablecard" id="srcTable"></section>
+    </div>
+
+    <div class="ps-sec-h"><div><h2>Campaigns and keywords</h2><span class="ps-hint ps-hint-b" id="ckHint"></span></div></div>
+    <div class="ps-two">
+      <section class="pm-panel ps-card ps-tablecard" id="campTable"></section>
+      <section class="pm-panel ps-card ps-tablecard" id="kwTable"></section>
+    </div>
+
+    <div id="locSec">
+      <div class="ps-sec-h"><div><h2>Locations</h2><span class="ps-hint ps-hint-b" id="locHint"></span></div></div>
+      <section class="pm-panel ps-card ps-tablecard" id="locTable"></section>
+    </div>
+
+    <div class="ps-sec-h"><div><h2>What callers wanted</h2><span class="ps-hint ps-hint-b" id="anHint"></span></div></div>
+    <div id="anBody"></div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='vendor/chart.umd.js') }}"></script>
+<script src="{{ url_for('static', filename='js/ps_data.js') }}?v=5"></script>
+<script src="{{ url_for('static', filename='js/cr_data.js') }}?v=1"></script>
+<script src="{{ url_for('static', filename='js/call_analyzer.js') }}?v=1"></script>
+{% endblock %}
