@@ -51,6 +51,7 @@
         <button type="button" class="sq-dd-btn" id="ddBtn" aria-haspopup="listbox" aria-expanded="false" aria-label="Rules"></button>
         <div class="sq-dd-menu" id="ddMenu" hidden>
           <input class="sq-dd-search" id="ddSearch" placeholder="Filter rules…" autocomplete="off" aria-label="Filter rules">
+          <p class="sq-dd-note">The rules are not a list of accounts. <b>Automatic</b> works for every Google Ads account. A <b>client rulebook</b> is hand-written for one client and is picked for that account by its name.</p>
           <div role="listbox" id="ddList" aria-label="Rules"></div>
         </div>
       </div>
@@ -117,6 +118,6 @@
 <script src="{{ url_for('static', filename='js/pm_picker.js') }}?v=1"></script>
 <script src="{{ url_for('static', filename='js/pm_platform.js') }}?v=4"></script>
 <script src="{{ url_for('static', filename='js/ps_data.js') }}?v=5"></script>
-<script src="{{ url_for('static', filename='js/sqr_core.js') }}?v=5"></script>
-<script src="{{ url_for('static', filename='js/sqr_agent.js') }}?v=10"></script>
+<script src="{{ url_for('static', filename='js/sqr_core.js') }}?v=9"></script>
+<script src="{{ url_for('static', filename='js/sqr_agent.js') }}?v=12"></script>
 {% endblock %}

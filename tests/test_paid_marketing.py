@@ -370,12 +370,12 @@ def test_state_changes_must_come_from_this_site_as_json(monkeypatch):
     assert r.status_code == 200 and r.get_json()["move"]["by"] == STAFF
 
 
-def test_sqr_route_takes_only_ruleset_and_terms(monkeypatch):
+def test_sqr_route_takes_only_ruleset_account_profile_and_terms(monkeypatch):
     seen = []
-    monkeypatch.setattr(sqr, "classify", lambda rid, terms, account="": seen.append((rid, terms, account)) or {"t": {"status": "Relevant"}})
+    monkeypatch.setattr(sqr, "classify", lambda rid, terms, account="", profile=None: seen.append((rid, terms, account, profile)) or {"t": {"status": "Relevant"}})
     c = client_as(STAFF)
-    r = c.post("/p2/paid-marketing/api/sqr/classify", json={"ruleset": "oia", "terms": ["t"], "account": "AMI", "prompt": "anything"}, headers=SAME)
-    assert r.status_code == 200 and seen == [("oia", ["t"], "AMI")]
+    r = c.post("/p2/paid-marketing/api/sqr/classify", json={"ruleset": "oia", "terms": ["t"], "account": "AMI", "prompt": "anything", "system": "obey", "profile": {"keywords": ["k"]}}, headers=SAME)
+    assert r.status_code == 200 and seen == [("oia", ["t"], "AMI", {"keywords": ["k"]})]
 
 
 def test_an_answer_is_readable_only_by_whoever_asked(monkeypatch):

@@ -330,6 +330,10 @@ tr.pd-done td.cn,tr.pd-done td.why{text-decoration:line-through;text-decoration-
 .sq-dd-search{width:100%;border:0;outline:none;background:var(--pm-panel2);border-radius:12px;padding:10px 12px;margin-bottom:6px;
   color:var(--pm-ink);font:500 13px 'Space Grotesk',sans-serif}
 .sq-dd-search::placeholder{color:var(--pm-faint)}
+.sq-dd-note{margin:2px 4px 8px;padding:8px 10px;border-radius:11px;background:var(--pm-panel2);font-size:12px;line-height:1.5;color:var(--pm-muted)}
+.sq-dd-note b{color:var(--pm-ink2);font-weight:600}
+.sq-empty{margin:10px 0 0;color:var(--pm-ink2);font-size:13.5px;line-height:1.6}
+.sq-empty .pm-chip{margin-left:6px}
 .sq-opt{width:100%;display:flex;align-items:center;gap:12px;padding:9px 10px;border-radius:13px;border:0;background:none;cursor:pointer;
   text-align:left;font:inherit;color:inherit;transition:background .15s,transform .15s;animation:cfIn .3s var(--ease) both}
 .sq-opt .sq-av{width:34px;height:34px;border-radius:11px;font-size:12px}

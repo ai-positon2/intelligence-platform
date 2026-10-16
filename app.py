@@ -4661,7 +4661,7 @@ def paid_sqr_classify():
     from tracker.market_radar_llm import ModelError
     body = request.get_json(silent=True) or {}
     try:
-        results = paid_sqr.classify(body.get("ruleset"), body.get("terms"), account=body.get("account") or "")
+        results = paid_sqr.classify(body.get("ruleset"), body.get("terms"), account=body.get("account") or "", profile=body.get("profile"))
     except paid_sqr.BadRequest as e:
         return jsonify(error=str(e)), 400
     except ModelError as e:

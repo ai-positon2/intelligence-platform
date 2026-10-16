@@ -99,7 +99,7 @@ def verdict(ruleset, term, slug="x"):
     ("riccobene", "free dental clinic near me", "apex", None),
     ("riccobene", "affordable dentist near me", "apex", ("Relevant", "Core dental intent")),      # the skill's own examples of what is NOT price-seeking
     ("riccobene", "do dentists offer payment plans", "apex", ("Relevant", "Core dental intent")),
-    ("beta_bionics", "insulin pump jobs", "x", None),
+    ("beta_bionics", "insulin pump jobs", "x", ("Not Relevant", "Jobs/Recruitment")),
     ("mchale", "landscape design ideas", "x", None),
     # and the rules still fire on what they are for
     ("riccobene", "dentist near me", "apex", ("Relevant", "Core dental intent")),
@@ -112,7 +112,7 @@ def verdict(ruleset, term, slug="x"):
     ("riccobene", "dentist boston ma", "apex", ("Not Relevant", "Out-of-Area Location")),
     ("eventgroove", "uline lanyards", "x", ("Competitor", "Named competitor")),
     ("eventgroove", "custom lanyards", "x", ("Relevant", "Named product/service")),
-    ("beta_bionics", "insulin pump in the uk", "x", ("Not Relevant", "Out-of-Area (US-only product)")),
+    ("beta_bionics", "insulin pump in the uk", "x", ("Not Relevant", "Out of market (US only)")),
     ("beta_bionics", "omnipod 5 review", "x", ("Competitor", "Named insulin delivery competitor")),
     ("oia", "mri near me", "heartland", ("Relevant", "Core imaging intent")),
     ("oia", "ami kokomo", "x", ("Relevant", "Brand (AMI: Kokomo)")),
@@ -412,3 +412,192 @@ def test_an_account_with_a_competitor_campaign_keeps_its_account_wide_competitor
     assert out["conq"] == [["rival x", ["the account runs a competitor campaign"]]] and out["conqPri"] == ["faraway y"]     # a campaign-level negative is not held
     assert out["conq2"] == [["the account runs a competitor campaign"]]
     assert out["conq3"] == [["rival z", "Campaign"]]
+
+
+# ── Beta Bionics: the client's own skill, priority by priority ──────────────
+
+BB_VERDICTS = [
+    # brand, and what beats it (the skill's checklist 2, 5, 6, 15)
+    ("ilet pump", "Relevant", "Brand"), ("islet cell transplant", "Not Relevant", "Different medical topic"), ("toilet pump", None, None),
+    ("beta bionics careers", "Not Relevant", "Jobs/Recruitment"), ("bbnx stock price", "Not Relevant", "Investor intent"), ("bbnx", "Not Relevant", "Investor intent"),
+    ("ilet vs omnipod", "Relevant", "Brand: comparison"), ("switching from tandem to ilet", "Relevant", "Brand: comparison"),
+    ("ilet not charging", "Relevant", "Brand: support intent"), ("bionic pancreas", "Relevant", "Brand"),
+    # a competitor with no brand word, and the partners that are not competitors (checklist 3)
+    ("omnipod 5 review", "Competitor", "Named insulin delivery competitor"), ("medtronic 780g", "Competitor", "Named insulin delivery competitor"),
+    ("freestyle libre 3 plus", "Not Relevant", "Partner product only"), ("dexcom g7 price", "Not Relevant", "Partner product only"),
+    ("insulin pump compatible with dexcom g7", "Relevant", "Core product intent"),
+    # free is a word, FreeStyle is a product; tube-free is a feature (checklist 3, P-04)
+    ("free insulin pump", "Not Relevant", "Price-seeking (freebie)"), ("tube free insulin pump", "Relevant", "Core product intent"), ("cheapest insulin pump", "Not Relevant", "Price-seeking (freebie)"),
+    # Medicare is covered, cost is the funnel (checklist 4, 9)
+    ("medicare insulin pump", "Relevant", "Core product intent"), ("insulin pump cost", "Relevant", "Core product intent"), ("insulin pump copay", "Relevant", "Core product intent"),
+    ("how much does an insulin pump cost", "Relevant", "Core product intent"),
+    # the client decides (checklist 10, 17, 18, 19, 20, 23)
+    ("type 2 diabetes insulin pump", "Client Review", "Off-label: type 2 (label expansion pending)"), ("medicaid insulin pump", "Client Review", "Medicaid: state coverage"),
+    ("unitedhealthcare insulin pump", "Client Review", "Insurance network / formulary"), ("ilet duo", "Client Review", "Pipeline product (not yet available)"),
+    ("mint insulin pump", "Client Review", "Pipeline product (not yet available)"), ("beta bionics mint", "Client Review", "Pipeline product (not yet available)"), ("mint tea", None, None),
+    ("smartguard insulin pump", "Competitor", "Named insulin delivery competitor"), ("medtronic", "Competitor", "Named insulin delivery competitor"), ("mobi insulin pump", "Competitor", "Named insulin delivery competitor"), ("eversense sensor price", "Not Relevant", "Partner product only"),
+    ("mint patch pump", "Client Review", "Pipeline product (not yet available)"), ("clinical trial insulin pump", "Client Review", "Clinical trial recruitment"),
+    ("puerto rico insulin pump", "Client Review", "US territory: distribution unconfirmed"), ("bomba de insulina", "Client Review", "Bilingual: confirm Spanish support"),
+    ("bomba de insulina gratis", "Not Relevant", "Price-seeking (freebie)"),
+    # not patients
+    ("heat pump installation", "Not Relevant", "Non-diabetes pump"), ("insulin pump for toddler", "Not Relevant", "Under minimum age (6+)"),
+    ("insulin pump for 4 year old", "Not Relevant", "Under minimum age (6+)"), ("gestational diabetes insulin", "Not Relevant", "Not indicated (gestational)"),
+    ("bionic arm cost", "Not Relevant", "Bionic prosthetics"), ("openaps loop", "Not Relevant", "DIY looping"), ("dog insulin pump", "Not Relevant", "Veterinary/Non-human"),
+    ("used insulin pump", "Not Relevant", "Used/Resale"), ("insulin pump ebay", "Not Relevant", "Used/Resale"), ("insulin pump course", "Not Relevant", "Education/Training"),
+    ("what is an insulin pump", "Not Relevant", "Informational/Research"), ("what is the best insulin pump on the market", None, None),   # comparison shopping: no longer an informational verdict, the model reads it, ("what is the newest insulin pump", None, None), ("what is the cost of an insulin pump", None, None), ("insulin pump nurse jobs", "Not Relevant", "Jobs/Recruitment"),
+    # "used for" is a question, "in stock" is a shop, "apply" in a coverage search is not a job (departure from the skill, named in the note)
+    ("what is an insulin pump used for", "Not Relevant", "Informational/Research"), ("insulin pump in stock", "Relevant", "Core product intent"),
+    ("how to apply for insulin pump coverage", None, None), ("apply insulin pump job", "Not Relevant", "Jobs/Recruitment"),
+    # US namesakes are not abroad (checklist 17, P-17); abroad is
+    ("new mexico insulin pump", "Relevant", "Core product intent"), ("insulin pump in mexico", "Not Relevant", "Out of market (US only)"), ("insulin pump uk nhs", "Not Relevant", "Out of market (US only)"),
+    # the skill's core signals, and what it leaves to judgement
+    ("insulin pump without carb counting", "Relevant", "Core product intent"), ("type 1 diabetes technology", "Relevant", "Core product intent"),
+    ("hybrid closed loop", "Relevant", "Core product intent"), ("type 1 diabetes recipes", None, None), ("tandem bike", None, None), ("twist pump", None, None), ("diabetes", None, None),
+]
+
+
+@pytest.mark.parametrize("term,status,subtype", BB_VERDICTS)
+def test_the_beta_bionics_skill_priority_by_priority(term, status, subtype):
+    assert verdict("beta_bionics", term) == ((status, subtype) if status else None)
+
+
+def test_beta_bionics_negatives_name_the_word_that_fired_and_never_a_forbidden_one():
+    out = js("""
+      const rs = C.RULESETS.beta_bionics;
+      const spec = t => { const v = rs.classifyDeterministic(t); return v ? [v.negText || "", v.negMatchType || "", v.noNeg || false] : null; };
+      return {free: spec("free insulin pump"), baby: spec("baby insulin pump"), canada: spec("insulin pump in canada"), partner: spec("dexcom g7 price"), jobs: spec("insulin pump jobs"),
+              forbid: rs.forbiddenNegatives};""")
+    assert out["free"] == ["free insulin", "Phrase", False]                   # a scoped phrase, never a bare "free" (FreeStyle Libre)
+    assert out["baby"] == ["", "", False]                                     # a bare "baby" is reviewed, not blocked wholesale
+    assert out["canada"] == ["canada", "Phrase", False] and out["jobs"] == ["jobs", "Phrase", False]
+    assert out["partner"] == ["", "", True]                                   # a partner brand is never a negative
+    assert {"pump", "loop", "patch", "trial", "bionic", "insulin", "free", "dexcom", "libre", "freestyle", "cgm", "medicare", "cost", "price", "baby", "mexico"} <= set(out["forbid"])
+
+
+def test_a_forbidden_word_is_never_the_negative_even_when_a_rule_asks_for_it():
+    out = js("""
+      const rs = Object.assign({}, STUB, {forbiddenNegatives: ["pump"], classifyDeterministic: t => ({status: "Not Relevant", subtype: "x", negMatchType: "Phrase", negText: "pump", negLevel: "Account"})});
+      const r = await C.analyze(rs, [R("pump", {clicks: 3, cost: 10}), R("a pump for sale", {clicks: 3, cost: 9})], {});
+      return r.allNegatives.map(n => [n.text, n.matchType]);""")
+    assert out == [["a pump for sale", "Exact"]]                              # the whole search, as an exact negative; a lone forbidden word gets nothing
+
+
+def test_brand_searches_in_a_nonbrand_campaign_get_a_routing_negative_and_nothing_else_does():
+    out = js("""
+      const rs = C.RULESETS.beta_bionics;
+      const rows = [R("ilet pump", {campaign: "P2_NonBrand_Pumps", clicks: 4, cost: 20, conversions: 2}), R("ilet pump", {campaign: "P2_Brand", clicks: 9, cost: 30, conversions: 3}),
+                    R("ilet vs omnipod", {campaign: "P2_NonBrand_Pumps", clicks: 2, cost: 8}), R("ilet pump", {campaign: "P2_NonBrand_Pmax", campaignType: "PERFORMANCE_MAX", clicks: 2, cost: 5}),
+                    R("beta bionics", {campaign: "P2_NonBrand_Kids", clicks: 3, cost: 9}), R("insulin pump", {campaign: "P2_NonBrand_Pumps", clicks: 6, cost: 40})];
+      const r = await C.analyze(rs, rows, {});
+      const again = await C.analyze(rs, rows, {negatives: [{text: "ilet", match: "PHRASE", level: "campaign", campaigns: ["P2_NonBrand_Pumps"]}]});
+      const bids = await C.analyze(rs, rows, {keywords: [{text: "ilet pump", match: "EXACT", campaign: "P2_NonBrand_Pumps"}]});
+      return {bids: bids.priorityNegatives.map(n => [n.text, n.risks, n.conflicts]), all: r.allNegatives.map(n => [n.text, n.level, n.campaign, n.matchType, n.risks, n.routing, n.wasted]), pri: r.priorityNegatives.map(n => n.text), again: again.allNegatives.map(n => n.text)};""")
+    assert sorted(out["all"]) == [["beta bionics", "Campaign", "P2_NonBrand_Kids", "Phrase", [], True, 9], ["ilet", "Campaign", "P2_NonBrand_Pumps", "Phrase", [], True, 20]]
+    assert sorted(out["pri"]) == ["beta bionics", "ilet"]                    # even with conversions: stopping the brand here is the point
+    assert out["again"] == ["beta bionics"]                                   # already blocked there
+    assert sorted(b[0] for b in out["bids"]) == ["beta bionics", "ilet"] and all(b[1] == [] and b[2] == [] for b in out["bids"])   # a keyword of the same name does not hold it back
+
+
+def test_a_partner_product_search_never_becomes_a_negative_even_after_spending():
+    out = js("""
+      const r = await C.analyze(C.RULESETS.beta_bionics, [R("dexcom g7 price", {clicks: 5, cost: 40}), R("freestyle libre 3", {clicks: 4, cost: 30})], {});
+      return [r.allNegatives.length, r.rows.map(x => x._det.subtype)];""")
+    assert out == [0, ["Partner product only", "Partner product only"]]
+
+
+# ── Automatic: any account, from its own data ───────────────────────────────
+
+@pytest.mark.parametrize("name,expected", [
+    ("AU - Eventgroove Products", ["eventgroove"]),
+    ("Position2-Digital-Ads", ["position2"]),
+    ("Tealium - ENG - NAM", ["tealium"]),
+    ("D&J Precision Machine LLC", ["dj precision machine", "djprecisionmachine", "dj precision", "djprecision"]),
+    ("1369614 B.C. LTD. (BD Engine Brake)", ["bd engine brake", "bdenginebrake", "bd engine", "bdengine"]),
+    ("Brian Tooley Racing", ["brian tooley racing", "briantooleyracing", "brian tooley", "briantooley"]),
+    ("Dynamic Dental", ["dynamic dental", "dynamicdental"]),            # "dynamic" alone is an ordinary word: not a brand
+    ("Centered Health for Women", ["centered health women", "centeredhealthwomen", "centered health", "centeredhealth"]),
+    ("CPIC", []), ("AMI", []), ("", []),
+])
+def test_an_accounts_brand_words_come_from_its_name(name, expected):
+    assert js("return C.brandPhrases(%s);" % json.dumps(name)) == expected
+
+
+def test_the_automatic_rules_settle_only_the_brand_and_the_exact_keywords():
+    out = js("""
+      const rs = C.autoRuleset({name: "D&J Precision Machine LLC", keywords: [{text: "cnc machining"}, "Metal Fabrication"]});
+      const v = t => { const x = rs.classifyDeterministic(t); return x ? [x.status, x.subtype] : null; };
+      return {brand: v("d&j precision machine near me"), brand2: v("dj precision"), kw: v("cnc machining"), kw2: v("metal fabrication"), careers: v("dj precision careers"),
+              generic: v("precision machine shop"), near: v("cnc machining near me"), label: rs.label, id: rs.id, shared: C.RULESETS.generic.classifyDeterministic("x")};""")
+    assert out["brand"] == ["Relevant", "Brand"] and out["brand2"] == ["Relevant", "Brand"]
+    assert out["kw"] == ["Relevant", "A keyword the account bids on"] and out["kw2"] == ["Relevant", "A keyword the account bids on"]
+    assert out["careers"] is None and out["generic"] is None and out["near"] is None      # the model reads these
+    assert out["label"] == "Automatic" and out["id"] == "generic" and out["shared"] is None
+
+
+def test_automatic_asks_the_model_about_everything_the_brand_and_keywords_did_not_settle():
+    out = js("""
+      const rs = C.autoRuleset({name: "Acme Widgets Inc", keywords: ["blue widgets"]});
+      const rows = [R("acme widgets reviews", {clicks: 3, cost: 9}), R("blue widgets", {clicks: 2, cost: 4}), R("widget jobs", {clicks: 4, cost: 12}), R("red gadgets", {clicks: 1, cost: 2})];
+      const asked = [];
+      const r = await C.analyze(rs, rows, {keywords: [{text: "blue widgets"}], classify: async terms => { asked.push(terms); return model({"widget jobs": M("Not Relevant", "Jobs"), "red gadgets": M("Not Relevant", "Other product")})(terms); }});
+      return {asked: asked[0], by: r.rows.map(x => [x.term, x._det.by, x._det.status]), neg: r.allNegatives.map(n => n.text)};""")
+    assert sorted(out["asked"]) == ["red gadgets", "widget jobs"]
+    assert out["by"] == [["acme widgets reviews", "rule", "Relevant"], ["blue widgets", "rule", "Relevant"], ["widget jobs", "model", "Not Relevant"], ["red gadgets", "model", "Not Relevant"]]
+    assert out["neg"] == ["widget jobs", "red gadgets"]
+
+
+def test_every_ruleset_has_a_label_and_a_note_and_automatic_comes_first():
+    out = js("return Object.values(C.RULESETS).map(r => [r.id, !!r.label, r.note.length > 80, typeof r.classifyDeterministic]);")
+    assert [o[0] for o in out][0] == "generic" and len(out) == 7
+    assert all(o[1] and o[2] and o[3] == "function" for o in out)
+
+
+# ── The account's own brand, as it says it itself ───────────────────────────
+
+def test_a_keyword_of_a_brand_campaign_makes_its_searches_brand_searches():
+    out = js("""
+      const kw = [{text: "acme widgets", campaign: "P2_Acme_Brand_E"}, {text: "acme", campaign: "P2_Acme_Brand_P"}, {text: "blue widgets", campaign: "P2_NonBrand_Widgets"},
+                  {text: "rival widgets", campaign: "P2_Competitor_Brand"}, {text: "bid on me", campaign: "P2_NonBrand_X"}];
+      const rows = ["acme widgets near me", "acme", "acme near me", "acme widgets careers", "acme widgets partners", "blue widgets near me", "rival widgets near me", "bid on me", "acme widgets reviews"].map(t => R(t, {clicks: 1, cost: 2}));
+      const r = await C.analyze({id: "t", label: "T", note: "", classifyDeterministic: () => null}, rows, {keywords: kw, classify: model({})});
+      return r.rows.map(x => [x.term, x._det.status, x._det.by, x._det.subtype]);""")
+    by = {t: (s, b, sub) for t, s, b, sub in out}
+    assert by["acme widgets near me"] == ("Relevant", "rule", "Brand (a keyword of the account's Brand campaign)")
+    assert by["acme"] == ("Relevant", "rule", "A keyword the account bids on")              # a one-word brand keyword is trusted only as the whole search
+    assert by["acme near me"][1] == "model"
+    assert by["acme widgets careers"][1] == "model" and by["acme widgets partners"][1] == "model" and by["acme widgets reviews"][1] == "model"
+    assert by["blue widgets near me"][1] == "model" and by["rival widgets near me"][1] == "model"      # a non-brand or competitor campaign's keyword is not the brand
+    assert by["bid on me"] == ("Relevant", "rule", "A keyword the account bids on")
+
+
+def test_a_rule_still_beats_the_brand_keywords_and_the_account_name_counts_when_it_is_more_than_one_word():
+    out = js("""
+      const rs = {id: "t", label: "T", note: "", classifyDeterministic: t => /jobs/.test(t) ? {status: "Not Relevant", subtype: "Jobs"} : null};
+      const kw = [{text: "great hill dental", campaign: "Boston_Brand"}];
+      const rows = ["great hill dental jobs", "great hill chelmsford", "great hill partners", "heartland dental"].map(t => R(t, {clicks: 1, cost: 2}));
+      const named = await C.analyze(rs, rows, {keywords: kw, accountName: "Great Hill Dental", classify: model({})});
+      const single = await C.analyze(rs, [R("heartland dental", {clicks: 1, cost: 2}), R("heartland imaging", {clicks: 1, cost: 2})], {accountName: "Heartland", classify: model({})});
+      return {named: named.rows.map(x => [x.term, x._det.status, x._det.by, x._det.subtype]), single: single.rows.map(x => [x.term, x._det.by])};""")
+    by = {t: (s, b, sub) for t, s, b, sub in out["named"]}
+    assert by["great hill dental jobs"][0] == "Not Relevant" and by["great hill dental jobs"][2] == "Jobs"
+    assert by["great hill chelmsford"] == ("Relevant", "rule", "Brand (the account's name)")
+    assert by["great hill partners"][1] == "model" and by["heartland dental"][1] == "model"      # a firm, and another business
+    assert out["single"] == [["heartland dental", "model"], ["heartland imaging", "model"]]       # "Heartland" is also other businesses' name
+
+
+def test_keywords_are_ranked_by_tier_then_conversions_then_click_rate_as_the_written_logic_says():
+    out = js("""
+      const rows = [R("a many clicks", {clicks: 40, impressions: 400, cost: 20, conversions: 2}), R("b high rate", {clicks: 9, impressions: 20, cost: 9, conversions: 2}),
+                    R("c one conversion", {clicks: 2, impressions: 100, cost: 3, conversions: 1}), R("d tier two", {clicks: 30, impressions: 300, cost: 10}), R("e tier two better rate", {clicks: 5, impressions: 20, cost: 4})];
+      const r = await C.analyze({id: "t", label: "T", note: "", classifyDeterministic: () => ({status: "Relevant", subtype: "x"})}, rows, {});
+      return r.allKeywords.map(k => [k.term, k.tier]);""")
+    assert out == [["b high rate", 1], ["a many clicks", 1], ["c one conversion", 1], ["e tier two better rate", 2], ["d tier two", 2]]
+
+
+def test_a_search_a_rulebook_would_send_to_the_model_stays_with_the_model_even_with_a_brand_keyword_in_it():
+    out = js("""
+      const rs = {id: "t", label: "T", note: "", modelHint: /\\bcheap\\b/i, classifyDeterministic: () => null};
+      const kw = [{text: "acme widgets", campaign: "P2_Acme_Brand_E"}];
+      const r = await C.analyze(rs, [R("acme widgets cheap", {clicks: 1, cost: 2}), R("acme widgets store", {clicks: 1, cost: 2})], {keywords: kw, classify: model({})});
+      return r.rows.map(x => [x.term, x._det.by]);""")
+    assert out == [["acme widgets cheap", "model"], ["acme widgets store", "rule"]]
