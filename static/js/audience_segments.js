@@ -224,7 +224,7 @@ function paintKindChips(){
   }).join("");
 }
 $("#kindChips").addEventListener("click",function(e){
-  var b=e.target.closest("button"); if(!b) return; S.tbl.kind=b.dataset.kc; S.tbl.limit=50; paintKinds(); paintKindChips(); paintTable();
+  var b=e.target.closest("button"); if(!b) return; S.tbl.kind=S.tbl.kind===b.dataset.kc?"all":b.dataset.kc; S.tbl.limit=50; paintKinds(); paintKindChips(); paintTable();
 });
 function paintVerdicts(){
   var v=view(); if(!v) return;
@@ -235,7 +235,7 @@ function paintVerdicts(){
   }).join("");
 }
 $("#verdicts").addEventListener("click",function(e){
-  var b=e.target.closest("button"); if(!b) return; S.tbl.verdict=b.dataset.v; S.tbl.limit=50; paintVerdicts(); paintTable();
+  var b=e.target.closest("button"); if(!b) return; S.tbl.verdict=S.tbl.verdict===b.dataset.v?"all":b.dataset.v; S.tbl.limit=50; paintVerdicts(); paintTable();
 });
 $("#filter").addEventListener("input",function(){S.tbl.filter=this.value; S.tbl.limit=50; paintTable();});
 function cell(c,r){
@@ -338,7 +338,9 @@ function paintListFilters(){
   chipRow("#lOrigin","origin",[["all","Any source"],["own","Yours"],["google","Created by Google"]],function(v){return v==="all"?ls.length:n(function(l){return v==="google"?l.readOnly:!l.readOnly;});});
 }
 $("#listsCard").addEventListener("click",function(e){
-  var b=e.target.closest("[data-lf]"); if(!b) return; S.lst[b.dataset.lf]=b.dataset.v; paintLists();
+  var b=e.target.closest("[data-lf]"); if(!b) return;
+  S.lst[b.dataset.lf]=S.lst[b.dataset.lf]===b.dataset.v?"all":b.dataset.v;                 // a second click on the chosen chip clears it
+  paintLists();
 });
 $("#lfilter").addEventListener("input",function(){S.lst.q=this.value; paintLists();});
 function paintLists(){
