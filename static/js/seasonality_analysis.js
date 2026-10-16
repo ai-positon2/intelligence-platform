@@ -187,7 +187,7 @@ function load(){
       parts=j.parts; (j.problems||[]).forEach(function(p){if(problems.indexOf(p)<0) problems.push(p);});
       i++;
       if(i<parts){
-        warmPanel(true,"Reading year "+(i+1)+" of "+parts,dateRange(j.start,j.end)+" read. Next: an earlier year.",i/parts);
+        warmPanel(true,"Reading the history: step "+(i+1)+" of "+parts,dateRange(j.start,j.end)+" is read. Next: an earlier stretch.",i/parts);
         next();
       }else{
         warmPanel(true,"Working out the shape of the year…","",1);

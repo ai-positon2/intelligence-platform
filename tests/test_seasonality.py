@@ -724,3 +724,20 @@ def test_an_account_with_spend_but_no_conversions_does_not_crash_and_has_no_cost
     assert all(e["index"] is None for e in out["index"]["cpa"]) and all(e["index"] is None for e in out["index"]["conv"])
     assert out["upcoming"][0]["verdict"] == "unknown" and out["upcoming"][0]["budget"] == 0
     assert out["index"]["cost"][10]["index"] is not None
+
+
+def test_meta_is_read_in_small_slices_and_google_alone_in_whole_years():
+    start, end = S.window(36, TODAY)
+    g_only, m_only = [{"platform": "google"}], [{"platform": "meta"}]
+    assert S.slice_size(g_only) == S.SLICE_DAYS and S.slice_size(m_only) == S.SLICE_DAYS_META and S.slice_size(g_only + m_only) == S.SLICE_DAYS_META
+    plan = S.slices(start, end, S.slice_size(m_only))
+    assert len(plan) == 12 and all((dt.date.fromisoformat(b) - dt.date.fromisoformat(a)).days + 1 <= 93 for a, b in plan)
+    assert plan[0][1] == end and plan[-1][0] == start
+
+
+def test_the_warm_route_counts_more_parts_for_a_meta_account_than_for_a_google_one(routes):
+    c = client_as(STAFF)
+    g_parts = c.get("/p2/paid-marketing/api/gads/seasonality/warm?account=" + CID).get_json()["parts"]
+    m_parts = c.get("/p2/paid-marketing/api/gads/seasonality/warm?account=" + ACT).get_json()["parts"]
+    assert (g_parts, m_parts) == (3, 12)
+    assert c.get("/p2/paid-marketing/api/gads/seasonality/warm?account=%s%%2B%s" % (CID, ACT)).get_json()["parts"] == 12

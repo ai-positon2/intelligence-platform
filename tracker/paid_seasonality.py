@@ -32,7 +32,8 @@ log = logging.getLogger(__name__)
 
 LOOKBACKS = (24, 36)               # months of history the page can ask for
 DEFAULT_MONTHS = 36               # 36 whole months give every calendar month two years to be judged on, 24 give one
-SLICE_DAYS = 400                   # one read of the platform never spans more than this
+SLICE_DAYS = 400                   # one read of Google Ads never spans more than this
+SLICE_DAYS_META = 93               # Meta is read 31 days at a time and one year of a busy account took 80 s: keep a request to about three of them
 REFRESH_DAYS = 45                  # Refresh re-reads this many latest days: older ones no longer change
 MIN_YEARLY_MONTHS = 13             # months in a row needed to see a yearly pattern at all
 ACTIVE_SHARE = 0.6                 # a month with spend on fewer of its days than this was mostly paused: it is left out
@@ -142,6 +143,11 @@ def _add(a, b):
     return out
 
 
+def slice_size(accts):
+    """Days in one read: Meta, alone or with Google, in small slices (the page waits on each), Google in whole years."""
+    return SLICE_DAYS_META if any(a.get("platform") == "meta" for a in accts) else SLICE_DAYS
+
+
 def read_part(store, acct, first, last, *, force=False, notes=None, stamps=None, http=None):
     """Daily totals for one platform's account over first..last (a slice)."""
     if acct.get("platform") == "meta":
@@ -158,7 +164,7 @@ def read(store, accts, start, end, *, force=False, http=None):
     in slices. A platform that cannot be read is left out and named in `problems`; every one failing raises the first error.
     Quota problems and the like surface as the platform's own AdsError."""
     notes, stamps, problems = [], [], []
-    plan = slices(start, end)[::-1]               # oldest first, to lay the days end to end
+    plan = slices(start, end, slice_size(accts))[::-1]               # oldest first, to lay the days end to end
     got = []
     for acct in accts:
         who = "Meta Ads" if acct.get("platform") == "meta" else "Google Ads"
@@ -184,7 +190,7 @@ def warm(store, accts, start, end, part, *, force=False, http=None):
     """Read one slice of the range into the stored days (nothing is analysed) and say how many there are. The page calls
     this slice by slice, newest first, so no single request is long and a failure keeps what was already read. With two
     platforms, one that cannot be read is named in `problems` and the other still counts."""
-    plan = slices(start, end)
+    plan = slices(start, end, slice_size(accts))
     if not 0 <= part < len(plan):
         raise BadRequest("part is out of range")
     first, last = plan[part]
