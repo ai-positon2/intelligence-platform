@@ -12,7 +12,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-tokens.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-components.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/gtm.css') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/paid_marketing.css') }}?v=29">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/paid_marketing.css') }}?v=32">
   <script src="/static/js/theme.js"></script>
   <link rel="stylesheet" href="/static/css/aurora-app.css?v=3">
   <script src="/static/js/aurora.js?v=1" defer></script>
@@ -68,7 +68,7 @@
     <div class="dash-grid pm-sec-grid">
 
       <!-- Paid Marketing Agents. 1 to 3 are from Agent Holmes (2026-10-12); 4,
-           Segment Analysis, is new on the platform. Geo Performance was added 2026-10-15, Seasonality Analysis and the Call Transcript Analyzer 2026-10-16, Ad Strength Analysis 2026-10-16. The hub card's
+           Segment Analysis, is new on the platform. Geo Performance was added 2026-10-15, Seasonality Analysis and the Call Transcript Analyzer 2026-10-16, Ad Strength Analysis and Audience Segment Analysis 2026-10-16. The hub card's
            "N dashboards / N live" counts these; tests/test_hub_card_counts.py
            checks the two agree. -->
 
@@ -298,6 +298,26 @@
         </div>
       </a>
 
+      <!-- 12. Audience Segment Analysis (2026-10-16): which audiences earn their bids -->
+      <a href="/p2/paid-marketing/audience-segments" class="dash-card active c-aud">
+        <div class="card-band"></div>
+        <div class="card-thumb">
+          <div class="card-thumb-icon"><svg class="au-ic" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><circle cx="17.5" cy="9" r="2.4"/><path d="M16 14.3c3 .1 5 2.1 5 5.2"/></svg></div>
+          <div class="card-thumb-badge tb-live"><span class="tb-dot live"></span> Live</div>
+        </div>
+        <div class="card-body">
+          <div class="card-name">Audience Segment Analysis</div>
+          <div class="card-desc">
+            In-market, remarketing and customer match audiences side by side against the account's own average:
+            which ones earn their bids, where an adjustment or an exclusion would pay, and which lists cannot serve.
+          </div>
+          <div class="card-footer">
+            <div class="card-tags"><span class="tag">Audiences</span><span class="tag">Bids</span></div>
+            <span class="card-arrow">→</span>
+          </div>
+        </div>
+      </a>
+
     </div>
 
     <p class="footer-note">Position2 · Internal use only</p>
@@ -336,6 +356,7 @@
     {t:'Seasonality Analysis',d:'The shape of the year, and the next three months',u:'/p2/paid-marketing/seasonality-analysis',i:'∿'},
     {t:'Call Transcript Analyzer',d:'What ad calls were about, from CallRail',u:'/p2/paid-marketing/call-transcript-analyzer',i:'☎'},
     {t:'Ad Strength Analysis',d:'Google ad strength, and the text changes to lift it',u:'/p2/paid-marketing/ad-strength',i:'▲'},
+    {t:'Audience Segment Analysis',d:'Which audiences earn their bids',u:'/p2/paid-marketing/audience-segments',i:'◉'},
     {t:'QA Agent',d:'Campaign launch QC checklist',u:'/p2/paid-marketing/qa-agent',i:'✓'}
   ];
   var ITEMS=(window.__KP_ITEMS||[]).concat(BASE);

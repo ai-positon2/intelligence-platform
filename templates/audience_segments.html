@@ -1,0 +1,102 @@
+{% extends "_paid_base.html" %}
+{% block title %}Audience Segment Analysis{% endblock %}
+{% block content %}
+<div class="pm pm-aud" id="au">
+  <section class="pm-hero">
+    <div class="pm-hero-l">
+      <span class="pm-eyebrow"><span class="d"></span>Paid Marketing · Audiences</span>
+      <h1 class="pm-title">Which audiences <span class="pm-grad">earn their bids.</span></h1>
+      <p class="pm-sub">Pick an account and a date range. The agent reads <b>Google Ads</b>, compares every audience the account uses
+        (in-market, affinity, remarketing, customer match, custom segments) against the account's own average, and says
+        <b>where a bid adjustment or an exclusion would pay</b>, and where it would do nothing because the campaign ignores it.</p>
+    </div>
+  </section>
+
+  <section class="pm-panel pd-cmd sg-cmd" id="cmd">
+    <div class="sg-cmd-grid">
+      <div class="sg-plat"><div id="acctPick"></div></div>
+      <div class="sg-when">
+        <span class="pd-dd-k">Date range</span>
+        <div class="cf-seg" id="presets" role="radiogroup" aria-label="Date range">
+          <button type="button" role="radio" data-p="7" aria-checked="false"><span class="dot"></span>Last 7 days</button>
+          <button type="button" role="radio" data-p="30" aria-checked="true"><span class="dot"></span>Last 30 days</button>
+          <button type="button" role="radio" data-p="mtd" aria-checked="false"><span class="dot"></span>This month</button>
+          <button type="button" role="radio" data-p="last" aria-checked="false"><span class="dot"></span>Last month</button>
+          <button type="button" role="radio" data-p="custom" aria-checked="false"><span class="dot"></span>Custom</button>
+          <i class="cf-seg-glow" aria-hidden="true"></i>
+        </div>
+      </div>
+      <div class="sg-custom" id="custom" hidden>
+        <label><span class="pd-dd-k">From</span><input type="date" id="from" aria-label="From date"></label>
+        <label><span class="pd-dd-k">To</span><input type="date" id="to" aria-label="To date"></label>
+        <button type="button" class="pm-btn sg-go" id="go">Run</button>
+      </div>
+    </div>
+  </section>
+
+  <div id="msg"></div>
+
+  <div id="empty" class="pm-panel sg-empty">
+    <div class="sg-empty-ic"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><circle cx="17.5" cy="9" r="2.4"/><path d="M16 14.3c3 .1 5 2.1 5 5.2"/></svg></div>
+    <h2>Choose an account to begin</h2>
+    <p>The report builds in a few seconds. Every suggestion comes with its numbers, and an audience with too little data is never judged.</p>
+  </div>
+  <div id="skel" hidden><div class="pd-skel"></div><div class="pd-skel"></div><div class="pd-skel"></div></div>
+
+  <div id="out" hidden>
+    <div class="sg-head">
+      <p class="pd-fresh" id="fresh"></p>
+      <button class="pm-btn-ghost" id="refreshBtn" type="button" title="Read this report again"><svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.3-5.6M20 4v5h-5"/></svg>Refresh</button>
+      <button class="pm-btn-ghost" id="exportBtn" type="button"><svg viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>Export CSV</button>
+    </div>
+    <div class="pd-strip" id="kpis"></div>
+
+    <section class="pm-panel" id="kindCard">
+      <div class="pm-panel-h"><span class="pm-panel-t">Which kinds drive results</span><span class="pm-panel-s">100 is the account's average. Click a kind to filter the table.</span></div>
+      <div class="au-kinds" id="kinds"></div>
+    </section>
+
+    <div class="sg-tools">
+      <div><span class="pd-dd-k">Campaign type</span><div class="pm-chips" id="types"></div></div>
+    </div>
+
+    <section class="pm-panel sg-ins" id="insights">
+      <div class="pm-panel-h"><span class="pm-panel-t">What to do</span><span class="pm-panel-s" id="insNote"></span></div>
+      <div id="insList"></div>
+    </section>
+
+    <section class="pm-panel" id="tableCard">
+      <div class="pm-panel-h"><span class="pm-panel-t">Audiences</span><span class="pm-panel-s" id="tblNote"></span></div>
+      <div class="au-tools">
+        <input type="text" id="filter" placeholder="Filter audiences…" aria-label="Filter audiences" autocomplete="off">
+        <div class="pm-chips" id="kindChips"></div>
+        <div class="pm-chips" id="verdicts"></div>
+      </div>
+      <div class="pm-scroll"><table id="tbl"></table></div>
+      <button type="button" class="pm-btn-ghost sg-more" id="more" hidden></button>
+    </section>
+
+    <section class="pm-panel" id="listsCard">
+      <div class="pm-panel-h"><span class="pm-panel-t">Audience lists the account has</span><span class="pm-panel-s" id="listsNote"></span></div>
+      <div class="au-tools">
+        <input type="text" id="lfilter" placeholder="Search lists by name, kind or account…" aria-label="Search audience lists" autocomplete="off">
+        <div class="pm-chips" id="lKinds" aria-label="Kind of list"></div>
+        <div class="pm-chips" id="lServe" aria-label="Whether the list can serve"></div>
+        <div class="pm-chips" id="lUse" aria-label="Whether the list is used"></div>
+        <div class="pm-chips" id="lOrigin" aria-label="Who made the list"></div>
+      </div>
+      <div class="pm-scroll"><table id="lists"></table></div>
+    </section>
+
+    <section class="pm-panel" id="exclCard" hidden>
+      <div class="pm-panel-h"><span class="pm-panel-t">Excluded audiences</span><span class="pm-panel-s">never targeted where they are listed</span></div>
+      <div class="pm-scroll"><table id="excl"></table></div>
+    </section>
+    <p class="pd-foot" id="foot"></p>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/pm_picker.js') }}?v=1"></script>
+<script src="{{ url_for('static', filename='js/audience_segments.js') }}?v=6"></script>
+{% endblock %}
