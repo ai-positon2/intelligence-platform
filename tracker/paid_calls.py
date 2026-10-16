@@ -331,7 +331,7 @@ def analysis(store, account_id, start, end, *, company_id="", source="", http=No
         if source:
             calls = [c for c in calls if c["source"] == (source if source != "Unknown" else "")]
         out = topics.analyze(calls)
-        out.update({"start": start, "end": end, "company": company_id, "source": source, "matching": total, "pages": len(pages),
+        out.update({"start": start, "end": end, "company": company_id, "source": source, "matching": total, "minSeconds": MIN_SAMPLE_SECONDS, "pages": len(pages),
                     "withTranscript": sum(1 for c in calls if c["transcript"]), "withSummary": sum(1 for c in calls if c["summary"])})
         return out
     return g._cached(store, ck, TTL_VIEW, make, notes, force=force, stamps=stamps)

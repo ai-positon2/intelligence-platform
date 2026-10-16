@@ -44,7 +44,9 @@ function flags(rows,totals){
 function coverage(an){
   if(!an) return "";
   if(!an.read) return "None of the "+num(an.sampled)+" calls sampled had a transcript.";
-  return "Read "+num(an.read)+" calls that had a transcript, from a sample of "+num(an.sampled)+" spread across the range ("+num(an.matching)+" calls match).";
+  var secs=an.minSeconds||20;
+  var of=an.source?"the "+num(an.matching)+" calls of "+secs+" seconds or more that CallRail's search finds for this source (a similarly named source is left out of the read)":"the "+num(an.matching)+" calls of "+secs+" seconds or more in the range";
+  return "Read "+num(an.read)+" calls that had a transcript, from a sample of "+num(an.sampled)+" spread across "+of+".";
 }
 /* Half of a share of calls is a guess when the sample is this small: say so. */
 function thin(an){return !!an&&an.read>0&&an.read<30;}

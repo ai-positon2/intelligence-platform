@@ -70,7 +70,8 @@ def test_flags_without_data_are_empty():
 
 
 def test_what_the_sample_covered_is_said_in_words_and_a_thin_sample_is_marked():
-    assert run('D.coverage({sampled: 462, read: 82, matching: 4781})') == "Read 82 calls that had a transcript, from a sample of 462 spread across the range (4,781 calls match)."
+    assert run('D.coverage({sampled: 462, read: 82, matching: 4781, minSeconds: 20})') == "Read 82 calls that had a transcript, from a sample of 462 spread across the 4,781 calls of 20 seconds or more in the range."
+    assert run('D.coverage({sampled: 422, read: 64, matching: 4744, minSeconds: 20, source: "Google Ads"})') == "Read 64 calls that had a transcript, from a sample of 422 spread across the 4,744 calls of 20 seconds or more that CallRail\'s search finds for this source (a similarly named source is left out of the read)."
     assert "None of the 300 calls sampled" in run('D.coverage({sampled: 300, read: 0, matching: 3000})')
     assert run("D.coverage(null)") == "" and run("[D.thin({read: 29}), D.thin({read: 30}), D.thin({read: 0}), D.thin(null)]") == [True, False, False, False]
 

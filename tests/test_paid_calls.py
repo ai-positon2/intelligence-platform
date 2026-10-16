@@ -336,6 +336,7 @@ def test_the_analysis_samples_the_pages_filters_on_source_and_returns_no_call_te
     assert all(q["search"] == "Google Ads" and q["min_duration"] == C.MIN_SAMPLE_SECONDS and q["per_page"] == 100 for _p, q in calls)
     assert all("customer_name" not in q["fields"] and "customer_phone_number" not in q["fields"] for _p, q in calls)
     assert out["sampled"] == 12 and out["read"] == 12 and out["matching"] == 9999 and out["pages"] == C.SAMPLE_PAGES      # 24 calls read, 12 of them Google Ads
+    assert out["minSeconds"] == C.MIN_SAMPLE_SECONDS
     assert {s["source"] for s in out["bySource"]} == {"Google Ads"}                  # CallRail's text search is not exact, this is
     blob = json.dumps(out) + json.dumps(st.cache)
     for leak in ("A new patient called to book", "Heather", "8573109334", "I am a new patient", "Hello"):

@@ -228,7 +228,7 @@ function paintKpis(){
   cards.push({k:"Answered",c:"#34d399",v:D.pct(ansR),d:delta(ansR,pAnsR,false)});
   cards.push({k:"Missed",c:"#fb7185",v:D.num(t.missed),d:'<span class="d '+(t.missRate>0.1?"bad":"flat")+'">'+D.pct(t.missRate)+'<em>of calls</em></span>'});
   cards.push({k:"First-time callers",c:"#a78bfa",v:D.num(t.firstTime),d:'<span class="d flat">'+D.pct(t.calls?t.firstTime/t.calls:null)+'<em>of calls</em></span>'});
-  cards.push({k:"CallRail leads",c:"#fbbf24",v:D.num(t.leads),d:'<span class="d flat">'+D.pct(t.leadRate)+'<em>of calls</em></span>'});
+  cards.push({k:"CallRail leads",c:"#fbbf24",v:D.num(t.leads),d:'<span class="d flat">'+(t.leads===0&&t.calls>=100?'<em>none marked as a lead in CallRail</em>':D.pct(t.leadRate)+'<em>of calls</em>')+'</span>'});
   cards.push({k:"Average call",c:"#f97316",v:D.dur(t.avgDuration),d:delta(t.avgDuration,p.avgDuration,false)});
   $("#kpis").style.setProperty("--cols",cards.length);
   $("#kpis").innerHTML=cards.map(function(x){
