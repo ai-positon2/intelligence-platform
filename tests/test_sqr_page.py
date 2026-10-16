@@ -158,19 +158,19 @@ def test_the_negative_tables_show_total_cost_next_to_the_wasted_part():
 
     src = "\n".join(grab(n) for n in ("esc", "money", "num", "none", "hint", "tbl", "negRow", "paneNegs"))
     harness = (
-        "const S = { currency: 'USD' }; const where = n => 'Account'; const source = n => 'rule';\n" + src + "\n"
-        "const n1 = { text: 'free trial', matchType: 'Phrase', reason: 'freebie', examples: ['free trial pump'], cost: 120.5, wasted: 80.25, clicks: 30, terms: 4, risks: [], level: 'Account' };\n"
-        "const n2 = { text: 'heat pump', matchType: 'Phrase', reason: 'other', examples: [], cost: 9.5, wasted: 9.5, clicks: 2, terms: 1, risks: ['x'], level: 'Account' };\n"
+        "const S = { currency: 'USD' }; const fmtConv = v => String(v); const where = n => 'Account'; const source = n => 'rule';\n" + src + "\n"
+        "const n1 = { text: 'free trial', matchType: 'Phrase', reason: 'freebie', examples: ['free trial pump'], cost: 120.5, wasted: 80.25, clicks: 30, terms: 4, conversions: 3, risks: [], level: 'Account' };\n"
+        "const n2 = { text: 'heat pump', matchType: 'Phrase', reason: 'other', examples: [], cost: 9.5, wasted: 9.5, clicks: 2, terms: 1, conversions: 0, risks: ['x'], level: 'Account' };\n"
         "process.stdout.write(paneNegs({ priorityNegatives: [n1], allNegatives: [n1, n2] }));"
     )
     out = subprocess.run(["node", "-e", harness], capture_output=True, text=True, timeout=30)
     assert out.returncode == 0, out.stderr
     html = out.stdout
     heads = re.findall(r"<th(?: [^>]*)?>(.*?)</th>", html)
-    assert heads == ["Negative", "Match", "Where", "Why", "Cost", "Wasted", "Clicks", "Terms", "Negative", "Match", "Where", "Cost", "Wasted", "Check"], heads
+    assert heads == ["Negative", "Match", "Where", "Why", "Cost", "Wasted", "Clicks", "Conv", "Terms", "Negative", "Match", "Where", "Cost", "Wasted", "Conv", "Check"], heads
     first = re.findall(r"<td[^>]*>(.*?)</td>", html.split("<tbody>")[1].split("</tbody>")[0])
-    assert first[4:8] == ["$121", "$80.25", "30", "4"], first             # the priority table rounds 100 and over, like Wasted did
-    assert re.findall(r"<td[^>]*>(.*?)</td>", html.split("<tbody>")[2])[3:5] == ["$120.50", "$80.25"]
+    assert first[4:9] == ["$121", "$80.25", "30", "3", "4"], first             # the priority table rounds 100 and over, like Wasted did
+    assert re.findall(r"<td[^>]*>(.*?)</td>", html.split("<tbody>")[2])[3:6] == ["$120.50", "$80.25", "3"]
 
 
 @pytest.mark.skipif(not shutil.which("node"), reason="node is not installed")

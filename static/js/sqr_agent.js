@@ -451,13 +451,13 @@ function howRanked(){
 }
 function negRow(n){
   return '<tr><td class="sq-term">' + esc(n.text) + (n.examples.length && n.examples[0] !== n.text ? '<small class="sq-ex">e.g. ' + esc(n.examples.slice(0, 2).join(", ")) + '</small>' : '') + '</td><td>' + esc(n.matchType) + '</td><td>' + esc(where(n)) +
-    '</td><td>' + esc(n.reason || "") + '<span class="sq-by">' + esc(source(n)) + '</span></td><td class="r num">' + money(n.cost) + '</td><td class="r num">' + money(n.wasted) + '</td><td class="r num">' + num(n.clicks) + '</td><td class="r num">' + num(n.terms) + '</td></tr>';
+    '</td><td>' + esc(n.reason || "") + '<span class="sq-by">' + esc(source(n)) + '</span></td><td class="r num">' + money(n.cost) + '</td><td class="r num">' + money(n.wasted) + '</td><td class="r num">' + num(n.clicks) + '</td><td class="r num">' + fmtConv(n.conversions) + '</td><td class="r num">' + num(n.terms) + '</td></tr>';
 }
 function paneNegs(r){
-  const ref = r.allNegatives.slice(0, 1000).map(n => '<tr><td class="sq-term">' + esc(n.text) + '</td><td>' + esc(n.matchType) + '</td><td>' + esc(where(n)) + '</td><td class="r num">' + money(n.cost, false) + '</td><td class="r num">' + money(n.wasted, false) + '</td><td>' + (n.risks.length ? esc(n.risks.join(", ")) : "") + '</td></tr>').join("");
+  const ref = r.allNegatives.slice(0, 1000).map(n => '<tr><td class="sq-term">' + esc(n.text) + '</td><td>' + esc(n.matchType) + '</td><td>' + esc(where(n)) + '</td><td class="r num">' + money(n.cost, false) + '</td><td class="r num">' + money(n.wasted, false) + '</td><td class="r num">' + fmtConv(n.conversions) + '</td><td>' + (n.risks.length ? esc(n.risks.join(", ")) : "") + '</td></tr>').join("");
   return '<div class="pane" id="pane-negs" hidden>' + hint("Ranked by the money spent on these terms that never converted. A negative whose terms did convert, that would also stop a relevant term or a keyword the account bids on, or that names a competitor the account bids on (or blocks competitors account-wide when the account runs a competitor campaign), is not here: it is under Check before blocking. A negative with no money wasted is in the full list below.") +
-    (r.priorityNegatives.length ? tbl([["Negative"], ["Match"], ["Where"], ["Why"], ["Cost", 1], ["Wasted", 1], ["Clicks", 1], ["Terms", 1]], r.priorityNegatives.map(negRow).join("")) : none()) +
-    (ref ? '<details class="sq-ref"><summary>All negatives (' + r.allNegatives.length + ')</summary>' + tbl([["Negative"], ["Match"], ["Where"], ["Cost", 1], ["Wasted", 1], ["Check"]], ref) +
+    (r.priorityNegatives.length ? tbl([["Negative"], ["Match"], ["Where"], ["Why"], ["Cost", 1], ["Wasted", 1], ["Clicks", 1], ["Conv", 1], ["Terms", 1]], r.priorityNegatives.map(negRow).join("")) : none()) +
+    (ref ? '<details class="sq-ref"><summary>All negatives (' + r.allNegatives.length + ')</summary>' + tbl([["Negative"], ["Match"], ["Where"], ["Cost", 1], ["Wasted", 1], ["Conv", 1], ["Check"]], ref) +
       (r.allNegatives.length > 1000 ? '<p class="pm-panel-s" style="margin-top:10px">Showing the first 1,000. The workbook has every one.</p>' : "") + '</details>' : "") + '</div>';
 }
 const PRIORITY_N = Core.PRIORITY;
