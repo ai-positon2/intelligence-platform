@@ -304,3 +304,68 @@ def test_an_empty_campaign_still_gives_evidence_without_errors():
     ev = ai.evidence_bundle(d, auto.Ctx(d))
     assert ev["adGroups"] == [] and ev["landingPages"] == [] and ev["targeting"]["languages"] == "all languages"
     assert ev["autoApplyRecommendationsEnabled"].startswith("none")
+
+
+# ── Campaigns the campaign book does not cover are judged on the spot ───────
+
+SPOT_ITEM = {"id": "1.8", "check": "Bid Strategy Type", "expected": "Depends on the campaign book", "otherThingsToCheck": "", "fromBook": True,
+             "onTheSpot": "There is no plan to compare with. Judge the bid strategy on its own."}
+
+
+def test_a_check_that_would_use_the_book_is_given_its_on_the_spot_guidance_when_the_book_does_not_apply():
+    withbook = ai._check_rows([SPOT_ITEM], {}, True)[0]
+    assert withbook["fromBook"] is True and "judgeOnTheSpot" not in withbook
+    without = ai._check_rows([SPOT_ITEM], {}, False)[0]
+    assert without["fromBook"] is False and without["judgeOnTheSpot"].startswith("There is no plan")
+    fixed = ai._check_rows([dict(SPOT_ITEM, fromBook=False, onTheSpot="")], {}, False)[0]
+    assert fixed["fromBook"] is False and "judgeOnTheSpot" not in fixed
+
+
+def test_the_prompt_tells_the_ai_how_to_treat_a_campaign_the_book_does_not_cover():
+    assert "judgeOnTheSpot" in ai.SYSTEM and "Never say the campaign book is needed" in ai.SYSTEM
+    assert "audience signals, search themes" in ai.SYSTEM and "—" not in ai.SYSTEM
+
+
+def test_the_evidence_says_the_book_is_not_used_and_never_carries_it():
+    d = sample_data(book={"filename": "b.xlsx", "rows": [{"field": "Bid Strategy Type", "value": "Manual CPC"}], "text": "Manual CPC"})
+    d["_channel"], d["_book"], d["_bookNotUsed"] = "PERFORMANCE_MAX", None, "Performance Max"
+    ev = ai.evidence_bundle(d, auto.Ctx(d))
+    assert ev["campaignBook"] == "not used for this campaign type (Performance Max): the checks that depend on it are judged on the spot"
+    assert "Manual CPC" not in json.dumps(ev)
+
+
+def test_performance_max_evidence_has_each_asset_groups_audience_signals_and_search_themes():
+    d = sample_data()
+    d.update(_channel="PERFORMANCE_MAX", _names={"customers/1/audiences/9": "P2_Customers"},
+             asset_groups=[{"assetGroup": {"id": "7", "name": "Design Build", "adStrength": "GOOD", "finalUrls": ["https://example.com/"]}},
+                           {"assetGroup": {"id": "8", "name": "Patios", "adStrength": "AVERAGE", "finalUrls": ["https://example.com/p"]}}],
+             signals=[{"assetGroup": {"id": "7"}, "assetGroupSignal": {"audience": {"audience": "customers/1/audiences/9"}}},
+                      {"assetGroup": {"id": "7"}, "assetGroupSignal": {"searchTheme": {"text": "patio builder"}}}])
+    ev = ai.evidence_bundle(d, auto.Ctx(d))
+    assert ev["performanceMaxSignals"] == [{"assetGroup": "Design Build", "audienceSignals": ["P2_Customers"], "searchThemes": ["patio builder"]},
+                                           {"assetGroup": "Patios", "audienceSignals": "none", "searchThemes": "none"}]
+    assert ev["demandGenTargeting"] is None
+
+
+def test_demand_gen_evidence_has_audiences_by_ad_group_exclusions_and_its_ads_text():
+    d = sample_data()
+    d.update(_channel="DEMAND_GEN", _names={"customers/1/userLists/5": "Past customers", "customers/1/userLists/7": "Employees"},
+             campaign=campaign(advertisingChannelType="DEMAND_GEN", demandGenCampaignSettings={"upgradedTargeting": True}),
+             adgroups=[ad_group("11", "Ads A")],
+             ads=[{"adGroup": {"id": "11"}, "adGroupAd": {"status": "ENABLED", "ad": {"type": "DEMAND_GEN_MULTI_ASSET_AD", "finalUrls": ["https://example.com/"],
+                                                                                  "demandGenMultiAssetAd": {"headlines": [{"text": "Patio Builders"}],
+                                                                                                            "descriptions": [{"text": "Design and build."}]}}}}],
+             ag_audiences=[{"adGroup": {"id": "11", "name": "Ads A"}, "adGroupCriterion": {"type": "USER_LIST", "negative": False, "userList": {"userList": "customers/1/userLists/5"}}},
+                           {"adGroup": {"id": "11", "name": "Ads A"}, "adGroupCriterion": {"type": "USER_LIST", "negative": True, "userList": {"userList": "customers/1/userLists/7"}}}])
+    ev = ai.evidence_bundle(d, auto.Ctx(d))
+    assert ev["demandGenTargeting"] == {"audiencesByAdGroup": {"Ads A": {"audiences": ["Past customers"], "excluded": ["Employees"]}}, "optimizedTargeting": True}
+    ad = ev["adGroups"][0]["ads"][0]
+    assert ad["type"] == "DEMAND_GEN_MULTI_ASSET_AD" and ad["headlines"] == ["Patio Builders"] and ad["descriptions"] == ["Design and build."]
+    assert ev["performanceMaxSignals"] is None
+
+
+def test_section_six_reads_the_signals_and_a_search_campaign_is_never_shown_empty_ones():
+    d = sample_data()
+    ev = ai.evidence_bundle(d, auto.Ctx(d))
+    assert set(ai._slice(ev, "6")) <= set(ai.SECTION_EVIDENCE["6"]) and "performanceMaxSignals" not in ai._slice(ev, "6")
+    assert "demandGenTargeting" not in ai._slice(ev, "1")

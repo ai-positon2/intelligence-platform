@@ -158,3 +158,50 @@ def test_the_note_wording():
     assert "no Anthropic key" in job._note({"not_configured": 10}, 10)
     assert "run the review again" in job._note({"refused": 10}, 10)
     assert job._note({"refused": 2}, 10).startswith("The AI could not review 2 of 10 sections")
+
+
+# ── A Performance Max campaign is not checked against the campaign book ──────
+
+def pmax_google():
+    camp = {"id": CAMPAIGN, "name": "P2_PMax_20261014", "status": "ENABLED", "advertisingChannelType": "PERFORMANCE_MAX",
+            "servingStatus": "SERVING", "biddingStrategyType": "MAXIMIZE_CONVERSIONS", "startDateTime": "2026-10-14 09:00:00",
+            "geoTargetTypeSetting": {"positiveGeoTargetType": "PRESENCE", "negativeGeoTargetType": "PRESENCE"}}
+    return fake_google(**{
+        "FROM campaign WHERE campaign.id": [{"campaign": camp, "campaignBudget": {"amountMicros": "30000000"}}],
+        "FROM asset_group WHERE": [{"assetGroup": {"id": "7", "name": "Design Build", "adStrength": "AVERAGE", "finalUrls": ["https://example.com/"]}}],
+        "FROM asset_group_asset": [],
+        "FROM asset_group_signal": [{"assetGroup": {"id": "7", "name": "Design Build"}, "assetGroupSignal": {"searchTheme": {"text": "patio builder"}}}],
+        "FROM ad_group": [], "FROM ad_group_ad": [], "FROM ad_group_criterion": []})
+
+
+def new_pmax_qc(mem):
+    launch, _ = mem.start_launch(by="u@position2.com", account_id=ACCOUNT, account_name="Example Co", campaign_id=CAMPAIGN,
+                                 campaign_name="P2_PMax_20261014", channel="PERFORMANCE_MAX", campaign_types=["PMax"])
+    mem.begin_review(launch["id"])
+    mem.set_book(launch["id"], {"filename": "book.xlsx", "rows": [{"field": "Bid Strategy Type", "value": "Manual CPC", "other": ""}], "text": "Bid Strategy Type Manual CPC"})
+    return launch["id"]
+
+
+def test_a_performance_max_review_never_shows_the_ai_the_book_and_asks_it_to_judge_on_the_spot():
+    mem = MemoryStore()
+    lid = new_pmax_qc(mem)
+    model = FakeModel(DEFAULT_ANSWERS)
+    run(mem, lid, model=model, search=pmax_google())
+    l = mem.launches[lid]
+    assert l["review_status"] == "done" and l["channel"] == "PERFORMANCE_MAX" and l["campaign_types"] == ["PMax"]
+    asked = {c["id"]: c for req in model.asked for c in req["checks"]}
+    assert asked["1.8"]["fromBook"] is False and "no plan to compare with" in asked["1.8"]["judgeOnTheSpot"].lower()
+    ev = [req["evidence"] for req in model.asked if "campaignBook" in req["evidence"]]
+    assert ev and all("not used for this campaign type (Performance Max)" in e["campaignBook"] for e in ev)
+    assert "Manual CPC" not in str(model.asked)                                           # the book's content never reached the model
+
+
+def test_a_performance_max_review_runs_the_on_the_spot_checks_and_not_the_search_only_ones():
+    mem = MemoryStore()
+    lid = new_pmax_qc(mem)
+    run(mem, lid, search=pmax_google())
+    auto = mem.launches[lid]["auto"]
+    assert auto["6.1"]["result"] == "fail" and "No audience signal on Design Build" in auto["6.1"]["found"]         # exact: nothing set
+    assert auto["6.3"]["result"] == "fail" and "average" in auto["6.3"]["found"]
+    assert "6.4" not in auto and not ({"1.3", "1.5", "1.23"} & set(auto))
+    assert auto["1.8"]["result"] is None or auto["1.8"]["source"] != "rule"                                         # never ticked from a book

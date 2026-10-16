@@ -1,6 +1,6 @@
 """Paid Marketing Agents: QA Agent, the Campaign Book QC done by the AI on a live campaign.
 
-Pinned here: the checklist data is the Campaign Book's (61 checks in 5 sections); which checks show
+Pinned here: the checklist data is the Campaign Book's (61 checks in 5 sections) plus 4 done on the spot for Performance Max and Demand Gen; which checks show
 for a campaign (its own type); the verdict (any check flagged is NOT READY, any check not yet
 verified is INCOMPLETE, else READY, with N/A counting as done); a person's wrong needs a reason; a
 person's answer beats the AI's; the storage SQL and its migration are valid Postgres; and the routes
@@ -44,10 +44,10 @@ CAMPAIGN = "9000000001"
 def test_the_checklist_is_the_campaign_books():
     cl = qa.checklist()
     items = cl["items"]
-    assert len(items) == 61 and len({i["id"] for i in items}) == 61
+    assert len(items) == 65 and len({i["id"] for i in items}) == 65
     assert cl["sections"] == ["1. Campaign Setup", "2. Automation", "3. Automatically Created Assets", "4. Auto-Apply Recommendations",
-                              "5. Account Automation"]
-    assert [sum(1 for i in items if i["section"] == s) for s in cl["sections"]] == [25, 2, 11, 21, 2]
+                              "5. Account Automation", "6. On the spot (Performance Max and Demand Gen)"]
+    assert [sum(1 for i in items if i["section"] == s) for s in cl["sections"]] == [25, 2, 11, 21, 2, 4]
     assert cl["severities"] == ["Required"] and cl["blocking"] == ["Required"] and cl["clientTypes"] == []
     assert qa.item("1.1")["check"] == "Campaign Name" and qa.item("2.1")["check"] == "Final URL Expansion"
     assert qa.item("4.21")["check"].startswith("Add store visits") and qa.item("5.2")["check"].startswith("Auto Migration")
@@ -58,7 +58,7 @@ def test_every_check_has_what_the_ai_and_the_page_need():
     for i in cl["items"]:
         assert i["check"] and i["verify"] and i["section"] in cl["sections"] and i["severity"] == "Required", i["id"]
         assert i["id"].startswith(str(cl["sections"].index(i["section"]) + 1) + "."), i["id"]
-        assert i["campaignTypes"] in (["All"], ["Search"]) and i["clientTypes"] == ["All"], i["id"]
+        assert i["campaignTypes"] in (["All"], ["Search"], ["PMax"], ["Demand Gen"]) and i["clientTypes"] == ["All"], i["id"]
         assert isinstance(i["fromBook"], bool) and "expected" in i and "otherThingsToCheck" in i, i["id"]
     assert [i["id"] for i in qa.items() if i["fromBook"]] == ["1.2", "1.8", "1.10", "1.11", "1.12", "1.14", "1.16", "1.24"]
     assert qa.item("1.7")["expected"] == "Account Level Default Goals"                       # the workbook's typo is fixed
@@ -74,8 +74,12 @@ def test_no_text_in_the_checklist_uses_an_em_dash():
 def test_every_check_shows_for_a_search_campaign_and_the_search_only_ones_do_not_for_pmax():
     assert len(qa.applicable([], ["Search"])) == 61
     pmax = {i["id"] for i in qa.applicable([], ["PMax"])}
-    assert len(pmax) == 58 and not ({"1.3", "1.5", "1.23"} & pmax)                       # networks, AI Max, ad rotation are Search only
-    assert len(qa.applicable([], [])) == 61                                              # an unmapped campaign type narrows nothing
+    assert len(pmax) == 61 and not ({"1.3", "1.5", "1.23"} & pmax)                       # networks, AI Max, ad rotation are Search only
+    assert {"6.1", "6.2", "6.3"} <= pmax and "6.4" not in pmax                           # PMax has its own three on-the-spot checks
+    dg = {i["id"] for i in qa.applicable([], ["Demand Gen"])}
+    assert len(dg) == 59 and "6.4" in dg and not ({"6.1", "6.2", "6.3"} & dg)
+    assert not any(i["id"].startswith("6.") for i in qa.applicable([], ["Search"]))
+    assert len(qa.applicable([], [])) == 65                                              # an unmapped campaign type narrows nothing
 
 
 def test_the_campaign_type_comes_from_the_google_ads_channel():
@@ -93,14 +97,14 @@ def test_there_is_no_client_type_to_wait_for():
 # ── The verdict ─────────────────────────────────────────────────────────────
 
 def launch(**kw):
-    return dict({"client_types": [], "campaign_types": []}, **kw)
+    return dict({"client_types": [], "campaign_types": ["Search"]}, **kw)
 
 
 def ticks(status, ids):
     return {i: {"status": status} for i in ids}
 
 
-SHOWN = qa.applicable([], [])
+SHOWN = qa.applicable([], ["Search"])
 ALL = [i["id"] for i in SHOWN]
 
 
@@ -613,7 +617,7 @@ def test_the_builder_is_gone():
 
 def test_the_checklist_is_served_and_cached_privately(mem):
     r = client_as(STAFF).get(API + "/checklist")
-    assert len(r.get_json()["items"]) == 61 and r.headers["Cache-Control"].startswith("private")
+    assert len(r.get_json()["items"]) == 65 and r.headers["Cache-Control"].startswith("private")
 
 
 def test_the_campaign_list_is_the_live_campaigns_of_the_account(mem):
@@ -977,3 +981,53 @@ def test_the_server_never_trusts_a_verdict_from_the_page(mem):
     r = c.put("%s/launches/%s/checks/1.1" % (API, lid), json={"status": "pass", "verdict": "ready", "summary": {"verdict": {"code": "ready"}}},
               headers=SAME)
     assert r.get_json()["summary"]["verdict"]["code"] != "ready"
+
+
+# ── The campaign book is for Search campaigns ───────────────────────────────
+
+import tracker.paid_qa_book as pqb  # noqa: E402
+
+
+@pytest.mark.parametrize("channel,used", [("SEARCH", True), ("", True), ("PERFORMANCE_MAX", False), ("DEMAND_GEN", False), ("SHOPPING", False),
+                                          ("DISPLAY", False), ("VIDEO", False), ("MULTI_CHANNEL", False)])
+def test_the_book_is_for_search_campaigns_only(channel, used):
+    assert pqb.applies_to(channel) is used
+
+
+def test_every_check_that_would_have_used_the_book_says_how_to_judge_it_without_one():
+    spot = [i for i in qa.items() if i["fromBook"]]
+    assert len(spot) == 8 and all(len(i.get("onTheSpot") or "") > 60 for i in spot)
+    assert all("There is no plan to compare with" in i["onTheSpot"] or "no plan" in i["onTheSpot"] for i in spot)
+    assert not any(i.get("onTheSpot") for i in qa.items() if not i["fromBook"])
+    assert all("\u2014" not in i.get("onTheSpot", "") for i in spot)
+
+
+def test_the_note_for_a_campaign_the_book_does_not_cover_says_what_happens_instead():
+    note = pqb.not_used_note("PERFORMANCE_MAX")
+    assert "Performance Max" in note and "judged on the spot" in note and "audience and search theme" in note and "\u2014" not in note
+    assert "Demand Gen" in pqb.not_used_note("DEMAND_GEN")
+
+
+def test_a_book_cannot_be_added_to_a_performance_max_qc_and_the_page_is_told_why(mem):
+    c, lid, _ = start(campaignId="9000000002", channel="PERFORMANCE_MAX", campaignName="P2_PMax_20261014")
+    mem.launches[lid]["channel"] = "PERFORMANCE_MAX"                       # the review's fake Google answers with a Search campaign
+    body = c.get(API + "/launches/" + lid).get_json()
+    assert body["launch"]["bookApplies"] is False and body["launch"]["book"] is None and "Performance Max" in body["launch"]["bookNote"]
+    r = upload(c, lid)
+    assert r.status_code == 400 and "for Search campaigns" in r.get_json()["error"]
+    assert not mem.launches[lid].get("book")
+
+
+def test_a_search_qc_still_takes_a_book_and_says_it_applies(mem):
+    c, lid, body = start()
+    assert body["launch"]["bookApplies"] is True and body["launch"]["bookNote"] == "" and body["launch"]["bookIgnored"] is False
+    assert upload(c, lid).status_code == 200
+
+
+def test_a_book_saved_before_is_kept_but_ignored_for_a_performance_max_qc(mem):
+    c, lid, _ = start(campaignId="9000000002", channel="PERFORMANCE_MAX", campaignName="P2_PMax_20261014")
+    mem.launches[lid]["channel"] = "PERFORMANCE_MAX"
+    mem.launches[lid]["book"] = {"filename": "old.xlsx", "rows": [{"field": "Bid Strategy Type", "value": "Max clicks", "other": ""}], "text": ""}
+    p = c.get(API + "/launches/" + lid).get_json()["launch"]
+    assert p["book"] is None and p["bookIgnored"] is True and p["bookApplies"] is False
+    assert c.delete("%s/launches/%s/book" % (API, lid), json={}, headers=SAME).status_code == 200      # it can still be removed

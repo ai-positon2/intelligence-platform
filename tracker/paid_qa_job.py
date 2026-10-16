@@ -15,7 +15,7 @@ from __future__ import annotations
 import datetime as dt
 import logging
 
-from . import paid_qa, paid_qa_ai, paid_qa_auto
+from . import paid_qa, paid_qa_ai, paid_qa_auto, paid_qa_book
 
 log = logging.getLogger(__name__)
 
@@ -56,7 +56,8 @@ def run_review(launch_id, *, store, search, geo_fn=None, web_fn=None, call=None,
         ask = [i for i in checks if i["id"] not in settled]
         sections = len({i["section"] for i in ask})
         ev = paid_qa_ai.evidence_bundle(data, paid_qa_auto.Ctx(data))
-        meta = {"name": camp["name"] or launch["campaign_name"], "type": camp["type"], "today": (today or dt.date.today()).isoformat()}
+        meta = {"name": camp["name"] or launch["campaign_name"], "type": camp["type"], "today": (today or dt.date.today()).isoformat(),
+                "bookUsed": paid_qa_book.applies_to(camp["channel"])}
         store.set_progress(launch_id, "The AI is reviewing the checklist", 0, sections)
         ai, problems = paid_qa_ai.review(
             ask, ev, rules, meta, call=call,

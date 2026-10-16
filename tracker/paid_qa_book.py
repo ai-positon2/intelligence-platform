@@ -33,6 +33,28 @@ SHEET_ID = re.compile(r"^https://docs\.google\.com/spreadsheets/d/([A-Za-z0-9_-]
 PLACEHOLDERS = ("depends on the campaign book", "depends on the client", "check the age", "from the campaign book", "can be asked back")
 
 
+# The Campaign Book is the team's Search campaign book: its rows (bid strategy, devices, locations, ages...) describe a Search campaign. A
+# Performance Max, Demand Gen, Display, Video, Shopping or App campaign is not checked against it; the checks that would depend on it are
+# judged on the spot from Google Ads instead (tracker/paid_qa_auto.py, paid_qa_ai.py).
+BOOK_CHANNELS = ("SEARCH",)
+TYPE_NAMES = {"PERFORMANCE_MAX": "Performance Max", "DEMAND_GEN": "Demand Gen", "SHOPPING": "Shopping", "DISPLAY": "Display",
+              "VIDEO": "Video", "MULTI_CHANNEL": "App", "SEARCH": "Search"}
+
+
+def applies_to(channel):
+    """True when the campaign book is used for a campaign of this Google Ads channel type. A campaign whose type is not known yet
+    (nothing has been read) is treated as Search."""
+    return not channel or channel in BOOK_CHANNELS
+
+
+def not_used_note(channel):
+    """The sentence for the page when a campaign's type means its book is not used."""
+    name = TYPE_NAMES.get(channel) or "this type of"
+    return ("The campaign book is for Search campaigns, so it is not used for a %s campaign. The checks that would depend on it "
+            "(bid strategy, devices, genders, household income, locations, age, ad schedule, campaign type) are judged on the spot from "
+            "Google Ads instead, and the audience and search theme checks are done the same way." % name)
+
+
 class BookError(ValueError):
     """What is wrong with the file or link, in words the page can show."""
 

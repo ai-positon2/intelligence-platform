@@ -64,12 +64,12 @@ def book_of(**fields):
 
 def test_every_check_in_the_campaign_book_has_a_rule_and_every_rule_a_check():
     ids = {i["id"] for i in qa.items()}
-    assert set(auto.RULES) == ids and len(ids) == 61
+    assert set(auto.RULES) == ids and len(ids) == 65
 
 
 def test_every_rule_survives_an_empty_answer_and_says_so_instead_of_ticking():
     out = auto.evaluate({"_errors": {"customer": "refused"}, "_channel": "SEARCH"})
-    assert set(out) == set(auto.RULES)
+    assert set(out) == set(auto.RULES) - {"6.1", "6.2", "6.3", "6.4"}                       # the on-the-spot checks are not a Search campaign's
     for cid, f in out.items():
         assert f["found"], cid
     assert out["1.20"] == {"result": None, "found": "Could not read this from Google Ads (refused)."}      # never a tick on nothing
@@ -477,8 +477,8 @@ def tables(g):
 
 def test_only_the_reads_a_campaign_type_can_answer_are_made():
     for channel, present, absent in (("SEARCH", {"ad_group", "ad_group_ad", "ad_group_criterion"}, {"asset_group"}),
-                                     ("PERFORMANCE_MAX", {"asset_group", "asset_group_asset"}, {"ad_group", "ad_group_ad", "ad_group_criterion"}),
-                                     ("DEMAND_GEN", set(), {"ad_group", "asset_group", "ad_group_criterion"})):
+                                     ("PERFORMANCE_MAX", {"asset_group", "asset_group_asset", "asset_group_signal"}, {"ad_group", "ad_group_ad", "ad_group_criterion"}),
+                                     ("DEMAND_GEN", {"ad_group", "ad_group_ad", "ad_group_criterion"}, {"asset_group", "asset_group_signal"})):
         g = Google(channel=channel)
         out = auto.run("2133861213", "1", g)
         t = tables(g)
@@ -551,3 +551,141 @@ def test_a_found_text_is_kept_to_a_readable_length():
     f = auto.Finding("pass", "word " * 1000)
     assert len(f["found"]) <= auto.MAX_FOUND and f["found"].endswith("...")
     assert auto.Finding(None, "a\n  b\t c")["found"] == "a b c"
+
+
+# ── The campaign book is Search only; Performance Max and Demand Gen are judged on the spot ─────────────
+
+def test_the_book_is_dropped_for_a_campaign_it_does_not_cover_and_kept_for_search():
+    b = book_of(bid_strategy_type="Target CPA")
+    pm = auto.run("2133861213", "1", Google(channel="PERFORMANCE_MAX"), book=b)
+    assert pm["data"]["_book"] is None and pm["data"]["_bookNotUsed"] == "Performance Max"
+    dg = auto.run("2133861213", "1", Google(channel="DEMAND_GEN"), book=b)
+    assert dg["data"]["_book"] is None and dg["data"]["_bookNotUsed"] == "Demand Gen"
+    se = auto.run("2133861213", "1", Google(channel="SEARCH"), book=b)
+    assert se["data"]["_book"] is b and se["data"]["_bookNotUsed"] == ""
+
+
+def test_no_rule_compares_a_performance_max_campaign_with_a_book_even_when_one_is_offered():
+    d = rows(_channel="PERFORMANCE_MAX", _book=None, campaign=campaign(advertisingChannelType="PERFORMANCE_MAX", biddingStrategyType="MAXIMIZE_CONVERSIONS"))
+    f = auto.evaluate(d)["1.8"]
+    assert f["result"] is None and "book" not in f["found"].lower().replace("campaign book", "")
+
+
+def pmax_data(signals=(), groups=(("1", "Design Build", "GOOD"), ("2", "Patios", "AVERAGE")), names=None):
+    sig = []
+    for gid, kind, value in signals:
+        s = {"audience": {"audience": value}} if kind == "audience" else {"searchTheme": {"text": value}}
+        sig.append({"assetGroup": {"id": gid, "name": dict((g[0], g[1]) for g in groups)[gid]}, "assetGroupSignal": s})
+    d = rows(_channel="PERFORMANCE_MAX", campaign=campaign(advertisingChannelType="PERFORMANCE_MAX"), signals=sig,
+             asset_groups=[{"assetGroup": {"id": g[0], "name": g[1], "adStrength": g[2], "finalUrls": ["https://example.com/"]}} for g in groups])
+    d["_names"] = names or {}
+    return d
+
+
+def test_an_asset_group_with_no_audience_signal_is_a_fail_naming_it():
+    d = pmax_data(signals=[("1", "audience", "customers/1/audiences/9"), ("1", "theme", "patio builder")], names={"customers/1/audiences/9": "P2_Customers"})
+    f = auto.evaluate(d)["6.1"]
+    assert f["result"] == "fail" and "Patios" in f["found"] and "Design Build: P2_Customers" in f["found"]
+
+
+def test_audience_signals_on_every_asset_group_are_printed_for_the_ai_to_judge_not_ticked():
+    d = pmax_data(signals=[("1", "audience", "customers/1/audiences/9"), ("2", "audience", "customers/1/audiences/9")], names={"customers/1/audiences/9": "P2_Customers"})
+    f = auto.evaluate(d)["6.1"]
+    assert f["result"] is None and "Design Build: P2_Customers" in f["found"] and "Patios: P2_Customers" in f["found"] and "landing page" in f["found"]
+
+
+def test_an_asset_group_with_no_search_theme_is_a_fail_and_themes_are_printed_otherwise():
+    d = pmax_data(signals=[("1", "theme", "patio builder"), ("1", "theme", "outdoor kitchen")])
+    f = auto.evaluate(d)["6.2"]
+    assert f["result"] == "fail" and "No search theme on Patios" in f["found"] and "2 themes: patio builder, outdoor kitchen" in f["found"]
+    d = pmax_data(signals=[("1", "theme", "patio builder"), ("2", "theme", "pergola design")])
+    f = auto.evaluate(d)["6.2"]
+    assert f["result"] is None and "pergola design" in f["found"]
+
+
+def test_an_asset_group_rated_below_good_by_google_fails_and_all_good_passes():
+    f = auto.evaluate(pmax_data())["6.3"]
+    assert f["result"] == "fail" and "Patios (average)" in f["found"] and "Design Build: good" in f["found"]
+    ok = auto.evaluate(pmax_data(groups=(("1", "Design Build", "GOOD"), ("2", "Patios", "EXCELLENT"))))["6.3"]
+    assert ok["result"] == "pass"
+    unrated = auto.evaluate(pmax_data(groups=(("1", "Design Build", "GOOD"), ("2", "Patios", "PENDING"))))["6.3"]
+    assert unrated["result"] is None and "not rated yet" in unrated["found"]
+
+
+def dg_data(audiences=(), excluded=(), names=None, ads=True):
+    ag = [{"adGroup": {"id": "11", "name": "Ads A", "status": "ENABLED"}}, {"adGroup": {"id": "12", "name": "Ads B", "status": "ENABLED"}}]
+    crit = []
+    for gid, ref in audiences:
+        crit.append({"adGroup": {"id": gid, "name": "Ads A" if gid == "11" else "Ads B"}, "adGroupCriterion": {"type": "USER_LIST", "negative": False, "userList": {"userList": ref}}})
+    for gid, ref in excluded:
+        crit.append({"adGroup": {"id": gid, "name": "Ads A"}, "adGroupCriterion": {"type": "USER_LIST", "negative": True, "userList": {"userList": ref}}})
+    live = [{"adGroup": {"id": "11"}, "adGroupAd": {"status": "ENABLED", "ad": {"type": "DEMAND_GEN_MULTI_ASSET_AD", "finalUrls": ["https://example.com/"],
+                                                                                 "demandGenMultiAssetAd": {"headlines": [{"text": "Patio Builders"}],
+                                                                                                           "descriptions": [{"text": "Design and build."}]}}}}] if ads else []
+    d = rows(_channel="DEMAND_GEN", campaign=campaign(advertisingChannelType="DEMAND_GEN", demandGenCampaignSettings={"upgradedTargeting": True}),
+             adgroups=ag, ag_audiences=crit, ads=live)
+    d["_names"] = names or {}
+    return d
+
+
+def test_a_demand_gen_ad_group_with_no_audience_fails_and_optimized_targeting_is_said():
+    d = dg_data(audiences=[("11", "customers/1/userLists/5")], names={"customers/1/userLists/5": "Past customers"})
+    f = auto.evaluate(d)["6.4"]
+    assert f["result"] == "fail" and "No audience on Ads B" in f["found"] and "Ads A: Past customers" in f["found"] and "Optimized targeting is ON" in f["found"]
+
+
+def test_demand_gen_audiences_on_every_ad_group_are_left_to_the_ai_and_exclusions_do_not_count():
+    d = dg_data(audiences=[("11", "customers/1/userLists/5"), ("12", "customers/1/userLists/6")], excluded=[("12", "customers/1/userLists/7")],
+                names={"customers/1/userLists/5": "Past customers", "customers/1/userLists/6": "Site visitors", "customers/1/userLists/7": "Employees"})
+    f = auto.evaluate(d)["6.4"]
+    assert f["result"] is None and "Ads B: Site visitors" in f["found"] and "Employees" not in f["found"]
+    only_excluded = auto.evaluate(dg_data(audiences=[("11", "customers/1/userLists/5")], excluded=[("12", "customers/1/userLists/7")]))["6.4"]
+    assert only_excluded["result"] == "fail" and "Ads B" in only_excluded["found"]
+
+
+def test_the_on_the_spot_rules_say_nothing_for_a_campaign_type_that_is_not_theirs():
+    out = auto.evaluate(pmax_data())
+    assert "6.4" not in out and {"6.1", "6.2", "6.3"} <= set(out)
+    out = auto.evaluate(dg_data())
+    assert "6.4" in out and not ({"6.1", "6.2", "6.3"} & set(out))
+
+
+def test_demand_gen_ads_count_as_ads_and_their_text_is_scanned_for_keyword_insertion():
+    d = dg_data(audiences=[("11", "customers/1/userLists/5")])
+    out = auto.evaluate(d)
+    assert out["1.4"]["result"] is None and "1 enabled ad" in out["1.4"]["found"]
+    assert out["1.17"]["result"] == "pass" and "2 headlines, descriptions" in out["1.17"]["found"]
+    assert auto.evaluate(dg_data(ads=False))["1.4"]["result"] == "fail"
+    d["ads"][0]["adGroupAd"]["ad"]["demandGenMultiAssetAd"]["headlines"][0]["text"] = "Best {KeyWord:Patios}"
+    assert auto.evaluate(d)["1.17"]["result"] == "fail"
+
+
+def test_the_names_of_audiences_are_looked_up_for_performance_max_and_demand_gen_only():
+    class Names(Google):
+        def __call__(self, cid, gaql):
+            self.queries.append(gaql)
+            if "advertising_channel_type FROM campaign WHERE campaign.id" in gaql:
+                return [{"campaign": {"id": "1", "advertisingChannelType": self.channel}}]
+            if "FROM user_list" in gaql:
+                return [{"userList": {"resourceName": "customers/1/userLists/5", "id": "5", "name": "Past customers"}}]
+            if "FROM ad_group_criterion" in gaql and "'USER_LIST'" in gaql and self.channel == "DEMAND_GEN":
+                return [{"adGroup": {"id": "11", "name": "A"}, "adGroupCriterion": {"type": "USER_INTEREST", "userInterest": {"userInterestCategory": "customers/1/userInterests/80483"}}}]
+            if "FROM user_interest" in gaql:
+                return [{"userInterest": {"resourceName": "customers/1/userInterests/80483", "name": "Home & Garden", "taxonomyType": "IN_MARKET"}}]
+            return []
+    dg = auto.run("2133861213", "1", Names(channel="DEMAND_GEN"))
+    names = dg["data"]["_names"]
+    assert names["customers/1/userLists/5"] == "Past customers" and names["customers/1/userInterests/80483"] == "Home & Garden (in market)"
+    se = Names(channel="SEARCH")
+    auto.run("2133861213", "1", se)
+    assert not any("FROM user_list" in q for q in se.queries)
+
+
+def test_a_printed_fact_does_not_ask_for_a_book_the_campaign_type_does_not_have():
+    pm = rows(_channel="PERFORMANCE_MAX", campaign=campaign(advertisingChannelType="PERFORMANCE_MAX", biddingStrategyType="MAXIMIZE_CONVERSIONS"))
+    pm["_bookNotUsed"] = "Performance Max"
+    f = auto.evaluate(pm)
+    assert f["1.8"]["found"].endswith("There is no campaign book for a Performance Max campaign, so it is judged on the spot.")
+    assert "judged on the spot" in f["1.2"]["found"]
+    se = auto.evaluate(rows(campaign=campaign(biddingStrategyType="MAXIMIZE_CONVERSIONS")))
+    assert se["1.8"]["found"].endswith("The campaign book names no bid strategy to compare with.")

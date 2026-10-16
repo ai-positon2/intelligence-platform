@@ -98,7 +98,8 @@ def _queries(cid, channel):
                     "campaign.geo_target_type_setting.negative_geo_target_type, "
                     "campaign_budget.amount_micros, campaign_budget.explicitly_shared, "
                     "campaign.asset_automation_settings, campaign.dynamic_search_ads_setting.domain_name, "
-                    "campaign.ai_max_setting.enable_ai_max FROM campaign WHERE %s" % w,
+                    "campaign.ai_max_setting.enable_ai_max, campaign.demand_gen_campaign_settings.upgraded_targeting "
+                    "FROM campaign WHERE %s" % w,
         "criteria": "SELECT campaign_criterion.type, campaign_criterion.negative, "
                     "campaign_criterion.location.geo_target_constant, campaign_criterion.language.language_constant, "
                     "campaign_criterion.ad_schedule.day_of_week, campaign_criterion.ad_schedule.start_hour, "
@@ -144,7 +145,24 @@ def _queries(cid, channel):
                             "FROM ad_group_criterion WHERE %s AND ad_group_criterion.type IN ('AGE_RANGE', 'GENDER', 'INCOME_RANGE', "
                             "'PARENTAL_STATUS', 'USER_LIST', 'USER_INTEREST', 'CUSTOM_AUDIENCE', 'COMBINED_AUDIENCE') "
                             "AND ad_group_criterion.status != 'REMOVED'" % w)
+    if channel == "DEMAND_GEN":
+        q["adgroups"] = ("SELECT ad_group.id, ad_group.name, ad_group.status, ad_group.type FROM ad_group "
+                         "WHERE %s AND ad_group.status != 'REMOVED'" % w)
+        q["ads"] = ("SELECT ad_group.id, ad_group_ad.status, ad_group_ad.ad.type, ad_group_ad.ad.final_urls, "
+                    "ad_group_ad.policy_summary.approval_status, ad_group_ad.ad.demand_gen_multi_asset_ad.headlines, "
+                    "ad_group_ad.ad.demand_gen_multi_asset_ad.descriptions, ad_group_ad.ad.demand_gen_video_responsive_ad.headlines, "
+                    "ad_group_ad.ad.demand_gen_video_responsive_ad.long_headlines, ad_group_ad.ad.demand_gen_video_responsive_ad.descriptions, "
+                    "ad_group_ad.ad.demand_gen_carousel_ad.headline, ad_group_ad.ad.demand_gen_carousel_ad.description "
+                    "FROM ad_group_ad WHERE %s AND ad_group_ad.status != 'REMOVED'" % w)
+        q["ag_audiences"] = ("SELECT ad_group.id, ad_group.name, ad_group_criterion.type, ad_group_criterion.negative, ad_group_criterion.display_name, "
+                             "ad_group_criterion.user_list.user_list, ad_group_criterion.user_interest.user_interest_category, "
+                             "ad_group_criterion.custom_audience.custom_audience, ad_group_criterion.custom_intent.custom_intent, "
+                             "ad_group_criterion.combined_audience.combined_audience, ad_group_criterion.audience.audience "
+                             "FROM ad_group_criterion WHERE %s AND ad_group_criterion.type IN ('USER_LIST', 'USER_INTEREST', 'CUSTOM_AUDIENCE', "
+                             "'CUSTOM_INTENT', 'COMBINED_AUDIENCE', 'AUDIENCE') AND ad_group_criterion.status != 'REMOVED'" % w)
     if channel == "PERFORMANCE_MAX":
+        q["signals"] = ("SELECT asset_group.id, asset_group.name, asset_group_signal.audience.audience, asset_group_signal.search_theme.text "
+                        "FROM asset_group_signal WHERE %s" % w)
         q["asset_groups"] = ("SELECT asset_group.id, asset_group.name, asset_group.status, asset_group.final_urls, "
                              "asset_group.ad_strength FROM asset_group WHERE %s AND asset_group.status != 'REMOVED'" % w)
         q["asset_group_assets"] = ("SELECT asset_group.id, asset_group_asset.field_type, asset_group_asset.status, "
@@ -181,6 +199,7 @@ def gather(account_id, campaign_id, search, *, geo_fn=None, channel=None, web_fn
     data["_errors"] = errors
     data["_channel"] = channel
     data["_book"] = book
+    data["_names"] = {}
     data["_pages"] = []
     if web_fn:
         urls = []
@@ -195,6 +214,14 @@ def gather(account_id, campaign_id, search, *, geo_fn=None, channel=None, web_fn
         except Exception as e:                              # noqa: BLE001 (the pages are evidence, never a reason to stop)
             log.warning("qa auto: landing pages failed: %s", str(e)[:200])
             errors["pages"] = "landing pages could not be read (%s)" % type(e).__name__
+    if channel in ("PERFORMANCE_MAX", "DEMAND_GEN"):
+        try:
+            data["_names"] = _audience_names(account_id, search, data)
+        except Exception as e:                              # noqa: BLE001 (the names are evidence, never a reason to stop)
+            if getattr(e, "kind", "") in ("quota", "auth", "not_configured", "permission"):
+                raise
+            log.warning("qa auto: audience names failed: %s", str(e)[:200])
+            errors["names"] = "audience names could not be read (%s)" % type(e).__name__
     data["_geo"], data["_lang"] = {}, {}
     crit = data.get("criteria") or []
     geo = [((r.get("campaignCriterion") or {}).get("location") or {}).get("geoTargetConstant") for r in crit]
@@ -217,6 +244,33 @@ def gather(account_id, campaign_id, search, *, geo_fn=None, channel=None, web_fn
     return data
 
 
+def _tail(resource):
+    return str(resource or "").rsplit("/", 1)[-1]
+
+
+def _audience_names(account_id, search, data):
+    """{resource name: name} for the audiences a Performance Max signal or a Demand Gen ad group points at."""
+    out = {}
+    for gaql, key in (("SELECT audience.id, audience.name FROM audience", "audience"),
+                      ("SELECT user_list.id, user_list.name FROM user_list", "userList"),
+                      ("SELECT custom_audience.id, custom_audience.name FROM custom_audience", "customAudience"),
+                      ("SELECT custom_interest.id, custom_interest.name FROM custom_interest", "customInterest")):
+        for r in search(account_id, gaql):
+            x = r.get(key) or {}
+            if x.get("resourceName") and x.get("name"):
+                out[x["resourceName"]] = x["name"]
+    ids = sorted({_tail((((r.get("adGroupCriterion") or {}).get("userInterest")) or {}).get("userInterestCategory"))
+                  for r in data.get("ag_audiences") or []} - {""})
+    ids = [i for i in ids if i.isdigit()]
+    if ids:
+        for r in search(account_id, "SELECT user_interest.user_interest_id, user_interest.name, user_interest.taxonomy_type FROM user_interest "
+                                    "WHERE user_interest.user_interest_id IN (%s)" % ", ".join(ids)):
+            x = r.get("userInterest") or {}
+            if x.get("resourceName") and x.get("name"):
+                out[x["resourceName"]] = "%s (%s)" % (x["name"], str(x.get("taxonomyType") or "").replace("_", " ").lower() or "interest")
+    return out
+
+
 # ── Reading the rows ────────────────────────────────────────────────────────
 
 class Ctx:
@@ -232,6 +286,11 @@ class Ctx:
         self.channel = data.get("_channel") or self.camp.get("advertisingChannelType") or ""
         self.currency = self.customer.get("currencyCode") or ""
         self.book = data.get("_book")
+        self.names = data.get("_names") or {}
+
+    def label(self, resource):
+        """The name of an audience a resource name points at, or what it is when Google would not name it."""
+        return self.names.get(resource) or ("audience " + _tail(resource) if resource else "an audience")
 
     def _first(self, name, key):
         rows = self.d.get(name) or []
@@ -249,6 +308,12 @@ class Ctx:
         if not bad:
             return None
         return F(None, "Could not read this from Google Ads (%s)." % (self.errors.get(bad[0]) or "no answer"))
+
+    def no_book(self, what):
+        """The sentence that closes a printed fact when there is nothing to compare it with."""
+        if self.d.get("_bookNotUsed"):
+            return " There is no campaign book for a %s campaign, so it is judged on the spot." % self.d["_bookNotUsed"]
+        return " The campaign book names no %s to compare with." % what
 
     def from_book(self, *names):
         return paid_qa_book.lookup(self.book, *names)
@@ -294,6 +359,17 @@ def _ad_texts(c):
         t = ((r.get("asset") or {}).get("textAsset") or {}).get("text")
         if t and (r.get("assetGroupAsset") or {}).get("status") == "ENABLED":
             out.append((((r.get("assetGroupAsset") or {}).get("fieldType") or "text").lower(), t))
+    for r in _live_ads(c):
+        ad = r["adGroupAd"].get("ad") or {}
+        for key in ("demandGenMultiAssetAd", "demandGenVideoResponsiveAd"):
+            for kind in ("headlines", "longHeadlines", "descriptions"):
+                for a in (ad.get(key) or {}).get(kind) or []:
+                    if a.get("text"):
+                        out.append((kind[:-1], a["text"]))
+        for key, kind in (("headline", "headline"), ("description", "description")):
+            t = (ad.get("demandGenCarouselAd") or {}).get(key)
+            if t:
+                out.append((kind, t))
     return out
 
 
@@ -369,7 +445,7 @@ def r_type(c):
     text = "The campaign is %s%s." % (actual, (" (" + sub.replace("_", " ").title() + ")") if sub and sub != "UNSPECIFIED" else "")
     book = c.from_book("campaign type", "type")
     if not book:
-        return F(None, text + " The campaign book names no type to compare with.")
+        return F(None, text + c.no_book("type"))
     b = re.sub(r"[^a-z]", "", book.lower())
     ok = {"Search": ("search",), "PMax": ("pmax", "performancemax"), "Shopping": ("shopping",), "Display": ("display",),
           "Demand Gen": ("demandgen",), "Video": ("video",), "App": ("app",)}.get(actual, ())
@@ -467,7 +543,7 @@ def r_bid_strategy(c):
     text = "Bid strategy is %s." % t.replace("_", " ").lower()
     book = c.from_book("bid strategy type", "bid strategy")
     if not book:
-        return F(None, text + " The campaign book names no bid strategy to compare with.")
+        return F(None, text + c.no_book("bid strategy"))
     b = " ".join(re.sub(r"[^a-z]+", " ", book.lower().replace("maximise", "maximize")).split())
     labels = _strategy_labels(c.camp)
     wants_target = [g for g in (("target cpa", "tcpa"), ("target roas", "troas")) if any(k in b for k in g)]
@@ -606,6 +682,8 @@ _DKI = re.compile(r"\{\s*(keyword|keywor|kw)\s*:", re.I)
 def r_dki(c):
     if c.channel == "PERFORMANCE_MAX":
         return F("pass", "Performance Max assets cannot use keyword insertion.")
+    if c.channel == "DEMAND_GEN" and not c.rows("ads") and c.read("ads"):
+        return F(None, "No enabled ad text to scan.")
     if c.unread("ads"):
         return c.unread("ads")
     texts = _ad_texts(c)
@@ -870,6 +948,108 @@ def r_migration(c):
 
 # ── Run ─────────────────────────────────────────────────────────────────────
 
+# 6. On the spot (Performance Max and Demand Gen) ----------------------------
+# The campaign book is for Search campaigns. These are the checks a Search campaign does not have: what Performance Max is told about
+# its audience (signals, search themes) and how Google rates its asset groups, and who a Demand Gen ad group is aimed at. A rule
+# settles what is exact (an asset group with no signal, a rating below Good); whether what is there fits the business is the AI's call
+# on the landing page text.
+
+def _pmax_groups(c):
+    groups = {}
+    for r in c.rows("asset_groups"):
+        g = r.get("assetGroup") or {}
+        groups[str(g.get("id"))] = {"name": g.get("name") or "an asset group", "strength": g.get("adStrength") or "", "audiences": [], "themes": []}
+    for r in c.rows("signals"):
+        g = groups.get(str((r.get("assetGroup") or {}).get("id")))
+        s = r.get("assetGroupSignal") or {}
+        if g is None:
+            continue
+        if (s.get("audience") or {}).get("audience"):
+            g["audiences"].append(c.label(s["audience"]["audience"]))
+        elif (s.get("searchTheme") or {}).get("text"):
+            g["themes"].append(s["searchTheme"]["text"])
+    return list(groups.values())
+
+
+@rule("6.1")
+def r_signals(c):
+    if c.channel != "PERFORMANCE_MAX":
+        return None
+    if c.unread("asset_groups", "signals"):
+        return c.unread("asset_groups", "signals")
+    groups = _pmax_groups(c)
+    if not groups:
+        return F(None, "The campaign has no asset group to read audience signals from.")
+    none = [g["name"] for g in groups if not g["audiences"]]
+    lines = "; ".join("%s: %s" % (g["name"], _list(sorted(set(g["audiences"]))) or "none") for g in groups)
+    if none:
+        return F("fail", "No audience signal on %s. %s." % (_list(none), lines))
+    return F(None, "Audience signals by asset group. %s. Whether they fit the business is read against the landing page." % lines)
+
+
+@rule("6.2")
+def r_search_themes(c):
+    if c.channel != "PERFORMANCE_MAX":
+        return None
+    if c.unread("asset_groups", "signals"):
+        return c.unread("asset_groups", "signals")
+    groups = _pmax_groups(c)
+    if not groups:
+        return F(None, "The campaign has no asset group to read search themes from.")
+    none = [g["name"] for g in groups if not g["themes"]]
+    lines = "; ".join("%s: %s" % (g["name"], ("%d theme%s: %s" % (len(g["themes"]), "" if len(g["themes"]) == 1 else "s", _list(g["themes"], 25)))
+                                  if g["themes"] else "none") for g in groups)
+    if none:
+        return F("fail", "No search theme on %s. %s." % (_list(none), lines))
+    return F(None, "Search themes by asset group. %s. Whether they match the landing page is read against its text." % lines)
+
+
+@rule("6.3")
+def r_group_strength(c):
+    if c.channel != "PERFORMANCE_MAX":
+        return None
+    if c.unread("asset_groups"):
+        return c.unread("asset_groups")
+    groups = _pmax_groups(c)
+    if not groups:
+        return F(None, "The campaign has no asset group.")
+    weak = [g for g in groups if g["strength"] in ("POOR", "AVERAGE")]
+    text = "; ".join("%s: %s" % (g["name"], (g["strength"] or "not rated").lower().replace("_", " ")) for g in groups)
+    if weak:
+        return F("fail", "Google rates %s below Good. All: %s." % (_list(["%s (%s)" % (g["name"], g["strength"].lower()) for g in weak]), text))
+    if any(g["strength"] not in ("GOOD", "EXCELLENT") for g in groups):
+        return F(None, "Some asset groups are not rated yet. %s." % text)
+    return F("pass", "Every asset group is rated Good or Excellent. %s." % text)
+
+
+@rule("6.4")
+def r_dg_audiences(c):
+    if c.channel != "DEMAND_GEN":
+        return None
+    if c.unread("adgroups", "ag_audiences"):
+        return c.unread("adgroups", "ag_audiences")
+    groups = {str((r.get("adGroup") or {}).get("id")): {"name": (r.get("adGroup") or {}).get("name") or "an ad group", "audiences": []}
+              for r in c.rows("adgroups") if (r.get("adGroup") or {}).get("status") == "ENABLED"}
+    for r in c.rows("ag_audiences"):
+        cc = r.get("adGroupCriterion") or {}
+        g = groups.get(str((r.get("adGroup") or {}).get("id")))
+        if g is None or cc.get("negative"):
+            continue
+        ref = ((cc.get("userList") or {}).get("userList") or (cc.get("userInterest") or {}).get("userInterestCategory")
+               or (cc.get("customAudience") or {}).get("customAudience") or (cc.get("customIntent") or {}).get("customIntent")
+               or (cc.get("combinedAudience") or {}).get("combinedAudience") or (cc.get("audience") or {}).get("audience"))
+        g["audiences"].append(c.names.get(ref) or cc.get("displayName") or c.label(ref))
+    if not groups:
+        return F(None, "The campaign has no enabled ad group.")
+    none = [g["name"] for g in groups.values() if not g["audiences"]]
+    lines = "; ".join("%s: %s" % (g["name"], _list(sorted(set(g["audiences"])), 8) or "none") for g in groups.values())
+    targeting = (c.camp.get("demandGenCampaignSettings") or {}).get("upgradedTargeting")
+    tail = " Optimized targeting is %s." % ("ON" if targeting else "off") if targeting is not None else ""
+    if none:
+        return F("fail", "No audience on %s. %s.%s" % (_list(none), lines, tail))
+    return F(None, "Audiences by ad group. %s.%s Whether they fit the business is read against the landing page." % (lines, tail))
+
+
 def evaluate(data):
     """{check_id: {'result', 'found'}} for every rule that has something to say."""
     c = Ctx(data)
@@ -905,5 +1085,7 @@ def run(account_id, campaign_id, search, *, geo_fn=None, web_fn=None, book=None)
         return {"data": {}, "findings": {}, "campaign": {"id": "", "name": "", "channel": "", "type": "", "dsa": False, "status": ""},
                 "errors": {}}
     channel = (rows[0].get("campaign") or {}).get("advertisingChannelType") or ""
-    data = gather(account_id, campaign_id, search, geo_fn=geo_fn, channel=channel, web_fn=web_fn, book=book)
+    use_book = paid_qa_book.applies_to(channel)
+    data = gather(account_id, campaign_id, search, geo_fn=geo_fn, channel=channel, web_fn=web_fn, book=book if use_book else None)
+    data["_bookNotUsed"] = "" if use_book else paid_qa_book.TYPE_NAMES.get(channel) or channel
     return {"data": data, "findings": evaluate(data), "campaign": campaign_summary(data), "errors": data.get("_errors") or {}}
