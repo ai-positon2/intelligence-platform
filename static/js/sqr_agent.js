@@ -451,13 +451,13 @@ function howRanked(){
 }
 function negRow(n){
   return '<tr><td class="sq-term">' + esc(n.text) + (n.examples.length && n.examples[0] !== n.text ? '<small class="sq-ex">e.g. ' + esc(n.examples.slice(0, 2).join(", ")) + '</small>' : '') + '</td><td>' + esc(n.matchType) + '</td><td>' + esc(where(n)) +
-    '</td><td>' + esc(n.reason || "") + '<span class="sq-by">' + esc(source(n)) + '</span></td><td class="r num">' + money(n.wasted) + '</td><td class="r num">' + num(n.clicks) + '</td><td class="r num">' + num(n.terms) + '</td></tr>';
+    '</td><td>' + esc(n.reason || "") + '<span class="sq-by">' + esc(source(n)) + '</span></td><td class="r num">' + money(n.cost) + '</td><td class="r num">' + money(n.wasted) + '</td><td class="r num">' + num(n.clicks) + '</td><td class="r num">' + num(n.terms) + '</td></tr>';
 }
 function paneNegs(r){
-  const ref = r.allNegatives.slice(0, 1000).map(n => '<tr><td class="sq-term">' + esc(n.text) + '</td><td>' + esc(n.matchType) + '</td><td>' + esc(where(n)) + '</td><td class="r num">' + money(n.wasted, false) + '</td><td>' + (n.risks.length ? esc(n.risks.join(", ")) : "") + '</td></tr>').join("");
+  const ref = r.allNegatives.slice(0, 1000).map(n => '<tr><td class="sq-term">' + esc(n.text) + '</td><td>' + esc(n.matchType) + '</td><td>' + esc(where(n)) + '</td><td class="r num">' + money(n.cost, false) + '</td><td class="r num">' + money(n.wasted, false) + '</td><td>' + (n.risks.length ? esc(n.risks.join(", ")) : "") + '</td></tr>').join("");
   return '<div class="pane" id="pane-negs" hidden>' + hint("Ranked by the money spent on these terms that never converted. A negative whose terms did convert, that would also stop a relevant term or a keyword the account bids on, or that names a competitor the account bids on (or blocks competitors account-wide when the account runs a competitor campaign), is not here: it is under Check before blocking. A negative with no money wasted is in the full list below.") +
-    (r.priorityNegatives.length ? tbl([["Negative"], ["Match"], ["Where"], ["Why"], ["Wasted", 1], ["Clicks", 1], ["Terms", 1]], r.priorityNegatives.map(negRow).join("")) : none()) +
-    (ref ? '<details class="sq-ref"><summary>All negatives (' + r.allNegatives.length + ')</summary>' + tbl([["Negative"], ["Match"], ["Where"], ["Wasted", 1], ["Check"]], ref) +
+    (r.priorityNegatives.length ? tbl([["Negative"], ["Match"], ["Where"], ["Why"], ["Cost", 1], ["Wasted", 1], ["Clicks", 1], ["Terms", 1]], r.priorityNegatives.map(negRow).join("")) : none()) +
+    (ref ? '<details class="sq-ref"><summary>All negatives (' + r.allNegatives.length + ')</summary>' + tbl([["Negative"], ["Match"], ["Where"], ["Cost", 1], ["Wasted", 1], ["Check"]], ref) +
       (r.allNegatives.length > 1000 ? '<p class="pm-panel-s" style="margin-top:10px">Showing the first 1,000. The workbook has every one.</p>' : "") + '</details>' : "") + '</div>';
 }
 const PRIORITY_N = Core.PRIORITY;
@@ -467,19 +467,19 @@ function paneCheck(r){
     (n.collateral.n ? '<small class="sq-ex">would also stop ' + esc(n.collateral.ex.join(", ")) + (n.collateral.n > n.collateral.ex.length ? " and " + (n.collateral.n - n.collateral.ex.length) + " more" : "") + '</small>' : '') +
     (n.conflicts.length ? '<small class="sq-ex">stops keyword ' + esc(n.conflicts.join(", ")) + '</small>' : '') + '</td><td class="r num">' + money(n.cost, false) + '</td><td class="r num">' + fmtConv(n.conversions) + '</td></tr>').join("");
   return '<div class="pane" id="pane-check" hidden>' + hint("These look like negatives, but a person should look first: the terms converted, or the negative would also stop terms judged relevant or a keyword the account bids on.") +
-    (rows ? tbl([["Negative"], ["Match"], ["Where"], ["Why"], ["Check"], ["Spend", 1], ["Conv", 1]], rows) : none()) + '</div>';
+    (rows ? tbl([["Negative"], ["Match"], ["Where"], ["Why"], ["Check"], ["Cost", 1], ["Conv", 1]], rows) : none()) + '</div>';
 }
 function paneKws(r){
   const rows = r.priorityKeywords.map(k => '<tr><td class="sq-term">' + esc(k.term) + '</td><td>' + esc(k.assetType) + '</td><td>' + esc(k.matchType) + '</td><td>' + esc(k.whereToAdd) + '</td><td class="r num">' + fmtConv(k.conversions) +
-    '</td><td class="r num">' + (k.cpa == null ? "–" : money(k.cpa, false)) + '</td><td class="r num">' + (k.ctr * 100).toFixed(1) + '%</td><td class="r num">' + num(k.clicks) + '</td><td><span class="pm-pill ' + (k.tier === 1 ? "ok" : "under") + '">Tier ' + k.tier + '</span></td></tr>').join("");
-  const ref = r.allKeywords.slice(PRIORITY_N).map(k => '<tr><td class="sq-term">' + esc(k.term) + '</td><td>' + esc(k.assetType) + '</td><td class="r num">' + fmtConv(k.conversions) + '</td></tr>').join("");
+    '</td><td class="r num">' + money(k.cost, false) + '</td><td class="r num">' + (k.cpa == null ? "–" : money(k.cpa, false)) + '</td><td class="r num">' + (k.ctr * 100).toFixed(1) + '%</td><td class="r num">' + num(k.clicks) + '</td><td><span class="pm-pill ' + (k.tier === 1 ? "ok" : "under") + '">Tier ' + k.tier + '</span></td></tr>').join("");
+  const ref = r.allKeywords.slice(PRIORITY_N).map(k => '<tr><td class="sq-term">' + esc(k.term) + '</td><td>' + esc(k.assetType) + '</td><td class="r num">' + fmtConv(k.conversions) + '</td><td class="r num">' + money(k.cost, false) + '</td></tr>').join("");
   return '<div class="pane" id="pane-kws" hidden>' + hint("Relevant terms the account does not bid on yet. Tier 1 converted at least once; tier 2 drew clicks at a good click rate (or a partial conversion). Ranked by tier, conversions, then clicks.") +
-    (rows ? tbl([["Term"], ["Type"], ["Match"], ["Where to add"], ["Conv", 1], ["Cost / conv", 1], ["CTR", 1], ["Clicks", 1], ["Tier"]], rows) : none()) +
-    (ref ? '<details class="sq-ref"><summary>All eligible keywords (' + r.allKeywords.length + ')</summary>' + tbl([["Term"], ["Type"], ["Conv", 1]], ref) + '</details>' : "") + '</div>';
+    (rows ? tbl([["Term"], ["Type"], ["Match"], ["Where to add"], ["Conv", 1], ["Cost", 1], ["Cost / conv", 1], ["CTR", 1], ["Clicks", 1], ["Tier"]], rows) : none()) +
+    (ref ? '<details class="sq-ref"><summary>All eligible keywords (' + r.allKeywords.length + ')</summary>' + tbl([["Term"], ["Type"], ["Conv", 1], ["Cost", 1]], ref) + '</details>' : "") + '</div>';
 }
 function paneReview(r){
   const rows = r.clientReview.map(c => '<tr><td>' + esc(c.subtype) + '</td><td class="r num">' + c.count + '</td><td class="r num">' + money(c.cost, false) + '</td><td class="r num">' + fmtConv(c.conversions) + '</td><td class="sq-term">' + esc(c.examples.join(", ")) + '</td></tr>').join("");
-  return '<div class="pane" id="pane-review" hidden>' + (rows ? tbl([["Issue"], ["Rows", 1], ["Spend", 1], ["Conv", 1], ["Costliest examples"]], rows) : none()) + '</div>';
+  return '<div class="pane" id="pane-review" hidden>' + (rows ? tbl([["Issue"], ["Rows", 1], ["Cost", 1], ["Conv", 1], ["Costliest examples"]], rows) : none()) + '</div>';
 }
 function paneAll(r){
   const sorted = r.rows.slice().sort((a, b) => b.cost - a.cost || b.clicks - a.clicks);
@@ -508,9 +508,9 @@ $id("dlBtn").addEventListener("click", () => {
   add("Negatives to Check First", [[...negHead, "Why check", "Would also stop", "Stops keyword"], ...r.reviewNegatives.map(n => [...negRowX(n), n.risks.join("; "), n.collateral.ex.join("; "), n.conflicts.join("; ")])]);
   add("New Keywords to Add (Priority)", [["Term", "Asset Type", "Suggested Match Type", "Add To Level", "Where To Add", "Tier", "Conversions", "Cost / Conv", "CTR", "Clicks", "Cost"],
     ...r.priorityKeywords.map(k => [k.term, k.assetType, k.matchType, k.addLevel, k.whereToAdd, k.tier, fmtConv(k.conversions), k.cpa == null ? "" : k.cpa.toFixed(2), (k.ctr * 100).toFixed(2) + "%", k.clicks, k.cost.toFixed(2)])]);
-  add("Client Review Required", [["Issue Type", "Rows", "Spend", "Conversions", "Costliest Example Terms"], ...r.clientReview.map(c => [c.subtype, c.count, c.cost.toFixed(2), fmtConv(c.conversions), c.examples.join("; ")])]);
+  add("Client Review Required", [["Issue Type", "Rows", "Cost", "Conversions", "Costliest Example Terms"], ...r.clientReview.map(c => [c.subtype, c.count, c.cost.toFixed(2), fmtConv(c.conversions), c.examples.join("; ")])]);
   add("All Negatives (Reference)", [[...negHead, "Check"], ...r.allNegatives.map(n => [...negRowX(n), n.risks.join("; ")])]);
-  add("All Keywords (Reference)", [["Term", "Asset Type", "Match Type", "Where To Add", "Tier", "Conversions", "CTR", "Clicks"], ...r.allKeywords.map(k => [k.term, k.assetType, k.matchType, k.whereToAdd, k.tier, fmtConv(k.conversions), (k.ctr * 100).toFixed(2) + "%", k.clicks])]);
+  add("All Keywords (Reference)", [["Term", "Asset Type", "Match Type", "Where To Add", "Tier", "Conversions", "CTR", "Clicks", "Cost"], ...r.allKeywords.map(k => [k.term, k.assetType, k.matchType, k.whereToAdd, k.tier, fmtConv(k.conversions), (k.ctr * 100).toFixed(2) + "%", k.clicks, k.cost.toFixed(2)])]);
   const blob = new Blob([XLSX.write(wb, { bookType: "xlsx", type: "array" })], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
   const slug = String(ran.account || r.ruleset.id).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40);
   const filename = "SQR_Analysis_" + slug + "_" + new Date().toISOString().slice(0, 10) + ".xlsx";
