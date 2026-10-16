@@ -396,3 +396,19 @@ def test_a_competitor_is_matched_by_the_listed_name_not_by_a_longer_word():
     out = js("""
       return [C.competitorName(STUB, "rival pump"), C.competitorName(STUB, "arrival times"), C.competitorName(STUB, "nothing"), C.competitorName(C.RULESETS.beta_bionics, "Twiist insulin pump cost")];""")
     assert out == ["rival", "", "", "twiist"]
+
+
+def test_an_account_with_a_competitor_campaign_keeps_its_account_wide_competitor_negatives_for_review():
+    out = js("""
+      const mk = camp => [R("rival x", {clicks: 4, cost: 20}), R("faraway y", {clicks: 3, cost: 5, campaign: camp})];
+      const plain = await C.analyze(STUB, mk("Generic"), {});
+      const conq = await C.analyze(STUB, mk("Generic"), {keywords: [{text: "something", campaign: "Competitor Campaign"}]});
+      const conq2 = await C.analyze(STUB, [R("rival x", {clicks: 4, cost: 20, campaign: "Conquesting - US"})], {});
+      const campaignWide = Object.assign({}, STUB, {classifyDeterministic: t => ({status: "Competitor", subtype: "x", negMatchType: "Exact", negLevel: "Campaign"})});
+      const conq3 = await C.analyze(campaignWide, [R("rival z", {clicks: 4, cost: 20})], {keywords: [{text: "something", campaign: "Competitor Campaign"}]});
+      return {plain: plain.priorityNegatives.map(n => n.text), conq: conq.reviewNegatives.map(n => [n.text, n.risks]), conqPri: conq.priorityNegatives.map(n => n.text),
+              conq2: conq2.reviewNegatives.map(n => n.risks), conq3: conq3.priorityNegatives.map(n => [n.text, n.level])};""")
+    assert out["plain"] == ["rival x", "faraway y"]
+    assert out["conq"] == [["rival x", ["the account runs a competitor campaign"]]] and out["conqPri"] == ["faraway y"]     # a campaign-level negative is not held
+    assert out["conq2"] == [["the account runs a competitor campaign"]]
+    assert out["conq3"] == [["rival z", "Campaign"]]

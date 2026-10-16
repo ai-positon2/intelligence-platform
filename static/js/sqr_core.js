@@ -668,7 +668,8 @@ function buildNegatives(rows, cover, keywords, ruleset){
     const key = s.text + "|" + s.match + "|" + s.level + "|" + (s.level === "Campaign" ? r.campaign : "");
     let g = groups.get(key);
     if (!g) { g = { text: s.text, matchType: s.match, level: s.level, campaign: s.level === "Campaign" ? r.campaign : "", campaigns: new Set(), reason: r._det.subtype, reasonCost: -1,
-      by: new Set(), implied: true, cost: 0, wasted: 0, conversions: 0, clicks: 0, impressions: 0, terms: new Set(), ex: [], rivals: new Set() }; groups.set(key, g); }
+      by: new Set(), implied: true, cost: 0, wasted: 0, conversions: 0, clicks: 0, impressions: 0, terms: new Set(), ex: [], rivals: new Set(), rival: false }; groups.set(key, g); }
+    if (r._det.status === "Competitor") g.rival = true;
     if (r._det.status === "Competitor") { const n = competitorName(ruleset || {}, r.term); if (n) g.rivals.add(n); }
     g.campaigns.add(r.campaign); g.by.add(r._det.by); if (s.explicit) g.implied = false;
     g.cost += r.cost; g.clicks += r.clicks; g.impressions += r.impressions; g.conversions += r.conversions;
@@ -680,6 +681,9 @@ function buildNegatives(rows, cover, keywords, ruleset){
   const rel = rows.filter(r => r._det.status === "Relevant" && r.status !== "EXCLUDED");
   const index = new Map();
   rel.forEach((r, i) => new Set(r.key.split(" ")).forEach(w => { let a = index.get(w); if (!a) { a = []; index.set(w, a); } a.push(i); }));
+  // An account with a campaign aimed at competitors wants competitor searches: a block at account level would reach that campaign too.
+  const CONQUEST = /compet|conquest/i;
+  const conquests = rows.some(r => CONQUEST.test(r.campaign)) || keywords.some(k => CONQUEST.test(k.campaign || ""));
   const kwTexts = keywords.map(k => ({ text: keyText(k.text), campaign: k.campaign || "" })).filter(k => k.text);
   const kwByText = new Map(); kwTexts.forEach(k => { let a = kwByText.get(k.text); if (!a) { a = []; kwByText.set(k.text, a); } a.push(k); });
   const kwConflicts = (neg, g) => {
@@ -709,6 +713,7 @@ function buildNegatives(rows, cover, keywords, ruleset){
     const risks = [];
     if (g.conversions > 0) risks.push("converted");
     if (bids.length) risks.push("you bid on this competitor");
+    else if (g.rival && conquests && g.level.indexOf("Account") === 0) risks.push("the account runs a competitor campaign");
     if (hit.clicks > 0 || hit.conversions > 0) risks.push("blocks relevant terms");
     if (conflicts.length) risks.push("blocks a keyword you bid on");
     const examples = Array.from(new Map(g.ex.sort((a, b) => b.cost - a.cost).map(r => [r.key, r.term])).values()).slice(0, 3);
