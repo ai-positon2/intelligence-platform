@@ -5445,6 +5445,8 @@ def paid_qa_book(launch_id):
         if request.method == "DELETE":
             store.set_book(launch_id, {})
             return jsonify(_qc_payload(store, store.get_launch(launch_id)))
+        if not books.applies_to(launch["channel"]):
+            return jsonify(error=books.not_used_note(launch["channel"])), 400
         body = request.get_json(silent=True)
         if not isinstance(body, dict):
             return jsonify(error="the body should be a JSON object"), 400

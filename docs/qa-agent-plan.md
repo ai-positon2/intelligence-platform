@@ -1,7 +1,7 @@
 # QA Agent plan (Campaign Book QC)
 
 Branch: `Divith`. Section: Paid Marketing Agents (`/p2/paid-marketing/qa-agent`).
-Status: **v4 built. The AI does the QC against the PPC team's Campaign Book checks; the team can add the client's
+Status: **v5 built (non-Search campaigns do not use the book, see below); v4 built. The AI does the QC against the PPC team's Campaign Book checks; the team can add the client's
 campaign book. Checked end to end except the real model call and the real Postgres (see the end).**
 
 ## The ask
@@ -64,6 +64,34 @@ shared as "anyone with the link can view" (fetched as an export from docs.google
 guard). Read into Field | Value | Other rows plus a text dump of every sheet, because a client's book will not always
 keep the template layout. A placeholder ("Depends on the campaign book") is not an answer. Adding or replacing the book
 starts a fresh review against it; removing it does not. The AI sees the rows and the text.
+
+## v5: campaigns the campaign book does not cover (Performance Max, Demand Gen, and any other non-Search type)
+
+The Campaign Book is the team's Search campaign book, so a campaign that is not Search is not compared with one.
+
+- **The book is not used.** The page shows "Not used for this campaign type" and no upload controls; the route refuses a book for such a
+  campaign (400, with the reason); a book saved earlier is kept but ignored (and can be removed); the book never reaches the rules or the
+  AI. "Apply to all N selected" applies to the Search campaigns among the selection only and says how many others are left out. Rule texts
+  no longer say "the campaign book names no ... to compare with" for these campaigns.
+- **Some checks are used as they are** (they never needed the book): name, goals, language, EU political ads, URL tracking, location option,
+  dates, final URL, the automation switches, the auto-apply recommendations, ad copies and keyword insertion (now also read for Demand Gen ads).
+- **The eight checks that took their expected value from the book** (campaign type, bid strategy, devices, genders, household income,
+  locations, age, ad schedule) are **judged on the spot**: each carries `onTheSpot` guidance in the checklist ("there is no plan to compare
+  with: judge this on its own merits, flag what is clearly wrong, cannot_verify only when nothing in the evidence can settle it"). The AI is
+  shown that instead of `fromBook`, and told never to answer "the campaign book is needed" for them.
+- **Four new checks** (section 6) are the ones the book has no row for, done on the spot from Google Ads:
+  - **6.1 Audience signals** (Performance Max): an asset group with none fails (exact); otherwise the signals, by name, are read against the landing page.
+  - **6.2 Search themes** (Performance Max): an asset group with none fails (exact); otherwise the themes are read against the landing page.
+  - **6.3 Asset group strength** (Performance Max): Google's own rating; below Good fails, all Good or Excellent passes.
+  - **6.4 Audiences** (Demand Gen): an enabled ad group with no audience fails (exact); otherwise the audiences by ad group (and whether optimized
+    targeting is on) are read against the landing page. Excluded audiences do not count.
+- A Search campaign still gets exactly the 61 checks, with the book. Performance Max gets 61 (58 plus 3), Demand Gen 59 (58 plus 1).
+- New reads: Performance Max `asset_group_signal` (audiences and search themes), Demand Gen ads, ad group audiences and optimized targeting, and the
+  names of the audiences they point at. Proven live on a real account before they went in.
+
+Not verified: the real model's judgement of audiences and themes against a landing page (no Anthropic key on the dev machine; the page was run with a
+stand-in), a Demand Gen campaign with audiences that are clearly wrong, and the other non-Search types (Display, Video, Shopping, App) beyond the book
+being skipped, since they have no on-the-spot checks of their own yet.
 
 ## The flow, and the rules the AI is held to
 
