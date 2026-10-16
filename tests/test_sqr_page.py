@@ -144,3 +144,30 @@ def test_the_keyword_tables_show_what_each_term_spent():
 def test_the_workbook_keeps_cost_on_both_keyword_sheets():
     js = read(PAGE)
     assert '"Clicks", "Cost"], ...r.allKeywords.map(' in js and "k.clicks, k.cost.toFixed(2)])" in js
+
+
+@pytest.mark.skipif(not shutil.which("node"), reason="node is not installed")
+def test_the_negative_tables_show_total_cost_next_to_the_wasted_part():
+    """Run the page's own drawing code for the Priority negatives tab: Cost (all spend on the terms) sits before Wasted (the part that never converted)."""
+    js = read(PAGE)
+
+    def grab(name):
+        m = re.search(r"^(?:function " + name + r"\b[^\n]*\}$|function " + name + r"\b.*?^\}|const " + name + r" = [^\n]*;$)", js, re.S | re.M)
+        assert m, name + " not found in the page script"
+        return m.group(0)
+
+    src = "\n".join(grab(n) for n in ("esc", "money", "num", "none", "hint", "tbl", "negRow", "paneNegs"))
+    harness = (
+        "const S = { currency: 'USD' }; const where = n => 'Account'; const source = n => 'rule';\n" + src + "\n"
+        "const n1 = { text: 'free trial', matchType: 'Phrase', reason: 'freebie', examples: ['free trial pump'], cost: 120.5, wasted: 80.25, clicks: 30, terms: 4, risks: [], level: 'Account' };\n"
+        "const n2 = { text: 'heat pump', matchType: 'Phrase', reason: 'other', examples: [], cost: 9.5, wasted: 9.5, clicks: 2, terms: 1, risks: ['x'], level: 'Account' };\n"
+        "process.stdout.write(paneNegs({ priorityNegatives: [n1], allNegatives: [n1, n2] }));"
+    )
+    out = subprocess.run(["node", "-e", harness], capture_output=True, text=True, timeout=30)
+    assert out.returncode == 0, out.stderr
+    html = out.stdout
+    heads = re.findall(r"<th(?: [^>]*)?>(.*?)</th>", html)
+    assert heads == ["Negative", "Match", "Where", "Why", "Cost", "Wasted", "Clicks", "Terms", "Negative", "Match", "Where", "Cost", "Wasted", "Check"], heads
+    first = re.findall(r"<td[^>]*>(.*?)</td>", html.split("<tbody>")[1].split("</tbody>")[0])
+    assert first[4:8] == ["$121", "$80.25", "30", "4"], first             # the priority table rounds 100 and over, like Wasted did
+    assert re.findall(r"<td[^>]*>(.*?)</td>", html.split("<tbody>")[2])[3:5] == ["$120.50", "$80.25"]
