@@ -1,0 +1,77 @@
+{% extends "_paid_base.html" %}
+{% block title %}Strategy &amp; Campaign Book{% endblock %}
+{% block head %}
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/campaign_book.css') }}?v=1">
+{% endblock %}
+{% block content %}
+<div class="pm pm-cb" id="cb">
+  <section class="pm-hero">
+    <div class="pm-hero-l">
+      <span class="pm-eyebrow"><span class="d"></span>Paid Marketing · Strategy</span>
+      <h1 class="pm-title">A full strategy and campaign book, <span class="pm-grad">built from the client's own evidence.</span></h1>
+      <p class="pm-sub">Give it a client: a website, a brief, and if there is one, the Google Ads account. It reads the client's site, the competitors' sites, what the
+        brand posts on social media, what the account has already spent, and the market, then <b>writes the strategy</b> and, for every campaign, the
+        <b>campaign book</b>: ad groups, keywords, negatives, ad copy and assets, with the settings in the layout the QA Agent checks.
+        Download it as Excel, CSV or PDF.</p>
+    </div>
+  </section>
+
+  <div id="msg"></div>
+
+  <section class="pm-panel cb-builder" id="builder">
+    <div class="pm-panel-h"><span class="pm-panel-t">1. The client</span><span class="pm-panel-s" id="builderNote">Only the name and one of website, brief or account are needed. More detail makes a better plan.</span></div>
+    <div class="cb-grid">
+      <label class="cb-f cb-w2"><span class="pd-dd-k">Client or business name *</span><input type="text" id="fName" maxlength="120" autocomplete="off" placeholder="Acme Dental"></label>
+      <label class="cb-f cb-w2"><span class="pd-dd-k">Website</span><input type="text" id="fSite" maxlength="300" autocomplete="off" placeholder="acmedental.com"></label>
+      <div class="cb-f cb-w2"><div id="acctPick"></div><span class="cb-hint" id="acctHint">Optional. With an account, the plan starts from what it has already spent and what converted.</span></div>
+      <label class="cb-f cb-w2"><span class="pd-dd-k">Industry</span><input type="text" id="fIndustry" maxlength="120" autocomplete="off" placeholder="Dental, SaaS, home services…"></label>
+      <label class="cb-f cb-w1"><span class="pd-dd-k">Monthly budget <span id="curTag" class="cb-cur"></span></span><input type="text" inputmode="decimal" id="fBudget" maxlength="12" autocomplete="off" placeholder="6000"></label>
+      <label class="cb-f cb-w1"><span class="pd-dd-k">Launch date</span><input type="date" id="fLaunch"></label>
+      <div class="cb-f cb-w3"><span class="pd-dd-k">Goal</span><div class="pm-chips" id="goals" role="radiogroup" aria-label="Goal"></div></div>
+      <label class="cb-f cb-w3"><span class="pd-dd-k">Where it serves customers</span><input type="text" id="fPlaces" maxlength="500" autocomplete="off" placeholder="Austin, TX; Round Rock, TX (separate places with a semicolon)"></label>
+      <label class="cb-f cb-w3"><span class="pd-dd-k">What to push</span><input type="text" id="fServices" maxlength="800" autocomplete="off" placeholder="dental implants, Invisalign, emergency care"></label>
+      <label class="cb-f cb-w3"><span class="pd-dd-k">Client brief</span><textarea id="fBrief" rows="5" maxlength="8000" placeholder="Paste what the client told you: who they are, who they want, what they sell, what has and has not worked, any offer."></textarea></label>
+      <label class="cb-f cb-w2"><span class="pd-dd-k">Competitors (one per line, a website or a name)</span><textarea id="fComp" rows="3" maxlength="1600" placeholder="smileaustin.com&#10;Another Dental"></textarea><span class="cb-hint">Leave this empty and the agent finds them with a web search.</span></label>
+      <label class="cb-f cb-w1"><span class="pd-dd-k">Things to avoid</span><textarea id="fAvoid" rows="3" maxlength="600" placeholder="Words the client will not use, claims they cannot make, places to leave out."></textarea></label>
+    </div>
+
+    <div class="pm-panel-h cb-h2"><span class="pm-panel-t">2. What to research</span><span class="pm-panel-s">Click a card to turn it on or off. Each one adds evidence the strategy is written from.</span></div>
+    <div class="cb-cards" id="cards"></div>
+
+    <div class="pm-panel-h cb-h2"><span class="pm-panel-t">3. Campaign types</span><span class="pm-panel-s">Leave it on automatic and the strategist picks what the budget can feed.</span></div>
+    <div class="pm-chips" id="kinds" role="group" aria-label="Campaign types"></div>
+
+    <div class="cb-go">
+      <button class="pm-btn" id="goBtn" type="button">Build the strategy and campaign book</button>
+      <p class="cb-fine" id="goNote">A build takes about 5 to 15 minutes and keeps going if you leave the page. It reads public pages and, depending on the cards, Google Ads and paid data sources. Nothing is changed in Google Ads.</p>
+    </div>
+  </section>
+
+  <section class="pm-panel cb-run" id="run" hidden>
+    <div class="pm-panel-h"><span class="pm-panel-t" id="runTitle">Building</span><span class="pm-panel-s" id="runSub"></span></div>
+    <ol class="cb-steps" id="steps"></ol>
+    <div class="cb-go" id="runAct"></div>
+    <div class="cb-go"><button class="pm-btn-ghost" id="runBack" type="button">Back to the form</button></div>
+  </section>
+
+  <section id="result" hidden>
+    <div class="cb-rhead">
+      <div class="cb-rtitle"><h2 id="rName"></h2><p id="rMeta"></p></div>
+      <div class="cb-rbtns" id="rBtns"></div>
+    </div>
+    <div id="rNote"></div>
+    <div class="cb-tabs" id="tabs" role="tablist" aria-label="Parts of the strategy"></div>
+    <div id="tabBody"></div>
+  </section>
+
+  <section class="pm-panel" id="recentCard">
+    <div class="pm-panel-h"><span class="pm-panel-t">Saved builds</span><span class="pm-panel-s">Everyone on the team sees these. Open one to read it, download it or build it again.</span></div>
+    <div id="recent"><p class="cb-fine">Loading…</p></div>
+  </section>
+  <p class="pd-foot">It only recommends: nothing is changed in Google Ads. Prices, claims and facts in the ads come from the client's own pages, and anything else is listed for the client to confirm.</p>
+</div>
+{% endblock %}
+{% block scripts %}
+  <script src="{{ url_for('static', filename='js/pm_picker.js') }}?v=1"></script>
+  <script src="{{ url_for('static', filename='js/campaign_book.js') }}?v=1"></script>
+{% endblock %}

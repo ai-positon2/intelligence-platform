@@ -1263,3 +1263,10 @@ details.sq-fallback .sq-drops{margin-top:10px}
   --thumb:linear-gradient(135deg,#00131f 0%,#12082a 100%);
   --icon-glow:rgba(56,189,248,.5);--card-border:rgba(56,189,248,.35);
   --card-glow:0 0 40px rgba(56,189,248,.10);--arrow-color:#bae6fd}
+
+/* ═══ Strategy & Campaign Book card ═══ */
+.c-campbook{--card-accent:#34d399;
+  --band:linear-gradient(90deg,#34d399,#38bdf8,#818cf8);
+  --thumb:linear-gradient(135deg,#00170f 0%,#081a2a 100%);
+  --icon-glow:rgba(52,211,153,.5);--card-border:rgba(52,211,153,.35);
+  --card-glow:0 0 40px rgba(52,211,153,.10);--arrow-color:#a7f3d0}

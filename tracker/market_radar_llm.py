@@ -116,6 +116,8 @@ def call_json(system, user, schema, *, model, max_tokens, run_id=None, stage, cl
 def _parse(resp, meta, model, max_tokens):
     meta.setdefault("stop_reason", resp.stop_reason)
     meta.setdefault("model_served", getattr(resp, "model", model))
+    if "usage" not in meta and getattr(resp, "usage", None) is not None:
+        meta["usage"] = resp.usage.model_dump() if hasattr(resp.usage, "model_dump") else dict(resp.usage)
     if resp.stop_reason == "refusal":
         raise ModelError("refused", "the model declined (%s)" % getattr(resp, "stop_details", None))
     if resp.stop_reason == "max_tokens":
