@@ -1,0 +1,57 @@
+{% extends "_paid_base.html" %}
+{% block title %}Ad Strength Analysis{% endblock %}
+{% block content %}
+<div class="pm pm-as" id="as">
+  <section class="pm-hero">
+    <div class="pm-hero-l">
+      <span class="pm-eyebrow"><span class="d"></span>Paid Marketing · Ads</span>
+      <h1 class="pm-title">Every ad Google rates low, <span class="pm-grad">and how to lift it.</span></h1>
+      <p class="pm-sub">Pick an account. The agent reads <b>Google's ad strength rating</b> for every live Responsive Search Ad and Performance Max
+        asset group, lists the ones below Good, busiest first, and shows <b>Google's own tips</b> beside the headlines and descriptions to change.
+        Ask for suggested text on any ad.</p>
+    </div>
+  </section>
+
+  <section class="pm-panel pd-cmd as-cmd" id="cmd">
+    <div class="as-cmd-row">
+      <div id="acctPick"></div>
+      <p class="as-scope">Google Ads only (Meta has no ad strength rating). Live, enabled ads. The last 30 days of impressions decide which ads come first.</p>
+    </div>
+  </section>
+
+  <div id="msg"></div>
+
+  <div id="empty" class="pm-panel sg-empty">
+    <div class="sg-empty-ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-8M22 20H2"/></svg></div>
+    <h2>Choose an account to begin</h2>
+    <p>The ratings come straight from Google Ads. Nothing is changed there: the agent only recommends.</p>
+  </div>
+  <div id="skel" hidden><div class="pd-skel"></div><div class="pd-skel"></div><div class="pd-skel"></div></div>
+
+  <div id="out" hidden>
+    <div class="sg-head">
+      <p class="pd-fresh" id="fresh"></p>
+      <button class="pm-btn-ghost" id="refreshBtn" type="button" title="Read this account again"><svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.3-5.6M20 4v5h-5"/></svg>Refresh</button>
+      <button class="pm-btn-ghost" id="exportBtn" type="button"><svg viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>Export CSV</button>
+    </div>
+    <div class="pd-strip" id="kpis"></div>
+
+    <section class="pm-panel" id="listCard">
+      <div class="pm-panel-h"><span class="pm-panel-t">Ads to work on</span><span class="pm-panel-s" id="listNote"></span></div>
+      <div class="as-tools">
+        <div><span class="pd-dd-k">Kind of ad</span><div class="pm-chips" id="kinds" role="radiogroup" aria-label="Kind of ad"></div></div>
+        <div><span class="pd-dd-k">Rating</span><div class="pm-chips" id="ratings" role="radiogroup" aria-label="Rating"></div></div>
+        <label class="as-find"><span class="pd-dd-k">Find</span><input type="text" id="filter" placeholder="Campaign, ad group or text…" aria-label="Find an ad" autocomplete="off"></label>
+      </div>
+      <div class="as-bar" id="bar" aria-hidden="true"></div>
+      <div id="list"></div>
+      <button type="button" class="pm-btn-ghost sg-more" id="more" hidden></button>
+    </section>
+    <p class="pd-foot" id="foot"></p>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/pm_picker.js') }}?v=1"></script>
+<script src="{{ url_for('static', filename='js/ad_strength.js') }}?v=1"></script>
+{% endblock %}
