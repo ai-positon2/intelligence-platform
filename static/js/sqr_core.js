@@ -456,6 +456,8 @@ const BB = {
   applyContext: /\b(medicare|medicaid|insurance|coverage|prescription|rx|order|pharmacy|assistance|program|grant|financial|covered|benefits?)\b/,
   // a rival named next to the brand makes it a comparison, even when only the company is named ("switching from tandem to ilet")
   rivalBare: /\b(tandem|omnipod|medtronic|minimed|insulet|twiist|t:?slim|control-?iq|ypsomed|ypsopump|camaps|cequr)\b/,
+  // the Mint is the not-yet-available patch pump: "mint insulin pump" and "beta bionics mint" are as much the pipeline as "mint patch pump"
+  mint: /\bmint\b/, mintCtx: /\b(pump|pumps|insulin|patch|diabetes|diabetic|bionics?|ilet|tubeless|bihormonal)\b/,
   pipeline: /(^|[^a-z0-9])(ilet\s+duo|mint\s+(?:patch\s+)?pump|mint\s+patch|bi-?hormonal|dual[\s-]hormone|glucagon\s+pump)(?![a-z0-9])/,
   brand: /(^|[^a-z0-9])(ilet|i-let|i\s+let\s+pump|beta\s*bionics|betabionics|bionic\s+pancreas|color\s+ilet|bionic\s+circle)(?![a-z0-9])/,
   support: /\b(not\s+charging|customer\s+service|customer\s+support|cartridges?|manuals?|log\s*in|app|support|troubleshoot\w*|alarms?|errors?|replacement|charger|warranty|phone\s+number|contact|reset|help|bionic\s+circle|battery)\b/,
@@ -482,7 +484,7 @@ const BB = {
   abroad: phraseRe(["canada", "canadian", "toronto", "vancouver", "uk", "united kingdom", "nhs", "england", "scotland", "ireland", "australia", "new zealand", "india", "pakistan", "philippines",
     "germany", "france", "spain", "italy", "netherlands", "sweden", "norway", "denmark", "uae", "dubai", "saudi", "qatar", "south africa", "nigeria", "kenya", "brazil", "argentina", "japan", "china",
     "korea", "singapore", "malaysia", "indonesia", "in mexico", "mexico city", "mexican", "london uk", "london england", "london ontario", "paris france", "dublin ireland", "melbourne australia", "ontario canada"]),
-  cgm: /\b(dexcom|libre|freestyle|cgm|g6|g7|continuous\s+glucose)\b/,
+  cgm: /\b(dexcom|libre|freestyle|eversense|cgm|g6|g7|continuous\s+glucose)\b/,
   deliveryCtx: /\b(pump|pumps|aid|automated\s+insulin|insulin\s+delivery|ilet|closed[\s-]?loop|artificial\s+pancreas|bionic|compatible|omnipod|tandem|medtronic|minimed)\b/,
   spanish: /\b(bomba\s+de\s+insulina|pancreas\s+artificial|diabetes\s+tipo\s+1)\b/,
   t1d: /\b(t1d|type\s*(?:1|i|one)\s+diabetes)\b/,
@@ -496,7 +498,7 @@ const BETA_BIONICS = {
   forbiddenNegatives: ["pump", "pumps", "loop", "patch", "trial", "bionic", "insulin", "free", "dexcom", "libre", "freestyle", "cgm", "medicare", "cost", "price", "baby", "mexico"],
   competitors: ["omnipod 5", "omnipod dash", "omnipod go", "omnipod5", "omnipod", "omni pod", "insulet", "tslim", "t:slim", "t slim", "tandem mobi", "tandem diabetes", "tandem insulin pump", "tandem pump",
     "tandem t:slim", "control-iq", "control iq", "minimed", "medtronic minimed", "medtronic pump", "medtronic insulin pump", "medtronic diabetes", "780g", "770g", "inpen", "twiist", "sequel med tech",
-    "cequr", "mannkind", "v-go", "ypsomed", "ypsopump", "camaps", "camaps fx", "sigi patch", "sigi pump", "eoflow", "eopatch", "bigfoot unity", "bigfoot biomedical", "accu-chek insight", "accu-chek combo",
+    "cequr", "mannkind", "medtronic", "smartguard", "simplera", "v-go", "ypsomed", "ypsopump", "camaps", "camaps fx", "sigi patch", "sigi pump", "eoflow", "eopatch", "bigfoot unity", "bigfoot biomedical", "accu-chek insight", "accu-chek combo",
     "accu-chek spirit", "accu chek insight", "accu chek combo", "accu chek spirit"],
   coreSignal: ["insulin pump", "automated insulin delivery", "aid system", "artificial pancreas", "closed loop", "closed-loop", "hybrid closed loop", "no carb counting", "without carb counting",
     "avoid carb counting", "stop carb counting", "mdi to pump", "switching insulin pump", "switch insulin pump", "tubeless insulin pump", "insulin delivery system", "insulin delivery device",
@@ -510,7 +512,7 @@ const BETA_BIONICS = {
     // 2 jobs, even next to the brand ("apply" is not a jobs word in a coverage or ordering search)
     if ((w = trigger(BB.jobs, t)) && !(w === "apply" && BB.applyContext.test(t))) return { status: "Not Relevant", subtype: "Jobs/Recruitment", negMatchType: "Phrase", negText: w, negLevel: "Account" };
     // pipeline products: never a keyword, a client decision (the skill lists them at 19, but "ilet duo" would otherwise be taken for the brand)
-    if (BB.pipeline.test(t)) return { status: "Client Review", subtype: "Pipeline product (not yet available)" };
+    if (BB.pipeline.test(t) || (BB.mint.test(t) && BB.mintCtx.test(t))) return { status: "Client Review", subtype: "Pipeline product (not yet available)" };
     // 3 brand
     const brand = BB.brand.test(t);
     if (brand) {
