@@ -5,7 +5,8 @@
   "2. Automation",
   "3. Automatically Created Assets",
   "4. Auto-Apply Recommendations",
-  "5. Account Automation"
+  "5. Account Automation",
+  "6. On the spot (Performance Max and Demand Gen)"
  ],
  "severities": [
   "Required"
@@ -57,7 +58,8 @@
     "All"
    ],
    "severity": "Required",
-   "sheetRow": 3
+   "sheetRow": 3,
+   "onTheSpot": "There is no plan to compare with for this campaign type. Judge the type on its own: pass when the campaign's type matches the type in its name (P2_<type>_<launch date>) and the evidence shows a normal sub-type; flag a mismatch between the name and the type."
   },
   {
    "id": "1.3",
@@ -159,7 +161,8 @@
     "All"
    ],
    "severity": "Required",
-   "sheetRow": 9
+   "sheetRow": 9,
+   "onTheSpot": "There is no plan to compare with. Judge the bid strategy on its own: Performance Max and Demand Gen are built to optimise for results, so a strategy that optimises for conversions or conversion value (with or without a target) is right when the account tracks conversions. Flag clicks-based or manual bidding on a campaign whose conversion goals are set, and say why. If the evidence cannot say what the campaign is for, cannot_verify."
   },
   {
    "id": "1.9",
@@ -193,7 +196,8 @@
     "All"
    ],
    "severity": "Required",
-   "sheetRow": 11
+   "sheetRow": 11,
+   "onTheSpot": "There is no plan to compare with. Judge the devices on their own: pass when no device is switched off (a bid adjustment of -100%) and none carries an adjustment the evidence cannot explain. A device switched off needs a reason in the evidence (the landing page or the campaign name); flag it when there is none."
   },
   {
    "id": "1.11",
@@ -210,7 +214,8 @@
     "All"
    ],
    "severity": "Required",
-   "sheetRow": 12
+   "sheetRow": 12,
+   "onTheSpot": "There is no plan to compare with. Pass when no gender is excluded unless the landing page or ad text clearly serves one group; flag a gender exclusion the business does not explain; cannot_verify when only a plan could say."
   },
   {
    "id": "1.12",
@@ -227,7 +232,8 @@
     "All"
    ],
    "severity": "Required",
-   "sheetRow": 13
+   "sheetRow": 13,
+   "onTheSpot": "There is no plan to compare with. Pass when no household income range is excluded; flag an exclusion the evidence does not explain; cannot_verify when only a plan could say."
   },
   {
    "id": "1.13",
@@ -261,7 +267,8 @@
     "All"
    ],
    "severity": "Required",
-   "sheetRow": 15
+   "sheetRow": 15,
+   "onTheSpot": "There is no plan to compare with. Judge the locations against the landing page and the business: flag locations clearly outside where the business serves (read from the landing page text and the campaign name), or none set at all (the whole world); otherwise pass and name the places. cannot_verify when the page does not say where the business serves."
   },
   {
    "id": "1.15",
@@ -295,7 +302,8 @@
     "All"
    ],
    "severity": "Required",
-   "sheetRow": 17
+   "sheetRow": 17,
+   "onTheSpot": "There is no plan to compare with. Pass when no age range is excluded unless the landing page or ad text clearly serves one group; flag an exclusion the business does not explain; cannot_verify when only a plan could say."
   },
   {
    "id": "1.17",
@@ -431,7 +439,8 @@
     "All"
    ],
    "severity": "Required",
-   "sheetRow": 25
+   "sheetRow": 25,
+   "onTheSpot": "There is no plan to compare with. Pass when no schedule is set (every hour) unless the landing page states opening hours that the ads depend on (a phone number, a booking line); flag a schedule that cuts hours without a reason in the evidence; cannot_verify when only a plan could say."
   },
   {
    "id": "1.25",
@@ -1061,6 +1070,78 @@
    ],
    "severity": "Required",
    "sheetRow": 63
+  },
+  {
+   "id": "6.1",
+   "section": "6. On the spot (Performance Max and Demand Gen)",
+   "check": "Audience signals",
+   "expected": "Every asset group has audience signals that fit the business: a customer list or a custom segment on what the landing page sells is best. None is left empty.",
+   "otherThingsToCheck": "A signal only guides Google, it does not limit who sees the ads. Flag signals that do not fit what the landing page sells.",
+   "verify": "Expected: Every asset group has audience signals that fit the business: a customer list or a custom segment on what the landing page sells is best. None is left empty. A signal only guides Google, it does not limit who sees the ads. Flag signals that do not fit what the landing page sells.",
+   "fromBook": false,
+   "campaignTypes": [
+    "PMax"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Required",
+   "sheetRow": null,
+   "onTheSpotOnly": true
+  },
+  {
+   "id": "6.2",
+   "section": "6. On the spot (Performance Max and Demand Gen)",
+   "check": "Search themes",
+   "expected": "Every asset group has search themes that match what the landing page sells. None is a competitor's name, unrelated to the page, or a repeat of another theme.",
+   "otherThingsToCheck": "Search themes guide Performance Max the way keywords guide Search. Read them against the landing page.",
+   "verify": "Expected: Every asset group has search themes that match what the landing page sells. None is a competitor's name, unrelated to the page, or a repeat of another theme. Search themes guide Performance Max the way keywords guide Search. Read them against the landing page.",
+   "fromBook": false,
+   "campaignTypes": [
+    "PMax"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Required",
+   "sheetRow": null,
+   "onTheSpotOnly": true
+  },
+  {
+   "id": "6.3",
+   "section": "6. On the spot (Performance Max and Demand Gen)",
+   "check": "Asset group strength",
+   "expected": "Every asset group is rated Good or Excellent by Google.",
+   "otherThingsToCheck": "This is Google's own ad strength rating. Name any asset group below Good.",
+   "verify": "Expected: Every asset group is rated Good or Excellent by Google. This is Google's own ad strength rating. Name any asset group below Good.",
+   "fromBook": false,
+   "campaignTypes": [
+    "PMax"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Required",
+   "sheetRow": null,
+   "onTheSpotOnly": true
+  },
+  {
+   "id": "6.4",
+   "section": "6. On the spot (Performance Max and Demand Gen)",
+   "check": "Audiences",
+   "expected": "Every ad group targets audiences that fit the business (a customer list, a custom segment, an in-market or affinity audience), not demographics alone.",
+   "otherThingsToCheck": "Demand Gen shows ads only to the audiences it is given. Flag an ad group with none, or audiences that do not fit what the landing page sells.",
+   "verify": "Expected: Every ad group targets audiences that fit the business (a customer list, a custom segment, an in-market or affinity audience), not demographics alone. Demand Gen shows ads only to the audiences it is given. Flag an ad group with none, or audiences that do not fit what the landing page sells.",
+   "fromBook": false,
+   "campaignTypes": [
+    "Demand Gen"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Required",
+   "sheetRow": null,
+   "onTheSpotOnly": true
   }
  ]
 }

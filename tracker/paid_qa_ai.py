@@ -68,6 +68,8 @@ For every check answer with:
 Rules you must follow:
 1. Use only the evidence given. If it is not in the evidence, say cannot_verify and name what is missing in the finding. Never guess a pass, and never flag something just because you cannot see it.
 2. Some checks take their expected value from the campaign book (fromBook is true: bid strategy, devices, genders, household income, locations, age, ad schedule, campaign type). Compare the live campaign with the matching row of campaignBook. If there is no campaign book, or it does not say, answer cannot_verify and say the campaign book is needed; do not guess the plan. A check that has a fixed expected value does not need the book.
+2b. The campaign book is a Search campaign book. When campaignBook says it is not used for this campaign type (Performance Max, Demand Gen and the like), the checks that would have used it carry judgeOnTheSpot instead of fromBook. Follow judgeOnTheSpot: judge the setting on its own merits from the evidence and the landing page, flag what is clearly wrong, and answer cannot_verify only when nothing in the evidence can settle it. Never say the campaign book is needed for such a check.
+2c. Section 6 checks (audience signals, search themes, audiences) are done on the spot: read what is set against the landing page text and the campaign name. Flag a signal, theme or audience that does not fit what the page sells, names a competitor, is a duplicate, or is off-topic; pass when they fit. Quote the signal or theme you rely on.
 3. Switches that Google Ads does not show to the API (the account's automatically created asset switches, auto migration) cannot be verified: answer cannot_verify and say the switch is not visible, unless an automatically created asset in the evidence proves it is on, which is a flag.
 4. Findings from exact rules (ruleFinding) are facts read straight from Google Ads. Use them as evidence. Where a rule has already ticked or crossed a check you will not be asked about it.
 5. For ad copy and other assets, judge the text you were given: spelling, grammar, Start Case where the agency uses it, brand name present and spelled right, claims that cannot be proven, and the minimum numbers Google recommends (about 15 headlines and 4 descriptions per responsive search ad; at least 4 sitelinks and 4 callouts; at least 1 structured snippet). Where a check asks about the account's gender focus, you may use the landing page text to say who the business serves.
@@ -195,10 +197,15 @@ def evidence_bundle(data, ctx):
         if g is None:
             continue
         rsa = (ad.get("ad") or {}).get("responsiveSearchAd") or {}
+        dg = (ad.get("ad") or {}).get("demandGenMultiAssetAd") or (ad.get("ad") or {}).get("demandGenVideoResponsiveAd") or {}
+        car = (ad.get("ad") or {}).get("demandGenCarouselAd") or {}
+        heads = [h.get("text") for h in (rsa.get("headlines") or dg.get("headlines") or [])] + [h.get("text") for h in dg.get("longHeadlines") or []]
+        descs = [h.get("text") for h in (rsa.get("descriptions") or dg.get("descriptions") or [])]
+        if car:
+            heads, descs = heads + [car.get("headline")], descs + [car.get("description")]
         g["ads"].append({"status": ad.get("status"), "strength": ad.get("adStrength"), "type": (ad.get("ad") or {}).get("type"),
                          "approval": (ad.get("policySummary") or {}).get("approvalStatus"), "finalUrls": (ad.get("ad") or {}).get("finalUrls"),
-                         "headlines": [h.get("text") for h in rsa.get("headlines") or []],
-                         "descriptions": [h.get("text") for h in rsa.get("descriptions") or []],
+                         "headlines": [h for h in heads if h], "descriptions": [d for d in descs if d],
                          "path1": rsa.get("path1"), "path2": rsa.get("path2")})
     ev["adGroups"] = list(groups.values())[:25]
 
@@ -243,6 +250,21 @@ def evidence_bundle(data, ctx):
         if t:
             g["texts"].setdefault(f, []).append(t)
     ev["performanceMaxAssetGroups"] = list(pm.values())[:10]
+    ev["performanceMaxSignals"] = ev["demandGenTargeting"] = None            # only a Performance Max or a Demand Gen campaign has them
+    if ctx.channel == "PERFORMANCE_MAX":
+        ev["performanceMaxSignals"] = [{"assetGroup": g["name"], "audienceSignals": g["audiences"] or "none", "searchThemes": g["themes"] or "none"}
+                                       for g in auto._pmax_groups(ctx)][:10]
+    if ctx.channel == "DEMAND_GEN":
+        by_group = {}
+        for r in _rows(data, "ag_audiences"):
+            cc = r.get("adGroupCriterion") or {}
+            ref = ((cc.get("userList") or {}).get("userList") or (cc.get("userInterest") or {}).get("userInterestCategory")
+                   or (cc.get("customAudience") or {}).get("customAudience") or (cc.get("customIntent") or {}).get("customIntent")
+                   or (cc.get("combinedAudience") or {}).get("combinedAudience") or (cc.get("audience") or {}).get("audience"))
+            slot = by_group.setdefault((r.get("adGroup") or {}).get("name") or "?", {"audiences": [], "excluded": []})
+            slot["excluded" if cc.get("negative") else "audiences"].append(ctx.names.get(ref) or cc.get("displayName") or ctx.label(ref))
+        ev["demandGenTargeting"] = {"audiencesByAdGroup": by_group or "none",
+                                    "optimizedTargeting": (camp.get("demandGenCampaignSettings") or {}).get("upgradedTargeting")}
     ev["autoApplyRecommendationsEnabled"] = auto._enabled_recs(ctx) or "none: no recommendation type is subscribed to auto-apply"
     ev["accountSettingsNotVisibleToTheApi"] = ["automatically created assets switches (apps, locations, promotions, logos, names, callouts, images, sitelinks, snippets, longer headlines, seller ratings)",
                                                 "automatically generated assets switch", "auto migration and upgrades"]
@@ -254,14 +276,18 @@ def evidence_bundle(data, ctx):
     ev["landingPages"] = pages
     book = data.get("_book")
     ev["campaignBook"] = ({"filename": book.get("filename"), "fields": book.get("rows"), "everythingOnItsSheets": book.get("text")}
-                          if book else "none uploaded")
+                          if book else
+                          "not used for this campaign type (%s): the checks that depend on it are judged on the spot" % data["_bookNotUsed"]
+                          if data.get("_bookNotUsed") else "none uploaded")
     return ev
 
 
 # Which evidence each section reads. Anything not listed here reads everything.
 SECTION_EVIDENCE = {
     "1": ["account", "campaign", "targeting", "negatives", "conversionGoals", "adGroups", "assets", "performanceMaxAssetGroups",
-          "landingPages", "campaignBook"],
+          "performanceMaxSignals", "demandGenTargeting", "landingPages", "campaignBook"],
+    "6": ["campaign", "targeting", "adGroups", "performanceMaxAssetGroups", "performanceMaxSignals", "demandGenTargeting", "landingPages",
+          "campaignBook"],
     "2": ["campaign", "campaignBook"],
     "3": ["assets", "automaticallyCreatedAssets", "accountSettingsNotVisibleToTheApi", "campaignBook"],
     "4": ["autoApplyRecommendationsEnabled", "campaignBook"],
@@ -275,7 +301,7 @@ def section_key(check):
 
 def _slice(ev, key):
     wanted = SECTION_EVIDENCE.get(key)
-    return {k: ev[k] for k in (wanted or ev) if k in ev}
+    return {k: ev[k] for k in (wanted or ev) if ev.get(k) is not None}
 
 
 # ── Asking, and checking what comes back ────────────────────────────────────
@@ -330,11 +356,13 @@ def _unverified(why):
     return {"result": None, "found": why, "evidence": "", "fix": "", "source": "ai", "unverified": True}
 
 
-def _check_rows(checks, rules):
+def _check_rows(checks, rules, book_used=True):
     out = []
     for it in checks:
         row = {"id": it["id"], "check": it["check"], "expectedValue": it.get("expected") or "", "otherThingsToCheck": it.get("otherThingsToCheck") or "",
-               "fromBook": bool(it.get("fromBook"))}
+               "fromBook": bool(it.get("fromBook")) and book_used}
+        if it.get("fromBook") and not book_used and it.get("onTheSpot"):
+            row["judgeOnTheSpot"] = it["onTheSpot"]
         if it.get("condition"):
             row["appliesOnlyIf"] = it["condition"]
         if rules.get(it["id"]):
@@ -349,7 +377,7 @@ def review_section(section, checks, ev, rules, meta, *, call):
     key = section_key(checks[0])
     sliced = _slice(ev, key)
     user = json.dumps({"section": section, "campaign": {"name": meta.get("name"), "type": meta.get("type")},
-                       "today": meta.get("today"), "evidence": sliced, "checks": _check_rows(checks, rules)}, indent=None, default=str)
+                       "today": meta.get("today"), "evidence": sliced, "checks": _check_rows(checks, rules, meta.get("bookUsed", True))}, indent=None, default=str)
     try:
         parsed = call(SYSTEM, user, max_tokens=min(9000, 380 * len(asked) + 600))
     except Exception as e:                                  # noqa: BLE001 (kinds in ModelError; a section never stops the rest)

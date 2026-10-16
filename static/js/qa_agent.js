@@ -293,7 +293,7 @@ document.addEventListener("click",function(e){ if(e.target&&e.target.id==="goMan
 /* ── The QC ───────────────────────────────────────────────── */
 var VERDICT_SUB = {
   ready:function(s){return "The AI found nothing wrong, and every check is passed or confirmed.";},
-  incomplete:function(s){return s.pendingBlocking.length+" check"+(s.pendingBlocking.length===1?"":"s")+" the AI could not verify from what it can see ("+s.pendingBlocking.join(", ")+"). A person has to look: confirm each below"+(S.launch&&!S.launch.book?", or add the campaign book, which some of them need":"")+".";},
+  incomplete:function(s){return s.pendingBlocking.length+" check"+(s.pendingBlocking.length===1?"":"s")+" the AI could not verify from what it can see ("+s.pendingBlocking.join(", ")+"). A person has to look: confirm each below"+(S.launch&&!S.launch.book&&S.launch.bookApplies!==false?", or add the campaign book, which some of them need":"")+".";},
   not_ready:function(s){return "The AI flagged "+s.failedBlocking.length+" check"+(s.failedBlocking.length===1?"":"s")+" ("+s.failedBlocking.join(", ")+"). Do not launch until "+(s.failedBlocking.length===1?"it is":"they are")+" fixed.";}
 };
 function rowState(id){
@@ -445,7 +445,8 @@ function render(){
   if(S.review&&S.review.status==="running") return;
   paintVerdict(); paintFilters(); paintSections();
   $("#foot").innerHTML="Source: the PPC team's Campaign Book checks, reviewed by the AI. The AI answers only from what it can read in Google Ads, on the landing pages and in the campaign book you add; "+
-    "Google Ads does not show some account switches to the API, so those stay for a person. Exact Google Ads rules outrank the AI, and your click outranks both.";
+    "Google Ads does not show some account switches to the API, so those stay for a person. Exact Google Ads rules outrank the AI, and your click outranks both. "+
+    "The campaign book is for Search campaigns: a Performance Max or Demand Gen campaign is not compared with one, and the checks that would use it are judged on the spot from Google Ads.";
 }
 function refresh(id){
   // After one check changes: repaint that row, the verdict, the section headers and the filter counts.
@@ -517,12 +518,22 @@ $("#sections").addEventListener("click",function(e){
 });
 
 /* ── The campaign book ────────────────────────────────────── */
+function takesBook(cid){var q=S.qcs[cid]; return !(q&&q.launch&&q.launch.bookApplies===false);}       // the campaign book is for Search campaigns
 function renderBook(){
+  if(S.launch&&S.launch.bookApplies===false){
+    var ign=S.launch.bookIgnored;
+    $("#bookBox").innerHTML='<section class="pm-panel qa-book"><div class="qa-book-t"><b>Campaign book</b><span class="qa-book-s">Not used for this campaign type</span></div>'+
+      '<p>'+esc(S.launch.bookNote)+'</p>'+
+      (ign?'<p>A campaign book saved earlier on this QC is ignored for this campaign.</p><div class="qa-book-row"><button type="button" class="pm-btn-ghost qa-danger" id="bookRemove">Remove the saved book</button></div>':"")+'</section>';
+    return;
+  }
   var b=S.launch&&S.launch.book, busy=S.bookBusy;
   var status=busy?'<span class="qa-book-s">'+esc(busy)+'</span>':
     b?'<span class="qa-book-s ok"><b>'+esc(b.filename||"Campaign book")+'</b> · '+b.fields+' field'+(b.fields===1?"":"s")+' read'+(b.uploadedBy?' · added by '+esc(who(b.uploadedBy)):"")+(b.uploadedAt?' · '+esc(rel(b.uploadedAt)):"")+'</span>':
     '<span class="qa-book-s">Not added</span>';
-  var all=S.sel.length>1?'<label class="qa-book-all"><input type="checkbox" id="bookAll"'+(S.bookAll?" checked":"")+(busy?" disabled":"")+'> Apply to all '+S.sel.length+' selected campaigns</label>':"";
+  var n=S.sel.filter(takesBook).length, skipped=S.sel.length-n;
+  var all=n>1?'<label class="qa-book-all"><input type="checkbox" id="bookAll"'+(S.bookAll?" checked":"")+(busy?" disabled":"")+'> Apply to all '+n+' selected Search campaigns'+
+    (skipped?' ('+skipped+' other type'+(skipped===1?"":"s")+' do not use a book)':"")+'</label>':"";
   $("#bookBox").innerHTML='<section class="pm-panel qa-book"><div class="qa-book-t"><b>Campaign book</b>'+status+'</div>'+
     '<p>'+(b?'The AI compares the campaign with this book on bid strategy, devices, genders, household income, locations, age and ad schedule.':
       'Some checks depend on the client\'s plan: bid strategy, devices, genders, household income, locations, age and ad schedule. Add the campaign book as an Excel file or a Google Sheet link and the AI reviews the campaign against it.')+'</p>'+
@@ -533,7 +544,7 @@ function renderBook(){
     (b?'<button type="button" class="pm-btn-ghost qa-danger" id="bookRemove"'+(busy?" disabled":"")+'>Remove</button>':"")+'</div>'+all+'</section>';
 }
 function sendBook(body){
-  var ids=(S.bookAll&&S.sel.length>1?S.sel:[S.campaignId]).map(function(c){return S.qcs[c]&&S.qcs[c].launch&&S.qcs[c].launch.id;}).filter(Boolean);
+  var ids=(S.bookAll&&S.sel.length>1?S.sel.filter(takesBook):[S.campaignId]).map(function(c){return S.qcs[c]&&S.qcs[c].launch&&S.qcs[c].launch.id;}).filter(Boolean);
   if(!ids.length) ids=[S.launchId];
   S.bookBusy="Reading the book…"; renderBook(); say("");
   var notes=[], i=0;

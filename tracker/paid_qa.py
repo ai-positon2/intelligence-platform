@@ -264,7 +264,10 @@ def public_launch(l):
     return {"id": l["id"], "accountId": l["account_id"], "accountName": l["account_name"],
             "campaignId": l["campaign_id"], "campaignName": l["campaign_name"], "channel": l["channel"],
             "campaignTypes": l["campaign_types"], "clientTypes": l["client_types"],
-            "readAt": l.get("auto_at"), "review": review_view(l), "book": paid_qa_book.public(l.get("book") or None),
+            "readAt": l.get("auto_at"), "review": review_view(l), "bookApplies": paid_qa_book.applies_to(l["channel"]),
+            "book": paid_qa_book.public(l.get("book") or None) if paid_qa_book.applies_to(l["channel"]) else None,
+            "bookNote": "" if paid_qa_book.applies_to(l["channel"]) else paid_qa_book.not_used_note(l["channel"]),
+            "bookIgnored": bool(l.get("book")) and not paid_qa_book.applies_to(l["channel"]),
             "createdBy": l["created_by"],
             "createdAt": l["created_at"], "updatedAt": l["updated_at"]}
 
