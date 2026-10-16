@@ -59,9 +59,9 @@ def test_the_page_reads_google_ads_and_keeps_the_csv_as_a_fallback():
     assert ".get(\"account\")" in js                        # an old link names a ruleset, a new one a Google Ads account
 
 
-def test_the_page_never_asks_the_model_anything_but_the_ruleset_account_and_terms():
+def test_the_page_never_asks_the_model_anything_but_the_ruleset_account_profile_and_terms():
     js = read(PAGE)
-    assert "JSON.stringify({ ruleset: rulesetId, account: account, terms: batch })" in js
+    assert "JSON.stringify({ ruleset: rulesetId, account: account, terms: batch, profile: profile || undefined })" in js
 
 
 def test_the_page_opens_for_staff_and_the_scripts_are_served():
@@ -91,3 +91,17 @@ def test_the_open_account_list_stacks_above_the_panels_under_it():
 def test_there_is_no_em_dash_in_any_of_it():
     for p in FILES:
         assert "—" not in read(p), p
+
+
+def test_the_rules_list_says_it_is_not_a_list_of_accounts_and_nothing_is_called_partial():
+    html, js = read(TEMPLATE), read(PAGE)
+    assert "The rules are not a list of accounts" in html and "Automatic</b> works for every Google Ads account" in html
+    assert "Partial" not in js and "Model only" not in js and "placeholder" not in js.lower()
+    assert 'Automatic</span>' in js and 'Client rulebook</span>' in js
+
+
+def test_automatic_sends_the_account_profile_and_an_empty_range_offers_a_longer_one():
+    js = read(PAGE)
+    assert "Core.autoRuleset({ name: inp.account, keywords: inp.keywords })" in js and "const profile = auto ? accountProfile(inp) : null;" in js
+    assert "0.32 + 0.6 * d / n), profile);" in js                          # and it is what the batches are sent with
+    assert 'id="tryLonger"' in js and 'S.preset = "last90"' in js

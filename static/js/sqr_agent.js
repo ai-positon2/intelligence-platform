@@ -23,19 +23,19 @@ const fmtConv = Core.fmtConv;
 const CLASSIFY_URL = BASE + "/sqr/classify";
 const BATCH = 40, PARALLEL = 3;
 
-async function classifyBatch(rulesetId, account, batch){
+async function classifyBatch(rulesetId, account, batch, profile){
   const ctl = new AbortController();
   const t = setTimeout(() => ctl.abort(), 90000);
   try {
     const res = await fetch(CLASSIFY_URL, { method: "POST", credentials: "same-origin", signal: ctl.signal,
-      headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ruleset: rulesetId, account: account, terms: batch }) });
+      headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ruleset: rulesetId, account: account, terms: batch, profile: profile || undefined }) });
     const j = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(j.error || ("classify answered " + res.status));
     return j.results || {};
   } finally { clearTimeout(t); }
 }
 
-async function classifyPending(ruleset, account, terms, progress){
+async function classifyPending(ruleset, account, terms, progress, profile){
   const out = {}, failures = [];
   const batches = [];
   for (let i = 0; i < terms.length; i += BATCH) batches.push(terms.slice(i, i + BATCH));
@@ -43,7 +43,7 @@ async function classifyPending(ruleset, account, terms, progress){
   async function worker(){
     while (next < batches.length){
       const b = batches[next++];
-      try { Object.assign(out, await classifyBatch(ruleset.id, account, b)); }
+      try { Object.assign(out, await classifyBatch(ruleset.id, account, b, profile)); }
       catch (e) { failures.push(e.message || String(e)); }
       done += b.length;
       progress(done, terms.length);
@@ -67,7 +67,7 @@ const files = { terms: null, keywords: null, negs: null }, meta = { terms: null,
 const PRESETS = [{id:"last7",label:"Last 7 days"},{id:"last14",label:"Last 14 days"},{id:"last30",label:"Last 30 days"},{id:"last90",label:"Last 90 days"}];
 const MAX_DAYS = 92;
 const ACCT_HINT = { riccobene: "Dental · 20 locations", oia: "Imaging · 12 facilities", eventgroove: "Event printing",
-  gentledental_42north: "Dental", mchale: "Landscaping · DC metro", beta_bionics: "Medical device · placeholder", generic: "Any account, no rules" };
+  gentledental_42north: "Dental", mchale: "Landscaping · DC metro", beta_bionics: "Medical device · type 1 diabetes, US only", generic: "Works for any account, learns it from its Google Ads data" };
 const ACCT_HUE = { riccobene: 190, oia: 255, eventgroove: 320, gentledental_42north: 160, mchale: 120, beta_bionics: 280, generic: 220 };
 
 function money(v, whole){
@@ -88,8 +88,7 @@ function toast(t){
 // =====================================================================
 function initials(label){ return label.replace(/\(.*?\)/g, "").split(/\s+/).filter(w => /^[A-Za-z0-9]/.test(w)).slice(0, 2).map(w => w[0]).join("").toUpperCase(); }
 function badge(id){
-  return id === "generic" ? '<span class="badge pm-pill mute">Model only</span>'
-    : id === "beta_bionics" ? '<span class="badge pm-pill unclear">Partial</span>' : '<span class="badge pm-pill ok">Rules</span>';
+  return id === "generic" ? '<span class="badge pm-pill ok">Automatic</span>' : '<span class="badge pm-pill mute">Client rulebook</span>';
 }
 function avatar(rs){ return '<span class="sq-av" style="--h:' + (ACCT_HUE[rs.id] || 200) + '">' + esc(initials(rs.label)) + '</span>'; }
 const dd = $id("dd"), ddBtn = $id("ddBtn"), ddMenu = $id("ddMenu"), ddList = $id("ddList"), ddSearch = $id("ddSearch");
@@ -100,7 +99,13 @@ function paintButton(){
   ddBtn.innerHTML = avatar(rs) + '<span class="sq-dd-txt"><span class="nm">' + esc(rs.label) + '</span><span class="ds">' +
     esc(ACCT_HINT[rs.id] || "") + '</span></span>' + badge(rs.id) +
     '<span class="sq-chev"><svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></span>';
-  $id("rulesetNote").innerHTML = rs.note;
+  let note = rs.note;
+  if (rs.id === "generic" && S.acct) {
+    const ph = Core.brandPhrases(S.acct.name).filter(p => p.indexOf(" ") >= 0 || Core.brandPhrases(S.acct.name).length === 1);
+    note += ph.length ? " <b>For " + esc(S.acct.name) + "</b>, a search containing " + ph.map(p => "\u2018" + esc(p) + "\u2019").join(" or ") + " counts as the account\'s own brand."
+      : " <b>For " + esc(S.acct.name) + "</b> the name is too short or too common to treat as a brand word, so the model reads brand searches too.";
+  }
+  $id("rulesetNote").innerHTML = note;
 }
 function paintList(){
   const q = ddSearch.value.trim().toLowerCase();
@@ -134,7 +139,7 @@ function paintWhy(){
   const why = S.data && S.data.ruleset ? S.data.ruleset : null;
   const el = $id("rulesWhy");
   if (!why || S.rulesManual) { el.textContent = S.rulesManual ? "Chosen by you for this account." : ""; return; }
-  el.textContent = why.id === "generic" ? "Judged by the model alone: " + why.why + "." : "Rules picked from the account's name: " + why.why + ".";
+  el.textContent = why.id === "generic" ? "Automatic rules: " + why.why + "." : "Client rulebook picked from the account's name: " + why.why + ".";
 }
 ddBtn.addEventListener("click", () => ddMenu.hidden ? openMenu() : closeMenu());
 ddList.addEventListener("click", e => { const o = e.target.closest(".sq-opt"); if (o) choose(o.dataset.id); });
@@ -185,6 +190,7 @@ $id("cApply").addEventListener("click", () => {
   S.preset = "custom"; S.range = { start: s, end: e }; paintRanges(); computeRange(); load(false);
 });
 $id("refreshBtn").addEventListener("click", () => load(true));
+$id("dataLine").addEventListener("click", e => { if (e.target.closest("#tryLonger")) { S.preset = "last90"; $id("custom")._open = false; paintRanges(); computeRange(); load(false); } });
 
 function setLive(text, off){
   $id("liveText").textContent = text; $id("live").classList.toggle("off", !!off);
@@ -197,7 +203,9 @@ function paintData(){
   el.innerHTML = '<div class="sq-data-in"><b>Read from Google Ads:</b> ' + num(d.terms.length) + ' search term rows, ' + num(d.keywords.length) + ' keywords and ' +
     num(negativeCount(d)) + ' negative keywords (campaign and list) for <b>' + esc(S.acct.name) + '</b>, ' + esc(d.range[0]) + ' to ' + esc(d.range[1]) + '.' +
     (marks ? ' ' + num(marks) + ' of the terms are already keywords.' : '') + (w ? '<ul class="sq-warns">' + w + '</ul>' : '') +
-    (d.notes || []).map(x => '<small class="sq-ex">' + esc(x) + '</small>').join("") + '</div>';
+    (d.notes || []).map(x => '<small class="sq-ex">' + esc(x) + '</small>').join("") +
+    (d.terms.length ? "" : '<p class="sq-empty">Google Ads reports no searches for this account in these dates: it had no traffic, or its campaigns were paused.' +
+      (S.preset === "last90" ? "" : ' <button type="button" class="pm-chip" id="tryLonger">Look at the last 90 days</button>') + '</p>') + '</div>';
   $id("readyText").textContent = d.terms.length ? num(d.terms.length) + " search term rows ready" + (S.acct ? " for " + S.acct.name : "") + "." : "That range has no search terms.";
 }
 function refreshReady(){
@@ -228,7 +236,7 @@ async function load(force){
     if (seq !== loadSeq) return;
     if (!r.ok) { const e = new Error(j.error || ("The server answered " + r.status)); e.status = r.status; e.config = j.configProblem; throw e; }
     S.data = j; S.currency = acct.currency || "USD";
-    if (!S.rulesManual && j.ruleset) setRules(j.ruleset.id, false); else paintWhy();
+    if (!S.rulesManual && j.ruleset) setRules(j.ruleset.id, false); else { paintButton(); paintWhy(); }
     $id("upd").textContent = j.fetchedAt ? "· read " + ago(j.fetchedAt) : "";
     setLive("Live from Google Ads · " + acct.name);
     if (j.stale) { $id("staleBar").hidden = false; $id("staleBar").innerHTML = "<b>Showing the copy saved " + esc(new Date(j.stale).toLocaleString([], { weekday: "short", hour: "numeric", minute: "2-digit" })) + ".</b> Google Ads did not answer, so fresh numbers will come back when it does."; }
@@ -335,10 +343,32 @@ function inputs(){
     keywords: d.keywords.map(k => ({ text: k.t, match: k.m, campaign: k.c, adGroup: k.g })),
     negatives: expandNegatives(d), account: S.acct ? S.acct.name : "", from: "Google Ads" };
 }
+// What the account is, from its own Google Ads data: its campaigns, what it bids on, what converted. The model is told this so it can judge a
+// search for any account, not only the ones with a written rulebook.
+function accountProfile(inp){
+  const cost = new Map(), conv = new Map(), camp = new Map();
+  inp.rows.forEach(r => {
+    const k = Core.normText(r.term); if (!k) return;
+    cost.set(k, (cost.get(k) || 0) + (+r.cost || 0));
+    if ((+r.conversions || 0) > 0) { const e = conv.get(k) || { term: r.term, conversions: 0, cost: 0 }; e.conversions += +r.conversions; e.cost += +r.cost || 0; conv.set(k, e); }
+    if (r.campaign) camp.set(r.campaign, (camp.get(r.campaign) || 0) + (+r.cost || 0));
+  });
+  const seen = new Set(), kws = [];
+  inp.keywords.forEach(k => { const t = Core.keyText(k.text); if (t && !seen.has(t)) { seen.add(t); kws.push(t); } });
+  kws.sort((a, b) => (cost.get(b) || 0) - (cost.get(a) || 0));
+  return {
+    campaigns: Array.from(camp.entries()).sort((a, b) => b[1] - a[1]).slice(0, 25).map(e => e[0]),
+    keywords: kws.slice(0, 40),
+    converting: Array.from(conv.values()).sort((a, b) => (b.conversions - a.conversions) || (b.cost - a.cost)).slice(0, 30).map(e => e.term),
+  };
+}
 async function runAnalysis(){
-  const ruleset = RULESETS[current], inp = inputs();
+  const inp = inputs();
+  const auto = current === "generic";
+  const profile = auto ? accountProfile(inp) : null;
+  const ruleset = auto ? Core.autoRuleset({ name: inp.account, keywords: inp.keywords }) : RULESETS[current];
   S.ran = { from: inp.from, account: inp.account, range: files.terms ? null : S.data.range, warnings: files.terms ? [] : (S.data.warnings || []), notes: files.terms ? [] : (S.data.notes || []) };
-  const classify = terms => classifyPending(ruleset, inp.account, terms, (d, n) => setStatus("Model: " + d.toLocaleString() + " / " + n.toLocaleString() + " terms the rules couldn't settle", 0.32 + 0.6 * d / n));
+  const classify = terms => classifyPending(ruleset, inp.account, terms, (d, n) => setStatus("Model: " + d.toLocaleString() + " / " + n.toLocaleString() + " terms the rules couldn't settle", 0.32 + 0.6 * d / n), profile);
   return Core.analyze(ruleset, inp.rows, { keywords: inp.keywords, negatives: inp.negatives, classify, status: setStatus });
 }
 document.addEventListener("keydown", e => {

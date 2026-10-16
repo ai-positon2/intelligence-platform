@@ -244,7 +244,8 @@ OIA_FACILITIES = {"ami", "cpic", "ft. jesse", "heartland", "holmdel-nj", "idi-fl
 
 def suggest_ruleset(name):
     """(ruleset id, why) for an account name. The rules are written per client, so an account is matched by what its name says; one that is
-    not recognised is judged by the model alone (the "generic" rules)."""
+    not recognised is judged by the Automatic rules (the "generic" id): its brand from its name, its own keywords, and the model told what the
+    account is."""
     n = str(name or "").strip().lower()
     if re.search(r"riccobene", n):
         return "riccobene", "Riccobene"
@@ -252,7 +253,7 @@ def suggest_ruleset(name):
         return "oia", "an Outpatient Imaging Affiliates facility"
     if re.search(r"eventgroove", n):
         if re.search(r"fundrais", n):
-            return "generic", "the Eventgroove rules treat the word 'fundraising' as not relevant, which would misjudge an account named for it, so the model alone judges it"
+            return "generic", "the Eventgroove rules treat the word 'fundraising' as not relevant, which would misjudge an account named for it, so it is judged from its own data instead"
         return "eventgroove", "Eventgroove"
     if re.search(r"gentle dental|great hill|great lakes", n):
         return "gentledental_42north", "a 42 North practice"
@@ -260,4 +261,4 @@ def suggest_ruleset(name):
         return "mchale", "McHale Landscaping"
     if re.search(r"beta bionics", n):
         return "beta_bionics", "Beta Bionics"
-    return "generic", "no rules are written for this account yet"
+    return "generic", "no client rulebook for this account, so it is judged from its own Google Ads data"
