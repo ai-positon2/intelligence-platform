@@ -13,33 +13,50 @@ import pytest
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 JS = os.path.join(ROOT, "static", "js", "asset_coverage.js")
+TILES = os.path.join(ROOT, "static", "js", "asset_tiles.js")
 TEMPLATE = os.path.join(ROOT, "templates", "asset_coverage.html")
 
 HARNESS = r"""
 const fs = require("fs"), vm = require("vm");
-const src = fs.readFileSync(process.argv[1], "utf8"), scenario = JSON.parse(process.argv[2]);
-const els = {}, handlers = {}, downloads = [];
+const pageSrc = fs.readFileSync(process.argv[1], "utf8"), tilesSrc = fs.readFileSync(process.argv[2], "utf8"), scenario = JSON.parse(process.argv[3]);
+const els = {}, handlers = {}, downloads = [], log = { scrolled: [], focused: [], classes: [], moved: [] };
 function el(sel){
-  if (!els[sel]) els[sel] = { sel, innerHTML: "", textContent: "", hidden: false, value: "", dataset: {},
-    addEventListener(ev, fn){ handlers[sel + ":" + ev] = fn; }, classList: { add(){}, remove(){}, toggle(){} }, closest: () => null, click(){}, remove(){}, appendChild(){} };
+  if (!els[sel]) els[sel] = { sel, innerHTML: "", textContent: "", hidden: ["#acDrawer", "#acZoom", "#acdMore", "#acdExport"].includes(sel), value: "", src: "", dataset: {}, parentNode: null, open: false,
+    addEventListener(ev, fn){ handlers[sel + ":" + ev] = fn; }, classList: { add(){}, remove(){}, toggle(){} }, closest: () => null, click(){}, remove(){}, appendChild(){},
+    focus(){ log.focused.push(sel); }, scrollIntoView(){ log.scrolled.push(sel); }, setSelectionRange(){} };
   return els[sel];
 }
-const doc = { querySelector: el, createElement: () => { const e = el("created" + downloads.length); e.click = () => downloads.push({ href: e.href, name: e.download }); return e; }, body: { appendChild(){} } };
-const calls = [];
+const doc = { querySelector: el, createElement: () => { const e = el("created" + downloads.length); e.click = () => downloads.push({ href: e.href, name: e.download }); return e; },
+  body: { appendChild(n){ log.moved.push(n.sel); } }, addEventListener(ev, fn){ handlers["document:" + ev] = fn; },
+  documentElement: { classList: { add(c){ log.classes.push("+" + c); }, remove(c){ log.classes.push("-" + c); } } }, activeElement: { sel: "opener", focus(){ log.focused.push("opener"); } } };
+const calls = [], held = [];
 const picker = { sets: [], set(items, v){ this.sets.push([items, v]); } };
 function respond(url){
   calls.push(url);
+  if (scenario.hang && url.includes(scenario.hang)) return new Promise(() => {});       // an answer that never comes
+  if (scenario.hold && url.includes(scenario.hold) && !held.released) return new Promise(res => held.push(() => res(answer(url))));      // an answer that comes when told to
+  return answer(url);
+}
+function answer(url){
+  for (const r of scenario.responses || []) if (url.includes(r.match)) return r.body === undefined ? r : { status: r.status || 200, body: r.body };
   if (url.includes("/segments/accounts")) return scenario.accounts;
   return scenario.reportBody;
 }
 const ctx = { window: { PMPicker: (host, o) => { picker.onChange = o.onChange; return picker; } }, document: doc, history: { replaceState(){} }, location: { pathname: "/p", search: scenario.search || "" },
   localStorage: { getItem: () => "", setItem(){} }, URLSearchParams, URL: { createObjectURL: b => { downloads.blob = b; return "blob:x"; }, revokeObjectURL(){} },
-  Blob: class { constructor(parts){ this.text = parts.join(""); } }, setTimeout: fn => fn(), Intl, Date, Math, JSON, Object, Array, String, Number, Promise, console,
-  fetch: url => Promise.resolve(respond(url)).then(r => ({ ok: r.status < 400, status: r.status, json: () => Promise.resolve(r.body) })) };
+  Blob: class { constructor(parts){ this.text = parts.join(""); } }, setTimeout: fn => fn(), Intl, Date, Math, JSON, Object, Array, String, Number, Promise, RegExp, encodeURIComponent, console,
+  fetch: url => (scenario.reject && url.includes(scenario.reject) ? (calls.push(url), Promise.reject(new Error("down"))) :
+    Promise.resolve(respond(url)).then(r => ({ ok: r.status < 400, status: r.status, json: () => Promise.resolve(r.body) }))) };
 ctx.window.document = doc;
 vm.createContext(ctx);
-vm.runInContext(src, ctx);
+vm.runInContext(tilesSrc, ctx);
+vm.runInContext(pageSrc, ctx);
 const tick = () => new Promise(r => setImmediate(r));
+// a fake click target: closest(selector) answers with an element carrying that selector's dataset (or null)
+function target(map){
+  const make = spec => Object.assign({ dataset: {}, closest: q => (map[q] ? make(map[q]) : null) }, spec);
+  return make(map["self"] || {});
+}
 (async () => {
   for (let i = 0; i < 6; i++) await tick();
   const out = {};
@@ -48,11 +65,20 @@ const tick = () => new Promise(r => setImmediate(r));
     if (step.type) { el("#filter").value = step.type; handlers["#filter:input"].call(el("#filter")); }
     if (step.open) { const head = { closest: q => q === ".ac-head" ? head : q === ".ac-row" ? { dataset: { key: step.open } } : null }; handlers["#list:click"]({ target: head }); }
     if (step.button) handlers[step.button + ":click"]();
+    if (step.release) { held.released = true; held.splice(0).forEach(f => f()); }
+    if (step.fire) {
+      const [sel, ev, map, extra] = step.fire;
+      const e = Object.assign({ target: target(map || {}), preventDefault(){ log.prevented = (log.prevented || 0) + 1; }, key: "" }, extra || {});
+      if (map && map.self && map.self.id !== undefined) e.target.id = map.self.id;
+      handlers[sel + ":" + ev].call(e.target, e);
+    }
     for (let i = 0; i < 6; i++) await tick();
   }
   const keys = ["#kpis", "#cov", "#sevs", "#kinds", "#list", "#acctAssets", "#foot", "#fresh", "#msg", "#listNote", "#more"];
   for (const k of keys) out[k] = els[k] ? els[k].innerHTML || els[k].textContent : "";
   out.hidden = { out: els["#out"] && els["#out"].hidden, empty: els["#empty"] && els["#empty"].hidden, acctCard: els["#acctCard"] && els["#acctCard"].hidden, more: els["#more"] && els["#more"].hidden };
+  out.el = {}; for (const k of Object.keys(els)) out.el[k] = { html: els[k].innerHTML, text: els[k].textContent, hidden: els[k].hidden, src: els[k].src, value: els[k].value };
+  out.log = log; out.handlers = Object.keys(handlers);
   out.calls = calls; out.csv = downloads.blob ? downloads.blob.text : null; out.download = downloads[0] || null; out.pickerLast = picker.sets.length;
   process.stdout.write(JSON.stringify(out));
 })();
@@ -106,7 +132,7 @@ ACCOUNTS = {"status": 200, "body": {"accounts": [{"id": "1234567890", "name": "A
 def run(scenario):
     scenario = dict({"accounts": ACCOUNTS, "search": "?account=1234567890", "report": lambda url: {"status": 200, "body": REPORT}}, **scenario)
     scenario["reportBody"] = scenario.pop("report")("")
-    out = subprocess.run(["node", "-e", HARNESS, JS, json.dumps(scenario)], capture_output=True, text=True, timeout=60)
+    out = subprocess.run(["node", "-e", HARNESS, JS, TILES, json.dumps(scenario)], capture_output=True, text=True, timeout=60)
     assert out.returncode == 0, out.stderr
     return json.loads(out.stdout)
 
@@ -219,8 +245,9 @@ def test_the_template_has_every_element_the_script_reaches_for():
     html = open(TEMPLATE, encoding="utf-8").read()
     import re
     js = open(JS, encoding="utf-8").read()
-    ids = set(re.findall(r'\$\("#([A-Za-z]+)"\)', js))
+    ids = set(re.findall(r'\$\("#([A-Za-z]+)"\)', js)) - {"acdFind"}                      # the find box is drawn with the drawer's tools
     assert ids and all('id="%s"' % i in html for i in ids), [i for i in ids if 'id="%s"' % i not in html]
+    assert {"acDrawer", "acdT", "acdS", "acdTools", "acdBody", "acdMore", "acdExport", "acdClose", "acZoom", "acZimg", "acZcap", "acFloat", "listCard"} <= ids
 
 
 def test_a_share_is_rounded_not_cut_and_an_mccs_rows_name_their_account_and_coverage_says_how_many_are_below():
@@ -241,3 +268,346 @@ def test_an_optional_kind_with_none_is_marked_optional_not_flagged():
     out = run({"report": lambda u: {"status": 200, "body": rep}, "steps": [{"open": "1:11"}]})
     row = [r for r in out["#list"].split("<tr") if "Promotions" in r][0]
     assert "optional" in row and "optional" not in [r for r in out["#list"].split("<tr") if "Prices" in r][0]
+
+
+# ═══ Everything opens: the cards, the bars, the kinds of asset ═══════════════════════════════════════════════════════════════════════════════
+# The detail the page asks for is built here by the server's own code from fake Google rows, so the page is tested against the real shape.
+
+import sys  # noqa: E402
+
+sys.path.insert(0, ROOT)
+from tests.test_paid_assets import TODAY, camp_row, link_row, searcher  # noqa: E402
+from tracker import paid_assets as A  # noqa: E402
+from tracker import paid_assets_detail as D  # noqa: E402
+
+GOOGLE_IMG = "https://tpc.googlesyndication.com/simgad/2833249052621513497"
+PICTURE = {"type": "IMAGE", "id": "i1", "name": "Hero.png", "imageAsset": {"fullSize": {"url": GOOGLE_IMG, "widthPixels": "896", "heightPixels": "640"}, "fileSize": "24273"}}
+MEMBER = {"id": "1", "name": "Acme Dental"}
+CAMP = "/p2/paid-marketing/api/assets/campaign?account=1234567890&campaign="
+LIB = "/p2/paid-marketing/api/assets/library?account=1234567890"
+
+
+def sl(cid, n, words, **kw):
+    return link_row(cid, "SITELINK", "sl%s" % n, asset={"sitelinkAsset": {"linkText": words, "description1": "Line one"}, "finalUrls": ["https://x.com/%s" % n]}, **kw)
+
+
+def detail():
+    """What the server saves for the fixture's account: campaign 11 (Search), 12 (Performance Max with one group, 700) and 14 (Display, ad 9)."""
+    s = D.Collector(MEMBER, TODAY)
+    ad = {"campaign": {"id": "14"}, "adGroup": {"id": "70", "name": "Level 1"}, "adGroupAd": {"ad": {"id": "9", "type": "RESPONSIVE_DISPLAY_AD", "responsiveDisplayAd": {
+        "marketingImages": [{"asset": "customers/1/assets/i1"}], "headlines": [{"text": "Hello"}], "businessName": "Acme"}}}}
+    A.read_account(MEMBER, today=TODAY, sink=s, search_fn=searcher(
+        campaigns=[camp_row("11", "Hudson_Broad"), camp_row("12", "PMax <Spring>", "PERFORMANCE_MAX"), camp_row("14", "Display lookalikes", "DISPLAY")],
+        campaign_assets=[sl("11", 1, "Book now"), sl("11", 2, "Our team"), sl("11", 3, "Gone", primary="NOT_ELIGIBLE", reasons=["ASSET_DISAPPROVED"]),
+                         link_row("11", "AD_IMAGE", "i1", asset=PICTURE), link_row("11", "CALLOUT", "co1", asset={"calloutAsset": {"calloutText": "Open late"}})],
+        groups=[{"campaign": {"id": "12"}, "assetGroup": {"id": "700", "name": "Crowns"}}],
+        group_assets=[{"campaign": {"id": "12"}, "assetGroup": {"id": "700"}, "assetGroupAsset": {"fieldType": "HEADLINE", "status": "ENABLED", "primaryStatus": "ELIGIBLE"},
+                       "asset": {"id": "h1", "type": "TEXT", "textAsset": {"text": "Crowns today"}}}],
+        ads={"RESPONSIVE_DISPLAY_AD": [ad]}, asset_by_id=[{"asset": PICTURE}]))
+    return s.to_dict()
+
+
+DET = detail()
+CAMP_11, CAMP_12, CAMP_14 = (D.campaign_detail(DET, c) for c in ("11", "12", "14"))
+SITELINKS = D.library([DET], "SITELINK", "live")
+
+
+def responses(*extra):
+    return list(extra) + [{"match": CAMP + "1%3A11", "body": CAMP_11}, {"match": CAMP + "1%3A12", "body": CAMP_12}, {"match": CAMP + "1%3A14", "body": CAMP_14},
+                          {"match": LIB + "&kind=SITELINK&state=live", "body": SITELINKS}]
+
+
+def fire(sel, ev, map_=None, **extra):
+    return {"fire": [sel, ev, map_ or {}, extra]}
+
+
+def card(act):
+    return fire("#kpis", "click", {"[data-act]": {"dataset": {"act": act}}})
+
+
+def lib_body(n=3, total=None, state="live", words="Callout %02d"):
+    items = [{"t": "CALLOUT", "x": words % i, "st": "live", "id": "c%d" % i, "fl": ["Callouts"], "nc": 2, "ng": 0, "camps": [{"key": "1:11", "name": "Hudson_Broad"}]} for i in range(n)]
+    return {"kind": "CALLOUT", "state": state, "label": "Callouts", "total": total or n, "assetCount": total or n, "counts": {"all": n, "live": n, "problem": 0, "disapproved": 0, "expired": 0, "paused": 0, "pending": 0}, "assets": items}
+
+
+def html(out, sel):
+    return out["el"].get(sel, {}).get("html", "")
+
+
+def test_the_cards_are_buttons_and_the_ones_about_campaigns_filter_the_list():
+    out = run({})
+    for act in ("all", "high", "low", "disapproved", "expired"):
+        assert 'data-act="%s"' % act in out["#kpis"], act
+    assert out["#kpis"].count('role="button" tabindex="0"') == 6
+    out = run({"steps": [card("low")]})
+    assert 'class="pm-chip on" data-s="low"' in out["#sevs"] and "Display lookalikes" in out["#list"] and "#listCard" in out["log"]["scrolled"]
+    out = run({"steps": [card("all")]})
+    assert 'class="pm-chip on" data-s="all"' in out["#sevs"] and "All campaigns <span class=\"n\">4</span>" in out["#sevs"] and "Complete" in out["#list"] and "Hudson_Broad" in out["#list"]
+    out = run({"steps": [card("all"), card("high")]})
+    assert "Hudson_Broad" in out["#list"] and "Complete" not in out["#list"] and "PMax" not in out["#list"]
+    out = run({"steps": [{"click": ["#kinds", "k", "DISPLAY"]}, {"type": "zzz"}, card("high")]})
+    assert out["el"]["#filter"]["value"] == "" and 'class="pm-chip on" data-k="all"' in out["#kinds"] and "Hudson_Broad" in out["#list"]       # the filters are cleared first
+
+
+def test_a_card_answers_the_keyboard_too():
+    out = run({"steps": [fire("#kpis", "keydown", {"[data-act]": {"dataset": {"act": "low"}}}, key="Enter")]})
+    assert 'class="pm-chip on" data-s="low"' in out["#sevs"] and out["log"]["prevented"] == 1
+    out = run({"steps": [fire("#kpis", "keydown", {"[data-act]": {"dataset": {"act": "low"}}}, key=" ")]})
+    assert 'class="pm-chip on" data-s="low"' in out["#sevs"]
+    out = run({"steps": [fire("#kpis", "keydown", {"[data-act]": {"dataset": {"act": "low"}}}, key="a")]})
+    assert 'class="pm-chip on" data-s="high"' in out["#sevs"] and "prevented" not in out["log"]
+
+
+def test_the_disapproved_card_opens_those_assets_with_who_uses_them():
+    body = D.library([DET], None, "disapproved")
+    out = run({"responses": [{"match": LIB + "&kind=&state=disapproved", "body": body}], "steps": [card("disapproved")]})
+    assert LIB + "&kind=&state=disapproved" in out["calls"]
+    d = out["el"]
+    assert d["#acDrawer"]["hidden"] is False and d["#acdT"]["text"] == "Disapproved assets" and d["#acdS"]["text"] == "1 asset"
+    assert "Gone" in d["#acdBody"]["html"] and "Disapproved by Google" in d["#acdBody"]["html"] and "Used by 1 campaign" in d["#acdBody"]["html"] and 'data-camp="1:11"' in d["#acdBody"]["html"]
+    assert d["#acdExport"]["hidden"] is False and d["#acdMore"]["hidden"] is True and "data-state" not in d["#acdTools"]["html"] and 'id="acdFind"' in d["#acdTools"]["html"]
+    assert "+ac-lock" in out["log"]["classes"] and "#acdClose" in out["log"]["focused"] and "#acFloat" in out["log"]["moved"]
+
+
+def test_the_end_date_card_opens_the_assets_past_it_and_counts_assets_not_links():
+    rep = json.loads(json.dumps(REPORT))
+    rep["summary"].update(expiredAssets=2, expired=9)
+    out = run({"report": lambda u: {"status": 200, "body": rep}, "responses": [{"match": LIB + "&kind=&state=expired", "body": D.library([DET], None, "expired")}], "steps": [card("expired")]})
+    assert ">2<" in out["#kpis"] and "9" not in out["#kpis"].split("Past their end date")[1].split("</div></div>")[0] and "assets ended but still switched on" in out["#kpis"]
+    assert LIB + "&kind=&state=expired" in out["calls"] and out["el"]["#acdT"]["text"] == "Past their end date" and out["el"]["#acdBody"]["html"].count("ac-tile") == 0
+    assert "None." in out["el"]["#acdBody"]["html"]                                                    # none of the fixture's sitelinks is past its date
+    old = json.loads(json.dumps(REPORT))                                                              # a report from before the server counted assets still shows its link count
+    assert ">1<" in run({"report": lambda u: {"status": 200, "body": old}})["#kpis"]
+
+
+def test_a_coverage_bar_opens_every_asset_of_its_kind_with_filters_and_the_campaigns_short_of_it():
+    out = run({"responses": responses(), "steps": [fire("#cov", "click", {"[data-kind]": {"dataset": {"kind": "SITELINK"}}})]})
+    assert LIB + "&kind=SITELINK&state=live" in out["calls"]
+    d = out["el"]
+    assert d["#acdT"]["text"] == "Sitelinks" and "different asset" in d["#acdS"]["text"] and "1 with a problem" in d["#acdS"]["text"]
+    tools = d["#acdTools"]["html"]
+    assert 'data-tab="assets"' in tools and "Campaigns (1 short)" in tools and 'data-state="live"' in tools and 'data-state="problem"' in tools and 'data-state="all"' in tools
+    assert 'role="radio" class="pm-chip on" data-state="live"' in tools and 'role="radio" class="pm-chip on" data-tab="assets"' in tools
+    body = d["#acdBody"]["html"]
+    assert "Book now" in body and "Our team" in body and "Line one" in body and "ac-tgrid" in body and "Gone" not in body                       # live ones only
+
+
+def test_a_kinds_problem_filter_and_campaign_tab_reach_the_server_and_the_report():
+    steps = [fire("#cov", "click", {"[data-kind]": {"dataset": {"kind": "SITELINK"}}}), fire("#acDrawer", "click", {"[data-state]": {"dataset": {"state": "problem"}}})]
+    out = run({"responses": responses({"match": LIB + "&kind=SITELINK&state=problem", "body": D.library([DET], "SITELINK", "problem")}), "steps": steps})
+    assert LIB + "&kind=SITELINK&state=problem" in out["calls"] and "Gone" in html(out, "#acdBody") and "Book now" not in html(out, "#acdBody")
+    steps.append(fire("#acDrawer", "click", {"[data-tab]": {"dataset": {"tab": "campaigns"}}}))
+    out = run({"responses": responses({"match": LIB + "&kind=SITELINK&state=problem", "body": D.library([DET], "SITELINK", "problem")}), "steps": steps})
+    body = html(out, "#acdBody")
+    assert body.index("Hudson_Broad") < body.index("PMax &lt;Spring&gt;") and "None live" in body and "At target" in body and 'data-camp="1:11"' in body
+    assert "0</b> live of 4" in body and "6</b> live of 4" in body                                                      # the report's own counts, campaign by campaign
+    assert 'id="acdFind"' not in html(out, "#acdTools")                                                                 # nothing to search on that tab
+
+
+def test_choosing_a_campaign_in_the_drawer_closes_it_and_opens_that_campaign_in_the_list():
+    steps = [fire("#cov", "click", {"[data-kind]": {"dataset": {"kind": "SITELINK"}}}), fire("#acDrawer", "click", {"[data-tab]": {"dataset": {"tab": "campaigns"}}}),
+             fire("#acDrawer", "click", {"[data-camp]": {"dataset": {"camp": "1:11"}}})]
+    out = run({"responses": responses(), "steps": steps})
+    assert out["el"]["#acDrawer"]["hidden"] is True and "-ac-lock" in out["log"]["classes"]
+    assert out["el"]["#filter"]["value"] == "Hudson_Broad" and 'class="pm-chip on" data-s="all"' in out["#sevs"] and "ac-row open" in out["#list"] and "#listCard" in out["log"]["scrolled"]
+    assert CAMP + "1%3A11" in out["calls"] and "PMax" not in out["#list"]
+    gone = run({"responses": responses(), "steps": [fire("#cov", "click", {"[data-kind]": {"dataset": {"kind": "SITELINK"}}}), fire("#acDrawer", "click", {"[data-camp]": {"dataset": {"camp": "1:99"}}})]})
+    assert "not in this report any more" in gone["#msg"] and gone["el"]["#acDrawer"]["hidden"] is True
+
+
+def test_an_account_wide_row_opens_only_what_is_linked_to_the_account():
+    assert 'class="ac-ar" data-kind="CALLOUT"' in run({})["#acctAssets"] and 'role="button"' in run({})["#acctAssets"]
+    out = run({"responses": [{"match": LIB + "&kind=CALLOUT&state=live&level=account", "body": lib_body(2)}], "steps": [fire("#acctAssets", "click", {".ac-ar": {"dataset": {"kind": "CALLOUT"}}})]})
+    assert LIB + "&kind=CALLOUT&state=live&level=account" in out["calls"] and out["el"]["#acdT"]["text"] == "Callouts linked to the account" and html(out, "#acdBody").count("<article") == 2
+    out = run({"responses": [{"match": LIB + "&kind=CALLOUT&state=live&level=account", "body": lib_body(1)}], "steps": [fire("#acctAssets", "keydown", {".ac-ar": {"dataset": {"kind": "CALLOUT"}}}, key="Enter")]})
+    assert out["el"]["#acDrawer"]["hidden"] is False and out["log"]["prevented"] == 1
+
+
+def test_a_drawer_shows_the_first_cards_then_more_and_says_when_the_server_cut_it_short():
+    steps = [fire("#cov", "click", {"[data-kind]": {"dataset": {"kind": "SITELINK"}}})]
+    big = {"match": LIB + "&kind=SITELINK&state=live", "body": dict(lib_body(30), total=500)}
+    out = run({"responses": [big] + responses(), "steps": steps})
+    body = html(out, "#acdBody")
+    assert body.count("<article") == 24 and "Showing the first 30 of 500" in body and out["el"]["#acdMore"]["hidden"] is False and "Show more (6 left)" in out["el"]["#acdMore"]["text"]
+    out = run({"responses": [big] + responses(), "steps": steps + [{"button": "#acdMore"}]})
+    assert html(out, "#acdBody").count("<article") == 30 and out["el"]["#acdMore"]["hidden"] is True
+    small = run({"responses": responses(), "steps": steps})
+    assert "Showing the first" not in html(small, "#acdBody") and small["el"]["#acdMore"]["hidden"] is True
+
+
+def test_the_find_box_narrows_the_cards_by_what_they_say_and_who_uses_them():
+    steps = [fire("#cov", "click", {"[data-kind]": {"dataset": {"kind": "SITELINK"}}}), fire("#acDrawer", "input", {"self": {"id": "acdFind", "value": "callout 05"}})]
+    out = run({"responses": [{"match": LIB + "&kind=SITELINK&state=live", "body": lib_body(30)}] + responses(), "steps": steps})
+    assert html(out, "#acdBody").count("<article") == 1 and "Callout 05" in html(out, "#acdBody")
+    steps[-1] = fire("#acDrawer", "input", {"self": {"id": "acdFind", "value": "hudson"}})
+    out = run({"responses": [{"match": LIB + "&kind=SITELINK&state=live", "body": lib_body(30)}] + responses(), "steps": steps})
+    assert html(out, "#acdBody").count("<article") == 24                                                           # matched on the campaign it names
+    steps[-1] = fire("#acDrawer", "input", {"self": {"id": "acdFind", "value": "zzz"}})
+    assert "Nothing matches." in html(run({"responses": [{"match": LIB + "&kind=SITELINK&state=live", "body": lib_body(30)}] + responses(), "steps": steps}), "#acdBody")
+    steps[-1] = fire("#acDrawer", "input", {"self": {"id": "somethingelse", "value": "zzz"}})
+    assert html(run({"responses": responses(), "steps": steps}), "#acdBody").count("<article") == 2                 # another input is not ours
+
+
+def test_a_drawer_that_cannot_load_says_so_and_can_be_tried_again():
+    steps = [fire("#cov", "click", {"[data-kind]": {"dataset": {"kind": "SITELINK"}}})]
+    out = run({"responses": [{"match": LIB, "status": 502, "body": {"error": "Google Ads did not answer."}}], "steps": steps})
+    assert "Google Ads did not answer." in html(out, "#acdBody") and 'data-reload="1"' in html(out, "#acdBody")
+    out = run({"responses": [{"match": LIB, "status": 502, "body": {"error": "Google Ads did not answer."}}], "steps": steps + [fire("#acDrawer", "click", {"[data-reload]": {}})]})
+    assert sum(LIB in c for c in out["calls"]) == 2
+    out = run({"reject": "/api/assets/library", "steps": steps})
+    assert "The server could not be reached." in html(out, "#acdBody")
+    out = run({"responses": [{"match": LIB, "status": 500, "body": {}}], "steps": steps})
+    assert "(HTTP 500)" in html(out, "#acdBody")
+    out = run({"responses": [{"match": LIB + "&kind=SITELINK", "body": lib_body(0)}], "steps": steps})
+    assert "No assets of this kind in this view." in html(out, "#acdBody") and out["el"]["#acdExport"]["hidden"] is True
+    out = run({"responses": [{"match": LIB, "body": {"unexpected": True}}], "steps": steps})                          # a good status with the wrong body is an error, not a crash
+    assert "does not understand" in html(out, "#acdBody") and 'data-reload="1"' in html(out, "#acdBody")
+
+
+def test_the_drawer_can_be_closed_and_escape_closes_a_picture_before_the_drawer():
+    steps = [card("disapproved")]
+    body = {"match": LIB + "&kind=&state=disapproved", "body": D.library([DET], None, "disapproved")}
+    out = run({"responses": [body], "steps": steps + [fire("#acDrawer", "click", {"[data-close]": {}})]})
+    assert out["el"]["#acDrawer"]["hidden"] is True and "-ac-lock" in out["log"]["classes"] and "opener" in out["log"]["focused"]
+    out = run({"responses": [body], "steps": steps + [fire("document", "keydown", key="Escape")]})
+    assert out["el"]["#acDrawer"]["hidden"] is True
+    out = run({"responses": [body], "steps": [fire("document", "keydown", key="Escape")]})
+    assert out["el"]["#acDrawer"]["hidden"] is True and out["el"]["#acZoom"]["hidden"] is True and "-ac-lock" not in out["log"]["classes"]      # nothing open: nothing happens
+    zoom = fire("document", "click", {"[data-zoom]": {"dataset": {"zoom": GOOGLE_IMG, "cap": "Hero.png"}}})
+    out = run({"responses": [body], "steps": steps + [zoom]})
+    assert out["el"]["#acZoom"]["hidden"] is False and out["el"]["#acZimg"]["src"] == GOOGLE_IMG and out["el"]["#acZcap"]["text"] == "Hero.png" and out["log"]["prevented"] == 1
+    out = run({"responses": [body], "steps": steps + [zoom, fire("document", "keydown", key="Escape")]})
+    assert out["el"]["#acZoom"]["hidden"] is True and out["el"]["#acDrawer"]["hidden"] is False and out["el"]["#acZimg"]["src"] == ""        # the picture first
+    out = run({"responses": [body], "steps": steps + [zoom, fire("#acZoom", "click", {}), ]})
+    assert out["el"]["#acZoom"]["hidden"] is True
+    out = run({"responses": [body], "steps": steps + [fire("document", "click", {"[data-zoom]": {"dataset": {"zoom": "https://evil.example.com/x.png", "cap": "x"}}})]})
+    assert out["el"].get("#acZoom", {}).get("hidden") is not False and out["el"].get("#acZimg", {}).get("src", "") == ""                       # a foreign picture is never opened
+
+
+def test_the_drawers_assets_can_be_downloaded_as_they_are_filtered():
+    steps = [fire("#cov", "click", {"[data-kind]": {"dataset": {"kind": "SITELINK"}}}), {"button": "#acdExport"}]
+    out = run({"responses": responses(), "steps": steps})
+    lines = out["csv"].lstrip("﻿").split("\r\n")
+    assert lines[0] == "Account,Kind,Text or name,Lines,Link,Picture,State,Why,Used by campaigns,Asset groups,Impressions (30 days),Clicks"
+    assert len(lines) == 3 and lines[1].startswith("Acme Dental,Sitelinks,Book now,Line one,https://x.com/1,,live,,1,0,") and out["download"]["name"] == "assets-SITELINK-Acme-Dental-2026-10-16.csv"
+    narrowed = run({"responses": responses(), "steps": steps[:1] + [fire("#acDrawer", "input", {"self": {"id": "acdFind", "value": "our team"}}), steps[1]]})
+    assert len(narrowed["csv"].lstrip("﻿").split("\r\n")) == 2
+    commas = D.library([DET], "SITELINK", "live")
+    commas["assets"][0]["x"] = 'Book, "now"'
+    quoted = run({"responses": [{"match": LIB + "&kind=SITELINK&state=live", "body": commas}] + responses(), "steps": steps})
+    assert '"Book, ""now"""' in quoted["csv"]
+
+
+def test_words_from_google_are_escaped_in_the_drawer_and_the_campaign_detail():
+    evil = "<img src=x onerror=alert(1)>"
+    bad = D.library([DET], "SITELINK", "live")
+    bad["assets"][0].update(x=evil, camps=[{"key": "1:11", "name": evil}], account=evil)
+    out = run({"responses": [{"match": LIB + "&kind=SITELINK&state=live", "body": bad}], "steps": [fire("#cov", "click", {"[data-kind]": {"dataset": {"kind": "SITELINK"}}})]})
+    assert "<img src=x" not in html(out, "#acdBody") and "&lt;img src=x" in html(out, "#acdBody")
+    sec = json.loads(json.dumps(CAMP_11))
+    sec["sections"][0]["tiles"][0]["x"] = evil
+    sec["sections"][0]["label"] = evil
+    out = run({"responses": [{"match": CAMP + "1%3A11", "body": sec}], "steps": [{"open": "1:11"}]})
+    assert "<img src=x" not in out["#list"]
+
+
+def test_opening_a_campaign_asks_for_its_assets_once_and_says_so_while_it_waits():
+    out = run({"hang": "/api/assets/campaign", "steps": [{"open": "1:11"}]})
+    assert "Loading what is linked…" in out["#list"] and out["calls"].count(CAMP + "1%3A11") == 1
+    out = run({"responses": responses(), "steps": [{"open": "1:11"}, {"open": "1:11"}, {"open": "1:11"}]})
+    assert out["calls"].count(CAMP + "1%3A11") == 1 and "Loading" not in out["#list"]                          # closed and opened again: not asked again
+    out = run({"responses": responses(), "steps": [{"open": "1:11"}]})
+    assert "ac-row open" in out["#list"] and "Loading" not in out["#list"]
+
+
+def test_each_kind_of_asset_shows_what_is_linked_and_opens_onto_the_assets_themselves():
+    out = run({"responses": responses(), "steps": [{"open": "1:11"}]})
+    h = out["#list"]
+    assert h.count("ac-pvb") >= 3 and "Book now" in h and "Our team" in h and 'class="ac-chip live img"' in h and "Open late" in h
+    assert 'aria-expanded="false"' in h and "Show all 3" in h and "ac-tgrid" not in h and "Gone" in h
+    out = run({"responses": responses(), "steps": [{"open": "1:11"}, fire("#list", "click", {".ac-pvb": {"dataset": {"kid": "c:1:11|SITELINK"}}})]})
+    h = out["#list"]
+    assert "ac-tgrid" in h and "Line one" in h and 'href="https://x.com/1"' in h and "Hide" in h and "Disapproved by Google" in h
+    assert h.count("ac-tile ") == 3
+    out = run({"responses": responses(), "steps": [{"open": "1:11"}, fire("#list", "click", {".ac-pvb": {"dataset": {"kid": "c:1:11|AD_IMAGE"}}})]})
+    assert 'src="%s"' % GOOGLE_IMG in out["#list"] and 'data-zoom="%s"' % GOOGLE_IMG in out["#list"] and "896 × 640 px" in out["#list"]
+    kid = {".ac-pvb": {"dataset": {"kid": "c:1:11|SITELINK"}}}
+    out = run({"responses": responses(), "steps": [{"open": "1:11"}, fire("#list", "click", kid), fire("#list", "click", kid)]})
+    assert "ac-tgrid" not in out["#list"]                                                                          # open, then shut
+    other = {".ac-pvb": {"dataset": {"kid": "c:1:11|CALLOUT"}}}
+    out = run({"responses": responses(), "steps": [{"open": "1:11"}, fire("#list", "click", kid), fire("#list", "click", other)]})
+    assert out["#list"].count("ac-tgrid") == 2                                                                       # opening one leaves the other open
+
+
+def test_an_asset_the_audit_does_not_judge_is_listed_after_the_judged_ones_marked_as_such():
+    rep = json.loads(json.dumps(REPORT))
+    det = json.loads(json.dumps(CAMP_11))
+    det["sections"].append({"key": "LANDSCAPE_LOGO", "label": "Landscape logo", "level": "campaign", "live": 1, "tiles": [dict(D.content(PICTURE), st="live", lv="campaign", id="ll")]})
+    out = run({"report": lambda u: {"status": 200, "body": rep}, "responses": [{"match": CAMP + "1%3A11", "body": det}], "steps": [{"open": "1:11"}]})
+    assert "Landscape logo" in out["#list"] and "not judged" in out["#list"]
+
+
+def test_a_performance_max_groups_and_a_display_ads_assets_open_too():
+    head = {".ac-pvb": {"dataset": {"kid": "g:1:12:700|HEADLINE"}}}
+    opened = fire("#list", "toggle", {"self": {"dataset": {"d": "g:1:12:700"}, "open": True}})
+    steps = [{"click": ["#sevs", "s", "medium"]}, {"open": "1:12"}, opened, fire("#list", "click", head)]
+    out = run({"responses": responses(), "steps": steps})
+    h = out["#list"]
+    assert 'data-d="g:1:12:700" open' in h and "Crowns" in h                                                         # a group left open stays open when the list is drawn again
+    assert "Crowns today" in h and "12 characters" in h
+    shut = fire("#list", "toggle", {"self": {"dataset": {"d": "g:1:12:700"}, "open": False}})
+    out = run({"responses": responses(), "steps": steps[:3] + [shut, fire("#list", "click", head)]})
+    assert 'data-d="g:1:12:700" open' not in out["#list"] and 'data-d="g:1:12:700"' in out["#list"]
+    steps = [{"click": ["#sevs", "s", "low"]}, {"open": "1:14"}, fire("#list", "click", {".ac-pvb": {"dataset": {"kid": "a:1:14:9|HEADLINE"}}})]
+    out = run({"responses": responses(), "steps": steps})
+    assert "Hello" in out["#list"] and "Level 1" in out["#list"]
+    unknown = run({"responses": responses(), "steps": [{"click": ["#sevs", "s", "medium"]}, {"open": "1:12"}, fire("#list", "toggle", {"self": {"dataset": {}, "open": True}})]})
+    assert "Crowns" in unknown["#list"]                                                                              # a toggle that is not ours is ignored
+
+
+def test_a_campaign_whose_assets_cannot_be_read_says_why_and_can_be_asked_again():
+    err = {"match": "/api/assets/campaign", "status": 400, "body": {"error": "That campaign is not live in this account any more."}}
+    out = run({"responses": [err], "steps": [{"open": "1:11"}]})
+    assert "That campaign is not live in this account any more." in out["#list"] and 'data-retry="1"' in out["#list"] and "What to add" in out["#list"]       # the gaps still show
+    retry = fire("#list", "click", {"[data-retry]": {}, ".ac-row": {"dataset": {"key": "1:11"}}})
+    out = run({"responses": [err], "steps": [{"open": "1:11"}, retry]})
+    assert out["calls"].count(CAMP + "1%3A11") == 2
+    out = run({"responses": [{"match": "/api/assets/campaign", "status": 500, "body": {}}], "steps": [{"open": "1:11"}]})
+    assert "(HTTP 500)" in out["#list"]
+    out = run({"reject": "/api/assets/campaign", "steps": [{"open": "1:11"}]})
+    assert "The server could not be reached." in out["#list"]
+    assert "ac-row open" in out["#list"]
+
+
+def test_a_fresh_report_forgets_what_was_open_and_closes_the_drawer():
+    out = run({"responses": responses(), "steps": [{"open": "1:11"}, card("disapproved"), {"button": "#refreshBtn"}, {"open": "1:11"}]})
+    assert out["el"]["#acDrawer"]["hidden"] is True and out["calls"].count(CAMP + "1%3A11") == 2
+
+
+def test_the_scripts_are_loaded_in_the_right_order_and_the_page_has_its_drawer():
+    html_ = open(TEMPLATE, encoding="utf-8").read()
+    assert html_.index("asset_tiles.js") < html_.index("asset_coverage.js")
+    assert 'id="acFloat"' in html_ and html_.index('id="acFloat"') < html_.index('id="acDrawer"') < html_.index('id="acZoom"')
+    assert 'role="dialog"' in html_ and 'aria-modal="true"' in html_ and 'aria-labelledby="acdT"' in html_
+
+
+def test_a_slow_answer_that_arrives_after_a_fresh_report_is_thrown_away():
+    out = run({"responses": responses(), "hold": "/api/assets/campaign", "steps": [{"open": "1:11"}, {"button": "#refreshBtn"}, {"release": True}, {"open": "1:11"}]})
+    assert out["calls"].count(CAMP + "1%3A11") == 2 and "Loading" not in out["#list"] and "Book now" in out["#list"]       # the old answer did not stand in for the new read
+
+
+def test_a_second_click_while_the_assets_are_loading_does_not_ask_again():
+    out = run({"hang": "/api/assets/campaign", "steps": [{"open": "1:11"}, {"open": "1:11"}, {"open": "1:11"}]})
+    assert out["calls"].count(CAMP + "1%3A11") == 1
+
+
+def test_the_assets_drawer_counts_assets_and_how_many_of_them_are_different():
+    body = lib_body(2, state="expired")
+    body.update(total=2, assetCount=5)
+    out = run({"responses": [{"match": LIB + "&kind=&state=expired", "body": body}], "steps": [card("expired")]})
+    assert out["el"]["#acdS"]["text"] == "5 assets, 2 different"
+    body.update(total=2, assetCount=2)
+    out = run({"responses": [{"match": LIB + "&kind=&state=expired", "body": body}], "steps": [card("expired")]})
+    assert out["el"]["#acdS"]["text"] == "2 assets"
+    body.update(total=1, assetCount=1)
+    assert run({"responses": [{"match": LIB + "&kind=&state=expired", "body": body}], "steps": [card("expired")]})["el"]["#acdS"]["text"] == "1 asset"

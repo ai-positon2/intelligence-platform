@@ -64,14 +64,14 @@ def many(cid, field, count, prefix=None, **kw):
 
 
 def searcher(campaigns=None, metrics=None, shown=None, campaign_assets=None, customer_assets=None, ad_group_assets=None, groups=None,
-             group_assets=None, campaign_sets=None, customer_sets=None, ads=None, log=None, fail=()):
+             group_assets=None, campaign_sets=None, customer_sets=None, ads=None, asset_by_id=None, log=None, fail=()):
     """A search function that answers by which query it is asked; `fail` names parts that raise a Google error."""
     ads = ads or {}
 
     def search(cid, q):
         if log is not None:
             log.append((cid, q))
-        part = ("campaign_asset_set" if "FROM campaign_asset_set" in q else "customer_asset_set" if "FROM customer_asset_set" in q else
+        part = ("asset_by_id" if "FROM asset WHERE asset.id IN" in q else "campaign_asset_set" if "FROM campaign_asset_set" in q else "customer_asset_set" if "FROM customer_asset_set" in q else
                 "shown" if "metrics.impressions > 0" in q else "campaign_asset" if "FROM campaign_asset " in q else
                 "customer_asset" if "FROM customer_asset " in q else "ad_group_asset" if "FROM ad_group_asset" in q else
                 "asset_group_asset" if "FROM asset_group_asset" in q else "asset_group" if "FROM asset_group " in q else
@@ -83,7 +83,7 @@ def searcher(campaigns=None, metrics=None, shown=None, campaign_assets=None, cus
             return ads.get(next(t for t in ("RESPONSIVE_DISPLAY_AD", "DEMAND_GEN_MULTI_ASSET_AD", "DEMAND_GEN_VIDEO_RESPONSIVE_AD") if t in q), [])
         return {"campaign": campaigns, "metrics": metrics, "shown": shown, "campaign_asset": campaign_assets, "customer_asset": customer_assets,
                 "ad_group_asset": ad_group_assets, "asset_group": groups, "asset_group_asset": group_assets, "campaign_asset_set": campaign_sets,
-                "customer_asset_set": customer_sets}[part] or []
+                "customer_asset_set": customer_sets, "asset_by_id": asset_by_id}[part] or []
     return search
 
 
@@ -179,7 +179,8 @@ def test_a_bucket_counts_states_names_the_problem_assets_and_finds_the_ones_neve
              {"f": "SITELINK", "st": "ENABLED", "ps": "ELIGIBLE", "rs": [], "a": "5", "l": "Old offer", "e": "2026-05-31"}]
     b = a.bucket(links, TODAY, shown={("9", "1")}, scope="9")
     assert (b["live"], b["disapproved"], b["paused"], b["expired"], b["notShown"]) == (2, 1, 1, 1, 1)
-    assert b["bad"] == [{"label": "Bad", "state": "disapproved"}, {"label": "Old offer", "state": "expired"}] and b["ids"] == ["3", "5"]
+    assert b["bad"] == [{"label": "Bad", "state": "disapproved"}, {"label": "Old offer", "state": "expired"}]
+    assert b["ids"] == ["3"] and b["expiredIds"] == ["5"]                              # a disapproved asset and one past its end date are named apart
     assert a.bucket(links, TODAY, shown=None)["notShown"] == 0                           # shown could not be read: nothing is called unshown
     assert a.bucket([dict(links[0], f="BUSINESS_NAME")], TODAY, shown=set(), scope="9")["notShown"] == 0     # not a kind Google reports shows for
 
@@ -518,8 +519,10 @@ def cache(monkeypatch):
     saved = {}
     monkeypatch.setattr(paid_store, "get_gads_cache", lambda key, ttl: saved.get(key))
     monkeypatch.setattr(paid_store, "put_gads_cache", lambda key, value: saved.update({key: value}))
+    from tracker import paid_assets_detail
     from tracker import paid_geo
     paid_geo.clear_cache()
+    paid_assets_detail.mem_clear()
     base.reset_state()
     base.forget("")
     yield saved
@@ -634,7 +637,8 @@ def test_the_agent_is_on_the_hub_and_in_the_command_palette():
 
 
 def test_there_is_no_em_dash_in_any_of_it():
-    for p in ("tracker/paid_assets.py", "tracker/paid_assets_rules.py", "static/js/asset_coverage.js", "static/css/asset_coverage.css", "templates/asset_coverage.html"):
+    for p in ("tracker/paid_assets.py", "tracker/paid_assets_rules.py", "tracker/paid_assets_detail.py", "static/js/asset_coverage.js", "static/js/asset_tiles.js",
+              "static/css/asset_coverage.css", "templates/asset_coverage.html"):
         assert "—" not in open(os.path.join(ROOT, p), encoding="utf-8").read(), p
 
 
