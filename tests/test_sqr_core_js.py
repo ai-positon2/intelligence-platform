@@ -444,7 +444,7 @@ BB_VERDICTS = [
     ("insulin pump for 4 year old", "Not Relevant", "Under minimum age (6+)"), ("gestational diabetes insulin", "Not Relevant", "Not indicated (gestational)"),
     ("bionic arm cost", "Not Relevant", "Bionic prosthetics"), ("openaps loop", "Not Relevant", "DIY looping"), ("dog insulin pump", "Not Relevant", "Veterinary/Non-human"),
     ("used insulin pump", "Not Relevant", "Used/Resale"), ("insulin pump ebay", "Not Relevant", "Used/Resale"), ("insulin pump course", "Not Relevant", "Education/Training"),
-    ("what is an insulin pump", "Not Relevant", "Informational/Research"), ("insulin pump nurse jobs", "Not Relevant", "Jobs/Recruitment"),
+    ("what is an insulin pump", "Not Relevant", "Informational/Research"), ("what is the best insulin pump on the market", None, None),   # comparison shopping: no longer an informational verdict, the model reads it, ("what is the newest insulin pump", None, None), ("what is the cost of an insulin pump", None, None), ("insulin pump nurse jobs", "Not Relevant", "Jobs/Recruitment"),
     # "used for" is a question, "in stock" is a shop, "apply" in a coverage search is not a job (departure from the skill, named in the note)
     ("what is an insulin pump used for", "Not Relevant", "Informational/Research"), ("insulin pump in stock", "Relevant", "Core product intent"),
     ("how to apply for insulin pump coverage", None, None), ("apply insulin pump job", "Not Relevant", "Jobs/Recruitment"),
@@ -550,3 +550,54 @@ def test_every_ruleset_has_a_label_and_a_note_and_automatic_comes_first():
     out = js("return Object.values(C.RULESETS).map(r => [r.id, !!r.label, r.note.length > 80, typeof r.classifyDeterministic]);")
     assert [o[0] for o in out][0] == "generic" and len(out) == 7
     assert all(o[1] and o[2] and o[3] == "function" for o in out)
+
+
+# ── The account's own brand, as it says it itself ───────────────────────────
+
+def test_a_keyword_of_a_brand_campaign_makes_its_searches_brand_searches():
+    out = js("""
+      const kw = [{text: "acme widgets", campaign: "P2_Acme_Brand_E"}, {text: "acme", campaign: "P2_Acme_Brand_P"}, {text: "blue widgets", campaign: "P2_NonBrand_Widgets"},
+                  {text: "rival widgets", campaign: "P2_Competitor_Brand"}, {text: "bid on me", campaign: "P2_NonBrand_X"}];
+      const rows = ["acme widgets near me", "acme", "acme near me", "acme widgets careers", "acme widgets partners", "blue widgets near me", "rival widgets near me", "bid on me", "acme widgets reviews"].map(t => R(t, {clicks: 1, cost: 2}));
+      const r = await C.analyze({id: "t", label: "T", note: "", classifyDeterministic: () => null}, rows, {keywords: kw, classify: model({})});
+      return r.rows.map(x => [x.term, x._det.status, x._det.by, x._det.subtype]);""")
+    by = {t: (s, b, sub) for t, s, b, sub in out}
+    assert by["acme widgets near me"] == ("Relevant", "rule", "Brand (a keyword of the account's Brand campaign)")
+    assert by["acme"] == ("Relevant", "rule", "A keyword the account bids on")              # a one-word brand keyword is trusted only as the whole search
+    assert by["acme near me"][1] == "model"
+    assert by["acme widgets careers"][1] == "model" and by["acme widgets partners"][1] == "model" and by["acme widgets reviews"][1] == "model"
+    assert by["blue widgets near me"][1] == "model" and by["rival widgets near me"][1] == "model"      # a non-brand or competitor campaign's keyword is not the brand
+    assert by["bid on me"] == ("Relevant", "rule", "A keyword the account bids on")
+
+
+def test_a_rule_still_beats_the_brand_keywords_and_the_account_name_counts_when_it_is_more_than_one_word():
+    out = js("""
+      const rs = {id: "t", label: "T", note: "", classifyDeterministic: t => /jobs/.test(t) ? {status: "Not Relevant", subtype: "Jobs"} : null};
+      const kw = [{text: "great hill dental", campaign: "Boston_Brand"}];
+      const rows = ["great hill dental jobs", "great hill chelmsford", "great hill partners", "heartland dental"].map(t => R(t, {clicks: 1, cost: 2}));
+      const named = await C.analyze(rs, rows, {keywords: kw, accountName: "Great Hill Dental", classify: model({})});
+      const single = await C.analyze(rs, [R("heartland dental", {clicks: 1, cost: 2}), R("heartland imaging", {clicks: 1, cost: 2})], {accountName: "Heartland", classify: model({})});
+      return {named: named.rows.map(x => [x.term, x._det.status, x._det.by, x._det.subtype]), single: single.rows.map(x => [x.term, x._det.by])};""")
+    by = {t: (s, b, sub) for t, s, b, sub in out["named"]}
+    assert by["great hill dental jobs"][0] == "Not Relevant" and by["great hill dental jobs"][2] == "Jobs"
+    assert by["great hill chelmsford"] == ("Relevant", "rule", "Brand (the account's name)")
+    assert by["great hill partners"][1] == "model" and by["heartland dental"][1] == "model"      # a firm, and another business
+    assert out["single"] == [["heartland dental", "model"], ["heartland imaging", "model"]]       # "Heartland" is also other businesses' name
+
+
+def test_keywords_are_ranked_by_tier_then_conversions_then_click_rate_as_the_written_logic_says():
+    out = js("""
+      const rows = [R("a many clicks", {clicks: 40, impressions: 400, cost: 20, conversions: 2}), R("b high rate", {clicks: 9, impressions: 20, cost: 9, conversions: 2}),
+                    R("c one conversion", {clicks: 2, impressions: 100, cost: 3, conversions: 1}), R("d tier two", {clicks: 30, impressions: 300, cost: 10}), R("e tier two better rate", {clicks: 5, impressions: 20, cost: 4})];
+      const r = await C.analyze({id: "t", label: "T", note: "", classifyDeterministic: () => ({status: "Relevant", subtype: "x"})}, rows, {});
+      return r.allKeywords.map(k => [k.term, k.tier]);""")
+    assert out == [["b high rate", 1], ["a many clicks", 1], ["c one conversion", 1], ["e tier two better rate", 2], ["d tier two", 2]]
+
+
+def test_a_search_a_rulebook_would_send_to_the_model_stays_with_the_model_even_with_a_brand_keyword_in_it():
+    out = js("""
+      const rs = {id: "t", label: "T", note: "", modelHint: /\\bcheap\\b/i, classifyDeterministic: () => null};
+      const kw = [{text: "acme widgets", campaign: "P2_Acme_Brand_E"}];
+      const r = await C.analyze(rs, [R("acme widgets cheap", {clicks: 1, cost: 2}), R("acme widgets store", {clicks: 1, cost: 2})], {keywords: kw, classify: model({})});
+      return r.rows.map(x => [x.term, x._det.by]);""")
+    assert out == [["acme widgets cheap", "model"], ["acme widgets store", "rule"]]

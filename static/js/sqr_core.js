@@ -186,6 +186,8 @@ function isAddress(t){
   return !MEASURE_RE.test(m[0]);
 }
 
+// A Performance Max campaign is targeted by radius, not by the city in its name, so a place named in a search is not a mismatch there.
+function radiusTargeted(row){ return !!row && (/pmax|performance[\s_]?max/i.test(row.campaignType || "") || /pmax|performance[\s_-]?max/i.test(row.campaign || "")); }
 function normSlug(campaign){
   return String(campaign || "").toLowerCase().replace(/[^a-z0-9]/g, "");
 }
@@ -229,9 +231,9 @@ const RICCOBENE = {
   spanishDentalRe: /(dentista|dolor de muela|limpieza dental|ortodoncia|frenillos|implante dental|clinica dental)/i,
   spanishPriceRe: /(no tengo dinero|sin dinero)/i,
   territoryMap: { apex:["Apex"], benson:["Benson","Garner","Goldsboro","Selma"], carywest:["Cary","Apex"], columbia:["Columbia"], concord:["Concord","Harrisburg","Kannapolis"], fortmill:["Fort Mill","Rock Hill"], hampstead:["Hampstead","Wilmington","Porters Neck"], harrisburg:["Harrisburg","Concord"], highpoint:["High Point","Greensboro"], independence:["Independence","Charlotte","Matthews"], knightdale:["Knightdale"], monkeyjunction:["Monkey Junction","Wilmington","Hampstead","Porters Neck"], myrtle:["Myrtle Beach","Myrtle"], portersneck:["Porters Neck","Wilmington","Hampstead"], rockhill:["Rock Hill","Fort Mill"], sixforks:["Six Forks","Raleigh"], southport:["Southport"], university:["University City","Charlotte"], winstonsalem:["Winston-Salem","Clemmons"], mechanicsville:["Mechanicsville","Ashland"] },
-  coreSignal: ["dental","tooth","teeth","oral","gum","tmj","tmd","invisalign","braces","implant","veneer","crown","bridge","denture","whitening","extraction","root canal","endodonti","periodonti","prosthodonti","sedation","cosmetic","pediatric","kids dent","family dent","emergency dent","urgent dent","sleep apnea","cleaning","checkup","appt","appointment","dentis"],
+  coreSignal: ["dental","tooth","teeth","oral","gum","tmj","tmd","invisalign","braces","implant","veneer","crown","bridge","denture","whitening","extraction","root canal","endodonti","periodonti","prosthodonti","sedation","cosmetic","pediatric","kids dent","family dent","emergency dent","urgent dent","sleep apnea","cleaning","checkup","appt","appointment","dentis","orthodont"],
 
-  classifyDeterministic(term, campaignSlug){
+  classifyDeterministic(term, campaignSlug, row){
     const t = term.trim(); if (!t) return null;
     if (this.brandRe.test(t)) return { status: "Relevant", subtype: "Brand" };
     if (this.falsePositiveGuard.some(re => re.test(t))) { /* fall through, never Competitor */ }
@@ -250,7 +252,7 @@ const RICCOBENE = {
     if (this.selmaRe.test(t)) return { status: "Client Review", subtype: "Potential New Service Area (Selma NC)" };
     if (this.spanishDentalRe.test(t)) return { status: "Client Review", subtype: "Bilingual – Confirm Staffing" };
     if (has(this, "outOfArea", t)) return { status: "Not Relevant", subtype: "Out-of-Area Location", negMatchType: "Phrase", negLevel: "Campaign" };
-    const mismatch = campaignServesCity(campaignSlug, this.territoryMap, t, this.ambiguousCities);
+    const mismatch = radiusTargeted(row) ? null : campaignServesCity(campaignSlug, this.territoryMap, t, this.ambiguousCities);
     if (mismatch === false) return { status: "Not Relevant", subtype: "Location Mismatch" };
     if (core(this, t)) return { status: "Relevant", subtype: "Core dental intent" };
     return null; // needs the model
@@ -261,18 +263,20 @@ const RICCOBENE = {
 // OIA ruleset
 // =====================================================================
 const OIA_FACILITIES = [
+  // The official names are the start, not the end: real searches say "fort jesse imaging", "nebraska imaging", "cardinal imaging", "idi fort walton",
+  // "odc huntsville", "uva imaging culpeper", and they are the facility's best-converting searches.
   { code:"AMI", re:/\b(advanced medical imaging)\b/i, market:"kokomo|indiana" },
-  { code:"Heartland", re:/heartland imaging|hartland imaging/i },
-  { code:"NHI", re:/nebraska health imaging|nebreska health imaging/i },
-  { code:"OIC-Culpeper", re:/outpatient imaging culpeper/i },
-  { code:"ODC-AL", re:/outpatient diagnostic center/i },
-  { code:"CPIC", re:/cardinal points? imaging|raleigh radiology|raleighrad/i },
-  { code:"IDL-FL", re:/institute of diagnostic imaging/i },
-  { code:"SMI", re:/spectrum medical imaging|platte valley medical/i },
-  { code:"Holmdel-NJ", re:/holmdel imaging/i },
-  { code:"Ft Jesse", re:/ft\.? jesse imaging|gale keeran/i },
-  { code:"UD", re:/university diagnostics/i },
-  { code:"Wolf River", re:/imaging center at wolf river|wolf river imaging/i },
+  { code:"Heartland", re:/heartland imaging|hartland imaging|heartland (diagnostics?|radiology|medical imaging)/i },
+  { code:"NHI", re:/nebraska (health |medical )?imaging|nebreska health imaging|\bnhi\b/i },
+  { code:"OIC-Culpeper", re:/outpatient imaging culpeper|culpeper (outpatient )?imaging|uva (outpatient )?imaging culpeper|uva culpeper|culpeper uva/i },
+  { code:"ODC-AL", re:/outpatient diagnostics?( center)?|\bodc\b/i },
+  { code:"CPIC", re:/cardinal points?( imaging)?|cardinal imaging|raleigh radiology|raleighrad|\bcpic\b/i },
+  { code:"IDL-FL", re:/institute of diagnostic imaging|\bidi\b/i },
+  { code:"SMI", re:/spectrum (medical )?imaging|platte valley medical/i },
+  { code:"Holmdel-NJ", re:/holmdel (medical )?imaging/i },
+  { code:"Ft Jesse", re:/\b(ft|fort|fr)\.? jesse( imaging)?|gale keeran/i },
+  { code:"UD", re:/university diagnostics?/i },
+  { code:"Wolf River", re:/(imaging|radiology) (center )?(at )?wolf river|wolf river (imaging|radiology)/i },
 ];
 const OIA = {
   id: "oia", label: "Outpatient Imaging Affiliates (OIA)",
@@ -293,7 +297,7 @@ const OIA = {
   territoryMap: { ami:["Kokomo"], heartland:["Louisville","Elizabethtown"], nhi:["Omaha"], culpeper:["Culpeper"], odcal:["Huntsville","Madison","Athens","Decatur"], cpic:["Raleigh","Cary","Wake Forest","Clayton"], idl:["Fort Walton Beach"], smi:["Brighton","Denver"], holmdel:["Holmdel"], ftjesse:["Normal","Bloomington"], ud:["Knoxville","Halls","Northshore"], wolfriver:["Germantown","Memphis"] },
   coreSignal: ["mri","open mri","ct scan","cat scan","mammogram","mammography","3d mammogram","ultrasound","sonogram","x-ray","xray","bone density","dexa scan","women's imaging","fluoroscopy","pet scan","pet/ct","nuclear medicine","arthrogram","biopsy","radiology","diagnostic imaging","imaging center","schedule a scan","mri appointment"],
 
-  classifyDeterministic(term, campaignSlug){
+  classifyDeterministic(term, campaignSlug, row){
     const t = term.trim(); if (!t) return null;
     if (this.jobsRe.test(t)) return { status: "Not Relevant", subtype: "Jobs/Recruitment", negMatchType: "Phrase", negLevel: "Account" };
     if (this.eduRe.test(t)) return { status: "Not Relevant", subtype: "Education/Training", negMatchType: "Phrase", negLevel: "Account" };
@@ -312,6 +316,8 @@ const OIA = {
         : { status: "Competitor", subtype: "AMI Imaging (unrelated national brand)", negMatchType: "Exact", negLevel: "Account" };
     }
 
+    // "advanced medical imaging" is AMI only with Kokomo/Indiana in the term or in an AMI campaign: elsewhere it is a different, national, name
+    if (/\badvanced (medical )?imaging\b/i.test(t) && (/(kokomo|indiana)/i.test(t) || /(^|[^a-z])ami([^a-z]|$)|p2ami/.test(campaignSlug || ""))) return { status: "Relevant", subtype: "Brand (AMI: Kokomo)" };
     for (const f of this.facilities){ if (f.code !== "AMI" && f.re.test(t)) return { status: "Relevant", subtype: "Brand (" + f.code + ")" }; }
     if (this.brandGeneric.test(t)) return { status: "Relevant", subtype: "Brand (OIA corporate)" };
 
@@ -327,11 +333,12 @@ const OIA = {
     if (isAddress(t)) return { status: "Not Relevant", subtype: "Specific Address Query" };
     if (PHONE_RE.test(t)) return { status: "Not Relevant", subtype: "Specific Phone Query" };
     if (this.infoRe.test(t)) return { status: "Not Relevant", subtype: "Informational/Research" };
-    if (this.vetRe.test(t)) return { status: "Not Relevant", subtype: "Veterinary/Non-Human" };
+    // "cat scan" and "pet scan" are imaging services, not animals: take the scan names out before looking for a pet
+    if (this.vetRe.test(t.replace(/\b(cat[\s-]*scans?|pet[\s\/-]*ct|pet[\s-]*scans?)\b/gi, " "))) return { status: "Not Relevant", subtype: "Veterinary/Non-Human" };
     if (this.medicareRe.test(t) || this.medicaidRe.test(t)) return { status: "Client Review", subtype: "Insurance Coverage Unconfirmed" };
     if (has(this, "insuranceBrands", t)) return { status: "Client Review", subtype: "Insurance Network Unconfirmed" };
     if (has(this, "outOfArea", t)) return { status: "Not Relevant", subtype: "Out-of-Area Location", negMatchType: "Phrase", negLevel: "Campaign" };
-    const mismatch = campaignServesCity(campaignSlug, this.territoryMap, t, this.ambiguousCities);
+    const mismatch = radiusTargeted(row) ? null : campaignServesCity(campaignSlug, this.territoryMap, t, this.ambiguousCities);
     if (mismatch === false) return { status: "Not Relevant", subtype: "Location Mismatch" };
     if (core(this, t)) return { status: "Relevant", subtype: "Core imaging intent" };
     return null;
@@ -353,7 +360,7 @@ const EVENTGROOVE = {
   freeRe: /\b(free printing|free event tickets?|free raffle tickets?|buy event tickets?|giveaway|free)\b/i,
   irrelevantRe: /\b(fundraising|saas)\b/i,
   nearMeRe: /\bnear me\b/i,
-  coreSignal: ["ticket","raffle","banner","poster","flyer","wristband","certificate","badge","lanyard","credential","laminate","yard sign","directional sign"],
+  coreSignal: ["ticket","raffle","banner","poster","flyer","wristband","wrist band","name tag","backstage pass","certificate","badge","lanyard","credential","laminate","yard sign","directional sign"],
 
   classifyDeterministic(term){
     const t = term.trim(); if (!t) return null;
@@ -384,7 +391,7 @@ const GENTLEDENTAL_42NORTH = {
   insuranceRe: /\b(medicaid|delta dental|aetna|cigna|altus|dental providers?)\b/i,
   costRe: /\b(cheap|low[\s-]?cost|cost|price|fees?)\b/i,
   disqualifyRe: /\b(free|hiring|careers?|jobs?|dental school|hygienist program|dental supplies|dental tools|toothbrush|toothpaste)\b/i,
-  coreSignal: ["dentist","dental","tooth","teeth","cleaning","implant","invisalign","braces","whitening","veneer","extraction","crown","denture","oral surgery","periodont","pediatric dent","emergency dent","urgent care dent","root canal","orthodont"],
+  coreSignal: ["dentist","dental","tooth","teeth","cleaning","implant","invisalign","braces","whitening","veneer","extraction","crown","denture","oral surgery","oral surgeon","endodont","periodont","pediatric dent","emergency dent","urgent care dent","root canal","orthodont"],
 
   classifyDeterministic(term){
     const t = term.trim(); if (!t) return null;
@@ -474,6 +481,7 @@ const BB = {
   freeNotFree: /\b(tube|tubing|carb|carbs|sugar|gluten|latex|hassle|worry|lag|pain|needle|injection|alarm)[\s-]+free\b|\bfree\s+(of|from)\b/,
   info: /(^|[^a-z0-9])(what\s+is|what\s+are|meaning|definition|wiki|wikipedia|pdf|ppt|pictures?\s+of|images?\s+of|video|videos|youtube|history\s+of|who\s+invented)(?![a-z0-9])/,
   underage: /(^|[^a-z0-9])(toddlers?|infants?|newborns?|baby|babies|[2-5]\s*(?:year|yr)s?[\s-]*old)(?![a-z0-9])/,
+  shopping: /\b(best|top|newest|latest|new|better|compare|comparison|vs|versus|cost|price|prices|pricing|copay|covered|coverage|insurance)\b/,
   gestational: /\bgestational\b/,
   type2: /\b(type\s*(?:2|ii|two)|t2d|t2dm)\b/,
   medicaid: /\bmedicaid\b/,
@@ -540,7 +548,8 @@ const BETA_BIONICS = {
     // 12 freebies (\bfree\b never matches FreeStyle; a scoped phrase is blocked, never bare "free")
     if ((w = trigger(BB.freebie, t)) && !BB.freeNotFree.test(t)) return { status: "Not Relevant", subtype: "Price-seeking (freebie)", negMatchType: "Phrase", negText: w === "free" ? window2(t, "free") : w, negLevel: "Account" };
     // 13 information only
-    if ((w = trigger(BB.info, t))) return { status: "Not Relevant", subtype: "Informational/Research", negMatchType: "Phrase", negText: w, negLevel: "Account" };
+    // ("what is the best insulin pump" is comparison shopping, the buying funnel on this account, not a definition)
+    if ((w = trigger(BB.info, t)) && !BB.shopping.test(t)) return { status: "Not Relevant", subtype: "Informational/Research", negMatchType: "Phrase", negText: w, negLevel: "Account" };
     // 14 under the minimum age (a bare "baby" is reviewed, not blocked wholesale)
     if ((w = trigger(BB.underage, t)) && BB.diabetesCtx.test(t)) {
       const d = { status: "Not Relevant", subtype: "Under minimum age (6+)" };
@@ -732,6 +741,32 @@ function prepareRows(raw){
   return rows;
 }
 
+// What the account itself says is its brand. A keyword of a Brand campaign (not Non-Brand, not a competitor campaign) is the account's own name for
+// itself, and the searches containing it are its brand searches whatever spelling a rulebook knew. A one-word keyword is trusted only as the whole
+// search (a bare "heartland" also names dental chains), and a search that mentions jobs, reviews, investors or a firm's money is read by the model.
+const BRAND_CAMPAIGN = /brand/i, NOT_BRAND_CAMPAIGN = /non[\s_-]?brand|competitor|conquest/i;
+const NOT_A_CUSTOMER = /\b(partners|capital|equity|holdings|investors?|investments?|stock|ceo|funds?|funding|jobs?|careers?|hiring|salary|reviews?|complaints?)\b/i;
+function brandKeywords(keywords, accountName){
+  const exact = new Set(), phrases = new Set();
+  (keywords || []).forEach(k => {
+    const t = keyText(typeof k === "string" ? k : k && k.text); if (!t) return;
+    exact.add(t);
+    const camp = typeof k === "string" ? "" : String((k && k.campaign) || "");
+    if (BRAND_CAMPAIGN.test(camp) && !NOT_BRAND_CAMPAIGN.test(camp) && t.split(" ").length >= 2) phrases.add(t);
+  });
+  // The account's own name, when it is more than one word ("Great Hill Dental"): a one-word name ("Heartland", "Piedmont") is also other businesses' name.
+  const named = brandPhrases(accountName).filter(p => p.indexOf(" ") >= 0);
+  return { exact, re: phrases.size ? phraseRe(Array.from(phrases)) : null, nameRe: named.length ? phraseRe(named) : null };
+}
+function fromKeywords(row, B, ruleset){
+  const k = normText(row.term);
+  if (B.exact.has(k)) return { status: "Relevant", subtype: "A keyword the account bids on" };
+  const guarded = NOT_A_CUSTOMER.test(k) || (ruleset.modelHint && ruleset.modelHint.test(k));
+  if (B.re && B.re.test(k) && !guarded) return { status: "Relevant", subtype: "Brand (a keyword of the account's Brand campaign)" };
+  if (B.nameRe && B.nameRe.test(k.replace(/\b([a-z])\s*&\s*([a-z])\b/g, "$1$2").replace(/[^a-z0-9]+/g, " ")) && !guarded) return { status: "Relevant", subtype: "Brand (the account's name)" };
+  return null;
+}
+
 async function analyze(ruleset, rawRows, ctx){
   ctx = ctx || {};
   const status = ctx.status || function(){};
@@ -739,10 +774,11 @@ async function analyze(ruleset, rawRows, ctx){
   if (!rows.length) throw new Error("There are no search terms in that range.");
 
   // 1 · the account's own rules, on every row
+  const B = brandKeywords(ctx.keywords, ctx.accountName);
   const pending = new Map();                       // term -> what it cost, for choosing what the model reads
   rows.forEach((r, i) => {
     r._slug = normSlug(r.campaign);
-    r._det = ruleset.classifyDeterministic(r.term, r._slug);
+    r._det = ruleset.classifyDeterministic(r.term, r._slug, r) || fromKeywords(r, B, ruleset);
     if (r._det) r._det.by = "rule";
     else { const p = pending.get(r.key) || { term: r.term, key: r.key, cost: 0, clicks: 0, conversions: 0 }; p.cost += r.cost; p.clicks += r.clicks; p.conversions += r.conversions; pending.set(r.key, p); }
     if (i > 0 && i % 2000 === 0) status("Applying " + ruleset.label + " rules… " + i.toLocaleString() + " / " + rows.length.toLocaleString(), 0.05 + 0.25 * i / rows.length);
@@ -914,7 +950,7 @@ function buildKeywords(rows, kwSet, cover){
       addLevel: g.pmax ? "Asset Group" : "Ad Group", whereToAdd: g.campaign + (g.pmax || !best || !best[0] ? "" : " / " + best[0]), tier, conversions: g.conversions, ctr,
       clicks: g.clicks, impressions: g.impressions, cost: g.cost, cpa: g.conversions > 0 ? g.cost / g.conversions : null });
   });
-  list.sort((a, b) => (a.tier - b.tier) || (b.conversions - a.conversions) || (b.clicks - a.clicks) || (b.ctr - a.ctr) || (a.term < b.term ? -1 : 1));
+  list.sort((a, b) => (a.tier - b.tier) || (b.conversions - a.conversions) || (b.ctr - a.ctr) || (b.clicks - a.clicks) || (a.term < b.term ? -1 : 1));
   return { all: list, skipped };
 }
 
@@ -943,7 +979,7 @@ function negativesFromCsv(text){
   }).filter(k => k.text);
 }
 
-const api = { autoRuleset, brandPhrases, parseCSV, pick, num, fmtConv, normText, keyText, matchOf, blocks, buildCover, isCovered, isBlockedHere, phraseRe, signalRe, has, core, individual, isAddress, competitorName,
+const api = { autoRuleset, brandPhrases, brandKeywords, parseCSV, pick, num, fmtConv, normText, keyText, matchOf, blocks, buildCover, isCovered, isBlockedHere, phraseRe, signalRe, has, core, individual, isAddress, competitorName,
   campaignServesCity, prepareRows, analyze, rowsFromCsv, keywordsFromCsv, negativesFromCsv, RULESETS, PRIORITY, MODEL_CAP, STATUS_ORDER };
 root.SQRCore = api;
 if (typeof module !== "undefined" && module.exports) module.exports = api;

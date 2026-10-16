@@ -181,6 +181,8 @@ def profile_text(profile):
     for key, label, _limit in PROFILE_LISTS:
         if profile.get(key):
             parts.append("%s: %s" % (label, "; ".join(profile[key])))
+    parts.append("Use it to recognise the account's own brand: a search that is a variant, abbreviation, nickname or misspelling of the account's name, "
+                 "of one of its locations or of its own brand keywords is Relevant, whatever a rule below says about other accounts.")
     return "\n".join(parts) + "\n\n"
 
 
