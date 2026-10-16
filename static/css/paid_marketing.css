@@ -1095,6 +1095,8 @@ details.sq-ref>summary{cursor:pointer;font-size:12.5px;font-weight:600;color:var
 .pm-sqr .sq-kpis{grid-template-columns:repeat(4,minmax(0,1fr))}
 @media (max-width:900px){.pm-sqr .sq-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .pm-sqr .pm-plat-sw{display:none}
+/* The account list opens inside .ps-cmd; the rules bar below is also z-index 5 and, being later, painted over the open list. */
+.pm-sqr .ps-cmd{z-index:9}
 .c-un{background:var(--pm-line2)}
 .sq-data{margin:0 0 14px}
 .sq-data-in{font-size:13px;line-height:1.6;color:var(--pm-muted);padding:12px 16px;border-radius:14px;background:var(--pm-panel2);border:1px solid var(--pm-line)}

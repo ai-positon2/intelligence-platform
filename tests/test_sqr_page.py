@@ -74,6 +74,20 @@ def test_the_page_opens_for_staff_and_the_scripts_are_served():
     assert c.get("/static/js/sqr_core.js").status_code == 200
 
 
+def test_the_open_account_list_stacks_above_the_panels_under_it():
+    # The account list opens inside .ps-cmd. The rules bar below it (.sq-bar) is z-index 5 and later in the page, so an equal z-index
+    # painted the bar over the open list. .ps-cmd must be higher on this page, and the CSS the template loads is the one that says so.
+    css = read(os.path.join(ROOT, "static", "css", "paid_marketing.css"))
+    ps = read(os.path.join(ROOT, "static", "css", "performance_summarizer.css"))
+    cmd = re.search(r"\.pm-sqr \.ps-cmd\{[^}]*z-index:(\d+)", css)
+    bar = re.search(r"\.sq-bar\{[^}]*z-index:(\d+)", css)
+    assert cmd and bar, "the stacking rules are missing"
+    assert int(cmd.group(1)) > int(bar.group(1))
+    assert re.search(r"\.ps-cmd\{[^}]*z-index:\d+", ps), "the base panel no longer sets a z-index the page override is raising"
+    base = read(os.path.join(ROOT, "templates", "_paid_base.html"))
+    assert re.search(r"paid_marketing\.css'\) \}\}\?v=(\d+)", base), "the stylesheet is loaded without a version"
+
+
 def test_there_is_no_em_dash_in_any_of_it():
     for p in FILES:
         assert "—" not in read(p), p
