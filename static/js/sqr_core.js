@@ -436,49 +436,195 @@ const MCHALE = {
 };
 
 // =====================================================================
-// BETA BIONICS ruleset: PLACEHOLDER, not a port of the real client skill.
-// The sqr-analysis-beta-bionics skill is confirmed to exist and be enabled
-// on the account, but this session's Skill tool cannot reach it (Unknown
-// skill error, retried after a session refresh) and it isn't synced to
-// local disk the way Riccobene/OIA's skill files were. Rather than guess
-// at its actual priority waterfall, known-issue log, or exact word lists,
-// this ruleset only encodes facts independently verifiable from the
-// public iLet Bionic Pancreas product record; everything else defers to
-// the model. Replace this once the real skill text is available.
+// BETA BIONICS ruleset: the client's own sqr-analysis-beta-bionics skill (a national US medical-device account: the iLet Bionic Pancreas,
+// type 1 diabetes, ages 6+, US only). The skill's 25 priorities run in its order, the first match wins, with two deliberate departures that
+// are named in the note: the pipeline products (iLet Duo, Mint) are caught before the brand check, because "ilet duo" carries the brand word
+// and the skill itself says a pipeline product is never a keyword; and "apply" is not a jobs word when the term is about coverage or
+// ordering. Medicare is covered here, cost and price are the funnel, and there are no city rules: dental habits are wrong on this account.
 // =====================================================================
+function trigger(re, t){ const m = re.exec(t); return m ? normText(m[0].replace(/^[^a-z0-9]/i, "")) : ""; }
+// the word that fired plus its neighbour, so a bare "free" (FreeStyle Libre risk) is never what gets blocked
+function window2(t, word){
+  const w = t.split(" "), i = w.indexOf(word);
+  if (i < 0) return word;
+  return i + 1 < w.length ? w[i] + " " + w[i + 1] : i > 0 ? w[i - 1] + " " + w[i] : word;
+}
+const BB = {
+  investor: phraseRe(["stock", "share price", "shares", "ticker", "bbnx", "nasdaq", "ipo", "investor", "investors", "earnings", "market cap", "sec filing", "10-k", "analyst", "analysts"]),
+  inStock: /\b(in|out of) stock\b/,
+  jobs: phraseRe(["jobs", "job", "hiring", "career", "careers", "vacancy", "vacancies", "recruitment", "salary", "salaries", "wage", "wages", "internship", "internships", "intern", "resume", "cv", "apply", "glassdoor"]),
+  applyContext: /\b(medicare|medicaid|insurance|coverage|prescription|rx|order|pharmacy|assistance|program|grant|financial|covered|benefits?)\b/,
+  // a rival named next to the brand makes it a comparison, even when only the company is named ("switching from tandem to ilet")
+  rivalBare: /\b(tandem|omnipod|medtronic|minimed|insulet|twiist|t:?slim|control-?iq|ypsomed|ypsopump|camaps|cequr)\b/,
+  pipeline: /(^|[^a-z0-9])(ilet\s+duo|mint\s+(?:patch\s+)?pump|mint\s+patch|bi-?hormonal|dual[\s-]hormone|glucagon\s+pump)(?![a-z0-9])/,
+  brand: /(^|[^a-z0-9])(ilet|i-let|i\s+let\s+pump|beta\s*bionics|betabionics|bionic\s+pancreas|color\s+ilet|bionic\s+circle)(?![a-z0-9])/,
+  support: /\b(not\s+charging|customer\s+service|customer\s+support|cartridges?|manuals?|log\s*in|app|support|troubleshoot\w*|alarms?|errors?|replacement|charger|warranty|phone\s+number|contact|reset|help|bionic\s+circle|battery)\b/,
+  diy: /(^|[^a-z0-9])(openaps|androidaps|diy\s+loop|iaps|trio\s+app|nightscout|loop\s+and\s+learn|build\s+your\s+own|homemade)(?![a-z0-9])/,
+  otherTopic: /(^|[^a-z0-9])(islets?\s+(?:cells?|transplant\w*)|pancreas\s+transplant\w*|pancreatitis|pancreatic\s+\w+|islets?)(?![a-z0-9])/,
+  prosthetic: /(^|[^a-z0-9])(bionic\s+(?:arm|arms|leg|legs|hand|hands|eye|eyes|limb|limbs|ear|ears|knee|foot|man|woman)|prosthe\w+)(?![a-z0-9])/,
+  pumpOther: phraseRe(["heat pump", "breast pump", "penis pump", "pain pump", "baclofen pump", "morphine pump", "sump pump", "well pump", "fuel pump", "hydraulic pump", "air pump", "water pump", "gas pump"]),
+  animal: /(^|[^a-z0-9])(dogs?|cats?|pets?|canine|feline|veterinary|veterinarian)(?![a-z0-9])/,
+  diabetesCtx: /\b(insulin|pump|pumps|diabetes|diabetic|t1d|glucose|ilet)\b/,
+  device: /\b(insulin|pump|pumps|ilet|omnipod|tandem|medtronic|minimed|dexcom|libre|cgm|device|glucose|diabetes)\b/,
+  used: /(^|[^a-z0-9])(refurbished|second\s*hand|secondhand|pre-?owned|ebay|craigslist|facebook\s+marketplace|marketplace|resale|for\s+sale|used\s+(?:insulin|pump|pumps|ilet|omnipod|tandem|medtronic|minimed|dexcom|cgm|diabetes|medical))(?![a-z0-9])|\b(?:pump|pumps|ilet|omnipod)\s+used\s*$/,
+  education: /(^|[^a-z0-9])(courses?|certification|degree|diploma|cdces?\s+exam|diabetes\s+educator\s+program)(?![a-z0-9])/,
+  freebie: /(^|[^a-z0-9])(free\s+trial|free|cheapest|cheap|coupons?|promo\s+code|discount\s+code|giveaway|gratis|barato|sin\s+dinero)(?![a-z0-9])/,
+  freeNotFree: /\b(tube|tubing|carb|carbs|sugar|gluten|latex|hassle|worry|lag|pain|needle|injection|alarm)[\s-]+free\b|\bfree\s+(of|from)\b/,
+  info: /(^|[^a-z0-9])(what\s+is|what\s+are|meaning|definition|wiki|wikipedia|pdf|ppt|pictures?\s+of|images?\s+of|video|videos|youtube|history\s+of|who\s+invented)(?![a-z0-9])/,
+  underage: /(^|[^a-z0-9])(toddlers?|infants?|newborns?|baby|babies|[2-5]\s*(?:year|yr)s?[\s-]*old)(?![a-z0-9])/,
+  gestational: /\bgestational\b/,
+  type2: /\b(type\s*(?:2|ii|two)|t2d|t2dm)\b/,
+  medicaid: /\bmedicaid\b/,
+  insurers: phraseRe(["unitedhealthcare", "united healthcare", "aetna", "cigna", "blue cross", "bcbs", "anthem", "humana", "kaiser", "tricare", "va benefits", "optum", "express scripts", "caremark"]),
+  pumpCtx: /\b(pump|pumps|ilet|insulin|aid|bionic|diabetes|diabetic|cgm|supplies|t1d)\b/,
+  trial: /\b(clinical\s+trials?|research\s+stud(?:y|ies)|enroll\s+in\s+(?:a\s+)?stud(?:y|ies))\b/,
+  territory: /\b(puerto\s+rico|guam|u\.?s\.?\s+virgin\s+islands|american\s+samoa)\b/,
+  abroad: phraseRe(["canada", "canadian", "toronto", "vancouver", "uk", "united kingdom", "nhs", "england", "scotland", "ireland", "australia", "new zealand", "india", "pakistan", "philippines",
+    "germany", "france", "spain", "italy", "netherlands", "sweden", "norway", "denmark", "uae", "dubai", "saudi", "qatar", "south africa", "nigeria", "kenya", "brazil", "argentina", "japan", "china",
+    "korea", "singapore", "malaysia", "indonesia", "in mexico", "mexico city", "mexican", "london uk", "london england", "london ontario", "paris france", "dublin ireland", "melbourne australia", "ontario canada"]),
+  cgm: /\b(dexcom|libre|freestyle|cgm|g6|g7|continuous\s+glucose)\b/,
+  deliveryCtx: /\b(pump|pumps|aid|automated\s+insulin|insulin\s+delivery|ilet|closed[\s-]?loop|artificial\s+pancreas|bionic|compatible|omnipod|tandem|medtronic|minimed)\b/,
+  spanish: /\b(bomba\s+de\s+insulina|pancreas\s+artificial|diabetes\s+tipo\s+1)\b/,
+  t1d: /\b(t1d|type\s*(?:1|i|one)\s+diabetes)\b/,
+  t1dDevice: /\b(pump|pumps|device|technology|tech|insulin\s+delivery|aid|closed[\s-]?loop|monitor|cgm|automated|system|app|ilet|bionic)\b/,
+};
 const BETA_BIONICS = {
   id: "beta_bionics", label: "Beta Bionics (iLet Bionic Pancreas)",
-  note: "<b>Placeholder, not yet ported from the client\'s own SQR skill.</b> It encodes only public facts about the product: the iLet Bionic Pancreas is FDA-cleared for <b>type 1</b> diabetes, ages 6+, US only, and its named competitors are Omnipod/Insulet, Tandem (t:slim X2, Control-IQ), Medtronic MiniMed and twiist. Type 2 diabetes and Medicare/Medicaid mentions go to <b>Client Review</b> rather than being guessed. Everything else goes to the model with no account-specific knowledge. Share the skill\'s content and this gets a real port, as Riccobene and OIA did.",
-  brandRe: /(beta\s*bionics|\bilet\b|bionic\s*pancreas)/i,
-  competitors: ["omnipod","insulet","tandem diabetes","tandem t:slim","t:slim x2","control-iq","medtronic minimed","minimed 780g","twiist"],
-  type2Re: /\btype\s*(2|ii|two)\s*diabetes\b/i,
-  medicareRe: /\bmedicare\b/i, medicaidRe: /\bmedicaid\b/i,
-  outOfCountry: ["uk","united kingdom","canada","australia","ireland","germany","france","india","mexico","new zealand"],
-  coreSignal: ["insulin pump","automated insulin delivery","aid system","artificial pancreas","closed loop insulin","closed-loop system","bionic pancreas","ilet","insulin delivery system","tubeless insulin pump","no carb counting","meal announcement free","type 1 diabetes","t1d management","diabetes management system"],
+  note: "Ported in full from the client\'s own <b>sqr-analysis-beta-bionics</b> skill: its 25 priorities in its order, first match wins. A national US medical-device account, so there is <b>no city or territory logic</b>, <b>Medicare is covered</b> (never a negative), and cost, price and copay searches are the buying funnel, not bargain hunting. Brand wins over most things (‘ilet vs omnipod’ is a brand comparison, never a competitor) but not over investor or jobs words (‘beta bionics careers’, ‘bbnx stock’). Partner brands (Dexcom, Libre) are relevant next to a pump and never negated. Type 2, Medicaid, insurance networks, pipeline products (iLet Duo, Mint), clinical trials, Spanish-language searches and US territories go to <b>Client Review</b>. Never suggested as a negative: pump, loop, patch, trial, bionic, insulin, free, dexcom, libre, freestyle, cgm, medicare, cost, price, baby, mexico. Brand searches that land in a NonBrand campaign get a campaign-level routing negative so they go to the Brand campaign. Two departures from the skill: pipeline products are checked before the brand word (‘ilet duo’ has it), and ‘apply’ is not a jobs word in a coverage or ordering search. What no priority settles is read by the model with this account\'s facts. One difference to know about: the skill ranks negatives by cost plus five times conversions; this page ranks by money wasted on terms that never converted, and holds back any negative whose terms converted.",
+  brandRe: /(ilet|i-let|beta\s*bionics|betabionics|bionic\s+pancreas)/i,
+  routeCampaignRe: /non[\s_-]?brand/i,
+  forbiddenNegatives: ["pump", "pumps", "loop", "patch", "trial", "bionic", "insulin", "free", "dexcom", "libre", "freestyle", "cgm", "medicare", "cost", "price", "baby", "mexico"],
+  competitors: ["omnipod 5", "omnipod dash", "omnipod go", "omnipod5", "omnipod", "omni pod", "insulet", "tslim", "t:slim", "t slim", "tandem mobi", "tandem diabetes", "tandem insulin pump", "tandem pump",
+    "tandem t:slim", "control-iq", "control iq", "minimed", "medtronic minimed", "medtronic pump", "medtronic insulin pump", "medtronic diabetes", "780g", "770g", "inpen", "twiist", "sequel med tech",
+    "cequr", "mannkind", "v-go", "ypsomed", "ypsopump", "camaps", "camaps fx", "sigi patch", "sigi pump", "eoflow", "eopatch", "bigfoot unity", "bigfoot biomedical", "accu-chek insight", "accu-chek combo",
+    "accu-chek spirit", "accu chek insight", "accu chek combo", "accu chek spirit"],
+  coreSignal: ["insulin pump", "automated insulin delivery", "aid system", "artificial pancreas", "closed loop", "closed-loop", "hybrid closed loop", "no carb counting", "without carb counting",
+    "avoid carb counting", "stop carb counting", "mdi to pump", "switching insulin pump", "switch insulin pump", "tubeless insulin pump", "insulin delivery system", "insulin delivery device",
+    "easiest insulin pump", "insulin pump without settings", "meal announcement free", "t1d management", "diabetes management system"],
 
   classifyDeterministic(term){
-    const t = term.trim(); if (!t) return null;
-    const tl = t.toLowerCase();
-    if (this.brandRe.test(t)) return { status: "Relevant", subtype: "Brand" };
+    const t = normText(term); if (!t) return null;
+    let w;
+    // 1 investors
+    if ((w = trigger(BB.investor, t)) && !BB.inStock.test(t)) return { status: "Not Relevant", subtype: "Investor intent", negMatchType: "Phrase", negText: w, negLevel: "Account" };
+    // 2 jobs, even next to the brand ("apply" is not a jobs word in a coverage or ordering search)
+    if ((w = trigger(BB.jobs, t)) && !(w === "apply" && BB.applyContext.test(t))) return { status: "Not Relevant", subtype: "Jobs/Recruitment", negMatchType: "Phrase", negText: w, negLevel: "Account" };
+    // pipeline products: never a keyword, a client decision (the skill lists them at 19, but "ilet duo" would otherwise be taken for the brand)
+    if (BB.pipeline.test(t)) return { status: "Client Review", subtype: "Pipeline product (not yet available)" };
+    // 3 brand
+    const brand = BB.brand.test(t);
+    if (brand) {
+      const rival = has(this, "competitors", t) || BB.rivalBare.test(t);
+      if (rival) return { status: "Relevant", subtype: "Brand: comparison" };
+      if (BB.support.test(t)) return { status: "Relevant", subtype: "Brand: support intent", routeNeg: trigger(BB.brand, t) };
+      return { status: "Relevant", subtype: "Brand", routeNeg: trigger(BB.brand, t) };
+    }
+    // 4 a named competitor, no iLet brand word
     if (has(this, "competitors", t)) return { status: "Competitor", subtype: "Named insulin delivery competitor", negMatchType: "Exact", negLevel: "Account" };
-    if (this.type2Re.test(t)) return { status: "Client Review", subtype: "Off-Label Interest (iLet is Type 1 only): confirm handling with client" };
-    if (has(this, "outOfCountry", t)) return { status: "Not Relevant", subtype: "Out-of-Area (US-only product)", negMatchType: "Phrase", negLevel: "Account" };
-    if (this.medicareRe.test(t) || this.medicaidRe.test(t)) return { status: "Client Review", subtype: "Insurance Coverage Unconfirmed" };
-    if (core(this, t)) return { status: "Relevant", subtype: "Core product intent" };
-    return null;
+    // 5 DIY looping
+    if ((w = trigger(BB.diy, t))) return { status: "Not Relevant", subtype: "DIY looping", negMatchType: "Phrase", negText: w, negLevel: "Account" };
+    // 6 islet and other-condition topics (an "islet pump" is read by the model: it may be a typo for ilet)
+    if ((w = trigger(BB.otherTopic, t)) && !(w.indexOf("islet") === 0 && /\bpumps?\b/.test(t) && !/\b(cells?|transplant\w*)\b/.test(w))) return { status: "Not Relevant", subtype: "Different medical topic", negMatchType: "Phrase", negText: w, negLevel: "Account" };
+    // 7 bionic prosthetics
+    if ((w = trigger(BB.prosthetic, t)) && !/\b(diabetes|diabetic|insulin|pancreas|glucose)\b/.test(t)) return { status: "Not Relevant", subtype: "Bionic prosthetics", negMatchType: "Phrase", negText: w, negLevel: "Account" };
+    // 8 pumps that are not insulin pumps
+    if ((w = trigger(BB.pumpOther, t))) return { status: "Not Relevant", subtype: "Non-diabetes pump", negMatchType: "Phrase", negText: w, negLevel: "Account" };
+    // 9 veterinary
+    if ((w = trigger(BB.animal, t)) && BB.diabetesCtx.test(t)) return { status: "Not Relevant", subtype: "Veterinary/Non-human", negMatchType: "Phrase", negText: w, negLevel: "Account" };
+    // 10 used and resale
+    if ((w = trigger(BB.used, t)) && BB.device.test(t)) return { status: "Not Relevant", subtype: "Used/Resale", negMatchType: "Phrase", negText: w, negLevel: "Account" };
+    // 11 education
+    if ((w = trigger(BB.education, t))) return { status: "Not Relevant", subtype: "Education/Training", negMatchType: "Phrase", negText: w, negLevel: "Account" };
+    // 12 freebies (\bfree\b never matches FreeStyle; a scoped phrase is blocked, never bare "free")
+    if ((w = trigger(BB.freebie, t)) && !BB.freeNotFree.test(t)) return { status: "Not Relevant", subtype: "Price-seeking (freebie)", negMatchType: "Phrase", negText: w === "free" ? window2(t, "free") : w, negLevel: "Account" };
+    // 13 information only
+    if ((w = trigger(BB.info, t))) return { status: "Not Relevant", subtype: "Informational/Research", negMatchType: "Phrase", negText: w, negLevel: "Account" };
+    // 14 under the minimum age (a bare "baby" is reviewed, not blocked wholesale)
+    if ((w = trigger(BB.underage, t)) && BB.diabetesCtx.test(t)) {
+      const d = { status: "Not Relevant", subtype: "Under minimum age (6+)" };
+      if (!/^(baby|babies)$/.test(w)) Object.assign(d, { negMatchType: "Phrase", negText: w, negLevel: "Account" });
+      return d;
+    }
+    // 15 gestational
+    if (BB.gestational.test(t)) return { status: "Not Relevant", subtype: "Not indicated (gestational)", negMatchType: "Phrase", negText: "gestational", negLevel: "Account" };
+    // 16 to 20: the client decides
+    if (BB.type2.test(t)) return { status: "Client Review", subtype: "Off-label: type 2 (label expansion pending)" };
+    if (BB.medicaid.test(t)) return { status: "Client Review", subtype: "Medicaid: state coverage" };
+    if (BB.insurers.test(t) && BB.pumpCtx.test(t)) return { status: "Client Review", subtype: "Insurance network / formulary" };
+    if (BB.trial.test(t) && BB.pumpCtx.test(t)) return { status: "Client Review", subtype: "Clinical trial recruitment" };
+    if (BB.territory.test(t)) return { status: "Client Review", subtype: "US territory: distribution unconfirmed" };
+    // 21 outside the US
+    if ((w = trigger(BB.abroad, t))) return { status: "Not Relevant", subtype: "Out of market (US only)", negMatchType: "Phrase", negText: w, negLevel: "Account" };
+    // 22 a CGM or partner brand with no pump in the search
+    if (BB.cgm.test(t) && !BB.deliveryCtx.test(t)) return { status: "Not Relevant", subtype: "Partner product only", noNeg: true };
+    // 23 Spanish: relevant, and the client confirms Spanish support
+    if (BB.spanish.test(t)) return { status: "Client Review", subtype: "Bilingual: confirm Spanish support" };
+    // 24 the product category
+    if ((BB.t1d.test(t) && BB.t1dDevice.test(t)) || core(this, t)) return { status: "Relevant", subtype: "Core product intent" };
+    return null;                                  // 25 the skill defaults to Not Relevant; here the model reads it with this account's facts
   },
 };
 
 // =====================================================================
-// Generic fallback (no dedicated ruleset yet)
+// Generic: no client rulebook (CSV mode, and the base of the Automatic rules below)
 // =====================================================================
 const GENERIC = {
-  id: "generic", label: "Other / not yet mapped",
-  note: "No dedicated ruleset for this account yet: every row is classified by the model with a plain SQR rubric (Relevant / Competitor / Not Relevant / Client Review), no client-specific brand, competitor, or territory knowledge. Add a real ruleset for this account the same way the others were done, once its own SQR conventions are known.",
+  id: "generic", label: "Automatic",
+  note: "For any account without a client rulebook. Nothing is typed in by hand: the account\'s own Google Ads data is the rulebook. Its brand comes from its name, and a search that is exactly a keyword it bids on is relevant. Everything else is read by the model, which is told what the account is: its campaigns, the keywords it bids on and the searches that converted. The model follows the standard Search Query process: relevant, competitor (another named business selling the same thing), not relevant (jobs, courses, do-it-yourself, free or bargain hunting, general questions, wrong area), and Client Review where only the client can decide, such as insurance. Where a client rulebook exists it is more exact, and it is picked for that account automatically.",
   classifyDeterministic(){ return null; },
 };
 
-const RULESETS = { riccobene: RICCOBENE, oia: OIA, eventgroove: EVENTGROOVE, gentledental_42north: GENTLEDENTAL_42NORTH, mchale: MCHALE, beta_bionics: BETA_BIONICS, generic: GENERIC };
+// =====================================================================
+// AUTOMATIC: the rules for any account that has no client rulebook. Nothing is written by hand: the account's own Google Ads data is the rulebook.
+// Two rules are certain enough to apply without the model: the account's own brand (taken from its name) and a search that is exactly a keyword
+// the account bids on. Everything else is read by the model, which is told what the account is: its campaigns, the keywords it bids on, and what
+// has converted. A client rulebook (below) always beats this.
+// =====================================================================
+const NAME_NOISE = new Set(("the and of for llc inc ltd corp co company products product ads ad ppc google search digital account us usa ca au uk nz eu na nam eng sem paid adwords " +
+  "group holdings international global limited pty gmbh").split(" "));
+const NAME_DESCRIPTORS = new Set(("racing dental dentistry family health medical center centre clinic studio design landscape landscaping construction plumbing systems technologies " +
+  "technology consulting marketing agency services service solutions associates partners machine precision").split(" "));
+// "Beta Bionics Inc." -> "beta bionics"; "AU - Eventgroove Products" -> "eventgroove"; "Brian Tooley Racing" -> "brian tooley racing", "brian tooley"
+function brandPhrases(name){
+  const raw = String(name || "").toLowerCase(), parts = [raw.replace(/\([^)]*\)/g, " ")];
+  (raw.match(/\(([^)]*)\)/g) || []).forEach(p => parts.push(p.slice(1, -1)));
+  const out = new Set();
+  parts.forEach(part => {
+    const toks = [];
+    let letters = false;                       // "d&j" is two one-letter tokens: joined, so they match how the name is typed
+    part.replace(/&/g, " ").split(/[^a-z0-9]+/).filter(Boolean).forEach(w => {
+      if (NAME_NOISE.has(w) || /^\d{5,}$/.test(w)) return;
+      if (w.length === 1) { if (letters) toks[toks.length - 1] += w; else toks.push(w); letters = true; }
+      else { toks.push(w); letters = false; }
+    });
+    if (!toks.length) return;
+    const add = ws => { const s = ws.join(" "); if (s.replace(/ /g, "").length >= (ws.length === 1 ? 5 : 8)) { out.add(s); if (ws.length > 1) out.add(ws.join("")); } };
+    add(toks);
+    if (toks.length >= 3) add(toks.slice(0, 2));
+    const last = toks[toks.length - 1];
+    // dropping a trailing descriptor ("racing", "dental") leaves two words, or one long enough not to be an ordinary word
+    if (toks.length >= 2 && NAME_DESCRIPTORS.has(last) && (toks.length >= 3 || toks[0].length >= 8)) add(toks.slice(0, -1));
+  });
+  return Array.from(out);
+}
+const AUTO_JOBS = /\b(jobs?|careers?|hiring|salar(?:y|ies)|employment|openings?|internships?|resumes?|stock|investor|investors)\b/i;
+function autoRuleset(profile){
+  profile = profile || {};
+  const phrases = brandPhrases(profile.name), brandRe = phrases.length ? phraseRe(phrases) : null;
+  const kw = new Set((profile.keywords || []).map(k => keyText(typeof k === "string" ? k : k && k.text)).filter(Boolean));
+  return Object.assign({}, GENERIC, {
+    profile, brandPhrases: phrases,
+    classifyDeterministic(term){
+      const k = normText(term); if (!k) return null;
+      // the brand's own jobs and investor searches are not customers: the model reads those
+      if (brandRe && brandRe.test(k.replace(/\b([a-z])\s*&\s*([a-z])\b/g, "$1$2").replace(/[^a-z0-9]+/g, " ")) && !AUTO_JOBS.test(k)) return { status: "Relevant", subtype: "Brand" };
+      if (kw.has(k)) return { status: "Relevant", subtype: "A keyword the account bids on" };
+      return null;
+    },
+  });
+}
+
+const RULESETS = { generic: GENERIC, riccobene: RICCOBENE, oia: OIA, eventgroove: EVENTGROOVE, gentledental_42north: GENTLEDENTAL_42NORTH, mchale: MCHALE, beta_bionics: BETA_BIONICS };
 
 // Place names that are also ordinary words or surnames (Normal, Apex, Independence, Cary) count as ANOTHER campaign's city only when the
 // state is named as well, or "normal mri results" is a Location Mismatch in every campaign but Normal, IL's.
@@ -508,7 +654,8 @@ const HINT_CHARITY = "charity|non-?profit|volunteer|free clinic|donat\\w*";
 const hint = (...parts) => new RegExp("\\b(?:" + parts.join("|") + ")\\b", "i");
 RICCOBENE.modelHint = hint(HINT_JOBS, HINT_SCHOOL, HINT_DIY, HINT_PRICE, HINT_INFO, HINT_PET, HINT_PRODUCT, HINT_CHARITY);
 MCHALE.modelHint = hint(HINT_PRICE, HINT_INFO, "ideas?", "pictures?", "photos?", "images?", "pdf", HINT_CHARITY);
-BETA_BIONICS.modelHint = hint(HINT_JOBS, HINT_SCHOOL, "reviews?", "complaints?", HINT_DIY, HINT_PRICE, "recalls?", "lawsuits?", "class action");
+// (jobs, courses, freebies and general questions are settled by the skill's own priorities before this; cost and price are the buying funnel here)
+BETA_BIONICS.modelHint = hint(HINT_JOBS, HINT_SCHOOL, "reviews?", "complaints?", HINT_DIY, HINT_INFO, "recalls?", "lawsuits?", "class action");
 
 
 // =====================================================================
@@ -645,15 +792,24 @@ async function analyze(ruleset, rawRows, ctx){
   };
 }
 
-function negativeSpec(r){
+function negativeSpec(r, ruleset){
   const d = r._det;
-  if (d.by === "fallback" || d.by === "skipped" || r.status === "EXCLUDED" || r.status === "ADDED_EXCLUDED") return null;
+  if (d.by === "fallback" || d.by === "skipped" || d.noNeg || r.status === "EXCLUDED" || r.status === "ADDED_EXCLUDED") return null;
+  // Brand searches that land in a NonBrand campaign belong in the Brand campaign: a campaign-level negative on the brand word routes them there.
+  if (d.routeNeg && ruleset && ruleset.routeCampaignRe && ruleset.routeCampaignRe.test(r.campaign) && !isPmax(r.campaignType)) {
+    return { text: normText(d.routeNeg), match: "Phrase", level: "Campaign", explicit: true, routing: true };
+  }
   const explicit = d.status === "Competitor" || (d.status === "Not Relevant" && d.negMatchType);
   if (!explicit && d.status !== "Not Relevant") return null;
-  const match = explicit ? (d.negMatchType || "Exact") : "Exact";
+  let match = explicit ? (d.negMatchType || "Exact") : "Exact";
   let text = normText(d.negText || r.term);
   // A suggested negative has to stop the term that raised it: "dental school" would not stop "school of dental hygiene".
   if (explicit && d.negText && match !== "Exact" && (" " + r.key + " ").indexOf(" " + text + " ") < 0) text = r.key;
+  // Some words are never to be blocked on their own for an account (Beta Bionics: pump, insulin, medicare...): block the whole search instead, or nothing.
+  if (ruleset && ruleset.forbiddenNegatives && ruleset.forbiddenNegatives.indexOf(text) >= 0) {
+    if (text === r.key) return null;
+    text = r.key; match = "Exact";
+  }
   // A campaign's own negative, Performance Max included (Google accepts campaign-level negative keywords there now, and these accounts use them):
   // turning one into an account-wide block would also stop the term in campaigns where it belongs.
   const level = explicit ? (d.negLevel || "Account") : "Campaign";
@@ -663,19 +819,19 @@ function negativeSpec(r){
 function buildNegatives(rows, cover, keywords, ruleset){
   const groups = new Map(); let skipped = 0;
   rows.forEach(r => {
-    const s = negativeSpec(r); if (!s) return;
+    const s = negativeSpec(r, ruleset); if (!s) return;
     if (isCovered(cover, s.text, matchOf(s.match), s.level, s.level === "Campaign" ? [r.campaign] : [])) { skipped++; return; }
     const key = s.text + "|" + s.match + "|" + s.level + "|" + (s.level === "Campaign" ? r.campaign : "");
     let g = groups.get(key);
     if (!g) { g = { text: s.text, matchType: s.match, level: s.level, campaign: s.level === "Campaign" ? r.campaign : "", campaigns: new Set(), reason: r._det.subtype, reasonCost: -1,
-      by: new Set(), implied: true, cost: 0, wasted: 0, conversions: 0, clicks: 0, impressions: 0, terms: new Set(), ex: [], rivals: new Set(), rival: false }; groups.set(key, g); }
+      by: new Set(), implied: true, routing: !!s.routing, cost: 0, wasted: 0, conversions: 0, clicks: 0, impressions: 0, terms: new Set(), ex: [], rivals: new Set(), rival: false }; groups.set(key, g); }
     if (r._det.status === "Competitor") g.rival = true;
     if (r._det.status === "Competitor") { const n = competitorName(ruleset || {}, r.term); if (n) g.rivals.add(n); }
     g.campaigns.add(r.campaign); g.by.add(r._det.by); if (s.explicit) g.implied = false;
     g.cost += r.cost; g.clicks += r.clicks; g.impressions += r.impressions; g.conversions += r.conversions;
     if (r.conversions === 0) g.wasted += r.cost;
     g.terms.add(r.key); g.ex.push(r);
-    if (r.cost > g.reasonCost) { g.reasonCost = r.cost; g.reason = s.explicit ? r._det.subtype : IMPLIED_NOTE + " (" + r._det.subtype + ")"; }
+    if (r.cost > g.reasonCost) { g.reasonCost = r.cost; g.reason = s.routing ? "Brand search in a NonBrand campaign: send it to the Brand campaign" : s.explicit ? r._det.subtype : IMPLIED_NOTE + " (" + r._det.subtype + ")"; }
   });
   // what the relevant rows would lose: the words of each relevant term, so a negative is only compared with terms that share its words
   const rel = rows.filter(r => r._det.status === "Relevant" && r.status !== "EXCLUDED");
@@ -711,14 +867,18 @@ function buildNegatives(rows, cover, keywords, ruleset){
     // An account that bids on a competitor's name on purpose does not want that competitor's searches blocked.
     const bids = Array.from(g.rivals).filter(name => kwTexts.some(k => (g.level !== "Campaign" || k.campaign === g.campaign) && (" " + k.text + " ").indexOf(" " + name + " ") >= 0));
     const risks = [];
-    if (g.conversions > 0) risks.push("converted");
-    if (bids.length) risks.push("you bid on this competitor");
+    // A routing negative is meant to stop brand terms in this campaign, converted or not; what it stops is the point, not a side effect.
+    if (g.routing) { hit.n = 0; hit.clicks = 0; hit.conversions = 0; hit.cost = 0; hit.ex = []; }
+    if (g.routing) conflicts.length = 0;
+    if (!g.routing && g.conversions > 0) risks.push("converted");
+    if (g.routing) { /* no competitor checks */ }
+    else if (bids.length) risks.push("you bid on this competitor");
     else if (g.rival && conquests && g.level.indexOf("Account") === 0) risks.push("the account runs a competitor campaign");
-    if (hit.clicks > 0 || hit.conversions > 0) risks.push("blocks relevant terms");
-    if (conflicts.length) risks.push("blocks a keyword you bid on");
+    if (!g.routing && (hit.clicks > 0 || hit.conversions > 0)) risks.push("blocks relevant terms");
+    if (!g.routing && conflicts.length) risks.push("blocks a keyword you bid on");
     const examples = Array.from(new Map(g.ex.sort((a, b) => b.cost - a.cost).map(r => [r.key, r.term])).values()).slice(0, 3);
     all.push({ text: g.text, matchType: g.matchType, level: g.level, campaign: g.campaign, reason: g.reason, by: g.by.size > 1 ? "mixed" : Array.from(g.by)[0] || "rule",
-      implied: g.implied, cost: g.cost, wasted: g.wasted, impact: g.wasted, conversions: g.conversions, clicks: g.clicks, impressions: g.impressions, terms: g.terms.size,
+      implied: g.implied, routing: g.routing, cost: g.cost, wasted: g.routing ? g.cost : g.wasted, impact: g.routing ? g.cost : g.wasted, conversions: g.conversions, clicks: g.clicks, impressions: g.impressions, terms: g.terms.size,
       examples, risks, collateral: hit, conflicts });
   });
   // Ranked by the money wasted on terms that never converted. A negative whose terms did convert, or that would also stop relevant terms or
@@ -781,7 +941,7 @@ function negativesFromCsv(text){
   }).filter(k => k.text);
 }
 
-const api = { parseCSV, pick, num, fmtConv, normText, keyText, matchOf, blocks, buildCover, isCovered, isBlockedHere, phraseRe, signalRe, has, core, individual, isAddress, competitorName,
+const api = { autoRuleset, brandPhrases, parseCSV, pick, num, fmtConv, normText, keyText, matchOf, blocks, buildCover, isCovered, isBlockedHere, phraseRe, signalRe, has, core, individual, isAddress, competitorName,
   campaignServesCity, prepareRows, analyze, rowsFromCsv, keywordsFromCsv, negativesFromCsv, RULESETS, PRIORITY, MODEL_CAP, STATUS_ORDER };
 root.SQRCore = api;
 if (typeof module !== "undefined" && module.exports) module.exports = api;
