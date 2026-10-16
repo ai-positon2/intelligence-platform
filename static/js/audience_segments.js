@@ -20,7 +20,8 @@ var VERDICTS = {star:["Strong","star"],good:["Above average","good"],par:["On pa
                 leak:["Leaking spend","leak"],thin:["Too little data","thin"],none:["Not judged","thin"]};
 var MODES = {observation:"Observation",targeting:"Targeting",mixed:"Mixed"};
 var S = {accounts:[], groups:[], account:"", currency:"USD", preset:"30", from:"", to:"", report:null, seq:0, type:"All",
-         tbl:{sort:{col:"cost",dir:-1}, filter:"", verdict:"all", kind:"all", limit:50, open:{}}};
+         tbl:{sort:{col:"cost",dir:-1}, filter:"", verdict:"all", kind:"all", limit:50, open:{}},
+         lst:{q:"", kind:"all", serve:"all", use:"all", origin:"all"}};
 
 /* ── Formats ──────────────────────────────────────────────── */
 var nf={};
@@ -127,6 +128,7 @@ function run(refresh){
     S.report=r.j; S.currency=r.j.account.currency||"USD";
     if(S.type!=="All"&&r.j.types.indexOf(S.type)<0) S.type="All";
     S.tbl.filter=""; S.tbl.verdict="all"; S.tbl.kind="all"; S.tbl.limit=50; S.tbl.open={}; $("#filter").value="";
+    S.lst={q:"", kind:"all", serve:"all", use:"all", origin:"all"}; $("#lfilter").value="";
     show("out"); render();
   }).catch(function(){
     if(seq!==S.seq) return;
@@ -310,15 +312,46 @@ $("#tbl").addEventListener("keydown",function(e){
 $("#more").addEventListener("click",function(){S.tbl.limit=100000; paintTable();});
 
 /* ── Lists and exclusions ─────────────────────────────────── */
+function listMatches(l){
+  var f=S.lst;
+  if(f.kind!=="all"&&l.kind!==f.kind) return false;
+  if(f.serve==="yes"&&!l.serves) return false;
+  if(f.serve==="no"&&l.serves) return false;
+  if(f.use==="yes"&&!l.used) return false;
+  if(f.use==="no"&&l.used) return false;
+  if(f.origin==="google"&&!l.readOnly) return false;
+  if(f.origin==="own"&&l.readOnly) return false;
+  var t=f.q.trim().toLowerCase();
+  return !t||[l.label,l.detail,l.account||"",l.status==="CLOSED"?"closed":"open",l.readOnly?"google":"",l.used?"used":"not used"].join(" ").toLowerCase().indexOf(t)>=0;
+}
+function chipRow(sel,key,defs,counts){
+  $(sel).innerHTML=defs.map(function(d){
+    return '<button type="button" class="pm-chip'+(S.lst[key]===d[0]?" on":"")+'" data-lf="'+key+'" data-v="'+d[0]+'" aria-pressed="'+(S.lst[key]===d[0])+'">'+esc(d[1])+' <span class="n">'+counts(d[0])+'</span></button>';
+  }).join("");
+}
+function paintListFilters(){
+  var ls=S.report.lists||[], n=function(fn){return ls.filter(fn).length;};
+  var kinds=S.report.kinds.filter(function(k){return n(function(l){return l.kind===k.key;});});
+  chipRow("#lKinds","kind",[["all","All kinds"]].concat(kinds.map(function(k){return [k.key,k.label];})),function(v){return v==="all"?ls.length:n(function(l){return l.kind===v;});});
+  chipRow("#lServe","serve",[["all","Any size"],["yes","Can serve"],["no","Cannot serve"]],function(v){return v==="all"?ls.length:n(function(l){return v==="yes"?l.serves:!l.serves;});});
+  chipRow("#lUse","use",[["all","Any use"],["yes","Used"],["no","Not used"]],function(v){return v==="all"?ls.length:n(function(l){return v==="yes"?l.used:!l.used;});});
+  chipRow("#lOrigin","origin",[["all","Any source"],["own","Yours"],["google","Created by Google"]],function(v){return v==="all"?ls.length:n(function(l){return v==="google"?l.readOnly:!l.readOnly;});});
+}
+$("#listsCard").addEventListener("click",function(e){
+  var b=e.target.closest("[data-lf]"); if(!b) return; S.lst[b.dataset.lf]=b.dataset.v; paintLists();
+});
+$("#lfilter").addEventListener("input",function(){S.lst.q=this.value; paintLists();});
 function paintLists(){
-  var ls=S.report.lists||[], multi=S.report.account.isGroup;
-  $("#listsNote").textContent=ls.length?ls.length+" list"+(ls.length===1?"":"s")+" · "+ls.filter(function(l){return !l.serves;}).length+" cannot serve properly":"none";
-  $("#lists").innerHTML=ls.length?'<thead><tr><th>List</th><th>Kind</th><th class="r">Search</th><th class="r">Display and YouTube</th><th>Status</th><th>Used</th><th>What is wrong</th></tr></thead><tbody>'+
-    ls.map(function(l){
+  if(!S.report) return;
+  var all=S.report.lists||[], multi=S.report.account.isGroup, ls=all.filter(listMatches);
+  paintListFilters();
+  $("#listsNote").textContent=all.length?(ls.length===all.length?all.length+" list"+(all.length===1?"":"s"):ls.length+" of "+all.length+" lists")+" · "+all.filter(function(l){return !l.serves;}).length+" cannot serve properly":"none";
+  $("#lists").innerHTML=all.length?'<thead><tr><th>List</th><th>Kind</th><th class="r">Search</th><th class="r">Display and YouTube</th><th>Status</th><th>Used</th><th>What is wrong</th></tr></thead><tbody>'+
+    (ls.length?ls.map(function(l){
       return '<tr><td class="sg-lab">'+esc(l.label)+(multi?'<span class="gp-sub">'+esc(l.account)+'</span>':"")+(l.readOnly?'<span class="gp-sub">created by Google</span>':"")+'</td><td>'+esc(l.detail)+'</td><td class="r num">'+int(l.sizeSearch)+
         '</td><td class="r num">'+int(l.sizeDisplay)+'</td><td>'+esc(l.status==="OPEN"?"Open":l.status==="CLOSED"?"Closed":l.status||"")+'</td><td>'+(l.used?"Yes":'<span class="au-no">Not used</span>')+
         '</td><td class="au-prob">'+(l.problems.length?l.problems.map(esc).join("<br>"):"Nothing")+'</td></tr>';
-    }).join("")+'</tbody>':'<tbody><tr><td class="pm-empty">The account has no audience lists.</td></tr></tbody>';
+    }).join(""):'<tr><td colspan="7" class="pm-empty">No list matches.</td></tr>')+'</tbody>':'<tbody><tr><td class="pm-empty">The account has no audience lists.</td></tr></tbody>';
 }
 function paintExcl(){
   var ex=S.report.exclusions||[], multi=S.report.account.isGroup;

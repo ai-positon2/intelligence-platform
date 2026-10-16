@@ -78,6 +78,13 @@
 
     <section class="pm-panel" id="listsCard">
       <div class="pm-panel-h"><span class="pm-panel-t">Audience lists the account has</span><span class="pm-panel-s" id="listsNote"></span></div>
+      <div class="au-tools">
+        <input type="text" id="lfilter" placeholder="Search lists by name, kind or account…" aria-label="Search audience lists" autocomplete="off">
+        <div class="pm-chips" id="lKinds" aria-label="Kind of list"></div>
+        <div class="pm-chips" id="lServe" aria-label="Whether the list can serve"></div>
+        <div class="pm-chips" id="lUse" aria-label="Whether the list is used"></div>
+        <div class="pm-chips" id="lOrigin" aria-label="Who made the list"></div>
+      </div>
       <div class="pm-scroll"><table id="lists"></table></div>
     </section>
 
@@ -91,5 +98,5 @@
 {% endblock %}
 {% block scripts %}
 <script src="{{ url_for('static', filename='js/pm_picker.js') }}?v=1"></script>
-<script src="{{ url_for('static', filename='js/audience_segments.js') }}?v=2"></script>
+<script src="{{ url_for('static', filename='js/audience_segments.js') }}?v=5"></script>
 {% endblock %}
