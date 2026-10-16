@@ -222,8 +222,8 @@ def read(store, account, start, end, *, force=False, notes=None, stamps=None, ht
     terms, pmax, kws, negs = g._par([terms_job, pmax_job, keywords_job, negatives_job])
     rows = merge_terms(terms["rows"], pmax["rows"])
     if terms["truncated"] or pmax["truncated"]:
-        warnings.append("This range has more than %s search term rows, so the %s that cost the most are analysed. Pick a shorter range to see the rest."
-                        % (format(MAX_TERM_ROWS, ","), format(MAX_TERM_ROWS, ",")))
+        warnings.append("This range has more than %s search term rows of one kind (search or Performance Max), so only the %s that cost the most of that kind are "
+                        "included. Pick a shorter range to see the rest." % (format(MAX_TERM_ROWS, ","), format(MAX_TERM_ROWS, ",")))
     if kws.get("failed"):
         warnings.append("Without the keyword list, a term the account already bids on can be suggested again.")
     if negs.get("failed"):
@@ -252,7 +252,7 @@ def suggest_ruleset(name):
         return "oia", "an Outpatient Imaging Affiliates facility"
     if re.search(r"eventgroove", n):
         if re.search(r"fundrais", n):
-            return "generic", "the Eventgroove rules treat the word 'fundraising' as not relevant, which this account sells, so the model alone judges it"
+            return "generic", "the Eventgroove rules treat the word 'fundraising' as not relevant, which would misjudge an account named for it, so the model alone judges it"
         return "eventgroove", "Eventgroove"
     if re.search(r"gentle dental|great hill|great lakes", n):
         return "gentledental_42north", "a 42 North practice"

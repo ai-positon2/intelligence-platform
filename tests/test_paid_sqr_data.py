@@ -175,7 +175,7 @@ def test_a_clipped_read_says_so():
     log = []
     out = D.read(FakeStore(), ACCT, START, END, http=google(log, {"FROM search_term_view": rows}))
     assert out["truncated"] is True and len(out["terms"]) == D.MAX_TERM_ROWS
-    assert any("more than 20,000 search term rows" in w for w in out["warnings"])
+    assert any("more than 20,000 search term rows of one kind" in w for w in out["warnings"])
 
 
 def test_a_piece_that_cannot_be_read_leaves_the_others_and_says_what_it_missed():
