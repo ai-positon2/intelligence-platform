@@ -84,10 +84,14 @@ def default_call(cost, effort="medium", client=None):
             held[0] = long_client()
         try:
             parsed, meta = call_json(system, user, schema, model=ai.MODEL, max_tokens=max_tokens, stage=stage, effort=effort, client=held[0])
-        except ModelError as e:
-            if e.kind != "api_error" or not ai.schema_refused(e.detail):
+        except Exception as e:                              # noqa: BLE001 (call_json without a ledger run lets the SDK's own errors out unwrapped)
+            if isinstance(e, ModelError):
+                refused, detail = e.kind == "api_error", e.detail
+            else:
+                refused, detail = getattr(e, "status_code", None) == 400, "%s: %s" % (type(e).__name__, str(e)[:300])
+            if not (refused and ai.schema_refused(detail)):
                 raise
-            log.warning("strategy: the API refused the schema of %s, asking with the schema in the prompt instead: %s", stage, e.detail[:200])
+            log.warning("strategy: the API refused the schema of %s, asking with the schema in the prompt instead: %s", stage, detail[:200])
             parsed, meta = ai.text_json(system, user, schema, model=ai.MODEL, max_tokens=max_tokens, effort=effort, client=held[0])
         cost.add(stage, meta)
         return parsed

@@ -267,6 +267,35 @@ def test_a_build_falls_back_to_the_schema_in_the_prompt_only_when_the_api_refuse
     assert job.default_call(cost, client=object())("s", "{}", schema, max_tokens=100, stage="strategy") == {"fine": True}
 
 
+def test_the_real_api_refusing_a_schema_as_too_large_falls_back_through_the_real_call_json():
+    """Seen in production: call_json without a ledger run lets the SDK's BadRequestError out raw, and only a ModelError was caught, so the build died."""
+    import anthropic, httpx
+    from tracker import paid_strategy_job as job
+    body = {"type": "error", "error": {"type": "invalid_request_error", "message": "The compiled grammar is too large, which would cause performance issues. Simplify your tool schemas or reduce the number of strict tools."}, "request_id": "req_x"}
+    refused = anthropic.BadRequestError("Error code: 400 - %r" % body, response=httpx.Response(400, request=httpx.Request("POST", "https://api.anthropic.com/v1/messages")), body=body)
+    plain = FakeClient([Resp('{"ok": 1}')])
+    client = type("C", (), {})()
+    client.beta = type("B", (), {})()
+    client.beta.messages = type("M", (), {"create": staticmethod(lambda **kw: (_ for _ in ()).throw(refused))})()
+    client.messages = plain.messages
+    cost = job.Cost()
+    schema = {"type": "object", "properties": {"ok": {"type": "integer"}}, "required": ["ok"], "additionalProperties": False}
+    assert job.default_call(cost, client=client)("s", "{}", schema, max_tokens=100, stage="architecture") == {"ok": 1}
+    assert len(plain.sent) == 1 and "format" not in plain.sent[0]["output_config"] and cost.total()["calls"] == 1
+    # a 400 that is not about the schema still stops the stage, as itself
+    other = anthropic.BadRequestError("Error code: 400 - prompt is too long", response=httpx.Response(400, request=httpx.Request("POST", "https://api.anthropic.com/v1/messages")), body={})
+    client.beta.messages = type("M", (), {"create": staticmethod(lambda **kw: (_ for _ in ()).throw(other))})()
+    with pytest.raises(anthropic.BadRequestError):
+        job.default_call(cost, client=client)("s", "{}", schema, max_tokens=100, stage="architecture")
+    assert len(plain.sent) == 1
+    # an error that only MENTIONS the schema, but is not the API's 400, is not a refusal either
+    server = anthropic.InternalServerError("Error code: 500 - invalid_request grammar 400 schema", response=httpx.Response(500, request=httpx.Request("POST", "https://api.anthropic.com/v1/messages")), body={})
+    client.beta.messages = type("M", (), {"create": staticmethod(lambda **kw: (_ for _ in ()).throw(server))})()
+    with pytest.raises(anthropic.InternalServerError):
+        job.default_call(cost, client=client)("s", "{}", schema, max_tokens=100, stage="architecture")
+    assert len(plain.sent) == 1
+
+
 def test_the_model_client_has_room_for_a_long_answer_and_is_made_once_and_only_with_a_key(monkeypatch):
     import anthropic
     from tracker import market_radar_llm as llm, paid_strategy_job as job
