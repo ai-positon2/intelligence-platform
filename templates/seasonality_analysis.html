@@ -1,0 +1,95 @@
+{% extends "_paid_base.html" %}
+{% block title %}Seasonality Analysis{% endblock %}
+{% block head %}
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/performance_summarizer.css') }}?v=10">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/seasonality_analysis.css') }}?v=2">
+{% endblock %}
+{% block content %}
+<div class="pm pm-ps pm-sa" id="sa">
+  <section class="pm-hero">
+    <div class="pm-hero-l">
+      <span class="pm-eyebrow"><span class="d"></span>Paid Marketing · Planning</span>
+      <h1 class="pm-title">Know when your account <span class="pm-grad">earns, and plan for it.</span></h1>
+      <p class="pm-sub">Two to three years of daily numbers from Google Ads, Meta Ads or both, turned into the shape of the year: which months and
+        which days carry the account, what the holidays really did, and what to do with budgets in the next three months. Every figure is plain
+        arithmetic on the account's own history, so you can check it.</p>
+    </div>
+    <div class="ps-live" id="live" aria-live="polite"><span class="ps-live-dot"></span><span id="liveText">Connecting to your ad accounts…</span><span class="ps-upd" id="upd"></span></div>
+  </section>
+
+  <section class="pm-panel ps-cmd" id="cmd">
+    <div class="ps-cmd-grid">
+      <div id="acctPick" class="ps-cmd-acct"></div>
+      <div class="ps-cmd-block">
+        <span class="pd-dd-k">History to read</span>
+        <div class="ps-seg" id="monthsSeg" role="radiogroup" aria-label="History to read">
+          <button type="button" role="radio" data-m="36" aria-checked="true">3 years</button>
+          <button type="button" role="radio" data-m="24" aria-checked="false">2 years</button>
+        </div>
+      </div>
+    </div>
+    <div class="ps-cmd-foot">
+      <p class="ps-range-note" id="rangeNote">Each calendar month is judged on two years with three years of history and on one with two, so three shows whether a pattern repeats.</p>
+      <div class="ps-cmd-tools">
+        <button type="button" class="pm-btn-ghost" id="refreshBtn" title="Read the latest 45 days from the platform again. Older months no longer change.">
+          <svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.3-5.6M20 4v5h-5"/></svg><span>Refresh</span></button>
+        <button type="button" class="pm-btn-ghost" id="shareBtn" title="Copy a link to exactly this view">
+          <svg viewBox="0 0 24 24"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg><span>Share view</span></button>
+        <button type="button" class="pm-btn-ghost" id="exportBtn" title="Download the months and the seasonal indexes as a CSV">
+          <svg viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg><span>Export</span></button>
+      </div>
+    </div>
+  </section>
+
+  <div id="notice"></div>
+  <div class="ps-stale" id="staleBar" hidden></div>
+  <section class="pm-panel sa-warm" id="warm" hidden aria-live="polite">
+    <div class="sa-warm-t"><b id="warmT">Reading the history…</b><span id="warmS"></span></div>
+    <div class="ps-meter"><i id="warmBar" style="width:0%;--kc:var(--pm-a)"></i></div>
+    <p class="sa-warm-n">The first read of a long history takes a minute. It is saved, so the next visit opens straight away.</p>
+  </section>
+
+  <div id="dash" hidden>
+    <div class="ps-sec-h"><div><h2>What stands out</h2><span class="ps-hint ps-hint-b" id="covHint"></span></div></div>
+    <section class="sa-top">
+      <div class="pm-panel ps-card" id="heads"></div>
+      <div class="sa-kpis" id="kpis"></div>
+    </section>
+
+    <div id="aheadSec">
+      <div class="ps-sec-h"><div><h2>Coming up</h2><span class="ps-hint ps-hint-b">The next three months, from how this account behaved in the same months before. Budget steps are a starting point to apply gradually, not a rule.</span></div></div>
+      <section class="sa-ahead" id="ahead"></section>
+    </div>
+
+    <div class="ps-sec-h"><div><h2>Year over year</h2><span class="ps-hint ps-hint-b" id="yoyHint"></span></div></div>
+    <section class="pm-panel ps-card" id="yoyCard"></section>
+
+    <div id="idxSec">
+      <div class="ps-sec-h"><div><h2>The shape of the year</h2><span class="ps-hint ps-hint-b">100 is an average month for this account. Growth is taken out first, so a rising account does not make every late month look strong.</span></div></div>
+      <div class="ps-two">
+        <section class="pm-panel ps-card" id="idxCard"></section>
+        <section class="pm-panel ps-card" id="gapCard"></section>
+      </div>
+    </div>
+
+    <div class="ps-sec-h"><div><h2>Days of the week</h2><span class="ps-hint ps-hint-b" id="dowHint"></span></div></div>
+    <section class="pm-panel ps-card" id="dowCard"></section>
+
+    <div id="evSec">
+      <div class="ps-sec-h"><div><h2>Holidays and big shopping days</h2><span class="ps-hint ps-hint-b">Each holiday's days against the 28 ordinary days before it. The US retail calendar; for an account elsewhere the effect is simply small.</span></div></div>
+      <section class="pm-panel ps-card ps-tablecard" id="events"></section>
+    </div>
+
+    <div class="ps-sec-h"><div><h2>Month by month</h2><span class="ps-hint" id="tblHint"></span></div></div>
+    <section class="pm-panel ps-card ps-tablecard" id="tbl"></section>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='vendor/chart.umd.js') }}"></script>
+<script src="{{ url_for('static', filename='js/pm_picker.js') }}?v=1"></script>
+<script src="{{ url_for('static', filename='js/pm_platform.js') }}?v=4"></script>
+<script src="{{ url_for('static', filename='js/ps_data.js') }}?v=5"></script>
+<script src="{{ url_for('static', filename='js/sa_data.js') }}?v=1"></script>
+<script src="{{ url_for('static', filename='js/seasonality_analysis.js') }}?v=3"></script>
+{% endblock %}

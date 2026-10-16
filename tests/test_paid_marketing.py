@@ -128,7 +128,7 @@ def test_the_page_and_the_server_build_the_same_move_id_shape():
 # ── SQR ─────────────────────────────────────────────────────────────────────
 
 def test_server_rulesets_match_the_pages():
-    js = open(os.path.join(ROOT, "static", "js", "sqr_agent.js")).read()
+    js = open(os.path.join(ROOT, "static", "js", "sqr_core.js")).read()
     page_ids = set(re.findall(r'^\s+id: "([a-z0-9_]+)", label:', js, re.M))
     assert page_ids == set(sqr.RULESETS)
     assert "llmCategories" not in js       # the categories live server-side only
@@ -372,10 +372,10 @@ def test_state_changes_must_come_from_this_site_as_json(monkeypatch):
 
 def test_sqr_route_takes_only_ruleset_and_terms(monkeypatch):
     seen = []
-    monkeypatch.setattr(sqr, "classify", lambda rid, terms: seen.append((rid, terms)) or {"t": {"status": "Relevant"}})
+    monkeypatch.setattr(sqr, "classify", lambda rid, terms, account="": seen.append((rid, terms, account)) or {"t": {"status": "Relevant"}})
     c = client_as(STAFF)
-    r = c.post("/p2/paid-marketing/api/sqr/classify", json={"ruleset": "oia", "terms": ["t"], "prompt": "anything"}, headers=SAME)
-    assert r.status_code == 200 and seen == [("oia", ["t"])]
+    r = c.post("/p2/paid-marketing/api/sqr/classify", json={"ruleset": "oia", "terms": ["t"], "account": "AMI", "prompt": "anything"}, headers=SAME)
+    assert r.status_code == 200 and seen == [("oia", ["t"], "AMI")]
 
 
 def test_an_answer_is_readable_only_by_whoever_asked(monkeypatch):

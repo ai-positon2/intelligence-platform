@@ -4201,9 +4201,10 @@ def seo_aeo_legacy_redirect(rest=""):
 #                          the month on budget (tracker/paid_pacing.py; the
 #                          engine itself runs on the PPC team's machine and
 #                          pushes each day's result to .../api/pacing/seed)
-#   Search Query Analysis  classifies a Google Ads search-terms export per
-#                          account (rules in static/js/sqr_agent.js, the
-#                          model step in tracker/paid_sqr.py)
+#   Search Query Analysis  classifies a Google Ads account's search terms
+#                          (read live: tracker/paid_sqr_data.py; the rules
+#                          and ranking in static/js/sqr_core.js, the model
+#                          step in tracker/paid_sqr.py)
 #   Client Feedback Agent  answers questions from live Slack, Gmail, meeting
 #                          transcripts and the Budget Tracker, through ONE
 #                          shared Slack and Google account an admin connects
@@ -4223,6 +4224,15 @@ def seo_aeo_legacy_redirect(rest=""):
 #                          the account's own average, with suggested geo bid
 #                          adjustments (tracker/paid_geo.py, paid_geo_insights.py,
 #                          paid_geo_summary.py)
+#   Seasonality Analysis   the shape of the year for a Google or Meta account or
+#                          both: monthly and weekday indexes, holiday effects,
+#                          year over year and a budget plan for the next three
+#                          months, all plain arithmetic (tracker/paid_seasonality.py)
+#   Call Transcript Analyzer  what the calls an ad account drives were about,
+#                          from CallRail: every call counted by source, campaign,
+#                          keyword and location, and a read of a sample of the
+#                          transcribed ones (tracker/paid_calls.py,
+#                          paid_calls_topics.py); counts only, never call text
 _PM_PREFIX = "/p2/paid-marketing"
 
 
@@ -4441,10 +4451,10 @@ def _gads_guard(fn):
         return jsonify(error=str(e)), 502
 
 
-def _gads_account(store):
-    """The Google Ads or Meta account named by ?account=, as {id, name, currency, platform, ...}."""
+def _gads_account(store, cid=None):
+    """The Google Ads or Meta account named by ?account= (or by `cid`), as {id, name, currency, platform, ...}."""
     from tracker import paid_gads, paid_meta
-    cid = request.args.get("account", "")
+    cid = request.args.get("account", "") if cid is None else cid
     if paid_meta.is_meta(cid):
         found = {a["id"]: a for a in paid_meta.list_accounts(store)}.get(cid)
         if not found:
@@ -4616,6 +4626,29 @@ def paid_gads_products():
 
 # Search Query Analysis -------------------------------------------------------
 
+@app.route("/p2/paid-marketing/api/sqr/data")
+@position2_required
+def paid_sqr_read():
+    """One Google Ads account's search terms, keywords and negative keywords for a range (what used to be three CSV exports), and which of
+    the agent's rulesets the account's name points to. Google only: Meta has no search terms."""
+    from tracker import paid_gads, paid_sqr_data, paid_store
+
+    def run():
+        acct = _gads_account(paid_store)
+        if acct.get("platform") != "google":
+            raise ValueError("Search terms are read from Google Ads: pick a Google Ads account")
+        start, end = paid_sqr_data.check_range(request.args.get("start", ""), request.args.get("end", ""))
+        force = request.args.get("refresh") == "1"
+        if force:
+            paid_gads.refresh_guard(paid_store, "sqr:" + acct["id"])
+        notes, stamps = [], []
+        out = paid_sqr_data.read(paid_store, acct, start, end, force=force, notes=notes, stamps=stamps)
+        rid, why = paid_sqr_data.suggest_ruleset(acct["name"])
+        return jsonify(account=acct, range=[start, end], ruleset={"id": rid, "why": why}, stale=min(notes) if notes else None,
+                       fetchedAt=paid_gads.oldest(stamps), blockedUntil=_platform_blocked(acct, paid_store), **out)
+    return _gads_guard(run)
+
+
 @app.route("/p2/paid-marketing/api/sqr/classify", methods=["POST"])
 @position2_required
 def paid_sqr_classify():
@@ -4623,7 +4656,7 @@ def paid_sqr_classify():
     from tracker.market_radar_llm import ModelError
     body = request.get_json(silent=True) or {}
     try:
-        results = paid_sqr.classify(body.get("ruleset"), body.get("terms"))
+        results = paid_sqr.classify(body.get("ruleset"), body.get("terms"), account=body.get("account") or "")
     except paid_sqr.BadRequest as e:
         return jsonify(error=str(e)), 400
     except ModelError as e:
@@ -4905,6 +4938,190 @@ def paid_geo_summary():
     _GEO_SUMMARY_USES[email] = (today, used + 1)
     key = (report["account"]["id"], report["level"], ctype, report["range"]["from"], report["range"]["to"])
     return jsonify(paid_geo_summary.cached_summary(key, report, view, ctype))
+
+
+# Seasonality Analysis --------------------------------------------------------
+# When in the year an account earns, and what to do about it: a Google Ads account, a Meta ad account, or one of each added
+# together, over up to three years of daily numbers (tracker/paid_seasonality.py; every figure is plain arithmetic, no model).
+# The page first reads the history slice by slice (api/gads/seasonality/warm, newest year first, so no request is long and a
+# failure keeps what was read), then asks for the analysis, which then answers from the stored days.
+
+@app.route("/p2/paid-marketing/seasonality-analysis")
+@position2_required
+def paid_seasonality_analysis():
+    return render_template("seasonality_analysis.html", user=_get_user())
+
+
+def _season_accounts(store):
+    """The one or two accounts ?account= names, each as _gads_account returns it. A platform that is not connected is
+    left out of a combined account (named in the second value) rather than failing the whole read."""
+    from tracker import paid_gads, paid_meta, paid_seasonality
+    ids = paid_seasonality.parse_account(request.args.get("account", ""))
+    accts, problems = [], []
+    for cid in ids:
+        meta = paid_meta.is_meta(cid)
+        problem = paid_meta.config_problem() if meta else paid_gads.config_problem()
+        if problem:
+            if len(ids) == 1:
+                raise paid_gads.NotConfigured(problem)
+            problems.append(problem)
+            continue
+        accts.append(_gads_account(store, cid))
+    if not accts:
+        raise paid_gads.NotConfigured(problems[0])
+    return accts, problems
+
+
+def _season_run(fn):
+    from tracker import paid_gads, paid_seasonality, paid_store
+    try:
+        accts, problems = _season_accounts(paid_store)
+        out = fn(accts, paid_store)
+        if problems:
+            out["warnings"] = list(out.get("warnings") or []) + problems
+        out["accounts"] = accts
+        out["blockedUntil"] = max((_platform_blocked(a, paid_store) or 0) for a in accts) or None
+        return jsonify(out)
+    except paid_seasonality.BadRequest as e:
+        return jsonify(error=str(e)), 400
+    except ValueError as e:
+        return jsonify(error=str(e)), 400
+    except paid_gads.NotConfigured as e:
+        return jsonify(error=str(e), configProblem=str(e)), 409
+    except paid_gads.RefreshTooSoon as e:
+        return jsonify(error=str(e), cooldown=True, retryIn=e.retry_in), 429
+    except paid_gads.OverQuota as e:
+        return jsonify(error=str(e), blockedUntil=e.until), 429
+    except paid_gads.AdsError as e:
+        app.logger.warning("paid marketing: seasonality read failed: %s", e)
+        return jsonify(error=str(e)), 502
+
+
+@app.route("/p2/paid-marketing/api/gads/seasonality/warm")
+@position2_required
+def paid_gads_seasonality_warm():
+    """Read one slice (?part=0 is the newest year) of the history into the stored days. ?refresh=1 re-reads the latest
+    45 days only, at most once every two minutes per account."""
+    from tracker import paid_gads, paid_seasonality
+
+    def run(accts, store):
+        months = paid_seasonality.check_months(request.args.get("months"))
+        start, end = paid_seasonality.window(months)
+        try:
+            part = int(request.args.get("part", "0"))
+        except ValueError:
+            raise paid_seasonality.BadRequest("part should be a whole number")
+        if request.args.get("refresh") == "1":
+            start = max(start, (paid_seasonality._d(end) - timedelta(days=paid_seasonality.REFRESH_DAYS - 1)).isoformat())
+            paid_gads.refresh_guard(store, "season:" + request.args.get("account", ""))
+            return paid_seasonality.warm(store, accts, start, end, 0, force=True)
+        return paid_seasonality.warm(store, accts, start, end, part)
+    return _season_run(run)
+
+
+@app.route("/p2/paid-marketing/api/gads/seasonality")
+@position2_required
+def paid_gads_seasonality():
+    from tracker import paid_seasonality
+
+    def run(accts, store):
+        months = paid_seasonality.check_months(request.args.get("months"))
+        return paid_seasonality.report(store, accts, months)
+    return _season_run(run)
+
+
+# Call Transcript Analyzer ----------------------------------------------------
+# What the calls an ad account drives were about, from CallRail (tracker/paid_calls.py, paid_calls_topics.py): every call of a range
+# counted by CallRail's own summary, and a sample of the transcribed ones read for what callers wanted and whether they got an
+# appointment. The accounts are HIPAA accounts: no summary, transcript, name or number is ever returned or stored, only counts
+# and call metadata with a link to the call in CallRail. All routes are GETs behind the Position2 login.
+
+CALLS_SOURCE_OK = re.compile(r"^[\w .&+/()\-]{1,60}$")
+
+
+@app.route("/p2/paid-marketing/call-transcript-analyzer")
+@position2_required
+def paid_call_analyzer():
+    return render_template("call_analyzer.html", user=_get_user())
+
+
+def _calls_run(fn):
+    from tracker import paid_calls, paid_gads, paid_store
+    problem = paid_calls.config_problem()
+    if problem:
+        return jsonify(error=problem, configProblem=problem), 409
+    try:
+        return jsonify(fn(paid_store))
+    except ValueError as e:
+        return jsonify(error=str(e)), 400
+    except paid_gads.RefreshTooSoon as e:
+        return jsonify(error=str(e), cooldown=True, retryIn=e.retry_in), 429
+    except paid_gads.OverQuota as e:
+        return jsonify(error=str(e), blockedUntil=e.until, rateLimited=True), 429
+    except paid_gads.AdsError as e:
+        app.logger.warning("paid marketing: callrail read failed: %s", e)
+        return jsonify(error=str(e)), 502
+
+
+def _calls_view(store, scope):
+    """(account, company id, source, start, end, force, notes, stamps) from the query string, checked against what the key can read."""
+    from tracker import paid_calls, paid_gads
+    account = paid_calls.account_of(store, request.args.get("account", ""))
+    start, end = paid_calls.check_range(request.args.get("start", ""), request.args.get("end", ""))
+    company = paid_calls.check_company(paid_calls.list_companies(store, account["id"]), request.args.get("company", ""))
+    source = request.args.get("source", "").strip()
+    if source and not CALLS_SOURCE_OK.match(source):
+        raise ValueError("that source name is not one CallRail uses")
+    force = request.args.get("refresh") == "1"
+    if force:
+        paid_gads.refresh_guard(store, "calls:%s:%s:%s" % (scope, account["id"], company or "-"))
+    return account, company, source, start, end, force, [], []
+
+
+@app.route("/p2/paid-marketing/api/calls/accounts")
+@position2_required
+def paid_calls_accounts():
+    from tracker import paid_calls
+
+    def run(store):
+        return {"accounts": paid_calls.list_accounts(store), "limits": paid_calls.limits() if _pm_is_admin() else None}
+    return _calls_run(run)
+
+
+@app.route("/p2/paid-marketing/api/calls/locations")
+@position2_required
+def paid_calls_locations():
+    from tracker import paid_calls
+
+    def run(store):
+        account = paid_calls.account_of(store, request.args.get("account", ""))
+        return {"account": account, "locations": paid_calls.list_companies(store, account["id"])}
+    return _calls_run(run)
+
+
+@app.route("/p2/paid-marketing/api/calls/overview")
+@position2_required
+def paid_calls_overview():
+    from tracker import paid_calls, paid_gads
+
+    def run(store):
+        account, company, source, start, end, force, notes, stamps = _calls_view(store, "overview")
+        out = paid_calls.overview(store, account["id"], start, end, company_id=company, source=source, force=force, notes=notes, stamps=stamps)
+        return {"account": account, "overview": out, "stale": min(notes) if notes else None, "fetchedAt": paid_gads.oldest(stamps)}
+    return _calls_run(run)
+
+
+@app.route("/p2/paid-marketing/api/calls/analysis")
+@position2_required
+def paid_calls_analysis():
+    from tracker import paid_calls, paid_gads
+
+    def run(store):
+        account, company, source, start, end, force, notes, stamps = _calls_view(store, "analysis")
+        out = paid_calls.analysis(store, account["id"], start, end, company_id=company, source=source, force=force, notes=notes, stamps=stamps)
+        return {"account": account, "analysis": out, "recording": account["recording"], "stale": min(notes) if notes else None,
+                "fetchedAt": paid_gads.oldest(stamps)}
+    return _calls_run(run)
 
 
 # QA Agent --------------------------------------------------------------------
@@ -19105,9 +19322,13 @@ campaign, campaign type, device or network, compared with the previous period or
 (/p2/paid-marketing/product-analysis): for ecommerce accounts, every Shopping and Performance Max product sorted into
 stars, steady sellers, below target and spend with no sales, the products that carry the account, and a list of what
 to cut, fix or push. Search Query Analysis
-(/p2/paid-marketing/search-query-analysis): upload a search terms CSV; each account's rules (Riccobene, OIA,
-Eventgroove, 42 North, McHale, Beta Bionics placeholder, or generic) settle most terms, Claude classifies the
-rest, and it outputs priority negatives, new keywords, client-review items and a 7-sheet workbook. Client
+(/p2/paid-marketing/search-query-analysis): pick a Google Ads account and a date range (up to 92 days); the search
+terms, the account's keywords and its negative keywords are read live from Google Ads (a CSV upload is still
+offered as a fallback). The account's rules (Riccobene, OIA, Eventgroove, 42 North, McHale, Beta Bionics
+placeholder, or generic, chosen from the account name) settle most terms, Claude classifies the rest that were
+clicked, and it outputs priority negatives (ranked by money spent on terms that never converted; ones that
+converted or would block relevant terms or a keyword the account bids on are held back for review), new keywords
+(never one already bid on or already blocked), client-review items and a workbook. Client
 Feedback Agent (/p2/paid-marketing/client-feedback-agent): a chat that answers from live Slack, Gmail, meeting
 transcripts (Zoom first when configured, else the Meeting Notes Drive folder) and the Budget Tracker, through
 one shared Slack and Google account an admin connects. Segment Analysis (/p2/paid-marketing/segment-analysis):
@@ -19130,7 +19351,7 @@ lists, goals, final URL loading and more), and Claude judges the rest from that 
 book. It flags what is wrong with the fix and the evidence, and lists as needing a human anything it cannot verify, such as the
 account's automatically created asset switches, which Google Ads does not show to the API; it never guesses a pass. A person
 can confirm or overrule any check. The verdict: NOT READY if any check is flagged, INCOMPLETE if any check could not be
-verified, otherwise READY TO LAUNCH. Each QC is saved per campaign. Geo Performance (/p2/paid-marketing/geo-performance): pick a Google Ads account or MCC, a Meta ad account, or a Google and a Meta account together, a date range and a location level (country, region, metro area, city, county or postal code; Meta has country, region and DMA), and it reads the platform live to show performance by place. Each place is judged against the account's own average (an efficiency index of 100 is average, from return on ad spend when the account has conversion value, otherwise cost per conversion) as strong, above average, on par, below average, weak, leaking spend, or too little data to judge, and where there are at least 5 conversions it suggests a geo bid adjustment (80% of the gap, in 5% steps, capped at +40% and -50%), a starting point to apply gradually. Places are where people were when they saw the ad, so a place can appear that is not targeted. Charts to choose from: ranked bars, spend against results, share of spend against conversions, share of a total, and efficiency against spend, with a table and CSV export. A short summary is written by Claude from the computed insights only.
+verified, otherwise READY TO LAUNCH. Each QC is saved per campaign. Geo Performance (/p2/paid-marketing/geo-performance): pick a Google Ads account or MCC, a Meta ad account, or a Google and a Meta account together, a date range and a location level (country, region, metro area, city, county or postal code; Meta has country, region and DMA), and it reads the platform live to show performance by place. Each place is judged against the account's own average (an efficiency index of 100 is average, from return on ad spend when the account has conversion value, otherwise cost per conversion) as strong, above average, on par, below average, weak, leaking spend, or too little data to judge, and where there are at least 5 conversions it suggests a geo bid adjustment (80% of the gap, in 5% steps, capped at +40% and -50%), a starting point to apply gradually. Places are where people were when they saw the ad, so a place can appear that is not targeted. Charts to choose from: ranked bars, spend against results, share of spend against conversions, share of a total, and efficiency against spend, with a table and CSV export. A short summary is written by Claude from the computed insights only. Seasonality Analysis (/p2/paid-marketing/seasonality-analysis): pick a Google Ads account, a Meta ad account or one of each, and it reads two or three years of daily numbers to show the shape of the year: a seasonal index for each calendar month (100 is an average month, after taking out growth with a centred 12-month moving average, so it needs 13 months in a row of history), the same for the days of the week, what each US retail holiday did to conversions, spend and cost per conversion against the ordinary days before it, this year against last year, and for the next three months the expected demand, the expected cost per conversion and a starting budget change in 5% steps. Every figure is plain arithmetic, no model is asked to find a pattern; a promotion or an outage in a month looks like a season, so a single year of history is shown as a lead, not a rule. Call Transcript Analyzer (/p2/paid-marketing/call-transcript-analyzer): reads CallRail (the agency's two accounts, OIA and 42 North Dental, and their locations) to show every call of a range counted by CallRail itself (calls, answered, missed, first-time callers, CallRail leads) by source, campaign, keyword and location, with the locations whose missed calls stand out, and a read of a sample of the transcribed calls by plain keyword rules (not a model): what callers wanted (new patient, pain, treatment, existing appointment, insurance, records), how many people looking for care ended in an appointment, the likeliest reason for the ones that did not, CallRail's own lead score and sentiment, and the calls that look like lost opportunities with a link to open each in CallRail. These are HIPAA accounts: no caller name, number, summary or transcript is shown, stored or sent to an AI model. OIA has no recordings, so it shows counts only.
 
 SEO STUDIO (/p2/seo-aeo/<tool>) and the /app agents: a suite of SEO/GEO tools (Keyword Finder, Content Brief
 Generator, Content Enhancer, SEO & GEO Audit, Agentic Readiness Audit, Competitor Analysis, and more).

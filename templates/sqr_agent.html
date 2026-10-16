@@ -1,77 +1,105 @@
 {% extends "_paid_base.html" %}
 {% block title %}Search Query Analysis{% endblock %}
 {% block head %}
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" defer></script>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/performance_summarizer.css') }}?v=10">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" defer></script>
 {% endblock %}
 {% block content %}
-<div class="pm pm-sqr">
+<div class="pm pm-ps pm-sqr" id="sqr">
   <section class="pm-hero">
     <div class="pm-hero-l">
       <span class="pm-eyebrow"><span class="d"></span>Paid Marketing · Search terms</span>
       <h1 class="pm-title">Every search term, <span class="pm-grad">sorted.</span></h1>
-      <p class="pm-sub">Drop in a Google Ads search terms export. Each account's own rules (brand, competitors,
-        territories, insurance) settle most terms instantly; <b>Claude reads only the ones the rules can't</b>.
-        Out come priority negatives, new keywords and a 7-sheet workbook.</p>
+      <p class="pm-sub">Pick a Google Ads account and a date range. Its search terms, keywords and negative keywords are <b>read straight from Google Ads</b>:
+        no exports to download. The account's own rules (brand, competitors, territories, insurance) settle most terms instantly; <b>Claude reads only
+        the clicked ones the rules can't</b>. Out come priority negatives, new keywords and a workbook.</p>
+    </div>
+    <div class="ps-live" id="live" aria-live="polite"><span class="ps-live-dot"></span><span id="liveText">Connecting to Google Ads…</span><span class="ps-upd" id="upd"></span></div>
+  </section>
+
+  <!-- 1 · Account and days -->
+  <section class="pm-panel ps-cmd" id="cmd">
+    <div class="ps-cmd-grid">
+      <div id="acctPick" class="ps-cmd-acct"></div>
+      <div class="ps-cmd-block">
+        <span class="pd-dd-k">Date range</span>
+        <div class="ps-ranges" id="ranges" role="group" aria-label="Date range"></div>
+        <div class="ps-custom" id="custom" hidden>
+          <input type="date" id="cStart" aria-label="Start date"><span>to</span><input type="date" id="cEnd" aria-label="End date">
+          <button type="button" class="pm-chip on" id="cApply">Apply</button>
+        </div>
+      </div>
+    </div>
+    <div class="ps-cmd-foot">
+      <p class="ps-range-note" id="rangeNote"></p>
+      <div class="ps-cmd-tools">
+        <button type="button" class="pm-btn-ghost" id="refreshBtn" title="Read this account from Google Ads again. The numbers are saved, so this is only needed when you want the very latest.">
+          <svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.3-5.6M20 4v5h-5"/></svg><span>Refresh</span></button>
+      </div>
     </div>
   </section>
 
-  <!-- 1 · Account -->
+  <div id="notice"></div>
+  <div class="ps-stale" id="staleBar" hidden></div>
+  <div class="sq-data" id="dataLine" aria-live="polite"></div>
+
+  <!-- 2 · Rules -->
   <section class="pm-panel sq-bar">
     <div class="sq-bar-l">
       <span class="sq-num">1</span>
       <div class="sq-dd" id="dd">
-        <button type="button" class="sq-dd-btn" id="ddBtn" aria-haspopup="listbox" aria-expanded="false" aria-label="Account"></button>
+        <button type="button" class="sq-dd-btn" id="ddBtn" aria-haspopup="listbox" aria-expanded="false" aria-label="Rules"></button>
         <div class="sq-dd-menu" id="ddMenu" hidden>
-          <input class="sq-dd-search" id="ddSearch" placeholder="Filter accounts…" autocomplete="off" aria-label="Filter accounts">
-          <div role="listbox" id="ddList" aria-label="Accounts"></div>
+          <input class="sq-dd-search" id="ddSearch" placeholder="Filter rules…" autocomplete="off" aria-label="Filter rules">
+          <div role="listbox" id="ddList" aria-label="Rules"></div>
         </div>
       </div>
     </div>
     <button type="button" class="sq-rules-btn" id="rulesBtn" aria-expanded="false" aria-controls="rulesetNote"><span class="i">i</span>How this account is judged</button>
+    <p class="sq-why" id="rulesWhy"></p>
   </section>
   <div class="sq-note" id="rulesetNote" hidden></div>
 
-  <!-- 2 · Exports -->
-  <div class="sq-head"><span class="sq-num">2</span><h2>Drop in the exports</h2>
-    <span class="hint">Google Ads UI exports, as CSV. Read in your browser.</span></div>
-  <div class="sq-drops">
-    <label class="sq-drop main" id="drop-terms">
-      <input type="file" accept=".csv,text/csv" id="file-terms">
-      <span class="ic"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/><path d="M8 11h6"/></svg></span>
-      <span class="ttl">Search terms report</span>
-      <span class="req">Required</span>
-      <span class="sub">Drag it here, or <span class="browse">browse</span>. Every term gets a verdict: relevant, competitor, not relevant, or client review.</span>
-      <span class="sq-file" id="file-terms-name"></span>
-    </label>
-    <label class="sq-drop" id="drop-keywords">
-      <input type="file" accept=".csv,text/csv" id="file-keywords">
-      <span class="ic"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h10M4 17h7"/></svg></span>
-      <span class="body"><span class="ttl">Keyword report</span><span class="req">Optional</span>
-        <span class="sub">So it never suggests a keyword you already bid on.</span>
-        <span class="sq-file" id="file-keywords-name"></span></span>
-    </label>
-    <label class="sq-drop" id="drop-negs">
-      <input type="file" accept=".csv,text/csv" id="file-negs">
-      <span class="ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8 12h8"/></svg></span>
-      <span class="body"><span class="ttl">Negative keyword report</span><span class="req">Optional</span>
-        <span class="sub">So it never re-suggests a negative that's already in place.</span>
-        <span class="sq-file" id="file-negs-name"></span></span>
-    </label>
-  </div>
-
   <!-- 3 · Run -->
   <section class="pm-panel sq-run">
-    <span class="sq-num">3</span>
-    <div class="sq-meter">
-      <div class="top"><span id="readyText">Add the search terms report to start.</span><b id="readyCount">0 / 3</b></div>
-      <div class="sq-track" id="track"><i></i><i></i><i></i></div>
-    </div>
+    <span class="sq-num">2</span>
+    <div class="sq-meter"><div class="top"><span id="readyText">Pick an account to start.</span></div></div>
     <div class="sq-actions">
       <button class="pm-btn sq-go" id="runBtn" disabled>Run analysis <kbd>⌘↵</kbd></button>
       <button class="pm-btn-ghost" id="dlBtn" disabled><svg viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>Workbook (.xlsx)</button>
     </div>
     <span class="sq-status" id="statusLine" style="flex-basis:100%"></span>
   </section>
+
+  <!-- Fallback: the exports, for an account Google Ads cannot be read for -->
+  <details class="sq-fallback" id="csvFallback">
+    <summary>Can't read Google Ads? Use CSV exports instead</summary>
+    <p class="sq-hint">Google Ads UI exports, as CSV, read in your browser. With a search terms file added, the analysis runs on the files and ignores the account above.</p>
+    <div class="sq-drops">
+      <label class="sq-drop main" id="drop-terms">
+        <input type="file" accept=".csv,text/csv" id="file-terms">
+        <span class="ic"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/><path d="M8 11h6"/></svg></span>
+        <span class="ttl">Search terms report</span>
+        <span class="req">Required</span>
+        <span class="sub">Drag it here, or <span class="browse">browse</span>. Every term gets a verdict: relevant, competitor, not relevant, or client review.</span>
+        <span class="sq-file" id="file-terms-name"></span>
+      </label>
+      <label class="sq-drop" id="drop-keywords">
+        <input type="file" accept=".csv,text/csv" id="file-keywords">
+        <span class="ic"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h10M4 17h7"/></svg></span>
+        <span class="body"><span class="ttl">Keyword report</span><span class="req">Optional</span>
+          <span class="sub">So it never suggests a keyword you already bid on.</span>
+          <span class="sq-file" id="file-keywords-name"></span></span>
+      </label>
+      <label class="sq-drop" id="drop-negs">
+        <input type="file" accept=".csv,text/csv" id="file-negs">
+        <span class="ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8 12h8"/></svg></span>
+        <span class="body"><span class="ttl">Negative keyword report</span><span class="req">Optional</span>
+          <span class="sub">So it never re-suggests a negative that's already in place.</span>
+          <span class="sq-file" id="file-negs-name"></span></span>
+      </label>
+    </div>
+  </details>
 
   <div id="results"></div>
 
@@ -86,5 +114,9 @@
 </div>
 {% endblock %}
 {% block scripts %}
-<script src="{{ url_for('static', filename='js/sqr_agent.js') }}?v=3"></script>
+<script src="{{ url_for('static', filename='js/pm_picker.js') }}?v=1"></script>
+<script src="{{ url_for('static', filename='js/pm_platform.js') }}?v=4"></script>
+<script src="{{ url_for('static', filename='js/ps_data.js') }}?v=5"></script>
+<script src="{{ url_for('static', filename='js/sqr_core.js') }}?v=5"></script>
+<script src="{{ url_for('static', filename='js/sqr_agent.js') }}?v=10"></script>
 {% endblock %}
