@@ -110,3 +110,37 @@ def test_automatic_sends_the_account_profile_and_an_empty_range_offers_a_longer_
 def test_every_ruleset_gets_the_profile_and_the_account_name_for_its_brand():
     js = read(PAGE)
     assert "accountName: inp.account" in js and "const profile = accountProfile(inp);" in js
+
+
+@pytest.mark.skipif(not shutil.which("node"), reason="node is not installed")
+def test_the_keyword_tables_show_what_each_term_spent():
+    """Run the page's own drawing code for the Priority keywords tab: Cost sits next to Conv and Cost / conv, and holds each term's spend."""
+    js = read(PAGE)
+
+    def grab(name):
+        m = re.search(r"^(?:function " + name + r"\b[^\n]*\}$|function " + name + r"\b.*?^\}|const " + name + r" = [^\n]*;$)", js, re.S | re.M)
+        assert m, name + " not found in the page script"
+        return m.group(0)
+
+    src = "\n".join(grab(n) for n in ("esc", "money", "num", "none", "hint", "tbl", "paneKws"))
+    harness = (
+        "const S = { currency: 'USD' }; const fmtConv = v => String(v); const PRIORITY_N = 1; const Core = {};\n" + src + "\n"
+        "const k = { term: 'beta bionic ilet pump', assetType: 'Keyword', matchType: 'Exact Match', whereToAdd: 'Brand / Branded', conversions: 5, cost: 73.7, cpa: 14.74, ctr: 0.336, clicks: 43, tier: 1 };\n"
+        "const k2 = { term: 'ilet pump cost', assetType: 'Keyword', matchType: 'Exact Match', whereToAdd: 'X / Y', conversions: 2, cost: 1234.5, cpa: 617.25, ctr: 0.1, clicks: 9, tier: 2 };\n"
+        "process.stdout.write(paneKws({ priorityKeywords: [k, k2], allKeywords: [k, k2] }));"
+    )
+    out = subprocess.run(["node", "-e", harness], capture_output=True, text=True, timeout=30)
+    assert out.returncode == 0, out.stderr
+    html = out.stdout
+    heads = re.findall(r"<th(?: [^>]*)?>(.*?)</th>", html)
+    assert heads[:9] == ["Term", "Type", "Match", "Where to add", "Conv", "Cost", "Cost / conv", "CTR", "Clicks"], heads
+    assert heads[9] == "Tier" and heads[10:] == ["Term", "Type", "Conv", "Cost"], heads
+    first = re.findall(r"<td[^>]*>(.*?)</td>", html.split("<tbody>")[1].split("</tbody>")[0])
+    assert first[4:7] == ["5", "$73.70", "$14.74"], first                     # Conv, Cost, Cost / conv
+    assert "$1,234.50" in html and "$617.25" in html
+    assert re.findall(r"<td[^>]*>(.*?)</td>", html.split("<tbody>")[2])[:4] == ["ilet pump cost", "Keyword", "2", "$1,234.50"]   # the list past the priority rows
+
+
+def test_the_workbook_keeps_cost_on_both_keyword_sheets():
+    js = read(PAGE)
+    assert '"Clicks", "Cost"], ...r.allKeywords.map(' in js and "k.clicks, k.cost.toFixed(2)])" in js

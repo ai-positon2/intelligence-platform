@@ -471,11 +471,11 @@ function paneCheck(r){
 }
 function paneKws(r){
   const rows = r.priorityKeywords.map(k => '<tr><td class="sq-term">' + esc(k.term) + '</td><td>' + esc(k.assetType) + '</td><td>' + esc(k.matchType) + '</td><td>' + esc(k.whereToAdd) + '</td><td class="r num">' + fmtConv(k.conversions) +
-    '</td><td class="r num">' + (k.cpa == null ? "–" : money(k.cpa, false)) + '</td><td class="r num">' + (k.ctr * 100).toFixed(1) + '%</td><td class="r num">' + num(k.clicks) + '</td><td><span class="pm-pill ' + (k.tier === 1 ? "ok" : "under") + '">Tier ' + k.tier + '</span></td></tr>').join("");
-  const ref = r.allKeywords.slice(PRIORITY_N).map(k => '<tr><td class="sq-term">' + esc(k.term) + '</td><td>' + esc(k.assetType) + '</td><td class="r num">' + fmtConv(k.conversions) + '</td></tr>').join("");
+    '</td><td class="r num">' + money(k.cost, false) + '</td><td class="r num">' + (k.cpa == null ? "–" : money(k.cpa, false)) + '</td><td class="r num">' + (k.ctr * 100).toFixed(1) + '%</td><td class="r num">' + num(k.clicks) + '</td><td><span class="pm-pill ' + (k.tier === 1 ? "ok" : "under") + '">Tier ' + k.tier + '</span></td></tr>').join("");
+  const ref = r.allKeywords.slice(PRIORITY_N).map(k => '<tr><td class="sq-term">' + esc(k.term) + '</td><td>' + esc(k.assetType) + '</td><td class="r num">' + fmtConv(k.conversions) + '</td><td class="r num">' + money(k.cost, false) + '</td></tr>').join("");
   return '<div class="pane" id="pane-kws" hidden>' + hint("Relevant terms the account does not bid on yet. Tier 1 converted at least once; tier 2 drew clicks at a good click rate (or a partial conversion). Ranked by tier, conversions, then clicks.") +
-    (rows ? tbl([["Term"], ["Type"], ["Match"], ["Where to add"], ["Conv", 1], ["Cost / conv", 1], ["CTR", 1], ["Clicks", 1], ["Tier"]], rows) : none()) +
-    (ref ? '<details class="sq-ref"><summary>All eligible keywords (' + r.allKeywords.length + ')</summary>' + tbl([["Term"], ["Type"], ["Conv", 1]], ref) + '</details>' : "") + '</div>';
+    (rows ? tbl([["Term"], ["Type"], ["Match"], ["Where to add"], ["Conv", 1], ["Cost", 1], ["Cost / conv", 1], ["CTR", 1], ["Clicks", 1], ["Tier"]], rows) : none()) +
+    (ref ? '<details class="sq-ref"><summary>All eligible keywords (' + r.allKeywords.length + ')</summary>' + tbl([["Term"], ["Type"], ["Conv", 1], ["Cost", 1]], ref) + '</details>' : "") + '</div>';
 }
 function paneReview(r){
   const rows = r.clientReview.map(c => '<tr><td>' + esc(c.subtype) + '</td><td class="r num">' + c.count + '</td><td class="r num">' + money(c.cost, false) + '</td><td class="r num">' + fmtConv(c.conversions) + '</td><td class="sq-term">' + esc(c.examples.join(", ")) + '</td></tr>').join("");
@@ -510,7 +510,7 @@ $id("dlBtn").addEventListener("click", () => {
     ...r.priorityKeywords.map(k => [k.term, k.assetType, k.matchType, k.addLevel, k.whereToAdd, k.tier, fmtConv(k.conversions), k.cpa == null ? "" : k.cpa.toFixed(2), (k.ctr * 100).toFixed(2) + "%", k.clicks, k.cost.toFixed(2)])]);
   add("Client Review Required", [["Issue Type", "Rows", "Spend", "Conversions", "Costliest Example Terms"], ...r.clientReview.map(c => [c.subtype, c.count, c.cost.toFixed(2), fmtConv(c.conversions), c.examples.join("; ")])]);
   add("All Negatives (Reference)", [[...negHead, "Check"], ...r.allNegatives.map(n => [...negRowX(n), n.risks.join("; ")])]);
-  add("All Keywords (Reference)", [["Term", "Asset Type", "Match Type", "Where To Add", "Tier", "Conversions", "CTR", "Clicks"], ...r.allKeywords.map(k => [k.term, k.assetType, k.matchType, k.whereToAdd, k.tier, fmtConv(k.conversions), (k.ctr * 100).toFixed(2) + "%", k.clicks])]);
+  add("All Keywords (Reference)", [["Term", "Asset Type", "Match Type", "Where To Add", "Tier", "Conversions", "CTR", "Clicks", "Cost"], ...r.allKeywords.map(k => [k.term, k.assetType, k.matchType, k.whereToAdd, k.tier, fmtConv(k.conversions), (k.ctr * 100).toFixed(2) + "%", k.clicks, k.cost.toFixed(2)])]);
   const blob = new Blob([XLSX.write(wb, { bookType: "xlsx", type: "array" })], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
   const slug = String(ran.account || r.ruleset.id).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40);
   const filename = "SQR_Analysis_" + slug + "_" + new Date().toISOString().slice(0, 10) + ".xlsx";
