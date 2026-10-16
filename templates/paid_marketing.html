@@ -12,7 +12,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-tokens.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-components.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/gtm.css') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/paid_marketing.css') }}?v=22">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/paid_marketing.css') }}?v=23">
   <script src="/static/js/theme.js"></script>
   <link rel="stylesheet" href="/static/css/aurora-app.css?v=3">
   <script src="/static/js/aurora.js?v=1" defer></script>
@@ -68,7 +68,7 @@
     <div class="dash-grid pm-sec-grid">
 
       <!-- Paid Marketing Agents. 1 to 3 are from Agent Holmes (2026-10-12); 4,
-           Segment Analysis, is new on the platform. Geo Performance was added 2026-10-15. The hub card's
+           Segment Analysis, is new on the platform. Geo Performance was added 2026-10-15 and Seasonality Analysis 2026-10-16. The hub card's
            "N dashboards / N live" counts these; tests/test_hub_card_counts.py
            checks the two agree. -->
 
@@ -237,6 +237,26 @@
         </div>
       </a>
 
+      <!-- 9. Seasonality Analysis (2026-10-16): the shape of the year, and what to do with the next three months -->
+      <a href="/p2/paid-marketing/seasonality-analysis" class="dash-card active c-season">
+        <div class="card-band"></div>
+        <div class="card-thumb">
+          <div class="card-thumb-icon"><svg class="au-ic" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M3 12c2.2 0 2.2-6 4.5-6S10 18 12.5 18 15 6 17.5 6 19.5 12 21 12"/></svg></div>
+          <div class="card-thumb-badge tb-live"><span class="tb-dot live"></span> Live</div>
+        </div>
+        <div class="card-body">
+          <div class="card-name">Seasonality Analysis</div>
+          <div class="card-desc">
+            Two to three years of an account's daily numbers, from Google, Meta or both, turned into the shape of the year:
+            the strong and slow months, the best days, what each holiday did, and what to do with the next three months.
+          </div>
+          <div class="card-footer">
+            <div class="card-tags"><span class="tag">Planning</span><span class="tag">Budgets</span></div>
+            <span class="card-arrow">→</span>
+          </div>
+        </div>
+      </a>
+
     </div>
 
     <p class="footer-note">Position2 · Internal use only</p>
@@ -272,6 +292,7 @@
     {t:'Client Feedback Agent',d:'Ask Slack, Gmail & meeting notes',u:'/p2/paid-marketing/client-feedback-agent',i:'✦'},
     {t:'Segment Analysis',d:'Day, hour, age, gender, city, device & network',u:'/p2/paid-marketing/segment-analysis',i:'◔'},
     {t:'Geo Performance',d:'Performance by location, with geo bid adjustments',u:'/p2/paid-marketing/geo-performance',i:'◍'},
+    {t:'Seasonality Analysis',d:'The shape of the year, and the next three months',u:'/p2/paid-marketing/seasonality-analysis',i:'∿'},
     {t:'QA Agent',d:'Campaign launch QC checklist',u:'/p2/paid-marketing/qa-agent',i:'✓'}
   ];
   var ITEMS=(window.__KP_ITEMS||[]).concat(BASE);

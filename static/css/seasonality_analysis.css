@@ -1,0 +1,81 @@
+/* Seasonality Analysis (Paid Marketing Agents).
+   Loaded after performance_summarizer.css and reuses its command bar, key cards, chart cards, tables and notices.
+   Accent: amber into coral, the colours of a turning year. */
+
+.pm.pm-ps.pm-sa{--pm-a:#f59e0b;--pm-a2:#ff7a59}
+[data-theme="light"] .pm.pm-ps.pm-sa{--pm-a:#b45309;--pm-a2:#c2410c}
+
+/* ── Reading the history ── */
+.sa-warm{padding:18px 22px;border-radius:20px;margin:0 0 18px}
+.sa-warm[hidden]{display:none}
+.sa-warm-t{display:flex;flex-wrap:wrap;align-items:baseline;gap:10px}
+.sa-warm-t b{font-size:15px;color:var(--pm-ink)}
+.sa-warm-t span{font-size:12.5px;color:var(--pm-muted)}
+.sa-warm .ps-meter{margin:12px 0 10px}
+.sa-warm #warmBar{transition:width .45s var(--ease,ease)}
+.sa-warm-n{margin:0;font-size:12px;color:var(--pm-faint)}
+
+/* ── What stands out ── */
+.sa-top{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(280px,1fr);gap:16px;align-items:start}
+.sa-top>*{min-width:0}
+.sa-heads{list-style:none;margin:0;padding:0;display:grid;gap:10px}
+.sa-heads li{position:relative;padding:10px 14px 10px 34px;border-radius:14px;background:var(--pm-panel2);border:1px solid var(--pm-line);
+  font-size:14px;line-height:1.55;color:var(--pm-ink2,var(--pm-ink))}
+.sa-heads li::before{content:"";position:absolute;left:14px;top:17px;width:9px;height:9px;border-radius:50%;background:var(--pm-a);box-shadow:0 0 10px var(--pm-a)}
+.sa-note{margin:14px 0 0;padding:11px 14px;border-radius:12px;font-size:12.5px;line-height:1.6;color:var(--pm-muted);
+  border:1px dashed color-mix(in srgb,#fbbf24 55%,transparent);background:color-mix(in srgb,#fbbf24 7%,transparent)}
+.sa-kpis{display:grid;grid-template-columns:repeat(var(--cols,1),minmax(0,1fr));gap:12px}
+.sa-kpis-h{grid-column:1 / -1;font-size:10.5px;font-weight:700;letter-spacing:var(--ls-caps);text-transform:uppercase;color:var(--pm-faint);margin:0 2px -2px}
+
+/* ── Coming up ── */
+.sa-ahead{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+.sa-mo{--vc:#8b94be;position:relative;overflow:hidden;display:flex;flex-direction:column;gap:12px;padding:18px 18px 16px;border-radius:20px;min-width:0;
+  border:1.5px solid color-mix(in srgb,var(--vc) 50%,var(--pm-line2));
+  background:linear-gradient(165deg,color-mix(in srgb,var(--vc) 11%,var(--pm-panel)) 0%,var(--pm-panel) 62%);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.05),0 24px 46px -34px var(--vc),var(--pm-shadow);animation:psIn .45s var(--ease,ease) both;animation-delay:calc(var(--i) * 80ms)}
+.sa-mo::before{content:"";position:absolute;left:0;right:0;top:0;height:4px;background:linear-gradient(90deg,var(--vc),color-mix(in srgb,var(--vc) 25%,transparent))}
+.sa-mo-h{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.sa-mo-n{font-family:'Bricolage Grotesque','Space Grotesk',sans-serif;font-size:22px;font-weight:700;letter-spacing:-.02em;color:var(--pm-ink)}
+.sa-mo-y{margin-left:8px;font-size:12px;color:var(--pm-faint)}
+.sa-badge{font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;padding:5px 10px;border-radius:999px;color:var(--vc);
+  background:color-mix(in srgb,var(--vc) 14%,transparent);border:1px solid color-mix(in srgb,var(--vc) 45%,transparent)}
+.sa-idx{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.sa-it{display:flex;flex-direction:column;gap:2px;padding:9px 10px;border-radius:12px;background:var(--pm-panel2);border:1px solid var(--pm-line);min-width:0}
+.sa-it .k{font-size:10.5px;line-height:1.3;color:var(--pm-faint)}
+.sa-it b{font-size:22px;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.sa-adv{margin:0;font-size:13.5px;line-height:1.55;color:var(--pm-ink2,var(--pm-ink))}
+.sa-bud{margin:0;font-size:13px;color:var(--pm-muted)}
+.sa-bud b{color:var(--vc)}
+.sa-small{margin:0;font-size:12px;line-height:1.5;color:var(--pm-faint)}
+.sa-ev{list-style:none;margin:2px 0 0;padding:10px 0 0;border-top:1px solid var(--pm-line);display:grid;gap:7px}
+.sa-ev li{display:flex;flex-direction:column;gap:1px;font-size:12.5px}
+.sa-ev b{color:var(--pm-ink);font-weight:600}
+.sa-ev span{color:var(--pm-muted)}
+
+/* ── Charts and tables ── */
+select.ps-sel{appearance:none;-webkit-appearance:none;padding:7px 30px 7px 12px;font:600 12px 'Space Grotesk',sans-serif;max-width:100%;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238b94be' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 9px center;background-size:14px}
+select.ps-sel option{color:#111;background:#fff}
+.sa-short.ps-wrap{height:260px}
+.sa-table th,.sa-table td{text-align:left}
+.sa-table td.num,.sa-table th.num{text-align:right;font-variant-numeric:tabular-nums}
+.sa-when{color:var(--pm-muted);font-size:12.5px}
+.sa-pill{display:inline-block;min-width:54px;text-align:center;padding:3px 9px;border-radius:999px;font-weight:700;font-size:12px;font-variant-numeric:tabular-nums;
+  background:color-mix(in srgb,var(--pm-faint) 16%,transparent);color:var(--pm-muted)}
+.sa-pill.good{background:color-mix(in srgb,#34d399 16%,transparent);color:#34d399}
+.sa-pill.bad{background:color-mix(in srgb,#fb7185 16%,transparent);color:#fb7185}
+[data-theme="light"] .sa-pill.good{color:#047857}
+[data-theme="light"] .sa-pill.bad{color:#be123c}
+.sa-tag{display:inline-block;margin-left:6px;padding:1px 7px;border-radius:999px;font-size:10.5px;font-weight:600;color:var(--pm-faint);border:1px solid var(--pm-line2)}
+.sa-dim td{color:var(--pm-faint)}
+.sa-dim td b{color:var(--pm-muted)}
+
+@media (max-width:1000px){
+  .sa-top{grid-template-columns:minmax(0,1fr)}
+  .sa-ahead{grid-template-columns:minmax(0,1fr)}
+}
+@media (max-width:520px){
+  .sa-idx{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .sa-it b{font-size:19px}
+}

@@ -365,12 +365,16 @@ def test_refresh_reads_again_and_a_second_refresh_straight_after_is_refused(cach
     cache_get = paid_store.get_gads_cache
     report(search, force=True)
     assert len(calls) > n
+    real = getattr(paid_store, "get_gads_entry", None)          # put back what was there: deleting it broke every later test that patches it
     paid_store.get_gads_entry = lambda key, ttl: (cache.get(key), "2026-06-30T00:00:00+00:00") if key in cache else None
     try:
         with pytest.raises(base.RefreshTooSoon):
             report(search, force=True)
     finally:
-        del paid_store.get_gads_entry
+        if real is None:
+            del paid_store.get_gads_entry
+        else:
+            paid_store.get_gads_entry = real
 
 
 def test_when_the_quota_is_spent_the_last_saved_read_is_served_with_its_date(cache, monkeypatch):

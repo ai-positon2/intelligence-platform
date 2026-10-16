@@ -372,6 +372,15 @@ def q_campaign_days(start, end, fields=()):
             "FROM campaign WHERE segments.date BETWEEN '%s' AND '%s'" % (_metrics(fields), start, end))
 
 
+def q_account_days(start, end, fields=()):
+    """The whole account, one row per day: one request reads years of it, where q_campaign_days is a row per campaign per day."""
+    return ("SELECT segments.date, %s FROM customer WHERE segments.date BETWEEN '%s' AND '%s'"
+            % (_metrics(fields), start, end))
+
+
+ACCOUNT_CAMPAIGN = {"id": "ACCOUNT", "name": "All campaigns", "advertisingChannelType": "ACCOUNT"}
+
+
 def q_campaign_sis(start, end):
     return ("SELECT campaign.id, metrics.search_impression_share FROM campaign "
             "WHERE segments.date BETWEEN '%s' AND '%s' AND campaign.advertising_channel_type = 'SEARCH'"
@@ -759,14 +768,18 @@ def assemble_days(days, per_day):
     return {"start": days[0], "end": days[-1], "days": list(days), "campaigns": camps, "rows": rows, "missing": sorted(missing)}
 
 
-def campaign_days(store, customer_id, start, end, *, force=False, notes=None, stamps=None, http=None):
+def campaign_days(store, customer_id, start, end, *, force=False, notes=None, stamps=None, http=None, account=False):
     """Campaign-by-day numbers for the range, from the days already stored; only days never read, or older than their
     time-to-live (or all of them, with `force`), are asked for, one query per run of consecutive days. If Google cannot
-    answer, stored days of any age stand in (their times go to `notes`); a day that was never stored cannot."""
+    answer, stored days of any age stand in (their times go to `notes`); a day that was never stored cannot.
+
+    With `account`, the same thing for the whole account in one row a day (the five core numbers only, kept under their own
+    key so they never mix with the campaign rows): years of history in one request, for pages that need no campaign split."""
     d0, d1 = dt.date.fromisoformat(start), dt.date.fromisoformat(end)
     days = [(d0 + dt.timedelta(days=i)).isoformat() for i in range((d1 - d0).days + 1)]
+    key = customer_id + ":acct" if account else customer_id
     try:
-        stored = store.get_gads_days(customer_id, start, end)
+        stored = store.get_gads_days(key, start, end)
     except Exception as e:
         log.warning("gads: stored days could not be read (%s)", e)
         stored = {}
@@ -776,14 +789,18 @@ def campaign_days(store, customer_id, start, end, *, force=False, notes=None, st
     stamp = {d: stored[d][1] for d in days if d in stored}
     for first, last in _runs(need):
         try:
-            rows, used = search_pruned(customer_id, lambda f: q_campaign_days(first, last, f), [o[0] for o in OPTIONAL],
-                                       _BAD, store, http=http)
+            if account:
+                rows, used = search_pruned(customer_id, lambda f: q_account_days(first, last, f), [], _BAD, store, http=http)
+                rows = [dict(r, campaign=ACCOUNT_CAMPAIGN) for r in rows]
+            else:
+                rows, used = search_pruned(customer_id, lambda f: q_campaign_days(first, last, f), [o[0] for o in OPTIONAL],
+                                           _BAD, store, http=http)
         except AdsError as e:
             if not _can_serve_stale(e):
                 raise
             lost = [d for d in _span(first, last) if d not in per_day]
             if lost:
-                legacy = _legacy_range(store, customer_id, start, end)
+                legacy = None if account else _legacy_range(store, customer_id, start, end)
                 if legacy is not None:
                     if notes is not None:
                         notes.append(legacy[1])
@@ -797,7 +814,7 @@ def campaign_days(store, customer_id, start, end, *, force=False, notes=None, st
             continue
         fresh = split_days(parse_campaign_days(rows, first, last, used))
         try:
-            store.put_gads_days(customer_id, fresh)
+            store.put_gads_days(key, fresh)
         except Exception as e:
             log.warning("gads: could not store days (%s)", e)
         now = _now_iso()
