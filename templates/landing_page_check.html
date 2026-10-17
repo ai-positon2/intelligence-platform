@@ -1,0 +1,86 @@
+{% extends "_paid_base.html" %}
+{% block title %}Landing Page &amp; Relevancy Check{% endblock %}
+{% block head %}
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/account_audit.css') }}?v=5">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/landing_page_check.css') }}?v=1">
+{% endblock %}
+{% block content %}
+<div class="pm pm-au pm-lp" id="lp">
+  <section class="pm-hero">
+    <div class="pm-hero-l">
+      <span class="pm-eyebrow"><span class="d"></span>Paid Marketing · Build &amp; Launch</span>
+      <h1 class="pm-title">Does the page keep the promise the ad made? <span class="pm-grad">See it for every landing page.</span></h1>
+      <p class="pm-sub">Pick a Google Ads account. The agent reads what each landing page took over the last 30 days, the ads, keywords and search terms that send people
+        there, then <b>fetches the pages</b> and holds each one against a written checklist: does it open, does it say what the keywords and the ad said, can a visitor act,
+        does it work on a phone, does it load fast, is it tracked. Every score is arithmetic on what Google and the page showed, and a page that refuses us is
+        <b>not verified</b>, never failed.</p>
+    </div>
+  </section>
+
+  <section class="pm-panel pd-cmd au-cmd" id="cmd">
+    <div class="au-cmd-row">
+      <div id="acctPick"></div>
+      <p class="au-scope">Read only: nothing is changed in Google Ads, and the pages are only fetched. One account at a time (an MCC is not checked). The busiest 40 pages are checked.
+        The read is saved for an hour, so the same report opens at once, and Refresh asks Google and the sites again.</p>
+    </div>
+  </section>
+
+  <div id="msg"></div>
+
+  <div id="empty" class="pm-panel sg-empty">
+    <div class="sg-empty-ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v14H4zM4 9h16M8 13h5M8 16h8"/></svg></div>
+    <h2>Choose an account to begin</h2>
+    <p>The first read of an account takes up to half a minute: it asks Google Ads, then fetches the pages.</p>
+  </div>
+  <div id="skel" hidden><div class="pd-skel"></div><div class="pd-skel"></div><div class="pd-skel"></div></div>
+
+  <div id="out" hidden>
+    <div class="sg-head">
+      <p class="pd-fresh" id="fresh"></p>
+      <button class="pm-btn-ghost" id="refreshBtn" type="button" title="Read the account and the pages again"><svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.3-5.6M20 4v5h-5"/></svg>Refresh</button>
+      <a class="pm-btn-ghost" id="dlXlsx" href="#" download><svg viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>Excel</a>
+      <a class="pm-btn-ghost" id="dlPdf" href="#" download><svg viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>PDF</a>
+      <a class="pm-btn-ghost" id="dlZip" href="#" download><svg viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>CSV files</a>
+    </div>
+    <div class="au-stale" id="stale" hidden></div>
+
+    <section class="pm-panel au-score" id="score"></section>
+    <div class="pd-strip au-tiles lp-tiles" id="tiles"></div>
+
+    <section class="pm-panel" id="sectionsCard">
+      <div class="pm-panel-h"><span class="pm-panel-t">How the pages do, by question</span><span class="pm-panel-s">Each page's score in that section, weighted by what the page spent</span></div>
+      <div class="lp-secs" id="secs"></div>
+    </section>
+
+    <section class="pm-panel" id="fixCard">
+      <div class="pm-panel-h"><span class="pm-panel-t">Fix first</span><span class="pm-panel-s" id="fixNote"></span></div>
+      <ol class="au-fix" id="fix"></ol>
+    </section>
+
+    <section class="pm-panel lp-pages" id="pagesCard">
+      <div class="pm-panel-h"><span class="pm-panel-t">Every landing page</span><span class="pm-panel-s" id="pagesNote"></span></div>
+      <div class="au-tools lp-tools">
+        <div class="pm-chips" role="radiogroup" aria-label="Which pages" id="viewChips"></div>
+        <label class="lp-sort"><span class="pd-dd-k">Sort</span>
+          <select id="sortSel" aria-label="Sort the pages"></select></label>
+        <label class="au-find"><input type="text" id="pageFind" placeholder="Find a page, keyword or ad group..." aria-label="Find a page" autocomplete="off"></label>
+      </div>
+      <ul class="lp-list" id="pageList"></ul>
+      <button type="button" class="pm-btn-ghost au-more-btn" id="moreBtn" hidden></button>
+    </section>
+
+    <section class="pm-panel" id="notesCard" hidden>
+      <div class="pm-panel-h"><span class="pm-panel-t">What this check could not see</span></div>
+      <ul class="au-notes" id="notes"></ul>
+    </section>
+    <p class="au-foot" id="foot"></p>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/pm_picker.js') }}?v=1"></script>
+<script src="{{ url_for('static', filename='js/pm_platform.js') }}?v=4"></script>
+<script src="{{ url_for('static', filename='js/au_data.js') }}?v=2"></script>
+<script src="{{ url_for('static', filename='js/lp_data.js') }}?v=1"></script>
+<script src="{{ url_for('static', filename='js/landing_page_check.js') }}?v=1"></script>
+{% endblock %}

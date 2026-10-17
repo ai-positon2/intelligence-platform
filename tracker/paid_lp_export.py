@@ -20,7 +20,7 @@ from .paid_strategy_export import CELL_CHARS, SHEET_NAME_BAD, _csv_text, plain
 
 RESULT_TEXT = {"pass": "Pass", "warn": "Warning", "fail": "Fail", "na": "Not applicable", "unknown": "Could not check"}
 SEVERITY_TEXT = {"critical": "Critical", "high": "High", "medium": "Medium", "low": "Low"}
-ON_TEXT = {"headline": "In the headline", "page": "On the page", "partial": "Part of it", "none": "Not on the page", None: "Not checked"}
+ON_TEXT = {"headline": "In the headline", "page": "On the page", "partial": "Partly there", "none": "Not on the page", None: "Not checked"}
 RATING_TEXT = {"below": "Below average", "average": "Average", "above": "Above average", None: ""}
 PDF_AFFECTED = 5
 PDF_PAGES = 30                                     # pages whose problems the PDF lists (the Excel file has every one)
@@ -98,10 +98,12 @@ def tables(report):
     if fix:
         fr = []
         for i, f in enumerate(fix):
-            f = _full(f, catalog)
-            fr.append([i + 1, f.get("pageName") or f.get("page"), f.get("spend"), labels.get(f["section"], f["section"]), "%s %s" % (f["id"], f["title"]), SEVERITY_TEXT.get(f["severity"], f["severity"]),
-                       RESULT_TEXT.get(f["result"], f["result"]), f["found"], _affected(f), f["fix"]])
-        out["Fix first"] = (["Order", "Page", "Page spend", "Section", "Check", "Severity", "Result", "What was found", "Affected", "What to do"], fr)
+            c = catalog.get(f["id"], {})
+            pages_ = f.get("pages") or []
+            fr.append([i + 1, "%s %s" % (f["id"], c.get("title", f["id"])), labels.get(c.get("section", ""), c.get("section", "")), SEVERITY_TEXT.get(f["severity"], f["severity"]),
+                       RESULT_TEXT.get(f["result"], f["result"]), f.get("failed", 0), f.get("warned", 0), f.get("spend"), "; ".join(x["pageName"] for x in pages_), f["found"],
+                       c.get("fix", "")])
+        out["Fix first"] = (["Order", "Check", "Section", "Severity", "Result", "Pages failing", "Pages warning", "Spend on those pages", "Pages (the biggest first)", "Example of what was found", "What to do"], fr)
 
     allrows, unknown = [], []
     for p in pages:
@@ -150,7 +152,7 @@ def xlsx(report):
     wb.remove(wb.active)
     head_fill, head_font, wrap = PatternFill("solid", fgColor="1F2A44"), Font(bold=True, color="FFFFFF"), Alignment(wrap_text=True, vertical="top")
     fills = {"Fail": "FFD9D6", "Warning": "FFF1CC", "Pass": "DDF3E2", "Could not check": "E4E8F0", "Not on the page": "FFD9D6", "In the headline": "DDF3E2", "On the page": "DDF3E2",
-             "Part of it": "FFF1CC"}
+             "Partly there": "FFF1CC"}
     used = set()
     for name, (header, rows) in tables(report).items():
         name = SHEET_NAME_BAD.sub("", name)[:31] or "Sheet"
@@ -265,11 +267,12 @@ def pdf(report):
     if "Fix first" in all_tables:
         fix_rows = []
         for i, f in enumerate(report.get("fixFirst") or []):
-            f = _full(f, catalog)
-            fix_rows.append([i + 1, f.get("pageName") or f.get("page"), "%s %s" % (f["id"], f["title"]), SEVERITY_TEXT.get(f["severity"], f["severity"]), RESULT_TEXT.get(f["result"], f["result"]),
-                             f["found"] + ((" Affected: " + _affected(f, PDF_AFFECTED)) if _affected(f) else ""), f["fix"]])
-        story += [PageBreak(), P("Fix first", h2), table(["No.", "Page", "Check", "Severity", "Result", "What was found", "What to do"], fix_rows, shade_col=4,
-                                                        weights=[0.5, 1.8, 1.8, 0.8, 0.8, 4.4, 3.0])]
+            c = catalog.get(f["id"], {})
+            pages_ = f.get("pages") or []
+            fix_rows.append([i + 1, "%s %s" % (f["id"], c.get("title", f["id"])), SEVERITY_TEXT.get(f["severity"], f["severity"]), RESULT_TEXT.get(f["result"], f["result"]),
+                             "%d failing, %d warning, %s spent. %s Pages: %s." % (f.get("failed", 0), f.get("warned", 0), f.get("spend"), f["found"], "; ".join(x["pageName"] for x in pages_[:PDF_AFFECTED])),
+                             c.get("fix", "")])
+        story += [PageBreak(), P("Fix first", h2), table(["No.", "Check", "Severity", "Result", "What was found", "What to do"], fix_rows, shade_col=3, weights=[0.5, 1.8, 0.8, 0.8, 5.0, 3.2])]
     if "Pages" in all_tables:
         rows = [[r[0], r[1], r[2], r[6], r[7], r[8], r[9], r[10]] for r in all_tables["Pages"][1]]
         story += [PageBreak(), P("Every page checked", h2), table(["Page", "Spend", "Clicks", "Score", "Grade", "Failed", "Warnings", "Could not check"], rows, weights=[6.0, 0.9, 0.8, 0.9, 0.7, 0.7, 0.8, 1.0])]

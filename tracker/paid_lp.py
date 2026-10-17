@@ -35,7 +35,7 @@ BadRequest = seg.BadRequest
 log = logging.getLogger(__name__)
 
 ID_RE = re.compile(r"^\d{10}$")
-MAX_PAGES = 24                                     # fetched and checked per account, the ones that spent most
+MAX_PAGES = 40                                     # fetched and checked per account, the ones that spent most
 MIN_JUDGED = 10                                    # checks a page needs judged (not "could not check") before it counts towards the account's score
 CACHE_VERSION = "1"                                # bump when the shape of a saved read changes
 TTL_S = 3600
@@ -44,6 +44,7 @@ SHOWN_GROUPS = 8                                   # ad groups shown per page
 SHOWN_KEYWORDS = 12
 SHOWN_TERMS = 8
 SHOWN_HEADLINES = 6
+FIX_ITEMS = 6                                      # affected things named under one page of the fix-first list
 NOTES = [
     "Pages are fetched from our servers and only their HTML is read, as a browser first receives it. Anything a script adds after load is not seen, so a page "
     "built by scripts is reported as such, not failed.",
@@ -216,7 +217,7 @@ def assemble(raw, now=None, labs=None):
         p["rated"] = p["checked"] and (p["summary"]["judged"] >= MIN_JUDGED or not p["summary"]["opens"])
     rated = [p for p in pages_out if p["rated"]]
     for_rank = [{"url": p["url"], "name": p["name"], "spend": p["spend"], "findings": p["_findings"]} for p in judged]
-    fix = [dict(_prune(f), page=f["page"], pageName=f["pageName"], spend=f["spend"]) for f in model.fix_first(for_rank)]
+    fix = [dict(row, pages=[dict(x, items=x["items"][:FIX_ITEMS]) for x in row["pages"]]) for row in model.fix_first(for_rank)]
     for p in pages_out:
         p.pop("_findings")
     tally = {r: 0 for r in model.RESULTS}

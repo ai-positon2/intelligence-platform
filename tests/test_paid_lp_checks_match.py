@@ -222,6 +222,11 @@ def test_the_share_of_rated_spend_below_average():
     assert f["result"] == "fail" and "30%" in f["found"] and f["items"] == ["b"]
     rows = [keyword("a", 80.0, landingPage="above"), keyword("b", 20.0, landingPage="below")]
     assert run("match_lp_experience", groups=kw_group(rows))["result"] == "warn"
+    rows = [keyword("a", 91.0, landingPage="above"), keyword("b", 9.0, landingPage="below")]
+    small = run("match_lp_experience", groups=kw_group(rows))
+    assert small["result"] == "pass" and small["items"] == ["b"] and "9%" in small["found"]            # too small a share to ask anyone to act on
+    rows = [keyword("a", 90.0, landingPage="above"), keyword("b", 10.0, landingPage="below")]
+    assert run("match_lp_experience", groups=kw_group(rows))["result"] == "warn"
     rows = [keyword("a", 80.0, landingPage="average"), keyword("b", 20.0, landingPage="above")]
     assert run("match_lp_experience", groups=kw_group(rows))["result"] == "pass"
 
@@ -244,6 +249,13 @@ def test_the_rating_check_names_the_biggest_offenders_first_and_caps_the_list():
     rows = [keyword("kw%d" % i, float(100 - i), landingPage="below") for i in range(20)]
     f = run("match_lp_experience", groups=kw_group(rows))
     assert f["items"][0] == "kw0" and len(f["items"]) == cm.SHOWN and f["count"] == 20
+
+
+def test_the_same_keyword_in_two_ad_groups_is_named_once():
+    g1 = group("g1", "One", keywords=[keyword("dentist near me", 60.0, landingPage="below")])
+    g2 = group("g2", "Two", keywords=[keyword("dentist near me", 40.0, landingPage="below")])
+    f = run("match_lp_experience", groups=[g1, g2])
+    assert f["items"] == ["dentist near me"] and f["count"] == 2
 
 
 def test_a_page_reached_by_several_ad_groups_pools_their_keywords():

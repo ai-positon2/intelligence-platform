@@ -131,15 +131,38 @@ def weighted_score(pages):
     return round(sum(s * w for s, w in scored) / total)
 
 
+FIX_PAGES = 8                                      # pages named under one check in the fix-first list
+
+
 def fix_first(pages, limit=12):
-    """The checks to put right first across the pages: failed and warned ones, ordered by severity, then failure before warning, then by what
-    the page spent. Each row is the finding with the page it is on (`page`: url) and what that page spent (`spend`)."""
-    rows = []
+    """The checks to put right first across the pages, one row per check (the same check failing on twenty pages is one thing to fix): the failed and
+    warned ones, most severe first, failures before warnings, then the one with most spend on the pages it fails on. A row is
+    {id, severity, result, found, spend, pages: [{url, pageName, pageId, spend, result, severity, found, items, count}], failed, warned}: `severity` is the most severe
+    any page's finding had, `result` is fail when any page fails, `found` is the sentence of the page that spent most, `spend` is what all its pages spent, and
+    `pages` are the worst and biggest of them (FIX_PAGES)."""
+    by = {}
     for p in pages:
         for f in p.get("findings") or []:
-            if f["result"] in ("fail", "warn"):
-                rows.append(dict(f, page=p["url"], pageName=p.get("name") or p["url"], spend=p.get("spend") or 0.0))
-    rows.sort(key=lambda f: (SEVERITIES.index(f["severity"]), ("fail", "warn").index(f["result"]), -f["spend"], f["id"], f["page"]))
+            if f["result"] not in ("fail", "warn"):
+                continue
+            spend = float(p.get("spend") or 0.0)
+            row = by.setdefault(f["id"], {"id": f["id"], "pages": [], "spend": 0.0})
+            row["spend"] += spend
+            row["pages"].append({"url": p["url"], "pageName": p.get("name") or p["url"], "pageId": p.get("name") or p["url"], "spend": spend, "result": f["result"],
+                                 "severity": f["severity"], "found": f["found"], "items": f.get("items") or [], "count": f.get("count", 0)})
+    rows = []
+    for row in by.values():
+        row["pages"].sort(key=lambda x: (("fail", "warn").index(x["result"]), -x["spend"], x["url"]))
+        row["failed"] = sum(1 for x in row["pages"] if x["result"] == "fail")
+        row["warned"] = len(row["pages"]) - row["failed"]
+        row["result"] = "fail" if row["failed"] else "warn"
+        row["severity"] = min((x["severity"] for x in row["pages"]), key=SEVERITIES.index)
+        row["found"] = row["pages"][0]["found"]
+        row["spend"] = round(row["spend"], 2)
+        rows.append(row)
+    rows.sort(key=lambda r: (SEVERITIES.index(r["severity"]), ("fail", "warn").index(r["result"]), -r["spend"], r["id"]))
+    for r in rows:
+        r["pages"] = r["pages"][:FIX_PAGES]
     return rows[:limit]
 
 

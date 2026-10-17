@@ -9,7 +9,7 @@ thing, and look at page speed, mobile, forms and calls to action, to lift Qualit
 
 ## What it does
 
-Pick a Google Ads account. The page reads, read only, the 30 days of what the account sent to each landing page and then fetches the pages that
+Pick a Google Ads account. The page reads, read only, the 30 days of what the account sent to each landing page and then fetches the 40 pages that
 took the most money and holds each one against a written checklist.
 
 From Google Ads, per landing page: spend, clicks, conversions, the mobile and desktop split, Google's own mobile speed score where it gives one; per ad

@@ -378,6 +378,27 @@ def test_no_robots_file_means_nothing_is_blocked_and_an_unreadable_one_means_unk
     assert p.make_robots(robots_fetcher("<html><body>a page</body></html>"))("https://a.test/x") is None
 
 
+def test_a_robots_request_that_fails_is_made_once_more_and_a_second_failure_is_unknown_not_blocked():
+    state = {"n": 0}
+
+    def flaky(url, **kw):
+        if url.endswith("/robots.txt"):
+            state["n"] += 1
+            if state["n"] == 1:
+                raise OSError("reset")
+            return Resp(200, url, b"User-agent: AdsBot-Google\nDisallow: /private\n", {"Content-Type": "text/plain"})
+        return Resp(200, url, html_bytes(), {"Content-Type": "text/html"})
+    allowed = p.make_robots(flaky)
+    assert allowed("https://a.test/private/x") is False and state["n"] == 2
+    always = {"n": 0}
+
+    def down(url, **kw):
+        always["n"] += 1
+        raise OSError("down")
+    allowed2 = p.make_robots(down)
+    assert allowed2("https://a.test/x") is None and allowed2("https://a.test/y") is None and always["n"] == 2       # tried twice, then remembered for the run
+
+
 def test_robots_txt_is_read_once_per_site():
     calls = []
     allowed = p.make_robots(robots_fetcher("User-agent: *\nAllow: /\n", calls=calls))

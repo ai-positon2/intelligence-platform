@@ -157,12 +157,21 @@ def test_a_keyword_the_page_lacks_is_marked_none():
     assert f["match_keywords_page"]["result"] in ("warn", "fail") and "orthodontist braces" in f["match_keywords_page"]["found"]
 
 
-def test_the_fix_first_list_puts_the_worst_checks_first_with_the_page_and_what_it_spent():
+def test_the_fix_first_list_is_one_row_per_check_worst_first_with_the_pages_and_what_they_spent():
     out = run(fetcher=Fetcher({"/lp": (200, b"<html><body>" + b"<p>nothing useful here</p>" * 20 + b"</body></html>")}))
     fix = out["fixFirst"]
-    assert fix and fix[0]["severity"] == "critical" and fix[0]["page"] == "https://acme-dental.com/lp" and fix[0]["spend"] == 1000.0 and fix[0]["pageName"] == "acme-dental.com/lp"
+    assert fix and fix[0]["severity"] == "critical" and fix[0]["spend"] == 1000.0 and fix[0]["pages"][0]["url"] == "https://acme-dental.com/lp" and fix[0]["pages"][0]["pageId"] == "acme-dental.com/lp"
+    assert len({r["id"] for r in fix}) == len(fix) and fix[0]["id"] in out["catalog"]
     sev = [model.SEVERITIES.index(f["severity"]) for f in fix]
     assert sev == sorted(sev)
+
+
+def test_the_same_check_failing_on_several_pages_is_one_row_that_names_them():
+    pages = [page_row("https://acme-dental.com/p%d" % i, float(500 - i), "MOBILE", 100, 2) for i in range(3)]
+    ads = [ad_row("g%d" % i, "G%d" % i, "C", "https://acme-dental.com/p%d" % i, 100.0, ("Zebra Grooming",), ("Free zebra stripes",)) for i in range(3)]
+    out = run(search_fn=search(pages=pages, ads=ads), fetcher=Fetcher({"/p0": (200, GOOD_HTML), "/p1": (200, GOOD_HTML), "/p2": (200, GOOD_HTML)}))
+    offers = next(r for r in out["fixFirst"] if r["id"] == "match_offers")
+    assert offers["failed"] == 3 and offers["spend"] == 500.0 + 499.0 + 498.0 and [x["pageId"] for x in offers["pages"]] == ["acme-dental.com/p0", "acme-dental.com/p1", "acme-dental.com/p2"]
 
 
 # ── Pages that could not be verified ────────────────────────────────────────

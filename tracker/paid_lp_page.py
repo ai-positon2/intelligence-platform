@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import logging
 import re
+import threading
 import time
 import urllib.robotparser
 from concurrent.futures import ThreadPoolExecutor, wait
@@ -449,18 +450,23 @@ def make_robots(fetcher=None):
     the rules written for every crawler ('*') and obeys only the ones that name it, so a site with no AdsBot rule is open to it."""
     if fetcher is None:
         from .event_intel_http import public_get as fetcher
-    cache = {}
+    cache, lock = {}, threading.Lock()
 
     def rules(parts):
         key = (parts.scheme, parts.netloc)
-        if key not in cache:
-            cache[key] = None
-            status, _f, _h, body, _n, _c, _a, _t, err = _once("%s://%s/robots.txt" % key, fetcher, html_only=False)
-            if err == "" and status == 200 and body is not None and "<html" not in body[:400].lower():
+        with lock:                                           # one reader per site, the others wait for its answer
+            if key not in cache:
+                body = None
+                for _try in range(2):                        # a request that fails is made once more: one bad moment must not leave a whole site unchecked
+                    status, _f, _h, text, _n, _c, _a, _t, err = _once("%s://%s/robots.txt" % key, fetcher, html_only=False)
+                    if err == "" and status == 200 and text is not None and "<html" not in text[:400].lower():
+                        body = text
+                        break
+                    if err == "" and 400 <= status < 500:
+                        body = ""                            # no robots.txt: nothing is blocked
+                        break
                 cache[key] = body
-            elif err == "" and 400 <= status < 500:
-                cache[key] = ""                              # no robots.txt: nothing is blocked
-        return cache[key]
+            return cache[key]
 
     def allowed(url):
         parts = urlsplit(url)

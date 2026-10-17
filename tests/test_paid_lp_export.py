@@ -68,11 +68,13 @@ def test_a_page_that_could_not_be_verified_says_so_instead_of_a_score(report):
     assert all(dict(zip(header, row))["Score"] == "Not verified" and dict(zip(header, row))["Grade"] == "" for row in rows)
 
 
-def test_fix_first_lists_the_worst_findings_with_the_page_and_what_to_do(report):
+def test_fix_first_is_one_row_per_check_with_the_pages_it_fails_on_and_what_to_do(report):
     header, rows = ex.tables(report)["Fix first"]
     first = dict(zip(header, rows[0]))
-    assert first["Page"] and first["Page spend"] > 0 and first["What to do"] and first["Check"].split(" ")[0] in report["catalog"]
+    assert first["Check"].split(" ")[0] in report["catalog"] and first["What to do"] and first["Pages (the biggest first)"] and first["Spend on those pages"] > 0
+    assert first["Pages failing"] + first["Pages warning"] >= 1 and first["Example of what was found"]
     assert [dict(zip(header, r))["Severity"] for r in rows][0] in ("Critical", "High")
+    assert len({r[1] for r in rows}) == len(rows)
 
 
 def test_all_checks_has_every_finding_of_every_page_with_why_and_fix(report):

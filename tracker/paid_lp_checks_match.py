@@ -22,7 +22,7 @@ HEADLINE_OK, HEADLINE_FAIR = 0.5, 0.25             # share of keyword spend whos
 TERMS_OK, TERMS_FAIR = 0.7, 0.45                   # share of search term spend whose words are on the page
 TERMS_MIN = 3                                      # search terms needed to judge
 ECHO_OK, ECHO_FAIR = 0.6, 0.3                      # share of ad group spend whose best headline the page's headings echo
-RATING_FAIL = 0.3                                  # share of rated keyword spend below average that fails
+RATING_FAIL, RATING_WARN = 0.3, 0.1                # share of rated keyword spend below average that fails, and that is worth a warning (less is noise)
 CONTENT_OK, CONTENT_THIN = 150, 50                 # visible words
 SHOWN = 8                                          # keywords or terms named in one finding
 
@@ -110,7 +110,8 @@ def _preflight(check_id, c):
 
 
 def _names(rows, n=SHOWN):
-    return [r["text"] for r in rows[:n]]
+    """The texts of the first `n` distinct keywords (the same keyword in two ad groups is named once)."""
+    return list(dict.fromkeys(r["text"] for r in rows))[:n]
 
 
 def _pct(x):
@@ -258,6 +259,8 @@ def _rating_check(check_id, key, label, c):
     if not below:
         return make(check_id, "pass", "Google rates the %s average or better for all %s rated." % (label, plural(len(rows), "keyword")))
     below.sort(key=lambda k: -k["cost"])
+    if share < RATING_WARN:
+        return make(check_id, "pass", said, items=_names(below), count=len(below))
     return make(check_id, "fail" if share >= RATING_FAIL else "warn", said, items=_names(below), count=len(below))
 
 

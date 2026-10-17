@@ -153,16 +153,39 @@ def test_a_negative_spend_is_not_a_negative_weight():
     assert m.weighted_score([{"score": 100, "spend": -50.0}, {"score": 50, "spend": 50.0}]) == 50
 
 
-def test_fix_first_is_severity_then_failure_then_the_page_that_spent_most():
+def test_fix_first_is_one_row_per_check_ordered_by_severity_then_failure_then_spend():
     setup(entry("A", severity="critical"), entry("B", severity="high"), entry("C", severity="high"), entry("D", severity="low"))
     pages = [
-        {"url": "u1", "name": "one", "spend": 100.0, "findings": [m.make("B", "warn", "x"), m.make("D", "fail", "x"), m.make("A", "pass", "x")]},
-        {"url": "u2", "name": "two", "spend": 900.0, "findings": [m.make("B", "warn", "x"), m.make("C", "fail", "x"), m.make("A", "fail", "x")]},
+        {"url": "u1", "name": "one", "spend": 100.0, "findings": [m.make("B", "warn", "b1"), m.make("D", "fail", "d1"), m.make("A", "pass", "x")]},
+        {"url": "u2", "name": "two", "spend": 900.0, "findings": [m.make("B", "warn", "b2"), m.make("C", "fail", "c2"), m.make("A", "fail", "a2")]},
     ]
     got = m.fix_first(pages)
-    assert [(f["id"], f["page"]) for f in got] == [("A", "u2"), ("C", "u2"), ("B", "u2"), ("B", "u1"), ("D", "u1")]
-    assert got[0]["pageName"] == "two" and got[0]["spend"] == 900.0
+    assert [r["id"] for r in got] == ["A", "C", "B", "D"]
+    b = next(r for r in got if r["id"] == "B")
+    assert b["result"] == "warn" and b["spend"] == 1000.0 and b["warned"] == 2 and b["failed"] == 0 and [x["url"] for x in b["pages"]] == ["u2", "u1"] and b["found"] == "b2"
     assert m.fix_first(pages, limit=2) == got[:2]
+
+
+def test_a_check_that_fails_on_some_pages_and_warns_on_others_is_a_failure_led_by_the_failing_pages():
+    setup(entry("A", severity="high"))
+    pages = [{"url": "big-warn", "name": "bw", "spend": 900.0, "findings": [m.make("A", "warn", "warned")]},
+             {"url": "small-fail", "name": "sf", "spend": 10.0, "findings": [m.make("A", "fail", "failed")]}]
+    row = m.fix_first(pages)[0]
+    assert row["result"] == "fail" and row["failed"] == 1 and row["warned"] == 1 and row["found"] == "failed" and [x["url"] for x in row["pages"]] == ["small-fail", "big-warn"]
+    assert row["spend"] == 910.0
+
+
+def test_a_findings_own_severity_is_what_counts_and_the_row_takes_the_most_severe():
+    setup(entry("A", severity="low"))
+    pages = [{"url": "u1", "name": "n1", "spend": 1.0, "findings": [m.make("A", "fail", "x")]}, {"url": "u2", "name": "n2", "spend": 1.0, "findings": [m.make("A", "fail", "x", severity="critical")]}]
+    assert m.fix_first(pages)[0]["severity"] == "critical"
+
+
+def test_a_row_names_only_the_first_few_pages_but_counts_them_all():
+    setup(entry("A", severity="high"))
+    pages = [{"url": "u%d" % i, "name": "n%d" % i, "spend": float(100 - i), "findings": [m.make("A", "fail", "x")]} for i in range(20)]
+    row = m.fix_first(pages)[0]
+    assert len(row["pages"]) == m.FIX_PAGES and row["failed"] == 20 and row["spend"] == sum(100.0 - i for i in range(20)) and row["pages"][0]["url"] == "u0"
 
 
 def test_fix_first_leaves_out_passes_and_what_could_not_be_checked():
