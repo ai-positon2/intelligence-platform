@@ -253,7 +253,7 @@ def cnv_primary(ctx):
        "feedback.",
        "Check the tag with Tag Assistant, submit a test conversion, and compare the platform's count with the client's own leads.")
 def cnv_recorded(ctx):
-    if ctx.spend is None or ctx.conversions is None:
+    if ctx.spend is None:
         return unknown("G-CNV-02", "the campaigns' numbers could not be read")
     if ctx.spend < MIN_SPEND:
         return na("G-CNV-02", "Only %s was spent in the last 30 days, too little to expect conversions." % ctx.money(ctx.spend))
@@ -577,7 +577,7 @@ def str_budget(ctx):
             held.append((x, lost))
     if not held:
         return make("G-STR-04", "pass", "No converting campaign is held back by budget.")
-    held.sort(key=lambda h: (-(h[0]["metrics"] or {}).get("cost", 0), h[0]["name"]))
+    held.sort(key=lambda h: (-h[0]["metrics"]["cost"], h[0]["name"]))
     return make("G-STR-04", "warn", "%s converting and held back by budget." % (plural(len(held), "campaign") + (" is" if len(held) == 1 else " are")),
                 items=["%s%s" % (x["name"], " (%d%% of impressions lost to budget)" % lost if lost is not None else " (budget limited)") for x, lost in held])
 
@@ -714,7 +714,7 @@ def str_rank(ctx):
 def str_paused(ctx):
     if ctx.camps is None:
         return unknown("G-STR-11", "the campaigns could not be read")
-    enabled, paused = ctx.counts.get("enabled", 0), ctx.counts.get("paused", 0)
+    enabled, paused = ctx.counts["enabled"], ctx.counts["paused"]
     if paused >= PAUSED_CLUTTER and paused >= 2 * enabled:
         return make("G-STR-11", "warn", "%s against %d enabled." % (plural(paused, "paused campaign"), enabled))
     return make("G-STR-11", "pass", "%s and %d enabled." % (plural(paused, "paused campaign"), enabled))
@@ -1073,14 +1073,17 @@ def ads_pages(ctx):
         return unknown("G-ADS-09", "the landing pages were not checked")
     if not p["results"]:
         return na("G-ADS-09", "No ad has a final URL to check.")
-    broken = [x for x in p["results"] if x.get("error") or (x.get("status") or 0) >= 400]
-    slow = [x for x in p["results"] if x not in broken and (x.get("ms") or 0) > SLOW_PAGE_MS]
+    blocked = [x for x in p["results"] if x.get("blocked")]
+    if len(blocked) == len(p["results"]):
+        return unknown("G-ADS-09", "every landing page refused the automated check (HTTP %s)" % "/".join(sorted({str(x["status"]) for x in blocked})))
+    broken = [x for x in p["results"] if not x.get("blocked") and (x["error"] or x["status"] >= 400)]
+    slow = [x for x in p["results"] if x not in broken and not x.get("blocked") and x["ms"] > SLOW_PAGE_MS]
     scope = "%d of %d landing pages" % (len(p["results"]), p["of"]) if p["of"] > len(p["results"]) else plural(len(p["results"]), "landing page")
+    note = " %s refused the automated check and could not be verified." % plural(len(blocked), "page") if blocked else ""
     if broken:
-        return make("G-ADS-09", "fail", "%d of %s did not load." % (len(broken), scope),
-                    items=["%s (%s)" % (x["url"], x.get("error") or "HTTP %d" % x["status"]) for x in broken])
+        return make("G-ADS-09", "fail", "%d of %s did not load.%s" % (len(broken), scope, note),
+                    items=["%s (%s)" % (x["url"], x["error"] or "HTTP %d" % x["status"]) for x in broken])
     if slow:
-        return make("G-ADS-09", "warn", "%d of %s took more than %d seconds to answer." % (len(slow), scope, SLOW_PAGE_MS // 1000),
+        return make("G-ADS-09", "warn", "%d of %s took more than %d seconds to answer.%s" % (len(slow), scope, SLOW_PAGE_MS // 1000, note),
                     items=["%s (%.1f seconds)" % (x["url"], x["ms"] / 1000.0) for x in slow])
-    return make("G-ADS-09", "pass", "Checked %s: all loaded." % scope)
-
+    return make("G-ADS-09", "pass", "Checked %s: all loaded.%s" % (scope, note))

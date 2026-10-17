@@ -15,6 +15,7 @@ def one(cid, read=None, **over):
     rd.update(over)
     out = c.run(rd, only={cid})
     assert len(out) == 1 and out[0]["id"] == cid
+    assert "the check itself failed" not in out[0]["found"], out[0]["found"]       # a check handles every read itself; the runner's net is for bugs
     return out[0]
 
 
@@ -62,7 +63,9 @@ def test_active_account():
     for status in ("SUSPENDED", "CANCELED", "CLOSED"):
         f = one("G-SET-01", customer_with(status=status))
         assert f["result"] == "fail" and status.lower() in f["found"]
-    assert one("G-SET-01", customer_with(status="UNKNOWN"))["result"] == "unknown"
+    f = one("G-SET-01", customer_with(status="UNKNOWN"))
+    assert f["result"] == "unknown" and "(it said UNKNOWN)" in f["found"]
+    assert "(it said nothing)" in one("G-SET-01", customer_with(status=""))["found"]
     assert one("G-SET-01", customer_with(test=True))["result"] == "fail"
     t = one("G-SET-01", customer_with(test=True, status="ENABLED"))
     assert "test account" in t["found"]
@@ -94,6 +97,8 @@ def test_enhanced_conversions_need_the_data_terms_too():
     assert f["result"] == "warn" and "cannot work" in f["found"]
     f = one("G-SET-05", customer_with(enhancedLeads=False))
     assert f["result"] == "warn" and "off" in f["found"]
+    both_off = one("G-SET-05", customer_with(enhancedLeads=False, dataTerms=False))
+    assert both_off["result"] == "warn" and both_off["found"] == "Enhanced conversions for leads are off."
     assert "privacy" in f["fix"]                                          # regulated clients may not be able to turn it on
 
 
@@ -133,6 +138,7 @@ def test_a_primary_action_is_needed():
     assert f["result"] == "pass" and "1 enabled primary conversion action: Submit lead form" in f["found"]
     rows = [A.action(str(i), "Action %d" % i) for i in range(5)]
     assert "5 enabled primary conversion actions: Action 0, Action 1, Action 2 and 2 more" in one("G-CNV-01", conv_read(rows))["found"]
+    assert one("G-CNV-01", conv_read(rows[:3]))["found"] == "3 enabled primary conversion actions: Action 0, Action 1, Action 2."
     none = conv_read([A.action("1", primary=False)])
     f = one("G-CNV-01", none)
     assert f["result"] == "fail" and "1 action in the account" in f["found"]
@@ -147,6 +153,8 @@ def test_a_primary_action_is_needed():
 def test_conversions_in_the_last_30_days():
     f = one("G-CNV-02")
     assert f["result"] == "pass" and "40 conversions" in f["found"] and "USD 1,000" in f["found"]
+    part = A.a_read(answers={r.CAMPAIGN_METRICS_GAQL: [A.campaign_metrics("10", 5000, 400, 1000.0, 0.5)]})
+    assert one("G-CNV-02", part)["result"] == "pass"                                        # half a conversion is still a conversion
     zero = A.a_read(answers={r.CAMPAIGN_METRICS_GAQL: [A.campaign_metrics("10", 5000, 400, 1000.0, 0.0)]})
     f = one("G-CNV-02", zero)
     assert f["result"] == "fail" and "USD 1,000 was spent" in f["found"]
@@ -204,6 +212,9 @@ def test_a_tag_and_a_ga4_import_of_the_same_kind_of_event_is_double_counting():
     ga4 = A.action("2", "GA4 form", type="GOOGLE_ANALYTICS_4_CUSTOM")
     f = one("G-CNV-06", conv_read([tag, ga4]))
     assert f["result"] == "warn" and sorted(f["items"]) == ["GA4 form", "Tag form"] and "Counted by both a tag and a GA4 import: submit lead form" in f["found"]
+    upload = A.action("4", "CRM upload", type="UPLOAD_CLICKS")
+    f = one("G-CNV-06", conv_read([tag, ga4, upload]))
+    assert sorted(f["items"]) == ["GA4 form", "Tag form"]                                      # an upload of the same category is not one of the two sources
     other = A.action("3", "GA4 purchase", type="GOOGLE_ANALYTICS_4_PURCHASE", category="PURCHASE")
     assert one("G-CNV-06", conv_read([tag, other]))["result"] == "pass"
     assert one("G-CNV-06", conv_read([tag, A.action("2", "GA4 form", type="GOOGLE_ANALYTICS_4_CUSTOM", primary=False)]))["result"] == "pass"
@@ -223,6 +234,8 @@ def test_value_bidding_needs_values():
     f = one("G-CNV-07", no_value)
     assert f["result"] == "fail" and f["items"] == ["Search | Implants"]
     assert one("G-CNV-07")["result"] == "na"
+    half = conv_read(rows, [A.volume("1", 5.0, value=0.5)], **{r.CAMPAIGNS_GAQL: [value_camp]})
+    assert one("G-CNV-07", half)["result"] == "pass"                                           # any value is something to optimise
     assert one("G-CNV-07", campaigns=None)["result"] == "unknown" and one("G-CNV-07", with_value, conversions=None)["result"] == "unknown"
     unread = dict(with_value)
     unread["conversions"] = [dict(a, value=None) for a in with_value["conversions"]]
@@ -242,6 +255,8 @@ def test_last_click_attribution():
 
 
 def test_click_windows():
+    one_day = conv_read([A.action("1", "One day", click="1")])
+    assert one("G-CNV-09", one_day)["result"] == "warn" and one("G-CNV-09", one_day)["items"] == ["One day (1 days)"]
     rows = [A.action("1", "Short", click="7"), A.action("2", "Edge", click="30"), A.action("3", "Long", click="90"), A.action("4", "Unset", click="0"),
             A.action("5", "Calls", type="AD_CALL", category="PHONE_CALL_LEAD", click="1")]
     f = one("G-CNV-09", conv_read(rows))
@@ -317,7 +332,7 @@ def test_audience_lists_need_members():
     assert one("G-LNK-02")["result"] == "pass"
     assert one("G-LNK-02", lists_read())["result"] == "warn" and "no audience lists" in one("G-LNK-02", lists_read())["found"]
     closed = lists_read(A.user_list(status="CLOSED"))
-    assert "all closed" in one("G-LNK-02", closed)["found"] and "1 list," in one("G-LNK-02", closed)["found"]
+    assert one("G-LNK-02", closed)["result"] == "warn" and "all closed" in one("G-LNK-02", closed)["found"] and "1 list," in one("G-LNK-02", closed)["found"]
     empty = lists_read(A.user_list("Empty A", lid="1"), A.user_list("Empty B", lid="2"))
     f = one("G-LNK-02", empty)
     assert f["result"] == "warn" and "None of the 2 open" in f["found"] and f["items"] == ["Empty A", "Empty B"]
@@ -363,6 +378,10 @@ def test_search_campaigns_on_the_display_network():
     assert f["result"] == "fail" and f["items"] == ["Search | A"] and "1 of 2 Search campaigns opt into the Display Network." in f["found"]
     net = {"cost": {"SEARCH": 90.0, "CONTENT": 10.0}, "total": 100.0, "conversions": {}}
     assert "10% of Search spend in the last 30 days ran on the Display Network." in one("G-STR-02", on, network=net)["found"]
+    none_spent = {"cost": {}, "total": 0.0, "conversions": {}}
+    assert "Search spend" not in one("G-STR-02", on, network=none_spent)["found"]                       # no spend, no share to quote
+    no_content = {"cost": {"SEARCH": 100.0}, "total": 100.0, "conversions": {}}
+    assert "0% of Search spend in the last 30 days ran on the Display Network." in one("G-STR-02", on, network=no_content)["found"]
     assert one("G-STR-02", camps(A.campaign("12", "PMax", ctype="PERFORMANCE_MAX", display=True)))["result"] == "na"
     assert one("G-STR-02", campaigns=None)["result"] == "unknown"
 
@@ -376,6 +395,7 @@ def test_search_partners_are_judged_on_cost_per_conversion():
     f = one("G-STR-03", network=net(100.0, 1.0))
     assert f["result"] == "warn" and "USD 100 per conversion against USD 30" in f["found"]
     assert one("G-STR-03", network=net(100.0, 3.0))["result"] == "pass"                           # 33 against 30 is in line
+    assert one("G-STR-03", network=net(90.0, 2.0))["result"] == "warn"                            # 45 against 30 is exactly 1.5 times: at the line it counts
     assert one("G-STR-03", network=net(100.0, 2.0))["result"] == "warn"                           # 50 against 30 is 1.67 times
     assert one("G-STR-03", network={"cost": {}, "total": 0.0, "conversions": {}})["result"] == "na"
     assert one("G-STR-03", network=None)["result"] == "unknown"
@@ -426,6 +446,12 @@ def test_smart_bidding_needs_conversions():
          A.campaign_metrics("13", cost=100.0, conversions=14.0), A.campaign_metrics("14", cost=100.0, conversions=15.0), A.campaign_metrics("16", cost=50.0, conversions=29.0)]
     f = one("G-STR-07", camps(*rows, metrics=m))
     assert f["result"] == "warn" and "4 of 6 Smart Bidding campaigns" in f["found"]
+    bare_roas = A.campaign("20", "Bare ROAS", bidding="TARGET_ROAS")                                       # no target set: still needs 50
+    value_target = A.campaign("21", "Value with target", bidding="MAXIMIZE_CONVERSION_VALUE", target_roas=2.0)
+    g = one("G-STR-07", camps(bare_roas, value_target, metrics=[A.campaign_metrics("20", cost=100.0, conversions=49.0), A.campaign_metrics("21", cost=100.0, conversions=49.0)]))
+    assert g["items"] == ["Bare ROAS (49 conversions, about 50 suggested)", "Value with target (49 conversions, about 50 suggested)"]
+    g = one("G-STR-07", camps(A.campaign("22", "Cents"), metrics=[A.campaign_metrics("22", cost=0.5, conversions=0.0)]))
+    assert g["result"] == "warn" and g["items"] == ["Cents (0 conversions, about 15 suggested)"]            # any spend counts, even under 1
     assert f["items"] == ["CPA thin (29 conversions, about 30 suggested)", "ROAS thin (49 conversions, about 50 suggested)", "MaxConv thin (14 conversions, about 15 suggested)",
                           "Maxconv with target (29 conversions, about 30 suggested)"]
     assert one("G-STR-07", camps(rows[1], rows[4], metrics=[m[1], m[4]]))["result"] == "pass"
@@ -479,12 +505,14 @@ def test_a_big_share_of_spend_with_no_conversions_fails():
 
 def test_search_campaigns_losing_reach_to_rank():
     assert one("G-STR-10")["result"] == "pass"
-    rows = [A.campaign("10", "Big lost"), A.campaign("11", "Small lost"), A.campaign("12", "Big fine"), A.campaign("13", "Edge")]
-    m = [A.campaign_metrics("10", cost=600.0, rank_lost=0.55), A.campaign_metrics("11", cost=20.0, rank_lost=0.9), A.campaign_metrics("12", cost=300.0, rank_lost=0.39),
-         A.campaign_metrics("13", cost=80.0, rank_lost=0.4)]
+    rows = [A.campaign("10", "Big lost"), A.campaign("11", "Small lost"), A.campaign("12", "Big fine"), A.campaign("13", "Edge"), A.campaign("14", "Five percent"),
+            A.campaign("15", "Just under")]
+    m = [A.campaign_metrics("10", cost=600.0, rank_lost=0.55), A.campaign_metrics("11", cost=20.0, rank_lost=0.9), A.campaign_metrics("12", cost=200.0, rank_lost=0.39),
+         A.campaign_metrics("13", cost=80.0, rank_lost=0.4), A.campaign_metrics("14", cost=50.0, rank_lost=0.6), A.campaign_metrics("15", cost=49.9, rank_lost=0.6)]
+    m[0] = A.campaign_metrics("10", cost=600.1, rank_lost=0.55)                                         # the total is exactly 1,000
     f = one("G-STR-10", camps(*rows, metrics=m))
-    assert f["result"] == "warn" and "2 big Search campaigns are losing 40% or more" in f["found"]
-    assert f["items"] == ["Big lost (55% lost to rank)", "Edge (40% lost to rank)"]                  # 20 of 1,000 is under 5% of spend, so it does not count
+    assert f["result"] == "warn" and "3 big Search campaigns are losing 40% or more" in f["found"]
+    assert f["items"] == ["Big lost (55% lost to rank)", "Edge (40% lost to rank)", "Five percent (60% lost to rank)"]   # 20 and 49.9 of 1,000 are under 5% of spend
     assert one("G-STR-10", camps(A.campaign("10", ctype="PERFORMANCE_MAX"), metrics=[]))["result"] == "na"
     unread = A.a_read()
     unread["campaigns"]["campaigns"][0]["metrics"] = None
@@ -500,6 +528,7 @@ def test_paused_campaign_clutter():
     assert f["result"] == "warn" and f["found"] == "50 paused campaigns against 2 enabled."
     assert one("G-STR-11", read(30, 59))["result"] == "pass" and one("G-STR-11", read(30, 60))["result"] == "warn"
     assert one("G-STR-11", read(1, 1))["found"] == "1 paused campaign and 1 enabled."
+    assert one("G-STR-11", read(0, 0))["found"] == "0 paused campaigns and 0 enabled."
     assert one("G-STR-11", campaigns=None)["result"] == "unknown"
 
 
@@ -579,6 +608,10 @@ def test_quality_score_parts_say_what_to_fix():
                           "expected click-through rate is below average on 100%.")
     assert one("G-KWD-04", qs_read([(8, 350, ("lp",)), (8, 650, ())]))["result"] == "warn"            # 35% is the line (the read keeps whole percents)
     assert one("G-KWD-04", qs_read([(8, 340, ("lp",)), (8, 660, ())]))["result"] == "pass"
+    assert one("G-KWD-04", qs_read([(8, 350, ("ad",)), (8, 650, ())]))["result"] == "warn"            # ad relevance is judged on the same 35% line
+    assert one("G-KWD-04", qs_read([(8, 340, ("ad",)), (8, 660, ())]))["result"] == "pass"
+    f = one("G-KWD-04", qs_read([(3, 100, ("ad",)), (5, 100, ("ad",))]))                              # low and mid impressions are equal
+    assert f["result"] == "warn" and "ad relevance is below average on 100%" in f["found"]
     assert one("G-KWD-04", qs_read([(8, 500, ("ctr",)), (8, 500, ())]))["result"] == "warn"
     assert one("G-KWD-04", qs_read([(8, 490, ("ctr",)), (8, 510, ())]))["result"] == "pass"
     assert one("G-KWD-04", kw_read([A.keyword()], [A.keyword_metrics()]))["result"] == "na" and one("G-KWD-04", keywords=None)["result"] == "unknown"
@@ -713,6 +746,8 @@ def test_poor_ad_strength():
     def read(poor, good):
         return ads_read([A.ad(aid="p%d" % i, strength="POOR") for i in range(poor)] + [A.ad(aid="g%d" % i, strength="GOOD") for i in range(good)] + [A.ad(aid="a", strength="AVERAGE")])
     assert one("G-ADS-04", read(0, 3))["result"] == "pass" and one("G-ADS-04", read(0, 3))["found"] == "Rated Poor: 0 of 4 responsive search ads. Rated Average: 1."
+    only_good = ads_read([A.ad(aid="g", strength="GOOD")])
+    assert one("G-ADS-04", only_good)["found"] == "Rated Poor: 0 of 1 responsive search ad. Rated Average: 0."
     assert one("G-ADS-04", read(1, 3))["result"] == "warn" and one("G-ADS-04", read(1, 3))["result"] == "warn"
     assert one("G-ADS-04", read(2, 2))["result"] == "fail"                                         # 2 of 5 is 40%
     assert one("G-ADS-04", read(1, 2))["result"] == "fail"                                         # 1 of 4 is 25%
@@ -775,3 +810,18 @@ def test_landing_pages_that_do_not_load():
     assert one("G-ADS-09", pages=pages({"url": "u", "status": 200, "error": "", "ms": 3000}))["result"] == "pass"
     assert one("G-ADS-09", pages=pages(*[ok] * 40, of=90))["found"] == "Checked 40 of 90 landing pages: all loaded."
     assert one("G-ADS-09", pages=pages())["result"] == "na" and one("G-ADS-09", pages=None)["result"] == "unknown" and one("G-ADS-09")["result"] == "unknown"
+
+
+def test_pages_that_refuse_the_automated_check_are_not_called_broken():
+    ok = {"url": "https://a.test/x", "status": 200, "error": "", "ms": 400, "blocked": False}
+    refused = {"url": "https://a.test/shield", "status": 403, "error": "", "ms": 100, "blocked": True}
+    f = one("G-ADS-09", pages=pages(ok, refused))
+    assert f["result"] == "pass" and f["found"] == "Checked 2 landing pages: all loaded. 1 page refused the automated check and could not be verified."
+    f = one("G-ADS-09", pages=pages(ok, refused, {"url": "https://a.test/gone", "status": 404, "error": "", "ms": 5, "blocked": False}))
+    assert f["result"] == "fail" and f["items"] == ["https://a.test/gone (HTTP 404)"] and f["found"].endswith("1 page refused the automated check and could not be verified.")
+    f = one("G-ADS-09", pages=pages(ok, refused, {"url": "https://a.test/slow", "status": 200, "error": "", "ms": 9000, "blocked": False}))
+    assert f["result"] == "warn" and f["items"] == ["https://a.test/slow (9.0 seconds)"]
+    slow_blocked = dict(refused, ms=9000)
+    assert one("G-ADS-09", pages=pages(ok, slow_blocked))["result"] == "pass"                  # a refusal is never slow or broken
+    f = one("G-ADS-09", pages=pages(refused, dict(refused, status=429, url="https://a.test/other")))
+    assert f["result"] == "unknown" and "refused the automated check (HTTP 403/429)" in f["found"]
