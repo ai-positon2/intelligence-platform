@@ -79,6 +79,15 @@ def not_applicable(check_id, reason):
     return make(check_id, "na", str(reason).strip())
 
 
+# The six sections every page is checked in, in the order they are shown.
+section("reach", "The page opens", 1)
+section("match", "Does it match the ad", 2)
+section("path", "Can a visitor act", 3)
+section("mobile", "Works on a phone", 4)
+section("speed", "Loads fast", 5)
+section("trust", "Tracking and trust", 6)
+
+
 # ── A page's results ────────────────────────────────────────────────────────
 
 def sections_of(findings):
