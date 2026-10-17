@@ -12,7 +12,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-tokens.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-components.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/gtm.css') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/paid_marketing.css') }}?v=35">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/paid_marketing.css') }}?v=36">
   <script src="/static/js/theme.js"></script>
   <link rel="stylesheet" href="/static/css/aurora-app.css?v=3">
   <script src="/static/js/aurora.js?v=1" defer></script>
@@ -68,7 +68,7 @@
     <div class="dash-grid pm-sec-grid">
 
       <!-- Paid Marketing Agents. 1 to 3 are from Agent Holmes (2026-10-12); 4,
-           Segment Analysis, is new on the platform. Geo Performance was added 2026-10-15, Seasonality Analysis and the Call Transcript Analyzer 2026-10-16, Ad Strength Analysis, Audience Segment Analysis, Asset Coverage Audit and Strategy &amp; Campaign Book 2026-10-16, Business Research 2026-10-17. The hub card's
+           Segment Analysis, is new on the platform. Geo Performance was added 2026-10-15, Seasonality Analysis and the Call Transcript Analyzer 2026-10-16, Ad Strength Analysis, Audience Segment Analysis, Asset Coverage Audit and Strategy &amp; Campaign Book 2026-10-16, Business Research and Keyword Research 2026-10-17. The hub card's
            "N dashboards / N live" counts these; tests/test_hub_card_counts.py
            checks the two agree. -->
 
@@ -378,6 +378,26 @@
         </div>
       </a>
 
+      <!-- 16. Keyword Research (2026-10-17): the searches the account is not bidding on yet -->
+      <a href="/p2/paid-marketing/keyword-research" class="dash-card active c-kwres">
+        <div class="card-band"></div>
+        <div class="card-thumb">
+          <div class="card-thumb-icon"><svg class="au-ic" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5M8.5 11h5M11 8.5v5"/></svg></div>
+          <div class="card-thumb-badge tb-live"><span class="tb-dot live"></span> Live</div>
+        </div>
+        <div class="card-body">
+          <div class="card-name">Keyword Research</div>
+          <div class="card-desc">
+            Finds the searches an account is not bidding on yet: Keyword Planner ideas for what the client sells, its site and its competitors, checked
+            against the account's own keywords and negatives, grouped into themes, with the year's shape. Excel, CSV, PDF and a file for Google Ads Editor.
+          </div>
+          <div class="card-footer">
+            <div class="card-tags"><span class="tag">Research</span><span class="tag">Keywords</span></div>
+            <span class="card-arrow">→</span>
+          </div>
+        </div>
+      </a>
+
     </div>
 
     <p class="footer-note">Position2 · Internal use only</p>
@@ -420,6 +440,7 @@
     {t:'Asset Coverage Audit',d:'What every campaign is missing, and what to add',u:'/p2/paid-marketing/asset-coverage',i:'▦'},
     {t:'Strategy & Campaign Book',d:'Researches a client, writes the strategy and each campaign book',u:'/p2/paid-marketing/campaign-book',i:'✎'},
     {t:'Business Research',d:'The picture of a client\'s business before any audit or strategy',u:'/p2/paid-marketing/business-research',i:'⌂'},
+    {t:'Keyword Research',d:'The searches an account is not bidding on yet',u:'/p2/paid-marketing/keyword-research',i:'⌕'},
     {t:'QA Agent',d:'Campaign launch QC checklist',u:'/p2/paid-marketing/qa-agent',i:'✓'}
   ];
   var ITEMS=(window.__KP_ITEMS||[]).concat(BASE);

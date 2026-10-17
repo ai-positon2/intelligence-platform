@@ -979,6 +979,10 @@ def read_market(inputs, *, ask=None):
 
 # ── For the page ────────────────────────────────────────────────────────────
 
+# Lists that only the build needs and that run to thousands of rows (Keyword Research's: the account's keywords and negatives, every idea Keyword Planner gave): not sent to the page.
+HEAVY = {"planner": ("ideas", "termMetrics"), "account": ("keywords", "negatives", "lists")}
+
+
 def public(research):
     """The research as the page is shown it: statuses, notes and facts, without the page text the model was given."""
     out = {}
@@ -986,7 +990,7 @@ def public(research):
         if not isinstance(pc, dict):
             continue
         row = {k: v for k, v in pc.items() if k != "spend"}
-        row["data"] = _without_page_text(pc.get("data") or {})
+        row["data"] = {k: v for k, v in _without_page_text(pc.get("data") or {}).items() if k not in HEAVY.get(key, ())}
         out[key] = row
     return out
 

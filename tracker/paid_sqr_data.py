@@ -231,7 +231,8 @@ def read(store, account, start, end, *, force=False, notes=None, stamps=None, ht
     if kws.get("truncated") or negs.get("truncated"):
         warnings.append("The account has more than %s keywords or negatives; the rest were not compared." % format(MAX_KEYWORD_ROWS, ","))
     return {"terms": rows, "truncated": bool(terms["truncated"] or pmax["truncated"]), "keywords": kws["rows"], "negatives": negs["rows"],
-            "lists": negs.get("lists", []), "warnings": warnings, "notes": NOTES}
+            "lists": negs.get("lists", []), "warnings": warnings, "notes": NOTES,
+            "keywordsFailed": bool(kws.get("failed")), "negativesFailed": bool(negs.get("failed")), "keywordsCut": bool(kws.get("truncated")), "negativesCut": bool(negs.get("truncated"))}
 
 
 NOTES = ["Account-level negative keywords are not available from the Google Ads API, so a suggestion can repeat one the account has only at account level."]

@@ -258,3 +258,22 @@ def test_a_nul_character_in_a_web_page_does_not_stop_the_build_being_saved(pg):
     store.fail(rec["id"], "error" + nul)
     got = store.get(rec["id"])
     assert got["research"]["website"]["data"]["pages"][0] == {"text": "beforeafter", "title": "T"} and got["plan"]["profile"]["summary"] == "ab" and got["error"] == "error"
+
+
+def test_keyword_research_builds_are_kept_apart_from_the_other_two_agents_and_its_judged_groups_are_saved_one_key_at_a_time(pg):
+    """Keyword Research saves its builds in the same table, with its own steps, and says so in its inputs (kind 'keywords')."""
+    from tests import business_fakes as B, keyword_fakes as K
+    from tracker import paid_business as pb, paid_keywords as pk
+    mine = store.create(by="ana@position2.com", inputs=K.clean(name="Keywords Listed %d" % time.time_ns()), account_name="", steps=pk.steps_for(K.clean()))
+    business = store.create(by="ana@position2.com", inputs=B.clean(name="Business Listed %d" % time.time_ns()), account_name="", steps=pb.steps_for(B.clean()))
+    theirs = new(name="Strategy Listed %d" % time.time_ns())
+    assert [s["key"] for s in store.get(mine["id"])["progress"]["steps"]][-4:] == ["a:themes", "a:classify", "a:plan", "f:finish"]
+    keywords = {r["id"] for r in store.list_recent(kind="keywords")}
+    assert mine["id"] in keywords and business["id"] not in keywords and theirs["id"] not in keywords
+    assert mine["id"] not in {r["id"] for r in store.list_recent(kind="business")} and mine["id"] not in {r["id"] for r in store.list_recent()}
+    assert store.get_light(mine["id"])["kind"] == "keywords"
+    store.save_plan_part(mine["id"], "themeDef", {"themes": [{"key": "a"}]})
+    store.save_plan_part(mine["id"], "classify", {"sig": "x", "parts": {"0": {"judged": {"dental implants": {"fit": "yes"}}, "dropped": 0}}, "total": 2})
+    store.save_plan_part(mine["id"], "classify", {"sig": "x", "parts": {"0": {"judged": {}, "dropped": 0}, "1": {"judged": {"a": {"fit": "no"}}, "dropped": 1}}, "total": 2})
+    plan = store.get(mine["id"])["plan"]
+    assert plan["themeDef"] == {"themes": [{"key": "a"}]} and sorted(plan["classify"]["parts"]) == ["0", "1"] and plan["classify"]["parts"]["1"]["dropped"] == 1

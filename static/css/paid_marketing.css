@@ -1277,3 +1277,10 @@ details.sq-fallback .sq-drops{margin-top:10px}
   --thumb:linear-gradient(135deg,#1a1100 0%,#220a14 100%);
   --icon-glow:rgba(251,191,36,.5);--card-border:rgba(251,191,36,.35);
   --card-glow:0 0 40px rgba(251,191,36,.10);--arrow-color:#fde68a}
+
+/* ═══ Keyword Research card ═══ */
+.c-kwres{--card-accent:#38bdf8;
+  --band:linear-gradient(90deg,#38bdf8,#818cf8,#c084fc);
+  --thumb:linear-gradient(135deg,#00121f 0%,#12122a 100%);
+  --icon-glow:rgba(56,189,248,.5);--card-border:rgba(56,189,248,.35);
+  --card-glow:0 0 40px rgba(56,189,248,.10);--arrow-color:#bae6fd}

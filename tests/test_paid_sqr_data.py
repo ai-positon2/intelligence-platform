@@ -383,3 +383,30 @@ def test_the_model_is_told_to_recognise_the_accounts_own_brand_in_any_spelling()
     seen = []
     sqr.classify("oia", ["idi fwb"], account="IDI-FL", profile={"keywords": ["idi fort walton beach"]}, call=lambda s, u: seen.append(u) or {"results": []})
     assert "variant, abbreviation, nickname or misspelling of the account's name" in seen[0] and "Keywords it bids on: idi fort walton beach" in seen[0]
+
+
+# ── what Keyword Research needs to know about a read: what failed and what was cut, as flags and not only as sentences ──
+
+def test_a_healthy_read_has_no_flag_raised():
+    out = D.read(FakeStore(), ACCT, START, END, http=google([], ANSWERS))
+    assert (out["keywordsFailed"], out["negativesFailed"], out["keywordsCut"], out["negativesCut"]) == (False, False, False, False)
+
+
+def test_a_piece_that_could_not_be_read_raises_its_own_flag_and_only_its_own():
+    fail = {"FROM ad_group_criterion WHERE ad_group_criterion.type = 'KEYWORD' AND ad_group_criterion.negative = FALSE": (500, {"error": {"message": "boom"}})}
+    out = D.read(FakeStore(), ACCT, START, END, http=google([], ANSWERS, fail))
+    assert (out["keywordsFailed"], out["negativesFailed"]) == (True, False) and out["keywords"] == []
+    g.forget()                                                                                  # what the first read kept in memory would answer the second
+    out = D.read(FakeStore(), ACCT, START, END, http=google([], ANSWERS, {"FROM campaign_criterion": (500, {"error": {"message": "boom"}})}))
+    assert (out["keywordsFailed"], out["negativesFailed"]) == (False, True)
+
+
+def test_a_list_that_was_cut_raises_its_flag(monkeypatch):
+    monkeypatch.setattr(D, "MAX_KEYWORD_ROWS", 0)
+    out = D.read(FakeStore(), ACCT, START, END, http=google([], ANSWERS))
+    assert out["keywordsCut"] is True and out["negativesCut"] is False
+    g.forget()
+    monkeypatch.setattr(D, "MAX_KEYWORD_ROWS", 50_000)
+    monkeypatch.setattr(D, "MAX_NEGATIVE_ROWS", 0)
+    out = D.read(FakeStore(), ACCT, START, END, http=google([], ANSWERS))
+    assert out["negativesCut"] is True and out["keywordsCut"] is False
