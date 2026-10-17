@@ -128,3 +128,92 @@ def test_the_search_minimum_is_inclusive_and_examples_are_capped():
 def test_no_lists_and_odd_rows_do_not_raise():
     assert r.parse_lists([]) == {"total": 0, "open": 0, "withMembers": 0, "byType": {}, "empty": 0, "tooSmallForSearch": 0, "examples": []}
     assert r.parse_lists([{}])["total"] == 1
+
+
+# ── Campaigns ───────────────────────────────────────────────────────────────
+
+def test_an_enabled_campaign_carries_its_settings_numbers_targeting_and_negatives():
+    rows = [A.campaign("10", "Search | Implants", partners=True, display=True, geo="PRESENCE", budget="75500000", shared=True, target_cpa="40000000",
+                       bidding="TARGET_CPA", reasons=("BUDGET_CONSTRAINED",), primary="LIMITED", portfolio="customers/1/biddingStrategies/5")]
+    out = r.parse_campaigns(rows, [A.campaign_metrics("10", 22138, 6109, 15082.63, 198.74, 346.91, 0.1756, 0.318, 0.5064)],
+                            [A.criterion("10", "LOCATION"), A.criterion("10", "LOCATION"), A.criterion("10", "LOCATION", True), A.criterion("10", "PROXIMITY"),
+                             A.criterion("10", "LANGUAGE")],
+                            [A.negative("10"), A.negative("10", "EXACT")], [A.attached_list("10", "900"), A.attached_list("10", "901", "Second", "12")])
+    c = out["campaigns"][0]
+    assert c["id"] == "10" and c["name"] == "Search | Implants" and c["type"] == "SEARCH" and c["bidding"] == "TARGET_CPA" and c["portfolio"] is True
+    assert c["targetKind"] == "cpa" and c["target"] == 40.0 and c["budget"] == 75.5 and c["budgetShared"] is True
+    assert c["googleSearch"] is True and c["searchPartners"] is True and c["displayNetwork"] is True and c["geoMode"] == "PRESENCE"
+    assert c["primaryStatus"] == "LIMITED" and c["reasons"] == ["BUDGET_CONSTRAINED"] and c["serving"] == "SERVING"
+    assert c["metrics"] == {"impressions": 22138, "clicks": 6109, "cost": 15082.63, "conversions": 198.74, "allConversions": 346.91,
+                            "budgetLost": 18, "rankLost": 32, "share": 51}
+    assert c["targeting"] == {"locations": 2, "excludedLocations": 1, "proximities": 1, "languages": 1}
+    assert c["negatives"] == 2 and c["lists"] == ["900", "901"]
+    assert out["lists"] == {"900": {"name": "Master negatives", "members": 4000}, "901": {"name": "Second", "members": 12}}
+    assert out["counts"] == {"enabled": 1, "paused": 0, "byType": {"SEARCH": 1}}
+    assert out["totals"] == {"impressions": 22138, "clicks": 6109, "cost": 15082.63, "conversions": 198.74}
+
+
+def test_paused_campaigns_are_counted_not_listed_and_removed_ones_never_come():
+    rows = [A.campaign("1", status="PAUSED"), A.campaign("2", status="PAUSED", ctype="PERFORMANCE_MAX"), A.campaign("3", ctype="PERFORMANCE_MAX"),
+            A.campaign("4", ctype="SEARCH"), A.campaign("5", ctype="SEARCH"), A.campaign("6", status="UNKNOWN")]
+    out = r.parse_campaigns(rows, [], [], [], [])
+    assert out["counts"] == {"enabled": 3, "paused": 2, "byType": {"PERFORMANCE_MAX": 1, "SEARCH": 2}}
+    assert sorted(c["id"] for c in out["campaigns"]) == ["3", "4", "5"]
+
+
+def test_a_campaign_with_no_rows_in_a_part_that_was_read_has_zeros_and_a_part_not_read_is_none():
+    read = r.parse_campaigns([A.campaign("10")], [], [], [], [])["campaigns"][0]
+    assert read["metrics"]["cost"] == 0 and read["metrics"]["impressions"] == 0 and read["metrics"]["budgetLost"] is None
+    assert read["targeting"] == {"locations": 0, "excludedLocations": 0, "proximities": 0, "languages": 0}
+    assert read["negatives"] == 0 and read["lists"] == []
+    unread = r.parse_campaigns([A.campaign("10")])
+    c = unread["campaigns"][0]
+    assert c["metrics"] is None and c["targeting"] is None and c["negatives"] is None and c["lists"] is None and unread["totals"] is None
+
+
+def test_impression_share_is_a_whole_percent_and_zero_is_not_missing():
+    c = r.parse_campaigns([A.campaign("10")], [A.campaign_metrics("10", budget_lost=0.0, rank_lost=0.004, share=1.0)])["campaigns"][0]
+    assert c["metrics"]["budgetLost"] == 0 and c["metrics"]["rankLost"] == 0 and c["metrics"]["share"] == 100
+    assert r.parse_campaigns([A.campaign("10")], [A.campaign_metrics("10")])["campaigns"][0]["metrics"]["share"] is None     # Display has none
+
+
+def test_numbers_of_a_campaign_split_over_several_rows_add_up():
+    c = r.parse_campaigns([A.campaign("10")], [A.campaign_metrics("10", 100, 10, 50.0, 2.0), A.campaign_metrics("10", 200, 20, 25.5, 1.5)])["campaigns"][0]
+    assert c["metrics"]["impressions"] == 300 and c["metrics"]["clicks"] == 30 and c["metrics"]["cost"] == 75.5 and c["metrics"]["conversions"] == 3.5
+
+
+def test_the_bid_target_comes_from_whichever_strategy_field_is_set():
+    t = lambda **kw: r.parse_campaigns([A.campaign("1", **kw)])["campaigns"][0]
+    assert (t(target_cpa="12500000")["targetKind"], t(target_cpa="12500000")["target"]) == ("cpa", 12.5)
+    assert (t(target_roas=3.456)["targetKind"], t(target_roas=3.456)["target"]) == ("roas", 3.46)
+    assert (t()["targetKind"], t()["target"]) == ("", 0)
+    mc = A.campaign("2", bidding="MAXIMIZE_CONVERSIONS")
+    mc["campaign"]["maximizeConversions"] = {"targetCpaMicros": "30000000"}
+    assert r.parse_campaigns([mc])["campaigns"][0]["target"] == 30.0
+    mv = A.campaign("3", bidding="MAXIMIZE_CONVERSION_VALUE")
+    mv["campaign"]["maximizeConversionValue"] = {"targetRoas": 4.0}
+    assert (r.parse_campaigns([mv])["campaigns"][0]["targetKind"], r.parse_campaigns([mv])["campaigns"][0]["target"]) == ("roas", 4.0)
+
+
+def test_a_shopping_campaign_names_its_merchant_center():
+    assert r.parse_campaigns([A.campaign("1", ctype="SHOPPING", merchant="9282495")])["campaigns"][0]["merchantId"] == "9282495"
+    assert r.parse_campaigns([A.campaign("1")])["campaigns"][0]["merchantId"] == ""
+
+
+def test_campaigns_are_listed_biggest_spender_first():
+    rows = [A.campaign("1", "small"), A.campaign("2", "big"), A.campaign("3", "idle")]
+    out = r.parse_campaigns(rows, [A.campaign_metrics("1", cost=10.0), A.campaign_metrics("2", cost=900.0)])
+    assert [c["name"] for c in out["campaigns"]] == ["big", "small", "idle"]
+
+
+def test_a_repeated_shared_list_is_remembered_once_and_attached_to_each_campaign():
+    out = r.parse_campaigns([A.campaign("1"), A.campaign("2")], [], [], [], [A.attached_list("1", "900"), A.attached_list("2", "900")])
+    assert out["lists"] == {"900": {"name": "Master negatives", "members": 4000}} and [c["lists"] for c in out["campaigns"]] == [["900"], ["900"]]
+
+
+def test_network_spend_is_split_by_where_the_ad_ran():
+    out = r.parse_network([A.network_row("1", "SEARCH", 80.0, 4.0), A.network_row("2", "SEARCH", 10.0, 1.0), A.network_row("1", "SEARCH_PARTNERS", 8.0, 0.0),
+                           A.network_row("1", "CONTENT", 2.0, 0.0)])
+    assert out == {"cost": {"SEARCH": 90.0, "SEARCH_PARTNERS": 8.0, "CONTENT": 2.0}, "total": 100.0,
+                   "conversions": {"SEARCH": 5.0, "SEARCH_PARTNERS": 0.0, "CONTENT": 0.0}}
+    assert r.parse_network([]) == {"cost": {}, "total": 0.0, "conversions": {}}
