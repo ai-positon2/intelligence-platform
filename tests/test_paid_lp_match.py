@@ -123,6 +123,10 @@ def test_a_one_word_headline_counts_only_when_there_is_no_longer_one():
     assert m.best_echo(["Dentist"], prom) == (1.0, "Dentist")
 
 
+def test_a_headline_with_none_of_its_words_on_the_page_is_still_named():
+    assert m.best_echo(["Teeth Whitening Deals", "Brighter Smile"], m.vocab("emergency dentist")) == (0.0, "Teeth Whitening Deals")
+
+
 def test_no_usable_headline_is_no_echo():
     assert m.best_echo([], set()) == (0.0, "")
     assert m.best_echo(["near me", ""], {"x"}) == (0.0, "")

@@ -158,12 +158,12 @@ def best_echo(headlines, prom):
     usable = [(h, content(h)) for h in headlines]
     usable = [(h, ws) for h, ws in usable if ws]
     longer = [(h, ws) for h, ws in usable if len(ws) > 1]
-    best, best_h = 0.0, ""
+    best, best_h = -1.0, ""
     for h, ws in (longer or usable):
         share = sum(1 for w in ws if w in prom) / len(ws)
         if share > best:
             best, best_h = share, h
-    return best, best_h
+    return max(best, 0.0), best_h
 
 
 # ── What the ad promises ────────────────────────────────────────────────────

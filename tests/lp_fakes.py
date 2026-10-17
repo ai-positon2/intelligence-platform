@@ -50,14 +50,15 @@ def group(gid="g1", name="Emergency", campaign="Boston Search", keywords=None, t
             "ads": [{"headlines": headlines if headlines is not None else ["Emergency Dentist Boston", "Same Day Appointments"],
                      "descriptions": descriptions if descriptions is not None else ["Cleanings from $99. Free consultation."], "urls": list(urls), "cost": cost, "type": "RESPONSIVE_SEARCH_AD"}],
             "keywords": keywords if keywords is not None else [keyword("emergency dentist boston", 50.0), keyword("tooth pain", 20.0)],
-            "terms": terms if terms is not None else [term("emergency dentist boston"), term("dentist open now boston")],
+            "terms": terms if terms is not None else [term("emergency dentist boston"), term("dentist boston"), term("tooth pain boston")],
             "pages": {}}
 
 
 def page(fetch_over=None, groups=None, **over):
     p = {"id": "acme-dental.com/lp", "url": "https://acme-dental.com/lp", "name": "acme-dental.com/lp", "spend": 1000.0, "clicks": 500, "conversions": 25.0, "impressions": 20000,
          "devices": {"mobile": {"clicks": 350, "cost": 700.0, "conversions": 18.0}, "desktop": {"clicks": 150, "cost": 300.0, "conversions": 10.0}},
-         "speed": 8, "fetch": fetch(**(fetch_over or {})), "groups": copy.deepcopy(groups) if groups is not None else [group()], "lab": None}
+         "speed": 8, "fetch": fetch(**(fetch_over or {})), "groups": copy.deepcopy(groups) if groups is not None else [group()], "lab": None,
+         "ok": {"pages": True, "ads": True, "keywords": True, "terms": True}}
     p.update(over)
     return p
 
