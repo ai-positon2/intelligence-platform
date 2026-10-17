@@ -4198,9 +4198,12 @@ def seo_aeo_legacy_redirect(rest=""):
 #   Product Analysis       which products earn their ad spend, per Google Ads
 #                          account (tracker/paid_products.py, read-only)
 #   Pacing Desk            where to move budget today so every account lands
-#                          the month on budget (tracker/paid_pacing.py; the
-#                          engine itself runs on the PPC team's machine and
-#                          pushes each day's result to .../api/pacing/seed)
+#                          the month on budget (tracker/paid_pacing.py). The
+#                          platform builds each run itself: spend and campaign
+#                          budgets read from Google Ads (tracker/paid_refresh.py,
+#                          paid_pacing_read.py) against the month's allocations
+#                          kept here (paid_pacing_budgets.py). A run can still
+#                          be pushed to .../api/pacing/seed
 #   Search Query Analysis  classifies a Google Ads account's search terms
 #                          (read live: tracker/paid_sqr_data.py; the rules
 #                          and ranking in static/js/sqr_core.js, the model
@@ -4412,20 +4415,95 @@ def paid_pacing_set_move(move_id):
 @app.route("/p2/paid-marketing/api/pacing/refresh", methods=["GET", "POST"])
 @position2_required
 def paid_pacing_refresh():
-    """The Refresh button. POST starts a rebuild from the two Google Sheets
-    (tracker/paid_refresh.py); GET is its progress, which the page polls."""
+    """The Refresh button, and the page's own start of the day. POST starts a rebuild from Google Ads and the saved budgets
+    (tracker/paid_refresh.py); {"auto": true} is the page asking, which is refused unless a run is due; {"recompute": true} runs the
+    engine again on the last read of Google Ads (an allocation changed), which needs no wait. GET is its progress, which the page polls."""
     from tracker import paid_pacing, paid_refresh, paid_store
+
+    def state():
+        return paid_refresh.status(paid_store, paid_store.latest_built())
     try:
         if request.method == "POST":
             problem = paid_refresh.config_problem()
             if problem:
-                return jsonify(error=problem, **paid_refresh.status(paid_store)), 409
-            if not paid_refresh.start(paid_store, paid_pacing, _pm_user_email()):
-                return jsonify(error="A refresh is already running.", **paid_refresh.status(paid_store)), 409
-            return jsonify(paid_refresh.status(paid_store)), 202
-        return jsonify(paid_refresh.status(paid_store))
+                return jsonify(error=problem, **state()), 409
+            body = request.get_json(silent=True)
+            body = body if isinstance(body, dict) else {}
+            try:
+                paid_refresh.start(paid_store, paid_pacing, _pm_user_email(), auto=body.get("auto") is True, recompute=body.get("recompute") is True,
+                                   last_built=paid_store.latest_built())
+            except paid_refresh.RefreshBusy as e:
+                return jsonify(error=str(e), **state()), 409
+            except paid_refresh.RefreshTooSoon as e:
+                return jsonify(error=str(e), retryIn=e.retry_in, **state()), 429
+            return jsonify(state()), 202
+        return jsonify(state())
     except paid_store.StoreUnavailable as e:
         return _pm_store_error(e)
+
+
+# The month's budgets: what each account is meant to spend, which Google Ads cannot say (tracker/paid_pacing_budgets.py). One table the
+# whole team edits; a save names the version it started from, so two people editing at once cannot overwrite each other.
+
+def _pacing_month():
+    from tracker import paid_pacing_budgets as pb, paid_refresh
+    month = request.args.get("month") or pb.month_of(paid_refresh.pacific_day())
+    return pb.check_month(month)
+
+
+@app.route("/p2/paid-marketing/api/pacing/budgets", methods=["GET", "PUT"])
+@position2_required
+def paid_pacing_budgets():
+    from tracker import paid_pacing_budgets as pb, paid_pacing_budget_store as bstore, paid_refresh, paid_store
+    try:
+        month = _pacing_month()
+        saved = bstore.list_month(month)
+        if request.method == "PUT":
+            body = request.get_json(silent=True)
+            if not isinstance(body, dict):
+                return jsonify(error="The body should be a JSON object."), 400
+            if str(body.get("version") or "") != pb.version_of(saved):
+                who = max(saved, key=lambda r: r.get("updatedAt") or "").get("updatedBy") if saved else None
+                return jsonify(error="Someone saved these allocations while you were editing%s. Reload to see their changes." % (" (%s)" % who if who else ""),
+                               kind="conflict"), 409
+            rows = pb.check_rows(body.get("rows"))
+            if not rows:
+                return jsonify(error="Add at least one account before saving."), 400
+            saved = bstore.replace_month(month, rows, _pm_user_email())
+            app.logger.info("pacing budgets: %s saved %d rows for %s", _pm_user_email(), len(saved), month)
+        book = pb.book_for(month, store=bstore, run_fn=lambda: paid_refresh.latest_run(paid_store))
+        last = max(saved, key=lambda r: r.get("updatedAt") or "") if saved else None
+        return jsonify(month=month, rows=book["rows"], source=book["source"], version=pb.version_of(saved),
+                       lastSaved={"by": last["updatedBy"], "at": last["updatedAt"]} if last else None,
+                       months=sorted(set(bstore.months()) | {month}), accounts=_pacing_google_names())
+    except pb.BadBudget as e:
+        return jsonify(error=str(e)), 400
+    except paid_store.StoreUnavailable as e:
+        return _pm_store_error(e)
+
+
+def _pacing_google_names():
+    """The Google Ads account names, as hints for the account column. Empty when the list cannot be had: it is a convenience."""
+    try:
+        from tracker import paid_gads_segments
+        return [a["name"] for a in paid_gads_segments.list_accounts()]
+    except Exception as e:
+        app.logger.info("pacing budgets: no account names for the hint (%s)", e)
+        return []
+
+
+@app.route("/p2/paid-marketing/api/pacing/budgets/parse", methods=["POST"])
+@position2_required
+def paid_pacing_budgets_parse():
+    """Rows pasted from the Budget Tracker, read for a month and handed back to be reviewed. Nothing is saved here."""
+    from tracker import paid_pacing_budgets as pb
+    body = request.get_json(silent=True)
+    if not isinstance(body, dict) or not isinstance(body.get("text"), str):
+        return jsonify(error="Send the pasted cells as {\"month\": \"2026-10\", \"text\": \"...\"}."), 400
+    try:
+        return jsonify(**pb.parse_paste(body["text"], pb.check_month(body.get("month"))))
+    except pb.BadBudget as e:
+        return jsonify(error=str(e)), 400
 
 
 @app.route("/p2/paid-marketing/api/pacing/seed", methods=["POST"])
