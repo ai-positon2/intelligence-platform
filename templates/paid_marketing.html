@@ -12,7 +12,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-tokens.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-components.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/gtm.css') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/paid_marketing.css') }}?v=36">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/paid_marketing.css') }}?v=37">
   <script src="/static/js/theme.js"></script>
   <link rel="stylesheet" href="/static/css/aurora-app.css?v=3">
   <script src="/static/js/aurora.js?v=1" defer></script>
@@ -68,7 +68,7 @@
     <div class="dash-grid pm-sec-grid">
 
       <!-- Paid Marketing Agents. 1 to 3 are from Agent Holmes (2026-10-12); 4,
-           Segment Analysis, is new on the platform. Geo Performance was added 2026-10-15, Seasonality Analysis and the Call Transcript Analyzer 2026-10-16, Ad Strength Analysis, Audience Segment Analysis, Asset Coverage Audit and Strategy &amp; Campaign Book 2026-10-16, Business Research and Keyword Research 2026-10-17. The hub card's
+           Segment Analysis, is new on the platform. Geo Performance was added 2026-10-15, Seasonality Analysis and the Call Transcript Analyzer 2026-10-16, Ad Strength Analysis, Audience Segment Analysis, Asset Coverage Audit and Strategy &amp; Campaign Book 2026-10-16, Business Research, Keyword Research and Account Audit 2026-10-17. The hub card's
            "N dashboards / N live" counts these; tests/test_hub_card_counts.py
            checks the two agree. -->
 
@@ -393,6 +393,26 @@
           </div>
           <div class="card-footer">
             <div class="card-tags"><span class="tag">Research</span><span class="tag">Keywords</span></div>
+            <span class="card-arrow">→</span>
+          </div>
+        </div>
+      </a>
+
+      <!-- 17. Account Audit (2026-10-17): is the account set up to win, before any strategy is built on it -->
+      <a href="/p2/paid-marketing/account-audit" class="dash-card active c-aud">
+        <div class="card-band"></div>
+        <div class="card-thumb">
+          <div class="card-thumb-icon"><svg class="au-ic" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M9 11.5l2.5 2.5L16 9.5"/><path d="M12 3l7 3v5.5c0 4.3-2.9 7.6-7 9.5-4.1-1.9-7-5.2-7-9.5V6z"/></svg></div>
+          <div class="card-thumb-badge tb-live"><span class="tb-dot live"></span> Live</div>
+        </div>
+        <div class="card-body">
+          <div class="card-name">Account Audit</div>
+          <div class="card-desc">
+            Reads a Google Ads account, a Meta ad account or both and holds them against a written checklist: settings, conversion tracking, links, structure and bidding,
+            keywords, ads and landing pages, pixels and campaigns. A score, the checks to fix first, and what could not be read. Excel, CSV and PDF.
+          </div>
+          <div class="card-footer">
+            <div class="card-tags"><span class="tag">Audit</span><span class="tag">Tracking</span></div>
             <span class="card-arrow">→</span>
           </div>
         </div>

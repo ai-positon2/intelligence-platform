@@ -115,3 +115,23 @@ def test_the_page_renders_for_staff_and_not_for_anyone_else():
     page = client_as(STAFF).get(path)
     assert page.status_code == 200 and b"account_audit.js" in page.data and b"account_audit.css" in page.data and b"au_data.js" in page.data and b"Account Audit" in page.data
     assert client_as(None).get(path).status_code == 302 and client_as("someone@gmail.com").get(path).status_code == 302
+
+
+def test_the_agent_is_on_the_hub_the_dashboard_the_command_palette_and_the_assistants_knowledge():
+    import os
+    hub = client_as(STAFF).get("/p2/paid-marketing").data.decode()
+    assert "/p2/paid-marketing/account-audit" in hub and "Account Audit" in hub and "c-aud" in hub
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    assert "Account Audit" in open(os.path.join(root, "templates", "_paid_kpal.html"), encoding="utf-8").read()
+    assert ".c-aud" in open(os.path.join(root, "static", "css", "paid_marketing.css"), encoding="utf-8").read()
+    src = open(os.path.join(root, "app.py"), encoding="utf-8").read()
+    assert "Account Audit (/p2/paid-marketing/account-audit)" in src and "a part the platform would not read is reported as could not check" in src
+
+
+def test_there_is_no_em_or_en_dash_in_any_of_the_audit_code():
+    import glob, os
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    files = glob.glob(os.path.join(root, "tracker", "paid_audit*.py")) + [os.path.join(root, "docs", "account-audit-plan.md")]
+    for p in files:
+        text = open(p, encoding="utf-8").read()
+        assert "—" not in text and "–" not in text, p
