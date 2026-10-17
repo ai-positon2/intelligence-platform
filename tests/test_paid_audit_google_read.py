@@ -217,3 +217,229 @@ def test_network_spend_is_split_by_where_the_ad_ran():
     assert out == {"cost": {"SEARCH": 90.0, "SEARCH_PARTNERS": 8.0, "CONTENT": 2.0}, "total": 100.0,
                    "conversions": {"SEARCH": 5.0, "SEARCH_PARTNERS": 0.0, "CONTENT": 0.0}}
     assert r.parse_network([]) == {"cost": {}, "total": 0.0, "conversions": {}}
+
+
+# ── Ad groups, keywords, ads ────────────────────────────────────────────────
+
+NAMES = {"10": "Search | Implants", "11": "Search | Whitening"}
+GROUPS = r.parse_ad_groups([A.ad_group("100", "10", "Implants"), A.ad_group("101", "10", "Dentures"), A.ad_group("200", "11", "Whitening"),
+                            A.ad_group("300", "11", "Display group", "DISPLAY_STANDARD")])["groups"]
+
+
+def test_ad_groups_are_mapped_by_id_with_their_campaign_and_type():
+    out = r.parse_ad_groups([A.ad_group("100", "10", "Implants"), A.ad_group("300", "11", "D", "DISPLAY_STANDARD"), {}])
+    assert out["total"] == 2 and out["groups"]["100"] == {"campaign": "10", "name": "Implants", "type": "SEARCH_STANDARD"}
+    assert out["groups"]["300"]["type"] == "DISPLAY_STANDARD"
+
+
+def test_keywords_are_counted_by_match_and_status_and_only_enabled_ones_are_judged():
+    rows = [A.keyword(crit="1", match="BROAD"), A.keyword(crit="2", match="PHRASE"), A.keyword(crit="3", match="EXACT"), A.keyword(crit="4", match="EXACT"),
+            A.keyword(crit="5", status="PAUSED", match="BROAD")]
+    k = r.parse_keywords(rows, [], GROUPS, NAMES)
+    assert k["total"] == 5 and k["enabled"] == 4 and k["paused"] == 1
+    assert k["byMatch"] == {"BROAD": 1, "PHRASE": 1, "EXACT": 2}
+    assert k["perCampaign"] == {"10": {"keywords": 4, "broad": 1}}
+    assert k["_perGroup"] == {"100": 4}
+
+
+def test_quality_score_is_weighted_by_impressions_and_split_in_three_bands():
+    rows = [A.keyword(crit="1", qs=3, ctr="BELOW_AVERAGE", creative="AVERAGE", post_click="BELOW_AVERAGE"),
+            A.keyword(crit="2", qs=4), A.keyword(crit="3", qs=5), A.keyword(crit="4", qs=6), A.keyword(crit="5", qs=7, ctr="ABOVE_AVERAGE"),
+            A.keyword(crit="6", qs=10), A.keyword(crit="7")]                      # no score yet
+    m = [A.keyword_metrics(crit="1", impressions=400), A.keyword_metrics(crit="2", impressions=100), A.keyword_metrics(crit="3", impressions=50),
+         A.keyword_metrics(crit="4", impressions=50), A.keyword_metrics(crit="5", impressions=200), A.keyword_metrics(crit="6", impressions=200),
+         A.keyword_metrics(crit="7", impressions=77)]
+    q = r.parse_keywords(rows, m, GROUPS, NAMES)["qs"]
+    assert q["scored"] == 6 and q["keywords"] == {"low": 2, "mid": 2, "high": 2}
+    assert q["impressions"] == {"low": 500, "mid": 100, "high": 400, "none": 77}
+    assert q["below"] == {"expectedCtr": 40, "adRelevance": 0, "landingPage": 40}      # of the 1,000 scored impressions: 400 below on CTR and on the page
+
+
+def test_the_worst_quality_keywords_are_named_busiest_first_and_need_impressions():
+    rows = [A.keyword(crit="1", text="a", qs=2), A.keyword(crit="2", text="b", qs=3), A.keyword(crit="3", text="c", qs=1)]
+    m = [A.keyword_metrics(crit="1", impressions=10), A.keyword_metrics(crit="2", impressions=500)]
+    ex = r.parse_keywords(rows, m, GROUPS, NAMES)["lowQualityExamples"]
+    assert [e["keyword"] for e in ex] == ["b", "a"]                       # "c" had no impressions
+    assert ex[0] == {"keyword": "b", "match": "PHRASE", "campaign": "Search | Implants", "adGroup": "Implants", "qs": 3, "impressions": 500}
+
+
+def test_keywords_that_spent_without_converting_need_enough_clicks():
+    rows = [A.keyword(crit="1", text="waste"), A.keyword(crit="2", text="edge"), A.keyword(crit="3", text="few"), A.keyword(crit="4", text="wins")]
+    m = [A.keyword_metrics(crit="1", clicks=40, cost=120.5, conversions=0), A.keyword_metrics(crit="2", clicks=15, cost=30.0, conversions=0),
+         A.keyword_metrics(crit="3", clicks=14, cost=99.0, conversions=0), A.keyword_metrics(crit="4", clicks=90, cost=500.0, conversions=2.5)]
+    w = r.parse_keywords(rows, m, GROUPS, NAMES)["wasted"]
+    assert w["cost"] == 150.5 and w["keywords"] == 2 and w["minClicks"] == 15
+    assert [e["keyword"] for e in w["examples"]] == ["waste", "edge"] and w["examples"][0]["clicks"] == 40
+
+
+def test_when_the_keyword_numbers_were_not_read_the_facts_that_need_them_are_none():
+    k = r.parse_keywords([A.keyword(qs=3)], None, GROUPS, NAMES)
+    assert k["wasted"] is None and k["qs"]["impressions"] is None and k["qs"]["below"] is None
+    assert k["qs"]["scored"] == 1 and k["qs"]["keywords"]["low"] == 1 and k["lowQualityExamples"] == []
+
+
+def test_the_same_keyword_in_two_ad_groups_of_one_campaign_is_a_duplicate_but_not_across_campaigns_or_match_types():
+    rows = [A.keyword(cid="10", gid="100", crit="1", text="Dental  Implants", match="PHRASE"), A.keyword(cid="10", gid="101", crit="2", text="dental implants", match="PHRASE"),
+            A.keyword(cid="10", gid="101", crit="3", text="dental implants", match="EXACT"),
+            A.keyword(cid="11", gid="200", crit="4", text="dental implants", match="PHRASE"),
+            A.keyword(cid="10", gid="100", crit="5", text="same group", match="PHRASE"), A.keyword(cid="10", gid="100", crit="6", text="same group", match="PHRASE")]
+    d = r.parse_keywords(rows, [], GROUPS, NAMES)["duplicates"]
+    assert d["keywords"] == 1 and d["copies"] == 1
+    assert d["examples"] == [{"keyword": "dental implants", "match": "PHRASE", "campaign": "Search | Implants", "adGroups": 2}]
+
+
+def test_disapproved_and_rarely_served_keywords_are_counted():
+    rows = [A.keyword(crit="1", approval="DISAPPROVED", text="bad"), A.keyword(crit="2", serving="RARELY_SERVED"), A.keyword(crit="3", approval="APPROVED_LIMITED")]
+    k = r.parse_keywords(rows, [], GROUPS, NAMES)
+    assert k["disapproved"]["count"] == 1 and k["disapproved"]["examples"][0]["keyword"] == "bad" and k["rarelyServed"] == 1
+
+
+def test_a_keyword_row_missing_pieces_does_not_raise():
+    k = r.parse_keywords([{}, {"adGroupCriterion": {"status": "ENABLED"}}], [{}], {}, {})
+    assert k["total"] == 2 and k["byMatch"] == {"UNKNOWN": 1}
+
+
+def test_ads_are_counted_by_type_and_responsive_search_ads_by_strength():
+    rows = [A.ad(aid="1", strength="POOR"), A.ad(aid="2", strength="GOOD"), A.ad(aid="3", strength="GOOD"), A.ad(aid="4", atype="EXPANDED_TEXT_AD"),
+            A.ad(aid="5", status="PAUSED"), A.ad(aid="6", atype="RESPONSIVE_DISPLAY_AD", gid="300")]
+    a = r.parse_ads(rows, GROUPS, NAMES)
+    assert a["total"] == 5 and a["byType"] == {"RESPONSIVE_SEARCH_AD": 3, "EXPANDED_TEXT_AD": 1, "RESPONSIVE_DISPLAY_AD": 1} and a["rsa"] == 3
+    assert a["strength"] == {"POOR": 1, "GOOD": 2} and a["legacy"] == 1
+
+
+def test_disapproved_ads_name_the_policy_topic_and_limited_ones_are_counted():
+    rows = [A.ad(aid="1", approval="DISAPPROVED", topics=("HEALTHCARE", "TRADEMARKS", "A", "B")), A.ad(aid="2", approval="APPROVED_LIMITED"),
+            A.ad(aid="3", approval="AREA_OF_INTEREST_ONLY"), A.ad(aid="4")]
+    a = r.parse_ads(rows, GROUPS, NAMES)
+    assert a["disapproved"] == {"count": 1, "examples": [{"campaign": "Search | Implants", "adGroup": "Implants", "type": "RESPONSIVE_SEARCH_AD",
+                                                          "topics": ["HEALTHCARE", "TRADEMARKS", "A"]}]}
+    assert a["limited"] == 2
+
+
+def test_pinned_headlines_are_counted_per_ad():
+    rows = [A.ad(aid="1", pins=0), A.ad(aid="2", pins=1), A.ad(aid="3", pins=2), A.ad(aid="4", pins=3), A.ad(aid="5", atype="EXPANDED_TEXT_AD")]
+    assert r.parse_ads(rows, GROUPS, NAMES)["pinned"] == {"any": 3, "heavy": 1}
+
+
+def test_landing_pages_are_listed_once_with_how_many_ads_use_each_and_capped():
+    rows = [A.ad(aid="1", urls=("https://a.test/x",)), A.ad(aid="2", urls=("https://a.test/x",)), A.ad(aid="3", urls=("https://a.test/y", "https://a.test/z"))]
+    u = r.parse_ads(rows, GROUPS, NAMES)["urls"]
+    assert u["distinct"] == 3 and u["list"][0] == {"url": "https://a.test/x", "ads": 2}
+    many = r.parse_ads([A.ad(aid=str(i), urls=("https://a.test/p%d" % i,)) for i in range(60)], GROUPS, NAMES)["urls"]
+    assert many["distinct"] == 60 and len(many["list"]) == r.MAX_URLS
+
+
+def test_ad_groups_are_judged_on_ads_and_keywords_together():
+    kw = r.parse_keywords([A.keyword(gid="100", crit="1"), A.keyword(gid="200", cid="11", crit="2")] +
+                          [A.keyword(gid="101", crit=str(10 + i), text="k%d" % i) for i in range(41)], [], GROUPS, NAMES)
+    ads = r.parse_ads([A.ad(gid="100", aid="1"), A.ad(gid="100", aid="2"), A.ad(gid="101", aid="3", atype="EXPANDED_TEXT_AD"),
+                       A.ad(gid="200", cid="11", aid="4"), A.ad(gid="200", cid="11", aid="5"), A.ad(gid="200", cid="11", aid="6"),
+                       A.ad(gid="200", cid="11", aid="7"), A.ad(gid="200", cid="11", aid="8")], GROUPS, NAMES)
+    s = r.join_structure(GROUPS, kw, ads, NAMES)
+    assert s["adGroups"] == 4 and s["searchAdGroups"] == 3 and s["byType"] == {"SEARCH_STANDARD": 3, "DISPLAY_STANDARD": 1}
+    assert s["noLiveAd"]["count"] == 0                                    # the Display group is not judged
+    assert [e["adGroup"] for e in s["noResponsiveAd"]["examples"]] == ["Dentures"]
+    assert [e["adGroup"] for e in s["oneAd"]["examples"]] == ["Dentures"]
+    assert [e["adGroup"] for e in s["manyAds"]["examples"]] == ["Whitening"]
+    assert s["noKeywords"]["count"] == 0 and [e["adGroup"] for e in s["manyKeywords"]["examples"]] == ["Dentures"]
+
+
+def test_an_ad_group_with_nothing_live_is_named_with_its_campaign():
+    kw = r.parse_keywords([], [], GROUPS, NAMES)
+    ads = r.parse_ads([], GROUPS, NAMES)
+    s = r.join_structure(GROUPS, kw, ads, NAMES)
+    assert s["noLiveAd"]["count"] == 3 and s["noKeywords"]["count"] == 3
+    assert s["noLiveAd"]["examples"][0] == {"adGroup": "Dentures", "campaign": "Search | Implants"}
+
+
+def test_structure_facts_that_need_an_unread_part_are_absent_not_zero():
+    s = r.join_structure(GROUPS, None, None, NAMES)
+    assert "noLiveAd" not in s and "noKeywords" not in s and s["searchAdGroups"] == 3
+    kw_only = r.join_structure(GROUPS, r.parse_keywords([], [], GROUPS, NAMES), None, NAMES)
+    assert "noKeywords" in kw_only and "noLiveAd" not in kw_only
+
+
+def test_compact_drops_the_join_helpers_only():
+    kw = r.parse_keywords([A.keyword()], [], GROUPS, NAMES)
+    c = r.compact(kw)
+    assert "_perGroup" not in c and c["enabled"] == 1 and "_perGroup" in kw
+    assert r.compact(None) is None
+
+
+# ── Search terms ────────────────────────────────────────────────────────────
+
+def test_search_terms_that_never_converted_are_the_waste():
+    rows = [A.term("good", 100.0, 20, 4.0), A.term("free implants", 60.0, 12, 0), A.term("implants jobs", 40.0, 9, 0.0), A.term("tiny", 0.5, 1, 0)]
+    t = r.parse_terms(rows, NAMES)
+    assert t["rows"] == 4 and t["capped"] is False and t["cost"] == 200.5 and t["wastedCost"] == 100.5 and t["wastedTerms"] == 3
+    assert [e["term"] for e in t["examples"]] == ["free implants", "implants jobs", "tiny"]
+    assert t["examples"][0] == {"term": "free implants", "cost": 60.0, "clicks": 12, "campaign": "Search | Implants"}
+
+
+def test_a_full_page_of_terms_says_the_cheaper_ones_are_not_in_it():
+    rows = [A.term("t%d" % i, 1.0) for i in range(r.TERMS_LIMIT)]
+    assert r.parse_terms(rows, NAMES)["capped"] is True
+    assert r.parse_terms(rows[:-1], NAMES)["capped"] is False
+    assert r.parse_terms([], NAMES) == {"rows": 0, "capped": False, "cost": 0.0, "wastedCost": 0.0, "wastedTerms": 0, "examples": []}
+
+
+# ── Cases the first round of deliberate faults showed were not pinned ───────
+
+def test_each_customer_flag_is_read_from_its_own_field():
+    c = r.parse_customer(A.customer(conversionTrackingSetting={"acceptedCustomerDataTerms": False, "enhancedConversionsForLeadsEnabled": True},
+                                    callReportingSetting={"callReportingEnabled": False, "callConversionReportingEnabled": True}))
+    assert c["enhancedLeads"] is True and c["dataTerms"] is False and c["callConversions"] is True and c["callReporting"] is False
+    c = r.parse_customer(A.customer(conversionTrackingSetting={"acceptedCustomerDataTerms": True}, callReportingSetting={"callReportingEnabled": True}))
+    assert c["enhancedLeads"] is False and c["dataTerms"] is True and c["callConversions"] is False and c["callReporting"] is True
+
+
+def test_the_optimization_score_rounds_to_the_nearest_percent():
+    assert r.parse_customer(A.customer(optimizationScore=0.4366))["optimizationScore"] == 44
+
+
+def test_the_conversion_value_falls_back_to_the_primary_value_field():
+    row = {"metrics": {"conversionsValue": 12.5, "conversions": 1.0, "allConversions": 1.0}, "segments": {"conversionAction": "customers/1/conversionActions/1"}}
+    assert r.parse_conversions([A.action("1")], [row])[0]["value"] == 12.5
+
+
+def test_a_keyword_with_some_conversion_is_not_waste_and_a_missing_serving_status_is_not_rarely_served():
+    rows = [A.keyword(crit="1", text="half"), A.keyword(crit="2", text="one"), A.keyword(crit="3", text="none"), A.keyword(crit="4", text="unset", serving=None)]
+    m = [A.keyword_metrics(crit="1", clicks=50, cost=10.0, conversions=0.5), A.keyword_metrics(crit="2", clicks=50, cost=10.0, conversions=1.0),
+         A.keyword_metrics(crit="3", clicks=50, cost=10.0, conversions=0.0)]
+    k = r.parse_keywords(rows, m, GROUPS, NAMES)
+    assert [e["keyword"] for e in k["wasted"]["examples"]] == ["none"] and k["rarelyServed"] == 0
+
+
+def test_every_legacy_ad_format_is_counted_and_the_current_ones_are_not():
+    legacy = ["EXPANDED_TEXT_AD", "TEXT_AD", "CALL_ONLY_AD", "EXPANDED_DYNAMIC_SEARCH_AD", "LEGACY_RESPONSIVE_DISPLAY_AD", "LEGACY_APP_INSTALL_AD"]
+    current = ["RESPONSIVE_SEARCH_AD", "CALL_AD", "RESPONSIVE_DISPLAY_AD", "SHOPPING_PRODUCT_AD"]
+    a = r.parse_ads([A.ad(aid=str(i), atype=t) for i, t in enumerate(legacy + current)], GROUPS, NAMES)
+    assert a["legacy"] == 6 and a["total"] == 10
+
+
+def test_a_responsive_search_ad_without_a_strength_is_unspecified_not_good():
+    assert r.parse_ads([A.ad(strength=None)], GROUPS, NAMES)["strength"] == {"UNSPECIFIED": 1}
+
+
+def test_the_thresholds_for_one_ad_many_ads_and_many_keywords_are_exact():
+    groups = r.parse_ad_groups([A.ad_group("1", "10", "none"), A.ad_group("2", "10", "one"), A.ad_group("3", "10", "three"), A.ad_group("4", "10", "four"),
+                                A.ad_group("5", "10", "forty"), A.ad_group("6", "10", "forty one")])["groups"]
+    ads = r.parse_ads([A.ad(gid="2", aid="a")] + [A.ad(gid="3", aid="b%d" % i) for i in range(3)] + [A.ad(gid="4", aid="c%d" % i) for i in range(4)], groups, {})
+    kw = r.parse_keywords([A.keyword(gid="5", crit="k%d" % i, text="t%d" % i) for i in range(40)] +
+                          [A.keyword(gid="6", crit="m%d" % i, text="u%d" % i) for i in range(41)], [], groups, {})
+    s = r.join_structure(groups, kw, ads, {})
+    assert [e["adGroup"] for e in s["oneAd"]["examples"]] == ["one"]                    # no ad at all is a different problem, not "one ad"
+    assert sorted(e["adGroup"] for e in s["noLiveAd"]["examples"]) == ["forty", "forty one", "none"]
+    assert [e["adGroup"] for e in s["manyAds"]["examples"]] == ["four"]                 # three is fine, four is too many
+    assert [e["adGroup"] for e in s["manyKeywords"]["examples"]] == ["forty one"]       # forty is fine
+
+
+def test_a_term_with_part_of_a_conversion_is_not_waste():
+    t = r.parse_terms([A.term("half", 10.0, 5, 0.5), A.term("none", 7.0, 5, 0.0)], NAMES)
+    assert t["wastedTerms"] == 1 and t["wastedCost"] == 7.0
+
+
+def test_the_conversion_value_counts_every_conversion_when_both_values_are_given():
+    row = {"metrics": {"conversionsValue": 12.5, "allConversionsValue": 20.0, "conversions": 1.0, "allConversions": 2.0},
+           "segments": {"conversionAction": "customers/1/conversionActions/1"}}
+    assert r.parse_conversions([A.action("1")], [row])[0]["value"] == 20.0

@@ -305,3 +305,236 @@ def parse_network(rows):
         conv[n] = conv.get(n, 0.0) + _f(_get(r, "metrics", "conversions"))
     return {"cost": {k: round(v, 2) for k, v in cost.items()}, "total": round(sum(cost.values()), 2),
             "conversions": {k: round(v, 2) for k, v in conv.items()}}
+
+
+# ── Ad groups, keywords and ads ─────────────────────────────────────────────
+# Three separate queries joined in code on the ad group id (a keyword or an ad row does not carry its ad group's name, and a keyword
+# that had no impressions in the window is not returned by the metrics query, so the keyword list and its numbers are two reads).
+
+AD_GROUPS_GAQL = (
+    "SELECT campaign.id, ad_group.id, ad_group.name, ad_group.type, ad_group.primary_status FROM ad_group "
+    "WHERE campaign.status = ENABLED AND ad_group.status = ENABLED")
+KEYWORDS_GAQL = (
+    "SELECT campaign.id, ad_group.id, ad_group_criterion.criterion_id, ad_group_criterion.keyword.text, ad_group_criterion.keyword.match_type, "
+    "ad_group_criterion.status, ad_group_criterion.approval_status, ad_group_criterion.system_serving_status, "
+    "ad_group_criterion.quality_info.quality_score, ad_group_criterion.quality_info.creative_quality_score, "
+    "ad_group_criterion.quality_info.post_click_quality_score, ad_group_criterion.quality_info.search_predicted_ctr FROM ad_group_criterion "
+    "WHERE ad_group_criterion.type = KEYWORD AND ad_group_criterion.negative = FALSE AND ad_group_criterion.status != REMOVED "
+    "AND campaign.status = ENABLED AND ad_group.status = ENABLED")
+KEYWORD_METRICS_GAQL = (
+    "SELECT ad_group.id, ad_group_criterion.criterion_id, metrics.impressions, metrics.clicks, metrics.cost_micros, metrics.conversions "
+    "FROM keyword_view WHERE " + WINDOW + " AND campaign.status = ENABLED AND ad_group.status = ENABLED "
+    "AND ad_group_criterion.status != REMOVED AND metrics.impressions > 0")
+ADS_GAQL = (
+    "SELECT campaign.id, ad_group.id, ad_group_ad.ad.id, ad_group_ad.ad.type, ad_group_ad.status, ad_group_ad.ad_strength, "
+    "ad_group_ad.policy_summary.approval_status, ad_group_ad.policy_summary.policy_topic_entries, ad_group_ad.ad.final_urls, "
+    "ad_group_ad.ad.responsive_search_ad.headlines FROM ad_group_ad "
+    "WHERE campaign.status = ENABLED AND ad_group.status = ENABLED AND ad_group_ad.status != REMOVED")
+WASTE_MIN_CLICKS = 15                         # a keyword with this many clicks in 30 days and no conversion has had a fair chance
+LEGACY_ADS = {"EXPANDED_TEXT_AD", "TEXT_AD", "CALL_ONLY_AD", "EXPANDED_DYNAMIC_SEARCH_AD", "LEGACY_RESPONSIVE_DISPLAY_AD", "LEGACY_APP_INSTALL_AD"}
+SEARCH_AD_GROUP = "SEARCH_STANDARD"
+MAX_URLS = 40
+MANY_KEYWORDS = 40                            # keywords in one ad group past which its ads cannot speak to each of them
+BELOW = "BELOW_AVERAGE"
+
+
+def parse_ad_groups(rows):
+    """{groups: {id: {campaign, name, type}}, total}. Only enabled ad groups of enabled campaigns are read."""
+    groups = {}
+    for r in rows:
+        g, c = r.get("adGroup") or {}, r.get("campaign") or {}
+        gid = str(g.get("id") or "")
+        if gid:
+            groups[gid] = {"campaign": str(c.get("id") or ""), "name": g.get("name") or "", "type": g.get("type") or "UNKNOWN"}
+    return {"groups": groups, "total": len(groups)}
+
+
+def _norm(text):
+    return " ".join(str(text or "").lower().split())
+
+
+def _qs_band(score):
+    return "low" if score <= 4 else "mid" if score <= 6 else "high"
+
+
+def parse_keywords(rows, metric_rows, groups, campaign_names=None):
+    """The keyword facts: counts by match type and status, Quality Score weighted by impressions, keywords that spent without ever
+    converting, the same keyword in several ad groups of one campaign, disapproved and rarely served keywords. `metric_rows` None means
+    the numbers could not be read: the facts that need them are None. `groups` is parse_ad_groups()["groups"]. The result also carries
+    `_perGroup` (enabled keywords per ad group) for the structure join; compact() drops it before the read is saved."""
+    names = campaign_names or {}
+    metrics = None
+    if metric_rows is not None:
+        metrics = {}
+        for r in metric_rows:
+            k = (str(_get(r, "adGroup", "id", default="")), str(_get(r, "adGroupCriterion", "criterionId", default="")))
+            m = metrics.setdefault(k, {"impressions": 0, "clicks": 0, "cost": 0.0, "conversions": 0.0})
+            x = r.get("metrics") or {}
+            m["impressions"] += _i(x.get("impressions"))
+            m["clicks"] += _i(x.get("clicks"))
+            m["cost"] += _f(x.get("costMicros")) / 1e6
+            m["conversions"] += _f(x.get("conversions"))
+    by_match, status = {}, {"ENABLED": 0, "PAUSED": 0}
+    per_group, per_campaign = {}, {}
+    qs = {"scored": 0, "keywords": {"low": 0, "mid": 0, "high": 0}, "impressions": {"low": 0, "mid": 0, "high": 0, "none": 0},
+          "below": {"expectedCtr": 0, "adRelevance": 0, "landingPage": 0}}
+    low_examples, waste_examples, dup, disapproved, rarely = [], [], {}, [], 0
+    waste_cost = waste_n = 0
+    scored_impressions = 0
+    for r in rows:
+        c, g, k = r.get("campaign") or {}, r.get("adGroup") or {}, r.get("adGroupCriterion") or {}
+        cid, gid, crit = str(c.get("id") or ""), str(g.get("id") or ""), str(k.get("criterionId") or "")
+        kw = k.get("keyword") or {}
+        text, match = kw.get("text") or "", kw.get("matchType") or "UNKNOWN"
+        st = k.get("status") or "UNKNOWN"
+        status[st] = status.get(st, 0) + 1
+        if st != "ENABLED":
+            continue
+        by_match[match] = by_match.get(match, 0) + 1
+        per_group[gid] = per_group.get(gid, 0) + 1
+        pc = per_campaign.setdefault(cid, {"keywords": 0, "broad": 0})
+        pc["keywords"] += 1
+        pc["broad"] += match == "BROAD"
+        m = metrics.get((gid, crit), {"impressions": 0, "clicks": 0, "cost": 0.0, "conversions": 0.0}) if metrics is not None else None
+        where = {"keyword": text, "match": match, "campaign": names.get(cid, ""), "adGroup": (groups.get(gid) or {}).get("name", "")}
+        score = _get(k, "qualityInfo", "qualityScore")
+        if score:
+            band = _qs_band(_i(score))
+            qs["scored"] += 1
+            qs["keywords"][band] += 1
+            if m is not None:
+                qs["impressions"][band] += m["impressions"]
+                scored_impressions += m["impressions"]
+                for src, dst in (("searchPredictedCtr", "expectedCtr"), ("creativeQualityScore", "adRelevance"), ("postClickQualityScore", "landingPage")):
+                    if _get(k, "qualityInfo", src) == BELOW:
+                        qs["below"][dst] += m["impressions"]
+                if band == "low" and m["impressions"]:
+                    low_examples.append(dict(where, qs=_i(score), impressions=m["impressions"]))
+        elif m is not None:
+            qs["impressions"]["none"] += m["impressions"]
+        if m is not None and m["clicks"] >= WASTE_MIN_CLICKS and m["conversions"] == 0:
+            waste_cost += m["cost"]
+            waste_n += 1
+            waste_examples.append(dict(where, clicks=m["clicks"], cost=round(m["cost"], 2)))
+        dup.setdefault((cid, _norm(text), match), set()).add(gid)
+        if k.get("approvalStatus") == "DISAPPROVED":
+            disapproved.append(where)
+        if k.get("systemServingStatus") == "RARELY_SERVED":
+            rarely += 1
+    if metrics is None:
+        qs["impressions"] = None
+        qs["below"] = None
+    else:
+        qs["below"] = {k: (round(100.0 * v / scored_impressions) if scored_impressions else 0) for k, v in qs["below"].items()}
+    low_examples.sort(key=lambda e: (-e["impressions"], e["keyword"]))
+    waste_examples.sort(key=lambda e: (-e["cost"], e["keyword"]))
+    dups = sorted(((key, ags) for key, ags in dup.items() if len(ags) > 1), key=lambda kv: (-len(kv[1]), kv[0]))
+    return {"total": sum(status.values()), "enabled": status["ENABLED"], "paused": status["PAUSED"], "byMatch": by_match, "qs": qs,
+            "lowQualityExamples": low_examples[:EXAMPLES],
+            "wasted": None if metrics is None else {"cost": round(waste_cost, 2), "keywords": waste_n, "minClicks": WASTE_MIN_CLICKS,
+                                                    "examples": waste_examples[:EXAMPLES]},
+            "duplicates": {"keywords": len(dups), "copies": sum(len(ags) - 1 for _k, ags in dups),
+                           "examples": [{"keyword": key[1], "match": key[2], "campaign": names.get(key[0], ""), "adGroups": len(ags)} for key, ags in dups[:EXAMPLES]]},
+            "disapproved": {"count": len(disapproved), "examples": disapproved[:EXAMPLES]}, "rarelyServed": rarely,
+            "perCampaign": per_campaign, "_perGroup": per_group}
+
+
+def parse_ads(rows, groups, campaign_names=None):
+    """The ad facts: counts by type, responsive search ad strength, disapproved and limited ads with the policy topic, legacy formats,
+    pinned headlines and the distinct landing pages. `_perGroup` (live ads per ad group) is for the structure join."""
+    names = campaign_names or {}
+    by_type, strength = {}, {}
+    per_group, urls = {}, {}
+    disapproved, limited, legacy, pinned_any, pinned_heavy, rsa = [], 0, 0, 0, 0, 0
+    for r in rows:
+        a, c, g = r.get("adGroupAd") or {}, r.get("campaign") or {}, r.get("adGroup") or {}
+        if a.get("status") != "ENABLED":
+            continue
+        ad, gid, cid = a.get("ad") or {}, str(g.get("id") or ""), str(c.get("id") or "")
+        t = ad.get("type") or "UNKNOWN"
+        by_type[t] = by_type.get(t, 0) + 1
+        pg = per_group.setdefault(gid, {"ads": 0, "rsa": 0})
+        pg["ads"] += 1
+        if t in LEGACY_ADS:
+            legacy += 1
+        if t == "RESPONSIVE_SEARCH_AD":
+            pg["rsa"] += 1
+            rsa += 1
+            s = a.get("adStrength") or "UNSPECIFIED"
+            strength[s] = strength.get(s, 0) + 1
+            pins = sum(1 for h in _get(ad, "responsiveSearchAd", "headlines", default=[]) or [] if h.get("pinnedField"))
+            pinned_any += pins > 0
+            pinned_heavy += pins >= 3
+        approval = _get(a, "policySummary", "approvalStatus", default="")
+        if approval == "DISAPPROVED":
+            topics = [str(e.get("topic") or "") for e in _get(a, "policySummary", "policyTopicEntries", default=[]) or []][:3]
+            disapproved.append({"campaign": names.get(cid, ""), "adGroup": (groups.get(gid) or {}).get("name", ""), "type": t, "topics": [x for x in topics if x]})
+        elif approval in ("APPROVED_LIMITED", "AREA_OF_INTEREST_ONLY"):
+            limited += 1
+        for u in ad.get("finalUrls") or []:
+            urls[u] = urls.get(u, 0) + 1
+    ranked = sorted(urls.items(), key=lambda kv: (-kv[1], kv[0]))
+    return {"total": sum(by_type.values()), "byType": by_type, "rsa": rsa, "strength": strength, "legacy": legacy,
+            "disapproved": {"count": len(disapproved), "examples": disapproved[:EXAMPLES]}, "limited": limited,
+            "pinned": {"any": pinned_any, "heavy": pinned_heavy},
+            "urls": {"distinct": len(urls), "list": [{"url": u, "ads": n} for u, n in ranked[:MAX_URLS]]}, "_perGroup": per_group}
+
+
+def join_structure(groups, kw, ads, campaign_names=None):
+    """Facts about ad groups that need both the keywords and the ads: ad groups with no live ad, with one ad, with no keyword, with too
+    many keywords. `kw` or `ads` None (not read) leaves the facts that need it None. Only Search ad groups are judged."""
+    names = campaign_names or {}
+    search = {gid: g for gid, g in groups.items() if g["type"] == SEARCH_AD_GROUP}
+
+    def pick(pred):
+        hits = [dict(adGroup=g["name"], campaign=names.get(g["campaign"], "")) for gid, g in search.items() if pred(gid)]
+        hits.sort(key=lambda h: (h["campaign"], h["adGroup"]))
+        return {"count": len(hits), "examples": hits[:EXAMPLES]}
+    out = {"adGroups": len(groups), "searchAdGroups": len(search), "byType": {}}
+    for g in groups.values():
+        out["byType"][g["type"]] = out["byType"].get(g["type"], 0) + 1
+    if ads is not None:
+        pg = ads["_perGroup"]
+        out["noLiveAd"] = pick(lambda gid: pg.get(gid, {}).get("rsa", 0) + pg.get(gid, {}).get("ads", 0) == 0)
+        out["noResponsiveAd"] = pick(lambda gid: pg.get(gid, {}).get("rsa", 0) == 0)
+        out["oneAd"] = pick(lambda gid: pg.get(gid, {}).get("ads", 0) == 1)
+        out["manyAds"] = pick(lambda gid: pg.get(gid, {}).get("rsa", 0) > 3)
+    if kw is not None:
+        pk = kw["_perGroup"]
+        out["noKeywords"] = pick(lambda gid: pk.get(gid, 0) == 0)
+        out["manyKeywords"] = pick(lambda gid: pk.get(gid, 0) > MANY_KEYWORDS)
+    return out
+
+
+
+def compact(facts):
+    """The facts without the join helpers, ready to be saved."""
+    return {k: v for k, v in (facts or {}).items() if not k.startswith("_")} if facts is not None else None
+
+
+# ── Search terms ────────────────────────────────────────────────────────────
+
+TERMS_LIMIT = 1000
+TERMS_GAQL = (
+    "SELECT search_term_view.search_term, search_term_view.status, campaign.id, metrics.cost_micros, metrics.clicks, metrics.conversions "
+    "FROM search_term_view WHERE " + WINDOW + " AND metrics.cost_micros > 0 ORDER BY metrics.cost_micros DESC LIMIT %d" % TERMS_LIMIT)
+
+
+def parse_terms(rows, campaign_names=None):
+    """The biggest search terms by spend and how much of that spend never converted: {rows, capped, cost, wastedCost, wastedTerms,
+    examples}. The read is the TERMS_LIMIT most expensive terms, so `capped` says the cheaper ones are not in it."""
+    names = campaign_names or {}
+    total = wasted = 0.0
+    n_wasted, examples = 0, []
+    for r in rows:
+        x = r.get("metrics") or {}
+        cost = _f(x.get("costMicros")) / 1e6
+        total += cost
+        if _f(x.get("conversions")) == 0:
+            wasted += cost
+            n_wasted += 1
+            examples.append({"term": _get(r, "searchTermView", "searchTerm", default=""), "cost": round(cost, 2), "clicks": _i(x.get("clicks")),
+                             "campaign": names.get(str(_get(r, "campaign", "id", default="")), "")})
+    examples.sort(key=lambda e: (-e["cost"], e["term"]))
+    return {"rows": len(rows), "capped": len(rows) >= TERMS_LIMIT, "cost": round(total, 2), "wastedCost": round(wasted, 2),
+            "wastedTerms": n_wasted, "examples": examples[:EXAMPLES]}

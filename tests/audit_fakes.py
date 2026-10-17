@@ -96,3 +96,52 @@ def attached_list(cid="10", sid="900", name="Master negatives", members="4000"):
 def network_row(cid="10", network="SEARCH", cost=100.0, conversions=5.0):
     return {"campaign": {"resourceName": "customers/1112223334/campaigns/" + cid, "id": cid},
             "metrics": {"impressions": "100", "clicks": "10", "costMicros": str(int(cost * 1e6)), "conversions": conversions}, "segments": {"adNetworkType": network}}
+
+
+def ad_group(gid="100", cid="10", name="Implants", gtype="SEARCH_STANDARD"):
+    return {"campaign": {"resourceName": "customers/1112223334/campaigns/" + cid, "id": cid},
+            "adGroup": {"resourceName": "customers/1112223334/adGroups/" + gid, "type": gtype, "id": gid, "name": name, "primaryStatus": "ELIGIBLE"}}
+
+
+def keyword(cid="10", gid="100", crit="1", text="dental implants", match="PHRASE", status="ENABLED", approval="APPROVED", serving="ELIGIBLE", qs=None,
+            creative=None, post_click=None, ctr=None):
+    q = {}
+    if qs is not None:
+        q["qualityScore"] = qs
+    if creative:
+        q["creativeQualityScore"] = creative
+    if post_click:
+        q["postClickQualityScore"] = post_click
+    if ctr:
+        q["searchPredictedCtr"] = ctr
+    k = {"resourceName": "customers/1112223334/adGroupCriteria/%s~%s" % (gid, crit), "status": status, "keyword": {"matchType": match, "text": text},
+         "systemServingStatus": serving, "approvalStatus": approval, "criterionId": crit}
+    if q:
+        k["qualityInfo"] = q
+    return {"campaign": {"resourceName": "customers/1112223334/campaigns/" + cid, "id": cid},
+            "adGroup": {"resourceName": "customers/1112223334/adGroups/" + gid, "id": gid}, "adGroupCriterion": k}
+
+
+def keyword_metrics(gid="100", crit="1", impressions=100, clicks=10, cost=20.0, conversions=1.0):
+    return {"adGroup": {"resourceName": "customers/1112223334/adGroups/" + gid, "id": gid},
+            "metrics": {"clicks": str(clicks), "conversions": conversions, "costMicros": str(int(cost * 1e6)), "impressions": str(impressions)},
+            "adGroupCriterion": {"resourceName": "customers/1112223334/adGroupCriteria/%s~%s" % (gid, crit), "criterionId": crit},
+            "keywordView": {"resourceName": "customers/1112223334/keywordViews/%s~%s" % (gid, crit)}}
+
+
+def ad(cid="10", gid="100", aid="7", atype="RESPONSIVE_SEARCH_AD", status="ENABLED", strength="GOOD", approval="APPROVED", topics=(), urls=("https://acme.test/implants",),
+       pins=0, headlines=8):
+    hs = [{"text": "H%d" % i, **({"pinnedField": "HEADLINE_1"} if i < pins else {})} for i in range(headlines)]
+    a = {"resourceName": "customers/1112223334/adGroupAds/%s~%s" % (gid, aid), "status": status, "adStrength": strength,
+         "policySummary": {"approvalStatus": approval, "reviewStatus": "REVIEWED", "policyTopicEntries": [{"topic": t, "type": "PROHIBITED"} for t in topics]},
+         "ad": {"type": atype, "id": aid, "finalUrls": list(urls)}}
+    if atype == "RESPONSIVE_SEARCH_AD":
+        a["ad"]["responsiveSearchAd"] = {"headlines": hs}
+    return {"campaign": {"resourceName": "customers/1112223334/campaigns/" + cid, "id": cid},
+            "adGroup": {"resourceName": "customers/1112223334/adGroups/" + gid, "id": gid}, "adGroupAd": a}
+
+
+def term(text="dental implants", cost=10.0, clicks=5, conversions=0.0, cid="10"):
+    return {"campaign": {"resourceName": "customers/1112223334/campaigns/" + cid, "id": cid},
+            "metrics": {"clicks": str(clicks), "conversions": conversions, "costMicros": str(int(cost * 1e6))},
+            "searchTermView": {"resourceName": "customers/1112223334/searchTermViews/%s~1~abc" % cid, "status": "NONE", "searchTerm": text}}
