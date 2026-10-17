@@ -25,7 +25,7 @@ def acct(**kw):
 def test_every_check_is_in_the_catalog_runs_once_and_a_healthy_account_has_no_failure():
     out = c.run(F.a_read())
     ids = [f["id"] for f in out]
-    assert ids == [cid for cid, _fn in c.CHECKS] and len(set(ids)) == len(ids) and len(ids) == 16
+    assert ids == [cid for cid, _fn in c.CHECKS] and len(set(ids)) == len(ids) and len(ids) == 17
     assert all(cid in model.CATALOG for cid in ids) and all(f["platform"] == "meta" for f in out)
     assert [(f["id"], f["found"]) for f in out if f["result"] in ("fail", "warn")] == []
 
@@ -251,3 +251,13 @@ def test_more_than_one_ad_per_ad_set():
     f = one("M-ADS-03", dark)
     assert f["found"].startswith("1 of 1 live ad set (100%)")                                # an ad set with no ad is a different finding
     assert one("M-ADS-03", F.a_read(answers={"adSets": [], "ads": []}))["result"] == "na" and one("M-ADS-03", F.a_read(fail={"ads"}))["result"] == "unknown"
+
+
+def test_an_ad_account_with_no_live_campaign_says_it_is_not_advertising():
+    f = one("M-STR-06")
+    assert f["result"] == "pass" and f["found"] == "1 live campaign."
+    none = F.a_read(answers={"campaigns": [], "insights": [], "adSets": [], "ads": []})
+    f = one("M-STR-06", none)
+    assert f["result"] == "warn" and f["severity"] == "high" and f["found"].startswith("No campaign is live. The ad account is not advertising")
+    assert one("M-STR-06", F.a_read(answers={"campaigns": [F.campaign("1"), F.campaign("2", "B")]}))["found"] == "2 live campaigns."
+    assert one("M-STR-06", F.a_read(fail={"campaigns"}))["result"] == "unknown"

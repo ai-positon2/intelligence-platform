@@ -20,6 +20,7 @@ TIMEOUT_S = 8
 WORKERS = 5
 BLOCKED = {401, 403, 429}
 UA = "Mozilla/5.0 (compatible; Position2AccountAudit/1.0; +https://intelligence.position2.com)"
+TIMED_OUT = "timed out"
 _TEMPLATE = re.compile(r"\{[^{}]*\}")
 
 
@@ -53,21 +54,28 @@ def pick(url_rows, limit=MAX_CHECK):
 
 
 def check_one(url, fetcher=None):
-    """{url, status, error, blocked, ms, finalUrl, redirected}. Never raises."""
+    """{url, status, error, blocked, ms, finalUrl, redirected, retried}. Never raises. A request that times out is made once more (a slow page
+    on a busy minute is not a broken one); the time recorded is the last attempt's."""
     if fetcher is None:
         from .event_intel_http import public_get as fetcher
-    out = {"url": url, "status": 0, "error": "", "blocked": False, "ms": 0, "finalUrl": "", "redirected": False}
-    t0 = time.monotonic()
-    try:
-        resp = fetcher(url, timeout=TIMEOUT_S, headers={"User-Agent": UA, "Accept": "text/html,*/*;q=0.8"})
+    out = {"url": url, "status": 0, "error": "", "blocked": False, "ms": 0, "finalUrl": "", "redirected": False, "retried": False}
+    for attempt in (0, 1):
+        out.update(status=0, error="", finalUrl="")
+        t0 = time.monotonic()
         try:
-            out["status"] = int(resp.status_code)
-            out["finalUrl"] = str(getattr(resp, "url", "") or url)
-        finally:
-            resp.close()
-    except Exception as e:                      # a private address, DNS, a timeout, TLS
-        out["error"] = _say(e)
-    out["ms"] = int((time.monotonic() - t0) * 1000)
+            resp = fetcher(url, timeout=TIMEOUT_S, headers={"User-Agent": UA, "Accept": "text/html,*/*;q=0.8"})
+            try:
+                out["status"] = int(resp.status_code)
+                out["finalUrl"] = str(getattr(resp, "url", "") or url)
+            finally:
+                resp.close()
+        except Exception as e:                  # a private address, DNS, a timeout, TLS
+            out["error"] = _say(e)
+        out["ms"] = int((time.monotonic() - t0) * 1000)
+        if out["error"] == TIMED_OUT and attempt == 0:
+            out["retried"] = True
+            continue
+        break
     out["blocked"] = out["status"] in BLOCKED
     out["redirected"] = bool(out["finalUrl"]) and page_key(out["finalUrl"]) != page_key(url)
     return out
@@ -79,7 +87,7 @@ def _say(e):
     if isinstance(e, ValueError):
         return "refused (%s)" % text[:80]
     if "timed out" in text.lower() or "timeout" in name.lower():
-        return "timed out"
+        return TIMED_OUT
     if "name or service" in text.lower() or "resolve" in text.lower() or "getaddrinfo" in text.lower():
         return "the address does not resolve"
     return "%s" % name

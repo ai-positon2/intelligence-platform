@@ -93,3 +93,33 @@ def test_check_returns_the_pages_checked_out_of_all_the_distinct_ones():
     assert p.check([], fetcher({})) == {"checked": 0, "of": 0, "results": []}
     one = p.check(rows[:1], fetcher({}), workers=0)
     assert one["checked"] == 1
+
+
+def test_a_timeout_is_tried_once_more_and_a_second_answer_is_the_result():
+    calls = []
+
+    def flaky(url, **kw):
+        calls.append(url)
+        if len(calls) == 1:
+            raise TimeoutError("timed out")
+        return Resp(200, url)
+    out = p.check_one("https://a.test/x", flaky)
+    assert out["status"] == 200 and out["error"] == "" and out["retried"] is True and len(calls) == 2
+
+
+def test_two_timeouts_are_a_timeout_and_other_errors_are_not_retried():
+    calls = []
+
+    def stuck(url, **kw):
+        calls.append(url)
+        raise TimeoutError("timed out")
+    out = p.check_one("https://a.test/x", stuck)
+    assert out["error"] == "timed out" and out["status"] == 0 and out["retried"] is True and len(calls) == 2
+    calls.clear()
+
+    def dead(url, **kw):
+        calls.append(url)
+        raise OSError("Name or service not known")
+    out = p.check_one("https://a.test/x", dead)
+    assert out["error"] == "the address does not resolve" and out["retried"] is False and len(calls) == 1
+    assert p.check_one("https://a.test/x", fetcher({"https://a.test/x": 200}))["retried"] is False

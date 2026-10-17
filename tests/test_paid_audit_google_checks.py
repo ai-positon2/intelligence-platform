@@ -812,10 +812,24 @@ def test_landing_pages_that_do_not_load():
     assert f["result"] == "fail" and f["found"] == "2 of 3 landing pages did not load." and f["items"] == ["https://a.test/gone (HTTP 404)", "https://a.test/down (could not connect)"]
     assert one("G-ADS-09", pages=pages({"url": "u", "status": 399, "error": "", "ms": 1}))["result"] == "pass" and one("G-ADS-09", pages=pages({"url": "u", "status": 400, "error": "", "ms": 1}))["result"] == "fail"
     f = one("G-ADS-09", pages=pages(ok, {"url": "https://a.test/slow", "status": 200, "error": "", "ms": 3001}))
-    assert f["result"] == "warn" and f["found"] == "1 of 2 landing pages took more than 3 seconds to answer." and f["items"] == ["https://a.test/slow (3.0 seconds)"]
+    assert f["result"] == "warn" and f["found"] == "1 of 2 landing pages were slow: they took more than 3 seconds to answer." and f["items"] == ["https://a.test/slow (3.0 seconds)"]
     assert one("G-ADS-09", pages=pages({"url": "u", "status": 200, "error": "", "ms": 3000}))["result"] == "pass"
     assert one("G-ADS-09", pages=pages(*[ok] * 40, of=90))["found"] == "Checked 40 of 90 landing pages: all loaded."
     assert one("G-ADS-09", pages=pages())["result"] == "na" and one("G-ADS-09", pages=None)["result"] == "unknown" and one("G-ADS-09")["result"] == "unknown"
+
+
+def test_a_page_that_never_answered_is_slow_not_broken_and_other_errors_are_failures():
+    ok = {"url": "https://a.test/x", "status": 200, "error": "", "ms": 400, "blocked": False}
+    gone = {"url": "https://a.test/gone", "status": 0, "error": "timed out", "ms": 8004, "blocked": False}
+    f = one("G-ADS-09", pages=pages(ok, gone))
+    assert f["result"] == "warn" and f["found"] == "1 of 2 landing pages were slow: they took more than 3 seconds to answer." and f["items"] == ["https://a.test/gone (no answer in 8 seconds, twice)"]
+    dns = {"url": "https://a.test/dns", "status": 0, "error": "the address does not resolve", "ms": 20, "blocked": False}
+    f = one("G-ADS-09", pages=pages(ok, gone, dns))
+    assert f["result"] == "fail" and f["found"] == "1 of 3 landing pages did not load." and f["items"] == ["https://a.test/dns (the address does not resolve)"]    # the slow one is not listed with the broken
+    quick = dict(gone, ms=300)
+    assert one("G-ADS-09", pages=pages(ok, quick))["items"] == ["https://a.test/gone (no answer in 1 seconds, twice)"]
+    f = one("G-ADS-09", pages=pages(ok, dict(gone, ms=3500, error="")))
+    assert f["items"] == ["https://a.test/gone (3.5 seconds)"]
 
 
 def test_pages_that_refuse_the_automated_check_are_not_called_broken():
@@ -831,3 +845,14 @@ def test_pages_that_refuse_the_automated_check_are_not_called_broken():
     assert one("G-ADS-09", pages=pages(ok, slow_blocked))["result"] == "pass"                  # a refusal is never slow or broken
     f = one("G-ADS-09", pages=pages(refused, dict(refused, status=429, url="https://a.test/other")))
     assert f["result"] == "unknown" and "refused the automated check (HTTP 403/429)" in f["found"]
+
+
+def test_an_account_with_no_enabled_campaign_says_it_is_not_advertising():
+    f = one("G-STR-12")
+    assert f["result"] == "pass" and f["found"] == "1 enabled campaign."
+    none = camps(A.campaign("1", status="PAUSED"), A.campaign("2", status="PAUSED"))
+    f = one("G-STR-12", none)
+    assert f["result"] == "warn" and f["severity"] == "high" and f["found"].startswith("No campaign is enabled (2 paused campaigns). The account is not advertising")
+    assert one("G-STR-12", camps())["found"].startswith("No campaign is enabled (0 paused campaigns).")
+    assert one("G-STR-12", campaigns=None)["result"] == "unknown"
+    assert one("G-STR-12", camps(A.campaign("1"), A.campaign("2")))["found"] == "2 enabled campaigns."

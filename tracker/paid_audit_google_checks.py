@@ -11,6 +11,7 @@ import logging
 from . import paid_audit_model as model
 from .paid_audit_model import names, pct, plural, share, verb  # noqa: F401  (the helpers every checklist uses)
 from .paid_audit_google_read import LEGACY_ADS, SEARCH_LIST_MIN
+from .paid_audit_pages import TIMED_OUT
 
 log = logging.getLogger(__name__)
 make, unknown, na = model.make, model.unknown, model.not_applicable
@@ -697,6 +698,18 @@ def str_paused(ctx):
     return make("G-STR-11", "pass", "%s and %d enabled." % (plural(paused, "paused campaign"), enabled))
 
 
+@check("G-STR-12", "structure", "The account has enabled campaigns", "high",
+       "An account with no enabled campaign is not advertising. Most of the other checks have nothing to look at, so its score only reflects its settings.",
+       "Enable the campaigns that should be running, or audit again once the account is built.")
+def str_any(ctx):
+    if ctx.camps is None:
+        return unknown("G-STR-12", "the campaigns could not be read")
+    if not ctx.camps:
+        return make("G-STR-12", "warn", "No campaign is enabled (%s). The account is not advertising, so most checks do not apply and the score only reflects its settings." %
+                    plural(ctx.counts["paused"], "paused campaign"))
+    return make("G-STR-12", "pass", "%s." % plural(len(ctx.camps), "enabled campaign"))
+
+
 # ── Keywords and search terms ───────────────────────────────────────────────
 
 QS_LOW_FAIL = 30                              # share of impressions on keywords at Quality Score 4 or less
@@ -1053,14 +1066,15 @@ def ads_pages(ctx):
     blocked = [x for x in p["results"] if x.get("blocked")]
     if len(blocked) == len(p["results"]):
         return unknown("G-ADS-09", "every landing page refused the automated check (HTTP %s)" % "/".join(sorted({str(x["status"]) for x in blocked})))
-    broken = [x for x in p["results"] if not x.get("blocked") and (x["error"] or x["status"] >= 400)]
-    slow = [x for x in p["results"] if x not in broken and not x.get("blocked") and x["ms"] > SLOW_PAGE_MS]
+    open_ = [x for x in p["results"] if not x.get("blocked")]
+    broken = [x for x in open_ if (x["error"] and x["error"] != TIMED_OUT) or x["status"] >= 400]
+    slow = [x for x in open_ if x not in broken and (x["error"] == TIMED_OUT or x["ms"] > SLOW_PAGE_MS)]
     scope = "%d of %d landing pages" % (len(p["results"]), p["of"]) if p["of"] > len(p["results"]) else plural(len(p["results"]), "landing page")
     note = " %s refused the automated check and could not be verified." % plural(len(blocked), "page") if blocked else ""
     if broken:
         return make("G-ADS-09", "fail", "%d of %s did not load.%s" % (len(broken), scope, note),
                     items=["%s (%s)" % (x["url"], x["error"] or "HTTP %d" % x["status"]) for x in broken])
     if slow:
-        return make("G-ADS-09", "warn", "%d of %s took more than %d seconds to answer.%s" % (len(slow), scope, SLOW_PAGE_MS // 1000, note),
-                    items=["%s (%.1f seconds)" % (x["url"], x["ms"] / 1000.0) for x in slow])
+        return make("G-ADS-09", "warn", "%d of %s were slow: they took more than %d seconds to answer.%s" % (len(slow), scope, SLOW_PAGE_MS // 1000, note),
+                    items=["%s (%s)" % (x["url"], "no answer in %d seconds, twice" % (x["ms"] // 1000 or 1) if x["error"] == TIMED_OUT else "%.1f seconds" % (x["ms"] / 1000.0)) for x in slow])
     return make("G-ADS-09", "pass", "Checked %s: all loaded.%s" % (scope, note))

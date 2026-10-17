@@ -297,6 +297,17 @@ def str_frequency(ctx):
                 items=["%s (frequency %g)" % (c["name"], c["frequency"]) for c in hot])
 
 
+@check("M-STR-06", "m_structure", "The ad account has live campaigns", "high",
+       "An ad account with no live campaign is not advertising. Most of the other checks have nothing to look at, so its score only reflects the account and its pixel.",
+       "Turn on the campaigns that should be running, or audit again once the account is built.")
+def str_any(ctx):
+    if ctx.camps is None:
+        return unknown("M-STR-06", "the campaigns could not be read")
+    if not ctx.camps:
+        return make("M-STR-06", "warn", "No campaign is live. The ad account is not advertising, so most checks do not apply and the score only reflects the account and its pixel.")
+    return make("M-STR-06", "pass", "%s." % plural(len(ctx.camps), "live campaign"))
+
+
 # ── Ads ─────────────────────────────────────────────────────────────────────
 
 @check("M-ADS-01", "m_ads", "No ad is disapproved", "high",
