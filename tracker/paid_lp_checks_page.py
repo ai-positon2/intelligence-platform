@@ -14,12 +14,12 @@ import re
 
 from . import paid_lp_model as m
 from .paid_lp_model import make, not_applicable, plural, unknown
-from .paid_lp_page import ATF_CHARS, TIMEOUT_S
+from .paid_lp_page import ATF_CHARS, MAX_BYTES, TIMEOUT_S
 from .paid_qa_web import STAGING
 
 # ── Thresholds ──────────────────────────────────────────────────────────────
 
-SERVER_OK_MS, SERVER_SLOW_MS = 1000, 2000          # time for the server to start answering
+SERVER_OK_MS, SERVER_SLOW_MS = 1500, 3000          # time for the server to start answering, counted from the request, so DNS, the secure connection and any redirect are in it
 HTML_OK_KB, HTML_HEAVY_KB = 300, 600
 COMPRESSED = ("gzip", "br", "deflate", "zstd")
 TINY_BYTES = 5000                                  # a page this small is not worth compressing
@@ -150,6 +150,13 @@ class Ctx:
     @property
     def script_built(self):
         return bool(self.facts and self.facts.get("scriptBuilt"))
+
+    def not_seen(self, check_id, what):
+        """The finding for a check that found NOTHING of `what` on a page that was cut at the reading limit (it may be further down): could not check.
+        None when the page was read in full."""
+        if self.fetch and self.fetch.get("truncated"):
+            return unknown(check_id, "%s was not found in the first %d KB of the page, which is longer, so it may be further down" % (what, MAX_BYTES // 1000))
+        return None
 
     def page_unread(self):
         """Why a check that needs the page's own HTML and its forms and buttons cannot run: the page was not read, or it is built by scripts."""
@@ -297,6 +304,9 @@ def check_action(c):
     if f["mailto"] or f["emails"]:
         weak.append("an email address")
     strong = [x for x in f["ctas"] if x["kind"] == "strong"]
+    cut = c.not_seen("path_action", "a form, phone link, booking tool or buy button")
+    if cut:
+        return cut
     if strong:
         weak.append("%s that %s" % (plural(len(strong), "button or link"), "asks" if len(strong) == 1 else "ask"))
     later = _script_forms(c)
@@ -313,6 +323,9 @@ def check_cta_top(c):
         return unknown("path_cta_top", why)
     strong = [x for x in c.facts["ctas"] if x["kind"] == "strong"]
     if not strong:
+        cut = c.not_seen("path_cta_top", "a call to action")
+        if cut:
+            return cut
         if _forms(c) or c.facts["embeds"]:
             return make("path_cta_top", "warn", "No button or link asks the visitor to act; the form is the only prompt.", severity="medium")
         return make("path_cta_top", "fail", "No call to action (such as Book now, Call now or Get a quote) was found on the page.")
@@ -386,6 +399,9 @@ def check_tap_to_call(c):
     if f["tel"]:
         return make("mobile_tap_to_call", "pass", "The page has a tappable phone link (%s)." % f["tel"][0])
     if f["phones"]:
+        cut = c.not_seen("mobile_tap_to_call", "a phone link")
+        if cut:
+            return cut
         return make("mobile_tap_to_call", "warn", "The page shows %s as text but has no tap-to-call link." % ("the number " + f["phones"][0] if len(f["phones"]) == 1 else "%d phone numbers" % len(f["phones"])),
                     items=f["phones"])
     return not_applicable("mobile_tap_to_call", "No phone number was found on the page.")
@@ -430,7 +446,7 @@ def check_server(c):
     if why:
         return unknown("speed_server", why)
     ms = c.fetch.get("responseMs") or 0
-    said = "The server started to answer after %s (measured from our servers, redirects included)." % _ms(ms)
+    said = "The server started to answer after %s (measured from our servers; connecting and any redirect are in it)." % _ms(ms)
     if ms <= SERVER_OK_MS:
         return make("speed_server", "pass", said)
     if ms <= SERVER_SLOW_MS:
@@ -540,6 +556,9 @@ def check_tracking(c):
     names = [t["name"] for t in c.tech.get("tools", []) if t["name"] in GOOGLE_TAGS]
     if names:
         return make("trust_tracking", "pass", "The page loads %s." % " and ".join(names))
+    cut = c.not_seen("trust_tracking", "a Google tag or Tag Manager")
+    if cut:
+        return cut
     later = " A cookie banner is on the page, so the tag may load only after a choice is made." if c.facts.get("consent") else ""
     return make("trust_tracking", "warn", "No Google tag or Tag Manager was seen in the page's HTML." + later + " A tag that loads later is not seen by a plain read.")
 
@@ -550,6 +569,9 @@ def check_privacy(c):
         return unknown("trust_privacy", why)
     if c.facts["privacyLink"]:
         return make("trust_privacy", "pass", "The page links to a privacy policy.")
+    cut = c.not_seen("trust_privacy", "a link to a privacy policy")
+    if cut:
+        return cut
     if _forms(c) or c.facts["embeds"]:
         return make("trust_privacy", "fail", "The page collects details in a form but has no link to a privacy policy.")
     return make("trust_privacy", "warn", "The page has no link to a privacy policy.", severity="low")
@@ -569,6 +591,9 @@ def check_contact(c):
         have.append("an email address")
     if have:
         return make("trust_contact", "pass", "The page shows %s." % ", ".join(have))
+    cut = c.not_seen("trust_contact", "a phone number, address or email address")
+    if cut:
+        return cut
     return make("trust_contact", "fail", "No phone number, address or email address was found on the page.")
 
 
@@ -579,6 +604,9 @@ def check_proof(c):
     p = c.facts["proof"]
     if p:
         return make("trust_proof", "pass", "The page shows proof: %s." % ", ".join(p))
+    cut = c.not_seen("trust_proof", "reviews, ratings, awards or credentials")
+    if cut:
+        return cut
     return make("trust_proof", "warn", "No reviews, ratings, awards, credentials or years in business were found on the page.")
 
 

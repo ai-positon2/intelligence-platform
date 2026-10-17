@@ -288,13 +288,14 @@ def test_no_speed_score_from_google_is_could_not_check():
     assert f["result"] == "unknown" and "enough mobile traffic" in f["found"]
 
 
-@pytest.mark.parametrize("ms,res", [(100, "pass"), (1000, "pass"), (1001, "warn"), (2000, "warn"), (2001, "fail")])
+@pytest.mark.parametrize("ms,res", [(100, "pass"), (1500, "pass"), (1501, "warn"), (3000, "warn"), (3001, "fail")])
 def test_server_response_time(ms, res):
     assert spoiled("speed_server", responseMs=ms)["result"] == res
 
 
 def test_the_server_time_says_it_was_measured_from_our_servers():
     assert "measured from our servers" in spoiled("speed_server", responseMs=3500)["found"] and "3.5 seconds" in spoiled("speed_server", responseMs=3500)["found"]
+    assert "connecting and any redirect" in spoiled("speed_server", responseMs=100)["found"]
 
 
 @pytest.mark.parametrize("kb,res", [(50, "pass"), (300, "pass"), (301, "warn"), (600, "warn"), (601, "fail")])
@@ -403,3 +404,32 @@ def test_a_spoiled_page_scores_well_below_a_good_one():
     bad = m.page_summary([fn(ctx2) for _i, fn in c.CHECKS])
     assert good["score"] == 100 and good["grade"] == "A"
     assert bad["score"] < 60 and bad["grade"] in ("D", "F") and "Google's ad crawler is blocked from the page" in bad["capReasons"]
+
+
+# ── A page cut at the reading limit ─────────────────────────────────────────
+
+CUT = ("path_action", "path_cta_top", "mobile_tap_to_call", "trust_tracking", "trust_privacy", "trust_contact", "trust_proof")
+
+
+def cut_page_facts(cid):
+    none = {"forms": [], "tel": [], "embeds": [], "booking": False, "commerce": False, "ctas": [], "phones": [], "mailto": [], "emails": [], "privacyLink": False, "address": False, "proof": []}
+    if cid == "mobile_tap_to_call":
+        none["phones"] = ["(617) 555-0123"]
+    return none
+
+
+@pytest.mark.parametrize("cid", CUT)
+def test_what_is_not_found_on_a_page_cut_at_the_reading_limit_is_could_not_check_not_a_failure(cid):
+    f = spoiled(cid, facts_over=cut_page_facts(cid), tech_over={"tools": []}, truncated=True, bytes=800_000)
+    assert f["result"] == "unknown" and "may be further down" in f["found"] and "800 KB" in f["found"]
+
+
+@pytest.mark.parametrize("cid", CUT)
+def test_the_same_page_read_in_full_does_fail_or_warn(cid):
+    f = spoiled(cid, facts_over=cut_page_facts(cid), tech_over={"tools": []})
+    assert f["result"] in ("fail", "warn")
+
+
+@pytest.mark.parametrize("cid", ("path_action", "trust_privacy", "trust_contact"))
+def test_what_is_found_on_a_cut_page_still_passes(cid):
+    assert spoiled(cid, truncated=True, bytes=800_000)["result"] == "pass"

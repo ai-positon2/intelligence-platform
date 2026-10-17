@@ -148,7 +148,12 @@ def test_prices_with_commas_and_cents_are_one_number():
 
 
 def test_free_followed_by_filler_is_not_a_promise_and_a_word_that_only_contains_free_is_not_free():
-    assert m.offers_in(["Free for all", "Carefree living", "Free and fair"]) == []
+    assert m.offers_in(["Free for all", "Carefree living", "Free and fair", "Stress-Free Dentistry", "Worry-free care"]) == []
+
+
+def test_what_is_free_is_every_word_up_to_the_first_filler():
+    got = m.offers_in(["Get a Free Dental Consultation", "Free consultation for new patients", "Free Teeth Whitening Kit Today"])
+    assert [(o["text"], o["key"]) for o in got] == [("free dental consultation", "dental|consultation"), ("free consultation", "consultation"), ("free teeth whitening kit", "teeth|whiten|kit")]
 
 
 def test_no_promise_in_plain_copy():
@@ -189,6 +194,14 @@ def test_a_free_thing_is_on_the_page_when_free_sits_next_to_it():
     assert m.on_page(promised("free consultation", "free", m.stem("consultation")), page(text="Book your free initial consultation today"))
     assert not m.on_page(promised("free consultation", "free", m.stem("consultation")), page(text="Free parking. Consultation by appointment only."), )
     assert not m.on_page(promised("free consultation", "free", m.stem("consultation")), page(text="consultation is free"))   # a looser reading than the ad's; the check says what was missing
+
+
+def test_a_free_promise_is_kept_when_any_of_its_words_follows_free_on_the_page():
+    ad = m.offers_in(["Get a Free Dental Consultation"])[0]
+    assert m.on_page(ad, page(text="Book your free consultation today"))
+    assert m.on_page(ad, page(text="Free dental exam for new patients"))
+    assert not m.on_page(ad, page(text="Free parking. Consultations by appointment."))
+    assert not m.on_page(ad, page(text="Stress-free dentistry"))
 
 
 def test_service_promises_are_found_in_their_other_wordings():

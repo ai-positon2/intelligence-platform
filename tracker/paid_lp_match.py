@@ -170,7 +170,7 @@ def best_echo(headlines, prom):
 
 _MONEY = re.compile(r"\$\s?(\d[\d,]*(?:\.\d{1,2})?)")
 _PERCENT = re.compile(r"(?<![\d.])(\d{1,3})(?:\.\d+)?\s?(?:%|percent\b)")
-_FREE = re.compile(r"\bfree\s+([a-z][a-z-]+)(?:\s+([a-z][a-z-]+))?", re.I)
+_FREE = re.compile(r"(?<![-\w])free\s+([a-z][a-z-]+(?:\s+[a-z][a-z-]+){0,2})", re.I)
 _ROUND_THE_CLOCK = re.compile(r"\b24\s?/\s?7\b|\b24[\s-]?hours?\b", re.I)
 _SAME_DAY = re.compile(r"\bsame[\s-]day\b", re.I)
 _NO_COST = re.compile(r"\bno[\s-](?:cost|obligation|fees?|commitment)\b", re.I)
@@ -198,11 +198,13 @@ def offers_in(texts):
         for m in _PERCENT.finditer(t):
             add("percent", "%s%%" % m.group(1), m.group(1))
         for m in _FREE.finditer(t):
-            first = m.group(1).lower()
-            if first in FREE_FILLER:
-                continue
-            thing = stem(first)
-            add("free", "free " + first, thing)
+            thing = []
+            for w in m.group(1).lower().split():            # the words of what is free, up to the first filler word ("free consultation for new patients")
+                if w in FREE_FILLER:
+                    break
+                thing.append(w)
+            if thing:
+                add("free", "free " + " ".join(thing), "|".join(stem(w) for w in thing))
         if _ROUND_THE_CLOCK.search(t):
             add("hours", "24/7", "24")
         if _SAME_DAY.search(t):
@@ -230,8 +232,9 @@ def on_page(offer, page):
     if kind == "percent":
         return re.search(r"(?<![\d.])%s(?:\.\d+)?\s?(?:%%|percent\b)" % re.escape(key), flat) is not None
     if kind == "free":
-        for m in re.finditer(r"\bfree\b((?:\s+[a-z0-9-]+){1,3})", flat):               # the next words of the same sentence
-            if key in words(m.group(1)):
+        wanted = set(key.split("|"))
+        for m in re.finditer(r"(?<![-\w])free\b((?:\s+[a-z0-9-]+){1,4})", flat):         # the next words of the same sentence; any one of the promised words will do
+            if wanted & set(words(m.group(1))):
                 return True
         return False
     if kind == "hours":
