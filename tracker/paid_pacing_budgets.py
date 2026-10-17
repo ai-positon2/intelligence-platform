@@ -315,3 +315,9 @@ def book_for(month, *, store, run_fn=None):
     if seeded:
         return {"month": month, "rows": seeded, "source": {"kind": "seeded", "from": date}}
     return {"month": month, "rows": [], "source": {"kind": "none"}}
+
+
+def version_of(saved_rows):
+    """The text that says which saved version of a month a person is looking at: the newest save time among its saved rows ("" when
+    nothing is saved). A save that names a different version is refused, so two people editing at once cannot overwrite each other."""
+    return max([r.get("updatedAt") or "" for r in saved_rows or []] or [""])

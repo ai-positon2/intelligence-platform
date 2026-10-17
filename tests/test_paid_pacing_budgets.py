@@ -246,3 +246,8 @@ def test_nothing_anywhere_is_an_empty_book():
     assert b.book_for("2026-10", store=MemStore(), run_fn=lambda: (None, []))["source"] == {"kind": "none"}
     with pytest.raises(b.BadBudget):
         b.book_for("October", store=MemStore())
+
+
+def test_the_saved_version_is_the_newest_save_time():
+    assert b.version_of([]) == "" and b.version_of(None) == ""
+    assert b.version_of([{"updatedAt": "2026-10-01T10:00:00+00:00"}, {"updatedAt": "2026-10-02T09:00:00+00:00"}, {}]) == "2026-10-02T09:00:00+00:00"
