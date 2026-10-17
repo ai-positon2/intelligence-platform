@@ -22,7 +22,7 @@ def test_customer_settings_are_read_and_the_tag_is_reduced_to_its_id():
     assert c["trackingTemplate"].startswith("{lpurl}") and c["finalUrlSuffix"] == ""
     assert c["trackingStatus"] == "CONVERSION_TRACKING_MANAGED_BY_SELF" and c["enhancedLeads"] is True and c["dataTerms"] is True
     assert c["callReporting"] is True and c["callConversions"] is True
-    assert c["optimizationScore"] == 43
+    assert c["optimizationScore"] == 43.3
     assert c["googleTagId"] == "AW-16599110526"
     assert "script" not in str(c)                       # the snippet is never kept
 
@@ -145,7 +145,7 @@ def test_an_enabled_campaign_carries_its_settings_numbers_targeting_and_negative
     assert c["googleSearch"] is True and c["searchPartners"] is True and c["displayNetwork"] is True and c["geoMode"] == "PRESENCE"
     assert c["primaryStatus"] == "LIMITED" and c["reasons"] == ["BUDGET_CONSTRAINED"] and c["serving"] == "SERVING"
     assert c["metrics"] == {"impressions": 22138, "clicks": 6109, "cost": 15082.63, "conversions": 198.74, "allConversions": 346.91,
-                            "budgetLost": 18, "rankLost": 32, "share": 51}
+                            "budgetLost": 17.6, "rankLost": 31.8, "share": 50.6}
     assert c["targeting"] == {"locations": 2, "excludedLocations": 1, "proximities": 1, "languages": 1}
     assert c["negatives"] == 2 and c["lists"] == ["900", "901"]
     assert out["lists"] == {"900": {"name": "Master negatives", "members": 4000}, "901": {"name": "Second", "members": 12}}
@@ -171,9 +171,10 @@ def test_a_campaign_with_no_rows_in_a_part_that_was_read_has_zeros_and_a_part_no
     assert c["metrics"] is None and c["targeting"] is None and c["negatives"] is None and c["lists"] is None and unread["totals"] is None
 
 
-def test_impression_share_is_a_whole_percent_and_zero_is_not_missing():
+def test_impression_share_keeps_a_tenth_of_a_percent_and_zero_is_not_missing():
     c = r.parse_campaigns([A.campaign("10")], [A.campaign_metrics("10", budget_lost=0.0, rank_lost=0.004, share=1.0)])["campaigns"][0]
-    assert c["metrics"]["budgetLost"] == 0 and c["metrics"]["rankLost"] == 0 and c["metrics"]["share"] == 100
+    assert c["metrics"]["budgetLost"] == 0.0 and c["metrics"]["rankLost"] == 0.4 and c["metrics"]["share"] == 100.0       # a rounded 19.6 must not read as 20
+    assert r.parse_campaigns([A.campaign("10")], [A.campaign_metrics("10", budget_lost=0.196, rank_lost=0.396)])["campaigns"][0]["metrics"]["budgetLost"] == 19.6
     assert r.parse_campaigns([A.campaign("10")], [A.campaign_metrics("10")])["campaigns"][0]["metrics"]["share"] is None     # Display has none
 
 
@@ -393,8 +394,8 @@ def test_each_customer_flag_is_read_from_its_own_field():
     assert c["enhancedLeads"] is False and c["dataTerms"] is True and c["callConversions"] is False and c["callReporting"] is True
 
 
-def test_the_optimization_score_rounds_to_the_nearest_percent():
-    assert r.parse_customer(A.customer(optimizationScore=0.4366))["optimizationScore"] == 44
+def test_the_optimization_score_keeps_a_tenth_of_a_percent():
+    assert r.parse_customer(A.customer(optimizationScore=0.4366))["optimizationScore"] == 43.7 and r.parse_customer(A.customer(optimizationScore=0.496))["optimizationScore"] == 49.6
 
 
 def test_the_conversion_value_falls_back_to_the_primary_value_field():

@@ -185,8 +185,8 @@ def set_score(ctx):
     if score is None:
         return unknown("G-SET-07", "Google did not give a score")
     if score < LOW_OPTIMIZATION:
-        return make("G-SET-07", "warn", "The optimization score is %d%%." % score)
-    return make("G-SET-07", "pass", "The optimization score is %d%%." % score)
+        return make("G-SET-07", "warn", "The optimization score is %d%%." % round(score))
+    return make("G-SET-07", "pass", "The optimization score is %d%%." % round(score))
 
 
 # ── Conversion tracking ─────────────────────────────────────────────────────
@@ -567,7 +567,7 @@ def str_budget(ctx):
         return make("G-STR-04", "pass", "No converting campaign is held back by budget.")
     held.sort(key=lambda h: (-h[0]["metrics"]["cost"], h[0]["name"]))
     return make("G-STR-04", "warn", "%s converting and held back by budget." % (plural(len(held), "campaign") + (" is" if len(held) == 1 else " are")),
-                items=["%s%s" % (x["name"], " (%d%% of impressions lost to budget)" % lost if lost is not None else " (budget limited)") for x, lost in held])
+                items=["%s%s" % (x["name"], " (%d%% of impressions lost to budget)" % round(lost) if lost is not None else " (budget limited)") for x, lost in held])
 
 
 @check("G-STR-05", "structure", "No campaign is flagged by Google as misconfigured or limited by policy", "high",
@@ -693,7 +693,7 @@ def str_rank(ctx):
         return make("G-STR-10", "pass", "No big Search campaign loses %d%% or more of its impressions to rank." % RANK_LOST_PCT)
     big.sort(key=lambda x: (-x["metrics"]["cost"], x["name"]))
     return make("G-STR-10", "warn", "%s losing %d%% or more of impressions to rank." % (plural(len(big), "big Search campaign") + (" is" if len(big) == 1 else " are"), RANK_LOST_PCT),
-                items=["%s (%d%% lost to rank)" % (x["name"], x["metrics"]["rankLost"]) for x in big])
+                items=["%s (%d%% lost to rank)" % (x["name"], round(x["metrics"]["rankLost"])) for x in big])
 
 
 @check("G-STR-11", "structure", "The account is not buried in paused campaigns", "low",
@@ -819,14 +819,14 @@ def kwd_components(ctx):
     b = kw["qs"]["below"]
     hits = []
     if b["adRelevance"] >= BELOW_AD_RELEVANCE:
-        hits.append("ad relevance is below average on %d%% of impressions" % b["adRelevance"])
+        hits.append("ad relevance is below average on %d%% of impressions" % round(b["adRelevance"]))
     if b["landingPage"] >= BELOW_LANDING_PAGE:
-        hits.append("landing page experience is below average on %d%%" % b["landingPage"])
+        hits.append("landing page experience is below average on %d%%" % round(b["landingPage"]))
     if b["expectedCtr"] >= BELOW_EXPECTED_CTR:
-        hits.append("expected click-through rate is below average on %d%%" % b["expectedCtr"])
+        hits.append("expected click-through rate is below average on %d%%" % round(b["expectedCtr"]))
     if not hits:
         return make("G-KWD-04", "pass", "No Quality Score part is below average on a large share of impressions (ad relevance %d%%, landing page %d%%, expected click-through rate %d%%)." %
-                    (b["adRelevance"], b["landingPage"], b["expectedCtr"]))
+                    (round(b["adRelevance"]), round(b["landingPage"]), round(b["expectedCtr"])))
     return make("G-KWD-04", "warn", "On scored keywords, " + "; ".join(hits) + ".")
 
 

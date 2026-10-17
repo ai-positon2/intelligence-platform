@@ -64,7 +64,8 @@ _TAG_ID = re.compile(r"\bAW-\d{6,}\b")
 
 
 def parse_customer(rows):
-    """The account record. The Google tag is reduced to its id (AW-...); the snippet itself is not kept."""
+    """The account record. The Google tag is reduced to its id (AW-...); the snippet itself is not kept. Shares are kept to a tenth of a percent
+    so a check decides a threshold on the real figure, not a rounded one."""
     c = (rows[0] if rows else {}).get("customer") or {}
     track = c.get("conversionTrackingSetting") or {}
     calls = c.get("callReportingSetting") or {}
@@ -79,7 +80,7 @@ def parse_customer(rows):
             "enhancedLeads": bool(track.get("enhancedConversionsForLeadsEnabled")),
             "dataTerms": bool(track.get("acceptedCustomerDataTerms")),
             "callReporting": bool(calls.get("callReportingEnabled")), "callConversions": bool(calls.get("callConversionReportingEnabled")),
-            "optimizationScore": None if score is None else round(_f(score) * 100), "googleTagId": tag.group(0) if tag else ""}
+            "optimizationScore": None if score is None else round(_f(score) * 100, 1), "googleTagId": tag.group(0) if tag else ""}
 
 
 # ── Conversion actions ──────────────────────────────────────────────────────
@@ -234,7 +235,7 @@ def parse_campaigns(campaign_rows, metric_rows=None, criteria_rows=None, negativ
         m["allConversions"] += _f(x.get("allConversions"))
         for src, dst in (("searchBudgetLostImpressionShare", "budgetLost"), ("searchRankLostImpressionShare", "rankLost"), ("searchImpressionShare", "share")):
             if x.get(src) is not None:
-                m[dst] = round(_f(x[src]) * 100)
+                m[dst] = round(_f(x[src]) * 100, 1)
     crit = {}
     for r in criteria_rows or []:
         cid = str(_get(r, "campaign", "id", default=""))
@@ -425,7 +426,7 @@ def parse_keywords(rows, metric_rows, groups, campaign_names=None):
         qs["impressions"] = None
         qs["below"] = None
     else:
-        qs["below"] = {k: (round(100.0 * v / scored_impressions) if scored_impressions else 0) for k, v in qs["below"].items()}
+        qs["below"] = {k: (round(100.0 * v / scored_impressions, 1) if scored_impressions else 0) for k, v in qs["below"].items()}
     low_examples.sort(key=lambda e: (-e["impressions"], e["keyword"]))
     waste_examples.sort(key=lambda e: (-e["cost"], e["keyword"]))
     dups = sorted(((key, ags) for key, ags in dup.items() if len(ags) > 1), key=lambda kv: (-len(kv[1]), kv[0]))

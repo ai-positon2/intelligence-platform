@@ -887,3 +887,21 @@ def test_a_paused_or_nearly_idle_account_is_not_failed_for_actions_that_recorded
     f = one("G-CNV-07", A.a_read(answers=dict(novalue, **{r.CAMPAIGN_METRICS_GAQL: [A.campaign_metrics("10", 50, 4, 20.0, 5.0)]})))
     assert f["result"] == "na" and "too little to expect conversion values" in f["found"]
     assert one("G-CNV-07", A.a_read(answers=dict(novalue, **{r.CAMPAIGN_METRICS_GAQL: [A.campaign_metrics("10", 5000, 400, 100.0, 5.0)]})))["result"] == "fail"
+
+
+def test_a_threshold_is_decided_on_the_real_share_not_a_rounded_one():
+    # budget: 19.6 percent lost is under the 20 line even though it rounds to 20
+    rows = [A.campaign("10", "Near")]
+    near = camps(*rows, metrics=[A.campaign_metrics("10", cost=500.0, conversions=5.0, budget_lost=0.196)])
+    assert one("G-STR-04", near)["result"] == "pass"
+    assert one("G-STR-04", camps(*rows, metrics=[A.campaign_metrics("10", cost=500.0, conversions=5.0, budget_lost=0.2)]))["items"] == ["Near (20% of impressions lost to budget)"]
+    # rank: 39.6 is under 40
+    rank = lambda v: camps(A.campaign("10", "R"), metrics=[A.campaign_metrics("10", cost=600.0, rank_lost=v)])
+    assert one("G-STR-10", rank(0.396))["result"] == "pass" and one("G-STR-10", rank(0.4))["result"] == "warn"
+    # quality score parts: 34.6 is under 35 on ad relevance, 49.6 under 50 on click-through rate
+    assert one("G-KWD-04", qs_read([(8, 346, ("ad",)), (8, 654, ())]))["result"] == "pass"
+    assert one("G-KWD-04", qs_read([(8, 496, ("ctr",)), (8, 504, ())]))["result"] == "pass"
+    f = one("G-KWD-04", qs_read([(8, 355, ("lp",)), (8, 645, ())]))
+    assert f["result"] == "warn" and "landing page experience is below average on 36%" in f["found"]
+    # optimization score: 49.6 is under 50 even though it rounds to 50
+    assert one("G-SET-07", customer_with(optimizationScore=49.6))["result"] == "warn" and one("G-SET-07", customer_with(optimizationScore=49.6))["found"] == "The optimization score is 50%."
