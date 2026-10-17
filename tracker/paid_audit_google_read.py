@@ -156,7 +156,9 @@ def parse_links(link_rows, merchant_rows=None):
 
 def parse_lists(rows):
     """The account's audience lists, compacted: {total, open, withMembers, byType, tooSmallForSearch, empty, examples}. A list is "open"
-    when it is still collecting members; `empty` and `tooSmallForSearch` count open lists only (a closed list is on purpose)."""
+    when it is still collecting members; `empty` and `tooSmallForSearch` count open lists only (a closed list is on purpose). Each example
+    says whether it is "empty" (no members at all) or "small" (members, but under the Search minimum, which includes a list that only
+    serves Display)."""
     lists = [r.get("userList") or {} for r in rows]
     by_type, empty, small, examples = {}, 0, 0, []
     open_lists = [u for u in lists if u.get("membershipStatus") == "OPEN"]
@@ -170,10 +172,10 @@ def parse_lists(rows):
             members += 1
         if not search and not display:
             empty += 1
-            examples.append({"name": u.get("name") or "", "type": u.get("type") or "", "size": 0})
+            examples.append({"name": u.get("name") or "", "type": u.get("type") or "", "size": 0, "kind": "empty"})
         elif search < SEARCH_LIST_MIN:
             small += 1
-            examples.append({"name": u.get("name") or "", "type": u.get("type") or "", "size": search})
+            examples.append({"name": u.get("name") or "", "type": u.get("type") or "", "size": search, "kind": "small"})
     return {"total": len(lists), "open": len(open_lists), "withMembers": members, "byType": by_type, "empty": empty,
             "tooSmallForSearch": small, "examples": examples[:EXAMPLES]}
 
@@ -282,7 +284,7 @@ def parse_campaigns(campaign_rows, metric_rows=None, criteria_rows=None, negativ
         out.append({"id": cid, "name": c.get("name") or "", "type": ctype, "subType": c.get("advertisingChannelSubType") or "",
                     "primaryStatus": c.get("primaryStatus") or "", "reasons": list(c.get("primaryStatusReasons") or []),
                     "serving": c.get("servingStatus") or "", "bidding": c.get("biddingStrategyType") or "UNKNOWN",
-                    "biddingStatus": c.get("biddingStrategySystemStatus") or "", "portfolio": bool(c.get("biddingStrategy")),
+                    "biddingStatus": c.get("biddingStrategySystemStatus") or "", "portfolio": str(c.get("biddingStrategy") or ""),
                     "targetKind": target_kind, "target": target,
                     "googleSearch": bool(net.get("targetGoogleSearch")), "searchPartners": bool(net.get("targetSearchNetwork")),
                     "displayNetwork": bool(net.get("targetContentNetwork")),

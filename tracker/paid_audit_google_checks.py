@@ -440,7 +440,7 @@ def lnk_lists(ctx):
     if lists["open"] == 0:
         return make("G-LNK-02", "warn", "No audience list is open to new members (%s, all closed)." % plural(lists["total"], "list"))
     if lists["withMembers"] == 0:
-        return make("G-LNK-02", "warn", "None of the %s open audience lists has any members." % lists["open"], items=[e["name"] for e in lists["examples"] if e["size"] == 0])
+        return make("G-LNK-02", "warn", "None of the %s open audience lists has any members." % lists["open"], items=[e["name"] for e in lists["examples"] if e["kind"] == "empty"])
     return make("G-LNK-02", "pass", "%d of %s open audience lists have members." % (lists["withMembers"], lists["open"]))
 
 
@@ -457,7 +457,7 @@ def lnk_small(ctx):
         return make("G-LNK-03", "pass", "No open list is under the %s-member Search minimum." % format(SEARCH_LIST_MIN, ","))
     return make("G-LNK-03", "warn", "%s under the Search minimum of %s members." % (plural(lists["tooSmallForSearch"], "open list") + (" is" if lists["tooSmallForSearch"] == 1 else " are"),
                                                                                       format(SEARCH_LIST_MIN, ",")),
-                items=["%s (%s)" % (e["name"], format(e["size"], ",")) for e in lists["examples"] if e["size"]])
+                items=["%s (%s for Search)" % (e["name"], format(e["size"], ",")) for e in lists["examples"] if e["kind"] == "small"])
 
 
 
@@ -626,12 +626,30 @@ def str_smart_data(ctx):
         return na("G-STR-07", "No enabled campaign uses a conversion-based bidding strategy.")
     if any(x["metrics"] is None for x in smart):
         return unknown("G-STR-07", "the campaigns' numbers could not be read")
-    thin = [x for x in smart if x["metrics"]["cost"] > 0 and x["metrics"]["conversions"] < _needs(x)]
+    pool = {}                                                   # a portfolio strategy learns from all its campaigns together
+    for x in smart:
+        if x["portfolio"]:
+            p = pool.setdefault(x["portfolio"], {"conversions": 0.0, "cost": 0.0, "campaigns": 0})
+            p["conversions"] += x["metrics"]["conversions"]
+            p["cost"] += x["metrics"]["cost"]
+            p["campaigns"] += 1
+
+    def seen(x):
+        p = pool.get(x["portfolio"]) if x["portfolio"] else None
+        return (p["conversions"], p["cost"]) if p else (x["metrics"]["conversions"], x["metrics"]["cost"])
+    thin = [x for x in smart if seen(x)[1] > 0 and seen(x)[0] < _needs(x)]
     if not thin:
         return make("G-STR-07", "pass", "Checked %s: all have the conversions Google suggests." % plural(len(smart), "Smart Bidding campaign"))
     thin.sort(key=lambda x: (-x["metrics"]["cost"], x["name"]))
+
+    def line(x):
+        if x["portfolio"] and pool[x["portfolio"]]["campaigns"] > 1:
+            p = pool[x["portfolio"]]
+            return "%s (%s together with the other %s on its portfolio strategy, about %d suggested)" % (
+                x["name"], plural(round(p["conversions"]), "conversion"), plural(p["campaigns"] - 1, "campaign"), _needs(x))
+        return "%s (%s, about %d suggested)" % (x["name"], plural(round(x["metrics"]["conversions"]), "conversion"), _needs(x))
     return make("G-STR-07", "warn", "%d of %s had fewer conversions in 30 days than Google suggests." % (len(thin), plural(len(smart), "Smart Bidding campaign")),
-                items=["%s (%s, about %d suggested)" % (x["name"], plural(round(x["metrics"]["conversions"]), "conversion"), _needs(x)) for x in thin])
+                items=[line(x) for x in thin])
 
 
 @check("G-STR-08", "structure", "Campaigns with plenty of conversions use Smart Bidding", "medium",
@@ -714,10 +732,13 @@ def str_paused(ctx):
 def str_any(ctx):
     if ctx.camps is None:
         return unknown("G-STR-12", "the campaigns could not be read")
-    if not ctx.camps:
-        return make("G-STR-12", "warn", "No campaign is enabled (%s). The account is not advertising, so most checks do not apply and the score only reflects its settings." %
-                    plural(ctx.counts["paused"], "paused campaign"), caps="the account is not advertising")
-    return make("G-STR-12", "pass", "%s." % plural(len(ctx.camps), "enabled campaign"))
+    running = [x for x in ctx.camps if x["primaryStatus"] != "ENDED"]
+    if not running:
+        what = "No campaign is enabled (%s)" % plural(ctx.counts["paused"], "paused campaign") if not ctx.camps else \
+            "No campaign is running (%s ended)" % plural(len(ctx.camps), "enabled campaign")
+        return make("G-STR-12", "warn", what + ". The account is not advertising, so most checks do not apply and the score only reflects its settings.",
+                    caps="the account is not advertising")
+    return make("G-STR-12", "pass", "%s." % plural(len(running), "enabled campaign"))
 
 
 # ── Keywords and search terms ───────────────────────────────────────────────

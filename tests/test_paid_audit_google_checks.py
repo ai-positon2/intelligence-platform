@@ -355,7 +355,7 @@ def test_lists_under_the_search_minimum():
     assert one("G-LNK-03")["result"] == "pass" and "1,000-member" in one("G-LNK-03")["found"]
     small = lists_read(A.user_list("Small", search=300, display=300, lid="1"), A.user_list("Full", search=5000, display=5000, lid="2"))
     f = one("G-LNK-03", small)
-    assert f["result"] == "warn" and "1 open list is under the Search minimum of 1,000" in f["found"] and f["items"] == ["Small (300)"]
+    assert f["result"] == "warn" and "1 open list is under the Search minimum of 1,000" in f["found"] and f["items"] == ["Small (300 for Search)"]
     two = lists_read(A.user_list("A", search=1, display=1, lid="1"), A.user_list("B", search=2, display=2, lid="2"), A.user_list("Full", search=5000, display=5000, lid="3"))
     assert "2 open lists are under" in one("G-LNK-03", two)["found"]
     assert one("G-LNK-03", lists_read(A.user_list("Empty")))["result"] == "na" and one("G-LNK-03", lists=None)["result"] == "unknown"
@@ -905,3 +905,33 @@ def test_a_threshold_is_decided_on_the_real_share_not_a_rounded_one():
     assert f["result"] == "warn" and "landing page experience is below average on 36%" in f["found"]
     # optimization score: 49.6 is under 50 even though it rounds to 50
     assert one("G-SET-07", customer_with(optimizationScore=49.6))["result"] == "warn" and one("G-SET-07", customer_with(optimizationScore=49.6))["found"] == "The optimization score is 50%."
+
+
+def test_a_portfolio_strategy_is_judged_on_its_campaigns_together():
+    pf = "customers/1112223334/biddingStrategies/5"
+    rows = [A.campaign("10", "Pool A", bidding="TARGET_CPA", target_cpa="40000000", portfolio=pf), A.campaign("11", "Pool B", bidding="TARGET_CPA", target_cpa="40000000", portfolio=pf),
+            A.campaign("12", "Alone", bidding="TARGET_CPA", target_cpa="40000000")]
+    enough = [A.campaign_metrics("10", cost=300.0, conversions=20.0), A.campaign_metrics("11", cost=300.0, conversions=20.0), A.campaign_metrics("12", cost=300.0, conversions=20.0)]
+    f = one("G-STR-07", camps(*rows, metrics=enough))
+    assert f["result"] == "warn" and f["found"] == "1 of 3 Smart Bidding campaigns had fewer conversions in 30 days than Google suggests." and f["items"] == ["Alone (20 conversions, about 30 suggested)"]
+    short = [A.campaign_metrics("10", cost=300.0, conversions=10.0), A.campaign_metrics("11", cost=300.0, conversions=15.0), A.campaign_metrics("12", cost=300.0, conversions=40.0)]
+    f = one("G-STR-07", camps(*rows, metrics=short))
+    assert f["found"].startswith("2 of 3") and f["items"] == ["Pool A (25 conversions together with the other 1 campaign on its portfolio strategy, about 30 suggested)",
+                                                              "Pool B (25 conversions together with the other 1 campaign on its portfolio strategy, about 30 suggested)"]
+    one_in_pool = camps(A.campaign("10", "Lone pool", bidding="TARGET_CPA", target_cpa="40000000", portfolio=pf), metrics=[A.campaign_metrics("10", cost=300.0, conversions=10.0)])
+    assert one("G-STR-07", one_in_pool)["items"] == ["Lone pool (10 conversions, about 30 suggested)"]            # a portfolio of one reads like a campaign
+    idle = camps(*rows[:2], metrics=[A.campaign_metrics("10", cost=0.0, conversions=0.0)])
+    assert one("G-STR-07", idle)["result"] == "pass"
+
+
+def test_a_list_that_only_serves_display_is_named_with_its_search_size_and_an_ended_campaign_is_not_running():
+    mixed = lists_read(A.user_list("Display only", search=0, display=500, lid="1"), A.user_list("Small", search=300, display=300, lid="2"), A.user_list("Empty", lid="3"),
+                       A.user_list("Full", search=5000, display=5000, lid="4"))
+    f = one("G-LNK-03", mixed)
+    assert f["result"] == "warn" and f["items"] == ["Display only (0 for Search)", "Small (300 for Search)"]                  # the empty list is not "small"
+    assert one("G-LNK-02", mixed)["result"] == "pass"
+    ended = camps(A.campaign("1", "Old promo", primary="ENDED"), A.campaign("2", "Older promo", primary="ENDED"))
+    f = one("G-STR-12", ended)
+    assert f["result"] == "warn" and f["found"].startswith("No campaign is running (2 enabled campaigns ended). The account is not advertising") and f["caps"] == "the account is not advertising"
+    some = camps(A.campaign("1", "Old promo", primary="ENDED"), A.campaign("2", "Live"))
+    assert one("G-STR-12", some)["result"] == "pass" and one("G-STR-12", some)["found"] == "1 enabled campaign."

@@ -115,7 +115,7 @@ def test_a_list_with_members_an_empty_one_and_a_small_one():
     assert out["byType"] == {"REMARKETING": 3, "RULE_BASED": 1, "CRM_BASED": 1}
     assert out["empty"] == 1 and out["tooSmallForSearch"] == 2                         # Small and Display only; the closed list is on purpose
     assert [e["name"] for e in out["examples"]] == ["Empty", "Small", "Display only"]
-    assert out["examples"][1] == {"name": "Small", "type": "CRM_BASED", "size": 300}
+    assert out["examples"][1] == {"name": "Small", "type": "CRM_BASED", "size": 300, "kind": "small"} and [e["kind"] for e in out["examples"]] == ["empty", "small", "small"]
 
 
 def test_the_search_minimum_is_inclusive_and_examples_are_capped():
@@ -140,7 +140,7 @@ def test_an_enabled_campaign_carries_its_settings_numbers_targeting_and_negative
                              A.criterion("10", "LANGUAGE")],
                             [A.negative("10"), A.negative("10", "EXACT")], [A.attached_list("10", "900"), A.attached_list("10", "901", "Second", "12")])
     c = out["campaigns"][0]
-    assert c["id"] == "10" and c["name"] == "Search | Implants" and c["type"] == "SEARCH" and c["bidding"] == "TARGET_CPA" and c["portfolio"] is True
+    assert c["id"] == "10" and c["name"] == "Search | Implants" and c["type"] == "SEARCH" and c["bidding"] == "TARGET_CPA" and c["portfolio"] == "customers/1/biddingStrategies/5"
     assert c["targetKind"] == "cpa" and c["target"] == 40.0 and c["budget"] == 75.5 and c["budgetShared"] is True
     assert c["googleSearch"] is True and c["searchPartners"] is True and c["displayNetwork"] is True and c["geoMode"] == "PRESENCE"
     assert c["primaryStatus"] == "LIMITED" and c["reasons"] == ["BUDGET_CONSTRAINED"] and c["serving"] == "SERVING"
