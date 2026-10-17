@@ -122,3 +122,35 @@ def test_the_server_and_the_page_agree_on_the_results_and_severities():
     assert set(run("Object.keys(D.RESULT)")) == set(model.RESULTS) and set(run("Object.keys(D.SEVERITY)")) == set(model.SEVERITIES)
     assert {k: run("D.RESULT[k].label", k=k) for k in model.RESULTS} == ex.RESULT_TEXT                       # the files and the page say the same words
     assert {k: run("D.SEVERITY[k].label", k=k) for k in model.SEVERITIES} == ex.SEVERITY_TEXT and run("D.PLATFORM") == ex.PLATFORM_TEXT
+
+
+# ── The page against its template ───────────────────────────────────────────
+
+def test_the_page_script_is_valid_javascript():
+    r = subprocess.run(["node", "--check", PAGE], capture_output=True, text=True, timeout=30)
+    assert r.returncode == 0, r.stderr
+    r = subprocess.run(["node", "--check", DATA], capture_output=True, text=True, timeout=30)
+    assert r.returncode == 0, r.stderr
+
+
+def test_every_element_the_page_script_reaches_for_is_in_the_template():
+    js, html = open(PAGE, encoding="utf-8").read(), open(TEMPLATE, encoding="utf-8").read()
+    ids = set(re.findall(r'\$\("#([A-Za-z0-9_-]+)"\)', js)) | set(re.findall(r'getElementById\("([A-Za-z0-9_-]+)"\)', js))
+    assert ids >= {"acctPick", "msg", "empty", "skel", "out", "fresh", "stale", "score", "tiles", "fix", "fixNote", "sections", "notes", "notesCard", "foot", "refreshBtn", "dlXlsx", "dlPdf", "dlZip"}
+    for i in sorted(ids - {"sec-"}):
+        assert 'id="%s"' % i in html, i
+    for attr in ("data-toggle", "data-jump", "data-view", "data-more", "data-find"):
+        assert attr in js, attr
+
+
+def test_the_page_loads_its_scripts_in_order_and_its_stylesheet():
+    html = open(TEMPLATE, encoding="utf-8").read()
+    order = [html.index(s) for s in ("js/pm_picker.js", "js/pm_platform.js", "js/au_data.js", "js/account_audit.js")]
+    assert order == sorted(order) and "css/account_audit.css" in html
+    assert "root.AuditData=api" in open(DATA, encoding="utf-8").read() and "window.AuditData" in open(PAGE, encoding="utf-8").read()
+
+
+def test_there_is_no_em_or_en_dash_in_any_of_the_page():
+    for p in (DATA, PAGE, TEMPLATE, os.path.join(ROOT, "static", "css", "account_audit.css")):
+        text = open(p, encoding="utf-8").read()
+        assert "—" not in text and "–" not in text, p

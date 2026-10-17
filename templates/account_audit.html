@@ -1,0 +1,69 @@
+{% extends "_paid_base.html" %}
+{% block title %}Account Audit{% endblock %}
+{% block head %}
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/account_audit.css') }}?v=1">
+{% endblock %}
+{% block content %}
+<div class="pm pm-au" id="au">
+  <section class="pm-hero">
+    <div class="pm-hero-l">
+      <span class="pm-eyebrow"><span class="d"></span>Paid Marketing · Audit</span>
+      <h1 class="pm-title">Is the account set up to win? <span class="pm-grad">Find out before you build on it.</span></h1>
+      <p class="pm-sub">Pick a Google Ads account, a Meta ad account or one of each. The agent reads it live and holds it against a written checklist:
+        the settings, the <b>conversion tracking</b>, the links, the structure and bidding, the keywords and search terms, the ads and the landing pages
+        for Google, and the ad account, the pixel, the campaigns and the ads for Meta. Every check has a severity and a result, and anything it
+        could not read says so instead of passing or failing. You get a score, the checks to <b>fix first</b>, and the full list to download.</p>
+    </div>
+  </section>
+
+  <section class="pm-panel pd-cmd au-cmd" id="cmd">
+    <div class="au-cmd-row">
+      <div id="acctPick"></div>
+      <p class="au-scope">Read only: nothing is changed in either platform. One account at a time (an MCC is not audited). The read is saved for an hour, so the same
+        audit opens at once, and Refresh asks the platform again.</p>
+    </div>
+  </section>
+
+  <div id="msg"></div>
+
+  <div id="empty" class="pm-panel sg-empty">
+    <div class="sg-empty-ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 11l3 3 8-8M20 12v6a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h9"/></svg></div>
+    <h2>Choose an account to begin</h2>
+    <p>The first read of an account takes up to half a minute. It checks around fifty things.</p>
+  </div>
+  <div id="skel" hidden><div class="pd-skel"></div><div class="pd-skel"></div><div class="pd-skel"></div></div>
+
+  <div id="out" hidden>
+    <div class="sg-head">
+      <p class="pd-fresh" id="fresh"></p>
+      <button class="pm-btn-ghost" id="refreshBtn" type="button" title="Read the account again"><svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.3-5.6M20 4v5h-5"/></svg>Refresh</button>
+      <a class="pm-btn-ghost" id="dlXlsx" href="#" download><svg viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>Excel</a>
+      <a class="pm-btn-ghost" id="dlPdf" href="#" download><svg viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>PDF</a>
+      <a class="pm-btn-ghost" id="dlZip" href="#" download><svg viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>CSV files</a>
+    </div>
+    <div class="au-stale" id="stale" hidden></div>
+
+    <section class="pm-panel au-score" id="score"></section>
+    <div class="pd-strip au-tiles" id="tiles"></div>
+
+    <section class="pm-panel" id="fixCard">
+      <div class="pm-panel-h"><span class="pm-panel-t">Fix first</span><span class="pm-panel-s" id="fixNote"></span></div>
+      <ol class="au-fix" id="fix"></ol>
+    </section>
+
+    <div id="sections"></div>
+
+    <section class="pm-panel" id="notesCard" hidden>
+      <div class="pm-panel-h"><span class="pm-panel-t">What this audit could not see</span></div>
+      <ul class="au-notes" id="notes"></ul>
+    </section>
+    <p class="au-foot" id="foot"></p>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/pm_picker.js') }}?v=1"></script>
+<script src="{{ url_for('static', filename='js/pm_platform.js') }}?v=4"></script>
+<script src="{{ url_for('static', filename='js/au_data.js') }}?v=1"></script>
+<script src="{{ url_for('static', filename='js/account_audit.js') }}?v=1"></script>
+{% endblock %}

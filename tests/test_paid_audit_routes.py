@@ -106,3 +106,12 @@ def test_a_file_that_cannot_be_made_is_a_500_in_words(monkeypatch):
     monkeypatch.setattr(export, "pdf", broken)
     r = client_as(STAFF).get(API + "/download?account=1112223334&file=pdf")
     assert r.status_code == 500 and r.get_json()["error"] == "The file could not be made (RuntimeError)."
+
+
+# ── The page ────────────────────────────────────────────────────────────────
+
+def test_the_page_renders_for_staff_and_not_for_anyone_else():
+    path = "/p2/paid-marketing/account-audit"
+    page = client_as(STAFF).get(path)
+    assert page.status_code == 200 and b"account_audit.js" in page.data and b"account_audit.css" in page.data and b"au_data.js" in page.data and b"Account Audit" in page.data
+    assert client_as(None).get(path).status_code == 302 and client_as("someone@gmail.com").get(path).status_code == 302

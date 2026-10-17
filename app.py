@@ -5302,6 +5302,12 @@ def paid_assets_library():
 # paid_audit_google_checks.py and paid_audit_meta_checks.py, the report tracker/paid_audit.py. It only reads: nothing is changed in either
 # platform. The account lists are Segment Analysis's (Google) and api/gads/accounts?platform=meta (Meta).
 
+@app.route("/p2/paid-marketing/account-audit")
+@position2_required
+def paid_account_audit():
+    return render_template("account_audit.html", user=_get_user())
+
+
 def _paid_audit_answer(make):
     """Runs the Account Audit's report and maps what can go wrong the same way for every route."""
     from tracker import paid_gads as paid_gads_base, paid_gads_segments as paid_gads, paid_audit
