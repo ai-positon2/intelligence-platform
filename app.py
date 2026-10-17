@@ -4266,6 +4266,12 @@ def seo_aeo_legacy_redirect(rest=""):
 #                          themes and judged, with the year's shape, as Excel,
 #                          CSV, PDF and a file for Google Ads Editor
 #                          (tracker/paid_keywords.py and paid_keywords_*.py)
+#   Account Audit          is the account set up to win: a Google Ads or Meta
+#                          account (or one of each) held against a written
+#                          checklist of settings, tracking, links, structure,
+#                          keywords, ads and pixels, with a score, the checks
+#                          to fix first, saved audits and what changed since,
+#                          as Excel, CSV and PDF (tracker/paid_audit*.py)
 _PM_PREFIX = "/p2/paid-marketing"
 
 
@@ -5310,11 +5316,13 @@ def paid_account_audit():
 
 def _paid_audit_answer(make):
     """Runs the Account Audit's report and maps what can go wrong the same way for every route."""
-    from tracker import paid_gads as paid_gads_base, paid_gads_segments as paid_gads, paid_audit
+    from tracker import paid_gads as paid_gads_base, paid_gads_segments as paid_gads, paid_audit, paid_audit_store
     try:
         return jsonify(make(paid_audit))
     except paid_audit.BadRequest as e:
         return jsonify(error=str(e)), 400
+    except paid_audit_store.StoreUnavailable as e:
+        return _pm_store_error(e)
     except paid_gads_base.RefreshTooSoon as e:
         return jsonify(error=str(e), kind="cooldown", retryIn=e.retry_in), 429
     except paid_gads.GadsError as e:
@@ -5326,6 +5334,65 @@ def _paid_audit_answer(make):
 def paid_audit_report():
     extra = {"force": True} if str(request.args.get("refresh") or "") in ("1", "true") else {}      # the Refresh button
     return _paid_audit_answer(lambda pa: pa.report_for(request.args.get("account"), **extra))
+
+
+# Saved audits: a person keeps an audit (with a note such as "Onboarding" or "Q1 review") and later sees what changed since. Nothing is saved
+# unless someone asks. tracker/paid_audit_store.py keeps them, tracker/paid_audit_history.py compares.
+
+@app.route("/p2/paid-marketing/api/audit/save", methods=["POST"])
+@position2_required
+def paid_audit_save():
+    body = request.get_json(silent=True) or {}
+
+    def make(pa):
+        from tracker import paid_audit_store as store
+        key = pa.account_key(body.get("account"))
+        report = pa.report_for(body.get("account"))
+        names = " + ".join(a["name"] for a in report["accounts"])
+        return {"saved": store.save(key, names, _pm_user_email(), report, body.get("note"))}
+    return _paid_audit_answer(make)
+
+
+@app.route("/p2/paid-marketing/api/audit/history")
+@position2_required
+def paid_audit_history_list():
+    def make(pa):
+        from tracker import paid_audit_store as store
+        return {"history": store.list_saved(pa.account_key(request.args.get("account")))}
+    return _paid_audit_answer(make)
+
+
+@app.route("/p2/paid-marketing/api/audit/compare")
+@position2_required
+def paid_audit_compare():
+    """The audit now against a saved one for the same account: ?id=<saved audit> or, without it, the latest saved. {compare: null} when none is saved."""
+    def make(pa):
+        from tracker import paid_audit_history as hist, paid_audit_store as store
+        key = pa.account_key(request.args.get("account"))
+        wanted = request.args.get("id")
+        saved = store.get(wanted, key) if wanted else store.latest(key)
+        if wanted and saved is None:
+            raise pa.BadRequest("That saved audit is not one for this account.")
+        if saved is None:
+            return {"compare": None}
+        return {"compare": hist.compare(pa.report_for(request.args.get("account")), saved), "id": saved["id"]}
+    return _paid_audit_answer(make)
+
+
+@app.route("/p2/paid-marketing/api/audit/history/<sid>", methods=["DELETE"])
+@position2_required
+def paid_audit_history_delete(sid):
+    from tracker import paid_audit_store as store
+    try:
+        row = store.get(sid)
+        if row is None:
+            return jsonify(error="That saved audit does not exist."), 404
+        if row["createdBy"] != _pm_user_email() and not _pm_is_admin():
+            return jsonify(error="Only whoever saved this audit, or an admin, can remove it."), 403
+        store.delete(sid, _pm_user_email(), _pm_is_admin())
+        return jsonify(ok=True)
+    except store.StoreUnavailable as e:
+        return _pm_store_error(e)
 
 
 _AUDIT_FILES = {"xlsx": ("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", ".xlsx"), "pdf": ("application/pdf", ".pdf"),

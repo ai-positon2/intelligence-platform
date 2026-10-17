@@ -57,6 +57,12 @@ def parse_account(raw):
     raise BadRequest("account should be a 10-digit Google Ads customer id, a Meta ad account id (act_...) or both joined by +")
 
 
+def account_key(raw):
+    """The one string a saved audit is filed under for this account: "<google id>", "act_..." or "<google id>+<act_...>"."""
+    ids = parse_account(raw)
+    return "+".join(x for x in (ids["google"], ids["meta"]) if x)
+
+
 # ── Reading ─────────────────────────────────────────────────────────────────
 
 def google_raw(account, *, search_fn=None, fetcher=None, now=None, check_pages=True):

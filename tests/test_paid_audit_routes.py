@@ -135,3 +135,118 @@ def test_there_is_no_em_or_en_dash_in_any_of_the_audit_code():
     for p in files:
         text = open(p, encoding="utf-8").read()
         assert "—" not in text and "–" not in text, p
+
+
+# ── Saved audits ────────────────────────────────────────────────────────────
+
+class FakeAuditStore:
+    """The audit store's functions over a list, so the routes are tested without a database."""
+
+    def __init__(self):
+        self.rows = []
+
+    def save(self, key, name, by, report, note=""):
+        from tracker import paid_audit_history as h
+        snap = h.snapshot(report)
+        row = {"id": "s%d" % (len(self.rows) + 1), "accountKey": key, "accountName": name, "createdBy": by, "createdAt": "2026-10-17T10:00:00+00:00", "score": snap["score"],
+               "grade": snap["grade"], "tally": snap["tally"], "critical": snap["critical"], "high": snap["high"], "note": note or "", "results": snap["results"]}
+        self.rows.append(row)
+        return {k: v for k, v in row.items() if k != "results"}
+
+    def list_saved(self, key, limit=30):
+        return [{k: v for k, v in r.items() if k != "results"} for r in reversed(self.rows) if r["accountKey"] == key]
+
+    def get(self, sid, key=None):
+        return next((r for r in self.rows if r["id"] == sid and (key is None or r["accountKey"] == key)), None)
+
+    def latest(self, key):
+        mine = [r for r in self.rows if r["accountKey"] == key]
+        return mine[-1] if mine else None
+
+    def delete(self, sid, by, is_admin=False):
+        row = self.get(sid)
+        if row and (is_admin or row["createdBy"] == by):
+            self.rows.remove(row)
+            return True
+        return False
+
+
+@pytest.fixture
+def store(monkeypatch):
+    from tracker import paid_audit_store
+    fake = FakeAuditStore()
+    for name in ("save", "list_saved", "get", "latest", "delete"):
+        monkeypatch.setattr(paid_audit_store, name, getattr(fake, name))
+    monkeypatch.setattr(audit, "report_for", lambda *x, **k: _report())
+    return fake
+
+
+def post(client, path, body):
+    return client.post(API + path, json=body)
+
+
+def test_an_audit_is_saved_with_a_note_and_listed_newest_first(store):
+    c = client_as(STAFF)
+    r = post(c, "/save", {"account": "1112223334", "note": "Onboarding"})
+    assert r.status_code == 200 and r.get_json()["saved"]["note"] == "Onboarding" and r.get_json()["saved"]["createdBy"] == STAFF and r.get_json()["saved"]["accountName"] == "Acme Dental"
+    assert r.get_json()["saved"]["accountKey"] == "1112223334" and "results" not in r.get_json()["saved"]
+    post(c, "/save", {"account": "1112223334", "note": "Q1"})
+    got = c.get(API + "/history?account=1112223334").get_json()["history"]
+    assert [h["note"] for h in got] == ["Q1", "Onboarding"] and c.get(API + "/history?account=2223334445").get_json()["history"] == []
+
+
+def test_a_combined_account_is_filed_under_both_ids(store):
+    r = post(client_as(STAFF), "/save", {"account": "1112223334+act_1234567890"})
+    assert r.get_json()["saved"]["accountKey"] == "1112223334+act_1234567890"
+
+
+def test_save_and_history_say_what_is_wrong_with_the_request(store):
+    c = client_as(STAFF)
+    assert post(c, "/save", {"account": "nonsense"}).status_code == 400 and post(c, "/save", {}).status_code == 400
+    assert c.get(API + "/history?account=nonsense").status_code == 400 and c.get(API + "/history").status_code == 400
+    assert client_as(None).post(API + "/save", json={"account": "1112223334"}).status_code == 302
+    assert client_as("someone@gmail.com").get(API + "/history?account=1112223334").status_code == 302
+
+
+def test_the_audit_now_is_compared_with_the_latest_saved_or_a_chosen_one(store):
+    c = client_as(STAFF)
+    assert c.get(API + "/compare?account=1112223334").get_json() == {"compare": None}
+    post(c, "/save", {"account": "1112223334", "note": "Onboarding"})
+    out = c.get(API + "/compare?account=1112223334").get_json()
+    assert out["id"] == "s1" and out["compare"]["note"] == "Onboarding" and out["compare"]["scoreChange"] == 0 and out["compare"]["since"] == "2026-10-17T10:00:00+00:00"
+    assert c.get(API + "/compare?account=1112223334&id=s1").get_json()["id"] == "s1"
+    r = c.get(API + "/compare?account=1112223334&id=nope")
+    assert r.status_code == 400 and "not one for this account" in r.get_json()["error"]
+    assert c.get(API + "/compare?account=2223334445&id=s1").status_code == 400                 # a saved audit of another account
+
+
+def test_only_whoever_saved_an_audit_or_an_admin_removes_it(store):
+    post(client_as(STAFF), "/save", {"account": "1112223334"})
+    assert client_as("ben@position2.com").delete(API + "/history/s1", content_type="application/json").status_code == 403 and store.get("s1") is not None
+    assert client_as(STAFF).delete(API + "/history/s1", content_type="application/json").get_json() == {"ok": True} and store.get("s1") is None
+    assert client_as(STAFF).delete(API + "/history/s1", content_type="application/json").status_code == 404
+    sid = post(client_as(STAFF), "/save", {"account": "1112223334"}).get_json()["saved"]["id"]
+    admin = sorted(app_module.ADMIN_EMAILS)[0]
+    assert admin != STAFF and client_as(admin).delete(API + "/history/" + sid, content_type="application/json").status_code == 200 and store.get(sid) is None
+
+
+def test_a_store_that_is_down_is_a_503_in_words(monkeypatch):
+    from tracker import paid_audit_store
+    def down(*a, **k):
+        raise paid_audit_store.StoreUnavailable("database is not configured")
+    monkeypatch.setattr(paid_audit_store, "list_saved", down)
+    monkeypatch.setattr(paid_audit_store, "save", down)
+    monkeypatch.setattr(paid_audit_store, "get", down)
+    monkeypatch.setattr(audit, "report_for", lambda *x, **k: _report())
+    c = client_as(STAFF)
+    for r in (c.get(API + "/history?account=1112223334"), post(c, "/save", {"account": "1112223334"}), c.delete(API + "/history/s1", content_type="application/json")):
+        assert r.status_code == 503 and "store is unavailable" in r.get_json()["error"]
+
+
+def test_saving_and_removing_refuse_a_cross_site_or_non_json_request(store):
+    c = client_as(STAFF)
+    assert c.post(API + "/save", json={"account": "1112223334"}, headers={"Origin": "https://evil.example"}).status_code == 403
+    assert c.post(API + "/save", data="account=1112223334", content_type="application/x-www-form-urlencoded").status_code == 415
+    post(c, "/save", {"account": "1112223334"})
+    assert c.delete(API + "/history/s1", headers={"Origin": "https://evil.example"}, content_type="application/json").status_code == 403
+    assert c.delete(API + "/history/s1").status_code == 415 and store.get("s1") is not None
