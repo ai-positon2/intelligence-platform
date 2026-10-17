@@ -415,6 +415,11 @@ def test_budget_limited_campaigns_that_convert():
     assert f["items"] == ["Lost share (20% of impressions lost to budget)", "Limited (budget limited)"]                    # biggest spend first
     assert one("G-STR-04", camps(A.campaign("10", ctype="VIDEO", reasons=("BUDGET_CONSTRAINED",)), metrics=[A.campaign_metrics("10", conversions=5.0)]))["result"] == "na"
     assert one("G-STR-04", campaigns=None)["result"] == "unknown"
+    unread = A.a_read(fail={r.CAMPAIGN_METRICS_GAQL})
+    f = one("G-STR-04", unread)
+    assert f["result"] == "unknown" and "numbers could not be read" in f["found"]               # Google's own budget reason does not stand in for numbers that were not read
+    flagged = A.a_read(answers={r.CAMPAIGNS_GAQL: [A.campaign("10", reasons=("BUDGET_CONSTRAINED",), primary="LIMITED")]}, fail={r.CAMPAIGN_METRICS_GAQL})
+    assert one("G-STR-04", flagged)["result"] == "unknown"
 
 
 def test_campaign_status_problems():

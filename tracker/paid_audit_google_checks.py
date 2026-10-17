@@ -546,12 +546,14 @@ def str_budget(ctx):
     live = [x for x in ctx.camps if x["type"] in CONVERSION_TYPES]
     if not live:
         return na("G-STR-04", "No enabled Search, Shopping, Performance Max or Demand Gen campaign.")
+    if any(x["metrics"] is None for x in live):
+        return unknown("G-STR-04", "the campaigns' numbers could not be read")
     held = []
     for x in live:
-        m = x["metrics"] or {}
-        lost = m.get("budgetLost")
+        m = x["metrics"]
+        lost = m["budgetLost"]
         limited = "BUDGET_CONSTRAINED" in x["reasons"] or (lost is not None and lost >= BUDGET_LOST_PCT)
-        if limited and (m.get("conversions") or 0) > 0:
+        if limited and m["conversions"] > 0:
             held.append((x, lost))
     if not held:
         return make("G-STR-04", "pass", "No converting campaign is held back by budget.")
