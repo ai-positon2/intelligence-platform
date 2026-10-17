@@ -103,6 +103,21 @@ def test_a_submit_button_inside_a_form_is_a_call_to_action_whatever_it_says():
     assert texts == ["Go"]
 
 
+def test_a_phone_link_is_a_call_to_action_whatever_its_label_says():
+    ctas = parsed('<html><body><p>Hello there</p><a href="tel:+16175550123">(617) 555-0123</a></body></html>')["facts"]["ctas"]
+    assert [(c["text"], c["kind"]) for c in ctas] == [("(617) 555-0123", "strong")]
+
+
+def test_a_page_built_by_scripts_is_recognised_by_its_few_words_and_its_app_shell_or_many_scripts():
+    shell = '<html><body><div id="root"></div><script src="/app.js"></script></body></html>'
+    assert parsed(shell)["facts"]["scriptBuilt"] is True and parsed(shell)["facts"]["appRoot"] is True
+    many = "<html><head>" + '<script src="/s%d.js"></script>' % 1 * 1 + "".join('<script src="/s%d.js"></script>' % i for i in range(7)) + "</head><body><p>Loading</p></body></html>"
+    assert parsed(many)["facts"]["scriptBuilt"] is True
+    assert parsed("<html><body><p>Just a few words</p></body></html>")["facts"]["scriptBuilt"] is False                  # short, but nothing says scripts build it
+    full = '<html><body><div id="root">' + "<p>word</p>" * 120 + "</div></body></html>"
+    assert parsed(full)["facts"]["scriptBuilt"] is False                                                                # an app shell that has its words in it
+
+
 def test_a_skip_link_is_not_a_call_to_action():
     assert parsed('<html><body><a class="button" href="#c">Skip to content</a></body></html>')["facts"]["ctas"] == []
 

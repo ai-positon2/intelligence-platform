@@ -64,6 +64,9 @@ ADDRESS = re.compile(r"\b\d{1,5}\s+(?:[A-Z0-9][A-Za-z0-9.'-]*\s+){1,4}(?:Street|
                      r"Parkway|Pkwy|Square|Sq|Suite|Ste)\b\.?")
 EMAIL = re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b")
 HIDDEN_STYLE = re.compile(r"display\s*:\s*none|visibility\s*:\s*hidden", re.I)
+APP_ROOTS = frozenset(("root", "__next", "app", "__nuxt", "___gatsby"))
+SCRIPT_BUILT_WORDS = 80                            # a page with fewer visible words than this and an app shell or many scripts is built by scripts
+SCRIPT_BUILT_SCRIPTS = 6
 SEARCH_NAMES = frozenset(("q", "s", "search", "query", "keyword", "keywords", "term", "k"))
 
 
@@ -96,6 +99,7 @@ class _Reader(HTMLParser):
         self._form = None
         self._radio = set()
         self.host = ""
+        self.app_root = False
 
     # -- elements ------------------------------------------------------------
     def handle_starttag(self, tag, attrs):
@@ -110,6 +114,8 @@ class _Reader(HTMLParser):
             self._ctx[tag] += 1
         if tag in SKIP_BLOCK:
             self._skip += 1
+        if a.get("id") in APP_ROOTS or "ng-version" in a or "data-reactroot" in a:
+            self.app_root = True
         if tag == "script":
             self._script(a)
             self._caps.append([tag, [], a, 0, 0, 4000])
@@ -238,7 +244,7 @@ class _Reader(HTMLParser):
         label = text[:60]
         if not label or len(label) > 45 or label.lower().startswith("skip"):
             return
-        kind = "strong" if STRONG_CTA.match(label) else "weak" if WEAK_CTA.match(label) else None
+        kind = "strong" if STRONG_CTA.match(label) or (tag == "a" and a.get("href", "").lower().startswith("tel:")) else "weak" if WEAK_CTA.match(label) else None
         cls = (a.get("class", "") + " " + a.get("role", "")).lower()
         if kind is None and tag == "a" and any(k in cls for k in ("btn", "button", "cta")) and len(label) >= 3:
             kind = "weak" if not STRONG_CTA.match(label) else "strong"
@@ -328,8 +334,9 @@ def parse(html, final_url=""):
         "emails": sorted(set(EMAIL.findall(text)))[:3], "links": dict(r.links), "images": dict(r.images),
         "head": {"blockingScripts": r.head["blockingScripts"], "stylesheets": r.head["stylesheets"], "scripts": len(r.scripts),
                  "thirdParty": sorted({h for h in map(_script_host, r.scripts) if h and registrable(h) != registrable(r.host)})[:40]},
-        "proof": proof[:8], "privacyLink": r.privacy, "consent": bool(CONSENT_WORDS.search(html[:200000])) or bool(CONSENT_WORDS.search(" ".join(r.scripts))),
+        "appRoot": r.app_root, "proof": proof[:8], "privacyLink": r.privacy, "consent": bool(CONSENT_WORDS.search(html[:200000])) or bool(CONSENT_WORDS.search(" ".join(r.scripts))),
     }
+    facts["scriptBuilt"] = facts["wordCount"] < SCRIPT_BUILT_WORDS and (r.app_root or facts["head"]["scripts"] >= SCRIPT_BUILT_SCRIPTS)
     return {"facts": facts, "tech": tech}
 
 
