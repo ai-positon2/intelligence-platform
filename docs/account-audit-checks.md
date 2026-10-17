@@ -429,11 +429,11 @@ Why it matters: A disapproved ad does not run, and repeated disapprovals put the
 
 What to do: Open each disapproved ad's review feedback, fix the creative, text or landing page, and request a review if it was wrongly flagged.
 
-**M-ADS-02** Every live ad set has an active ad (critical)
+**M-ADS-02** Every live ad set has an ad that can deliver (critical)
 
-Why it matters: An ad set with no active ad cannot deliver, however its audience and budget are set.
+Why it matters: An ad set whose ads are all disapproved, paused or deleted cannot deliver, however its audience and budget are set.
 
-What to do: Add an ad to the ad set or turn the ad set off.
+What to do: Add an ad to the ad set, fix the disapproved ones, or turn the ad set off.
 
 **M-ADS-03** Ad sets have more than one ad to test (medium)
 

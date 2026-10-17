@@ -17,8 +17,9 @@ from . import paid_meta as meta
 
 EXAMPLES = 8
 LEARNING_LIMITED = "FAIL"                      # Meta's learning_stage_info.status for "Learning limited"
-LIVE = ["ACTIVE"]
+LIVE = ["ACTIVE", "WITH_ISSUES"]                # campaigns and ad sets that are on; Meta flags some of them WITH_ISSUES and they still deliver
 AD_STATES = ["ACTIVE", "DISAPPROVED", "WITH_ISSUES", "PENDING_REVIEW"]
+CAN_RUN = ("ACTIVE", "WITH_ISSUES", "PENDING_REVIEW")      # an ad in one of these states is delivering or about to; a disapproved one is not
 WINDOW = "last_30d"
 STATS_DAYS = 7
 MAX_PIXELS_READ = 3
@@ -126,15 +127,15 @@ def parse_campaigns(rows, insight_rows=None):
         stats = {}
         for r in insight_rows:
             n = meta.numbers(r)                        # impressions, link clicks, spend, results ...
-            stats[str(r.get("campaign_id") or "")] = {"impressions": n[0], "clicks": n[1], "spend": n[2], "results": n[3],
+            stats[str(r.get("campaign_id") or "")] = {"impressions": n[0], "clicks": n[1], "spend": n[2], "results": n[3], "anyResults": n[5],
                                                        "frequency": round(_f(r.get("frequency")), 2), "reach": _i(r.get("reach"))}
     out = []
     for c in rows:
         cid = str(c.get("id") or "")
-        s = (stats or {}).get(cid, {"impressions": 0, "clicks": 0, "spend": 0.0, "results": 0.0, "frequency": 0.0, "reach": 0}) if stats is not None else None
+        s = (stats or {}).get(cid, {"impressions": 0, "clicks": 0, "spend": 0.0, "results": 0.0, "anyResults": 0.0, "frequency": 0.0, "reach": 0}) if stats is not None else None
         out.append({"id": cid, "name": c.get("name") or cid, "objective": c.get("objective") or "", "kind": meta.objective_kind(c.get("objective")),
                     "issues": _issues(c.get("issues_info")), "special": list(c.get("special_ad_categories") or []), "bidStrategy": c.get("bid_strategy") or "",
-                    "spend": None if s is None else s["spend"], "results": None if s is None else s["results"],
+                    "spend": None if s is None else s["spend"], "results": None if s is None else s["results"], "anyResults": None if s is None else s["anyResults"],
                     "impressions": None if s is None else s["impressions"], "clicks": None if s is None else s["clicks"],
                     "frequency": None if s is None else s["frequency"], "reach": None if s is None else s["reach"]})
     out.sort(key=lambda c: (-(c["spend"] or 0), c["name"].lower()))
@@ -154,7 +155,8 @@ def parse_adsets(rows):
 
 
 def parse_ads(rows, adsets=None, campaigns=None):
-    """Counts of ads by delivery state, the disapproved and flagged ones with Meta's reason, and how many live ads each ad set holds."""
+    """Counts of ads by delivery state, the disapproved and flagged ones with Meta's reason, and how many ads each ad set holds that are
+    delivering or about to (active, flagged with issues, in review; not disapproved)."""
     set_names = {s["id"]: s["name"] for s in adsets or []}
     camp_names = {c["id"]: c["name"] for c in campaigns or []}
     by_status, per_set, bad, flagged = {}, {}, [], []
@@ -162,7 +164,7 @@ def parse_ads(rows, adsets=None, campaigns=None):
         st = a.get("effective_status") or "UNKNOWN"
         by_status[st] = by_status.get(st, 0) + 1
         sid = str(a.get("adset_id") or "")
-        if st == "ACTIVE":
+        if st in CAN_RUN:
             per_set[sid] = per_set.get(sid, 0) + 1
         where = {"ad": a.get("name") or str(a.get("id") or ""), "adSet": set_names.get(sid, ""), "campaign": camp_names.get(str(a.get("campaign_id") or ""), "")}
         if st == "DISAPPROVED":

@@ -225,13 +225,17 @@ def test_disapproved_ads():
     assert one("M-ADS-01", F.a_read(fail={"ads"}))["result"] == "unknown"
 
 
-def test_every_live_ad_set_needs_an_active_ad():
-    assert one("M-ADS-02")["result"] == "pass" and "Every one of the 1 live ad set has" in one("M-ADS-02")["found"]
-    sets = [F.adset("10", "Has ad"), F.adset("11", "Dark")]
-    f = one("M-ADS-02", F.a_read(answers={"adSets": sets, "ads": [F.ad("1", "A", "10"), F.ad("2", "Paused one", "11", status="PENDING_REVIEW")]}))
-    assert f["result"] == "fail" and f["severity"] == "critical" and f["found"] == "1 of 2 live ad sets have no active ad." and f["items"] == ["Dark"]
+def test_every_live_ad_set_needs_an_ad_that_can_deliver():
+    assert one("M-ADS-02")["result"] == "pass" and one("M-ADS-02")["found"] == "Checked 1 live ad set: all have an ad that can deliver."
+    sets = [F.adset("10", "Has ad"), F.adset("11", "Dark"), F.adset("12", "Only disapproved"), F.adset("13", "In review"), F.adset("14", "With issues")]
+    ads = [F.ad("1", "A", "10"), F.ad("2", "Gone", "12", status="DISAPPROVED"), F.ad("3", "Wait", "13", status="PENDING_REVIEW"), F.ad("4", "Flag", "14", status="WITH_ISSUES", issues=("Low quality",))]
+    f = one("M-ADS-02", F.a_read(answers={"adSets": sets, "ads": ads}))
+    assert f["result"] == "fail" and f["severity"] == "critical" and f["found"] == "2 of 5 live ad sets have no ad that can deliver." and f["items"] == ["Dark", "Only disapproved"]
     assert one("M-ADS-02", F.a_read(answers={"adSets": []}))["result"] == "na"
     assert one("M-ADS-02", F.a_read(fail={"ads"}))["result"] == "unknown" and one("M-ADS-02", F.a_read(fail={"adSets"}))["result"] == "unknown"
+    # an ad set whose only ad is flagged with issues is not "dark": the ads check and this one agree
+    only_flag = F.a_read(answers={"adSets": [F.adset("14", "With issues")], "ads": [F.ad("4", "Flag", "14", status="WITH_ISSUES", issues=("Low quality",))]})
+    assert one("M-ADS-02", only_flag)["result"] == "pass" and one("M-ADS-01", only_flag)["result"] == "warn"
 
 
 def test_more_than_one_ad_per_ad_set():
@@ -261,3 +265,19 @@ def test_an_ad_account_with_no_live_campaign_says_it_is_not_advertising():
     assert f["result"] == "warn" and f["severity"] == "high" and f["found"].startswith("No campaign is live. The ad account is not advertising")
     assert one("M-STR-06", F.a_read(answers={"campaigns": [F.campaign("1"), F.campaign("2", "B")]}))["found"] == "2 live campaigns."
     assert one("M-STR-06", F.a_read(fail={"campaigns"}))["result"] == "unknown"
+
+
+def test_a_lead_campaign_optimised_for_another_conversion_event_has_results():
+    camps = [F.campaign("1", "Booked"), F.campaign("2", "Nothing")]
+    ins = [dict(F.insight("1", "Booked", spend=400.0, leads=None), actions=[{"action_type": "schedule", "value": "80"}]), F.insight("2", "Nothing", spend=300.0, leads=None)]
+    f = one("M-STR-03", F.a_read(answers={"campaigns": camps, "insights": ins}))
+    assert f["items"] == ["Nothing (USD 300)"] and f["found"].startswith("1 campaign spent USD 300")                  # the Schedule campaign is not called dead
+    contact = [dict(F.insight("1", "Booked", spend=400.0, leads=None), actions=[{"action_type": "contact", "value": "9"}])]
+    assert one("M-STR-03", F.a_read(answers={"campaigns": camps[:1], "insights": contact}))["result"] == "pass"
+
+
+def test_the_events_meta_detects_on_its_own_are_not_conversion_events():
+    only_auto = F.a_read(answers={"stats": F.stats({"PageView": 9000, "Microdata": 900, "SubscribedButtonClick": 300})})
+    f = one("M-TRK-03", only_auto)
+    assert f["result"] == "fail" and "only browsing events" in f["found"]
+    assert one("M-TRK-03", F.a_read(answers={"stats": F.stats({"PageView": 9000, "Microdata": 900, "Lead": 10})}))["result"] == "pass"

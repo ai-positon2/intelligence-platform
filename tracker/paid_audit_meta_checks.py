@@ -38,7 +38,8 @@ ONE_AD_WARN = 25
 RESULT_KINDS = {"SALES", "LEADS", "APP"}
 WEAK_GOALS = {"LINK_CLICKS", "LANDING_PAGE_VIEWS", "IMPRESSIONS", "REACH", "POST_ENGAGEMENT"}
 OUTCOME_OBJECTIVES = {"LEADS", "SALES"}
-BROWSING_EVENTS = {"PageView", "ViewContent", "Search", "AddToCart", "AddToWishlist", "AddPaymentInfo"}
+BROWSING_EVENTS = {"PageView", "ViewContent", "Search", "AddToCart", "AddToWishlist", "AddPaymentInfo",
+                   "Microdata", "SubscribedButtonClick"}        # the last two are events Meta detects on its own, not ones the site set up
 SERVER_WORDS = ("server", "capi", "conversions_api", "api")
 DISABLE_REASONS = {1: "an ads integrity policy", 2: "an intellectual property review", 3: "a payment risk review", 4: "a gray account shutdown",
                    5: "an ads authenticity review", 6: "a business integrity review", 7: "a permanent close", 8: "an unused reseller account",
@@ -257,7 +258,7 @@ def str_results(ctx):
     live = [c for c in ctx.camps if c["kind"] in RESULT_KINDS]
     if not live:
         return na("M-STR-03", "No live lead, sales or app campaign.")
-    dead = [c for c in live if c["spend"] >= MIN_SPEND and c["results"] == 0]
+    dead = [c for c in live if c["spend"] >= MIN_SPEND and c["results"] == 0 and c["anyResults"] == 0]      # a lead campaign optimised for Schedule or Contact has results of its own
     if not dead:
         return make("M-STR-03", "pass", "Every lead, sales or app campaign that spent %s or more recorded a result." % ctx.money(MIN_SPEND))
     cost = sum(c["spend"] for c in dead)
@@ -327,9 +328,9 @@ def ads_disapproved(ctx):
     return make("M-ADS-01", "warn", "%s with issues." % plural(flagged, "ad"), items=["%s (%s)" % (e["ad"], ", ".join(e["why"]) or "no reason given") for e in a["withIssues"]["examples"]], count=flagged)
 
 
-@check("M-ADS-02", "m_ads", "Every live ad set has an active ad", "critical",
-       "An ad set with no active ad cannot deliver, however its audience and budget are set.",
-       "Add an ad to the ad set or turn the ad set off.")
+@check("M-ADS-02", "m_ads", "Every live ad set has an ad that can deliver", "critical",
+       "An ad set whose ads are all disapproved, paused or deleted cannot deliver, however its audience and budget are set.",
+       "Add an ad to the ad set, fix the disapproved ones, or turn the ad set off.")
 def ads_none(ctx):
     per = ctx.read.get("adsPerSet")
     if ctx.sets is None or per is None:
@@ -338,8 +339,8 @@ def ads_none(ctx):
         return na("M-ADS-02", "No live ad set.")
     dark = [s for s in ctx.sets if not per.get(s["id"])]
     if not dark:
-        return make("M-ADS-02", "pass", "Every one of the %s has an active ad." % plural(len(ctx.sets), "live ad set"))
-    return make("M-ADS-02", "fail", "%d of %s have no active ad." % (len(dark), plural(len(ctx.sets), "live ad set")), items=names(dark), count=len(dark))
+        return make("M-ADS-02", "pass", "Checked %s: all have an ad that can deliver." % plural(len(ctx.sets), "live ad set"))
+    return make("M-ADS-02", "fail", "%d of %s have no ad that can deliver." % (len(dark), plural(len(ctx.sets), "live ad set")), items=names(dark), count=len(dark))
 
 
 @check("M-ADS-03", "m_ads", "Ad sets have more than one ad to test", "medium",
@@ -351,7 +352,7 @@ def ads_testing(ctx):
         return unknown("M-ADS-03", "the ad sets or the ads could not be read")
     live = [s for s in ctx.sets if per.get(s["id"])]
     if not live:
-        return na("M-ADS-03", "No live ad set has an active ad.")
+        return na("M-ADS-03", "No live ad set has an ad that can deliver.")
     single = [s for s in live if per[s["id"]] == 1]
     exact = share(len(single), len(live))
     if exact < ONE_AD_WARN:

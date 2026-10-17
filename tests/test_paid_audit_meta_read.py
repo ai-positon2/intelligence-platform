@@ -81,6 +81,9 @@ def test_campaigns_carry_their_objective_issues_and_the_last_30_days():
     assert a["kind"] == "LEADS" and a["issues"] == ["Payment issue"] and a["spend"] == 500.0 and a["results"] == 25.0 and a["frequency"] == 4.2
     assert a["reach"] == 1000 and a["impressions"] == 40000 and a["clicks"] == 800 and a["bidStrategy"] == "LOWEST_COST_WITHOUT_CAP"
     assert out[0]["special"] == ["HOUSING"] and out[0]["kind"] == "SALES" and out[0]["results"] == 0.0
+    sched = m.parse_campaigns([F.campaign("5", "Booked")], [dict(F.insight("5", "Booked", leads=None), actions=[{"action_type": "schedule", "value": "80"}])])[0]
+    assert sched["results"] == 0.0 and sched["anyResults"] == 80.0                  # a lead campaign optimised for Schedule has results of its own
+    assert out[1]["anyResults"] == 25.0 and out[2]["anyResults"] == 0.0
     assert out[2]["spend"] == 0.0 and out[2]["results"] == 0.0 and out[2]["frequency"] == 0.0           # read, nothing spent
     assert out[2]["impressions"] == 0 and out[2]["clicks"] == 0 and out[2]["reach"] == 0
     unnamed = m.parse_campaigns([{"id": "77"}], [])
@@ -89,7 +92,7 @@ def test_campaigns_carry_their_objective_issues_and_the_last_30_days():
 
 def test_campaign_numbers_are_none_when_the_insights_were_not_read():
     out = m.parse_campaigns([F.campaign()], None)
-    assert out[0]["spend"] is None and out[0]["results"] is None and out[0]["frequency"] is None and out[0]["impressions"] is None
+    assert out[0]["spend"] is None and out[0]["results"] is None and out[0]["frequency"] is None and out[0]["impressions"] is None and out[0]["anyResults"] is None
 
 
 def test_ad_sets_carry_learning_and_issues():
@@ -107,7 +110,7 @@ def test_ads_are_counted_by_delivery_state_and_disapproved_ones_say_why():
             F.ad("5", "Flag", "11", status="WITH_ISSUES", issues=("Low quality",)), F.ad("6", "Wait", "11", status="PENDING_REVIEW")]
     a = m.parse_ads(rows, sets, camps)
     assert a["total"] == 6 and a["byStatus"] == {"ACTIVE": 3, "DISAPPROVED": 1, "WITH_ISSUES": 1, "PENDING_REVIEW": 1}
-    assert a["_perAdSet"] == {"10": 2, "11": 1}
+    assert a["_perAdSet"] == {"10": 2, "11": 3}                                  # active, flagged and in review all count; the disapproved one does not
     assert a["disapproved"] == {"count": 1, "examples": [{"ad": "Bad", "adSet": "Set A", "campaign": "Camp", "why": ["Before and after", "Health claims"]}]}
     assert a["withIssues"]["examples"][0] == {"ad": "Flag", "adSet": "Set B", "campaign": "Camp", "why": ["Low quality"]}
     assert "_perAdSet" not in m.compact(a) and m.compact(None) is None
@@ -149,8 +152,8 @@ def test_requests_ask_for_live_things_in_the_last_30_days_and_stats_for_seven_da
         return F.Graph().answers[F.Graph().key(path, params)]
     m.read_account(F.ACT, get=get, pages=pages, now=dt.datetime.fromisoformat(F.NOW))
     camp = seen[("campaigns", m.CAMPAIGN_FIELDS)][1]
-    assert camp["effective_status"] == '["ACTIVE"]' and camp["limit"] == 500
-    assert seen[("adsets", m.ADSET_FIELDS)][1]["limit"] == 500 and seen[("adsets", m.ADSET_FIELDS)][1]["effective_status"] == '["ACTIVE"]'
+    assert camp["effective_status"] == '["ACTIVE", "WITH_ISSUES"]' and camp["limit"] == 500
+    assert seen[("adsets", m.ADSET_FIELDS)][1]["limit"] == 500 and seen[("adsets", m.ADSET_FIELDS)][1]["effective_status"] == '["ACTIVE", "WITH_ISSUES"]'
     assert seen[("adspixels", m.PIXEL_CORE)][1]["limit"] == 100 and seen[("adspixels", m.PIXEL_EXTRA)][1]["limit"] == 100
     ads = seen[("ads", m.AD_FIELDS)][1]
     assert ads["effective_status"] == '["ACTIVE", "DISAPPROVED", "WITH_ISSUES", "PENDING_REVIEW"]'
