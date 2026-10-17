@@ -38,7 +38,8 @@
 .au-fix{margin:0;padding:0;list-style:none;counter-reset:fix}
 .au-fix li{counter-increment:fix;display:grid;grid-template-columns:34px minmax(0,1fr);gap:4px 12px;padding:14px 0;border-bottom:1px solid var(--pm-line)}
 .au-fix li:last-child{border-bottom:0}
-.au-fix li::before{content:counter(fix);grid-row:1 / span 3;display:flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:50%;font-size:13px;font-weight:700;
+.au-fix li>*{grid-column:2;min-width:0}
+.au-fix li::before{content:counter(fix);grid-column:1;grid-row:1 / span 4;align-self:start;display:flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:50%;font-size:13px;font-weight:700;
   color:var(--pm-ink);border:1px solid var(--pm-line2);background:var(--pm-panel2);font-variant-numeric:tabular-nums}
 .au-fix-h{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;min-width:0}
 .au-fix-h button{all:unset;cursor:pointer;font-size:14.5px;font-weight:700;color:var(--pm-ink);line-height:1.35}
