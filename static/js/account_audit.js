@@ -14,14 +14,16 @@ var $ = function(s){return document.querySelector(s)};
 var esc = function(s){return String(s==null?"":s).replace(/[&<>"']/g,function(c){
   return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]})};
 var enc = encodeURIComponent;
-var S = {acct:null, report:null, seq:0, views:{}, filters:{}, open:{}, shown:{}};
+var S = {acct:null, report:null, seq:0, views:{}, filters:{}, open:{}, shown:{}, history:[], hseq:0};
 var PAGE = 40;                                           // findings drawn per section before "Show more"
 var accts = null;
 
 function setMsg(html, kind){$("#msg").innerHTML = html ? '<div class="'+(kind||"pm-err")+'">'+html+'</div>' : "";}
 function show(which){$("#empty").hidden = which !== "empty"; $("#skel").hidden = which !== "skel"; $("#out").hidden = which !== "out";}
-function getJson(url){
-  return fetch(url, {credentials:"same-origin"}).then(function(r){
+function getJson(url, method, body){
+  var opts = {credentials:"same-origin"};
+  if(method){opts.method = method; opts.headers = {"Content-Type":"application/json"}; opts.body = JSON.stringify(body || {});}
+  return fetch(url, opts).then(function(r){
     return r.json().catch(function(){return {};}).then(function(j){return {ok:r.ok, status:r.status, j:j};});
   });
 }
@@ -55,7 +57,7 @@ function run(refresh){
     }
     S.report = r.j; S.views = {}; S.filters = {}; S.open = {}; S.shown = {};
     setMsg("");
-    show("out"); render();
+    show("out"); render(); loadHistory();
   }).catch(function(){
     if(seq !== S.seq) return;
     show(S.report ? "out" : "empty"); setMsg("The server could not be reached. Try again.");
@@ -80,6 +82,7 @@ function render(){
   $("#dlPdf").href = API + "/download?" + q + "&file=pdf";
   $("#dlZip").href = API + "/download?" + q + "&file=zip";
   paintScore(s, rep); paintTiles(s); paintFix(rep); paintSections(rep); paintNotes(rep);
+  $("#sinceCard").hidden = true; $("#histCard").hidden = true; $("#saveNote").value = "";
   $("#foot").textContent = "Source: the platform's own API, read only and saved for an hour. A score is the share of the checks' weight that passed (critical checks weigh most, a warning counts half), and checks that could not be read are left out of it and counted. A failed critical check keeps the grade at C or below. Nothing is changed in either platform: make the changes there.";
 }
 function paintScore(s, rep){
@@ -175,6 +178,63 @@ function paintNotes(rep){
   $("#notes").innerHTML = items.map(function(x){return "<li>" + x + "</li>";}).join("");
 }
 
+/* ── Saved audits and what changed ─────────────────────────── */
+function loadHistory(){
+  var seq = ++S.hseq, acct = S.acct.id;
+  getJson(API + "/history?account=" + enc(acct)).then(function(r){
+    if(seq !== S.hseq || !r.ok) return;
+    S.history = r.j.history || []; paintHistory();
+    if(S.history.length) loadCompare("");
+  }).catch(function(){});
+}
+function loadCompare(id){
+  var seq = ++S.hseq, acct = S.acct.id;
+  getJson(API + "/compare?account=" + enc(acct) + (id ? "&id=" + enc(id) : "")).then(function(r){
+    if(seq !== S.hseq) return;
+    if(!r.ok){setMsg(esc((r.j && r.j.error) || "The comparison could not be made."), "pm-note"); return;}
+    paintSince(r.j.compare);
+  }).catch(function(){});
+}
+function paintSince(c){
+  var card = $("#sinceCard"); if(!c){card.hidden = true; return;}
+  card.hidden = false;
+  $("#sinceNote").textContent = "Saved " + D.dateText(c.since) + (c.by ? " by " + c.by : "") + (c.note ? " (" + c.note + ")" : "");
+  $("#sinceTiles").innerHTML = D.changeTiles(c).map(function(t){
+    return '<div class="pd-kpi au-tile ' + t.tone + '"><span>' + esc(t.label) + '</span><b>' + esc(t.value) + '</b><i>' + esc(t.hint) + '</i></div>';
+  }).join("");
+  var groups = D.changeGroups(c);
+  $("#sinceLists").innerHTML = groups.length ? groups.map(function(g){
+    return '<div class="au-chg ' + g[2] + '"><h4>' + esc(g[0]) + ' (' + g[1].length + ')</h4><ul>' + g[1].map(function(r){
+      return '<li>' + chip("res", r.now) + '<div><button type="button" data-jump="' + esc(r.id) + '">' + esc(r.title) + '</button><br><span>' + esc(r.found) + '</span></div></li>';
+    }).join("") + '</ul></div>';
+  }).join("") : '<p class="au-none">No check changed between the two audits.</p>';
+}
+function paintHistory(){
+  var card = $("#histCard"); card.hidden = !S.history.length;
+  $("#hist").innerHTML = S.history.map(function(h){
+    return '<li><span class="au-grade au-tone-' + D.gradeTone(h.grade) + '">' + esc(D.scoreText(h.score)) + (h.grade ? " · " + esc(h.grade) : "") + '</span>' +
+      '<div class="au-hist-t"><b>' + esc(D.dateText(h.createdAt)) + (h.note ? " · " + esc(h.note) : "") + '</b><span>' + esc(h.createdBy || "") + ' · ' + esc(D.plural(h.critical, "critical failure")) + ', ' + esc(D.plural(h.high, "high failure")) + '</span></div>' +
+      '<div class="au-hist-b"><button type="button" class="pm-btn-ghost" data-compare="' + esc(h.id) + '">Compare with now</button>' +
+      '<button type="button" class="pm-btn-ghost" data-remove="' + esc(h.id) + '">Remove</button></div></li>';
+  }).join("");
+}
+function saveAudit(){
+  var btn = $("#saveBtn"); if(btn.disabled || !S.acct) return;
+  btn.disabled = true;
+  getJson(API + "/save", "POST", {account: S.acct.id, note: $("#saveNote").value}).then(function(r){
+    btn.disabled = false;
+    if(!r.ok){setMsg(esc((r.j && r.j.error) || "The audit could not be saved."), "pm-err"); return;}
+    setMsg("Saved. It is in Saved audits below, and the next audit can be compared with it.", "pm-note");
+    $("#saveNote").value = ""; loadHistory();
+  }).catch(function(){btn.disabled = false; setMsg("The server could not be reached. Try again.");});
+}
+function removeAudit(id){
+  getJson(API + "/history/" + enc(id), "DELETE", {}).then(function(r){
+    if(!r.ok){setMsg(esc((r.j && r.j.error) || "The saved audit could not be removed."), "pm-err"); return;}
+    setMsg(""); $("#sinceCard").hidden = true; loadHistory();
+  }).catch(function(){setMsg("The server could not be reached. Try again.");});
+}
+
 /* ── Events ───────────────────────────────────────────────── */
 function toggle(id){
   S.open[id] = !S.open[id];
@@ -199,6 +259,8 @@ document.addEventListener("click", function(e){
   var b = t.closest("[data-toggle]"); if(b){toggle(b.getAttribute("data-toggle")); return;}
   b = t.closest("[data-jump]"); if(b){jump(b.getAttribute("data-jump")); return;}
   b = t.closest("[data-view]"); if(b){S.views[b.getAttribute("data-sec")] = b.getAttribute("data-view"); S.shown[b.getAttribute("data-sec")] = 0; repaintSection(b.getAttribute("data-sec")); return;}
+  b = t.closest("[data-compare]"); if(b){loadCompare(b.getAttribute("data-compare")); try{$("#sinceCard").scrollIntoView({behavior: "smooth", block: "start"});}catch(x){} return;}
+  b = t.closest("[data-remove]"); if(b){removeAudit(b.getAttribute("data-remove")); return;}
   b = t.closest("[data-more]"); if(b){var k = b.getAttribute("data-more"); S.shown[k] = (S.shown[k] || PAGE) + PAGE; repaintSection(k); return;}
 });
 document.addEventListener("input", function(e){
@@ -206,6 +268,7 @@ document.addEventListener("input", function(e){
   var k = t.getAttribute("data-find"); S.filters[k] = t.value; S.shown[k] = 0; repaintSection(k);
 });
 $("#refreshBtn").addEventListener("click", function(){run(true);});
+$("#saveBtn").addEventListener("click", saveAudit);
 
 /* ── Boot ─────────────────────────────────────────────────── */
 function boot(){

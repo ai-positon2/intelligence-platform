@@ -92,6 +92,36 @@ def test_time_since_a_read_is_said_in_words():
     assert run('D.ago("", 1)') == "" and run('D.ago("not a date", 1)') == "" and run("D.plural(1, 'day') + '|' + D.plural(0, 'day')") == "1 day|0 days"
 
 
+def test_a_signed_change_reads_plus_minus_or_nothing():
+    assert [run("D.signed(n)", n=n) for n in (12, -3, 0, None)] == ["+12", "-3", "0", ""]
+
+
+def test_the_change_tiles_say_what_moved_since_a_saved_audit():
+    c = {"scoreChange": 12, "scoreWas": 60, "gradeWas": "C", "scoreNow": 72, "gradeNow": "B", "counts": {"fixed": 2, "improved": 1, "worse": 0, "newProblems": 2}, "stillFailing": 1, "stillWarning": 1}
+    t = {x["key"]: x for x in run("D.changeTiles(c)", c=c)}
+    assert t["score"]["value"] == "+12" and t["score"]["tone"] == "good" and t["score"]["hint"] == "was 60 (C), now 72 (B)"
+    assert t["fixed"]["value"] == 2 and t["fixed"]["tone"] == "good" and t["fixed"]["hint"] == "1 more got better"
+    assert t["newProblems"]["value"] == 2 and t["newProblems"]["tone"] == "bad" and t["worse"]["value"] == 0 and t["worse"]["tone"] == "good" and t["worse"]["hint"] == "none"
+    assert t["still"]["value"] == 1 and t["still"]["tone"] == "warn" and t["still"]["hint"] == "1 still warning"
+    worse = {x["key"]: x for x in run("D.changeTiles(c)", c=dict(c, scoreChange=-5, counts={"fixed": 0, "improved": 0, "worse": 1, "newProblems": 0}, stillFailing=0, gradeNow=None, scoreWas=None))}
+    assert worse["score"]["tone"] == "bad" and worse["score"]["value"] == "-5" and worse["score"]["hint"] == "no score then, now 72" and worse["worse"]["tone"] == "bad"
+    assert worse["fixed"]["tone"] == "unk" and worse["fixed"]["hint"] == "checks that now pass" and worse["still"]["tone"] == "good"
+    none = {x["key"]: x for x in run("D.changeTiles(c)", c={"scoreChange": None, "scoreNow": None})}
+    assert none["score"]["value"] == "n/a" and none["score"]["tone"] == "unk" and none["score"]["hint"] == "no score then, now n/a"
+    same = {x["key"]: x for x in run("D.changeTiles(c)", c=dict(c, scoreChange=0))}
+    assert same["score"]["value"] == "0" and same["score"]["tone"] == "unk"
+
+
+def test_the_changed_checks_are_listed_worst_news_first_and_empty_groups_are_left_out():
+    c = {"newProblems": [{"id": "A"}], "worse": [], "fixed": [{"id": "B"}, {"id": "C"}], "improved": [{"id": "D"}]}
+    assert run("D.changeGroups(c).map(g=>[g[0], g[1].length, g[2]])", c=c) == [["New problems", 1, "bad"], ["Put right", 2, "good"], ["Got better", 1, "good"]]
+    assert run("D.changeGroups(c)", c={}) == []
+
+
+def test_a_date_reads_in_words_and_a_bad_one_reads_as_nothing():
+    assert run('D.dateText("2026-07-17T10:00:00+00:00")') in ("Jul 17, 2026", "Jul 16, 2026") and run('D.dateText("")') == "" and run('D.dateText("nope")') == ""
+
+
 def test_the_headline_tiles_say_what_matters_and_stay_calm_when_nothing_does():
     s = {"critical": 2, "high": 1, "judged": 40, "unknownShare": 8, "tally": {"fail": 3, "warn": 5, "pass": 30, "na": 4, "unknown": 3}}
     t = {x["key"]: x for x in run("D.tiles(s)", s=s)}
@@ -136,10 +166,11 @@ def test_the_page_script_is_valid_javascript():
 def test_every_element_the_page_script_reaches_for_is_in_the_template():
     js, html = open(PAGE, encoding="utf-8").read(), open(TEMPLATE, encoding="utf-8").read()
     ids = set(re.findall(r'\$\("#([A-Za-z0-9_-]+)"\)', js)) | set(re.findall(r'getElementById\("([A-Za-z0-9_-]+)"\)', js))
-    assert ids >= {"acctPick", "msg", "empty", "skel", "out", "fresh", "stale", "score", "tiles", "fix", "fixNote", "sections", "notes", "notesCard", "foot", "refreshBtn", "dlXlsx", "dlPdf", "dlZip"}
+    assert ids >= {"acctPick", "msg", "empty", "skel", "out", "fresh", "stale", "score", "tiles", "fix", "fixNote", "sections", "notes", "notesCard", "foot", "refreshBtn", "dlXlsx", "dlPdf", "dlZip",
+                   "saveBtn", "saveNote", "sinceCard", "sinceNote", "sinceTiles", "sinceLists", "histCard", "hist"}
     for i in sorted(ids - {"sec-"}):
         assert 'id="%s"' % i in html, i
-    for attr in ("data-toggle", "data-jump", "data-view", "data-more", "data-find"):
+    for attr in ("data-toggle", "data-jump", "data-view", "data-more", "data-find", "data-compare", "data-remove"):
         assert attr in js, attr
 
 

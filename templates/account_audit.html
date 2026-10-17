@@ -1,7 +1,7 @@
 {% extends "_paid_base.html" %}
 {% block title %}Account Audit{% endblock %}
 {% block head %}
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/account_audit.css') }}?v=2">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/account_audit.css') }}?v=4">
 {% endblock %}
 {% block content %}
 <div class="pm pm-au" id="au">
@@ -42,9 +42,20 @@
       <a class="pm-btn-ghost" id="dlZip" href="#" download><svg viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>CSV files</a>
     </div>
     <div class="au-stale" id="stale" hidden></div>
+    <div class="au-save" id="saveRow">
+      <label class="au-save-l"><span class="pd-dd-k">Keep this audit</span>
+        <input type="text" id="saveNote" maxlength="120" placeholder="A note, such as Onboarding or Q1 review (optional)" autocomplete="off" aria-label="A note to keep with this audit"></label>
+      <button class="pm-btn-ghost" id="saveBtn" type="button"><svg viewBox="0 0 24 24"><path d="M5 4h11l3 3v13H5zM8 4v5h7V4M8 20v-6h8v6"/></svg>Save audit</button>
+    </div>
 
     <section class="pm-panel au-score" id="score"></section>
     <div class="pd-strip au-tiles" id="tiles"></div>
+
+    <section class="pm-panel au-since" id="sinceCard" hidden>
+      <div class="pm-panel-h"><span class="pm-panel-t">Since the last saved audit</span><span class="pm-panel-s" id="sinceNote"></span></div>
+      <div class="pd-strip au-tiles" id="sinceTiles"></div>
+      <div id="sinceLists"></div>
+    </section>
 
     <section class="pm-panel" id="fixCard">
       <div class="pm-panel-h"><span class="pm-panel-t">Fix first</span><span class="pm-panel-s" id="fixNote"></span></div>
@@ -52,6 +63,11 @@
     </section>
 
     <div id="sections"></div>
+
+    <section class="pm-panel" id="histCard" hidden>
+      <div class="pm-panel-h"><span class="pm-panel-t">Saved audits</span><span class="pm-panel-s">Compare the audit now with any of them</span></div>
+      <ul class="au-hist" id="hist"></ul>
+    </section>
 
     <section class="pm-panel" id="notesCard" hidden>
       <div class="pm-panel-h"><span class="pm-panel-t">What this audit could not see</span></div>
@@ -64,6 +80,6 @@
 {% block scripts %}
 <script src="{{ url_for('static', filename='js/pm_picker.js') }}?v=1"></script>
 <script src="{{ url_for('static', filename='js/pm_platform.js') }}?v=4"></script>
-<script src="{{ url_for('static', filename='js/au_data.js') }}?v=1"></script>
-<script src="{{ url_for('static', filename='js/account_audit.js') }}?v=1"></script>
+<script src="{{ url_for('static', filename='js/au_data.js') }}?v=2"></script>
+<script src="{{ url_for('static', filename='js/account_audit.js') }}?v=2"></script>
 {% endblock %}

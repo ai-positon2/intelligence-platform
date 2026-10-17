@@ -89,7 +89,27 @@ function readNote(report){
   (report.accounts||[]).forEach(function(a){parts.push(a.name+" ("+(PLATFORM[a.platform]||a.platform)+")");});
   return parts.join(" and ");
 }
-var api={RESULT:RESULT,SEVERITY:SEVERITY,PLATFORM:PLATFORM,VIEWS:VIEWS,tally:tally,viewCount:viewCount,defaultView:defaultView,filterFindings:filterFindings,
+function signed(n){return n==null?"":n>0?"+"+n:n<0?"-"+Math.abs(n):"0";}
+/* What changed since a saved audit, as tiles. `c` is the server's comparison (tracker/paid_audit_history.py compare). */
+function changeTiles(c){
+  var k=c.counts||{fixed:0,improved:0,worse:0,newProblems:0};
+  return [
+    {key:"score",    label:"Score",          value:c.scoreChange==null?"n/a":signed(c.scoreChange), tone:(c.scoreChange>0?"good":c.scoreChange<0?"bad":"unk"), hint:(c.scoreWas==null?"no score then":"was "+c.scoreWas+(c.gradeWas?" ("+c.gradeWas+")":""))+", now "+(c.scoreNow==null?"n/a":c.scoreNow)+(c.gradeNow?" ("+c.gradeNow+")":"")},
+    {key:"fixed",    label:"Put right",      value:k.fixed,       tone:(k.fixed?"good":"unk"),        hint:k.improved?k.improved+" more got better":"checks that now pass"},
+    {key:"newProblems",label:"New problems", value:k.newProblems, tone:(k.newProblems?"bad":"good"),  hint:k.newProblems?"passed then, not now":"none"},
+    {key:"worse",    label:"Got worse",      value:k.worse,       tone:(k.worse?"bad":"good"),        hint:k.worse?"a warning that became a failure":"none"},
+    {key:"still",    label:"Still failing",  value:c.stillFailing||0, tone:((c.stillFailing||0)?"warn":"good"), hint:(c.stillWarning||0)+" still warning"}
+  ];
+}
+/* The changed checks in the order they are listed: new problems and worse first, then what was put right. */
+function changeGroups(c){
+  return [["New problems",c.newProblems,"bad"],["Got worse",c.worse,"bad"],["Put right",c.fixed,"good"],["Got better",c.improved,"good"]].filter(function(g){return g[1]&&g[1].length;});
+}
+function dateText(iso){
+  var d=new Date(iso); if(!iso||isNaN(d.getTime())) return "";
+  return d.toLocaleDateString("en-US",{year:"numeric",month:"short",day:"numeric"});
+}
+var api={signed:signed,changeTiles:changeTiles,changeGroups:changeGroups,dateText:dateText,RESULT:RESULT,SEVERITY:SEVERITY,PLATFORM:PLATFORM,VIEWS:VIEWS,tally:tally,viewCount:viewCount,defaultView:defaultView,filterFindings:filterFindings,
   affectedText:affectedText,gradeTone:gradeTone,scoreText:scoreText,percentText:percentText,ring:ring,plural:plural,ago:ago,tiles:tiles,readNote:readNote};
 if(typeof module!=="undefined"&&module.exports) module.exports=api; else root.AuditData=api;
 })(typeof window!=="undefined"?window:globalThis);
