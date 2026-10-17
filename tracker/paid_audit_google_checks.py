@@ -9,6 +9,7 @@ from __future__ import annotations
 import logging
 
 from . import paid_audit_model as model
+from .paid_audit_google_read import SEARCH_LIST_MIN
 
 log = logging.getLogger(__name__)
 make, unknown, na = model.make, model.unknown, model.not_applicable
@@ -89,8 +90,14 @@ class Ctx:
         return [c for c in self.camps or [] if c["type"] == "SEARCH"]
 
 
+def share(part, whole):
+    """The exact percentage, for deciding a threshold (a rounded 24.6% must not count as 25%)."""
+    return 100.0 * part / whole if whole else 0.0
+
+
 def pct(part, whole):
-    return round(100.0 * part / whole) if whole else 0
+    """The whole-percent figure shown in a sentence."""
+    return round(share(part, whole))
 
 
 def plural(n, word):
@@ -398,3 +405,316 @@ def cnv_ga4(ctx):
     if ga4:
         return make("G-CNV-11", "pass", "Conversion actions imported from GA4: %d, so the link exists." % len(ga4))
     return unknown("G-CNV-11", "Google's API does not show the GA4 link, and no conversion action is imported from GA4")
+
+
+# ── Links and audiences ─────────────────────────────────────────────────────
+
+RETAIL_TYPES = {"SHOPPING"}
+GEO_ELSEWHERE = {"LOCAL_SERVICES", "DEMAND_GEN"}   # locations are set per ad group (Demand Gen) or by Google (Local Services), not on the campaign
+
+
+def _retail(ctx):
+    return [x for x in ctx.camps if x["type"] in RETAIL_TYPES or (x["type"] == "PERFORMANCE_MAX" and x["merchantId"])]
+
+
+@check("G-LNK-01", "links", "Shopping campaigns have their Merchant Center linked", "high",
+       "A Shopping or retail Performance Max campaign serves from a Merchant Center product feed. Without the link, or with a link to a "
+       "different Merchant Center than the one named in the campaign, it has no products to show.",
+       "Link the Merchant Center account in Google Ads (Linked accounts) and check each shopping campaign points at it.")
+def lnk_merchant(ctx):
+    if ctx.camps is None:
+        return unknown("G-LNK-01", "the campaigns could not be read")
+    retail = _retail(ctx)
+    if not retail:
+        return na("G-LNK-01", "No enabled campaign serves products from a Merchant Center feed.")
+    links = ctx.read.get("links")
+    if links is None:
+        return unknown("G-LNK-01", "the product links could not be read")
+    if not links["counts"].get("MERCHANT_CENTER"):
+        return make("G-LNK-01", "fail", "%s serve products but no Merchant Center account is linked." % plural(len(retail), "campaign"), items=names(retail))
+    ids = links["merchantCenter"]
+    if ids is not None:
+        off = [x for x in retail if x["merchantId"] and x["merchantId"] not in ids]
+        if off:
+            return make("G-LNK-01", "fail", "%s point at a Merchant Center that is not linked (linked: %s)." % (plural(len(off), "campaign"), ", ".join(ids) or "none"),
+                        items=["%s (Merchant Center %s)" % (x["name"], x["merchantId"]) for x in off])
+    return make("G-LNK-01", "pass", "%s serve products and a Merchant Center account is linked." % plural(len(retail), "campaign"))
+
+
+@check("G-LNK-02", "links", "Audience lists are collecting members", "low",
+       "Remarketing and customer lists only help once they have people in them. Empty lists mean the tag or the upload is not feeding them.",
+       "Check that the Google tag fires on the pages that build each list and that customer lists are uploaded. Some regulated sectors may not "
+       "be allowed to build remarketing lists, so confirm the client's policy.")
+def lnk_lists(ctx):
+    lists = ctx.read.get("lists")
+    if lists is None:
+        return unknown("G-LNK-02", "the audience lists could not be read")
+    if lists["total"] == 0:
+        return make("G-LNK-02", "warn", "The account has no audience lists.")
+    if lists["open"] == 0:
+        return make("G-LNK-02", "warn", "No audience list is open to new members (%s, all closed)." % plural(lists["total"], "list"))
+    if lists["withMembers"] == 0:
+        return make("G-LNK-02", "warn", "None of the %s open audience lists has any members." % lists["open"], items=[e["name"] for e in lists["examples"] if e["size"] == 0])
+    return make("G-LNK-02", "pass", "%d of %s open audience lists have members." % (lists["withMembers"], lists["open"]))
+
+
+@check("G-LNK-03", "links", "Audience lists are big enough to serve on Search", "low",
+       "Google only serves a list on Search once it has 1,000 members. A smaller list is collected but does nothing for Search targeting or bids.",
+       "Let the list grow, widen the rule that builds it, or use it for Display and YouTube, where the minimum is lower.")
+def lnk_small(ctx):
+    lists = ctx.read.get("lists")
+    if lists is None:
+        return unknown("G-LNK-03", "the audience lists could not be read")
+    if lists["withMembers"] == 0:
+        return na("G-LNK-03", "No audience list has members yet.")
+    if lists["tooSmallForSearch"] == 0:
+        return make("G-LNK-03", "pass", "No open list is under the %s-member Search minimum." % format(SEARCH_LIST_MIN, ","))
+    return make("G-LNK-03", "warn", "%s under the Search minimum of %s members." % (plural(lists["tooSmallForSearch"], "open list") + (" is" if lists["tooSmallForSearch"] == 1 else " are"),
+                                                                                      format(SEARCH_LIST_MIN, ",")),
+                items=["%s (%s)" % (e["name"], format(e["size"], ",")) for e in lists["examples"] if e["size"]])
+
+
+
+# ── Structure and bidding ───────────────────────────────────────────────────
+
+BUDGET_LOST_PCT = 20                          # impression share lost to budget at which a campaign is held back
+RANK_LOST_PCT = 40
+RANK_LOST_MIN_SHARE = 5                       # a campaign must carry this share of spend for rank loss to matter
+PARTNER_MIN_SHARE = 5
+PARTNER_WORSE_BY = 1.5
+NO_CONVERSION_CLICKS = 50
+NO_CONVERSION_FAIL_SHARE = 25
+PAUSED_CLUTTER = 50
+CONVERSION_TYPES = {"SEARCH", "PERFORMANCE_MAX", "SHOPPING", "DEMAND_GEN"}
+CLICK_BIDDING = {"MANUAL_CPC", "TARGET_SPEND", "MANUAL_CPM", "ENHANCED_CPC"}
+MIN_CONVERSIONS = {"cpa": 30, "roas": 50, "smart": 15}
+BAD_PRIMARY = {"MISCONFIGURED", "NOT_ELIGIBLE"}
+ISSUE_REASONS = {"HAS_ADS_DISAPPROVED", "HAS_ADS_LIMITED_BY_POLICY", "HAS_ASSET_GROUPS_DISAPPROVED", "HAS_ASSET_GROUPS_LIMITED_BY_POLICY",
+                 "NO_AD_GROUP_ADS", "NO_ACTIVE_AD_GROUPS", "MISSING_LEAD_FORM_EXTENSION", "MISSING_CALL_EXTENSION", "PENDING_REVIEW"}
+
+
+def _say(reason):
+    return str(reason).lower().replace("_", " ")
+
+
+@check("G-STR-01", "structure", "Every campaign targets locations", "critical",
+       "A campaign with no location target is eligible in every country and territory. The budget then spreads across places the client "
+       "cannot serve.",
+       "Add the locations (or a radius around each site) to each campaign, and exclude the places the client does not serve.")
+def str_locations(ctx):
+    if ctx.camps is None:
+        return unknown("G-STR-01", "the campaigns could not be read")
+    camps = [x for x in ctx.camps if x["type"] not in GEO_ELSEWHERE]
+    if not camps:
+        return na("G-STR-01", "No enabled campaign takes its locations from the campaign (Demand Gen sets them on each ad group).")
+    if any(x["targeting"] is None for x in camps):
+        return unknown("G-STR-01", "the campaigns' locations could not be read")
+    open_ = [x for x in camps if not x["targeting"]["locations"] and not x["targeting"]["proximities"]]
+    if not open_:
+        return make("G-STR-01", "pass", "All %s target at least one location or radius." % plural(len(camps), "enabled campaign"))
+    return make("G-STR-01", "fail", "Campaigns with no location target: %d of %s. They can show anywhere." % (len(open_), plural(len(camps), "enabled campaign")), items=names(open_))
+
+
+@check("G-STR-02", "structure", "Search campaigns do not run on the Display Network", "high",
+       "Search campaigns that also run on the Display Network spend on pages where people are not searching, at lower intent, and mix the "
+       "numbers so the search results cannot be read cleanly.",
+       "Turn off the Display Network in each Search campaign's network settings. Run Display as its own campaign if it is wanted.")
+def str_display(ctx):
+    if ctx.camps is None:
+        return unknown("G-STR-02", "the campaigns could not be read")
+    search = ctx.search_camps()
+    if not search:
+        return na("G-STR-02", "No enabled Search campaign.")
+    on = [x for x in search if x["displayNetwork"]]
+    if not on:
+        return make("G-STR-02", "pass", "None of the %s opts into the Display Network." % plural(len(search), "Search campaign"))
+    net = ctx.read.get("network")
+    spend = ""
+    if net and net["total"]:
+        spend = " %d%% of Search spend in the last 30 days ran on the Display Network." % pct(net["cost"].get("CONTENT", 0), net["total"])
+    return make("G-STR-02", "fail", "%d of %s opt into the Display Network.%s" % (len(on), plural(len(search), "Search campaign"), spend), items=names(on))
+
+
+@check("G-STR-03", "structure", "Search Partners are not costing more per conversion", "low",
+       "Search Partners are other sites that show Google search ads. Their traffic is often cheaper and weaker. If it costs clearly more per "
+       "conversion it is worth turning off.",
+       "Compare cost per conversion on Google Search and on Search Partners in the network report, and turn Search Partners off where it is worse.")
+def str_partners(ctx):
+    net = ctx.read.get("network")
+    if net is None:
+        return unknown("G-STR-03", "where Search spend ran could not be read")
+    if not net["total"]:
+        return na("G-STR-03", "No Search spend in the last 30 days.")
+    cost_p, conv_p = net["cost"].get("SEARCH_PARTNERS", 0.0), net["conversions"].get("SEARCH_PARTNERS", 0.0)
+    cost_s, conv_s = net["cost"].get("SEARCH", 0.0), net["conversions"].get("SEARCH", 0.0)
+    taken = pct(cost_p, net["total"])
+    if share(cost_p, net["total"]) < PARTNER_MIN_SHARE:
+        return make("G-STR-03", "pass", "Search Partners took %d%% of Search spend, a small share." % taken)
+    cpa_s = cost_s / conv_s if conv_s else None
+    cpa_p = cost_p / conv_p if conv_p else None
+    if conv_p == 0 or (cpa_s is not None and cpa_p is not None and cpa_p >= PARTNER_WORSE_BY * cpa_s):
+        how = "recorded no conversions" if conv_p == 0 else "cost %s per conversion against %s on Google Search" % (ctx.money(cpa_p), ctx.money(cpa_s))
+        return make("G-STR-03", "warn", "Search Partners took %d%% of Search spend (%s) and %s." % (taken, ctx.money(cost_p), how))
+    return make("G-STR-03", "pass", "Search Partners took %d%% of Search spend at a cost per conversion in line with Google Search." % taken)
+
+
+@check("G-STR-04", "structure", "Campaigns that convert are not held back by budget", "medium",
+       "A campaign that runs out of budget while it is converting leaves conversions on the table, and its Smart Bidding learns from a "
+       "partial day.",
+       "Raise the budget of the campaigns that convert at an acceptable cost, funded from the ones that do not.")
+def str_budget(ctx):
+    if ctx.camps is None:
+        return unknown("G-STR-04", "the campaigns could not be read")
+    live = [x for x in ctx.camps if x["type"] in CONVERSION_TYPES]
+    if not live:
+        return na("G-STR-04", "No enabled Search, Shopping, Performance Max or Demand Gen campaign.")
+    held = []
+    for x in live:
+        m = x["metrics"] or {}
+        lost = m.get("budgetLost")
+        limited = "BUDGET_CONSTRAINED" in x["reasons"] or (lost is not None and lost >= BUDGET_LOST_PCT)
+        if limited and (m.get("conversions") or 0) > 0:
+            held.append((x, lost))
+    if not held:
+        return make("G-STR-04", "pass", "No converting campaign is held back by budget.")
+    held.sort(key=lambda h: (-(h[0]["metrics"] or {}).get("cost", 0), h[0]["name"]))
+    return make("G-STR-04", "warn", "%s converting and held back by budget." % (plural(len(held), "campaign") + (" is" if len(held) == 1 else " are")),
+                items=["%s%s" % (x["name"], " (%d%% of impressions lost to budget)" % lost if lost is not None else " (budget limited)") for x, lost in held])
+
+
+@check("G-STR-05", "structure", "No campaign is flagged by Google as misconfigured or limited by policy", "high",
+       "Google shows a campaign status and the reasons behind it. A misconfigured campaign, a missing ad group or a policy limit means the "
+       "campaign is not serving as built.",
+       "Open each campaign's status in Google Ads, read the reason Google gives and fix it (an ad group without ads, a disapproved ad, a missing asset).")
+def str_status(ctx):
+    if ctx.camps is None:
+        return unknown("G-STR-05", "the campaigns could not be read")
+    bad = [x for x in ctx.camps if x["primaryStatus"] in BAD_PRIMARY]
+    warn = [x for x in ctx.camps if x["primaryStatus"] not in BAD_PRIMARY and any(r in ISSUE_REASONS for r in x["reasons"])]
+    if not bad and not warn:
+        return make("G-STR-05", "pass", "No enabled campaign shows a misconfigured, not eligible or policy-limited status.")
+
+    def line(x):
+        why = [_say(r) for r in x["reasons"] if r in ISSUE_REASONS] or [_say(x["primaryStatus"])]
+        return "%s (%s)" % (x["name"], ", ".join(why))
+    if bad:
+        return make("G-STR-05", "fail", "%d campaigns are %s." % (len(bad), " or ".join(sorted({_say(x["primaryStatus"]) for x in bad}))), items=[line(x) for x in bad + warn])
+    return make("G-STR-05", "warn", "%s limited by policy or missing something Google needs." % (plural(len(warn), "campaign") + (" is" if len(warn) == 1 else " are")),
+                items=[line(x) for x in warn], severity="medium")
+
+
+@check("G-STR-06", "structure", "No campaign is still learning", "low",
+       "A campaign in its learning period reads high and low until the strategy settles, and changes made then restart the learning.",
+       "Leave campaigns that are learning alone for a couple of weeks, and avoid stacking bid, budget and conversion changes together.")
+def str_learning(ctx):
+    if ctx.camps is None:
+        return unknown("G-STR-06", "the campaigns could not be read")
+    learning = [x for x in ctx.camps if x["primaryStatus"] == "LEARNING" or any(r.endswith("_LEARNING") for r in x["reasons"])]
+    if not learning:
+        return make("G-STR-06", "pass", "No enabled campaign is in a learning period.")
+    return make("G-STR-06", "warn", "%s in a learning period." % (plural(len(learning), "campaign") + (" is" if len(learning) == 1 else " are")), items=names(learning))
+
+
+def _needs(x):
+    """How many conversions in 30 days Google suggests a campaign's bidding strategy has, or None when it has no such need."""
+    if x["targetKind"] == "cpa" or x["bidding"] == "TARGET_CPA":
+        return MIN_CONVERSIONS["cpa"]
+    if x["targetKind"] == "roas" or x["bidding"] == "TARGET_ROAS":
+        return MIN_CONVERSIONS["roas"]
+    if x["bidding"] in ("MAXIMIZE_CONVERSIONS", "MAXIMIZE_CONVERSION_VALUE"):
+        return MIN_CONVERSIONS["smart"]
+    return None
+
+
+@check("G-STR-07", "structure", "Smart Bidding campaigns have enough conversions to learn from", "high",
+       "Smart Bidding sets each bid from past conversions. Google suggests about 30 conversions a month for a target CPA, 50 for a target ROAS "
+       "and 15 for maximise conversions. With fewer, bids swing and targets are missed.",
+       "Merge thin campaigns so they share conversions, use a portfolio strategy, or count a nearer step such as a form start as a secondary signal.")
+def str_smart_data(ctx):
+    if ctx.camps is None:
+        return unknown("G-STR-07", "the campaigns could not be read")
+    smart = [x for x in ctx.camps if x["type"] in CONVERSION_TYPES and _needs(x) is not None]
+    if not smart:
+        return na("G-STR-07", "No enabled campaign uses a conversion-based bidding strategy.")
+    if any(x["metrics"] is None for x in smart):
+        return unknown("G-STR-07", "the campaigns' numbers could not be read")
+    thin = [x for x in smart if x["metrics"]["cost"] > 0 and x["metrics"]["conversions"] < _needs(x)]
+    if not thin:
+        return make("G-STR-07", "pass", "All %s have the conversions Google suggests." % plural(len(smart), "Smart Bidding campaign"))
+    thin.sort(key=lambda x: (-x["metrics"]["cost"], x["name"]))
+    return make("G-STR-07", "warn", "%d of %s had fewer conversions in 30 days than Google suggests." % (len(thin), plural(len(smart), "Smart Bidding campaign")),
+                items=["%s (%d conversions, about %d suggested)" % (x["name"], round(x["metrics"]["conversions"]), _needs(x)) for x in thin])
+
+
+@check("G-STR-08", "structure", "Campaigns with plenty of conversions use Smart Bidding", "medium",
+       "Manual and click-based bidding cannot use the conversion signal. A campaign that already records conversions usually does better "
+       "when bids are set from them.",
+       "Move the campaign to Maximise conversions (or a target CPA once it has run for a few weeks) and watch it for two weeks.")
+def str_manual(ctx):
+    if ctx.camps is None:
+        return unknown("G-STR-08", "the campaigns could not be read")
+    click = [x for x in ctx.camps if x["type"] == "SEARCH" and x["bidding"] in CLICK_BIDDING]
+    if not click:
+        return make("G-STR-08", "pass", "No Search campaign uses manual or click-based bidding.")
+    if any(x["metrics"] is None for x in click):
+        return unknown("G-STR-08", "the campaigns' numbers could not be read")
+    ready = [x for x in click if x["metrics"]["conversions"] >= MIN_CONVERSIONS["smart"]]
+    if not ready:
+        return make("G-STR-08", "pass", "%s use manual or click-based bidding, none with enough conversions yet to bid on them." % plural(len(click), "Search campaign"))
+    ready.sort(key=lambda x: (-x["metrics"]["conversions"], x["name"]))
+    return make("G-STR-08", "warn", "%d of %s on manual or click-based bidding already record %d or more conversions a month." %
+                (len(ready), plural(len(click), "Search campaign"), MIN_CONVERSIONS["smart"]),
+                items=["%s (%s, %d conversions)" % (x["name"], _say(x["bidding"]), round(x["metrics"]["conversions"])) for x in ready])
+
+
+@check("G-STR-09", "structure", "Campaigns that spend are converting", "high",
+       "A campaign with a lot of clicks and no conversions in a month is either not converting or not measuring, and it keeps spending.",
+       "Check the landing page and the conversion tracking for each, tighten the targeting, or pause the campaign and move its budget.")
+def str_no_conversions(ctx):
+    if ctx.camps is None or ctx.spend is None:
+        return unknown("G-STR-09", "the campaigns or their numbers could not be read")
+    live = [x for x in ctx.camps if x["type"] in CONVERSION_TYPES]
+    if any(x["metrics"] is None for x in live):
+        return unknown("G-STR-09", "the campaigns' numbers could not be read")
+    dead = [x for x in live if x["metrics"]["clicks"] >= NO_CONVERSION_CLICKS and x["metrics"]["conversions"] == 0]
+    if not dead:
+        return make("G-STR-09", "pass", "Every campaign with %d or more clicks in 30 days recorded a conversion." % NO_CONVERSION_CLICKS)
+    cost = sum(x["metrics"]["cost"] for x in dead)
+    exact = share(cost, ctx.spend)
+    dead.sort(key=lambda x: (-x["metrics"]["cost"], x["name"]))
+    found = "%s %d or more clicks and no conversion in 30 days, %s (%d%% of spend)." % (plural(len(dead), "campaign") + (" has" if len(dead) == 1 else " have"),
+                                                                                          NO_CONVERSION_CLICKS, ctx.money(cost), round(exact))
+    return make("G-STR-09", "fail" if exact >= NO_CONVERSION_FAIL_SHARE else "warn", found,
+                items=["%s (%s, %s clicks)" % (x["name"], ctx.money(x["metrics"]["cost"]), format(x["metrics"]["clicks"], ",")) for x in dead])
+
+
+@check("G-STR-10", "structure", "Search campaigns are not losing much reach to rank", "medium",
+       "Impression share lost to rank means the ad was not shown because its Ad Rank was too low: weak bids, Quality Score, or a weak ad or page.",
+       "Improve ad relevance and landing page experience first, then raise the target or bid where the campaign earns it.")
+def str_rank(ctx):
+    if ctx.camps is None or ctx.spend is None:
+        return unknown("G-STR-10", "the campaigns or their numbers could not be read")
+    search = ctx.search_camps()
+    if not search:
+        return na("G-STR-10", "No enabled Search campaign.")
+    if any(x["metrics"] is None for x in search):
+        return unknown("G-STR-10", "the campaigns' numbers could not be read")
+    big = [x for x in search if x["metrics"]["rankLost"] is not None and x["metrics"]["rankLost"] >= RANK_LOST_PCT
+           and share(x["metrics"]["cost"], ctx.spend) >= RANK_LOST_MIN_SHARE]
+    if not big:
+        return make("G-STR-10", "pass", "No big Search campaign loses %d%% or more of its impressions to rank." % RANK_LOST_PCT)
+    big.sort(key=lambda x: (-x["metrics"]["cost"], x["name"]))
+    return make("G-STR-10", "warn", "%s losing %d%% or more of impressions to rank." % (plural(len(big), "big Search campaign") + (" is" if len(big) == 1 else " are"), RANK_LOST_PCT),
+                items=["%s (%d%% lost to rank)" % (x["name"], x["metrics"]["rankLost"]) for x in big])
+
+
+@check("G-STR-11", "structure", "The account is not buried in paused campaigns", "low",
+       "Hundreds of paused campaigns make the account slow to read and easy to enable by mistake.",
+       "Archive the campaigns that will not come back and keep their results in a report.")
+def str_paused(ctx):
+    if ctx.camps is None:
+        return unknown("G-STR-11", "the campaigns could not be read")
+    enabled, paused = ctx.counts.get("enabled", 0), ctx.counts.get("paused", 0)
+    if paused >= PAUSED_CLUTTER and paused >= 2 * enabled:
+        return make("G-STR-11", "warn", "%s against %d enabled." % (plural(paused, "paused campaign"), enabled))
+    return make("G-STR-11", "pass", "%s and %d enabled." % (plural(paused, "paused campaign"), enabled))
