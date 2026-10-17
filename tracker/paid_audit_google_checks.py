@@ -9,7 +9,7 @@ from __future__ import annotations
 import logging
 
 from . import paid_audit_model as model
-from .paid_audit_google_read import SEARCH_LIST_MIN
+from .paid_audit_google_read import LEGACY_ADS, SEARCH_LIST_MIN
 
 log = logging.getLogger(__name__)
 make, unknown, na = model.make, model.unknown, model.not_applicable
@@ -511,7 +511,7 @@ def str_locations(ctx):
         return unknown("G-STR-01", "the campaigns' locations could not be read")
     open_ = [x for x in camps if not x["targeting"]["locations"] and not x["targeting"]["proximities"]]
     if not open_:
-        return make("G-STR-01", "pass", "All %s target at least one location or radius." % plural(len(camps), "enabled campaign"))
+        return make("G-STR-01", "pass", "Checked %s: all target at least one location or radius." % plural(len(camps), "enabled campaign"))
     return make("G-STR-01", "fail", "Campaigns with no location target: %d of %s. They can show anywhere." % (len(open_), plural(len(camps), "enabled campaign")), items=names(open_))
 
 
@@ -527,7 +527,7 @@ def str_display(ctx):
         return na("G-STR-02", "No enabled Search campaign.")
     on = [x for x in search if x["displayNetwork"]]
     if not on:
-        return make("G-STR-02", "pass", "None of the %s opts into the Display Network." % plural(len(search), "Search campaign"))
+        return make("G-STR-02", "pass", "Checked %s: none opts into the Display Network." % plural(len(search), "Search campaign"))
     net = ctx.read.get("network")
     spend = ""
     if net and net["total"]:
@@ -640,7 +640,7 @@ def str_smart_data(ctx):
         return unknown("G-STR-07", "the campaigns' numbers could not be read")
     thin = [x for x in smart if x["metrics"]["cost"] > 0 and x["metrics"]["conversions"] < _needs(x)]
     if not thin:
-        return make("G-STR-07", "pass", "All %s have the conversions Google suggests." % plural(len(smart), "Smart Bidding campaign"))
+        return make("G-STR-07", "pass", "Checked %s: all have the conversions Google suggests." % plural(len(smart), "Smart Bidding campaign"))
     thin.sort(key=lambda x: (-x["metrics"]["cost"], x["name"]))
     return make("G-STR-07", "warn", "%d of %s had fewer conversions in 30 days than Google suggests." % (len(thin), plural(len(smart), "Smart Bidding campaign")),
                 items=["%s (%d conversions, about %d suggested)" % (x["name"], round(x["metrics"]["conversions"]), _needs(x)) for x in thin])
@@ -718,3 +718,369 @@ def str_paused(ctx):
     if paused >= PAUSED_CLUTTER and paused >= 2 * enabled:
         return make("G-STR-11", "warn", "%s against %d enabled." % (plural(paused, "paused campaign"), enabled))
     return make("G-STR-11", "pass", "%s and %d enabled." % (plural(paused, "paused campaign"), enabled))
+
+
+# ── Keywords and search terms ───────────────────────────────────────────────
+
+QS_LOW_FAIL = 30                              # share of impressions on keywords at Quality Score 4 or less
+QS_LOW_WARN = 15
+BELOW_AD_RELEVANCE = 35                       # share of scored impressions with a below-average component
+BELOW_LANDING_PAGE = 35
+BELOW_EXPECTED_CTR = 50
+WASTED_KEYWORD_FAIL = 10                      # share of spend on keywords with 15+ clicks and no conversion
+WASTED_KEYWORD_WARN = 3
+WASTED_TERM_FAIL = 60                         # share of the biggest search terms' spend that never converted
+WASTED_TERM_WARN = 35
+RARELY_SERVED_SHARE = 10
+ONE_AD_FAIL = 75
+ONE_AD_WARN = 25
+NO_KEYWORD_FAIL = 50
+
+
+@check("G-KWD-01", "keywords", "Search campaigns use negative keywords", "high",
+       "Negative keywords stop the ads showing for searches that cannot convert (jobs, free, other cities, competitors). Without them a "
+       "share of the budget goes to the wrong searches every day.",
+       "Add negative keyword lists for the account and for each theme from the search terms report. Account-level negatives cannot be read "
+       "through Google's API, so check those in the account's settings before adding.")
+def kwd_negatives(ctx):
+    if ctx.camps is None:
+        return unknown("G-KWD-01", "the campaigns could not be read")
+    search = ctx.search_camps()
+    if not search:
+        return na("G-KWD-01", "No enabled Search campaign.")
+    if any(x["negatives"] is None or x["lists"] is None for x in search):
+        return unknown("G-KWD-01", "the campaigns' negative keywords could not be read")
+    bare = [x for x in search if not x["negatives"] and not x["lists"]]
+    if not bare:
+        return make("G-KWD-01", "pass", "Checked %s: all have negative keywords of their own or a negative keyword list." % plural(len(search), "Search campaign"))
+    if len(bare) == len(search):
+        return make("G-KWD-01", "warn", "No Search campaign has a negative keyword or a negative keyword list. Negatives set for the whole account cannot be read, so they may exist.",
+                    items=names(bare))
+    return make("G-KWD-01", "warn", "%d of %s have no negative keyword and no negative keyword list." % (len(bare), plural(len(search), "Search campaign")), items=names(bare))
+
+
+@check("G-KWD-02", "keywords", "Broad match keywords run under Smart Bidding", "high",
+       "Broad match reaches a wide range of searches. Smart Bidding keeps it in check by bidding on the chance each search converts. With "
+       "manual bids or click bidding, broad match spends on loosely related searches.",
+       "Move the campaign to a conversion-based strategy, or change its broad match keywords to phrase or exact.")
+def kwd_broad(ctx):
+    kw = ctx.read.get("keywords")
+    if kw is None or ctx.camps is None:
+        return unknown("G-KWD-02", "the keywords or the campaigns could not be read")
+    if not kw["byMatch"].get("BROAD"):
+        return make("G-KWD-02", "pass", "No enabled broad match keyword.")
+    by_id = {x["id"]: x for x in ctx.camps}
+    bad = []
+    for cid, n in kw["perCampaign"].items():
+        x = by_id.get(cid)
+        if x and n["broad"] and x["bidding"] not in SMART_BIDDING:
+            bad.append((x, n["broad"]))
+    if not bad:
+        return make("G-KWD-02", "pass", "%s, all in campaigns that bid with a conversion-based strategy." % plural(kw["byMatch"]["BROAD"], "broad match keyword"))
+    bad.sort(key=lambda b: (-b[1], b[0]["name"]))
+    return make("G-KWD-02", "fail", "%s in %s without a conversion-based bidding strategy." % (plural(sum(n for _x, n in bad), "broad match keyword"), plural(len(bad), "campaign")),
+                items=["%s (%d broad keywords, %s)" % (x["name"], n, _say(x["bidding"])) for x, n in bad])
+
+
+@check("G-KWD-03", "keywords", "Quality Score is healthy where the ads show", "medium",
+       "Quality Score of 4 or less means Google expects a poor click-through rate, a weak ad match or a weak landing page. Those keywords pay "
+       "more per click and lose auctions to better ads.",
+       "Start with the keywords that carry the most impressions: tighten the ad groups so the ads match the keywords, and improve the landing page.")
+def kwd_quality(ctx):
+    kw = ctx.read.get("keywords")
+    if kw is None or kw["qs"]["impressions"] is None:
+        return unknown("G-KWD-03", "the keywords or their impressions could not be read")
+    imp = kw["qs"]["impressions"]
+    scored = imp["low"] + imp["mid"] + imp["high"]
+    if not scored:
+        return na("G-KWD-03", "No keyword has a Quality Score with impressions yet.")
+    low = share(imp["low"], scored)
+    found = "%d%% of impressions on keywords with a Quality Score are on keywords at 4 or less (%s keywords)." % (round(low), format(kw["qs"]["keywords"]["low"], ","))
+    examples = ["%s (Quality Score %d, %s impressions, %s)" % (e["keyword"], e["qs"], format(e["impressions"], ","), e["campaign"]) for e in kw["lowQualityExamples"]]
+    if low >= QS_LOW_FAIL:
+        return make("G-KWD-03", "fail", found, items=examples)
+    if low >= QS_LOW_WARN:
+        return make("G-KWD-03", "warn", found, items=examples)
+    return make("G-KWD-03", "pass", found)
+
+
+@check("G-KWD-04", "keywords", "Quality Score parts point to the ads and the landing pages", "medium",
+       "Quality Score has three parts: expected click-through rate, ad relevance and landing page experience. A large share of impressions "
+       "below average on one of them says which to fix.",
+       "Ad relevance: write ads that use the keywords and split ad groups by theme. Landing page: match the page to the search and speed it up. "
+       "Expected click-through rate: test stronger headlines and add assets.")
+def kwd_components(ctx):
+    kw = ctx.read.get("keywords")
+    if kw is None or kw["qs"]["below"] is None:
+        return unknown("G-KWD-04", "the keywords or their impressions could not be read")
+    imp = kw["qs"]["impressions"]
+    if not imp["low"] + imp["mid"] + imp["high"]:
+        return na("G-KWD-04", "No keyword has a Quality Score with impressions yet.")
+    b = kw["qs"]["below"]
+    hits = []
+    if b["adRelevance"] >= BELOW_AD_RELEVANCE:
+        hits.append("ad relevance is below average on %d%% of impressions" % b["adRelevance"])
+    if b["landingPage"] >= BELOW_LANDING_PAGE:
+        hits.append("landing page experience is below average on %d%%" % b["landingPage"])
+    if b["expectedCtr"] >= BELOW_EXPECTED_CTR:
+        hits.append("expected click-through rate is below average on %d%%" % b["expectedCtr"])
+    if not hits:
+        return make("G-KWD-04", "pass", "No Quality Score part is below average on a large share of impressions (ad relevance %d%%, landing page %d%%, expected click-through rate %d%%)." %
+                    (b["adRelevance"], b["landingPage"], b["expectedCtr"]))
+    return make("G-KWD-04", "warn", "On scored keywords, " + "; ".join(hits) + ".")
+
+
+@check("G-KWD-05", "keywords", "The same keyword is not in several ad groups of one campaign", "low",
+       "Two ad groups with the same keyword compete with each other in the same auction and split the data, so neither learns well.",
+       "Keep the keyword in the ad group whose ads fit it best and pause or remove the other copies.")
+def kwd_duplicates(ctx):
+    kw = ctx.read.get("keywords")
+    if kw is None:
+        return unknown("G-KWD-05", "the keywords could not be read")
+    d = kw["duplicates"]
+    if not d["keywords"]:
+        return make("G-KWD-05", "pass", "No keyword appears in more than one ad group of the same campaign.")
+    return make("G-KWD-05", "warn", "Keywords in more than one ad group of the same campaign: %d (%s extra copies)." % (d["keywords"], format(d["copies"], ",")),
+                items=["%s (%s, %d ad groups, %s)" % (e["keyword"], e["match"].lower(), e["adGroups"], e["campaign"]) for e in d["examples"]], count=d["keywords"])
+
+
+@check("G-KWD-06", "keywords", "Few keywords spend without ever converting", "high",
+       "A keyword with plenty of clicks and no conversion in a month is spending money the account cannot trace to a result.",
+       "Check the search terms behind each one. Pause it, lower its bid, move it to exact match, or add the junk terms as negatives.")
+def kwd_waste(ctx):
+    kw = ctx.read.get("keywords")
+    if kw is None or kw["wasted"] is None or ctx.spend is None:
+        return unknown("G-KWD-06", "the keywords' numbers or the campaigns' spend could not be read")
+    w = kw["wasted"]
+    exact = share(w["cost"], ctx.spend)
+    found = "%s on %s with %d or more clicks and no conversion in 30 days (%d%% of spend)." % (ctx.money(w["cost"]), plural(w["keywords"], "keyword"), w["minClicks"], round(exact))
+    items = ["%s (%s, %s clicks, %s)" % (e["keyword"], ctx.money(e["cost"]), format(e["clicks"], ","), e["campaign"]) for e in w["examples"]]
+    if exact >= WASTED_KEYWORD_FAIL:
+        return make("G-KWD-06", "fail", found, items=items, count=w["keywords"])
+    if exact >= WASTED_KEYWORD_WARN:
+        return make("G-KWD-06", "warn", found, items=items, count=w["keywords"])
+    return make("G-KWD-06", "pass", found)
+
+
+@check("G-KWD-07", "keywords", "Most search term spend ends in a conversion", "medium",
+       "The search terms report shows what people typed. Spend on terms that never converted is the clearest list of what to add as a negative "
+       "keyword or to move to a more exact match.",
+       "Run the Search Query Analysis agent for this account and add the negatives it recommends.")
+def kwd_terms(ctx):
+    t = ctx.read.get("terms")
+    if t is None:
+        return unknown("G-KWD-07", "the search terms could not be read")
+    if not t["cost"]:
+        return na("G-KWD-07", "No search term spend in the last 30 days.")
+    exact = share(t["wastedCost"], t["cost"])
+    where = "the %s most expensive search terms" % format(t["rows"], ",") if t["capped"] else "search terms"
+    found = "%d%% of spend on %s (%s) went to terms that never converted." % (round(exact), where, ctx.money(t["wastedCost"]))
+    items = ["%s (%s, %d clicks, %s)" % (e["term"], ctx.money(e["cost"]), e["clicks"], e["campaign"]) for e in t["examples"]]
+    if exact >= WASTED_TERM_FAIL:
+        return make("G-KWD-07", "fail", found, items=items)
+    if exact >= WASTED_TERM_WARN:
+        return make("G-KWD-07", "warn", found, items=items)
+    return make("G-KWD-07", "pass", found)
+
+
+@check("G-KWD-08", "keywords", "Keywords are approved and can serve", "low",
+       "A disapproved keyword never shows. A keyword Google calls rarely served has too little search volume to trigger ads.",
+       "Fix or replace disapproved keywords, and remove or broaden keywords that are rarely served.")
+def kwd_serving(ctx):
+    kw = ctx.read.get("keywords")
+    if kw is None:
+        return unknown("G-KWD-08", "the keywords could not be read")
+    if not kw["enabled"]:
+        return na("G-KWD-08", "No enabled keyword.")
+    d, rare = kw["disapproved"]["count"], kw["rarelyServed"]
+    rare_share = share(rare, kw["enabled"])
+    if not d and rare_share < RARELY_SERVED_SHARE:
+        return make("G-KWD-08", "pass", "No disapproved keyword (%s rarely served)." % plural(rare, "keyword"))
+    parts = []
+    if d:
+        parts.append("%s disapproved" % plural(d, "keyword"))
+    if rare_share >= RARELY_SERVED_SHARE:
+        parts.append("%s (%d%%) rarely served" % (plural(rare, "keyword"), round(rare_share)))
+    return make("G-KWD-08", "warn", " and ".join(parts).capitalize() + ".", items=["%s (%s, %s)" % (e["keyword"], e["match"].lower(), e["campaign"]) for e in kw["disapproved"]["examples"]], count=d)
+
+
+@check("G-KWD-09", "keywords", "Ad groups hold a focused set of keywords", "low",
+       "An ad group with dozens of keywords cannot have ads that speak to each one, which lowers ad relevance and Quality Score.",
+       "Split the ad group by theme so each group has a handful of closely related keywords and its own ads.")
+def kwd_many(ctx):
+    s = ctx.read.get("structure")
+    if s is None or "manyKeywords" not in s:
+        return unknown("G-KWD-09", "the ad groups or the keywords could not be read")
+    m = s["manyKeywords"]
+    if not m["count"]:
+        return make("G-KWD-09", "pass", "No Search ad group has more than 40 keywords.")
+    return make("G-KWD-09", "warn", "Search ad groups with more than 40 keywords: %d." % m["count"], items=["%s (%s)" % (e["adGroup"], e["campaign"]) for e in m["examples"]], count=m["count"])
+
+
+@check("G-KWD-10", "keywords", "Every Search ad group has keywords", "medium",
+       "A Search ad group with no keyword cannot serve, and its ads are dead weight in the account.",
+       "Add keywords to the ad group or pause it.")
+def kwd_none(ctx):
+    s = ctx.read.get("structure")
+    if s is None or "noKeywords" not in s:
+        return unknown("G-KWD-10", "the ad groups or the keywords could not be read")
+    if not s["searchAdGroups"]:
+        return na("G-KWD-10", "No enabled Search ad group.")
+    n = s["noKeywords"]
+    if not n["count"]:
+        return make("G-KWD-10", "pass", "Every enabled Search ad group has an enabled keyword.")
+    found = "%d of %s have no enabled keyword." % (n["count"], plural(s["searchAdGroups"], "Search ad group"))
+    return make("G-KWD-10", "fail" if share(n["count"], s["searchAdGroups"]) >= NO_KEYWORD_FAIL else "warn", found,
+                items=["%s (%s)" % (e["adGroup"], e["campaign"]) for e in n["examples"]], count=n["count"])
+
+
+# ── Ads and landing pages ───────────────────────────────────────────────────
+
+SLOW_PAGE_MS = 3000
+
+
+@check("G-ADS-01", "ads", "Every Search ad group has a live ad", "critical",
+       "An ad group with no live ad cannot show anything, whatever its keywords are worth.",
+       "Write a responsive search ad for the ad group or pause the ad group.")
+def ads_none(ctx):
+    s = ctx.read.get("structure")
+    if s is None or "noLiveAd" not in s:
+        return unknown("G-ADS-01", "the ad groups or the ads could not be read")
+    if not s["searchAdGroups"]:
+        return na("G-ADS-01", "No enabled Search ad group.")
+    n = s["noLiveAd"]
+    if not n["count"]:
+        return make("G-ADS-01", "pass", "Checked %s: all have a live ad." % plural(s["searchAdGroups"], "enabled Search ad group"))
+    return make("G-ADS-01", "fail", "%d of %s have no live ad." % (n["count"], plural(s["searchAdGroups"], "enabled Search ad group")),
+                items=["%s (%s)" % (e["adGroup"], e["campaign"]) for e in n["examples"]], count=n["count"])
+
+
+@check("G-ADS-02", "ads", "Every Search ad group has a responsive search ad", "high",
+       "Google no longer lets new expanded text ads be made, and responsive search ads are where Google's optimisation and reporting now live. "
+       "An ad group with only older formats is not using them.",
+       "Add a responsive search ad with up to 15 headlines and 4 descriptions to each of these ad groups.")
+def ads_rsa(ctx):
+    s = ctx.read.get("structure")
+    if s is None or "noResponsiveAd" not in s:
+        return unknown("G-ADS-02", "the ad groups or the ads could not be read")
+    if not s["searchAdGroups"]:
+        return na("G-ADS-02", "No enabled Search ad group.")
+    dead = {(e["adGroup"], e["campaign"]) for e in s["noLiveAd"]["examples"]}
+    only_old = s["noResponsiveAd"]["count"] - s["noLiveAd"]["count"]
+    if only_old <= 0:
+        return make("G-ADS-02", "pass", "Every Search ad group with a live ad has a responsive search ad.")
+    items = ["%s (%s)" % (e["adGroup"], e["campaign"]) for e in s["noResponsiveAd"]["examples"] if (e["adGroup"], e["campaign"]) not in dead]
+    return make("G-ADS-02", "warn", "Search ad groups with only older or call ad formats and no responsive search ad: %d." % only_old, items=items, count=only_old)
+
+
+@check("G-ADS-03", "ads", "Ad groups have more than one ad to test", "medium",
+       "With one ad there is nothing to compare. Two or three responsive search ads let Google and the team see which messages work.",
+       "Add a second responsive search ad built around a different angle (price, speed, trust) to each ad group.")
+def ads_testing(ctx):
+    s = ctx.read.get("structure")
+    if s is None or "oneAd" not in s:
+        return unknown("G-ADS-03", "the ad groups or the ads could not be read")
+    if not s["searchAdGroups"]:
+        return na("G-ADS-03", "No enabled Search ad group.")
+    n = s["oneAd"]["count"]
+    exact = share(n, s["searchAdGroups"])
+    if exact < ONE_AD_WARN:
+        return make("G-ADS-03", "pass", "%d of %s have a single ad." % (n, plural(s["searchAdGroups"], "Search ad group")))
+    return make("G-ADS-03", "fail" if exact >= ONE_AD_FAIL else "warn", "%d of %s (%d%%) have a single ad, so nothing is being tested." % (n, plural(s["searchAdGroups"], "Search ad group"), round(exact)),
+                items=["%s (%s)" % (e["adGroup"], e["campaign"]) for e in s["oneAd"]["examples"]], count=n)
+
+
+@check("G-ADS-04", "ads", "Responsive search ads are not rated Poor", "medium",
+       "Google rates each responsive search ad's strength from the number, variety and relevance of its headlines and descriptions. A Poor "
+       "ad is limited in how it can be shown.",
+       "Open the Ad Strength Analysis agent for this account and apply the headline and description changes it recommends.")
+def ads_strength(ctx):
+    a = ctx.read.get("ads")
+    if a is None:
+        return unknown("G-ADS-04", "the ads could not be read")
+    if not a["rsa"]:
+        return na("G-ADS-04", "No live responsive search ad.")
+    poor = a["strength"].get("POOR", 0)
+    avg = a["strength"].get("AVERAGE", 0)
+    found = "Rated Poor: %d of %s. Rated Average: %d." % (poor, plural(a["rsa"], "responsive search ad"), avg)
+    if not poor:
+        return make("G-ADS-04", "pass", found)
+    return make("G-ADS-04", "fail" if share(poor, a["rsa"]) >= 25 else "warn", found)
+
+
+@check("G-ADS-05", "ads", "No ad is disapproved", "high",
+       "A disapproved ad does not run. If it was the only ad in its ad group, the ad group is dark.",
+       "Open each disapproved ad's policy details, fix the text, landing page or claim that broke the policy, and appeal if it was wrongly flagged.")
+def ads_disapproved(ctx):
+    a = ctx.read.get("ads")
+    if a is None:
+        return unknown("G-ADS-05", "the ads could not be read")
+    d, limited = a["disapproved"]["count"], a["limited"]
+    if not d:
+        extra = " %s approved with limits." % plural(limited, "ad") if limited else ""
+        return make("G-ADS-05", "pass", "No live ad is disapproved." + extra)
+    return make("G-ADS-05", "fail", "%s disapproved%s." % (plural(d, "live ad") + (" is" if d == 1 else " are"), ", and %d more approved with limits" % limited if limited else ""),
+                items=["%s / %s (%s)" % (e["campaign"], e["adGroup"], ", ".join(e["topics"]).lower().replace("_", " ") or "no topic given") for e in a["disapproved"]["examples"]], count=d)
+
+
+@check("G-ADS-06", "ads", "No ad uses a retired format", "low",
+       "Expanded text ads and call-only ads can no longer be created. The ones left keep serving but get none of the newer features.",
+       "Replace them with responsive search ads and keep the old ads paused for a short overlap.")
+def ads_legacy(ctx):
+    a = ctx.read.get("ads")
+    if a is None:
+        return unknown("G-ADS-06", "the ads could not be read")
+    if not a["legacy"]:
+        return make("G-ADS-06", "pass", "No live ad uses a retired format.")
+    kinds = ", ".join("%d %s" % (n, t.lower().replace("_", " ")) for t, n in sorted(a["byType"].items(), key=lambda kv: -kv[1]) if t in LEGACY_ADS)
+    return make("G-ADS-06", "warn", "%s a retired format (%s)." % (plural(a["legacy"], "live ad") + (" uses" if a["legacy"] == 1 else " use"), kinds))
+
+
+@check("G-ADS-07", "ads", "Responsive search ads are not heavily pinned", "low",
+       "Pinning headlines to positions limits the combinations Google can test, which lowers ad strength and often performance.",
+       "Pin only what has to appear (a legal line, the brand) and let the rest rotate.")
+def ads_pins(ctx):
+    a = ctx.read.get("ads")
+    if a is None:
+        return unknown("G-ADS-07", "the ads could not be read")
+    if not a["rsa"]:
+        return na("G-ADS-07", "No live responsive search ad.")
+    if not a["pinned"]["heavy"]:
+        return make("G-ADS-07", "pass", "No responsive search ad pins three or more headlines (%d pin some)." % a["pinned"]["any"])
+    return make("G-ADS-07", "warn", "%s pin three or more headlines." % (plural(a["pinned"]["heavy"], "responsive search ad")))
+
+
+@check("G-ADS-08", "ads", "Ad groups do not carry too many responsive search ads", "low",
+       "Google serves at most three responsive search ads per ad group. More only add clutter and slow the learning.",
+       "Keep the best two or three and pause the rest.")
+def ads_many(ctx):
+    s = ctx.read.get("structure")
+    if s is None or "manyAds" not in s:
+        return unknown("G-ADS-08", "the ad groups or the ads could not be read")
+    n = s["manyAds"]
+    if not n["count"]:
+        return make("G-ADS-08", "pass", "No Search ad group has more than three responsive search ads.")
+    return make("G-ADS-08", "warn", "Search ad groups with more than three responsive search ads: %d." % n["count"],
+                items=["%s (%s)" % (e["adGroup"], e["campaign"]) for e in n["examples"]], count=n["count"])
+
+
+@check("G-ADS-09", "ads", "Landing pages load", "high",
+       "An ad that sends people to a page that errors or never loads pays for clicks that cannot convert.",
+       "Fix or replace the final URL in the ads that point at broken pages, and check the pages are fast on mobile.")
+def ads_pages(ctx):
+    p = ctx.read.get("pages")
+    if p is None:
+        return unknown("G-ADS-09", "the landing pages were not checked")
+    if not p["results"]:
+        return na("G-ADS-09", "No ad has a final URL to check.")
+    broken = [x for x in p["results"] if x.get("error") or (x.get("status") or 0) >= 400]
+    slow = [x for x in p["results"] if x not in broken and (x.get("ms") or 0) > SLOW_PAGE_MS]
+    scope = "%d of %d landing pages" % (len(p["results"]), p["of"]) if p["of"] > len(p["results"]) else plural(len(p["results"]), "landing page")
+    if broken:
+        return make("G-ADS-09", "fail", "%d of %s did not load." % (len(broken), scope),
+                    items=["%s (%s)" % (x["url"], x.get("error") or "HTTP %d" % x["status"]) for x in broken])
+    if slow:
+        return make("G-ADS-09", "warn", "%d of %s took more than %d seconds to answer." % (len(slow), scope, SLOW_PAGE_MS // 1000),
+                    items=["%s (%.1f seconds)" % (x["url"], x["ms"] / 1000.0) for x in slow])
+    return make("G-ADS-09", "pass", "Checked %s: all loaded." % scope)
+

@@ -340,7 +340,7 @@ def test_lists_under_the_search_minimum():
 
 def test_every_campaign_needs_a_location():
     f = one("G-STR-01")
-    assert f["result"] == "pass" and "All 1 enabled campaign target" in f["found"]
+    assert f["result"] == "pass" and "Checked 1 enabled campaign: all target at least one location or radius." == f["found"]
     bare = camps(A.campaign("10", "Has location"), A.campaign("11", "No location"), A.campaign("12", "Radius only"),
                  criteria=[A.criterion("10", "LOCATION"), A.criterion("12", "PROXIMITY"), A.criterion("11", "LANGUAGE"), A.criterion("11", "LOCATION", True)])
     f = one("G-STR-01", bare)
@@ -501,3 +501,277 @@ def test_paused_campaign_clutter():
     assert one("G-STR-11", read(30, 59))["result"] == "pass" and one("G-STR-11", read(30, 60))["result"] == "warn"
     assert one("G-STR-11", read(1, 1))["found"] == "1 paused campaign and 1 enabled."
     assert one("G-STR-11", campaigns=None)["result"] == "unknown"
+
+
+# ── Keywords and search terms ───────────────────────────────────────────────
+
+def kw_read(keywords, metrics=(), campaigns=None, **answers):
+    ans = {r.KEYWORDS_GAQL: list(keywords), r.KEYWORD_METRICS_GAQL: list(metrics)}
+    if campaigns is not None:
+        ans[r.CAMPAIGNS_GAQL] = list(campaigns)
+    ans.update(answers)
+    return A.a_read(answers=ans)
+
+
+def test_negative_keywords_in_search_campaigns():
+    assert one("G-KWD-01")["result"] == "pass" and "Checked 1 Search campaign: all have negative keywords" in one("G-KWD-01")["found"]
+    rows = [A.campaign("10", "Has own"), A.campaign("11", "Has list"), A.campaign("12", "Has none"), A.campaign("13", "PMax", ctype="PERFORMANCE_MAX")]
+    f = one("G-KWD-01", A.a_read(answers={r.CAMPAIGNS_GAQL: rows, r.CAMPAIGN_NEGATIVES_GAQL: [A.negative("10")], r.CAMPAIGN_LISTS_GAQL: [A.attached_list("11")]}))
+    assert f["result"] == "warn" and f["items"] == ["Has none"] and "1 of 3 Search campaigns have no negative keyword and no negative keyword list." == f["found"]
+    nothing = A.a_read(answers={r.CAMPAIGN_NEGATIVES_GAQL: [], r.CAMPAIGN_LISTS_GAQL: []})
+    f = one("G-KWD-01", nothing)
+    assert f["result"] == "warn" and "Negatives set for the whole account cannot be read" in f["found"]
+    assert one("G-KWD-01", camps(A.campaign("13", "PMax", ctype="PERFORMANCE_MAX")))["result"] == "na"
+    unread = A.a_read()
+    unread["campaigns"]["campaigns"][0]["negatives"] = None
+    assert one("G-KWD-01", unread)["result"] == "unknown" and one("G-KWD-01", campaigns=None)["result"] == "unknown"
+    unread = A.a_read()
+    unread["campaigns"]["campaigns"][0]["lists"] = None
+    assert one("G-KWD-01", unread)["result"] == "unknown"
+
+
+def test_broad_match_without_smart_bidding():
+    assert one("G-KWD-02")["result"] == "pass" and "No enabled broad match keyword" in one("G-KWD-02")["found"]
+    camps_ = [A.campaign("10", "Manual", bidding="MANUAL_CPC"), A.campaign("11", "Smart", bidding="TARGET_CPA", target_cpa="30000000"), A.campaign("12", "Clicks", bidding="TARGET_SPEND")]
+    kws = [A.keyword(cid="10", gid="100", crit=str(i), text="m%d" % i, match="BROAD") for i in range(3)] + [A.keyword(cid="11", gid="101", crit="9", text="smart", match="BROAD"),
+           A.keyword(cid="12", gid="102", crit="8", text="phrase", match="PHRASE"), A.keyword(cid="12", gid="102", crit="7", text="c", match="BROAD")]
+    f = one("G-KWD-02", kw_read(kws, campaigns=camps_))
+    assert f["result"] == "fail" and "4 broad match keywords in 2 campaigns without a conversion-based bidding strategy." == f["found"]
+    assert f["items"] == ["Manual (3 broad keywords, manual cpc)", "Clicks (1 broad keywords, target spend)"]
+    ok = kw_read([A.keyword(cid="11", gid="101", crit="9", match="BROAD")], campaigns=camps_)
+    assert one("G-KWD-02", ok)["result"] == "pass" and "1 broad match keyword, all in" in one("G-KWD-02", ok)["found"]
+    assert one("G-KWD-02", keywords=None)["result"] == "unknown" and one("G-KWD-02", campaigns=None)["result"] == "unknown"
+
+
+def qs_read(rows):
+    """rows: [(qs, impressions, below flags)]"""
+    kws, mets = [], []
+    for i, (qs, imp, flags) in enumerate(rows):
+        kws.append(A.keyword(qs=qs, crit=str(i), text="kw %d" % i, creative="BELOW_AVERAGE" if "ad" in flags else "AVERAGE",
+                             post_click="BELOW_AVERAGE" if "lp" in flags else "AVERAGE", ctr="BELOW_AVERAGE" if "ctr" in flags else "AVERAGE"))
+        mets.append(A.keyword_metrics(crit=str(i), impressions=imp))
+    return kw_read(kws, mets)
+
+
+def test_quality_score_share_of_impressions():
+    assert one("G-KWD-03")["result"] == "pass"
+    f = one("G-KWD-03", qs_read([(3, 300, ()), (9, 700, ())]))
+    assert f["result"] == "fail" and f["found"].startswith("30% of impressions") and f["items"] == ["kw 0 (Quality Score 3, 300 impressions, Search | Implants)"]
+    assert one("G-KWD-03", qs_read([(3, 299, ()), (9, 701, ())]))["result"] == "warn"                 # 29.9% is a warning, not a failure
+    assert one("G-KWD-03", qs_read([(3, 150, ()), (9, 850, ())]))["result"] == "warn"
+    f = one("G-KWD-03", qs_read([(3, 149, ()), (9, 851, ())]))
+    assert f["result"] == "pass" and f["items"] == []
+    assert one("G-KWD-03", qs_read([(4, 500, ()), (5, 500, ())]))["result"] == "fail"                 # 4 counts as low, 5 does not
+    assert one("G-KWD-03", kw_read([A.keyword()], [A.keyword_metrics(impressions=100)]))["result"] == "na"       # nothing scored
+    assert one("G-KWD-03", keywords=None)["result"] == "unknown"
+    nometrics = A.a_read(answers={r.KEYWORD_METRICS_GAQL: []})
+    assert one("G-KWD-03", nometrics)["result"] == "na"
+
+
+def test_quality_score_parts_say_what_to_fix():
+    healthy = qs_read([(8, 1000, ())])
+    f = one("G-KWD-04", healthy)
+    assert f["result"] == "pass" and "ad relevance 0%, landing page 0%, expected click-through rate 0%" in f["found"]
+    f = one("G-KWD-04", qs_read([(8, 650, ("ad",)), (8, 350, ())]))
+    assert f["result"] == "warn" and "ad relevance is below average on 65% of impressions" in f["found"] and "landing page" not in f["found"]
+    f = one("G-KWD-04", qs_read([(8, 1000, ("ad", "lp", "ctr"))]))
+    assert f["found"] == ("On scored keywords, ad relevance is below average on 100% of impressions; landing page experience is below average on 100%; "
+                          "expected click-through rate is below average on 100%.")
+    assert one("G-KWD-04", qs_read([(8, 350, ("lp",)), (8, 650, ())]))["result"] == "warn"            # 35% is the line (the read keeps whole percents)
+    assert one("G-KWD-04", qs_read([(8, 340, ("lp",)), (8, 660, ())]))["result"] == "pass"
+    assert one("G-KWD-04", qs_read([(8, 500, ("ctr",)), (8, 500, ())]))["result"] == "warn"
+    assert one("G-KWD-04", qs_read([(8, 490, ("ctr",)), (8, 510, ())]))["result"] == "pass"
+    assert one("G-KWD-04", kw_read([A.keyword()], [A.keyword_metrics()]))["result"] == "na" and one("G-KWD-04", keywords=None)["result"] == "unknown"
+
+
+def test_duplicate_keywords():
+    assert one("G-KWD-05")["result"] == "pass"
+    rows = [A.keyword(gid="100", crit="1", text="dup"), A.keyword(gid="101", crit="2", text="dup")]
+    f = one("G-KWD-05", kw_read(rows, campaigns=[A.campaign("10", "Search | Implants")], **{r.AD_GROUPS_GAQL: [A.ad_group("100", "10", "A"), A.ad_group("101", "10", "B")]}))
+    assert f["result"] == "warn" and "Keywords in more than one ad group of the same campaign: 1 (1 extra copies)." == f["found"]
+    assert f["items"] == ["dup (phrase, 2 ad groups, Search | Implants)"] and f["count"] == 1
+    assert one("G-KWD-05", keywords=None)["result"] == "unknown"
+
+
+def test_keywords_that_spend_and_never_convert():
+    def read(cost):
+        return kw_read([A.keyword(crit="1", text="waste")], [A.keyword_metrics(crit="1", clicks=40, cost=cost, conversions=0.0)])
+    base_spend = 1000.0                                                                  # the fixture's campaign spent USD 1,000
+    f = one("G-KWD-06", read(100.0))
+    assert f["result"] == "fail" and "USD 100 on 1 keyword with 15 or more clicks and no conversion in 30 days (10% of spend)." == f["found"]
+    assert f["items"] == ["waste (USD 100, 40 clicks, Search | Implants)"]
+    assert one("G-KWD-06", read(99.0))["result"] == "warn" and one("G-KWD-06", read(30.0))["result"] == "warn"
+    assert one("G-KWD-06", read(29.0))["result"] == "pass" and one("G-KWD-06")["result"] == "pass"
+    assert one("G-KWD-06", keywords=None)["result"] == "unknown" and one("G-KWD-06", campaigns=None)["result"] == "unknown"
+    nometrics = A.a_read(answers={r.KEYWORD_METRICS_GAQL: []})
+    assert one("G-KWD-06", nometrics)["result"] == "pass"
+    unread = A.a_read()
+    unread["keywords"]["wasted"] = None
+    assert one("G-KWD-06", unread)["result"] == "unknown"
+    assert base_spend == 1000.0
+
+
+def test_search_term_spend_that_never_converted():
+    def read(wasted, total, rows=2):
+        return A.a_read(answers={r.TERMS_GAQL: [A.term("ok", total - wasted, 10, 3.0), A.term("junk", wasted, 9, 0.0)][:rows]})
+    f = one("G-KWD-07", read(600.0, 1000.0))
+    assert f["result"] == "fail" and f["found"] == "60% of spend on search terms (USD 600) went to terms that never converted." and f["items"] == ["junk (USD 600, 9 clicks, Search | Implants)"]
+    assert one("G-KWD-07", read(599.0, 1000.0))["result"] == "warn" and one("G-KWD-07", read(350.0, 1000.0))["result"] == "warn"
+    assert one("G-KWD-07", read(349.0, 1000.0))["result"] == "pass"
+    full = A.a_read(answers={r.TERMS_GAQL: [A.term("t%d" % i, 2.0, 1, 0.0) for i in range(r.TERMS_LIMIT)]})
+    assert "the 1,000 most expensive search terms" in one("G-KWD-07", full)["found"]
+    assert one("G-KWD-07", A.a_read(answers={r.TERMS_GAQL: []}))["result"] == "na" and one("G-KWD-07", terms=None)["result"] == "unknown"
+
+
+def test_disapproved_and_rarely_served_keywords():
+    assert one("G-KWD-08")["result"] == "pass" and "(0 keywords rarely served)" in one("G-KWD-08")["found"]
+    f = one("G-KWD-08", kw_read([A.keyword(crit="1", text="bad", approval="DISAPPROVED"), A.keyword(crit="2")]))
+    assert f["result"] == "warn" and f["found"] == "1 keyword disapproved." and f["items"] == ["bad (phrase, Search | Implants)"]
+    ten = [A.keyword(crit=str(i), text="k%d" % i, serving="RARELY_SERVED" if i == 0 else "ELIGIBLE") for i in range(10)]
+    f = one("G-KWD-08", kw_read(ten))
+    assert f["result"] == "warn" and f["found"] == "1 keyword (10%) rarely served."
+    nine = [A.keyword(crit=str(i), text="k%d" % i, serving="RARELY_SERVED" if i == 0 else "ELIGIBLE") for i in range(11)]
+    assert one("G-KWD-08", kw_read(nine))["result"] == "pass"
+    both = [A.keyword(crit="1", text="a", approval="DISAPPROVED", serving="RARELY_SERVED")]
+    assert one("G-KWD-08", kw_read(both))["found"] == "1 keyword disapproved and 1 keyword (100%) rarely served."
+    assert one("G-KWD-08", kw_read([]))["result"] == "na" and one("G-KWD-08", keywords=None)["result"] == "unknown"
+
+
+def test_ad_groups_with_too_many_or_no_keywords():
+    groups = [A.ad_group("100", "10", "Big"), A.ad_group("101", "10", "Empty"), A.ad_group("102", "10", "Fine")]
+    kws = [A.keyword(gid="100", crit="b%d" % i, text="big %d" % i) for i in range(41)] + [A.keyword(gid="102", crit="f", text="fine")]
+    rd = kw_read(kws, **{r.AD_GROUPS_GAQL: groups})
+    f = one("G-KWD-09", rd)
+    assert f["result"] == "warn" and f["found"] == "Search ad groups with more than 40 keywords: 1." and f["items"] == ["Big (Search | Implants)"]
+    assert one("G-KWD-09")["result"] == "pass"
+    f = one("G-KWD-10", rd)
+    assert f["result"] == "warn" and f["found"] == "1 of 3 Search ad groups have no enabled keyword." and f["items"] == ["Empty (Search | Implants)"]
+    assert one("G-KWD-10")["result"] == "pass"
+    half = kw_read([A.keyword(gid="100", crit="1")], **{r.AD_GROUPS_GAQL: groups[:2]})
+    assert one("G-KWD-10", half)["result"] == "fail"                                                  # 1 of 2 is 50%
+    four = groups + [A.ad_group("103", "10", "Four")]
+    assert one("G-KWD-10", kw_read([A.keyword(gid="100", crit="1"), A.keyword(gid="102", crit="3")], **{r.AD_GROUPS_GAQL: four}))["result"] == "fail"       # 2 of 4
+    five = four + [A.ad_group("104", "10", "Five")]
+    assert one("G-KWD-10", kw_read([A.keyword(gid="100", crit="1"), A.keyword(gid="102", crit="3"), A.keyword(gid="104", crit="4")], **{r.AD_GROUPS_GAQL: five}))["result"] == "warn"
+    assert one("G-KWD-10", A.a_read(answers={r.AD_GROUPS_GAQL: [A.ad_group("1", "10", "Display", "DISPLAY_STANDARD")]}))["result"] == "na"
+    for cid in ("G-KWD-09", "G-KWD-10"):
+        assert one(cid, A.a_read(fail={r.KEYWORDS_GAQL}))["result"] == "unknown", cid                 # the keywords part was not read
+        assert one(cid, A.a_read(fail={r.AD_GROUPS_GAQL}))["result"] == "unknown", cid                # nor the ad groups
+        assert one(cid, structure={"searchAdGroups": 1})["result"] == "unknown", cid
+
+
+# ── Ads and landing pages ───────────────────────────────────────────────────
+
+def ads_read(ads, groups=None, **answers):
+    ans = {r.ADS_GAQL: list(ads)}
+    if groups is not None:
+        ans[r.AD_GROUPS_GAQL] = list(groups)
+    ans.update(answers)
+    return A.a_read(answers=ans)
+
+
+def test_an_ad_group_with_no_live_ad_is_critical():
+    f = one("G-ADS-01")
+    assert f["result"] == "pass" and "Checked 1 enabled Search ad group: all have a live ad." == f["found"]
+    groups = [A.ad_group("100", "10", "Has ads"), A.ad_group("101", "10", "Dark")]
+    f = one("G-ADS-01", ads_read([A.ad(gid="100")], groups))
+    assert f["result"] == "fail" and f["severity"] == "critical" and f["found"] == "1 of 2 enabled Search ad groups have no live ad." and f["items"] == ["Dark (Search | Implants)"]
+    assert one("G-ADS-01", A.a_read(answers={r.AD_GROUPS_GAQL: []}))["result"] == "na"
+    assert one("G-ADS-01", A.a_read(fail={r.ADS_GAQL}))["result"] == "unknown" and one("G-ADS-01", A.a_read(fail={r.AD_GROUPS_GAQL}))["result"] == "unknown"
+    assert one("G-ADS-01", structure=None)["result"] == "unknown"
+    paused = ads_read([A.ad(gid="100", status="PAUSED")], groups[:1])
+    assert one("G-ADS-01", paused)["result"] == "fail"
+
+
+def test_an_ad_group_with_only_old_formats_needs_a_responsive_search_ad():
+    groups = [A.ad_group("100", "10", "Old"), A.ad_group("101", "10", "Dark"), A.ad_group("102", "10", "Good")]
+    rd = ads_read([A.ad(gid="100", atype="EXPANDED_TEXT_AD", aid="1"), A.ad(gid="102", aid="2")], groups)
+    f = one("G-ADS-02", rd)
+    assert f["result"] == "warn" and f["found"] == "Search ad groups with only older or call ad formats and no responsive search ad: 1." and f["items"] == ["Old (Search | Implants)"]
+    assert f["count"] == 1                                                                       # the dark ad group is a different, critical finding
+    assert one("G-ADS-02")["result"] == "pass" and one("G-ADS-02", structure=None)["result"] == "unknown" and one("G-ADS-02", A.a_read(fail={r.ADS_GAQL}))["result"] == "unknown"
+    assert one("G-ADS-02", A.a_read(answers={r.AD_GROUPS_GAQL: []}))["result"] == "na"
+
+
+def test_one_ad_per_ad_group():
+    groups = [A.ad_group(str(100 + i), "10", "G%d" % i) for i in range(4)]
+    def read(n_single):
+        ads = []
+        for i in range(4):
+            ads.append(A.ad(gid=str(100 + i), aid="a%d" % i))
+            if i >= n_single:
+                ads.append(A.ad(gid=str(100 + i), aid="b%d" % i))
+        return ads_read(ads, groups)
+    assert one("G-ADS-03", read(0))["result"] == "pass" and one("G-ADS-03", read(0))["found"] == "0 of 4 Search ad groups have a single ad."
+    f = one("G-ADS-03", read(1))
+    assert f["result"] == "warn" and f["found"] == "1 of 4 Search ad groups (25%) have a single ad, so nothing is being tested." and f["items"] == ["G0 (Search | Implants)"]
+    assert one("G-ADS-03", read(2))["result"] == "warn" and one("G-ADS-03", read(3))["result"] == "fail" and one("G-ADS-03", read(4))["result"] == "fail"
+    assert one("G-ADS-03", A.a_read(answers={r.AD_GROUPS_GAQL: []}))["result"] == "na" and one("G-ADS-03", structure=None)["result"] == "unknown" and one("G-ADS-03", A.a_read(fail={r.ADS_GAQL}))["result"] == "unknown"
+
+
+def test_poor_ad_strength():
+    def read(poor, good):
+        return ads_read([A.ad(aid="p%d" % i, strength="POOR") for i in range(poor)] + [A.ad(aid="g%d" % i, strength="GOOD") for i in range(good)] + [A.ad(aid="a", strength="AVERAGE")])
+    assert one("G-ADS-04", read(0, 3))["result"] == "pass" and one("G-ADS-04", read(0, 3))["found"] == "Rated Poor: 0 of 4 responsive search ads. Rated Average: 1."
+    assert one("G-ADS-04", read(1, 3))["result"] == "warn" and one("G-ADS-04", read(1, 3))["result"] == "warn"
+    assert one("G-ADS-04", read(2, 2))["result"] == "fail"                                         # 2 of 5 is 40%
+    assert one("G-ADS-04", read(1, 2))["result"] == "fail"                                         # 1 of 4 is 25%
+    assert one("G-ADS-04", read(1, 3))["result"] == "warn"                                         # 1 of 5 is 20%
+    assert one("G-ADS-04", A.a_read(answers={r.ADS_GAQL: []}))["result"] == "na" and one("G-ADS-04", ads=None)["result"] == "unknown"
+
+
+def test_disapproved_ads():
+    f = one("G-ADS-05")
+    assert f["result"] == "pass" and f["found"] == "No live ad is disapproved."
+    rd = ads_read([A.ad(aid="1", approval="DISAPPROVED", topics=("HEALTHCARE_AND_MEDICINE",)), A.ad(aid="2", approval="APPROVED_LIMITED"), A.ad(aid="3", approval="DISAPPROVED")])
+    f = one("G-ADS-05", rd)
+    assert f["result"] == "fail" and f["found"] == "2 live ads are disapproved, and 1 more approved with limits."
+    assert f["items"] == ["Search | Implants / Implants (healthcare and medicine)", "Search | Implants / Implants (no topic given)"] and f["count"] == 2
+    assert "approved with limits" in one("G-ADS-05", ads_read([A.ad(aid="2", approval="APPROVED_LIMITED")]))["found"]
+    assert one("G-ADS-05", ads_read([A.ad(aid="1", approval="DISAPPROVED")]))["found"] == "1 live ad is disapproved."
+    assert one("G-ADS-05", ads=None)["result"] == "unknown"
+
+
+def test_retired_ad_formats():
+    assert one("G-ADS-06")["result"] == "pass"
+    rd = ads_read([A.ad(aid="1", atype="EXPANDED_TEXT_AD"), A.ad(aid="2", atype="EXPANDED_TEXT_AD"), A.ad(aid="3", atype="CALL_ONLY_AD"), A.ad(aid="4")])
+    f = one("G-ADS-06", rd)
+    assert f["result"] == "warn" and f["found"] == "3 live ads use a retired format (2 expanded text ad, 1 call only ad)."
+    assert one("G-ADS-06", ads_read([A.ad(aid="1", atype="EXPANDED_TEXT_AD")]))["found"] == "1 live ad uses a retired format (1 expanded text ad)."
+    assert one("G-ADS-06", ads=None)["result"] == "unknown"
+
+
+def test_pinned_headlines():
+    f = one("G-ADS-07")
+    assert f["result"] == "pass" and "(0 pin some)" in f["found"]
+    rd = ads_read([A.ad(aid="1", pins=3), A.ad(aid="2", pins=1), A.ad(aid="3", pins=4)])
+    f = one("G-ADS-07", rd)
+    assert f["result"] == "warn" and f["found"] == "2 responsive search ads pin three or more headlines."
+    assert one("G-ADS-07", ads_read([A.ad(aid="1", pins=2), A.ad(aid="2", pins=1)]))["result"] == "pass"
+    assert one("G-ADS-07", A.a_read(answers={r.ADS_GAQL: []}))["result"] == "na" and one("G-ADS-07", ads=None)["result"] == "unknown"
+
+
+def test_too_many_responsive_search_ads_in_one_ad_group():
+    assert one("G-ADS-08")["result"] == "pass"
+    four = [A.ad(aid=str(i)) for i in range(4)]
+    f = one("G-ADS-08", ads_read(four))
+    assert f["result"] == "warn" and f["found"] == "Search ad groups with more than three responsive search ads: 1." and f["items"] == ["Implants (Search | Implants)"]
+    assert one("G-ADS-08", ads_read(four[:3]))["result"] == "pass" and one("G-ADS-08", structure=None)["result"] == "unknown" and one("G-ADS-08", A.a_read(fail={r.ADS_GAQL}))["result"] == "unknown"
+
+
+def pages(*results, of=None):
+    return {"checked": len(results), "of": of or len(results), "results": list(results)}
+
+
+def test_landing_pages_that_do_not_load():
+    ok = {"url": "https://a.test/x", "status": 200, "error": "", "ms": 400}
+    f = one("G-ADS-09", pages=pages(ok))
+    assert f["result"] == "pass" and f["found"] == "Checked 1 landing page: all loaded."
+    f = one("G-ADS-09", pages=pages(ok, {"url": "https://a.test/gone", "status": 404, "error": "", "ms": 200}, {"url": "https://a.test/down", "status": 0, "error": "could not connect", "ms": 0}))
+    assert f["result"] == "fail" and f["found"] == "2 of 3 landing pages did not load." and f["items"] == ["https://a.test/gone (HTTP 404)", "https://a.test/down (could not connect)"]
+    assert one("G-ADS-09", pages=pages({"url": "u", "status": 399, "error": "", "ms": 1}))["result"] == "pass" and one("G-ADS-09", pages=pages({"url": "u", "status": 400, "error": "", "ms": 1}))["result"] == "fail"
+    f = one("G-ADS-09", pages=pages(ok, {"url": "https://a.test/slow", "status": 200, "error": "", "ms": 3001}))
+    assert f["result"] == "warn" and f["found"] == "1 of 2 landing pages took more than 3 seconds to answer." and f["items"] == ["https://a.test/slow (3.0 seconds)"]
+    assert one("G-ADS-09", pages=pages({"url": "u", "status": 200, "error": "", "ms": 3000}))["result"] == "pass"
+    assert one("G-ADS-09", pages=pages(*[ok] * 40, of=90))["found"] == "Checked 40 of 90 landing pages: all loaded."
+    assert one("G-ADS-09", pages=pages())["result"] == "na" and one("G-ADS-09", pages=None)["result"] == "unknown" and one("G-ADS-09")["result"] == "unknown"
