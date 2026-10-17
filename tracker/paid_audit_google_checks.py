@@ -9,6 +9,7 @@ from __future__ import annotations
 import logging
 
 from . import paid_audit_model as model
+from .paid_audit_model import names, pct, plural, share, verb  # noqa: F401  (the helpers every checklist uses)
 from .paid_audit_google_read import LEGACY_ADS, SEARCH_LIST_MIN
 
 log = logging.getLogger(__name__)
@@ -88,30 +89,6 @@ class Ctx:
 
     def search_camps(self):
         return [c for c in self.camps or [] if c["type"] == "SEARCH"]
-
-
-def share(part, whole):
-    """The exact percentage, for deciding a threshold (a rounded 24.6% must not count as 25%)."""
-    return 100.0 * part / whole if whole else 0.0
-
-
-def pct(part, whole):
-    """The whole-percent figure shown in a sentence."""
-    return round(share(part, whole))
-
-
-def plural(n, word):
-    """"1 action", "2 actions"."""
-    return "%d %s" % (n, word if n == 1 else word + "s")
-
-
-def verb(n, word):
-    """The verb that goes with a count of n ("1 of 4 counts", "2 of 4 count")."""
-    return word + "s" if n == 1 else word
-
-
-def names(items, key="name"):
-    return [i[key] if isinstance(i, dict) else str(i) for i in items]
 
 
 # ── Account and settings ────────────────────────────────────────────────────

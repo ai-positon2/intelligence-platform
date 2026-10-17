@@ -513,6 +513,8 @@ def test_search_campaigns_losing_reach_to_rank():
     f = one("G-STR-10", camps(*rows, metrics=m))
     assert f["result"] == "warn" and "3 big Search campaigns are losing 40% or more" in f["found"]
     assert f["items"] == ["Big lost (55% lost to rank)", "Edge (40% lost to rank)", "Five percent (60% lost to rank)"]   # 20 and 49.9 of 1,000 are under 5% of spend
+    single = camps(A.campaign("10", "Only one"), metrics=[A.campaign_metrics("10", cost=600.0, rank_lost=0.55)])
+    assert one("G-STR-10", single)["found"] == "1 big Search campaign is losing 40% or more of impressions to rank."
     assert one("G-STR-10", camps(A.campaign("10", ctype="PERFORMANCE_MAX"), metrics=[]))["result"] == "na"
     unread = A.a_read()
     unread["campaigns"]["campaigns"][0]["metrics"] = None
@@ -611,6 +613,8 @@ def test_quality_score_parts_say_what_to_fix():
     assert one("G-KWD-04", qs_read([(8, 350, ("ad",)), (8, 650, ())]))["result"] == "warn"            # ad relevance is judged on the same 35% line
     assert one("G-KWD-04", qs_read([(8, 340, ("ad",)), (8, 660, ())]))["result"] == "pass"
     f = one("G-KWD-04", qs_read([(3, 100, ("ad",)), (5, 100, ("ad",))]))                              # low and mid impressions are equal
+    assert f["result"] == "warn" and "ad relevance is below average on 100%" in f["found"]
+    f = one("G-KWD-04", qs_read([(3, 100, ("ad",)), (8, 100, ("ad",))]))                              # low and high impressions are equal
     assert f["result"] == "warn" and "ad relevance is below average on 100%" in f["found"]
     assert one("G-KWD-04", qs_read([(8, 500, ("ctr",)), (8, 500, ())]))["result"] == "warn"
     assert one("G-KWD-04", qs_read([(8, 490, ("ctr",)), (8, 510, ())]))["result"] == "pass"

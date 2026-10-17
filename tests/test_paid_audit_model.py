@@ -208,3 +208,20 @@ def test_the_grade_cap_shows_in_the_summary_and_the_section():
     fs = [m.make("A", "fail", "a")] + [m.make("P%d" % i, "pass", "p") for i in range(40)]
     assert m.summarise(fs)["score"] == 83 and m.summarise(fs)["grade"] == "C"
     assert m.sections_of(fs)[0]["grade"] == "C"
+
+
+# ── Wording and arithmetic ──────────────────────────────────────────────────
+
+def test_share_is_exact_and_pct_is_the_rounded_figure_shown():
+    assert m.share(1, 4) == 25.0 and m.share(0, 5) == 0.0 and m.share(5, 0) == 0.0
+    assert m.share(249, 1000) == 24.9 and m.pct(249, 1000) == 25 and m.pct(1, 3) == 33 and m.pct(2, 3) == 67 and m.pct(1, 0) == 0
+
+
+def test_plural_and_verb_agree_with_the_count():
+    assert [m.plural(n, "action") for n in (0, 1, 2)] == ["0 actions", "1 action", "2 actions"]
+    assert [m.verb(n, "count") for n in (0, 1, 2)] == ["count", "counts", "count"]
+
+
+def test_names_takes_a_key_from_dicts_and_text_from_anything_else():
+    assert m.names([{"name": "A"}, {"name": "B"}]) == ["A", "B"] and m.names(["x", 3]) == ["x", "3"]
+    assert m.names([{"title": "T"}], key="title") == ["T"] and m.names([]) == []

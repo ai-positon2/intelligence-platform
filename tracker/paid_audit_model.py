@@ -169,3 +169,29 @@ def summarise(findings):
             s = _score(fs)
             out.setdefault("platforms", {})[p] = {"score": s, "grade": grade_of(s, fs), "tally": tally(fs)}
     return out
+
+
+# ── Wording and arithmetic every checklist uses ─────────────────────────────
+
+def share(part, whole):
+    """The exact percentage, for deciding a threshold (a rounded 24.6% must not count as 25%)."""
+    return 100.0 * part / whole if whole else 0.0
+
+
+def pct(part, whole):
+    """The whole-percent figure shown in a sentence."""
+    return round(share(part, whole))
+
+
+def plural(n, word):
+    """"1 action", "2 actions"."""
+    return "%d %s" % (n, word if n == 1 else word + "s")
+
+
+def verb(n, word):
+    """The verb that goes with a count of n ("1 of 4 counts", "2 of 4 count")."""
+    return word + "s" if n == 1 else word
+
+
+def names(items, key="name"):
+    return [i[key] if isinstance(i, dict) else str(i) for i in items]
