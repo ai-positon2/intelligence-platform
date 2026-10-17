@@ -145,3 +145,17 @@ def term(text="dental implants", cost=10.0, clicks=5, conversions=0.0, cid="10")
     return {"campaign": {"resourceName": "customers/1112223334/campaigns/" + cid, "id": cid},
             "metrics": {"clicks": str(clicks), "conversions": conversions, "costMicros": str(int(cost * 1e6))},
             "searchTermView": {"resourceName": "customers/1112223334/searchTermViews/%s~1~abc" % cid, "status": "NONE", "searchTerm": text}}
+
+
+def fake_search(answers, fail=()):
+    """A search function for read_account: `answers` maps a query's text to its rows (a query not named answers with no rows);
+    `fail` is a set of query texts that raise a Google Ads error. Records what was asked in `.asked`."""
+    from tracker import paid_gads_segments as gads
+
+    def search(cid, gaql):
+        search.asked.append(gaql)
+        if gaql in fail:
+            raise gads.GadsError("upstream", "Google Ads answered 500")
+        return answers.get(gaql, [])
+    search.asked = []
+    return search

@@ -443,3 +443,92 @@ def test_the_conversion_value_counts_every_conversion_when_both_values_are_given
     row = {"metrics": {"conversionsValue": 12.5, "allConversionsValue": 20.0, "conversions": 1.0, "allConversions": 2.0},
            "segments": {"conversionAction": "customers/1/conversionActions/1"}}
     assert r.parse_conversions([A.action("1")], [row])[0]["value"] == 20.0
+
+
+# ── Reading the whole account ───────────────────────────────────────────────
+
+def a_full_answer():
+    return {r.CUSTOMER_GAQL: A.customer(), r.CONVERSIONS_GAQL: [A.action("1")], r.CONVERSION_VOLUME_GAQL: [A.volume("1", 20.0)],
+            r.LINKS_GAQL: [A.link()], r.MERCHANT_GAQL: [A.merchant("77")], r.LISTS_GAQL: [A.user_list(search=2000, display=2000)],
+            r.CAMPAIGNS_GAQL: [A.campaign("10", "Search | Implants")], r.CAMPAIGN_METRICS_GAQL: [A.campaign_metrics("10")],
+            r.CAMPAIGN_CRITERIA_GAQL: [A.criterion("10")], r.CAMPAIGN_NEGATIVES_GAQL: [A.negative("10")], r.CAMPAIGN_LISTS_GAQL: [A.attached_list("10")],
+            r.NETWORK_GAQL: [A.network_row("10")], r.AD_GROUPS_GAQL: [A.ad_group("100", "10", "Implants")],
+            r.KEYWORDS_GAQL: [A.keyword(qs=7)], r.KEYWORD_METRICS_GAQL: [A.keyword_metrics(impressions=50)], r.ADS_GAQL: [A.ad(aid="1"), A.ad(aid="2")],
+            r.TERMS_GAQL: [A.term("implants near me", 12.0, 4, 1.0)]}
+
+
+def test_the_whole_account_is_read_with_every_query_once_and_joined():
+    search = A.fake_search(a_full_answer())
+    out = r.read_account("1112223334", search_fn=search)
+    assert sorted(search.asked) == sorted(q for _k, _w, q in r.READS) and len(search.asked) == len(r.READS) == 17
+    assert out["warnings"] == [] and all(out["ok"].values()) and set(out["ok"]) == {k for k, _w, _q in r.READS}
+    assert out["customer"]["name"] == "Acme Dental" and out["conversions"][0]["conversions"] == 20.0 and out["conversions"][0]["mine"] is True
+    assert out["links"] == {"counts": {"MERCHANT_CENTER": 1}, "merchantCenter": ["77"]} and out["lists"]["withMembers"] == 1
+    c = out["campaigns"]["campaigns"][0]
+    assert c["name"] == "Search | Implants" and c["negatives"] == 1 and c["targeting"]["locations"] == 1
+    assert out["network"]["total"] == 100.0
+    assert out["structure"]["searchAdGroups"] == 1 and out["structure"]["oneAd"]["count"] == 0 and out["structure"]["noKeywords"]["count"] == 0
+    assert out["keywords"]["enabled"] == 1 and "_perGroup" not in out["keywords"] and out["keywords"]["lowQualityExamples"] == []
+    assert out["ads"]["rsa"] == 2 and "_perGroup" not in out["ads"]
+    assert out["terms"]["cost"] == 12.0
+    assert out["keywords"]["lowQualityExamples"] == [] and out["keywords"]["qs"]["scored"] == 1
+
+
+def test_the_names_of_campaigns_and_ad_groups_reach_the_examples():
+    ans = a_full_answer()
+    ans[r.KEYWORDS_GAQL] = [A.keyword(qs=2, text="low one")]
+    ans[r.KEYWORD_METRICS_GAQL] = [A.keyword_metrics(impressions=900)]
+    ans[r.TERMS_GAQL] = [A.term("free implants", 30.0, 9, 0)]
+    out = r.read_account("1112223334", search_fn=A.fake_search(ans))
+    assert out["keywords"]["lowQualityExamples"][0]["campaign"] == "Search | Implants" and out["keywords"]["lowQualityExamples"][0]["adGroup"] == "Implants"
+    assert out["terms"]["examples"][0]["campaign"] == "Search | Implants"
+
+
+def test_an_unreadable_account_record_is_an_error_not_a_partial_read():
+    import pytest
+    from tracker import paid_gads_segments as gads
+    with pytest.raises(gads.GadsError):
+        r.read_account("1112223334", search_fn=A.fake_search(a_full_answer(), fail={r.CUSTOMER_GAQL}))
+
+
+def test_every_other_part_failing_alone_is_a_warning_and_leaves_what_depends_on_it_unknown():
+    for key, what, gaql in r.READS[1:]:
+        out = r.read_account("1112223334", search_fn=A.fake_search(a_full_answer(), fail={gaql}))
+        assert out["ok"][key] is False and sum(1 for v in out["ok"].values() if not v) == 1, key
+        assert len(out["warnings"]) == 1 and out["warnings"][0].startswith(what[0].upper() + what[1:]) and "could not be read" in out["warnings"][0], key
+        assert out["customer"]["name"] == "Acme Dental"
+
+
+def test_what_each_failed_part_takes_down():
+    def read(key):
+        gaql = next(q for k, _w, q in r.READS if k == key)
+        return r.read_account("1112223334", search_fn=A.fake_search(a_full_answer(), fail={gaql}))
+    assert read("conversionActions")["conversions"] is None
+    assert read("conversionVolume")["conversions"][0]["conversions"] is None            # the actions are still there, their volume is not
+    assert read("links")["links"] is None and read("merchant")["links"]["merchantCenter"] is None
+    assert read("lists")["lists"] is None
+    c = read("campaigns")
+    assert c["campaigns"] is None and c["structure"]["searchAdGroups"] == 1             # ad groups still read, without campaign names
+    assert read("campaignMetrics")["campaigns"]["campaigns"][0]["metrics"] is None and read("campaignMetrics")["campaigns"]["totals"] is None
+    assert read("criteria")["campaigns"]["campaigns"][0]["targeting"] is None
+    assert read("campaignNegatives")["campaigns"]["campaigns"][0]["negatives"] is None
+    assert read("campaignLists")["campaigns"]["campaigns"][0]["lists"] is None
+    assert read("network")["network"] is None
+    ag = read("adGroups")
+    assert ag["structure"] is None and ag["keywords"]["enabled"] == 1 and ag["ads"]["rsa"] == 2
+    assert read("keywords")["keywords"] is None and "noKeywords" not in read("keywords")["structure"]
+    assert read("keywordMetrics")["keywords"]["wasted"] is None
+    assert read("ads")["ads"] is None and "noLiveAd" not in read("ads")["structure"]
+    assert read("terms")["terms"] is None
+
+
+def test_an_account_with_nothing_in_it_reads_as_empty_not_as_an_error():
+    out = r.read_account("1112223334", search_fn=A.fake_search({r.CUSTOMER_GAQL: A.customer()}))
+    assert out["warnings"] == [] and out["conversions"] == [] and out["campaigns"]["counts"]["enabled"] == 0
+    assert out["keywords"]["total"] == 0 and out["ads"]["total"] == 0 and out["terms"]["rows"] == 0 and out["structure"]["adGroups"] == 0
+
+
+def test_two_workers_or_one_give_the_same_read():
+    a = r.read_account("1112223334", search_fn=A.fake_search(a_full_answer()), workers=1)
+    b = r.read_account("1112223334", search_fn=A.fake_search(a_full_answer()), workers=8)
+    assert a == b

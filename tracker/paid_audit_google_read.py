@@ -538,3 +538,72 @@ def parse_terms(rows, campaign_names=None):
     examples.sort(key=lambda e: (-e["cost"], e["term"]))
     return {"rows": len(rows), "capped": len(rows) >= TERMS_LIMIT, "cost": round(total, 2), "wastedCost": round(wasted, 2),
             "wastedTerms": n_wasted, "examples": examples[:EXAMPLES]}
+
+
+# ── Reading the whole account ───────────────────────────────────────────────
+
+WORKERS = 4
+READS = [                                      # (key, what it is, query), in the order they are reported when one fails
+    ("customer", "the account settings", CUSTOMER_GAQL),
+    ("conversionActions", "the conversion actions", CONVERSIONS_GAQL),
+    ("conversionVolume", "the conversions of the last 30 days", CONVERSION_VOLUME_GAQL),
+    ("links", "the product links", LINKS_GAQL),
+    ("merchant", "the Merchant Center links", MERCHANT_GAQL),
+    ("lists", "the audience lists", LISTS_GAQL),
+    ("campaigns", "the campaigns", CAMPAIGNS_GAQL),
+    ("campaignMetrics", "the campaigns' numbers for the last 30 days", CAMPAIGN_METRICS_GAQL),
+    ("criteria", "the campaigns' locations and languages", CAMPAIGN_CRITERIA_GAQL),
+    ("campaignNegatives", "the campaigns' negative keywords", CAMPAIGN_NEGATIVES_GAQL),
+    ("campaignLists", "the negative keyword lists in use", CAMPAIGN_LISTS_GAQL),
+    ("network", "where Search spend ran", NETWORK_GAQL),
+    ("adGroups", "the ad groups", AD_GROUPS_GAQL),
+    ("keywords", "the keywords", KEYWORDS_GAQL),
+    ("keywordMetrics", "the keywords' numbers for the last 30 days", KEYWORD_METRICS_GAQL),
+    ("ads", "the ads", ADS_GAQL),
+    ("terms", "the search terms", TERMS_GAQL),
+]
+
+
+def read_account(account_id, *, search_fn=None, workers=WORKERS):
+    """The compact read of one account: {customer, conversions, links, lists, campaigns, network, structure, keywords, ads, terms, ok,
+    warnings}. The account record is the point, so a failure there is raised; every other part is read on its own, a failure is a warning,
+    its `ok` flag is False and what depends on it is None (the checks then say unknown instead of guessing). Read only."""
+    from concurrent.futures import ThreadPoolExecutor
+    search = search_fn or gads.search
+    rows, errors = {}, {}
+
+    def fetch(read):
+        key, _what, gaql = read
+        try:
+            return key, search(account_id, gaql), None
+        except gads.GadsError as e:
+            return key, None, e
+    with ThreadPoolExecutor(max_workers=max(1, workers)) as ex:
+        for key, got, err in ex.map(fetch, READS):
+            if err is not None:
+                errors[key] = err
+            else:
+                rows[key] = got
+    if "customer" in errors:
+        raise errors["customer"]
+    what = {key: w for key, w, _q in READS}
+    warnings = ["%s could not be read (%s)." % (what[k][0].upper() + what[k][1:], e) for k, e in errors.items()]
+    ok = {key: key in rows for key, _w, _q in READS}
+
+    def got(key):
+        return rows.get(key)
+    customer = parse_customer(rows["customer"])
+    actions = None if got("conversionActions") is None else parse_conversions(rows["conversionActions"], got("conversionVolume"), own_id=account_id)
+    links = None if got("links") is None else parse_links(rows["links"], got("merchant"))
+    lists = None if got("lists") is None else parse_lists(rows["lists"])
+    camp = None if got("campaigns") is None else parse_campaigns(rows["campaigns"], got("campaignMetrics"), got("criteria"), got("campaignNegatives"), got("campaignLists"))
+    names = {c["id"]: c["name"] for c in camp["campaigns"]} if camp else {}
+    network = None if got("network") is None else parse_network(rows["network"])
+    ag = parse_ad_groups(rows["adGroups"]) if got("adGroups") is not None else None
+    groups = ag["groups"] if ag else {}
+    kw = None if got("keywords") is None else parse_keywords(rows["keywords"], got("keywordMetrics"), groups, names)
+    ads = None if got("ads") is None else parse_ads(rows["ads"], groups, names)
+    structure = None if ag is None else join_structure(groups, kw, ads, names)
+    terms = None if got("terms") is None else parse_terms(rows["terms"], names)
+    return {"customer": customer, "conversions": actions, "links": links, "lists": lists, "campaigns": camp, "network": network,
+            "structure": structure, "keywords": compact(kw), "ads": compact(ads), "terms": terms, "ok": ok, "warnings": warnings}
