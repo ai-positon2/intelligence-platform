@@ -1270,3 +1270,10 @@ details.sq-fallback .sq-drops{margin-top:10px}
   --thumb:linear-gradient(135deg,#00170f 0%,#081a2a 100%);
   --icon-glow:rgba(52,211,153,.5);--card-border:rgba(52,211,153,.35);
   --card-glow:0 0 40px rgba(52,211,153,.10);--arrow-color:#a7f3d0}
+
+/* ═══ Business Research card ═══ */
+.c-bizres{--card-accent:#fbbf24;
+  --band:linear-gradient(90deg,#fbbf24,#fb923c,#f472b6);
+  --thumb:linear-gradient(135deg,#1a1100 0%,#220a14 100%);
+  --icon-glow:rgba(251,191,36,.5);--card-border:rgba(251,191,36,.35);
+  --card-glow:0 0 40px rgba(251,191,36,.10);--arrow-color:#fde68a}

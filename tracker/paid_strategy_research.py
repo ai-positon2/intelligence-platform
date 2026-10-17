@@ -30,7 +30,7 @@ from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import TimeoutError as FuturesTimeout
 from urllib.parse import urljoin, urlsplit, urlunsplit
 
-from . import paid_strategy as ps
+from . import paid_site_tech as site_tech, paid_strategy as ps
 
 log = logging.getLogger(__name__)
 
@@ -170,7 +170,7 @@ def read_page(html, final_url, text_limit):
             "ctas": ctas[:8], "offers": offers, "phones": (tel + sorted(set(PHONE.findall(text))))[:4],
             "forms": [{"fields": f["fields"][:8]} for f in p.forms[:3]],
             "rating": {"value": float(rating.group(1)), "count": int(count.group(1))} if rating and count else None,
-            "links": [(h, " ".join(t.split())[:60]) for h, t in p.links[:300]], "scripts": len(p.scripts)}
+            "links": [(h, " ".join(t.split())[:60]) for h, t in p.links[:300]], "scripts": len(p.scripts), "tech": site_tech.detect(p, final_url)}
 
 
 def same_site(host, other):
@@ -951,15 +951,18 @@ def read_market(inputs, *, ask=None):
     if not isinstance(found, dict):
         return piece("market", "failed", "The market search came back in a form that could not be read.", took=time.monotonic() - started, usd=usd, spend=spend)
 
+    def aslist(v):
+        return v if isinstance(v, list) else ([v] if isinstance(v, str) else [])        # a reply with a string where a list belongs is one item, not its letters (or a failed card)
+
     def lines(key, n=8):
-        return [cw.strip_em_dash(_clip(x, 260)) for x in (found.get(key) or []) if isinstance(x, str) and x.strip()][:n]
+        return [cw.strip_em_dash(_clip(x, 260)) for x in aslist(found.get(key)) if isinstance(x, str) and x.strip()][:n]
 
     policy = []
-    for r in found.get("ad_policy") or []:
+    for r in aslist(found.get("ad_policy")):
         if isinstance(r, dict) and r.get("rule"):
             policy.append({"rule": cw.strip_em_dash(_clip(r.get("rule"), 280)), "appliesTo": cw.strip_em_dash(_clip(r.get("applies_to"), 120))})
     sources = []
-    for s in (found.get("sources") or []) + list((res or {}).get("result_urls") or []):
+    for s in aslist(found.get("sources")) + list((res or {}).get("result_urls") or []):
         try:
             u = ps.clean_url(s, "source")
         except ps.BadPayload:

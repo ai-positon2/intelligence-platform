@@ -51,7 +51,7 @@ CREATE INDEX IF NOT EXISTS pm_strategy_runs_by ON pm_strategy_runs (email, at DE
 
 COLS = ("id, created_by, created_at, updated_at, name, account_id, account_name, inputs, status, progress, research, plan, cost, note, error, started, archived, "
         "EXTRACT(EPOCH FROM (now() - updated_at))")
-LIGHT = "id, status, progress, error, note, updated_at, started, EXTRACT(EPOCH FROM (now() - updated_at))"
+LIGHT = "id, status, progress, error, note, updated_at, started, EXTRACT(EPOCH FROM (now() - updated_at)), COALESCE(inputs->>'kind', 'strategy')"
 LISTED = ("id, created_by, created_at, updated_at, name, account_id, account_name, inputs, status, '{}'::jsonb, '{}'::jsonb, '{}'::jsonb, cost, note, error, started, archived, "
           "EXTRACT(EPOCH FROM (now() - updated_at)), COALESCE(jsonb_array_length(CASE WHEN jsonb_typeof(plan->'campaigns') = 'array' THEN plan->'campaigns' END), 0)")
 _READY = False
@@ -117,13 +117,13 @@ def _t(text):
     return ps.scrub(str(text or ""))
 
 
-def create(*, by, inputs, account_name=""):
-    """A new build, queued. Returns the record."""
+def create(*, by, inputs, account_name="", steps=None):
+    """A new build, queued. Returns the record. `steps` are the build's steps when it is not a Strategy & Campaign Book (Business Research has its own)."""
     sid = uuid.uuid4().hex
     with _tx() as cur:
         cur.execute("INSERT INTO pm_strategies (id, created_by, name, account_id, account_name, inputs, progress) VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING " + COLS,
                     (sid, by, inputs["name"], inputs.get("account") or "", account_name or "", _j(inputs),
-                     _j({"steps": ps.steps_for(inputs), "phase": "Queued"})))
+                     _j({"steps": steps if steps is not None else ps.steps_for(inputs), "phase": "Queued"})))
         return _rec(cur.fetchone())
 
 
@@ -135,18 +135,19 @@ def get(sid):
 
 
 def get_light(sid):
-    """Just the status and progress, for the page's polling (the research and the plan can be large)."""
+    """Just the status and progress (and which agent the build belongs to), for the page's polling (the research and the plan can be large)."""
     with _tx() as cur:
         cur.execute("SELECT " + LIGHT + " FROM pm_strategies WHERE id = %s AND NOT archived", (sid,))
         r = cur.fetchone()
     return {"id": r[0], "status": r[1], "progress": r[2] or {}, "error": r[3] or "", "note": r[4] or "", "updatedAt": _iso(r[5]), "started": _iso(r[6]),
-            "stale": _stale(r[1], r[7])} if r else None
+            "stale": _stale(r[1], r[7]), "kind": r[8]} if r else None
 
 
-def list_recent(limit=100):
-    """The saved builds for the list: everything but the research and the plan (tens of megabytes for a hundred builds), with the campaigns counted."""
+def list_recent(limit=100, kind="strategy"):
+    """The saved builds of one agent for the list ("strategy" is Strategy & Campaign Book, a build with no kind; "business" is Business Research): everything but
+    the research and the plan (tens of megabytes for a hundred builds), with the campaigns counted."""
     with _tx() as cur:
-        cur.execute("SELECT " + LISTED + " FROM pm_strategies WHERE NOT archived ORDER BY created_at DESC LIMIT %s", (limit,))
+        cur.execute("SELECT " + LISTED + " FROM pm_strategies WHERE NOT archived AND COALESCE(inputs->>'kind', 'strategy') = %s ORDER BY created_at DESC LIMIT %s", (kind, limit))
         return [_rec(r) for r in cur.fetchall()]
 
 

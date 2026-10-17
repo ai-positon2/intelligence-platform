@@ -166,7 +166,7 @@ def test_the_light_status_leaves_out_the_plan_and_an_archived_build_disappears(p
     rec = new()
     store.begin(rec["id"])
     light = store.get_light(rec["id"])
-    assert set(light) == {"id", "status", "progress", "error", "note", "updatedAt", "started", "stale"} and light["status"] == "running" and light["started"] and light["stale"] is False
+    assert set(light) == {"id", "status", "progress", "error", "note", "updatedAt", "started", "stale", "kind"} and light["status"] == "running" and light["started"] and light["stale"] is False
     store.archive(rec["id"])
     assert store.get_light(rec["id"]) is None and rec["id"] not in [r["id"] for r in store.list_recent()] and store.get(rec["id"])["archived"] is True
     assert store.begin(rec["id"]) is False
@@ -221,6 +221,20 @@ def test_the_list_does_not_carry_the_research_or_the_plan_only_the_campaigns_cou
     assert ps.brief(row)["campaigns"] == 3 and ps.brief(row)["cost"] == 1.5
     bare = next(r for r in store.list_recent() if r["id"] != rec["id"])
     assert bare["campaign_count"] == 0
+
+
+def test_a_build_belongs_to_one_agent_and_each_agents_list_holds_only_its_own(pg):
+    """Business Research saves its builds in the same table, with its own steps, and says so in its inputs (kind 'business')."""
+    from tests import business_fakes as B
+    from tracker import paid_business as pb
+    mine = store.create(by="ana@position2.com", inputs=B.clean(name="Business Listed %d" % time.time_ns()), account_name="", steps=pb.steps_for(B.clean()))
+    theirs = new(name="Strategy Listed %d" % time.time_ns())
+    assert [s["key"] for s in store.get(mine["id"])["progress"]["steps"]][-4:] == ["a:core", "a:audience", "a:implications", "f:finish"]
+    assert "a:strategy" in [s["key"] for s in store.get(theirs["id"])["progress"]["steps"]]                    # no steps given: Strategy & Campaign Book's own
+    business = {r["id"] for r in store.list_recent(kind="business")}
+    strategy = {r["id"] for r in store.list_recent()}
+    assert mine["id"] in business and theirs["id"] not in business and theirs["id"] in strategy and mine["id"] not in strategy
+    assert store.get_light(mine["id"])["kind"] == "business" and store.get_light(theirs["id"])["kind"] == "strategy"
 
 
 def test_runs_are_counted_per_person_in_the_database_for_the_last_day(pg):

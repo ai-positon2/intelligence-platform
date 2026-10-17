@@ -157,3 +157,7 @@
 .cb-rn em,.cb-rs em{font-style:normal;font-size:12px;color:var(--pm-muted)}
 .cb-rs{display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
 @media (max-width:640px){.cb-open{grid-template-columns:auto minmax(0,1fr)}.cb-rs{grid-column:1 / -1;justify-content:flex-start}.cb-menu{right:auto;left:0}}
+
+/* links inside the report: the browser's default blue is unreadable on the dark panels */
+.cb-sec a,.cb-p a,.cb-fine a,.cb-ul a,.cb-tw a{color:var(--pm-a2);text-decoration:underline;text-decoration-color:color-mix(in srgb,var(--pm-a2) 45%,transparent);text-underline-offset:2px;overflow-wrap:anywhere}
+.cb-sec a:hover,.cb-p a:hover,.cb-fine a:hover,.cb-ul a:hover,.cb-tw a:hover{text-decoration-color:var(--pm-a2)}

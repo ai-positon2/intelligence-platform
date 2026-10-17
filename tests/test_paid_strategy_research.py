@@ -582,3 +582,10 @@ def test_a_source_that_is_not_an_address_is_left_out_of_the_market_findings():
     text = json.dumps({"demand": ["Peaks in January"], "decision_factors": [], "trends": [], "ad_policy": [], "cost_signals": [], "sources": ["not an address", "https://ok.example/a", "https://ok.example/a", "javascript:x"]})
     pc = rs.read_market(inputs(), ask=lambda *a, **k: {"text": text, "result_urls": ["ftp://bad.example/x", "https://more.example/y"]})
     assert pc["data"]["sources"] == ["https://ok.example/a", "https://more.example/y"]
+
+
+def test_a_market_reply_with_a_string_where_a_list_belongs_is_one_item_not_a_failed_card():
+    import json
+    body = {"demand": "Implant searches peak in January", "decision_factors": ["Price"], "trends": None, "ad_policy": {"rule": "x"}, "cost_signals": [], "sources": "https://example.com/report"}
+    pc = rs.read_market(F.clean(), ask=lambda system, user, **kw: {"text": json.dumps(body), "usage": {}, "search_count": 1})
+    assert pc["state"] == "ok" and pc["data"]["demand"] == ["Implant searches peak in January"] and pc["data"]["sources"] == ["https://example.com/report"] and pc["data"]["adPolicy"] == []

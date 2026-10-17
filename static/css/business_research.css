@@ -1,0 +1,12 @@
+/* ═══ Business Research: the picture of a client's business before any audit or strategy ═══
+   The layout is Strategy & Campaign Book's (css/campaign_book.css: the cb-* classes); this file gives it its own accent and the few parts only it has. */
+.pm.pm-br{--pm-a:#fbbf24;--pm-a2:#fb923c}
+[data-theme="light"] .pm.pm-br{--pm-a:#b45309;--pm-a2:#c2410c}
+.br-qgroup{margin:0 0 16px}
+.br-qgroup h4{margin:0 0 6px;font:700 14px 'Space Grotesk',sans-serif;color:var(--pm-ink)}
+.br-tools{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px;margin:0 0 12px}
+.br-tool{padding:10px 12px;border-radius:12px;border:1px solid var(--pm-line);background:var(--pm-panel);display:flex;flex-direction:column;gap:2px;min-width:0}
+.br-tool b{font-size:13px;color:var(--pm-ink);overflow-wrap:anywhere}
+.br-tool span{font-size:11.5px;color:var(--pm-muted);overflow-wrap:anywhere}
+.br-quote{margin:4px 0 0;padding-left:10px;border-left:2px solid var(--pm-line2);font-size:12.5px;color:var(--pm-muted)}
+.br-stars{font:700 15px 'Space Grotesk',sans-serif;color:var(--pm-ink)}

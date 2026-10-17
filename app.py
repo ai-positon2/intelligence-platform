@@ -4254,6 +4254,11 @@ def seo_aeo_legacy_redirect(rest=""):
 #                          campaign, its campaign book in the QA Agent's layout,
 #                          downloadable as Excel, CSV and PDF
 #                          (tracker/paid_strategy.py and paid_strategy_*.py)
+#   Business Research      a clear picture of a client before any audit or
+#                          strategy: what it sells, what sets it apart, who buys
+#                          and why, what customers say, what the site measures
+#                          and what to ask the client, as Excel, CSV and PDF
+#                          (tracker/paid_business.py and paid_business_*.py)
 _PM_PREFIX = "/p2/paid-marketing"
 
 
@@ -5300,11 +5305,12 @@ def _strat_spawn(fn):
     threading.Thread(target=fn, daemon=True, name="strategy-build").start()
 
 
-def _strat_rec_or_404(store, sid):
+def _strat_rec_or_404(store, sid, kind="strategy"):
+    """The saved build, or a 404. A build belongs to one agent (its inputs say which: Business Research's say "business"): the other agent's ids are not found here."""
     if not _STRAT_ID.fullmatch(sid or ""):
         abort(404)
     rec = store.get(sid)
-    if not rec or rec["archived"]:
+    if not rec or rec["archived"] or (rec.get("inputs") or {}).get("kind", "strategy") != kind:
         abort(404)
     return rec
 
@@ -5339,8 +5345,10 @@ def _strat_deps(rec, account):
 
 
 def _strat_begin(store, rec, resume=False):
-    """Start (or resume) the build unless one is already running. Returns (started, why_not)."""
-    from tracker import paid_strategy as ps, paid_strategy_job as job
+    """Start (or resume) the build unless one is already running. Returns (started, why_not). The agent that runs it is the one the build belongs to."""
+    from tracker import paid_business_job, paid_strategy as ps, paid_strategy_job as job
+    if (rec.get("inputs") or {}).get("kind") == "business":
+        job = paid_business_job                                         # noqa: F811 (same run_build call, Business Research's own build)
     email = _pm_user_email()
     used = store.runs_today(email)                          # counted in the database, so every server counts the same builds
     if used >= ps.BUILDS_PER_DAY:
@@ -5422,7 +5430,7 @@ def paid_strategy_status(sid):
         light = store.get_light(sid)
     except store.StoreUnavailable as e:
         return _pm_store_error(e)
-    if not light:
+    if not light or light.get("kind", "strategy") != "strategy":
         abort(404)
     return jsonify(light)
 
@@ -5509,6 +5517,167 @@ def paid_strategy_download(sid):
     resp = make_response(body)
     resp.headers["Content-Type"] = mime
     resp.headers["Content-Disposition"] = 'attachment; filename="%s"' % name
+    resp.headers["Cache-Control"] = "private, no-store"
+    return resp
+
+
+# Business Research ------------------------------------------------------------
+# The first step of any engagement: a clear picture of the client's business before an audit or a strategy. Give it a client (a website, a brief,
+# optionally a Google Ads account) and it reads the site (and what the site is set up to measure), what customers and the press say, what the brand
+# posts on social media, what the account has paid for, a few competitors and the market's rules, then writes the business (offers, what sets it apart and
+# what proves it), who buys and how they decide, what it means for paid media and what to ask the client. It shares its run, its table of saved builds and
+# its research with Strategy & Campaign Book (above): tracker/paid_business.py (inputs), paid_business_research.py (reputation and site tracking),
+# paid_business_ai.py (the writing), paid_business_check.py (what is kept), paid_business_export.py (Excel, CSV, PDF) and paid_business_job.py (the run).
+# It only recommends: nothing is changed in Google Ads.
+
+_BIZ_FILES = {"xlsx": ("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", ".xlsx"), "pdf": ("application/pdf", ".pdf"),
+              "zip": ("application/zip", "-all-tables.zip"), "csv": ("text/csv; charset=utf-8", "-questions-for-the-client.csv")}
+
+
+@app.route("/p2/paid-marketing/business-research")
+@position2_required
+def paid_business_research_page():
+    return render_template("business_research.html", user=_get_user())
+
+
+@app.route("/p2/paid-marketing/api/business/options")
+@position2_required
+def paid_business_options():
+    from tracker import paid_business as pb, paid_strategy as ps
+    return jsonify(cards=pb.CARDS, goals=ps.GOALS, buildsPerDay=pb.BUILDS_PER_DAY, modelReady=bool(os.environ.get("ANTHROPIC_API_KEY")))
+
+
+@app.route("/p2/paid-marketing/api/business/list")
+@position2_required
+def paid_business_list():
+    from tracker import paid_business as pb, paid_strategy_store as store
+    try:
+        return jsonify(builds=[pb.brief(r) for r in store.list_recent(kind=pb.KIND)])
+    except store.StoreUnavailable as e:
+        return _pm_store_error(e)
+
+
+@app.route("/p2/paid-marketing/api/business/start", methods=["POST"])
+@position2_required
+def paid_business_start():
+    """POST the client's details and the research cards that are on: save the build and start it."""
+    from tracker import paid_business as pb, paid_strategy as ps, paid_strategy_store as store
+    try:
+        inputs = pb.clean_inputs(request.get_json(silent=True))
+    except ps.BadPayload as e:
+        return jsonify(error=str(e)), 400
+    account = _strat_account(inputs["account"])
+    if inputs["account"] and not account:
+        return jsonify(error="That Google Ads account is not one this platform can read."), 400
+    if account:
+        inputs["currency"] = account.get("currency") or inputs["currency"]
+    try:
+        rec = store.create(by=_pm_user_email(), inputs=inputs, account_name=(account or {}).get("name") or "", steps=pb.steps_for(inputs))
+        started, why = _strat_begin(store, rec)
+        if why:
+            store.archive(rec["id"])
+            return jsonify(error=why, kind="cap"), 429
+        return jsonify(id=rec["id"], started=started), 201
+    except store.StoreUnavailable as e:
+        return _pm_store_error(e)
+
+
+@app.route("/p2/paid-marketing/api/business/<sid>")
+@position2_required
+def paid_business_get(sid):
+    from tracker import paid_business as pb, paid_strategy as ps, paid_strategy_store as store
+    try:
+        return jsonify(ps.public(_strat_rec_or_404(store, sid, pb.KIND)))
+    except store.StoreUnavailable as e:
+        return _pm_store_error(e)
+
+
+@app.route("/p2/paid-marketing/api/business/<sid>/status")
+@position2_required
+def paid_business_status(sid):
+    from tracker import paid_business as pb, paid_strategy_store as store
+    if not _STRAT_ID.fullmatch(sid or ""):
+        abort(404)
+    try:
+        light = store.get_light(sid)
+    except store.StoreUnavailable as e:
+        return _pm_store_error(e)
+    if not light or light.get("kind") != pb.KIND:
+        abort(404)
+    return jsonify(light)
+
+
+@app.route("/p2/paid-marketing/api/business/<sid>/rebuild", methods=["POST"])
+@position2_required
+def paid_business_rebuild(sid):
+    """Build again. {resume: true} keeps what the last build finished and redoes only the rest; otherwise it starts over."""
+    import time
+    from tracker import paid_business as pb, paid_strategy_store as store
+    try:
+        rec = _strat_rec_or_404(store, sid, pb.KIND)
+        if rec["created_by"] != _pm_user_email() and not _pm_is_admin():
+            return jsonify(error="Only whoever started this build, or an admin, can build it again. Open the form with these details to start your own."), 403
+        wait = _STRAT_RUN_GAP_S - (time.time() - _STRAT_LAST.get(sid, 0))
+        if wait > 0:
+            return jsonify(error="That was started a moment ago. Try again in %d seconds." % (wait + 1), kind="cooldown", retryIn=int(wait) + 1), 429
+        started, why = _strat_begin(store, rec, resume=bool((request.get_json(silent=True) or {}).get("resume")))
+        if why:
+            return jsonify(error=why, kind="cap"), 429
+        if not started:
+            return jsonify(error="This build is already running."), 409
+        _STRAT_LAST[sid] = time.time()
+        return jsonify(id=sid, started=True)
+    except store.StoreUnavailable as e:
+        return _pm_store_error(e)
+
+
+@app.route("/p2/paid-marketing/api/business/<sid>", methods=["DELETE"])
+@position2_required
+def paid_business_delete(sid):
+    from tracker import paid_business as pb, paid_strategy_store as store
+    try:
+        rec = _strat_rec_or_404(store, sid, pb.KIND)
+        if rec["created_by"] != _pm_user_email() and not _pm_is_admin():
+            return jsonify(error="Only whoever started this build, or an admin, can remove it."), 403
+        store.archive(sid)
+        return jsonify(ok=True)
+    except store.StoreUnavailable as e:
+        return _pm_store_error(e)
+
+
+@app.route("/p2/paid-marketing/api/business/<sid>/download")
+@position2_required
+def paid_business_download(sid):
+    """?file=xlsx|pdf|zip|csv (csv is the questions for the client)."""
+    from tracker import paid_business as pb, paid_business_export as export, paid_strategy_store as store
+    try:
+        rec = _strat_rec_or_404(store, sid, pb.KIND)
+    except store.StoreUnavailable as e:
+        return _pm_store_error(e)
+    kind = request.args.get("file") or ""
+    if kind not in _BIZ_FILES:
+        return jsonify(error="file should be one of: %s." % ", ".join(_BIZ_FILES)), 400
+    if not (rec.get("plan") or {}).get("generatedAt"):                       # the checks are written last: a report that stopped halfway has no claims sheet and must not read as "none"
+        return jsonify(error="There is nothing to download yet: the write-up has not been finished and checked."), 409
+    stem = export.file_stem(rec)
+    try:
+        if kind == "xlsx":
+            body = export.xlsx(rec)
+        elif kind == "pdf":
+            body = export.pdf(rec)
+        elif kind == "zip":
+            body = export.csv_zip(rec)
+        else:
+            body = export.csv_questions(rec)
+            if body is None:
+                return jsonify(error="There are no questions for the client."), 404
+            body = "\ufeff" + body
+    except Exception as e:                                  # noqa: BLE001 (a file that cannot be made is said in words, not a stack trace)
+        app.logger.exception("business research download failed")
+        return jsonify(error="The file could not be made (%s)." % type(e).__name__), 500
+    resp = make_response(body)
+    resp.headers["Content-Type"] = _BIZ_FILES[kind][0]
+    resp.headers["Content-Disposition"] = 'attachment; filename="%s%s"' % (stem, _BIZ_FILES[kind][1])
     resp.headers["Cache-Control"] = "private, no-store"
     return resp
 
@@ -19742,7 +19911,7 @@ lists, goals, final URL loading and more), and Claude judges the rest from that 
 book. It flags what is wrong with the fix and the evidence, and lists as needing a human anything it cannot verify, such as the
 account's automatically created asset switches, which Google Ads does not show to the API; it never guesses a pass. A person
 can confirm or overrule any check. The verdict: NOT READY if any check is flagged, INCOMPLETE if any check could not be
-verified, otherwise READY TO LAUNCH. Each QC is saved per campaign. Geo Performance (/p2/paid-marketing/geo-performance): pick a Google Ads account or MCC, a Meta ad account, or a Google and a Meta account together, a date range and a location level (country, region, metro area, city, county or postal code; Meta has country, region and DMA), and it reads the platform live to show performance by place. Each place is judged against the account's own average (an efficiency index of 100 is average, from return on ad spend when the account has conversion value, otherwise cost per conversion) as strong, above average, on par, below average, weak, leaking spend, or too little data to judge, and where there are at least 5 conversions it suggests a geo bid adjustment (80% of the gap, in 5% steps, capped at +40% and -50%), a starting point to apply gradually. Places are where people were when they saw the ad, so a place can appear that is not targeted. Charts to choose from: ranked bars, spend against results, share of spend against conversions, share of a total, and efficiency against spend, with a table and CSV export. A short summary is written by Claude from the computed insights only. Seasonality Analysis (/p2/paid-marketing/seasonality-analysis): pick a Google Ads account, a Meta ad account or one of each, and it reads two or three years of daily numbers to show the shape of the year: a seasonal index for each calendar month (100 is an average month, after taking out growth with a centred 12-month moving average, so it needs 13 months in a row of history), the same for the days of the week, what each US retail holiday did to conversions, spend and cost per conversion against the ordinary days before it, this year against last year, and for the next three months the expected demand, the expected cost per conversion and a starting budget change in 5% steps. Every figure is plain arithmetic, no model is asked to find a pattern; a promotion or an outage in a month looks like a season, so a single year of history is shown as a lead, not a rule. Call Transcript Analyzer (/p2/paid-marketing/call-transcript-analyzer): reads CallRail (the agency's two accounts, OIA and 42 North Dental, and their locations) to show every call of a range counted by CallRail itself (calls, answered, missed, first-time callers, CallRail leads) by source, campaign, keyword and location, with the locations whose missed calls stand out, and a read of a sample of the transcribed calls by plain keyword rules (not a model): what callers wanted (new patient, pain, treatment, existing appointment, insurance, records), how many people looking for care ended in an appointment, the likeliest reason for the ones that did not, CallRail's own lead score and sentiment, and the calls that look like lost opportunities with a link to open each in CallRail. These are HIPAA accounts: no caller name, number, summary or transcript is shown, stored or sent to an AI model. OIA has no recordings, so it shows counts only. Ad Strength Analysis (/p2/paid-marketing/ad-strength): pick a Google Ads account or MCC and it reads Google's ad strength rating (Poor, Average, Good, Excellent) for every live Responsive Search Ad and Performance Max asset group, with Google's own tips for each ad (for example to include more keywords in the headlines, or to add sitelinks), every headline and description with Google's rating of it, and the new ad text Google itself recommends where it has some. The ads below Good are listed worst and busiest first (last 30 days of impressions). On request for one ad, Claude suggests which headlines and descriptions to replace or add; the code holds every suggestion to Google's character limits and to facts the ad already states. Performance Max tips and per-asset ratings are not in Google's API, so for those the asset counts are held against what Google accepts. It only recommends: nothing is changed in Google Ads, and Google does not publish how it scores strength, so a change is not guaranteed to reach Good or Excellent. Audience Segment Analysis (/p2/paid-marketing/audience-segments): pick a Google Ads account or MCC and a date range and it reads Google Ads to compare the audiences the account uses (in-market, affinity, remarketing, customer match, similar and custom segments) wherever they are attached (ad groups and campaigns), each judged against the account's own average for the same campaign type (an efficiency index of 100 is average, from return on ad spend when conversion value is tracked, otherwise cost per conversion; under 5 conversions is too little data). It says whether each audience observes or targets, its current bid adjustment, and a suggested adjustment, but only where the campaign can take one: Smart Bidding, Demand Gen and Performance Max ignore audience bid adjustments, so there the advice is an ad group, a budget or an exclusion. It also compares the kinds with each other, lists the account's audience lists with their sizes (a list under about 1,000 members cannot serve on Search) and which are unused, and lists the excluded audiences. Performance Max audience signals report no results in Google's API, so they are not in it. Asset Coverage Audit (/p2/paid-marketing/asset-coverage): pick a Google Ads account or MCC and it reads every asset the live campaigns carry, from the ad group, the campaign and the account, and holds each Search and Performance Max campaign against the sitelinks, callouts, structured snippets, call, images, business name, logo and location assets it should have, each Performance Max asset group against the headlines, descriptions, images, logo, business name and video it needs, and each Display and Demand Gen ad against its images, logos, videos, headlines, descriptions and business name. It lists what to add, how many, worst gap and busiest campaign first (last 30 days of impressions), plus assets that are disapproved, paused, past their end date or never shown, coverage bars per kind of asset, and the account-wide assets. Everything on it opens onto the assets themselves: a card or a coverage bar opens every asset behind it (the picture of an image, the text and lines of a sitelink, a snippet's values, a promotion's terms, a video's thumbnail, with whether each is live, disapproved, paused or past its end date, which campaigns use it and its impressions and clicks over the last 30 days), and each kind of asset in an opened campaign, Performance Max asset group or Display and Demand Gen ad opens onto the assets it holds. Minimums are what Google needs for the format to show; targets are Position2's rule of thumb and say so. Shopping, Video, Smart, Local Services and app campaigns are not audited (their assets are built from a feed or managed by Google). It only recommends: nothing is changed in Google Ads. Strategy & Campaign Book (/p2/paid-marketing/campaign-book): give it a client (a website, a client brief, optionally a Google Ads account), the monthly budget and the goal, choose which research to run (the client's website, the competitors' websites, Social Media Intelligence for what the brand posts on its own, the Google Ads account's history, Google Keyword Planner, the account's seasonality, and a web search for the market and its advertising rules), and it writes a full strategy and a campaign book in the background: the business and its proof, the competitors compared, objectives with a forecast worked out in code, channels and budget by campaign, bidding path, targeting, messaging, measurement, tests, a 90 day roadmap and risks, and for every campaign its ad groups, keywords, negative keywords, responsive search ad copy held to Google's character limits, sitelinks, callouts and snippets (or Performance Max asset groups with audience signals and search themes, or Demand Gen, Display and Video ad groups). Each campaign also gets its Campaign Book in the layout the QA Agent checks a launched campaign against (Field, Value, Other things to check), so the downloaded book can be added to the QA Agent unchanged. It downloads as Excel, CSV and PDF. Facts used in ads are quoted from the client's own pages, claims not found there are listed for the client to confirm, and it only recommends: nothing is changed in Google Ads.
+verified, otherwise READY TO LAUNCH. Each QC is saved per campaign. Geo Performance (/p2/paid-marketing/geo-performance): pick a Google Ads account or MCC, a Meta ad account, or a Google and a Meta account together, a date range and a location level (country, region, metro area, city, county or postal code; Meta has country, region and DMA), and it reads the platform live to show performance by place. Each place is judged against the account's own average (an efficiency index of 100 is average, from return on ad spend when the account has conversion value, otherwise cost per conversion) as strong, above average, on par, below average, weak, leaking spend, or too little data to judge, and where there are at least 5 conversions it suggests a geo bid adjustment (80% of the gap, in 5% steps, capped at +40% and -50%), a starting point to apply gradually. Places are where people were when they saw the ad, so a place can appear that is not targeted. Charts to choose from: ranked bars, spend against results, share of spend against conversions, share of a total, and efficiency against spend, with a table and CSV export. A short summary is written by Claude from the computed insights only. Seasonality Analysis (/p2/paid-marketing/seasonality-analysis): pick a Google Ads account, a Meta ad account or one of each, and it reads two or three years of daily numbers to show the shape of the year: a seasonal index for each calendar month (100 is an average month, after taking out growth with a centred 12-month moving average, so it needs 13 months in a row of history), the same for the days of the week, what each US retail holiday did to conversions, spend and cost per conversion against the ordinary days before it, this year against last year, and for the next three months the expected demand, the expected cost per conversion and a starting budget change in 5% steps. Every figure is plain arithmetic, no model is asked to find a pattern; a promotion or an outage in a month looks like a season, so a single year of history is shown as a lead, not a rule. Call Transcript Analyzer (/p2/paid-marketing/call-transcript-analyzer): reads CallRail (the agency's two accounts, OIA and 42 North Dental, and their locations) to show every call of a range counted by CallRail itself (calls, answered, missed, first-time callers, CallRail leads) by source, campaign, keyword and location, with the locations whose missed calls stand out, and a read of a sample of the transcribed calls by plain keyword rules (not a model): what callers wanted (new patient, pain, treatment, existing appointment, insurance, records), how many people looking for care ended in an appointment, the likeliest reason for the ones that did not, CallRail's own lead score and sentiment, and the calls that look like lost opportunities with a link to open each in CallRail. These are HIPAA accounts: no caller name, number, summary or transcript is shown, stored or sent to an AI model. OIA has no recordings, so it shows counts only. Ad Strength Analysis (/p2/paid-marketing/ad-strength): pick a Google Ads account or MCC and it reads Google's ad strength rating (Poor, Average, Good, Excellent) for every live Responsive Search Ad and Performance Max asset group, with Google's own tips for each ad (for example to include more keywords in the headlines, or to add sitelinks), every headline and description with Google's rating of it, and the new ad text Google itself recommends where it has some. The ads below Good are listed worst and busiest first (last 30 days of impressions). On request for one ad, Claude suggests which headlines and descriptions to replace or add; the code holds every suggestion to Google's character limits and to facts the ad already states. Performance Max tips and per-asset ratings are not in Google's API, so for those the asset counts are held against what Google accepts. It only recommends: nothing is changed in Google Ads, and Google does not publish how it scores strength, so a change is not guaranteed to reach Good or Excellent. Audience Segment Analysis (/p2/paid-marketing/audience-segments): pick a Google Ads account or MCC and a date range and it reads Google Ads to compare the audiences the account uses (in-market, affinity, remarketing, customer match, similar and custom segments) wherever they are attached (ad groups and campaigns), each judged against the account's own average for the same campaign type (an efficiency index of 100 is average, from return on ad spend when conversion value is tracked, otherwise cost per conversion; under 5 conversions is too little data). It says whether each audience observes or targets, its current bid adjustment, and a suggested adjustment, but only where the campaign can take one: Smart Bidding, Demand Gen and Performance Max ignore audience bid adjustments, so there the advice is an ad group, a budget or an exclusion. It also compares the kinds with each other, lists the account's audience lists with their sizes (a list under about 1,000 members cannot serve on Search) and which are unused, and lists the excluded audiences. Performance Max audience signals report no results in Google's API, so they are not in it. Asset Coverage Audit (/p2/paid-marketing/asset-coverage): pick a Google Ads account or MCC and it reads every asset the live campaigns carry, from the ad group, the campaign and the account, and holds each Search and Performance Max campaign against the sitelinks, callouts, structured snippets, call, images, business name, logo and location assets it should have, each Performance Max asset group against the headlines, descriptions, images, logo, business name and video it needs, and each Display and Demand Gen ad against its images, logos, videos, headlines, descriptions and business name. It lists what to add, how many, worst gap and busiest campaign first (last 30 days of impressions), plus assets that are disapproved, paused, past their end date or never shown, coverage bars per kind of asset, and the account-wide assets. Everything on it opens onto the assets themselves: a card or a coverage bar opens every asset behind it (the picture of an image, the text and lines of a sitelink, a snippet's values, a promotion's terms, a video's thumbnail, with whether each is live, disapproved, paused or past its end date, which campaigns use it and its impressions and clicks over the last 30 days), and each kind of asset in an opened campaign, Performance Max asset group or Display and Demand Gen ad opens onto the assets it holds. Minimums are what Google needs for the format to show; targets are Position2's rule of thumb and say so. Shopping, Video, Smart, Local Services and app campaigns are not audited (their assets are built from a feed or managed by Google). It only recommends: nothing is changed in Google Ads. Strategy & Campaign Book (/p2/paid-marketing/campaign-book): give it a client (a website, a client brief, optionally a Google Ads account), the monthly budget and the goal, choose which research to run (the client's website, the competitors' websites, Social Media Intelligence for what the brand posts on its own, the Google Ads account's history, Google Keyword Planner, the account's seasonality, and a web search for the market and its advertising rules), and it writes a full strategy and a campaign book in the background: the business and its proof, the competitors compared, objectives with a forecast worked out in code, channels and budget by campaign, bidding path, targeting, messaging, measurement, tests, a 90 day roadmap and risks, and for every campaign its ad groups, keywords, negative keywords, responsive search ad copy held to Google's character limits, sitelinks, callouts and snippets (or Performance Max asset groups with audience signals and search themes, or Demand Gen, Display and Video ad groups). Each campaign also gets its Campaign Book in the layout the QA Agent checks a launched campaign against (Field, Value, Other things to check), so the downloaded book can be added to the QA Agent unchanged. It downloads as Excel, CSV and PDF. Facts used in ads are quoted from the client's own pages, claims not found there are listed for the client to confirm, and it only recommends: nothing is changed in Google Ads. Business Research (/p2/paid-marketing/business-research): the first step with a new client, before any audit or strategy. Give it a client (a website, a client brief, optionally a Google Ads account), choose which research to run (the client's website, including which analytics, ad, call tracking and booking tags its pages carry; a web search for reviews, press, awards and who is behind the business; Social Media Intelligence; the Google Ads account's history; up to three competitors' websites; and a web search for the market and its advertising rules), and it writes up, in the background, the business (what it sells with a priority for paid search, what sets it apart with the quote that proves each point, the voice, the advertising rules that touch it, the facts an ad may state and what its website gets wrong), who buys and why (audiences with what they search and what worries them, the journey from search to customer, objections and answers, places and seasons), and what it means for paid media (what to advertise first and what to hold back, angles and tests to try, how the client compares with the competitors that were read, what the reviews and the brand's own posts say, what to check about tracking, the questions to put to the client grouped by area and urgency, risks and next steps). The tags a site carries are read by code from its pages, and ratings and review counts are transcribed from what the web search found (marked when no page it read confirms them), never worked out by the model; facts and points of difference are marked when their quote cannot be found word for word on a page (a point backed only by the web search says so), and claims not found on the client's pages or in what the search found are listed for the client to confirm. It downloads as Excel, CSV (the questions for the client) and PDF, and a zip of every table as CSV. It only recommends: nothing is changed in Google Ads.
 
 SEO STUDIO (/p2/seo-aeo/<tool>) and the /app agents: a suite of SEO/GEO tools (Keyword Finder, Content Brief
 Generator, Content Enhancer, SEO & GEO Audit, Agentic Readiness Audit, Competitor Analysis, and more).

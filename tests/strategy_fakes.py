@@ -82,14 +82,14 @@ class FakeStrategyStore:
         self.rows, self.lock, self.n = {}, threading.RLock(), 0
         self.failures = {}
 
-    def create(self, *, by, inputs, account_name=""):
+    def create(self, *, by, inputs, account_name="", steps=None):
         from tracker import paid_strategy as ps
         with self.lock:
             self.n += 1
             sid = "%032x" % self.n
             self.rows[sid] = {"id": sid, "created_by": by, "created_at": "2026-10-16T10:00:00+00:00", "updated_at": "2026-10-16T10:00:00+00:00", "name": inputs["name"],
                               "account_id": inputs.get("account") or "", "account_name": account_name, "inputs": copy.deepcopy(inputs), "status": "queued",
-                              "progress": {"steps": ps.steps_for(inputs), "phase": "Queued"}, "research": {}, "plan": {}, "cost": {}, "note": "", "error": "",
+                              "progress": {"steps": steps if steps is not None else ps.steps_for(inputs), "phase": "Queued"}, "research": {}, "plan": {}, "cost": {}, "note": "", "error": "",
                               "started": None, "archived": False}
             return copy.deepcopy(self.rows[sid])
 
@@ -100,11 +100,11 @@ class FakeStrategyStore:
     def get_light(self, sid):
         r = self.get(sid)
         return None if not r or r["archived"] else {"id": sid, "status": r["status"], "progress": r["progress"], "error": r["error"], "note": r["note"],
-                                                   "updatedAt": r["updated_at"], "started": r["started"]}
+                                                   "updatedAt": r["updated_at"], "started": r["started"], "kind": r["inputs"].get("kind", "strategy")}
 
-    def list_recent(self, limit=100):
+    def list_recent(self, limit=100, kind="strategy"):
         with self.lock:
-            return [copy.deepcopy(r) for r in reversed(list(self.rows.values())) if not r["archived"]][:limit]
+            return [copy.deepcopy(r) for r in reversed(list(self.rows.values())) if not r["archived"] and r["inputs"].get("kind", "strategy") == kind][:limit]
 
     def begin(self, sid, *, resume=False):
         with self.lock:

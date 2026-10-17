@@ -103,7 +103,11 @@ def _note_of(exc):
 
 
 class Build:
-    """One build's state while it runs. Not shared between builds."""
+    """One build's state while it runs. Not shared between builds. Another agent that researches and writes the same way (Business Research) subclasses
+    this: it says which steps it has (`default_steps`) and what makes one of its writing stages usable (`USABLE`, `EMPTY_ANSWER`)."""
+    USABLE = USABLE
+    EMPTY_ANSWER = EMPTY_ANSWER
+    NO_MODEL = "The AI is not available on this server (no Anthropic key is set), so a strategy cannot be written."
 
     def __init__(self, sid, rec, store, deps, resume=False):
         self.sid, self.rec, self.store, self.deps = sid, rec, store, deps
@@ -115,12 +119,15 @@ class Build:
         self.call = deps.get("call") or default_call(self.cost)
         kept = [dict(s) for s in (rec.get("progress") or {}).get("steps") or []] if resume else []
         self.steps = [dict(s, state=s["state"] if s["state"] in ("done", "skipped") else "pending", note=s["note"] if s["state"] in ("done", "skipped") else "")
-                      for s in kept] or ps.steps_for(self.inputs)
+                      for s in kept] or self.default_steps()
         self.lock = threading.Lock()
         try:
             store.set_steps(sid, self.steps, phase="Starting")
         except Exception:                                   # noqa: BLE001 (progress is for the page)
             log.exception("strategy %s: could not save the steps", sid)
+
+    def default_steps(self):
+        return ps.steps_for(self.inputs)
 
     # progress -----------------------------------------------------------------
     def step(self, key, state, note="", phase=None):
@@ -217,7 +224,7 @@ class Build:
     # writing ------------------------------------------------------------------
     def stage(self, key, plan_key, fn):
         """Run one writing stage unless it was finished before. Returns its result; a stage that raises fails the build."""
-        usable = USABLE[key]
+        usable = self.USABLE[key]
         if self.plan.get(plan_key) and usable(self.plan[plan_key]):
             self.step("a:" + key, "done", "Kept from the earlier run.")
             return self.plan[plan_key]
@@ -225,7 +232,7 @@ class Build:
         try:
             out = fn()
             if not usable(out or {}):
-                raise RuntimeError(EMPTY_ANSWER[key])
+                raise RuntimeError(self.EMPTY_ANSWER[key])
         except Exception as e:                              # noqa: BLE001 (the step must not be left turning for ever on a build that has stopped)
             self.step("a:" + key, "failed", _note_of(e))
             raise
@@ -363,16 +370,16 @@ def heartbeat(store, sid, stop, every):
             log.warning("strategy %s: heartbeat failed", sid, exc_info=True)
 
 
-def run_build(sid, *, store, deps, resume=False):
-    """Do the build and save it. Never raises: a failure is saved on the build for the page to show."""
+def run_build(sid, *, store, deps, resume=False, build_class=None):
+    """Do the build and save it. Never raises: a failure is saved on the build for the page to show. `build_class` is the agent's own Build subclass."""
     try:
         rec = store.get(sid)
         if not rec or rec.get("archived"):
             return
         deps = deps() if callable(deps) else deps                   # built here, so a failure to wire it up is saved on the build like any other
-        b = Build(sid, rec, store, deps, resume=resume)
+        b = (build_class or Build)(sid, rec, store, deps, resume=resume)
         if not deps.get("call") and not deps.get("model_ready", True):
-            store.fail(sid, "The AI is not available on this server (no Anthropic key is set), so a strategy cannot be written.")
+            store.fail(sid, b.NO_MODEL)
             return
         stop = threading.Event()
         beat = threading.Thread(target=heartbeat, args=(store, sid, stop, deps.get("heartbeat_s", ps.HEARTBEAT_S)), daemon=True, name="strategy-heartbeat")
