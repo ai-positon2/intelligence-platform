@@ -5293,6 +5293,35 @@ def paid_assets_library():
     return _paid_assets_answer(lambda pa: pa.library_for(request.args.get("account"), request.args.get("kind"), request.args.get("state") or "all", request.args.get("level")))
 
 
+# Account Audit ----------------------------------------------------------------
+# Pick a Google Ads account, a Meta ad account or one of each ("<google id>", "act_...", or "<google id>+<act_...>"; an MCC is not audited)
+# and it reads the account live and holds it against a written checklist: settings, conversion tracking, links, structure and bidding,
+# keywords and search terms, ads and landing pages for Google; the ad account, pixel and tracking, campaigns and ad sets, and ads for
+# Meta. Each check has a severity and a result (pass, warn, fail, not applicable, unknown); a part that could not be read says unknown and
+# is never passed or failed. Reading is tracker/paid_audit_google_read.py, paid_audit_meta_read.py and paid_audit_pages.py, the checklists
+# paid_audit_google_checks.py and paid_audit_meta_checks.py, the report tracker/paid_audit.py. It only reads: nothing is changed in either
+# platform. The account lists are Segment Analysis's (Google) and api/gads/accounts?platform=meta (Meta).
+
+def _paid_audit_answer(make):
+    """Runs the Account Audit's report and maps what can go wrong the same way for every route."""
+    from tracker import paid_gads as paid_gads_base, paid_gads_segments as paid_gads, paid_audit
+    try:
+        return jsonify(make(paid_audit))
+    except paid_audit.BadRequest as e:
+        return jsonify(error=str(e)), 400
+    except paid_gads_base.RefreshTooSoon as e:
+        return jsonify(error=str(e), kind="cooldown", retryIn=e.retry_in), 429
+    except paid_gads.GadsError as e:
+        return _pm_gads_error(e)
+
+
+@app.route("/p2/paid-marketing/api/audit/report")
+@position2_required
+def paid_audit_report():
+    extra = {"force": True} if str(request.args.get("refresh") or "") in ("1", "true") else {}      # the Refresh button
+    return _paid_audit_answer(lambda pa: pa.report_for(request.args.get("account"), **extra))
+
+
 # Strategy & Campaign Book -----------------------------------------------------
 # Give it a client (a website, a brief, optionally a Google Ads account) and it researches the client, its competitors, its social media,
 # the account and the market, then writes the strategy and, for each campaign, the campaign book: ad groups, keywords, negatives, ad copy
