@@ -267,6 +267,10 @@ function render(){
     st.hidden = false;
     st.innerHTML = rep.stale.map(function(x){return esc("Google Ads is not answering now, so this report is built from the copy saved " + D.ago(x.savedAt) + ".");}).join(" ");
   } else {st.hidden = true; st.innerHTML = "";}
+  var q = "account=" + enc(S.acct.id);
+  $("#dlXlsx").href = API + "/download?" + q + "&file=xlsx";
+  $("#dlPdf").href = API + "/download?" + q + "&file=pdf";
+  $("#dlZip").href = API + "/download?" + q + "&file=zip";
   paintTop(rep); paintNeeds(rep); paintExperiments(rep); paintAds(rep); paintNotes(rep);
   $("#foot").textContent = "Source: Google Ads (read only), saved for an hour. A verdict is a two-sided two-proportion z-test at 95 percent confidence, made only when a test has 7 days and enough clicks, impressions or conversions to count. " +
     "Conversions are Google's own and may be counted late. Nothing is changed in Google Ads: apply, end or pause a test there.";
