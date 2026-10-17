@@ -110,6 +110,17 @@ def _pct(v):
     return ("%.1f" % v).rstrip("0").rstrip(".") if v is not None else ""
 
 
+def _sure(c):
+    """"97.3% sure", and "over 99.9% sure" rather than a claim of certainty when the rounding reaches 100."""
+    return "over 99.9% sure" if c is not None and c >= 100 else "%s%% sure" % _pct(c)
+
+
+def _date_text(d):
+    """"Oct 14" for a date, or an ISO string."""
+    d = rd._date(d) if not isinstance(d, dt.date) else d
+    return "%s %d" % (d.strftime("%b"), d.day) if d else ""
+
+
 def _count(n, word):
     return "%d %s%s" % (n, word, "" if n == 1 else "s")
 
@@ -152,7 +163,7 @@ def _experiment_action(e, cmp_, today):
     end = rd._date(e["end"])
     start = rd._date(e["start"])
     if state == "setting up":
-        return {"kind": "wait", "text": "Not started yet%s." % (" (set to start on %s)" % e["start"] if e["start"] else "")}
+        return {"kind": "wait", "text": "Not started yet%s." % (" (set to start on %s)" % _date_text(e["start"]) if e["start"] else "")}
     if state in ("ended", "applied"):
         what = "Applied to the campaign." if state == "applied" else "Ended."
         if cmp_ and cmp_["verdict"] in ("winner", "behind", "no_difference"):
@@ -164,7 +175,7 @@ def _experiment_action(e, cmp_, today):
     soon = bool(end and not overdue and (end - today).days <= ENDS_SOON_DAYS)
     lead = ""
     if overdue:
-        lead = "Past its end date (%s) and still running. " % e["end"]
+        lead = "Past its end date (%s) and still running. " % _date_text(end)
     elif soon:
         lead = "Ends today. " if end == today else "Ends in %s. " % _count((end - today).days, "day")
     if cmp_ is None:
@@ -173,9 +184,9 @@ def _experiment_action(e, cmp_, today):
     metric = cmp_["metricLabel"]
     both = "%s%% against %s%%" % (_pct(cmp_["control"]), _pct(cmp_["trial"])) if cmp_["control"] is not None and cmp_["trial"] is not None else ""
     if v == "winner":
-        return {"kind": "decide" if overdue else "apply", "text": lead + "The trial is ahead on %s (%s, %s%% sure). Apply it to the campaign, or end the experiment and keep the original." % (metric, both, _pct(cmp_["confidence"]))}
+        return {"kind": "decide" if overdue else "apply", "text": lead + "The trial is ahead on %s (%s, %s). Apply it to the campaign, or end the experiment and keep the original." % (metric, both, _sure(cmp_["confidence"]))}
     if v == "behind":
-        return {"kind": "decide" if overdue else "end", "text": lead + "The trial is behind on %s (%s, %s%% sure). End it: waiting will not turn a result this clear." % (metric, both, _pct(cmp_["confidence"]))}
+        return {"kind": "decide" if overdue else "end", "text": lead + "The trial is behind on %s (%s, %s). End it: waiting will not turn a result this clear." % (metric, both, _sure(cmp_["confidence"]))}
     if v == "no_difference":
         long_ = start is not None and (today - start).days >= LONG_RUN_DAYS
         gap = " It could only have told apart gaps of %s%% or more." % _pct(cmp_["detectable"]) if cmp_.get("detectable") else ""

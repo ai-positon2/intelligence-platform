@@ -105,7 +105,7 @@ def test_an_experiment_past_its_end_date_needs_a_decision_whatever_it_found():
     for kw, want in ((WIN, "ahead"), (LOSE, "behind"), (FLAT, "No difference"), (dict(EARLY, **short), "Too early")):
         r = build(end="2026-10-10", **kw)
         assert r["overdue"] and r["action"]["kind"] == "decide", want
-        assert "Past its end date (2026-10-10) and still running." in r["action"]["text"] and want in r["action"]["text"]
+        assert "Past its end date (Oct 10) and still running." in r["action"]["text"] and want in r["action"]["text"]
     assert build(end="2026-10-10", start="2026-10-08", window=("2026-10-08", "2026-10-17"), **EARLY)["action"]["text"].endswith("End it or extend its dates.")
 
 
@@ -137,7 +137,7 @@ def test_an_applied_experiment_says_it_was_applied():
 
 def test_an_experiment_being_set_up_says_when_it_starts():
     r = build(state="setting up", start="2026-11-01", end="2026-11-30", window=None, measured=False)
-    assert r["action"] == {"kind": "wait", "text": "Not started yet (set to start on 2026-11-01)."} and r["verdict"] == "not_measured"
+    assert r["action"] == {"kind": "wait", "text": "Not started yet (set to start on Nov 1)."} and r["verdict"] == "not_measured"
     assert build(state="setting up", start=None, end=None, window=None, measured=False)["action"]["text"] == "Not started yet."
 
 
@@ -149,7 +149,7 @@ def test_an_experiment_whose_arms_are_not_reported_is_sent_to_the_screen():
     r = build(measured=False, control=None, trial=None, typ="AD_VARIATION")
     assert r["verdict"] == "not_measured" and r["comparison"] is None and r["action"]["kind"] == "manual" and "Google Ads screen" in r["action"]["text"]
     r2 = build(measured=False, control=None, trial=None, end="2026-10-10")
-    assert r2["action"]["text"].startswith("Past its end date (2026-10-10) and still running. Google does not report")
+    assert r2["action"]["text"].startswith("Past its end date (Oct 10) and still running. Google does not report")
 
 
 def test_an_arm_that_got_the_wrong_share_of_the_traffic_is_flagged():
@@ -574,3 +574,13 @@ def test_an_experiment_with_only_one_arm_read_is_not_compared():
     assert r["verdict"] == "not_measured" and r["comparison"] is None and r["action"]["kind"] == "manual"
     r2 = build(measured=False, control=None, trial=tot(20000, 1000, 50))
     assert r2["verdict"] == "not_measured" and r2["comparison"] is None
+
+
+def test_a_result_that_rounds_to_certain_says_over_99_9_not_100():
+    r = build(control=tot(200000, 10000, 400), trial=tot(200000, 10000, 900))
+    assert r["comparison"]["confidence"] == 100.0 and "over 99.9% sure" in r["action"]["text"] and "100% sure" not in r["action"]["text"]
+    assert ex._sure(99.9) == "99.9% sure" and ex._sure(95.0) == "95% sure" and ex._sure(100.0) == "over 99.9% sure"
+
+
+def test_dates_in_the_words_read_as_month_and_day():
+    assert ex._date_text("2026-10-14") == "Oct 14" and ex._date_text("2026-11-01") == "Nov 1" and ex._date_text(dt.date(2026, 1, 5)) == "Jan 5" and ex._date_text(None) == "" and ex._date_text("junk") == ""
