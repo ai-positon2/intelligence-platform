@@ -27,7 +27,7 @@ FIX_HEADER = ["Order", "Platform", "Section", "Check", "Severity", "Result", "Wh
 
 def file_stem(report):
     names = [a.get("name") or a.get("id") or "" for a in report.get("accounts") or []]
-    base = re.sub(r"[^A-Za-z0-9]+", "-", "-".join(n for n in names if n)).strip("-")[:60] or "account"
+    base = re.sub(r"[^A-Za-z0-9]+", "-", "-".join(n for n in names if n))[:60].strip("-") or "account"
     return "%s-account-audit" % base
 
 

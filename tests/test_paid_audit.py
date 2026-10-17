@@ -256,3 +256,19 @@ def test_the_fix_first_list_is_the_worst_findings():
     first = out["fixFirst"][0]
     assert first["id"] == "G-CNV-02" and first["result"] == "fail" and first["severity"] == "critical"
     assert out["summary"]["critical"] >= 1 and out["summary"]["grade"] in ("C", "D", "F")
+
+
+def test_the_parts_of_a_meta_read_that_failed_are_listed_as_not_read(meta_connected):
+    g = F.Graph(fail={"campaigns", "ads"})
+    out = run(F.ACT, meta_get=g.get, meta_pages=g.pages)
+    assert out["unread"] == ["Meta: campaigns", "Meta: ads"] and len(out["warnings"]) == 2 and all("could not be read" in w for w in out["warnings"])
+    fresh()
+    both = run(GOOGLE_ID + "+" + F.ACT, meta_get=F.Graph(fail={"adSets"}).get, meta_pages=F.Graph(fail={"adSets"}).pages, search_fn=google_search(fail={gread.TERMS_GAQL}))
+    assert both["unread"] == ["Google Ads: terms", "Meta: adSets"]
+
+
+def test_the_key_a_saved_audit_is_filed_under_names_the_accounts_in_order():
+    assert audit.account_key("1112223334") == "1112223334" and audit.account_key(" act_1234567890 ") == "act_1234567890"
+    assert audit.account_key("1112223334+act_1234567890") == "1112223334+act_1234567890"
+    with pytest.raises(audit.BadRequest):
+        audit.account_key("nonsense")

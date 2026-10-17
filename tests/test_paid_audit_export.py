@@ -173,3 +173,44 @@ def test_the_file_stem_names_the_accounts_safely(report):
     assert ex.file_stem(report) == "Acme-Dental-Acme-Meta-account-audit"
     assert ex.file_stem({"accounts": []}) == "account-account-audit"
     assert ex.file_stem({"accounts": [{"name": "../../etc/passwd  &x", "id": "1"}]}) == "etc-passwd-x-account-audit"
+
+
+# ── Cases the mutation round showed were not pinned ─────────────────────────
+
+def test_the_file_stem_falls_back_to_the_id_and_is_cut_at_sixty_characters():
+    assert ex.file_stem({"accounts": [{"id": "1112223334"}]}) == "1112223334-account-audit" and ex.file_stem({"accounts": [{"name": "", "id": "act_9"}]}) == "act-9-account-audit"
+    long_name = "x" * 100
+    assert ex.file_stem({"accounts": [{"name": long_name, "id": "1"}]}) == "x" * 60 + "-account-audit"
+    assert ex.file_stem({"accounts": [{"name": "A" * 59 + "-" + "B" * 5, "id": "1"}]}) == "A" * 59 + "-account-audit"          # a dash left at the cut is trimmed
+
+
+def test_one_more_is_said_when_exactly_one_more_was_kept_back():
+    assert ex._affected({"items": ["a", "b"], "count": 3}) == "a; b (and 1 more)"
+
+
+def test_a_platform_or_section_that_could_not_be_judged_says_so(report):
+    mixed = make_report()
+    mixed["summary"]["platforms"]["meta"]["score"] = None
+    mixed["summary"]["platforms"]["meta"]["grade"] = None
+    mixed["sections"][0]["score"] = None
+    mixed["sections"][0]["grade"] = None
+    d = dict((r[0], r[1]) for r in ex.tables(mixed)["Summary"][1])
+    assert d["Meta Ads score"] == "Nothing could be judged" and d["Google Ads: Account and settings"] == "Nothing could be judged"
+    assert ex.pdf_sections(mixed)[0][1] == "nothing could be judged" and ex.pdf(mixed)[:5] == b"%PDF-"
+
+
+def test_the_workbook_columns_are_as_wide_as_their_text_up_to_sixty():
+    wb = openpyxl.load_workbook(io.BytesIO(ex.xlsx(make_report())))
+    ws = wb["All checks"]
+    header = [c.value for c in ws[1]]
+    assert ws.column_dimensions[openpyxl.utils.get_column_letter(header.index("Severity") + 1)].width == 10          # a short column has a floor
+    assert ws.column_dimensions[openpyxl.utils.get_column_letter(header.index("What to do") + 1)].width == 60       # a long one a ceiling
+    assert ws.column_dimensions[openpyxl.utils.get_column_letter(header.index("Result") + 1)].width >= 10
+
+
+def test_a_passing_check_names_no_affected_things_in_the_pdf_even_when_the_read_kept_some():
+    r = make_report()
+    f = next(f for s in r["sections"] for f in s["findings"] if f["result"] == "pass")
+    f["items"], f["count"] = ["a campaign name"], 1
+    rows = [row for _l, _s, _h, rows_ in ex.pdf_sections(r) for row in rows_ if row[2].startswith(f["id"])]
+    assert rows and rows[0][0] == "Pass" and "Affected" not in rows[0][3] and "a campaign name" not in rows[0][3]
