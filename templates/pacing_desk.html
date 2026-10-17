@@ -6,8 +6,8 @@
     <div class="pm-hero-l">
       <span class="pm-eyebrow"><span class="d"></span>Paid Marketing · Budget pacing</span>
       <h1 class="pm-title">Land every account <span class="pm-grad">on budget.</span></h1>
-      <p class="pm-sub">Each morning's run reads the Google Ads export and the Budget Tracker, projects every
-        account to month end from what it actually spends, and says <b>where to move budget today</b>.
+      <p class="pm-sub">Each morning's run reads every account straight from Google Ads and measures it against the month's
+        allocations, projects it to month end from what it actually spends, and says <b>where to move budget today</b>.
         Moves stay inside one location and net to zero.</p>
     </div>
     <div class="pd-ring" id="ring" hidden></div>
@@ -16,13 +16,19 @@
   <div class="pm-panel pd-cmd" id="pickers" hidden></div>
   <div class="pd-freshrow">
     <p class="pd-fresh stale" id="fresh"><span class="live"></span>Loading the latest run…</p>
-    <div class="pd-refresh" id="refreshBox">
-      <button type="button" class="pd-refresh-btn" id="refreshBtn" title="Rebuild today’s run from the spend sheet and the Budget Tracker">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/></svg><span id="refreshLabel">Refresh</span>
+    <div class="pd-actions">
+      <button type="button" class="pm-btn-ghost" id="alBtn" aria-expanded="false" aria-controls="alPanel" title="What each account is meant to spend this month">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10"/></svg>Allocations
       </button>
+      <div class="pd-refresh" id="refreshBox">
+        <button type="button" class="pd-refresh-btn" id="refreshBtn" title="Read every account from Google Ads again and rebuild today’s run">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/></svg><span id="refreshLabel">Refresh</span>
+        </button>
+      </div>
     </div>
   </div>
   <div class="pd-refresh-note" id="refreshNote" hidden></div>
+  <section class="pm-panel pd-al" id="alPanel" hidden aria-label="Monthly allocations"></section>
   <div class="pd-strip" id="strip"></div>
   <div class="pm-panel pd-trend" id="trend" hidden></div>
 
@@ -38,5 +44,6 @@
 {% endblock %}
 {% block scripts %}
 <script src="{{ url_for('static', filename='js/pm_picker.js') }}?v=1"></script>
-<script src="{{ url_for('static', filename='js/pacing_desk.js') }}?v=5"></script>
+<script src="{{ url_for('static', filename='js/pacing_budgets.js') }}?v=1"></script>
+<script src="{{ url_for('static', filename='js/pacing_desk.js') }}?v=6"></script>
 {% endblock %}

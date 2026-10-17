@@ -1,11 +1,13 @@
 /* Pacing Desk (Paid Marketing Agents).
  *
- * Ported from Agent Holmes' landing/pacing_desk.html. The engine's daily run
- * is pushed to /p2/paid-marketing/api/pacing/seed, or rebuilt on the platform
- * from the two Google Sheets by the Refresh button (api/pacing/refresh,
- * tracker/paid_refresh.py); this page reads it back,
- * lets anyone switch to an earlier day, and keeps a shared "applied" tick on
- * each recommended move (who ticked it is recorded server-side).
+ * Ported from Agent Holmes' landing/pacing_desk.html. The platform builds each
+ * run itself: every Google Ads account is read live and measured against the
+ * month's Allocations (api/pacing/refresh, tracker/paid_refresh.py), started by
+ * this page when no run has been built since the Pacific day began, or by the
+ * Refresh button. A run can still be pushed to /p2/paid-marketing/api/pacing/seed.
+ * This page reads the stored run back, lets anyone switch to an earlier day,
+ * and keeps a shared "applied" tick on each recommended move (who ticked it is
+ * recorded server-side). The Allocations editor is static/js/pacing_budgets.js.
  *
  * Kept from the original on purpose (each was user feedback or a real bug):
  * client + account dropdowns rather than a search box; the top strip
@@ -134,13 +136,20 @@ function paintRing(){
   })});
 }
 
+function monthLabel(m){
+  var names=["January","February","March","April","May","June","July","August","September","October","November","December"];
+  return m&&/^\d{4}-\d{2}$/.test(m)?names[Number(m.slice(5,7))-1]+" "+m.slice(0,4):"the month";
+}
 function paintFresh(){
   var el=$("#fresh"), stale=SOURCE!=="live";
   el.className="pd-fresh"+(stale?" stale":"");
   var when = D.seededAt ? new Date(D.seededAt).toLocaleString([], {dateStyle:"medium", timeStyle:"short"}) : "";
+  var src=D.source, from=src&&src.kind==="googleAds"?', read from Google Ads ('+src.accounts+' accounts)':'';
+  var bk=src&&src.budgets&&(src.budgets.kind==="carried"||src.budgets.kind==="seeded")?src.budgets:null;
+  var unsaved=bk?' <span class="pd-fresh-warn">This run used allocations nobody has saved for '+esc(monthLabel(bk.month))+'. <button type="button" class="pd-al-link" id="alOpen">Review them</button></span>':'';
   el.innerHTML='<span class="live"></span>'+(stale
     ? 'Viewing an earlier run, <b>'+esc(D.asOf)+'</b>. Pick the latest date in “As of” for today’s numbers.'
-    : 'Live: the <b>'+esc(D.asOf)+'</b> run'+(when?', built '+esc(when):'')+'. A refresh replaces this for everyone.');
+    : 'Live: the <b>'+esc(D.asOf)+'</b> run'+(when?', built '+esc(when):'')+esc(from)+'. A refresh replaces this for everyone.')+unsaved;
 }
 
 function inScope(a){
@@ -478,7 +487,7 @@ function render(){
       var allDone=a.moves.length&&a.moves.every(function(m){var st=movesApplied[moveId(D.asOf,m.loc||a.name,m.from,m.to)];return st&&st.applied});
       html+='<details class="pd-acct"'+(open?' open':'')+' data-key="'+esc(key)+'"><summary><span class="pd-aname"><span class="caret"></span><span class="t">'+esc(a.name)+'</span>'+
         '<span class="pm-pill '+p[0]+'">'+p[1]+'</span>'+
-        (a.channels&&a.channels!=="Google"?'<span class="pm-tag" title="Channels in the Budget Tracker; this desk tracks Google spend only">'+esc(a.channels)+'</span>':'')+
+        (a.channels&&a.channels!=="Google"?'<span class="pm-tag" title="Other channels this account is also allocated; this desk tracks Google spend only">'+esc(a.channels)+'</span>':'')+
         (a.capped?'<span class="pm-tag warn" title="Daily caps cannot reach the monthly budget">capped</span>':'')+
         (a.moves.length?(allDone?'<span class="pm-tag good">'+a.moves.length+' applied</span>':'<span class="pm-tag">'+a.moves.length+' move'+(a.moves.length===1?'':'s')+'</span>'):'')+'</span>'+
         (a.ambiguous?'<span class="pd-fig dim">budget figure unconfirmed</span>':bar(a))+
@@ -496,14 +505,18 @@ function paintOrphans(){
   var b=[];
   if(D.portfolioWarnings&&D.portfolioWarnings.length){
     var tot=D.portfolioWarnings.reduce(function(t,w){var m=w.match(/\$([\d,]+(?:\.\d+)?)/);return t+(m?parseFloat(m[1].replace(/,/g,"")):0)},0);
-    b.push('<div class="pd-h4"><span>Spending outside the Budget Tracker</span></div><div class="pd-client"><p class="pm-note warn"><b>'+m0(tot)+
-      '</b> spent month to date by accounts with no Google budget row. They are left out of every figure above.</p>'+
+    b.push('<div class="pd-h4"><span>Spending with no allocation</span></div><div class="pd-client"><p class="pm-note warn"><b>'+m0(tot)+
+      '</b> spent month to date by accounts with no allocation for this month. They are left out of every figure above. Add them in <b>Allocations</b>.</p>'+
       D.portfolioWarnings.map(function(w){return '<p class="pm-note">'+esc(w)+'</p>'}).join("")+'</div>');
   }
   if(D.otherChannels&&D.otherChannels.length){
     b.push('<div class="pd-h4"><span>Other channels this desk doesn’t cover</span></div><div class="pd-client"><p class="pm-note">'+
-      'This desk reads the Google Ads export only. The Budget Tracker also allocates these, which no figure here includes:</p>'+
+      'This desk reads Google Ads only. These are also allocated, and no figure here includes them:</p>'+
       D.otherChannels.map(function(o){return '<p class="pm-note"><b>'+esc(o.client)+'</b>, '+esc(o.account)+' on <b>'+esc(o.channel)+'</b>: '+m0(o.allocated)+' allocated</p>'}).join("")+'</div>');
+  }
+  if(D.source&&D.source.notes&&D.source.notes.length){
+    b.push('<div class="pd-h4"><span>Notes on the Google Ads read</span></div><div class="pd-client">'+
+      D.source.notes.map(function(n){return '<p class="pm-note">'+esc(n)+'</p>'}).join("")+'</div>');
   }
   $("#orphans").innerHTML=b.join("");
 }
@@ -511,8 +524,8 @@ function paintOrphans(){
 function paintFoot(){
   $("#foot").textContent='Ideal pacing is (today − 1) ÷ days in month, with a +'+D.tolerance+'pp tolerance. '+
     'The month-end projection comes from actual spend per active day, never from the daily cap, because most campaigns never spend their full cap. '+
-    'Budget moves stay inside a single location and net to zero. Daily caps, status and impression share come from the Google Ads export; '+
-    'allocations from the Budget Tracker. Recommendations are a draft: check before applying.';
+    'Budget moves stay inside a single location and net to zero. Spend, daily caps, status and impression share are read live from Google Ads; '+
+    'allocations are the ones saved in Allocations. Recommendations are a draft: check before applying.';
 }
 
 function setD(nd, source){
@@ -567,10 +580,12 @@ $("#controls").addEventListener("click",function(e){
 $("#exportAccounts").addEventListener("click",exportAccountsCsv);
 
 /* ── Refresh ─────────────────────────────────────────────────
- * Rebuilds the run on the server from the spend sheet and the Budget
- * Tracker. The job lives in Postgres, so the page polls for it and a second
- * tab (or a second person) sees the same run in progress. */
-var RF = {timer:null, seen:null};
+ * Reads every Google Ads account on the server and measures it against the
+ * month's Allocations. The job lives in Postgres, so the page polls for it
+ * and a second tab (or a second person) sees the same run in progress. The
+ * page starts one itself when the server says a run is due (none built since
+ * the Pacific day began); the button starts one on demand. */
+var RF = {timer:null, seen:null, auto:false};
 function rfNote(kind, html){
   var n=$("#refreshNote");
   if(!html){n.hidden=true;n.innerHTML="";return;}
@@ -580,21 +595,25 @@ function ago(iso){
   var s=(Date.now()-new Date(iso).getTime())/1000; if(!(s>=0)) return "";
   return s<60?"just now":s<3600?Math.round(s/60)+" min ago":s<86400?Math.round(s/3600)+" h ago":new Date(iso).toLocaleDateString();
 }
+function wait(sec){ return sec<60 ? sec+" seconds" : Math.ceil(sec/60)+" minute"+(Math.ceil(sec/60)===1?"":"s"); }
 function paintRefresh(st){
   var b=$("#refreshBtn"), box=$("#refreshBox"), running=st.state==="running";
   box.classList.toggle("busy",running); b.disabled=running;
   $("#refreshLabel").textContent=running?(st.step||"Refreshing")+"…":"Refresh";
+  b.title=st.configProblem||(st.cooldownLeft?"Google Ads was just read. You can read it again in "+wait(st.cooldownLeft)+".":"Read every account from Google Ads again and rebuild today\u2019s run");
   if(running){ rfNote("", ""); return; }
   if(st.state==="failed" && st.error){
-    rfNote("bad",'<b>Refresh failed.</b> '+esc(st.error)+(st.finishedAt?' <span class="t">'+esc(ago(st.finishedAt))+'</span>':''));
+    rfNote("bad",'<b>Refresh failed.</b> '+esc(st.error)+(st.finishedAt?' <span class="t">'+esc(ago(st.finishedAt))+'</span>':'')+' The run above is the last good one.');
   } else if(st.state==="done" && st.result && RF.seen==="running"){
     var r=st.result, f=r.issueCount||0;
-    rfNote("ok",'<b>Updated.</b> The '+esc(r.date)+' run, data through '+esc(r.dataThrough||"?")+', '+r.clients+' clients, '+r.accounts+' accounts.'+
+    rfNote("ok",'<b>Updated.</b> The '+esc(r.date)+' run, data through '+esc(r.dataThrough||"?")+', '+r.clients+' clients, '+r.accounts+' accounts, read from Google Ads.'+
+      (r.reusedRead?' It used the Google Ads read of '+esc(new Date(r.readAt).toLocaleTimeString([],{hour:"numeric",minute:"2-digit"}))+' with the saved allocations.':'')+
       (r.notes||[]).map(function(x){return ' <span class="warn">'+esc(x)+'</span>'}).join("")+
       (f?' <details><summary>'+f+' engine self-check flag'+(f===1?'':'s')+'</summary><ul>'+
         (r.issues||[]).map(function(x){return '<li>'+esc(x)+'</li>'}).join("")+'</ul></details>':''));
+  } else if(st.configProblem){
+    rfNote("bad",'<b>Google Ads is not set up for this site.</b> '+esc(st.configProblem));
   }
-  if(st.configProblem) b.title=st.configProblem;
 }
 function pollRefresh(){
   clearTimeout(RF.timer);
@@ -603,23 +622,38 @@ function pollRefresh(){
     var was=RF.seen; paintRefresh(st); RF.seen=st.state;
     if(st.state==="running"){ RF.timer=setTimeout(pollRefresh, 2000); return; }
     if(was==="running" && st.state==="done") loadLatest(true);
+    else if(!RF.auto && st.due && !st.configProblem){ RF.auto=true; startRefresh(true); }
   }).catch(function(){ RF.timer=setTimeout(pollRefresh, 5000); });
 }
-$("#refreshBtn").addEventListener("click",function(){
+function startRefresh(auto, recompute){
   var b=$("#refreshBtn"); b.disabled=true; $("#refreshBox").classList.add("busy"); $("#refreshLabel").textContent="Starting…";
   rfNote("","");
-  fetch(API+"/refresh",{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json"},body:"{}"})
+  fetch(API+"/refresh",{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json"},body:JSON.stringify(auto?{auto:true}:recompute?{recompute:true}:{})})
   .then(function(r){return r.json().catch(function(){return {}}).then(function(j){return {r:r,j:j}})})
   .then(function(x){
-    if(x.r.status===202 || (x.j && x.j.state==="running")){ RF.seen="running"; paintRefresh(x.j); pollRefresh(); return; }
+    if(x.r.status===202 || (x.r.status===409 && x.j && x.j.state==="running")){ RF.seen="running"; paintRefresh(x.j); pollRefresh(); return; }   // started, or someone else already had
     paintRefresh(x.j||{});
+    if(auto) return;                                       // the page asked on its own: nothing to tell anyone
     var msg=(x.j&&x.j.error)||("the server answered "+x.r.status);
-    if(x.j && x.j.configProblem){
-      rfNote("bad",'<b>Refresh is not set up yet.</b> '+esc(x.j.error)+(x.j.serviceEmail?' Share both Google Sheets with <code>'+esc(x.j.serviceEmail)+'</code> (Viewer), then set PACING_SPEND_SHEET_ID on Railway.':''));
-    } else rfNote("bad",'<b>Refresh did not start.</b> '+esc(msg));
+    if(x.j && x.j.configProblem) rfNote("bad",'<b>Google Ads is not set up for this site.</b> '+esc(x.j.configProblem));
+    else if(x.r.status===429) rfNote("",'<b>Just refreshed.</b> '+esc(msg));
+    else rfNote("bad",'<b>Refresh did not start.</b> '+esc(msg));
   })
-  .catch(function(e){ paintRefresh({}); rfNote("bad",'<b>Refresh did not start.</b> '+esc(e.message)); });
-});
+  .catch(function(e){ paintRefresh({}); if(!auto) rfNote("bad",'<b>Refresh did not start.</b> '+esc(e.message)); });
+}
+$("#refreshBtn").addEventListener("click",function(){ startRefresh(false); });
+window.PDRecompute=function(){ if(!$("#refreshBtn").disabled) startRefresh(false, true); };
+document.addEventListener("click",function(e){ if(e.target&&e.target.id==="alOpen"){ var b=$("#alBtn"); if(b&&$("#alPanel").hidden) b.click(); } });
+
+/* ── Allocations ─────────────────────────────────────────────── */
+(function(){
+  var panel=$("#alPanel"), btn=$("#alBtn");
+  window.PDAllocations.init(panel,{onSaved:function(){}});
+  btn.addEventListener("click",function(){
+    var open=panel.hidden; panel.hidden=!open; btn.setAttribute("aria-expanded",String(open));
+    if(open){ window.PDAllocations.open(); panel.scrollIntoView({behavior:"smooth",block:"nearest"}); }
+  });
+})();
 
 /* ── Boot ────────────────────────────────────────────────────── */
 var PICKERS_BUILT=false;
@@ -630,7 +664,7 @@ function loadLatest(again){
   LIVE_DATE=(j&&j.latest)||DATES[0]||null;
   if(!LIVE_DATE){
     $("#list").innerHTML='<div class="pm-panel"><p class="pm-empty" style="padding:26px 0">No run yet. '+
-      'Press <b>Refresh</b> to build one from the spend sheet and the Budget Tracker.</p></div>';
+      'Press <b>Refresh</b> to read every account from Google Ads.</p></div>';
     showError("Waiting for the first run.");
     return;
   }

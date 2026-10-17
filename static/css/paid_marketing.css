@@ -1291,3 +1291,55 @@ details.sq-fallback .sq-drops{margin-top:10px}
   --thumb:linear-gradient(135deg,#00170f 0%,#001a24 100%);
   --icon-glow:rgba(52,211,153,.5);--card-border:rgba(52,211,153,.35);
   --card-glow:0 0 40px rgba(52,211,153,.10);--arrow-color:#a7f3d0}
+
+/* Pacing Desk: the Allocations editor and the page's action row */
+.pd-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.pd-actions .pm-btn-ghost{padding:9px 15px;border-radius:999px}
+.pd-fresh-warn{color:var(--pm-ink2)}
+.pd-al{margin:0 0 18px;padding:20px 22px 22px}
+.pd-al .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.pd-al-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:14px 0 8px}
+.pd-al-month{display:inline-flex;align-items:center;gap:8px;font-size:12.5px;color:var(--pm-muted)}
+.pd-al-total{font-size:12.5px;color:var(--pm-muted)}
+.pd-al-total b{color:var(--pm-ink)}
+.pd-al-dirty{color:#fbbf24}
+.pd-al-banner{margin:8px 0;padding:9px 13px;border-radius:12px;font-size:12.5px;line-height:1.55;color:var(--pm-ink2);border:1px solid var(--pm-line);background:var(--pm-panel2)}
+.pd-al-banner b{color:var(--pm-ink)}
+.pd-al-banner.ok{border-color:color-mix(in srgb,var(--ok) 38%,transparent)}
+.pd-al-banner.warn{border-color:color-mix(in srgb,#fbbf24 50%,transparent)}
+.pd-al-banner.bad{border-color:color-mix(in srgb,#fb7185 50%,transparent)}
+.pd-al-msg{margin:8px 0;padding:9px 13px;border-radius:12px;font-size:12.5px;line-height:1.55;color:var(--pm-ink2);border:1px solid var(--pm-line);background:var(--pm-panel2)}
+.pd-al-msg.ok{border-color:color-mix(in srgb,var(--ok) 38%,transparent)}
+.pd-al-msg.warn{border-color:color-mix(in srgb,#fbbf24 50%,transparent)}
+.pd-al-msg.bad{border-color:color-mix(in srgb,#fb7185 50%,transparent)}
+.pd-al-msg b{color:var(--pm-ink)}
+.pd-al-wrap{overflow-x:auto;margin:10px -4px 0;padding:0 4px}
+.pd-al-table{width:100%;border-collapse:separate;border-spacing:0 6px;min-width:860px}
+.pd-al-table th{text-align:left;font:600 11px 'Space Grotesk',sans-serif;letter-spacing:.06em;text-transform:uppercase;color:var(--pm-faint);padding:0 6px 2px}
+.pd-al-table td{padding:0 3px;vertical-align:middle}
+.pd-al-empty{padding:18px 6px;color:var(--pm-muted);font-size:13px}
+.pd-al-in{width:100%;box-sizing:border-box;font:500 13px/1.2 inherit;font-family:inherit;color:var(--pm-ink);background:var(--pm-raise);
+  border:1px solid var(--pm-line2);border-radius:9px;padding:8px 10px;min-width:0}
+.pd-al-in:focus{outline:2px solid var(--pm-a);outline-offset:1px;border-color:transparent}
+.pd-al-in::placeholder{color:var(--pm-faint)}
+.pd-al-in.w-num{text-align:right;min-width:96px}
+.pd-al-in.w-client{min-width:130px}.pd-al-in.w-account{min-width:190px}.pd-al-in.w-days{min-width:140px}.pd-al-in.w-am{min-width:90px}.pd-al-in.w-status{min-width:96px}
+.pd-al-month .pd-al-in{width:auto}
+.pd-al-x{cursor:pointer;border:0;background:transparent;color:var(--pm-faint);font-size:20px;line-height:1;padding:4px 8px;border-radius:8px}
+.pd-al-x:hover{color:#fb7185;background:var(--pm-raise)}
+.pd-al-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:14px 0 0}
+.pd-al-sp{flex:1}
+.pd-al-save{cursor:pointer;border:0;border-radius:999px;padding:9px 18px;font:700 13px/1 inherit;font-family:inherit;color:#1a1206;
+  background:linear-gradient(120deg,var(--pm-a),var(--pm-a2))}
+.pd-al-save:disabled{opacity:.5;cursor:progress}
+.pd-al-save:focus-visible{outline:2px solid var(--pm-a);outline-offset:3px}
+.pd-al-link{cursor:pointer;border:0;background:transparent;padding:0;font:inherit;color:var(--pm-a);text-decoration:underline}
+.pd-al-paste{margin-top:16px;padding-top:14px;border-top:1px solid var(--pm-line)}
+.pd-al-text{width:100%;box-sizing:border-box;margin-top:8px;font:12.5px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--pm-ink);
+  background:var(--pm-raise);border:1px solid var(--pm-line2);border-radius:10px;padding:10px 12px;resize:vertical}
+.pd-al-skipped{margin:6px 0;font-size:12.5px;color:var(--pm-muted)}
+.pd-al-skipped summary{cursor:pointer;color:var(--pm-ink2)}
+.pd-al-skipped ul{margin:6px 0 0 18px;padding:0}
+[data-theme="light"] .pd-al-save{color:#fff}
+[data-theme="light"] .pd-al-dirty{color:#b45309}
+@media (max-width:720px){.pd-al{padding:16px 14px 18px}.pd-actions{width:100%}.pd-al-actions .pm-btn-ghost,.pd-al-save{flex:1 1 auto;justify-content:center}}
