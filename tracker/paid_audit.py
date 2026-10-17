@@ -6,16 +6,18 @@ tracker/paid_audit_pages.py (the landing pages) and tracker/paid_audit_meta_read
 and tracker/paid_audit_meta_checks.py; how a finding and a score work is tracker/paid_audit_model.py.
 
 The account is named the way Seasonality Analysis names it: a 10-digit Google Ads customer id, a Meta ad account id (act_...), or both
-joined by "+". An MCC is not audited here (an audit is of one account). Reading is cached through the shared cache (tracker/paid_geo.py
-_cached): one read per account per hour, Refresh limited per account, a spent quota served from the last saved read with its date. A part
-that could not be read is a warning and its checks say "unknown": the audit never reports a pass or a failure for something it could not
-look at. Read only: nothing is changed in either platform.
+joined by "+". An MCC is not audited here (an audit is of one account). A read is saved in the shared Postgres cache (tracker/paid_gads.py
+helpers): one read per account per hour, Refresh limited per account, a spent quota served from the last saved read of any age with its date.
+A read with a part missing (a warning) is kept for only five minutes, so an account is not stuck on a failure for an hour after the platform
+recovers. A part that could not be read is a warning and its checks say "unknown": the audit never reports a pass or a failure for something
+it could not look at. Read only: nothing is changed in either platform.
 """
 from __future__ import annotations
 
 import datetime as dt
 import logging
 import re
+import threading
 
 from . import paid_audit_google_checks as gchecks
 from . import paid_audit_google_read as gread
@@ -23,6 +25,7 @@ from . import paid_audit_meta_checks as mchecks
 from . import paid_audit_meta_read as mread
 from . import paid_audit_model as model
 from . import paid_audit_pages as pages
+from . import paid_gads as base
 from . import paid_gads_segments as gads
 from . import paid_segments as seg
 
@@ -91,9 +94,50 @@ def meta_raw(account, *, store, get=None, pages_fn=None, now=None):
         raise gads.translate(e) from e
 
 
-def _cached(kind, key_id, build, *, force, store, now, day):
-    from . import paid_geo
-    return paid_geo._cached(kind, key_id, "audit", day, day, build, force=force, store=store, now=now)
+CACHE_VERSION = "1"                 # bump when the shape of a saved read changes, so an older copy is never read as a newer one
+TTL_S = 3600
+PARTIAL_TTL_S = 300                 # a read with a part missing is worth keeping for minutes, not an hour
+_LOCKS, _LOCKS_GUARD = {}, threading.Lock()
+
+
+def cache_key(kind, key_id):
+    return base.CACHE_V + "audit%s:%s:%s" % (CACHE_VERSION, kind, key_id)
+
+
+def _usable(hit):
+    """A saved read is used while it is fresh; one with a part missing only for PARTIAL_TTL_S."""
+    raw, saved = hit
+    return not (raw.get("warnings") and (saved is None or base._age_s(saved) > PARTIAL_TTL_S))
+
+
+def _cached(kind, key_id, build, *, force, store):
+    """(raw read, saved-at or None). Two people asking at once share one read; with `force` the saved read is skipped (at most once per
+    paid_gads.REFRESH_COOLDOWN_S per account); when the platform's allowance is spent the last saved read of any age is served with its date."""
+    key = cache_key(kind, key_id)
+    with _LOCKS_GUARD:
+        lock = _LOCKS.setdefault(key, threading.Lock())
+    if force:
+        base.refresh_guard(store, "audit:%s:%s" % (kind, key_id))
+        base.forget(key)
+    with lock:
+        if not force:
+            hit = base._entry(store, key, TTL_S)
+            if hit is not None and _usable(hit):
+                return hit[0], None
+        try:
+            raw = build()
+        except gads.GadsError as err:
+            old = base._saved_copy(store, key) if err.kind == "quota" else None
+            if old is None:
+                raise
+            return old[0], old[1]
+        saved = base._now_iso()
+        try:
+            store.put_gads_cache(key, raw)
+        except Exception as err:                          # a failed save never costs the report
+            log.warning("account audit: could not save the read (%s)", err)
+        base._mem_put(key, raw, saved)
+        return raw, None
 
 
 # ── The report ──────────────────────────────────────────────────────────────
@@ -120,28 +164,26 @@ def assemble(google, meta, accounts, now=None):
 
 
 def report_for(account, *, force=False, store=None, accounts_fn=None, search_fn=None, fetcher=None, meta_get=None, meta_pages=None,
-               now=None, today=None, check_pages=True):
+               now=None, check_pages=True):
     """The audit of the account named by `account` (see parse_account). `force` (Refresh) skips the saved reads, at most once per
     paid_gads.REFRESH_COOLDOWN_S per account. Raises BadRequest for a bad or unknown account, paid_gads_segments.GadsError for a platform
     that would not answer."""
     from . import paid_meta, paid_store
     store = store or paid_store
     ids = parse_account(account)
-    day = today or dt.date.today()
-    clock = None
     accounts, google, meta, stale = [], None, None, []
     if ids["google"]:
         target = _google_account(ids["google"], accounts_fn)
         accounts.append({"platform": "google", "id": target["id"], "name": target["name"], "currency": target.get("currency") or ""})
         google, old = _cached("audit-google", target["id"], lambda: google_raw(target, search_fn=search_fn, fetcher=fetcher, now=now, check_pages=check_pages),
-                              force=force, store=store, now=clock, day=day)
+                              force=force, store=store)
         if old:
             stale.append({"platform": "google", "savedAt": old})
     if ids["meta"]:
         target = _meta_account(ids["meta"], store)
         accounts.append({"platform": "meta", "id": target["id"], "name": target["name"], "currency": target.get("currency") or ""})
         meta, old = _cached("audit-meta", target["id"], lambda: meta_raw(target, store=store, get=meta_get, pages_fn=meta_pages, now=now),
-                            force=force, store=store, now=clock, day=day)
+                            force=force, store=store)
         if old:
             stale.append({"platform": "meta", "savedAt": old})
     out = assemble(google, meta, accounts, now=now)

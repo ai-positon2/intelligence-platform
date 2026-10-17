@@ -66,7 +66,6 @@ def run(account=GOOGLE_ID, **kw):
     kw.setdefault("accounts_fn", lambda: [ACCOUNT])
     kw.setdefault("search_fn", google_search())
     kw.setdefault("fetcher", Fetcher())
-    kw.setdefault("today", TODAY)
     kw.setdefault("now", NOW)
     return audit.report_for(account, **kw)
 
@@ -272,3 +271,83 @@ def test_the_key_a_saved_audit_is_filed_under_names_the_accounts_in_order():
     assert audit.account_key("1112223334+act_1234567890") == "1112223334+act_1234567890"
     with pytest.raises(audit.BadRequest):
         audit.account_key("nonsense")
+
+
+# ── The audit's own cache: partial reads, any-age fallback, versioning ─────
+
+def asked(search):
+    return len(search.asked)
+
+
+def test_a_read_with_a_part_missing_is_kept_for_five_minutes_not_an_hour():
+    store, search = FakeStore(), google_search(fail={gread.TERMS_GAQL})
+    first = run(store=store, search_fn=search)
+    assert first["unread"] == ["Google Ads: terms"]
+    n = asked(search)
+    run(store=store, search_fn=search)
+    assert asked(search) == n                                                    # asked again at once: the saved partial read answers
+    key = audit.cache_key("audit-google", GOOGLE_ID)
+    store.at[key] = store.at[key] - audit.PARTIAL_TTL_S - 5
+    fresh()                                                                      # (the minute of in-memory copies is not what is being tested)
+    healed = google_search()
+    again = run(store=store, search_fn=healed)
+    assert asked(healed) == len(gread.READS) and again["unread"] == [] and again["warnings"] == []          # the platform recovered: the next look reads again and shows it
+
+
+def test_a_complete_read_stays_fresh_for_the_hour():
+    store, search = FakeStore(), google_search()
+    run(store=store, search_fn=search)
+    key = audit.cache_key("audit-google", GOOGLE_ID)
+    store.at[key] = store.at[key] - audit.PARTIAL_TTL_S - 5
+    fresh()
+    n = asked(search)
+    run(store=store, search_fn=search)
+    assert asked(search) == n
+    store.at[key] = store.at[key] - audit.TTL_S
+    fresh()
+    run(store=store, search_fn=search)
+    assert asked(search) == 2 * n                                                # past the hour it is read again
+
+
+def test_a_spent_quota_serves_the_last_saved_read_even_from_another_day():
+    store, search = FakeStore(), google_search()
+    run(store=store, search_fn=search)
+    key = audit.cache_key("audit-google", GOOGLE_ID)
+    store.at[key] = store.at[key] - 3 * 86400                                     # saved three days ago
+    fresh()
+
+    def quota(cid, gaql):
+        raise gads.GadsError("quota", "Google Ads daily limit reached")
+    out = run(store=store, search_fn=quota)
+    assert out["stale"] == [{"platform": "google", "savedAt": out["stale"][0]["savedAt"]}] and out["stale"][0]["savedAt"]
+    with pytest.raises(gads.GadsError):
+        run(store=FakeStore(), search_fn=quota)                                    # nothing was ever saved for this store: the error is the answer
+
+
+def test_an_error_that_is_not_a_spent_quota_is_not_hidden_by_an_old_copy():
+    store, search = FakeStore(), google_search()
+    run(store=store, search_fn=search)
+    key = audit.cache_key("audit-google", GOOGLE_ID)
+    store.at[key] = store.at[key] - 3 * 86400
+    fresh()
+
+    def broken(cid, gaql):
+        raise gads.GadsError("api", "Google Ads answered 500")
+    with pytest.raises(gads.GadsError):
+        run(store=store, search_fn=broken)
+
+
+def test_a_copy_saved_under_another_version_is_never_read_as_this_one():
+    store, search = FakeStore(), google_search()
+    store.cache[paid_gads.CACHE_V + "audit0:audit-google:" + GOOGLE_ID] = {"customer": {}, "warnings": []}          # an older shape
+    store.at[paid_gads.CACHE_V + "audit0:audit-google:" + GOOGLE_ID] = __import__("time").time()
+    out = run(store=store, search_fn=search)
+    assert asked(search) == len(gread.READS) and out["accounts"][0]["id"] == GOOGLE_ID and audit.cache_key("audit-google", GOOGLE_ID).startswith(paid_gads.CACHE_V + "audit" + audit.CACHE_VERSION + ":")
+
+
+def test_a_google_and_a_meta_read_never_share_a_saved_copy(meta_connected):
+    g = F.Graph()
+    store = FakeStore()
+    run(GOOGLE_ID + "+" + F.ACT, store=store, meta_get=g.get, meta_pages=g.pages)
+    keys = sorted(k for k in store.cache if "audit" in k)
+    assert len(keys) == 2 and keys[0] != keys[1] and any("audit-google" in k for k in keys) and any("audit-meta" in k for k in keys)
