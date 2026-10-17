@@ -450,6 +450,8 @@ def test_smart_bidding_needs_conversions():
     value_target = A.campaign("21", "Value with target", bidding="MAXIMIZE_CONVERSION_VALUE", target_roas=2.0)
     g = one("G-STR-07", camps(bare_roas, value_target, metrics=[A.campaign_metrics("20", cost=100.0, conversions=49.0), A.campaign_metrics("21", cost=100.0, conversions=49.0)]))
     assert g["items"] == ["Bare ROAS (49 conversions, about 50 suggested)", "Value with target (49 conversions, about 50 suggested)"]
+    one_conv = one("G-STR-07", camps(A.campaign("23", "One"), metrics=[A.campaign_metrics("23", cost=50.0, conversions=1.0)]))
+    assert one_conv["items"] == ["One (1 conversion, about 15 suggested)"]
     g = one("G-STR-07", camps(A.campaign("22", "Cents"), metrics=[A.campaign_metrics("22", cost=0.5, conversions=0.0)]))
     assert g["result"] == "warn" and g["items"] == ["Cents (0 conversions, about 15 suggested)"]            # any spend counts, even under 1
     assert f["items"] == ["CPA thin (29 conversions, about 30 suggested)", "ROAS thin (49 conversions, about 50 suggested)", "MaxConv thin (14 conversions, about 15 suggested)",

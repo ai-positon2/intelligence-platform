@@ -620,7 +620,7 @@ def str_smart_data(ctx):
         return make("G-STR-07", "pass", "Checked %s: all have the conversions Google suggests." % plural(len(smart), "Smart Bidding campaign"))
     thin.sort(key=lambda x: (-x["metrics"]["cost"], x["name"]))
     return make("G-STR-07", "warn", "%d of %s had fewer conversions in 30 days than Google suggests." % (len(thin), plural(len(smart), "Smart Bidding campaign")),
-                items=["%s (%d conversions, about %d suggested)" % (x["name"], round(x["metrics"]["conversions"]), _needs(x)) for x in thin])
+                items=["%s (%s, about %d suggested)" % (x["name"], plural(round(x["metrics"]["conversions"]), "conversion"), _needs(x)) for x in thin])
 
 
 @check("G-STR-08", "structure", "Campaigns with plenty of conversions use Smart Bidding", "medium",
@@ -641,7 +641,7 @@ def str_manual(ctx):
     ready.sort(key=lambda x: (-x["metrics"]["conversions"], x["name"]))
     return make("G-STR-08", "warn", "%d of %s on manual or click-based bidding already record %d or more conversions a month." %
                 (len(ready), plural(len(click), "Search campaign"), MIN_CONVERSIONS["smart"]),
-                items=["%s (%s, %d conversions)" % (x["name"], _say(x["bidding"]), round(x["metrics"]["conversions"])) for x in ready])
+                items=["%s (%s, %s)" % (x["name"], _say(x["bidding"]), plural(round(x["metrics"]["conversions"]), "conversion")) for x in ready])
 
 
 @check("G-STR-09", "structure", "Campaigns that spend are converting", "high",
