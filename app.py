@@ -5536,6 +5536,29 @@ def paid_audit_download():
     return resp
 
 
+# Landing Page & Relevancy Check -----------------------------------------------
+# Pick a Google Ads account and it reads, read only, what each landing page took over the last 30 days and the ads, keywords (with their Quality Score
+# parts) and search terms of the ad groups that send people there, fetches the busiest pages (the platform's SSRF-guarded fetch) and holds each one against a
+# written checklist: the page opens, does it match the ad, can a visitor act, works on a phone, loads fast, tracking and trust. Every check has a severity and a
+# result (pass, warn, fail, not applicable, could not check); a page that refuses us or is built by scripts is "could not check", never failed. Reading is
+# tracker/paid_lp_read.py, the page fetch paid_lp_page.py, the matching paid_lp_match.py, the checks paid_lp_checks*.py and the report tracker/paid_lp.py. It only
+# reads. The account list is Segment Analysis's (api/segments/accounts).
+
+@app.route("/p2/paid-marketing/api/lp/report")
+@position2_required
+def paid_lp_report():
+    from tracker import paid_gads as paid_gads_base, paid_gads_segments as paid_gads, paid_lp
+    extra = {"force": True} if str(request.args.get("refresh") or "") in ("1", "true") else {}      # the Refresh button
+    try:
+        return jsonify(paid_lp.report_for(request.args.get("account"), **extra))
+    except paid_lp.BadRequest as e:
+        return jsonify(error=str(e)), 400
+    except paid_gads_base.RefreshTooSoon as e:
+        return jsonify(error=str(e), kind="cooldown", retryIn=e.retry_in), 429
+    except paid_gads.GadsError as e:
+        return _pm_gads_error(e)
+
+
 # Strategy & Campaign Book -----------------------------------------------------
 # Give it a client (a website, a brief, optionally a Google Ads account) and it researches the client, its competitors, its social media,
 # the account and the market, then writes the strategy and, for each campaign, the campaign book: ad groups, keywords, negatives, ad copy
