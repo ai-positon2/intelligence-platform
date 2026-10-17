@@ -4209,7 +4209,7 @@ def seo_aeo_legacy_redirect(rest=""):
 #                          and ranking in static/js/sqr_core.js, the model
 #                          step in tracker/paid_sqr.py)
 #   Client Feedback Agent  answers questions from live Slack, Gmail, meeting
-#                          transcripts and the Budget Tracker, through ONE
+#                          transcripts and the Pacing Desk's allocations, through ONE
 #                          shared Slack and Google account an admin connects
 #                          (tracker/paid_feedback.py)
 #   Segment Analysis       the seven-segment report (day, hour, age, gender,
@@ -20289,11 +20289,11 @@ AD INTELLIGENCE (/p2/strategic-agents/ad-intelligence): tracks competitors' runn
 keywords, messaging angle, first/last seen) pulled from a shared Google Sheet.
 
 PAID MARKETING AGENTS (/p2/paid-marketing): the PPC team's five agents (three came from Agent Holmes).
-Pacing Desk (/p2/paid-marketing/pacing-desk): reads each morning's Google Ads export and the Budget Tracker,
-projects every account to month end from actual spend per active day (never from the daily cap), labels it
+Pacing Desk (/p2/paid-marketing/pacing-desk): reads every Google Ads account live each day and measures it against the
+month's allocations (kept on the page, not in a sheet), projects every account to month end from actual spend per active day (never from the daily cap), labels it
 over/under/on target against ideal pacing ((today-1)/days in month, +2pp tolerance), and recommends budget
 moves between categories inside one location that net to zero; anyone can tick a move as applied. The
-engine runs on the PPC team's machine, or the Refresh button rebuilds it from the two Google Sheets. Performance
+platform builds the run itself (the first visit of each day, or the Refresh button). Performance
 Summarizer (/p2/paid-marketing/performance-summarizer): live Google Ads numbers for any of the ~50 accounts under
 the Position2 manager account, chartable by any metric against any other, split by day, week, month, weekday, hour,
 campaign, campaign type, device or network, compared with the previous period or last year. Product Analysis
@@ -20308,7 +20308,7 @@ clicked, and it outputs priority negatives (ranked by money spent on terms that 
 converted or would block relevant terms or a keyword the account bids on are held back for review), new keywords
 (never one already bid on or already blocked), client-review items and a workbook. Client
 Feedback Agent (/p2/paid-marketing/client-feedback-agent): a chat that answers from live Slack, Gmail, meeting
-transcripts (Zoom first when configured, else the Meeting Notes Drive folder) and the Budget Tracker, through
+transcripts (Zoom first when configured, else the Meeting Notes Drive folder) and the Pacing Desk's allocations, through
 one shared Slack and Google account an admin connects. Segment Analysis (/p2/paid-marketing/segment-analysis):
 pick a Google Ads account, or a whole MCC (OIA, Eventgroove, Tealium, Workato: all of its accounts together), and
 a date range and it reads Google Ads live to build the PPC team's segment report: day of the week, hour of the

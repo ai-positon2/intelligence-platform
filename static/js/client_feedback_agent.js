@@ -242,7 +242,7 @@ sendBtn.addEventListener("click",function(){send(input.value)});
 
 /* ── Sources: chips in the bar, details + connect in a popover ── */
 var LABEL={slack:["Slack","S","slack"],google:["Google","G","google"],zoom:["Zoom","Z","zoom"]};
-var WHAT={slack:"Search and channel history",google:"Gmail, Meeting Notes, Budget Tracker",zoom:"Cloud meeting transcripts"};
+var WHAT={slack:"Search and channel history",google:"Gmail and Meeting Notes",zoom:"Cloud meeting transcripts"};
 var STATE=null;
 function stateOf(p){
   var s=(STATE&&STATE.sources[p])||{};

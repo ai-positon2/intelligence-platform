@@ -4,7 +4,7 @@ A chat for account managers: "summarise the last Riccobene meeting", "what's
 the latest budget for Eventgroove", "what's been said about Beta Bionics this
 week". Claude answers with six read-only tools over live Slack, Gmail, the
 daily meeting-notes Drive folder (Zoom's own cloud transcripts first, when
-Zoom is configured) and the Budget Tracker sheet.
+Zoom is configured) and the Pacing Desk's allocations and latest Google Ads run.
 
 Ported from Agent Holmes (server/feedback.js). Same tools, same prompt, same
 single shared grant: ONE Slack account and ONE Google account, connected once
@@ -42,8 +42,6 @@ from . import paid_store as store
 log = logging.getLogger(__name__)
 
 MEETING_FOLDER_ID = "1hc1fPOHKsUNGbqBClcb4G7qwa5T38KYf"
-BUDGET_TRACKER_ID = "1X_HjD0NUzp1br9SsLV7AICdS_SokdYuzbXc75ENVJ7A"
-BUDGET_TAB = "DPR"
 
 SLACK_SCOPES = ("search:read.public,search:read.private,search:read.mpim,search:read.im,"
                 "search:read.users,channels:history,groups:history,im:history,mpim:history,"
@@ -93,6 +91,37 @@ def configured():
         "zoom": bool(env("ZOOM_ACCOUNT_ID") and env("ZOOM_CLIENT_ID") and env("ZOOM_CLIENT_SECRET")
                      and env("ZOOM_USER_ID")),
     }
+
+
+def budget_snapshot(book, run, client=""):
+    """The text the budget tool answers with: the month's allocations (pb.book_for) and, when `run` (a stored Pacing Desk run) is for the
+    same month, each account's spend so far, projection and verdict. `client` keeps the rows whose client or account contains it."""
+    month = book["month"]
+    kind, frm = book["source"]["kind"], book["source"].get("from")
+    names = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
+    label = lambda m: "%s %s" % (names[int(m[5:7]) - 1], m[:4])
+    head = "Allocations for %s (%s)." % (label(month), {
+        "saved": "saved by the team", "carried": "carried over from %s, not yet saved for %s" % (label(frm or month), label(month)) if frm else "carried over",
+        "seeded": "taken from the Pacing Desk run of %s, not yet saved" % frm, "none": "none saved yet"}[kind])
+    pace = {}
+    if run and str(run.get("asOf") or "")[:7] == month:
+        for c in run.get("clients") or []:
+            for a in c.get("accounts") or []:
+                pace[(str(c.get("name")).lower(), str(a.get("name")).lower())] = a
+        head += " Spend and projection are from the Google Ads run of %s." % run["asOf"]
+    q = client.strip().lower()
+    rows = [r for r in book["rows"] if not q or q in r["client"].lower() or q in r["account"].lower()]
+    if not rows:
+        return head + (" No allocation matches %r." % client if q else " Add them in the Pacing Desk's Allocations.")
+    lines = [head, "Client | Account | Allocated | Target CPA | Days running | Status | Spent so far | Projected month end | Verdict"]
+    for r in rows:
+        a = pace.get((r["client"].lower(), r["account"].lower()))
+        lines.append(" | ".join([r["client"], r["account"], "$%s" % format(r["allocated"], ",.0f"),
+                                 "$%s" % format(r["targetCpa"], ",.0f") if r.get("targetCpa") else "",
+                                 r.get("daysRunning") or "every day", r.get("status") or "",
+                                 "$%s" % format(a["spend"], ",.0f") if a else "", "$%s" % format(a["projected"], ",.0f") if a and not a.get("ambiguous") else "",
+                                 (a.get("landing") or "").lower() if a else ""]))
+    return "\n".join(lines)
 
 
 def truncate(s, n):
@@ -404,23 +433,20 @@ class Tools:
 
     # Budget -----------------------------------------------------------------
     def get_budget_snapshot(self, inp):
-        token = google_token(self.post)
-        client = str(inp.get("client") or "").strip().lower()
-        # The Budget Tracker's DPR tab, read as values. A Drive CSV export
-        # only ever returns a spreadsheet's FIRST tab, so it is the fallback.
-        rows = None
-        r = self.get("https://sheets.googleapis.com/v4/spreadsheets/%s/values/%s" % (BUDGET_TRACKER_ID, BUDGET_TAB),
-                     headers={"Authorization": "Bearer " + token}, timeout=HTTP_TIMEOUT)
-        if r.status_code == 200:
-            rows = [",".join(str(c) for c in row) for row in r.json().get("values") or []]
-        else:
-            log.info("paid_feedback: Sheets read failed (%s), using the Drive export", r.status_code)
-            rows = self._drive_export(token, BUDGET_TRACKER_ID, "text/csv").split("\n")
-        if client:
-            hit = [l for l in rows if client in l.lower()]
-            if hit:
-                rows = (rows[:1] + hit) if rows and rows[0] not in hit else hit
-        return truncate("\n".join(rows), 5000)
+        """This month's allocations (what each account is meant to spend) with where the latest Google Ads run has each one: both are the
+        Pacing Desk's own, no Google Sheet is read."""
+        from . import paid_pacing_budget_store as bstore
+        from . import paid_pacing_budgets as pb
+        from . import paid_refresh
+        month = pb.month_of(paid_refresh.pacific_day())
+        book = pb.book_for(month, store=bstore, run_fn=lambda: paid_refresh.latest_run(store))
+        date_, run = None, None
+        try:
+            date_ = store.latest_date()
+            run = store.get_snapshot(date_) if date_ else None
+        except store.StoreUnavailable:
+            run = None
+        return truncate(budget_snapshot(book, run, str(inp.get("client") or "")), 5000)
 
     # Gmail ------------------------------------------------------------------
     def search_email(self, inp):
@@ -537,9 +563,9 @@ TOOL_SPECS = [
          "keyword": {"type": "string", "description": "Client name or topic to find, e.g. 'Riccobene' or 'Beta Bionics'"}},
          "required": ["keyword"]}},
     {"name": "get_budget_snapshot",
-     "description": "Read Position2's Budget Tracker sheet (allocated budgets, target CPA/ROAS, status, channel per account). Optionally filter to rows mentioning one client.",
+     "description": "Read this month's budget allocations for Position2's Google Ads accounts (allocated budget, target CPA, days running, status), with each account's spend so far, projected month end and pacing verdict from the latest Pacing Desk run. Optionally filter to rows mentioning one client.",
      "input_schema": {"type": "object", "properties": {
-         "client": {"type": "string", "description": "Client or account name to filter to, e.g. 'Eventgroove'. Omit for the whole sheet."}}}},
+         "client": {"type": "string", "description": "Client or account name to filter to, e.g. 'Eventgroove'. Omit for every account."}}}},
     {"name": "search_email",
      "description": "Search the connected Gmail account using Gmail search syntax (from:, to:, subject:, after:, newer_than:, etc). Returns compact results: subject, sender, date, snippet, and thread ID for follow-up reads.",
      "input_schema": {"type": "object", "properties": {"query": {"type": "string"}}, "required": ["query"]}},
@@ -557,7 +583,7 @@ def step_label(name, inp):
         "search_slack": 'Searching Slack for "%s"' % q("query"),
         "read_slack_channel": "Reading Slack channel %s" % q("channel_id"),
         "get_meeting_transcript": 'Finding the "%s" meeting transcript' % q("keyword"),
-        "get_budget_snapshot": "Reading the Budget Tracker" + (" for %s" % q("client") if inp.get("client") else ""),
+        "get_budget_snapshot": "Reading the budget allocations" + (" for %s" % q("client") if inp.get("client") else ""),
         "search_email": 'Searching email for "%s"' % q("query"),
         "read_email": "Reading an email thread",
     }.get(name, name)
