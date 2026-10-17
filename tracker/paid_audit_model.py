@@ -12,9 +12,10 @@ Results:
     unknown   the platform would not say, so the audit does not guess (never counted as a pass or as a failure)
 
 Scoring is plain arithmetic: a pass earns the check's weight, a warn half of it, a fail nothing; na and unknown are left out of the
-denominator and counted so the report can say how much of the account it could not look at. A failed critical check keeps the grade
-from rising above a C however much else is right, because one broken tracking or targeting setting can make every other number
-untrustworthy.
+denominator and counted so the report can say how much of the account it could not look at. The grade is held at C or below when a
+critical check failed (one broken tracking or targeting setting can make every other number untrustworthy), when 30 percent or more of
+the checks could not be read (a high score over a small judged part is not a good account), or when a check says the account is not
+advertising (most of the other checks then pass because there is nothing to fault).
 """
 from __future__ import annotations
 
@@ -24,7 +25,8 @@ WEIGHT = {"critical": 8, "high": 4, "medium": 2, "low": 1}
 CREDIT = {"pass": 1.0, "warn": 0.5, "fail": 0.0}
 MAX_ITEMS = 12                                    # affected things named in one finding
 GRADES = ((90, "A"), (75, "B"), (60, "C"), (40, "D"), (0, "F"))
-CAP_GRADE = "C"                                   # the best grade an account with a failed critical check can have
+CAP_GRADE = "C"                                   # the best grade an account can have while any reason to hold it down applies
+UNKNOWN_CAP = 30                                  # per cent of the checks that could not be read, from which the grade is held
 PLATFORMS = ("google", "meta")
 
 CATALOG: dict = {}                                # check id -> {section, platform, title, severity, why, fix}
@@ -60,10 +62,11 @@ def register(entries):
         CATALOG[e["id"]] = dict(e)
 
 
-def make(check_id, result, found, *, items=None, count=None, severity=None, detail=None):
+def make(check_id, result, found, *, items=None, count=None, severity=None, detail=None, caps=None):
     """One finding. `found` is the sentence that says what was seen, with its numbers. `items` names the affected things (campaigns,
     ad groups, keywords), capped; `count` is how many there really are when that is more than the items shown. `severity` overrides the
-    catalog's for this finding (a failure that is costing a lot is more severe than the same failure on a quiet account)."""
+    catalog's for this finding (a failure that is costing a lot is more severe than the same failure on a quiet account). `caps` is a short
+    reason (a sentence fragment) that holds the grade at C or below for as long as this finding stands."""
     spec = CATALOG.get(check_id)
     if spec is None:
         raise CatalogError("unknown check %r" % check_id)
@@ -80,6 +83,8 @@ def make(check_id, result, found, *, items=None, count=None, severity=None, deta
            "items": shown, "count": total}
     if detail:
         out["detail"] = detail
+    if caps:
+        out["caps"] = str(caps)
     return out
 
 
@@ -106,12 +111,27 @@ def _score(findings):
     return None if not possible else round(100.0 * earned / possible)
 
 
+def cap_reasons(findings):
+    """Why the grade is held at C or below, as short phrases (empty when it is not)."""
+    reasons = []
+    if any(f["severity"] == "critical" and f["result"] == "fail" for f in findings):
+        reasons.append("a critical check failed")
+    judged = sum(1 for f in findings if f["result"] in CREDIT)
+    unread = sum(1 for f in findings if f["result"] == "unknown")
+    if unread and 100.0 * unread / (judged + unread) >= UNKNOWN_CAP:
+        reasons.append("%d%% of the checks could not be read" % round(100.0 * unread / (judged + unread)))
+    for f in findings:
+        if f.get("caps") and f["caps"] not in reasons:
+            reasons.append(f["caps"])
+    return reasons
+
+
 def grade_of(score, findings=()):
-    """A letter for a score, held to C when any finding is a failed critical check. None when nothing could be judged."""
+    """A letter for a score, held to C when there is a reason to (see cap_reasons). None when nothing could be judged."""
     if score is None:
         return None
     letter = next(g for floor, g in GRADES if score >= floor)
-    if letter in ("A", "B") and any(f["severity"] == "critical" and f["result"] == "fail" for f in findings):
+    if letter in ("A", "B") and cap_reasons(findings):
         return CAP_GRADE
     return letter
 
@@ -159,7 +179,7 @@ def summarise(findings):
     score = _score(findings)
     judged = sum(1 for f in findings if f["result"] in CREDIT)
     unread = sum(1 for f in findings if f["result"] == "unknown")
-    out = {"score": score, "grade": grade_of(score, findings), "tally": tally(findings), "judged": judged, "unknown": unread,
+    out = {"score": score, "grade": grade_of(score, findings), "capReasons": cap_reasons(findings), "tally": tally(findings), "judged": judged, "unknown": unread,
            "unknownShare": round(100.0 * unread / (judged + unread)) if (judged + unread) else 0,
            "critical": sum(1 for f in findings if f["severity"] == "critical" and f["result"] == "fail"),
            "high": sum(1 for f in findings if f["severity"] == "high" and f["result"] == "fail")}

@@ -716,7 +716,7 @@ def str_any(ctx):
         return unknown("G-STR-12", "the campaigns could not be read")
     if not ctx.camps:
         return make("G-STR-12", "warn", "No campaign is enabled (%s). The account is not advertising, so most checks do not apply and the score only reflects its settings." %
-                    plural(ctx.counts["paused"], "paused campaign"))
+                    plural(ctx.counts["paused"], "paused campaign"), caps="the account is not advertising")
     return make("G-STR-12", "pass", "%s." % plural(len(ctx.camps), "enabled campaign"))
 
 

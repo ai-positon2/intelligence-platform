@@ -140,7 +140,7 @@ def test_grades_and_the_cap_for_a_failed_critical_check():
     assert m.grade_of(55, crit) == "D"                        # the cap only lowers, never raises
     assert m.grade_of(95, [f("B", "fail", "high")]) == "A"
     assert m.grade_of(95, [f("C", "warn", "critical")]) == "A"   # a warning is not a failed check
-    assert m.grade_of(95, [f("D", "unknown", "critical")]) == "A"
+    assert m.grade_of(95, [f("D", "unknown", "critical")] + [f("Q%d" % i, "pass", "low") for i in range(9)]) == "A"       # one unread check in ten is not a reason
 
 
 def test_sections_are_grouped_in_order_with_their_own_scores():
@@ -225,3 +225,44 @@ def test_plural_and_verb_agree_with_the_count():
 def test_names_takes_a_key_from_dicts_and_text_from_anything_else():
     assert m.names([{"name": "A"}, {"name": "B"}]) == ["A", "B"] and m.names(["x", 3]) == ["x", "3"]
     assert m.names([{"title": "T"}], key="title") == ["T"] and m.names([]) == []
+
+
+# ── What holds a grade down ─────────────────────────────────────────────────
+
+def many(passed, unread, **kw):
+    return [f("P%d" % i, "pass", "low") for i in range(passed)] + [f("U%d" % i, "unknown", "low") for i in range(unread)]
+
+
+def test_a_grade_is_held_at_c_when_thirty_percent_or_more_of_the_checks_could_not_be_read():
+    assert m.cap_reasons(many(7, 3)) == ["30% of the checks could not be read"] and m.grade_of(100, many(7, 3)) == "C"
+    assert m.cap_reasons(many(8, 2)) == [] and m.grade_of(100, many(8, 2)) == "A"                      # 20 percent is not
+    assert m.cap_reasons(many(69, 31)) == ["31% of the checks could not be read"] and m.cap_reasons(many(71, 29)) == []
+    assert m.cap_reasons(many(1, 9)) == ["90% of the checks could not be read"]
+    assert m.grade_of(100, many(3, 7)) == "C" and m.grade_of(50, many(3, 7)) == "D"                     # a cap only lowers
+    assert m.cap_reasons([]) == [] and m.cap_reasons(many(5, 0)) == []
+
+
+def test_a_finding_can_hold_the_grade_with_a_reason_and_the_reason_is_said_once():
+    setup = [entry("N-1", "s1", "high"), entry("N-2", "s1", "high")]
+    m.section("s1", "First", "google", 1)
+    m.register(setup)
+    a = m.make("N-1", "warn", "No campaign is enabled.", caps="the account is not advertising")
+    b = m.make("N-2", "warn", "No campaign is live.", caps="the account is not advertising")
+    assert a["caps"] == "the account is not advertising" and "caps" not in m.make("N-1", "warn", "x")
+    p = many(40, 0)
+    assert m.cap_reasons(p + [a, b]) == ["the account is not advertising"] and m.grade_of(95, p + [a, b]) == "C"
+    assert m.grade_of(95, p + [m.make("N-1", "warn", "x")]) == "A"
+    both = m.cap_reasons([f("C1", "fail", "critical")] + many(4, 6) + [a])
+    assert both == ["a critical check failed", "50% of the checks could not be read", "the account is not advertising"]
+
+
+def test_the_summary_and_each_section_say_why_the_grade_is_held():
+    m.section("s1", "First", "google", 1)
+    m.section("s2", "Second", "google", 2)
+    m.register([entry("A", "s1", "low"), entry("B", "s2", "low"), entry("C", "s2", "low"), entry("D", "s2", "low")])
+    fs = [m.make("A", "pass", "a")] + [m.make("B", "pass", "b"), m.make("C", "unknown", "c"), m.make("D", "unknown", "d")]
+    s = m.summarise(fs)
+    assert s["capReasons"] == ["50% of the checks could not be read"] and s["grade"] == "C" and s["score"] == 100
+    secs = {x["key"]: x for x in m.sections_of(fs)}
+    assert secs["s1"]["grade"] == "A" and secs["s2"]["grade"] == "C"                                    # the section that was mostly unread is held, the other is not
+    assert m.summarise([m.make("A", "pass", "a")])["capReasons"] == []

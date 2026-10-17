@@ -305,7 +305,8 @@ def str_any(ctx):
     if ctx.camps is None:
         return unknown("M-STR-06", "the campaigns could not be read")
     if not ctx.camps:
-        return make("M-STR-06", "warn", "No campaign is live. The ad account is not advertising, so most checks do not apply and the score only reflects the account and its pixel.")
+        return make("M-STR-06", "warn", "No campaign is live. The ad account is not advertising, so most checks do not apply and the score only reflects the account and its pixel.",
+                    caps="the ad account is not advertising")
     return make("M-STR-06", "pass", "%s." % plural(len(ctx.camps), "live campaign"))
 
 

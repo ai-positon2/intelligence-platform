@@ -93,10 +93,11 @@ function paintScore(s, rep){
   }).join("");
   var judged = s.judged || 0;
   var fails = s.tally ? s.tally.fail : 0, warns = s.tally ? s.tally.warn : 0;
-  var sentence = s.score == null ? "Nothing could be judged: every part the checks need could not be read." :
-    s.critical ? D.plural(s.critical, "critical check") + " failed, so the grade is held at C or below." :
+  var held = (s.capReasons || []).length ? " The grade is held at C or below because " + s.capReasons.join(", and ") + "." : "";
+  var sentence = (s.score == null ? "Nothing could be judged: every part the checks need could not be read." :
+    s.critical ? D.plural(s.critical, "critical check") + " failed." :
     fails ? "No critical check failed. " + D.plural(fails, "check") + " failed and " + D.plural(warns, "check") + (warns === 1 ? " is a warning." : " are warnings.") :
-    warns ? "No check failed. " + D.plural(warns, "check") + (warns === 1 ? " is a warning." : " are warnings.") : "No check failed and nothing is a warning.";
+    warns ? "No check failed. " + D.plural(warns, "check") + (warns === 1 ? " is a warning." : " are warnings.") : "No check failed and nothing is a warning.") + held;
   $("#score").innerHTML = '<div class="au-ring au-tone-'+tone+'"><svg viewBox="0 0 132 132" aria-hidden="true"><circle class="bg" cx="66" cy="66" r="56"></circle>' +
     '<circle class="fg" cx="66" cy="66" r="56" stroke-dasharray="'+r.dash.toFixed(1)+' '+r.gap.toFixed(1)+'"></circle></svg>' +
     '<div class="au-ring-n"><b>' + esc(D.scoreText(s.score)) + '</b><span>' + (s.grade ? "GRADE " + esc(s.grade) : "") + '</span></div></div>' +

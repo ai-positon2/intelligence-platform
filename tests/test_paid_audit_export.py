@@ -214,3 +214,13 @@ def test_a_passing_check_names_no_affected_things_in_the_pdf_even_when_the_read_
     f["items"], f["count"] = ["a campaign name"], 1
     rows = [row for _l, _s, _h, rows_ in ex.pdf_sections(r) for row in rows_ if row[2].startswith(f["id"])]
     assert rows and rows[0][0] == "Pass" and "Affected" not in rows[0][3] and "a campaign name" not in rows[0][3]
+
+
+def test_the_summary_says_why_a_grade_is_held_and_says_nothing_when_it_is_not(report):
+    held = make_report()
+    held["summary"]["capReasons"] = ["a critical check failed", "40% of the checks could not be read"]
+    d = dict((r[0], r[1]) for r in ex.tables(held)["Summary"][1])
+    assert d["Grade held at C or below because"] == "a critical check failed; 40% of the checks could not be read"
+    clear = make_report()
+    clear["summary"]["capReasons"] = []
+    assert "Grade held at C or below because" not in dict((r[0], r[1]) for r in ex.tables(clear)["Summary"][1])

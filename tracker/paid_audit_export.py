@@ -59,7 +59,8 @@ def tables(report):
     for a in report.get("accounts") or []:
         ov.append([PLATFORM_TEXT.get(a["platform"], a["platform"]) + " account", "%s (%s)" % (a.get("name") or "", a.get("id") or "")])
     ov += [["Read on", (report.get("readAt") or "")[:16].replace("T", " ")], ["Audit made on", (report.get("generatedAt") or "")[:10]],
-           ["Overall score", summary.get("score") if summary.get("score") is not None else "Nothing could be judged"], ["Overall grade", summary.get("grade") or ""]]
+           ["Overall score", summary.get("score") if summary.get("score") is not None else "Nothing could be judged"], ["Overall grade", summary.get("grade") or ""],
+           ["Grade held at C or below because", "; ".join(summary.get("capReasons") or [])]]
     for p, v in (summary.get("platforms") or {}).items():
         ov.append(["%s score" % PLATFORM_TEXT.get(p, p), "%s (%s)" % (v.get("score"), v.get("grade")) if v.get("score") is not None else "Nothing could be judged"])
     t = summary.get("tally") or {}
