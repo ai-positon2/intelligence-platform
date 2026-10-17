@@ -159,3 +159,20 @@ def fake_search(answers, fail=()):
         return answers.get(gaql, [])
     search.asked = []
     return search
+
+
+def a_read(**over):
+    """A healthy compact read (what tracker.paid_audit_google_read.read_account returns), built from the fixtures above through the real
+    parsers; `over` replaces whole parts (for example conversions=None for a part that could not be read)."""
+    from tracker import paid_audit_google_read as r
+    ans = {r.CUSTOMER_GAQL: customer(optimizationScore=0.72), r.CONVERSIONS_GAQL: [action("1", "Submit lead form")], r.CONVERSION_VOLUME_GAQL: [volume("1", 40.0, value=0.0)],
+           r.LINKS_GAQL: [], r.MERCHANT_GAQL: [], r.LISTS_GAQL: [user_list(search=5000, display=5000)],
+           r.CAMPAIGNS_GAQL: [campaign("10", "Search | Implants")], r.CAMPAIGN_METRICS_GAQL: [campaign_metrics("10", 5000, 400, 1000.0, 40.0, share=0.6)],
+           r.CAMPAIGN_CRITERIA_GAQL: [criterion("10", "LOCATION"), criterion("10", "LANGUAGE")], r.CAMPAIGN_NEGATIVES_GAQL: [negative("10")],
+           r.CAMPAIGN_LISTS_GAQL: [attached_list("10")], r.NETWORK_GAQL: [network_row("10", "SEARCH", 1000.0, 40.0)],
+           r.AD_GROUPS_GAQL: [ad_group("100", "10", "Implants")], r.KEYWORDS_GAQL: [keyword(qs=8, crit=str(i), text="kw %d" % i) for i in range(5)],
+           r.KEYWORD_METRICS_GAQL: [keyword_metrics(crit=str(i), impressions=1000, clicks=80, cost=200.0, conversions=8.0) for i in range(5)],
+           r.ADS_GAQL: [ad(aid="1"), ad(aid="2")], r.TERMS_GAQL: [term("implants near me", 600.0, 60, 6.0), term("free implants", 50.0, 9, 0.0)]}
+    out = r.read_account("1112223334", search_fn=fake_search(ans))
+    out.update(over)
+    return out
