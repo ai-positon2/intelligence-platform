@@ -285,3 +285,33 @@ def dpr_rows(rows, month):
         out.append([r["client"], r["account"], r["allocated"], r.get("targetCpa"), first, r.get("status") or "Active",
                     r.get("daysRunning") or "All days", r.get("am") or "", "Google"])
     return out
+
+
+# ── Which rows a month uses ─────────────────────────────────────────────────
+
+FIELDS = ("client", "account", "allocated", "targetCpa", "daysRunning", "status", "am")
+
+
+def book_for(month, *, store, run_fn=None):
+    """{month, rows, source} for the month the engine is about to pace. The rows are, in order of preference:
+
+      saved    the month's own rows (someone saved them);
+      carried  the most recent earlier month's rows, because a month's budgets are usually the last month's until someone changes them;
+      seeded   the accounts and allocations of the last Pacing Desk run the platform stored (run_fn() gives (date, clients)), for the
+               first month the platform keeps its own;
+      none     nothing yet.
+
+    `source` says which, and (carried, seeded) where from, so the page can ask a person to confirm rows nobody has saved."""
+    check_month(month)
+    rows = store.list_month(month)
+    if rows:
+        return {"month": month, "rows": rows, "source": {"kind": "saved"}}
+    earlier = [m for m in store.months() if m < month]
+    if earlier:
+        return {"month": month, "rows": [{k: r.get(k) for k in FIELDS} for r in store.list_month(earlier[-1])],
+                "source": {"kind": "carried", "from": earlier[-1]}}
+    date, clients = run_fn() if run_fn else (None, [])
+    seeded = seed_from_run(clients)
+    if seeded:
+        return {"month": month, "rows": seeded, "source": {"kind": "seeded", "from": date}}
+    return {"month": month, "rows": [], "source": {"kind": "none"}}

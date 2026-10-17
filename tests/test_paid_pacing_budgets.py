@@ -207,3 +207,42 @@ def test_a_header_with_only_one_of_client_and_account_is_refused():
 def test_a_stored_runs_allocation_must_be_a_real_positive_number():
     clients = [{"name": "A", "accounts": [{"name": "B", "allocated": "5"}, {"name": "C", "allocated": True}, {"name": "D", "allocated": -4}]}]
     assert b.seed_from_run(clients) == []
+
+
+# ── Which rows a month uses ─────────────────────────────────────────────────
+
+class MemStore:
+    def __init__(self, **by_month):
+        self.by = by_month
+
+    def list_month(self, m):
+        return [dict(r, updatedBy="ana", updatedAt="2026-09-01T00:00:00+00:00") for r in self.by.get(m, [])]
+
+    def months(self):
+        return sorted(m for m, rows in self.by.items() if rows)
+
+
+def test_a_month_with_saved_rows_uses_them():
+    book = b.book_for("2026-10", store=MemStore(**{"2026-10": [b.check_row(row())], "2026-09": [b.check_row(row(allocated=1))]}))
+    assert book["source"] == {"kind": "saved"} and book["rows"][0]["allocated"] == 3000 and book["rows"][0]["updatedBy"] == "ana"
+
+
+def test_a_new_month_carries_the_latest_earlier_months_rows_without_who_saved_them():
+    store = MemStore(**{"2026-07": [b.check_row(row(allocated=1))], "2026-09": [b.check_row(row(allocated=2))], "2026-12": [b.check_row(row(allocated=3))]})
+    book = b.book_for("2026-10", store=store)
+    assert book["source"] == {"kind": "carried", "from": "2026-09"} and [r["allocated"] for r in book["rows"]] == [2]
+    assert set(book["rows"][0]) == set(b.FIELDS)                  # nothing says a person saved it
+    assert b.book_for("2026-06", store=store)["source"] == {"kind": "none"}            # nothing earlier than June: nothing to carry
+
+
+def test_the_first_month_is_seeded_from_the_last_run():
+    run = lambda: ("2026-09-30", [{"name": "Acme", "accounts": [{"name": "Acme Dental", "allocated": 3000}]}])
+    book = b.book_for("2026-10", store=MemStore(), run_fn=run)
+    assert book["source"] == {"kind": "seeded", "from": "2026-09-30"} and book["rows"][0]["account"] == "Acme Dental"
+
+
+def test_nothing_anywhere_is_an_empty_book():
+    assert b.book_for("2026-10", store=MemStore()) == {"month": "2026-10", "rows": [], "source": {"kind": "none"}}
+    assert b.book_for("2026-10", store=MemStore(), run_fn=lambda: (None, []))["source"] == {"kind": "none"}
+    with pytest.raises(b.BadBudget):
+        b.book_for("October", store=MemStore())
