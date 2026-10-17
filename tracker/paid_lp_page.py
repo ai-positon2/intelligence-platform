@@ -402,6 +402,15 @@ def _once(url, fetcher, html_only=True):
         resp.close()
 
 
+def _where(url):
+    """(scheme, host, path) of an address, for telling whether a request ended somewhere else: http against https, the apex against www and a changed path all count, a trailing slash, a default port, a fragment and the query do not."""
+    p = urlsplit(str(url or ""))
+    scheme, host = p.scheme.lower(), p.netloc.lower().rsplit("@", 1)[-1]
+    if host.endswith(":80" if scheme == "http" else ":443"):
+        host = host.rsplit(":", 1)[0]
+    return scheme, host, p.path.rstrip("/") or "/"
+
+
 def _survives(final):
     keys = {k for k, _ in parse_qsl(urlsplit(final).query)}
     return "gclid" in keys and "utm_source" in keys
@@ -422,9 +431,9 @@ def fetch(url, fetcher=None, robots=None):
             continue
         break
     out["blocked"] = out["status"] in BLOCKED
-    out["redirected"] = bool(out["finalUrl"]) and pages.page_key(out["finalUrl"]) != pages.page_key(url)
+    out["redirected"] = bool(out["finalUrl"]) and _where(out["finalUrl"]) != _where(url)
     if out["redirected"]:
-        a, b = urlsplit(pages.clean(url)), urlsplit(out["finalUrl"])
+        a, b = urlsplit(url), urlsplit(out["finalUrl"])
         out["collapsed"] = (b.path or "/") == "/" and (a.path or "/") != "/"
     if html is not None and out["status"] < 400:
         out["isHtml"] = True

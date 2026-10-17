@@ -20,7 +20,6 @@ import logging
 import re
 import threading
 
-from . import paid_audit_pages as audit_pages
 from . import paid_gads as base
 from . import paid_gads_segments as gads
 from . import paid_lp_ai as lp_ai
@@ -39,7 +38,7 @@ log = logging.getLogger(__name__)
 ID_RE = re.compile(r"^\d{10}$")
 MAX_PAGES = 40                                     # fetched and checked per account, the ones that spent most
 MIN_JUDGED = 10                                    # checks a page needs judged (not "could not check") before it counts towards the account's score
-CACHE_VERSION = "1"                                # bump when the shape of a saved read changes
+CACHE_VERSION = "2"                                # bump when the shape of a saved read changes
 TTL_S = 3600
 PARTIAL_TTL_S = 300
 SHOWN_GROUPS = 8                                   # ad groups shown per page
@@ -53,6 +52,8 @@ NOTES = [
     "A site that refuses automated requests (HTTP 401, 403 or 429) is reported as not verified, not as broken. Google's crawler and real visitors are normally let in.",
     "Server time is measured from our servers and includes redirects. Google's own mobile speed score and the optional lab test are shown beside the "
     "measured figures and never replace them.",
+    "A page is its address without the tracking tags: the same host and path is one page, and so is the same page with or without www or https. A parameter that chooses "
+    "which page a site shows (a location, a product, a post) makes another page.",
     "A keyword is on the page when every one of its words is (plurals and common endings count). Search terms and keywords are weighted by what they spent.",
 ]
 FINDING_KEYS = ("id", "result", "severity", "found", "items", "count", "caps", "detail")
@@ -71,9 +72,13 @@ def parse_account(raw):
 def raw_read(account, *, search_fn=None, fetcher=None, now=None, max_pages=MAX_PAGES):
     """The raw read of one account: Google's side, and the busiest `max_pages` pages fetched. Reading the landing pages from Google failing is raised."""
     read = lp_read.read_account(account["id"], search_fn=search_fn)
-    chosen = [p for p in read["pages"] if audit_pages.clean(p["url"])][:max_pages]
-    records = lp_page.fetch_many([p["url"] for p in chosen], fetcher) if chosen else []
-    fetches = {p["id"]: rec for p, rec in zip(chosen, records)}
+    chosen = read["pages"][:max_pages]
+    reachable = [p for p in chosen if not p.get("templated")]
+    records = lp_page.fetch_many([p["url"] for p in reachable], fetcher) if reachable else []
+    fetches = {p["id"]: rec for p, rec in zip(reachable, records)}
+    for p in chosen:
+        if p.get("templated"):                                # Google fills the host or path in at click time: the page people reach is not known, so none is fetched
+            fetches[p["id"]] = {"url": p["url"], "status": 0, "error": "", "templated": True, "skipped": False, "blocked": False, "isHtml": False, "facts": None, "tech": None}
     return {"read": read, "fetches": fetches, "account": {"id": account["id"], "name": account["name"], "currency": account.get("currency") or ""},
             "readAt": (now or dt.datetime.now(dt.timezone.utc)).isoformat()}
 
@@ -137,7 +142,7 @@ def _seen(fetch):
         return None
     f = fetch.get("facts") or {}
     base_ = {"status": fetch.get("status"), "error": fetch.get("error") or "", "blocked": bool(fetch.get("blocked")), "skipped": bool(fetch.get("skipped")),
-             "finalUrl": fetch.get("finalUrl") or "", "redirected": bool(fetch.get("redirected")), "responseMs": fetch.get("responseMs"), "ms": fetch.get("ms"),
+             "templated": bool(fetch.get("templated")), "finalUrl": fetch.get("finalUrl") or "", "redirected": bool(fetch.get("redirected")), "responseMs": fetch.get("responseMs"), "ms": fetch.get("ms"),
              "bytes": fetch.get("bytes"), "encoding": fetch.get("encoding") or "", "truncated": bool(fetch.get("truncated")), "adsbot": fetch.get("adsbot")}
     if not f:
         return base_
@@ -186,7 +191,7 @@ def build_page(p, raw):
     groups = [read["adGroups"][gid] for gid in p.get("adGroups", []) if gid in read["adGroups"]]
     fetch = raw["fetches"].get(p["id"])
     clicks = p["clicks"]
-    rec = {"id": p["id"], "url": p["url"], "name": p["id"], "spend": p["cost"], "clicks": clicks, "conversions": p["conversions"], "impressions": p["impressions"],
+    rec = {"id": p["id"], "url": p["url"], "name": p.get("name") or p["id"], "spend": p["cost"], "clicks": clicks, "conversions": p["conversions"], "impressions": p["impressions"],
            "devices": p["devices"], "speed": p["speed"], "fetch": fetch, "groups": groups, "lab": p.get("lab"), "ok": read["ok"]}
     findings = checks.run(rec)
     summary = model.page_summary(findings)
@@ -241,6 +246,10 @@ def assemble(raw, now=None, labs=None):
     if read["pageCount"] > len(read["pages"]) or len(read["pages"]) > len(judged):
         notes.append("%d landing pages took money in the last 30 days. The %d that spent most were checked, %d%% of the spend." % (
             read["pageCount"], len(judged), round(100.0 * checked_spend / total_spend) if total_spend else 0))
+    unknown_address = [p for p in pages_out if (p["seen"] or {}).get("templated")]
+    if unknown_address:
+        notes.append("%d page%s send%s people to an address Google fills in when someone clicks (a {placeholder} in the host or path), so the page they reach is not known here and %s not fetched. "
+                     "Their spend is counted as not verified." % (len(unknown_address), "" if len(unknown_address) == 1 else "s", "s" if len(unknown_address) == 1 else "", "it was" if len(unknown_address) == 1 else "they were"))
     blocked = [p for p in pages_out if (p["seen"] or {}).get("blocked")]
     if blocked:
         notes.append("%d page%s refused our request, so %s checked only on what Google Ads says." % (len(blocked), "" if len(blocked) == 1 else "s", "it was" if len(blocked) == 1 else "they were"))

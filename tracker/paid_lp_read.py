@@ -9,7 +9,7 @@ Four read-only queries over the last 30 days (a fifth part, the account record, 
              and the address it sends to when it has one of its own (an address on a keyword overrides its ad's)
   terms      what people actually searched, per ad group
 
-A page is its host and path: the same page reached with different parameters is one page. An ad group belongs to the pages its ads and its
+A page is its host and path, plus the few parameters that choose which page a site shows (see ROUTING): the same page reached with other parameters is one page. An ad group belongs to the pages its ads and its
 keywords send people to. Shopping and Performance Max traffic reaches a page with no keyword or ad text to compare, so such a page has no ad group
 and the match checks do not apply to it.
 
@@ -18,9 +18,10 @@ pages part is the point, so its failure is raised. Rows are compacted so a saved
 """
 from __future__ import annotations
 
+import re
 from concurrent.futures import ThreadPoolExecutor
+from urllib.parse import parse_qsl, unquote, urlsplit, urlunsplit
 
-from . import paid_audit_pages as pages
 from . import paid_gads_segments as gads
 
 WINDOW = "LAST_30_DAYS"
@@ -89,15 +90,57 @@ def _money(micros):
     return round(_f(micros) / 1e6, 2)
 
 
+_TEMPLATE = re.compile(r"\{[^{}]*\}")
+# Query parameters that choose WHICH page a site shows (a location, a product, a post), so the same path with another value is another page. Tracking tags and
+# parameters that only vary one page (variant, currency, sort, page number, search words) are not here: they never make a second landing page.
+ROUTING = frozenset({
+    "id", "p", "pid", "page_id", "post", "post_id", "product", "product_id", "sku", "item", "item_id", "cat", "category", "service", "treatment", "topic", "offer",
+    "lp", "landing", "landingpage", "slug", "route", "view", "location", "location_title", "loc", "city", "state", "store", "branch", "office", "clinic"})
+_PORTS = {"http": "80", "https": "443"}
+
+
+def templated(url):
+    """True when the host or path of the address is a {placeholder} Google fills in at click time ({_domain}, {_page}). Such an address is not one page, so it cannot be fetched."""
+    p = urlsplit(str(url or "").strip())
+    return bool(_TEMPLATE.search(p.netloc + p.path))
+
+
+def clean(url):
+    """The address as a visitor would reach it: the fragment dropped and every query parameter whose name or value is a {placeholder} left out (Google fills those in at
+    click time, and an invented value can send a site to an error page or its home page). A placeholder in the host or path is kept as written."""
+    p = urlsplit(str(url or "").strip())
+    query = "&".join(seg for seg in p.query.split("&") if seg and not _TEMPLATE.search(unquote(seg)))
+    return urlunsplit((p.scheme, p.netloc, p.path, query, ""))
+
+
+def _routing(query):
+    """[(name, value)] of the parameters in `query` that choose the page, sorted, in lower case."""
+    return sorted((k.lower(), v.strip().lower()) for k, v in parse_qsl(query, keep_blank_values=False) if k.lower() in ROUTING and v.strip())
+
+
 def page_id(url):
-    """What makes a landing page one page: its host and path, as one string ("www.a.test/x")."""
-    host, path = pages.page_key(url)
-    return host + path
+    """What makes a landing page one page: its host and path ("a.test/x"), with the parameters that choose the page when it has them ("a.test/ols?location_title=quincy").
+    The same page reached by http or https, with or without www or a trailing slash, or with other parameters, is one page."""
+    p = urlsplit(clean(url))
+    host = p.netloc.lower().rsplit("@", 1)[-1]
+    if host.endswith(":" + _PORTS.get(p.scheme.lower(), "")):
+        host = host.rsplit(":", 1)[0]
+    if host.startswith("www."):
+        host = host[4:]
+    path = unquote(p.path).rstrip("/") or "/"
+    pairs = _routing(p.query)
+    return host + path + (("?" + "&".join("%s=%s" % kv for kv in pairs)) if pairs else "")
+
+
+def label(url):
+    """The page as a person would write it: the host as the ad has it, the path and the parameters that choose the page ("www.a.test/ols?location_title=quincy")."""
+    p = urlsplit(clean(url))
+    pairs = _routing(p.query)
+    return p.netloc.lower().rsplit("@", 1)[-1] + (unquote(p.path).rstrip("/") or "/") + (("?" + "&".join("%s=%s" % kv for kv in pairs)) if pairs else "")
 
 
 def _valid(url):
-    from urllib.parse import urlsplit
-    u = pages.clean(url)
+    u = clean(url)
     parts = urlsplit(u)
     return u if parts.scheme in ("http", "https") and parts.netloc else ""
 
@@ -105,8 +148,8 @@ def _valid(url):
 # ── The pages ───────────────────────────────────────────────────────────────
 
 def parse_pages(rows):
-    """[{id, url, impressions, clicks, cost, conversions, value, speed, devices}] by cost, one per page. `url` is the address of the variant that
-    spent most; `devices` is {mobile|desktop|tablet: {clicks, cost, conversions}}; `speed` is Google's 1 to 10 mobile speed score (None when it gave none)."""
+    """[{id, name, url, templated, impressions, clicks, cost, conversions, value, speed, devices}] by cost, one per page. `url` is the address of the variant that
+    spent most and `name` how a person would write it; `templated` is True when the address has a {placeholder} in its host or path; `devices` is {mobile|desktop|tablet: {clicks, cost, conversions}}; `speed` is Google's 1 to 10 mobile speed score (None when it gave none)."""
     out = {}
     for r in rows:
         raw = _get(r, "landingPageView", "unexpandedFinalUrl", default="")
@@ -116,7 +159,7 @@ def parse_pages(rows):
         m = r.get("metrics") or {}
         cost = _money(m.get("costMicros"))
         pid = page_id(url)
-        p = out.setdefault(pid, {"id": pid, "url": url, "impressions": 0, "clicks": 0, "cost": 0.0, "conversions": 0.0, "value": 0.0, "speed": None, "devices": {}, "_top": -1.0,
+        p = out.setdefault(pid, {"id": pid, "name": label(url), "templated": templated(url), "url": url, "impressions": 0, "clicks": 0, "cost": 0.0, "conversions": 0.0, "value": 0.0, "speed": None, "devices": {}, "_top": -1.0,
                                  "_speedCost": -1.0})
         p["impressions"] += _i(m.get("impressions"))
         p["clicks"] += _i(m.get("clicks"))
@@ -129,7 +172,7 @@ def parse_pages(rows):
         d["cost"] = round(d["cost"] + cost, 2)
         d["conversions"] = round(d["conversions"] + _f(m.get("conversions")), 4)
         if cost > p["_top"]:                                # the address shown is the variant that spent most
-            p["_top"], p["url"] = cost, url
+            p["_top"], p["url"], p["name"] = cost, url, label(url)
         score = _i(m.get("speedScore"), None)
         if score is not None and 1 <= score <= 10 and cost > p["_speedCost"]:
             p["_speedCost"], p["speed"] = cost, score

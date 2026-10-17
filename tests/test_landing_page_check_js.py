@@ -111,6 +111,7 @@ def test_device_rates_say_how_phones_do_against_desktops_and_how_much_of_the_tra
 
 def test_the_answer_a_page_gave_reads_in_words():
     assert run("L.statusText(null)") == "Not fetched" and run("L.statusText({skipped:true})") == "Not read in time"
+    assert run("L.statusText({templated:true,status:0})") == "Not fetched (the address is filled in by Google when someone clicks)"
     assert run("L.statusText({blocked:true,status:403})") == "Refused our request (HTTP 403)" and run("L.statusText({status:404})") == "HTTP 404"
     assert run("L.statusText({status:0,error:'timed out'})") == "Could not be reached (timed out)" and run("L.statusText({status:0})") == "Could not be reached"
     assert run("L.statusText({status:200,responseMs:340})") == "HTTP 200 in 340 ms" and run("L.statusText({status:200,responseMs:1800})") == "HTTP 200 in 1.8 s"

@@ -15,7 +15,7 @@ import re
 from . import paid_lp_model as m
 from .paid_lp_model import make, not_applicable, plural, unknown
 from .paid_lp_page import ATF_CHARS, MAX_BYTES, TIMEOUT_S
-from .paid_qa_web import STAGING
+from .paid_strategy_research import registrable
 
 # ── Thresholds ──────────────────────────────────────────────────────────────
 
@@ -137,6 +137,8 @@ class Ctx:
         f = self.fetch
         if not f or f.get("skipped"):
             return "the page was not read in time"
+        if f.get("templated"):
+            return "the ad's address has a placeholder in its host or path that Google fills in when someone clicks, so the page people reach is not known here"
         if f.get("blocked"):
             return "the page refuses automated requests (HTTP %d), so it could not be verified" % f["status"]
         if not f.get("status"):
@@ -182,6 +184,8 @@ def check_status(c):
     f = c.fetch
     if not f or f.get("skipped"):
         return unknown("reach_status", "the page was not read in time")
+    if f.get("templated"):
+        return unknown("reach_status", c.why_unread())
     if f.get("blocked"):
         return unknown("reach_status", "the page refuses automated requests (HTTP %d); Google's crawler and real visitors are normally let in, so it is not called broken" % f["status"])
     status = f.get("status") or 0
@@ -231,8 +235,30 @@ def check_https(c):
     if why:
         return unknown("reach_https", why)
     if (c.tech or {}).get("https"):
+        if (f.get("url") or "").lower().startswith("http://"):
+            return make("reach_https", "warn", "The ad's address uses plain http (%s). The site sends every click on to https, but each visitor waits for that redirect first." % f["url"])
         return make("reach_https", "pass", "The page is served over https.")
     return make("reach_https", "fail", "The page is served over plain http: %s" % (f.get("finalUrl") or f.get("url")))
+
+
+_PRIVATE_END = (".localhost", ".local", ".test", ".invalid", ".internal")
+_IPV4 = re.compile(r"^\d{1,3}(?:\.\d{1,3}){3}$")
+_SURE = re.compile(r"(?:^|-)(?:staging|uat|sandbox)(?:-|\d*$)")      # words that only ever mean a test copy, in any part of a name
+_UNSURE = re.compile(r"^(?:dev|test|qa|preview|stage)\d*$")         # words a real business name can hold ("test-prep.com"), so only a whole subdomain counts
+
+
+def is_test_site(host):
+    """True when a host name is a test or staging copy of a site: a private or numeric address, a subdomain that is dev, test, qa, preview or stage ("dev.acme.com"), or a name
+    with staging, uat or sandbox in it ("acme-staging.com"). A business whose own name holds one of those words ("test-prep.com", "qa-solutions.com") is not one."""
+    host = (host or "").lower().strip(".")
+    if not host:
+        return False
+    if host == "localhost" or host.endswith(_PRIVATE_END) or _IPV4.match(host):
+        return True
+    reg = registrable(host)
+    brand = reg.split(".")[0]
+    subs = host[:-len(reg)].strip(".").split(".") if host != reg and host.endswith(reg) else []
+    return any(_UNSURE.match(x) or _SURE.search(x) for x in subs) or bool(_SURE.search(brand))
 
 
 def check_staging(c):
@@ -241,7 +267,7 @@ def check_staging(c):
     hosts = [urlsplit(c.page["url"]).hostname or ""]
     if f and f.get("finalUrl"):
         hosts.append(urlsplit(f["finalUrl"]).hostname or "")
-    hit = next((h for h in hosts if STAGING.search(h)), "")
+    hit = next((h for h in hosts if is_test_site(h)), "")
     if hit:
         return make("reach_staging", "fail", "The address %s looks like a test or staging site." % hit, caps="the ad points at a test site")
     return make("reach_staging", "pass", "The address does not look like a test or staging site.")

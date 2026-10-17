@@ -38,6 +38,16 @@ copy, keywords and the page's own visible text, treats all of it as data, and it
 - A tag that a consent banner or tag manager loads later is not seen, so a missing tag is a warning that says what was seen.
 - The lab speed test (PageSpeed Insights) needs `PAGESPEED_API_KEY`; without it the page says the test is not connected and shows the
   measured server time, page weight and Google's own speed score instead. Nothing is invented.
+- A page is its host and path, plus the few parameters that choose which page a site shows (a location, a product, a post; the list is `ROUTING` in
+  `tracker/paid_lp_read.py`). Tracking tags (utm_, gclid, fbclid, ValueTrack) never make another page, and neither do parameters that only vary one page (variant,
+  currency, sort, page number, search words). www, http against https, a default port, a trailing slash and a fragment do not make another page either.
+- A {placeholder} in a query parameter is left out of the address that is fetched, never replaced by an invented value. A {placeholder} in the host or path
+  (`{_domain}`, `{_page}`) is filled in by Google at click time, so the page people reach is not known: it is not fetched, its checks say "could not check" and its
+  spend counts as not verified. It is never called broken.
+- An ad address that uses plain http and is sent on to https is a warning (a redirect hop), and a move between http and https, the apex and www, or to another path
+  counts as a redirect.
+- "Looks like a test site" means a dev, test, qa, preview or stage subdomain, a staging, uat or sandbox name, a private address or localhost. A business whose own name
+  holds one of those words (test-prep.com) is not one.
 - Shopping and Performance Max send traffic with no keywords or ad text to compare, so the match checks are not applicable there; every other check still runs.
 
 ## The checklist (6 sections)

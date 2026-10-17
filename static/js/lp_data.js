@@ -125,6 +125,7 @@ function deviceRates(devices){
 function statusText(seen){
   if(!seen) return "Not fetched";
   if(seen.skipped) return "Not read in time";
+  if(seen.templated) return "Not fetched (the address is filled in by Google when someone clicks)";
   if(seen.blocked) return "Refused our request (HTTP " + seen.status + ")";
   if(seen.status && seen.status >= 400) return "HTTP " + seen.status;
   if(!seen.status) return seen.error ? "Could not be reached (" + seen.error + ")" : "Could not be reached";
