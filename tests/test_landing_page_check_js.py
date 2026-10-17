@@ -161,6 +161,18 @@ def test_what_a_keyword_is_doing_on_the_page_has_a_label_and_a_tone_for_every_an
     assert run("L.ratingInfo('below')") == {"label": "Below average", "tone": "bad"} and run("L.ratingInfo(null)")["label"] == "Not rated"
 
 
+def test_the_lab_test_reads_in_seconds_with_a_tone_and_rows_for_the_page_to_draw():
+    assert run("L.secText(3100)") == "3.1 s" and run("L.secText(410)") == "410 ms" and run("L.secText(null)") == "n/a" and run("L.secText(999.6)") == "1000 ms"
+    assert [run("L.labTone(s)", s=s) for s in (100, 90, 89, 50, 49, 0, None)] == ["good", "good", "warn", "warn", "bad", "bad", "unk"]
+    lab = {"score": 62, "lcpMs": 3100, "tbtMs": 410, "cls": 0.123, "fcpMs": 1800, "speedIndexMs": 3300, "field": {"category": "average", "lcpMs": 2800, "inpMs": 190, "cls": 0.12}}
+    rows = dict(run("L.labRows(l)", l=lab))
+    assert rows["Performance score"] == "62 out of 100" and rows["Largest content shown after"] == "3.1 s" and rows["Page blocked for"] == "410 ms" and rows["Layout shift"] == "0.123"
+    assert rows["Real visitors (Chrome UX Report)"] == "rated average, largest content after 2.8 s, interaction delay 190 ms, layout shift 0.12"
+    bare = dict(run("L.labRows(l)", l={"score": None}))
+    assert bare["Performance score"] == "not scored" and bare["Largest content shown after"] == "n/a" and "Real visitors (Chrome UX Report)" not in bare
+    assert run("L.labRows(null)") == [] and dict(run("L.labRows(l)", l={"score": 1, "field": {"category": None}}))["Real visitors (Chrome UX Report)"] == "no figures"
+
+
 def test_the_headline_tiles_say_what_is_at_stake_and_are_calm_when_nothing_is():
     s = {"checked": 24, "pagesOfSpend": 93, "spend": 85000, "spendChecked": 49000, "spendAtRisk": 12000, "pagesAtRisk": 3, "critical": 2, "high": 5, "tally": {"warn": 9}, "spendUnverified": 3000}
     t = {x["key"]: x for x in run("L.tiles(s,'USD')", s=s)}
@@ -213,7 +225,7 @@ def test_every_element_the_page_script_reaches_for_is_in_the_template():
                    "pageFind", "pageList", "moreBtn", "notes", "notesCard", "foot", "refreshBtn", "dlXlsx", "dlPdf", "dlZip"}
     for i in sorted(ids):
         assert 'id="%s"' % i in html, i
-    for attr in ("data-open", "data-page", "data-tab", "data-passed", "data-view"):
+    for attr in ("data-open", "data-page", "data-tab", "data-passed", "data-view", "data-lab"):
         assert attr in js, attr
 
 

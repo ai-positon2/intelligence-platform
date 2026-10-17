@@ -244,6 +244,20 @@ function tabSeen(p){
   return '<dl class="lp-dl">' + rows.map(function(r){return '<dt>' + esc(r[0]) + '</dt><dd>' + esc(r[1]) + '</dd>';}).join("") + '</dl>' +
     '<p class="lp-muted">Seen in the page\'s HTML as a browser first receives it. Whatever a script adds after the page loads, or a tag a consent banner holds back, is not seen here.</p>';
 }
+function labBlock(p){
+  var rep = S.report, conf = !!(rep.lab && rep.lab.configured), lab = p.lab;
+  var btn = function(text){return '<button type="button" class="pm-btn-ghost lp-labbtn" data-lab="' + esc(p.id) + '">' + esc(text) + '</button>';};
+  if(!lab){
+    return '<div class="lp-lab"><h4>Lab speed test</h4>' + (conf ?
+      '<p class="lp-muted">Google loads the page like a mid-range phone on a mobile connection and times what a visitor sees. It takes up to half a minute.</p>' + btn("Run the lab speed test") :
+      '<p class="lp-muted">The lab speed test is not connected. An admin sets PAGESPEED_API_KEY on the server (a Google Cloud API key with the PageSpeed Insights API enabled). The checks above use the server time, the page weight and Google\'s own speed score meanwhile.</p>') + '</div>';
+  }
+  var tone = L.labTone(lab.score);
+  return '<div class="lp-lab"><h4>Lab speed test <span class="lp-on ' + tone + '">' + esc(lab.score == null ? "not scored" : lab.score + " / 100") + '</span></h4>' +
+    '<dl class="lp-dl">' + L.labRows(lab).map(function(r){return '<dt>' + esc(r[0]) + '</dt><dd>' + esc(r[1]) + '</dd>';}).join("") + '</dl>' +
+    ((lab.savings || []).length ? '<h4>Biggest savings Lighthouse names</h4><ul class="lp-sav">' + lab.savings.map(function(x){return '<li>' + esc(x.title) + ' <em class="lp-muted">about ' + esc(L.secText(x.ms)) + '</em></li>';}).join("") + '</ul>' : '') +
+    '<p class="lp-muted">Run ' + esc(D.ago(lab.ranAt)) + '.</p>' + (conf ? btn("Run it again") : '') + '</div>';
+}
 function tabNumbers(p){
   var d = L.deviceRates(p.devices), rows = [];
   [["mobile", "Phones"], ["desktop", "Desktops"], ["tablet", "Tablets"]].forEach(function(k){
@@ -254,12 +268,30 @@ function tabNumbers(p){
     '<div><span>Cost per conversion</span><b>' + esc(p.cpa == null ? "n/a" : L.moneyText(p.cpa, cur())) + '</b></div>' +
     '<div><span>Google mobile speed</span><b>' + esc(p.speed == null ? "no score" : p.speed + " / 10") + '</b></div></div>' +
     (rows.length ? '<table class="lp-t"><thead><tr><th>Device</th><th>Clicks</th><th>Spend</th><th>Conversions</th><th>Conversion rate</th></tr></thead><tbody>' + rows.join("") + '</tbody></table>' : '') +
-    (d.gap != null ? '<p class="lp-note">Phones convert at ' + esc(Math.round(d.gap * 100)) + '% of the desktop rate on this page.</p>' : '');
+    (d.gap != null ? '<p class="lp-note">Phones convert at ' + esc(Math.round(d.gap * 100)) + '% of the desktop rate on this page.</p>' : '') + labBlock(p);
 }
 function paintNotes(rep){
   var items = (rep.warnings || []).map(function(w){return "<b>Not read:</b> " + esc(w);}).concat((rep.notes || []).map(esc));
   $("#notesCard").hidden = !items.length;
   $("#notes").innerHTML = items.map(function(x){return "<li>" + x + "</li>";}).join("");
+}
+
+/* ── The lab speed test ───────────────────────────────────── */
+function runLab(id, btn){
+  if(!S.acct || btn.disabled) return;
+  btn.disabled = true; var label = btn.textContent; btn.textContent = "Running the test. This takes up to half a minute...";
+  var seq = S.seq;
+  fetch(API + "/lab", {method:"POST", credentials:"same-origin", headers:{"Content-Type":"application/json"}, body:JSON.stringify({account:S.acct.id, page:id})}).then(function(r){
+    return r.json().catch(function(){return {};}).then(function(j){return {ok:r.ok, status:r.status, j:j};});
+  }).then(function(r){
+    if(seq !== S.seq) return;
+    if(!r.ok){btn.disabled = false; btn.textContent = label; setMsg(esc((r.j && r.j.error) || ("The test could not be run (HTTP " + r.status + ").")), "pm-err"); return;}
+    setMsg("");
+    return getJson(API + "/report?account=" + enc(S.acct.id)).then(function(rep){       // the saved read: the page's score now counts the test
+      if(seq !== S.seq || !rep.ok) return;
+      S.report = rep.j; render();
+    });
+  }).catch(function(){btn.disabled = false; btn.textContent = label; setMsg("The server could not be reached. Try again.");});
 }
 
 /* ── Events ───────────────────────────────────────────────── */
@@ -287,6 +319,7 @@ document.addEventListener("click", function(e){
   b = t.closest("[data-tab]"); if(b){var q = b.getAttribute("data-pid"); S.tab[q] = b.getAttribute("data-tab"); repaintPage(q); return;}
   b = t.closest("[data-passed]"); if(b){var r = b.getAttribute("data-passed"); S.passed[r] = !S.passed[r]; repaintPage(r); return;}
   b = t.closest("[data-view]"); if(b){S.view = b.getAttribute("data-view"); S.shown = PAGE; paintPageControls(); paintPages(); return;}
+  b = t.closest("[data-lab]"); if(b){runLab(b.getAttribute("data-lab"), b); return;}
   if(t.closest("#moreBtn")){S.shown += PAGE; paintPages(); return;}
 });
 $("#sortSel").addEventListener("change", function(e){S.sort = e.target.value; S.shown = PAGE; paintPages();});

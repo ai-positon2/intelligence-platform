@@ -95,3 +95,10 @@ em.lp-muted{font-style:normal}
 .lp-nums div{padding:10px 12px;border:1px solid var(--pm-line);border-radius:12px;background:var(--pm-panel)}
 .lp-nums span{display:block;font-size:10.5px;font-weight:700;letter-spacing:var(--ls-caps);text-transform:uppercase;color:var(--pm-faint)}
 .lp-nums b{font-size:18px;color:var(--pm-ink);font-variant-numeric:tabular-nums}
+
+/* the lab speed test */
+.lp-lab{margin:14px 0 0;padding:12px 14px;border:1px solid var(--pm-line);border-radius:14px;background:var(--pm-panel)}
+.lp-lab h4{margin:0 0 8px;font-size:13px;color:var(--pm-ink);display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.lp-lab p{margin:0 0 8px;line-height:1.55}
+.lp-sav{margin:0 0 8px;padding:0 0 0 18px;font-size:13px;line-height:1.6;color:var(--pm-ink2)}
+.lp-labbtn{margin-top:2px}

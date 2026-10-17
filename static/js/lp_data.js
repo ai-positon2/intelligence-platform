@@ -151,6 +151,19 @@ function seenRows(seen){
   rows.push(["Tags seen", seen.tools && seen.tools.length ? seen.tools.join(", ") : "none seen"]);
   return rows;
 }
+function secText(ms){return ms == null ? "n/a" : ms >= 1000 ? (ms / 1000).toFixed(1) + " s" : Math.round(ms) + " ms";}
+/* How a lab score is drawn: 90 and over is good, 50 to 89 needs work, under 50 is poor (Lighthouse's own bands). */
+function labTone(score){return score == null ? "unk" : score >= 90 ? "good" : score >= 50 ? "warn" : "bad";}
+/* The lab test as label and value rows, and the biggest savings and field data in words. */
+function labRows(lab){
+  if(!lab) return [];
+  var rows = [["Performance score", lab.score == null ? "not scored" : lab.score + " out of 100"], ["Largest content shown after", secText(lab.lcpMs)], ["Page blocked for", secText(lab.tbtMs)],
+    ["Layout shift", lab.cls == null ? "n/a" : String(lab.cls)], ["First paint after", secText(lab.fcpMs)], ["Speed index", secText(lab.speedIndexMs)]];
+  var f = lab.field;
+  if(f) rows.push(["Real visitors (Chrome UX Report)", [f.category ? "rated " + f.category : "", f.lcpMs != null ? "largest content after " + secText(f.lcpMs) : "", f.inpMs != null ? "interaction delay " + secText(f.inpMs) : "",
+    f.cls != null ? "layout shift " + f.cls : ""].filter(Boolean).join(", ") || "no figures"]);
+  return rows;
+}
 /* The headline tiles of a report. */
 function tiles(summary, currency){
   var s = summary || {}, t = s.tally || {};
@@ -174,7 +187,7 @@ function readNote(report){
 var api = {
   VIEWS:VIEWS, SORTS:SORTS, ON:ON, RATING:RATING, onInfo:onInfo, ratingInfo:ratingInfo, full:full, pageFindings:pageFindings, problems:problems, pageState:pageState,
   viewCounts:viewCounts, defaultView:defaultView, filterPages:filterPages, sortPages:sortPages, moneyText:moneyText, rateText:rateText, numText:numText, shareText:shareText,
-  shortPage:shortPage, hostOf:hostOf, deviceRates:deviceRates, statusText:statusText, seenRows:seenRows, tiles:tiles, readNote:readNote
+  shortPage:shortPage, hostOf:hostOf, secText:secText, labTone:labTone, labRows:labRows, deviceRates:deviceRates, statusText:statusText, seenRows:seenRows, tiles:tiles, readNote:readNote
 };
 if(typeof module !== "undefined" && module.exports) module.exports = api; else root.LpData = api;
 })(typeof window !== "undefined" ? window : globalThis);

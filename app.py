@@ -5565,6 +5565,41 @@ def paid_lp_report():
         return _pm_gads_error(e)
 
 
+# The lab speed test (tracker/paid_lp_speed.py): Google's PageSpeed Insights loads one page of the report like a mid-range phone. It is run only when someone asks,
+# for a page the report names (never an address the caller supplies), at most LP_LAB_DAILY_CAP a person a day, and only when PAGESPEED_API_KEY is set.
+LP_LAB_DAILY_CAP = 40
+_LP_LAB_USES = {}
+
+
+@app.route("/p2/paid-marketing/api/lp/lab", methods=["POST"])
+@position2_required
+def paid_lp_lab():
+    from tracker import paid_gads_segments as paid_gads, paid_lp, paid_lp_speed
+    body = request.get_json(silent=True)
+    body = body if isinstance(body, dict) else {}
+    problem = paid_lp_speed.config_problem()
+    if problem:
+        return jsonify(error=problem, kind="not_configured"), 503
+    email, today = _pm_user_email(), datetime.now(timezone.utc).date().isoformat()
+    day, used = _LP_LAB_USES.get(email, (today, 0))
+    if day != today:
+        used = 0
+    if used >= LP_LAB_DAILY_CAP:
+        return jsonify(error="That is %d speed tests in a day, the most this allows." % used, kind="cap"), 429
+    try:
+        result = paid_lp.run_lab(body.get("account"), body.get("page"))
+        _LP_LAB_USES[email] = (today, used + 1)
+        return jsonify(lab=result)
+    except paid_lp.BadRequest as e:
+        return jsonify(error=str(e)), 400
+    except paid_lp_speed.LabError as e:
+        _LP_LAB_USES[email] = (today, used + (0 if e.kind in ("not_configured", "quota") else 1))
+        status = {"not_configured": 503, "quota": 429}.get(e.kind, 502)
+        return jsonify(error=str(e), kind=e.kind), status
+    except paid_gads.GadsError as e:
+        return _pm_gads_error(e)
+
+
 _LP_FILES = {"xlsx": ("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", ".xlsx"), "pdf": ("application/pdf", ".pdf"), "zip": ("application/zip", ".zip")}
 
 

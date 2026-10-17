@@ -28,6 +28,7 @@ from . import paid_lp_match as words
 from . import paid_lp_model as model
 from . import paid_lp_page as lp_page
 from . import paid_lp_read as lp_read
+from . import paid_lp_speed as lp_speed
 from . import paid_segments as seg
 
 BadRequest = seg.BadRequest
@@ -268,11 +269,28 @@ def report_for(account, *, force=False, store=None, accounts_fn=None, search_fn=
     target = seg.resolve_target(cid, accounts_fn=accounts_fn, groups_fn=lambda: [])
     raw, old = _cached(target["id"], lambda: raw_read(target, search_fn=search_fn, fetcher=fetcher, now=now, max_pages=max_pages), force=force, store=store)
     out = assemble(raw, now=now, labs=lab_results(store, target["id"], raw))
+    out["lab"] = {"configured": lp_speed.configured()}
     if old:
         out["stale"] = [{"platform": "google", "savedAt": old}]
     return out
 
 
 def lab_results(store, account_id, raw):
-    """The lab speed tests run for this account's pages: {page id: lab}. None are run yet, so this is empty until tracker/paid_lp_speed.py fills it."""
-    return {}
+    """The lab speed tests run for this account's pages in the last three days: {page id: result}."""
+    ids = {p["id"] for p in raw["read"]["pages"]}
+    return {pid: r for pid, r in lp_speed.saved(store, account_id).items() if pid in ids}
+
+
+def run_lab(account, page_id, *, store=None, accounts_fn=None, search_fn=None, fetcher=None, get=None, now=None):
+    """Runs the lab speed test (tracker/paid_lp_speed.py) for one page of the account's report and keeps the result. The page must be one the report
+    names: the test is never run for an address the caller supplies. Raises BadRequest for an account or page that is not one, LabError for a test that could not run."""
+    from . import paid_store
+    store = store or paid_store
+    cid = parse_account(account)
+    target = seg.resolve_target(cid, accounts_fn=accounts_fn, groups_fn=lambda: [])
+    raw, _old = _cached(target["id"], lambda: raw_read(target, search_fn=search_fn, fetcher=fetcher, now=now), force=False, store=store)
+    page = next((p for p in raw["read"]["pages"] if p["id"] == str(page_id or "")), None)
+    if page is None:
+        raise BadRequest("That page is not one of this account's landing pages.")
+    result = lp_speed.run(page["url"], get=get)
+    return lp_speed.remember(store, target["id"], page["id"], result, now=now)

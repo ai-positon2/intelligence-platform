@@ -149,3 +149,74 @@ def test_no_em_or_en_dash_in_any_landing_page_check_code_or_the_plan():
     for p in files:
         text = open(p, encoding="utf-8").read()
         assert "—" not in text and "–" not in text, p
+
+
+# ── The lab speed test ──────────────────────────────────────────────────────
+
+def _lab_client(monkeypatch, result=None, error=None, key="K"):
+    from tracker import paid_lp_speed as sp
+    if key:
+        monkeypatch.setenv("PAGESPEED_API_KEY", key)
+    else:
+        monkeypatch.delenv("PAGESPEED_API_KEY", raising=False)
+    calls = []
+
+    def fake(account, page, **kw):
+        calls.append((account, page))
+        if error:
+            raise error
+        return result or {"score": 55, "lcpMs": 3000, "ranAt": "2026-10-17T12:00:00+00:00"}
+    monkeypatch.setattr(lp, "run_lab", fake)
+    app_module._LP_LAB_USES.clear()
+    return calls, sp
+
+
+def test_the_lab_test_runs_for_the_page_named_and_returns_its_result(monkeypatch):
+    calls, _sp = _lab_client(monkeypatch)
+    r = client_as(STAFF).post(API + "/lab", json={"account": "1112223334", "page": "acme-dental.com/lp"})
+    assert r.status_code == 200 and r.get_json()["lab"]["score"] == 55 and calls == [("1112223334", "acme-dental.com/lp")]
+
+
+def test_the_lab_test_is_closed_without_a_key_and_to_everyone_but_staff(monkeypatch):
+    calls, _sp = _lab_client(monkeypatch, key=None)
+    r = client_as(STAFF).post(API + "/lab", json={"account": "1112223334", "page": "x"})
+    assert r.status_code == 503 and r.get_json()["kind"] == "not_configured" and "PAGESPEED_API_KEY" in r.get_json()["error"] and calls == []
+    assert client_as(None).post(API + "/lab", json={}).status_code == 302 and client_as("someone@gmail.com").post(API + "/lab", json={}).status_code == 302
+
+
+@pytest.mark.parametrize("kind, status", [("quota", 429), ("page", 502), ("api", 502), ("not_configured", 503)])
+def test_what_goes_wrong_in_the_test_reaches_the_page_with_a_status_and_a_reason(monkeypatch, kind, status):
+    from tracker import paid_lp_speed as sp
+    _calls, _s = _lab_client(monkeypatch, error=sp.LabError(kind, "the reason"))
+    r = client_as(STAFF).post(API + "/lab", json={"account": "1112223334", "page": "x"})
+    assert r.status_code == status and r.get_json() == {"error": "the reason", "kind": kind}
+
+
+def test_a_page_or_account_that_is_not_one_is_a_400_and_a_google_failure_is_mapped(monkeypatch):
+    _lab_client(monkeypatch, error=lp.BadRequest("That page is not one of this account's landing pages."))
+    r = client_as(STAFF).post(API + "/lab", json={"account": "1112223334", "page": "evil"})
+    assert r.status_code == 400 and "not one of this account's landing pages" in r.get_json()["error"]
+    _lab_client(monkeypatch, error=gads.GadsError("quota", "slow down"))
+    assert client_as(STAFF).post(API + "/lab", json={"account": "1112223334", "page": "x"}).status_code == 429
+    calls, _sp = _lab_client(monkeypatch)
+    assert client_as(STAFF).post(API + "/lab", json=["not", "an", "object"]).status_code == 200 and calls == [(None, None)]          # a body that is not an object names no account or page: the runner says so
+
+
+def test_a_person_can_run_only_so_many_tests_a_day(monkeypatch):
+    calls, _sp = _lab_client(monkeypatch)
+    c = client_as(STAFF)
+    for _ in range(app_module.LP_LAB_DAILY_CAP):
+        assert c.post(API + "/lab", json={"account": "1112223334", "page": "x"}).status_code == 200
+    r = c.post(API + "/lab", json={"account": "1112223334", "page": "x"})
+    assert r.status_code == 429 and r.get_json()["kind"] == "cap" and len(calls) == app_module.LP_LAB_DAILY_CAP
+    other = client_as("ben@position2.com").post(API + "/lab", json={"account": "1112223334", "page": "x"})
+    assert other.status_code == 200
+
+
+def test_a_test_that_could_not_run_does_not_use_up_the_days_allowance_when_it_never_reached_google(monkeypatch):
+    from tracker import paid_lp_speed as sp
+    _calls, _s = _lab_client(monkeypatch, error=sp.LabError("quota", "x"))
+    c = client_as(STAFF)
+    for _ in range(app_module.LP_LAB_DAILY_CAP + 5):
+        assert c.post(API + "/lab", json={"account": "1112223334", "page": "x"}).status_code == 429
+    assert app_module._LP_LAB_USES.get(STAFF, (None, 0))[1] == 0
