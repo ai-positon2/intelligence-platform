@@ -1,0 +1,65 @@
+# Landing Page & Relevancy Check (Paid Marketing)
+
+Page: `/p2/paid-marketing/landing-page-check`. The 18th Paid Marketing agent.
+
+## The ask
+
+From the agent roster ("Landing Page & Relevancy Check", Build & Launch): check that the keyword, the ad and the landing page say the same
+thing, and look at page speed, mobile, forms and calls to action, to lift Quality Score and conversion rate.
+
+## What it does
+
+Pick a Google Ads account. The page reads, read only, the 30 days of what the account sent to each landing page and then fetches the pages that
+took the most money and holds each one against a written checklist.
+
+From Google Ads, per landing page: spend, clicks, conversions, the mobile and desktop split, Google's own mobile speed score where it gives one; per ad
+group that sends people there: its ads' headlines and descriptions, its keywords with their Quality Score parts (expected click rate, ad
+relevance, landing page experience), and the search terms people really typed.
+
+From the page itself (one plain GET from our servers, through the platform's guarded fetch): whether it opens, where it ends up, what the title and
+headings say, the words on it, its forms and their fields, its calls to action, phone numbers and whether they can be tapped, whether it is
+built for a phone, how fast the server answers, how heavy the HTML is, what slows the first paint, and which tracking tags it carries.
+
+Every check has an id, a severity (critical, high, medium, low), a result (pass, warn, fail, not applicable, could not check), what was
+found with its numbers, why it matters and what to do. A page gets a score and a grade, the account gets a spend-weighted score, and the report
+lists the fixes to make first with the money that goes to each page.
+
+## What is code and what is the model
+
+Every check is arithmetic on what Google and the page returned. The model is not asked to find problems. An optional "Read it like a person"
+step has Claude judge, for the biggest pages only, whether the page keeps the promise the ad makes, and suggest edits. It is shown public ad
+copy, keywords and the page's own visible text, treats all of it as data, and its answer never changes a score.
+
+## Honesty rules
+
+- A page that refuses automated requests (401, 403, 429) is **not verified**, never called broken; its page checks say "could not check".
+- A page whose words are put there by scripts (very little text in the HTML) is judged on what a plain read can see only where that is
+  fair: the match checks say "could not check" rather than failing it.
+- A tag that a consent banner or tag manager loads later is not seen, so a missing tag is a warning that says what was seen.
+- The lab speed test (PageSpeed Insights) needs `PAGESPEED_API_KEY`; without it the page says the test is not connected and shows the
+  measured server time, page weight and Google's own speed score instead. Nothing is invented.
+- Shopping and Performance Max send traffic with no keywords or ad text to compare, so the match checks are not applicable there; every other check still runs.
+
+## The checklist (6 sections)
+
+1. **The page opens**: answers with 200, does not bounce a deep link to the home page, keeps the click id and UTM through redirects, https, not a
+   staging site, not closed to AdsBot.
+2. **Does it match the ad**: the keywords (by spend) are on the page and in its headline; the ad's headline is echoed by the page's; the search terms
+   people typed are on the page; offers and prices in the ads appear on the page; one clear H1; not one catch-all page for many ad groups;
+   Google's landing page experience and ad relevance ratings.
+3. **Can a visitor act**: a way to convert at all; a call to action near the top; forms not too long; a phone number that can be tapped.
+4. **Works on a phone**: a mobile viewport, zoom not blocked, mobile against desktop conversion rate, Google's mobile speed score.
+5. **Loads fast**: server response time, HTML weight, compression, render-blocking scripts, script count, images that shift the page, the lab score.
+6. **Tracking and trust**: a Google tag or tag manager seen, a privacy link, contact details, proof (reviews, awards, ratings).
+
+## Scoring
+
+Same arithmetic as the Account Audit: a pass earns a check's weight (critical 8, high 4, medium 2, low 1), a warning half, a failure
+nothing; not applicable and could not check are left out and counted. The grade is held at C or below when a critical check failed or
+30 percent or more of the checks could not be read. The account score weights each page's score by what the page spent.
+
+## Files
+
+`tracker/paid_lp_read.py` (Google reads), `paid_lp_page.py` (fetch and parse a page), `paid_lp_match.py` (words, keywords, offers),
+`paid_lp_model.py` (a finding and a score), `paid_lp_checks.py` (the checklist), `paid_lp.py` (the report, cached like the audit's),
+`paid_lp_export.py` (Excel, PDF, CSV zip), `paid_lp_ai.py` (the optional model read), `paid_lp_speed.py` (the optional lab test).
