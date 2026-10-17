@@ -144,6 +144,11 @@ def test_a_primary_action_is_needed():
     assert f["result"] == "fail" and "1 action in the account" in f["found"]
     google_default = conv_read([A.action("1", "Installs", type="ANDROID_INSTALLS_ALL_OTHER_APPS", category="DOWNLOAD")])
     assert one("G-CNV-01", google_default)["result"] == "fail"                                # Google's own default action is not the client's tracking
+    for kind in ("GOOGLE_HOSTED", "UNKNOWN", "SMART_CAMPAIGN_TRACKED_CALLS", "SMART_CAMPAIGN_AD_CLICKS_TO_CALL"):
+        assert one("G-CNV-01", conv_read([A.action("1", "Default", type=kind)]))["result"] == "fail", kind
+    for kind in ("GOOGLE_PLAY_DOWNLOAD", "FIREBASE_ANDROID_FIRST_OPEN", "FIREBASE_IOS_CUSTOM", "THIRD_PARTY_APP_ANALYTICS_IOS_PURCHASE", "STORE_SALES_DIRECT_UPLOAD", "STORE_VISITS",
+                 "WEBPAGE_CODELESS", "SALESFORCE", "GOOGLE_ANALYTICS_4_PURCHASE"):
+        assert one("G-CNV-01", conv_read([A.action("1", "Own", type=kind)]))["result"] == "pass", kind          # an app or store account has its own measurement
     assert one("G-CNV-01", conv_read([A.action("1", status="PAUSED")]))["result"] == "fail"
     assert one("G-CNV-01", conv_read([A.action("1", type="AD_CALL", category="PHONE_CALL_LEAD")]))["result"] == "pass"
     assert one("G-CNV-01", conv_read([A.action("1", type="LEAD_FORM_SUBMIT", origin="GOOGLE_HOSTED")]))["result"] == "pass"
@@ -861,3 +866,19 @@ def test_an_account_with_no_enabled_campaign_says_it_is_not_advertising():
     assert one("G-STR-12", camps())["found"].startswith("No campaign is enabled (0 paused campaigns).")
     assert one("G-STR-12", campaigns=None)["result"] == "unknown"
     assert one("G-STR-12", camps(A.campaign("1"), A.campaign("2")))["found"] == "2 enabled campaigns."
+
+
+def test_a_paused_or_nearly_idle_account_is_not_failed_for_actions_that_recorded_nothing():
+    idle = {r.CAMPAIGN_METRICS_GAQL: [A.campaign_metrics("10", 50, 4, 20.0, 0.0)]}
+    paused = {r.CAMPAIGNS_GAQL: [A.campaign("10", status="PAUSED")], r.CAMPAIGN_METRICS_GAQL: []}
+    quiet = lambda answers: A.a_read(answers=dict({r.CONVERSIONS_GAQL: [A.action("1", "Form")], r.CONVERSION_VOLUME_GAQL: [A.volume("1", 0.0, all_conversions=0.0)]}, **answers))
+    for answers in (idle, paused):
+        f = one("G-CNV-03", quiet(answers))
+        assert f["result"] == "na" and "too little to expect an action to record anything" in f["found"]
+    assert one("G-CNV-03", quiet({r.CAMPAIGN_METRICS_GAQL: [A.campaign_metrics("10", 5000, 400, 100.0, 0.0)]}))["result"] == "fail"          # at the minimum it is judged
+    assert one("G-CNV-03", quiet({}), campaigns=None)["result"] == "fail"                                                                   # spend unread: judged on the actions alone
+    value = A.campaign("10", bidding="MAXIMIZE_CONVERSION_VALUE")
+    novalue = {r.CONVERSIONS_GAQL: [A.action("1", "Sale", category="PURCHASE")], r.CONVERSION_VOLUME_GAQL: [A.volume("1", 5.0, value=0.0)], r.CAMPAIGNS_GAQL: [value]}
+    f = one("G-CNV-07", A.a_read(answers=dict(novalue, **{r.CAMPAIGN_METRICS_GAQL: [A.campaign_metrics("10", 50, 4, 20.0, 5.0)]})))
+    assert f["result"] == "na" and "too little to expect conversion values" in f["found"]
+    assert one("G-CNV-07", A.a_read(answers=dict(novalue, **{r.CAMPAIGN_METRICS_GAQL: [A.campaign_metrics("10", 5000, 400, 100.0, 5.0)]})))["result"] == "fail"

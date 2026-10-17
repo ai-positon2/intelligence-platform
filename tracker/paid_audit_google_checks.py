@@ -16,9 +16,8 @@ from .paid_audit_pages import TIMED_OUT
 log = logging.getLogger(__name__)
 make, unknown, na = model.make, model.unknown, model.not_applicable
 
-# Conversion action types that count as the client's own measurement: a tag on the site, an import from GA4, a CRM or an offline
-# upload, or a call. The rest (app installs, Smart campaign and Google-hosted actions) are Google's defaults and say nothing about
-# whether the client's tracking works.
+# Conversion action types counted from a tag, an import or an upload (judged for recording nothing, counting and windows). Google's own
+# defaults are listed by GOOGLE_DEFAULT_TYPES further down and are never taken as the client's measurement.
 WEB_TYPES = {"WEBPAGE", "WEBPAGE_CODELESS", "UPLOAD_CLICKS", "UPLOAD_CALLS", "GOOGLE_ANALYTICS_4_CUSTOM", "GOOGLE_ANALYTICS_4_PURCHASE",
              "UNIVERSAL_ANALYTICS_GOAL", "UNIVERSAL_ANALYTICS_TRANSACTION", "SALESFORCE"}
 CALL_TYPES = {"AD_CALL", "CLICK_TO_CALL", "WEBSITE_CALL"}
@@ -194,9 +193,13 @@ def set_score(ctx):
 MIN_SPEND = 100                               # a month's spend under this (in the account's currency) is too little to expect conversions
 
 
+GOOGLE_DEFAULT_TYPES = {"ANDROID_INSTALLS_ALL_OTHER_APPS", "GOOGLE_HOSTED", "UNKNOWN", "UNSPECIFIED", ""}
+
+
 def _real(a):
-    """An enabled conversion action that is the client's own measurement, not one of Google's defaults."""
-    return a["status"] in ACTIVE_STATES and (a["type"] in WEB_TYPES or a["type"] in CALL_TYPES or a["type"] == "LEAD_FORM_SUBMIT")
+    """An enabled conversion action that is the client's own measurement (a tag, an import, a call, a lead form, an app or a store), not one of
+    Google's defaults (the all-other-apps install, Google-hosted local actions, Smart campaign actions, YouTube follow-on views)."""
+    return a["status"] in ACTIVE_STATES and a["type"] not in GOOGLE_DEFAULT_TYPES and not a["type"].startswith("SMART_CAMPAIGN")
 
 
 def _primary(ctx):
@@ -247,6 +250,8 @@ def cnv_recorded(ctx):
 def cnv_silent(ctx):
     if ctx.actions is None:
         return unknown("G-CNV-03", "the conversion actions could not be read")
+    if ctx.spend is not None and ctx.spend < MIN_SPEND:
+        return na("G-CNV-03", "Only %s was spent in the last 30 days, too little to expect an action to record anything." % ctx.money(ctx.spend))
     cand = [a for a in _primary(ctx) if a["type"] in WEB_TYPES]
     if not cand:
         return na("G-CNV-03", "No primary action counts a tag, an import or an upload.")
@@ -319,6 +324,8 @@ def cnv_value(ctx):
     bidders = [x for x in ctx.camps if x["bidding"] in VALUE_BIDDING]
     if not bidders:
         return na("G-CNV-07", "No enabled campaign bids on conversion value.")
+    if ctx.spend is not None and ctx.spend < MIN_SPEND:
+        return na("G-CNV-07", "Only %s was spent in the last 30 days, too little to expect conversion values." % ctx.money(ctx.spend))
     p = _primary(ctx)
     if any(a["value"] is None for a in p):
         return unknown("G-CNV-07", "the conversion values of the last 30 days could not be read")
