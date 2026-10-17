@@ -1,7 +1,7 @@
 {% extends "_paid_base.html" %}
 {% block title %}Account Audit{% endblock %}
 {% block head %}
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/account_audit.css') }}?v=4">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/account_audit.css') }}?v=5">
 {% endblock %}
 {% block content %}
 <div class="pm pm-au" id="au">
@@ -51,6 +51,13 @@
     <section class="pm-panel au-score" id="score"></section>
     <div class="pd-strip au-tiles" id="tiles"></div>
 
+    <section class="pm-panel au-brief" id="briefCard">
+      <div class="pm-panel-h"><span class="pm-panel-t">A short briefing</span><span class="pm-panel-s">Written by Claude from this audit's findings only</span></div>
+      <div id="briefOut"><p class="au-none">Claude writes a few plain sentences on what to fix first and why, and what to ask the client. It is shown the scores and the checks to fix first, never the
+        names of campaigns, keywords or pages, and any number it writes that the audit did not give is sent back.</p></div>
+      <button class="pm-btn-ghost" id="briefBtn" type="button"><svg viewBox="0 0 24 24"><path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8zM18 15l.8 2.2L21 18l-2.2.8L18 21l-.8-2.2L15 18l2.2-.8z"/></svg>Write the briefing</button>
+    </section>
+
     <section class="pm-panel au-since" id="sinceCard" hidden>
       <div class="pm-panel-h"><span class="pm-panel-t">Since the last saved audit</span><span class="pm-panel-s" id="sinceNote"></span></div>
       <div class="pd-strip au-tiles" id="sinceTiles"></div>
@@ -81,5 +88,5 @@
 <script src="{{ url_for('static', filename='js/pm_picker.js') }}?v=1"></script>
 <script src="{{ url_for('static', filename='js/pm_platform.js') }}?v=4"></script>
 <script src="{{ url_for('static', filename='js/au_data.js') }}?v=2"></script>
-<script src="{{ url_for('static', filename='js/account_audit.js') }}?v=2"></script>
+<script src="{{ url_for('static', filename='js/account_audit.js') }}?v=3"></script>
 {% endblock %}

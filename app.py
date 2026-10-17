@@ -5395,6 +5395,31 @@ def paid_audit_history_delete(sid):
         return _pm_store_error(e)
 
 
+# The Claude-written briefing: written from the audit's findings only (tracker/paid_audit_summary.py), never from the names of the campaigns,
+# keywords or pages. At most AUDIT_SUMMARY_DAILY_CAP a person a day; the briefing falls back to the findings' own words without a model.
+AUDIT_SUMMARY_DAILY_CAP = 20
+_AUDIT_SUMMARY_USES = {}
+
+
+@app.route("/p2/paid-marketing/api/audit/summary", methods=["POST"])
+@position2_required
+def paid_audit_summary_route():
+    body = request.get_json(silent=True) or {}
+    email, today = _pm_user_email(), datetime.now(timezone.utc).date().isoformat()
+    day, used = _AUDIT_SUMMARY_USES.get(email, (today, 0))
+    if day != today:
+        used = 0
+    if used >= AUDIT_SUMMARY_DAILY_CAP:
+        return jsonify(error="That is %d briefings in a day, the most this allows." % used), 429
+
+    def make(pa):
+        from tracker import paid_audit_summary
+        report = pa.report_for(body.get("account"))
+        _AUDIT_SUMMARY_USES[email] = (today, used + 1)
+        return paid_audit_summary.cached_summary((pa.account_key(body.get("account")),), report)
+    return _paid_audit_answer(make)
+
+
 _AUDIT_FILES = {"xlsx": ("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", ".xlsx"), "pdf": ("application/pdf", ".pdf"),
                 "zip": ("application/zip", ".zip")}
 

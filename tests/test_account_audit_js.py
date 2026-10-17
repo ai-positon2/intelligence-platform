@@ -167,7 +167,7 @@ def test_every_element_the_page_script_reaches_for_is_in_the_template():
     js, html = open(PAGE, encoding="utf-8").read(), open(TEMPLATE, encoding="utf-8").read()
     ids = set(re.findall(r'\$\("#([A-Za-z0-9_-]+)"\)', js)) | set(re.findall(r'getElementById\("([A-Za-z0-9_-]+)"\)', js))
     assert ids >= {"acctPick", "msg", "empty", "skel", "out", "fresh", "stale", "score", "tiles", "fix", "fixNote", "sections", "notes", "notesCard", "foot", "refreshBtn", "dlXlsx", "dlPdf", "dlZip",
-                   "saveBtn", "saveNote", "sinceCard", "sinceNote", "sinceTiles", "sinceLists", "histCard", "hist"}
+                   "saveBtn", "saveNote", "sinceCard", "sinceNote", "sinceTiles", "sinceLists", "histCard", "hist", "briefBtn", "briefOut"}
     for i in sorted(ids - {"sec-"}):
         assert 'id="%s"' % i in html, i
     for attr in ("data-toggle", "data-jump", "data-view", "data-more", "data-find", "data-compare", "data-remove"):

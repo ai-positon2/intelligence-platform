@@ -70,7 +70,8 @@ def _report():
     google = A.a_read(answers={gread.CAMPAIGN_METRICS_GAQL: [A.campaign_metrics("10", 5000, 400, 1000.0, 0.0)]})
     google["pages"] = None
     google["readAt"] = "2026-10-17T12:00:00+00:00"
-    return audit.assemble(google, None, [{"platform": "google", "id": "1112223334", "name": "Acme Dental", "currency": "USD"}])
+    import datetime as dt
+    return audit.assemble(google, None, [{"platform": "google", "id": "1112223334", "name": "Acme Dental", "currency": "USD"}], now=dt.datetime(2026, 10, 17, 12, 0, tzinfo=dt.timezone.utc))
 
 
 @pytest.mark.parametrize("kind, ctype, ext, magic", [("xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", ".xlsx", b"PK"),
@@ -250,3 +251,53 @@ def test_saving_and_removing_refuse_a_cross_site_or_non_json_request(store):
     post(c, "/save", {"account": "1112223334"})
     assert c.delete(API + "/history/s1", headers={"Origin": "https://evil.example"}, content_type="application/json").status_code == 403
     assert c.delete(API + "/history/s1").status_code == 415 and store.get("s1") is not None
+
+
+# ── The Claude briefing ─────────────────────────────────────────────────────
+
+@pytest.fixture
+def briefing(monkeypatch):
+    from tracker import paid_audit_summary as summ
+    summ.clear_cache()
+    app_module._AUDIT_SUMMARY_USES.clear()
+    calls = []
+
+    def fake_call(system, user):
+        calls.append(user)
+        return {"summary": "The account scored %s." % _report()["summary"]["score"], "firstSteps": ["Fix the tag."], "questionsForClient": ["Who owns tracking?"]}
+    monkeypatch.setattr(audit, "report_for", lambda account=None, **k: (audit.parse_account(account), _report())[1])        # a bad account is refused before any report
+    real = summ.cached_summary
+    monkeypatch.setattr(summ, "cached_summary", lambda key, report, **kw: real(key, report, call=fake_call, **kw))
+    yield calls
+    summ.clear_cache()
+    app_module._AUDIT_SUMMARY_USES.clear()
+
+
+def test_the_briefing_is_written_from_the_report_and_is_asked_once_per_audit(briefing):
+    c = client_as(STAFF)
+    r = post(c, "/summary", {"account": "1112223334"})
+    assert r.status_code == 200 and r.get_json()["source"] == "model" and r.get_json()["firstSteps"] == ["Fix the tag."] and r.get_json()["questionsForClient"] == ["Who owns tracking?"]
+    post(c, "/summary", {"account": "1112223334"})
+    assert len(briefing) == 1
+
+
+def test_the_briefing_needs_a_good_account_and_staff_and_is_capped_per_person_per_day(briefing, monkeypatch):
+    c = client_as(STAFF)
+    assert post(c, "/summary", {"account": "nonsense"}).status_code == 400 and post(c, "/summary", {}).status_code == 400
+    assert client_as(None).post(API + "/summary", json={"account": "1112223334"}).status_code == 302
+    monkeypatch.setattr(app_module, "AUDIT_SUMMARY_DAILY_CAP", 2)
+    assert post(c, "/summary", {"account": "1112223334"}).status_code == 200 and post(c, "/summary", {"account": "1112223334"}).status_code == 200
+    r = post(c, "/summary", {"account": "1112223334"})
+    assert r.status_code == 429 and "2 briefings in a day" in r.get_json()["error"]
+    assert post(client_as("ben@position2.com"), "/summary", {"account": "1112223334"}).status_code == 200            # the cap is per person
+
+
+def test_a_briefing_without_a_model_falls_back_to_the_findings(monkeypatch):
+    from tracker import paid_audit_summary as summ
+    summ.clear_cache()
+    app_module._AUDIT_SUMMARY_USES.clear()
+    monkeypatch.setattr(audit, "report_for", lambda *x, **k: _report())
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    r = post(client_as(STAFF), "/summary", {"account": "1112223334"})
+    assert r.status_code == 200 and r.get_json()["source"] == "rules" and "scored" in r.get_json()["summary"]
+    summ.clear_cache()

@@ -129,3 +129,12 @@
 .au-hist-b{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
 @media (max-width:640px){.au-hist li{grid-template-columns:auto minmax(0,1fr)}.au-hist-b{grid-column:1 / -1;justify-content:flex-start}}
 
+/* the Claude briefing */
+.au-brief{margin-bottom:14px}
+.au-brief .au-none{margin:0 0 12px;max-width:80ch;line-height:1.6}
+.au-brief-t p{margin:0 0 10px;font-size:14px;line-height:1.65;color:var(--pm-ink2);max-width:80ch}
+.au-brief-t h4{margin:14px 0 6px;font-size:11px;font-weight:700;letter-spacing:var(--ls-caps);text-transform:uppercase;color:var(--pm-faint)}
+.au-brief-t ol,.au-brief-t ul{margin:0 0 10px;padding:0 0 0 20px;font-size:13.5px;line-height:1.6;color:var(--pm-ink2);max-width:80ch}
+.au-brief-t li{margin:4px 0}
+.au-brief-src{margin:8px 0 12px;font-size:12px;color:var(--pm-faint)}
+

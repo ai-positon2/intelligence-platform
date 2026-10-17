@@ -82,7 +82,7 @@ function render(){
   $("#dlPdf").href = API + "/download?" + q + "&file=pdf";
   $("#dlZip").href = API + "/download?" + q + "&file=zip";
   paintScore(s, rep); paintTiles(s); paintFix(rep); paintSections(rep); paintNotes(rep);
-  $("#sinceCard").hidden = true; $("#histCard").hidden = true; $("#saveNote").value = "";
+  $("#sinceCard").hidden = true; $("#histCard").hidden = true; $("#saveNote").value = ""; $("#briefOut").innerHTML = BRIEF_IDLE;
   $("#foot").textContent = "Source: the platform's own API, read only and saved for an hour. A score is the share of the checks' weight that passed (critical checks weigh most, a warning counts half), and checks that could not be read are left out of it and counted. A failed critical check keeps the grade at C or below. Nothing is changed in either platform: make the changes there.";
 }
 function paintScore(s, rep){
@@ -235,6 +235,25 @@ function removeAudit(id){
   }).catch(function(){setMsg("The server could not be reached. Try again.");});
 }
 
+/* ── The Claude briefing ───────────────────────────────────── */
+var BRIEF_IDLE = $("#briefOut").innerHTML;
+function writeBrief(){
+  var btn = $("#briefBtn"); if(btn.disabled || !S.acct) return;
+  btn.disabled = true; var seq = S.seq;
+  $("#briefOut").innerHTML = '<p class="au-none">Writing the briefing. This takes a few seconds.</p>';
+  getJson(API + "/summary", "POST", {account: S.acct.id}).then(function(r){
+    btn.disabled = false;
+    if(seq !== S.seq) return;
+    if(!r.ok){$("#briefOut").innerHTML = '<p class="au-none">' + esc((r.j && r.j.error) || "The briefing could not be written.") + '</p>'; return;}
+    var b = r.j;
+    $("#briefOut").innerHTML = '<div class="au-brief-t">' + String(b.summary || "").split(/\n{2,}/).map(function(x){return '<p>' + esc(x) + '</p>';}).join("") +
+      (b.firstSteps && b.firstSteps.length ? '<h4>First steps</h4><ol>' + b.firstSteps.map(function(x){return '<li>' + esc(x) + '</li>';}).join("") + '</ol>' : '') +
+      (b.questionsForClient && b.questionsForClient.length ? '<h4>Questions for the client</h4><ul>' + b.questionsForClient.map(function(x){return '<li>' + esc(x) + '</li>';}).join("") + '</ul>' : '') +
+      '</div><p class="au-brief-src">' + (b.source === "model" ? "Written by Claude from this audit's findings only. Every number in it is one the audit gave." :
+        "A model was not available" + (b.unavailable ? " (" + esc(b.unavailable) + ")" : "") + ", so this is the audit's own wording.") + '</p>';
+  }).catch(function(){btn.disabled = false; $("#briefOut").innerHTML = '<p class="au-none">The server could not be reached. Try again.</p>';});
+}
+
 /* ── Events ───────────────────────────────────────────────── */
 function toggle(id){
   S.open[id] = !S.open[id];
@@ -269,6 +288,7 @@ document.addEventListener("input", function(e){
 });
 $("#refreshBtn").addEventListener("click", function(){run(true);});
 $("#saveBtn").addEventListener("click", saveAudit);
+$("#briefBtn").addEventListener("click", writeBrief);
 
 /* ── Boot ─────────────────────────────────────────────────── */
 function boot(){
