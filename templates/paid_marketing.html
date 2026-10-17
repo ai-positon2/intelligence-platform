@@ -12,7 +12,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-tokens.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-components.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/gtm.css') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/paid_marketing.css') }}?v=37">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/paid_marketing.css') }}?v=39">
   <script src="/static/js/theme.js"></script>
   <link rel="stylesheet" href="/static/css/aurora-app.css?v=3">
   <script src="/static/js/aurora.js?v=1" defer></script>
@@ -68,7 +68,7 @@
     <div class="dash-grid pm-sec-grid">
 
       <!-- Paid Marketing Agents. 1 to 3 are from Agent Holmes (2026-10-12); 4,
-           Segment Analysis, is new on the platform. Geo Performance was added 2026-10-15, Seasonality Analysis and the Call Transcript Analyzer 2026-10-16, Ad Strength Analysis, Audience Segment Analysis, Asset Coverage Audit and Strategy &amp; Campaign Book 2026-10-16, Business Research, Keyword Research and Account Audit 2026-10-17. The hub card's
+           Segment Analysis, is new on the platform. Geo Performance was added 2026-10-15, Seasonality Analysis and the Call Transcript Analyzer 2026-10-16, Ad Strength Analysis, Audience Segment Analysis, Asset Coverage Audit and Strategy &amp; Campaign Book 2026-10-16, Business Research, Keyword Research, Account Audit and Landing Page &amp; Relevancy Check 2026-10-17. The hub card's
            "N dashboards / N live" counts these; tests/test_hub_card_counts.py
            checks the two agree. -->
 
@@ -418,6 +418,26 @@
         </div>
       </a>
 
+      <!-- 18. Landing Page & Relevancy Check (2026-10-17): does each landing page keep the promise the ad made -->
+      <a href="/p2/paid-marketing/landing-page-check" class="dash-card active c-lp">
+        <div class="card-band"></div>
+        <div class="card-thumb">
+          <div class="card-thumb-icon"><svg class="au-ic" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 5h16v14H4z"/><path d="M4 9h16"/><path d="M8 13h5M8 16h8"/></svg></div>
+          <div class="card-thumb-badge tb-live"><span class="tb-dot live"></span> Live</div>
+        </div>
+        <div class="card-body">
+          <div class="card-name">Landing Page &amp; Relevancy Check</div>
+          <div class="card-desc">
+            Reads what each landing page took in Google Ads, fetches the busiest pages and checks that the keywords, the ad and the page say the same thing, a visitor can act,
+            it works on a phone, it loads fast and it is tracked. A score for every page, the checks to fix first, and Excel, CSV and PDF.
+          </div>
+          <div class="card-footer">
+            <div class="card-tags"><span class="tag">Relevancy</span><span class="tag">Conversion</span></div>
+            <span class="card-arrow">→</span>
+          </div>
+        </div>
+      </a>
+
     </div>
 
     <p class="footer-note">Position2 · Internal use only</p>
@@ -461,6 +481,8 @@
     {t:'Strategy & Campaign Book',d:'Researches a client, writes the strategy and each campaign book',u:'/p2/paid-marketing/campaign-book',i:'✎'},
     {t:'Business Research',d:'The picture of a client\'s business before any audit or strategy',u:'/p2/paid-marketing/business-research',i:'⌂'},
     {t:'Keyword Research',d:'The searches an account is not bidding on yet',u:'/p2/paid-marketing/keyword-research',i:'⌕'},
+    {t:'Account Audit',d:'Is the account set up to win: settings, tracking, structure, ads',u:'/p2/paid-marketing/account-audit',i:'✔'},
+    {t:'Landing Page & Relevancy Check',d:'Does each landing page keep the promise the ad made',u:'/p2/paid-marketing/landing-page-check',i:'▤'},
     {t:'QA Agent',d:'Campaign launch QC checklist',u:'/p2/paid-marketing/qa-agent',i:'✓'}
   ];
   var ITEMS=(window.__KP_ITEMS||[]).concat(BASE);

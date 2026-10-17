@@ -1343,3 +1343,10 @@ details.sq-fallback .sq-drops{margin-top:10px}
 [data-theme="light"] .pd-al-save{color:#fff}
 [data-theme="light"] .pd-al-dirty{color:#b45309}
 @media (max-width:720px){.pd-al{padding:16px 14px 18px}.pd-actions{width:100%}.pd-al-actions .pm-btn-ghost,.pd-al-save{flex:1 1 auto;justify-content:center}}
+
+/* ═══ Landing Page & Relevancy Check card ═══ */
+.c-lp{--card-accent:#f59e0b;
+  --band:linear-gradient(90deg,#f59e0b,#fb7185,#a78bfa);
+  --thumb:linear-gradient(135deg,#1a1100 0%,#1f0b18 100%);
+  --icon-glow:rgba(245,158,11,.5);--card-border:rgba(245,158,11,.35);
+  --card-glow:0 0 40px rgba(245,158,11,.10);--arrow-color:#fde68a}

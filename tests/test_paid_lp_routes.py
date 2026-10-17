@@ -107,3 +107,45 @@ def test_a_file_that_cannot_be_made_is_said_in_words(monkeypatch):
     monkeypatch.setattr(export, "pdf", lambda r: (_ for _ in ()).throw(RuntimeError("x")))
     r = client_as(STAFF).get(API + "/download?account=1112223334&file=pdf")
     assert r.status_code == 500 and "RuntimeError" in r.get_json()["error"]
+
+
+# ── The page, the card and the registry ─────────────────────────────────────
+
+PAGE = "/p2/paid-marketing/landing-page-check"
+
+
+def test_the_page_opens_for_staff_and_is_closed_to_everyone_else():
+    r = client_as(STAFF).get(PAGE)
+    assert r.status_code == 200
+    html = r.get_data(as_text=True)
+    assert "Landing Page &amp; Relevancy Check" in html and 'id="acctPick"' in html and "js/lp_data.js" in html and "js/landing_page_check.js" in html
+    assert client_as(None).get(PAGE).status_code == 302 and client_as("someone@gmail.com").get(PAGE).status_code == 302
+
+
+def test_the_card_is_on_the_paid_marketing_page_the_hub_counts_it_and_the_command_palette_lists_it():
+    paid = client_as(STAFF).get("/p2/paid-marketing").get_data(as_text=True)
+    assert 'href="/p2/paid-marketing/landing-page-check"' in paid and "c-lp" in paid
+    from tracker import paid_lp_docs
+    assert paid_lp_docs.markdown()                                           # the checklist document builds
+    import os
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    for name in ("templates/_paid_kpal.html", "templates/paid_marketing.html"):
+        assert "/p2/paid-marketing/landing-page-check" in open(os.path.join(root, name), encoding="utf-8").read(), name
+    hub = open(os.path.join(root, "templates/hub.html"), encoding="utf-8").read()
+    assert '<div class="card-stat"><span>18</span> dashboards</div>' in hub and '<div class="card-stat"><span>18</span> live</div>' in hub and 'data-lxn="45"' in hub
+
+
+def test_the_assistant_knows_the_agent():
+    src = open(app_module.__file__, encoding="utf-8").read()
+    assert "Landing Page & Relevancy Check (/p2/paid-marketing/landing-page-check)" in src and "35 checks in six sections" in src and "A page that does not open scores 0" in src
+
+
+def test_no_em_or_en_dash_in_any_landing_page_check_code_or_the_plan():
+    import glob
+    import os
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    files = glob.glob(os.path.join(root, "tracker", "paid_lp*.py")) + [os.path.join(root, "docs", "landing-page-check-plan.md"), os.path.join(root, "docs", "landing-page-check-checks.md")]
+    assert files
+    for p in files:
+        text = open(p, encoding="utf-8").read()
+        assert "—" not in text and "–" not in text, p
