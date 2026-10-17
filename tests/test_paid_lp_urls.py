@@ -263,3 +263,112 @@ def test_the_staging_check_reads_the_ad_address_and_where_it_ended_up():
     assert {x["id"]: x for x in checks.run(f)}["reach_staging"]["result"] == "pass"
     f = page(fetch_over={"finalUrl": "https://staging.acme-dental.com/lp"})
     assert {x["id"]: x for x in checks.run(f)}["reach_staging"]["result"] == "fail"
+
+
+# ── Does the page really open ───────────────────────────────────────────────
+
+@pytest.fixture
+def no_pause(monkeypatch):
+    monkeypatch.setattr(pg, "RETRY_PAUSE_S", 0)
+
+
+class Answers:
+    """A fetcher that gives the page's answers in turn (the last one is repeated); robots.txt is not there."""
+
+    def __init__(self, *answers):
+        self.answers, self.pages = list(answers), 0
+
+    def __call__(self, url, **kw):
+        if url.endswith("/robots.txt"):
+            return Resp(404, url, b"", {"Content-Type": "text/plain"})
+        self.pages += 1
+        status, body, headers = (self.answers.pop(0) if len(self.answers) > 1 else self.answers[0])
+        return Resp(status, url, body, headers or {"Content-Type": "text/html"})
+
+
+def _status(rec, **over):
+    f = page(fetch_over=dict(rec, **over))
+    return {x["id"]: x for x in checks.run(f)}["reach_status"]
+
+
+def test_one_server_error_is_asked_again_before_it_is_held_against_the_page(no_pause):
+    f = Answers((503, b"<html>down</html>", None), (200, GOOD_HTML, None))
+    rec = pg.fetch("https://acme-dental.com/lp", f)
+    assert f.pages == 2 and rec["status"] == 200 and rec["retried"] is True and rec["isHtml"] and not rec["blocked"]
+
+
+def test_a_page_that_keeps_answering_with_a_server_error_is_asked_twice_and_fails(no_pause):
+    f = Answers((500, b"<html>down</html>", None))
+    rec = pg.fetch("https://acme-dental.com/lp", f)
+    assert f.pages == 2 and rec["status"] == 500 and rec["retried"] is True and not rec["blocked"]
+    assert _status(rec)["result"] == "fail"
+
+
+def test_every_server_error_status_is_asked_again(no_pause):
+    for status in (500, 502, 503, 504, 599):
+        f = Answers((status, b"x", None), (200, GOOD_HTML, None))
+        assert pg.fetch("https://acme-dental.com/lp", f)["status"] == 200 and f.pages == 2, status
+
+
+def test_a_missing_page_or_a_refusal_is_not_asked_again(no_pause):
+    for status in (404, 410, 403, 429, 401):
+        f = Answers((status, b"<html>x</html>", None))
+        rec = pg.fetch("https://acme-dental.com/lp", f)
+        assert f.pages == 1 and rec["retried"] is False, status
+
+
+def test_the_pause_before_asking_again_is_half_a_second():
+    assert pg.RETRY_PAUSE_S == 0.5
+
+
+def test_the_pause_is_taken_before_the_second_request(monkeypatch):
+    slept = []
+    monkeypatch.setattr(pg.time, "sleep", slept.append)
+    pg.fetch("https://acme-dental.com/lp", Answers((502, b"x", None), (200, GOOD_HTML, None)))
+    assert slept == [pg.RETRY_PAUSE_S]
+    slept.clear()
+    pg.fetch("https://acme-dental.com/lp", Answers((200, GOOD_HTML, None)))
+    assert slept == []
+    pg.fetch("https://acme-dental.com/lp", Answers((503, b"x", None)))
+    assert slept == [pg.RETRY_PAUSE_S]                              # asked twice in all, so one pause, never one after the last answer
+
+
+def test_a_bot_check_is_not_a_broken_page_whatever_its_status(no_pause):
+    challenge = {"Content-Type": "text/html", "cf-mitigated": "challenge", "Server": "cloudflare"}
+    for status in (403, 503):
+        f = Answers((status, b"<html>Just a moment...</html>", challenge))
+        rec = pg.fetch("https://acme-dental.com/lp", f)
+        assert rec["blocked"] is True and f.pages == 1 and rec["retried"] is False, status
+        got = _status(rec)
+        assert got["result"] == "unknown" and "refuses automated requests" in got["found"]
+    rec = pg.fetch("https://acme-dental.com/lp", Answers((200, b"<html>Just a moment...</html>", challenge)))
+    assert rec["blocked"] is True                                   # a check page is not the site's page, whatever status it came with
+    assert pg._challenged({"cf-mitigated": "Challenge"}) and not pg._challenged({"cf-mitigated": "other"}) and not pg._challenged({}) and not pg._challenged(None)
+
+
+def test_a_server_error_that_is_not_a_bot_check_is_not_called_one(no_pause):
+    rec = pg.fetch("https://acme-dental.com/lp", Answers((503, b"x", {"Content-Type": "text/html", "Server": "cloudflare"})))
+    assert rec["blocked"] is False
+
+
+@pytest.mark.parametrize("title", ["404 - Page Not Found", "Page not found | Acme Dental", "Not Found", "Not found - Acme", "Not found " + chr(0x2013) + " Acme", "Not found " + chr(0x2014) + " Acme", "Not found: Acme", "This page doesn't exist", "We can’t find that page",
+                                   "Sorry, this offer is no longer available", "Page unavailable", "Error 404"])
+def test_a_page_that_answers_200_but_says_it_is_gone_is_a_warning(title):
+    f = page(fetch_over={"status": 200, "ms": 300})
+    f["fetch"]["facts"]["title"] = title
+    out = {x["id"]: x for x in checks.run(f)}["reach_status"]
+    assert out["result"] == "warn" and out["severity"] == "high" and "reads like an error page" in out["found"] and title[:20] in out["found"]
+
+
+def test_a_gone_headline_counts_when_the_title_does_not_say_it():
+    f = page(fetch_over={"status": 200, "ms": 300})
+    f["fetch"]["facts"].update(title="Acme Dental", h1=["Oops, page not found"])
+    out = {x["id"]: x for x in checks.run(f)}["reach_status"]
+    assert out["result"] == "warn" and "its headline reads like an error page" in out["found"]
+
+
+@pytest.mark.parametrize("title", ["Emergency Dentist Boston | Acme Dental", "Not Found Yet? Call us", "Find a dentist who cannot be beaten", "Free consultation, no exist-ing patients needed"])
+def test_an_ordinary_title_is_not_taken_for_an_error_page(title):
+    f = page(fetch_over={"status": 200, "ms": 300})
+    f["fetch"]["facts"].update(title=title, h1=["Welcome"])
+    assert {x["id"]: x for x in checks.run(f)}["reach_status"]["result"] == "pass"

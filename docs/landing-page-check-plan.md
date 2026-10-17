@@ -48,6 +48,9 @@ copy, keywords and the page's own visible text, treats all of it as data, and it
   counts as a redirect.
 - "Looks like a test site" means a dev, test, qa, preview or stage subdomain, a staging, uat or sandbox name, a private address or localhost. A business whose own name
   holds one of those words (test-prep.com) is not one.
+- A server error (HTTP 500 to 599) or a timeout is asked again once, half a second later, before it is held against the page. A bot check (Cloudflare's
+  `cf-mitigated: challenge`) is "not verified", never a broken page.
+- A page that answers 200 but whose title or main headline says it is gone ("Page not found", "404", "no longer available") is a warning, not a pass.
 - Shopping and Performance Max send traffic with no keywords or ad text to compare, so the match checks are not applicable there; every other check still runs.
 
 ## The checklist (6 sections)

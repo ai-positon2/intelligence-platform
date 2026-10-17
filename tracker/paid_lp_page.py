@@ -39,6 +39,7 @@ ATF_CHARS = 1500                                  # visible characters from the 
 UA = "Mozilla/5.0 (compatible; Position2LandingPageCheck/1.0; +https://intelligence.position2.com)"
 TEST_PARAMS = "gclid=LPcheck123&utm_source=lp_check"
 BLOCKED = pages.BLOCKED
+RETRY_PAUSE_S = 0.5                                 # wait before a page that timed out or answered with a server error is asked again
 SKIP_BLOCK = frozenset(("script", "style", "noscript", "template", "svg", "select"))      # whose text is never part of what a visitor reads
 CAP_TEXT = 400                                    # characters kept of the text of a link, button or heading
 
@@ -402,6 +403,11 @@ def _once(url, fetcher, html_only=True):
         resp.close()
 
 
+def _challenged(hdrs):
+    """True when a response is a bot check ("just a moment") rather than the site's own answer. Cloudflare marks one with cf-mitigated: challenge, whatever the status."""
+    return str((hdrs or {}).get("cf-mitigated", "")).lower() == "challenge"
+
+
 def _where(url):
     """(scheme, host, path) of an address, for telling whether a request ended somewhere else: http against https, the apex against www and a changed path all count, a trailing slash, a default port, a fragment and the query do not."""
     p = urlsplit(str(url or ""))
@@ -426,11 +432,12 @@ def fetch(url, fetcher=None, robots=None):
         status, final, hdrs, html, size, cut, first, total, err = _once(url, fetcher)
         out.update(status=status, finalUrl=final, error=err, ms=total, responseMs=first, bytes=size, truncated=cut,
                    encoding=hdrs.get("content-encoding", "")[:20], contentType=hdrs.get("content-type", "")[:60])
-        if err == pages.TIMED_OUT and attempt == 0:
+        if attempt == 0 and (err == pages.TIMED_OUT or (500 <= status < 600 and not _challenged(hdrs))):      # one slow or failed answer is asked again before it is held against the page
             out["retried"] = True
+            time.sleep(RETRY_PAUSE_S)
             continue
         break
-    out["blocked"] = out["status"] in BLOCKED
+    out["blocked"] = out["status"] in BLOCKED or _challenged(hdrs)
     out["redirected"] = bool(out["finalUrl"]) and _where(out["finalUrl"]) != _where(url)
     if out["redirected"]:
         a, b = urlsplit(url), urlsplit(out["finalUrl"])

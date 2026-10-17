@@ -120,6 +120,11 @@ m.register([
 ])
 
 
+# A page that answers 200 but says, in its title or main headline, that the page is gone. Narrow on purpose: it is a warning on what the page itself says.
+SOFT_404 = re.compile(r"\b404\b|\bpage (?:was |is )?not found\b|^\s*not found\s*(?:$|[|:!.\-\u2013\u2014])|\bno longer (?:available|exists?)\b|\b(?:does not|doesn['\u2019]?t) exist\b|"
+                      r"\bcan['\u2019]?t (?:find|be found)\b|\bpage (?:is )?unavailable\b", re.I)
+
+
 # ── What a check is given ───────────────────────────────────────────────────
 
 class Ctx:
@@ -190,6 +195,10 @@ def check_status(c):
         return unknown("reach_status", "the page refuses automated requests (HTTP %d); Google's crawler and real visitors are normally let in, so it is not called broken" % f["status"])
     status = f.get("status") or 0
     if 200 <= status < 400:
+        gone = next((t for t in [(c.facts or {}).get("title") or ""] + list((c.facts or {}).get("h1") or [])[:1] if SOFT_404.search(t)), "")
+        if gone:
+            return make("reach_status", "warn", "The page answered with HTTP %d but its %s reads like an error page (\"%s\"), so the ad may be sending people to a page that no longer exists."
+                        % (status, "title" if gone == (c.facts or {}).get("title") else "headline", gone[:90]), severity="high")
         return make("reach_status", "pass", "The page answered with HTTP %d in %s." % (status, _ms(f.get("ms") or 0)))
     if status >= 400:
         return make("reach_status", "fail", "The page answered HTTP %d, so the ads' clicks reach an error page." % status, caps="a landing page does not open")
