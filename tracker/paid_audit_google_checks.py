@@ -93,6 +93,16 @@ def pct(part, whole):
     return round(100.0 * part / whole) if whole else 0
 
 
+def plural(n, word):
+    """"1 action", "2 actions"."""
+    return "%d %s" % (n, word if n == 1 else word + "s")
+
+
+def verb(n, word):
+    """The verb that goes with a count of n ("1 of 4 counts", "2 of 4 count")."""
+    return word + "s" if n == 1 else word
+
+
 def names(items, key="name"):
     return [i[key] if isinstance(i, dict) else str(i) for i in items]
 
@@ -175,9 +185,10 @@ def set_calls(ctx):
     if not calls:
         return na("G-SET-06", "No call conversion action is enabled.")
     if ctx.customer.get("callReporting") and ctx.customer.get("callConversions"):
-        return make("G-SET-06", "pass", "Call reporting and call conversion reporting are on (%d call conversion actions)." % len(calls))
-    return make("G-SET-06", "fail", "%d call conversion actions are enabled but call reporting is %s." %
-                (len(calls), "off" if not ctx.customer.get("callReporting") else "on without call conversion reporting"))
+        return make("G-SET-06", "pass", "Call reporting and call conversion reporting are on (%s)." % plural(len(calls), "call conversion action"))
+    return make("G-SET-06", "fail", "%s enabled but call reporting is %s." %
+                (plural(len(calls), "call conversion action") + (" is" if len(calls) == 1 else " are"),
+                 "off" if not ctx.customer.get("callReporting") else "on without call conversion reporting"))
 
 
 @check("G-SET-07", "settings", "Google's optimization score is not low", "low",
@@ -191,3 +202,199 @@ def set_score(ctx):
     if score < LOW_OPTIMIZATION:
         return make("G-SET-07", "warn", "The optimization score is %d%%." % score)
     return make("G-SET-07", "pass", "The optimization score is %d%%." % score)
+
+
+# ── Conversion tracking ─────────────────────────────────────────────────────
+
+MIN_SPEND = 100                               # a month's spend under this (in the account's currency) is too little to expect conversions
+
+
+def _real(a):
+    """An enabled conversion action that is the client's own measurement, not one of Google's defaults."""
+    return a["status"] in ACTIVE_STATES and (a["type"] in WEB_TYPES or a["type"] in CALL_TYPES or a["type"] == "LEAD_FORM_SUBMIT")
+
+
+def _primary(ctx):
+    return [a for a in ctx.actions if _real(a) and a["primary"]]
+
+
+def _is_ga4(a):
+    return a["type"].startswith(GA4_PREFIX)
+
+
+def _site_based(a):
+    """Counted from a tag on the site or an import from GA4 (the actions whose counting and window settings are the client's choice)."""
+    return a["type"] in TAG_TYPES or _is_ga4(a)
+
+
+@check("G-CNV-01", "conversions", "There is an enabled primary conversion action", "critical",
+       "Bidding optimises towards the primary conversion actions. With none, Smart Bidding has nothing to learn from and reports show "
+       "no results.",
+       "Create or import the conversion that matters to the client (a form, a call, a booking, a purchase) and mark it primary.")
+def cnv_primary(ctx):
+    if ctx.actions is None:
+        return unknown("G-CNV-01", "the conversion actions could not be read")
+    p = _primary(ctx)
+    if not p:
+        return make("G-CNV-01", "fail", "No enabled primary conversion action was found (%s in the account)." % plural(len(ctx.actions), "action"))
+    shown = ", ".join(a["name"] for a in p[:3]) + (" and %d more" % (len(p) - 3) if len(p) > 3 else "")
+    return make("G-CNV-01", "pass", "%s: %s." % (plural(len(p), "enabled primary conversion action"), shown))
+
+
+@check("G-CNV-02", "conversions", "Conversions were recorded in the last 30 days", "critical",
+       "An account that spends and records nothing is either not converting or not measuring. Either way the bids are being set without "
+       "feedback.",
+       "Check the tag with Tag Assistant, submit a test conversion, and compare the platform's count with the client's own leads.")
+def cnv_recorded(ctx):
+    if ctx.spend is None or ctx.conversions is None:
+        return unknown("G-CNV-02", "the campaigns' numbers could not be read")
+    if ctx.spend < MIN_SPEND:
+        return na("G-CNV-02", "Only %s was spent in the last 30 days, too little to expect conversions." % ctx.money(ctx.spend))
+    if ctx.conversions > 0:
+        return make("G-CNV-02", "pass", "%s conversions were recorded on %s of spend in the last 30 days." % (format(round(ctx.conversions), ","), ctx.money(ctx.spend)))
+    return make("G-CNV-02", "fail", "%s was spent in the last 30 days and no conversion was recorded." % ctx.money(ctx.spend))
+
+
+@check("G-CNV-03", "conversions", "Primary conversion actions that tag or import data are recording", "high",
+       "A primary action that has recorded nothing in 30 days is usually a tag that fell off the page, a form that changed, or an import that "
+       "stopped. If it is the only primary action, bidding is running without data.",
+       "Open each action's tag status, test the form or page it counts, and fix or remove the action.")
+def cnv_silent(ctx):
+    if ctx.actions is None:
+        return unknown("G-CNV-03", "the conversion actions could not be read")
+    cand = [a for a in _primary(ctx) if a["type"] in WEB_TYPES]
+    if not cand:
+        return na("G-CNV-03", "No primary action counts a tag, an import or an upload.")
+    if any(a["allConversions"] is None for a in cand):
+        return unknown("G-CNV-03", "the conversions of the last 30 days could not be read")
+    silent = [a for a in cand if a["allConversions"] == 0]
+    if not silent:
+        return make("G-CNV-03", "pass", "Checked %s: all recorded conversions in the last 30 days." % plural(len(cand), "primary tag and import action"))
+    found = "%d of %s recorded nothing in the last 30 days." % (len(silent), plural(len(cand), "primary tag and import action"))
+    return make("G-CNV-03", "fail" if len(silent) == len(cand) else "warn", found, items=names(silent))
+
+
+@check("G-CNV-04", "conversions", "Lead actions count one conversion per click", "medium",
+       "A form counted every time it is submitted makes one person who fills it in twice look like two leads, which inflates conversions and "
+       "teaches Smart Bidding to chase repeat submitters.",
+       "Set the counting of lead actions to One per click (or per conversion) unless every submission is genuinely a separate lead.")
+def cnv_lead_counting(ctx):
+    if ctx.actions is None:
+        return unknown("G-CNV-04", "the conversion actions could not be read")
+    lead = [a for a in _primary(ctx) if _site_based(a) and a["category"] in LEAD_CATEGORIES]
+    if not lead:
+        return na("G-CNV-04", "No primary lead action is counted from a tag or a GA4 import.")
+    many = [a for a in lead if a["counting"] == "MANY_PER_CLICK"]
+    if not many:
+        return make("G-CNV-04", "pass", "Checked %s: none counts every submission." % plural(len(lead), "primary lead action"))
+    return make("G-CNV-04", "warn", "%d of %s %s every submission." % (len(many), plural(len(lead), "primary lead action"), verb(len(many), "count")), items=names(many))
+
+
+@check("G-CNV-05", "conversions", "Purchase actions count every purchase", "medium",
+       "A purchase counted once per click misses repeat orders in the same visit, so revenue and return on ad spend read low.",
+       "Set the counting of purchase actions to Every.")
+def cnv_purchase_counting(ctx):
+    if ctx.actions is None:
+        return unknown("G-CNV-05", "the conversion actions could not be read")
+    buy = [a for a in _primary(ctx) if _site_based(a) and a["category"] == "PURCHASE"]
+    if not buy:
+        return na("G-CNV-05", "No primary purchase action is counted from a tag or a GA4 import.")
+    once = [a for a in buy if a["counting"] == "ONE_PER_CLICK"]
+    if not once:
+        return make("G-CNV-05", "pass", "Checked %s: none counts one per click." % plural(len(buy), "primary purchase action"))
+    return make("G-CNV-05", "warn", "%d of %s %s one per click." % (len(once), plural(len(buy), "primary purchase action"), verb(len(once), "count")), items=names(once))
+
+
+@check("G-CNV-06", "conversions", "The same conversion is not counted by a tag and a GA4 import", "high",
+       "When a Google Ads tag and a GA4 import both count the same kind of event as primary, one lead can be counted twice and bids "
+       "are set on inflated numbers.",
+       "Keep one source per conversion. Make one of the two secondary, or remove it.")
+def cnv_double(ctx):
+    if ctx.actions is None:
+        return unknown("G-CNV-06", "the conversion actions could not be read")
+    p = [a for a in _primary(ctx) if a["included"]]
+    tags = {a["category"] for a in p if a["type"] in TAG_TYPES}
+    ga4 = {a["category"] for a in p if _is_ga4(a)}
+    if not tags and not ga4:
+        return na("G-CNV-06", "No primary action is counted from a tag or a GA4 import.")
+    both = sorted(tags & ga4)
+    if not both:
+        return make("G-CNV-06", "pass", "No kind of event is counted by both a Google Ads tag and a GA4 import.")
+    hit = [a for a in p if a["category"] in both and (a["type"] in TAG_TYPES or _is_ga4(a))]
+    return make("G-CNV-06", "warn", "Counted by both a tag and a GA4 import: %s." % ", ".join(x.lower().replace("_", " ") for x in both), items=names(hit))
+
+
+@check("G-CNV-07", "conversions", "Value bidding has conversion values to work with", "high",
+       "Maximise conversion value and target ROAS optimise towards the value of each conversion. If every conversion has no value the strategy "
+       "has nothing to optimise and performs like a guess.",
+       "Give each primary action a value (a fixed value per lead is enough) or move the campaigns to a conversion-count strategy.")
+def cnv_value(ctx):
+    if ctx.camps is None or ctx.actions is None:
+        return unknown("G-CNV-07", "the campaigns or the conversion actions could not be read")
+    bidders = [x for x in ctx.camps if x["bidding"] in VALUE_BIDDING]
+    if not bidders:
+        return na("G-CNV-07", "No enabled campaign bids on conversion value.")
+    p = _primary(ctx)
+    if any(a["value"] is None for a in p):
+        return unknown("G-CNV-07", "the conversion values of the last 30 days could not be read")
+    total = sum(a["value"] for a in p)
+    if total > 0:
+        return make("G-CNV-07", "pass", "Campaigns bidding on conversion value: %d. The primary actions recorded %s of value." % (len(bidders), ctx.money(total)))
+    return make("G-CNV-07", "fail", "Campaigns bidding on conversion value: %d, but the primary actions recorded no value in the last 30 days." % len(bidders), items=names(bidders))
+
+
+@check("G-CNV-08", "conversions", "Primary actions use data-driven attribution", "low",
+       "Last-click credits only the final ad clicked. Data-driven attribution spreads credit across the clicks that led to the conversion, "
+       "which suits Smart Bidding better.",
+       "Switch primary actions to data-driven attribution where Google offers it.")
+def cnv_attribution(ctx):
+    if ctx.actions is None:
+        return unknown("G-CNV-08", "the conversion actions could not be read")
+    p = [a for a in _primary(ctx) if a["attribution"]]
+    if not p:
+        return na("G-CNV-08", "No primary action reports an attribution model.")
+    last = [a for a in p if a["attribution"] in LAST_CLICK]
+    if not last:
+        return make("G-CNV-08", "pass", "No primary action uses last-click attribution.")
+    return make("G-CNV-08", "warn", "%d of %s %s last-click attribution." % (len(last), plural(len(p), "primary action"), verb(len(last), "use")), items=names(last))
+
+
+@check("G-CNV-09", "conversions", "Click lookback windows are long enough", "low",
+       "A window shorter than a month drops conversions of people who take time to decide, which matters for higher-consideration services.",
+       "Set the click-through window to 30 days or more for lead and purchase actions.")
+def cnv_window(ctx):
+    if ctx.actions is None:
+        return unknown("G-CNV-09", "the conversion actions could not be read")
+    p = [a for a in _primary(ctx) if _site_based(a)]
+    if not p:
+        return na("G-CNV-09", "No primary action is counted from a tag or a GA4 import.")
+    short = [a for a in p if 0 < a["clickWindow"] < LONG_ENOUGH_CLICK_WINDOW]
+    if not short:
+        return make("G-CNV-09", "pass", "Checked %s: all look back %d days or more." % (plural(len(p), "primary tag and import action"), LONG_ENOUGH_CLICK_WINDOW))
+    return make("G-CNV-09", "warn", "Primary actions with a click window under %d days: %d." % (LONG_ENOUGH_CLICK_WINDOW, len(short)),
+                items=["%s (%d days)" % (a["name"], a["clickWindow"]) for a in short])
+
+
+@check("G-CNV-10", "conversions", "Not too many primary conversion actions", "low",
+       "Every primary action is something bidding optimises towards. Many of them dilute the signal and make the conversion column hard to read.",
+       "Keep the few actions that mark a real lead or sale as primary and make the supporting ones (page views, clicks to call) secondary.")
+def cnv_many(ctx):
+    if ctx.actions is None:
+        return unknown("G-CNV-10", "the conversion actions could not be read")
+    p = [a for a in _primary(ctx) if a["type"] in WEB_TYPES]
+    if len(p) <= MAX_PRIMARY:
+        return make("G-CNV-10", "pass", "%s." % plural(len(p), "primary tag and import action"))
+    return make("G-CNV-10", "warn", "%s, more than %d." % (plural(len(p), "primary tag and import action"), MAX_PRIMARY), items=names(p))
+
+
+@check("G-CNV-11", "conversions", "Google Analytics 4 conversions are imported", "medium",
+       "Linking GA4 lets the account use the site's own events as conversions and audiences. Google's API does not show the link itself, so "
+       "this can only be seen through the conversions imported from it.",
+       "In Google Ads open Linked accounts and check the GA4 link, then import the key events that matter as conversions.")
+def cnv_ga4(ctx):
+    if ctx.actions is None:
+        return unknown("G-CNV-11", "the conversion actions could not be read")
+    ga4 = [a for a in ctx.actions if _is_ga4(a) and a["status"] in ACTIVE_STATES]
+    if ga4:
+        return make("G-CNV-11", "pass", "Conversion actions imported from GA4: %d, so the link exists." % len(ga4))
+    return unknown("G-CNV-11", "Google's API does not show the GA4 link, and no conversion action is imported from GA4")
