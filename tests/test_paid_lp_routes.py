@@ -220,3 +220,51 @@ def test_a_test_that_could_not_run_does_not_use_up_the_days_allowance_when_it_ne
     for _ in range(app_module.LP_LAB_DAILY_CAP + 5):
         assert c.post(API + "/lab", json={"account": "1112223334", "page": "x"}).status_code == 429
     assert app_module._LP_LAB_USES.get(STAFF, (None, 0))[1] == 0
+
+
+# ── Read it like a person ───────────────────────────────────────────────────
+
+def _read_client(monkeypatch, result=None, error=None):
+    calls = []
+
+    def fake(account, page, **kw):
+        calls.append((account, page))
+        if error:
+            raise error
+        return result or {"verdict": "partly", "promiseKept": "Some of it.", "gaps": [], "pageEdits": [], "headlineIdeas": [], "adEdits": [], "source": "model"}
+    monkeypatch.setattr(lp, "explain", fake)
+    app_module._LP_READ_USES.clear()
+    return calls
+
+
+def test_a_page_is_read_for_the_account_and_page_named(monkeypatch):
+    calls = _read_client(monkeypatch)
+    r = client_as(STAFF).post(API + "/read", json={"account": "1112223334", "page": "acme-dental.com/lp"})
+    assert r.status_code == 200 and r.get_json()["read"]["verdict"] == "partly" and calls == [("1112223334", "acme-dental.com/lp")]
+    assert client_as(None).post(API + "/read", json={}).status_code == 302 and client_as("someone@gmail.com").post(API + "/read", json={}).status_code == 302
+
+
+@pytest.mark.parametrize("err, status", [(lp.BadRequest("That page is not one of this account's landing pages."), 400), (gads.GadsError("quota", "slow down"), 429),
+                                         (gads.GadsError("api", "broke"), 502), (base.RefreshTooSoon("moments ago", 9), 429)])
+def test_what_goes_wrong_reading_a_page_reaches_the_page(monkeypatch, err, status):
+    _read_client(monkeypatch, error=err)
+    r = client_as(STAFF).post(API + "/read", json={"account": "1112223334", "page": "x"})
+    assert r.status_code == status and str(err) in r.get_json()["error"]
+
+
+def test_a_person_can_have_only_so_many_pages_read_a_day(monkeypatch):
+    calls = _read_client(monkeypatch)
+    c = client_as(STAFF)
+    for _ in range(app_module.LP_READ_DAILY_CAP):
+        assert c.post(API + "/read", json={"account": "1112223334", "page": "x"}).status_code == 200
+    r = c.post(API + "/read", json={"account": "1112223334", "page": "x"})
+    assert r.status_code == 429 and r.get_json()["kind"] == "cap" and len(calls) == app_module.LP_READ_DAILY_CAP
+    assert client_as("ben@position2.com").post(API + "/read", json={"account": "1112223334", "page": "x"}).status_code == 200
+
+
+def test_a_read_that_failed_does_not_use_up_the_allowance(monkeypatch):
+    _read_client(monkeypatch, error=lp.BadRequest("no"))
+    c = client_as(STAFF)
+    for _ in range(app_module.LP_READ_DAILY_CAP + 3):
+        assert c.post(API + "/read", json={"account": "1112223334", "page": "x"}).status_code == 400
+    assert app_module._LP_READ_USES.get(STAFF, (None, 0))[1] == 0

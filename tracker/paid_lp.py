@@ -23,6 +23,7 @@ import threading
 from . import paid_audit_pages as audit_pages
 from . import paid_gads as base
 from . import paid_gads_segments as gads
+from . import paid_lp_ai as lp_ai
 from . import paid_lp_checks as checks
 from . import paid_lp_match as words
 from . import paid_lp_model as model
@@ -294,3 +295,24 @@ def run_lab(account, page_id, *, store=None, accounts_fn=None, search_fn=None, f
         raise BadRequest("That page is not one of this account's landing pages.")
     result = lp_speed.run(page["url"], get=get)
     return lp_speed.remember(store, target["id"], page["id"], result, now=now)
+
+
+def explain(account, page_id, *, store=None, accounts_fn=None, search_fn=None, fetcher=None, call=None, now=None):
+    """The model's read of one page of the report (tracker/paid_lp_ai.py): did the page keep the ads' promise, what is missing, what to change. {..., source: "model" or
+    "rules"}. Raises BadRequest for an account or page that is not one, or a page there is nothing to hold against (it was not fetched, is built by scripts, or no Search ad
+    group sends people to it)."""
+    from . import paid_store
+    store = store or paid_store
+    cid = parse_account(account)
+    target = seg.resolve_target(cid, accounts_fn=accounts_fn, groups_fn=lambda: [])
+    raw, _old = _cached(target["id"], lambda: raw_read(target, search_fn=search_fn, fetcher=fetcher, now=now), force=False, store=store)
+    p = next((x for x in raw["read"]["pages"] if x["id"] == str(page_id or "")), None)
+    if p is None:
+        raise BadRequest("That page is not one of this account's landing pages.")
+    built = build_page(p, raw)
+    findings = [dict(f, fix=model.CATALOG[f["id"]]["fix"]) for sec in built["sections"] for f in sec["findings"]]
+    findings.sort(key=lambda f: (("fail", "warn").index(f["result"]) if f["result"] in ("fail", "warn") else 2, model.SEVERITIES.index(f.get("severity") or model.CATALOG[f["id"]]["severity"])))
+    out = lp_ai.cached_read((target["id"], p["id"]), raw.get("readAt"), raw, p["id"], findings, now=None, call=call)
+    if out is None:
+        raise BadRequest("This page cannot be read like a person yet: it was not fetched, it is built by scripts, or no Search ad group sends people to it.")
+    return out

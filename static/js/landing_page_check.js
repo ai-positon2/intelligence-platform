@@ -14,7 +14,7 @@ var $ = function(s){return document.querySelector(s)};
 var esc = function(s){return String(s==null?"":s).replace(/[&<>"']/g,function(c){
   return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]})};
 var enc = encodeURIComponent;
-var S = {acct:null, report:null, seq:0, view:"all", sort:"spend", text:"", shown:12, open:{}, tab:{}, passed:{}};
+var S = {acct:null, report:null, seq:0, view:"all", sort:"spend", text:"", shown:12, open:{}, tab:{}, passed:{}, reads:{}};
 var PAGE = 12;                                           // pages drawn before "Show more"
 var TABS = [["checks", "Checks"], ["ads", "Ads and keywords"], ["seen", "What we saw"], ["numbers", "Numbers"]];
 var accts = null;
@@ -56,7 +56,7 @@ function run(refresh){
       setMsg(esc((r.j && r.j.error) || ("The report could not be made (HTTP " + r.status + ")."))+hint);
       return;
     }
-    S.report = r.j; S.view = L.defaultView(r.j.pages); S.sort = "spend"; S.text = ""; S.shown = PAGE; S.open = {}; S.tab = {}; S.passed = {};
+    S.report = r.j; S.view = L.defaultView(r.j.pages); S.sort = "spend"; S.text = ""; S.shown = PAGE; S.open = {}; S.tab = {}; S.passed = {}; S.reads = {};
     setMsg("");
     show("out"); render();
   }).catch(function(){
@@ -201,6 +201,25 @@ function findingHtml(f){
     ((f.result === "fail" || f.result === "warn") ? '<p class="lp-do"><b>What to do:</b> ' + esc(f.fix) + '</p>' : '') +
     '<details class="lp-why"><summary>Why it matters</summary><p>' + esc(f.why) + '</p></details></li>';
 }
+function readList(title, items){
+  return (items && items.length) ? '<h4>' + esc(title) + '</h4><ul class="lp-rl">' + items.map(function(x){return '<li>' + esc(x) + '</li>';}).join("") + '</ul>' : '';
+}
+function readBlock(p){
+  if(!(p.adGroups || []).length) return "";
+  var r = S.reads[p.id];
+  if(!r){
+    return '<div class="lp-read"><h4>Read it like a person</h4><p class="lp-muted">Claude reads this page the way someone who clicked the ad would, and says whether it keeps the promise the ad made, what is missing and what to change. ' +
+      'It is shown only the ad copy, the keywords, the search terms and the page\'s own visible text, and it never changes a score.</p>' +
+      '<button type="button" class="pm-btn-ghost lp-readbtn" data-read="' + esc(p.id) + '">Ask Claude to read this page</button></div>';
+  }
+  var v = L.verdictInfo(r.verdict);
+  return '<div class="lp-read"><h4>Read it like a person' + (v ? ' <span class="lp-on ' + v.tone + '">' + esc(v.label) + '</span>' : '') + '</h4>' +
+    (r.promiseKept ? '<p class="lp-rp">' + esc(r.promiseKept) + '</p>' : '') +
+    readList(r.source === "model" ? "What the page does not answer" : "What the checks found", r.gaps) + readList(r.source === "model" ? "Change on the page" : "What to do", r.pageEdits) +
+    readList("Headlines that use the keyword's words", r.headlineIdeas) + readList("If the page is right, change the ad", r.adEdits) +
+    '<p class="lp-muted">' + (r.source === "model" ? "Written by Claude from the ad copy and the page's text. Every number in it is one it was shown; it changes no score." :
+      "A model was not available" + (r.unavailable ? " (" + esc(r.unavailable) + ")" : "") + ", so these are the checks' own words for this page.") + '</p></div>';
+}
 function tabChecks(p){
   var cat = S.report.catalog || {}, all = L.pageFindings(p, cat);
   var showPassed = !!S.passed[p.id];
@@ -213,7 +232,7 @@ function tabChecks(p){
   var nothing = !secs ? '<p class="au-none">Nothing needs attention on this page.</p>' : "";
   var why = (p.summary && p.summary.capReasons && p.summary.capReasons.length) ? '<p class="lp-note">The grade is held at C or below because ' + esc(p.summary.capReasons.join(", and ")) + '.</p>' : '';
   if(p.summary && p.summary.opens === false) why = '<p class="lp-note">This page does not open, so it scores 0 whatever else is true of it.</p>' + why;
-  return why + secs + nothing + '<button type="button" class="pm-btn-ghost lp-toggle" data-passed="' + esc(p.id) + '">' + (showPassed ? "Hide" : "Show") + ' the ' + passed + ' checks that passed or do not apply</button>';
+  return readBlock(p) + why + secs + nothing + '<button type="button" class="pm-btn-ghost lp-toggle" data-passed="' + esc(p.id) + '">' + (showPassed ? "Hide" : "Show") + ' the ' + passed + ' checks that passed or do not apply</button>';
 }
 function onChip(on){var i = L.onInfo(on); return '<span class="lp-on ' + i.tone + '">' + esc(i.label) + '</span>';}
 function ratingChip(r){var i = L.ratingInfo(r); return '<span class="lp-rate ' + i.tone + '">' + esc(i.label) + '</span>';}
@@ -294,6 +313,20 @@ function runLab(id, btn){
   }).catch(function(){btn.disabled = false; btn.textContent = label; setMsg("The server could not be reached. Try again.");});
 }
 
+/* ── Read it like a person ────────────────────────────────── */
+function readPage(id, btn){
+  if(!S.acct || btn.disabled) return;
+  btn.disabled = true; var label = btn.textContent; btn.textContent = "Reading the page. This takes a few seconds...";
+  var seq = S.seq;
+  fetch(API + "/read", {method:"POST", credentials:"same-origin", headers:{"Content-Type":"application/json"}, body:JSON.stringify({account:S.acct.id, page:id})}).then(function(r){
+    return r.json().catch(function(){return {};}).then(function(j){return {ok:r.ok, status:r.status, j:j};});
+  }).then(function(r){
+    if(seq !== S.seq) return;
+    if(!r.ok){btn.disabled = false; btn.textContent = label; setMsg(esc((r.j && r.j.error) || ("The page could not be read (HTTP " + r.status + ").")), "pm-err"); return;}
+    setMsg(""); S.reads[id] = r.j.read; repaintPage(id);
+  }).catch(function(){btn.disabled = false; btn.textContent = label; setMsg("The server could not be reached. Try again.");});
+}
+
 /* ── Events ───────────────────────────────────────────────── */
 function repaintPage(id){
   var p = pageById(id); if(!p) return;
@@ -320,6 +353,7 @@ document.addEventListener("click", function(e){
   b = t.closest("[data-passed]"); if(b){var r = b.getAttribute("data-passed"); S.passed[r] = !S.passed[r]; repaintPage(r); return;}
   b = t.closest("[data-view]"); if(b){S.view = b.getAttribute("data-view"); S.shown = PAGE; paintPageControls(); paintPages(); return;}
   b = t.closest("[data-lab]"); if(b){runLab(b.getAttribute("data-lab"), b); return;}
+  b = t.closest("[data-read]"); if(b){readPage(b.getAttribute("data-read"), b); return;}
   if(t.closest("#moreBtn")){S.shown += PAGE; paintPages(); return;}
 });
 $("#sortSel").addEventListener("change", function(e){S.sort = e.target.value; S.shown = PAGE; paintPages();});

@@ -102,3 +102,13 @@ em.lp-muted{font-style:normal}
 .lp-lab p{margin:0 0 8px;line-height:1.55}
 .lp-sav{margin:0 0 8px;padding:0 0 0 18px;font-size:13px;line-height:1.6;color:var(--pm-ink2)}
 .lp-labbtn{margin-top:2px}
+
+/* read it like a person */
+.lp-read{margin:0 0 14px;padding:12px 14px;border:1px solid color-mix(in srgb,var(--pm-a) 40%,transparent);border-radius:14px;background:color-mix(in srgb,var(--pm-a) 6%,var(--pm-panel))}
+.lp-read h4{margin:12px 0 4px;font-size:10.5px;font-weight:700;letter-spacing:var(--ls-caps);text-transform:uppercase;color:var(--pm-faint);display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.lp-read h4:first-child{margin-top:0;font-size:13px;letter-spacing:0;text-transform:none;color:var(--pm-ink)}
+.lp-read p{margin:0 0 8px;font-size:13px;line-height:1.6;color:var(--pm-ink2);max-width:80ch}
+.lp-rp{font-size:14px!important}
+.lp-rl{margin:0 0 8px;padding:0 0 0 18px;font-size:13px;line-height:1.6;color:var(--pm-ink2);max-width:80ch}
+.lp-rl li{margin:2px 0}
+.lp-readbtn{margin-top:2px}

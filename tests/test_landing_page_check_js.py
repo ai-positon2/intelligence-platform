@@ -173,6 +173,13 @@ def test_the_lab_test_reads_in_seconds_with_a_tone_and_rows_for_the_page_to_draw
     assert run("L.labRows(null)") == [] and dict(run("L.labRows(l)", l={"score": 1, "field": {"category": None}}))["Real visitors (Chrome UX Report)"] == "no figures"
 
 
+def test_every_verdict_the_model_can_give_has_a_label_and_a_tone():
+    from tracker import paid_lp_ai
+    for v, tone in (("matches", "good"), ("partly", "warn"), ("mismatch", "bad")):
+        assert run("L.verdictInfo(v).tone", v=v) == tone and run("L.verdictInfo(v).label", v=v)
+    assert set(run("Object.keys(L.VERDICT)")) == set(paid_lp_ai.VERDICTS) and run("L.verdictInfo(null)") is None and run("L.verdictInfo('great')") is None
+
+
 def test_the_headline_tiles_say_what_is_at_stake_and_are_calm_when_nothing_is():
     s = {"checked": 24, "pagesOfSpend": 93, "spend": 85000, "spendChecked": 49000, "spendAtRisk": 12000, "pagesAtRisk": 3, "critical": 2, "high": 5, "tally": {"warn": 9}, "spendUnverified": 3000}
     t = {x["key"]: x for x in run("L.tiles(s,'USD')", s=s)}
@@ -225,7 +232,7 @@ def test_every_element_the_page_script_reaches_for_is_in_the_template():
                    "pageFind", "pageList", "moreBtn", "notes", "notesCard", "foot", "refreshBtn", "dlXlsx", "dlPdf", "dlZip"}
     for i in sorted(ids):
         assert 'id="%s"' % i in html, i
-    for attr in ("data-open", "data-page", "data-tab", "data-passed", "data-view", "data-lab"):
+    for attr in ("data-open", "data-page", "data-tab", "data-passed", "data-view", "data-lab", "data-read"):
         assert attr in js, attr
 
 
