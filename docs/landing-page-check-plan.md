@@ -62,4 +62,11 @@ nothing; not applicable and could not check are left out and counted. The grade 
 
 `tracker/paid_lp_read.py` (Google reads), `paid_lp_page.py` (fetch and parse a page), `paid_lp_match.py` (words, keywords, offers),
 `paid_lp_model.py` (a finding and a score), `paid_lp_checks.py` (the checklist), `paid_lp.py` (the report, cached like the audit's),
-`paid_lp_export.py` (Excel, PDF, CSV zip), `paid_lp_ai.py` (the optional model read), `paid_lp_speed.py` (the optional lab test).
+`paid_lp_export.py` (Excel, PDF, CSV zip), `paid_lp_ai.py` (the optional model read), `paid_lp_speed.py` (the optional lab test), `paid_lp_docs.py` (the checklist as a document,
+`docs/landing-page-check-checks.md`, held equal to the catalog by a test). The page is `templates/landing_page_check.html`, `static/js/lp_data.js` (pure functions, run in Node by the tests),
+`static/js/landing_page_check.js` and `static/css/landing_page_check.css`.
+
+## Setting it up
+
+Nothing is needed for the report itself: it uses the Google Ads access the other Paid Marketing agents use. Two optional steps need a key on the server:
+`PAGESPEED_API_KEY` (a Google Cloud API key with the PageSpeed Insights API enabled) turns on the lab speed test, and `ANTHROPIC_API_KEY` (already set) is what Read it like a person uses.
