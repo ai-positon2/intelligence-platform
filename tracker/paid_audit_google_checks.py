@@ -675,7 +675,9 @@ def str_manual(ctx):
 
 @check("G-STR-09", "structure", "Campaigns that spend are converting", "high",
        "A campaign with a lot of clicks and no conversions in a month is either not converting or not measuring, and it keeps spending.",
-       "Check the landing page and the conversion tracking for each, tighten the targeting, or pause the campaign and move its budget.")
+       "Check the landing page and the conversion tracking for each, tighten the targeting, or pause the campaign and move its budget. If conversions "
+       "are imported from a CRM or uploaded offline they arrive days or weeks after the click, so recent clicks may not have a conversion yet: look at "
+       "the import's delay before pausing anything.")
 def str_no_conversions(ctx):
     if ctx.camps is None or ctx.spend is None:
         return unknown("G-STR-09", "the campaigns or their numbers could not be read")
@@ -867,7 +869,8 @@ def kwd_duplicates(ctx):
 
 @check("G-KWD-06", "keywords", "Few keywords spend without ever converting", "high",
        "A keyword with plenty of clicks and no conversion in a month is spending money the account cannot trace to a result.",
-       "Check the search terms behind each one. Pause it, lower its bid, move it to exact match, or add the junk terms as negatives.")
+       "Check the search terms behind each one. Pause it, lower its bid, move it to exact match, or add the junk terms as negatives. If conversions are "
+       "imported offline they arrive late, so recent clicks may not have a conversion yet: look at the import's delay first.")
 def kwd_waste(ctx):
     kw = ctx.read.get("keywords")
     if kw is None or kw["wasted"] is None or ctx.spend is None:

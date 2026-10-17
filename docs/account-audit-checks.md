@@ -191,7 +191,7 @@ What to do: Move the campaign to Maximise conversions (or a target CPA once it h
 
 Why it matters: A campaign with a lot of clicks and no conversions in a month is either not converting or not measuring, and it keeps spending.
 
-What to do: Check the landing page and the conversion tracking for each, tighten the targeting, or pause the campaign and move its budget.
+What to do: Check the landing page and the conversion tracking for each, tighten the targeting, or pause the campaign and move its budget. If conversions are imported from a CRM or uploaded offline they arrive days or weeks after the click, so recent clicks may not have a conversion yet: look at the import's delay before pausing anything.
 
 **G-STR-10** Search campaigns are not losing much reach to rank (medium)
 
@@ -247,7 +247,7 @@ What to do: Keep the keyword in the ad group whose ads fit it best and pause or 
 
 Why it matters: A keyword with plenty of clicks and no conversion in a month is spending money the account cannot trace to a result.
 
-What to do: Check the search terms behind each one. Pause it, lower its bid, move it to exact match, or add the junk terms as negatives.
+What to do: Check the search terms behind each one. Pause it, lower its bid, move it to exact match, or add the junk terms as negatives. If conversions are imported offline they arrive late, so recent clicks may not have a conversion yet: look at the import's delay first.
 
 **G-KWD-07** Most search term spend ends in a conversion (medium)
 

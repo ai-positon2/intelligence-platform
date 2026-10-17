@@ -24,8 +24,10 @@ score and counted, so the page can say how much of the account it could not look
 ### Scoring
 
 A pass earns a check's weight (critical 8, high 4, medium 2, low 1), a warning half of it, a failure nothing. The score is the share of the
-weight that was earned over the checks that could be judged. A failed critical check keeps the grade from rising above C. The score decides
-nothing by itself: the fix-first list is the worst failures and warnings by severity, then failures before warnings, then how many things they touch.
+weight that was earned over the checks that could be judged. The grade is held at C or below when a critical check failed, when 30 percent or more
+of the checks could not be read (a high score over a small judged part is not a good account), or when a check says the account is not advertising
+(most checks then pass because there is nothing to fault); the page and the downloads say which. The score decides nothing by itself: the fix-first
+list is the worst failures and warnings by severity, then failures before warnings, then how many things they touch.
 
 ### Google Ads (52 checks, 6 sections)
 
@@ -46,8 +48,9 @@ a single ad).
 
 Every check is arithmetic on what the platform returned. A finding quotes its own numbers. The model is not asked to find problems. An
 optional "Write the briefing" step has Claude write a short read of the findings from the scores, the checks to fix first and what could not
-be checked, never from the names of campaigns, keywords, search terms or pages, and a number it writes that the audit did not give sends it
-back once and then falls back to the findings' own words.
+be checked, never from the names of campaigns, keywords, search terms or pages (a sentence can name a conversion action, a pixel or an account, and
+any identifier, such as a Google tag id or a Merchant Center id, is masked), and a number it writes that the audit did not give sends it back once and
+then falls back to the findings' own words. One briefing is made per read, however many people ask.
 
 ## Saved audits
 
@@ -75,3 +78,12 @@ failing, and the score change. Only a check judged in both audits is compared.
   from Meta's documented fields. A wrong field name makes that part "could not read", never a wrong pass, but the first real read happens on Railway.
 - **The real model.** There is no Anthropic key on the development machine, so the briefing is tested on a stand-in.
 - Production while signed in (the browser pane cannot sign in).
+
+## Independent review
+
+A reviewer who had not seen the reasoning read the code and found 14 real defects, all fixed in their own commits with tests: a budget check that passed on
+numbers it could not read; tracking checks that failed a paused account and app and store accounts; call reporting demanded for a website click-to-call
+tag; an imported action's attribution called last click; rounded shares deciding thresholds; a briefing that called the model on every click; a partial
+read cached for an hour and a saved-copy fallback that only worked within one day; an A for an account that was mostly unread or not advertising; a
+stale audit filed as today's; portfolio strategies judged one campaign at a time; and four Meta checks (the ad-set check that contradicted the ads check,
+campaigns Meta flags with issues left out, lead campaigns optimised for Schedule or Contact called dead, automatic events counted as conversions).
