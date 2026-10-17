@@ -22,11 +22,25 @@ def test_the_run_is_for_the_day_after_the_newest_yesterday():
     assert as_of == dt.date(2026, 10, 12) and start == dt.date(2026, 10, 1) and ends == {"1111111111": "2026-10-11"}
 
 
-def test_each_account_is_read_through_its_own_yesterday():
+def test_one_account_in_a_distant_zone_does_not_move_the_whole_runs_today():
+    la1, la2, au = acct("1111111111", tz="America/Los_Angeles"), acct("2222222222", tz="America/New_York"), acct("3333333333", tz="Australia/Sydney")
+    # 20:00 UTC on the 11th: the 11th in America, already the 12th in Sydney
+    as_of, start, ends = rd.plan_window([la1, la2, au], now=utc(2026, 10, 11, 20))
+    assert as_of == dt.date(2026, 10, 11)                      # the Americans' today, not Sydney's
+    assert ends == {"1111111111": "2026-10-10", "2222222222": "2026-10-10", "3333333333": "2026-10-10"}     # Sydney is not read past the run's day
+
+
+def test_an_account_a_day_behind_is_read_through_its_own_yesterday():
+    ny, ny2, la = acct("1111111111", tz="America/New_York"), acct("2222222222", tz="America/New_York"), acct("3333333333", tz="America/Los_Angeles")
+    # 05:00 UTC on the 12th: still the 11th in Los Angeles (yesterday the 10th), already the 12th in New York (yesterday the 11th)
+    as_of, _, ends = rd.plan_window([ny, ny2, la], now=utc(2026, 10, 12, 5))
+    assert as_of == dt.date(2026, 10, 12) and ends == {"1111111111": "2026-10-11", "2222222222": "2026-10-11", "3333333333": "2026-10-10"}
+
+
+def test_a_tie_takes_the_earlier_day():
     a, b = acct("1111111111", tz="America/Los_Angeles"), acct("2222222222", tz="Asia/Kolkata")
-    # 20:00 UTC on the 11th: still the 11th in Los Angeles, already the 12th in India
-    as_of, start, ends = rd.plan_window([a, b], now=utc(2026, 10, 11, 20))
-    assert ends == {"1111111111": "2026-10-10", "2222222222": "2026-10-11"} and as_of == dt.date(2026, 10, 12)
+    as_of, _, ends = rd.plan_window([a, b], now=utc(2026, 10, 11, 20))
+    assert as_of == dt.date(2026, 10, 11) and ends == {"1111111111": "2026-10-10", "2222222222": "2026-10-10"}
 
 
 def test_the_first_of_the_month_stays_on_the_month_that_ended():

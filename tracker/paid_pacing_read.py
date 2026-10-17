@@ -60,17 +60,22 @@ def account_today(tz, now=None):
 def plan_window(accounts, now=None):
     """(as_of, month_start, ends): the day the run is for, the first day of its month, and {account id: last day to read}.
 
-    The engine treats as_of as "today" and expects data through yesterday. Accounts sit in different time zones, so the newest
-    "yesterday" among them sets the day (as_of is the day after it) and each account is read through its own yesterday. On the
-    first of a month nothing has been spent in the new month yet, so the run stays on the month that just ended (as_of is its last
-    day), the same rule the sheet-based refresh followed."""
+    The engine treats as_of as "today" and expects data through yesterday. Accounts sit in different time zones (Position2's are mostly
+    American, with a few in Australia or the UK), so the run follows the MOST COMMON yesterday among them (the earlier one on a tie): one
+    account in Sydney must not move every American account's "today" a day on, which would skew every ideal-pacing figure by a whole day.
+    Each account is read through its own yesterday, never past the run's (an account already a day ahead is read only that far; one a day
+    behind is read through its own, and the engine judges it against its own last day). On the first of a month nothing has been spent in
+    the new month yet, so the run stays on the month that just ended (as_of is its last day), the same rule the sheet-based refresh followed."""
     if not accounts:
         raise ValueError("no accounts to read")
     yest = {a["id"]: account_today(a.get("timeZone") or a.get("tz"), now) - dt.timedelta(days=1) for a in accounts}
-    newest = max(yest.values())
-    nxt = newest + dt.timedelta(days=1)
-    as_of = nxt if nxt.month == newest.month else newest
-    return as_of, as_of.replace(day=1), {i: d.isoformat() for i, d in yest.items()}
+    counts = {}
+    for d in yest.values():
+        counts[d] = counts.get(d, 0) + 1
+    usual = min(d for d, n in counts.items() if n == max(counts.values()))
+    nxt = usual + dt.timedelta(days=1)
+    as_of = nxt if nxt.month == usual.month else usual
+    return as_of, as_of.replace(day=1), {i: min(d, usual).isoformat() for i, d in yest.items()}
 
 
 # ── Queries and parsing ─────────────────────────────────────────────────────
