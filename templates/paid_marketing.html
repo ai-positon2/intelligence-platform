@@ -68,7 +68,7 @@
     <div class="dash-grid pm-sec-grid">
 
       <!-- Paid Marketing Agents. 1 to 3 are from Agent Holmes (2026-10-12); 4,
-           Segment Analysis, is new on the platform. Geo Performance was added 2026-10-15, Seasonality Analysis and the Call Transcript Analyzer 2026-10-16, Ad Strength Analysis, Audience Segment Analysis, Asset Coverage Audit and Strategy &amp; Campaign Book 2026-10-16, Business Research, Keyword Research, Account Audit and Landing Page &amp; Relevancy Check 2026-10-17. The hub card's
+           Segment Analysis, is new on the platform. Geo Performance was added 2026-10-15, Seasonality Analysis and the Call Transcript Analyzer 2026-10-16, Ad Strength Analysis, Audience Segment Analysis, Asset Coverage Audit and Strategy &amp; Campaign Book 2026-10-16, Business Research, Keyword Research, Account Audit and Landing Page &amp; Relevancy Check 2026-10-17, Test &amp; Experiment Tracker 2026-10-18. The hub card's
            "N dashboards / N live" counts these; tests/test_hub_card_counts.py
            checks the two agree. -->
 
@@ -438,6 +438,26 @@
         </div>
       </a>
 
+      <!-- 19. Test & Experiment Tracker (2026-10-18): which tests have said anything, and what to do about each -->
+      <a href="/p2/paid-marketing/experiment-tracker" class="dash-card active c-ex">
+        <div class="card-band"></div>
+        <div class="card-thumb">
+          <div class="card-thumb-icon"><svg class="au-ic" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M9 3h6"/><path d="M10 3v6.2L4.8 18a1.6 1.6 0 0 0 1.4 2.4h11.6a1.6 1.6 0 0 0 1.4-2.4L14 9.2V3"/><path d="M7.5 14.5h9"/></svg></div>
+          <div class="card-thumb-badge tb-live"><span class="tb-dot live"></span> Live</div>
+        </div>
+        <div class="card-body">
+          <div class="card-name">Test &amp; Experiment Tracker</div>
+          <div class="card-desc">
+            Reads every Google Ads experiment and every ad group that runs two or more ads, and says for each test whether it has a result yet, which side is ahead and what to
+            do: apply it, end it, pause the losing ad, or wait and for how long. Plain arithmetic at 95 percent confidence, never a verdict on a small number.
+          </div>
+          <div class="card-footer">
+            <div class="card-tags"><span class="tag">Experiments</span><span class="tag">Ad tests</span></div>
+            <span class="card-arrow">→</span>
+          </div>
+        </div>
+      </a>
+
     </div>
 
     <p class="footer-note">Position2 · Internal use only</p>
@@ -483,6 +503,7 @@
     {t:'Keyword Research',d:'The searches an account is not bidding on yet',u:'/p2/paid-marketing/keyword-research',i:'⌕'},
     {t:'Account Audit',d:'Is the account set up to win: settings, tracking, structure, ads',u:'/p2/paid-marketing/account-audit',i:'✔'},
     {t:'Landing Page & Relevancy Check',d:'Does each landing page keep the promise the ad made',u:'/p2/paid-marketing/landing-page-check',i:'▤'},
+    {t:'Test & Experiment Tracker',d:'Which tests have a result, and what to do about each',u:'/p2/paid-marketing/experiment-tracker',i:'⚗'},
     {t:'QA Agent',d:'Campaign launch QC checklist',u:'/p2/paid-marketing/qa-agent',i:'✓'}
   ];
   var ITEMS=(window.__KP_ITEMS||[]).concat(BASE);

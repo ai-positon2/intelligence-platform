@@ -131,8 +131,7 @@ def test_the_card_is_on_the_paid_marketing_page_the_hub_counts_it_and_the_comman
     root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     for name in ("templates/_paid_kpal.html", "templates/paid_marketing.html"):
         assert "/p2/paid-marketing/landing-page-check" in open(os.path.join(root, name), encoding="utf-8").read(), name
-    hub = open(os.path.join(root, "templates/hub.html"), encoding="utf-8").read()
-    assert '<div class="card-stat"><span>18</span> dashboards</div>' in hub and '<div class="card-stat"><span>18</span> live</div>' in hub and 'data-lxn="45"' in hub
+    # the hub's counts are held to the cards by tests/test_hub_card_counts.py and tests/test_paid_exp_routes.py
 
 
 def test_the_assistant_knows_the_agent():
