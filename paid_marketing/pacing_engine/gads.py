@@ -206,7 +206,8 @@ def load_export(path: str | Path) -> pd.DataFrame:
         "conversions": num("Conversions"),
         "impressions": num("Impr."),
         "clicks": num("Clicks"),
-        "conv_value": 0.0,
+        # the UI export has no conversion value; the platform's own Google Ads read adds a "Conv. value" column
+        "conv_value": num("Conv. value") if "Conv. value" in df else 0.0,
         "search_is": df["Search impr. share"].map(_pct) if "Search impr. share" in df else None,
     })
     return out[out["date"].notna()].reset_index(drop=True)
@@ -285,7 +286,7 @@ def resolve(df: pd.DataFrame, budgets: pd.DataFrame,
                 warns.append(f"'{raw}' spent ${spend:,.0f} until it was paused.")
             else:
                 warns.append(f"'{raw}' spent ${spend:,.0f} MTD but has no "
-                             f"{channel} budget row in the Budget Tracker.")
+                             f"{channel} budget row for this month in Allocations.")
     df = df[df["account"].notna()].copy()
 
     # budgeted accounts with no spend at all

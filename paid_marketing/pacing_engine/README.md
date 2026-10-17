@@ -8,12 +8,17 @@ covers ranking weights, guardrails and adding a client.
 
 Two ways a run reaches the page:
 
-1. **The Refresh button** on the Pacing Desk. The platform reads the
-   "All Accounts Spend Data" sheet and the Budget Tracker with its service
-   account, runs this engine in a throwaway folder, and publishes the result
-   (`tracker/paid_refresh.py`). Needs `PACING_SPEND_SHEET_ID` set on Railway
-   and both sheets shared (Viewer) with the service account in
-   `GOOGLE_SA_JSON`. `PACING_BUDGET_SHEET_ID` overrides the Budget Tracker.
+1. **The platform builds it itself** (`tracker/paid_refresh.py`), by the Refresh
+   button or by the page on the first visit of each Pacific day. It reads every
+   Google Ads account under the manager account through the API
+   (`tracker/paid_pacing_read.py`: the month's campaign days, each campaign's
+   real daily budget, shared pools, search impression share) and measures them
+   against the month's **Allocations**, which the team keeps on the page
+   (`tracker/paid_pacing_budgets.py`). No Google Sheet is read. It writes the
+   two workbooks this engine's loaders expect into a throwaway folder, runs
+   `validate.py` and `export_dashboard.py`, and publishes the result. Needs the
+   `GOOGLE_ADS_*` variables the other Paid Marketing agents already use.
+   `docs/pacing-desk-input.md` has the details.
 2. **A push from the PPC team's machine**, below. The inputs in `raw/` hold
    client spend and are deliberately **not committed** (this repository is
    public).

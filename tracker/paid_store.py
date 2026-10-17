@@ -221,6 +221,17 @@ def latest_date():
     return (row[0] or {}).get("date") if row else None
 
 
+def latest_built():
+    """When the latest stored run was built, as ISO text, or None before the first run."""
+    date = latest_date()
+    if not date:
+        return None
+    with _tx() as cur:
+        cur.execute("SELECT seeded_at FROM pm_pacing_snapshots WHERE date = %s", (date,))
+        row = cur.fetchone()
+    return row[0].isoformat() if row and row[0] else None
+
+
 def latest_clients():
     """(date, [{name, accounts, offTarget}]) from the latest run, without
     shipping its campaign detail. (None, []) before the first push."""
@@ -321,6 +332,14 @@ def get_gads_entry(key, ttl_s):
                     "AND fetched_at > now() - %s * interval '1 second'", (key, ttl_s))
         row = cur.fetchone()
     return (row[0], row[1].isoformat()) if row else None
+
+
+def gads_saved_at(key):
+    """When `key` was saved, as ISO text, or None. Cheap: the saved value itself is not read."""
+    with _tx() as cur:
+        cur.execute("SELECT fetched_at FROM pm_gads_cache WHERE key = %s", (key,))
+        row = cur.fetchone()
+    return row[0].isoformat() if row else None
 
 
 def get_gads_days(customer_id, start, end):

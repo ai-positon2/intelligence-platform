@@ -25,6 +25,8 @@ MAX_ACCOUNTS = 2000
 DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 LANDINGS = ("WILL OVERSPEND", "WILL UNDERSPEND", "ON TARGET", "BUDGET UNCLEAR")
 META_KEYS = ("asOf", "dataThrough", "month", "elapsed", "daysInMonth", "idealPacing", "tolerance")
+SOURCE_KEYS = ("kind", "accounts", "unread", "readAt", "budgets", "notes")      # where a run's numbers came from, when the platform built it itself
+MAX_SOURCE_NOTES = 60
 
 # A move's id is built by the page (moveDocId): the day, two short slugs and
 # a hash of (location, from, to). Anything else is refused.
@@ -139,6 +141,11 @@ def build_seed(body):
     meta = {k: head.get(k) for k in META_KEYS}
     for k in ("elapsed", "daysInMonth", "idealPacing", "tolerance"):
         _num(meta[k], k)
+    src = head.get("source")
+    meta["source"] = {k: src[k] for k in SOURCE_KEYS if k in src} if isinstance(src, dict) else None
+    if meta["source"] is not None:
+        notes = meta["source"].get("notes")
+        meta["source"]["notes"] = [str(n)[:300] for n in notes][:MAX_SOURCE_NOTES] if isinstance(notes, list) else []
     meta["portfolioWarnings"] = [str(w) for w in (head.get("portfolioWarnings") or [])][:200]
     meta["otherChannels"] = [o for o in (head.get("otherChannels") or []) if isinstance(o, dict)][:200]
     meta.update(rollup(clients))
