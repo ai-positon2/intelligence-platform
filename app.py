@@ -5318,7 +5318,8 @@ def _paid_audit_answer(make):
     """Runs the Account Audit's report and maps what can go wrong the same way for every route."""
     from tracker import paid_gads as paid_gads_base, paid_gads_segments as paid_gads, paid_audit, paid_audit_store
     try:
-        return jsonify(make(paid_audit))
+        out = make(paid_audit)
+        return (jsonify(out[0]), out[1]) if isinstance(out, tuple) else jsonify(out)
     except paid_audit.BadRequest as e:
         return jsonify(error=str(e)), 400
     except paid_audit_store.StoreUnavailable as e:
@@ -5342,12 +5343,15 @@ def paid_audit_report():
 @app.route("/p2/paid-marketing/api/audit/save", methods=["POST"])
 @position2_required
 def paid_audit_save():
-    body = request.get_json(silent=True) or {}
+    body = request.get_json(silent=True)
+    body = body if isinstance(body, dict) else {}
 
     def make(pa):
         from tracker import paid_audit_store as store
         key = pa.account_key(body.get("account"))
         report = pa.report_for(body.get("account"))
+        if report.get("stale"):                          # a saved copy shown because a platform would not answer is not today's audit
+            return {"error": "A platform is not answering, so the audit shown is an older saved copy. Save it once a fresh read is possible.", "kind": "stale"}, 409
         names = " + ".join(a["name"] for a in report["accounts"])
         return {"saved": store.save(key, names, _pm_user_email(), report, body.get("note"))}
     return _paid_audit_answer(make)
@@ -5404,7 +5408,8 @@ _AUDIT_SUMMARY_USES = {}
 @app.route("/p2/paid-marketing/api/audit/summary", methods=["POST"])
 @position2_required
 def paid_audit_summary_route():
-    body = request.get_json(silent=True) or {}
+    body = request.get_json(silent=True)
+    body = body if isinstance(body, dict) else {}
     email, today = _pm_user_email(), datetime.now(timezone.utc).date().isoformat()
     day, used = _AUDIT_SUMMARY_USES.get(email, (today, 0))
     if day != today:

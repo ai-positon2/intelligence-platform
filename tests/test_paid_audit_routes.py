@@ -301,3 +301,20 @@ def test_a_briefing_without_a_model_falls_back_to_the_findings(monkeypatch):
     r = post(client_as(STAFF), "/summary", {"account": "1112223334"})
     assert r.status_code == 200 and r.get_json()["source"] == "rules" and "scored" in r.get_json()["summary"]
     summ.clear_cache()
+
+
+def test_a_body_that_is_not_an_object_is_a_400_not_a_crash(store, briefing):
+    c = client_as(STAFF)
+    for path in ("/save", "/summary"):
+        for body in ([], ["1112223334"], "1112223334", 5):
+            r = c.post(API + path, json=body)
+            assert r.status_code == 400, (path, body, r.status_code)
+
+
+def test_an_older_saved_copy_is_not_filed_as_todays_audit(store, monkeypatch):
+    stale = dict(_report(), stale=[{"platform": "google", "savedAt": "2026-10-16T08:30:00+00:00"}])
+    monkeypatch.setattr(audit, "report_for", lambda *x, **k: stale)
+    r = post(client_as(STAFF), "/save", {"account": "1112223334"})
+    assert r.status_code == 409 and r.get_json()["kind"] == "stale" and "older saved copy" in r.get_json()["error"] and store.rows == []
+    monkeypatch.setattr(audit, "report_for", lambda *x, **k: _report())
+    assert post(client_as(STAFF), "/save", {"account": "1112223334"}).status_code == 200 and len(store.rows) == 1

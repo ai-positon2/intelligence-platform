@@ -105,8 +105,8 @@ def test_one_model_call_per_audit_however_many_ask(report):
     assert a == b and len(call.calls) == 1
     s.cached_summary("k", report, now=1000.0 + s.TTL_S, call=call)
     assert len(call.calls) == 2                                                    # at exactly the limit it is stale: asked again
-    s.cached_summary("k", dict(report, generatedAt="2026-10-18T00:00:00+00:00"), now=1000.0 + s.TTL_S + 2, call=call)
-    assert len(call.calls) == 3                                                    # a new audit is a new briefing
+    s.cached_summary("k", dict(report, readAt="2026-10-18T00:00:00+00:00"), now=1000.0 + s.TTL_S + 2, call=call)
+    assert len(call.calls) == 3                                                    # an audit made from a new read is a new briefing
     s.cached_summary("other", report, now=1.0, call=call)
     assert len(call.calls) == 4
 
@@ -116,3 +116,25 @@ def test_the_cache_is_bounded(report):
     for i in range(80):
         s.cached_summary("k%d" % i, report, now=float(i), call=call)
     assert len(s._summaries) == 64 and "k0" not in s._summaries and "k79" in s._summaries
+
+
+def test_the_same_read_is_the_same_audit_even_though_every_report_has_a_new_time_on_it(report):
+    call = model_says("It scored %s." % report["summary"]["score"])
+    again = dict(report, generatedAt="2026-10-17T12:00:09+00:00")                      # the report is made afresh on each request, from the same saved read
+    s.cached_summary("k", report, now=10.0, call=call)
+    s.cached_summary("k", again, now=11.0, call=call)
+    assert len(call.calls) == 1
+    assert s.read_marker(report) == report["readAt"] and s.read_marker({"generatedAt": "g"}) == "g" and s.read_marker({"readAt": None, "generatedAt": "g"}) == "g"
+
+
+def test_identifiers_are_masked_before_the_model_sees_a_sentence(report):
+    r = make_report()
+    first = r["fixFirst"][0]
+    first["found"] = "The account has a Google tag (AW-1057982098) and Merchant Center 101609788 is linked; USD 24,240 was spent."
+    shown = s.summary_input(r)
+    assert shown["fixFirst"][0]["found"] == "The account has a Google tag (an id) and Merchant Center an id is linked; USD 24,240 was spent."
+    text = json.dumps(shown)
+    assert "AW-1057982098" not in text and "101609788" not in text and "24,240" in text
+    unknown = next(f for sec in r["sections"] for f in sec["findings"] if f["result"] == "unknown")
+    unknown["found"] = "Could not be checked: account 1112223334 refused"
+    assert "1112223334" not in json.dumps(s.summary_input(r)) and s._mask(None) == "" and s._mask("12345 and 123456") == "12345 and 123456"

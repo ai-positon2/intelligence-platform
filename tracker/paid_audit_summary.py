@@ -2,7 +2,8 @@
 
 A short note for the account manager written from the audit's own findings, and only from them. The model is shown the scores and the
 checks to fix first (their titles, how severe, what was found and what to do), never the affected campaign, ad group, keyword or search term
-names, never the page, never a request body. It is told to copy numbers exactly, and its answer is checked: any number in it that is not in
+names, never the page, never a request body. A sentence a check wrote can name a conversion action, a pixel or an account, which are labels
+the team gave them; identifiers (a Google tag id, a Merchant Center id, any run of seven or more digits) are masked before it is shown. It is told to copy numbers exactly, and its answer is checked: any number in it that is not in
 what it was shown sends it back once, and a second miss (or no model at all) falls back to the findings' own words. So the briefing can
 never say something the audit did not find. Same guard as tracker/paid_geo_summary.py, whose number check this uses.
 """
@@ -40,6 +41,13 @@ SCHEMA = {
 }
 
 
+_ID = re.compile(r"\bAW-\d+\b|\b\d{7,}\b")
+
+
+def _mask(text):
+    return _ID.sub("an id", str(text or ""))
+
+
 def summary_input(report):
     """What the model is shown: scores, sections, the fix-first checks and the checks that could not be read. Nothing named in `items`."""
     s = report.get("summary") or {}
@@ -50,9 +58,9 @@ def summary_input(report):
                     "share of checks that could not be judged": "%d%%" % s.get("unknownShare", 0)},
         "platforms": {p: {"score": v.get("score"), "grade": v.get("grade")} for p, v in (s.get("platforms") or {}).items()},
         "sections": [{"section": sec["label"], "platform": sec["platform"], "score": sec["score"], "grade": sec["grade"]} for sec in report.get("sections") or []],
-        "fixFirst": [{"check": f["title"], "severity": f["severity"], "result": f["result"], "found": f["found"], "whatToDo": f["fix"]}
+        "fixFirst": [{"check": f["title"], "severity": f["severity"], "result": f["result"], "found": _mask(f["found"]), "whatToDo": f["fix"]}
                      for f in (report.get("fixFirst") or [])[:FIX_SHOWN]],
-        "couldNotCheck": [{"check": f["title"], "why": f["found"]} for f in unknown[:UNKNOWN_SHOWN]],
+        "couldNotCheck": [{"check": f["title"], "why": _mask(f["found"])} for f in unknown[:UNKNOWN_SHOWN]],
         "notes": list(report.get("notes") or []),
     }
 
@@ -101,16 +109,22 @@ _summaries = {}
 _lock = threading.Lock()
 
 
+def read_marker(report):
+    """What makes two reports the same audit: the time the platforms were read (the report's own `generatedAt` is new on every request)."""
+    return report.get("readAt") or report["generatedAt"]
+
+
 def cached_summary(key, report, *, now=None, call=None):
-    """One model call per audit per TTL_S, however many people ask."""
+    """One model call per audit per TTL_S, however many people ask. An audit is the same while the read behind it is the same."""
     clock = time.time() if now is None else now
+    marker = read_marker(report)
     with _lock:
         hit = _summaries.get(key)
-        if hit and clock - hit[0] < TTL_S and hit[2] == report["generatedAt"]:
+        if hit and clock - hit[0] < TTL_S and hit[2] == marker:
             return hit[1]
     out = summarise(report, call=call)
     with _lock:
-        _summaries[key] = (clock, out, report["generatedAt"])
+        _summaries[key] = (clock, out, marker)
         while len(_summaries) > 64:
             _summaries.pop(min(_summaries, key=lambda k: _summaries[k][0]))
     return out
