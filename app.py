@@ -5322,6 +5322,39 @@ def paid_audit_report():
     return _paid_audit_answer(lambda pa: pa.report_for(request.args.get("account"), **extra))
 
 
+_AUDIT_FILES = {"xlsx": ("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", ".xlsx"), "pdf": ("application/pdf", ".pdf"),
+                "zip": ("application/zip", ".zip")}
+
+
+@app.route("/p2/paid-marketing/api/audit/download")
+@position2_required
+def paid_audit_download():
+    """?account=...&file=xlsx|pdf|zip. The files are made from the same report the page shows (the saved read, so no new quota is spent
+    while it is fresh); a report that could not be made is the same error the page shows."""
+    from tracker import paid_gads as paid_gads_base, paid_gads_segments as paid_gads, paid_audit, paid_audit_export as export
+    kind = request.args.get("file") or ""
+    if kind not in _AUDIT_FILES:
+        return jsonify(error="file should be one of: %s." % ", ".join(_AUDIT_FILES)), 400
+    try:
+        report = paid_audit.report_for(request.args.get("account"))
+    except paid_audit.BadRequest as e:
+        return jsonify(error=str(e)), 400
+    except paid_gads_base.RefreshTooSoon as e:
+        return jsonify(error=str(e), kind="cooldown", retryIn=e.retry_in), 429
+    except paid_gads.GadsError as e:
+        return _pm_gads_error(e)
+    try:
+        body = {"xlsx": export.xlsx, "pdf": export.pdf, "zip": export.csv_zip}[kind](report)
+    except Exception as e:                                  # noqa: BLE001 (a file that cannot be made is said in words, not a stack trace)
+        app.logger.exception("account audit download failed")
+        return jsonify(error="The file could not be made (%s)." % type(e).__name__), 500
+    resp = make_response(body)
+    resp.headers["Content-Type"] = _AUDIT_FILES[kind][0]
+    resp.headers["Content-Disposition"] = 'attachment; filename="%s%s"' % (export.file_stem(report), _AUDIT_FILES[kind][1])
+    resp.headers["Cache-Control"] = "private, no-store"
+    return resp
+
+
 # Strategy & Campaign Book -----------------------------------------------------
 # Give it a client (a website, a brief, optionally a Google Ads account) and it researches the client, its competitors, its social media,
 # the account and the market, then writes the strategy and, for each campaign, the campaign book: ad groups, keywords, negatives, ad copy
