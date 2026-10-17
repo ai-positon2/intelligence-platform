@@ -125,3 +125,53 @@ def parse_conversions(action_rows, volume_rows=None, own_id=""):
                     "value": None if vol is None else round(vol["value"], 2)})
     out.sort(key=lambda x: (x["status"] != "ENABLED", not x["primary"], x["name"].lower()))
     return out
+
+
+# ── Links and audience lists ────────────────────────────────────────────────
+# Google's API exposes the product links (Merchant Center, a manager, a data partner, an advertising partner, Hotel Center) but not a
+# Google Analytics 4 link, so a GA4 link can only be inferred from the conversion actions imported from it (the checks say so).
+
+LINKS_GAQL = "SELECT product_link.type, product_link.resource_name FROM product_link"
+MERCHANT_GAQL = ("SELECT product_link.type, product_link.merchant_center.merchant_center_id FROM product_link "
+                 "WHERE product_link.type = MERCHANT_CENTER")
+LISTS_GAQL = (
+    "SELECT user_list.id, user_list.name, user_list.type, user_list.membership_status, user_list.size_for_search, user_list.size_for_display, "
+    "user_list.eligible_for_search, user_list.eligible_for_display, user_list.closing_reason, user_list.read_only FROM user_list")
+SEARCH_LIST_MIN = 1000                        # Google's minimum list size to serve on Search
+DISPLAY_LIST_MIN = 100
+
+
+def parse_links(link_rows, merchant_rows=None):
+    """{counts: {link type: how many}, merchantCenter: [merchant ids]}. The ids are None when they could not be read."""
+    counts = {}
+    for r in link_rows:
+        t = _get(r, "productLink", "type", default="UNKNOWN")
+        counts[t] = counts.get(t, 0) + 1
+    ids = None
+    if merchant_rows is not None:
+        ids = sorted({str(_get(r, "productLink", "merchantCenter", "merchantCenterId", default="")) for r in merchant_rows} - {""})
+    return {"counts": counts, "merchantCenter": ids}
+
+
+def parse_lists(rows):
+    """The account's audience lists, compacted: {total, open, withMembers, byType, tooSmallForSearch, empty, examples}. A list is "open"
+    when it is still collecting members; `empty` and `tooSmallForSearch` count open lists only (a closed list is on purpose)."""
+    lists = [r.get("userList") or {} for r in rows]
+    by_type, empty, small, examples = {}, 0, 0, []
+    open_lists = [u for u in lists if u.get("membershipStatus") == "OPEN"]
+    for u in lists:
+        t = u.get("type") or "UNKNOWN"
+        by_type[t] = by_type.get(t, 0) + 1
+    members = 0
+    for u in open_lists:
+        search, display = _i(u.get("sizeForSearch")), _i(u.get("sizeForDisplay"))
+        if search or display:
+            members += 1
+        if not search and not display:
+            empty += 1
+            examples.append({"name": u.get("name") or "", "type": u.get("type") or "", "size": 0})
+        elif search < SEARCH_LIST_MIN:
+            small += 1
+            examples.append({"name": u.get("name") or "", "type": u.get("type") or "", "size": search})
+    return {"total": len(lists), "open": len(open_lists), "withMembers": members, "byType": by_type, "empty": empty,
+            "tooSmallForSearch": small, "examples": examples[:EXAMPLES]}

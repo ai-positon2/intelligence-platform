@@ -29,3 +29,16 @@ def volume(aid="1", conversions=10.0, all_conversions=None, value=0.0):
             "metrics": {"conversionsValue": value, "conversions": conversions, "allConversions": conversions if all_conversions is None else all_conversions,
                         "allConversionsValue": value},
             "segments": {"conversionAction": "customers/1112223334/conversionActions/" + aid}}
+
+
+def link(kind="MERCHANT_CENTER", rid="1"):
+    return {"productLink": {"resourceName": "customers/1112223334/productLinks/" + rid, "type": kind}}
+
+
+def merchant(mid="9282495"):
+    return {"productLink": {"resourceName": "customers/1112223334/productLinks/9", "type": "MERCHANT_CENTER", "merchantCenter": {"merchantCenterId": mid}}}
+
+
+def user_list(name="All Converters", kind="RULE_BASED", status="OPEN", search=0, display=0, lid="1"):
+    return {"userList": {"resourceName": "customers/1112223334/userLists/" + lid, "membershipStatus": status, "type": kind, "id": lid, "readOnly": True,
+                         "name": name, "sizeForDisplay": str(display), "sizeForSearch": str(search), "eligibleForSearch": True, "eligibleForDisplay": True}}

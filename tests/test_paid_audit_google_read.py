@@ -90,3 +90,41 @@ def test_missing_settings_in_a_conversion_row_do_not_raise():
     acts = r.parse_conversions([{"conversionAction": {"resourceName": "customers/1/conversionActions/77"}}, {}], [])
     assert acts[0]["id"] == "77" and acts[0]["status"] == "UNKNOWN" and acts[0]["clickWindow"] == 0 and acts[0]["primary"] is False
     assert acts[1]["id"] == "" and acts[1]["name"] == ""
+
+
+# ── Links and audience lists ────────────────────────────────────────────────
+
+def test_links_are_counted_by_type_and_merchant_ids_listed():
+    out = r.parse_links([A.link("MERCHANT_CENTER", "1"), A.link("MERCHANT_CENTER", "2"), A.link("DATA_PARTNER", "3")],
+                        [A.merchant("9282495"), A.merchant("9282495"), A.merchant("77")])
+    assert out == {"counts": {"MERCHANT_CENTER": 2, "DATA_PARTNER": 1}, "merchantCenter": ["77", "9282495"]}
+
+
+def test_no_links_is_an_empty_answer_and_unreadable_merchant_ids_are_none():
+    assert r.parse_links([], []) == {"counts": {}, "merchantCenter": []}
+    assert r.parse_links([A.link()], None)["merchantCenter"] is None
+    assert r.parse_links([{}], [{}]) == {"counts": {"UNKNOWN": 1}, "merchantCenter": []}
+
+
+def test_a_list_with_members_an_empty_one_and_a_small_one():
+    rows = [A.user_list("Big", "REMARKETING", search=5000, display=9000, lid="1"), A.user_list("Empty", "RULE_BASED", lid="2"),
+            A.user_list("Small", "CRM_BASED", search=300, display=300, lid="3"), A.user_list("Display only", "REMARKETING", search=0, display=500, lid="4"),
+            A.user_list("Closed", "REMARKETING", status="CLOSED", lid="5")]
+    out = r.parse_lists(rows)
+    assert out["total"] == 5 and out["open"] == 4 and out["withMembers"] == 3
+    assert out["byType"] == {"REMARKETING": 3, "RULE_BASED": 1, "CRM_BASED": 1}
+    assert out["empty"] == 1 and out["tooSmallForSearch"] == 2                         # Small and Display only; the closed list is on purpose
+    assert [e["name"] for e in out["examples"]] == ["Empty", "Small", "Display only"]
+    assert out["examples"][1] == {"name": "Small", "type": "CRM_BASED", "size": 300}
+
+
+def test_the_search_minimum_is_inclusive_and_examples_are_capped():
+    assert r.parse_lists([A.user_list(search=1000)])["tooSmallForSearch"] == 0
+    assert r.parse_lists([A.user_list(search=999)])["tooSmallForSearch"] == 1
+    many = r.parse_lists([A.user_list("L%d" % i, lid=str(i)) for i in range(30)])
+    assert many["empty"] == 30 and len(many["examples"]) == r.EXAMPLES
+
+
+def test_no_lists_and_odd_rows_do_not_raise():
+    assert r.parse_lists([]) == {"total": 0, "open": 0, "withMembers": 0, "byType": {}, "empty": 0, "tooSmallForSearch": 0, "examples": []}
+    assert r.parse_lists([{}])["total"] == 1
