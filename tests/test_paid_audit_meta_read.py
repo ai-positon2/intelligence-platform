@@ -82,6 +82,9 @@ def test_campaigns_carry_their_objective_issues_and_the_last_30_days():
     assert a["reach"] == 1000 and a["impressions"] == 40000 and a["clicks"] == 800 and a["bidStrategy"] == "LOWEST_COST_WITHOUT_CAP"
     assert out[0]["special"] == ["HOUSING"] and out[0]["kind"] == "SALES" and out[0]["results"] == 0.0
     assert out[2]["spend"] == 0.0 and out[2]["results"] == 0.0 and out[2]["frequency"] == 0.0           # read, nothing spent
+    assert out[2]["impressions"] == 0 and out[2]["clicks"] == 0 and out[2]["reach"] == 0
+    unnamed = m.parse_campaigns([{"id": "77"}], [])
+    assert unnamed[0]["name"] == "77" and unnamed[0]["objective"] == "" and unnamed[0]["kind"] == "OTHER"          # a campaign with no name is its id
 
 
 def test_campaign_numbers_are_none_when_the_insights_were_not_read():
@@ -108,6 +111,11 @@ def test_ads_are_counted_by_delivery_state_and_disapproved_ones_say_why():
     assert a["disapproved"] == {"count": 1, "examples": [{"ad": "Bad", "adSet": "Set A", "campaign": "Camp", "why": ["Before and after", "Health claims"]}]}
     assert a["withIssues"]["examples"][0] == {"ad": "Flag", "adSet": "Set B", "campaign": "Camp", "why": ["Low quality"]}
     assert "_perAdSet" not in m.compact(a) and m.compact(None) is None
+
+
+def test_an_ad_without_a_name_is_its_id_and_a_reason_list_is_capped_at_three():
+    a = m.parse_ads([{"id": "999", "effective_status": "DISAPPROVED", "adset_id": "10", "ad_review_feedback": {"global": {"d": 1, "a": 1, "c": 1, "b": 1}}}], [], [])
+    assert a["disapproved"]["examples"][0]["ad"] == "999" and a["disapproved"]["examples"][0]["why"] == ["a", "b", "c"]
 
 
 def test_a_disapproved_ad_without_review_feedback_falls_back_to_its_issues():
@@ -142,13 +150,16 @@ def test_requests_ask_for_live_things_in_the_last_30_days_and_stats_for_seven_da
     m.read_account(F.ACT, get=get, pages=pages, now=dt.datetime.fromisoformat(F.NOW))
     camp = seen[("campaigns", m.CAMPAIGN_FIELDS)][1]
     assert camp["effective_status"] == '["ACTIVE"]' and camp["limit"] == 500
+    assert seen[("adsets", m.ADSET_FIELDS)][1]["limit"] == 500 and seen[("adsets", m.ADSET_FIELDS)][1]["effective_status"] == '["ACTIVE"]'
+    assert seen[("adspixels", m.PIXEL_CORE)][1]["limit"] == 100 and seen[("adspixels", m.PIXEL_EXTRA)][1]["limit"] == 100
     ads = seen[("ads", m.AD_FIELDS)][1]
     assert ads["effective_status"] == '["ACTIVE", "DISAPPROVED", "WITH_ISSUES", "PENDING_REVIEW"]'
     ins = seen[("insights", m.INSIGHT_FIELDS)][1]
-    assert ins["level"] == "campaign" and ins["date_preset"] == "last_30d"
+    assert ins["level"] == "campaign" and ins["date_preset"] == "last_30d" and ins["limit"] == 500 and ads["limit"] == 500
     path, st = seen[("stats", "event")]
     assert path == "111/stats" and st["start_time"] == int(dt.datetime.fromisoformat(F.NOW).timestamp()) - 7 * 86400
     assert seen[("stats", "event_detection_method")][1]["start_time"] == st["start_time"]
+    assert st["limit"] == 500 and seen[("stats", "event_detection_method")][1]["limit"] == 500
 
 
 def test_an_unreadable_account_is_an_error_but_every_other_part_is_a_warning():
@@ -158,6 +169,7 @@ def test_an_unreadable_account_is_an_error_but_every_other_part_is_a_warning():
         out = F.a_read(fail={part})
         assert out["ok"][flag] is False and len(out["warnings"]) == 1 and "could not be read" in out["warnings"][0], part
         assert out["account"]["name"] == "Acme Dental", part
+    assert F.a_read(fail={"pixels"})["warnings"] == ["The pixels could not be read (Meta answered 400: (#100) nonexisting field)."]
 
 
 def test_what_each_failed_part_takes_down():

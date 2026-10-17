@@ -92,6 +92,8 @@ def test_the_pixel_has_fired_recently():
     f = one("M-TRK-02", fired(at(hours=3)))
     assert f["result"] == "pass" and f["found"] == "The pixel last fired 3 hours ago (Acme pixel)."
     assert one("M-TRK-02", fired(at(hours=24)))["result"] == "pass" and one("M-TRK-02", fired(at(hours=25)))["result"] == "warn"
+    assert one("M-TRK-02", fired(at(hours=47)))["found"] == "The freshest pixel last fired 47 hours ago (Acme pixel)."
+    assert one("M-TRK-02", fired(at(hours=48)))["found"] == "The freshest pixel last fired 2 days ago (Acme pixel)."       # 48 hours is said as days
     f = one("M-TRK-02", fired(at(hours=60)))
     assert f["result"] == "warn" and f["found"] == "The freshest pixel last fired 2 days ago (Acme pixel)."
     assert one("M-TRK-02", fired(at(days=7)))["result"] == "warn" and one("M-TRK-02", fired(at(days=7, hours=1)))["result"] == "fail"
@@ -167,6 +169,10 @@ def test_campaigns_that_spend_without_results():
     f = one("M-STR-03", F.a_read(answers={"campaigns": camps, "insights": ins}))
     assert f["result"] == "warn" and f["found"] == "1 campaign spent USD 300 (17% of spend) and recorded no result in the last 30 days." and f["items"] == ["Dead (USD 300)"]
     assert one("M-STR-03", F.a_read(answers={"campaigns": camps[3:], "insights": ins[3:]}))["result"] == "na"
+    edge = F.a_read(answers={"campaigns": camps[:2], "insights": [F.insight("1", "Dead", spend=100.0, leads=None), F.insight("2", "Alive", spend=9900.0, leads=10)]})
+    assert one("M-STR-03", edge)["items"] == ["Dead (USD 100)"]                                  # exactly the minimum spend is judged
+    under = F.a_read(answers={"campaigns": camps[:2], "insights": [F.insight("1", "Dead", spend=99.99, leads=None), F.insight("2", "Alive", spend=9900.0, leads=10)]})
+    assert one("M-STR-03", under)["result"] == "pass"
     assert one("M-STR-03", F.a_read(fail={"campaigns"}))["result"] == "unknown" and one("M-STR-03", F.a_read(fail={"insights"}))["result"] == "unknown"
 
 

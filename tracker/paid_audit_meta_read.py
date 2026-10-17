@@ -80,7 +80,7 @@ def parse_account(core, extra=None):
     core, extra = core or {}, extra or {}
     code = core.get("account_status")
     cur = core.get("currency") or ""
-    cap = _major(core.get("spend_cap"), cur) if core.get("spend_cap") not in (None, "", "0", 0) else 0.0
+    cap = _major(core.get("spend_cap"), cur)                       # "0" and a missing cap both mean no cap
     return {"name": core.get("name") or "", "statusCode": code, "status": meta.ACCOUNT_STATUS.get(code, "UNKNOWN"),
             "disableReason": core.get("disable_reason"), "currency": cur, "timeZone": core.get("timezone_name") or "",
             "spendCap": cap, "amountSpent": _major(core.get("amount_spent"), cur),
