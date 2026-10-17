@@ -145,6 +145,7 @@ def fix_first(pages, limit=12):
 
 # ── Wording and arithmetic the checklist uses (the audit's) ─────────────────
 
+grade_of = am.grade_of
 share = am.share
 pct = am.pct
 plural = am.plural
