@@ -254,3 +254,40 @@ def test_there_is_no_em_or_en_dash_in_any_of_the_page():
     for p in (DATA, PAGE, TEMPLATE, CSS):
         text = open(p, encoding="utf-8").read()
         assert "—" not in text and "–" not in text, p
+
+
+# ── The playbook: how the fix-first cards and the check cards are laid out ──
+
+def test_the_fix_first_cards_know_their_place_and_how_much_money_each_carries():
+    rows = [{"spend": 400.0}, {"spend": 100.0}, {"spend": 1.0}, {"spend": 0}, {"spend": 400.0}]
+    got = run("L.impact(rows)", rows=rows)
+    assert [g["rank"] for g in got] == [1, 2, 3, 4, 5]
+    assert [g["share"] for g in got] == [100, 25, 4, 4, 100]                  # a bar is never empty while there is a biggest row, and never over the whole
+    assert [g["start"] for g in got] == [True, True, True, False, False]
+
+
+def test_a_playbook_with_no_money_has_empty_bars_and_with_no_rows_nothing():
+    assert [g["share"] for g in run("L.impact(rows)", rows=[{"spend": 0}, {}])] == [0, 0]
+    assert run("L.impact([])") == [] and run("L.impact(null)") == [] and run("L.impact(undefined)") == []
+    assert run("L.START_HERE") == 3
+
+
+def test_the_counts_under_a_card_are_pills_that_name_what_is_failing_and_what_is_a_warning():
+    assert run("L.fixPills(r)", r={"failed": 3, "warned": 1}) == [{"text": "4 pages", "tone": ""}, {"text": "3 failing", "tone": "bad"}, {"text": "1 warning", "tone": "warn"}]
+    assert run("L.fixPills(r)", r={"failed": 1, "warned": 0}) == [{"text": "1 page", "tone": ""}, {"text": "1 failing", "tone": "bad"}]
+    assert run("L.fixPills(r)", r={"failed": 0, "warned": 2}) == [{"text": "2 pages", "tone": ""}, {"text": "2 warnings", "tone": "warn"}]
+
+
+def test_a_checks_weight_is_worded_for_a_person():
+    assert [run("L.sevWord(s)", s=s) for s in ("critical", "high", "medium", "low", "odd", None)] == ["Critical", "High impact", "Medium", "Minor", "Minor", "Minor"]
+
+
+def test_the_playbook_is_drawn_from_the_report_the_template_has_the_list_for_and_the_copy_button_is_wired():
+    js = open(PAGE, encoding="utf-8").read()
+    tpl = open(TEMPLATE, encoding="utf-8").read()
+    assert 'id="fix"' in tpl and 'class="lp-fixlist"' in tpl
+    assert "L.impact(" in js and "L.fixPills(" in js and "data-copy" in js and "function copyText" in js
+    css = open(CSS, encoding="utf-8").read()
+    for cls in (".lp-fx", ".lp-f2", ".lp-rd", ".lp-do2", ".lp-ad", ".lp-copy", ".lp-fixlist"):
+        assert cls in css, cls
+    assert "prefers-reduced-motion" in css

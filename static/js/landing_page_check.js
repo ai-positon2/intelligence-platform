@@ -14,6 +14,26 @@ var $ = function(s){return document.querySelector(s)};
 var esc = function(s){return String(s==null?"":s).replace(/[&<>"']/g,function(c){
   return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]})};
 var enc = encodeURIComponent;
+/* small line icons, drawn inline so they take the colour of the text around them */
+var IC = {
+  check:'<path d="M5 12.5l4.5 4.5L19 7.5"/>',
+  cross:'<path d="M6 6l12 12M18 6L6 18"/>',
+  alert:'<path d="M12 8.5v4.5M12 16.6v.4"/><path d="M10.3 4.3L2.9 17.4A2 2 0 0 0 4.6 20.4h14.8a2 2 0 0 0 1.7-3L13.7 4.3a2 2 0 0 0-3.4 0z"/>',
+  help:'<circle cx="12" cy="12" r="9"/><path d="M9.6 9.4a2.5 2.5 0 1 1 3.5 2.3c-.7.4-1.1.9-1.1 1.7M12 16.9v.2"/>',
+  dash:'<path d="M6 12h12"/>',
+  arrow:'<path d="M5 12h14M13 6l6 6-6 6"/>',
+  bolt:'<path d="M13 2.5L4.5 13.5h6.5l-1 8 8.5-11H12z"/>',
+  wrench:'<path d="M14.7 6.3a4 4 0 0 0-5.4 5.1L3.6 17.1a1.8 1.8 0 0 0 2.6 2.6l5.7-5.7a4 4 0 0 0 5.1-5.4l-2.4 2.4-2.3-.6-.6-2.3z"/>',
+  spark:'<path d="M11 3.5l1.9 5.1 5.1 1.9-5.1 1.9L11 17.5l-1.9-5.1L4 10.5l5.1-1.9z"/><path d="M18.5 15.5l.7 1.8 1.8.7-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7z"/>',
+  copy:'<rect x="9" y="9" width="11" height="11" rx="2.2"/><path d="M5.5 15V6.5A2 2 0 0 1 7.5 4.5H15"/>',
+  eye:'<path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="2.8"/>',
+  target:'<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="1"/>',
+  coin:'<circle cx="12" cy="12" r="8.5"/><path d="M14.6 9.3c-.4-.8-1.4-1.3-2.6-1.3-1.5 0-2.6.8-2.6 1.9 0 2.7 5.4 1.2 5.4 4 0 1.1-1.1 2-2.8 2-1.3 0-2.4-.5-2.9-1.4M12 6.5v1.5M12 16v1.5"/>',
+  megaphone:'<path d="M4 10v4a1 1 0 0 0 1 1h2l5 4V5L7 9H5a1 1 0 0 0-1 1z"/><path d="M16 9.5a3.5 3.5 0 0 1 0 5M18.5 7a7 7 0 0 1 0 10"/>',
+  quote:'<path d="M7 17.5c-2-.4-3.5-2-3.5-4.5 0-3 2-5.2 5-5.8M17.5 17.5c-2-.4-3.5-2-3.5-4.5 0-3 2-5.2 5-5.8"/>'
+};
+function ic(name, cls){return '<svg class="lp-ic' + (cls ? " " + cls : "") + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + (IC[name] || "") + '</svg>';}
+var RES_ICON = {pass:"check", warn:"alert", fail:"cross", unknown:"help", na:"dash"};
 var S = {acct:null, report:null, seq:0, view:"all", sort:"spend", text:"", shown:12, open:{}, tab:{}, passed:{}, reads:{}};
 var PAGE = 12;                                           // pages drawn before "Show more"
 var TABS = [["checks", "Checks"], ["ads", "Ads and keywords"], ["seen", "What we saw"], ["numbers", "Numbers"]];
@@ -122,23 +142,30 @@ function sectionLabel(rep, key){
   return f ? f.label : "";
 }
 function paintFix(rep){
-  var fix = rep.fixFirst || [], cat = rep.catalog || {};
+  var fix = rep.fixFirst || [], cat = rep.catalog || {}, lay = L.impact(fix);
   $("#fixCard").hidden = false;
-  $("#fixNote").textContent = fix.length ? "One row per check, the worst first: the same problem on twenty pages is one thing to fix. Click a page to open it below." : "";
-  $("#fix").innerHTML = fix.length ? fix.map(function(r){
-    var c = cat[r.id] || {}, n = r.failed + r.warned;
+  $("#fixNote").textContent = fix.length ? "One card per check, biggest money first: the same problem on twenty pages is one thing to fix. Click a page to open it below." : "";
+  $("#fix").innerHTML = fix.length ? fix.map(function(r, i){
+    var c = cat[r.id] || {}, n = r.failed + r.warned, lo = lay[i];
     var links = (r.pages || []).map(function(x){
-      return '<button type="button" class="lp-link" data-page="' + esc(x.pageId) + '" title="' + esc(x.found) + '">' + esc(L.shortPage(x.pageName, 56)) + '</button>';
+      return '<button type="button" class="lp-link" data-page="' + esc(x.pageId) + '" title="' + esc(x.found) + '">' + ic("eye") + esc(L.shortPage(x.pageName, 52)) + '</button>';
     }).join("");
-    var more = n > (r.pages || []).length ? ' <span class="lp-muted">and ' + (n - r.pages.length) + ' more</span>' : "";
-    return '<li><div class="au-fix-h">' + chip("res", r.result) + chip("sev", r.severity) + '<b class="lp-fix-t">' + esc(c.title || r.id) + '</b>' +
-      '<span class="au-fix-sec">' + esc(sectionLabel(rep, c.section)) + '</span></div>' +
-      '<p class="lp-fix-meta"><b>' + esc(D.plural(n, "page")) + '</b>' + (r.failed ? ' · ' + r.failed + ' failing' : '') + (r.warned ? ' · ' + r.warned + ' with a warning' : '') +
-      ' · <b>' + esc(L.moneyText(r.spend, cur())) + '</b> spent on them in 30 days</p>' +
-      '<p>For example: ' + esc(r.found) + '</p>' +
-      '<p class="lp-fix-pages">' + links + more + '</p>' +
-      '<p class="do"><b>What to do:</b> ' + esc(c.fix || "") + '</p></li>';
-  }).join("") : '<li><p>Nothing failed and nothing is a warning.</p></li>';
+    var more = n > (r.pages || []).length ? '<span class="lp-more">+ ' + (n - r.pages.length) + ' more</span>' : "";
+    var pills = L.fixPills(r).map(function(x){return '<span class="lp-pill ' + x.tone + '">' + esc(x.text) + '</span>';}).join("");
+    return '<li class="lp-fx sev-' + esc(r.severity) + (lo.start ? " start" : "") + '" style="--i:' + i + ';--share:' + lo.share + '%">' +
+      '<div class="lp-fx-rank" aria-hidden="true"><b>' + lo.rank + '</b></div>' +
+      '<div class="lp-fx-main">' +
+        '<div class="lp-fx-top"><span class="lp-fx-sec">' + esc(sectionLabel(rep, c.section)) + '</span>' + chip("sev", r.severity) +
+          (lo.start ? '<span class="lp-fx-start">' + ic("bolt") + 'Start here</span>' : '') + '</div>' +
+        '<h3 class="lp-fx-t">' + esc(c.title || r.id) + '</h3>' +
+        '<div class="lp-fx-stats"><div class="lp-fx-money">' + ic("coin") + '<div><span>Spent, last 30 days</span><b>' + esc(L.moneyText(r.spend, cur())) + '</b></div>' +
+          '<div class="lp-fx-bar" aria-hidden="true"><i></i></div></div><div class="lp-pills">' + pills + '</div></div>' +
+        '<div class="lp-seen">' + ic("target") + '<div><em>What we saw</em><p>' + esc(r.found) + '</p></div></div>' +
+        '<div class="lp-do2">' + ic("wrench") + '<div><em>Do this</em><p>' + esc(c.fix || "") + '</p></div></div>' +
+        '<div class="lp-fx-pages"><em>Where</em><div>' + links + more + '</div></div>' +
+        (c.why ? '<details class="lp-why"><summary>Why it matters</summary><p>' + esc(c.why) + '</p></details>' : '') +
+      '</div></li>';
+  }).join("") : '<li class="lp-fx-none">' + ic("check") + '<p>Nothing failed and nothing is a warning.</p></li>';
 }
 function paintPageControls(){
   var pages = S.report.pages || [], c = L.viewCounts(pages);
@@ -193,32 +220,47 @@ function pageBody(p){
   return head + '<div class="lp-tab">' + body + '</div>';
 }
 function findingHtml(f){
-  var tone = (D.RESULT[f.result] || {}).tone || "";
-  var aff = f.items || [];
-  return '<li class="au-f lp-f ' + tone + '"><div class="lp-fh">' + chip("res", f.result) + chip("sev", f.severity) +
-    '<span class="au-ft"><b>' + esc(f.title) + '</b></span></div><p class="lp-found">' + esc(f.found) + '</p>' +
-    (aff.length ? '<p class="lp-aff"><b>Affected (' + esc(f.count) + '):</b> ' + esc(D.affectedText(f)) + '</p>' : '') +
-    ((f.result === "fail" || f.result === "warn") ? '<p class="lp-do"><b>What to do:</b> ' + esc(f.fix) + '</p>' : '') +
-    '<details class="lp-why"><summary>Why it matters</summary><p>' + esc(f.why) + '</p></details></li>';
+  var tone = (D.RESULT[f.result] || {}).tone || "", aff = f.items || [], act = f.result === "fail" || f.result === "warn";
+  var chips = aff.length ? '<div class="lp-aff"><em>Affected (' + esc(f.count) + ')</em><div>' + aff.map(function(x){return '<span class="lp-tag2">' + esc(x) + '</span>';}).join("") +
+    ((f.count || aff.length) > aff.length ? '<span class="lp-more">+ ' + ((f.count || aff.length) - aff.length) + ' more</span>' : "") + '</div></div>' : '';
+  return '<li class="lp-f2 ' + tone + ' sev-' + esc(f.severity) + '"><span class="lp-f2-ic">' + ic(RES_ICON[f.result] || "help") + '</span><div class="lp-f2-b">' +
+    '<div class="lp-f2-h"><b>' + esc(f.title) + '</b>' + chip("res", f.result) + '<span class="lp-sevtag">' + esc(L.sevWord(f.severity)) + '</span></div>' +
+    '<p class="lp-found">' + esc(f.found) + '</p>' + chips +
+    (act ? '<div class="lp-do2 slim">' + ic("wrench") + '<div><em>Do this</em><p>' + esc(f.fix) + '</p></div></div>' : '') +
+    (f.why ? '<details class="lp-why"><summary>Why it matters</summary><p>' + esc(f.why) + '</p></details>' : '') + '</div></li>';
 }
-function readList(title, items){
-  return (items && items.length) ? '<h4>' + esc(title) + '</h4><ul class="lp-rl">' + items.map(function(x){return '<li>' + esc(x) + '</li>';}).join("") + '</ul>' : '';
+function readList(kind, icon, title, items, ordered){
+  if(!(items && items.length)) return "";
+  var tag = ordered ? "ol" : "ul";
+  return '<div class="lp-rd-col ' + kind + '"><h5>' + ic(icon) + esc(title) + '</h5><' + tag + '>' + items.map(function(x){return '<li>' + esc(x) + '</li>';}).join("") + '</' + tag + '></div>';
+}
+function headlineCards(items, host){
+  if(!(items && items.length)) return "";
+  return '<div class="lp-rd-ideas"><h5>' + ic("megaphone") + 'Headlines that use the keyword\'s words</h5><div class="lp-ads">' + items.map(function(x){
+    return '<div class="lp-ad"><span class="lp-ad-l"><i>Ad</i>' + esc(host) + '</span><b>' + esc(x) + '</b>' +
+      '<button type="button" class="lp-copy" data-copy="' + esc(x) + '" aria-label="Copy this headline">' + ic("copy") + '<span>Copy</span></button></div>';
+  }).join("") + '</div></div>';
 }
 function readBlock(p){
   if(!(p.adGroups || []).length) return "";
   var r = S.reads[p.id];
   if(!r){
-    return '<div class="lp-read"><h4>Read it like a person</h4><p class="lp-muted">Claude reads this page the way someone who clicked the ad would, and says whether it keeps the promise the ad made, what is missing and what to change. ' +
+    return '<div class="lp-rd lp-rd-ask"><div class="lp-rd-orb">' + ic("spark") + '</div><div class="lp-rd-askb"><h4>Read it like a person</h4>' +
+      '<p>Claude reads this page the way someone who clicked the ad would, and says whether it keeps the promise the ad made, what is missing and what to change. ' +
       'It is shown only the ad copy, the keywords, the search terms and the page\'s own visible text, and it never changes a score.</p>' +
-      '<button type="button" class="pm-btn-ghost lp-readbtn" data-read="' + esc(p.id) + '">Ask Claude to read this page</button></div>';
+      '<button type="button" class="pm-btn-ghost lp-readbtn" data-read="' + esc(p.id) + '">' + ic("spark") + 'Ask Claude to read this page</button></div></div>';
   }
-  var v = L.verdictInfo(r.verdict);
-  return '<div class="lp-read"><h4>Read it like a person' + (v ? ' <span class="lp-on ' + v.tone + '">' + esc(v.label) + '</span>' : '') + '</h4>' +
-    (r.promiseKept ? '<p class="lp-rp">' + esc(r.promiseKept) + '</p>' : '') +
-    readList(r.source === "model" ? "What the page does not answer" : "What the checks found", r.gaps) + readList(r.source === "model" ? "Change on the page" : "What to do", r.pageEdits) +
-    readList("Headlines that use the keyword's words", r.headlineIdeas) + readList("If the page is right, change the ad", r.adEdits) +
-    '<p class="lp-muted">' + (r.source === "model" ? "Written by Claude from the ad copy and the page's text. Every number in it is one it was shown; it changes no score." :
-      "A model was not available" + (r.unavailable ? " (" + esc(r.unavailable) + ")" : "") + ", so these are the checks' own words for this page.") + '</p></div>';
+  var v = L.verdictInfo(r.verdict), model = r.source === "model", host = L.hostOf(L.shortPage(p.id, 200));
+  var icon = v ? (v.tone === "good" ? "check" : v.tone === "warn" ? "alert" : "cross") : "eye";
+  return '<section class="lp-rd ' + (v ? v.tone : "plain") + '"><header class="lp-rd-h"><span class="lp-rd-badge">' + ic("spark") + (model ? "Read like a person" : "What the checks found") + '</span>' +
+    (v ? '<div class="lp-rd-verdict"><span class="lp-rd-vi">' + ic(icon) + '</span><b>' + esc(v.label) + '</b></div>' : '') + '</header>' +
+    (r.promiseKept ? '<blockquote class="lp-rd-q">' + ic("quote", "lp-qm") + '<p>' + esc(r.promiseKept) + '</p></blockquote>' : '') +
+    '<div class="lp-rd-grid">' + readList("gap", "cross", model ? "What the page does not answer" : "What the checks found", r.gaps) +
+      readList("edit", "wrench", model ? "Change on the page" : "What to do", r.pageEdits, true) + '</div>' +
+    headlineCards(r.headlineIdeas, host) +
+    (r.adEdits && r.adEdits.length ? '<div class="lp-rd-adfix">' + readList("ad", "megaphone", "If the page is right, change the ad", r.adEdits) + '</div>' : '') +
+    '<p class="lp-rd-src">' + (model ? "Written by Claude from the ad copy and the page's text. Every number in it is one it was shown; it changes no score." :
+      "A model was not available" + (r.unavailable ? " (" + esc(r.unavailable) + ")" : "") + ", so these are the checks' own words for this page.") + '</p></section>';
 }
 function tabChecks(p){
   var cat = S.report.catalog || {}, all = L.pageFindings(p, cat);
@@ -327,6 +369,21 @@ function readPage(id, btn){
   }).catch(function(){btn.disabled = false; btn.textContent = label; setMsg("The server could not be reached. Try again.");});
 }
 
+/* ── Copying a suggested headline ─────────────────────────── */
+function copyText(text, btn){
+  var done = function(){
+    var span = btn.querySelector("span"); if(!span) return;
+    btn.classList.add("done"); span.textContent = "Copied";
+    setTimeout(function(){btn.classList.remove("done"); span.textContent = "Copy";}, 1600);
+  };
+  if(navigator.clipboard && navigator.clipboard.writeText){navigator.clipboard.writeText(text).then(done, function(){fallbackCopy(text); done();}); return;}
+  fallbackCopy(text); done();
+}
+function fallbackCopy(text){
+  var ta = document.createElement("textarea"); ta.value = text; ta.setAttribute("readonly", ""); ta.style.cssText = "position:fixed;top:-100px;opacity:0";
+  document.body.appendChild(ta); ta.select(); try{document.execCommand("copy");}catch(e){} document.body.removeChild(ta);
+}
+
 /* ── Events ───────────────────────────────────────────────── */
 function repaintPage(id){
   var p = pageById(id); if(!p) return;
@@ -354,6 +411,7 @@ document.addEventListener("click", function(e){
   b = t.closest("[data-view]"); if(b){S.view = b.getAttribute("data-view"); S.shown = PAGE; paintPageControls(); paintPages(); return;}
   b = t.closest("[data-lab]"); if(b){runLab(b.getAttribute("data-lab"), b); return;}
   b = t.closest("[data-read]"); if(b){readPage(b.getAttribute("data-read"), b); return;}
+  b = t.closest("[data-copy]"); if(b){copyText(b.getAttribute("data-copy"), b); return;}
   if(t.closest("#moreBtn")){S.shown += PAGE; paintPages(); return;}
 });
 $("#sortSel").addEventListener("change", function(e){S.sort = e.target.value; S.shown = PAGE; paintPages();});

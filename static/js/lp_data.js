@@ -158,6 +158,26 @@ var VERDICT = {
   mismatch: {label:"The page does not keep the promise", tone:"bad"}
 };
 function verdictInfo(v){return VERDICT[v] || null;}
+/* The fix-first rows laid out as a playbook: each row's place, how much of the biggest row's spend it carries (for a bar that is never empty), and whether it is one of
+   the three to start with. */
+var START_HERE = 3;
+function impact(rows){
+  var max = 0, list = rows || [];
+  list.forEach(function(r){if((r.spend || 0) > max) max = r.spend;});
+  return list.map(function(r, i){
+    return {rank:i + 1, share:max > 0 ? Math.max(4, Math.round(100 * (r.spend || 0) / max)) : 0, start:i < START_HERE};
+  });
+}
+/* The counts under a fix-first row, as pills: how many pages, how many fail, how many warn. */
+function fixPills(r){
+  var n = (r.failed || 0) + (r.warned || 0), out = [{text:n + (n === 1 ? " page" : " pages"), tone:""}];
+  if(r.failed) out.push({text:r.failed + " failing", tone:"bad"});
+  if(r.warned) out.push({text:r.warned + (r.warned === 1 ? " warning" : " warnings"), tone:"warn"});
+  return out;
+}
+/* The glyph and wording for the weight of a check. */
+var SEV_WORD = {critical:"Critical", high:"High impact", medium:"Medium", low:"Minor"};
+function sevWord(sev){return SEV_WORD[sev] || "Minor";}
 function secText(ms){return ms == null ? "n/a" : ms >= 1000 ? (ms / 1000).toFixed(1) + " s" : Math.round(ms) + " ms";}
 /* How a lab score is drawn: 90 and over is good, 50 to 89 needs work, under 50 is poor (Lighthouse's own bands). */
 function labTone(score){return score == null ? "unk" : score >= 90 ? "good" : score >= 50 ? "warn" : "bad";}
@@ -194,7 +214,7 @@ function readNote(report){
 var api = {
   VIEWS:VIEWS, SORTS:SORTS, ON:ON, RATING:RATING, onInfo:onInfo, ratingInfo:ratingInfo, full:full, pageFindings:pageFindings, problems:problems, pageState:pageState,
   viewCounts:viewCounts, defaultView:defaultView, filterPages:filterPages, sortPages:sortPages, moneyText:moneyText, rateText:rateText, numText:numText, shareText:shareText,
-  shortPage:shortPage, hostOf:hostOf, secText:secText, labTone:labTone, labRows:labRows, VERDICT:VERDICT, verdictInfo:verdictInfo, deviceRates:deviceRates, statusText:statusText, seenRows:seenRows, tiles:tiles, readNote:readNote
+  shortPage:shortPage, hostOf:hostOf, secText:secText, labTone:labTone, labRows:labRows, VERDICT:VERDICT, verdictInfo:verdictInfo, impact:impact, fixPills:fixPills, sevWord:sevWord, START_HERE:START_HERE, deviceRates:deviceRates, statusText:statusText, seenRows:seenRows, tiles:tiles, readNote:readNote
 };
 if(typeof module !== "undefined" && module.exports) module.exports = api; else root.LpData = api;
 })(typeof window !== "undefined" ? window : globalThis);
