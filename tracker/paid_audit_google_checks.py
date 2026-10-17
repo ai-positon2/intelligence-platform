@@ -26,7 +26,8 @@ GA4_PREFIX = "GOOGLE_ANALYTICS_4"
 LEAD_CATEGORIES = {"SUBMIT_LEAD_FORM", "REQUEST_QUOTE", "CONTACT", "SIGNUP", "BOOK_APPOINTMENT"}
 VALUE_BIDDING = {"MAXIMIZE_CONVERSION_VALUE", "TARGET_ROAS"}
 SMART_BIDDING = {"MAXIMIZE_CONVERSIONS", "MAXIMIZE_CONVERSION_VALUE", "TARGET_CPA", "TARGET_ROAS"}
-LAST_CLICK = {"GOOGLE_ADS_LAST_CLICK", "LAST_CLICK", "EXTERNAL"}
+LAST_CLICK = {"GOOGLE_ADS_LAST_CLICK", "LAST_CLICK"}
+EXTERNAL_ATTRIBUTION = "EXTERNAL"             # an imported action: its model is set in the tool it came from (GA4), not in Google Ads
 ACTIVE_STATES = {"ENABLED"}
 BAD_ACCOUNT = {"SUSPENDED", "CANCELED", "CLOSED"}
 MAX_PRIMARY = 6                                              # primary actions on the site or in imports before bidding is spread thin
@@ -165,7 +166,7 @@ def set_enhanced(ctx):
 def set_calls(ctx):
     if ctx.actions is None:
         return unknown("G-SET-06", "the conversion actions could not be read")
-    calls = [a for a in ctx.actions if a["status"] in ACTIVE_STATES and (a["type"] in CALL_TYPES or a["category"] == "PHONE_CALL_LEAD")]
+    calls = [a for a in ctx.actions if a["status"] in ACTIVE_STATES and a["type"] in CALL_TYPES]
     if not calls:
         return na("G-SET-06", "No call conversion action is enabled.")
     if ctx.customer.get("callReporting") and ctx.customer.get("callConversions"):
@@ -342,9 +343,9 @@ def cnv_value(ctx):
 def cnv_attribution(ctx):
     if ctx.actions is None:
         return unknown("G-CNV-08", "the conversion actions could not be read")
-    p = [a for a in _primary(ctx) if a["attribution"]]
+    p = [a for a in _primary(ctx) if a["attribution"] and a["attribution"] != EXTERNAL_ATTRIBUTION]
     if not p:
-        return na("G-CNV-08", "No primary action reports an attribution model.")
+        return na("G-CNV-08", "No primary action has an attribution model that is set in Google Ads.")
     last = [a for a in p if a["attribution"] in LAST_CLICK]
     if not last:
         return make("G-CNV-08", "pass", "No primary action uses last-click attribution.")

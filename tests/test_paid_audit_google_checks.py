@@ -112,8 +112,10 @@ def test_call_reporting_is_only_needed_when_calls_are_tracked():
     assert f["result"] == "fail" and "without call conversion reporting" in f["found"]
     paused = actions_with([A.action("1", "Calls", type="AD_CALL", category="PHONE_CALL_LEAD", status="PAUSED")])
     assert one("G-SET-06", customer_with(callReporting=False), conversions=paused)["result"] == "na"
-    by_category = actions_with([A.action("1", "Lead call", type="WEBPAGE", category="PHONE_CALL_LEAD")])
-    assert one("G-SET-06", customer_with(callReporting=False), conversions=by_category)["result"] == "fail"
+    by_category = actions_with([A.action("1", "Click on the number", type="WEBPAGE", category="PHONE_CALL_LEAD")])
+    assert one("G-SET-06", customer_with(callReporting=False), conversions=by_category)["result"] == "na"          # a tag on a click-to-call number needs no call reporting
+    for kind in ("AD_CALL", "CLICK_TO_CALL", "WEBSITE_CALL"):
+        assert one("G-SET-06", customer_with(callReporting=False), conversions=actions_with([A.action("1", "Calls", type=kind, category="PHONE_CALL_LEAD")]))["result"] == "fail", kind
     assert one("G-SET-06", conversions=None)["result"] == "unknown"
 
 
@@ -251,9 +253,12 @@ def test_value_bidding_needs_values():
 
 
 def test_last_click_attribution():
-    rows = [A.action("1", "A"), A.action("2", "B", attribution="GOOGLE_ADS_LAST_CLICK"), A.action("3", "C", attribution="EXTERNAL"), A.action("4", "D", attribution="")]
+    rows = [A.action("1", "A"), A.action("2", "B", attribution="GOOGLE_ADS_LAST_CLICK"), A.action("3", "C", attribution="LAST_CLICK"), A.action("4", "D", attribution=""),
+            A.action("5", "GA4", attribution="EXTERNAL", type="GOOGLE_ANALYTICS_4_CUSTOM")]
     f = one("G-CNV-08", conv_read(rows))
-    assert f["result"] == "warn" and f["items"] == ["B", "C"] and "2 of 3 primary actions use last-click attribution" in f["found"]
+    assert f["result"] == "warn" and f["items"] == ["B", "C"] and "2 of 3 primary actions use last-click attribution" in f["found"]          # an import's model is set in GA4, not here
+    ga4_only = conv_read([A.action("5", "GA4", attribution="EXTERNAL", type="GOOGLE_ANALYTICS_4_CUSTOM")])
+    assert one("G-CNV-08", ga4_only)["result"] == "na" and "set in Google Ads" in one("G-CNV-08", ga4_only)["found"]
     assert one("G-CNV-08")["result"] == "pass"
     assert one("G-CNV-08", conv_read([A.action("1", attribution="")]))["result"] == "na"
     assert one("G-CNV-08", conversions=None)["result"] == "unknown"
