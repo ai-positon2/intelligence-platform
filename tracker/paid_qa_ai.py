@@ -73,6 +73,7 @@ Rules you must follow:
 3. Switches that Google Ads does not show to the API (the account's automatically created asset switches, auto migration) cannot be verified: answer cannot_verify and say the switch is not visible, unless an automatically created asset in the evidence proves it is on, which is a flag.
 4. Findings from exact rules (ruleFinding) are facts read straight from Google Ads. Use them as evidence. Where a rule has already ticked or crossed a check you will not be asked about it.
 5. For ad copy and other assets, judge the text you were given: spelling, grammar, Start Case where the agency uses it, brand name present and spelled right, claims that cannot be proven, and the minimum numbers Google recommends (about 15 headlines and 4 descriptions per responsive search ad; at least 4 sitelinks and 4 callouts; at least 1 structured snippet). Where a check asks about the account's gender focus, you may use the landing page text to say who the business serves.
+5b. A list in the evidence that ends with {"more": n} was cut short: n items were not shown to you. Judge what you can see, say that n more were not shown, and never pass a check about every item of that list from part of it.
 6. Be strict on what the check says and fair on style. Flag real problems, not preferences.
 7. Answer every check id you were given, exactly once, using the id as given. Do not use em dashes."""
 
@@ -207,7 +208,7 @@ def evidence_bundle(data, ctx):
                          "approval": (ad.get("policySummary") or {}).get("approvalStatus"), "finalUrls": (ad.get("ad") or {}).get("finalUrls"),
                          "headlines": [h for h in heads if h], "descriptions": [d for d in descs if d],
                          "path1": rsa.get("path1"), "path2": rsa.get("path2")})
-    ev["adGroups"] = list(groups.values())[:25]
+    ev["adGroups"] = _cap(groups.values(), 25)          # a list cut short says how many it left out, so the model never judges "all" from some
 
     def assets(rows, key):
         out = []
@@ -249,11 +250,12 @@ def evidence_bundle(data, ctx):
         t = ((r.get("asset") or {}).get("textAsset") or {}).get("text")
         if t:
             g["texts"].setdefault(f, []).append(t)
-    ev["performanceMaxAssetGroups"] = list(pm.values())[:10]
+    ev["performanceMaxAssetGroups"] = _cap(pm.values(), 10)
     ev["performanceMaxSignals"] = ev["demandGenTargeting"] = None            # only a Performance Max or a Demand Gen campaign has them
     if ctx.channel == "PERFORMANCE_MAX":
         ev["performanceMaxSignals"] = [{"assetGroup": g["name"], "audienceSignals": g["audiences"] or "none", "searchThemes": g["themes"] or "none"}
-                                       for g in auto._pmax_groups(ctx)][:10]
+                                       for g in auto._pmax_groups(ctx)]
+        ev["performanceMaxSignals"] = _cap(ev["performanceMaxSignals"], 10)
     if ctx.channel == "DEMAND_GEN":
         by_group = {}
         for r in _rows(data, "ag_audiences"):

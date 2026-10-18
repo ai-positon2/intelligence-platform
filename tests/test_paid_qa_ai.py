@@ -369,3 +369,13 @@ def test_section_six_reads_the_signals_and_a_search_campaign_is_never_shown_empt
     ev = ai.evidence_bundle(d, auto.Ctx(d))
     assert set(ai._slice(ev, "6")) <= set(ai.SECTION_EVIDENCE["6"]) and "performanceMaxSignals" not in ai._slice(ev, "6")
     assert "demandGenTargeting" not in ai._slice(ev, "1")
+
+
+def test_a_list_cut_short_for_the_model_says_how_many_it_left_out():
+    """With 40 ad groups the model saw 25 and nothing said so, and a pass on the ad copy rested on part of the evidence."""
+    d = rows(customer=customer(), campaign=campaign(), adgroups=[ad_group(str(i), "Group %d" % i) for i in range(40)],
+             ads=[rsa(str(i), headlines=3, descriptions=2) for i in range(40)])
+    ev = ai.evidence_bundle(d, auto.Ctx(d))
+    assert len(ev["adGroups"]) == 26 and ev["adGroups"][-1] == {"more": 15} and ev["adGroups"][0]["name"] == "Group 0"
+    few = rows(customer=customer(), campaign=campaign(), adgroups=[ad_group("1", "Only")], ads=[rsa("1", headlines=3, descriptions=2)])
+    assert all("more" not in g for g in ai.evidence_bundle(few, auto.Ctx(few))["adGroups"])
