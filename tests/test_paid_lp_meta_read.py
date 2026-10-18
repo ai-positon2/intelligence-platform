@@ -293,3 +293,66 @@ def test_the_read_says_when_it_was_made():
     import datetime as dt
     now = dt.datetime(2026, 10, 18, 9, 0, tzinfo=dt.timezone.utc)
     assert run(Graph(), now=now)["readAt"] == now.isoformat()
+
+
+# ── Pinned by mutation: the details a first test left loose ─────────────────
+
+def test_a_carousel_made_from_a_template_is_a_carousel_and_a_story_with_only_a_page_is_not_a_post_kind():
+    assert r.creative_kind({"object_story_spec": {"template_data": {"child_attachments": [{}]}}}) == "CAROUSEL"
+    assert r.creative_kind({"effective_object_story_id": "1_2", "object_story_spec": {"page_id": "1"}}) == ""
+
+
+def test_a_creative_with_a_dynamic_feed_or_a_spec_is_not_just_a_shown_post():
+    assert r.parse_ads([{"id": "1", "creative": {"effective_object_story_id": "1_2", "asset_feed_spec": {"link_urls": []}}}])["1"]["post"] is False
+    assert r.parse_ads([{"id": "1", "creative": {"effective_object_story_id": "1_2", "object_story_spec": {"page_id": "1"}}}])["1"]["post"] is False
+    assert r.parse_ads([{"id": "1", "creative": {"effective_object_story_id": "1_2"}}])["1"]["post"] is True
+
+
+def test_the_kind_of_destination_is_read_in_any_case():
+    assert r.parse_adset_kinds([{"id": "1", "destination_type": "on_ad"}]) == {"1": "an instant form"}
+
+
+def test_an_ad_with_an_address_on_facebook_and_a_shown_post_is_counted_as_facebook_itself():
+    ads = {"id": "1", "adset_id": "s1", "creative": {"effective_object_story_id": "9_9", "object_url": "https://facebook.com/acme/posts/1"}}
+    _p, _g, _c, _cost, off = built([ads], [ins("1", 5)])
+    assert [k["kind"] for k in off["kinds"]] == [r.KIND_META]
+
+
+def test_two_ads_that_go_the_same_place_are_two_ads_and_the_kinds_are_listed_biggest_spend_first():
+    ads = [{"id": str(i), "adset_id": "s%d" % i, "creative": {"effective_object_story_id": "9_%d" % i}} for i in range(1, 5)]
+    ads += [{"id": "5", "adset_id": "s5", "creative": {"object_story_spec": {"link_data": {"message": "hi"}}}}]
+    _p, _g, _c, _cost, off = built(ads, [ins("1", 5, adset="s1"), ins("2", 6, adset="s2"), ins("3", 7, adset="s3"), ins("5", 40, adset="s5")], kinds={"s5": "a phone call"})
+    assert [(k["kind"], k["spend"], k["ads"]) for k in off["kinds"]] == [("a phone call", 40.0, 1), (r.KIND_POST, 18.0, 3)]
+    assert off["ads"] == 4 and off["spend"] == 58.0
+
+
+def test_the_address_shown_is_the_one_that_took_the_biggest_share_even_when_a_smaller_ad_comes_later():
+    many = link_ad("1", "https://a.test/x?utm=a", asset_feed_spec={"link_urls": [{"website_url": "https://a.test/x?utm=a"}, {"website_url": "https://a.test/y"}, {"website_url": "https://a.test/z"}]})
+    small = link_ad("2", "https://a.test/x?utm=b")
+    pages, *_ = built([many, small], [ins("1", 30), ins("2", 12)])
+    x = next(p for p in pages if p["id"] == "a.test/x")
+    assert x["url"] == "https://a.test/x?utm=b" and x["cost"] == 22.0
+
+
+def test_everything_that_belongs_to_a_split_ad_is_split_and_nothing_private_is_left_on_a_page():
+    ad = link_ad("1", "https://a.test/x", asset_feed_spec={"link_urls": [{"website_url": "https://a.test/x"}, {"website_url": "https://a.test/y"}]})
+    row = ins("1", 20, 10, 200, objective="OUTCOME_SALES", actions=[{"action_type": "omni_purchase", "value": "4"}], action_values=[{"action_type": "omni_purchase", "value": "400"}])
+    dev = {"1": {"mobile": {"clicks": 8, "cost": 15.0, "conversions": 2.0}}}
+    pages, *_ = built([ad], [row], devices=dev)
+    for p in pages:
+        assert p["impressions"] == 100 and p["clicks"] == 5 and p["cost"] == 10.0 and p["conversions"] == 2.0 and p["value"] == 200.0
+        assert p["devices"] == {"mobile": {"clicks": 4, "cost": 7.5, "conversions": 1.0}}
+        assert not any(k.startswith("_") for k in p)
+
+
+def test_a_group_counts_every_click_and_result_of_its_ads_and_an_ad_lists_one_address_per_page():
+    ad1 = link_ad("1", "https://a.test/x?utm=1", asset_feed_spec={"link_urls": [{"website_url": "https://a.test/x?utm=1"}, {"website_url": "https://www.a.test/x"}]})
+    _p, groups, *_ = built([ad1, link_ad("2", "https://a.test/x")], [ins("1", 20, 10, 200, leads=3), ins("2", 5, 4, 50, leads=1)])
+    g = groups["meta:s1"]
+    assert g["clicks"] == 14 and g["conversions"] == 4.0
+    assert g["ads"][0]["urls"] == ["https://a.test/x?utm=1"]                                          # the same page twice is one address, the first
+
+
+def test_the_device_names_are_read_in_any_case():
+    got = r.parse_devices([ins("1", 5, 3, impression_device="IPhone")])
+    assert list(got["1"]) == ["mobile"]

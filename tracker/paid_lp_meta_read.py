@@ -89,7 +89,7 @@ def creative_urls(c):
         found.append((u or {}).get("website_url"))
     urls, on_meta = [], False
     for raw in found:
-        u = lp._valid(raw) if isinstance(raw, str) else ""
+        u = lp._valid(raw)
         if not u:
             continue
         if _is_meta_host(u):
