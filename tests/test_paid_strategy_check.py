@@ -404,3 +404,19 @@ def test_a_snippet_needs_a_real_header_and_three_values():
     raw["assets"]["snippets"] = [{"header": "Services", "values": ["A", "B"]}, {"header": "Not A Header", "values": ["A", "B", "C"]}, {"header": "types", "values": ["A", "B", "C", "D"]}]
     built, drops = ck.build("search", raw, CTX)
     assert built["assets"]["snippets"] == [{"header": "Types", "values": ["A", "B", "C", "D"]}] and drops["snippets"] == 2
+
+
+def test_channel_shares_that_add_to_more_than_a_whole_budget_are_scaled_to_100():
+    """The prompt says the shares add to 100; a model answered 60, 50 and 30 and the sheet and PDF showed 140%."""
+    raw = {"channels": [{"channel": c, "why": "w", "share": s, "priority": "High", "phase": "Launch"} for c, s in (("Search", 60), ("PMax", 50), ("Meta", 30))]}
+    shares = [c["share"] for c in ck.strategy(raw, inputs())["channels"]]
+    assert shares == [42.9, 35.7, 21.4] and abs(sum(shares) - 100) < 0.2
+    fine = {"channels": [{"channel": "Search", "why": "w", "share": 70, "priority": "High", "phase": "Launch"}, {"channel": "PMax", "why": "w", "share": 30, "priority": "", "phase": ""}]}
+    assert [c["share"] for c in ck.strategy(fine, inputs())["channels"]] == [70, 30]            # a split that is right is left alone
+
+
+def test_two_campaigns_on_the_same_theme_do_not_get_the_same_name():
+    arch = ck.architecture({"campaigns": [camp("search", "Brand"), camp("search", "brand"), camp("search", "Brand")]}, inputs())
+    names = [c["name"] for c in arch["campaigns"]]
+    assert len(set(names)) == 3 and names[0] == "P2_Search_Brand_20261102" and names[1].startswith("P2_Search_Brand_20261102_")
+    assert len({c["key"] for c in arch["campaigns"]}) == 3

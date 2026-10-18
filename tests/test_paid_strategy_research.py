@@ -589,3 +589,17 @@ def test_a_market_reply_with_a_string_where_a_list_belongs_is_one_item_not_a_fai
     body = {"demand": "Implant searches peak in January", "decision_factors": ["Price"], "trends": None, "ad_policy": {"rule": "x"}, "cost_signals": [], "sources": "https://example.com/report"}
     pc = rs.read_market(F.clean(), ask=lambda system, user, **kw: {"text": json.dumps(body), "usage": {}, "search_count": 1})
     assert pc["state"] == "ok" and pc["data"]["demand"] == ["Implant searches peak in January"] and pc["data"]["sources"] == ["https://example.com/report"] and pc["data"]["adPolicy"] == []
+
+
+def test_places_are_looked_up_worldwide_not_only_in_the_united_states():
+    """A Canadian or British client's "Toronto; Leeds" was sent with countryCode US, so the market, volumes and bids were the wrong country's."""
+    sent = []
+
+    def post(path, body):
+        sent.append((path, body))
+        return {"geoTargetConstantSuggestions": [{"geoTargetConstant": {"id": "1", "canonicalName": "X", "targetType": "City"}}]}
+    rs.resolve_places(["Toronto", "Leeds"], post=post)
+    assert [b for _p, b in sent] == [{"locale": "en", "locationNames": {"names": ["Toronto"]}}, {"locale": "en", "locationNames": {"names": ["Leeds"]}}]
+    sent.clear()
+    rs.resolve_places(["Austin"], post=post, country_code="US")
+    assert sent[0][1]["countryCode"] == "US"

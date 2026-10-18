@@ -356,6 +356,11 @@ def strategy(raw, inputs):
     chans = rows(raw.get("channels"), ["channel", "why", "share", "priority", "phase"], n=8)
     for c in chans:
         c["share"] = number(c["share"], 0, 100, None)
+    over = sum(c["share"] or 0 for c in chans)
+    if over > 100.5:                                    # shares of 60, 50 and 30 are not a split of one budget: scale them to 100 (the prompt says they add to 100)
+        for c in chans:
+            if c["share"] is not None:
+                c["share"] = round(c["share"] * 100.0 / over, 1)
     conv = []
     for r in rows(meas.get("conversions"), ["name", "type", "primary", "how"], n=10):
         r["primary"] = r["primary"].lower() in ("yes", "true", "primary", "1")
@@ -406,7 +411,7 @@ def architecture(raw, inputs):
     they add up to the monthly budget."""
     raw = raw if isinstance(raw, dict) else {}
     allowed = inputs.get("campaignTypes") or ps.KIND_KEYS
-    campaigns, keys = [], set()
+    campaigns, keys, names = [], set(), set()
     for r in raw.get("campaigns") if isinstance(raw.get("campaigns"), list) else []:
         if not isinstance(r, dict):
             continue
@@ -420,6 +425,10 @@ def architecture(raw, inputs):
         while key in keys:
             key, n = "%s%d" % (base, n), n + 1
         keys.add(key)
+        name = base_name = ps.campaign_name(kind, theme, inputs.get("launch"))
+        while name in names:                            # two campaigns on the same theme get the same name, and Google Ads refuses a repeated campaign name
+            name = "%s_%d" % (base_name, len(names) + 1)
+        names.add(name)
         sets = r.get("settings") if isinstance(r.get("settings"), dict) else {}
         settings = {k: _setting(sets, k) for k in SETTING_KEYS}
         if not settings["bidStrategy"]["value"]:
@@ -427,7 +436,7 @@ def architecture(raw, inputs):
         if not settings["locations"]["value"]:
             settings["locations"] = {"value": inputs.get("locations") or "To be confirmed with the client", "why": "Taken from the client's service area."}
         campaigns.append({"key": key, "kind": kind, "kindLabel": ps.KINDS[kind]["label"], "theme": theme or ps.KINDS[kind]["label"],
-                          "name": ps.campaign_name(kind, theme, inputs.get("launch")), "purpose": text(r.get("purpose"), 500),
+                          "name": name, "purpose": text(r.get("purpose"), 500),
                           "share": number(r.get("share"), 0, 1000, 0) or 0, "landingPage": text(r.get("landingPage"), 300),
                           "keywordFocus": lines(r.get("keywordFocus"), 10, 80), "audience": text(r.get("audience"), 400), "notes": text(r.get("notes"), 500),
                           "settings": settings})

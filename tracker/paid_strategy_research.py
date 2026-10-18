@@ -688,12 +688,16 @@ def split_places(text):
     return [p.strip() for p in re.split(r"[;\n|]+", str(text or "")) if p.strip()][:6]
 
 
-def resolve_places(places, *, post, country_code="US"):
-    """[{'name', 'id', 'canonical', 'type'}] for the places Google knows, best match first. Never raises: an unknown place is left out."""
+def resolve_places(places, *, post, country_code=None):
+    """[{'name', 'id', 'canonical', 'type'}] for the places Google knows, best match first. Never raises: an unknown place is left out. With no
+    country the lookup is worldwide (Toronto or Leeds are found), as Keyword Research does: a US default sent every other client's places to the US."""
     out = []
     for place in places:
+        body = {"locale": "en", "locationNames": {"names": [place]}}
+        if country_code:
+            body["countryCode"] = country_code
         try:
-            d = post("/geoTargetConstants:suggest", {"locale": "en", "countryCode": country_code, "locationNames": {"names": [place]}})
+            d = post("/geoTargetConstants:suggest", body)
         except Exception as e:                              # noqa: BLE001
             log.info("strategy keywords: place %r not resolved: %s", place, e)
             continue
