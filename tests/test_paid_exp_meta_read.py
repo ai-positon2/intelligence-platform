@@ -370,3 +370,35 @@ def test_an_account_with_nothing_is_an_empty_read_not_an_error():
 def test_the_day_defaults_to_the_pacific_day_when_none_is_given():
     out = r.read_account("act_1", pages=Graph(studies=[], ads=[], ad_stats=[]).pages)
     assert dt.date.fromisoformat(out["today"])
+
+
+# ── Pinned by mutation ──────────────────────────────────────────────────────
+
+def test_cells_are_ordered_by_their_number_not_their_name_or_their_text():
+    s = r.parse_studies([study(cells=[cell("10", "Alpha"), cell("9", "Zeta")])], TODAY)[0]
+    assert [c["id"] for c in s["cells"]] == ["9", "10"] and s["cells"][0]["name"] == "Zeta"
+
+
+def test_a_row_at_the_ad_set_level_is_filed_under_the_ad_set_though_it_also_names_its_campaign():
+    row = day_row("a1", "2026-10-02", campaign_id="c9")
+    assert list(r.parse_days([row])) == ["a1"]
+
+
+def test_a_test_is_measured_only_when_both_of_its_first_two_cells_have_a_result_and_a_lift_study_is_never_blamed_for_missing_cells():
+    assert built([cell("1", "A", adsets=["a1"]), cell("2", "B")])["measured"] is False
+    lift = r.build_studies(r.parse_studies([study(typ="LIFT")], TODAY), {}, TODAY)[0]
+    assert lift["reason"] == "" and lift["measured"] is False
+    assert r.build_studies(r.parse_studies([study(cells=[cell("1", "A", adsets=["a1"]), cell("2", "B", adsets=["a2"])])], TODAY), {"a1": {}, "a2": {}}, TODAY)[0]["measured"] is True
+
+
+def test_meta_asking_to_wait_while_the_ads_are_read_stops_at_the_first_ask():
+    class Slow(Graph):
+        def pages(self, path, params):
+            if path.endswith("/ads"):
+                self.calls.append((path, dict(params)))
+                raise meta.OverQuota("wait")
+            return super().pages(path, params)
+    g = Slow()
+    with pytest.raises(meta.OverQuota):
+        run(g)
+    assert len([c for c in g.calls if c[0].endswith("/ads")]) == 1

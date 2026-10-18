@@ -190,8 +190,7 @@ def read_days(pages, act, studies, today):
         for chunk in _chunks(ids, ENTITIES_PER_QUERY):
             rows = pages(act + "/insights", _q(level=level, fields=DAY_FIELDS, time_increment=1, time_range=window, limit=500,
                                                filtering=json.dumps([{"field": field, "operator": "IN", "value": chunk}])))
-            for eid, by_day in parse_days(rows).items():
-                days.setdefault(eid, {}).update(by_day)
+            days.update(parse_days(rows))
     return days
 
 

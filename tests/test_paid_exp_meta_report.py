@@ -260,7 +260,7 @@ def test_a_meta_test_with_no_result_gives_its_reason_in_the_file():
     from tracker import paid_exp_export as export
     out = run(ACT, graph=two_ads(fail=["nested", "days"]), search_fn=no_google)
     head, rows = export.tables(out)["Experiments"]
-    assert rows[0][-2] == "Meta Ads"
+    assert rows[0][-2] == "Meta Ads" and rows[0][-1] == "Meta did not say which campaigns or ad sets each cell holds."
 
 
 def test_the_needs_list_carries_a_winners_own_label_into_the_file():
