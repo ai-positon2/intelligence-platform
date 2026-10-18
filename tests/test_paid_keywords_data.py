@@ -676,3 +676,13 @@ def test_a_negative_that_covers_the_campaigns_it_would_go_in_blocks_the_keyword_
     out = kd.assemble([dict(kw="b", avg=1, comp="", idx=None, lo=None, hi=None, m={}, status="new", by=None, neg={"scope": "some", "by": [], "campaigns": ["C1"]}, conv=None, brand=False, rival="")],
                       {"b": {"fit": "yes", "intent": "local", "theme": "t", "match": "exact", "priority": "high", "note": ""}}, themes)
     assert out["keywords"][0]["include"] is False and out["keywords"][0]["blockedInTarget"] is True and row["include"] is True
+
+
+def test_a_search_term_that_converted_is_always_exact_whatever_the_model_judged():
+    """The plan says "added as exact"; a Broad judgement put a Broad row in the Ads Editor file for a term a Broad keyword already matched."""
+    rows, _ = cands()
+    judged = {r["kw"]: {"fit": "yes", "intent": "transactional", "theme": "implants", "match": "broad", "priority": "high", "note": ""} for r in rows}
+    by = {r["kw"]: r for r in kd.assemble(rows, judged, theme_list())["keywords"]}
+    converted = [r for r in by.values() if r["conv"]]
+    assert converted and all(r["match"] == "exact" for r in converted)
+    assert all(r["match"] == "broad" for r in by.values() if not r["conv"])           # the model's choice stands for the rest

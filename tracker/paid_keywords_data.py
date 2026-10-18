@@ -517,6 +517,8 @@ def _row(c, j, theme_keys):
            "src": c.get("src") or "idea", "status": c.get("status") or "new", "by": c.get("by"), "neg": c.get("neg"), "conv": c.get("conv"), "rival": c.get("rival") or "",
            "fit": fit, "intent": intent, "theme": theme, "match": j.get("match") if j.get("match") in MATCHES else "phrase", "priority": j.get("priority") if j.get("priority") in PRIORITIES else "medium",
            "note": j.get("note") or "", "blockedInTarget": False}
+    if row["conv"]:
+        row["match"] = "exact"                          # a search term that converted is added as exact whatever the model said: a broader keyword already covers it, and exact is what pins it
     row["editorOk"] = editor_ok(c["kw"])
     row["include"] = bool(fit == "yes" and (row["status"] == "new" or row["conv"]) and intent != "competitor" and row["editorOk"])        # a converting search term is worth adding as exact even where a broader keyword already matches it
     return row
