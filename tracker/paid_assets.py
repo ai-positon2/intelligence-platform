@@ -588,6 +588,9 @@ def analyse_account(a, today=None):
             ads.append({"id": ad["adId"], "adGroup": ad["adGroup"], "type": ad["type"], "typeLabel": rules.AD_SPECS[ad["type"]][2], "slots": sl,
                         "severity": rules.worst(sl)})
         gaps = _gaps("Campaign", slots)
+        if c["type"] == "PERFORMANCE_MAX" and ok.get("groups") and not groups_by.get(cid):
+            gaps.append({"scope": "Campaign", "key": "ASSET_GROUPS", "label": "Asset groups", "severity": rules.HIGH, "have": 0, "target": 1, "add": 1,
+                         "message": "No enabled asset group, so a Performance Max campaign has nothing to show.", "_n": -1})      # no group, no row of slots: it must not read as covered
         gaps += _fold([x for g in groups for x in _gaps("Asset group: " + (g["name"] or g["id"]), g["slots"])], "asset group")
         gaps += _fold([x for ad in ads for x in _gaps("%s: %s" % (ad["typeLabel"], ad["adGroup"] or "an ad group"), ad["slots"])], "ad")
         gaps.sort(key=lambda x: (-rules.SEVERITY_RANK[x["severity"]], x["scope"] != "Campaign", x["_n"], x["scope"]))

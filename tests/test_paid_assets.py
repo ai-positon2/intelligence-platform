@@ -717,3 +717,17 @@ def test_a_disapproved_asset_is_counted_once_per_account_at_every_level(where):
     both = a.assemble({"accounts": [acct(1), acct(2)], "warnings": []}, ACCT, TODAY)
     assert both["summary"]["disapprovedAssets"] == 2
     assert a.assemble({"accounts": [acct(1)], "warnings": []}, ACCT, TODAY)["summary"]["disapprovedAssets"] == 1
+
+
+def test_a_performance_max_campaign_with_no_enabled_asset_group_is_a_high_gap_not_a_clean_bill():
+    """It had no group to judge, so no gap at all and "severity None": a campaign that cannot serve looked fully covered."""
+    item = analyse(campaigns=[camp_row("6", "PMax", "PERFORMANCE_MAX")], campaign_assets=many("6", "SITELINK", 4) + many("6", "CALLOUT", 4))["items"][0]
+    gap = next(g for g in item["gaps"] if g["label"] == "Asset groups")
+    assert gap["severity"] == "high" and gap["scope"] == "Campaign" and "No enabled asset group" in gap["message"] and item["severity"] == "high" and item["counts"]["high"] >= 1
+    assert gap is item["gaps"][0] or gap["severity"] == item["gaps"][0]["severity"]
+    ok = analyse(campaigns=[camp_row("6", "PMax", "PERFORMANCE_MAX")], groups=[group()], group_assets=gassets("700", **FULL_GROUP))["items"][0]
+    assert not any(g["label"] == "Asset groups" for g in ok["gaps"])                                     # with a group there is nothing to say
+    search = analyse(campaigns=[camp_row("5")])["items"][0]
+    assert not any(g["label"] == "Asset groups" for g in search["gaps"])                                  # a Search campaign has no asset groups
+    unread = analyse(campaigns=[camp_row("6", "PMax", "PERFORMANCE_MAX")], fail={"asset_group"})["items"][0]
+    assert not any(g["label"] == "Asset groups" for g in unread["gaps"])                                  # a group list that could not be read is never "no groups"
