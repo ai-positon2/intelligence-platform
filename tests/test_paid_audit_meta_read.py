@@ -137,7 +137,7 @@ def test_the_whole_account_is_read_and_joined():
     assert out["campaigns"][0]["results"] == 25.0 and out["adSets"][0]["learning"] == "SUCCESS" and out["ads"]["total"] == 2 and out["adsPerSet"] == {"10": 2}
     assert "_perAdSet" not in out["ads"]
     keys = [k for _p, k in g.asked]
-    assert keys == ["account", "accountExtra", "pixels", "pixelExtra", "stats", "sources", "insights", "campaigns", "adSets", "ads"]
+    assert keys == ["account", "accountExtra", "accountBusiness", "pixels", "pixelExtra", "stats", "sources", "insights", "campaigns", "adSets", "ads"]
 
 
 def test_requests_ask_for_live_things_in_the_last_30_days_and_stats_for_seven_days():
@@ -219,3 +219,21 @@ def test_an_odd_answer_in_an_optional_part_is_a_warning_not_a_crash():
 def test_an_account_with_nothing_live_reads_as_empty():
     out = F.a_read(answers={"pixels": [], "campaigns": [], "insights": [], "adSets": [], "ads": []})
     assert out["warnings"] == [] and out["pixels"] == [] and out["stats"] is None and out["campaigns"] == [] and out["adSets"] == [] and out["ads"]["total"] == 0
+
+
+def test_a_token_without_business_management_still_gives_the_pixel_terms_and_the_audit_says_nothing_of_it():
+    """Live: Meta answered "(#100) Requires business_management permission to access the field" to the business, and with it the account's pixel
+    terms were lost, because both were asked in one request."""
+    out = F.a_read(fail={"accountBusiness"})
+    assert out["account"]["pixelTerms"] is True and out["account"]["prepaid"] is False and out["account"]["business"] == ""
+    assert out["warnings"] == [] and all(out["ok"].values())
+
+
+def test_the_business_name_is_read_when_the_token_may_see_it():
+    assert F.a_read()["account"]["business"] == "Acme Holdings"
+    assert F.a_read(fail={"accountExtra"})["account"]["business"] == ""            # no terms read: the account record carries no extras at all
+
+
+def test_meta_asking_to_wait_while_the_business_is_read_stops_the_read():
+    with pytest.raises(meta.OverQuota):
+        F.a_read(quota={"accountBusiness"})

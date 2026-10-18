@@ -68,7 +68,8 @@ class Graph:
 
     def __init__(self, answers=None, fail=(), quota=()):
         self.answers = {
-            "account": account(), "accountExtra": account_extra(), "pixels": [pixel()], "pixelExtra": [pixel_extra()],
+            "account": account(), "accountExtra": {k: v for k, v in account_extra().items() if k != "business"},
+            "accountBusiness": {"business": {"id": "55", "name": "Acme Holdings"}, "id": ACT}, "pixels": [pixel()], "pixelExtra": [pixel_extra()],
             "stats": stats({"PageView": 5000, "Lead": 40}), "sources": stats({"pixel": 5000, "server": 30}),
             "campaigns": [campaign()], "insights": [insight()], "adSets": [adset()], "ads": [ad("100", "Ad A"), ad("101", "Ad B")]}
         self.answers.update(answers or {})
@@ -88,7 +89,7 @@ class Graph:
             return "ads"
         if path.endswith("/insights"):
             return "insights"
-        return "accountExtra" if fields == m.ACCOUNT_EXTRA else "account"
+        return {m.ACCOUNT_EXTRA: "accountExtra", m.ACCOUNT_BUSINESS: "accountBusiness"}.get(fields, "account")
 
     def call(self, path, params):
         k = self.key(path, params)

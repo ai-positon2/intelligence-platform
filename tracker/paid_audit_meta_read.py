@@ -25,7 +25,8 @@ STATS_DAYS = 7
 MAX_PIXELS_READ = 3
 
 ACCOUNT_CORE = "name,account_status,disable_reason,spend_cap,amount_spent,currency,timezone_name"
-ACCOUNT_EXTRA = "is_prepay_account,offsite_pixels_tos_accepted,business{id,name}"
+ACCOUNT_EXTRA = "is_prepay_account,offsite_pixels_tos_accepted"
+ACCOUNT_BUSINESS = "business{id,name}"          # asked alone: Meta refuses this field to a token without business_management, and it must not take the terms above down with it
 PIXEL_CORE = "id,name,last_fired_time,is_unavailable,creation_time"
 PIXEL_EXTRA = "id,enable_automatic_matching,first_party_cookie_status"
 CAMPAIGN_FIELDS = "id,name,objective,effective_status,buying_type,special_ad_categories,bid_strategy,issues_info"
@@ -210,6 +211,14 @@ def read_account(act, *, get, pages, now=None):
             return None
     core = part("account", "the account", lambda: get(act, _q(fields=ACCOUNT_CORE)), required=True)
     extra = part("accountExtra", "the account's payment and pixel terms", lambda: get(act, _q(fields=ACCOUNT_EXTRA)))
+    try:
+        biz = get(act, _q(fields=ACCOUNT_BUSINESS))
+    except meta.OverQuota:
+        raise
+    except Exception:                           # only the business's name hangs on it, so a refusal is not worth a warning on every audit
+        biz = None
+    if extra is not None and isinstance(biz, dict) and biz.get("business"):
+        extra = dict(extra, business=biz["business"])
     account = parse_account(core, extra)
     pixel_rows = part("pixels", "the pixels", lambda: pages(act + "/adspixels", _q(fields=PIXEL_CORE, limit=100)))
     pixel_extra = part("pixelExtra", "the pixels' matching settings", lambda: pages(act + "/adspixels", _q(fields=PIXEL_EXTRA, limit=100))) if pixel_rows else None
