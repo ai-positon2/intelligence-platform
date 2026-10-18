@@ -55,7 +55,7 @@ var INTENT_COLOR={new_patient:"#34d399",emergency:"#fb7185",service:"#38bdf8",ap
   not_a_patient:"#f97316",no_conversation:"#5d6688",other:"#475069"};
 var REASON_COLOR={no_availability:"#fbbf24",insurance:"#fb7185",transfer:"#f97316",callback:"#38bdf8",price:"#a78bfa",other:"#8b94be"};
 
-function csvCell(v){var s=String(v==null?"":v); return /[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s;}
+function csvCell(v){if(v==null)v="";var num=typeof v==="number";var s=String(v);if(!num&&/^[=+\-@\t\r]/.test(s))s="'"+s;return /[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s;}
 function csv(ov,an){
   var out=[], head=["Name","Calls","Answered","Missed","Missed rate","First-time callers","CallRail leads","Lead rate","Average length (s)"];
   function table(title,rows){

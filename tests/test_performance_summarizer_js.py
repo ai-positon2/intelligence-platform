@@ -140,6 +140,11 @@ def test_a_csv_cell_can_never_run_as_a_formula():
     assert run("P.toCsv([['=SUM(A1)','+1','-2','@x','a,b','say \"hi\"',null,5]])") == "'=SUM(A1),'+1,'-2,'@x,\"a,b\",\"say \"\"hi\"\"\",,5"
 
 
+def test_a_negative_number_in_a_csv_stays_a_number():
+    """It was written as the text '-2, which Excel cannot add up: every negative change in an export became text."""
+    assert run("P.toCsv([[-2, -0.5, 7, '-2']])") == "-2,-0.5,7,'-2"
+
+
 def test_index_to_100_starts_at_the_first_real_value():
     assert run("P.indexTo100([0,0,50,100,25])") == [0, 0, 100, 200, 50]
     assert run("P.indexTo100([0,0,0])") == [None, None, None]

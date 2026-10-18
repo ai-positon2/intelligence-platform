@@ -129,7 +129,7 @@ function monthsText(a,b){
 }
 
 /* Month by month, as CSV: the months in the data, then the seasonal index of each calendar month. */
-function csvCell(v){var s=String(v==null?"":v); return /[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s;}
+function csvCell(v){if(v==null)v="";var num=typeof v==="number";var s=String(v);if(!num&&/^[=+\-@\t\r]/.test(s))s="'"+s;return /[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s;}
 function csv(rep){
   var out=[["Month","Days","Spend","Impressions","Clicks","Conversions","Conversion value","Cost per conversion","Return on ad spend"]];
   (rep.monthly||[]).forEach(function(r){

@@ -83,7 +83,7 @@ function pollMoves(){
 }
 
 /* ── CSV ─────────────────────────────────────────────────────── */
-function csvCell(v){var s=String(v==null?"":v);if(/[",\n]/.test(s))s='"'+s.replace(/"/g,'""')+'"';return s;}
+function csvCell(v){if(v==null)v="";var num=typeof v==="number";var s=String(v);if(!num&&/^[=+\-@\t\r]/.test(s))s="'"+s;return /[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s;}
 function downloadCsv(rows, filename){
   var blob=new Blob(["﻿"+rows.map(function(r){return r.map(csvCell).join(",")}).join("\r\n")],{type:"text/csv;charset=utf-8"});
   var url=URL.createObjectURL(blob), a=document.createElement("a");

@@ -364,7 +364,7 @@ function paintExcl(){
 }
 
 /* ── CSV and Refresh ──────────────────────────────────────── */
-function csv(v){v=v==null?"":String(v);return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v;}
+function csv(v){if(v==null)v="";var num=typeof v==="number";v=String(v);if(!num&&/^[=+\-@\t\r]/.test(v))v="'"+v;return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v;}   /* a text cell must never run as a formula in Excel; a number is left alone */
 $("#refreshBtn").addEventListener("click",function(){run(true);});
 $("#exportBtn").addEventListener("click",function(){
   var rep=S.report, v=view(); if(!rep||!v) return;

@@ -575,8 +575,9 @@ function sumCost(per,idx){return idx.reduce(function(a,i){return a+per[i][COST];
 /* ── Misc ── */
 function csvCell(v){
   if(v==null) return "";
+  var num=typeof v==="number";
   v=String(v);
-  if(/^[=+\-@\t\r]/.test(v)) v="'"+v;                  // a cell must never run as a formula in Excel
+  if(!num&&/^[=+\-@\t\r]/.test(v)) v="'"+v;           // a text cell must never run as a formula in Excel; a negative number is a number, not text
   return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v;
 }
 function toCsv(rows){return rows.map(function(r){return r.map(csvCell).join(",");}).join("\r\n");}
