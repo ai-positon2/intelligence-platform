@@ -230,7 +230,7 @@ def test_pasted_cells_are_read_for_review_and_nothing_is_saved(book):
     text = "Client\tAccount\tAllocated Budget\tDate\tChannels\nAcme\tAcme Dental\t$3,000\t10/1/2026\tGoogle\nAcme\tAcme Dental\t900\t10/1/2026\tBing"
     r = client_as(STAFF).post(PARSE, json={"month": "2026-10", "text": text}, headers=SAME)
     j = r.get_json()
-    assert r.status_code == 200 and j["rows"][0]["allocated"] == 3000 and j["skipped"][0]["reason"] == "Bing budget, not Google Ads" and book.by == {}
+    assert r.status_code == 200 and j["rows"][0]["allocated"] == 3000 and j["skipped"][0]["reason"] == "Bing budget, not Google Ads or Meta Ads" and book.by == {}
 
 
 @pytest.mark.parametrize("body,why", [

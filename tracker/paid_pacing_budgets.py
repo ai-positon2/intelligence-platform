@@ -10,7 +10,7 @@ The rows are kept by tracker/paid_pacing_budget_store.py. This module is the log
 rows pasted from the Budget Tracker (a copy of its cells, not a connection to it), carrying last month's rows forward when a month
 starts, seeding the very first month from the last run the platform stored, and laying the rows out the way the engine reads them.
 
-Only Google rows matter here (the Pacing Desk paces Google Ads), so a pasted row for another channel is skipped and said so.
+A row belongs to a channel: Google (the default) or Meta. The Pacing Desk paces both; a pasted row for any other channel is skipped and said so.
 """
 from __future__ import annotations
 
@@ -26,6 +26,7 @@ MAX_ALLOCATED = 10_000_000
 MAX_TARGET = 1_000_000
 DPR_HEADER = ["Client", "Account", "Allocated Budget", "Target CPA/ROAS/CPM", "Date", "Account Status", "Days Ads are Running", "AM", "Channels"]
 STATUSES = ("Active", "Paused")
+CHANNELS = ("Google", "Meta")
 
 _DAYS = {"monday", "mon", "tuesday", "tue", "tues", "wednesday", "wed", "thursday", "thu", "thur", "thurs", "friday", "fri", "saturday",
          "sat", "sunday", "sun"}
@@ -65,9 +66,23 @@ def previous_month(month):
     return "%04d-%02d" % ((y - 1, 12) if m == 1 else (y, m - 1))
 
 
-def row_key(client, account):
-    """What makes two rows the same one: client and account, ignoring case and spacing."""
-    return re.sub(r"\s+", " ", str(client).strip().lower()) + "|" + re.sub(r"\s+", " ", str(account).strip().lower())
+def row_key(client, account, channel="Google"):
+    """What makes two rows the same one: client, account and channel, ignoring case and spacing. A Google row's key is what it always was, so rows saved
+    before there were channels are still the same rows."""
+    key = re.sub(r"\s+", " ", str(client).strip().lower()) + "|" + re.sub(r"\s+", " ", str(account).strip().lower())
+    return key + "|meta" if channel == "Meta" else key
+
+
+def channel_of(text):
+    """'Google' or 'Meta' from a channel cell (empty means Google), or None for any other channel (Bing, LinkedIn, ...)."""
+    s = re.sub(r"\s+", " ", str(text or "").strip().lower())
+    if not s:
+        return "Google"
+    if "google" in s or s in ("adwords", "ppc"):
+        return "Google"
+    if "meta" in s or "facebook" in s or "instagram" in s or s in ("fb", "ig"):
+        return "Meta"
+    return None
 
 
 # ── One row ─────────────────────────────────────────────────────────────────
@@ -113,7 +128,7 @@ def _text(v, field, limit, required=False):
 
 
 def check_row(body):
-    """The row to store from one submitted row: {client, account, allocated, targetCpa, daysRunning, status, am}. Raises BadBudget."""
+    """The row to store from one submitted row: {client, account, allocated, targetCpa, daysRunning, status, am, channel}. Raises BadBudget."""
     if not isinstance(body, dict):
         raise BadBudget("a budget row should be a JSON object")
     client = _text(body.get("client"), "client", 120, required=True)
@@ -130,12 +145,15 @@ def check_row(body):
     if status and status.lower() not in {s.lower() for s in STATUSES}:
         raise BadBudget("status should be Active or Paused (or empty)")
     status = next((s for s in STATUSES if s.lower() == status.lower()), "")
+    channel = channel_of(body.get("channel"))
+    if channel is None:
+        raise BadBudget("channel should be Google or Meta (or empty for Google), got %r" % str(body.get("channel"))[:40])
     return {"client": client, "account": account, "allocated": round(allocated, 2), "targetCpa": None if target is None else round(target, 2),
-            "daysRunning": days_running(body.get("daysRunning")), "status": status, "am": _text(body.get("am"), "AM", 80)}
+            "daysRunning": days_running(body.get("daysRunning")), "status": status, "am": _text(body.get("am"), "AM", 80), "channel": channel}
 
 
 def check_rows(rows):
-    """[row, ...] checked, with no client and account twice. Raises BadBudget naming the row at fault."""
+    """[row, ...] checked, with no client, account and channel twice. Raises BadBudget naming the row at fault."""
     if not isinstance(rows, list):
         raise BadBudget("rows should be a list")
     if len(rows) > MAX_ROWS:
@@ -147,9 +165,9 @@ def check_rows(rows):
         except BadBudget as e:
             who = (r.get("account") if isinstance(r, dict) else None) or "row %d" % i
             raise BadBudget("%s: %s" % (who, e)) from None
-        k = row_key(row["client"], row["account"])
+        k = row_key(row["client"], row["account"], row["channel"])
         if k in seen:
-            raise BadBudget("%s / %s is listed twice" % (row["client"], row["account"]))
+            raise BadBudget("%s / %s is listed twice%s" % (row["client"], row["account"], " for Meta" if row["channel"] == "Meta" else ""))
         seen[k] = True
         out.append(row)
     return out
@@ -218,8 +236,8 @@ def parse_paste(text, month):
         if not rec.get("account") and not rec.get("client"):
             continue
         chan = rec.get("channel", "")
-        if chan and "google" not in chan.lower():
-            skipped.append({"row": rec.get("account") or "row %d" % n, "reason": "%s budget, not Google Ads" % chan})
+        if channel_of(chan) is None:
+            skipped.append({"row": rec.get("account") or "row %d" % n, "reason": "%s budget, not Google Ads or Meta Ads" % chan})
             continue
         got = cell_month(rec.get("date"))
         if rec.get("date") and got and got != month:
@@ -228,7 +246,7 @@ def parse_paste(text, month):
         status = rec.get("status", "")
         try:
             row = check_row({"client": rec.get("client"), "account": rec.get("account"), "allocated": rec.get("allocated"),
-                             "targetCpa": rec.get("targetCpa"), "daysRunning": rec.get("daysRunning"), "am": rec.get("am"),
+                             "targetCpa": rec.get("targetCpa"), "daysRunning": rec.get("daysRunning"), "am": rec.get("am"), "channel": chan,
                              "status": status if status.lower() in {s.lower() for s in STATUSES} else ""})
         except BadBudget as e:
             skipped.append({"row": rec.get("account") or "row %d" % n, "reason": str(e)})
@@ -236,7 +254,7 @@ def parse_paste(text, month):
         rows.append(row)
     seen = {}
     for r in rows:                      # a pasted account twice: the later row is the one meant
-        seen[row_key(r["client"], r["account"])] = r
+        seen[row_key(r["client"], r["account"], r["channel"])] = r
     unique = list(seen.values())
     if len(unique) < len(rows):
         skipped.append({"row": "", "reason": "%d rows repeated an account already pasted; the later one was kept" % (len(rows) - len(unique))})
@@ -271,7 +289,7 @@ def seed_from_run(clients):
                 days = ""
             tgt = a.get("targetCpl") if isinstance(a.get("targetCpl"), (int, float)) else a.get("targetCpa")
             try:
-                rows.append(check_row({"client": data.get("name"), "account": a["name"], "allocated": alloc,
+                rows.append(check_row({"client": data.get("name"), "account": a["name"], "allocated": alloc, "channel": a.get("channel"),
                                        "targetCpa": tgt if isinstance(tgt, (int, float)) and not isinstance(tgt, bool) and tgt > 0 else None,
                                        "daysRunning": days}))
             except BadBudget:
@@ -285,13 +303,13 @@ def dpr_rows(rows, month):
     out = [list(DPR_HEADER)]
     for r in rows:
         out.append([r["client"], r["account"], r["allocated"], r.get("targetCpa"), first, r.get("status") or "Active",
-                    r.get("daysRunning") or "All days", r.get("am") or "", "Google"])
+                    r.get("daysRunning") or "All days", r.get("am") or "", r.get("channel") or "Google"])
     return out
 
 
 # ── Which rows a month uses ─────────────────────────────────────────────────
 
-FIELDS = ("client", "account", "allocated", "targetCpa", "daysRunning", "status", "am")
+FIELDS = ("client", "account", "allocated", "targetCpa", "daysRunning", "status", "am", "channel")
 
 
 def book_for(month, *, store, run_fn=None):

@@ -33,7 +33,7 @@ def test_two_rows_are_the_same_one_ignoring_case_and_spacing():
 def test_a_row_is_checked_and_cleaned():
     got = b.check_row(row(allocated="$3,000.456", targetCpa="45", daysRunning="Monday - Friday", status="paused", am=" Sam  K "))
     assert got == {"client": "Acme", "account": "Acme Dental", "allocated": 3000.46, "targetCpa": 45.0, "daysRunning": "Monday - Friday",
-                   "status": "Paused", "am": "Sam K"}
+                   "status": "Paused", "am": "Sam K", "channel": "Google"}
     plain = b.check_row(row())
     assert plain["targetCpa"] is None and plain["daysRunning"] == "" and plain["status"] == "" and plain["am"] == ""
 
@@ -257,3 +257,48 @@ def test_nothing_anywhere_is_an_empty_book():
 def test_the_saved_version_is_the_newest_save_time():
     assert b.version_of([]) == "" and b.version_of(None) == ""
     assert b.version_of([{"updatedAt": "2026-10-01T10:00:00+00:00"}, {"updatedAt": "2026-10-02T09:00:00+00:00"}, {}]) == "2026-10-02T09:00:00+00:00"
+
+
+# ── Channels: Google (the default) and Meta ─────────────────────────────────
+
+@pytest.mark.parametrize("text,want", [("", "Google"), (None, "Google"), ("Google", "Google"), ("Google Ads", "Google"), ("google ads", "Google"), ("Meta", "Meta"),
+                                       ("Meta Ads", "Meta"), ("Facebook", "Meta"), ("Instagram", "Meta"), ("FB", "Meta"), ("Bing", None), ("LinkedIn", None)])
+def test_a_channel_cell_is_google_or_meta_or_something_else(text, want):
+    assert b.channel_of(text) == want
+
+
+def test_a_google_row_keeps_the_key_it_always_had_and_a_meta_row_has_its_own():
+    assert b.row_key("Acme", "Acme Dental") == "acme|acme dental" == b.row_key("Acme", "Acme Dental", "Google")
+    assert b.row_key("Acme", "Acme Dental", "Meta") == "acme|acme dental|meta"
+
+
+def test_a_row_has_a_channel_google_unless_it_says_meta_and_any_other_is_refused():
+    assert b.check_row(row())["channel"] == "Google" and b.check_row(row(channel="Meta Ads"))["channel"] == "Meta" and b.check_row(row(channel="facebook"))["channel"] == "Meta"
+    with pytest.raises(b.BadBudget, match="channel should be Google or Meta"):
+        b.check_row(row(channel="Bing"))
+
+
+def test_the_same_account_may_have_a_google_row_and_a_meta_row_but_not_two_of_one():
+    both = b.check_rows([row(), row(channel="Meta")])
+    assert [r["channel"] for r in both] == ["Google", "Meta"]
+    with pytest.raises(b.BadBudget, match="listed twice for Meta"):
+        b.check_rows([row(channel="Meta"), row(account="acme  dental", channel="Facebook")])
+    with pytest.raises(b.BadBudget, match="listed twice"):
+        b.check_rows([row(), row()])
+
+
+def test_the_engines_sheet_says_each_rows_channel():
+    out = b.dpr_rows(b.check_rows([row(), row(channel="Meta", allocated=900)]), "2026-10")
+    assert out[0][-1] == "Channels" and [r[-1] for r in out[1:]] == ["Google", "Meta"]
+
+
+def test_a_pasted_meta_row_is_kept_and_another_channel_is_skipped_and_said_so():
+    text = "Client\tAccount\tAllocated Budget\tDate\tChannels\nAcme\tAcme Dental\t3000\t10/1/2026\tGoogle\nAcme\tAcme Dental\t900\t10/1/2026\tMeta\nAcme\tAcme Dental\t500\t10/1/2026\tBing"
+    got = b.parse_paste(text, "2026-10")
+    assert [(r["channel"], r["allocated"]) for r in got["rows"]] == [("Google", 3000.0), ("Meta", 900.0)]
+    assert got["skipped"] == [{"row": "Acme Dental", "reason": "Bing budget, not Google Ads or Meta Ads"}]
+
+
+def test_a_run_that_paced_a_meta_account_seeds_it_as_a_meta_row():
+    clients = [{"name": "Acme", "accounts": [{"name": "Acme Dental", "allocated": 3000}, {"name": "Acme Dental", "allocated": 900, "channel": "Meta"}]}]
+    assert [(r["account"], r["channel"]) for r in b.seed_from_run(clients)] == [("Acme Dental", "Google"), ("Acme Dental", "Meta")]

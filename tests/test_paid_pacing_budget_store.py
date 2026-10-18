@@ -74,3 +74,33 @@ def test_the_same_account_in_two_months_is_two_rows(pg):
 def test_the_same_account_under_two_clients_is_two_rows(pg):
     store.replace_month("2027-06", [r("Shared", "One"), r("Shared", "Two")], "ana@position2.com")
     assert [x["client"] for x in store.list_month("2027-06")] == ["One", "Two"]
+
+
+def test_a_google_row_and_a_meta_row_for_the_same_account_are_two_rows(pg):
+    store.replace_month("2027-01", [r(), r(channel="Meta", allocated=900)], "ana@position2.com")
+    got = store.list_month("2027-01")
+    assert sorted((x["channel"], x["allocated"]) for x in got) == [("Google", 3000.0), ("Meta", 900.0)]
+    store.save_row("2027-01", r(channel="Meta", allocated=1200), "ben@position2.com")                # changes the Meta row, not the Google one
+    assert sorted((x["channel"], x["allocated"]) for x in store.list_month("2027-01")) == [("Google", 3000.0), ("Meta", 1200.0)]
+    assert store.delete_row("2027-01", "Acme", "Acme Dental", "Meta") is True
+    assert [(x["channel"], x["allocated"]) for x in store.list_month("2027-01")] == [("Google", 3000.0)]
+
+
+def test_a_table_made_before_there_were_channels_gets_the_column_and_its_rows_are_google(pg):
+    from tracker import paid_store
+    conn = paid_store._connect()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("DROP TABLE pm_pacing_budgets")
+            cur.execute("CREATE TABLE pm_pacing_budgets (month TEXT NOT NULL, ckey TEXT NOT NULL, client TEXT NOT NULL, account TEXT NOT NULL, allocated NUMERIC NOT NULL, "
+                        "target_cpa NUMERIC, days_running TEXT NOT NULL DEFAULT '', status TEXT NOT NULL DEFAULT '', am TEXT NOT NULL DEFAULT '', updated_by TEXT, "
+                        "updated_at TIMESTAMPTZ NOT NULL DEFAULT now(), PRIMARY KEY (month, ckey))")
+            cur.execute("INSERT INTO pm_pacing_budgets (month, ckey, client, account, allocated) VALUES ('2026-09', 'old|row', 'Old', 'Row', 700)")
+        conn.commit()
+    finally:
+        conn.close()
+    store._READY = False
+    got = store.list_month("2026-09")
+    assert [(x["client"], x["account"], x["channel"]) for x in got] == [("Old", "Row", "Google")]
+    store.replace_month("2026-09", [r(channel="Meta")], "ana@position2.com")                          # and it takes a Meta row after the change
+    assert [x["channel"] for x in store.list_month("2026-09")] == ["Meta"]
