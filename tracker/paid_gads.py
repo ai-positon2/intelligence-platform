@@ -754,16 +754,20 @@ def split_days(parsed):
 
 def assemble_days(days, per_day):
     """The shape the page charts from, built from stored days: campaigns in the order first seen, rows
-    [campaign index, day index, <numbers>], and `missing`, the columns any of those days could not get from Google."""
+    [campaign index, day index, <numbers>], and `missing`, the columns any of those days could not get from Google. A campaign's name, status
+    and daily budget are the ones its newest stored day carries (a day read weeks ago must not say a paused campaign is enabled)."""
     camps, cidx, rows, missing = [], {}, [], set()
     for di, d in enumerate(days):
         entry = per_day[d]
         missing.update(entry.get("m") or [])
         for r in entry["r"]:
             cid = r[0]
+            now = {"id": cid, "name": r[1], "status": r[2], "type": r[3], "budget": r[4]}
             if cid not in cidx:
                 cidx[cid] = len(camps)
-                camps.append({"id": cid, "name": r[1], "status": r[2], "type": r[3], "budget": r[4]})
+                camps.append(now)
+            else:
+                camps[cidx[cid]] = now             # the days run oldest first: the newest one a campaign appears in says what it is now
             rows.append([cidx[cid], di] + r[5:])
     return {"start": days[0], "end": days[-1], "days": list(days), "campaigns": camps, "rows": rows, "missing": sorted(missing)}
 

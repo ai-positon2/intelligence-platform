@@ -463,3 +463,14 @@ def test_the_day_store_and_the_entries_work_on_a_real_postgres():
     out = g.campaign_days(paid_store, cid, "2026-01-05", "2026-01-06", http=google([]))
     again = g.campaign_days(paid_store, cid, "2026-01-05", "2026-01-06", http=lambda *a, **k: pytest.fail("went to Google"))
     assert out == again and end_to_end is not None
+
+
+def test_a_campaign_is_described_by_its_newest_stored_day_not_its_oldest():
+    """A day read weeks ago said ENABLED with a $100 budget; a day read since says PAUSED with $20: the page must show what it is now."""
+    cols = [10, 1, 5.0, 0, 0] + [0] * 12
+    per_day = {"2026-09-01": {"m": [], "r": [["1", "Old name", "ENABLED", "SEARCH", 100.0] + cols, ["2", "Other", "ENABLED", "SEARCH", 50.0] + cols]},
+               "2026-10-10": {"m": [], "r": [["1", "Brand", "PAUSED", "SEARCH", 20.0] + cols]}}
+    out = g.assemble_days(["2026-09-01", "2026-10-10"], per_day)
+    assert out["campaigns"] == [{"id": "1", "name": "Brand", "status": "PAUSED", "type": "SEARCH", "budget": 20.0},
+                                {"id": "2", "name": "Other", "status": "ENABLED", "type": "SEARCH", "budget": 50.0}]    # order is first seen, the facts are the newest
+    assert [r[:2] for r in out["rows"]] == [[0, 0], [1, 0], [0, 1]]
