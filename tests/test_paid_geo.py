@@ -433,14 +433,18 @@ def test_a_combined_account_must_be_one_google_and_one_meta_and_the_same_currenc
 
 def test_a_read_that_lost_a_part_is_shown_but_not_saved_for_the_next_ask(cache):
     """A place-name lookup that failed once must not leave "Place 1234" on the page for the day a closed range is kept."""
+    from tests.gads_fakes import FakeStore
+    store = FakeStore()
+
     def search(cid, q):
         return PLACES if "user_location_view" in q else TOTALS
 
     def broken(keys):
         raise gads.GadsError("api", "Google Ads answered 503: hiccup")
-    first = g.report_for("1234567890", "region", "2026-06-01", "2026-06-30", accounts_fn=lambda: [GOOGLE], groups_fn=lambda: [], search_fn=search, geo_fn=broken)
+    kw = dict(accounts_fn=lambda: [GOOGLE], groups_fn=lambda: [], search_fn=search, store=store)
+    first = g.report_for("1234567890", "region", "2026-06-01", "2026-06-30", geo_fn=broken, **kw)
     assert first["warnings"] and "Place names could not be looked up" in first["warnings"][0]
     g.clear_cache()
     base.forget("")                                                          # the minute in memory is gone; only what was saved is left
-    second = report(search)
+    second = g.report_for("1234567890", "region", "2026-06-01", "2026-06-30", geo_fn=geo_fn, **kw)
     assert second["warnings"] == [] and second["views"]["All"]["rows"][0]["label"] == "Maryland"
