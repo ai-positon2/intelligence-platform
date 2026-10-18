@@ -98,6 +98,8 @@ def days_running(text):
     words = re.findall(r"[a-z]+", s)
     if not words or any(w not in _DAYS for w in words):
         raise BadBudget("days running should look like \"Monday - Friday\" or \"Monday, Wednesday, Thursday\" (or be empty for every day), got %r" % str(text)[:40])
+    if "-" in s and len(words) != 2:                  # the engine reads the first range it finds and drops every other day named
+        raise BadBudget("days running is either a range (\"Monday - Friday\") or a list (\"Monday, Wednesday, Thursday\"), not both, got %r" % str(text)[:40])
     return re.sub(r"\s+", " ", str(text).strip())
 
 

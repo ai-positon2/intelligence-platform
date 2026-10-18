@@ -62,6 +62,12 @@ def test_days_running_in_the_forms_the_engine_reads(text, want):
     assert b.days_running(text) == want
 
 
+@pytest.mark.parametrize("text", ["Monday - Friday, Sunday", "Monday, Tuesday - Thursday", "Monday - Wednesday - Friday"])
+def test_a_range_mixed_with_other_days_is_refused_because_the_engine_would_drop_the_rest(text):
+    with pytest.raises(b.BadBudget, match="not both|either a range"):
+        b.days_running(text)
+
+
 def test_rows_are_checked_together_and_a_repeat_names_both_halves():
     assert len(b.check_rows([row(), row(account="B")])) == 2
     with pytest.raises(b.BadBudget, match="listed twice"):
