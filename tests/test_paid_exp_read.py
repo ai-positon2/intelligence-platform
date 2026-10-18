@@ -147,6 +147,12 @@ def test_an_experiment_with_no_arm_campaigns_is_listed_but_not_measured():
     assert out["arms"] == [] and out["measured"] is False and out["typeLabel"] == "Ad variations"
 
 
+@pytest.mark.parametrize("typ,label", [("OPTIMIZE_ASSETS", "Optimize assets"), ("ADOPT_AI_MAX", "Adopt AI Max"), ("ADOPT_BROAD_MATCH_KEYWORDS", "Adopt broad match keywords"),
+                                       ("PMAX_REPLACEMENT_SHOPPING", "Performance Max replacing Shopping")])
+def test_the_experiment_types_added_in_v24_have_a_plain_label(typ, label):
+    assert built(exp_row(1, typ=typ))[0]["typeLabel"] == label
+
+
 def test_an_experiment_that_has_not_started_is_not_measured():
     out = built(exp_row(1, start="2026-11-01", end="2026-11-30"), arms=[arm_row(1, "Base", True, 50, 11), arm_row(1, "Trial", False, 50, 22)], camps=[camp_row(11, "A"), camp_row(22, "B")])[0]
     assert out["window"] is None and out["measured"] is False

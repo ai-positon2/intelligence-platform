@@ -46,7 +46,8 @@ STATUSES = {"ENABLED": "running", "INITIATED": "running", "SETUP": "setting up",
 TYPES = {"SEARCH_CUSTOM": "Search custom", "DISPLAY_CUSTOM": "Display custom", "YOUTUBE_CUSTOM": "YouTube custom", "HOTEL_CUSTOM": "Hotel custom",
          "SEARCH_AUTOMATED_BIDDING_STRATEGY": "Search bidding strategy", "DISPLAY_AUTOMATED_BIDDING_STRATEGY": "Display bidding strategy",
          "SHOPPING_AUTOMATED_BIDDING_STRATEGY": "Shopping bidding strategy", "DISPLAY_AND_VIDEO_360": "Display and Video 360", "AD_VARIATION": "Ad variations",
-         "SMART_MATCHING": "Smart matching"}
+         "SMART_MATCHING": "Smart matching", "OPTIMIZE_ASSETS": "Optimize assets", "ADOPT_AI_MAX": "Adopt AI Max", "ADOPT_BROAD_MATCH_KEYWORDS": "Adopt broad match keywords",
+         "PMAX_REPLACEMENT_SHOPPING": "Performance Max replacing Shopping"}
 
 
 def _get(row, *path, default=None):
