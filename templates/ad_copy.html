@@ -1,0 +1,93 @@
+{% extends "_paid_base.html" %}
+{% block title %}Ad Copy and Creative Briefs{% endblock %}
+{% block head %}
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/campaign_book.css') }}?v=2">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/keyword_research.css') }}?v=1">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/ad_copy.css') }}?v=1">
+{% endblock %}
+{% block content %}
+<div class="pm pm-ac" id="cb">
+  <section class="pm-hero">
+    <div class="pm-hero-l">
+      <span class="pm-eyebrow"><span class="d"></span>Paid Marketing · Build and launch</span>
+      <h1 class="pm-title">Ad copy that fits the limits, <span class="pm-grad">and only says what the client can stand behind.</span></h1>
+      <p class="pm-sub">Say what the ads are for and pick the formats: Google Search, Performance Max, Demand Gen, Responsive Display, Meta feed, Meta Stories and Reels. It reads the
+        client's website and, if you give one, the Google Ads account, then Claude writes each format from <b>only that and the facts you confirmed</b>. <b>Every line is then checked
+        by rules, not by the AI</b>: the character limit, Google's and Meta's ad rules, repeats, competitor names, and any claim (a price, "free", years in business, a rating,
+        "best") that the evidence does not hold is marked <b>Confirm</b> instead of being let through. Formats with an image or a video come with a creative brief. Download Excel, CSV or PDF,
+        or the search ad as a file for Google Ads Editor.</p>
+    </div>
+  </section>
+
+  <div id="msg"></div>
+
+  <section class="pm-panel cb-builder" id="builder">
+    <div class="pm-panel-h"><span class="pm-panel-t">1. The client and what the ads are for</span><span class="pm-panel-s" id="builderNote">Only the name and what to promote are needed.</span></div>
+    <div class="cb-grid">
+      <label class="cb-f cb-w2"><span class="pd-dd-k">Client or business name *</span><input type="text" id="fName" maxlength="120" autocomplete="off" placeholder="Acme Dental"></label>
+      <label class="cb-f cb-w2"><span class="pd-dd-k">Website</span><input type="text" id="fSite" maxlength="300" autocomplete="off" placeholder="acmedental.com"><span class="cb-hint">Its pages are the evidence for what the copy may say.</span></label>
+      <div class="cb-f cb-w2"><div id="acctPick"></div><span class="cb-hint" id="acctHint">Optional. With an account, the copy uses the keywords that earn clicks and does not repeat the best ads it already runs.</span></div>
+      <label class="cb-f cb-w2"><span class="pd-dd-k">Industry</span><input type="text" id="fIndustry" maxlength="120" autocomplete="off" placeholder="Dental, SaaS, home services…"></label>
+      <label class="cb-f cb-w3"><span class="pd-dd-k">What the ads are for *</span><textarea id="fProduct" rows="2" maxlength="800" placeholder="Dental implants and Invisalign for adults in Austin, with a free consultation"></textarea><span class="cb-hint">The service, product or offer to promote. Be specific: it is what every line is about.</span></label>
+      <label class="cb-f cb-w2"><span class="pd-dd-k">Who it is for (optional)</span><textarea id="fAudience" rows="2" maxlength="600" placeholder="Adults 35 to 65 who have lost a tooth and want a permanent fix"></textarea></label>
+      <label class="cb-f cb-w2"><span class="pd-dd-k">Where it serves customers</span><input type="text" id="fPlaces" maxlength="500" autocomplete="off" placeholder="Austin, TX; Round Rock, TX"></label>
+      <div class="cb-f cb-w2"><span class="pd-dd-k">What the client wants from advertising</span><div class="pm-chips" id="goals" role="radiogroup" aria-label="Goal"></div></div>
+      <label class="cb-f cb-w2"><span class="pd-dd-k">Tone</span><select id="fTone"></select></label>
+      <label class="cb-f cb-w2"><span class="pd-dd-k">Language</span><input type="text" id="fLang" maxlength="40" autocomplete="off" value="English"></label>
+    </div>
+
+    <div class="pm-panel-h cb-h2"><span class="pm-panel-t">2. Where the ads will run</span><span class="pm-panel-s">Pick one or more. Each is written on its own, to its own limits.</span></div>
+    <div class="cb-cards" id="formats"></div>
+    <label class="ac-brief"><input type="checkbox" id="fBriefs" checked> <span>Write a creative brief for every format that needs an image or a video</span></label>
+
+    <div class="pm-panel-h cb-h2"><span class="pm-panel-t">3. The angles to try</span><span class="pm-panel-s" id="angleNote">Pick up to 5. Each line is labelled with its angle, so they can be tested against each other.</span></div>
+    <div class="pm-chips ac-angles" id="angles" role="group" aria-label="Angles"></div>
+
+    <div class="pm-panel-h cb-h2"><span class="pm-panel-t">4. What it may say</span><span class="pm-panel-s">The more you confirm here, the more the copy can say.</span></div>
+    <div class="cb-grid">
+      <label class="cb-f cb-w3"><span class="pd-dd-k">Facts you have confirmed with the client</span><textarea id="fFacts" rows="4" maxlength="1500" placeholder="Free consultation for new patients&#10;Financing from $89 a month&#10;Rated 4.9 stars from 312 reviews&#10;Serving Austin since 2009"></textarea>
+        <span class="cb-hint">One fact on each line: prices, offers, years in business, ratings, credentials. A price, a number, "free" or a guarantee in the copy is allowed only if it is here or on the website; anything else is marked Confirm.</span></label>
+      <label class="cb-f cb-w2"><span class="pd-dd-k">Keywords to work in (separate with commas)</span><input type="text" id="fKeywords" maxlength="600" autocomplete="off" placeholder="dental implants austin, invisalign cost"><span class="cb-hint">Used in Google headlines where they read naturally. The result says which were not used.</span></label>
+      <label class="cb-f cb-w2"><span class="pd-dd-k">Words and topics to stay away from</span><input type="text" id="fAvoid" maxlength="600" autocomplete="off" placeholder="cheap, dentures"><span class="cb-hint">Any line holding one of these is dropped.</span></label>
+      <label class="cb-f cb-w2"><span class="pd-dd-k">Competitors never to name (one per line or separated by commas)</span><textarea id="fComp" rows="2" maxlength="600" placeholder="Smile Austin"></textarea></label>
+      <label class="cb-f cb-w1"><span class="pd-dd-k">Campaign name, for the Editor file</span><input type="text" id="fCampaign" maxlength="80" autocomplete="off" placeholder="New campaign"></label>
+      <label class="cb-f cb-w1"><span class="pd-dd-k">Ad group name, for the Editor file</span><input type="text" id="fAdGroup" maxlength="80" autocomplete="off" placeholder="New ad group"></label>
+    </div>
+
+    <div class="pm-panel-h cb-h2"><span class="pm-panel-t">5. What to read first</span><span class="pm-panel-s">Click a card to turn it on or off.</span></div>
+    <div class="cb-cards" id="cards"></div>
+
+    <div class="cb-go">
+      <button class="pm-btn" id="goBtn" type="button">Write the copy</button>
+      <p class="cb-fine" id="goNote">It takes about a minute or two, and keeps going if you leave the page. It reads public pages and, if you chose an account, Google Ads. Nothing is created or changed in Google Ads or Meta.</p>
+    </div>
+  </section>
+
+  <section class="pm-panel cb-run" id="run" hidden>
+    <div class="pm-panel-h"><span class="pm-panel-t" id="runTitle">Writing</span><span class="pm-panel-s" id="runSub"></span></div>
+    <ol class="cb-steps" id="steps"></ol>
+    <div class="cb-go" id="runAct"></div>
+    <div class="cb-go"><button class="pm-btn-ghost" id="runBack" type="button">Back to the form</button></div>
+  </section>
+
+  <section id="result" hidden>
+    <div class="cb-rhead">
+      <div class="cb-rtitle"><h2 id="rName"></h2><p id="rMeta"></p></div>
+      <div class="cb-rbtns" id="rBtns"></div>
+    </div>
+    <div id="rNote"></div>
+    <div class="cb-tabs" id="tabs" role="tablist" aria-label="Parts of the result"></div>
+    <div id="tabBody"></div>
+  </section>
+
+  <section class="pm-panel" id="recentCard">
+    <div class="pm-panel-h"><span class="pm-panel-t">Saved ad copy</span><span class="pm-panel-s">Everyone on the team sees these. Open one to read it, copy lines, download it or write it again.</span></div>
+    <div id="recent"><p class="cb-fine">Loading…</p></div>
+  </section>
+  <p class="pd-foot">It only writes: nothing is created or changed in Google Ads or Meta, and it does not make images or video. A line marked Confirm states something the client's pages and your facts do not hold: confirm it with the client before it runs. Meta's lengths are the ones Meta recommends (it cuts text off after them); image and video sizes are the published ones and should be checked on the platform before a brief goes to a designer.</p>
+</div>
+{% endblock %}
+{% block scripts %}
+  <script src="{{ url_for('static', filename='js/pm_picker.js') }}?v=1"></script>
+  <script src="{{ url_for('static', filename='js/ad_copy.js') }}?v=1"></script>
+{% endblock %}

@@ -306,3 +306,49 @@ def test_a_new_build_is_saved_with_this_agents_own_steps(world, monkeypatch):
     monkeypatch.setattr(store, "create", spy)
     built(client_as(STAFF))
     assert [s["key"] for s in saved[0]["steps"]] == ["r:website", "r:account", "a:google_rsa", "a:meta_feed", "f:finish"] and saved[0]["inputs"]["kind"] == "adcopy"
+
+
+# ── the wiring ──────────────────────────────────────────────────────────────
+
+def test_the_page_renders_for_staff(world):
+    html = client_as(STAFF).get("/p2/paid-marketing/ad-copy").get_data(as_text=True)
+    assert "<title>Ad Copy and Creative Briefs" in html and "ad_copy.js" in html and "ad_copy.css" in html and "pm_picker.js" in html
+    for el in ('id="formats"', 'id="angles"', 'id="cards"', 'id="fProduct"', 'id="fFacts"', 'id="fBriefs"', 'id="fTone"', 'id="tabs"', 'id="tabBody"', 'id="recent"', 'id="goBtn"'):
+        assert el in html, el
+
+
+def test_every_element_the_script_looks_up_is_on_the_page(world):
+    import re
+    html = client_as(STAFF).get("/p2/paid-marketing/ad-copy").get_data(as_text=True)
+    js = open(os.path.join(ROOT, "static", "js", "ad_copy.js"), encoding="utf-8").read()
+    ids = set(re.findall(r'\$\("#([A-Za-z][\w-]*)"\)', js))
+    assert ids and all('id="%s"' % i in html for i in ids), [i for i in ids if 'id="%s"' % i not in html]
+
+
+def test_every_address_the_page_script_uses_is_a_route():
+    import re
+    js = open(os.path.join(ROOT, "static", "js", "ad_copy.js"), encoding="utf-8").read()
+    rules = {r.rule for r in appmod.app.url_map.iter_rules()}
+    used = set(re.findall(r'API\+"(/[a-z]+)"', js)) | {"/<sid>/status", "/<sid>/rebuild", "/<sid>/download"}
+    for path in used:
+        assert any(r.startswith("/p2/paid-marketing/api/adcopy") and r.endswith(path) for r in rules), path
+    assert "/p2/paid-marketing/api/segments/accounts" in rules and "/p2/paid-marketing/ad-copy" in rules
+
+
+def test_the_agent_is_on_the_paid_marketing_page_the_palette_and_the_hub_counts_it():
+    import re
+    root = os.path.join(ROOT, "templates")
+    for name in ("paid_marketing.html", "_paid_kpal.html"):
+        assert "/p2/paid-marketing/ad-copy" in open(os.path.join(root, name), encoding="utf-8").read(), name
+    page = open(os.path.join(root, "paid_marketing.html"), encoding="utf-8").read()
+    assert "c-adcopy" in page and "Ad Copy &amp; Creative Generator" in page
+    css = open(os.path.join(ROOT, "static", "css", "paid_marketing.css"), encoding="utf-8").read()
+    assert ".c-adcopy" in css
+    assert "Ad Copy" in open(os.path.join(root, "hub.html"), encoding="utf-8").read()
+    hub = re.sub(r"<!--.*?-->", "", open(os.path.join(root, "hub.html"), encoding="utf-8").read(), flags=re.S)
+    assert 'data-lxn="47"' in hub
+
+
+def test_the_knowledge_the_chat_agents_hold_describes_it():
+    src = open(os.path.join(ROOT, "app.py"), encoding="utf-8").read()
+    assert "Ad Copy & Creative Generator (/p2/paid-marketing/ad-copy)" in src and "marks it Confirm" in src

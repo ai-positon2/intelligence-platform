@@ -1286,6 +1286,13 @@ details.sq-fallback .sq-drops{margin-top:10px}
   --icon-glow:rgba(56,189,248,.5);--card-border:rgba(56,189,248,.35);
   --card-glow:0 0 40px rgba(56,189,248,.10);--arrow-color:#bae6fd}
 
+/* ═══ Ad Copy & Creative Generator card ═══ */
+.c-adcopy{--card-accent:#f472b6;
+  --band:linear-gradient(90deg,#f472b6,#fb923c,#fbbf24);
+  --thumb:linear-gradient(135deg,#1f0714 0%,#241008 100%);
+  --icon-glow:rgba(244,114,182,.5);--card-border:rgba(244,114,182,.35);
+  --card-glow:0 0 40px rgba(244,114,182,.10);--arrow-color:#fbcfe8}
+
 /* ═══ Account Audit card ═══ */
 .c-aud{--card-accent:#34d399;
   --band:linear-gradient(90deg,#34d399,#38bdf8,#818cf8);

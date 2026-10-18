@@ -1,0 +1,34 @@
+/* ═══ Ad Copy and Creative Briefs: copy that fits the limits and says only what the client can stand behind ═══
+   The layout is Strategy & Campaign Book's (css/campaign_book.css: the cb-* classes) and Keyword Research's tables (css/keyword_research.css); this file gives it its own accent
+   and the few parts only it has. */
+.pm.pm-ac{--pm-a:#f472b6;--pm-a2:#fb923c}
+[data-theme="light"] .pm.pm-ac{--pm-a:#be185d;--pm-a2:#c2410c}
+.ac-brief{display:flex;gap:10px;align-items:center;margin:14px 0 0;font-size:13px;color:var(--pm-ink2);cursor:pointer}
+.ac-brief input{width:18px;height:18px;accent-color:var(--pm-a)}
+.ac-angles .pm-chip{display:inline-flex;flex-direction:column;align-items:flex-start;gap:1px;text-align:left}
+.ac-angles .pm-chip small{font:500 11px 'Space Grotesk',sans-serif;color:var(--pm-muted);text-transform:none;letter-spacing:0}
+.ac-field{margin:0 0 20px}
+.ac-field:last-child{margin-bottom:0}
+.ac-fh{display:flex;justify-content:space-between;align-items:center;gap:10px 16px;flex-wrap:wrap;margin:0 0 8px}
+.ac-fh h4{margin:0;font:700 14px 'Space Grotesk',sans-serif;color:var(--pm-ink)}
+.ac-fh em{font-style:normal;font-weight:500;color:var(--pm-muted);font-size:12px;margin-left:8px}
+.ac-t{font-size:13.5px;line-height:1.5;color:var(--pm-ink);overflow-wrap:anywhere}
+.ac-c1{min-width:260px}
+.ac-nw{white-space:nowrap}
+.ac-meter{display:inline-flex;flex-direction:column;gap:3px;min-width:64px;font-variant-numeric:tabular-nums;font-size:12px;color:var(--pm-ink2)}
+.ac-meter i{display:block;height:4px;border-radius:99px;background:var(--pm-line2);overflow:hidden}
+.ac-meter i b{display:block;height:100%;background:var(--pm-a);border-radius:99px}
+.ac-meter.full i b{background:#fbbf24}
+.ac-claims{display:block;margin-top:4px;font-size:11.5px;color:#fbbf24}
+[data-theme="light"] .ac-claims{color:#b45309}
+.ac-copy{all:unset;box-sizing:border-box;cursor:pointer;padding:4px 10px;border-radius:99px;border:1px solid var(--pm-line2);font:600 11.5px 'Space Grotesk',sans-serif;color:var(--pm-ink2);white-space:nowrap}
+.ac-copy:hover{border-color:var(--pm-a);color:var(--pm-ink)}
+.ac-copy:focus-visible{outline:2px solid var(--pm-a);outline-offset:2px}
+.ac-meta{display:flex;gap:18px;flex-wrap:wrap;margin:10px 0 0;font-size:12.5px;color:var(--pm-ink2)}
+.ac-meta b{color:var(--pm-ink)}
+.ac-brief-card{margin:0 0 18px}
+.ac-brief-card h4{margin:0 0 8px;font:700 15px 'Space Grotesk',sans-serif;color:var(--pm-ink)}
+.ac-kv{display:grid;grid-template-columns:150px minmax(0,1fr);gap:6px 14px;margin:0 0 10px;font-size:13.5px;line-height:1.5}
+.ac-kv dt{color:var(--pm-muted);font-weight:600}
+.ac-kv dd{margin:0;color:var(--pm-ink);overflow-wrap:anywhere}
+@media (max-width:700px){.ac-kv{grid-template-columns:minmax(0,1fr)}}
