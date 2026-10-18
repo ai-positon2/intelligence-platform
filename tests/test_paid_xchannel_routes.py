@@ -151,8 +151,11 @@ def test_the_agent_is_on_the_paid_marketing_page_the_palette_and_the_hub_counts_
     page = open(os.path.join(root, "paid_marketing.html"), encoding="utf-8").read()
     assert "c-xch" in page and "Cross-Channel &amp; Attribution Analysis" in page
     assert ".c-xch" in open(os.path.join(ROOT, "static", "css", "paid_marketing.css"), encoding="utf-8").read()
-    hub = re.sub(r"<!--.*?-->", "", open(os.path.join(root, "hub.html"), encoding="utf-8").read(), flags=re.S)
-    assert 'data-lxn="48"' in hub and "<span>21</span> dashboards" in hub and "Google and Meta compared side by side" in hub
+    from tests import hidden_paid
+    hub = re.sub(r"<!--.*?-->", "", hidden_paid.rendered("/p2/hub"), flags=re.S)
+    shown = "cross-channel" not in hidden_paid.hidden()
+    assert ("Google and Meta compared side by side" in hub) == shown
+    assert ('data-lxn="%d"' % (48 - len(hidden_paid.hidden()))) in hub and ("<span>%d</span> dashboards" % (21 - len(hidden_paid.hidden()))) in hub
 
 
 def test_the_stylesheet_and_the_scripts_are_served():

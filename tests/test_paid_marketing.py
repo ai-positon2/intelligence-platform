@@ -416,10 +416,11 @@ def test_only_admins_connect_and_the_callback_checks_state(monkeypatch):
 
 
 def test_hub_paid_card_counts_match_the_section_page():
-    hub = re.sub(r"<!--.*?-->", "", open(os.path.join(ROOT, "templates", "hub.html")).read(), flags=re.S)
+    from tests import hidden_paid
+    hub = re.sub(r"<!--.*?-->", "", hidden_paid.rendered("/p2/hub"), flags=re.S)
     block = hub.split('href="/p2/paid-marketing"', 1)[1].split("</a>", 1)[0]
     stats = dict((label, int(n)) for n, label in re.findall(r'class="card-stat"><span>(\d+)</span>\s*(\w+)', block))
-    page = re.sub(r"<!--.*?-->", "", open(os.path.join(ROOT, "templates", "paid_marketing.html")).read(), flags=re.S)
+    page = re.sub(r"<!--.*?-->", "", hidden_paid.visible(open(os.path.join(ROOT, "templates", "paid_marketing.html")).read()), flags=re.S)
     cards = re.findall(r'class="dash-card (\w+)', page)
     assert stats == {"dashboards": len(cards), "live": cards.count("active")}
     order = [m.group(1) for m in re.finditer(r'<a href="(/p2/[a-z-]+)" class="hub-card', hub)]

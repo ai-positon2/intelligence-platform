@@ -23,12 +23,12 @@
     {t:'Asset Coverage Audit',d:'What every campaign is missing, and what to add',u:'/p2/paid-marketing/asset-coverage',i:'▦'},
     {t:'Strategy & Campaign Book',d:'Researches a client, writes the strategy and each campaign book',u:'/p2/paid-marketing/campaign-book',i:'✎'},
     {t:'Business Research',d:'The picture of a client\'s business before any audit or strategy',u:'/p2/paid-marketing/business-research',i:'⌂'},
-    {t:'Keyword Research',d:'The searches an account is not bidding on yet',u:'/p2/paid-marketing/keyword-research',i:'⌕'},
-    {t:'Ad Copy & Creative Generator',d:'Ad copy within the limits and the rules, and creative briefs',u:'/p2/paid-marketing/ad-copy',i:'✐'},
-    {t:'Cross-Channel & Attribution Analysis',d:'Google and Meta side by side, and whether their numbers add up',u:'/p2/paid-marketing/cross-channel',i:'◎'},
+    {% if 'keyword-research' not in paid_hidden %}    {t:'Keyword Research',d:'The searches an account is not bidding on yet',u:'/p2/paid-marketing/keyword-research',i:'⌕'},{% endif %}
+    {% if 'ad-copy' not in paid_hidden %}    {t:'Ad Copy & Creative Generator',d:'Ad copy within the limits and the rules, and creative briefs',u:'/p2/paid-marketing/ad-copy',i:'✐'},{% endif %}
+    {% if 'cross-channel' not in paid_hidden %}    {t:'Cross-Channel & Attribution Analysis',d:'Google and Meta side by side, and whether their numbers add up',u:'/p2/paid-marketing/cross-channel',i:'◎'},{% endif %}
     {t:'Account Audit',d:'Is the account set up to win: settings, tracking, structure, ads',u:'/p2/paid-marketing/account-audit',i:'✔'},
-    {t:'Landing Page & Relevancy Check',d:'Does each landing page keep the promise the ad made',u:'/p2/paid-marketing/landing-page-check',i:'▤'},
-    {t:'Test & Experiment Tracker',d:'Which tests have a result, and what to do about each',u:'/p2/paid-marketing/experiment-tracker',i:'⚗'},
+    {% if 'landing-page-check' not in paid_hidden %}    {t:'Landing Page & Relevancy Check',d:'Does each landing page keep the promise the ad made',u:'/p2/paid-marketing/landing-page-check',i:'▤'},{% endif %}
+    {% if 'experiment-tracker' not in paid_hidden %}    {t:'Test & Experiment Tracker',d:'Which tests have a result, and what to do about each',u:'/p2/paid-marketing/experiment-tracker',i:'⚗'},{% endif %}
     {t:'QA Agent',d:'Campaign launch QC checklist',u:'/p2/paid-marketing/qa-agent',i:'✓'}
   ];
   var ITEMS=(window.__KP_ITEMS||[]).concat(BASE);

@@ -3191,7 +3191,7 @@ def _inject_app_agents():
     _u = _get_user() or {}
     _is_admin = (_u.get("email", "").lower() in ADMIN_EMAILS)
     return {"app_agents": _visible_app_agents(), "google_client_id": GOOGLE_CLIENT_ID,
-            "is_admin": _is_admin}
+            "is_admin": _is_admin, "paid_hidden": PAID_HIDDEN_SLUGS}
 
 @app.route("/app")
 @login_required
@@ -20719,6 +20719,44 @@ def _cap_rows(lines: list, key: str) -> tuple:
 # with CONTEXT_FOR_NEW_CHAT_V17.md when that doc changes; it is intentionally short
 # (cheap to inject on every request) and internal-only (this prompt only reaches
 # @position2_required routes).
+# Paid Marketing agents withdrawn from the listings (2026-10-18, on the owner's
+# word, to be brought back on their word). Slug -> the title the assistant text
+# and the cards use. Unlisted, not gone: the pages, APIs, tests and saved
+# results all still work, so a bookmark keeps working. To RESTORE, empty this
+# dict; every card, command-palette entry, hub count and assistant paragraph
+# below follows it. The hand-written hub card text is the one thing that does not
+# (see the HIDDEN-PAID note in templates/hub.html).
+PAID_HIDDEN_AGENTS = {
+    "experiment-tracker": "Test & Experiment Tracker",
+    "ad-copy": "Ad Copy & Creative Generator",
+    "landing-page-check": "Landing Page & Relevancy Check",
+    "cross-channel": "Cross-Channel & Attribution Analysis",
+    "keyword-research": "Keyword Research",
+}
+PAID_HIDDEN_SLUGS = frozenset(PAID_HIDDEN_AGENTS)
+PAID_AGENT_TOTAL = 21  # Paid Marketing agents built, hidden ones included
+
+
+def _without_hidden_paid(text):
+    """Drop the paragraph of every hidden Paid Marketing agent from the
+    assistant's platform knowledge, so it does not describe a page the
+    owner has withdrawn. An entry runs from "Title (/p2/paid-marketing/slug):"
+    to the next entry's title or the end of its line."""
+    starts = re.compile(r"(?<![A-Za-z])([A-Z][A-Za-z&+ \-]{3,50}) \(/p2/paid-marketing/")
+    for slug, title in PAID_HIDDEN_AGENTS.items():
+        head = "%s (/p2/paid-marketing/%s)" % (title, slug)
+        i = text.find(head)
+        if i < 0:
+            continue
+        j = text.find("\n", i)
+        j = len(text) if j < 0 else j
+        m = starts.search(text, i + len(head))
+        if m and m.start() < j:
+            j = m.start()
+        text = text[:i] + text[j:]
+    return text
+
+
 _VIMI_PLATFORM_KNOWLEDGE = """=== ABOUT THIS PLATFORM (ground truth for questions about the platform itself) ===
 Intelligence by Position2 (intelligence.position2.com) is Position2's internal B2B revenue-intelligence
 platform. Position2 is a B2B digital-marketing agency (SEO/organic growth, paid media, paid social,
@@ -20814,6 +20852,7 @@ Ground rule: answer questions about how a platform feature/number/term works fro
 and without guessing. If something asked is genuinely outside both this and the LIVE DATA section, say so
 plainly rather than inventing an answer, and use web search for public information neither one covers.
 """
+_VIMI_PLATFORM_KNOWLEDGE = _without_hidden_paid(_VIMI_PLATFORM_KNOWLEDGE)
 
 
 def _build_ppc_context() -> str:

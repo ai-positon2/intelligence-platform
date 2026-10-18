@@ -104,6 +104,7 @@
            Agent Holmes, plus the Performance Summarizer, Segment Analysis, Product Analysis, QA Agent, Geo Performance, Seasonality Analysis, Call Transcript Analyzer, Ad Strength Analysis, Audience Segment Analysis, Asset Coverage Audit, Strategy &amp; Campaign Book, Business Research, Keyword Research, Account Audit, Landing Page &amp; Relevancy Check, Test &amp; Experiment Tracker, Ad Copy &amp; Creative Generator and Cross-Channel &amp; Attribution Analysis). Sits between the other two on purpose. Its counts are
            the cards on /p2/paid-marketing; tests/test_hub_card_counts.py
            checks they agree. -->
+      {# HIDDEN-PAID (2026-10-18): the paid dashboard counts below (21) and the band (48) are minus PAID_HIDDEN_AGENTS in app.py, and the card text drops the ad copy and Google-and-Meta clauses when those agents are hidden. RESTORE = empty that dict in app.py; nothing here needs editing. #}
       <a href="/p2/paid-marketing" class="hub-card card-paid">
         <div class="card-preview">
           <div class="card-preview-icon"><svg class="au-ic" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M3 20h18"/><path d="M6 16v-4"/><path d="M11 16V8"/><path d="M16 16v-6"/><path d="M4 9l5-4 4 3 7-5"/></svg></div>
@@ -119,13 +120,13 @@
             moves to make today, search-term triage with priority negatives and keywords,
             segment analysis of any Google Ads account with the insights to act on, a
             product-by-product read of which items earn their ecommerce ad spend, a launch
-            QC checklist with a ready-to-launch verdict, ad copy checked against the platforms' limits and rules, Google and Meta compared side by side with a check on whether their numbers add up, and a client feedback chat over
+            QC checklist with a ready-to-launch verdict,{% if 'ad-copy' not in paid_hidden %} ad copy checked against the platforms' limits and rules,{% endif %}{% if 'cross-channel' not in paid_hidden %} Google and Meta compared side by side with a check on whether their numbers add up,{% endif %} and a client feedback chat over
             Slack, Gmail and meeting transcripts.
           </div>
           <div class="card-footer">
             <div class="card-meta">
-              <div class="card-stat"><span>21</span> dashboards</div>
-              <div class="card-stat"><span>21</span> live</div>
+              <div class="card-stat"><span>{{ 21 - paid_hidden|length }}</span> dashboards</div>
+              <div class="card-stat"><span>{{ 21 - paid_hidden|length }}</span> live</div>
             </div>
             <div class="card-cta">Open <span class="card-arrow">→</span></div>
           </div>
@@ -180,7 +181,7 @@
            added 2026-08-31), 25 before that, 24 before Social Media
            Intelligence, 23 before the Slot Checker, and 22 before LinkedIn
            Strategy Researcher. #}
-        <div><b data-lxn="48">0</b><span>dashboards</span></div>
+        <div><b data-lxn="{{ 48 - paid_hidden|length }}">0</b><span>dashboards</span></div>
         <div><b class="grad-k">Vimi</b><span>ai on every page</span></div>
       </div>
     </section>

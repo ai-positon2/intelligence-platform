@@ -214,7 +214,8 @@ def test_the_hub_band_dashboard_total_matches_the_live_cards(hub_card, dashboard
     import app as appmod
     # Plus the live cards on /p2/paid-marketing (the third workspace, 2026-10-12).
     with open(os.path.join(_ROOT, "templates", "paid_marketing.html")) as fh:
-        paid = re.findall(r'class="dash-card active ', _strip_comments(fh.read()))
+        from tests import hidden_paid
+        paid = re.findall(r'class="dash-card active ', _strip_comments(hidden_paid.visible(fh.read())))
     expected = len(dashboard_cards["live"]) + len(paid) + len(appmod._seo_tools())
     assert _hub_band()["dashboards"] == expected, (
         "band says %d dashboards, live cards total %d"

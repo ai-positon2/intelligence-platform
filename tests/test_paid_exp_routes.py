@@ -84,16 +84,18 @@ def _cards(html):
 
 def test_the_card_is_on_the_paid_marketing_page_and_the_command_palette_lists_it():
     paid = client_as(STAFF).get("/p2/paid-marketing").get_data(as_text=True)
-    assert 'href="/p2/paid-marketing/experiment-tracker"' in paid and "c-ex" in paid
+    from tests import hidden_paid
+    assert ('href="/p2/paid-marketing/experiment-tracker"' in paid) == ("experiment-tracker" not in hidden_paid.hidden())
     for name in ("templates/_paid_kpal.html", "templates/paid_marketing.html"):
         assert "/p2/paid-marketing/experiment-tracker" in _read(name), name
     assert ".c-ex{" in _read("static/css/paid_marketing.css")
 
 
 def test_the_hub_counts_every_live_paid_marketing_card_and_the_whole_platform():
-    paid_live = sum(1 for c in _cards(_read("templates/paid_marketing.html")) if c.split()[0] == "active")
+    from tests import hidden_paid
+    paid_live = sum(1 for c in _cards(hidden_paid.visible(_read("templates/paid_marketing.html"))) if c.split()[0] == "active")
     strategic_live = sum(1 for c in _cards(_read("templates/b2b_agents.html")) if c.split()[0] == "active")
-    hub = _read("templates/hub.html")
+    hub = hidden_paid.rendered("/p2/hub")
     assert '<div class="card-stat"><span>%d</span> dashboards</div>' % paid_live in hub and '<div class="card-stat"><span>%d</span> live</div>' % paid_live in hub
     assert 'data-lxn="%d"' % (strategic_live + paid_live + 16) in hub                           # 16 SEO and AEO tools beside the two workspaces
 

@@ -608,6 +608,9 @@ Route `/p2/b2b-agents/linkedin-intelligence`. Renders `templates/linkedin_scrape
 
 ## PAID MARKETING AGENTS (the third hub section, `/p2/paid-marketing`, 21 agents, built 2026-10-12 to 2026-10-18)
 
+**HIDDEN FROM THE LISTINGS (2026-10-18, on the owner's word, to be restored on their word):** Keyword Research, Ad Copy & Creative Generator, Cross-Channel & Attribution Analysis, Landing Page & Relevancy Check and Test & Experiment Tracker. One switch: `PAID_HIDDEN_AGENTS` in `app.py`. While it holds them, their cards (`templates/paid_marketing.html`), their command-palette entries (that file and `templates/_paid_kpal.html`), the hub counts (21 dashboards and 48 in the band become 16 and 43) and the hub card clauses for ad copy and Google-and-Meta, and their paragraphs in the assistant's platform knowledge are all dropped. Unlisted, not gone: the pages, APIs and saved results still answer. **To restore, empty `PAID_HIDDEN_AGENTS`** (then `PAID_HIDDEN_SLUGS` is empty too); nothing else needs editing. `tests/test_paid_hidden.py` holds both states, and `tests/hidden_paid.py` is the helper the listing tests use. The 21-agent counts elsewhere in this file describe what is built, not what is listed.
+
+
 The PPC team's tools. The first three were ported on 2026-10-12 from the old Agent Holmes Node service (`github.com/ai-positon2/Agent_Holmes`, which ran with no sign-in); the other sixteen were built here. Everything is Python/Flask behind `@position2_required`, with its data in Postgres `pm_*` tables.
 
 ### Gate model (all in one contiguous block of `app.py`, from the comment `# ── Paid Marketing Agents` to just before `/p2/strategic-agents/ad-intelligence`)

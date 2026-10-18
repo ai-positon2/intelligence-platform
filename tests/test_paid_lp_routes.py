@@ -124,7 +124,8 @@ def test_the_page_opens_for_staff_and_is_closed_to_everyone_else():
 
 def test_the_card_is_on_the_paid_marketing_page_the_hub_counts_it_and_the_command_palette_lists_it():
     paid = client_as(STAFF).get("/p2/paid-marketing").get_data(as_text=True)
-    assert 'href="/p2/paid-marketing/landing-page-check"' in paid and "c-lp" in paid
+    from tests import hidden_paid
+    assert ('href="/p2/paid-marketing/landing-page-check"' in paid) == ("landing-page-check" not in hidden_paid.hidden())
     from tracker import paid_lp_docs
     assert paid_lp_docs.markdown()                                           # the checklist document builds
     import os
