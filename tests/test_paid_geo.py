@@ -448,3 +448,17 @@ def test_a_read_that_lost_a_part_is_shown_but_not_saved_for_the_next_ask(cache):
     base.forget("")                                                          # the minute in memory is gone; only what was saved is left
     second = g.report_for("1234567890", "region", "2026-06-01", "2026-06-30", geo_fn=geo_fn, **kw)
     assert second["warnings"] == [] and second["views"]["All"]["rows"][0]["label"] == "Maryland"
+
+
+def test_the_report_says_when_the_platform_was_read_not_when_the_page_was_built():
+    old = dict(raw_google(), readAt="2026-06-30T10:00:00+00:00")
+    assert g.assemble(old, GOOGLE, START, END)["generatedAt"] == "2026-06-30T10:00:00+00:00"
+    assert g.assemble(raw_google(), GOOGLE, START, END)["generatedAt"]                      # a read saved before this was kept has no stamp: it is dated now
+    a, b = dict(raw_google(), readAt="2026-06-30T10:00:00+00:00"), dict(raw_google(), readAt="2026-06-29T08:00:00+00:00")
+    assert g.merge_raw(a, dict(b, platform="meta"))["readAt"] == "2026-06-29T08:00:00+00:00"       # two halves: the older read
+
+
+def test_a_fresh_read_is_stamped_with_the_time_it_was_made(cache):
+    from tests.gads_fakes import FakeStore
+    raw = g._cached("geo", "1234567890", "region", START, END, lambda: {"places": {}, "warnings": []}, force=False, store=FakeStore(), now=None)[0]
+    assert raw["readAt"].startswith("20")

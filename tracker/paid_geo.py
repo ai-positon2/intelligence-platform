@@ -348,7 +348,7 @@ def merge_raw(g, m):
             add(totals.setdefault(t, zero()), v)
     return {"platform": "both", "level": g["level"], "places": places, "totals": totals,
             "warnings": list(g["warnings"]) + list(m["warnings"]), "timeZones": sorted(set(g["timeZones"]) | set(m["timeZones"])),
-            "members": g.get("members") or []}
+            "members": g.get("members") or [], "readAt": min(filter(None, (g.get("readAt"), m.get("readAt"))), default=None)}
 
 
 # ── Assembling a report from a raw read ─────────────────────────────────────
@@ -399,7 +399,7 @@ def assemble(raw, account, start, end):
         "range": {"from": start.isoformat(), "to": end.isoformat(), "days": (end - start).days + 1},
         "level": raw["level"], "levels": [{"key": k, "label": l} for k, l in levels_for(platform)],
         "types": types, "views": views, "warnings": raw.get("warnings") or [], "timeZones": raw.get("timeZones") or [],
-        "generatedAt": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"),
+        "generatedAt": raw.get("readAt") or dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"),         # when the numbers were read, not when this page was built
     }
 
 
@@ -447,7 +447,7 @@ def _cached(kind, key_id, level, s, e, build, *, force, store, now):
                     _cache[key] = (clock, saved[0])
                 return saved[0], None
         try:
-            raw = build()
+            raw = dict(build(), readAt=dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"))      # when the platform was asked, kept with the read
         except gads.GadsError as err:
             old = base._saved_copy(store, pkey) if err.kind == "quota" else None
             if old is None:

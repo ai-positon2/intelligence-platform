@@ -351,7 +351,7 @@ def assemble(raw, account, start, end):
         "kinds": [{"key": k, "label": l, "count": sum(1 for r in views[ALL]["rows"] if r["kind"] == k)} for k, l in KINDS],
         "kindTotals": insights.kind_totals(views[ALL]),
         "types": types, "views": views, "lists": lists, "exclusions": raw["exclusions"], "warnings": raw.get("warnings") or [],
-        "generatedAt": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"),
+        "generatedAt": raw.get("readAt") or dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"),         # when the numbers were read, not when this page was built
     }
     report["views"][ALL]["insights"] = insights.report_insights(report, views[ALL])
     return report

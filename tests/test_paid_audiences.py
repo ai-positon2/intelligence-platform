@@ -452,3 +452,25 @@ def test_a_bid_modifier_is_read_as_the_multiplier_it_is():
     rows = [ag_row("USER_LIST", "10", bid=1.25), ag_row("USER_LIST", "11", bid=0.8), ag_row("USER_LIST", "12", bid=1.0), ag_row("USER_LIST", "13")]
     out = a.read_uses(rows, "ad_group", {}, {})
     assert [u["bid"] for u in out] == [0.25, -0.2, None, None]
+
+
+def test_a_saved_read_is_dated_when_it_was_read_not_when_it_was_shown_again(monkeypatch):
+    """The page says "read from Google Ads ..." and the Claude summary is kept per read: a read made at 10:00 and shown again at 18:00 is still the 10:00 read."""
+    import types
+    from tests.gads_fakes import FakeStore
+    box = {"t": dt.datetime(2026, 6, 30, 10, 0, tzinfo=dt.timezone.utc)}
+
+    class Clock(dt.datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return box["t"]
+    clock = types.SimpleNamespace(datetime=Clock, timezone=dt.timezone, timedelta=dt.timedelta, date=dt.date)
+    monkeypatch.setattr(paid_geo, "dt", clock)
+    monkeypatch.setattr(a, "dt", clock)
+    store = FakeStore()
+    first = report(store=store)
+    assert first["generatedAt"] == "2026-06-30T10:00:00+00:00"
+    box["t"] = dt.datetime(2026, 6, 30, 18, 0, tzinfo=dt.timezone.utc)
+    paid_geo.clear_cache()
+    base.forget("")                                           # the minute in memory is gone; the read saved in the store is what answers
+    assert report(store=store)["generatedAt"] == "2026-06-30T10:00:00+00:00"
