@@ -18,7 +18,6 @@ from __future__ import annotations
 
 import datetime as dt
 import logging
-import re
 import threading
 
 from . import paid_gads as base
@@ -33,13 +32,12 @@ from . import paid_lp_page as lp_page
 from . import paid_lp_read as lp_read
 from . import paid_lp_speed as lp_speed
 from . import paid_segments as seg
+from .paid_accounts import NAMES, targets as _targets_of
 
 BadRequest = seg.BadRequest
 
 log = logging.getLogger(__name__)
 
-ID_RE = re.compile(r"^\d{10}$")
-COMBO_RE = re.compile(r"^(\d{10})\+(act_\d{4,20})$")
 MAX_PAGES = 40                                     # fetched and checked per account, the ones that spent most
 MIN_JUDGED = 10                                    # checks a page needs judged (not "could not check") before it counts towards the account's score
 CACHE_VERSION = "3"                                # bump when the shape of a saved read changes
@@ -70,25 +68,6 @@ NOTES = [
 FINDING_KEYS = ("id", "result", "severity", "found", "items", "count", "caps", "detail")
 
 
-def parse_account(raw):
-    """{google: id or None, meta: act id or None} from "<google id>", "act_..." or "<google id>+<act_...>"."""
-    raw = str(raw or "").strip()
-    m = COMBO_RE.match(raw)
-    if m:
-        return {"google": m.group(1), "meta": m.group(2)}
-    if ID_RE.match(raw):
-        return {"google": raw, "meta": None}
-    from . import paid_meta
-    if paid_meta.is_meta(raw):
-        return {"google": None, "meta": raw}
-    raise BadRequest("account should be a 10-digit Google Ads customer id, a Meta ad account id (act_...) or both joined by +")
-
-
-def account_key(ids):
-    """The one string a read of this account is filed under: "<google id>", "act_..." or "<google id>+<act_...>"."""
-    return "+".join(x for x in (ids["google"], ids["meta"]) if x)
-
-
 # ── Reading ─────────────────────────────────────────────────────────────────
 
 def _read_google(target, *, search_fn, keep):
@@ -102,9 +81,6 @@ def _read_meta(target, *, store, pages_fn, now, keep):
         return lp_meta.read_account(target["id"], pages=pages_fn, now=now, keep=keep)
     except paid_meta.AdsError as e:
         raise gads.translate(e) from e
-
-
-NAMES = {"google": "Google Ads", "meta": "Meta Ads"}
 
 
 def raw_read(targets, *, search_fn=None, fetcher=None, now=None, max_pages=MAX_PAGES, store=None, meta_pages=None):
@@ -359,26 +335,9 @@ def _unread(read):
     return out + ["%s: the whole account" % NAMES[f["platform"]] for f in read.get("failed") or []]
 
 
-def _targets(account, *, store, accounts_fn):
-    """(account key, [{platform, id, name, currency}]) for the account named: its Google Ads account and its Meta ad account, resolved against what the connections can read. Raises
-    BadRequest for one that cannot be read or for a pair that bills in two currencies (their spend would be added)."""
-    ids = parse_account(account)
-    targets = []
-    if ids["google"]:
-        g = seg.resolve_target(ids["google"], accounts_fn=accounts_fn, groups_fn=lambda: [])
-        targets.append({"platform": "google", "id": g["id"], "name": g["name"], "currency": g.get("currency") or ""})
-    if ids["meta"]:
-        m = seg._meta_target(ids["meta"], store)
-        targets.append({"platform": "meta", "id": m["id"], "name": m["name"], "currency": m.get("currency") or ""})
-    if len(targets) == 2 and targets[0]["currency"] and targets[1]["currency"] and targets[0]["currency"] != targets[1]["currency"]:
-        raise BadRequest("A Google Ads account and a Meta ad account are read together only when they bill in the same currency (%s and %s here), because their spend is added." % (
-            targets[0]["currency"], targets[1]["currency"]))
-    return account_key(ids), targets
-
-
 def _raw_for(account, *, force, store, accounts_fn, search_fn, fetcher, now, max_pages, meta_pages):
     """(account key, raw read, saved-at of an old copy or None)."""
-    key, targets = _targets(account, store=store, accounts_fn=accounts_fn)
+    key, targets = _targets_of(account, store=store, accounts_fn=accounts_fn)
     raw, old = _cached(key, lambda: raw_read(targets, search_fn=search_fn, fetcher=fetcher, now=now, max_pages=max_pages, store=store, meta_pages=meta_pages),
                        force=force, store=store)
     return key, raw, old

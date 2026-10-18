@@ -95,22 +95,6 @@ def run(account=ACCOUNT_ID, **kw):
 
 # ── Naming the account ──────────────────────────────────────────────────────
 
-def test_an_account_is_a_google_ads_id_a_meta_ad_account_or_both_joined_by_a_plus():
-    assert lp.parse_account(" 1112223334 ") == {"google": "1112223334", "meta": None}
-    assert lp.parse_account("act_1234567890") == {"google": None, "meta": "act_1234567890"}
-    assert lp.parse_account("1112223334+act_1234567890") == {"google": "1112223334", "meta": "act_1234567890"}
-    for bad in ("", None, "123", "abc", "11122233345", "act_12", "1112223334+", "+act_1234567890", "1112223334+1112223334", "act_1234567890+1112223334", "1112223334 + act_1234567890",
-                "x1112223334+act_1234567890", "1112223334+act_1234567890x", "1112223334+act_1234567890+1112223334", "ACT_1234567890"):
-        with pytest.raises(lp.BadRequest):
-            lp.parse_account(bad)
-
-
-def test_the_account_key_is_the_one_string_a_read_is_filed_under():
-    assert lp.account_key({"google": "1112223334", "meta": None}) == "1112223334"
-    assert lp.account_key({"google": None, "meta": "act_1234567890"}) == "act_1234567890"
-    assert lp.account_key({"google": "1112223334", "meta": "act_1234567890"}) == "1112223334+act_1234567890"
-
-
 def test_an_account_the_platform_cannot_read_is_a_bad_request():
     with pytest.raises(lp.BadRequest):
         run(account="9998887776")
