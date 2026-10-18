@@ -250,8 +250,10 @@ def forecast(inputs, research):
     if tot.get("clicks", 0) >= 100 and tot.get("cpc"):
         cpc, cpc_src = float(tot["cpc"]), "the account's own average over the last 90 days (%d clicks)" % tot["clicks"]
     else:
-        mids = sorted((i["lowBid"] + i["highBid"]) / 2 for i in (((research or {}).get("keywords") or {}).get("data") or {}).get("ideas", [])[:40]
-                      if i.get("lowBid") and i.get("highBid"))
+        kw = ((research or {}).get("keywords") or {}).get("data") or {}
+        # Planner's bids come back in the currency of the account that asked: against a budget in another currency they would be the wrong size, so they are not used.
+        same = not kw.get("bidCurrency") or kw["bidCurrency"] == (inputs.get("currency") or "USD")
+        mids = sorted((i["lowBid"] + i["highBid"]) / 2 for i in kw.get("ideas", [])[:40] if i.get("lowBid") and i.get("highBid")) if same else []
         if mids:
             cpc, cpc_src = round(mids[len(mids) // 2], 2), "the middle of Keyword Planner's top-of-page bid ranges for the %d biggest ideas" % len(mids)
     if tot.get("clicks", 0) >= 200 and tot.get("conv", 0) >= 5 and tot.get("cvr"):

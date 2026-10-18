@@ -193,7 +193,8 @@ class Build:
             self.piece("keywords", lambda: rs.read_keywords(
                 inp, post=d["post"], planner_account=d.get("planner_account"), website_piece=self.research.get("website"),
                 history_piece=self.research.get("history"), competitor_piece=self.research.get("competitors"),
-                currency=((self.research.get("history") or {}).get("data") or {}).get("account", {}).get("currency") or inp.get("currency")))
+                currency=((self.research.get("history") or {}).get("data") or {}).get("account", {}).get("currency") or inp.get("currency"),
+                planner_currency=d.get("planner_currency")))
 
     def start_social(self):
         """Find or start the Social Media Intelligence run first, so it works while everything else is read. Returns (run id, reused) or None."""

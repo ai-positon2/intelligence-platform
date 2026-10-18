@@ -107,6 +107,17 @@ def test_without_history_cost_per_click_comes_from_planner_and_the_rate_is_an_as
     assert fc["scenarios"][1]["cpc"] == 6.0 and fc["scenarios"][1]["cvr"] == 5.0 and "Keyword Planner" in fc["cpcFrom"] and "assumption" in fc["cvrFrom"]
 
 
+def test_planner_bids_in_another_currency_than_the_budget_are_not_used_for_the_forecast():
+    """With no account chosen Planner is asked through Position2's first account, whose bids come back in ITS currency: divided into a budget in dollars they are the wrong size."""
+    ideas = [{"lowBid": 2.0, "highBid": 4.0}, {"lowBid": 4.0, "highBid": 8.0}, {"lowBid": 6.0, "highBid": 10.0}]
+    other = {"keywords": {"data": {"ideas": ideas, "bidCurrency": "INR"}}}
+    assert ai.forecast(inputs(budget="3000", goal="calls", currency="USD"), other) is None
+    same = {"keywords": {"data": {"ideas": ideas, "bidCurrency": "USD"}}}
+    assert ai.forecast(inputs(budget="3000", goal="calls", currency="USD"), same)["scenarios"][1]["cpc"] == 6.0
+    assert ai.forecast(inputs(budget="3000", goal="calls", currency="INR"), other)["scenarios"][1]["cpc"] == 6.0            # a budget in the same currency uses them
+    assert ai.forecast(inputs(budget="3000", goal="calls"), {"keywords": {"data": {"ideas": ideas}}}) is not None            # a read that did not say is as before
+
+
 def test_there_is_no_forecast_without_a_budget_a_cost_per_click_or_for_awareness():
     full = {"history": {"data": {"totals": {"clicks": 1000, "cpc": 4.0, "conv": 40, "cvr": 4.0}}}}
     assert ai.forecast(inputs(budget=None), full) is None and ai.forecast(inputs(goal="awareness"), full) is None and ai.forecast(inputs(), {}) is None

@@ -747,8 +747,9 @@ def seeds_from(inputs, website_piece=None, history_piece=None):
     return seeds[:MAX_SEEDS]
 
 
-def read_keywords(inputs, *, post, planner_account, website_piece=None, history_piece=None, competitor_piece=None, currency=None):
-    """Keyword Planner ideas for the client. `post(path, body)` is Google Ads' API call; `planner_account` is any account that may ask."""
+def read_keywords(inputs, *, post, planner_account, website_piece=None, history_piece=None, competitor_piece=None, currency=None, planner_currency=None):
+    """Keyword Planner ideas for the client. `post(path, body)` is Google Ads' API call; `planner_account` is any account that may ask. `currency` is the client's
+    (it picks the market when no place is named); `planner_currency` is the currency the planner account bills in, which is the currency Planner's bids come back in."""
     started = time.monotonic()
     if not planner_account:
         return skipped("keywords", "There is no Google Ads account to ask Keyword Planner through.")
@@ -786,7 +787,7 @@ def read_keywords(inputs, *, post, planner_account, website_piece=None, history_
     for i in ranked:
         s = sources[i["text"]]
         i["from"] = "competitor" if s.startswith("rival:") else ("site" if s == "site" else "your terms")
-    data = {"seeds": seeds, "places": places, "geo": geo, "ideas": ranked[:150], "total": len(ranked)}
+    data = {"seeds": seeds, "places": places, "geo": geo, "ideas": ranked[:150], "total": len(ranked), "bidCurrency": planner_currency or ""}
     state = "partial" if notes else "ok"
     return piece("keywords", state, " ".join(["%d keyword ideas from %d request%s." % (len(ranked), len(calls) - len(notes), "" if len(calls) - len(notes) == 1 else "s")] + notes),
                  data, time.monotonic() - started)
