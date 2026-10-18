@@ -226,6 +226,8 @@ def report_for(account, *, preset="30", measure="primary", actual_conv=None, act
     av = clean_actual(actual_value, "Revenue recorded")
     periods = m.periods(preset, today)
     key, targets = _targets_of(account, store=store, accounts_fn=accounts_fn)
+    if force:
+        base.refresh_guard(store, "xch:" + key)
     first, last = periods["previous"][0], periods["current"][1]
     shapes, problems, notes, stamps = read_days(targets, first, last, store=store, force=force, shape_fn=shape_fn)
     read_targets = [t for t in targets if t["platform"] in shapes]

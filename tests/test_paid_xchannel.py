@@ -309,3 +309,18 @@ def test_the_report_is_plain_data_the_page_and_the_files_can_use():
 def test_one_platform_notes_only_name_that_platform():
     r = run(account=GID)
     assert not any("Meta's conversions are the results" in n for n in r["notes"])
+
+
+def test_refresh_is_limited_per_account_and_re_reads_what_it_is_asked_for():
+    store = FakeStore()
+    run(store=store, force=True)
+    with pytest.raises(paid_gads.RefreshTooSoon):
+        run(store=store, force=True)
+    run(store=store)                                               # an ordinary read is never held back
+    run(store=FakeStore(), force=True)                             # another store (another account's history) is not
+
+
+def test_the_cooldown_is_per_account():
+    store = FakeStore()
+    run(store=store, force=True)
+    run(account=GID, store=store, force=True)
