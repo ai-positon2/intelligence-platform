@@ -63,6 +63,23 @@ two-proportion z-test on one metric, and the result says which metric and how su
   challenger against it.
 - An ad group with more than 4 live ads that is "no difference": too many ads to learn from, keep the best two or three.
 
+## Meta Ads
+
+The account can be a Google Ads account, a Meta ad account (act_...) or one of each, named as Account Audit names it ("<google id>", "act_..." or "<google id>+<act_...>", see `tracker/paid_accounts.py`).
+
+`tracker/paid_exp_meta_read.py` reads two kinds of test on its own. Meta's A/B tests (ad studies): the test, its dates, its cells and what each cell's campaigns or ad sets did on every day of the test. Meta splits the
+audience between the cells at random, so two cells are a fair test, held to the same arithmetic as a Google experiment: the first cell is the control and the second the trial, and a test of three or more cells
+is compared on its first two. A study that is not an A/B test (a conversion lift or brand lift study) is listed without a result. And every ad set that runs two or more live ads over the last 30 days. Meta moves
+delivery towards the ad it expects to do best, so the ads of one ad set do not share the audience evenly: that test reads what happened, which is a lead and not a fair test, and the page says so.
+
+A Meta test is worded in terms of its cells (the winner is "kept" and the budget goes behind it; there is no "apply" in Meta). What Meta counts as a conversion depends on the campaign's objective, so a campaign that
+counts no result is judged on click rate. `tracker/paid_exp_merge.py` joins the two reads; the report marks each test with its platform. One platform that will not answer is a warning and the report is the other's
+alone; a platform lost to its allowance leaves a whole saved read to be served with its date; a Google and a Meta account are read together only when they bill in the same currency.
+
+The Meta read was written from Meta's documentation and tested against a copy of the Graph API's answers. It could not be tried against a live account from the development machine, and how Meta describes an ad
+study's cells is the least certain part: if Meta will not describe them the test is listed as not measured with the reason (and the page says "could not be read" with Meta's own message when a request is refused),
+while the ad tests stand on their own.
+
 ## Files
 
 `tracker/paid_exp_stats.py` (the test), `paid_exp_read.py` (Google reads), `paid_exp.py` (the report, cached like the other reports'),
