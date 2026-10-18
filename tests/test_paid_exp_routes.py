@@ -62,7 +62,7 @@ def test_a_bad_account_is_a_400_through_the_real_parser():
     r = client_as(STAFF).get(API + "/report?account=nonsense")
     assert r.status_code == 400 and "10-digit Google Ads customer id" in r.get_json()["error"]
     assert client_as(STAFF).get(API + "/report").status_code == 400
-    assert client_as(STAFF).get(API + "/report?account=1112223334%2Bact_1234567890").status_code == 400
+    assert client_as(STAFF).get(API + "/report?account=1112223334%2B1112223334").status_code == 400            # two Google accounts are not a pair
 
 
 def test_the_page_opens_for_staff_and_is_closed_to_everyone_else():

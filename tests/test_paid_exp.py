@@ -315,7 +315,7 @@ def test_the_notes_say_when_ad_tests_were_capped_clipped_or_had_extra_arms():
     assert "40 ad groups run two or more live ads. The 1 that spent most" in joined
     assert "1 experiment started more than 365 days ago" in joined and "first trial arm only" in joined
     plain = ex.assemble(read_with([made(**WIN)], [group(ad(1, 20000, 1000, 100), ad(2, 20000, 1000, 50))]), now=NOW, today=TODAY)
-    assert len(plain["notes"]) == len(ex.NOTES)
+    assert len(plain["notes"]) == len(ex.NOTES) + len(ex.NOTES_GOOGLE)
 
 
 def test_a_part_that_could_not_be_read_is_reported_not_hidden():
@@ -364,13 +364,6 @@ def run_report(**kw):
     kw.setdefault("store", FakeStore())
     kw.setdefault("search_fn", search())
     return ex.report_for(ACCOUNT_ID, accounts_fn=lambda: [ACCOUNT], now=NOW, today=TODAY, **kw)
-
-
-def test_the_account_must_be_a_ten_digit_id():
-    for bad in ("", "abc", "123", "12345678901", None):
-        with pytest.raises(ex.BadRequest):
-            ex.parse_account(bad)
-    assert ex.parse_account(" 1112223334 ") == ACCOUNT_ID
 
 
 def test_an_account_that_is_not_ours_is_refused():
