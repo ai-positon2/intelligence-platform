@@ -37,7 +37,7 @@ BUDGET_S = 70                                     # for the whole list of pages 
 WORKERS = 6
 ATF_CHARS = 1500                                  # visible characters from the top that stand in for "above the fold"
 UA = "Mozilla/5.0 (compatible; Position2LandingPageCheck/1.0; +https://intelligence.position2.com)"
-TEST_PARAMS = "gclid=LPcheck123&utm_source=lp_check"
+TEST_PARAMS = "gclid=LPcheck123&fbclid=LPcheck123&utm_source=lp_check"      # one test click carries both platforms' click ids, so one request answers for Google and for Meta
 BLOCKED = pages.BLOCKED
 RETRY_PAUSE_S = 0.5                                 # wait before a page that timed out or answered with a server error is asked again
 SKIP_BLOCK = frozenset(("script", "style", "noscript", "template", "svg", "select"))      # whose text is never part of what a visitor reads
@@ -417,9 +417,15 @@ def _where(url):
     return scheme, host, p.path.rstrip("/") or "/"
 
 
-def _survives(final):
+def _kept(final):
+    """Which of the test click's parts were still on the address after the redirect: {gclid, fbclid, utm}."""
     keys = {k for k, _ in parse_qsl(urlsplit(final).query)}
-    return "gclid" in keys and "utm_source" in keys
+    return {"gclid": "gclid" in keys, "fbclid": "fbclid" in keys, "utm": "utm_source" in keys}
+
+
+def _survives(final):
+    k = _kept(final)
+    return k["gclid"] and k["utm"]
 
 
 def fetch(url, fetcher=None, robots=None):
@@ -427,7 +433,7 @@ def fetch(url, fetcher=None, robots=None):
     if fetcher is None:
         from .event_intel_http import public_get as fetcher
     out = {"url": url, "status": 0, "error": "", "blocked": False, "ms": 0, "responseMs": 0, "bytes": 0, "truncated": False, "encoding": "", "contentType": "",
-           "finalUrl": "", "redirected": False, "collapsed": False, "retried": False, "isHtml": False, "facts": None, "tech": None, "paramsSurvive": None, "adsbot": None}
+           "finalUrl": "", "redirected": False, "collapsed": False, "retried": False, "isHtml": False, "facts": None, "tech": None, "paramsSurvive": None, "keptIds": None, "adsbot": None}
     for attempt in (0, 1):
         status, final, hdrs, html, size, cut, first, total, err = _once(url, fetcher)
         out.update(status=status, finalUrl=final, error=err, ms=total, responseMs=first, bytes=size, truncated=cut,
@@ -452,7 +458,9 @@ def fetch(url, fetcher=None, robots=None):
     if out["redirected"] and out["status"] and out["status"] < 400:
         sep = "&" if urlsplit(url).query else "?"
         s2, f2, _h, _html, _n, _c, _a, _t, e2 = _once(url + sep + TEST_PARAMS, fetcher)
-        out["paramsSurvive"] = _survives(f2) if (s2 and s2 < 400 and not e2) else None
+        if s2 and s2 < 400 and not e2:
+            out["keptIds"] = _kept(f2)
+            out["paramsSurvive"] = _survives(f2)
     if robots is not None:
         try:
             out["adsbot"] = robots(out["finalUrl"] or url)

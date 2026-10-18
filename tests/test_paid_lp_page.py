@@ -450,3 +450,20 @@ def test_one_page_that_raises_does_not_take_the_others_down():
         return Resp(200, url, html_bytes(), {"Content-Type": "text/html"})
     out = p.fetch_many(["https://a.test/ok", "https://a.test/bad"], get)
     assert out[0]["status"] == 200 and out[1]["status"] == 0 and out[1]["error"] == "RuntimeError"
+
+
+def test_the_test_click_carries_both_platforms_ids_and_says_which_survived_the_redirect():
+    only_meta = (200, "https://a.test/offers?fbclid=LPcheck123&utm_source=lp_check", html_bytes(), {"Content-Type": "text/html"})
+    only_google = (200, "https://a.test/offers?gclid=LPcheck123&utm_source=lp_check", html_bytes(), {"Content-Type": "text/html"})
+    nothing = (200, "https://a.test/offers", html_bytes(), {"Content-Type": "text/html"})
+    assert "gclid=LPcheck123" in p.TEST_PARAMS and "fbclid=LPcheck123" in p.TEST_PARAMS and "utm_source=lp_check" in p.TEST_PARAMS
+
+    def run(answer):
+        return p.fetch("https://a.test/x", fetcher({"https://a.test/x": answer, "https://a.test/x?" + p.TEST_PARAMS: answer}))
+    meta = run(only_meta)
+    assert meta["keptIds"] == {"gclid": False, "fbclid": True, "utm": True} and meta["paramsSurvive"] is False      # the Google answer is still Google's
+    google = run(only_google)
+    assert google["keptIds"] == {"gclid": True, "fbclid": False, "utm": True} and google["paramsSurvive"] is True
+    assert run(nothing)["keptIds"] == {"gclid": False, "fbclid": False, "utm": False}
+    calls = []
+    assert p.fetch("https://a.test/x", fetcher({}, calls))["keptIds"] is None            # no redirect, nothing was tested
