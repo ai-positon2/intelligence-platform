@@ -45,7 +45,20 @@ def test_a_tie_takes_the_earlier_day():
 
 def test_the_first_of_the_month_stays_on_the_month_that_ended():
     as_of, start, ends = rd.plan_window([acct()], now=utc(2026, 10, 1))
-    assert as_of == dt.date(2026, 9, 30) and start == dt.date(2026, 9, 1) and ends == {"1111111111": "2026-09-30"}
+    assert as_of == dt.date(2026, 9, 30) and start == dt.date(2026, 9, 1)
+    assert ends == {"1111111111": "2026-09-29"}                # the engine reads the 30th as today, so the data stops the day before it
+
+
+def test_a_finished_month_is_not_projected_over_for_a_day_that_was_already_read():
+    """The run for the last day, from the rows plan_window asks for: a perfectly paced account is on target, not 3% over."""
+    from tracker import paid_refresh as rf, paid_pacing_budgets as pb
+    _, _, ends = rd.plan_window([acct()], now=utc(2026, 11, 1, 20))
+    last = int(ends["1111111111"][-2:])
+    rows = [{"id": "1", "name": "Camp", "status": "ENABLED", "type": "Search", "bid": "Manual CPC", "budget": 100.0, "pool": "", "date": "2026-10-%02d" % d,
+             "impr": 100.0, "clicks": 10.0, "cost": 100.0, "conv": 2.0, "value": 0.0, "sis": 0.5, "account": "Acme", "accountId": "1"} for d in range(1, last + 1)]
+    body, _ = rf.run_engine(rd.export_rows(rows), pb.dpr_rows([pb.check_row({"client": "Acme", "account": "Acme", "allocated": 3100})], "2026-10"), dt.date(2026, 10, 31))
+    a = body["clients"][0]["accounts"][0]
+    assert last == 30 and a["landing"] == "ON TARGET" and a["projected"] == 3100.0
 
 
 def test_a_zone_this_machine_does_not_know_falls_back_instead_of_failing():

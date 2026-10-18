@@ -65,7 +65,9 @@ def plan_window(accounts, now=None):
     account in Sydney must not move every American account's "today" a day on, which would skew every ideal-pacing figure by a whole day.
     Each account is read through its own yesterday, never past the run's (an account already a day ahead is read only that far; one a day
     behind is read through its own, and the engine judges it against its own last day). On the first of a month nothing has been spent in
-    the new month yet, so the run stays on the month that just ended (as_of is its last day), the same rule the sheet-based refresh followed."""
+    the new month yet, so the run stays on the month that just ended (as_of is its last day), the same rule the sheet-based refresh followed. The engine
+    reads that last day as "today" (one more day still to pace), so the data stops the day before it, as on every other day: reading the last day too
+    would count it as spent AND project it again, and a perfectly paced account would come out 3% over."""
     if not accounts:
         raise ValueError("no accounts to read")
     yest = {a["id"]: account_today(a.get("timeZone") or a.get("tz"), now) - dt.timedelta(days=1) for a in accounts}
@@ -75,7 +77,8 @@ def plan_window(accounts, now=None):
     usual = min(d for d, n in counts.items() if n == max(counts.values()))
     nxt = usual + dt.timedelta(days=1)
     as_of = nxt if nxt.month == usual.month else usual
-    return as_of, as_of.replace(day=1), {i: min(d, usual).isoformat() for i, d in yest.items()}
+    last = as_of - dt.timedelta(days=1)
+    return as_of, as_of.replace(day=1), {i: min(d, last).isoformat() for i, d in yest.items()}
 
 
 # ── Queries and parsing ─────────────────────────────────────────────────────
