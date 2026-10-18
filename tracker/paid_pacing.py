@@ -25,7 +25,7 @@ MAX_ACCOUNTS = 2000
 DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 LANDINGS = ("WILL OVERSPEND", "WILL UNDERSPEND", "ON TARGET", "BUDGET UNCLEAR")
 META_KEYS = ("asOf", "dataThrough", "month", "elapsed", "daysInMonth", "idealPacing", "tolerance")
-SOURCE_KEYS = ("kind", "accounts", "unread", "readAt", "budgets", "notes")      # where a run's numbers came from, when the platform built it itself
+SOURCE_KEYS = ("kind", "channels", "accounts", "unread", "readAt", "budgets", "meta", "notes")      # where a run's numbers came from, when the platform built it itself
 MAX_SOURCE_NOTES = 60
 
 # A move's id is built by the page (moveDocId): the day, two short slugs and

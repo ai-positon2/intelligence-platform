@@ -32,7 +32,9 @@ from pathlib import Path
 
 from . import paid_gads as base
 from . import paid_gads_segments as gads
+from . import paid_meta
 from . import paid_pacing_budgets as budgets
+from . import paid_pacing_meta as meta_reader
 from . import paid_pacing_read as reader
 
 log = logging.getLogger(__name__)
@@ -133,6 +135,78 @@ def _tail(out):
     return (lines[-1] if lines else "no output")[:300]
 
 
+def merge_bodies(google, meta):
+    """The Google run's dashboard with the Meta run's accounts added to their clients (a client Meta has and Google does not is added). Every account says
+    its channel; a Meta account named like one the client already has is shown as "<name> (Meta)", because the page tells accounts apart by name. The
+    client's totals are summed again, and the Meta run's warnings are added (they say Meta). Neither input is changed."""
+    out = dict(google)
+    out["clients"] = [dict(c, accounts=[dict(a, channel="Google") for a in c["accounts"]]) for c in google["clients"]]
+    by = {c["name"].strip().lower(): c for c in out["clients"]}
+    for mc in meta["clients"]:
+        accounts = [dict(a, channel="Meta") for a in mc["accounts"]]
+        have = by.get(mc["name"].strip().lower())
+        if have is None:
+            out["clients"].append(dict(mc, accounts=accounts))
+            by[mc["name"].strip().lower()] = out["clients"][-1]
+            continue
+        taken = {a["name"].strip().lower() for a in have["accounts"]}
+        for a in accounts:
+            if a["name"].strip().lower() in taken:
+                a["name"] += " (Meta)"
+        have["accounts"] = have["accounts"] + accounts
+        for k in ("allocated", "spend", "spendSolid", "projected"):
+            have[k] = round(have[k] + mc[k], 2)
+        have["conv"] = round(have["conv"] + mc["conv"], 1)
+        have["cpa"] = round(have["spend"] / have["conv"], 2) if have["conv"] else None
+        have["warnings"] = list(have.get("warnings") or []) + list(mc.get("warnings") or [])
+    out["clients"].sort(key=lambda c: c["name"])
+    out["portfolioWarnings"] = list(google.get("portfolioWarnings") or []) + ["Meta: " + w for w in meta.get("portfolioWarnings") or []]
+    return out
+
+
+def _meta_key(as_of, matched):
+    ids = sorted("%s=%s" % (a["id"], r["account"]) for r, a in matched)
+    return "%s:meta:%s:%s" % (READ_KEY, as_of.isoformat(), "|".join(ids))
+
+
+def _read_meta(store, step, book, as_of, now, meta_accounts_fn, meta_fetch):
+    """The month read from Meta Ads for the Meta allocations: {rows, unread, notes, accounts, readAt}, or None when no allocation is for Meta. Never raises:
+    Meta not answering is a note on the run, and the Google run is published without it."""
+    wanted = [r for r in book["rows"] if r.get("channel") == "Meta"]
+    if not wanted:
+        return None
+    notes = []
+    try:
+        problem = paid_meta.config_problem()
+        if problem:
+            return {"rows": [], "unread": [], "accounts": 0, "readAt": (now or _now()).isoformat(),
+                    "notes": ["Meta Ads is not connected (%s), so the %d Meta allocation%s not paced." % (problem, len(wanted), " is" if len(wanted) == 1 else "s are")]}
+        step("Listing the Meta ad accounts")
+        accounts = (meta_accounts_fn or (lambda: paid_meta.list_accounts(store)))()
+        matched, notes = meta_reader.match_accounts(wanted, accounts)
+        if not matched:
+            return {"rows": [], "unread": [], "accounts": 0, "notes": notes, "readAt": (now or _now()).isoformat()}
+        key = _meta_key(as_of, matched)
+        try:
+            hit = store.get_gads_entry(key, READ_TTL_S)
+        except Exception:
+            hit = None
+        if hit is not None:
+            return dict(hit[0], notes=list(hit[0].get("notes") or []))
+        step("Reading %d Meta ad account%s" % (len(matched), "" if len(matched) == 1 else "s"))
+        ends = meta_reader.ends_for([a for _r, a in matched], as_of, now)
+        got = meta_reader.read_all(matched, as_of.replace(day=1).isoformat(), ends, store=store, fetch=meta_fetch)
+        part = {"rows": got["rows"], "unread": got["unread"], "notes": notes + got["notes"], "accounts": len(matched), "readAt": (now or _now()).isoformat()}
+        try:
+            store.put_gads_cache(key, part)
+        except Exception:
+            log.exception("pacing refresh: could not save the Meta read")
+        return part
+    except (base.AdsError, gads.GadsError) as e:
+        return {"rows": [], "unread": [], "accounts": 0, "readAt": (now or _now()).isoformat(),
+                "notes": notes + ["Meta Ads would not answer (%s), so the Meta allocations are not paced in this run." % e]}
+
+
 # ── The job ─────────────────────────────────────────────────────────────────
 
 def latest_run(store):
@@ -197,7 +271,7 @@ def _usable_read(store, now=None):
     return read if pacific_day(made) == pacific_day(now) else None
 
 
-def refresh(store, pacing, step=lambda s: None, *, budget_store=None, accounts_fn=None, search_fn=None, now=None, reuse=False):
+def refresh(store, pacing, step=lambda s: None, *, budget_store=None, accounts_fn=None, search_fn=None, now=None, reuse=False, meta_accounts_fn=None, meta_fetch=None):
     """Read, run, check, publish. Returns the stored run's summary. With `reuse` the engine runs on the saved read (see _usable_read)
     and Google Ads is not asked again; without a usable one it reads as usual."""
     problem = config_problem()
@@ -222,18 +296,34 @@ def refresh(store, pacing, step=lambda s: None, *, budget_store=None, accounts_f
     if not book["rows"]:
         raise RefreshError("There are no %s allocations yet. Open Allocations, add each account's budget for the month (or paste it from the "
                            "Budget Tracker) and run the refresh again." % _month_name(month))
+    meta_part = _read_meta(store, step, book, as_of, now, meta_accounts_fn, meta_fetch)
     step("Running the engine for %s" % as_of.strftime("%b %-d"))
     body, issues = run_engine(reader.export_rows(read["rows"]), budgets.dpr_rows(book["rows"], month), as_of)
     notes = list(filter(None, [_source_note(book, month)]))
     warnings = ["Google Ads would not return %s (%s). Its pacing is missing from this run." % (u["name"], u["reason"]) for u in read["unread"]]
-    body["source"] = {"kind": "googleAds", "accounts": read["accounts"], "unread": len(read["unread"]), "readAt": read["readAt"],
-                      "budgets": dict(book["source"], month=month), "notes": warnings + read["notes"]}
+    channels, meta_notes, meta_unread = ["Google"], [], 0
+    if meta_part is not None:
+        meta_notes = list(meta_part["notes"])
+        meta_unread = len(meta_part["unread"])
+        meta_notes += ["Meta Ads would not return %s (%s). Its pacing is missing from this run." % (u["name"], u["reason"]) for u in meta_part["unread"]]
+        if meta_part["rows"]:
+            try:
+                meta_body, meta_issues = run_engine(reader.export_rows(meta_part["rows"]), budgets.dpr_rows(book["rows"], month), as_of, channel="Meta")
+                body = merge_bodies(body, meta_body)
+                issues = issues + ["Meta: " + i for i in meta_issues]
+                channels.append("Meta")
+            except RefreshError as e:
+                meta_notes.append("The Meta part of the run could not be built (%s), so it is left out." % e)
+    body["source"] = {"kind": "googleAds", "channels": channels, "accounts": read["accounts"], "unread": len(read["unread"]), "readAt": read["readAt"],
+                      "budgets": dict(book["source"], month=month), "notes": warnings + meta_notes + read["notes"]}
+    if meta_part is not None:
+        body["source"]["meta"] = {"accounts": meta_part["accounts"], "unread": meta_unread, "readAt": meta_part["readAt"]}
     step("Publishing")
     meta, clients, latest = pacing.build_seed(body)
     store.save_snapshot(meta, clients, latest)
     return {"date": meta["asOf"], "dataThrough": meta.get("dataThrough"), "clients": meta["clientCount"], "accounts": meta["accountCount"],
-            "notes": notes + warnings[:5] + read["notes"][:5], "issues": issues[:40], "issueCount": len(issues),
-            "unread": len(read["unread"]), "budgets": book["source"]["kind"], "reusedRead": again, "readAt": read["readAt"]}
+            "notes": notes + warnings[:5] + meta_notes[:5] + read["notes"][:5], "issues": issues[:40], "issueCount": len(issues),
+            "unread": len(read["unread"]) + meta_unread, "budgets": book["source"]["kind"], "reusedRead": again, "readAt": read["readAt"], "channels": channels}
 
 
 def _age_s(iso, now=None):
