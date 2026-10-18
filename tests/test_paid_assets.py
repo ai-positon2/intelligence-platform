@@ -64,7 +64,7 @@ def many(cid, field, count, prefix=None, **kw):
 
 
 def searcher(campaigns=None, metrics=None, shown=None, campaign_assets=None, customer_assets=None, ad_group_assets=None, groups=None,
-             group_assets=None, campaign_sets=None, customer_sets=None, ads=None, asset_by_id=None, log=None, fail=()):
+             group_assets=None, campaign_sets=None, customer_sets=None, ads=None, asset_by_id=None, log=None, fail=(), ad_groups=None):
     """A search function that answers by which query it is asked; `fail` names parts that raise a Google error."""
     ads = ads or {}
 
@@ -74,7 +74,7 @@ def searcher(campaigns=None, metrics=None, shown=None, campaign_assets=None, cus
         part = ("asset_by_id" if "FROM asset WHERE asset.id IN" in q else "campaign_asset_set" if "FROM campaign_asset_set" in q else "customer_asset_set" if "FROM customer_asset_set" in q else
                 "shown" if "metrics.impressions > 0" in q else "campaign_asset" if "FROM campaign_asset " in q else
                 "customer_asset" if "FROM customer_asset " in q else "ad_group_asset" if "FROM ad_group_asset" in q else
-                "asset_group_asset" if "FROM asset_group_asset" in q else "asset_group" if "FROM asset_group " in q else
+                "asset_group_asset" if "FROM asset_group_asset" in q else "asset_group" if "FROM asset_group " in q else "ad_group" if "FROM ad_group WHERE" in q else
                 "metrics" if "metrics.impressions" in q and "FROM campaign " in q else "campaign" if "FROM campaign " in q else
                 "ad_group_ad")
         if part in fail:
@@ -83,7 +83,7 @@ def searcher(campaigns=None, metrics=None, shown=None, campaign_assets=None, cus
             return ads.get(next(t for t in ("RESPONSIVE_DISPLAY_AD", "DEMAND_GEN_MULTI_ASSET_AD", "DEMAND_GEN_VIDEO_RESPONSIVE_AD") if t in q), [])
         return {"campaign": campaigns, "metrics": metrics, "shown": shown, "campaign_asset": campaign_assets, "customer_asset": customer_assets,
                 "ad_group_asset": ad_group_assets, "asset_group": groups, "asset_group_asset": group_assets, "campaign_asset_set": campaign_sets,
-                "customer_asset_set": customer_sets, "asset_by_id": asset_by_id}[part] or []
+                "customer_asset_set": customer_sets, "asset_by_id": asset_by_id, "ad_group": ad_groups}[part] or []
     return search
 
 
@@ -342,6 +342,20 @@ def test_ad_groups_with_their_own_assets_are_mentioned_on_a_short_campaign():
     assert slot_of(analyse(campaigns=[camp_row("5")], ad_group_assets=two)["items"][0], "SITELINK")["message"].endswith("2 ad groups hold their own.")
     covered = slot_of(analyse(campaigns=[camp_row("5")], campaign_assets=many("5", "SITELINK", 4), ad_group_assets=two)["items"][0], "SITELINK")
     assert covered["status"] == "ok" and not covered.get("message")
+
+
+def test_a_campaign_whose_every_ad_group_holds_its_own_sitelinks_is_not_called_bare():
+    """The lowest level that holds a live asset is what serves: three ad groups with their own sitelinks are covered although the campaign has none."""
+    def agl(g):
+        return {"campaign": {"id": "5"}, "adGroup": {"id": g}, "adGroupAsset": {"fieldType": "SITELINK", "status": "ENABLED", "primaryStatus": "ELIGIBLE"}}
+    def groups(*ids):
+        return [{"campaign": {"id": "5"}, "adGroup": {"id": g}} for g in ids]
+    every = slot_of(analyse(campaigns=[camp_row("5")], ad_group_assets=[agl("g1"), agl("g2"), agl("g3")], ad_groups=groups("g1", "g2", "g3"))["items"][0], "SITELINK")
+    assert every["status"] == "ok" and not every.get("severity") and not every.get("add") and every["coveredByAdGroups"] and not every.get("message")
+    some = slot_of(analyse(campaigns=[camp_row("5")], ad_group_assets=[agl("g1"), agl("g2")], ad_groups=groups("g1", "g2", "g3"))["items"][0], "SITELINK")
+    assert some["status"] == "missing" and some.get("severity") == "high" and "2 ad groups hold their own" in some["message"]     # the third ad group has none
+    unread = slot_of(analyse(campaigns=[camp_row("5")], ad_group_assets=[agl("g1")], ad_groups=[])["items"][0], "SITELINK")
+    assert unread["status"] == "missing"                                                                                       # no count of ad groups: never assumed covered
 
 
 def test_links_never_shown_in_30_days_are_noted_only_on_a_campaign_that_was_shown():

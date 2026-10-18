@@ -247,6 +247,19 @@ def read_customer_assets(rows, today=None, sink=None):
     return {f: bucket(links, today) for f, links in by.items()}
 
 
+AD_GROUP_COUNT_GAQL = "SELECT campaign.id, ad_group.id FROM ad_group WHERE " + _LIVE + " AND ad_group.status = ENABLED"
+
+
+def read_ad_group_counts(rows):
+    """{campaign id: how many enabled ad groups it has}: with it, a campaign whose every ad group holds its own assets is not called bare."""
+    seen = {}
+    for r in rows:
+        cid, gid = str(_get(r, "campaign", "id", default="")), str(_get(r, "adGroup", "id", default=""))
+        if cid and gid:
+            seen.setdefault(cid, set()).add(gid)
+    return {cid: len(g) for cid, g in seen.items()}
+
+
 def read_ad_group_assets(rows):
     """{campaign id: {field: [ad group ids]}}: where an ad group holds its own live assets of a kind (they override the campaign's)."""
     out = {}
@@ -383,6 +396,7 @@ def read_account(member, *, search_fn=None, today=None, sink=None):
     campaign_assets = part("campaignAssets", "the campaign assets", lambda: read_campaign_assets(search(cid, CAMPAIGN_ASSETS_GAQL), shown, today, sink), {})
     customer_assets = part("customerAssets", "the account-wide assets", lambda: read_customer_assets(search(cid, CUSTOMER_ASSETS_GAQL), today, sink), {})
     ad_group_assets = part("adGroupAssets", "the ad group assets", lambda: read_ad_group_assets(search(cid, AD_GROUP_ASSETS_GAQL)), {})
+    ad_group_counts = part("adGroupCounts", "the ad groups", lambda: read_ad_group_counts(search(cid, AD_GROUP_COUNT_GAQL)), {})
     types = {c["type"] for c in campaigns.values()}
     groups = []
     if "PERFORMANCE_MAX" in types:
@@ -395,7 +409,7 @@ def read_account(member, *, search_fn=None, today=None, sink=None):
         part("adAssets", "the pictures and videos of the Display and Demand Gen ads", lambda: read_ad_assets(sink, search, cid), None)
     sets = part("sets", "the location sets", lambda: read_sets(search(cid, CAMPAIGN_SETS_GAQL), search(cid, CUSTOMER_SETS_GAQL), sink), {"account": 0, "campaigns": {}})
     return {"id": cid, "name": name, "campaigns": campaigns, "metrics": metrics, "campaignAssets": campaign_assets, "customerAssets": customer_assets,
-            "adGroupAssets": ad_group_assets, "groups": groups, "ads": ads, "sets": sets, "ok": ok, "warnings": warnings}
+            "adGroupAssets": ad_group_assets, "adGroupCounts": ad_group_counts, "groups": groups, "ads": ads, "sets": sets, "ok": ok, "warnings": warnings}
 
 
 def google_raw(account, *, search_fn=None, workers=6, today=None, detail_save=None):
@@ -431,7 +445,7 @@ def _unknown(key, spec, source):
             "message": "Google Ads could not be read for this, so it is not judged."}
 
 
-def _ext_slot(key, spec, camp_b, acct_b, ad_groups, ok, impressions):
+def _ext_slot(key, spec, camp_b, acct_b, ad_groups, ok, impressions, n_groups=None):
     """One kind of campaign asset: the campaign's own live links, or else the account's. Problems named are the campaign's own: the
     account's are reported once under the account's assets, not once per campaign."""
     if not (ok.get("campaignAssets") and ok.get("customerAssets")):
@@ -446,6 +460,10 @@ def _ext_slot(key, spec, camp_b, acct_b, ad_groups, ok, impressions):
         s["notShown"] = cb["notShown"]
     if own and s["status"] != "ok":
         s["message"] += " 1 ad group holds its own." if len(own) == 1 else " %d ad groups hold their own." % len(own)
+    # Every enabled ad group has its own live ones, and the lowest level that holds one is what serves: the campaign having none is not a gap.
+    if (source == "campaign" and cb["have"] == 0 and s["status"] != "ok" and n_groups and len(own) >= n_groups
+            and ok.get("adGroupAssets") and ok.get("adGroupCounts")):
+        s.update(status="ok", severity=None, add=0, message="", coveredByAdGroups=True)
     return s
 
 
@@ -555,7 +573,8 @@ def analyse_account(a, today=None):
             for key in rules.CAMPAIGN_ASSET_ORDER:
                 spec = rules.CAMPAIGN_ASSETS[key]
                 if c["type"] in spec.get("channels", ("SEARCH", "PERFORMANCE_MAX")):
-                    slots.append(_ext_slot(key, spec, camp_b, acct_b, (a.get("adGroupAssets") or {}).get(cid, {}), ok, m["impressions"]))
+                    slots.append(_ext_slot(key, spec, camp_b, acct_b, (a.get("adGroupAssets") or {}).get(cid, {}), ok, m["impressions"],
+                                           (a.get("adGroupCounts") or {}).get(cid)))
             slots.append(_location_slot(cid, a.get("sets") or {}, ok))
         if c["type"] == "PERFORMANCE_MAX":
             for g in groups_by.get(cid, []):
