@@ -22,6 +22,7 @@ from __future__ import annotations
 import datetime as dt
 import json
 import logging
+import os
 import shutil
 import subprocess
 import sys
@@ -89,14 +90,16 @@ def write_workbook(path, tab, rows):
     wb.save(path)
 
 
-def _run(script, args, cwd):
+def _run(script, args, cwd, channel="Google"):
+    env = dict(os.environ, PACING_CHANNEL=channel)
     p = subprocess.run([sys.executable, script, *args], cwd=cwd, capture_output=True,
-                       text=True, timeout=ENGINE_TIMEOUT_S)
+                       text=True, timeout=ENGINE_TIMEOUT_S, env=env)
     return p.returncode, (p.stdout or "") + (p.stderr or "")
 
 
-def run_engine(spend_rows, budget_rows, as_of):
-    """(dashboard.json, self-check flags) for as_of, built by the engine in a throwaway folder. Raises RefreshError when the engine itself
+def run_engine(spend_rows, budget_rows, as_of, channel="Google"):
+    """(dashboard.json, self-check flags) for as_of, built by the engine in a throwaway folder. `channel` (Google or Meta) says which of the allocation rows
+    the spend is matched against. Raises RefreshError when the engine itself
     stops.
 
     A failed self-check does not stop the run. On the team's real September data the engine's own validate.py flags policy-floor and
@@ -112,11 +115,11 @@ def run_engine(spend_rows, budget_rows, as_of):
         write_workbook(work / "raw" / SPEND_FILE, "Data", spend_rows)
         write_workbook(work / "raw" / BUDGET_FILE, "DPR", budget_rows)
         day = as_of.isoformat()
-        code, out = _run("validate.py", [day], tmp)
+        code, out = _run("validate.py", [day], tmp, channel)
         issues = [ln.strip().lstrip("✗").strip() for ln in out.splitlines() if "✗" in ln]
         if code != 0 and not issues:
             raise RefreshError("The engine stopped: %s" % _tail(out))
-        code, out = _run("export_dashboard.py", [day], tmp)
+        code, out = _run("export_dashboard.py", [day], tmp, channel)
         dash = work / "out" / "dashboard.json"
         if code != 0 or not dash.exists():
             raise RefreshError("The engine stopped: %s" % _tail(out))

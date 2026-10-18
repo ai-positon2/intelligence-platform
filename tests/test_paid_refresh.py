@@ -228,7 +228,7 @@ def test_a_missing_google_ads_setup_stops_the_run_before_anything_is_read(monkey
 def test_an_engine_that_stops_is_reported_and_flags_are_not(monkeypatch):
     seen = []
 
-    def fake_run(script, args, cwd):
+    def fake_run(script, args, cwd, channel="Google"):
         seen.append(script)
         if script == "validate.py":
             return 1, "[FAIL] x: 1 issue(s)\n   ✗ OIA/Wolf River/MRI: below the $1/day policy floor\n"
@@ -241,7 +241,7 @@ def test_an_engine_that_stops_is_reported_and_flags_are_not(monkeypatch):
     monkeypatch.setattr(rf, "_run", fake_run)
     body, issues = rf.run_engine([["Day"]], [["Client"]], dt.date(2026, 10, 12))
     assert body == {"asOf": "2026-10-12"} and issues == ["OIA/Wolf River/MRI: below the $1/day policy floor"] and seen == ["validate.py", "export_dashboard.py"]
-    monkeypatch.setattr(rf, "_run", lambda s, a, c: (1, "Traceback...\nKeyError: 'Account'"))
+    monkeypatch.setattr(rf, "_run", lambda s, a, c, ch="Google": (1, "Traceback...\nKeyError: 'Account'"))
     with pytest.raises(rf.RefreshError, match="KeyError"):
         rf.run_engine([["Day"]], [["Client"]], dt.date(2026, 10, 12))
 

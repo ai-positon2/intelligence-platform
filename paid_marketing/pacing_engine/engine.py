@@ -14,6 +14,7 @@ Every account's moves net to zero. Cross-account gaps are flagged, never moved.
 from __future__ import annotations
 
 import datetime as dt
+import os
 from dataclasses import dataclass, field
 
 import numpy as np
@@ -858,9 +859,9 @@ def run(campaigns: pd.DataFrame, budgets: pd.DataFrame,
         clock: Clock, client: str) -> list[AccountResult]:
     out: list[AccountResult] = []
     b = budgets[budgets["client"].str.strip().str.lower() == client.strip().lower()]
-    # The export is Google-only; a Meta or Bing budget line is not ours to pace.
+    # One run is one channel (the platform runs Google, then Meta): a budget line for another channel is not ours to pace in this run.
     if "channel" in b.columns:
-        b = b[b["channel"].str.contains("Google", case=False, na=False)]
+        b = b[b["channel"].str.contains(os.environ.get("PACING_CHANNEL") or "Google", case=False, na=False)]
     b = b[b["allocated_budget"] > 0]
     for _, row in b.iterrows():
         acct = str(row["account"]).strip()

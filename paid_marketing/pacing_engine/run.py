@@ -14,6 +14,7 @@ from __future__ import annotations
 import argparse
 import datetime as dt
 import json
+import os
 from pathlib import Path
 
 import categories
@@ -34,7 +35,8 @@ DEFAULT_EXPORT = str(Path(__file__).parent / "raw" / "all_accounts_spend_data.xl
 def load_all(export: str, as_of: dt.date):
     budgets = loaders.load_budgets()
     raw = gads.load_any_export(export)
-    df, warns = gads.resolve(raw, budgets)
+    # The platform runs the engine once per channel (Google, then Meta): PACING_CHANNEL says which budget rows this run's spend belongs to.
+    df, warns = gads.resolve(raw, budgets, channel=os.environ.get("PACING_CHANNEL") or "Google")
     df["category"] = [categories.categorise(cl, cm, ac, ty) for cl, cm, ac, ty in
                       zip(df["client"], df["campaign"], df["account"], df["campaign_type"])]
     df = df[(df["date"].dt.year == as_of.year) & (df["date"].dt.month == as_of.month)]
