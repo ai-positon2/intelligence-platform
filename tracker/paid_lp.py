@@ -250,6 +250,8 @@ def _group_rows(page, groups):
             "terms": [{"text": t["text"], "clicks": t["clicks"], "cost": t["cost"], "conversions": t["conversions"], "on": words.hit(t["text"], prom, full) if readable else None}
                       for t in g["terms"][:SHOWN_TERMS]],
             "offers": [{"text": o["text"], "on": words.on_page(o, facts) if readable else None} for o in offers[:6]]})
+        if g.get("platform") == "meta":                                   # a Meta ad is what the ratings are about, so the ads are listed
+            out[-1]["ads"] = [{"name": ad.get("name") or "", "cost": ad["cost"], "headlines": ad["headlines"][:2], "ranks": ad.get("ranks") or {}} for ad in g["ads"]]
     return out
 
 

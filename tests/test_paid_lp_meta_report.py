@@ -6,7 +6,9 @@ from tests.test_paid_lp import ACCOUNT, ACCOUNT_ID, NOW, Fetcher, fresh, search
 from tests.test_paid_lp_meta_read import Graph, ins, link_ad
 from tracker import paid_gads, paid_meta
 from tracker import paid_gads_segments as gads
+from tests.test_paid_lp_export import make_report
 from tracker import paid_lp as lp
+from tracker import paid_lp_export as ex
 
 ACT = "act_1234567890"
 META_ACCOUNT = {"id": ACT, "name": "Acme Dental", "currency": "USD", "tz": "America/New_York", "platform": "meta"}
@@ -207,3 +209,37 @@ def test_the_model_is_shown_a_meta_ad_set_with_no_keywords(monkeypatch):
         return {"verdict": "partly", "promiseKept": "It keeps some of it.", "gaps": ["g"], "pageEdits": ["e"], "headlineIdeas": [], "adEdits": []}
     out = lp.explain(ACT, "acme-dental.com/lp", store=store, search_fn=no_google, fetcher=Fetcher(), call=call, now=NOW, meta_pages=acme_graph().pages)
     assert out["source"] == "model" and "Meta ad set (no keywords or search terms)" in asked[0] and "Free quote" in asked[0]
+
+
+# ── The downloads ───────────────────────────────────────────────────────────
+
+def test_a_report_that_reads_both_platforms_names_both_accounts_and_each_page_s_platforms():
+    t = ex.tables(run(BOTH))
+    rows = dict(t["Summary"][1])
+    assert rows["Google Ads account"].endswith("(1112223334)") and rows["Meta ad account"].endswith("(act_1234567890)")
+    head, pages = t["Pages"]
+    assert head[-1] == "Platforms" and pages[0][-1] == "Google Ads and Meta Ads"
+
+
+def test_the_meta_ads_are_listed_with_metas_ratings():
+    head, rows = ex.tables(run(BOTH))["Meta ads"]
+    assert head[:5] == ["Page", "Campaign", "Ad set", "Ad", "Spend"] and head[-3:] == ["Conversion rate rating", "Quality rating", "Engagement rate rating"]
+    assert len(rows) == 1 and rows[0][3] == "Ad 1" and rows[0][4] == 20.0 and rows[0][5] == "Free quote" and rows[0][6:] == ["Below average", "Average", "Average"]
+
+
+def test_a_google_report_has_no_meta_sheet_and_says_google_ads_as_before():
+    t = ex.tables(make_report())
+    assert "Meta ads" not in t and dict(t["Summary"][1])["Google Ads account"]
+    assert t["Pages"][1][0][-1] == "Google Ads"
+
+
+def test_a_saved_copy_of_either_platform_says_which_would_not_answer():
+    report = dict(make_report(), stale=[{"platform": "google", "savedAt": "2026-10-10T08:00:00+00:00"}, {"platform": "meta", "savedAt": "2026-10-10T08:00:00+00:00"}])
+    notes = [r[1] for r in ex.tables(report)["Notes"][1] if r[0] == "Saved read"]
+    assert notes == ["The read is the one saved on 2026-10-10 08:00 because Google Ads would not answer now.", "The read is the one saved on 2026-10-10 08:00 because Meta Ads would not answer now."]
+
+
+def test_a_both_report_opens_as_excel_pdf_and_zip():
+    report = run(BOTH)
+    assert ex.xlsx(report)[:2] == b"PK" and ex.pdf(report)[:4] == b"%PDF" and ex.csv_zip(report)[:2] == b"PK"
+    assert ex.file_stem(report).startswith("Acme-Dental")

@@ -22,6 +22,8 @@ RESULT_TEXT = {"pass": "Pass", "warn": "Warning", "fail": "Fail", "na": "Not app
 SEVERITY_TEXT = {"critical": "Critical", "high": "High", "medium": "Medium", "low": "Low"}
 ON_TEXT = {"headline": "In the headline", "page": "On the page", "partial": "Partly there", "none": "Not on the page", None: "Not checked"}
 RATING_TEXT = {"below": "Below average", "average": "Average", "above": "Above average", None: ""}
+ACCOUNT_LABEL = {"google": "Google Ads account", "meta": "Meta ad account"}
+PLATFORM_TEXT = {"google": "Google Ads", "meta": "Meta Ads"}
 PDF_AFFECTED = 5
 PDF_PAGES = 30                                     # pages whose problems the PDF lists (the Excel file has every one)
 
@@ -70,7 +72,9 @@ def tables(report):
     pages = report.get("pages") or []
     out = {}
     t = summary.get("tally") or {}
-    ov = [["Google Ads account", "%s (%s)" % (acct.get("name") or "", acct.get("id") or "")], ["Window", report.get("window") or ""],
+    shown = [[ACCOUNT_LABEL.get(a["platform"], "Account"), "%s (%s)" % (a.get("name") or "", a.get("id") or "")] for a in report.get("accounts") or []] or \
+        [["Google Ads account", "%s (%s)" % (acct.get("name") or "", acct.get("id") or "")]]
+    ov = shown + [["Window", report.get("window") or ""],
           ["Read on", (report.get("readAt") or "")[:16].replace("T", " ")], ["Report made on", (report.get("generatedAt") or "")[:10]],
           ["Overall score", summary.get("score") if summary.get("score") is not None else "Nothing could be judged"], ["Overall grade", summary.get("grade") or ""],
           ["Grade held at C or below because", "; ".join(summary.get("capReasons") or [])],
@@ -89,10 +93,11 @@ def tables(report):
         tally = s.get("tally") or {}
         rows.append([p["url"], p["spend"], p["clicks"], p["conversions"], _pct(p.get("convRate")), p.get("cpa"), p["score"] if p.get("rated") else "Not verified", p["grade"] if p.get("rated") else "",
                      tally.get("fail", 0), tally.get("warn", 0), tally.get("unknown", 0), seen.get("status"), seen.get("responseMs"), seen.get("words"), p.get("speed"),
-                     _pct(dev["mobile"]), _pct(dev["desktop"]), (seen.get("title") or ""), "; ".join(seen.get("h1") or []), p.get("groupCount", 0)])
+                     _pct(dev["mobile"]), _pct(dev["desktop"]), (seen.get("title") or ""), "; ".join(seen.get("h1") or []), p.get("groupCount", 0),
+                     " and ".join(PLATFORM_TEXT.get(x, x) for x in p.get("platforms") or ["google"])])
     if rows:
         out["Pages"] = (["Page", "Spend", "Clicks", "Conversions", "Conv rate %", "Cost per conversion", "Score", "Grade", "Failed", "Warnings", "Could not check", "HTTP status",
-                         "Server ms", "Words", "Google speed score", "Mobile conv rate %", "Desktop conv rate %", "Title", "Main headline", "Ad groups"], rows)
+                         "Server ms", "Words", "Google speed score", "Mobile conv rate %", "Desktop conv rate %", "Title", "Main headline", "Ad groups", "Platforms"], rows)
 
     fix = report.get("fixFirst") or []
     if fix:
@@ -119,9 +124,13 @@ def tables(report):
     if unknown:
         out["Could not check"] = (["Page", "Check", "Why not"], unknown)
 
-    kw, terms, offers = [], [], []
+    kw, terms, offers, ads = [], [], [], []
     for p in pages:
         for g in p.get("adGroups") or []:
+            for ad in g.get("ads") or []:
+                ranks = ad.get("ranks") or {}
+                ads.append([p["url"], g["campaign"], g["name"], ad["name"], ad["cost"], "; ".join(ad.get("headlines") or []), RATING_TEXT.get(ranks.get("conversion"), ""),
+                            RATING_TEXT.get(ranks.get("quality"), ""), RATING_TEXT.get(ranks.get("engagement"), "")])
             for k in g.get("keywords") or []:
                 kw.append([p["url"], g["campaign"], g["name"], k["text"], k["match"], k["cost"], k["clicks"], k["qs"], RATING_TEXT.get(k["landingPage"], ""), RATING_TEXT.get(k["adRelevance"], ""),
                            RATING_TEXT.get(k["expectedCtr"], ""), ON_TEXT.get(k["on"], "")])
@@ -133,12 +142,15 @@ def tables(report):
         out["Keywords"] = (["Page", "Campaign", "Ad group", "Keyword", "Match", "Spend", "Clicks", "Quality score", "Landing page experience", "Ad relevance", "Expected click rate", "On the page"], kw)
     if terms:
         out["Search terms"] = (["Page", "Campaign", "Ad group", "Search term", "Clicks", "Spend", "Conversions", "On the page"], terms)
+    if ads:
+        out["Meta ads"] = (["Page", "Campaign", "Ad set", "Ad", "Spend", "Headline", "Conversion rate rating", "Quality rating", "Engagement rate rating"], ads)
     if offers:
         out["Ad offers"] = (["Page", "Campaign", "Ad group", "Promise in the ad", "On the page"], offers)
 
     notes = [["Note", n] for n in report.get("notes") or []] + [["Part that could not be read", w] for w in report.get("warnings") or []]
     for st in report.get("stale") or []:
-        notes.append(["Saved read", "The read is the one saved on %s because Google Ads would not answer now." % str(st.get("savedAt") or "")[:16].replace("T", " ")])
+        notes.append(["Saved read", "The read is the one saved on %s because %s would not answer now." % (str(st.get("savedAt") or "")[:16].replace("T", " "),
+                                                                                                      PLATFORM_TEXT.get(st.get("platform"), "the platform"))])
     if notes:
         out["Notes"] = (["Kind", "Detail"], notes)
     return out

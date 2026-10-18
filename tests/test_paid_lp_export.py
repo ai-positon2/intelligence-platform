@@ -174,3 +174,4 @@ def test_no_em_or_en_dash_in_any_file_text(report):
     for name, (header, rows) in ex.tables(report).items():
         for cell in header + [c for r in rows for c in r]:
             assert "—" not in str(cell) and "–" not in str(cell), name
+
