@@ -248,3 +248,36 @@ def test_the_store_being_down_is_a_clean_error_not_a_crash(book, monkeypatch):
     monkeypatch.setattr(bstore, "list_month", down)
     r = client_as(STAFF).get(BUDGETS + "?month=2026-10")
     assert r.status_code == 503 and "unavailable" in r.get_json()["error"]
+
+
+# ── The admin check of what the desk would read from one Meta ad account ────
+
+PROBE = "/p2/paid-marketing/api/pacing/meta-probe"
+
+
+def test_the_meta_pacing_probe_is_for_admins_and_signed_in_people_only():
+    import app as appmod
+    from tests.test_paid_marketing import ADMIN
+    assert appmod.app.test_client().get(PROBE + "?account=act_5550001").status_code == 302
+    assert client_as(STAFF).get(PROBE + "?account=act_5550001").status_code == 403
+    r = client_as(ADMIN).get(PROBE + "?account=1234567890")
+    assert r.status_code == 400 and "Meta ad account" in r.get_json()["error"]
+
+
+def test_the_meta_pacing_probe_shows_the_campaigns_budgets_and_spend_it_would_read_without_saving(monkeypatch):
+    from tests.test_paid_marketing import ADMIN
+    from tracker import paid_meta, paid_pacing_meta as pm
+    monkeypatch.setattr(paid_meta, "config_problem", lambda: "")
+    acct = {"id": "act_5550001", "name": "Acme Social", "currency": "USD", "tz": "America/Los_Angeles", "platform": "meta"}
+    monkeypatch.setattr(paid_meta, "account_by_id", lambda store, a: acct)
+    rows = [{"id": "1", "name": "Leads", "status": "ENABLED", "type": "Meta Leads", "bid": "Lowest cost", "budget": 90.0, "pool": "", "date": "2026-10-01", "cost": 60.0},
+            {"id": "1", "name": "Leads", "status": "ENABLED", "type": "Meta Leads", "bid": "Lowest cost", "budget": 90.0, "pool": "", "date": "2026-10-02", "cost": 40.0},
+            {"id": "2", "name": "Dark", "status": "ENABLED", "type": "Meta Traffic", "bid": "Lowest cost", "budget": 30.0, "pool": "", "date": "2026-10-02", "cost": 0.0}]
+    seen = []
+    monkeypatch.setattr(pm, "read_account", lambda a, start, end, **kw: seen.append((a["id"], start, end)) or {"rows": rows, "notes": ["Evergreen has a lifetime budget and no end date, so its budget a day is not known"]})
+    r = client_as(ADMIN).get(PROBE + "?account=act_5550001")
+    j = r.get_json()
+    assert r.status_code == 200 and j["account"] == "Acme Social" and j["rows"] == 3 and len(seen) == 1
+    assert j["campaigns"] == [{"name": "Leads", "status": "ENABLED", "type": "Meta Leads", "bid": "Lowest cost", "budget": 90.0, "spend": 100.0, "days": 2},
+                              {"name": "Dark", "status": "ENABLED", "type": "Meta Traffic", "bid": "Lowest cost", "budget": 30.0, "spend": 0.0, "days": 0}]
+    assert j["notes"] and j["start"].endswith("-01") and seen[0][1] == j["start"] and seen[0][2] == j["end"]

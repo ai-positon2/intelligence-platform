@@ -4513,6 +4513,38 @@ def paid_pacing_budgets_parse():
         return jsonify(error=str(e)), 400
 
 
+@app.route("/p2/paid-marketing/api/pacing/meta-probe")
+@position2_required
+def paid_pacing_meta_probe():
+    """Admin only: what the Pacing Desk would read for one Meta ad account this month (its campaigns, their budgets and the days), without saving or running anything.
+    A check that Meta's answers are what the reader expects, like /api/meta/status?probe=."""
+    if not _pm_is_admin():
+        return jsonify(error="Only an admin can run the Meta pacing check."), 403
+    from tracker import paid_meta, paid_pacing_meta as pm, paid_pacing_read as reader, paid_store
+    act = request.args.get("account", "")
+    if not paid_meta.is_meta(act):
+        return jsonify(error="account should be a Meta ad account (act_...)."), 400
+    try:
+        problem = paid_meta.config_problem()
+        if problem:
+            return jsonify(error=problem), 503
+        account = paid_meta.account_by_id(paid_store, act)
+        if not account:
+            return jsonify(error="That account is not one of the Meta ad accounts the connected token can read."), 400
+        as_of, start, _ends = reader.plan_window([account])
+        end = pm.ends_for([account], as_of)[act]
+        got = pm.read_account(account, start.isoformat(), end, store=paid_store)
+        camps = {}
+        for r in got["rows"]:
+            c = camps.setdefault(r["id"], {"name": r["name"], "status": r["status"], "type": r["type"], "bid": r["bid"], "budget": r["budget"], "spend": 0.0, "days": 0})
+            c["spend"] = round(c["spend"] + r["cost"], 2)
+            c["days"] += 1 if r["cost"] else 0
+        return jsonify(account=account["name"], currency=account["currency"], asOf=as_of.isoformat(), start=start.isoformat(), end=end, campaigns=list(camps.values()),
+                       rows=len(got["rows"]), notes=got["notes"])
+    except paid_meta.AdsError as e:
+        return jsonify(error=str(e)), 502
+
+
 @app.route("/p2/paid-marketing/api/pacing/seed", methods=["POST"])
 def paid_pacing_seed():
     """The engine's daily push. No session: a shared secret in X-Seed-Secret,
@@ -20482,7 +20514,7 @@ AD INTELLIGENCE (/p2/strategic-agents/ad-intelligence): tracks competitors' runn
 keywords, messaging angle, first/last seen) pulled from a shared Google Sheet.
 
 PAID MARKETING AGENTS (/p2/paid-marketing): the PPC team's five agents (three came from Agent Holmes).
-Pacing Desk (/p2/paid-marketing/pacing-desk): reads every Google Ads account live each day and measures it against the
+Pacing Desk (/p2/paid-marketing/pacing-desk): reads every Google Ads account live each day, and the Meta ad accounts the month's Meta allocations name (an allocation row has a channel, Google or Meta; a Meta row is matched to a Meta ad account by name, and a Meta campaign's daily budget is its own, else its running ad sets', a lifetime budget spread over its flight, or unknown and said so), and measures each against the
 month's allocations (kept on the page, not in a sheet), projects every account to month end from actual spend per active day (never from the daily cap), labels it
 over/under/on target against ideal pacing ((today-1)/days in month, +2pp tolerance), and recommends budget
 moves between categories inside one location that net to zero; anyone can tick a move as applied. The
