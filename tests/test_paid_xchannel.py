@@ -330,3 +330,36 @@ def test_the_cooldown_is_per_account():
     store = FakeStore()
     run(store=store, force=True)
     run(account=GID, store=store, force=True)
+
+
+# ── reading in pieces ───────────────────────────────────────────────────────
+
+def test_without_a_stand_in_each_platform_is_read_period_by_period_and_then_as_a_whole(monkeypatch):
+    seen = []
+
+    def fake(target, first, last, **kw):
+        seen.append((target["platform"], first, last, kw["force"]))
+        return shape(first, last, GOOGLE_CAMPAIGNS if target["platform"] == "google" else META_CAMPAIGNS, google_numbers if target["platform"] == "google" else meta_numbers)
+    monkeypatch.setattr(xc, "_shape", fake)
+    r = xc.report_for(GID + "+" + ACT, store=FakeStore(), today=TODAY, now=NOW, accounts_fn=lambda: ACCTS, search_fn=lambda g: [], pages_fn=lambda p, q: [], force=True)
+    assert [x[:3] for x in seen] == [("google", "2026-08-19", "2026-09-17"), ("google", "2026-09-18", "2026-10-17"), ("google", "2026-08-19", "2026-10-17"),
+                                     ("meta", "2026-08-19", "2026-09-17"), ("meta", "2026-09-18", "2026-10-17"), ("meta", "2026-08-19", "2026-10-17")]
+    assert [x[3] for x in seen] == [True, True, False, True, True, False]            # Refresh re-reads the pieces; the whole is then assembled from what they saved
+    assert r["platforms"] == ["google", "meta"] and r["range"]["days"] == 30
+
+
+def test_an_ordinary_read_asks_each_piece_without_force(monkeypatch):
+    seen = []
+    monkeypatch.setattr(xc, "_shape", lambda t, a, b, **kw: seen.append(kw["force"]) or shape(a, b, GOOGLE_CAMPAIGNS, google_numbers))
+    xc.report_for(GID, store=FakeStore(), today=TODAY, now=NOW, accounts_fn=lambda: ACCTS, search_fn=lambda g: [], pages_fn=lambda p, q: [])
+    assert seen == [False, False, False]
+
+
+def test_a_piece_that_fails_counts_as_that_platform_failing(monkeypatch):
+    def fake(target, first, last, **kw):
+        if target["platform"] == "meta" and first == "2026-09-18":
+            raise paid_gads.AdsError("Meta would not answer the second piece")
+        return shape(first, last, GOOGLE_CAMPAIGNS if target["platform"] == "google" else META_CAMPAIGNS, google_numbers if target["platform"] == "google" else meta_numbers)
+    monkeypatch.setattr(xc, "_shape", fake)
+    r = xc.report_for(GID + "+" + ACT, store=FakeStore(), today=TODAY, now=NOW, accounts_fn=lambda: ACCTS, search_fn=lambda g: [], pages_fn=lambda p, q: [])
+    assert r["platforms"] == ["google"] and any("second piece" in w for w in r["warnings"])

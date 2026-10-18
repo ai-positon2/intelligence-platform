@@ -75,16 +75,21 @@ def _shape(target, first, last, *, store, force, notes, stamps, http=None):
     return base.campaign_days(store, target["id"], first, last, force=force, notes=notes, stamps=stamps, http=http)
 
 
-def read_days(targets, first, last, *, store, force=False, shape_fn=None):
+def read_days(targets, first, last, *, store, force=False, shape_fn=None, stages=()):
     """({platform: shape}, problems, notes, stamps) over first..last. With two platforms, one that cannot be read is a problem and the other still counts; one platform alone failing is raised.
-    A spent allowance is raised however many platforms there are, so the page can say when to come back."""
+    A spent allowance is raised however many platforms there are, so the page can say when to come back.
+
+    `stages` are the pieces (each a (first, last) pair) that are read, and so saved day by day, one after the other before the whole range is assembled from what is saved: a platform
+    stores a read only when the whole read has come back, so one long read that is cut short by a timeout would keep nothing, where two shorter ones keep the first."""
     shapes, problems, notes, stamps = {}, [], [], []
     for t in targets:
         try:
             if shape_fn:
                 shapes[t["platform"]] = shape_fn(t, first, last)
             else:
-                shapes[t["platform"]] = _shape(t, first, last, store=store, force=force, notes=notes, stamps=stamps)
+                for a, b in stages:
+                    _shape(t, a, b, store=store, force=force, notes=notes, stamps=stamps)
+                shapes[t["platform"]] = _shape(t, first, last, store=store, force=False if stages else force, notes=notes, stamps=stamps)
         except base.OverQuota:
             raise
         except base.AdsError as e:
@@ -229,7 +234,7 @@ def report_for(account, *, preset="30", measure="primary", actual_conv=None, act
     if force:
         base.refresh_guard(store, "xch:" + key)
     first, last = periods["previous"][0], periods["current"][1]
-    shapes, problems, notes, stamps = read_days(targets, first, last, store=store, force=force, shape_fn=shape_fn)
+    shapes, problems, notes, stamps = read_days(targets, first, last, store=store, force=force, shape_fn=shape_fn, stages=(periods["previous"], periods["current"]))
     read_targets = [t for t in targets if t["platform"] in shapes]
     settings, swarn = read_settings(read_targets, periods["current"][0], periods["current"][1], store=store, force=force, search_fn=search_fn, pages_fn=pages_fn, notes=notes, stamps=stamps)
     raw = {"accounts": targets, "shapes": shapes, "settings": settings, "problems": problems, "settingsWarnings": swarn, "periods": periods, "preset": str(preset or "30"),
