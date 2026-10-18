@@ -656,7 +656,10 @@ def run_loop(messages, *, client, tools=None, on_step=lambda s: None):
         resp = client.messages.create(model=MODEL, max_tokens=MAX_TOKENS, system=system,
                                       tools=TOOL_SPECS, messages=messages)
         if resp.stop_reason != "tool_use":
-            return _text(resp), used
+            text = _text(resp)
+            if resp.stop_reason == "max_tokens":          # the model ran out of room mid-sentence: say so rather than present half an answer as the whole
+                text += "\n\n(The answer was cut off here. Ask a narrower question to get the rest.)"
+            return text, used
         messages.append({"role": "assistant", "content": resp.content})
         calls = [b for b in resp.content if getattr(b, "type", None) == "tool_use"]
         for b in calls:

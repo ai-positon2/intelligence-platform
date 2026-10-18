@@ -216,14 +216,19 @@ function send(text){
   api("/chat",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({message:message,history:history})})
   .then(function(j){
     return new Promise(function(resolve,reject){
-      var delay=1200;
+      var delay=1200, fails=0;
       (function poll(){
         api("/jobs/"+j.job_id).then(function(job){
+          fails=0;
           turn.steps(job.steps||[]);
           if(job.status==="running"){ setTimeout(poll, delay); delay=Math.min(2500,delay+200); return; }
           if(job.status==="failed") return reject(new Error(job.error||"The question failed."));
           resolve(job);
-        }).catch(function(e){ setTimeout(poll, 4000); console.warn("Client Feedback Agent: poll", e); });
+        }).catch(function(e){
+          console.warn("Client Feedback Agent: poll", e);
+          if(++fails>=6) return reject(new Error("Lost touch with the server while the question was running. Reload the page and ask again."));    // not for ever: a 404 or a lapsed sign-in never gets better
+          setTimeout(poll, 4000);
+        });
       })();
     });
   })

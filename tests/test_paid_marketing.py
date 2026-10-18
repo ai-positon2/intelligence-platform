@@ -452,3 +452,16 @@ def test_the_section_page_has_no_client_launcher():
         assert gone not in html, gone
     assert 'data-live="pacing"' in html            # the card readouts stay
     assert "launchPick" not in open(os.path.join(ROOT, "static", "js", "paid_marketing.js")).read()
+
+
+def test_an_answer_the_model_ran_out_of_room_for_is_not_presented_as_complete():
+    client = FakeClient([([text("The meeting decided three things: first, the budget goes up by")], "max_tokens")])
+    answer, _ = fb.run_loop([{"role": "user", "content": "q"}], client=client, tools=FakeTools())
+    assert answer.startswith("The meeting decided three things: first, the budget goes up by") and "The answer was cut off here." in answer
+    done = FakeClient([([text("All of it.")], "end_turn")])
+    assert fb.run_loop([{"role": "user", "content": "q"}], client=done, tools=FakeTools())[0] == "All of it."
+
+
+def test_the_client_feedback_page_stops_polling_a_job_it_can_no_longer_reach():
+    page = open(os.path.join(ROOT, "static", "js", "client_feedback_agent.js"), encoding="utf-8").read()
+    assert "if(++fails>=6) return reject(" in page and "fails=0;" in page and "Reload the page and ask again." in page
