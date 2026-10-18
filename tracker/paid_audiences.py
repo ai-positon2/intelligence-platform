@@ -41,8 +41,8 @@ ALL = seg.ALL
 zero, add, is_empty, derive = geo.zero, geo.add, geo.is_empty, geo.derive
 LOOKUP_CHUNK = 300
 
-KINDS = [("in_market", "In-market"), ("affinity", "Affinity"), ("remarketing", "Remarketing"), ("customer_match", "Customer match"),
-         ("similar", "Similar"), ("custom", "Custom segments"), ("other", "Other")]
+KINDS = [("in_market", "In-market"), ("affinity", "Affinity"), ("interest", "Interests"), ("behavior", "Behaviors"), ("remarketing", "Remarketing"),
+         ("customer_match", "Customer match"), ("similar", "Similar"), ("custom", "Custom segments"), ("other", "Other")]
 KIND_LABEL = dict(KINDS)
 LIST_KIND = {"CRM_BASED": ("customer_match", "Customer match list"), "SIMILAR": ("similar", "Similar audience"),
              "LOOKALIKE": ("similar", "Lookalike audience"), "REMARKETING": ("remarketing", "Remarketing list"),
@@ -322,6 +322,7 @@ def _view(audiences, ctype, account, multi):
         row = derive(m, account["cost"], account["conv"])
         modes = sorted({u["mode"] for u in uses})
         row.update(key=key, label=a["label"], kind=a["kind"], kindLabel=KIND_LABEL[a["kind"]], detail=a["detail"], account=a["account"] if multi else "",
+                   platform="meta" if uses and all(u.get("platform") == "meta" for u in uses) else "google",
                    mode=modes[0] if len(modes) == 1 else "mixed", types=sorted({u["ctype"] for u in uses}), **_bid_summary(uses),
                    uses=[dict(u, m=derive(u["m"], account["cost"], account["conv"])) for u in sorted(uses, key=lambda u: -u["m"]["cost"])])
         rows.append(row)
@@ -338,14 +339,16 @@ def assemble(raw, account, start, end):
     types = [t for t, m in sorted(totals.items(), key=lambda p: -p[1]["cost"]) if t in seen]
     types += sorted(t for t in seen if t not in types)
     multi = bool(raw.get("members"))
+    platform = raw.get("platform") or "google"
     views = {}
     for t in [ALL] + types:
         base = acct if t == ALL else totals.get(t, zero())
         v = _view(raw["audiences"], t, {"cost": base["cost"], "conv": base["conv"], "m": base}, multi)
-        views[t] = insights.analyse(v, currency=account.get("currency") or "USD", ctype=t)
+        views[t] = insights.analyse(v, currency=account.get("currency") or "USD", ctype=t,
+                                    mixed=t == ALL and platform == "meta" and geo._mixed_results(totals), force_cpa=t == ALL and platform == "both")
     lists = insights.judge_lists(raw["lists"])
     report = {
-        "account": {"id": account["id"], "name": account["name"], "currency": account.get("currency") or "USD", "platform": "google",
+        "account": {"id": account["id"], "name": account["name"], "currency": account.get("currency") or "USD", "platform": platform,
                     "isGroup": multi, "accountCount": len(raw.get("members") or []) or 1},
         "range": {"from": start.isoformat(), "to": end.isoformat(), "days": (end - start).days + 1},
         "kinds": [{"key": k, "label": l, "count": sum(1 for r in views[ALL]["rows"] if r["kind"] == k)} for k, l in KINDS],
@@ -357,14 +360,71 @@ def assemble(raw, account, start, end):
     return report
 
 
-def report_for(account_id, start, end, *, accounts_fn=None, groups_fn=None, search_fn=None, now=None, force=False, store=None):
-    """The audience report for a Google Ads account or an MCC the root MCC holds over a date range. `force` (Refresh) skips the saved
-    read, at most once per paid_gads.REFRESH_COOLDOWN_S for the account."""
-    from . import paid_store
+def merge_raw(g, m):
+    """One raw read from a Google and a Meta one of the same range: the audiences of the two accounts side by side (their keys carry the account),
+    the totals and the lists added. Neither input is changed."""
+    totals = {}
+    for src in (g["totals"], m["totals"]):
+        for t, v in src.items():
+            add(totals.setdefault(t, zero()), v)
+    return {"platform": "both", "audiences": {**g["audiences"], **m["audiences"]}, "totals": totals, "lists": list(g["lists"]) + list(m["lists"]),
+            "exclusions": list(g["exclusions"]) + list(m["exclusions"]), "members": g.get("members") or [],
+            "warnings": list(g["warnings"]) + list(m["warnings"]), "readAt": min(filter(None, (g.get("readAt"), m.get("readAt"))), default=None)}
+
+
+PLATFORM_NAME = {"google": "Google Ads", "meta": "Meta Ads"}
+
+
+def _raw_for(raw_id, s, e, *, force, store, now, accounts_fn, groups_fn, search_fn, meta_fetch):
+    """(raw read, account, stale) for one Google account / MCC group or one Meta account."""
+    from . import paid_meta, paid_meta_audiences
+    if paid_meta.is_meta(raw_id):
+        account = seg._meta_target(raw_id, store)
+        raw, stale = geo._cached("audiences", paid_meta.day_key(account["id"]), "all", s, e,
+                                 lambda: paid_meta_audiences.meta_raw(account, s, e, store=store, fetch=meta_fetch), force=force, store=store, now=now)
+    else:
+        account = seg.resolve_target(raw_id, accounts_fn=accounts_fn, groups_fn=groups_fn)
+        raw, stale = geo._cached("audiences", account["id"], "all", s, e, lambda: google_raw(account, s, e, search_fn=search_fn),
+                                 force=force, store=store, now=now)
+    return raw, account, stale
+
+
+def report_for(account_id, start, end, *, accounts_fn=None, groups_fn=None, search_fn=None, now=None, force=False, store=None, meta_fetch=None):
+    """The audience report for a Google Ads account or an MCC the root MCC holds, a Meta ad account (act_...), or a Google and a Meta account together
+    ("<google id>+<act_ id>") over a date range. `force` (Refresh) skips the saved read, at most once per paid_gads.REFRESH_COOLDOWN_S for the account."""
+    from . import paid_meta, paid_store
     store = store or paid_store
+    raw_id = str(account_id or "").strip()
     s, e = seg.parse_range(start, end)
-    account = seg.resolve_target(account_id, accounts_fn=accounts_fn, groups_fn=groups_fn)
-    raw, stale = geo._cached("audiences", account["id"], "all", s, e, lambda: google_raw(account, s, e, search_fn=search_fn),
-                             force=force, store=store, now=now)
+    kw = dict(force=force, store=store, now=now, accounts_fn=accounts_fn, groups_fn=groups_fn, search_fn=search_fn, meta_fetch=meta_fetch)
+    if "+" in raw_id:
+        parts = raw_id.split("+")
+        if len(parts) != 2 or not geo.base.ID_RE.match(parts[0]) or not paid_meta.is_meta(parts[1]):
+            raise BadRequest("A combined account is one Google Ads account and one Meta ad account.")
+
+        def half(rid):
+            try:
+                return _raw_for(rid, s, e, **kw), None
+            except geo.base.RefreshTooSoon:
+                return _raw_for(rid, s, e, **dict(kw, force=False)), None        # just refreshed: it is current
+            except gads.GadsError as err:
+                return None, err
+        (gres, gerr), (mres, merr) = half(parts[0]), half(parts[1])
+        if gres is None and mres is None:
+            raise gerr
+        if gres is None or mres is None:
+            ok, bad, who = (mres, gerr, "google") if gres is None else (gres, merr, "meta")
+            raw, account, stale = ok
+            raw = dict(raw, warnings=list(raw.get("warnings") or []) + ["%s could not be read: %s Showing the other platform only." % (PLATFORM_NAME[who], bad)])
+            report = assemble(raw, account, s, e)
+            return dict(report, stale=stale) if stale else report
+        (graw, gacct, gstale), (mraw, macct, mstale) = gres, mres
+        if (gacct.get("currency") or "USD") != (macct.get("currency") or "USD"):
+            raise BadRequest("The two accounts bill in different currencies, so they cannot be added together.")
+        account = {"id": raw_id, "name": gacct["name"] + " + " + macct["name"], "currency": gacct.get("currency")}
+        report = assemble(merge_raw(graw, mraw), account, s, e)
+        stale = gstale or mstale
+        return dict(report, stale=stale) if stale else report
+    raw, account, stale = _raw_for(raw_id, s, e, **kw)
     report = assemble(raw, account, s, e)
     return dict(report, stale=stale) if stale else report

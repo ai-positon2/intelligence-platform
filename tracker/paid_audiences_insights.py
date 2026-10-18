@@ -26,9 +26,10 @@ MIN_CONV = gi.MIN_CONV
 SEARCH_MIN, DISPLAY_MIN = 1000, 100
 NO_BID_TYPES = ("Demand Gen", "Performance Max")
 ADJUSTABLE_STRATEGIES = ("MANUAL_CPC", "MANUAL_CPM", "MANUAL_CPV", "TARGET_SPEND", "PERCENT_CPC")      # the bidding that honours an audience adjustment
-KIND_ORDER = ["in_market", "affinity", "remarketing", "customer_match", "similar", "custom", "other"]
-KINDS_SHORT = {"in_market": "In-market", "affinity": "Affinity", "remarketing": "Remarketing", "customer_match": "Customer match",
-               "similar": "Similar", "custom": "Custom segments", "other": "Other"}
+KIND_ORDER = ["in_market", "affinity", "interest", "behavior", "remarketing", "customer_match", "similar", "custom", "other"]
+KINDS_SHORT = {"in_market": "In-market", "affinity": "Affinity", "interest": "Interests", "behavior": "Behaviors", "remarketing": "Remarketing",
+               "customer_match": "Customer match", "similar": "Similar", "custom": "Custom segments", "other": "Other"}
+META_MIN = 1000                         # an audience Meta estimates under this many people delivers poorly (it needs at least 100 to run at all)
 VERDICT_LABEL = dict(gi.VERDICT_LABEL)
 money, pct, num = gi.money, gi.pct, gi.num
 
@@ -42,8 +43,29 @@ def _signed(adj):
     return "%+d%%" % round(adj * 100)
 
 
+def _meta(row):
+    """True for an audience that is a Meta ad set's: Meta has no audience bid adjustment, so its advice is about ad sets, budget and targeting."""
+    return row.get("platform") == "meta"
+
+
+def _meta_action(row, verdict, adj):
+    suggestion = row["mode"] == "observation"
+    note = " Its ad sets use Advantage+ audience, which treats an audience as a suggestion, so keep it as a strict target in an ad set of its own to test it fairly." if suggestion else ""
+    if verdict in ("star", "good") and (adj or 0) >= 0.10:
+        return {"kind": "raise", "text": "Give it an ad set of its own, or a larger share of the budget, and check it after two weeks.%s" % note}
+    if verdict in ("weak", "below") and (adj or 0) <= -0.10:
+        return {"kind": "lower", "text": "Give it a smaller budget (an ad set of its own makes that possible), and take it out of the ad sets' targeting if it stays weak after a month."}
+    if verdict == "leak":
+        return {"kind": "exclude", "text": "Take it out of the ad sets' targeting, or exclude it, unless it matters for a reason the numbers cannot show."}
+    return {"kind": "hold", "text": "Leave it as it is."}
+
+
 def action_for(row, verdict, adj):
     """{kind, text}: what to do with one audience, given how it is attached and how its campaigns bid."""
+    if verdict in ("none", "thin"):
+        return {"kind": "none", "text": ""}
+    if _meta(row):
+        return _meta_action(row, verdict, adj)
     uses = row["uses"]
     can_bid = any(adjustable(u) for u in uses)
     observing = row["mode"] == "observation"
@@ -68,23 +90,28 @@ def action_for(row, verdict, adj):
     return {"kind": "hold", "text": "Leave it as it is."}
 
 
-def analyse(view, *, currency="USD", ctype="All"):
+def analyse(view, *, currency="USD", ctype="All", mixed=False, force_cpa=False):
     """The view with every audience judged, and `insights`, `basis` and `counts` added. `view` is {rows, total, account} as
-    tracker/paid_audiences.py builds it."""
+    tracker/paid_audiences.py builds it. `mixed`: the view adds together results that are not the same thing (a Meta account's sales and leads), so
+    nothing is ranked. `force_cpa`: Google and Meta are added, and Meta's results carry no value, so ROAS would call every Meta audience a failure: cost per
+    conversion is the one measure both have."""
     total = dict(view["account"], _cur=currency)
-    basis = gi.basis_of(total)
+    basis = None if mixed else gi.basis_of(total)
+    if force_cpa and not mixed:
+        basis = "cpa" if total.get("conversions", 0) > 0 and total.get("cpa") else None
     rows = []
     for r in view["rows"]:
         verdict, idx, adj, conf, why = gi.judge(r, total, basis)
         if verdict == "none":
-            why = "The account recorded no conversions in this range, so audiences cannot be judged on results."
+            why = gi.MIXED_WHY.replace("campaigns", "audiences' campaigns").replace("a place", "an audience") if mixed else \
+                "The account recorded no conversions in this range, so audiences cannot be judged on results."
         row = dict(r, verdict=verdict, verdictLabel=VERDICT_LABEL[verdict], index=None if idx is None else round(idx * 100), adjustment=adj,
                    confidence=conf, why=why)
         row["adjustable"] = any(adjustable(u) for u in r["uses"])
         row["action"] = action_for(row, verdict, adj)
         rows.append(row)
     out = dict(view, rows=rows, basis=basis)
-    out["insights"] = make_insights(rows, total, basis, currency, ctype)
+    out["insights"] = make_insights(rows, total, basis, currency, ctype, mixed)
     out["counts"] = {v: sum(1 for r in rows if r["verdict"] == v) for v in VERDICT_LABEL if any(r["verdict"] == v for r in rows)}
     return out
 
@@ -101,7 +128,7 @@ def _ev(r, total, basis, currency):
         r["index"], pct(r["pctCost"], 1), pct(r["pctConv"], 1))
 
 
-def make_insights(rows, total, basis, currency, ctype):
+def make_insights(rows, total, basis, currency, ctype, mixed=False):
     out = []
     if not rows:
         return out
@@ -109,10 +136,16 @@ def make_insights(rows, total, basis, currency, ctype):
     def add_(kind, severity, headline, evidence, action, conf, keys):
         out.append({"kind": kind, "severity": severity, "headline": headline, "evidence": evidence, "action": action,
                     "confidence": conf, "keys": keys})
+    if mixed:
+        add_("mixed", "watch", "Campaign types with different results are added together here",
+             "%s spent across %s audiences on campaigns whose results are different things (sales, leads, app installs), so one audience's cost per result "
+             "cannot be set against another's." % (money(total["cost"], currency), num(len(rows))),
+             "Pick one campaign type above: the audiences are judged within it.", "high", [])
+        return out
     if basis is None:
         add_("nodata", "watch", "No conversions in this range, so no audience can be judged on results",
              "%s spent across %s audiences with no conversions recorded." % (money(total["cost"], currency), num(len(rows))),
-             "Check conversion tracking, or pick a longer date range, before changing any audience bids.", "high", [])
+             "Check conversion tracking, or pick a longer date range, before changing %s." % ("any audience" if all(_meta(r) for r in rows) else "any audience bids"), "high", [])
         return out
     pushes = sorted([r for r in rows if r["action"]["kind"] == "raise"], key=lambda r: -r["conversions"])[:3]
     for r in pushes:
@@ -127,7 +160,7 @@ def make_insights(rows, total, basis, currency, ctype):
              "%s (%s): %s on %s clicks, no conversions; the average cost of a conversion here is %s, so this is %s times that." % (
                  r["label"], r["kindLabel"].lower(), money(r["cost"], currency), num(r["clicks"]), money(total["cpa"], currency, 2),
                  format(r["cost"] / total["cpa"], ".1f") if total.get("cpa") else "Na"), r["action"]["text"], "medium", [r["key"]])
-    stuck = [r for r in rows if r["verdict"] in ("star", "good", "weak", "below", "leak") and not r["adjustable"] and r["mode"] != "targeting"]
+    stuck = [r for r in rows if r["verdict"] in ("star", "good", "weak", "below", "leak") and not r["adjustable"] and r["mode"] != "targeting" and not _meta(r)]
     if stuck:
         add_("smart", "info", "Bid adjustments do not apply to %s of these audiences" % num(len(stuck)),
              "%s sit in campaigns on Smart Bidding, Demand Gen or Performance Max, which set their own bids and ignore an audience adjustment." % _names(stuck),
@@ -154,6 +187,9 @@ def judge_lists(lists):
     """Each list with what stops it serving: a size under what Google needs, a closed list, or no use at all."""
     out = []
     for l in lists:
+        if l.get("platform") == "meta":
+            out.append(_judge_meta_list(l))
+            continue
         problems = []
         if l["status"] == "CLOSED":
             problems.append("The list is closed, so no new people join it.")
@@ -168,10 +204,22 @@ def judge_lists(lists):
     return out
 
 
+def _judge_meta_list(l):
+    """A Meta audience with what stops it delivering: Meta says it is not ready, or estimates fewer people than it needs."""
+    problems = []
+    if l["status"] == "NOT_READY":
+        problems.append("Meta says the audience is not ready%s." % (": " + l["why"] if l.get("why") else ""))
+    size = l.get("sizeSearch")
+    if size is not None and size < META_MIN:
+        problems.append("Meta estimates %s people; an audience needs at least 100 to run and about %s to deliver well." % (
+            "fewer than " + num(META_MIN) if not size else num(size), num(META_MIN)))
+    return dict(l, problems=problems, serves=not problems)
+
+
 def kind_totals(view):
     """How each kind of audience does as a whole, against the account: {kind, label, count, cost, conversions, cpa, roas, index...}."""
     total = dict(view["account"], _cur="USD")
-    basis = gi.basis_of(total)
+    basis = view["basis"] if "basis" in view else gi.basis_of(total)          # the basis the view was judged on (cost per conversion when it adds Google and Meta)
     out = []
     by = {}
     for r in view["rows"]:
@@ -230,9 +278,15 @@ def report_insights(report, view):
         add_("exclusions", "info", "%s audience exclusion%s in place" % (num(n), "" if n == 1 else "s"),
              "%s." % _names([{"label": "%s (%s)" % (e["label"], e["adGroup"] or e["campaign"])} for e in report["exclusions"]], 4),
              "These are listed below. An excluded audience is never recommended above.", "high")
-    out.append({"kind": "pmax", "severity": "info", "headline": "Performance Max audiences are not in this table",
-                "evidence": "Google reports no results for the audience signals of a Performance Max campaign.",
-                "action": "Judge Performance Max by its asset groups and its campaign totals instead.", "confidence": "high", "keys": []})
+    platform = report["account"].get("platform") or "google"
+    if platform != "meta":
+        out.append({"kind": "pmax", "severity": "info", "headline": "Performance Max audiences are not in this table",
+                    "evidence": "Google reports no results for the audience signals of a Performance Max campaign.",
+                    "action": "Judge Performance Max by its asset groups and its campaign totals instead.", "confidence": "high", "keys": []})
+    if platform in ("meta", "both"):
+        out.append({"kind": "meta", "severity": "info", "headline": "Meta's audiences are judged by the ad sets that use them",
+                    "evidence": "Meta reports results per ad set, not per audience, so an audience's numbers are those of the ad sets aimed at it, and an ad set aimed at two audiences counts under both.",
+                    "action": "Read an audience's row as how the ad sets built on it do. To test one fairly, give it an ad set of its own.", "confidence": "high", "keys": []})
     rank = {"action": 0, "watch": 1, "info": 2}
     out.sort(key=lambda i: rank[i["severity"]])
     return out
