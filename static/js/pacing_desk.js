@@ -158,6 +158,11 @@ function inScope(a){
   return true;
 }
 
+/* The cost per conversion of the accounts in view: ALL their spend over ALL their conversions. The "Spent to date" tile leaves out the accounts
+   whose allocation is unclear (it is a share of budget), but their spend is real and their conversions are in the Conversions tile, so the CPA
+   must count both or neither. */
+function cpaOf(A){var cv=sum(A,function(a){return a.conv});return cv?sum(A,function(a){return a.spend})/cv:null;}
+
 function paintStrip(){
   var A=DERIVED.A.filter(inScope), solid=A.filter(function(a){return !a.ambiguous});
   var tAll=sum(solid,function(a){return a.allocated}), tSp=sum(solid,function(a){return a.spend}),
@@ -172,7 +177,7 @@ function paintStrip(){
     ["","Allocated",m0(tAll),pl(nC,"client")+" · "+pl(A.length,"account"),null],
     ["","Spent to date",m0(tSp),tAll?pc(tSp/tAll,1)+" of budget":"–",tAll?tSp/tAll:null],
     [Math.abs((tPr/(tAll||1))-1)<=0.02?"good":"info","Projected month end",m0(tPr),tAll?pc(tPr/tAll)+" of budget":"–",tAll?tPr/tAll:null],
-    ["","Conversions",Math.round(tCv).toLocaleString("en-US"),tCv?"CPA "+m0(tSp/tCv):"–",null],
+    ["","Conversions",Math.round(tCv).toLocaleString("en-US"),tCv?"CPA "+m0(cpaOf(A)):"–",null],
     [off?"warn":"good","Moves suggested",String(tMv),pl(off,"account")+" off target",null],
     [atRisk>0?"warn":"good","At risk from caps",m0(atRisk),pl(capped.length,"account")+" can’t reach budget",null]
   ];
@@ -501,13 +506,29 @@ function render(){
   crumb();
 }
 
+/* The engine's warnings about the whole portfolio, in two kinds: money SPENT by an account with no allocation (the first dollar figure is the spend),
+   and an allocation with no spend read for it (the dollar figure is the budget, not money spent: a dormant account, or one whose read failed). */
+function orphanSplit(ws){
+  var noData=/budget but no campaign data/, out={spent:[],unread:[],total:0};
+  (ws||[]).forEach(function(w){
+    if(noData.test(w)){out.unread.push(w);return;}
+    out.spent.push(w);
+    var m=w.match(/\$([\d,]+(?:\.\d+)?)/);if(m)out.total+=parseFloat(m[1].replace(/,/g,""));
+  });
+  return out;
+}
+
 function paintOrphans(){
-  var b=[];
-  if(D.portfolioWarnings&&D.portfolioWarnings.length){
-    var tot=D.portfolioWarnings.reduce(function(t,w){var m=w.match(/\$([\d,]+(?:\.\d+)?)/);return t+(m?parseFloat(m[1].replace(/,/g,"")):0)},0);
-    b.push('<div class="pd-h4"><span>Spending with no allocation</span></div><div class="pd-client"><p class="pm-note warn"><b>'+m0(tot)+
+  var b=[], o=orphanSplit(D.portfolioWarnings);
+  if(o.spent.length){
+    b.push('<div class="pd-h4"><span>Spending with no allocation</span></div><div class="pd-client"><p class="pm-note warn"><b>'+m0(o.total)+
       '</b> spent month to date by accounts with no allocation for this month. They are left out of every figure above. Add them in <b>Allocations</b>.</p>'+
-      D.portfolioWarnings.map(function(w){return '<p class="pm-note">'+esc(w)+'</p>'}).join("")+'</div>');
+      o.spent.map(function(w){return '<p class="pm-note">'+esc(w)+'</p>'}).join("")+'</div>');
+  }
+  if(o.unread.length){
+    b.push('<div class="pd-h4"><span>Allocated, but no spend read</span></div><div class="pd-client"><p class="pm-note">These have a budget and no campaign data for this month '+
+      '(an account that is not running, or one Google would not answer for). Their budget is not counted as spend.</p>'+
+      o.unread.map(function(w){return '<p class="pm-note">'+esc(w)+'</p>'}).join("")+'</div>');
   }
   if(D.otherChannels&&D.otherChannels.length){
     b.push('<div class="pd-h4"><span>Other channels this desk doesn’t cover</span></div><div class="pd-client"><p class="pm-note">'+
