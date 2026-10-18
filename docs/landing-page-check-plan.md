@@ -65,6 +65,25 @@ copy, keywords and the page's own visible text, treats all of it as data, and it
 5. **Loads fast**: server response time, HTML weight, compression, render-blocking scripts, script count, images that shift the page, the lab score.
 6. **Tracking and trust**: a Google tag or tag manager seen, a privacy link, contact details, proof (reviews, awards, ratings).
 
+## Meta Ads
+
+The account can be a Google Ads account, a Meta ad account (act_...) or one of each, named as Account Audit names it ("<google id>", "act_..." or "<google id>+<act_...>"). A page both
+platforms send people to is one page: fetched once, its spend, clicks, results and device split added, and held to the checks of every platform that sends people to it.
+
+`tracker/paid_lp_meta_read.py` reads each ad's creative (the address it sends people to and its headline, primary text and description), what each ad spent and took, the split by device,
+Meta's own quality, engagement and conversion rate ratings and where an ad set sends people when its ads carry no web address. A Meta ad set stands where a Google ad group stands. Meta has no
+keywords and no search terms, so a Meta page is held to what its ads say, to Meta's ratings and to what Meta's pixel needs. Spend that reaches no web page of the client's (an instant form,
+a message, a call, an app, a post whose link the ad record does not carry, an ad no longer in the account) is counted and named, never guessed at. `tracker/paid_lp_merge.py` joins the two reads.
+
+Four checks are Meta's own (Meta's click id fbclid survives a redirect, the Meta pixel is on the page, Meta rates the conversion rate and the ad quality average or better). Google's keyword,
+Quality Score, tag, AdsBot and speed score checks run only for a page Google's ads reach. A Google page is held to 35 checks, a Meta page to 30 and a page both reach to all 39. The Meta
+pixel is looked for in the page's HTML only: a pixel added later by a script or a tag manager, and the Conversions API, cannot be seen from a page, and the check says so.
+
+One platform that will not answer is a warning and the report is the other platform's alone. A platform lost to its allowance leaves a whole saved read to be served with its date. A Google and
+a Meta account are read together only when they bill in the same currency, because their spend is added. What Meta counts as a result depends on the campaign's objective, so a page that
+only traffic or awareness campaigns reach shows no conversions. The Meta read was written from Meta's documentation and tested against a copy of the Graph API's answers; it has not been run
+against a live account from the development machine, so a field Meta names differently shows up as a warning on the page ("could not be read") with Meta's own message, not as a gap.
+
 ## Scoring
 
 Same arithmetic as the Account Audit: a pass earns a check's weight (critical 8, high 4, medium 2, low 1), a warning half, a failure
@@ -73,7 +92,7 @@ nothing; not applicable and could not check are left out and counted. The grade 
 
 ## Files
 
-`tracker/paid_lp_read.py` (Google reads), `paid_lp_page.py` (fetch and parse a page), `paid_lp_match.py` (words, keywords, offers),
+`tracker/paid_lp_read.py` (Google reads), `paid_lp_meta_read.py` (Meta reads), `paid_lp_merge.py` (the two together), `paid_lp_page.py` (fetch and parse a page), `paid_lp_match.py` (words, keywords, offers),
 `paid_lp_model.py` (a finding and a score), `paid_lp_checks.py` (the checklist), `paid_lp.py` (the report, cached like the audit's),
 `paid_lp_export.py` (Excel, PDF, CSV zip), `paid_lp_ai.py` (the optional model read), `paid_lp_speed.py` (the optional lab test), `paid_lp_docs.py` (the checklist as a document,
 `docs/landing-page-check-checks.md`, held equal to the catalog by a test). The page is `templates/landing_page_check.html`, `static/js/lp_data.js` (pure functions, run in Node by the tests),

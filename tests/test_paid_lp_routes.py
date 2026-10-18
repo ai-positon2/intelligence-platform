@@ -136,7 +136,7 @@ def test_the_card_is_on_the_paid_marketing_page_the_hub_counts_it_and_the_comman
 
 def test_the_assistant_knows_the_agent():
     src = open(app_module.__file__, encoding="utf-8").read()
-    assert "Landing Page & Relevancy Check (/p2/paid-marketing/landing-page-check)" in src and "35 checks in six sections" in src and "A page that does not open scores 0" in src
+    assert "Landing Page & Relevancy Check (/p2/paid-marketing/landing-page-check)" in src and "39 checks in six sections" in src and "a page Meta's ads send people to" in src and "A page that does not open scores 0" in src
 
 
 def test_no_em_or_en_dash_in_any_landing_page_check_code_or_the_plan():
