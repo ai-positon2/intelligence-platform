@@ -601,3 +601,16 @@ def test_a_search_a_rulebook_would_send_to_the_model_stays_with_the_model_even_w
       const r = await C.analyze(rs, [R("acme widgets cheap", {clicks: 1, cost: 2}), R("acme widgets store", {clicks: 1, cost: 2})], {keywords: kw, classify: model({})});
       return r.rows.map(x => [x.term, x._det.by]);""")
     assert out == [["acme widgets cheap", "model"], ["acme widgets store", "rule"]]
+
+
+def test_terms_a_failed_model_batch_never_judged_are_not_counted_as_wasted_spend():
+    out = js("""
+      const rows = [R("brand core", {clicks: 10, cost: 100, conversions: 5}), R("faraway town", {clicks: 4, cost: 40}), R("mystery one", {clicks: 30, cost: 300}),
+                    R("mystery two", {clicks: 20, cost: 200})];
+      const classify = async (terms) => { const o = {}; terms.forEach(t => { o[t] = {status: "Not Relevant", subtype: "No Clear Intent", by: "fallback"}; });
+                                          return {results: o, fallback: terms.length, failures: ["classify answered 502"]}; };
+      const r = await C.analyze(STUB, rows, {classify, status: () => {}});
+      return {s: r.summary};""")
+    s = out["s"]
+    assert s["fallback"] == 2 and s["notJudgedSpend"] == 500
+    assert s["wastedSpend"] == 40                                   # only the term a rule judged ("faraway") is waste

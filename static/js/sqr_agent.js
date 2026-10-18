@@ -414,7 +414,7 @@ function renderResults(r){
   const tab = (k, l, n) => '<button class="sq-tab" data-k="' + k + '">' + l + '<span class="n">' + n + '</span></button>';
   let warn = "";
   if (s.failures.length) warn += '<div class="pm-err">' + s.failures.length + ' model batch' + (s.failures.length === 1 ? "" : "es") +
-    ' failed: ' + esc(s.failures[0]) + ' Their ' + s.fallback.toLocaleString() + ' term rows are marked Not Relevant, No Clear Intent, and say "fallback" in the table. They are not turned into negatives. Run again to retry them.</div>';
+    ' failed: ' + esc(s.failures[0]) + ' Their ' + s.fallback.toLocaleString() + ' term rows (' + money(s.notJudgedSpend) + ' of spend) are marked Not Relevant, No Clear Intent, and say "fallback" in the table. They are not turned into negatives and are not counted as wasted spend. Run again to retry them.</div>';
   if (s.overLimit) warn += '<div class="sq-warn">' + plural(s.overLimit, "term row") + ' that cost money ' + (s.overLimit === 1 ? "was" : "were") + ' not read by the model: a run reads at most ' + Core.MODEL_CAP.toLocaleString() +
     ' terms, the costliest first (' + money(s.notReviewedSpend) + ' of spend is in the rows left unread, marked Not reviewed). A shorter range or one account at a time reads them all.</div>';
   (ran.warnings || []).forEach(w => { warn += '<div class="sq-warn">' + esc(w) + '</div>'; });

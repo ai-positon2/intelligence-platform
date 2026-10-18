@@ -824,7 +824,8 @@ async function analyze(ruleset, rawRows, ctx){
     summary: { totalRows: rows.length, uniqueTerms: new Set(rows.map(r => r.key)).size, totalSpend, totalConv: sum(r => r.conversions, all), byStatus,
       byRule: byBy.rule || 0, byModel: byBy.model || 0, fallback: byBy.fallback || 0, skipped: byBy.skipped || 0, failures: llm.failures || [],
       notReviewedSpend: sum(r => r.cost, r => r._det.status === "Not reviewed"), overLimit: rows.filter(r => r._det.subtype === "Over the review limit").length,
-      wastedSpend: sum(r => r.cost, r => r._det.status === "Not Relevant" && r.conversions === 0),
+      wastedSpend: sum(r => r.cost, r => r._det.status === "Not Relevant" && r.conversions === 0 && r._det.by !== "fallback"),
+      notJudgedSpend: sum(r => r.cost, r => r._det.by === "fallback"),       // a batch the model failed on is not "not relevant": nobody read those terms
       competitorSpend: sum(r => r.cost, r => r._det.status === "Competitor"),
       relevantPct: Math.round(100 * (byStatus["Relevant"] || 0) / rows.length), relevantSpendPct: totalSpend > 0 ? Math.round(100 * relevantSpend / totalSpend) : null },
   };
