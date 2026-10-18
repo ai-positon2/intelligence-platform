@@ -172,11 +172,12 @@ def read_uses(rows, level, camp_settings, group_settings):
         mode = (mode_of(group_settings.get(gid), channel) if gid else None) or mode_of(camp_settings.get(cid), channel) \
             or ("observation" if channel in OBSERVE_BY_DEFAULT else "targeting")
         bid = crit.get("bidModifier")
+        adj = None if bid is None else round(float(bid) - 1.0, 2)          # Google's bid_modifier is a multiplier (1.25 is +25%, 1 is no adjustment)
         out.append({"type": str(crit.get("type") or ""), "ref": ref, "refKind": kind, "name": str(crit.get("displayName") or ""),
                     "campaign": _get(r, "campaign", "name", default=""), "campaignId": cid, "ctype": _ctype(r), "channel": channel,
                     "bidding": str(_get(r, "campaign", "biddingStrategyType", default="")),
                     "adGroup": _get(r, "adGroup", "name", default="") if level == "ad_group" else "", "level": level, "mode": mode,
-                    "bid": None if bid is None else round(float(bid), 2), "m": _vals(r)})
+                    "bid": adj or None, "m": _vals(r)})
     return out
 
 

@@ -170,7 +170,7 @@ def test_one_audience_in_several_places_is_one_row_with_every_use_under_it():
 
 
 def test_campaign_level_audiences_are_read_too_and_carry_their_bid_and_bidding():
-    out = a.read_account(MEMBER, START, END, search_fn=searcher(camp=[camp_row("USER_LIST", "10", bid=0.25, bidding="MANUAL_CPC", cost=40, conv=2)],
+    out = a.read_account(MEMBER, START, END, search_fn=searcher(camp=[camp_row("USER_LIST", "10", bid=1.25, bidding="MANUAL_CPC", cost=40, conv=2)],
                                                                 lists=[list_row("10", "CRM list", "CRM_BASED")], totals=[total_row()]))
     aud = next(iter(out["audiences"].values()))
     use = aud["uses"][0]
@@ -221,8 +221,8 @@ def test_every_account_failing_is_an_error():
 # Non Brand, the account's average: 1,000 spent, 50 conversions, 5,000 of value (ROAS 5, CPA 20)
 TOTALS = [total_row(cost=1000, conv=50, val=5000, clk=800, imp=20000), total_row("Gen", "DEMAND_GEN", cost=500, conv=10, val=500, clk=300, imp=9000)]
 SETTINGS = [{"campaign": {"id": "5", "targetingSetting": {"targetRestrictions": [{"targetingDimension": "AUDIENCE", "bidOnly": True}]}}, "adGroup": {"id": "900"}}]
-AG = [ag_row("USER_LIST", "10", ag="900", bid=0.1, bidding="MANUAL_CPC", cost=200, conv=20, val=3000, clk=100),           # strong, can bid
-      ag_row("USER_LIST", "11", ag="900", bid=0.0, bidding="MANUAL_CPC", cost=300, conv=10, val=500, clk=120),            # weak, can bid
+AG = [ag_row("USER_LIST", "10", ag="900", bid=1.1, bidding="MANUAL_CPC", cost=200, conv=20, val=3000, clk=100),           # strong, can bid
+      ag_row("USER_LIST", "11", ag="900", bid=1.0, bidding="MANUAL_CPC", cost=300, conv=10, val=500, clk=120),            # weak, can bid
       ag_row("USER_INTEREST", "1", ag="900", bidding="TARGET_CPA", cost=150, conv=0, clk=200),                              # leaks, Smart Bidding
       ag_row("USER_INTEREST", "2", ag="900", bidding="TARGET_CPA", cost=60, conv=2, val=100, clk=40),                       # too little data
       ag_row("CUSTOM_AUDIENCE", "5", display="Local Landscapers", ag="901", campaign="Gen", channel="DEMAND_GEN", bidding="MAXIMIZE_CONVERSIONS", cid="6",
@@ -445,3 +445,10 @@ def test_a_refresh_that_is_too_soon_says_when_to_try_again_and_the_api_is_staff_
     r = client_as(STAFF).get(API + "/report?account=1234567890&from=2026-06-01&to=2026-06-30&refresh=1")
     assert r.status_code == 429 and r.get_json()["kind"] == "cooldown" and r.get_json()["retryIn"] == 45
     assert client_as(None).get(API + "/report?account=1").status_code == 302
+
+
+def test_a_bid_modifier_is_read_as_the_multiplier_it_is():
+    """Google says 1.25 for +25% and 0.8 for -20%; 1 is no adjustment. The page and the advice write it as a percentage."""
+    rows = [ag_row("USER_LIST", "10", bid=1.25), ag_row("USER_LIST", "11", bid=0.8), ag_row("USER_LIST", "12", bid=1.0), ag_row("USER_LIST", "13")]
+    out = a.read_uses(rows, "ad_group", {}, {})
+    assert [u["bid"] for u in out] == [0.25, -0.2, None, None]
