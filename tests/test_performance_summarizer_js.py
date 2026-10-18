@@ -328,4 +328,5 @@ def test_the_hour_rows_hold_googles_weekday_hours_and_metas_hours_alike():
 
 def test_the_hour_of_day_chart_reads_the_hours_of_both_platforms():
     page = open(os.path.join(ROOT, "static", "js", "performance_summarizer.js"), encoding="utf-8").read()
-    assert "P.hourGrid(P.hourRows(S.extras))" in page and "P.hourGrid(S.extras.dowHour)" not in page
+    chart = page[page.index('if(dim==="hour"){'):][:200]            # the Explorer's hour chart
+    assert "P.hourGrid(P.hourRows(S.extras))" in chart and "S.extras.dowHour" not in chart
