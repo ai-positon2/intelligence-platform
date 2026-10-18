@@ -355,7 +355,8 @@ def build_ad_test(group):
 
 def _needs(items):
     """The tests that need a decision, ordered by what the decision is and then by what is spent."""
-    rows = [dict(kind=i["action"]["kind"], title=i["title"], text=i["action"]["text"], ref=i["ref"], spend=i["spend"]) for i in items if i["action"]["kind"] in ACTION_ORDER]
+    rows = [dict(kind=i["action"]["kind"], title=i["title"], text=i["action"]["text"], ref=i["ref"], spend=i["spend"], **({"label": i["action"]["label"]} if i["action"].get("label") else {}))
+            for i in items if i["action"]["kind"] in ACTION_ORDER]
     rows.sort(key=lambda r: (ACTION_ORDER.index(r["kind"]), -r["spend"], r["title"]))
     return rows
 

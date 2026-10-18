@@ -260,7 +260,8 @@ def test_the_test_carries_its_group_and_the_bar():
 
 def read_with(exps, groups, tests=None, ok=None, warnings=None):
     return {"read": {"experiments": exps, "adGroups": groups, "adTests": len(groups) if tests is None else tests, "ok": ok or {"experiments": True, "ads": True},
-                     "warnings": warnings or [], "today": "2026-10-18"}, "account": {"id": ACCOUNT_ID, "name": "Acme", "currency": "USD"}, "readAt": NOW.isoformat()}
+                     "warnings": warnings or [], "today": "2026-10-18"}, "account": {"id": ACCOUNT_ID, "name": "Acme", "currency": "USD"},
+            "accounts": [{"platform": "google", "id": ACCOUNT_ID, "name": "Acme", "currency": "USD"}], "readAt": NOW.isoformat()}
 
 
 def test_the_needs_list_orders_by_the_decision_then_by_money():

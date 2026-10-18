@@ -238,3 +238,51 @@ def test_no_em_or_en_dash_anywhere_in_a_meta_report():
     for state in ("ended", "running"):
         for kw in (WIN, LOSE, FLAT, EARLY):
             assert "—" not in json.dumps(meta_exp(state=state, **kw), ensure_ascii=False)
+
+
+# ── The downloads ───────────────────────────────────────────────────────────
+
+def test_a_report_of_both_platforms_names_both_accounts_and_marks_each_test_with_its_platform():
+    from tracker import paid_exp_export as export
+    t = export.tables(run(BOTH))
+    rows = dict(t["Summary"][1])
+    assert rows["Google Ads account"].endswith("(1112223334)") and rows["Meta ad account"].endswith("(act_1234567890)")
+    head, exps = t["Experiments"]
+    assert head[-2:] == ["Platform", "Why there is no result"] and {r[-2] for r in exps} == {"Google Ads", "Meta Ads"}
+    head, tests = t["Ad tests"]
+    assert head[0] == "Ad group or ad set" and head[-1] == "Platform" and {r[-1] for r in tests} == {"Google Ads", "Meta Ads"}
+    assert t["Ads"][0][0] == "Ad group or ad set"
+    for name, (header, body) in t.items():
+        assert all(len(r) == len(header) for r in body), name
+
+
+def test_a_meta_test_with_no_result_gives_its_reason_in_the_file():
+    from tracker import paid_exp_export as export
+    out = run(ACT, graph=two_ads(fail=["nested", "days"]), search_fn=no_google)
+    head, rows = export.tables(out)["Experiments"]
+    assert rows[0][-2] == "Meta Ads"
+
+
+def test_the_needs_list_carries_a_winners_own_label_into_the_file():
+    from tracker import paid_exp_export as export
+    exps = [made(**WIN)]
+    raw = read_with(exps, [])
+    raw["read"]["experiments"][0]["platform"] = "meta"
+    out = ex.assemble(raw, now=NOW, today=TODAY)
+    assert out["needs"][0]["label"] == "Keep the winner"
+    assert export.tables(out)["Needs a decision"][1][0][1] == "Keep the winner"
+    google = ex.assemble(read_with([made(**WIN)], []), now=NOW, today=TODAY)
+    assert "label" not in google["needs"][0] and export.tables(google)["Needs a decision"][1][0][1] == "Apply it"
+
+
+def test_a_saved_copy_of_either_platform_says_which_would_not_answer():
+    from tracker import paid_exp_export as export
+    report = dict(run(ACCOUNT_ID), stale=[{"platform": "google", "savedAt": "2026-10-10T08:00:00+00:00"}, {"platform": "meta", "savedAt": "2026-10-10T08:00:00+00:00"}])
+    notes = [r[1] for r in export.tables(report)["Notes"][1] if r[0] == "Saved read"]
+    assert notes == ["The read is the one saved on 2026-10-10 08:00 because Google Ads would not answer now.", "The read is the one saved on 2026-10-10 08:00 because Meta Ads would not answer now."]
+
+
+def test_a_both_report_opens_as_excel_pdf_and_zip():
+    from tracker import paid_exp_export as export
+    report = run(BOTH)
+    assert export.xlsx(report)[:2] == b"PK" and export.pdf(report)[:4] == b"%PDF" and export.csv_zip(report)[:2] == b"PK"

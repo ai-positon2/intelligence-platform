@@ -22,6 +22,8 @@ AD_TEXT = {"winner": "Clear leader", "partial": "Leads some", "behind": "Behind"
 KIND_TEXT = {"decide": "Decide now", "apply": "Apply it", "end": "End it", "pause": "Pause the losers", "stuck": "Not getting traffic", "check": "Check it"}
 STATE_TEXT = {"running": "Running", "setting up": "Setting up", "ended": "Ended", "applied": "Applied"}
 METRIC_TEXT = {"convRate": "Conversion rate", "ctr": "Click rate"}
+ACCOUNT_LABEL = {"google": "Google Ads account", "meta": "Meta ad account"}
+PLATFORM_TEXT = {"google": "Google Ads", "meta": "Meta Ads"}
 PDF_AD_TESTS = 40
 
 
@@ -47,7 +49,8 @@ def tables(report):
     exps = report.get("experiments") or []
     tests = report.get("adTests") or []
     out = {}
-    ov = [["Google Ads account", "%s (%s)" % (acct.get("name") or "", acct.get("id") or "")], ["Ad tests cover", report.get("window") or ""], ["Read on", _when(report.get("readAt"))],
+    shown = [[ACCOUNT_LABEL.get(a["platform"], "Account"), "%s (%s)" % (a.get("name") or "", a.get("id") or "")] for a in report.get("accounts") or []]
+    ov = shown + [["Ad tests cover", report.get("window") or ""], ["Read on", _when(report.get("readAt"))],
           ["Report made on", (report.get("generatedAt") or "")[:10]], ["Tests that need a decision", summary.get("needsAction")],
           ["Experiments", summary.get("experiments")], ["Experiments running", summary.get("running")], ["Experiments ended", summary.get("ended")], ["Experiments applied", summary.get("applied")],
           ["Running and the trial is ahead", summary.get("winners")], ["Running and the trial is behind", summary.get("behind")], ["Running with no difference", summary.get("noDifference")],
@@ -60,7 +63,7 @@ def tables(report):
     needs = report.get("needs") or []
     if needs:
         out["Needs a decision"] = (["Order", "What to do", "Kind of test", "Test", "Detail", "Spend (%s)" % cur],
-                                   [[i + 1, KIND_TEXT.get(n["kind"], n["kind"]), "Ad test" if n["ref"]["type"] == "adTest" else "Experiment", n["title"], n["text"], n["spend"]] for i, n in enumerate(needs)])
+                                   [[i + 1, n.get("label") or KIND_TEXT.get(n["kind"], n["kind"]), "Ad test" if n["ref"]["type"] == "adTest" else "Experiment", n["title"], n["text"], n["spend"]] for i, n in enumerate(needs)])
 
     if exps:
         rows, days = [], []
@@ -72,13 +75,13 @@ def tables(report):
             rows.append([e["name"], STATE_TEXT.get(e["state"], e["state"]), e.get("typeLabel") or "", e.get("start") or "", e.get("end") or "", e.get("daysRead"),
                          TRIAL_TEXT.get(e["verdict"], e["verdict"]), METRIC_TEXT.get(c.get("metric"), ""), _rate(c.get("control")), _rate(c.get("trial")), c.get("relative"), c.get("confidence"),
                          c.get("p"), ct.get("impressions"), ct.get("clicks"), ct.get("conversions"), ct.get("cost"), tt.get("impressions"), tt.get("clicks"), tt.get("conversions"), tt.get("cost"),
-                         e["action"]["text"], e.get("splitNote") or ""])
+                         e["action"]["text"], e.get("splitNote") or "", PLATFORM_TEXT.get(e.get("platform"), ""), e.get("reason") or ""])
             for a in e["arms"]:
                 for d in a.get("days") or []:
                     days.append([e["name"], a["name"], "Control" if a["control"] else "Trial", d[0], d[1], d[2], d[3], d[4], d[5]])
         out["Experiments"] = (["Experiment", "Status", "Type", "Start", "End", "Days of results", "Verdict", "Compared on", "Control rate %", "Trial rate %", "Trial change %", "Confidence %",
                                "p value", "Control impressions", "Control clicks", "Control conversions", "Control spend", "Trial impressions", "Trial clicks", "Trial conversions", "Trial spend",
-                               "What to do", "Traffic split warning"], rows)
+                               "What to do", "Traffic split warning", "Platform", "Why there is no result"], rows)
         if days:
             out["Experiment days"] = (["Experiment", "Arm", "Role", "Date", "Impressions", "Clicks", "Spend", "Conversions", "Conversion value"], days)
 
@@ -86,19 +89,19 @@ def tables(report):
         trows, arows = [], []
         for t in tests:
             trows.append([t["name"], t["campaign"], t["adCount"], t["spend"], AD_TEXT.get(t["verdict"], t["verdict"]), METRIC_TEXT.get(t.get("metric"), ""), t.get("eligible"),
-                          t["action"]["text"], t.get("note") or ""])
+                          t["action"]["text"], t.get("note") or "", PLATFORM_TEXT.get(t.get("platform"), "")])
             for a in t["ads"]:
                 n = a["numbers"]
                 arows.append([t["name"], t["campaign"], a["label"], " | ".join(a.get("descriptions") or []), a.get("url") or "", a.get("strength") or "", n["impressions"], n["clicks"], n["ctr"],
                               n["conversions"], n["convRate"], n["cost"], n["cpa"], AD_TEXT.get(a["verdict"], a["verdict"]), a.get("rate"), a.get("relative"), a.get("confidence"),
                               "Yes" if a["id"] == t.get("leader") else ""])
-        out["Ad tests"] = (["Ad group", "Campaign", "Live ads", "Spend, last 30 days", "Verdict", "Compared on", "Ads compared", "What to do", "Note"], trows)
-        out["Ads"] = (["Ad group", "Campaign", "Ad (headlines)", "Descriptions", "Final URL", "Ad strength", "Impressions", "Clicks", "Click rate %", "Conversions", "Conversion rate %", "Spend",
+        out["Ad tests"] = (["Ad group or ad set", "Campaign", "Live ads", "Spend, last 30 days", "Verdict", "Compared on", "Ads compared", "What to do", "Note", "Platform"], trows)
+        out["Ads"] = (["Ad group or ad set", "Campaign", "Ad (headlines)", "Descriptions", "Final URL", "Ad strength", "Impressions", "Clicks", "Click rate %", "Conversions", "Conversion rate %", "Spend",
                        "Cost per conversion", "Verdict", "Rate compared %", "Against the leader %", "Confidence %", "Leader"], arows)
 
     notes = [["Note", n] for n in report.get("notes") or []] + [["Part that could not be read", w] for w in report.get("warnings") or []]
     for st in report.get("stale") or []:
-        notes.append(["Saved read", "The read is the one saved on %s because Google Ads would not answer now." % _when(st.get("savedAt"))])
+        notes.append(["Saved read", "The read is the one saved on %s because %s would not answer now." % (_when(st.get("savedAt")), PLATFORM_TEXT.get(st.get("platform"), "the platform"))])
     if notes:
         out["Notes"] = (["Kind", "Detail"], notes)
     return out
