@@ -322,3 +322,39 @@ def test_mixed_time_zones_are_noted_for_an_mcc_and_not_for_one_account():
     assert not any("time zones" in i["headline"] for i in same)
     single = ins.build(report({"day": days(WEEK)}))
     assert not any("time zones" in i["headline"] for i in single)
+
+
+def _on(platform, rows=None):
+    rep = report(rows if rows is not None else {"day": days(WEEK)})
+    rep["account"]["platform"] = platform
+    return rep
+
+
+def test_on_a_meta_account_the_advice_does_not_offer_a_bid_adjustment_meta_does_not_have():
+    items = ins.build(_on("meta"))
+    waste, best = find(items, "waste", "day")[0], find(items, "best", "day")[0]
+    for text in (waste["action"], best["action"]):
+        assert "bid adjustment" not in text.lower() and "lower bids" not in text.lower() and "Google" not in text
+    assert "lifetime budget" in waste["action"] and "lifetime budget" in best["action"]
+
+
+def test_on_a_google_account_the_advice_is_unchanged():
+    items = ins.build(_on("google"))
+    assert "Lower bids or pause ads on" in find(items, "waste", "day")[0]["action"]
+    assert "Meta" not in find(items, "waste", "day")[0]["action"]
+
+
+def test_on_a_google_and_meta_account_the_google_advice_stands_with_a_line_for_meta():
+    action = find(ins.build(_on("both")), "waste", "day")[0]["action"]
+    assert action.startswith("Lower bids or pause ads on") and "On Meta there is no bid adjustment" in action
+
+
+def test_the_no_spend_note_names_the_platform_that_was_read():
+    for platform, name in (("meta", "Meta Ads"), ("google", "Google Ads"), ("both", "Google Ads and Meta Ads")):
+        text = find(ins.build(_on(platform, {})), "caveat")[0]["evidence"]
+        assert text.startswith(name + " reports no spend"), platform
+
+
+def test_the_briefing_is_written_for_the_platform_that_was_read():
+    assert "Meta Ads segment analysis" in ins.system_for({"account": {"platform": "meta"}})
+    assert "Google Ads segment analysis" in ins.system_for({"account": {}}) and ins.SYSTEM == ins.system_for({})
