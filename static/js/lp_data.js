@@ -207,14 +207,31 @@ function tiles(summary, currency){
   ];
 }
 function readNote(report){
-  var a = (report && report.account) || {};
+  var a = (report && report.account) || {}, list = (report && report.accounts) || [];
+  if(list.length > 1) return (a.name || "") + " (" + list.map(function(x){return x.id;}).join(" and ") + ")";
   return (a.name || a.id || "") + (a.id && a.name ? " (" + a.id + ")" : "");
+}
+/* Which platforms' ads send people to a page (a page record without the list is a Google page), and the words that name them. */
+var PLATFORM = {google:"Google Ads", meta:"Meta Ads"};
+function platformsOf(x){var p = (x && x.platforms) || []; return p.length ? p : ["google"];}
+function reaches(page, platform){return platformsOf(page).indexOf(platform) >= 0;}
+function platformNames(platforms, joiner){return (platforms && platforms.length ? platforms : ["google"]).map(function(k){return PLATFORM[k] || k;}).join(joiner || " and ");}
+function staleText(x, ago){return (PLATFORM[(x && x.platform) || "google"] || "The platform") + " is not answering now, so this report is built from the copy saved " + ago + ".";}
+function sourceText(platforms){
+  return "Source: " + platformNames(platforms) + " (read only) and the pages themselves, saved for an hour. A score is the share of the checks' weight that passed (critical checks weigh most, a warning counts half); " +
+    "checks that could not be judged are left out and counted. A page that does not open scores 0. The account's score weights each page by what it spent. Nothing is changed in " +
+    platformNames(platforms, " or ") + ": make the changes there and on the site.";
+}
+function noGroupsText(platforms){
+  var meta = (platforms || []).indexOf("meta") >= 0;
+  return "No Search ad group" + (meta ? " or Meta ad set" : "") + " sends people to this page. It is reached by Shopping or Performance Max, which have no keywords or ad text to hold a page against, " +
+    (meta ? "by Meta ads that carry no words, " : "") + "or the ads could not be read.";
 }
 
 var api = {
   VIEWS:VIEWS, SORTS:SORTS, ON:ON, RATING:RATING, onInfo:onInfo, ratingInfo:ratingInfo, full:full, pageFindings:pageFindings, problems:problems, pageState:pageState,
   viewCounts:viewCounts, defaultView:defaultView, filterPages:filterPages, sortPages:sortPages, moneyText:moneyText, rateText:rateText, numText:numText, shareText:shareText,
-  shortPage:shortPage, hostOf:hostOf, secText:secText, labTone:labTone, labRows:labRows, VERDICT:VERDICT, verdictInfo:verdictInfo, impact:impact, fixPills:fixPills, sevWord:sevWord, START_HERE:START_HERE, deviceRates:deviceRates, statusText:statusText, seenRows:seenRows, tiles:tiles, readNote:readNote
+  shortPage:shortPage, hostOf:hostOf, secText:secText, labTone:labTone, labRows:labRows, VERDICT:VERDICT, verdictInfo:verdictInfo, impact:impact, fixPills:fixPills, sevWord:sevWord, START_HERE:START_HERE, deviceRates:deviceRates, statusText:statusText, seenRows:seenRows, tiles:tiles, readNote:readNote, PLATFORM:PLATFORM, platformsOf:platformsOf, reaches:reaches, platformNames:platformNames, staleText:staleText, sourceText:sourceText, noGroupsText:noGroupsText
 };
 if(typeof module !== "undefined" && module.exports) module.exports = api; else root.LpData = api;
 })(typeof window !== "undefined" ? window : globalThis);

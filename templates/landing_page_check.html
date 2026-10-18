@@ -2,7 +2,7 @@
 {% block title %}Landing Page &amp; Relevancy Check{% endblock %}
 {% block head %}
   <link rel="stylesheet" href="{{ url_for('static', filename='css/account_audit.css') }}?v=5">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/landing_page_check.css') }}?v=5">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/landing_page_check.css') }}?v=6">
 {% endblock %}
 {% block content %}
 <div class="pm pm-au pm-lp" id="lp">
@@ -10,9 +10,9 @@
     <div class="pm-hero-l">
       <span class="pm-eyebrow"><span class="d"></span>Paid Marketing · Build &amp; Launch</span>
       <h1 class="pm-title">Does the page keep the promise the ad made? <span class="pm-grad">See it for every landing page.</span></h1>
-      <p class="pm-sub">Pick a Google Ads account. The agent reads what each landing page took over the last 30 days, the ads, keywords and search terms that send people
+      <p class="pm-sub">Pick a Google Ads account, a Meta ad account or one of each. The agent reads what each landing page took over the last 30 days, the ads (and Google's keywords and search terms) that send people
         there, then <b>fetches the pages</b> and holds each one against a written checklist: does it open, does it say what the keywords and the ad said, can a visitor act,
-        does it work on a phone, does it load fast, is it tracked. Every score is arithmetic on what Google and the page showed, and a page that refuses us is
+        does it work on a phone, does it load fast, is it tracked. Every score is arithmetic on what the ad platform and the page showed, and a page that refuses us is
         <b>not verified</b>, never failed.</p>
     </div>
   </section>
@@ -20,8 +20,8 @@
   <section class="pm-panel pd-cmd au-cmd" id="cmd">
     <div class="au-cmd-row">
       <div id="acctPick"></div>
-      <p class="au-scope">Read only: nothing is changed in Google Ads, and the pages are only fetched. One account at a time (an MCC is not checked). The busiest 40 pages are checked.
-        The read is saved for an hour, so the same report opens at once, and Refresh asks Google and the sites again.</p>
+      <p class="au-scope">Read only: nothing is changed in Google Ads or Meta, and the pages are only fetched. One account of each platform at a time (an MCC is not checked). The busiest 40 pages are checked.
+        The read is saved for an hour, so the same report opens at once, and Refresh asks the platforms and the sites again.</p>
     </div>
   </section>
 
@@ -30,7 +30,7 @@
   <div id="empty" class="pm-panel sg-empty">
     <div class="sg-empty-ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v14H4zM4 9h16M8 13h5M8 16h8"/></svg></div>
     <h2>Choose an account to begin</h2>
-    <p>The first read of an account takes up to half a minute: it asks Google Ads, then fetches the pages.</p>
+    <p>The first read of an account takes up to half a minute: it asks Google Ads or Meta, then fetches the pages.</p>
   </div>
   <div id="skel" hidden><div class="pd-skel"></div><div class="pd-skel"></div><div class="pd-skel"></div></div>
 
@@ -81,6 +81,6 @@
 <script src="{{ url_for('static', filename='js/pm_picker.js') }}?v=1"></script>
 <script src="{{ url_for('static', filename='js/pm_platform.js') }}?v=4"></script>
 <script src="{{ url_for('static', filename='js/au_data.js') }}?v=2"></script>
-<script src="{{ url_for('static', filename='js/lp_data.js') }}?v=5"></script>
-<script src="{{ url_for('static', filename='js/landing_page_check.js') }}?v=5"></script>
+<script src="{{ url_for('static', filename='js/lp_data.js') }}?v=6"></script>
+<script src="{{ url_for('static', filename='js/landing_page_check.js') }}?v=6"></script>
 {% endblock %}

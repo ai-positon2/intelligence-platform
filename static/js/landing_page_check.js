@@ -1,6 +1,6 @@
 /* Landing Page & Relevancy Check (Paid Marketing Agents).
  *
- * Pick a Google Ads account. The server reads what each landing page took, the ads, keywords and search terms behind it, fetches the busiest pages and
+ * Pick a Google Ads account, a Meta ad account or one of each. The server reads what each landing page took, the ads (and Google's keywords and search terms) behind it, fetches the busiest pages and
  * holds each one against a written checklist (tracker/paid_lp.py and the modules beside it). This page draws the report: the account's score, the checks
  * to fix first, and every page with its checks, its ad groups (and whether the page carries each keyword) and what the page was seen to say. It never reads
  * an account, fetches a page, runs a check or scores anything itself; how a finding is worded and which pages a view shows are in lp_data.js.
@@ -54,7 +54,7 @@ function readHash(){
 }
 function writeHash(){
   if(!S.acct) return;
-  try{history.replaceState(null, "", "#a=" + enc(S.acct.id));}catch(e){}
+  try{history.replaceState(null, "", "#pf=" + enc(S.acct.platform) + "&a=" + enc(S.acct.id));}catch(e){}
 }
 function lastAccount(){try{return localStorage.getItem("lp_account") || "";}catch(e){return "";}}
 function safeUrl(u){return /^https?:\/\//i.test(String(u || "")) ? u : "";}
@@ -65,14 +65,14 @@ function run(refresh){
   if(!S.acct){show("empty"); setMsg(""); return;}
   var seq = ++S.seq;
   writeHash();
-  setMsg("");
+  setMsg(S.acct.platform === "both" ? "Reading both accounts. The first read takes up to half a minute." : "", S.acct.platform === "both" ? "pm-note" : "");
   show("skel");
   getJson(API + "/report?account=" + enc(S.acct.id) + (refresh === true ? "&refresh=1" : "")).then(function(r){
     if(seq !== S.seq) return;
     if(!r.ok){
       show(S.report ? "out" : "empty");
       if(r.j && r.j.kind === "cooldown"){setMsg(esc(r.j.error), "pm-note"); return;}
-      var hint = r.j && r.j.kind === "quota" ? " Google limits how fast this app can read, so this clears on its own." : "";
+      var hint = r.j && r.j.kind === "quota" ? " The platform limits how fast this app can read, so this clears on its own." : "";
       setMsg(esc((r.j && r.j.error) || ("The report could not be made (HTTP " + r.status + ")."))+hint);
       return;
     }
@@ -100,14 +100,14 @@ function render(){
   var st = $("#stale");
   if(rep.stale && rep.stale.length){
     st.hidden = false;
-    st.innerHTML = rep.stale.map(function(x){return esc("Google Ads is not answering now, so this report is built from the copy saved " + D.ago(x.savedAt) + ".");}).join(" ");
+    st.innerHTML = rep.stale.map(function(x){return esc(L.staleText(x, D.ago(x.savedAt)));}).join(" ");
   } else {st.hidden = true; st.innerHTML = "";}
   var q = "account=" + enc(S.acct.id);
   $("#dlXlsx").href = API + "/download?" + q + "&file=xlsx";
   $("#dlPdf").href = API + "/download?" + q + "&file=pdf";
   $("#dlZip").href = API + "/download?" + q + "&file=zip";
   paintScore(s, rep); paintTiles(s); paintSecs(rep); paintFix(rep); paintPageControls(); paintPages(); paintNotes(rep);
-  $("#foot").textContent = "Source: Google Ads (read only) and the pages themselves, saved for an hour. A score is the share of the checks' weight that passed (critical checks weigh most, a warning counts half); checks that could not be judged are left out and counted. A page that does not open scores 0. The account's score weights each page by what it spent. Nothing is changed in Google Ads: make the changes there and on the site.";
+  $("#foot").textContent = L.sourceText(s.platforms);
 }
 function paintScore(s, rep){
   var tone = D.gradeTone(s.grade), r = D.ring(s.score, 56);
@@ -181,6 +181,11 @@ function dots(p){
     return '<i class="lp-dot au-tone-' + D.gradeTone(sec.grade) + '" title="' + esc(sec.label + ": " + D.scoreText(sec.score)) + '"></i>';
   }).join("");
 }
+function platformTags(p){
+  var many = ((S.report.summary || {}).platforms || []).length > 1;
+  if(!many) return "";
+  return L.platformsOf(p).map(function(k){return '<span class="lp-plat ' + esc(k) + '">' + esc(k === "meta" ? "Meta" : "Google") + '</span>';}).join("");
+}
 function pageRow(p, open){
   var seen = p.seen || {}, t = (p.summary && p.summary.tally) || {};
   var dev = L.deviceRates(p.devices);
@@ -192,7 +197,7 @@ function pageRow(p, open){
   if(!counts.length && p.rated) counts.push('<span class="au-res good">no problems</span>');
   return '<li class="lp-p ' + L.pageState(p) + (open ? " open" : "") + '" data-p="' + esc(p.id) + '"><button type="button" class="lp-ph" aria-expanded="' + !!open + '" data-open="' + esc(p.id) + '">' +
     gradeBadge(p) +
-    '<span class="lp-pt"><b>' + esc(L.shortPage(p.id, 70)) + '</b><em>' + esc(sub) + '</em></span>' +
+    '<span class="lp-pt"><b>' + esc(L.shortPage(p.id, 70)) + platformTags(p) + '</b><em>' + esc(sub) + '</em></span>' +
     '<span class="lp-pn"><b>' + esc(L.moneyText(p.spend, cur())) + '</b><em>' + esc(L.numText(p.clicks)) + ' clicks · ' + esc(L.rateText(p.convRate)) + ' convert</em></span>' +
     '<span class="lp-dots" aria-hidden="true">' + dots(p) + '</span>' +
     '<span class="lp-pc">' + counts.join("") + '</span><i class="au-chev"></i></button>' +
@@ -278,26 +283,37 @@ function tabChecks(p){
 }
 function onChip(on){var i = L.onInfo(on); return '<span class="lp-on ' + i.tone + '">' + esc(i.label) + '</span>';}
 function ratingChip(r){var i = L.ratingInfo(r); return '<span class="lp-rate ' + i.tone + '">' + esc(i.label) + '</span>';}
+function metaAds(g){
+  var ads = g.ads || [];
+  if(!ads.length) return "";
+  return '<table class="lp-t"><thead><tr><th>Ad</th><th>Spend</th><th>Conversion rate</th><th>Quality</th><th>Engagement rate</th></tr></thead><tbody>' + ads.map(function(a){
+    var r = a.ranks || {};
+    return '<tr><td>' + esc(a.name || "an ad") + (a.headlines && a.headlines.length ? '<em class="lp-muted"> ' + esc(a.headlines[0]) + '</em>' : '') + '</td><td>' + esc(L.moneyText(a.cost, cur())) + '</td><td>' +
+      ratingChip(r.conversion) + '</td><td>' + ratingChip(r.quality) + '</td><td>' + ratingChip(r.engagement) + '</td></tr>';
+  }).join("") + '</tbody></table><p class="lp-muted">Meta\'s own ratings of each ad against the ads competing for the same people. Meta rates only ads with enough impressions.</p>';
+}
 function tabAds(p){
   var groups = p.adGroups || [];
-  if(!groups.length) return '<p class="au-none">No Search ad group sends people to this page. It is reached by Shopping or Performance Max, which have no keywords or ad text to hold a page against, or the ads could not be read.</p>';
+  if(!groups.length) return '<p class="au-none">' + esc(L.noGroupsText((S.report.summary || {}).platforms)) + '</p>';
   return groups.map(function(g){
     var echo = g.echo == null ? '<span class="lp-on unk">Not checked</span>' :
       g.echo >= 0.6 ? '<span class="lp-on good">The page\'s headings echo "' + esc(g.bestHeadline) + '"</span>' :
       '<span class="lp-on bad">The page\'s headings carry only ' + Math.round(g.echo * 100) + '% of "' + esc(g.bestHeadline) + '"</span>';
-    return '<div class="lp-g"><div class="lp-g-h"><b>' + esc(g.name) + '</b><span>' + esc(g.campaign) + ' · ' + esc(L.moneyText(g.cost, cur())) + ' · ' + esc(L.numText(g.clicks)) + ' clicks</span></div>' +
+    var meta = g.platform === "meta";
+    return '<div class="lp-g"><div class="lp-g-h"><b>' + esc(g.name) + '</b>' + (meta ? '<span class="lp-plat meta">Meta ad set</span>' : '') + '<span>' + esc(g.campaign) + ' · ' + esc(L.moneyText(g.cost, cur())) + ' · ' + esc(L.numText(g.clicks)) + ' clicks</span></div>' +
       '<div class="lp-g-e">' + echo + '</div>' +
       (g.headlines && g.headlines.length ? '<p class="lp-heads"><b>Headlines:</b> ' + g.headlines.map(esc).join(" | ") + '</p>' : '') +
       ((g.offers || []).length ? '<p class="lp-offers"><b>Promises in the ads:</b> ' + g.offers.map(function(o){return esc(o.text) + ' ' + onChip(o.on);}).join(" ") + '</p>' : '') +
-      (g.keywords.length ? '<table class="lp-t"><thead><tr><th>Keyword</th><th>Spend</th><th>Quality score</th><th>Landing page</th><th>Ad relevance</th><th>On the page</th></tr></thead><tbody>' +
+      (meta ? metaAds(g) : "") +
+      (meta ? '' : g.keywords.length ? '<table class="lp-t"><thead><tr><th>Keyword</th><th>Spend</th><th>Quality score</th><th>Landing page</th><th>Ad relevance</th><th>On the page</th></tr></thead><tbody>' +
         g.keywords.map(function(k){
           return '<tr><td>' + esc(k.text) + (k.own ? ' <em class="lp-muted">(own address)</em>' : '') + '<em class="lp-muted"> ' + esc(k.match) + '</em></td><td>' + esc(L.moneyText(k.cost, cur())) + '</td><td>' + esc(k.qs == null ? "n/a" : k.qs + "/10") +
             '</td><td>' + ratingChip(k.landingPage) + '</td><td>' + ratingChip(k.adRelevance) + '</td><td>' + onChip(k.on) + '</td></tr>';
         }).join("") + '</tbody></table>' : '<p class="au-none">No keyword with spend was read for this ad group.</p>') +
-      (g.terms.length ? '<table class="lp-t"><thead><tr><th>What people searched</th><th>Clicks</th><th>Spend</th><th>On the page</th></tr></thead><tbody>' +
+      (!meta && g.terms.length ? '<table class="lp-t"><thead><tr><th>What people searched</th><th>Clicks</th><th>Spend</th><th>On the page</th></tr></thead><tbody>' +
         g.terms.map(function(t){return '<tr><td>' + esc(t.text) + '</td><td>' + esc(L.numText(t.clicks)) + '</td><td>' + esc(L.moneyText(t.cost, cur())) + '</td><td>' + onChip(t.on) + '</td></tr>';}).join("") + '</tbody></table>' : '') +
       '</div>';
-  }).join("") + (p.groupCount > groups.length ? '<p class="lp-muted">and ' + (p.groupCount - groups.length) + ' more ad groups. The Excel file lists the keywords and search terms the read kept.</p>' : '');
+  }).join("") + (p.groupCount > groups.length ? '<p class="lp-muted">and ' + (p.groupCount - groups.length) + ' more ad groups' + (L.reaches(p, "meta") ? ' and ad sets' : '') + '. The Excel file lists the keywords and search terms the read kept.</p>' : '');
 }
 function tabSeen(p){
   var rows = L.seenRows(p.seen);
@@ -327,7 +343,7 @@ function tabNumbers(p){
   return '<div class="lp-nums"><div><span>Spend</span><b>' + esc(L.moneyText(p.spend, cur())) + '</b></div><div><span>Clicks</span><b>' + esc(L.numText(p.clicks)) + '</b></div>' +
     '<div><span>Conversions</span><b>' + esc(L.numText(p.conversions)) + '</b></div><div><span>Conversion rate</span><b>' + esc(L.rateText(p.convRate)) + '</b></div>' +
     '<div><span>Cost per conversion</span><b>' + esc(p.cpa == null ? "n/a" : L.moneyText(p.cpa, cur())) + '</b></div>' +
-    '<div><span>Google mobile speed</span><b>' + esc(p.speed == null ? "no score" : p.speed + " / 10") + '</b></div></div>' +
+    (L.reaches(p, "google") ? '<div><span>Google mobile speed</span><b>' + esc(p.speed == null ? "no score" : p.speed + " / 10") + '</b></div>' : '') + '</div>' +
     (rows.length ? '<table class="lp-t"><thead><tr><th>Device</th><th>Clicks</th><th>Spend</th><th>Conversions</th><th>Conversion rate</th></tr></thead><tbody>' + rows.join("") + '</tbody></table>' : '') +
     (d.gap != null ? '<p class="lp-note">Phones convert at ' + esc(Math.round(d.gap * 100)) + '% of the desktop rate on this page.</p>' : '') + labBlock(p);
 }
@@ -421,9 +437,13 @@ $("#refreshBtn").addEventListener("click", function(){run(true);});
 /* ── Boot ─────────────────────────────────────────────────── */
 function boot(){
   var h = readHash(), first = true;
-  accts = PL.accounts($("#acctPick"), {url: BASE + "/accounts", allow: ["google"], platform: "google", account: h.a || lastAccount(),
-    onChange: function(a){
-      if(!a){S.acct = null; S.report = null; show("empty"); setMsg("There are no Google Ads accounts to show.", "pm-note"); return;}
+  accts = PL.accounts($("#acctPick"), {url: BASE + "/accounts", allow: ["google", "meta", "both"], platform: h.pf, account: h.a || lastAccount(),
+    onChange: function(a, platform){
+      if(!a){
+        S.acct = null; S.report = null; show("empty");
+        setMsg((platform === "meta" ? "There are no Meta ad accounts this token can read yet." : "There are no accounts to show for this platform.") + " Pick another platform or account above.", "pm-note");
+        return;
+      }
       if(S.acct && a.id === S.acct.id && !first) return;
       first = false; S.acct = a; S.report = null;
       try{localStorage.setItem("lp_account", a.id);}catch(e){}

@@ -291,3 +291,45 @@ def test_the_playbook_is_drawn_from_the_report_the_template_has_the_list_for_and
     for cls in (".lp-fx", ".lp-f2", ".lp-rd", ".lp-do2", ".lp-ad", ".lp-copy", ".lp-fixlist"):
         assert cls in css, cls
     assert "prefers-reduced-motion" in css
+
+
+# ── Meta ────────────────────────────────────────────────────────────────────
+
+def test_a_page_with_no_platforms_listed_is_a_google_page_and_the_platforms_are_named():
+    assert run("L.platformsOf({})") == ["google"] and run("L.platformsOf(null)") == ["google"] and run("L.platformsOf({platforms:[]})") == ["google"]
+    assert run("L.platformsOf({platforms:['meta']})") == ["meta"]
+    assert run("[L.reaches({platforms:['meta']}, 'meta'), L.reaches({platforms:['meta']}, 'google'), L.reaches({}, 'google'), L.reaches({platforms:['google','meta']}, 'meta')]") == [True, False, True, True]
+    assert run("L.platformNames(['google','meta'])") == "Google Ads and Meta Ads" and run("L.platformNames(['google','meta'], ' or ')") == "Google Ads or Meta Ads"
+    assert run("L.platformNames(undefined)") == "Google Ads" and run("L.platformNames(['tiktok'])") == "tiktok"
+
+
+def test_a_saved_copy_says_which_platform_is_not_answering_and_a_google_report_reads_as_before():
+    assert run("L.staleText({platform:'meta'}, '3 hours ago')") == "Meta Ads is not answering now, so this report is built from the copy saved 3 hours ago."
+    assert run("L.staleText({platform:'google'}, 'x')").startswith("Google Ads is not answering now") and run("L.staleText({}, 'x')").startswith("Google Ads is not")
+    assert run("L.staleText({platform:'tiktok'}, 'x')").startswith("The platform is not answering now")
+    foot = run("L.sourceText(['google'])")
+    assert foot.startswith("Source: Google Ads (read only) and the pages themselves, saved for an hour.") and foot.endswith("Nothing is changed in Google Ads: make the changes there and on the site.")
+    both = run("L.sourceText(['google','meta'])")
+    assert both.startswith("Source: Google Ads and Meta Ads (read only)") and both.endswith("Nothing is changed in Google Ads or Meta Ads: make the changes there and on the site.")
+    assert run("L.sourceText(undefined)") == foot
+
+
+def test_a_page_nothing_reaches_is_explained_in_the_words_of_the_platforms_read():
+    google = run("L.noGroupsText(['google'])")
+    assert google.startswith("No Search ad group sends people to this page.") and "Meta" not in google
+    both = run("L.noGroupsText(['google','meta'])")
+    assert both.startswith("No Search ad group or Meta ad set sends people to this page.") and "Meta ads that carry no words" in both
+    assert run("L.noGroupsText(undefined)") == google
+
+
+def test_a_report_of_two_accounts_names_both_ids():
+    assert run("L.readNote(r)", r={"account": {"name": "Acme", "id": "1112223334+act_123"}, "accounts": [{"id": "1112223334"}, {"id": "act_123"}]}) == "Acme (1112223334 and act_123)"
+    assert run("L.readNote(r)", r={"account": {"name": "Acme", "id": "1112223334"}, "accounts": [{"id": "1112223334"}]}) == "Acme (1112223334)"
+
+
+def test_the_page_offers_all_three_platforms_and_every_new_class_it_draws_is_styled():
+    page, css = open(PAGE, encoding="utf-8").read(), open(CSS, encoding="utf-8").read()
+    assert 'allow: ["google", "meta", "both"]' in page and "#pf=" in page
+    for cls in (".lp-plat", ".lp-plat.meta", ".lp-plat.google"):
+        assert cls in css
+    assert "lp-plat" in page and "metaAds(g)" in page

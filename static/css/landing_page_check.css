@@ -244,3 +244,5 @@ em.lp-muted{font-style:normal}
 @keyframes lpGrow{from{width:0}}
 @keyframes lpPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.25)}}
 @keyframes lpFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}
+.lp-plat{display:inline-block;margin-left:8px;padding:1px 8px;border-radius:var(--radius-pill);font-size:11px;font-weight:700;letter-spacing:.02em;vertical-align:middle;color:var(--c,var(--pm-ink2));border:1px solid color-mix(in srgb,var(--c,var(--pm-ink2)) 40%,transparent);background:color-mix(in srgb,var(--c,var(--pm-ink2)) 10%,transparent)}
+.lp-plat.google{--c:var(--pm-a)}.lp-plat.meta{--c:var(--pm-a2)}
