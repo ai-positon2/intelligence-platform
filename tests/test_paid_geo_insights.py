@@ -185,3 +185,36 @@ def test_money_is_written_in_the_accounts_currency():
     assert ins.money(1234.5) == "$1,234" or ins.money(1234.5) == "$1,235"
     assert ins.money(12.5, "GBP", 2) == "£12.50" and ins.money(7, "CHF") == "CHF 7" and ins.money(None) == "Na" and ins.money(-3, "USD") == "-$3"
     assert ins.pct(0.1234, 1) == "12.3%" and ins.pct(None) == "Na" and ins.num(3.0) == "3" and ins.num(3.4) == "3.4"
+
+
+PLACES = lambda: [row("Maryland", 200, 30), row("Ohio", 400, 12), row("Texas", 60, 0, clicks=90), row("Utah", 340, 58)]
+
+
+def _insights(platform):
+    return ins.analyse(table(PLACES(), total_cost=1000, total_conv=100), level="region", platform=platform)["insights"]
+
+
+def test_on_a_meta_account_the_advice_talks_of_budget_and_ad_sets_not_bid_adjustments():
+    """Meta has no location bid adjustment: the same index says how much more or less budget a place deserves."""
+    out = _insights("meta")
+    said = " ".join(i["headline"] + " " + i["action"] for i in out if i["kind"] in ("push", "trim", "exclude", "concentration"))
+    assert {i["kind"] for i in out} >= {"push", "trim", "exclude", "concentration"}
+    assert "bid" not in said.lower() and "budget" in said
+    push = next(i for i in out if i["kind"] == "push")
+    assert push["headline"].startswith("Put more budget behind Utah") and "ad set of its own" in push["action"]
+    assert next(i for i in out if i["kind"] == "trim")["headline"].startswith("Take budget out of Ohio")
+    assert "halve" not in said and "cut its budget by half" in said
+
+
+def test_on_google_and_on_both_the_advice_is_still_about_bids():
+    for platform in ("google", "both"):
+        said = " ".join(i["headline"] for i in _insights(platform))
+        assert "Raise bids in" in said and "Lower bids in" in said, platform
+
+
+def test_the_briefing_is_worded_for_the_platform_that_was_read():
+    from tracker import paid_geo_summary as gs
+    meta, google = gs.system_for({"account": {"platform": "meta"}}), gs.system_for({"account": {"platform": "google"}})
+    assert "share of the budget" in meta and "Meta Ads terms" in meta and "bid adjustment" not in meta
+    assert "higher or lower bid" in google and "Google Ads terms" in google and gs.SYSTEM == gs.system_for({})
+    assert "Google Ads and Meta Ads terms" in gs.system_for({"account": {"platform": "both"}})

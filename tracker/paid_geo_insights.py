@@ -115,7 +115,7 @@ def _label(row):
     return row["label"]
 
 
-def analyse(view, *, level="region", currency="USD"):
+def analyse(view, *, level="region", currency="USD", platform="google"):
     """The view with every row judged, and `insights`, `basis` and `average` added. `view` is
     {rows, total, coverage, account} as tracker/paid_geo.py builds it."""
     total = dict(view["total"], _cur=currency)
@@ -126,7 +126,7 @@ def analyse(view, *, level="region", currency="USD"):
         rows.append(dict(r, verdict=verdict, verdictLabel=VERDICT_LABEL[verdict], index=None if idx is None else round(idx * 100),
                          adjustment=adj, confidence=conf, why=why))
     out = dict(view, rows=rows, basis=basis)
-    out["insights"] = make_insights(rows, view["total"], view.get("coverage"), basis, level, currency)
+    out["insights"] = make_insights(rows, view["total"], view.get("coverage"), basis, level, currency, platform)
     out["counts"] = {v: sum(1 for r in rows if r["verdict"] == v) for v in VERDICT_LABEL if any(r["verdict"] == v for r in rows)}
     return out
 
@@ -137,8 +137,11 @@ def _basis_words(r, total, basis, currency):
     return "CPA %s against %s for the account" % (money(r["cpa"], currency, 2) if r["cpa"] else "Na", money(total["cpa"], currency, 2))
 
 
-def make_insights(rows, total, coverage, basis, level, currency):
+def make_insights(rows, total, coverage, basis, level, currency, platform="google"):
+    """On Meta there is no bid adjustment by place: the same index says how much more or less budget a place deserves, and the advice is in ad sets and
+    location targeting. (On Google, and on the two added together, it is Google's bid adjustment.)"""
     noun = LEVEL_NOUN.get(level, "location")
+    meta = platform == "meta"
     out = []
     if not rows:
         return out
@@ -150,7 +153,7 @@ def make_insights(rows, total, coverage, basis, level, currency):
     if basis is None:
         add_("nodata", "watch", "No conversions in this range, so no place can be judged on results",
              "%s spent across %s %s with no conversions recorded." % (money(total["cost"], currency), num(len(rows)), plural(noun)),
-             "Check conversion tracking, or pick a longer date range, before adjusting any bids by location.", "high", [])
+             "Check conversion tracking, or pick a longer date range, before %s by location." % ("changing the budget" if meta else "adjusting any bids"), "high", [])
         return out
 
     def ev(r):
@@ -161,6 +164,13 @@ def make_insights(rows, total, coverage, basis, level, currency):
     pushes = sorted([r for r in rows if r["verdict"] in ("star", "good") and (r["adjustment"] or 0) >= 0.10],
                     key=lambda r: -r["conversions"])[:3]
     for r in pushes:
+        if meta:
+            add_("push", "action", "Put more budget behind %s, about %d%% more" % (_label(r), round(r["adjustment"] * 100)),
+                 ev(r), "Give %s an ad set of its own, or about %d%% more of the budget, and check it after two weeks. %s." % (
+                     _label(r), round(r["adjustment"] * 100), "A place this small needs its own ad set to keep its budget"
+                     if r["pctCost"] and r["pctCost"] < 0.03 else "It already takes a real share of the spend"),
+                 r["confidence"], [r["key"]])
+            continue
         add_("push", "action", "Raise bids in %s by about %d%%" % (_label(r), round(r["adjustment"] * 100)),
              ev(r), "Add a +%d%% location bid adjustment for %s and check it after two weeks. %s." % (
                  round(r["adjustment"] * 100), _label(r), "It is also worth a campaign of its own if the budget is capped"
@@ -170,6 +180,11 @@ def make_insights(rows, total, coverage, basis, level, currency):
     trims = sorted([r for r in rows if r["verdict"] in ("weak", "below") and (r["adjustment"] or 0) <= -0.10],
                    key=lambda r: -r["cost"])[:3]
     for r in trims:
+        if meta:
+            add_("trim", "action", "Take budget out of %s, about %d%% less" % (_label(r), round(-r["adjustment"] * 100)),
+                 ev(r), "Cut its share of the budget by about %d%% (an ad set of its own makes that possible). If it stays weak after a month, exclude %s from the location targeting."
+                 % (round(-r["adjustment"] * 100), _label(r)), r["confidence"], [r["key"]])
+            continue
         add_("trim", "action", "Lower bids in %s by about %d%%" % (_label(r), round(-r["adjustment"] * 100)),
              ev(r), "Add a %d%% location bid adjustment for %s. If it stays weak after a month, exclude it." % (round(r["adjustment"] * 100), _label(r)),
              r["confidence"], [r["key"]])
@@ -180,7 +195,7 @@ def make_insights(rows, total, coverage, basis, level, currency):
              "%s: %s on %s clicks, no conversions; the account's CPA is %s, so this is %s times a normal conversion's cost." % (
                  _label(r), money(r["cost"], currency), num(r["clicks"]), money(total["cpa"], currency, 2),
                  format(r["cost"] / total["cpa"], ".1f") if total.get("cpa") else "Na"),
-             "Exclude %s, or cut its bid by half, unless it matters for a reason the numbers cannot show (a new market, brand awareness)." % _label(r),
+             "Exclude %s, or cut its %s by half, unless it matters for a reason the numbers cannot show (a new market, brand awareness)." % (_label(r), "budget" if meta else "bid"),
              "medium", [r["key"]])
 
     top = rows[:3]
@@ -188,7 +203,7 @@ def make_insights(rows, total, coverage, basis, level, currency):
         share = sum(r["pctCost"] or 0 for r in top)
         add_("concentration", "info", "Three %s hold %s of the spend" % (plural(noun), pct(share)),
              "%s: %s of spend between them, out of %s %s." % (", ".join(_label(r) for r in top), pct(share, 1), num(len(rows)), plural(noun)),
-             "These are where a bid change moves the most money; judge them first." if share >= 0.5 else
+             "These are where a %s change moves the most money; judge them first." % ("budget" if meta else "bid") if share >= 0.5 else
              "Spend is spread out, so no single %s decides the result." % noun, "high", [r["key"] for r in top])
 
     thin = [r for r in rows if r["verdict"] == "thin"]

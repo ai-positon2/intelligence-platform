@@ -45,6 +45,8 @@ function pc(v,d){return v==null?"Na":(v*100).toFixed(d==null?1:d)+"%";}
 function conv(v){return v==null?"Na":(Math.abs(v-Math.round(v))<0.05?Math.round(v).toLocaleString("en-US"):v.toLocaleString("en-US",{minimumFractionDigits:1,maximumFractionDigits:1}));}
 function x2(v){return v==null?"Na":v.toFixed(2)+"x";}
 function adjText(a){return a==null?"":a===0?"Hold":(a>0?"+":"")+Math.round(a*100)+"%";}
+/* Meta has no bid adjustment by place: the same suggestion is a change in the share of the budget there (on Google, and on the two added, it is the bid). */
+function budgetWords(){return !!(S.report&&S.report.account.platform==="meta");}
 function platName(p){return p==="meta"?"Meta Ads":p==="both"?"Google Ads and Meta Ads":"Google Ads";}
 function longDate(s){return new Date(s+"T12:00:00").toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"});}
 function ago(iso){
@@ -233,9 +235,9 @@ function render(){
     ' to '+esc(longDate(rep.range.to))+' ('+rep.range.days+' day'+(rep.range.days===1?"":"s")+') · by '+esc(levelLabel(rep.level).toLowerCase())+' · read from '+plat+' '+
     esc(ago(rep.generatedAt))+(rep.stale?' <span class="sg-mcc">'+plat+' is not answering, so this is the copy saved '+esc(ago(rep.stale))+'</span>':"");
   paintKpis(); paintTypes(); paintInsights(); paintChartControls(); drawChart(); paintVerdicts(); paintTable();
-  $("#foot").innerHTML="Source: "+plat+", saved so the same report opens instantly. Places are where people <b>were</b> when they saw the ad (Google's user location report), "+
+  $("#foot").innerHTML="Source: "+plat+", saved so the same report opens instantly. Places are where people <b>were</b> when they saw the ad ("+(budgetWords()?"Meta's region report":"Google's user location report")+"), "+
     "so a place can appear that you do not target. A place is judged against this account's own average: the <b>efficiency index</b> is the account's "+
-    (view()&&view().basis==="roas"?"return on ad spend":"cost per conversion")+" compared with the place's, and 100 is average. A <b>suggested bid adjustment</b> is 80% of the gap, in steps of 5%, "+
+    (view()&&view().basis==="roas"?"return on ad spend":"cost per conversion")+" compared with the place's, and 100 is average. A <b>suggested "+(budgetWords()?"budget change":"bid adjustment")+"</b> is 80% of the gap, in steps of 5%, "+
     "only with at least 5 conversions behind it: a starting point to apply gradually and check, not an instruction. Spend, conversions and conversion value are "+
     "as the platform reports them."+((rep.account.platform==="meta"||rep.account.platform==="both")?" On Meta, conversions are the campaign objective's results and the metro level is Meta's DMA; Meta has no city breakdown.":"")+
     (rep.account.isGroup?" This is an MCC view: the "+rep.account.accountCount+" accounts are read one by one and their rows added together.":"");
@@ -276,7 +278,7 @@ function paintInsights(){
     html+='<h3 class="sg-gh">'+g[1]+'</h3><div class="sg-cards">'+list.map(function(i){
       var link=i.keys&&i.keys.length?' data-key="'+esc(i.keys[0])+'" tabindex="0" role="link"':"";
       return '<article class="sg-card '+i.severity+(link?" link":"")+'"'+link+'>'+
-        '<div class="sg-card-top"><span class="sg-tag">'+esc({push:"Raise bids",trim:"Lower bids",exclude:"Exclude",concentration:"Concentration",thin:"Thin data",coverage:"Coverage",nodata:"No data"}[i.kind]||i.kind)+'</span>'+
+        '<div class="sg-card-top"><span class="sg-tag">'+esc({push:budgetWords()?"More budget":"Raise bids",trim:budgetWords()?"Less budget":"Lower bids",exclude:"Exclude",concentration:"Concentration",thin:"Thin data",coverage:"Coverage",nodata:"No data"}[i.kind]||i.kind)+'</span>'+
         (i.severity==="info"?"":'<span class="sg-conf '+(i.confidence==="high"?"high":"")+'">'+(i.confidence==="high"?"High confidence":i.confidence==="medium"?"Medium confidence":"Directional")+'</span>')+'</div>'+
         '<h4>'+esc(i.headline)+'</h4><p class="ev">'+esc(i.evidence)+'</p>'+
         '<p class="ac"><b>'+(i.severity==="info"?"Note":"Do")+'</b> '+esc(i.action)+'</p></article>';
@@ -464,6 +466,7 @@ new MutationObserver(function(){ if(S.report) drawChart(); }).observe(document.d
 /* ── The table ────────────────────────────────────────────── */
 var COLS = [["label","Place"],["cost","Spend"],["pctCost","% spend"],["clicks","Clicks"],["ctr","CTR"],["cpc","CPC"],["conversions","Conv."],
             ["cvr","Conv. rate"],["cpa","CPA"],["roas","ROAS"],["index","Index"],["verdict","Verdict"],["adjustment","Suggested bid"]];
+function colLabel(c){return c[0]==="adjustment"&&budgetWords()?"Suggested budget":c[1];}
 function paintVerdicts(){
   var v=view(); if(!v) return;
   var counts={}; v.rows.forEach(function(r){counts[r.verdict]=(counts[r.verdict]||0)+1;});
@@ -507,7 +510,7 @@ function paintTable(){
   $("#covNote").textContent=cov==null?"":(cov>=0.995?"Covers all spend":"Covers "+pc(cov,0)+" of spend");
   var head=cols.map(function(c){
     var arw=st&&st.col===c[0]?'<span class="arw">'+(st.dir>0?"▲":"▼")+'</span>':"";
-    return '<th class="sortable'+(c[0]!=="label"?" r":"")+'" data-col="'+c[0]+'">'+esc(c[1])+arw+'</th>';
+    return '<th class="sortable'+(c[0]!=="label"?" r":"")+'" data-col="'+c[0]+'">'+esc(colLabel(c))+arw+'</th>';
   }).join("");
   var maxShare=v.rows.reduce(function(m,r){return Math.max(m,r.pctCost||0);},0)||1;
   var shown=rows.slice(0,S.tbl.limit);
@@ -542,7 +545,7 @@ $("#refreshBtn").addEventListener("click",function(){run(true);});
 $("#exportBtn").addEventListener("click",function(){
   var rep=S.report, v=view(); if(!rep||!v) return;
   var lines=[["Account",rep.account.name],["Platform",platName(rep.account.platform)],["Date range",rep.range.from+" to "+rep.range.to],["Level",levelLabel(rep.level)],["Campaign type",S.type],[],
-    ["Place","Parent","Impressions","Clicks","Cost","% cost","CTR","CPC","Conversions","Conv. rate","CPA","Conversion value","ROAS","Efficiency index","Verdict","Suggested bid adjustment","Confidence"]];
+    ["Place","Parent","Impressions","Clicks","Cost","% cost","CTR","CPC","Conversions","Conv. rate","CPA","Conversion value","ROAS","Efficiency index","Verdict",budgetWords()?"Suggested budget change":"Suggested bid adjustment","Confidence"]];
   v.rows.forEach(function(r){
     lines.push([r.label,r.sub,r.impressions,r.clicks,r.cost.toFixed(2),r.pctCost==null?"":(r.pctCost*100).toFixed(2)+"%",r.ctr==null?"":(r.ctr*100).toFixed(2)+"%",
       r.cpc==null?"":r.cpc.toFixed(2),r.conversions,r.cvr==null?"":(r.cvr*100).toFixed(2)+"%",r.cpa==null?"":r.cpa.toFixed(2),r.value,r.roas==null?"":r.roas.toFixed(3),

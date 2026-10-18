@@ -386,13 +386,13 @@ def assemble(raw, account, start, end):
     seen = {t for p in raw["places"].values() for t in p["types"]}
     types += sorted(t for t in seen if t not in types)
     views = {}
+    platform = raw["platform"]
     for t in [ALL] + types:
         cost = acct["cost"] if t == ALL else totals.get(t, zero())["cost"]
         conv = acct["conv"] if t == ALL else totals.get(t, zero())["conv"]
         v = _view(raw["places"], t, cost, conv)
         v["account"] = derive(acct if t == ALL else totals.get(t, zero()), cost or 0, conv or 0)
-        views[t] = insights.analyse(v, level=raw["level"], currency=account.get("currency") or "USD")
-    platform = raw["platform"]
+        views[t] = insights.analyse(v, level=raw["level"], currency=account.get("currency") or "USD", platform=platform)
     return {
         "account": {"id": account["id"], "name": account["name"], "currency": account.get("currency") or "USD", "platform": platform,
                     "isGroup": bool(raw.get("members")), "accountCount": len(raw.get("members") or []) or 1, "accounts": raw.get("members") or []},
