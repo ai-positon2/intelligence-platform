@@ -499,11 +499,12 @@ def summary_input(report, insights):
     }
 
 
-def check_numbers(text, shown):
+def check_numbers(text, shown, free=10):
     """Numbers in `text` that are not in `shown` (a dict or string). Whole numbers
-    up to 10 are free: 'three actions', 'two weeks'."""
+    up to `free` (10) are free: 'three actions', 'two weeks'. A caller that counts things the reader can check (the audit's failed checks) passes
+    free=0: with 10 free, any invented count of ten or less went through."""
     allowed = _numbers(shown if isinstance(shown, str) else json.dumps(shown))
-    return sorted(n for n in _numbers(text) if n not in allowed and not (n <= 10 and n == int(n)))
+    return sorted(n for n in _numbers(text) if n not in allowed and not (n <= free and n == int(n)))
 
 
 def _day(iso):

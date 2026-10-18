@@ -96,12 +96,12 @@ def summarise(report, *, call=None):
         text = str(parsed.get("summary") or "")
         steps = [str(a) for a in (parsed.get("firstSteps") or [])][:6]
         asks = [str(a) for a in (parsed.get("questionsForClient") or [])][:6]
-        bad = check_numbers(" ".join([text] + steps + asks), shown_text)
+        bad = check_numbers(" ".join([text] + steps + asks), shown_text, free=0)         # every figure must be one the audit gave: a count is checkable
         if text and not bad:
             clean = lambda s: re.sub(r"\s*[%s%s]\s*" % (chr(0x2014), chr(0x2013)), ", ", s)
             return {"summary": clean(text), "firstSteps": [clean(a) for a in steps], "questionsForClient": [clean(a) for a in asks], "source": "model"}
         note = ("\n\nYour last answer used numbers that were not in the results above (%s). "
-                "Rewrite it using only numbers exactly as given." % ", ".join(("%g" % n) for n in bad[:6]))
+                "Rewrite it using only numbers exactly as given (write any other small number as a word)." % ", ".join(("%g" % n) for n in bad[:6]))
     return fallback(report, shown)
 
 

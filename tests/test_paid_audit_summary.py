@@ -65,11 +65,14 @@ def test_a_number_that_was_not_given_sends_the_model_back_once_and_a_second_miss
     assert out["source"] == "rules" and "8,888" not in out["summary"] and out["questionsForClient"] == []
 
 
-def test_numbers_up_to_ten_and_the_ones_in_the_results_are_free(report):
-    ok = model_says("Three things matter, and the score is %s." % report["summary"]["score"])
+def test_only_numbers_the_audit_gave_are_free_and_a_small_invented_count_is_not(report):
+    """The page says every number in the briefing is one the audit gave. With 1 to 10 free, "9 checks failed" passed whatever the audit found."""
+    ok = model_says("Three things matter, and the score is %s." % report["summary"]["score"])            # a number written as a word is not a figure
     assert s.summarise(report, call=ok)["source"] == "model"
-    bad = model_says("Eleven things matter, in 11 places.")
-    assert s.summarise(report, call=bad)["source"] == "rules"                       # 11 is a number the audit never gave
+    for invented in ("9 checks failed and 7 are warnings.", "Eleven things matter, in 11 places.", "It failed 8 checks."):
+        assert s.summarise(report, call=model_says(invented))["source"] == "rules", invented
+    given = report["summary"]["tally"]["fail"]
+    assert s.summarise(report, call=model_says("%d checks failed." % given))["source"] == "model"         # the audit's own count is fine
 
 
 def test_dashes_in_the_models_words_become_commas(report):
@@ -94,7 +97,7 @@ def test_the_fallback_says_when_nothing_needs_fixing_first():
 
 
 def test_the_answers_lists_are_capped(report):
-    out = s.summarise(report, call=model_says(steps=["s%d" % i for i in range(20)], asks=["q%d" % i for i in range(20)]))
+    out = s.summarise(report, call=model_says(steps=["step " + chr(97 + i) for i in range(20)], asks=["question " + chr(97 + i) for i in range(20)]))
     assert len(out["firstSteps"]) == 6 and len(out["questionsForClient"]) == 6
 
 
