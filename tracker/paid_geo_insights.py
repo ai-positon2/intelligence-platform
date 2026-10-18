@@ -56,6 +56,10 @@ def num(v):
     return format(round(v), ",") if abs(v - round(v)) < 0.05 else format(v, ",.1f")
 
 
+MIXED_WHY = ("This account runs campaigns whose results are not the same thing (sales, leads, app installs), so a place cannot be fairly compared "
+             "across them. Pick one campaign type above.")
+
+
 def basis_of(total):
     """'roas' when the account tracks conversion value, 'cpa' when it only counts conversions, None when it has neither."""
     if total.get("roas") and total.get("value", 0) > 0:
@@ -115,18 +119,20 @@ def _label(row):
     return row["label"]
 
 
-def analyse(view, *, level="region", currency="USD", platform="google"):
+def analyse(view, *, level="region", currency="USD", platform="google", mixed=False):
     """The view with every row judged, and `insights`, `basis` and `average` added. `view` is
     {rows, total, coverage, account} as tracker/paid_geo.py builds it."""
     total = dict(view["total"], _cur=currency)
-    basis = basis_of(total)
+    basis = None if mixed else basis_of(total)
     rows = []
     for r in view["rows"]:
         verdict, idx, adj, conf, why = judge(r, total, basis)
+        if mixed:
+            why = MIXED_WHY
         rows.append(dict(r, verdict=verdict, verdictLabel=VERDICT_LABEL[verdict], index=None if idx is None else round(idx * 100),
                          adjustment=adj, confidence=conf, why=why))
     out = dict(view, rows=rows, basis=basis)
-    out["insights"] = make_insights(rows, view["total"], view.get("coverage"), basis, level, currency, platform)
+    out["insights"] = make_insights(rows, view["total"], view.get("coverage"), basis, level, currency, platform, mixed)
     out["counts"] = {v: sum(1 for r in rows if r["verdict"] == v) for v in VERDICT_LABEL if any(r["verdict"] == v for r in rows)}
     return out
 
@@ -137,7 +143,7 @@ def _basis_words(r, total, basis, currency):
     return "CPA %s against %s for the account" % (money(r["cpa"], currency, 2) if r["cpa"] else "Na", money(total["cpa"], currency, 2))
 
 
-def make_insights(rows, total, coverage, basis, level, currency, platform="google"):
+def make_insights(rows, total, coverage, basis, level, currency, platform="google", mixed=False):
     """On Meta there is no bid adjustment by place: the same index says how much more or less budget a place deserves, and the advice is in ad sets and
     location targeting. (On Google, and on the two added together, it is Google's bid adjustment.)"""
     noun = LEVEL_NOUN.get(level, "location")
@@ -150,6 +156,12 @@ def make_insights(rows, total, coverage, basis, level, currency, platform="googl
         out.append({"kind": kind, "severity": severity, "headline": headline, "evidence": evidence, "action": action,
                     "confidence": conf, "keys": keys})
 
+    if mixed:
+        add_("mixed", "watch", "Campaign types with different results are added together here",
+             "%s spent across %s %s on campaigns whose results are different things (sales, leads, app installs), so one place's cost per result "
+             "cannot be set against another's." % (money(total["cost"], currency), num(len(rows)), plural(noun)),
+             "Pick one campaign type above: the places are judged within it.", "high", [])
+        return out
     if basis is None:
         add_("nodata", "watch", "No conversions in this range, so no place can be judged on results",
              "%s spent across %s %s with no conversions recorded." % (money(total["cost"], currency), num(len(rows)), plural(noun)),

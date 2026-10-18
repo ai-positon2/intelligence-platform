@@ -278,7 +278,7 @@ function paintInsights(){
     html+='<h3 class="sg-gh">'+g[1]+'</h3><div class="sg-cards">'+list.map(function(i){
       var link=i.keys&&i.keys.length?' data-key="'+esc(i.keys[0])+'" tabindex="0" role="link"':"";
       return '<article class="sg-card '+i.severity+(link?" link":"")+'"'+link+'>'+
-        '<div class="sg-card-top"><span class="sg-tag">'+esc({push:budgetWords()?"More budget":"Raise bids",trim:budgetWords()?"Less budget":"Lower bids",exclude:"Exclude",concentration:"Concentration",thin:"Thin data",coverage:"Coverage",nodata:"No data"}[i.kind]||i.kind)+'</span>'+
+        '<div class="sg-card-top"><span class="sg-tag">'+esc({push:budgetWords()?"More budget":"Raise bids",trim:budgetWords()?"Less budget":"Lower bids",exclude:"Exclude",concentration:"Concentration",mixed:"Mixed results",thin:"Thin data",coverage:"Coverage",nodata:"No data"}[i.kind]||i.kind)+'</span>'+
         (i.severity==="info"?"":'<span class="sg-conf '+(i.confidence==="high"?"high":"")+'">'+(i.confidence==="high"?"High confidence":i.confidence==="medium"?"Medium confidence":"Directional")+'</span>')+'</div>'+
         '<h4>'+esc(i.headline)+'</h4><p class="ev">'+esc(i.evidence)+'</p>'+
         '<p class="ac"><b>'+(i.severity==="info"?"Note":"Do")+'</b> '+esc(i.action)+'</p></article>';

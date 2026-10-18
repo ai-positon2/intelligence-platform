@@ -353,6 +353,15 @@ def merge_raw(g, m):
 
 # ── Assembling a report from a raw read ─────────────────────────────────────
 
+RESULT_TYPES = ("Meta Sales", "Meta Leads", "Meta App promotion", "Meta Other")      # the Meta campaign types whose "conversion" is a sale, a lead or an install
+
+
+def _mixed_results(totals):
+    """True when two or more kinds of result are added together: a sale, a lead and an install are not the same thing, so the places of the whole account
+    cannot be ranked on them (Meta's traffic, awareness and engagement campaigns have no conversion and are not counted here)."""
+    return sum(1 for t in RESULT_TYPES if (totals.get(t) or {}).get("cost", 0) > 0) >= 2
+
+
 def _view(places, ctype, account_cost, account_conv):
     picked = []
     for key, p in places.items():
@@ -392,7 +401,8 @@ def assemble(raw, account, start, end):
         conv = acct["conv"] if t == ALL else totals.get(t, zero())["conv"]
         v = _view(raw["places"], t, cost, conv)
         v["account"] = derive(acct if t == ALL else totals.get(t, zero()), cost or 0, conv or 0)
-        views[t] = insights.analyse(v, level=raw["level"], currency=account.get("currency") or "USD", platform=platform)
+        views[t] = insights.analyse(v, level=raw["level"], currency=account.get("currency") or "USD", platform=platform,
+                                    mixed=t == ALL and platform == "meta" and _mixed_results(totals))
     return {
         "account": {"id": account["id"], "name": account["name"], "currency": account.get("currency") or "USD", "platform": platform,
                     "isGroup": bool(raw.get("members")), "accountCount": len(raw.get("members") or []) or 1, "accounts": raw.get("members") or []},

@@ -462,3 +462,26 @@ def test_a_fresh_read_is_stamped_with_the_time_it_was_made(cache):
     from tests.gads_fakes import FakeStore
     raw = g._cached("geo", "1234567890", "region", START, END, lambda: {"places": {}, "warnings": []}, force=False, store=FakeStore(), now=None)[0]
     assert raw["readAt"].startswith("20")
+
+
+def test_a_meta_account_that_mixes_sales_and_leads_does_not_rank_its_places_on_one_measure(monkeypatch):
+    """A lead with no value looked like a failure next to a sale with one: Utah at $10 a lead was "Weak" and told to lose half its budget."""
+    from tests.gads_fakes import FakeStore
+    from tracker import paid_meta
+    monkeypatch.setenv("META_ADS_ACCESS_TOKEN", "x")
+    monkeypatch.setattr(paid_meta, "account_by_id", lambda st, act: dict(META))
+
+    def lead(spend, n, **place):
+        return {"objective": "OUTCOME_LEADS", "spend": str(spend), "impressions": "20000", "inline_link_clicks": "900",
+                "actions": [{"action_type": "lead", "value": str(n)}], "action_values": [], **place}
+    rows = [mrow("OUTCOME_SALES", 1000, 50000, 1500, purchases=40, value=8000, region="Texas"),
+            mrow("OUTCOME_SALES", 1000, 50000, 1500, purchases=40, value=8000, region="Ohio"), lead(500, 50, region="Utah")]
+    g.clear_cache()
+    base.forget("")
+    rep = g.report_for("act_5550001", "region", "2026-06-01", "2026-06-30", store=FakeStore(), meta_fetch=lambda a, l, p: rows)
+    every = rep["views"]["All"]
+    assert {r["verdict"] for r in every["rows"]} == {"none"} and [i["kind"] for i in every["insights"]] == ["mixed"]
+    assert all(r["adjustment"] is None for r in every["rows"])
+    for kind in ("Meta Sales", "Meta Leads"):                                     # inside one campaign type the places are judged as before
+        assert rep["views"][kind]["insights"] is not None and rep["views"][kind]["basis"] is not None
+    assert g._mixed_results({"Meta Sales": {"cost": 5}, "Meta Traffic": {"cost": 9}}) is False        # traffic has no result: not a second kind
