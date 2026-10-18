@@ -51,12 +51,13 @@ function fmt(key,v,cur,small){
   return P?P.fmt(m.kind,v,cur,small):String(v);
 }
 
-/* The rows of the year-over-year chart: one line per year, a point per calendar month (or ISO week). Months with fewer than
-   10 days in the data are left out (the first and the current one are partial), and so is a week the server did not send. */
+/* The rows of the year-over-year chart: one line per year, a point per calendar month (or ISO week). A month that is not whole in the data
+   is left out (the first and the current one are partial: 17 days of October laid against all of last October would look like a collapse), and so is
+   a week the server did not send. */
 function overlay(monthly,weekly,key,grain){
   var rows=grain==="week"?weekly:monthly, n=grain==="week"?53:12, byYear={};
   (rows||[]).forEach(function(r){
-    if(grain!=="week"&&r.days<10) return;
+    if(grain!=="week"&&!r.full) return;
     var y=r.y, at=(grain==="week"?r.w:r.m)-1;
     if(at<0||at>=n) return;
     (byYear[y]=byYear[y]||new Array(n).fill(null))[at]=valueOf(key,r,grain==="week"?7:r.days);
@@ -75,7 +76,7 @@ function trailing(monthly){
   return {cur:sum(cur),prev:prev?sum(prev):null,months:cur.length,
     from:cur[0].y+"-"+String(cur[0].m).padStart(2,"0"),to:cur[cur.length-1].y+"-"+String(cur[cur.length-1].m).padStart(2,"0")};
 }
-function change(cur,prev){return prev==null||!prev?null:cur/prev-1;}
+function change(cur,prev){return cur==null||prev==null||!prev?null:cur/prev-1;}
 function pct(x,d){
   if(x==null||!isFinite(x)) return "–";
   var v=x*100, s=Math.abs(v)>=10?Math.round(v):Math.round(v*10)/10;

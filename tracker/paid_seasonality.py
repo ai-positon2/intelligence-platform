@@ -420,7 +420,7 @@ def events_of(year):
         ("labor", "Labor Day weekend", labor - 3 * day, labor),
         ("halloween", "Halloween run-up", dt.date(year, 10, 24), dt.date(year, 10, 31)),
         ("prebf", "Week before Thanksgiving", thanks - 7 * day, thanks - day),
-        ("bfcm", "Black Friday to Cyber Monday", thanks, thanks + 4 * day),
+        ("bfcm", "Thanksgiving to Cyber Monday", thanks, thanks + 4 * day),
         ("xmasrun", "Christmas run-up", dt.date(year, 12, 15), dt.date(year, 12, 24)),
         ("xmasweek", "Between Christmas and New Year", dt.date(year, 12, 26), dt.date(year, 12, 31)),
     ]

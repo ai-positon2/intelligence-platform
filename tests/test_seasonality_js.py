@@ -66,8 +66,8 @@ def test_the_overlay_has_a_line_per_year_and_a_point_per_month():
     assert o["years"][0]["data"][2] == pytest.approx(10.0) and o["years"][1]["data"][2] == pytest.approx(20.0)
 
 
-def test_a_month_with_under_ten_days_is_left_out_of_the_overlay_and_a_missing_one_is_null():
-    rows = [row(2025, 1, days=30), row(2025, 2, days=6), row(2025, 4, days=30)]
+def test_a_month_that_is_not_whole_is_left_out_of_the_overlay_and_a_missing_one_is_null():
+    rows = [row(2025, 1, days=30), row(2025, 2, days=6, full=False), row(2025, 4, days=30)]
     d = run('D.overlay(rows, [], "cost", "month").years[0].data', rows=rows)
     assert d[0] == 10.0 and d[1] is None and d[2] is None and d[3] == 10.0
 
@@ -174,3 +174,14 @@ def test_the_page_loads_its_scripts_in_dependency_order_and_with_a_version():
 def test_no_page_copy_uses_an_em_dash():
     for f in (PAGE, DATA, TEMPLATE):
         assert "—" not in open(f).read(), f
+
+
+def test_the_current_part_month_is_not_laid_against_whole_months():
+    """17 days of October at 10 a day is not a collapse against last year's whole October: the partial month is not drawn at all."""
+    rows = [row(2025, 10, days=31, cost=3100.0), row(2026, 10, days=17, cost=170.0, full=False)]
+    years = run('D.overlay(rows, [], "cost", "month").years', rows=rows)
+    assert years == [{"y": 2025, "data": [None] * 9 + [100.0, None, None]}]
+
+
+def test_a_missing_figure_is_not_a_change_of_minus_one_hundred_percent():
+    assert run("D.change(null, 100)") is None and run("D.change(0, 100)") == -1                # no figure is not the same as none of it
