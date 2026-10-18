@@ -1,6 +1,6 @@
 /* Audience Segment Analysis (Paid Marketing Agents).
  *
- * Pick a Google Ads account (or an MCC) and a date range. The server reads how every audience the account uses performs
+ * Pick a Google Ads account (or an MCC), a Meta ad account, or one of each (Google | Meta | Both), and a date range. The server reads how every audience the account uses performs
  * (tracker/paid_audiences.py), judges each against the account's own average for the same campaign type and says what to do given how
  * it is attached and how its campaigns bid (paid_audiences_insights.py). This page draws it. It never works out a verdict, an index or
  * a suggestion for itself: the server's are what is shown.
@@ -19,7 +19,12 @@ function dashed(id){return id.length===10?id.slice(0,3)+"-"+id.slice(3,6)+"-"+id
 var VERDICTS = {star:["Strong","star"],good:["Above average","good"],par:["On par","par"],below:["Below average","below"],weak:["Weak","weak"],
                 leak:["Leaking spend","leak"],thin:["Too little data","thin"],none:["Not judged","thin"]};
 var MODES = {observation:"Observation",targeting:"Targeting",mixed:"Mixed"};
-var S = {accounts:[], groups:[], account:"", currency:"USD", preset:"30", from:"", to:"", report:null, seq:0, type:"All",
+/* On Meta an ad set on Advantage+ audience treats its audiences as suggestions, not limits. */
+function modeText(mode,platform){return platform==="meta"&&mode==="observation"?"Suggestion":MODES[mode];}
+function platName(p){return p==="meta"?"Meta Ads":p==="both"?"Google Ads and Meta Ads":"Google Ads";}
+function showBid(){return !!(S.report&&S.report.account.platform!=="meta");}
+var PL = window.PMPlatform;
+var S = {accounts:[], groups:[], metaAccounts:[], metaProblem:"", platform:"google", g:"", m:"", pickNote:"", account:"", currency:"USD", preset:"30", from:"", to:"", report:null, seq:0, type:"All",
          tbl:{sort:{col:"cost",dir:-1}, filter:"", verdict:"all", kind:"all", limit:50, open:{}},
          lst:{q:"", kind:"all", serve:"all", use:"all", origin:"all"}};
 
@@ -75,16 +80,53 @@ $("#from").addEventListener("change",function(){S.from=this.value;});
 $("#to").addEventListener("change",function(){S.to=this.value;});
 $("#go").addEventListener("click",function(){run();});
 
-/* ── Accounts ─────────────────────────────────────────────── */
+/* ── Platform and accounts (the same pickers as Geo Performance) ─── */
 var picker = window.PMPicker($("#acctPick"),{label:"Google Ads account",search:true,onChange:function(v){
-  S.account=v; try{localStorage.setItem("au_account",v);}catch(e){} run();
+  S.g=v; if(S.platform==="google") S.m=""; if(S.platform==="both"&&v&&!S.m) autoMeta(); recompute();
 }});
+var mpicker = window.PMPicker($("#metaPick"),{label:"Meta ad account",search:true,onChange:function(v){
+  S.m=v; if(S.platform==="meta") S.g=""; recompute();
+}});
+var switcher = PL.switcher($("#platPick"),{allow:["google","meta","both"],value:"google",onChange:function(p){
+  S.platform=p; if(p!=="meta"&&!S.g&&S.m) autoGoogle(); if(p!=="google"&&!S.m&&S.g) autoMeta(); paintPickers(); recompute();
+}});
+function googleAcct(id){return S.accounts.filter(function(a){return a.id===id;})[0]||null;}
+function metaAcct(id){return S.metaAccounts.filter(function(a){return a.id===id;})[0]||null;}
+function autoMeta(){var g=googleAcct(S.g), c=g?PL.counterpart(g,S.metaAccounts):null; if(c) S.m=c.id;}
+function autoGoogle(){var m=metaAcct(S.m), c=m?PL.counterpart(m,S.accounts):null; if(c) S.g=c.id;}
+function chosenAccount(){
+  var p=S.platform;
+  if(p==="google") return S.g;
+  if(p==="meta") return S.m;
+  if(S.g&&S.m&&googleAcct(S.g)&&metaAcct(S.m)&&googleAcct(S.g).currency===metaAcct(S.m).currency) return S.g+"+"+S.m;
+  return S.g||S.m;
+}
+function recompute(){
+  S.account=chosenAccount()||"";
+  try{localStorage.setItem("au_account",S.account);}catch(e){}
+  var note="";
+  if(S.platform==="both"&&S.g&&S.m&&googleAcct(S.g)&&metaAcct(S.m)&&googleAcct(S.g).currency!==metaAcct(S.m).currency)
+    note="These two accounts bill in different currencies, so they cannot be added together. Showing the Google account.";
+  if(S.platform!=="google"&&S.metaProblem) note=S.metaProblem+(S.platform==="both"?" Showing Google only.":"");
+  S.pickNote=note;
+  run();
+}
+function paintPickers(){
+  $("#acctPick").hidden=S.platform==="meta"; $("#metaPick").hidden=S.platform==="google";
+  var both=S.platform==="both";
+  var items=[{value:"",label:both?"None":"Choose an account",sub:both?"Leave Google out":S.metaAccounts.length+" accounts",avatar:both?"–":"?",hue:200}];
+  S.metaAccounts.forEach(function(a){items.push({value:a.id,label:a.name,avatar:inits(a.name),hue:hueOf(a.name),sub:a.id+" · "+a.currency});});
+  if(!metaAcct(S.m)) S.m="";
+  mpicker.set(items,S.m,!S.metaAccounts.length);
+  setAccounts(S.accounts,S.groups);
+}
 function groupOf(id){return S.groups.filter(function(g){return g.id===id;})[0]||null;}
 var MCC_BADGE='<span class="badge pm-pill ok">MCC</span>';
 function setAccounts(list, groups){
   S.accounts=list; S.groups=groups||[];
-  var items=[{value:"",label:"Choose an account",sub:list.length+" accounts"+(S.groups.length?" · "+S.groups.length+" MCCs to combine":""),avatar:"?",hue:200}], seen={};
-  S.groups.forEach(function(g){
+  var both=S.platform==="both";
+  var items=[{value:"",label:both?"None":"Choose an account",sub:both?"Leave Meta out":list.length+" accounts"+(S.groups.length?" · "+S.groups.length+" MCCs to combine":""),avatar:both?"–":"?",hue:200}], seen={};
+  (both?[]:S.groups).forEach(function(g){
     var head=g.name+" MCC";
     items.push({value:g.id,label:"All of "+g.name,avatar:inits(g.name),hue:hueOf(g.name),group:head,badge:MCC_BADGE,sub:g.accountIds.length+" accounts combined · "+g.currency});
     list.filter(function(a){return a.group===g.id;}).forEach(function(a){
@@ -94,8 +136,8 @@ function setAccounts(list, groups){
   list.filter(function(a){return !seen[a.id];}).forEach(function(a){
     items.push({value:a.id,label:a.name,avatar:inits(a.name),hue:hueOf(a.name),group:S.groups.length?"Other accounts":"",sub:dashed(a.id)+" · "+a.currency});
   });
-  if(!list.some(function(a){return a.id===S.account;})&&!groupOf(S.account)) S.account="";
-  picker.set(items,S.account);
+  if(!list.some(function(a){return a.id===S.g;})&&!groupOf(S.g)) S.g="";
+  picker.set(items,S.g);
 }
 
 /* ── Loading ──────────────────────────────────────────────── */
@@ -108,16 +150,16 @@ function getJson(url,opts){
 function show(which){$("#empty").hidden=which!=="empty"; $("#skel").hidden=which!=="skel"; $("#out").hidden=which!=="out";}
 
 function run(refresh){
-  if(!S.account){show("empty");setMsg("");return;}
+  if(!S.account){show("empty");setMsg(esc(S.pickNote||""),"pm-note");return;}
   if(!S.from||!S.to){setMsg("Pick a start and an end date.");return;}
   if(S.from>S.to){setMsg("The start date is after the end date.");return;}
   var seq=++S.seq, g=groupOf(S.account), q="?account="+encodeURIComponent(S.account)+"&from="+S.from+"&to="+S.to;
   try{history.replaceState(null,"",location.pathname+q);}catch(e){}
-  setMsg(g?"Reading all "+g.accountIds.length+" accounts of "+esc(g.name)+" together. This takes a little longer, about 10 to 30 seconds.":"",g?"pm-note":"");
+  setMsg(g?"Reading all "+g.accountIds.length+" accounts of "+esc(g.name)+" together. This takes a little longer, about 10 to 30 seconds.":esc(S.pickNote||""),"pm-note");
   show("skel");
   getJson(API+"/report"+q+(refresh===true?"&refresh=1":"")).then(function(r){
     if(seq!==S.seq) return;
-    if(g) setMsg("");
+    if(g) setMsg(esc(S.pickNote||""),"pm-note");
     if(!r.ok){
       show(S.report?"out":"empty");
       if(r.j&&r.j.kind==="cooldown"){setMsg(esc(r.j.error),"pm-note");return;}
@@ -139,18 +181,22 @@ function run(refresh){
 /* ── Rendering ────────────────────────────────────────────── */
 function view(){return S.report&&S.report.views[S.type];}
 function render(){
-  var rep=S.report, warn=rep.warnings&&rep.warnings.length?esc(rep.warnings.join(" · ")):"";
-  setMsg(warn,"pm-note");
+  var rep=S.report, warn=rep.warnings&&rep.warnings.length?esc(rep.warnings.join(" · ")):"", pn=platName(rep.account.platform);
+  setMsg(warn||esc(S.pickNote||""),"pm-note");
   $("#fresh").innerHTML='<span class="live"></span><b>'+esc(rep.account.name)+'</b>'+
     (rep.account.isGroup?' <span class="sg-mcc">MCC · '+rep.account.accountCount+' accounts combined</span>':"")+'&nbsp;· '+esc(longDate(rep.range.from))+
-    ' to '+esc(longDate(rep.range.to))+' ('+rep.range.days+' day'+(rep.range.days===1?"":"s")+') · read from Google Ads '+esc(ago(rep.generatedAt))+
-    (rep.stale?' <span class="sg-mcc">Google Ads is not answering, so this is the copy saved '+esc(ago(rep.stale))+'</span>':"");
+    ' to '+esc(longDate(rep.range.to))+' ('+rep.range.days+' day'+(rep.range.days===1?"":"s")+') · read from '+pn+' '+esc(ago(rep.generatedAt))+
+    (rep.stale?' <span class="sg-mcc">'+pn+' is not answering, so this is the copy saved '+esc(ago(rep.stale))+'</span>':"");
   paintKpis(); paintKinds(); paintTypes(); paintInsights(); paintKindChips(); paintVerdicts(); paintTable(); paintLists(); paintExcl();
-  $("#foot").innerHTML="Source: Google Ads, saved so the same report opens instantly. An audience is judged against this account's own average for the same kind of campaign: "+
+  var meta=rep.account.platform==="meta", both=rep.account.platform==="both";
+  $("#foot").innerHTML="Source: "+pn+", saved so the same report opens instantly. An audience is judged against this account's own average for the same kind of campaign: "+
     "the <b>efficiency index</b> is "+(view()&&view().basis==="roas"?"its return on ad spend":"the account's cost per conversion")+" compared with the account's, and 100 is average. "+
-    "Nothing is judged under 5 conversions. A <b>suggested bid adjustment</b> is 80% of the gap in steps of 5%, shown only where the campaign takes one: Smart Bidding, Demand Gen and Performance Max "+
-    "ignore audience bid adjustments. One click can belong to several audiences, so the shares do not add to 100%. Performance Max audience signals report no results in Google's API, so they are not here. "+
-    "Nothing is changed in Google Ads.";
+    "Nothing is judged under 5 conversions. "+
+    (meta?"Meta reports results per ad set, not per audience, so an audience's numbers are those of the ad sets aimed at it, and an ad set aimed at two audiences counts under both. Meta has no audience bid adjustment, so the advice is an ad set of its own, a budget, or the targeting. "
+         :"A <b>suggested bid adjustment</b> is 80% of the gap in steps of 5%, shown only where the campaign takes one: Smart Bidding, Demand Gen and Performance Max "+
+          "ignore audience bid adjustments. "+(both?"On Meta there is no such adjustment, and an audience's numbers are those of the ad sets aimed at it. ":""))+
+    "One click can belong to several audiences, so the shares do not add to 100%. "+(meta?"":"Performance Max audience signals report no results in Google's API, so they are not here. ")+
+    "Nothing is changed in "+(meta?"Meta Ads":both?"Google Ads or Meta Ads":"Google Ads")+".";
 }
 function paintKpis(){
   var v=S.report.views.All, judged=v.rows.filter(function(r){return r.verdict!=="thin"&&r.verdict!=="none";}).length;
@@ -197,7 +243,7 @@ function paintInsights(){
     html+='<h3 class="sg-gh">'+g[1]+'</h3><div class="sg-cards">'+list.map(function(i){
       var link=i.keys&&i.keys.length?' data-key="'+esc(i.keys[0])+'" tabindex="0" role="link"':"";
       return '<article class="sg-card '+i.severity+(link?" link":"")+'"'+link+'><div class="sg-card-top"><span class="sg-tag">'+esc({push:"Raise",trim:"Lower",exclude:"Exclude",kinds:"Kinds",
-        smart:"Smart Bidding",thin:"Thin data",lists:"Lists",unused:"Unused lists",exclusions:"Exclusions",pmax:"Not included",nodata:"No data"}[i.kind]||i.kind)+'</span>'+
+        smart:"Smart Bidding",meta:"Meta Ads",thin:"Thin data",lists:"Lists",unused:"Unused lists",exclusions:"Exclusions",pmax:"Not included",nodata:"No data"}[i.kind]||i.kind)+'</span>'+
         (i.severity==="info"?"":'<span class="sg-conf '+(i.confidence==="high"?"high":"")+'">'+(i.confidence==="high"?"High confidence":i.confidence==="medium"?"Medium confidence":"Directional")+'</span>')+'</div>'+
         '<h4>'+esc(i.headline)+'</h4><p class="ev">'+esc(i.evidence)+'</p><p class="ac"><b>'+(i.severity==="info"?"Note":"Do")+'</b> '+esc(i.action)+'</p></article>';
     }).join("")+'</div>';
@@ -263,7 +309,7 @@ function paintTable(){
     if(S.tbl.kind!=="all"&&r.kind!==S.tbl.kind) return false;
     return !term||(r.label+" "+r.kindLabel+" "+(r.account||"")).toLowerCase().indexOf(term)>=0;
   }));
-  var cols=COLS.filter(function(c){return c[0]!=="roas"||showRoas;}), st=S.tbl.sort;
+  var cols=COLS.filter(function(c){return (c[0]!=="roas"||showRoas)&&((c[0]!=="bid"&&c[0]!=="adjustment")||showBid());}), st=S.tbl.sort;
   $("#tblNote").textContent=S.type==="All"?"all campaign types":S.type+" campaigns";
   var head=cols.map(function(c){
     var arw=st&&st.col===c[0]?'<span class="arw">'+(st.dir>0?"▲":"▼")+'</span>':"";
@@ -276,10 +322,10 @@ function paintTable(){
       '<span class="gp-sub">'+esc(r.detail)+(r.account?" · "+esc(r.account):"")+'</span></td>'+cols.slice(1).map(function(c){
         if(c[0]==="pctCost") return '<td class="r sg-pc"><i style="width:'+Math.min(100,(r.pctCost||0)/maxShare*100).toFixed(1)+'%"></i><span>'+pc(r.pctCost,1)+'</span></td>';
         if(c[0]==="verdict") return '<td class="r"><span class="gp-v '+VERDICTS[r.verdict][1]+'" title="'+esc(r.why||"")+'">'+esc(r.verdictLabel)+'</span></td>';
-        if(c[0]==="mode") return '<td class="r"><span class="au-mode '+r.mode+'">'+MODES[r.mode]+'</span></td>';
-        if(c[0]==="bid") return '<td class="r num">'+esc(bidText(r))+'</td>';
+        if(c[0]==="mode") return '<td class="r"><span class="au-mode '+r.mode+'">'+modeText(r.mode,r.platform)+'</span></td>';
+        if(c[0]==="bid") return '<td class="r num">'+esc(r.platform==="meta"?"–":bidText(r))+'</td>';
         if(c[0]==="adjustment") return '<td class="r"><span class="gp-adj '+(r.adjustment>0?"up":r.adjustment<0?"down":"")+(r.adjustable?"":" off")+'" title="'+
-          (r.adjustable?esc(r.confidence||"")+" confidence":"These campaigns take no audience bid adjustment")+'">'+esc(r.adjustment==null?"":signed(r.adjustment))+'</span></td>';
+          (r.adjustable?esc(r.confidence||"")+" confidence":r.platform==="meta"?"Meta has no audience bid adjustment":"These campaigns take no audience bid adjustment")+'">'+esc(r.adjustment==null||r.platform==="meta"?"":signed(r.adjustment))+'</span></td>';
         return '<td class="r num">'+esc(cell(c[0],r))+'</td>';
       }).join("")+'</tr>';
     return tr+(open?'<tr class="au-detail"><td colspan="'+cols.length+'">'+detail(r)+'</td></tr>':"");
@@ -295,10 +341,10 @@ function detail(r){
   var what=r.action&&r.action.text?'<p class="au-do '+r.action.kind+'"><b>'+({raise:"Raise",lower:"Lower",exclude:"Exclude",hold:"Hold"}[r.action.kind]||"")+'</b> '+esc(r.action.text)+'</p>':"";
   var why=r.why?'<p class="au-why">'+esc(r.why)+'</p>':"";
   var live=r.uses.filter(function(u){return u.m.impressions>0||u.m.cost>0;}), silent=r.uses.length-live.length;
-  return what+why+'<table class="as-tx au-uses"><thead><tr><th>Where it is used</th><th>Mode</th><th class="r">Bid now</th><th class="r">Spend</th><th class="r">Clicks</th><th class="r">Conv.</th></tr></thead><tbody>'+
+  return what+why+'<table class="as-tx au-uses"><thead><tr><th>Where it is used</th><th>Mode</th>'+(showBid()?'<th class="r">Bid now</th>':'')+'<th class="r">Spend</th><th class="r">Clicks</th><th class="r">Conv.</th></tr></thead><tbody>'+
     live.map(function(u){
-      return '<tr><td>'+esc(u.campaign)+(u.adGroup?' <span class="gp-sub">'+esc(u.adGroup)+'</span>':' <span class="gp-sub">campaign level</span>')+'</td><td><span class="au-mode '+u.mode+'">'+MODES[u.mode]+'</span></td>'+
-        '<td class="r">'+(u.bid==null?"None":signed(u.bid))+'</td><td class="r">'+money(u.m.cost,0)+'</td><td class="r">'+int(u.m.clicks)+'</td><td class="r">'+conv(u.m.conversions)+'</td></tr>';
+      return '<tr><td>'+esc(u.campaign)+(u.adGroup?' <span class="gp-sub">'+esc(u.adGroup)+(u.platform==="meta"?" (ad set)":"")+'</span>':' <span class="gp-sub">campaign level</span>')+'</td><td><span class="au-mode '+u.mode+'">'+modeText(u.mode,u.platform)+'</span></td>'+
+        (showBid()?'<td class="r">'+(u.platform==="meta"?"–":u.bid==null?"None":signed(u.bid))+'</td>':'')+'<td class="r">'+money(u.m.cost,0)+'</td><td class="r">'+int(u.m.clicks)+'</td><td class="r">'+conv(u.m.conversions)+'</td></tr>';
     }).join("")+'</tbody></table>'+(silent?'<p class="au-why">'+silent+' more place'+(silent===1?" it is":"s it is")+' attached had no traffic in this range.</p>':"");
 }
 $("#tbl").addEventListener("click",function(e){
@@ -348,10 +394,10 @@ function paintLists(){
   var all=S.report.lists||[], multi=S.report.account.isGroup, ls=all.filter(listMatches);
   paintListFilters();
   $("#listsNote").textContent=all.length?(ls.length===all.length?all.length+" list"+(all.length===1?"":"s"):ls.length+" of "+all.length+" lists")+" · "+all.filter(function(l){return !l.serves;}).length+" cannot serve properly":"none";
-  $("#lists").innerHTML=all.length?'<thead><tr><th>List</th><th>Kind</th><th class="r">Search</th><th class="r">Display and YouTube</th><th>Status</th><th>Used</th><th>What is wrong</th></tr></thead><tbody>'+
+  $("#lists").innerHTML=all.length?'<thead><tr><th>List</th><th>Kind</th><th class="r">'+(S.report.account.platform==="meta"?"People (Meta's estimate)":S.report.account.platform==="both"?"Search · Meta people":"Search")+'</th>'+(S.report.account.platform==="meta"?"":'<th class="r">Display and YouTube</th>')+'<th>Status</th><th>Used</th><th>What is wrong</th></tr></thead><tbody>'+
     (ls.length?ls.map(function(l){
-      return '<tr><td class="sg-lab">'+esc(l.label)+(multi?'<span class="gp-sub">'+esc(l.account)+'</span>':"")+(l.readOnly?'<span class="gp-sub">created by Google</span>':"")+'</td><td>'+esc(l.detail)+'</td><td class="r num">'+int(l.sizeSearch)+
-        '</td><td class="r num">'+int(l.sizeDisplay)+'</td><td>'+esc(l.status==="OPEN"?"Open":l.status==="CLOSED"?"Closed":l.status||"")+'</td><td>'+(l.used?"Yes":'<span class="au-no">Not used</span>')+
+      return '<tr><td class="sg-lab">'+esc(l.label)+(multi?'<span class="gp-sub">'+esc(l.account)+'</span>':"")+(l.readOnly?'<span class="gp-sub">created by Google</span>':"")+'</td><td>'+esc(l.detail)+'</td><td class="r num">'+(l.sizeSearch==null?"Not shown":int(l.sizeSearch))+'</td>'+
+        (S.report.account.platform==="meta"?"":'<td class="r num">'+(l.platform==="meta"?"–":int(l.sizeDisplay))+'</td>')+'<td>'+esc(l.status==="OPEN"?"Open":l.status==="CLOSED"?"Closed":l.status==="NOT_READY"?"Not ready":l.status||"")+'</td><td>'+(l.used?"Yes":'<span class="au-no">Not used</span>')+
         '</td><td class="au-prob">'+(l.problems.length?l.problems.map(esc).join("<br>"):"Nothing")+'</td></tr>';
     }).join(""):'<tr><td colspan="7" class="pm-empty">No list matches.</td></tr>')+'</tbody>':'<tbody><tr><td class="pm-empty">The account has no audience lists.</td></tr></tbody>';
 }
@@ -369,10 +415,10 @@ $("#refreshBtn").addEventListener("click",function(){run(true);});
 $("#exportBtn").addEventListener("click",function(){
   var rep=S.report, v=view(); if(!rep||!v) return;
   var lines=[["Account",rep.account.name],["Date range",rep.range.from+" to "+rep.range.to],["Campaign type",S.type],[],
-    ["Audience","Kind","Detail","Impressions","Clicks","Cost","% cost","CTR","Conversions","Conv. rate","CPA","Conversion value","ROAS","Efficiency index","Verdict","Mode","Bid adjustment now","Suggested bid adjustment","What to do"]];
+    ["Audience","Platform","Kind","Detail","Impressions","Clicks","Cost","% cost","CTR","Conversions","Conv. rate","CPA","Conversion value","ROAS","Efficiency index","Verdict","Mode","Bid adjustment now","Suggested bid adjustment","What to do"]];
   v.rows.forEach(function(r){
-    lines.push([r.label,r.kindLabel,r.detail,r.impressions,r.clicks,r.cost.toFixed(2),r.pctCost==null?"":(r.pctCost*100).toFixed(2)+"%",r.ctr==null?"":(r.ctr*100).toFixed(2)+"%",r.conversions,
-      r.cvr==null?"":(r.cvr*100).toFixed(2)+"%",r.cpa==null?"":r.cpa.toFixed(2),r.value,r.roas==null?"":r.roas.toFixed(3),r.index==null?"":r.index,r.verdictLabel,MODES[r.mode],bidText(r),
+    lines.push([r.label,r.platform==="meta"?"Meta Ads":"Google Ads",r.kindLabel,r.detail,r.impressions,r.clicks,r.cost.toFixed(2),r.pctCost==null?"":(r.pctCost*100).toFixed(2)+"%",r.ctr==null?"":(r.ctr*100).toFixed(2)+"%",r.conversions,
+      r.cvr==null?"":(r.cvr*100).toFixed(2)+"%",r.cpa==null?"":r.cpa.toFixed(2),r.value,r.roas==null?"":r.roas.toFixed(3),r.index==null?"":r.index,r.verdictLabel,modeText(r.mode,r.platform),r.platform==="meta"?"":bidText(r),
       r.adjustment==null||!r.adjustable?"":Math.round(r.adjustment*100)+"%",(r.action&&r.action.text)||""]);
   });
   var blob=new Blob(["﻿"+lines.map(function(l){return l.map(csv).join(",");}).join("\r\n")],{type:"text/csv;charset=utf-8"});
@@ -385,17 +431,32 @@ $("#exportBtn").addEventListener("click",function(){
 (function init(){
   var p=new URLSearchParams(location.search), saved="";
   try{saved=localStorage.getItem("au_account")||"";}catch(e){}
-  S.account=p.get("account")||saved;
+  var want=p.get("account")||saved;
+  var pf=p.get("platform");
+  if(!PL.validPlatform(pf)) pf=want?PL.platformOfId(want):(switcher.saved()||"google");
+  S.platform=pf; switcher.set(pf);
+  PL.partsOf(want||"").forEach(function(id){if(PL.isMeta(id)) S.m=id; else if(id) S.g=id;});
   if(p.get("from")&&p.get("to")){S.preset="custom";S.from=p.get("from");S.to=p.get("to");}
   else{var r=rangeFor(S.preset);S.from=r[0];S.to=r[1];}
   $("#from").value=S.from; $("#to").value=S.to; paintPresets();
   picker.set([{value:"",label:"Loading accounts…",sub:"",avatar:"…",hue:200}],"",true);
+  mpicker.set([{value:"",label:"Loading accounts…",sub:"",avatar:"…",hue:200}],"",true);
+  var metaReq=getJson("/p2/paid-marketing/api/gads/accounts?platform=meta").then(function(r){
+    if(r.ok) S.metaAccounts=(r.j.accounts||[]); else S.metaProblem=(r.j&&r.j.error)||"Meta Ads could not be read.";
+  }).catch(function(){S.metaProblem="Meta Ads could not be reached.";});
   getJson("/p2/paid-marketing/api/segments/accounts").then(function(r){
     if(!r.ok){
       picker.set([{value:"",label:"Accounts unavailable",sub:"",avatar:"!",hue:20}],"",true);
-      setMsg(esc((r.j&&r.j.error)||"The account list could not be loaded.")); return;
+      if(S.platform==="google") setMsg(esc((r.j&&r.j.error)||"The account list could not be loaded."));
+      return metaReq;
     }
-    setAccounts(r.j.accounts||[],r.j.groups||[]); run();
+    S.accounts=r.j.accounts||[]; S.groups=r.j.groups||[];
+    return metaReq;
+  }).then(function(){
+    if(S.platform!=="meta"&&!S.g&&S.m) autoGoogle();
+    if(S.platform!=="google"&&!S.m&&S.g) autoMeta();
+    if(S.platform==="meta"&&!S.m&&S.g) autoMeta();
+    paintPickers(); recompute();
   }).catch(function(){
     picker.set([{value:"",label:"Accounts unavailable",sub:"",avatar:"!",hue:20}],"",true);
     setMsg("The server could not be reached. Reload to try again.");

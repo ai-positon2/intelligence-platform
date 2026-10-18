@@ -6,15 +6,20 @@
     <div class="pm-hero-l">
       <span class="pm-eyebrow"><span class="d"></span>Paid Marketing · Audiences</span>
       <h1 class="pm-title">Which audiences <span class="pm-grad">earn their bids.</span></h1>
-      <p class="pm-sub">Pick an account and a date range. The agent reads <b>Google Ads</b>, compares every audience the account uses
-        (in-market, affinity, remarketing, customer match, custom segments) against the account's own average, and says
-        <b>where a bid adjustment or an exclusion would pay</b>, and where it would do nothing because the campaign ignores it.</p>
+      <p class="pm-sub">Pick an account and a date range. The agent reads <b>Google Ads, Meta Ads or both</b>, compares every audience the account uses
+        (in-market, affinity, interests, remarketing, customer lists, lookalikes, custom segments) against the account's own average, and says
+        <b>where a bid adjustment, an ad set of its own or an exclusion would pay</b>, and where it would do nothing because the campaign ignores it.
+        On Meta an audience's numbers are those of the ad sets aimed at it.</p>
     </div>
   </section>
 
   <section class="pm-panel pd-cmd sg-cmd" id="cmd">
     <div class="sg-cmd-grid">
-      <div class="sg-plat"><div id="acctPick"></div></div>
+      <div class="sg-plat">
+        <div id="platPick"></div>
+        <div id="acctPick"></div>
+        <div id="metaPick"></div>
+      </div>
       <div class="sg-when">
         <span class="pd-dd-k">Date range</span>
         <div class="cf-seg" id="presets" role="radiogroup" aria-label="Date range">
@@ -98,5 +103,6 @@
 {% endblock %}
 {% block scripts %}
 <script src="{{ url_for('static', filename='js/pm_picker.js') }}?v=1"></script>
-<script src="{{ url_for('static', filename='js/audience_segments.js') }}?v=7"></script>
+<script src="{{ url_for('static', filename='js/pm_platform.js') }}?v=4"></script>
+<script src="{{ url_for('static', filename='js/audience_segments.js') }}?v=8"></script>
 {% endblock %}
