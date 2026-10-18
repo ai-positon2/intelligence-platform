@@ -678,3 +678,24 @@ def test_the_accounts_route_lists_accounts_and_the_mccs_that_hold_them(monkeypat
 def test_the_page_knows_the_account_table_and_the_group_picker():
     js = open(os.path.join(ROOT, "static", "js", "segment_analysis.js"), encoding="utf-8").read()
     assert 'account:"Account"' in js and "All of " in js and "groups" in js
+
+
+def test_a_report_with_a_table_that_could_not_be_read_is_not_saved_for_the_next_ask():
+    from tests.gads_fakes import FakeStore
+    state = {"fail": True}
+
+    def search(_cid, q):
+        if " FROM age_range_view " in q and state["fail"]:
+            raise gads.GadsError("api", "Google Ads answered 503: hiccup")
+        return [row("P2_Brand_Acme", "SEARCH", (100, 10, 5.0, 1), **day("MONDAY"))] if " FROM campaign " in q else []
+    store = FakeStore()
+    seg.clear_cache()
+    base.forget("")
+    kw = dict(accounts_fn=lambda: [ACCOUNT], search_fn=search, geo_fn=lambda k: {}, store=store)
+    first = seg.report_for("1234567890", "2026-06-01", "2026-06-30", now=1000.0, **kw)
+    assert next(t for t in first["segments"] if t["key"] == "age")["error"]
+    state["fail"] = False
+    seg.clear_cache()
+    base.forget("")
+    second = seg.report_for("1234567890", "2026-06-01", "2026-06-30", now=99999.0, **kw)
+    assert next(t for t in second["segments"] if t["key"] == "age")["error"] is None

@@ -526,11 +526,12 @@ def report_for(account_id, start, end, *, accounts_fn=None, groups_fn=None, sear
             if old is None:
                 raise
             return dict(old[0], stale=old[1])
-        try:
-            store.put_gads_cache(pkey, report)
-        except Exception as err:
-            base.log.warning("segments: could not save the report (%s)", err)
-        base._mem_put(pkey, report, report.get("generatedAt"))
+        if not (report.get("warnings") or any(t.get("error") for t in report.get("segments") or [])):      # a report that lost a part is shown, not kept for hours
+            try:
+                store.put_gads_cache(pkey, report)
+            except Exception as err:
+                base.log.warning("segments: could not save the report (%s)", err)
+            base._mem_put(pkey, report, report.get("generatedAt"))
         with _cache_lock:
             _cache[key] = (clock, report)
             while len(_cache) > CACHE_MAX:

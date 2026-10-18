@@ -453,11 +453,12 @@ def _cached(kind, key_id, level, s, e, build, *, force, store, now):
             if old is None:
                 raise
             return old[0], old[1]
-        try:
-            store.put_gads_cache(pkey, raw)
-        except Exception as err:                          # noqa: BLE001 (a failed save never costs the report)
-            base.log.warning("geo: could not save the read (%s)", err)
-        base._mem_put(pkey, raw, dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"))
+        if not raw.get("warnings"):                       # a read that lost a part is shown, but not kept for hours: the next ask reads again
+            try:
+                store.put_gads_cache(pkey, raw)
+            except Exception as err:                      # noqa: BLE001 (a failed save never costs the report)
+                base.log.warning("geo: could not save the read (%s)", err)
+            base._mem_put(pkey, raw, dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"))
         with _cache_lock:
             _cache[key] = (clock, raw)
             while len(_cache) > CACHE_MAX:
