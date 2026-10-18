@@ -80,7 +80,7 @@ def parse_account(raw):
         return {"google": raw, "meta": None}
     from . import paid_meta
     if paid_meta.is_meta(raw):
-        return {"google": None, "meta": paid_meta.norm_id(raw)}
+        return {"google": None, "meta": raw}
     raise BadRequest("account should be a 10-digit Google Ads customer id, a Meta ad account id (act_...) or both joined by +")
 
 

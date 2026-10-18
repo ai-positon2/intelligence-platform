@@ -112,3 +112,25 @@ def test_a_group_s_pages_are_cut_to_the_kept_pages():
     g["adGroups"]["g1"]["pages"]["a.test/y"] = 1.0
     out = mg.merge(g, m, keep=1)
     assert out["adGroups"]["g1"]["pages"] == {"a.test/x": 300.0}
+
+
+def test_a_group_s_pages_list_puts_the_bigger_spender_first_whichever_platform_it_is():
+    g, m = reads()
+    m["adGroups"]["meta:s1"]["pages"]["a.test/x"] = 500.0
+    m["pages"][0]["adGroups"] = ["meta:s1"]
+    assert mg.merge(g, m)["pages"][0]["adGroups"] == ["meta:s1", "g1"]
+
+
+def test_the_value_of_both_platforms_is_added():
+    g, m = reads()
+    m["pages"][0]["value"] = 25.0
+    assert mg.merge(g, m)["pages"][0]["value"] == 75.0
+
+
+def test_a_page_only_meta_reaches_is_copied_so_the_merge_cannot_reorder_the_meta_read():
+    g, m = reads()
+    m["pages"][1]["adGroups"] = ["meta:s2", "meta:s3"]
+    m["adGroups"]["meta:s3"] = group("meta:s3", 900.0, {"b.test/z": 900.0}, "meta")
+    before = copy.deepcopy(m["pages"][1])
+    out = mg.merge(g, m)
+    assert out["pages"][1]["adGroups"] == ["meta:s3", "meta:s2"] and m["pages"][1] == before and out["pages"][1] is not m["pages"][1]

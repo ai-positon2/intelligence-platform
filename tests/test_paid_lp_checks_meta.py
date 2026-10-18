@@ -207,3 +207,24 @@ def test_no_new_text_has_an_em_or_en_dash():
             assert "—" not in model.CATALOG[cid][key] and "–" not in model.CATALOG[cid][key]
     for f in checks.run(meta_page(platforms=["google", "meta"], fetch_over={"redirected": True, "keptIds": {"gclid": True, "fbclid": False, "utm": False}})):
         assert "—" not in f["found"] and "–" not in f["found"]
+
+
+def test_a_meta_ad_set_whose_ads_go_to_another_page_is_not_held_against_this_one():
+    elsewhere = meta_group(ads=[meta_ad(urls=("https://acme-dental.com/other",), headlines=["Orthodontics Cambridge Braces"])])
+    p = meta_page(groups=[elsewhere])
+    assert one("match_headline", p)["result"] == "na" and one("match_offers", p)["result"] == "na" and cm.meta_groups(cp.Ctx(p)) == []
+
+
+def test_a_meta_ad_set_whose_ads_say_nothing_is_not_held_against_the_page():
+    mute = meta_group(ads=[meta_ad(headlines=[], descriptions=[])])
+    p = meta_page(groups=[mute])
+    assert one("match_headline", p)["result"] == "na" and one("match_offers", p)["result"] == "na" and cm.ad_groups(cp.Ctx(p)) == []
+
+
+def test_the_reason_the_ads_could_not_be_read_is_the_platform_s_own():
+    google_flag = meta_page(groups=[], ok={"pages": True, "ads": False, "meta:ads": True})
+    f = one("match_offers", google_flag)
+    assert f["result"] == "na" and "No Search ad group or Meta ad set" in f["found"]                    # Meta-only: Google's flag is not Meta's
+    meta_flag_on_google = page(groups=[], ok={"pages": True, "ads": True, "meta:ads": False})
+    f = one("match_offers", meta_flag_on_google)
+    assert f["result"] == "na" and "No Search ad group sends people" in f["found"]                        # Google-only: Meta's flag is not Google's

@@ -221,3 +221,23 @@ def test_with_the_model_down_the_report_still_answers_with_the_checks_words():
 def test_no_em_or_en_dash_in_what_the_module_tells_the_model():
     for text in (ai.SYSTEM,):
         assert "—" not in text and "–" not in text
+
+
+def test_a_meta_ad_set_is_shown_with_its_words_and_a_note_that_it_has_no_keywords_and_a_google_group_has_no_such_note():
+    raw = raw_read()
+    meta_group = {"id": "meta:s1", "name": "Set", "campaign": "C", "campaignType": "META_LEADS", "platform": "meta", "cost": 10.0, "clicks": 1, "conversions": 0.0, "keywords": [], "terms": [],
+                  "ads": [{"headlines": ["Free quote"], "descriptions": ["Save 20% this week"], "urls": ["https://acme-dental.com/lp"], "cost": 10.0, "type": "LINK"}], "pages": {}}
+    raw["read"]["adGroups"]["meta:s1"] = meta_group
+    raw["read"]["pages"][0]["adGroups"].append("meta:s1")
+    shown = ai.page_input(raw, "acme-dental.com/lp")
+    google, meta = shown["adGroups"]
+    assert "kind" not in google and meta["kind"] == "Meta ad set (no keywords or search terms)" and meta["headlines"] == ["Free quote"] and meta["keywords"] == []
+
+
+def test_a_meta_ad_set_that_says_nothing_is_left_out_and_a_page_only_such_sets_reach_cannot_be_read():
+    raw = raw_read()
+    mute = {"id": "meta:s1", "name": "Set", "campaign": "C", "campaignType": "META_LEADS", "platform": "meta", "cost": 10.0, "clicks": 1, "conversions": 0.0, "keywords": [], "terms": [],
+            "ads": [{"headlines": [], "descriptions": [], "urls": ["https://acme-dental.com/lp"], "cost": 10.0, "type": "LINK"}], "pages": {}}
+    raw["read"]["adGroups"] = {"meta:s1": mute}
+    raw["read"]["pages"][0]["adGroups"] = ["meta:s1"]
+    assert ai.page_input(raw, "acme-dental.com/lp") is None

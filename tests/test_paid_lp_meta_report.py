@@ -243,3 +243,88 @@ def test_a_both_report_opens_as_excel_pdf_and_zip():
     report = run(BOTH)
     assert ex.xlsx(report)[:2] == b"PK" and ex.pdf(report)[:4] == b"%PDF" and ex.csv_zip(report)[:2] == b"PK"
     assert ex.file_stem(report).startswith("Acme-Dental")
+
+
+# ── Pinned by mutation ──────────────────────────────────────────────────────
+
+def test_a_read_of_two_platforms_keeps_twice_the_pages_from_each_so_the_other_platform_can_lift_a_page(monkeypatch):
+    seen = {}
+    real_g, real_m = lp.lp_read.read_account, lp.lp_meta.read_account
+
+    def g(*a, **kw):
+        seen["google"] = kw["keep"]
+        return real_g(*a, **kw)
+
+    def m(*a, **kw):
+        seen["meta"] = kw["keep"]
+        return real_m(*a, **kw)
+    monkeypatch.setattr(lp.lp_read, "read_account", g)
+    monkeypatch.setattr(lp.lp_meta, "read_account", m)
+    run(BOTH)
+    assert seen == {"google": 2 * lp.lp_read.KEEP_PAGES, "meta": 2 * lp.lp_read.KEEP_PAGES}
+    seen.clear()
+    fresh()
+    run(ACT, search_fn=no_google)
+    assert seen == {"meta": lp.lp_read.KEEP_PAGES}
+
+
+def test_a_report_with_no_meta_spend_off_the_page_has_no_note_about_it():
+    assert not any(n.startswith("Meta spent") for n in run(ACT, search_fn=no_google)["notes"])
+
+
+def test_a_fresh_read_that_lost_a_platform_is_not_replaced_by_an_old_one_that_lost_it_too():
+    class Spent(acme_graph().__class__):
+        def pages(self, path, params):
+            raise paid_meta.OverQuota("Meta is rate limiting this app right now.")
+    store = FakeStore()
+    run(BOTH, store=store, graph=Spent())                                   # the saved copy lost Meta to its allowance
+    key = lp.cache_key(BOTH)
+    store.old[key] = store.cache.pop(key)
+    paid_gads.forget()
+    out = run(BOTH, store=store, graph=Spent())
+    assert "stale" not in out and out["summary"]["platforms"] == ["google"]
+
+
+def test_an_address_the_ad_platform_fills_in_is_said_in_the_platforms_words():
+    ads = [link_ad("1", "https://{{site}}.acme-dental.com/lp")]
+    note = next(n for n in run(ACT, graph=acme_graph(ads=ads), search_fn=no_google)["notes"] if "fills in when someone clicks" in n)
+    assert note.startswith("1 page sends people to an address the ad platform fills in when someone clicks")
+
+
+def test_a_page_that_refuses_us_is_checked_only_on_what_the_platforms_that_were_read_say():
+    refuse = Fetcher({"/lp": (403, b"no")})
+    note = next(n for n in run(ACT, fetcher=refuse, search_fn=no_google)["notes"] if "refused our request" in n)
+    assert note == "1 page refused our request, so it was checked only on what Meta Ads says."
+    fresh()
+    note = next(n for n in run(BOTH, fetcher=refuse)["notes"] if "refused our request" in n)
+    assert note == "1 page refused our request, so it was checked only on what Google Ads and Meta Ads say."
+    fresh()
+    note = next(n for n in run(ACCOUNT_ID, fetcher=refuse)["notes"] if "refused our request" in n)
+    assert note == "1 page refused our request, so it was checked only on what Google Ads says."
+
+
+def test_the_model_s_answer_is_kept_for_one_account_and_not_handed_to_another_that_has_a_page_of_the_same_name():
+    from tracker import paid_lp_ai
+    paid_lp_ai.clear_cache()
+    asked = []
+
+    def call(system, text):
+        asked.append(1)
+        return {"verdict": "matches", "promiseKept": "Yes.", "gaps": [], "pageEdits": [], "headlineIdeas": [], "adEdits": []}
+    store = FakeStore()
+    kw = dict(store=store, accounts_fn=lambda: [ACCOUNT], search_fn=search(), fetcher=Fetcher(), call=call, now=NOW, meta_pages=acme_graph().pages)
+    lp.explain(ACCOUNT_ID, "acme-dental.com/lp", **kw)
+    lp.explain(ACT, "acme-dental.com/lp", **kw)
+    assert len(asked) == 2
+    lp.explain(ACT, "acme-dental.com/lp", **kw)
+    assert len(asked) == 2
+    paid_lp_ai.clear_cache()
+
+
+def test_a_meta_ad_in_the_report_shows_its_first_two_headlines_and_its_ratings():
+    ad = link_ad("1", LP, asset_feed_spec={"titles": [{"text": "Second"}, {"text": "Third"}]})
+    out = run(ACT, graph=acme_graph(ads=[ad]), search_fn=no_google)
+    shown = out["pages"][0]["adGroups"][0]["ads"][0]
+    assert shown["name"] == "Ad 1" and shown["cost"] == 20.0 and shown["headlines"] == ["Free quote", "Second"] and shown["ranks"]["conversion"] == "below"
+    google = run(ACCOUNT_ID)
+    assert "ads" not in google["pages"][0]["adGroups"][0]

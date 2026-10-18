@@ -99,7 +99,8 @@ def test_an_account_is_a_google_ads_id_a_meta_ad_account_or_both_joined_by_a_plu
     assert lp.parse_account(" 1112223334 ") == {"google": "1112223334", "meta": None}
     assert lp.parse_account("act_1234567890") == {"google": None, "meta": "act_1234567890"}
     assert lp.parse_account("1112223334+act_1234567890") == {"google": "1112223334", "meta": "act_1234567890"}
-    for bad in ("", None, "123", "abc", "11122233345", "act_12", "1112223334+", "+act_1234567890", "1112223334+1112223334", "act_1234567890+1112223334", "1112223334 + act_1234567890"):
+    for bad in ("", None, "123", "abc", "11122233345", "act_12", "1112223334+", "+act_1234567890", "1112223334+1112223334", "act_1234567890+1112223334", "1112223334 + act_1234567890",
+                "x1112223334+act_1234567890", "1112223334+act_1234567890x", "1112223334+act_1234567890+1112223334", "ACT_1234567890"):
         with pytest.raises(lp.BadRequest):
             lp.parse_account(bad)
 

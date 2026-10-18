@@ -72,8 +72,7 @@ def tables(report):
     pages = report.get("pages") or []
     out = {}
     t = summary.get("tally") or {}
-    shown = [[ACCOUNT_LABEL.get(a["platform"], "Account"), "%s (%s)" % (a.get("name") or "", a.get("id") or "")] for a in report.get("accounts") or []] or \
-        [["Google Ads account", "%s (%s)" % (acct.get("name") or "", acct.get("id") or "")]]
+    shown = [[ACCOUNT_LABEL.get(a["platform"], "Account"), "%s (%s)" % (a.get("name") or "", a.get("id") or "")] for a in report.get("accounts") or []]
     ov = shown + [["Window", report.get("window") or ""],
           ["Read on", (report.get("readAt") or "")[:16].replace("T", " ")], ["Report made on", (report.get("generatedAt") or "")[:10]],
           ["Overall score", summary.get("score") if summary.get("score") is not None else "Nothing could be judged"], ["Overall grade", summary.get("grade") or ""],
@@ -94,7 +93,7 @@ def tables(report):
         rows.append([p["url"], p["spend"], p["clicks"], p["conversions"], _pct(p.get("convRate")), p.get("cpa"), p["score"] if p.get("rated") else "Not verified", p["grade"] if p.get("rated") else "",
                      tally.get("fail", 0), tally.get("warn", 0), tally.get("unknown", 0), seen.get("status"), seen.get("responseMs"), seen.get("words"), p.get("speed"),
                      _pct(dev["mobile"]), _pct(dev["desktop"]), (seen.get("title") or ""), "; ".join(seen.get("h1") or []), p.get("groupCount", 0),
-                     " and ".join(PLATFORM_TEXT.get(x, x) for x in p.get("platforms") or ["google"])])
+                     " and ".join(PLATFORM_TEXT.get(x, x) for x in p["platforms"])])
     if rows:
         out["Pages"] = (["Page", "Spend", "Clicks", "Conversions", "Conv rate %", "Cost per conversion", "Score", "Grade", "Failed", "Warnings", "Could not check", "HTTP status",
                          "Server ms", "Words", "Google speed score", "Mobile conv rate %", "Desktop conv rate %", "Title", "Main headline", "Ad groups", "Platforms"], rows)
