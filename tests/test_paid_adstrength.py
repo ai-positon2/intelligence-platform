@@ -371,3 +371,20 @@ def test_no_text_the_page_shows_has_an_em_dash(cache):
         for it in view["items"]:
             texts += [g["text"] for g in it["gaps"]] + [it["nextStep"]]
     assert texts and all("—" not in t for t in texts)
+
+
+def test_keywords_in_any_script_can_be_found_in_the_text():
+    """The words were a-z only, so a keyword in Chinese or Hindi had no words and no headline ever "carried" it."""
+    assert ins.covers("牙医 附近", ["附近牙医 预约"]) and not ins.covers("牙医 附近", ["Dental office"])
+    assert ins.covers("दंत चिकित्सक", ["आपके पास दंत चिकित्सक"]) and not ins.covers("दंत चिकित्सक", ["दंत"])
+    assert ins.covers("café près", ["Le café près de vous"]) and not ins.covers("café près", ["cafe pres"])
+    assert ins.covers("patio design", ["Custom Patio Designs Near You"])                      # the Latin rule is as before
+
+
+def test_every_keyword_the_page_lists_is_checked_not_just_the_first_eight():
+    """12 keywords were listed on the page and 8 were checked: the last four always showed as "No headline carries this"."""
+    ad = a.read_rsas([rsa_row()])[0]
+    ad["keywords"] = ["k%d" % i for i in range(12)]
+    ad["headlines"] = [dict(ad["headlines"][0], text=" ".join("k%d" % i for i in range(12)))] + ad["headlines"]
+    cover = ins.analyse_rsa(ad)["keywordCoverage"]
+    assert len(cover["headlines"]["covered"]) == 12 and cover["headlines"]["missing"] == []

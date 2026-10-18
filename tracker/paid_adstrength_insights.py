@@ -59,7 +59,7 @@ def plural(n, one, many=None):
 
 def tokens(text):
     out = set()
-    for w in re.findall(r"[a-z0-9]+", str(text).lower()):
+    for w in re.findall(r"\w+", str(text).lower()):                 # any script: a keyword in Hindi or Chinese has words too (the old a-z only gave it none)
         if w in _STOP:
             continue
         out.add(w[:-1] if len(w) > 3 and w.endswith("s") else w)
@@ -69,7 +69,14 @@ def tokens(text):
 def covers(keyword, texts):
     """True when one of the texts carries every word of the keyword."""
     want = tokens(keyword)
-    return bool(want) and any(want <= tokens(t) for t in texts)
+    if not want:
+        return False
+    # A word in a script without spaces (Chinese, Japanese) is found inside the text, not as one of its words; every other word must be one of the text's.
+    for t in texts:
+        have, low = tokens(t), str(t).lower()
+        if all(w in have or (not w.isascii() and w in low) for w in want):
+            return True
+    return False
 
 
 def near_duplicates(texts):
@@ -131,14 +138,14 @@ def analyse_rsa(ad):
                          "%s of up to %d." % (plural(len(descs), "description"), RSA_DESCRIPTIONS)))
     keywords = ad.get("keywords") or []
     cover = {"headlines": {"covered": [], "missing": []}, "descriptions": {"covered": [], "missing": []}}
-    for k in keywords[:8]:
+    for k in keywords:
         cover["headlines"]["covered" if covers(k, heads) else "missing"].append(k)
         cover["descriptions"]["covered" if covers(k, descs) else "missing"].append(k)
     if keywords:
         hm, dm = cover["headlines"]["missing"], cover["descriptions"]["missing"]
-        if len(hm) >= max(2, len(keywords[:8]) // 2):
+        if len(hm) >= max(2, len(keywords) // 2):
             gaps.append(_gap("keywords_headlines", "action", "No headline carries %s, among the ad group's top keywords." % _names(hm[:5])))
-        if len(dm) >= max(2, len(keywords[:8]) // 2) and len(dm) > len(hm):
+        if len(dm) >= max(2, len(keywords) // 2) and len(dm) > len(hm):
             gaps.append(_gap("keywords_descriptions", "info", "No description carries %s." % _names(dm[:5])))
     low_h = [h["text"] for h in ad["headlines"] if h["label"] == "LOW"]
     low_d = [d["text"] for d in ad["descriptions"] if d["label"] == "LOW"]
