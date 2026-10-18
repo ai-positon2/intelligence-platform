@@ -475,3 +475,7 @@ def test_the_rate_limit_numbers_are_shown_to_admins_only(routes):
     assert j["limits"] is None
     admin = client_as(sorted(appmod.ADMIN_EMAILS)[0]).get("/p2/paid-marketing/api/calls/accounts").get_json()
     assert admin["limits"] and admin["limits"]["hourlyAllowed"] == 1000
+
+
+def test_a_call_keeps_its_tags_whether_callrail_sends_them_as_names_or_as_objects():
+    assert C.parse_call({"id": "1", "tags": ["Booked Appointment", {"id": 2, "name": "Lead"}, "", {"id": 3}]})["tags"] == ["Booked Appointment", "Lead"]

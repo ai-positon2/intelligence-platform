@@ -294,7 +294,7 @@ def parse_call(c):
     return {"id": str(c.get("id") or ""), "start": str(c.get("start_time") or "")[:19], "company": str(c.get("company_name") or "")[:80],
             "source": str(c.get("source") or ""), "campaign": str(c.get("campaign") or "")[:80], "duration": int(c.get("duration") or 0),
             "answered": bool(c.get("answered")), "summary": c.get("call_summary") or "", "transcript": c.get("transcription") or "",
-            "tags": [str(t.get("name")) for t in (c.get("tags") or []) if isinstance(t, dict) and t.get("name")],
+            "tags": [str(t.get("name") if isinstance(t, dict) else t) for t in (c.get("tags") or []) if (t.get("name") if isinstance(t, dict) else t)],
             "sentiment": c.get("sentiment") or "", "score": c.get("lead_score"), "url": _link(c.get("timeline_url"))}
 
 

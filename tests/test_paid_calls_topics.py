@@ -232,3 +232,21 @@ def test_an_automated_greeting_heard_as_the_caller_is_not_what_the_caller_wanted
                        "hang up and call 911, otherwise please leave a message after the tone about your account.")
     r = T.read_call(c)
     assert r["intent"] != "emergency" and "emergency" not in r["topics"]
+
+
+def test_an_appointment_that_was_not_made_is_not_counted_as_booked():
+    """"No appointment was scheduled" matched the booked wording, so a lost new patient was counted as a booking and left out of the lost list."""
+    for said in ("New patient called for a cleaning exam but no appointment was scheduled because the office was fully booked.",
+                 "The caller wanted a visit. No appointment has been scheduled.", "An appointment was not scheduled; they will call back."):
+        r = T.read_call(call(summary=said))
+        assert r["outcome"] == "not_booked", said
+    assert T.read_call(call(summary="New patient called for a cleaning exam but no appointment was scheduled because the office was fully booked."))["reason"] == "no_availability"
+    assert T.read_call(call(summary="She scheduled an appointment for Tuesday at 9."))["outcome"] == "booked"
+    assert T.read_call(call(summary="The appointment was scheduled for Friday, no insurance needed."))["outcome"] == "booked"      # a far "no" is not about it
+    assert T.read_call(call(summary="Not a problem, an appointment was booked for next week."))["outcome"] == "booked"
+
+
+def test_painless_is_not_pain_but_painful_still_is():
+    assert T.read_call(call(caller="Do you offer painless sedation dentistry for implants?", agent="Yes we do."))["intent"] != "emergency"
+    assert T.read_call(call(caller="My tooth is painful and I need to come in.", agent="Come at two."))["intent"] == "emergency"
+    assert T.read_call(call(caller="I have pain when I chew.", agent="Let me find you a time."))["intent"] == "emergency"

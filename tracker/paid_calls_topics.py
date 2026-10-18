@@ -45,8 +45,8 @@ _R = lambda p: re.compile(p, re.I)
 NOT_A_PATIENT = _R(r"\b(marketing|seo\b|search engine|web ?site design|solicit|vendor|sales ?(rep|call|pitch)|on behalf of (a|an|the) (company|agency)|"
                    r"wrong (number|office|practice|location)|(job|position|employment) (opening|application|inquiry)|applying for|resume|hiring|"
                    r"looking for work|recruit|merchant services|business loan)")
-EMERGENCY = _R(r"\b(pain|toothache|tooth ?ache|hurts?|hurting|swollen|swelling|abscess|infect(ed|ion)|broke(n)?|chipped|cracked|knocked out|"
-               r"bleeding|throbbing|emergency|urgent)")
+EMERGENCY = _R(r"\b(pain(ful)?|toothache|tooth ?ache|hurts?|hurting|swollen|swelling|abscess|infect(ed|ion)|broke(n)?|chipped|cracked|knocked out|"
+               r"bleeding|throbbing|emergenc(y|ies)|urgent)\b")          # closed with a word boundary: "painless sedation" is not pain
 NEW_PATIENT = _R(r"\b(new patients?|become a patient|first (time|visit|appointment)|never (been|seen)|looking for a (new )?dentist|"
                  r"accepting new|taking new|consultation|second opinion|(just )?moved (to|here)|establish(ing)? care|referred (by|to))")
 APPOINTMENT = _R(r"\b(re-?schedul\w*|cancel\w*|confirm\w*|running late|late for|my appointment|appointment (on|for|at|tomorrow|next|today)|"
@@ -137,6 +137,20 @@ def _strip_boilerplate(text):
     return " ".join(s for s in sentences if not BOILERPLATE.search(s))
 
 
+NEGATION = _R(r"\b(no|not|never|without|unable|cannot|can't|couldn't|wasn't|weren't|isn't|hasn't|haven't|didn't|doesn't|don't|nor)\b|n't\b")
+
+
+def _said_booked(text):
+    """True when the text says an appointment was made. "No appointment was scheduled because the office was full" matches the booked wording and is the
+    opposite of it, so a match with a negation just before it (or inside it) does not count."""
+    text = text or ""
+    for m in BOOKED_TEXT.finditer(text):
+        clause = re.split(r"[.,;:!?]", text[max(0, m.start() - 30):m.start()])[-1]       # a "no" in an earlier clause ("Not a problem, ...") is not about it
+        if not NEGATION.search(clause + m.group(0)):
+            return True
+    return False
+
+
 def read_call(call):
     """What one call was about and how it ended.
 
@@ -180,7 +194,7 @@ def read_call(call):
         outcome = "booked"
     elif tags & NOT_BOOKED_TAGS:
         outcome = "not_booked"
-    elif BOOKED_TEXT.search(evidence):
+    elif _said_booked(evidence):
         outcome = "booked"
     elif NOT_BOOKED_TEXT.search(evidence):
         outcome = "not_booked"
