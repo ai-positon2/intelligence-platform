@@ -935,3 +935,15 @@ def test_a_list_that_only_serves_display_is_named_with_its_search_size_and_an_en
     assert f["result"] == "warn" and f["found"].startswith("No campaign is running (2 enabled campaigns ended). The account is not advertising") and f["caps"] == "the account is not advertising"
     some = camps(A.campaign("1", "Old promo", primary="ENDED"), A.campaign("2", "Live"))
     assert one("G-STR-12", some)["result"] == "pass" and one("G-STR-12", some)["found"] == "1 enabled campaign."
+
+
+def test_too_little_spend_to_expect_conversions_is_about_a_hundred_dollars_in_any_currency():
+    """100 was read as 100 of the account's own currency: about $1 in rupees, so a rupee account spending $35 and converting nothing failed a critical check."""
+    assert model.min_spend("USD") == 100 and model.min_spend("EUR") == 100 and model.min_spend("") == 100 and model.min_spend(None) == 100
+    assert model.min_spend("INR") == 8500 and model.min_spend("jpy") == 15000
+    small = A.a_read(answers={r.CAMPAIGN_METRICS_GAQL: [A.campaign_metrics("10", 500, 40, 3000.0, 0.0)]})
+    small["customer"] = dict(small["customer"], currency="INR")
+    assert one("G-CNV-02", small)["result"] == "na"                                              # INR 3,000 is about $35
+    big = A.a_read(answers={r.CAMPAIGN_METRICS_GAQL: [A.campaign_metrics("10", 500, 40, 9000.0, 0.0)]})
+    big["customer"] = dict(big["customer"], currency="INR")
+    assert one("G-CNV-02", big)["result"] == "fail"                                              # INR 9,000 is over $100 and nothing converted

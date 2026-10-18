@@ -281,3 +281,16 @@ def test_the_events_meta_detects_on_its_own_are_not_conversion_events():
     f = one("M-TRK-03", only_auto)
     assert f["result"] == "fail" and "only browsing events" in f["found"]
     assert one("M-TRK-03", F.a_read(answers={"stats": F.stats({"PageView": 9000, "Microdata": 900, "Lead": 10})}))["result"] == "pass"
+
+
+def test_a_campaign_that_spent_the_equivalent_of_a_few_dollars_is_not_called_dead_in_rupees():
+    camps = [F.campaign("1", "Quiet"), F.campaign("2", "Alive")]
+    ins = [F.insight("1", "Quiet", spend=3000.0, leads=None), F.insight("2", "Alive", spend=900000.0, leads=10)]       # INR 3,000 is about $35
+    rd = F.a_read(answers={"campaigns": camps, "insights": ins})
+    rd["account"] = dict(rd["account"], currency="INR")
+    assert one("M-STR-03", rd)["result"] == "pass"
+    ins[0] = F.insight("1", "Quiet", spend=9000.0, leads=None)                                                          # INR 9,000 is over $100
+    rd = F.a_read(answers={"campaigns": camps, "insights": ins})
+    rd["account"] = dict(rd["account"], currency="INR")
+    f = one("M-STR-03", rd)
+    assert f["result"] == "warn" and f["items"] == ["Quiet (INR 9,000)"]

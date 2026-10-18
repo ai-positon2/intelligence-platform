@@ -84,6 +84,7 @@ class Ctx:
         self.spend = None if totals is None else totals["cost"]
         self.conversions = None if totals is None else totals["conversions"]
         self.currency = self.customer.get("currency") or ""
+        self.min_spend = model.min_spend(self.currency)
 
     def money(self, x):
         return "%s %s" % (self.currency, format(round(x), ",")) if self.currency else format(round(x), ",")
@@ -191,7 +192,6 @@ def set_score(ctx):
 
 # ── Conversion tracking ─────────────────────────────────────────────────────
 
-MIN_SPEND = 100                               # a month's spend under this (in the account's currency) is too little to expect conversions
 
 
 GOOGLE_DEFAULT_TYPES = {"ANDROID_INSTALLS_ALL_OTHER_APPS", "GOOGLE_HOSTED", "UNKNOWN", "UNSPECIFIED", ""}
@@ -237,7 +237,7 @@ def cnv_primary(ctx):
 def cnv_recorded(ctx):
     if ctx.spend is None:
         return unknown("G-CNV-02", "the campaigns' numbers could not be read")
-    if ctx.spend < MIN_SPEND:
+    if ctx.spend < ctx.min_spend:
         return na("G-CNV-02", "Only %s was spent in the last 30 days, too little to expect conversions." % ctx.money(ctx.spend))
     if ctx.conversions > 0:
         return make("G-CNV-02", "pass", "%s conversions were recorded on %s of spend in the last 30 days." % (format(round(ctx.conversions), ","), ctx.money(ctx.spend)))
@@ -251,7 +251,7 @@ def cnv_recorded(ctx):
 def cnv_silent(ctx):
     if ctx.actions is None:
         return unknown("G-CNV-03", "the conversion actions could not be read")
-    if ctx.spend is not None and ctx.spend < MIN_SPEND:
+    if ctx.spend is not None and ctx.spend < ctx.min_spend:
         return na("G-CNV-03", "Only %s was spent in the last 30 days, too little to expect an action to record anything." % ctx.money(ctx.spend))
     cand = [a for a in _primary(ctx) if a["type"] in WEB_TYPES]
     if not cand:
@@ -325,7 +325,7 @@ def cnv_value(ctx):
     bidders = [x for x in ctx.camps if x["bidding"] in VALUE_BIDDING]
     if not bidders:
         return na("G-CNV-07", "No enabled campaign bids on conversion value.")
-    if ctx.spend is not None and ctx.spend < MIN_SPEND:
+    if ctx.spend is not None and ctx.spend < ctx.min_spend:
         return na("G-CNV-07", "Only %s was spent in the last 30 days, too little to expect conversion values." % ctx.money(ctx.spend))
     p = _primary(ctx)
     if any(a["value"] is None for a in p):

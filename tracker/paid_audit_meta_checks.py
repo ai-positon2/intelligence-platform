@@ -24,7 +24,6 @@ model.section("m_ads", "Ads", "meta", 4)
 
 CHECKS = []
 
-MIN_SPEND = 100                               # a month's spend under this (in the account's currency) is too little to expect results
 FRESH_HOURS = 24
 STALE_DAYS = 7
 CAP_FAIL = 100                                # per cent of the spend cap already spent
@@ -60,6 +59,7 @@ class Ctx:
         self.read = read
         self.account = read.get("account") or {}
         self.currency = self.account.get("currency") or ""
+        self.min_spend = model.min_spend(self.currency)
         self.camps = read.get("campaigns")
         self.sets = read.get("adSets")
         self.spend = None if self.camps is None or any(c["spend"] is None for c in self.camps) else sum(c["spend"] for c in self.camps)
@@ -258,9 +258,9 @@ def str_results(ctx):
     live = [c for c in ctx.camps if c["kind"] in RESULT_KINDS]
     if not live:
         return na("M-STR-03", "No live lead, sales or app campaign.")
-    dead = [c for c in live if c["spend"] >= MIN_SPEND and c["results"] == 0 and c["anyResults"] == 0]      # a lead campaign optimised for Schedule or Contact has results of its own
+    dead = [c for c in live if c["spend"] >= ctx.min_spend and c["results"] == 0 and c["anyResults"] == 0]      # a lead campaign optimised for Schedule or Contact has results of its own
     if not dead:
-        return make("M-STR-03", "pass", "Every lead, sales or app campaign that spent %s or more recorded a result." % ctx.money(MIN_SPEND))
+        return make("M-STR-03", "pass", "Every lead, sales or app campaign that spent %s or more recorded a result." % ctx.money(ctx.min_spend))
     cost = sum(c["spend"] for c in dead)
     exact = share(cost, ctx.spend)
     found = "%s spent %s (%d%% of spend) and recorded no result in the last 30 days." % (plural(len(dead), "campaign"), ctx.money(cost), round(exact))

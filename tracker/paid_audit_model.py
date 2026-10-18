@@ -203,6 +203,17 @@ def pct(part, whole):
     return round(share(part, whole))
 
 
+# Roughly how many of a currency make a US dollar (for thresholds written in dollars, not for any amount shown to a person): 100 of the account's own
+# currency is about $1 in rupees or yen, so "too little spend to expect conversions" must scale. A currency near a dollar is left at 1.
+UNITS_PER_USD = {"INR": 85, "JPY": 150, "KRW": 1400, "IDR": 16000, "VND": 25000, "PHP": 58, "THB": 35, "TWD": 32, "HUF": 350, "CLP": 950, "COP": 4000,
+                 "CZK": 23, "MXN": 18, "BRL": 5.5, "ZAR": 18, "TRY": 40, "PKR": 280, "BDT": 120, "NGN": 1500, "KES": 130, "EGP": 50, "RUB": 90, "ARS": 1000}
+
+
+def min_spend(currency, base=100):
+    """A month's spend, in the account's currency, under which it is too little to expect a conversion or a result (about `base` US dollars)."""
+    return round(base * UNITS_PER_USD.get(str(currency or "").upper(), 1))
+
+
 def plural(n, word):
     """"1 action", "2 actions"."""
     return "%d %s" % (n, word if n == 1 else word + "s")
