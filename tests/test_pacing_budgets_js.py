@@ -64,7 +64,7 @@ def pasted(account, allocated, client="Acme", target=None, days="", status="Acti
 
 def test_replacing_makes_the_pasted_rows_the_whole_table():
     got = run("M.merge(C, P, true)", C=[row(account="Old")], P=[pasted("New", 5.5, target=45, days="Monday - Friday")])
-    assert got == [{"client": "Acme", "account": "New", "allocated": 5.5, "targetCpa": 45, "daysRunning": "Monday - Friday", "status": "Active", "am": ""}]
+    assert got == [{"client": "Acme", "account": "New", "channel": "Google", "allocated": 5.5, "targetCpa": 45, "daysRunning": "Monday - Friday", "status": "Active", "am": ""}]
 
 
 def test_a_missing_target_becomes_an_empty_cell_not_the_word_null():
@@ -87,6 +87,27 @@ def test_merging_leaves_the_table_it_was_given_alone():
     current = [row(account="A", allocated="1")]
     run("M.merge(C, P, false)", C=current, P=[pasted("A", 9), pasted("B", 9)])
     assert current == [row(account="A", allocated="1")]
+
+
+# ── Channels ────────────────────────────────────────────────────────────────
+
+def test_a_google_row_and_a_meta_row_of_one_account_are_different_rows():
+    assert run("M.key('Acme', 'Acme Dental') === M.key('acme', 'ACME DENTAL', 'Google')") is True               # a Google row's key is what it always was
+    assert run("M.key('Acme', 'Acme Dental') === M.key('Acme', 'Acme Dental', 'Meta')") is False
+
+
+def test_pasting_keeps_the_channel_and_a_meta_row_does_not_replace_the_google_row():
+    current = [dict(row(account="A", allocated="1"), channel="Google")]
+    got = run("M.merge(C, P, false)", C=current, P=[dict(pasted("A", 9), channel="Meta")])
+    assert [(r["account"], r["channel"], r["allocated"]) for r in got] == [("A", "Google", "1"), ("A", "Meta", 9)]
+    again = run("M.merge(C, P, false)", C=got, P=[dict(pasted("a", 11), channel="Meta")])
+    assert [(r["channel"], r["allocated"]) for r in again] == [("Google", "1"), ("Meta", 11)]                      # the Meta row is updated in place
+    assert run("M.merge([], P, true)[0].channel", P=[pasted("A", 1)]) == "Google"                                  # no channel means Google
+
+
+def test_the_editor_has_a_channel_column_that_is_read_back_and_sent():
+    page = open(BUDGETS, encoding="utf-8").read()
+    assert 'data-f="channel"' in page and 'channel:g("channel")||"Google"' in page and "<th>Channel</th>" in page and "Google and Meta rows" in page
 
 
 # ── The page scripts and the template ───────────────────────────────────────

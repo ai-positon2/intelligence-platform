@@ -4483,13 +4483,20 @@ def paid_pacing_budgets():
 
 
 def _pacing_google_names():
-    """The Google Ads account names, as hints for the account column. Empty when the list cannot be had: it is a convenience."""
+    """The Google Ads and Meta ad account names, as hints for the account column. Empty when the lists cannot be had: it is a convenience."""
+    names = []
     try:
         from tracker import paid_gads_segments
-        return [a["name"] for a in paid_gads_segments.list_accounts()]
+        names += [a["name"] for a in paid_gads_segments.list_accounts()]
     except Exception as e:
-        app.logger.info("pacing budgets: no account names for the hint (%s)", e)
-        return []
+        app.logger.info("pacing budgets: no Google account names for the hint (%s)", e)
+    try:
+        from tracker import paid_meta, paid_store
+        if not paid_meta.config_problem():
+            names += [a["name"] for a in paid_meta.list_accounts(paid_store)]
+    except Exception as e:
+        app.logger.info("pacing budgets: no Meta account names for the hint (%s)", e)
+    return list(dict.fromkeys(names))
 
 
 @app.route("/p2/paid-marketing/api/pacing/budgets/parse", methods=["POST"])

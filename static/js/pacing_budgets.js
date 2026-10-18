@@ -50,7 +50,7 @@ function readRows(){
   var rows = [];
   root.querySelectorAll("tbody tr[data-i]").forEach(function(tr){
     var g = function(f){var el = tr.querySelector('[data-f="'+f+'"]'); return el ? el.value : ""};
-    rows.push({client:g("client").trim(), account:g("account").trim(), allocated:g("allocated"), targetCpa:g("targetCpa"),
+    rows.push({client:g("client").trim(), account:g("account").trim(), channel:g("channel")||"Google", allocated:g("allocated"), targetCpa:g("targetCpa"),
       daysRunning:g("daysRunning").trim(), status:g("status"), am:g("am").trim()});
   });
   return rows;
@@ -83,6 +83,8 @@ function rowHtml(r, i){
   return '<tr data-i="'+i+'">'+
     '<td>'+inp("client", r.client, "w-client", "Client", "Client")+'</td>'+
     '<td>'+inp("account", r.account, "w-account", "Account", "Account", 'list="alAccounts"')+'</td>'+
+    '<td><select class="pd-al-in w-channel" data-f="channel" aria-label="Channel for row '+(i+1)+'">'+
+      ["Google","Meta"].map(function(o){return '<option value="'+o+'"'+((r.channel||"Google")===o?" selected":"")+'>'+o+'</option>'}).join("")+'</select></td>'+
     '<td>'+inp("allocated", r.allocated, "w-num", "0", "Allocated budget", 'inputmode="decimal"')+'</td>'+
     '<td>'+inp("targetCpa", r.targetCpa, "w-num", "optional", "Target CPA", 'inputmode="decimal"')+'</td>'+
     '<td>'+inp("daysRunning", r.daysRunning, "w-days", "every day", "Days running")+'</td>'+
@@ -102,15 +104,15 @@ function paint(){
   months.sort();
   root.innerHTML =
     '<div class="pm-panel-h"><span class="pm-panel-t">Allocations</span>'+
-      '<span class="pm-panel-s">What each account is meant to spend this month. Google Ads cannot know this, so it is kept here.</span></div>'+
+      '<span class="pm-panel-s">What each account is meant to spend this month. Neither Google Ads nor Meta Ads can know this, so it is kept here. An account that runs on both has a Google row and a Meta row.</span></div>'+
     '<div class="pd-al-bar"><label class="pd-al-month">Month <select id="alMonth" class="pd-al-in">'+
       months.map(function(m){return '<option value="'+m+'"'+(m===S.month?" selected":"")+'>'+esc(monthName(m))+'</option>'}).join("")+'</select></label>'+
       '<span class="pd-al-total" id="alTotal"></span></div>'+
     '<div id="alBanner">'+bannerHtml()+'</div>'+
     '<div class="pd-al-msg" id="alMsg" hidden role="status"></div>'+
-    '<div class="pd-al-wrap"><table class="pd-al-table"><thead><tr><th>Client</th><th>Account</th><th>Allocated ($)</th><th>Target CPA ($)</th>'+
+    '<div class="pd-al-wrap"><table class="pd-al-table"><thead><tr><th>Client</th><th>Account</th><th>Channel</th><th>Allocated ($)</th><th>Target CPA ($)</th>'+
       '<th>Days running</th><th>Status</th><th>AM</th><th><span class="sr-only">Remove</span></th></tr></thead><tbody>'+
-      (S.rows.length ? S.rows.map(rowHtml).join("") : '<tr><td colspan="8" class="pd-al-empty">No accounts yet.</td></tr>')+
+      (S.rows.length ? S.rows.map(rowHtml).join("") : '<tr><td colspan="9" class="pd-al-empty">No accounts yet.</td></tr>')+
     '</tbody></table></div>'+
     '<datalist id="alAccounts">'+S.accounts.map(function(a){return '<option value="'+esc(a)+'">'}).join("")+'</datalist>'+
     '<div class="pd-al-actions">'+
@@ -121,7 +123,7 @@ function paint(){
       '<button type="button" class="pd-al-save" id="alSave">Save allocations</button></div>'+
     '<div class="pd-al-paste" id="alPaste" hidden>'+
       '<p class="pm-panel-s">In the Budget Tracker, select the rows for the month (with the header row), copy, and paste here. '+
-        'Only Google rows for '+esc(monthName(S.month))+' are read. Nothing is changed until you choose how to use them.</p>'+
+        'Only Google and Meta rows for '+esc(monthName(S.month))+' are read. Nothing is changed until you choose how to use them.</p>'+
       '<textarea id="alText" class="pd-al-text" rows="6" spellcheck="false" aria-label="Pasted Budget Tracker rows"></textarea>'+
       '<div class="pd-al-actions"><button type="button" class="pm-btn-ghost" id="alRead">Read the pasted rows</button></div>'+
       '<div id="alPreview"></div></div>';
@@ -176,7 +178,7 @@ function save(){
 
 /* ── Pasting from the Budget Tracker ─────────────────────────── */
 var PASTED = null;
-function key(c, a){return (String(c).trim()+"|"+String(a).trim()).toLowerCase().replace(/\s+/g," ");}
+function key(c, a, ch){return (String(c).trim()+"|"+String(a).trim()).toLowerCase().replace(/\s+/g," ")+(ch==="Meta"?"|meta":"");}      /* a Google row's key is what it always was */
 
 function readPasted(){
   var text = $("#alText").value;
@@ -198,12 +200,12 @@ function readPasted(){
 
 /* The table after pasting: the pasted rows alone (replace) or the table with matching client+account rows updated and the rest added. */
 function merge(current, pasted, replace){
-  var rows = pasted.map(function(r){return {client:r.client, account:r.account, allocated:r.allocated, targetCpa:r.targetCpa==null?"":r.targetCpa,
+  var rows = pasted.map(function(r){return {client:r.client, account:r.account, channel:r.channel||"Google", allocated:r.allocated, targetCpa:r.targetCpa==null?"":r.targetCpa,
     daysRunning:r.daysRunning||"", status:r.status||"", am:r.am||""}});
   if(replace) return rows;
   var out = current.slice(), at = {};
-  out.forEach(function(r, i){at[key(r.client, r.account)] = i});
-  rows.forEach(function(r){var k = key(r.client, r.account); if(k in at) out[at[k]] = r; else { at[k] = out.length; out.push(r); }});
+  out.forEach(function(r, i){at[key(r.client, r.account, r.channel)] = i});
+  rows.forEach(function(r){var k = key(r.client, r.account, r.channel); if(k in at) out[at[k]] = r; else { at[k] = out.length; out.push(r); }});
   return out;
 }
 
@@ -230,7 +232,7 @@ function wire(){
     var t = e.target.closest("button"); if(!t) return;
     if(t.dataset.del != null){ syncFromDom(); S.rows.splice(Number(t.dataset.del), 1); S.dirty = true; var open = !$("#alPaste").hidden; paint(); if(open) togglePaste(true); return; }
     var id = t.id;
-    if(id === "alAdd"){ syncFromDom(); S.rows.push({client:S.rows.length?S.rows[S.rows.length-1].client:"", account:"", allocated:"", targetCpa:"", daysRunning:"", status:"", am:""}); S.dirty = true;
+    if(id === "alAdd"){ syncFromDom(); S.rows.push({client:S.rows.length?S.rows[S.rows.length-1].client:"", account:"", channel:"Google", allocated:"", targetCpa:"", daysRunning:"", status:"", am:""}); S.dirty = true;
       var wasOpen = !$("#alPaste").hidden; paint(); if(wasOpen) togglePaste(true);
       var last = root.querySelectorAll("tbody tr[data-i]"); if(last.length){ var f = last[last.length-1].querySelector('[data-f="account"]'); if(f) f.focus(); } }
     else if(id === "alSave") save();
