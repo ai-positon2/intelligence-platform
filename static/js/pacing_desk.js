@@ -94,7 +94,7 @@ function exportAccountsCsv(){
   var rows=[["Client","Account","Channels","Status","Capped","Budget unclear","Allocated","Spend",
              "Projected","Pacing %","Ideal %","Spend/day","Budget/day","Utilisation %","Moves"]];
   D.clients.forEach(function(c){ c.accounts.filter(keep).forEach(function(a){
-    rows.push([c.name,a.name,a.channels||"Google",a.landing,a.capped?"Yes":"No",a.ambiguous?"Yes":"No",
+    rows.push([c.name,a.name,a.channel||a.channels||"Google",a.landing,a.capped?"Yes":"No",a.ambiguous?"Yes":"No",
       a.allocated,a.spend,a.ambiguous?"":a.projected,(a.pacing*100).toFixed(1),(a.ideal*100).toFixed(1),
       a.currentDaily,a.budgetDaily,(a.utilisation*100).toFixed(1),a.moves.length]);
   }); });
@@ -144,7 +144,8 @@ function paintFresh(){
   var el=$("#fresh"), stale=SOURCE!=="live";
   el.className="pd-fresh"+(stale?" stale":"");
   var when = D.seededAt ? new Date(D.seededAt).toLocaleString([], {dateStyle:"medium", timeStyle:"short"}) : "";
-  var src=D.source, from=src&&src.kind==="googleAds"?', read from Google Ads ('+src.accounts+' accounts)':'';
+  var src=D.source, withMeta=!!(src&&src.channels&&src.channels.indexOf("Meta")>=0),
+      from=src&&src.kind==="googleAds"?', read from Google Ads'+(withMeta?' and Meta Ads':'')+' ('+src.accounts+' Google account'+(src.accounts===1?'':'s')+(withMeta&&src.meta?', '+src.meta.accounts+' Meta':'')+')':'';
   var bk=src&&src.budgets&&(src.budgets.kind==="carried"||src.budgets.kind==="seeded")?src.budgets:null;
   var unsaved=bk?' <span class="pd-fresh-warn">This run used allocations nobody has saved for '+esc(monthLabel(bk.month))+'. <button type="button" class="pd-al-link" id="alOpen">Review them</button></span>':'';
   el.innerHTML='<span class="live"></span>'+(stale
@@ -458,7 +459,7 @@ function detail(a){
   if(a.targetCpa) k.push(["Target CPA",m0(a.targetCpa)]);
   if(a.roas!=null) k.push(["ROAS",a.roas.toFixed(2)+"x"]);
   if(a.convValue) k.push(["Conv. value",m0(a.convValue)]);
-  k.push(["Runs",esc(a.schedule)],["Channels",esc(a.channels||"Google")]);
+  k.push(["Runs",esc(a.schedule)],["Channels",esc(a.channel||a.channels||"Google")]);
   var notes=(a.notes||[]).map(function(n){
     var warn=/looks wrong|Cannot reach|not spending at all|Guardrails/i.test(n);
     return '<p class="pm-note'+(warn?' warn':'')+'">'+esc(n).replace(/\*(.+?)\*/g,"<b>$1</b>")+'</p>';
@@ -492,7 +493,8 @@ function render(){
       var allDone=a.moves.length&&a.moves.every(function(m){var st=movesApplied[moveId(D.asOf,m.loc||a.name,m.from,m.to)];return st&&st.applied});
       html+='<details class="pd-acct"'+(open?' open':'')+' data-key="'+esc(key)+'"><summary><span class="pd-aname"><span class="caret"></span><span class="t">'+esc(a.name)+'</span>'+
         '<span class="pm-pill '+p[0]+'">'+p[1]+'</span>'+
-        (a.channels&&a.channels!=="Google"?'<span class="pm-tag" title="Other channels this account is also allocated; this desk tracks Google spend only">'+esc(a.channels)+'</span>':'')+
+        (a.channel==="Meta"?'<span class="pm-tag pd-meta" title="Read from Meta Ads and measured against the Meta allocation">Meta</span>':
+         a.channels&&a.channels!=="Google"?'<span class="pm-tag" title="Other channels this account is also allocated; this desk tracks Google Ads and Meta Ads only">'+esc(a.channels)+'</span>':'')+
         (a.capped?'<span class="pm-tag warn" title="Daily caps cannot reach the monthly budget">capped</span>':'')+
         (a.moves.length?(allDone?'<span class="pm-tag good">'+a.moves.length+' applied</span>':'<span class="pm-tag">'+a.moves.length+' move'+(a.moves.length===1?'':'s')+'</span>'):'')+'</span>'+
         (a.ambiguous?'<span class="pd-fig dim">budget figure unconfirmed</span>':bar(a))+
@@ -527,16 +529,16 @@ function paintOrphans(){
   }
   if(o.unread.length){
     b.push('<div class="pd-h4"><span>Allocated, but no spend read</span></div><div class="pd-client"><p class="pm-note">These have a budget and no campaign data for this month '+
-      '(an account that is not running, or one Google would not answer for). Their budget is not counted as spend.</p>'+
+      '(an account that is not running, or one Google Ads or Meta Ads would not answer for). Their budget is not counted as spend.</p>'+
       o.unread.map(function(w){return '<p class="pm-note">'+esc(w)+'</p>'}).join("")+'</div>');
   }
   if(D.otherChannels&&D.otherChannels.length){
     b.push('<div class="pd-h4"><span>Other channels this desk doesn’t cover</span></div><div class="pd-client"><p class="pm-note">'+
-      'This desk reads Google Ads only. These are also allocated, and no figure here includes them:</p>'+
+      'This desk paces Google Ads and Meta Ads only. These are also allocated, and no figure here includes them:</p>'+
       D.otherChannels.map(function(o){return '<p class="pm-note"><b>'+esc(o.client)+'</b>, '+esc(o.account)+' on <b>'+esc(o.channel)+'</b>: '+m0(o.allocated)+' allocated</p>'}).join("")+'</div>');
   }
   if(D.source&&D.source.notes&&D.source.notes.length){
-    b.push('<div class="pd-h4"><span>Notes on the Google Ads read</span></div><div class="pd-client">'+
+    b.push('<div class="pd-h4"><span>Notes on the read</span></div><div class="pd-client">'+
       D.source.notes.map(function(n){return '<p class="pm-note">'+esc(n)+'</p>'}).join("")+'</div>');
   }
   $("#orphans").innerHTML=b.join("");
@@ -545,7 +547,7 @@ function paintOrphans(){
 function paintFoot(){
   $("#foot").textContent='Ideal pacing is (today − 1) ÷ days in month, with a +'+D.tolerance+'pp tolerance. '+
     'The month-end projection comes from actual spend per active day, never from the daily cap, because most campaigns never spend their full cap. '+
-    'Budget moves stay inside a single location and net to zero. Spend, daily caps, status and impression share are read live from Google Ads; '+
+    'Budget moves stay inside a single location and net to zero. Spend, daily caps and status are read live from Google Ads and Meta Ads, and impression share from Google Ads (Meta has none); '+
     'allocations are the ones saved in Allocations. Recommendations are a draft: check before applying.';
 }
 
@@ -621,13 +623,13 @@ function paintRefresh(st){
   var b=$("#refreshBtn"), box=$("#refreshBox"), running=st.state==="running";
   box.classList.toggle("busy",running); b.disabled=running;
   $("#refreshLabel").textContent=running?(st.step||"Refreshing")+"…":"Refresh";
-  b.title=st.configProblem||(st.cooldownLeft?"Google Ads was just read. You can read it again in "+wait(st.cooldownLeft)+".":"Read every account from Google Ads again and rebuild today\u2019s run");
+  b.title=st.configProblem||(st.cooldownLeft?"Google Ads was just read. You can read it again in "+wait(st.cooldownLeft)+".":"Read every account from Google Ads and Meta Ads again and rebuild today\u2019s run");
   if(running){ rfNote("", ""); return; }
   if(st.state==="failed" && st.error){
     rfNote("bad",'<b>Refresh failed.</b> '+esc(st.error)+(st.finishedAt?' <span class="t">'+esc(ago(st.finishedAt))+'</span>':'')+' The run above is the last good one.');
   } else if(st.state==="done" && st.result && RF.seen==="running"){
     var r=st.result, f=r.issueCount||0;
-    rfNote("ok",'<b>Updated.</b> The '+esc(r.date)+' run, data through '+esc(r.dataThrough||"?")+', '+r.clients+' clients, '+r.accounts+' accounts, read from Google Ads.'+
+    rfNote("ok",'<b>Updated.</b> The '+esc(r.date)+' run, data through '+esc(r.dataThrough||"?")+', '+r.clients+' clients, '+r.accounts+' accounts, read from '+((r.channels||[]).indexOf("Meta")>=0?"Google Ads and Meta Ads":"Google Ads")+'.'+
       (r.reusedRead?' It used the Google Ads read of '+esc(new Date(r.readAt).toLocaleTimeString([],{hour:"numeric",minute:"2-digit"}))+' with the saved allocations.':'')+
       (r.notes||[]).map(function(x){return ' <span class="warn">'+esc(x)+'</span>'}).join("")+
       (f?' <details><summary>'+f+' engine self-check flag'+(f===1?'':'s')+'</summary><ul>'+

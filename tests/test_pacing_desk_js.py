@@ -50,3 +50,13 @@ def test_a_budget_with_no_data_is_not_reported_as_money_spent():
 
 def test_no_warnings_is_an_empty_split():
     assert run("orphanSplit(W)", W=None) == {"spent": [], "unread": [], "total": 0}
+
+
+def test_the_page_says_when_a_run_was_read_from_meta_too_and_marks_a_meta_account():
+    page = open(DESK, encoding="utf-8").read()
+    assert 'src.channels.indexOf("Meta")>=0' in page and "Google Ads'+(withMeta?' and Meta Ads':'')" in page
+    assert 'a.channel==="Meta"?\'<span class="pm-tag pd-meta"' in page
+    assert 'a.channel||a.channels||"Google"' in page                                              # the CSV and the account detail say the channel
+    assert "This desk paces Google Ads and Meta Ads only" in page and "This desk reads Google Ads only" not in page
+    html = open(os.path.join(ROOT, "templates", "pacing_desk.html"), encoding="utf-8").read()
+    assert "Google Ads and Meta Ads" in html and "straight from Google Ads and Meta Ads" in html

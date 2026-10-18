@@ -130,6 +130,7 @@
 .pm-tag{font-size:10px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--pm-muted);
   border:1px solid var(--pm-line2);border-radius:6px;padding:1px 6px;white-space:nowrap}
 .pm-tag.warn{color:var(--over);border-color:var(--over-l)}
+.pm-tag.pd-meta{color:#8ab4ff;border-color:rgba(138,180,255,.35)}
 .pm-tag.good{color:var(--ok);border-color:var(--ok-l)}
 
 /* ── Notes, empties, errors ───────────────────────────────────── */
