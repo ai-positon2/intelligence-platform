@@ -1,0 +1,209 @@
+"""Landing Page & Relevancy Check: the report for a Meta ad account, or a Google Ads account and a Meta ad account together (tracker/paid_lp.py)."""
+import pytest
+
+from tests.gads_fakes import FakeStore
+from tests.test_paid_lp import ACCOUNT, ACCOUNT_ID, NOW, Fetcher, fresh, search
+from tests.test_paid_lp_meta_read import Graph, ins, link_ad
+from tracker import paid_gads, paid_meta
+from tracker import paid_gads_segments as gads
+from tracker import paid_lp as lp
+
+ACT = "act_1234567890"
+META_ACCOUNT = {"id": ACT, "name": "Acme Dental", "currency": "USD", "tz": "America/New_York", "platform": "meta"}
+BOTH = ACCOUNT_ID + "+" + ACT
+LP = "https://acme-dental.com/lp"
+
+
+@pytest.fixture(autouse=True)
+def meta_account(monkeypatch):
+    fresh()
+    monkeypatch.setattr(paid_meta, "config_problem", lambda: "")
+    monkeypatch.setattr(paid_meta, "account_by_id", lambda store, act, http=None: META_ACCOUNT if act == ACT else None)
+    yield
+    fresh()
+
+
+def no_google(*_a):
+    raise AssertionError("Google Ads was asked and should not have been")
+
+
+def acme_graph(**kw):
+    """Meta's ads of the same client: one ad to the same page Google's ad sends people to."""
+    kw.setdefault("ads", [link_ad("1", LP)])
+    kw.setdefault("stats", [ins("1", 20, 10, 200, leads=2)])
+    return Graph(**kw)
+
+
+def run(account=BOTH, graph=None, **kw):
+    kw.setdefault("store", FakeStore())
+    kw.setdefault("accounts_fn", lambda: [ACCOUNT])
+    kw.setdefault("search_fn", search())
+    kw.setdefault("fetcher", Fetcher())
+    kw.setdefault("now", NOW)
+    kw.setdefault("meta_pages", (graph or acme_graph()).pages)
+    return lp.report_for(account, **kw)
+
+
+def count(out):
+    return sum(len(s["findings"]) for s in out["pages"][0]["sections"])
+
+
+# ── A Meta ad account on its own ────────────────────────────────────────────
+
+def test_a_meta_account_has_pages_from_its_ads_and_is_never_asked_of_google():
+    out = run(ACT, search_fn=no_google)
+    assert out["account"] == {"id": ACT, "name": "Acme Dental", "currency": "USD"}
+    assert out["accounts"] == [{"platform": "meta", "id": ACT, "name": "Acme Dental", "currency": "USD"}] and out["summary"]["platforms"] == ["meta"]
+    assert [p["id"] for p in out["pages"]] == ["acme-dental.com/lp"]
+    p = out["pages"][0]
+    assert p["platforms"] == ["meta"] and p["spend"] == 20.0 and p["clicks"] == 10 and p["conversions"] == 2.0 and p["checked"] is True and p["speed"] is None
+    assert count(out) == 30
+    g = p["adGroups"][0]
+    assert g["platform"] == "meta" and g["name"] == "Set s1" and g["keywords"] == [] and g["terms"] == [] and g["headlines"] == ["Free quote"]
+    assert out["warnings"] == [] and out["unread"] == [] and "stale" not in out
+
+
+def test_the_notes_of_a_meta_report_explain_meta_and_leave_out_the_keyword_note():
+    out = run(ACT, search_fn=no_google)
+    assert any("A Meta ad set stands where a Google ad group stands" in n for n in out["notes"])
+    assert any("pixel is looked for in the page's HTML" in n for n in out["notes"])
+    assert not any("A keyword is on the page when every one of its words is" in n for n in out["notes"])
+    google = run(ACCOUNT_ID, search_fn=search())
+    assert any("A keyword is on the page" in n for n in google["notes"]) and not any("Meta ad set" in n for n in google["notes"])
+
+
+def test_a_meta_page_is_checked_for_the_pixel_and_not_for_googles_tag():
+    out = run(ACT, search_fn=no_google)
+    ids = {f["id"]: f for s in out["pages"][0]["sections"] for f in s["findings"]}
+    assert "trust_meta_pixel" in ids and "trust_tracking" not in ids and "match_keywords_page" not in ids and "speed_google" not in ids
+    assert ids["trust_meta_pixel"]["result"] == "warn"                        # the page in the test carries a Google tag only
+
+
+def test_what_meta_spent_on_ads_with_no_web_page_is_said_and_not_checked():
+    ads = [link_ad("1", LP), {"id": "2", "adset_id": "s2", "creative": {"object_story_spec": {"link_data": {"message": "Fill in our form"}}}}]
+    graph = acme_graph(ads=ads, stats=[ins("1", 20, 10, 200), ins("2", 30, 12, 300, adset="s2")])
+    out = run(ACT, graph=graph, search_fn=no_google)
+    note = next(n for n in out["notes"] if n.startswith("Meta spent"))
+    assert note == "Meta spent $30 of its $50 on ads that send people to no web page of the client's (somewhere that could not be read), so there is no page to check for them."
+    assert out["summary"]["spend"] == 20.0                                    # only what reached a page
+
+
+def test_a_meta_account_that_cannot_be_read_is_an_error_not_an_empty_report():
+    with pytest.raises(gads.GadsError):
+        run(ACT, graph=acme_graph(fail=["insights"]), search_fn=no_google)
+    with pytest.raises(lp.BadRequest):
+        run("act_9999999999", search_fn=no_google)
+
+
+# ── A Google Ads and a Meta ad account together ─────────────────────────────
+
+def test_a_page_both_platforms_send_people_to_is_one_page_held_to_every_check():
+    out = run(BOTH)
+    assert [a["platform"] for a in out["accounts"]] == ["google", "meta"] and out["account"]["id"] == BOTH and out["account"]["name"] == "Acme Dental"
+    assert out["summary"]["platforms"] == ["google", "meta"] and len(out["pages"]) == 1
+    p = out["pages"][0]
+    assert p["platforms"] == ["google", "meta"] and p["spend"] == 1020.0 and p["clicks"] == 860 and p["conversions"] == 32.0
+    assert count(out) == 39
+    assert sorted(g["platform"] for g in p["adGroups"]) == ["google", "meta"]
+    assert any("A keyword is on the page" in n for n in out["notes"]) and any("Meta ad set" in n for n in out["notes"])
+
+
+def test_the_two_platforms_flags_and_warnings_are_named_apart():
+    out = run(BOTH, graph=acme_graph(fail=["rankings"]), search_fn=search(fail={"terms": gads.GadsError("api", "x")}))
+    assert sorted(out["unread"]) == ["Google Ads: terms", "Meta Ads: rankings"]
+    assert any(w.startswith("Meta: Meta's own ratings of the ads could not be read") for w in out["warnings"]) and any(w.startswith("The search terms could not be read") for w in out["warnings"])
+    f = {f["id"]: f for s in out["pages"][0]["sections"] for f in s["findings"]}
+    assert f["match_meta_conversion"]["result"] == "unknown" and "ratings of the ads could not be read" in f["match_meta_conversion"]["found"]
+    assert f["match_terms"]["result"] == "unknown"
+
+
+def test_when_one_platform_would_not_answer_the_report_is_the_others_with_a_warning():
+    out = run(BOTH, graph=acme_graph(fail=["ads"]))
+    assert out["summary"]["platforms"] == ["google"] and out["pages"][0]["platforms"] == ["google"] and count(out) == 35
+    assert out["warnings"][-1].startswith("Meta Ads could not be read (Meta answered 400") and out["warnings"][-1].endswith("This report is Google Ads alone.")
+    assert out["unread"] == ["Meta Ads: the whole account"]
+    fresh()
+    out = run(BOTH, search_fn=search(fail={"pages": gads.GadsError("api", "Google answered 500")}))
+    assert out["summary"]["platforms"] == ["meta"] and out["warnings"][-1].startswith("Google Ads could not be read (Google answered 500). This report is Meta Ads alone.")
+    assert out["unread"] == ["Google Ads: the whole account"]
+
+
+def test_both_platforms_failing_is_an_error_naming_the_first():
+    with pytest.raises(gads.GadsError) as e:
+        run(BOTH, graph=acme_graph(fail=["ads"]), search_fn=search(fail={"pages": gads.GadsError("api", "Google answered 500")}))
+    assert "Google answered 500" in str(e.value)
+
+
+def test_a_read_that_lost_a_platform_is_kept_only_five_minutes():
+    store, calls, graph = FakeStore(), [], Graph(fail=["ads"])
+    run(BOTH, store=store, graph=graph, search_fn=search(calls=calls))
+    n = len(calls)
+    run(BOTH, store=store, graph=graph, search_fn=search(calls=calls))
+    assert len(calls) == n                                                 # still fresh
+    paid_gads.forget()
+    store.at[lp.cache_key(BOTH)] -= lp.PARTIAL_TTL_S + 5
+    out = run(BOTH, store=store, search_fn=search(calls=calls))
+    assert len(calls) == 2 * n and out["summary"]["platforms"] == ["google", "meta"] and out["warnings"] == []
+
+
+def test_a_platform_lost_to_its_allowance_leaves_a_whole_saved_read_to_be_served_with_its_date():
+    store = FakeStore()
+    first = run(BOTH, store=store)
+    key = lp.cache_key(BOTH)
+    store.old[key] = store.cache.pop(key)
+    paid_gads.forget()
+    out = run(BOTH, store=store, graph=acme_graph(fail=["insights"], over=None), search_fn=search(fail={"pages": gads.GadsError("quota", "allowance spent")}))
+    assert out["stale"] == [{"platform": "google", "savedAt": "2026-10-10T08:00:00+00:00"}, {"platform": "meta", "savedAt": "2026-10-10T08:00:00+00:00"}]
+    assert out["pages"][0]["platforms"] == ["google", "meta"] and out["pages"][0]["spend"] == first["pages"][0]["spend"]
+
+
+def test_one_platform_lost_to_its_allowance_is_the_others_report_when_nothing_was_saved():
+    class Spent(acme_graph().__class__):
+        def pages(self, path, params):
+            raise paid_meta.OverQuota("Meta is rate limiting this app right now.")
+    out = run(BOTH, graph=Spent())
+    assert out["summary"]["platforms"] == ["google"] and "Meta Ads could not be read (Meta is rate limiting" in out["warnings"][-1]
+    fresh()
+    store = FakeStore()
+    run(BOTH, store=store)
+    key = lp.cache_key(BOTH)
+    store.old[key] = store.cache.pop(key)
+    paid_gads.forget()
+    out = run(BOTH, store=store, graph=Spent())
+    assert out["summary"]["platforms"] == ["google", "meta"] and out["stale"][0]["savedAt"] == "2026-10-10T08:00:00+00:00"       # a whole old read beats half a new one
+
+
+def test_two_accounts_that_bill_in_two_currencies_are_not_read_together():
+    with pytest.raises(lp.BadRequest) as e:
+        run(BOTH, accounts_fn=lambda: [dict(ACCOUNT, currency="EUR")])
+    assert "same currency (EUR and USD" in str(e.value)
+    run(BOTH, accounts_fn=lambda: [dict(ACCOUNT, currency="")])             # an account that does not say is not held against the other
+
+
+def test_each_account_string_is_read_and_saved_on_its_own():
+    store = FakeStore()
+    run(ACCOUNT_ID, store=store)
+    run(ACT, store=store, search_fn=no_google)
+    run(BOTH, store=store)
+    assert {k for k in store.cache if "lp3:" in k} == {lp.cache_key(ACCOUNT_ID), lp.cache_key(ACT), lp.cache_key(BOTH)}
+
+
+def test_the_lab_test_and_the_model_s_read_name_the_account_the_report_was_made_for(monkeypatch):
+    store = FakeStore()
+    seen = {}
+    monkeypatch.setattr(lp.lp_speed, "run", lambda url, get=None: {"score": 90, "url": url})
+    monkeypatch.setattr(lp.lp_speed, "remember", lambda st, key, pid, result, now=None: seen.update(key=key, pid=pid) or result)
+    out = lp.run_lab(BOTH, "acme-dental.com/lp", store=store, accounts_fn=lambda: [ACCOUNT], search_fn=search(), fetcher=Fetcher(), now=NOW, meta_pages=acme_graph().pages)
+    assert seen == {"key": BOTH, "pid": "acme-dental.com/lp"} and out["score"] == 90
+    with pytest.raises(lp.BadRequest):
+        lp.run_lab(BOTH, "nope.test/x", store=store, accounts_fn=lambda: [ACCOUNT], search_fn=search(), fetcher=Fetcher(), now=NOW, meta_pages=acme_graph().pages)
+
+
+def test_the_model_is_shown_a_meta_ad_set_with_no_keywords(monkeypatch):
+    store, asked = FakeStore(), []
+
+    def call(system, text):
+        asked.append(text)
+        return {"verdict": "partly", "promiseKept": "It keeps some of it.", "gaps": ["g"], "pageEdits": ["e"], "headlineIdeas": [], "adEdits": []}
+    out = lp.explain(ACT, "acme-dental.com/lp", store=store, search_fn=no_google, fetcher=Fetcher(), call=call, now=NOW, meta_pages=acme_graph().pages)
+    assert out["source"] == "model" and "Meta ad set (no keywords or search terms)" in asked[0] and "Free quote" in asked[0]

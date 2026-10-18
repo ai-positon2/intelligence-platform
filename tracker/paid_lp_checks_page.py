@@ -44,6 +44,9 @@ m.register([
     {"id": "reach_params", "section": "reach", "title": "The click id survives the redirect", "severity": "high",
      "why": "When a redirect drops the click id (gclid) and the UTM tags, Google Ads and Analytics lose track of which click became a customer.",
      "fix": "Have the redirect keep the whole query string, or send the ad straight to the final address."},
+    {"id": "reach_params_meta", "section": "reach", "title": "Meta's click id survives the redirect", "severity": "high",
+     "why": "When a redirect drops the click id (fbclid) and the UTM tags, the Meta pixel cannot match the visit to the ad click, so Meta and Analytics lose track of which click became a customer.",
+     "fix": "Have the redirect keep the whole query string, or send the ad straight to the final address."},
     {"id": "reach_https", "section": "reach", "title": "The page is served over https", "severity": "high",
      "why": "Browsers warn visitors away from pages that are not secure and Google may refuse the ad, especially where a form asks for contact details.",
      "fix": "Serve the page over https and use the https address in the ad."},
@@ -108,6 +111,9 @@ m.register([
     {"id": "trust_tracking", "section": "trust", "title": "A Google tag or tag manager is on the page", "severity": "high",
      "why": "Without a tag Google Ads and Analytics cannot count the visit or the sale that follows it.",
      "fix": "Install the Google tag or Tag Manager on the page and check that the conversion fires on the thank-you step."},
+    {"id": "trust_meta_pixel", "section": "trust", "title": "The Meta pixel is on the page", "severity": "high",
+     "why": "Without the pixel Meta cannot count the visit or the lead or sale that follows it, so it cannot find more people like the ones who act and the ad set learns from clicks alone.",
+     "fix": "Install the Meta pixel on the page (directly or through Tag Manager) and check in Events Manager that the conversion fires on the thank-you step."},
     {"id": "trust_privacy", "section": "trust", "title": "There is a privacy policy link", "severity": "medium",
      "why": "Google's rules and privacy laws expect a policy to be reachable wherever a page collects contact details.",
      "fix": "Link the privacy policy in the page's footer and next to the form."},
@@ -137,13 +143,19 @@ class Ctx:
         self.tech = (self.fetch or {}).get("tech") or {}
         self.groups = page.get("groups") or []
 
+    @property
+    def platforms(self):
+        """The platforms whose ads send people to this page: google, meta or both. A page record without the list is a Google page."""
+        return set(self.page.get("platforms") or ["google"])
+
     def why_unread(self):
         """Why the page's HTML could not be judged, as a sentence fragment; '' when it was read."""
         f = self.fetch
         if not f or f.get("skipped"):
             return "the page was not read in time"
         if f.get("templated"):
-            return "the ad's address has a placeholder in its host or path that Google fills in when someone clicks, so the page people reach is not known here"
+            who = "Google" if self.platforms == {"google"} else "the ad platform"
+            return "the ad's address has a placeholder in its host or path that %s fills in when someone clicks, so the page people reach is not known here" % who
         if f.get("blocked"):
             return "the page refuses automated requests (HTTP %d), so it could not be verified" % f["status"]
         if not f.get("status"):
@@ -236,6 +248,22 @@ def check_params(c):
     if s is False:
         return make("reach_params", "fail", "A test click id (gclid) and UTM tag were dropped by the redirect, so conversions from this page cannot be tied to the click.")
     return unknown("reach_params", "the second request that tests the click id did not complete")
+
+
+def check_params_meta(c):
+    f = c.fetch
+    why = c.why_unread()
+    if why:
+        return unknown("reach_params_meta", why)
+    if not f.get("redirected"):
+        return not_applicable("reach_params_meta", "The address does not redirect, so nothing is lost on the way.")
+    kept = f.get("keptIds")
+    if not kept:
+        return unknown("reach_params_meta", "the second request that tests the click id did not complete")
+    if kept.get("fbclid") and kept.get("utm"):
+        return make("reach_params_meta", "pass", "A test click id (fbclid) and UTM tag were still on the address after the redirect.")
+    lost = " and ".join(x for x, ok in (("the click id (fbclid)", kept.get("fbclid")), ("the UTM tag", kept.get("utm"))) if not ok)
+    return make("reach_params_meta", "fail", "A test click carrying a Meta click id (fbclid) and a UTM tag lost %s in the redirect, so conversions from this page cannot be tied to the ad click." % lost)
 
 
 def check_https(c):
@@ -598,6 +626,23 @@ def check_tracking(c):
     return make("trust_tracking", "warn", "No Google tag or Tag Manager was seen in the page's HTML." + later + " A tag that loads later is not seen by a plain read.")
 
 
+def check_meta_pixel(c):
+    why = c.why_unread()
+    if why:
+        return unknown("trust_meta_pixel", why)
+    pixel = next((t for t in c.tech.get("tools", []) if t["name"] == "Meta Pixel"), None)
+    if pixel:
+        ids = pixel.get("ids") or []
+        return make("trust_meta_pixel", "pass", "The page loads the Meta pixel%s." % ((" (%s)" % ", ".join(str(i) for i in ids[:3])) if ids else ""))
+    cut = c.not_seen("trust_meta_pixel", "the Meta pixel")
+    if cut:
+        return cut
+    gtm = any(t["name"] == "Google Tag Manager" for t in c.tech.get("tools", []))
+    later = " A cookie banner is on the page, so the pixel may load only after a choice is made." if c.facts.get("consent") else ""
+    via = " Google Tag Manager is on the page and may load the pixel, which a plain read does not see." if gtm else ""
+    return make("trust_meta_pixel", "warn", "The Meta pixel was not seen in the page's HTML." + via + later + " A pixel that loads later is not seen by a plain read, and the Conversions API cannot be seen from a page at all.")
+
+
 def check_privacy(c):
     why = c.page_unread()
     if why:
@@ -646,11 +691,11 @@ def check_proof(c):
 
 
 CHECKS = [
-    ("reach_status", check_status), ("reach_redirect", check_redirect), ("reach_params", check_params), ("reach_https", check_https),
+    ("reach_status", check_status), ("reach_redirect", check_redirect), ("reach_params", check_params), ("reach_params_meta", check_params_meta), ("reach_https", check_https),
     ("reach_staging", check_staging), ("reach_adsbot", check_adsbot),
     ("path_action", check_action), ("path_cta_top", check_cta_top), ("path_form_length", check_form_length), ("path_focus", check_focus),
     ("mobile_viewport", check_viewport), ("mobile_zoom", check_zoom), ("mobile_tap_to_call", check_tap_to_call), ("mobile_conv_gap", check_conv_gap),
     ("speed_google", check_google_speed), ("speed_server", check_server), ("speed_html", check_html), ("speed_compression", check_compression),
     ("speed_blocking", check_blocking), ("speed_scripts", check_scripts), ("speed_images", check_images), ("speed_lab", check_lab),
-    ("trust_tracking", check_tracking), ("trust_privacy", check_privacy), ("trust_contact", check_contact), ("trust_proof", check_proof),
+    ("trust_tracking", check_tracking), ("trust_meta_pixel", check_meta_pixel), ("trust_privacy", check_privacy), ("trust_contact", check_contact), ("trust_proof", check_proof),
 ]

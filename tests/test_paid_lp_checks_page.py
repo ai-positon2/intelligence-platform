@@ -2,8 +2,11 @@
 import pytest
 
 from tests.lp_fakes import blocked_fetch, fetch, group, page
+from tracker import paid_lp_checks as all_checks
 from tracker import paid_lp_checks_page as c
 from tracker import paid_lp_model as m
+
+GOOGLE_PAGE = [(i, fn) for i, fn in c.CHECKS if i not in all_checks.META_ONLY]            # the checks a page that only Google's ads reach is held to
 
 
 def run(check_id, **kw):
@@ -31,7 +34,7 @@ def test_every_check_in_the_list_has_a_catalog_entry_and_every_entry_of_these_se
 
 def test_a_good_page_passes_everything_it_can_be_asked():
     ctx = c.Ctx(page())
-    got = {i: fn(ctx)["result"] for i, fn in c.CHECKS}
+    got = {i: fn(ctx)["result"] for i, fn in GOOGLE_PAGE}
     assert {r for r in got.values()} <= {"pass", "na"}, {i: r for i, r in got.items() if r not in ("pass", "na")}
     assert got["speed_lab"] == "na" and got["reach_params"] == "na"
 
@@ -397,11 +400,11 @@ def test_proof():
 
 def test_a_spoiled_page_scores_well_below_a_good_one():
     ctx = c.Ctx(page())
-    good = m.page_summary([fn(ctx) for _i, fn in c.CHECKS])
+    good = m.page_summary([fn(ctx) for _i, fn in GOOGLE_PAGE])
     bad_fetch = fetch(facts_over={"forms": [], "tel": [], "ctas": [], "phones": [], "viewport": "", "privacyLink": False, "proof": [], "links": {"total": 300, "nav": 200, "outbound": 3}},
                       tech_over={"mobile": False, "tools": []}, encoding="", responseMs=4000, adsbot=False)
     ctx2 = c.Ctx(page(fetch=bad_fetch, speed=2))
-    bad = m.page_summary([fn(ctx2) for _i, fn in c.CHECKS])
+    bad = m.page_summary([fn(ctx2) for _i, fn in GOOGLE_PAGE])
     assert good["score"] == 100 and good["grade"] == "A"
     assert bad["score"] < 60 and bad["grade"] in ("D", "F") and "Google's ad crawler is blocked from the page" in bad["capReasons"]
 

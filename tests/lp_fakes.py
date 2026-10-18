@@ -65,3 +65,23 @@ def page(fetch_over=None, groups=None, **over):
 
 def blocked_fetch(status=403):
     return fetch(status=status, blocked=True, isHtml=False, facts=None, tech=None, adsbot=None)
+
+
+def meta_ad(name="Ad 1", headlines=None, descriptions=None, urls=("https://acme-dental.com/lp",), cost=100.0, ranks=None):
+    return {"name": name, "headlines": headlines if headlines is not None else ["Emergency Dentist Boston"],
+            "descriptions": descriptions if descriptions is not None else ["Cleanings from $99. Free consultation."], "urls": list(urls), "cost": cost, "type": "LINK",
+            "ranks": ranks if ranks is not None else {"quality": "above", "engagement": "average", "conversion": "above"}}
+
+
+def meta_group(gid="meta:s1", name="Set 1", ads=None, cost=100.0, campaign="Meta Leads"):
+    return {"id": gid, "name": name, "campaign": campaign, "campaignType": "META_LEADS", "cost": cost, "clicks": 50, "conversions": 2.0,
+            "ads": ads if ads is not None else [meta_ad(cost=cost)], "keywords": [], "terms": [], "pages": {}, "platform": "meta"}
+
+
+def meta_page(fetch_over=None, groups=None, **over):
+    """A page only Meta's ads reach: the good page, its ad sets, Meta's click id and pixel."""
+    f = dict(fetch_over or {})
+    f.setdefault("tech_over", {"tools": [{"name": "Meta Pixel", "category": "advertising", "ids": ["1234567890"]}]})
+    ok = {"pages": True, "ads": True, "keywords": True, "terms": True, "meta:ads": True, "meta:insights": True, "meta:rankings": True}
+    over = dict({"platforms": ["meta"], "ok": ok, "speed": None}, **over)
+    return page(fetch_over=f, groups=groups if groups is not None else [meta_group()], **over)

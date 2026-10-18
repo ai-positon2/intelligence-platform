@@ -27,6 +27,12 @@ CONTENT_OK, CONTENT_THIN = 150, 50                 # visible words
 SHOWN = 8                                          # keywords or terms named in one finding
 
 m.register([
+    {"id": "match_meta_conversion", "section": "match", "title": "Meta rates the conversion rate average or better", "severity": "high",
+     "why": "Meta compares each ad's conversion rate with the ads competing for the same people. Below average means the page converts fewer of the people the ad brings than other advertisers' pages do, and Meta charges more to show the ad.",
+     "fix": "Fix what the other checks on this page find (match, speed, mobile, a short form) and Meta's rating follows in a few weeks."},
+    {"id": "match_meta_quality", "section": "match", "title": "Meta rates the ad quality average or better", "severity": "medium",
+     "why": "Meta's quality ranking compares how people judge an ad (what they hide, report or ignore) with the ads competing for the same people, and a low one raises what each person costs.",
+     "fix": "Make the ad say what the page delivers, in plain words, with the same offer and the same picture of the service, and take out claims the page does not make."},
     {"id": "match_keywords_page", "section": "match", "title": "The keywords are on the page", "severity": "high",
      "why": "People searched for these words and clicked an ad written for them. A page that never uses them feels like the wrong place, and Google rates it down.",
      "fix": "Add the missing keywords, in the words people use, to the page's headline and body, or send those ad groups to a page that already uses them."},
@@ -90,19 +96,36 @@ def page_keywords(c, groups):
     return rows
 
 
-def _no_groups(check_id, c):
-    """The finding when there is nothing to hold the page against, or None when there is."""
-    if not search_groups(c):
+def meta_groups(c):
+    """The Meta ad sets whose ads send people to this page and carry words to compare with it."""
+    pid = c.page["id"]
+    return [g for g in c.groups if g.get("platform") == "meta" and via_ads(g, pid) and any(ad["headlines"] or ad["descriptions"] for ad in g["ads"])]
+
+
+def ad_groups(c):
+    """What the ads' words are held against: the Search ad groups (as search_groups) and the Meta ad sets that send people to the page."""
+    return search_groups(c) + meta_groups(c)
+
+
+def _no_groups(check_id, c, groups=None):
+    """The finding when there is nothing to hold the page against, or None when there is. `groups` is the function that finds what the check holds the page against."""
+    groups = groups or search_groups
+    if not groups(c):
         ok = c.page.get("ok") or {}
-        if ok.get("ads") is False:
+        google = "google" in c.platforms
+        if google and ok.get("ads") is False:
             return unknown(check_id, "the ads could not be read, so it is not known which keywords send people to this page")
+        if "meta" in c.platforms and ok.get("meta:ads") is False and groups is ad_groups:
+            return unknown(check_id, "the Meta ads could not be read, so it is not known what they say")
+        if groups is ad_groups and "meta" in c.platforms:
+            return not_applicable(check_id, "No Search ad group or Meta ad set with words to compare sends people to this page (Shopping and Performance Max have no keywords or ad text to compare it with).")
         return not_applicable(check_id, "No Search ad group sends people to this page (Shopping and Performance Max have no keywords or ad text to compare it with).")
     return None
 
 
-def _preflight(check_id, c):
+def _preflight(check_id, c, groups=None):
     """A finding when the check cannot run (nothing to compare, the page unread or built by scripts), else None."""
-    f = _no_groups(check_id, c)
+    f = _no_groups(check_id, c, groups)
     if f:
         return f
     why = c.page_unread()
@@ -182,14 +205,14 @@ def _group_echo(g, prom):
 
 
 def check_headline(c):
-    f = _preflight("match_headline", c)
+    f = _preflight("match_headline", c, ad_groups)
     if f:
         return f
     prom = words.vocab(words.prominent_text(c.facts))
     total = hit = 0.0
     misses = []
     judged = 0
-    for g in search_groups(c):
+    for g in ad_groups(c):
         share, head = _group_echo(g, prom)
         if not head:
             continue
@@ -201,21 +224,25 @@ def check_headline(c):
         else:
             misses.append((w, '%s: "%s" (%d%% of its words are in the page\'s headings)' % (g["name"], head, _pct(share))))
     if not judged:
-        return not_applicable("match_headline", "The page's ad groups have no responsive search ad headlines to compare.")
+        return not_applicable("match_headline", "The page's ad groups have no responsive search ad headlines to compare." if "meta" not in c.platforms
+                              else "The page's ad groups and ad sets have no ad headlines to compare.")
     share = hit / total
     misses.sort(key=lambda x: -x[0])
-    said = "Ad groups that took %d%% of the spend have a headline the page's title or headings echo (%s judged)." % (_pct(share), plural(judged, "ad group"))
+    if "meta" in c.platforms:
+        said = "Ad groups and ad sets that took %d%% of the spend have a headline the page's title or headings echo (%d judged)." % (_pct(share), judged)
+    else:
+        said = "Ad groups that took %d%% of the spend have a headline the page's title or headings echo (%s judged)." % (_pct(share), plural(judged, "ad group"))
     res = "pass" if share >= ECHO_OK else "warn" if share >= ECHO_FAIR else "fail"
     return make("match_headline", res, said, items=[t for _w, t in misses], count=len(misses))
 
 
 def check_offers(c):
-    f = _preflight("match_offers", c)
+    f = _preflight("match_offers", c, ad_groups)
     if f:
         return f
     pid = c.page["id"]
     texts = []
-    for g in search_groups(c):
+    for g in ad_groups(c):
         if via_ads(g, pid):
             for ad in g["ads"]:
                 texts += ad["headlines"] + ad["descriptions"]
@@ -264,6 +291,44 @@ def _rating_check(check_id, key, label, c):
     return make(check_id, "fail" if share >= RATING_FAIL else "warn", said, items=_names(below), count=len(below))
 
 
+def _meta_rank_check(check_id, key, label, c):
+    """Meta's own rating (quality or conversion rate) of the ads that send people to this page, by what each ad spent. Meta rates only ads with enough impressions."""
+    ok = c.page.get("ok") or {}
+    ads = [ad for g in meta_groups(c) for ad in g["ads"] if page_id_in(ad, c.page["id"])]
+    if not ads:
+        if ok.get("meta:ads") is False:
+            return unknown(check_id, "the Meta ads could not be read")
+        return not_applicable(check_id, "No Meta ad with words to compare sends people to this page.")
+    if ok.get("meta:rankings") is False:
+        return unknown(check_id, "Meta's ratings of the ads could not be read")
+    rated = [ad for ad in ads if (ad.get("ranks") or {}).get(key)]
+    if not rated:
+        return unknown(check_id, "Meta gave no %s rating for the ads that send people to this page (it rates only ads with enough impressions)" % label)
+    total = sum(max(ad["cost"], 0.01) for ad in rated)
+    below = [ad for ad in rated if ad["ranks"][key] == "below"]
+    share = sum(max(ad["cost"], 0.01) for ad in below) / total
+    if not below:
+        return make(check_id, "pass", "Meta rates the %s average or better for all %s rated." % (label, plural(len(rated), "ad")))
+    below.sort(key=lambda ad: -ad["cost"])
+    said = "Meta rates the %s below average for ads that took %d%% of the rated ad spend (%d of %d rated)." % (label, _pct(share), len(below), len(rated))
+    names = list(dict.fromkeys(ad.get("name") or "an ad" for ad in below))[:SHOWN]
+    if share < RATING_WARN:
+        return make(check_id, "pass", said, items=names, count=len(below))
+    return make(check_id, "fail" if share >= RATING_FAIL else "warn", said, items=names, count=len(below))
+
+
+def page_id_in(ad, pid):
+    return any(page_id(u) == pid for u in ad["urls"])
+
+
+def check_meta_conversion(c):
+    return _meta_rank_check("match_meta_conversion", "conversion", "conversion rate", c)
+
+
+def check_meta_quality(c):
+    return _meta_rank_check("match_meta_quality", "quality", "ad quality", c)
+
+
 def check_lp_experience(c):
     return _rating_check("match_lp_experience", "landingPage", "landing page experience", c)
 
@@ -284,6 +349,6 @@ def check_content(c):
     return make("match_content", "fail", "The page has only about %d words of text." % n)
 
 
-CHECKS = [("match_keywords_page", check_keywords_page), ("match_keywords_headline", check_keywords_headline), ("match_terms", check_terms), ("match_headline", check_headline),
+CHECKS = [("match_meta_conversion", check_meta_conversion), ("match_meta_quality", check_meta_quality), ("match_keywords_page", check_keywords_page), ("match_keywords_headline", check_keywords_headline), ("match_terms", check_terms), ("match_headline", check_headline),
           ("match_offers", check_offers), ("match_h1", check_h1), ("match_lp_experience", check_lp_experience), ("match_ad_relevance", check_ad_relevance),
           ("match_content", check_content)]

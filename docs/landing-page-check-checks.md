@@ -1,11 +1,11 @@
 # Landing Page & Relevancy Check: every check
 
 Generated from the catalog in `tracker/paid_lp_model.py` by `tracker/paid_lp_docs.py`; a test holds this file equal to it.
-Every check is run on each landing page. A check whose input could not be read says "could not check" and is never passed or failed. Severity weights: critical 8, high 4, medium 2, low 1.
+Every check is run on each landing page, except the ones marked for one platform, which run only for a page that platform's ads send people to. A check whose input could not be read says "could not check" and is never passed or failed. Severity weights: critical 8, high 4, medium 2, low 1.
 
-35 checks in 6 sections.
+39 checks in 6 sections.
 
-## The page opens (6)
+## The page opens (7)
 
 **reach_status** The page opens (critical)
 
@@ -21,7 +21,17 @@ What to do: Put the address people should land on straight into the ad's final U
 
 **reach_params** The click id survives the redirect (high)
 
+Runs for pages Google's ads reach only.
+
 Why it matters: When a redirect drops the click id (gclid) and the UTM tags, Google Ads and Analytics lose track of which click became a customer.
+
+What to do: Have the redirect keep the whole query string, or send the ad straight to the final address.
+
+**reach_params_meta** Meta's click id survives the redirect (high)
+
+Runs for pages Meta's ads reach only.
+
+Why it matters: When a redirect drops the click id (fbclid) and the UTM tags, the Meta pixel cannot match the visit to the ad click, so Meta and Analytics lose track of which click became a customer.
 
 What to do: Have the redirect keep the whole query string, or send the ad straight to the final address.
 
@@ -39,13 +49,33 @@ What to do: Replace the final URL with the live site's address.
 
 **reach_adsbot** Google's ad crawler may read the page (critical)
 
+Runs for pages Google's ads reach only.
+
 Why it matters: AdsBot judges the landing page. When robots.txt names it and keeps it out, the page cannot be checked and the ad can stop running.
 
 What to do: Remove the rule that blocks AdsBot-Google from the page in robots.txt.
 
-## Does it match the ad (9)
+## Does it match the ad (11)
+
+**match_meta_conversion** Meta rates the conversion rate average or better (high)
+
+Runs for pages Meta's ads reach only.
+
+Why it matters: Meta compares each ad's conversion rate with the ads competing for the same people. Below average means the page converts fewer of the people the ad brings than other advertisers' pages do, and Meta charges more to show the ad.
+
+What to do: Fix what the other checks on this page find (match, speed, mobile, a short form) and Meta's rating follows in a few weeks.
+
+**match_meta_quality** Meta rates the ad quality average or better (medium)
+
+Runs for pages Meta's ads reach only.
+
+Why it matters: Meta's quality ranking compares how people judge an ad (what they hide, report or ignore) with the ads competing for the same people, and a low one raises what each person costs.
+
+What to do: Make the ad say what the page delivers, in plain words, with the same offer and the same picture of the service, and take out claims the page does not make.
 
 **match_keywords_page** The keywords are on the page (high)
+
+Runs for pages Google's ads reach only.
 
 Why it matters: People searched for these words and clicked an ad written for them. A page that never uses them feels like the wrong place, and Google rates it down.
 
@@ -53,11 +83,15 @@ What to do: Add the missing keywords, in the words people use, to the page's hea
 
 **match_keywords_headline** The keywords are in the page's headline (medium)
 
+Runs for pages Google's ads reach only.
+
 Why it matters: The headline is what a visitor reads first. When it does not repeat what they searched, they stop to wonder if they are in the right place.
 
 What to do: Rewrite the page's title and main headline so they say what the ad group's keywords say.
 
 **match_terms** What people typed is on the page (high)
+
+Runs for pages Google's ads reach only.
 
 Why it matters: The search terms are the real wording of the people who clicked, and a page that does not use their words converts fewer of them.
 
@@ -83,11 +117,15 @@ What to do: Give the page one H1 that says what is offered and where.
 
 **match_lp_experience** Google rates the landing page experience average or better (high)
 
+Runs for pages Google's ads reach only.
+
 Why it matters: Landing page experience is one of the three parts of Quality Score. Below average raises the cost of every click and lowers where the ad shows.
 
 What to do: Fix what the other checks on this page find (match, speed, mobile) and Google's rating follows in a few weeks.
 
 **match_ad_relevance** Google rates the ad relevance average or better (medium)
+
+Runs for pages Google's ads reach only.
 
 Why it matters: Ad relevance is one of the three parts of Quality Score and measures how closely the ad speaks to the keyword.
 
@@ -155,6 +193,8 @@ What to do: Open the page on a phone, find where it gets hard (the form, a menu,
 
 **speed_google** Google's mobile speed score is good (medium)
 
+Runs for pages Google's ads reach only.
+
 Why it matters: Google scores each landing page's mobile speed from one to ten and slow pages lose clicks before they load.
 
 What to do: Compress images, remove scripts the page does not need and ask the developer for the biggest delays in a speed test.
@@ -201,13 +241,23 @@ Why it matters: A lab test loads the page like a mid-range phone on a mobile con
 
 What to do: Work through the test's own list of biggest delays, starting with images and scripts.
 
-## Tracking and trust (4)
+## Tracking and trust (5)
 
 **trust_tracking** A Google tag or tag manager is on the page (high)
+
+Runs for pages Google's ads reach only.
 
 Why it matters: Without a tag Google Ads and Analytics cannot count the visit or the sale that follows it.
 
 What to do: Install the Google tag or Tag Manager on the page and check that the conversion fires on the thank-you step.
+
+**trust_meta_pixel** The Meta pixel is on the page (high)
+
+Runs for pages Meta's ads reach only.
+
+Why it matters: Without the pixel Meta cannot count the visit or the lead or sale that follows it, so it cannot find more people like the ones who act and the ad set learns from clicks alone.
+
+What to do: Install the Meta pixel on the page (directly or through Tag Manager) and check in Events Manager that the conversion fires on the thank-you step.
 
 **trust_privacy** There is a privacy policy link (medium)
 

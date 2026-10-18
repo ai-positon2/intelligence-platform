@@ -230,7 +230,7 @@ class Graph:
 
 
 def run(g, **kw):
-    return r.read_account("act_1234", get=None, pages=g.pages, **kw)
+    return r.read_account("act_1234", pages=g.pages, **kw)
 
 
 def test_the_whole_read_gives_the_google_shape_and_names_what_it_asked_for():

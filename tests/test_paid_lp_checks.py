@@ -14,7 +14,8 @@ DOC = os.path.join(ROOT, "docs", "landing-page-check-checks.md")
 
 def test_every_catalog_entry_is_run_exactly_once():
     ids = [cid for cid, _fn in checks.CHECKS]
-    assert len(ids) == len(set(ids)) == len(model.CATALOG) == 35
+    assert len(ids) == len(set(ids)) == len(model.CATALOG) == 39 and set(ids) == set(model.CATALOG)
+    assert checks.GOOGLE_ONLY | checks.META_ONLY <= set(ids) and not checks.GOOGLE_ONLY & checks.META_ONLY
 
 
 def test_a_good_page_scores_a_hundred_and_every_section_is_there_in_order():
@@ -77,4 +78,4 @@ def test_the_headings_count_the_checks_of_each_section():
     for key, spec in model.SECTIONS.items():
         n = sum(1 for c in model.CATALOG.values() if c["section"] == key)
         assert "## %s (%d)" % (spec["label"], n) in text
-    assert "35 checks in 6 sections." in text
+    assert "39 checks in 6 sections." in text

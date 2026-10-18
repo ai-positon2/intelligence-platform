@@ -259,9 +259,9 @@ def _q(**kw):
     return kw
 
 
-def read_account(act, *, get, pages, now=None, keep=lp.KEEP_PAGES):
-    """{pages, pageCount, pageCost, adGroups, off, ok, warnings, readAt}: the Meta side of the landing page read. `get(path, params)` and `pages(path, params)` are the Graph API
-    calls (paid_meta._get and _pages bound to a store). The ads and the insights are the point, so a failure there is raised; every other part is a warning with its `ok`
+def read_account(act, *, pages, now=None, keep=lp.KEEP_PAGES):
+    """{pages, pageCount, pageCost, adGroups, off, ok, warnings, readAt}: the Meta side of the landing page read. `pages(path, params)` is the Graph API call that gives every
+    row of a list (paid_meta._pages bound to a store). The ads and the insights are the point, so a failure there is raised; every other part is a warning with its `ok`
     flag False. Meta asking to wait (paid_meta.OverQuota) stops the read and is raised: the rest would only fail the same way."""
     now = now or dt.datetime.now(dt.timezone.utc)
     ok, warnings = {}, []

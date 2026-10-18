@@ -2,6 +2,7 @@
 import pytest
 
 from tests.lp_fakes import blocked_fetch, fetch, group, keyword, page, term
+from tracker import paid_lp_checks as all_checks
 from tracker import paid_lp_checks_match as cm
 from tracker import paid_lp_checks_page as cp
 from tracker import paid_lp_model as m
@@ -27,13 +28,15 @@ def test_every_check_here_has_a_catalog_entry_and_every_match_entry_is_checked()
 
 def test_a_good_page_passes_every_match_check():
     for cid, fn in cm.CHECKS:
+        if cid in all_checks.META_ONLY:
+            continue                                       # Meta's checks are for a page Meta's ads reach (tests/test_paid_lp_checks_meta.py)
         f = fn(cp.Ctx(page()))
         assert f["result"] == "pass" and f["id"] == cid, (cid, f)
 
 
 # ── Nothing to compare ──────────────────────────────────────────────────────
 
-AD_SIDE = [i for i, _f in cm.CHECKS if i not in ("match_h1", "match_content")]
+AD_SIDE = [i for i, _f in cm.CHECKS if i not in ("match_h1", "match_content") and i not in all_checks.META_ONLY]
 
 
 @pytest.mark.parametrize("cid", AD_SIDE)
