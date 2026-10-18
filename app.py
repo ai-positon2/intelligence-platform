@@ -5803,7 +5803,7 @@ def _strat_account(account_id):
 
 def _strat_deps(rec, account):
     """What a build needs from the rest of the platform, so the job itself touches nothing global."""
-    from tracker import (paid_gads as base, paid_gads_segments as gads, paid_seasonality, paid_sqr_data, paid_store, paid_strategy_store, sci_pipeline, sci_store)
+    from tracker import (paid_adstrength, paid_gads as base, paid_gads_segments as gads, paid_seasonality, paid_sqr_data, paid_store, paid_strategy_store, sci_pipeline, sci_store)
     planner, planner_currency = (account or {}).get("id"), (account or {}).get("currency")
     if not planner:
         try:
@@ -5815,6 +5815,7 @@ def _strat_deps(rec, account):
             "business_list": lambda kind="business": paid_strategy_store.list_recent(kind=kind), "business_get": paid_strategy_store.get,
             "search": lambda cid, gaql: gads.search(cid, gaql), "geo_names": gads.geo_names, "gads_store": paid_store,
             "sqr_read": lambda st, acct, start, end: paid_sqr_data.read(paid_store, acct, start, end),
+            "ads_report": lambda account_id: paid_adstrength.report_for(account_id),
             "cached": lambda key, ttl, make: base._cached(paid_store, key, ttl, make),
             "post": lambda path, body: base._post(path, body, paid_store),
             "season_report": lambda accts, months: paid_seasonality.report(paid_store, accts, months),
@@ -5823,12 +5824,14 @@ def _strat_deps(rec, account):
 
 def _strat_begin(store, rec, resume=False):
     """Start (or resume) the build unless one is already running. Returns (started, why_not). The agent that runs it is the one the build belongs to."""
-    from tracker import paid_business_job, paid_keywords_job, paid_strategy as ps, paid_strategy_job as job
+    from tracker import paid_adcopy_job, paid_business_job, paid_keywords_job, paid_strategy as ps, paid_strategy_job as job
     kind = (rec.get("inputs") or {}).get("kind")
     if kind == "business":
         job = paid_business_job                                         # noqa: F811 (same run_build call, Business Research's own build)
     elif kind == "keywords":
         job = paid_keywords_job                                         # noqa: F811 (and Keyword Research's)
+    elif kind == "adcopy":
+        job = paid_adcopy_job                                           # noqa: F811 (and the Ad Copy generator's)
     email = _pm_user_email()
     used = store.runs_today(email)                          # counted in the database, so every server counts the same builds
     if used >= ps.BUILDS_PER_DAY:
@@ -6321,6 +6324,170 @@ def paid_keywords_download(sid):
     resp = make_response(body)
     resp.headers["Content-Type"] = _KW_FILES[kind][0]
     resp.headers["Content-Disposition"] = 'attachment; filename="%s%s"' % (stem, _KW_FILES[kind][1])
+    resp.headers["Cache-Control"] = "private, no-store"
+    return resp
+
+
+# Ad Copy & Creative Generator -------------------------------------------------
+# Ad copy that is ready to paste, and the creative briefs for the formats that need an image or a video. Give it a client (what to promote, optionally a website and a
+# Google Ads account), the formats (Google Search, Performance Max, Demand Gen, Responsive Display, Meta feed, Meta Stories and Reels), the angles and the tone, and
+# it writes one format at a time from what it was given: the client's pages, the facts the person confirmed and the account's keywords and best ads. What is kept is
+# decided in code (tracker/paid_adcopy_check.py): over-length lines are dropped, lines a platform would refuse are dropped, and a claim the evidence does not hold marks
+# the line "Confirm" instead of letting it through. It shares its run and its table of saved builds with the three agents above: tracker/paid_adcopy.py (the formats and
+# the inputs), paid_adcopy_research.py (the account), paid_adcopy_ai.py (the writing), paid_adcopy_check.py (what is kept), paid_adcopy_export.py (Excel, CSV, PDF and the
+# file for Google Ads Editor) and paid_adcopy_job.py (the run). It only writes: nothing is created or changed in Google Ads or Meta.
+
+_AC_FILES = {"xlsx": ("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", ".xlsx"), "pdf": ("application/pdf", ".pdf"),
+             "zip": ("application/zip", "-all-tables.zip"), "csv": ("text/csv; charset=utf-8", "-ads-editor-search-ad.csv")}
+
+
+@app.route("/p2/paid-marketing/ad-copy")
+@position2_required
+def paid_adcopy_page():
+    return render_template("ad_copy.html", user=_get_user())
+
+
+@app.route("/p2/paid-marketing/api/adcopy/options")
+@position2_required
+def paid_adcopy_options():
+    from tracker import paid_adcopy as pa, paid_strategy as ps
+    formats = [{"key": k, "label": f["label"], "short": f["short"], "platform": f["platform"], "about": f["about"], "brief": f["brief"], "paths": f["paths"], "cta": f["cta"],
+                "fields": [{x: fld[x] for x in ("key", "label", "limit", "min", "max", "optional")} for fld in f["fields"]]} for k, f in pa.FORMATS.items()]
+    return jsonify(formats=formats, defaultFormats=pa.DEFAULT_FORMATS, angles=pa.ANGLES, defaultAngles=pa.DEFAULT_ANGLES, maxAngles=pa.MAX_ANGLES, tones=pa.TONES,
+                   defaultTone=pa.DEFAULT_TONE, cards=pa.CARDS, goals=ps.GOALS, buildsPerDay=pa.BUILDS_PER_DAY, modelReady=bool(os.environ.get("ANTHROPIC_API_KEY")))
+
+
+@app.route("/p2/paid-marketing/api/adcopy/list")
+@position2_required
+def paid_adcopy_list():
+    from tracker import paid_adcopy as pa, paid_strategy_store as store
+    try:
+        return jsonify(builds=[pa.brief(r) for r in store.list_recent(kind=pa.KIND)])
+    except store.StoreUnavailable as e:
+        return _pm_store_error(e)
+
+
+@app.route("/p2/paid-marketing/api/adcopy/start", methods=["POST"])
+@position2_required
+def paid_adcopy_start():
+    """POST what to write and the formats: save the build and start it."""
+    from tracker import paid_adcopy as pa, paid_strategy as ps, paid_strategy_store as store
+    try:
+        inputs = pa.clean_inputs(request.get_json(silent=True))
+    except ps.BadPayload as e:
+        return jsonify(error=str(e)), 400
+    account = _strat_account(inputs["account"])
+    if inputs["account"] and not account:
+        return jsonify(error="That Google Ads account is not one this platform can read."), 400
+    if account:
+        inputs["currency"] = account.get("currency") or inputs["currency"]
+    try:
+        rec = store.create(by=_pm_user_email(), inputs=inputs, account_name=(account or {}).get("name") or "", steps=pa.steps_for(inputs))
+        started, why = _strat_begin(store, rec)
+        if why:
+            store.archive(rec["id"])
+            return jsonify(error=why, kind="cap"), 429
+        return jsonify(id=rec["id"], started=started), 201
+    except store.StoreUnavailable as e:
+        return _pm_store_error(e)
+
+
+@app.route("/p2/paid-marketing/api/adcopy/<sid>")
+@position2_required
+def paid_adcopy_get(sid):
+    from tracker import paid_adcopy as pa, paid_strategy as ps, paid_strategy_store as store
+    try:
+        return jsonify(ps.public(_strat_rec_or_404(store, sid, pa.KIND)))
+    except store.StoreUnavailable as e:
+        return _pm_store_error(e)
+
+
+@app.route("/p2/paid-marketing/api/adcopy/<sid>/status")
+@position2_required
+def paid_adcopy_status(sid):
+    from tracker import paid_adcopy as pa, paid_strategy_store as store
+    if not _STRAT_ID.fullmatch(sid or ""):
+        abort(404)
+    try:
+        light = store.get_light(sid)
+    except store.StoreUnavailable as e:
+        return _pm_store_error(e)
+    if not light or light.get("kind") != pa.KIND:
+        abort(404)
+    return jsonify(light)
+
+
+@app.route("/p2/paid-marketing/api/adcopy/<sid>/rebuild", methods=["POST"])
+@position2_required
+def paid_adcopy_rebuild(sid):
+    """Write again. {resume: true} keeps the formats the last build finished and writes only the rest; otherwise it starts over."""
+    import time
+    from tracker import paid_adcopy as pa, paid_strategy_store as store
+    try:
+        rec = _strat_rec_or_404(store, sid, pa.KIND)
+        if rec["created_by"] != _pm_user_email() and not _pm_is_admin():
+            return jsonify(error="Only whoever started this build, or an admin, can build it again. Open the form with these details to start your own."), 403
+        wait = _STRAT_RUN_GAP_S - (time.time() - _STRAT_LAST.get(sid, 0))
+        if wait > 0:
+            return jsonify(error="That was started a moment ago. Try again in %d seconds." % (wait + 1), kind="cooldown", retryIn=int(wait) + 1), 429
+        started, why = _strat_begin(store, rec, resume=bool((request.get_json(silent=True) or {}).get("resume")))
+        if why:
+            return jsonify(error=why, kind="cap"), 429
+        if not started:
+            return jsonify(error="This build is already running."), 409
+        _STRAT_LAST[sid] = time.time()
+        return jsonify(id=sid, started=True)
+    except store.StoreUnavailable as e:
+        return _pm_store_error(e)
+
+
+@app.route("/p2/paid-marketing/api/adcopy/<sid>", methods=["DELETE"])
+@position2_required
+def paid_adcopy_delete(sid):
+    from tracker import paid_adcopy as pa, paid_strategy_store as store
+    try:
+        rec = _strat_rec_or_404(store, sid, pa.KIND)
+        if rec["created_by"] != _pm_user_email() and not _pm_is_admin():
+            return jsonify(error="Only whoever started this build, or an admin, can remove it."), 403
+        store.archive(sid)
+        return jsonify(ok=True)
+    except store.StoreUnavailable as e:
+        return _pm_store_error(e)
+
+
+@app.route("/p2/paid-marketing/api/adcopy/<sid>/download")
+@position2_required
+def paid_adcopy_download(sid):
+    """?file=xlsx|pdf|zip|csv (csv is the responsive search ad, the lines that are ready, for Google Ads Editor)."""
+    from tracker import paid_adcopy as pa, paid_adcopy_export as export, paid_strategy_store as store
+    try:
+        rec = _strat_rec_or_404(store, sid, pa.KIND)
+    except store.StoreUnavailable as e:
+        return _pm_store_error(e)
+    kind = request.args.get("file") or ""
+    if kind not in _AC_FILES:
+        return jsonify(error="file should be one of: %s." % ", ".join(_AC_FILES)), 400
+    if not (rec.get("plan") or {}).get("generatedAt"):                       # the checks are written last: a result that stopped halfway must not read as complete
+        return jsonify(error="There is nothing to download yet: the copy has not been written and checked."), 409
+    stem = export.file_stem(rec)
+    try:
+        if kind == "xlsx":
+            body = export.xlsx(rec)
+        elif kind == "pdf":
+            body = export.pdf(rec)
+        elif kind == "zip":
+            body = export.csv_zip(rec)
+        else:
+            body = export.csv_editor(rec)
+            if body is None:
+                return jsonify(error="There is no search ad to import: it needs at least three headlines and two descriptions that are ready (a line that needs the client to confirm a claim is left out)."), 404
+            body = "\ufeff" + body
+    except Exception as e:                                  # noqa: BLE001 (a file that cannot be made is said in words, not a stack trace)
+        app.logger.exception("ad copy download failed")
+        return jsonify(error="The file could not be made (%s)." % type(e).__name__), 500
+    resp = make_response(body)
+    resp.headers["Content-Type"] = _AC_FILES[kind][0]
+    resp.headers["Content-Disposition"] = 'attachment; filename="%s%s"' % (stem, _AC_FILES[kind][1])
     resp.headers["Cache-Control"] = "private, no-store"
     return resp
 
