@@ -137,6 +137,17 @@ def identify(typ, ref, name, audiences):
     return "%s:%s" % (typ, ref or name), name or "%s %s" % (detail, ref), kind, detail
 
 
+def _every_include(adsets, members, audiences):
+    """(type, id, name) of each thing in `members` (their identify() keys), as the ad sets name them."""
+    seen, out = set(), []
+    for s in adsets:
+        for typ, ref, name in s["include"]:
+            if identify(typ, ref, name, audiences)[0] in members and (typ, ref) not in seen:
+                seen.add((typ, ref))
+                out.append((typ, ref, name))
+    return sorted(out, key=lambda t: identify(*t, audiences)[0])
+
+
 def build(account, adsets, stats, audiences):
     """The raw read from the parsed parts (see the module's doc). An ad set that shows no results in the range adds no use but still counts
     as nothing to the totals."""
@@ -146,17 +157,41 @@ def build(account, adsets, stats, audiences):
         if not is_empty(s["m"]):
             add(totals.setdefault(s["ctype"], zero()), s["m"])
     attached = set()
+    users = {}                                    # what an ad set names -> the ad sets (with results) that name it
     for s in adsets:
         st = stats.get(s["id"])
         for typ, ref, name in s["include"] + s["exclude"]:
             if typ == "audience":
                 attached.add(ref)
+        if st is not None and not is_empty(st["m"]):
+            for typ, ref, name in s["include"]:
+                users.setdefault(identify(typ, ref, name, audiences)[0], set()).add(s["id"])
+    # Audiences that exactly the same ad sets use cannot be told apart: Meta gives results per ad set, so they share one set of numbers. One row says that.
+    together = {}
+    for key, ids in users.items():
+        together.setdefault(frozenset(ids), []).append(key)
+    group_of = {k: sorted(keys) for keys in together.values() if len(keys) > 1 for k in keys}
+    for s in adsets:
+        st = stats.get(s["id"])
         if st is None or is_empty(st["m"]):
             continue
         for typ, ref, name in s["include"]:
             key, label, kind, detail = identify(typ, ref, name, audiences)
+            members = group_of.get(key)
+            if members:
+                if key != members[0]:
+                    continue                        # the group's first member carries the row for all of them
+                parts = [identify(t2, r2, n2, audiences) for t2, r2, n2 in _every_include(adsets, members, audiences)]
+                names = [p[1] for p in parts]
+                kinds = {p[2] for p in parts}
+                key = "group:" + "+".join(members)                  # the type stays in it: audience 10 and interest 10 are not the same thing
+                label = " + ".join(names[:3]) + (" and %d more" % (len(names) - 3) if len(names) > 3 else "")
+                kind = kinds.pop() if len(kinds) == 1 else "other"
+                detail = "%d audiences always used together" % len(names)
+            else:
+                names = None
             a = out.setdefault("%s|%s" % (aid, key), {"label": label, "kind": kind, "detail": detail, "account": acct, "ref": ref, "refKind": typ,
-                                                     "uses": [], "all": zero(), "types": {}})
+                                                     "uses": [], "all": zero(), "types": {}, **({"members": names} if names else {})})
             a["uses"].append({"campaign": st["campaign"], "campaignId": st["campaignId"], "ctype": st["ctype"], "adGroup": s["name"], "level": "ad_group",
                               "mode": "observation" if s["suggestion"] else "targeting", "bid": None, "bidding": "", "platform": "meta", "m": dict(st["m"])})
             add(a["all"], st["m"])

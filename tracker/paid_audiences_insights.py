@@ -284,8 +284,10 @@ def report_insights(report, view):
                     "evidence": "Google reports no results for the audience signals of a Performance Max campaign.",
                     "action": "Judge Performance Max by its asset groups and its campaign totals instead.", "confidence": "high", "keys": []})
     if platform in ("meta", "both"):
+        joined = [r for r in view["rows"] if r.get("members")]
         out.append({"kind": "meta", "severity": "info", "headline": "Meta's audiences are judged by the ad sets that use them",
-                    "evidence": "Meta reports results per ad set, not per audience, so an audience's numbers are those of the ad sets aimed at it, and an ad set aimed at two audiences counts under both.",
+                    "evidence": "Meta reports results per ad set, not per audience, so an audience's numbers are those of the ad sets aimed at it, and an ad set aimed at two audiences counts under both."
+                    + ((" %s of these rows join audiences that exactly the same ad sets use, so Meta cannot tell them apart and they share one set of numbers." % num(len(joined))) if joined else ""),
                     "action": "Read an audience's row as how the ad sets built on it do. To test one fairly, give it an ad set of its own.", "confidence": "high", "keys": []})
     rank = {"action": 0, "watch": 1, "info": 2}
     out.sort(key=lambda i: rank[i["severity"]])

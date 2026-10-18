@@ -312,3 +312,31 @@ def test_a_meta_account_that_mixes_sales_and_leads_does_not_rank_its_audiences_o
     assert {r["verdict"] for r in every["rows"]} == {"none"} and "mixed" in kinds and not {"push", "trim", "exclude"} & set(kinds)
     assert all(r["adjustment"] is None for r in every["rows"]) and every["basis"] is None
     assert "Meta Sales" in rep["types"] and rep["views"]["Meta Sales"]["basis"] == "roas" and rep["views"]["Meta Leads"]["basis"] == "cpa"      # inside one type they are judged
+
+
+def test_audiences_that_exactly_the_same_ad_sets_use_are_one_row_because_meta_cannot_tell_them_apart():
+    """Live, every ad set of an account aimed at the same seven audiences: seven rows with identical numbers, adding up to 373% of the account."""
+    bundle = [("10", "Page visitors"), ("11", "Followers"), ("12", "Video viewers")]
+    sets = dict(adsets=[adset("1", "A", custom=bundle + [("13", "Only A")]), adset("2", "B", custom=bundle)],
+                insights=[lead_row("1", "A", 300, 30), lead_row("2", "B", 200, 20)],
+                audiences=[audience("10", "Page visitors"), audience("11", "Followers", "ENGAGEMENT"), audience("12", "Video viewers", "VIDEO"), audience("13", "Only A", "CUSTOM")])
+    raw = raw_of(**sets)
+    keys = sorted(raw["audiences"])
+    assert keys == ["act_5550001|audience:13", "act_5550001|group:audience:10+audience:11+audience:12"]
+    g = raw["audiences"]["act_5550001|group:audience:10+audience:11+audience:12"]
+    assert g["label"] == "Page visitors + Followers + Video viewers" and g["members"] == ["Page visitors", "Followers", "Video viewers"]
+    assert g["detail"] == "3 audiences always used together" and g["kind"] == "remarketing" and len(g["uses"]) == 2
+    assert g["all"]["cost"] == 500.0 and g["all"]["conv"] == 50.0                            # each ad set counted once, not three times
+    assert raw["audiences"]["act_5550001|audience:13"]["all"]["cost"] == 300.0 and "members" not in raw["audiences"]["act_5550001|audience:13"]
+    assert all(l["used"] for l in raw["lists"])                                              # every audience is still listed and in use
+
+
+def test_a_joined_row_is_shown_with_its_members_and_the_note_says_why(meta_on):
+    bundle = [("10", "Page visitors"), ("11", "Followers")]
+    sets = dict(adsets=[adset("1", "A", custom=bundle), adset("2", "B", custom=bundle)], insights=[lead_row("1", "A", 300, 30), lead_row("2", "B", 200, 20)],
+                audiences=[audience("10", "Page visitors"), audience("11", "Followers")])
+    rep = a.report_for("act_5550001", "2026-06-01", "2026-06-30", store=FakeStore(), meta_fetch=graph(**sets))
+    rows = rep["views"]["All"]["rows"]
+    assert len(rows) == 1 and rows[0]["members"] == ["Page visitors", "Followers"] and rows[0]["cost"] == 500.0
+    note = next(i for i in rep["views"]["All"]["insights"] if i["kind"] == "meta")
+    assert "1 of these rows join audiences that exactly the same ad sets use" in note["evidence"]

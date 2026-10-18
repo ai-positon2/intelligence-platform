@@ -340,6 +340,8 @@ function paintTable(){
 function detail(r){
   var what=r.action&&r.action.text?'<p class="au-do '+r.action.kind+'"><b>'+({raise:"Raise",lower:"Lower",exclude:"Exclude",hold:"Hold"}[r.action.kind]||"")+'</b> '+esc(r.action.text)+'</p>':"";
   var why=r.why?'<p class="au-why">'+esc(r.why)+'</p>':"";
+  if(r.members&&r.members.length) why='<p class="au-why"><b>'+r.members.length+' audiences always used together:</b> '+r.members.map(esc).join(", ")+
+    '. Meta reports results per ad set, and the same ad sets use every one of them, so it cannot tell them apart: they share these numbers.</p>'+why;
   var live=r.uses.filter(function(u){return u.m.impressions>0||u.m.cost>0;}), silent=r.uses.length-live.length;
   return what+why+'<table class="as-tx au-uses"><thead><tr><th>Where it is used</th><th>Mode</th>'+(showBid()?'<th class="r">Bid now</th>':'')+'<th class="r">Spend</th><th class="r">Clicks</th><th class="r">Conv.</th></tr></thead><tbody>'+
     live.map(function(u){

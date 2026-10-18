@@ -322,6 +322,7 @@ def _view(audiences, ctype, account, multi):
         row = derive(m, account["cost"], account["conv"])
         modes = sorted({u["mode"] for u in uses})
         row.update(key=key, label=a["label"], kind=a["kind"], kindLabel=KIND_LABEL[a["kind"]], detail=a["detail"], account=a["account"] if multi else "",
+                   members=a.get("members") or [],
                    platform="meta" if uses and all(u.get("platform") == "meta" for u in uses) else "google",
                    mode=modes[0] if len(modes) == 1 else "mixed", types=sorted({u["ctype"] for u in uses}), **_bid_summary(uses),
                    uses=[dict(u, m=derive(u["m"], account["cost"], account["conv"])) for u in sorted(uses, key=lambda u: -u["m"]["cost"])])

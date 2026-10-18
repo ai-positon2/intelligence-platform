@@ -61,3 +61,8 @@ def test_the_page_script_asks_for_meta_accounts_and_sends_a_combined_account_str
     page = open(PAGE, encoding="utf-8").read()
     assert "/p2/paid-marketing/api/gads/accounts?platform=meta" in page and "S.g+\"+\"+S.m" in page
     assert 'PL.switcher($("#platPick"),{allow:["google","meta","both"]' in page
+
+
+def test_a_row_that_joins_audiences_names_them_and_says_why_they_share_numbers():
+    page = open(PAGE, encoding="utf-8").read()
+    assert "audiences always used together:" in page and "r.members.map(esc).join" in page and "cannot tell them apart" in page
