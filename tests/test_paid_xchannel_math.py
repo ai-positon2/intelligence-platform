@@ -100,6 +100,7 @@ def test_figures_are_ratios_of_totals_and_none_without_a_denominator():
     f = m.figures({"impr": 1000, "clicks": 50, "cost": 200.0, "conv": 10, "value": 800.0})
     assert f["ctr"] == pytest.approx(5.0) and f["cpc"] == pytest.approx(4.0) and f["cvr"] == pytest.approx(20.0)
     assert f["cpa"] == pytest.approx(20.0) and f["roas"] == pytest.approx(4.0)
+    assert m.figures({"impr": 1000, "clicks": 50, "cost": 200.0, "conv": 10, "value": 0.0})["roas"] is None          # no value recorded is not a return of zero
     z = m.figures(m.blank())
     assert z["ctr"] is None and z["cpa"] is None and z["roas"] is None and z["cvr"] is None and z["cpc"] is None
 

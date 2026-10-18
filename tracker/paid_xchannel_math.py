@@ -136,11 +136,12 @@ def _ratio(a, b):
 
 
 def figures(t):
-    """The rates from totals: click rate (percent), cost per click, conversion rate (percent), cost per conversion, return on ad spend (None where the denominator is 0)."""
+    """The rates from totals: click rate (percent), cost per click, conversion rate (percent), cost per conversion, return on ad spend (None where the denominator is 0, and for return
+    when no conversion value was recorded: a platform that records none has no return to show, not a return of zero)."""
     ctr, cvr = _ratio(t["clicks"], t["impr"]), _ratio(t["conv"], t["clicks"])
     return {"impr": t["impr"], "clicks": t["clicks"], "cost": t["cost"], "conv": t["conv"], "value": t["value"],
             "ctr": None if ctr is None else ctr * 100, "cpc": _ratio(t["cost"], t["clicks"]), "cvr": None if cvr is None else cvr * 100,
-            "cpa": _ratio(t["cost"], t["conv"]), "roas": _ratio(t["value"], t["cost"])}
+            "cpa": _ratio(t["cost"], t["conv"]), "roas": _ratio(t["value"], t["cost"]) if t["value"] > 0 else None}
 
 
 def add(a, b):

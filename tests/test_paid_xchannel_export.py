@@ -52,7 +52,7 @@ def test_the_cost_change_sheet_adds_up():
         return [(2000, 100, 15.0 if d < "2026-09-18" else 30.0, 1.5, 0.0, 2, 0.0, 0), (8000, 40, 20.0, 0, 0.0, 0, 0.0, 0)][ci]
     _h, rows = ex.tables(t.run(shape_fn=t.shape_fn(meta=meta)))["Cost change"]
     vals = {r[0]: r[1] for r in rows}
-    assert vals["Change"] == pytest.approx(vals["Of which the mix of conversions between platforms"] + vals["Of which Google Ads's own cost per conversion"] + vals["Of which Meta Ads's own cost per conversion"], abs=0.02)
+    assert vals["Change"] == pytest.approx(vals["Of which the mix of conversions between platforms"] + vals["Of which Google Ads' own cost per conversion"] + vals["Of which Meta Ads' own cost per conversion"], abs=0.02)
 
 
 def test_the_attribution_sheet_lists_the_actions_the_windows_and_the_notes():

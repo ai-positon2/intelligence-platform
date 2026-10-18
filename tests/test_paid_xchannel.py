@@ -97,6 +97,12 @@ def test_campaign_types_carry_a_role_and_their_share_of_the_spend():
     assert [t["label"] for t in r["channels"]["google"]["types"]] == ["Search", "Performance Max"]
 
 
+def test_a_platform_that_records_no_value_has_no_return_rather_than_a_return_of_zero():
+    r = run()
+    assert r["channels"]["meta"]["cur"]["roas"] is None and r["channels"]["google"]["cur"]["roas"] is not None
+    assert {t["label"]: t["roas"] for t in r["channels"]["meta"]["types"]} == {"Leads": None, "Awareness": None}
+
+
 def test_the_findings_include_the_gap_and_the_idle_awareness_spend():
     r = run()
     ids = [f["id"] for f in r["findings"]]

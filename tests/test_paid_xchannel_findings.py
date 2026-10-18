@@ -80,7 +80,7 @@ def test_a_cost_gap_of_one_and_a_half_times_is_flagged_high_with_a_test_to_run()
     r = report(channel(1000, 50), channel(1500, 50))                       # 20 against 30
     f = get(r, "cpa-gap")
     assert f["level"] == "high" and "Meta Ads costs 1.5 times as much per conversion as Google Ads" in f["title"]
-    assert "$30.00 against $20.00" in f["text"] and "10 to 20 percent of Meta Ads's budget" in f["action"] and "your own system records" in f["action"]
+    assert "$30.00 against $20.00" in f["text"] and "10 to 20 percent of Meta Ads' budget" in f["action"] and "your own system records" in f["action"]
     assert "averages" in f["text"]
 
 
@@ -102,7 +102,7 @@ def test_the_gap_mentions_the_attribution_windows_when_they_differ():
 def test_the_gap_says_when_most_of_the_dearer_platforms_spend_creates_demand():
     meta = channel(1500, 50, types=[typ("Awareness", "create", 1000, 0), typ("Leads", "mixed", 500, 50)])
     f = get(report(channel(1000, 50), meta), "cpa-gap")
-    assert "67% of Meta Ads's spend is on campaigns that create demand" in f["text"]
+    assert "67% of Meta Ads' spend is on campaigns that create demand" in f["text"]
     meta = channel(1500, 50, types=[typ("Awareness", "create", 600, 0), typ("Leads", "mixed", 900, 50)])
     assert "create demand" not in get(report(channel(1000, 50), meta), "cpa-gap")["text"]
 
@@ -112,7 +112,7 @@ def test_the_gap_says_when_most_of_the_dearer_platforms_spend_creates_demand():
 def test_a_blended_rise_of_ten_percent_is_a_finding_and_says_where_it_came_from():
     r = report(channel(1000, 50, 1000, 50), channel(1400, 35, 1000, 35))      # meta 28.6 -> 40
     f = get(r, "blended-move")
-    assert f["level"] == "medium" and "rose" in f["title"] and "Meta Ads's own cost" in " ".join(f["evidence"]) and any(e.startswith("Mix:") for e in f["evidence"])
+    assert f["level"] == "medium" and "rose" in f["title"] and "Meta Ads' own cost" in " ".join(f["evidence"]) and any(e.startswith("Mix:") for e in f["evidence"])
     assert "platforms' own costs changing" in f["text"]
 
 
@@ -141,7 +141,7 @@ def test_a_blended_move_without_a_split_still_reports_the_move():
 def test_a_quarter_of_spend_on_demand_creating_campaigns_with_no_conversions_is_called_out():
     meta = channel(1000, 40, types=[typ("Awareness", "create", 250, 0), typ("Leads", "mixed", 750, 40)])
     f = get(report(channel(1000, 50), meta), "idle-meta")
-    assert f["level"] == "medium" and f["title"].startswith("25% of Meta Ads's spend")
+    assert f["level"] == "medium" and f["title"].startswith("25% of Meta Ads' spend")
     meta = channel(1000, 40, types=[typ("Awareness", "create", 240, 0), typ("Leads", "mixed", 760, 40)])
     assert "idle-meta" not in ids(report(channel(1000, 50), meta))
 
@@ -248,3 +248,7 @@ def test_claims_a_little_over_what_happened_are_neither_overlap_nor_a_share():
 def test_a_platform_with_spend_and_exactly_thirty_conversions_is_not_thin():
     assert "thin-google" not in ids(report(channel(1000, 30), channel(1000, 60)))
     assert "thin-google" in ids(report(channel(0.01, 0), channel(1000, 60)))
+
+
+def test_a_platform_name_takes_an_apostrophe_alone():
+    assert fd.poss("meta") == "Meta Ads'" and fd.poss("google") == "Google Ads'" and fd.poss("tiktok") == "tiktok's"

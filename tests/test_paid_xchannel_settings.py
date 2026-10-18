@@ -206,7 +206,7 @@ def test_no_view_window_means_no_view_through_note():
 
 def test_the_models_note_says_both_platforms_claim_the_same_person():
     n = next(n for n in st.compare(google_summary(model="GOOGLE_ADS_LAST_CLICK"), meta_summary()) if n["id"] == "models")
-    assert "last click" in n["text"] and "counted by both" in n["text"]
+    assert "last click" in n["text"] and "counted by both" in n["text"] and "counts that person twice" in n["text"] and "at the top of the page" in n["text"]
 
 
 def test_different_goals_are_flagged_only_when_meta_mostly_spends_on_the_other_goal():

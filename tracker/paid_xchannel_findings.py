@@ -35,6 +35,12 @@ def name(p):
     return m.PLATFORM_NAME.get(p, p)
 
 
+def poss(p):
+    """The possessive of a platform's name: both names end in s, so an apostrophe alone ("Meta Ads' budget")."""
+    n = name(p)
+    return n + ("'" if n.endswith("s") else "'s")
+
+
 def _item(id_, level, title, text, evidence=None, action=None):
     out = {"id": id_, "level": level, "title": title, "text": text, "evidence": evidence or []}
     if action:
@@ -71,10 +77,10 @@ def findings(r):
                 text += " Part of the gap is the two platforms' different attribution windows (see below)."
             create = _create_share(ch[b])
             if create is not None and create >= 50:
-                text += " %s of %s's spend is on campaigns that create demand, which are not judged fairly on cost per conversion alone." % (pct(create), name(b))
+                text += " %s of %s spend is on campaigns that create demand, which are not judged fairly on cost per conversion alone." % (pct(create), poss(b))
             out.append(_item("cpa-gap", "high", "%s costs %.1f times as much per conversion as %s" % (name(b), ratio, name(a)), text,
                              ["%s: %s per conversion, %s conversions" % (name(n), money(ch[n]["cur"]["cpa"], cur), num(ch[n]["cur"]["conv"])) for n in (a, b)],
-                             "Test moving 10 to 20 percent of %s's budget to %s for two to four weeks, and judge it on the conversions your own system records, not on what the platforms claim." % (name(b), name(a))))
+                             "Test moving 10 to 20 percent of %s budget to %s for two to four weeks, and judge it on the conversions your own system records, not on what the platforms claim." % (poss(b), name(a))))
     bl = r["blended"]
     if bl["cur"]["conv"] >= m.MIN_CONV and bl["prev"]["conv"] >= m.MIN_CONV and bl["cur"]["cpa"] and bl["prev"]["cpa"]:
         move = m.change(bl["cur"]["cpa"], bl["prev"]["cpa"])
@@ -87,15 +93,15 @@ def findings(r):
                 text += " Of the %s change, %s is the platforms' own costs changing and %s is the mix of where the conversions came from." % (
                     money(abs(d["change"]), cur), money(abs(d["rateTotal"]), cur), money(abs(d["mix"]), cur))
                 for n, v in sorted(d["rate"].items(), key=lambda kv: -abs(kv[1])):
-                    ev.append("%s's own cost: %s%s" % (name(n), "+" if v >= 0 else "-", money(abs(v), cur)))
+                    ev.append("%s own cost: %s%s" % (poss(n), "+" if v >= 0 else "-", money(abs(v), cur)))
                 ev.append("Mix: %s%s" % ("+" if d["mix"] >= 0 else "-", money(abs(d["mix"]), cur)))
             out.append(_item("blended-move", "medium" if up else "info", "Blended cost per conversion %s %s" % ("rose" if up else "fell", pct(abs(move))), text, ev))
     for n in names:
         idle = _idle_share(ch[n])
         if idle is not None and idle >= CREATE_SHARE:
-            out.append(_item("idle-" + n, "medium", "%s of %s's spend recorded no conversions" % (pct(idle), name(n)),
-                             "%s of %s's spend is on campaign types that create demand (awareness, traffic, video and the like) and recorded no conversions in this range. %s's cost per conversion divides all of its "
-                             "spend by conversions only some of its campaigns are built to produce, so it reads worse than the campaigns that convert are doing." % (pct(idle), name(n), name(n))))
+            out.append(_item("idle-" + n, "medium", "%s of %s spend recorded no conversions" % (pct(idle), poss(n)),
+                             "%s of %s spend is on campaign types that create demand (awareness, traffic, video and the like) and recorded no conversions in this range. %s cost per conversion divides all of its "
+                             "spend by conversions only some of its campaigns are built to produce, so it reads worse than the campaigns that convert are doing." % (pct(idle), poss(n), poss(n))))
     allcost = sum(ch[n]["cur"]["cost"] for n in names)
     create_cost = sum(t["cost"] for n in names for t in ch[n]["types"] if t["role"] == "create")
     if allcost > 0 and create_cost / allcost * 100 >= CREATE_OVERALL:

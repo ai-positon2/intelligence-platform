@@ -1,0 +1,120 @@
+{% extends "_paid_base.html" %}
+{% block title %}Cross-Channel &amp; Attribution{% endblock %}
+{% block head %}
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/account_audit.css') }}?v=5">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/cross_channel.css') }}?v=4">
+{% endblock %}
+{% block content %}
+<div class="pm pm-au pm-xc" id="xc">
+  <section class="pm-hero">
+    <div class="pm-hero-l">
+      <span class="pm-eyebrow"><span class="d"></span>Paid Marketing · Analyze</span>
+      <h1 class="pm-title">Do your channels add up? <span class="pm-grad">And do you believe them?</span></h1>
+      <p class="pm-sub">Pick a Google Ads account, a Meta ad account or one of each. The agent puts the two platforms side by side and blended, shows what moved the blended cost per conversion, checks whether the two
+        platforms <b>count a conversion the same way</b>, and, if you type in what your own system recorded, shows how many of the conversions they claim are counted twice. Every figure is plain arithmetic: no model is asked.</p>
+    </div>
+  </section>
+
+  <section class="pm-panel pd-cmd au-cmd xc-cmd" id="cmd">
+    <div class="au-cmd-row">
+      <div id="acctPick"></div>
+      <p class="au-scope">Read only: nothing is changed in Google Ads or Meta. A Google and a Meta account are read together only when they bill in the same currency. GA4, LinkedIn Ads and programmatic are not read yet.
+        The platforms' daily numbers are saved, so a repeat read is quick, and Refresh asks the platforms again.</p>
+    </div>
+    <div class="xc-ctl">
+      <div class="xc-grp"><span class="xc-lab" id="rangeLab">Range</span><div class="pm-chips" role="radiogroup" aria-labelledby="rangeLab" id="ranges"></div></div>
+      <div class="xc-grp"><span class="xc-lab" id="measureLab">Count</span><div class="pm-chips" role="radiogroup" aria-labelledby="measureLab" id="measures"></div></div>
+    </div>
+    <p class="xc-hint" id="measureHint"></p>
+    <details class="xc-own" id="own">
+      <summary>Check against your own numbers <span>(optional)</span></summary>
+      <p class="xc-own-t">Type what your own system (GA4, a CRM, your orders) recorded for the same range. The page then says whether the platforms claim more than happened.</p>
+      <div class="xc-own-row">
+        <label>Conversions recorded<input type="text" inputmode="decimal" id="fConv" placeholder="for example 120" autocomplete="off"></label>
+        <label>Revenue recorded<input type="text" inputmode="decimal" id="fValue" placeholder="for example 48000" autocomplete="off"></label>
+        <button type="button" class="pm-btn" id="ownGo">Check</button>
+        <button type="button" class="pm-btn-ghost" id="ownClear">Clear</button>
+      </div>
+    </details>
+  </section>
+
+  <div id="msg"></div>
+
+  <div id="empty" class="pm-panel sg-empty">
+    <div class="sg-empty-ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 18V9M10 18V5M16 18v-7M22 18H2"/></svg></div>
+    <h2>Choose an account to begin</h2>
+    <p>The read takes a few seconds: it asks Google Ads and Meta for the daily numbers and for how each counts a conversion.</p>
+  </div>
+  <div id="skel" hidden><div class="pd-skel"></div><div class="pd-skel"></div><div class="pd-skel"></div></div>
+
+  <div id="out" hidden>
+    <div class="sg-head">
+      <p class="pd-fresh" id="fresh"></p>
+      <button class="pm-btn-ghost" id="refreshBtn" type="button" title="Read the account again"><svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.3-5.6M20 4v5h-5"/></svg>Refresh</button>
+      <a class="pm-btn-ghost" id="dlXlsx" href="#" download><svg viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>Excel</a>
+      <a class="pm-btn-ghost" id="dlPdf" href="#" download><svg viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>PDF</a>
+      <a class="pm-btn-ghost" id="dlZip" href="#" download><svg viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>CSV files</a>
+    </div>
+    <div class="au-stale" id="stale" hidden></div>
+    <div class="xc-warn" id="warn" hidden></div>
+
+    <section class="xc-lead" id="lead"></section>
+    <div class="pd-strip au-tiles xc-tiles" id="tiles"></div>
+
+    <section class="pm-panel" id="findCard">
+      <div class="pm-panel-h"><span class="pm-panel-t">What to look at</span><span class="pm-panel-s" id="findNote"></span></div>
+      <ol class="xc-finds" id="finds"></ol>
+    </section>
+
+    <section class="pm-panel" id="chCard">
+      <div class="pm-panel-h"><span class="pm-panel-t">The platforms side by side</span><span class="pm-panel-s" id="chNote"></span></div>
+      <div class="xc-cols" id="channels"></div>
+      <div class="xc-shares" id="shares"></div>
+    </section>
+
+    <section class="pm-panel" id="wfCard" hidden>
+      <div class="pm-panel-h"><span class="pm-panel-t">What moved the blended cost per conversion</span><span class="pm-panel-s" id="wfNote"></span></div>
+      <div id="wf"></div>
+    </section>
+
+    <section class="pm-panel" id="typeCard">
+      <div class="pm-panel-h"><span class="pm-panel-t">Campaign types</span><span class="pm-panel-s">What each is usually for: a rule of thumb, not a measurement</span></div>
+      <div class="xc-scroll"><table class="xc-table" id="types"></table></div>
+    </section>
+
+    <section class="pm-panel" id="wkCard">
+      <div class="pm-panel-h"><span class="pm-panel-t">Week by week</span><span class="pm-panel-s" id="wkNote"></span></div>
+      <div class="xc-charts"><figure><figcaption>Spend</figcaption><div id="chartCost"></div></figure><figure><figcaption>Conversions claimed</figcaption><div id="chartConv"></div></figure></div>
+      <div class="xc-legend" id="legend"></div>
+      <h3 class="xc-h3">Do the platforms move together?</h3>
+      <p class="xc-p" id="linkWhy"></p>
+      <ul class="xc-links" id="links"></ul>
+    </section>
+
+    <section class="pm-panel" id="attrCard" hidden>
+      <div class="pm-panel-h"><span class="pm-panel-t">Do the platforms count a conversion the same way?</span><span class="pm-panel-s">How each one decides what to claim</span></div>
+      <div class="xc-cols" id="attr"></div>
+      <p class="xc-p" id="attrNote">What these differences mean for the numbers is listed under What to look at, above.</p>
+    </section>
+
+    <section class="pm-panel" id="recCard" hidden>
+      <div class="pm-panel-h"><span class="pm-panel-t">Against your own numbers</span><span class="pm-panel-s" id="recNote"></span></div>
+      <dl class="xc-rec" id="rec"></dl>
+    </section>
+
+    <section class="pm-panel" id="notesCard" hidden>
+      <div class="pm-panel-h"><span class="pm-panel-t">How to read this, and what it could not see</span></div>
+      <ul class="au-notes" id="notes"></ul>
+    </section>
+    <p class="au-foot" id="foot"></p>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/pm_picker.js') }}?v=1"></script>
+<script src="{{ url_for('static', filename='js/pm_platform.js') }}?v=4"></script>
+<script src="{{ url_for('static', filename='js/au_data.js') }}?v=2"></script>
+<script src="{{ url_for('static', filename='js/exp_data.js') }}?v=2"></script>
+<script src="{{ url_for('static', filename='js/xch_data.js') }}?v=2"></script>
+<script src="{{ url_for('static', filename='js/cross_channel.js') }}?v=2"></script>
+{% endblock %}

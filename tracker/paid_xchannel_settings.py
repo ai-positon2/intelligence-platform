@@ -194,8 +194,8 @@ def compare(google, meta, *, meta_kinds=None, google_view=None):
     if mk:
         label = MODEL_LABEL.get(mk, mk.replace("_", " ").title())
         notes.append({"id": "models", "level": "medium", "title": "Each platform gives itself the credit",
-                      "text": "Google's main model for what it counts is %s; Meta credits its own ads. Neither platform sees the other's ads, so a person who clicked both is counted by both. This is why the two "
-                              "platforms' conversions are not added to a blended total here without the reconciliation below." % label.lower()})
+                      "text": "Google's main model for what it counts is %s; Meta credits its own ads. Neither platform sees the other's ads, so a person who clicked both is counted by both. The blended "
+                              "total here is the two platforms' claims added, so it counts that person twice: type what your own system recorded, at the top of the page, to see by how much." % label.lower()})
     if meta_kinds:
         total = sum(meta_kinds.values())
         mk_name = max(("sales", "leads"), key=lambda k: meta_kinds.get(k, 0.0))

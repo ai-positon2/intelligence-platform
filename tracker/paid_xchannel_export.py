@@ -16,6 +16,7 @@ import zipfile
 
 from .paid_strategy_check import text as clean
 from .paid_strategy_export import CELL_CHARS, _csv_text, plain
+from .paid_xchannel_findings import poss
 from .paid_xchannel_math import PLATFORM_NAME
 
 LEVEL_TEXT = {"high": "High", "medium": "Medium", "low": "Low", "info": "For information"}
@@ -80,7 +81,7 @@ def tables(report):
     d = report.get("decomposition") or {}
     if d.get("ok"):
         rows = [["Blended cost per conversion, previous period", _r(d["from"])], ["Blended cost per conversion, this period", _r(d["to"])], ["Change", _r(d["change"])],
-                ["Of which the mix of conversions between platforms", _r(d["mix"])]] + [["Of which %s's own cost per conversion" % _name(p), _r(v)] for p, v in d["rate"].items()]
+                ["Of which the mix of conversions between platforms", _r(d["mix"])]] + [["Of which %s own cost per conversion" % poss(p), _r(v)] for p, v in d["rate"].items()]
         rows += [["%s share of conversions, previous to this period %%" % _name(p), "%s to %s" % (_r(s["before"], 1), _r(s["after"], 1))] for p, s in d["mixShare"].items()]
         out["Cost change"] = (["Part", "Amount (%s)" % cur if cur else "Amount"], rows)
 
