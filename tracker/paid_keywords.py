@@ -30,7 +30,7 @@ CARDS = [
     {"key": "website", "title": "Client website", "needs": "website", "paid": False, "default": True,
      "blurb": "Reads the home page and up to a dozen more: the services and headings the site uses become starting points for Keyword Planner."},
     {"key": "account", "title": "Account keywords and search terms", "needs": "account", "paid": False, "default": True,
-     "blurb": "Every keyword and negative keyword the account has, and 90 days of search terms, so nothing is suggested that the account already bids on or blocks, and what converts is not missed."},
+     "blurb": "Every keyword the account has, its campaign-level and shared-list negative keywords (an ad group's own negatives are not read), and 90 days of search terms, so nothing is suggested that the account already bids on or blocks, and what converts is not missed."},
     {"key": "competitors", "title": "Competitors", "needs": None, "paid": False, "default": True,
      "blurb": "Up to three competitor websites (the ones you name, or found from the web): what Keyword Planner finds each of them for."},
 ]
