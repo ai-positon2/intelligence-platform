@@ -289,3 +289,29 @@ def test_meta_campaign_types_and_placements_read_as_words():
 def test_the_reason_a_metric_is_empty_does_not_blame_google_for_a_meta_account():
     why = run("P.noData('allConv',[0,0,0,0,0,5,0,0,0,0,0,0,0,0,0,0,0],[5],null)")
     assert "Google" not in why and "platform" in why
+
+
+def _meta(*campaigns):
+    """insights for one-day Meta campaigns given as (type, cost, conversions)."""
+    cs = ",".join("{id:'%d',name:'C%d',type:'%s'}" % (i + 1, i + 1, c[0]) for i, c in enumerate(campaigns))
+    rows = ",".join("[%d,0,1000,100,%s,%s,0]" % (i, c[1], c[2]) for i, c in enumerate(campaigns))
+    return run("P.insights({cur:{days:['2026-10-01'],campaigns:[%s],rows:[%s]},cmp:null,set:null,currency:'USD'}).map(i=>[i.id,i.text])" % (cs, rows))
+
+
+@pytest.mark.parametrize("kind", ["META_TRAFFIC", "META_AWARENESS", "META_ENGAGEMENT"])
+def test_a_meta_campaign_that_cannot_report_conversions_is_not_called_wasted_spend(kind):
+    out = _meta(("META_LEADS", 1400, 70), (kind, 1400, 0))
+    ids = [i[0] for i in out]
+    assert "waste" not in ids and "concentration" not in ids
+    assert out[0][1] == "You spent $2,800 and got 70 conversions at $40.00 each, counting $1,400 spent on Meta Traffic, Awareness or Engagement campaigns, which cannot report conversions."
+
+
+def test_a_meta_leads_campaign_with_no_leads_is_still_wasted_spend():
+    out = _meta(("META_LEADS", 1400, 70), ("META_LEADS", 1400, 0))
+    assert [i[0] for i in out].count("waste") == 1 and "counting" not in out[0][1]
+
+
+def test_the_share_of_spend_is_against_the_spend_that_can_bring_a_conversion():
+    # Leads $1,000 of the $4,000 spent brings every conversion; the $3,000 of awareness could not have brought any
+    out = dict(_meta(("META_LEADS", 1000, 40), ("META_AWARENESS", 3000, 0)))
+    assert "concentration" not in out                              # 100% of conversions from 100% of the spend that can bring one: nothing stands out

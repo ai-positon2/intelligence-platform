@@ -357,6 +357,7 @@ function label(map,k){return map[k]||String(k||"Other").toLowerCase().replace(/_
    ctx: {cur, cmp, set, sis, cur$ (currency)}. Returns up to 7 of
    {id, tone: good|warn|info, title, text, action}. An action is
    {kind:"filter", ids:[campaign id]} or {kind:"explore", metrics:[], dim:""}. */
+var RESULTLESS = {META_TRAFFIC:1,META_AWARENESS:1,META_ENGAGEMENT:1};
 function insights(ctx){
   var cur=ctx.cur, cmp=ctx.cmp, set=ctx.set, C=ctx.currency||"USD", out=[];
   var tc=total(cur,set); if(!tc[COST]&&!tc[IMPR]) return out;
@@ -382,10 +383,19 @@ function insights(ctx){
       action:{kind:"explore",metrics:["cost","conversions"],dim:"day"}});
   }
 
+  /* Meta's Traffic, Awareness and Engagement campaigns have no conversion to report (their result is a click, a view or a reaction), so a zero there is
+     not waste and they must not be set against the campaigns that do report conversions. */
+  var counts=function(p){return !RESULTLESS[p.c.type];};
+  var noResCost=pick.reduce(function(a,p){return counts(p)?a:a+p.t[COST];},0);
+  if(noResCost>0&&tc[CONV]>0){
+    var hl=out[out.length-1];
+    hl.text=hl.text.replace(/\.$/,", counting "+money(noResCost)+" spent on Meta Traffic, Awareness or Engagement campaigns, which cannot report conversions.");
+  }
+
   /* 2. Spend with nothing to show for it */
   if(tc[CONV]>0){
     var floor=Math.max(50,tc[COST]*0.02);
-    var dead=pick.filter(function(p){return p.t[CONV]===0&&p.t[COST]>=floor;});
+    var dead=pick.filter(function(p){return counts(p)&&p.t[CONV]===0&&p.t[COST]>=floor;});
     if(dead.length){
       var dc=dead.reduce(function(a,p){return a+p.t[COST];},0);
       out.push({id:"waste",tone:"warn",title:"Spend without a conversion",
@@ -396,10 +406,11 @@ function insights(ctx){
   }
 
   /* 3. The campaign doing the most (or least) for its share of spend */
-  if(tc[CONV]>=10&&tc[COST]>0){
+  var rCost=tc[COST]-noResCost;                                  // the spend that could have brought a conversion
+  if(tc[CONV]>=10&&rCost>0){
     var best=null;
-    pick.slice().sort(function(a,b){return b.t[COST]-a.t[COST];}).slice(0,6).forEach(function(p){
-      var cs=p.t[COST]/tc[COST], vs=p.t[CONV]/tc[CONV];
+    pick.filter(counts).sort(function(a,b){return b.t[COST]-a.t[COST];}).slice(0,6).forEach(function(p){
+      var cs=p.t[COST]/rCost, vs=p.t[CONV]/tc[CONV];
       if(cs<0.08) return;
       var r=vs/cs, dev=Math.abs(Math.log(r||0.0001));
       if(!best||dev>best.dev) best={p:p,cs:cs,vs:vs,r:r,dev:dev};
