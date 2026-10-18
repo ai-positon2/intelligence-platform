@@ -317,3 +317,54 @@ def test_a_click_rate_line_starts_at_two_hundred_impressions():
     assert [p["date"] for p in c["series"][0]["points"]] == ["2026-10-02", "2026-10-03"] and c["series"][0]["points"][0]["rate"] == 10.0
     assert [p["date"] for p in run("X.chart(E, 600, 200, 20)", E=dict(e, arms=[arm("A", True, [day("2026-10-01", 200, 20, 0), day("2026-10-02", 200, 20, 0)]),
                                                                                   arm("B", False, [day("2026-10-01", 200, 40, 0), day("2026-10-02", 200, 40, 0)])]))["series"][0]["points"]] == ["2026-10-01", "2026-10-02"]
+
+
+# ── Meta ────────────────────────────────────────────────────────────────────
+
+def test_a_report_that_does_not_say_which_platforms_were_read_is_a_google_report():
+    assert run("X.platformsOf({})") == ["google"] and run("X.platformsOf(null)") == ["google"] and run("X.platformsOf({summary:{platforms:[]}})") == ["google"]
+    assert run("X.platformsOf({summary:{platforms:['meta']}})") == ["meta"] and run("X.platformsOf({summary:{platforms:['google','meta']}})") == ["google", "meta"]
+    assert run("X.platformNames(['google','meta'])") == "Google Ads and Meta Ads" and run("X.platformNames(['google','meta'], ' or ')") == "Google Ads or Meta Ads"
+    assert run("X.platformNames(undefined)") == "Google Ads" and run("X.platformNames(['tiktok'])") == "tiktok"
+
+
+def test_a_meta_test_is_known_by_its_id():
+    assert run("[X.isMetaId('meta:900'), X.isMetaId('900'), X.isMetaId(''), X.isMetaId(null), X.isMetaId('xmeta:1')]") == [True, False, False, False, False]
+
+
+def test_the_stale_note_names_the_platform_that_is_not_answering():
+    assert run("X.staleText({platform:'meta'}, '3 hours ago')") == "Meta Ads is not answering now, so this report is built from the copy saved 3 hours ago."
+    assert run("X.staleText({platform:'google'}, 'x')").startswith("Google Ads is not answering now") and run("X.staleText({}, 'x')").startswith("Google Ads is not")
+    assert run("X.staleText({platform:'tiktok'}, 'x')").startswith("The platform is not answering now")
+
+
+def test_the_account_line_names_both_ids_when_two_accounts_were_read():
+    assert run("X.accountNote(r)", r={"account": {"name": "Acme", "id": "1112223334+act_1"}, "accounts": [{"id": "1112223334"}, {"id": "act_1"}]}) == "Acme (1112223334 and act_1)"
+    assert run("X.accountNote(r)", r={"account": {"name": "Acme", "id": "1112223334"}, "accounts": [{"id": "1112223334"}]}) == "Acme (1112223334)"
+    assert run("X.accountNote(r)", r={"account": {"id": "1112223334"}}) == "1112223334" and run("X.accountNote(null)") == ""
+
+
+def test_the_source_line_names_the_platforms_and_the_conversions_each_counts():
+    google = run("X.sourceText(['google'])")
+    assert google.startswith("Source: Google Ads (read only), saved for an hour.") and "Conversions are Google's own and may be counted late." in google
+    assert google.endswith("Nothing is changed in Google Ads: apply, end or pause a test there.") and run("X.sourceText(undefined)") == google
+    meta = run("X.sourceText(['meta'])")
+    assert meta.startswith("Source: Meta Ads (read only)") and "Conversions are what Meta counts for each campaign's objective" in meta and "Google" not in meta
+    both = run("X.sourceText(['google','meta'])")
+    assert both.startswith("Source: Google Ads and Meta Ads (read only)") and "Conversions are each platform's own" in both and both.endswith("Nothing is changed in Google Ads or Meta Ads: apply, end or pause a test there.")
+
+
+def test_the_ad_tests_are_called_ad_groups_ad_sets_or_both_for_the_platforms_read():
+    assert run("[X.adUnit(['google'], 1), X.adUnit(['google'], 3), X.adUnit(['meta'], 1), X.adUnit(['meta'], 3), X.adUnit(undefined, 2)]") == ["1 ad group", "3 ad groups", "1 ad set", "3 ad sets", "2 ad groups"]
+    assert run("[X.adUnit(['google','meta'], 1), X.adUnit(['google','meta'], 4)]") == ["1 ad group or ad set", "4 ad groups and ad sets"]
+    assert "2 ad sets testing copy" in run("X.leadLine(r)", r={"summary": {"adTests": 2, "platforms": ["meta"]}})
+    assert "2 ad groups testing copy" in run("X.leadLine(r)", r={"summary": {"adTests": 2}})
+    assert "4 ad groups and ad sets testing copy" in run("X.leadLine(r)", r={"summary": {"adTests": 4, "platforms": ["google", "meta"]}})
+
+
+def test_the_page_offers_all_three_platforms_marks_each_test_and_styles_what_it_draws():
+    page, css, tpl = (open(f, encoding="utf-8").read() for f in (PAGE, CSS, TEMPLATE))
+    assert 'allow: ["google", "meta", "both"]' in page and "#pf=" in page and "platformTag(" in page
+    assert ".ex-plat" in css and ".ex-plat.meta" in css and ".ex-plat.google" in css
+    assert "Meta's A/B tests" in tpl and "ad set" in tpl
+    assert "x.label || k.label" in page

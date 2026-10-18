@@ -1,6 +1,6 @@
 /* Test & Experiment Tracker (Paid Marketing Agents).
  *
- * Pick a Google Ads account. The server reads every experiment and every ad group that runs two or more ads, compares each test with a two-proportion z-test and
+ * Pick a Google Ads account, a Meta ad account or one of each. The server reads every experiment (Meta's A/B tests too) and every ad group or ad set that runs two or more ads, compares each test with a two-proportion z-test and
  * decides a verdict and a next step for each (tracker/paid_exp.py and the modules beside it). This page draws the report: what needs a decision, each experiment with
  * its two arms side by side and a chart of how the gap grew, and each ad group with its ads held against the leader. It never reads an account, runs a test or decides
  * a verdict itself; how a verdict is labelled and which tests a view shows are in exp_data.js.
@@ -51,7 +51,7 @@ function readHash(){
   });
   return h;
 }
-function writeHash(){if(S.acct){try{history.replaceState(null, "", "#a=" + enc(S.acct.id));}catch(e){}}}
+function writeHash(){if(S.acct){try{history.replaceState(null, "", "#pf=" + enc(S.acct.platform) + "&a=" + enc(S.acct.id));}catch(e){}}}
 function lastAccount(){try{return localStorage.getItem("ex_account") || "";}catch(e){return "";}}
 function cur(){return (S.report && S.report.account && S.report.account.currency) || "USD";}
 
@@ -59,13 +59,13 @@ function cur(){return (S.report && S.report.account && S.report.account.currency
 function run(refresh){
   if(!S.acct){show("empty"); setMsg(""); return;}
   var seq = ++S.seq;
-  writeHash(); setMsg(""); show("skel");
+  writeHash(); setMsg(S.acct.platform === "both" ? "Reading both accounts. The first read takes up to half a minute." : "", S.acct.platform === "both" ? "pm-note" : ""); show("skel");
   getJson(API + "/report?account=" + enc(S.acct.id) + (refresh === true ? "&refresh=1" : "")).then(function(r){
     if(seq !== S.seq) return;
     if(!r.ok){
       show(S.report ? "out" : "empty");
       if(r.j && r.j.kind === "cooldown"){setMsg(esc(r.j.error), "pm-note"); return;}
-      var hint = r.j && r.j.kind === "quota" ? " Google limits how fast this app can read, so this clears on its own." : "";
+      var hint = r.j && r.j.kind === "quota" ? " The platform limits how fast this app can read, so this clears on its own." : "";
       setMsg(esc((r.j && r.j.error) || ("The report could not be made (HTTP " + r.status + ")."))+hint);
       return;
     }
@@ -83,12 +83,16 @@ function badge(v, kind){
   var m = X.verdictInfo(v, kind);
   return '<span class="ex-badge ex-t-' + m.tone + '">' + ic(m.icon) + esc(m.label) + '</span>';
 }
+function platformTag(k){
+  if(X.platformsOf(S.report).length < 2) return "";
+  return '<span class="ex-plat ' + esc(k) + '">' + esc(k === "meta" ? "Meta" : "Google") + '</span>';
+}
 function stateChip(e){
   return '<span class="ex-state ex-s-' + esc(String(e.state).replace(/\s+/g, "-")) + '">' + esc(X.stateInfo(e.state)) + '</span>';
 }
 function actionBox(a, tone){
   var k = X.kindInfo(a.kind);
-  return '<div class="ex-do ex-t-' + (tone || k.tone) + '">' + ic(k.icon) + '<div><em>' + esc(k.label === "Look" ? "What to do" : k.label) + '</em><p>' + esc(a.text) + '</p></div></div>';
+  return '<div class="ex-do ex-t-' + (tone || k.tone) + '">' + ic(k.icon) + '<div><em>' + esc(a.label || (k.label === "Look" ? "What to do" : k.label)) + '</em><p>' + esc(a.text) + '</p></div></div>';
 }
 function ruler(c){
   var r = X.ruler(c); if(!r) return "";
@@ -116,7 +120,7 @@ function paintNeeds(rep){
   $("#needs").innerHTML = n.map(function(x, i){
     var k = X.kindInfo(x.kind), what = x.ref.type === "adTest" ? "Ad test" : "Experiment";
     return '<li class="ex-nd ex-t-' + k.tone + '" style="--i:' + i + '">' +
-      '<div class="ex-nd-h"><span class="ex-nd-k">' + ic(k.icon) + esc(k.label) + '</span><span class="ex-what">' + esc(what) + '</span>' +
+      '<div class="ex-nd-h"><span class="ex-nd-k">' + ic(k.icon) + esc(x.label || k.label) + '</span><span class="ex-what">' + esc(what) + '</span>' + platformTag(X.isMetaId(x.ref.id) ? "meta" : "google") +
       '<b class="ex-nd-t">' + esc(x.title) + '</b><span class="ex-nd-m">' + esc(X.money(x.spend, cur())) + '</span></div>' +
       '<p>' + esc(x.text) + '</p>' +
       '<button type="button" class="ex-go" data-jump="' + esc(x.ref.type) + ':' + esc(x.ref.id) + '">Open it' + ic("arrow") + '</button></li>';
@@ -136,10 +140,10 @@ function timeline(e){
   return '<div class="ex-time' + (e.overdue ? " late" : "") + '"><div class="ex-time-bar" aria-hidden="true"><i style="width:' + (e.end ? (e.overdue ? 100 : pct) : 0) + '%"></i></div>' +
     '<div class="ex-time-l"><span>' + esc(X.span(e.start, e.end)) + '</span><b>' + esc(e.state === "running" || e.state === "setting up" ? left : "") + '</b></div></div>';
 }
-function armRow(a, metric, cmp){
+function armRow(a, metric, cmp, meta){
   var t = a.total;
   if(!t) return '<tr><th>' + esc(a.name) + '</th><td colspan="7" class="ex-muted">not read</td></tr>';
-  return '<tr class="' + (a.control ? "ctl" : "tri") + '"><th><span class="ex-dot"></span>' + esc(a.name) + '<em>' + (a.control ? "control" : "trial") + (a.split != null ? " · " + a.split + "% of traffic" : "") + '</em></th>' +
+  return '<tr class="' + (a.control ? "ctl" : "tri") + '"><th><span class="ex-dot"></span>' + esc(a.name) + '<em>' + (a.control ? (meta ? "first cell" : "control") : (meta ? "cell" : "trial")) + (a.split != null ? " · " + a.split + "% of traffic" : "") + '</em></th>' +
     '<td>' + esc(X.num(t.impressions)) + '</td><td>' + esc(X.num(t.clicks)) + '</td><td>' + esc(X.pct(t.ctr)) + '</td><td>' + esc(X.num(t.conversions)) + '</td>' +
     '<td>' + esc(X.pct(t.convRate)) + '</td><td>' + esc(X.money(t.cost, cur())) + '</td><td>' + esc(t.cpa == null ? "n/a" : X.money(t.cpa, cur())) + '</td></tr>';
 }
@@ -164,12 +168,17 @@ function chartSvg(e){
 function compareBlock(e){
   var cmp = e.comparison; if(!cmp) return "";
   var b = X.bars(cmp), label = cmp.metricLabel || "rate";
+  var ctlName = "Control", triName = "Trial";
+  if(e.platform === "meta"){
+    var ca = e.arms.filter(function(a){return a.control;})[0], ta = e.arms.filter(function(a){return !a.control;})[0];
+    ctlName = (ca && ca.name) || "First cell"; triName = (ta && ta.name) || "Other cell";
+  }
   var rows = "";
   if(b){
     rows = '<div class="ex-vs"><div class="ex-vs-h"><b>' + esc(label.charAt(0).toUpperCase() + label.slice(1)) + '</b>' +
-      (cmp.relative != null ? '<span class="ex-rel ex-t-' + (cmp.verdict === "winner" ? "good" : cmp.verdict === "behind" ? "bad" : "neutral") + '">' + esc(X.rel(cmp.relative)) + ' for the trial</span>' : "") + '</div>' +
-      '<div class="ex-bar ctl"><span>Control</span><div><i style="width:' + b.control + '%"></i></div><b>' + esc(X.pct(cmp.control)) + '</b></div>' +
-      '<div class="ex-bar tri"><span>Trial</span><div><i style="width:' + b.trial + '%"></i></div><b>' + esc(X.pct(cmp.trial)) + '</b></div></div>';
+      (cmp.relative != null ? '<span class="ex-rel ex-t-' + (cmp.verdict === "winner" ? "good" : cmp.verdict === "behind" ? "bad" : "neutral") + '">' + esc(X.rel(cmp.relative)) + ' for ' + (e.platform === "meta" ? esc(triName) : 'the trial') + '</span>' : "") + '</div>' +
+      '<div class="ex-bar ctl"><span>' + esc(ctlName) + '</span><div><i style="width:' + b.control + '%"></i></div><b>' + esc(X.pct(cmp.control)) + '</b></div>' +
+      '<div class="ex-bar tri"><span>' + esc(triName) + '</span><div><i style="width:' + b.trial + '%"></i></div><b>' + esc(X.pct(cmp.trial)) + '</b></div></div>';
   }
   var extra = "";
   if(cmp.verdict === "winner" || cmp.verdict === "behind" || cmp.verdict === "no_difference") extra = ruler(cmp.confidence);
@@ -184,8 +193,8 @@ function compareBlock(e){
 function experimentCard(e){
   var open = e.id in S.open ? S.open[e.id] : (e.state === "running" || e.state === "setting up");
   var cmp = e.comparison, tone = X.verdictInfo(e.verdict, "trial").tone;
-  var arms = e.arms.length ? '<table class="ex-t"><thead><tr><th>Arm</th><th>Impr.</th><th>Clicks</th><th>Click rate</th><th>Conv.</th><th>Conv. rate</th><th>Spend</th><th>Cost / conv.</th></tr></thead><tbody>' +
-    e.arms.map(function(a){return armRow(a, cmp && cmp.metric, cmp);}).join("") + '</tbody></table>' : "";
+  var arms = e.arms.length ? '<table class="ex-t"><thead><tr><th>' + (e.platform === "meta" ? "Cell" : "Arm") + '</th><th>Impr.</th><th>Clicks</th><th>Click rate</th><th>Conv.</th><th>Conv. rate</th><th>Spend</th><th>Cost / conv.</th></tr></thead><tbody>' +
+    e.arms.map(function(a){return armRow(a, cmp && cmp.metric, cmp, e.platform === "meta");}).join("") + '</tbody></table>' : "";
   var camps = e.arms.map(function(a){return a.campaigns.length ? '<li><b>' + esc(a.name) + '</b> runs ' + a.campaigns.map(function(c){return esc(c.name);}).join(", ") + '</li>' : "";}).join("");
   var body = '<div class="ex-xb">' +
     '<div class="ex-xgrid"><div class="ex-xl">' + compareBlock(e) + '</div><div class="ex-xr">' + (e.measured ? chartSvg(e) : "") + '</div></div>' +
@@ -194,7 +203,7 @@ function experimentCard(e){
     (e.clipped ? '<p class="ex-fine">Only the last 365 days are read.</p>' : "") + '</div>';
   return '<li class="ex-x ex-t-' + tone + (open ? " open" : "") + '" data-x="' + esc(e.id) + '">' +
     '<button type="button" class="ex-xh" data-open="x:' + esc(e.id) + '" aria-expanded="' + open + '">' +
-    '<span class="ex-xh-main"><b>' + esc(e.name) + '</b><em>' + stateChip(e) + '<span>' + esc(e.typeLabel) + '</span>' + (e.daysRead ? '<span>' + esc(D.plural(e.daysRead, "day")) + ' of results</span>' : '') + '</em></span>' +
+    '<span class="ex-xh-main"><b>' + esc(e.name) + '</b><em>' + stateChip(e) + platformTag(e.platform || "google") + '<span>' + esc(e.typeLabel) + '</span>' + (e.daysRead ? '<span>' + esc(D.plural(e.daysRead, "day")) + ' of results</span>' : '') + '</em></span>' +
     badge(e.verdict, "trial") + '<span class="au-chev" aria-hidden="true"></span></button>' + timeline(e) + (open ? body : "") + '</li>';
 }
 function paintExperiments(rep){
@@ -230,20 +239,21 @@ function adCard(t){
   var open = !!S.open["a:" + t.id], tone = X.verdictInfo(t.verdict, "ad").tone;
   var top = 0; t.ads.forEach(function(a){if(a.rate != null && a.rate > top) top = a.rate;});
   var body = '<div class="ex-ab">' + actionBox(t.action) +
+    (t.platform === "meta" ? '<p class="ex-fine">Meta shows the ad it expects to do best more often, so these ads did not share the audience evenly. This is what happened, a lead and not a fair test.</p>' : "") +
     (t.note ? '<p class="ex-fine">' + esc(t.note) + '</p>' : "") +
     (t.bar ? '<p class="ex-fine">' + esc(t.eligible) + ' ads had enough to be compared. Each is held against the best one at ' + esc(Math.round((1 - t.bar) * 1000) / 10) + '% confidence' + (t.eligible > 2 ? ' (stricter than 95% because the best of several is not a fair pick)' : '') + '.</p>' : "") +
     '<ul class="ex-ads">' + t.ads.map(function(a){return adRow(a, t, top);}).join("") + '</ul>' +
-    (t.adCount > t.shown ? '<p class="ex-fine">' + esc(D.plural(t.adCount, "ad")) + ' are live in this ad group. The ' + t.shown + ' that spent most are shown.</p>' : "") + '</div>';
+    (t.adCount > t.shown ? '<p class="ex-fine">' + esc(D.plural(t.adCount, "ad")) + ' are live in this ' + (t.platform === "meta" ? "ad set" : "ad group") + '. The ' + t.shown + ' that spent most are shown.</p>' : "") + '</div>';
   return '<li class="ex-g ex-t-' + tone + (open ? " open" : "") + '" data-g="' + esc(t.id) + '">' +
     '<button type="button" class="ex-gh" data-open="a:' + esc(t.id) + '" aria-expanded="' + open + '">' +
-    '<span class="ex-gh-main"><b>' + esc(t.name) + '</b><em>' + esc(t.campaign) + '</em></span>' +
+    '<span class="ex-gh-main"><b>' + esc(t.name) + '</b><em>' + platformTag(t.platform || "google") + '<span>' + esc(t.campaign) + '</span></em></span>' +
     '<span class="ex-gh-n"><b>' + esc(D.plural(t.adCount, "ad")) + '</b><em>' + esc(X.money(t.spend, cur())) + ' in 30 days</em></span>' + badge(t.verdict, "ad") + '<span class="au-chev" aria-hidden="true"></span></button>' + (open ? body : "") + '</li>';
 }
 function paintAds(rep){
   var all = rep.adTests || [], c = X.adCounts(all);
   $("#adCard").hidden = !all.length;
   var more = (rep.summary || {}).adTests || 0;
-  $("#adNote").textContent = all.length ? (more > all.length ? "The " + all.length + " of " + more + " that spent most, last 30 days" : D.plural(all.length, "ad group") + ", last 30 days") : "";
+  $("#adNote").textContent = all.length ? (more > all.length ? "The " + all.length + " of " + more + " that spent most, last 30 days" : X.adUnit(X.platformsOf(rep), all.length) + ", last 30 days") : "";
   $("#adChips").innerHTML = X.AD_VIEWS.map(function(v){
     if(!c[v.key] && v.key !== "all" && v.key !== S.adView) return "";
     return '<button type="button" class="pm-chip' + (S.adView === v.key ? " on" : "") + '" role="radio" aria-checked="' + (S.adView === v.key) + '" data-aview="' + v.key + '">' + esc(v.label) + ' · ' + c[v.key] + '</button>';
@@ -261,19 +271,18 @@ function paintNotes(rep){
 }
 function render(){
   var rep = S.report;
-  $("#fresh").innerHTML = '<span class="live"></span><b>' + esc((rep.account.name || rep.account.id) + " (" + rep.account.id + ")") + '</b>&nbsp;· read ' + esc(D.ago(rep.readAt)) + ' · made ' + esc(D.ago(rep.generatedAt)) + ' · ' + esc(rep.window || "");
+  $("#fresh").innerHTML = '<span class="live"></span><b>' + esc(X.accountNote(rep)) + '</b>&nbsp;· read ' + esc(D.ago(rep.readAt)) + ' · made ' + esc(D.ago(rep.generatedAt)) + ' · ' + esc(rep.window || "");
   var st = $("#stale");
   if(rep.stale && rep.stale.length){
     st.hidden = false;
-    st.innerHTML = rep.stale.map(function(x){return esc("Google Ads is not answering now, so this report is built from the copy saved " + D.ago(x.savedAt) + ".");}).join(" ");
+    st.innerHTML = rep.stale.map(function(x){return esc(X.staleText(x, D.ago(x.savedAt)));}).join(" ");
   } else {st.hidden = true; st.innerHTML = "";}
   var q = "account=" + enc(S.acct.id);
   $("#dlXlsx").href = API + "/download?" + q + "&file=xlsx";
   $("#dlPdf").href = API + "/download?" + q + "&file=pdf";
   $("#dlZip").href = API + "/download?" + q + "&file=zip";
   paintTop(rep); paintNeeds(rep); paintExperiments(rep); paintAds(rep); paintNotes(rep);
-  $("#foot").textContent = "Source: Google Ads (read only), saved for an hour. A verdict is a two-sided two-proportion z-test at 95 percent confidence, made only when a test has 7 days and enough clicks, impressions or conversions to count. " +
-    "Conversions are Google's own and may be counted late. Nothing is changed in Google Ads: apply, end or pause a test there.";
+  $("#foot").textContent = X.sourceText(X.platformsOf(rep));
 }
 
 /* ── Events ───────────────────────────────────────────────── */
@@ -317,9 +326,13 @@ $("#refreshBtn").addEventListener("click", function(){run(true);});
 /* ── Boot ─────────────────────────────────────────────────── */
 function boot(){
   var h = readHash(), first = true;
-  accts = PL.accounts($("#acctPick"), {url: BASE + "/accounts", allow: ["google"], platform: "google", account: h.a || lastAccount(),
-    onChange: function(a){
-      if(!a){S.acct = null; S.report = null; show("empty"); setMsg("There are no Google Ads accounts to show.", "pm-note"); return;}
+  accts = PL.accounts($("#acctPick"), {url: BASE + "/accounts", allow: ["google", "meta", "both"], platform: h.pf, account: h.a || lastAccount(),
+    onChange: function(a, platform){
+      if(!a){
+        S.acct = null; S.report = null; show("empty");
+        setMsg((platform === "meta" ? "There are no Meta ad accounts this token can read yet." : "There are no accounts to show for this platform.") + " Pick another platform or account above.", "pm-note");
+        return;
+      }
       if(S.acct && a.id === S.acct.id && !first) return;
       first = false; S.acct = a; S.report = null;
       try{localStorage.setItem("ex_account", a.id);}catch(e){}

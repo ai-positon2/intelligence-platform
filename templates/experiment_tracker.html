@@ -2,7 +2,7 @@
 {% block title %}Test &amp; Experiment Tracker{% endblock %}
 {% block head %}
   <link rel="stylesheet" href="{{ url_for('static', filename='css/account_audit.css') }}?v=5">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/experiment_tracker.css') }}?v=1">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/experiment_tracker.css') }}?v=2">
 {% endblock %}
 {% block content %}
 <div class="pm pm-au pm-ex" id="ex">
@@ -10,7 +10,7 @@
     <div class="pm-hero-l">
       <span class="pm-eyebrow"><span class="d"></span>Paid Marketing · Optimize</span>
       <h1 class="pm-title">Which tests have said something? <span class="pm-grad">And what to do about each.</span></h1>
-      <p class="pm-sub">Pick a Google Ads account. The agent reads every <b>experiment</b> and every ad group that runs <b>two or more ads</b> (a copy test whether or not anyone
+      <p class="pm-sub">Pick a Google Ads account, a Meta ad account or one of each. The agent reads every <b>experiment</b> (Meta's A/B tests too) and every ad group or ad set that runs <b>two or more ads</b> (a copy test whether or not anyone
         planned it), holds each one to the same honest arithmetic and tells you which side is ahead, whether that is more than chance, and what to do: apply it, end it,
         pause the losing ad, or wait and for how long. Nothing is called a winner on a small number.</p>
     </div>
@@ -19,8 +19,8 @@
   <section class="pm-panel pd-cmd au-cmd" id="cmd">
     <div class="au-cmd-row">
       <div id="acctPick"></div>
-      <p class="au-scope">Read only: nothing is changed in Google Ads. One account at a time (an MCC is not read). Experiments are read for the days they ran, ad tests for the last 30 days.
-        The read is saved for an hour, so the same report opens at once, and Refresh asks Google again.</p>
+      <p class="au-scope">Read only: nothing is changed in Google Ads or Meta. One account of each platform at a time (an MCC is not read). Experiments are read for the days they ran, ad tests for the last 30 days.
+        The read is saved for an hour, so the same report opens at once, and Refresh asks the platforms again.</p>
     </div>
   </section>
 
@@ -29,7 +29,7 @@
   <div id="empty" class="pm-panel sg-empty">
     <div class="sg-empty-ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3h6M10 3v6.2L4.8 18a1.6 1.6 0 0 0 1.4 2.4h11.6a1.6 1.6 0 0 0 1.4-2.4L14 9.2V3M7.5 14.5h9"/></svg></div>
     <h2>Choose an account to begin</h2>
-    <p>The read takes a few seconds: it asks Google Ads for the experiments and the ads.</p>
+    <p>The read takes a few seconds: it asks Google Ads or Meta for the experiments and the ads.</p>
   </div>
   <div id="skel" hidden><div class="pd-skel"></div><div class="pd-skel"></div><div class="pd-skel"></div></div>
 
@@ -80,6 +80,6 @@
 <script src="{{ url_for('static', filename='js/pm_picker.js') }}?v=1"></script>
 <script src="{{ url_for('static', filename='js/pm_platform.js') }}?v=4"></script>
 <script src="{{ url_for('static', filename='js/au_data.js') }}?v=2"></script>
-<script src="{{ url_for('static', filename='js/exp_data.js') }}?v=1"></script>
-<script src="{{ url_for('static', filename='js/experiment_tracker.js') }}?v=1"></script>
+<script src="{{ url_for('static', filename='js/exp_data.js') }}?v=2"></script>
+<script src="{{ url_for('static', filename='js/experiment_tracker.js') }}?v=2"></script>
 {% endblock %}

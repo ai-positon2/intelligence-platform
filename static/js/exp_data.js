@@ -151,6 +151,30 @@ function tiles(summary, currency){
   ];
 }
 /* One sentence for the top of the report. */
+/* Which platforms the report read (a report that does not say is a Google report), and the words that name them. */
+var PLATFORM = {google:"Google Ads", meta:"Meta Ads"};
+function platformsOf(report){var p = (report && report.summary && report.summary.platforms) || []; return p.length ? p : ["google"];}
+function platformNames(platforms, joiner){return (platforms && platforms.length ? platforms : ["google"]).map(function(k){return PLATFORM[k] || k;}).join(joiner || " and ");}
+function isMetaId(id){return String(id || "").indexOf("meta:") === 0;}
+function staleText(x, ago){return (PLATFORM[(x && x.platform) || "google"] || "The platform") + " is not answering now, so this report is built from the copy saved " + ago + ".";}
+function accountNote(report){
+  var a = (report && report.account) || {}, list = (report && report.accounts) || [];
+  if(list.length > 1) return (a.name || "") + " (" + list.map(function(x){return x.id;}).join(" and ") + ")";
+  return (a.name || a.id || "") + (a.id && a.name ? " (" + a.id + ")" : "");
+}
+function sourceText(platforms){
+  var p = platforms && platforms.length ? platforms : ["google"], both = p.length > 1;
+  var conv = both ? "Conversions are each platform's own and may be counted late." : p[0] === "meta" ? "Conversions are what Meta counts for each campaign's objective and may be counted late." : "Conversions are Google's own and may be counted late.";
+  return "Source: " + platformNames(p) + " (read only), saved for an hour. A verdict is a two-sided two-proportion z-test at 95 percent confidence, made only when a test has 7 days and enough clicks, impressions or conversions to count. " +
+    conv + " Nothing is changed in " + platformNames(p, " or ") + ": apply, end or pause a test there.";
+}
+/* "3 ad groups", "3 ad sets" or "3 ad groups and ad sets": what the ad tests are called for the platforms read. */
+function adUnit(platforms, n){
+  var p = platforms && platforms.length ? platforms : ["google"], g = p.indexOf("google") >= 0, m = p.indexOf("meta") >= 0;
+  if(g && m) return n + (n === 1 ? " ad group or ad set" : " ad groups and ad sets");
+  return AD.plural(n, m ? "ad set" : "ad group");
+}
+
 function leadLine(report){
   var s = (report && report.summary) || {};
   var parts = [];
@@ -159,7 +183,7 @@ function leadLine(report){
   else parts.push("This account has no test to track");
   var bits = [];
   if(s.experiments) bits.push(AD.plural(s.running || 0, "experiment") + " running" + ((s.winners || s.behind) ? ", " + ((s.winners || 0) + (s.behind || 0)) + " with a result" : ""));
-  if(s.adTests) bits.push(AD.plural(s.adTests, "ad group") + " testing copy" + (s.adConclusive ? ", " + s.adConclusive + " with a clear leader" : ""));
+  if(s.adTests) bits.push(adUnit(platformsOf(report), s.adTests) + " testing copy" + (s.adConclusive ? ", " + s.adConclusive + " with a clear leader" : ""));
   return parts[0] + (bits.length ? ". " + bits.join(" and ") + "." : ".");
 }
 
@@ -242,7 +266,7 @@ function waitText(w){
 }
 
 var api = {
-  VERDICT:VERDICT, KIND:KIND, STATE:STATE, EXP_VIEWS:EXP_VIEWS, AD_VIEWS:AD_VIEWS, verdictInfo:verdictInfo, kindInfo:kindInfo, stateInfo:stateInfo,
+  VERDICT:VERDICT, KIND:KIND, STATE:STATE, EXP_VIEWS:EXP_VIEWS, AD_VIEWS:AD_VIEWS, verdictInfo:verdictInfo, kindInfo:kindInfo, stateInfo:stateInfo, PLATFORM:PLATFORM, platformsOf:platformsOf, platformNames:platformNames, isMetaId:isMetaId, staleText:staleText, accountNote:accountNote, sourceText:sourceText, adUnit:adUnit,
   pct:pct, rel:rel, conf:conf, num:num, money:money, dateText:dateText, span:span, expCounts:expCounts, filterExperiments:filterExperiments, defaultExpView:defaultExpView,
   adCounts:adCounts, filterAdTests:filterAdTests, defaultAdView:defaultAdView, tiles:tiles, leadLine:leadLine, chart:chart, bars:bars, ruler:ruler, waitText:waitText, scale:scale
 };
