@@ -6,13 +6,15 @@ Paste this entire file at the start of a new chat to give the assistant full con
 
 **What this cycle was.** Mostly one thing: the **Paid Marketing Agents** section (`/p2/paid-marketing`, the third hub section), built over 2026-10-12 to 2026-10-18 from 3 agents to **19**, then audited end to end on 2026-10-18 against live Google Ads and Meta Ads accounts, with Meta support added to the Pacing Desk and the Audience Segments agent. It is documented in full in the new **PAID MARKETING AGENTS** section below (placed before ARCHITECTURE). v31 had no mention of it at all. The other work since v31 is only indexed here, see "OTHER WORK SINCE V31 (INDEX ONLY)".
 
+**Next on the PPC team's agent sheet and still NOT built: #9 Cross-Channel & Attribution Analysis** (blended CPA/ROAS across Google, Meta, LinkedIn and programmatic, reconciled to GA4). Nothing in the platform reads GA4, LinkedIn Ads or programmatic yet, so it needs new read-only integrations first; a Google + Meta version could ship first.
+
 **Standing rules that applied all cycle (and still apply):** author and committer are always `Krishna Ladha <krishna.ladha@position2.com>`, never `reporting@` (verify with the GitHub commits API after the first push); build in many small pushed slices (module, then tests, then wiring last); never write an em or en dash in any copy; mutation-test every fix; a green suite is not the gate (see TESTING DISCIPLINE); never commit real client data; Google and Meta access stay READ ONLY; do not publish an Artifact unless asked.
 
 ---
 
 ## WHAT V32 ADDS ON TOP OF V31
 
-1. **Paid Marketing Agents, 19 agents** (full section below). Google Ads reads over REST v24, Meta reads over Graph v23.0, Postgres `pm_*` tables, a vendored pacing engine, Claude for the written parts. All numbers shown come from live reads, cached in Postgres.
+1. **Paid Marketing Agents, 20 agents** (full section below; agent 20, the Ad Copy & Creative Generator, was built last, on 2026-10-18, after the audit). Google Ads reads over REST v24, Meta reads over Graph v23.0, Postgres `pm_*` tables, a vendored pacing engine, Claude for the written parts. All numbers shown come from live reads, cached in Postgres.
 2. **Audit of all 19 agents on 2026-10-18** (the user's ask: "check all the paid marketing agents and see there are no flaws, everything works from Google and Meta API keys, both ads accounts work wherever relevant"). Live checks on production through the user's own signed-in Chrome (read only), plus independent code reviews of the agents that had not had one. About 35 verified fixes, each reproduced first and mutation-tested. Two bugs only live data could expose. Details in the section below.
 3. **Meta added to Pacing Desk and Audience Segments** (the user said yes to both). Every other data agent already had a Google | Meta | Both switch.
 4. **Test suite 4,799 -> 11,912 passed.** Most of the growth is the Paid Marketing agents (each has pure-logic tests, route tests, and page-script tests that execute the JS in Node).
@@ -30,7 +32,7 @@ Read the code, the `docs/` plans, and `git log` for detail. Commit hashes are fr
 - **Agent feedback (thumbs up/down)** on five agents' generated reports (`485303e`), admin review at `/p2/admin/agent-feedback`.
 - **Thinking-orb loading component** (vendored MIT engine, vanilla JS port) on all vanilla-JS Strategic Agent pages; **cube-motion** reveal animation on four pages; **border-beam** search glow on seven pages (`2c24e3d`).
 - **Analytics dashboards audit** (`6b2089a`, 2026-09-25): twelve number fixes across the admin dashboards.
-- **Social Media Intelligence** renamed from Social Creative Intelligence (`1404d88`, `49ba8e8`), with `sci_*` names kept on purpose and the old slug aliased in three persisted places.
+- **Social Media Intelligence** renamed from its earlier name (the section titled SOCIAL CREATIVE INTELLIGENCE ANALYST below still carries it) (`1404d88`, `49ba8e8`), with `sci_*` names kept on purpose and the old slug aliased in three persisted places.
 - **Brag videos** live outside the repo in `/Users/teampx/brag-output` (seven films). Not part of the app.
 - The section formerly called "B2B Agents" is **Strategic Agents** (`a684cdc`, 2026-09-11); several internal identifiers keep the old names on purpose (see README "Known gaps").
 
@@ -604,7 +606,7 @@ Route `/p2/b2b-agents/linkedin-intelligence`. Renders `templates/linkedin_scrape
 
 ---
 
-## PAID MARKETING AGENTS (the third hub section, `/p2/paid-marketing`, 19 agents, built 2026-10-12 to 2026-10-18)
+## PAID MARKETING AGENTS (the third hub section, `/p2/paid-marketing`, 20 agents, built 2026-10-12 to 2026-10-18)
 
 The PPC team's tools. The first three were ported on 2026-10-12 from the old Agent Holmes Node service (`github.com/ai-positon2/Agent_Holmes`, which ran with no sign-in); the other sixteen were built here. Everything is Python/Flask behind `@position2_required`, with its data in Postgres `pm_*` tables.
 
@@ -624,7 +626,7 @@ The PPC team's tools. The first three were ported on 2026-10-12 from the old Age
 - **Models:** every structured Claude call goes through `tracker/market_radar_llm.call_json` (JSON-schema output, `ModelError` kinds not_configured / refused / truncated / bad_json / api_error / budget; a truncated or refused reply is never returned as a result). Web-search calls use `tracker/claude_websearch.py`; PDFs use `tracker/event_intel_pdf.py` (fonts in `tracker/fonts/`); fetching a page a user or model named goes ONLY through the SSRF-safe `tracker/event_intel_http.public_get`.
 - **Background jobs:** Campaign Book, Business Research, Keyword Research, the QA run and the Client Feedback chat run as jobs with a Postgres row and a status endpoint the page polls.
 
-### The 19 agents
+### The 20 agents
 
 | # | Agent (page under `/p2/paid-marketing/`) | Core files | What it does / what to know |
 |---|---|---|---|
@@ -647,6 +649,7 @@ The PPC team's tools. The first three were ported on 2026-10-12 from the old Age
 | 17 | Business Research (`business-research`) | `paid_business*.py` | First step of an engagement; shares the Campaign Book's job and table (`inputs.kind = business`). |
 | 18 | Keyword Research (`keyword-research`) | `paid_keywords*.py` | Planner ideas against the account's own keywords and negatives (campaign level and shared lists), themes judged by Claude, Excel/CSV/PDF plus an Ads Editor CSV; shares the job table (`inputs.kind = keywords`). |
 | 19 | QA Agent (`qa-agent`) | `paid_qa*.py`, `tracker/qa_checklist.json` | Pre-launch checklist: automatic checks against live Google Ads and the page, a model judges the rest with evidence, per-check override, campaign book. Tables `pm_qc_launches`, `pm_qc_checks`. |
+| 20 | Ad Copy & Creative Generator (`ad-copy`) | `paid_adcopy.py`, `paid_adcopy_check.py`, `paid_adcopy_ai.py`, `paid_adcopy_research.py`, `paid_adcopy_job.py`, `paid_adcopy_export.py`, `ad_copy.js` | Built 2026-10-18 (plan in `docs/ad-copy-plan.md`). Copy ready to paste for Google Search (RSA), Performance Max, Demand Gen, Responsive Display, Meta feed and Meta Stories/Reels, plus creative briefs (concept, hook, script, assets, sizes) for the formats with an image or video. Evidence is only the client's website (guarded fetch), the facts the person confirmed, and optionally a Google Ads account's keywords and best RSAs. **What is kept is decided in code, never by the model** (`paid_adcopy_check.py`): over-limit lines are dropped not cut, Google-refused lines (emoji, `!` in a headline, caps, doubled punctuation, phone or URL) and Meta personal-attribute copy are dropped, competitor and avoid words are dropped, repeats are dropped, Google headlines are Start Case, and a claim the evidence does not hold (price, %, years, reviews, rating, free, guarantee, best, same day, health claim) marks the line **Confirm** (listed, and left out of the Editor CSV) instead of dropping it. A short format is asked once more for exactly what is missing. Shares the Campaign Book job and table (`inputs.kind = adcopy`, dispatched in `_strat_begin`), saved a format at a time so a stopped build resumes. Downloads: Excel (sheet per format), CSV zip, PDF, and the ready search ad as a Google Ads Editor CSV (Paused). Meta limits (125/40/30) are Meta's recommended lengths and the image/video sizes are the published ones, both held as constants in `FORMATS` and `SPECS`: not verified against a live account. Real model NOT yet run (no key here); everything else tested with a fake model. |
 
 Per-agent design plans are in `docs/` (`pacing-desk-input.md`, `segment-analysis-plan.md`, `geo-performance-plan.md`, `ad-strength-plan.md`, `audience-segment-plan.md`, `account-audit-plan.md` and `-checks.md`, `landing-page-check-plan.md` and `-checks.md`, `experiment-tracker-plan.md`, `campaign-book-plan.md`, `business-research-plan.md`, `keyword-research-plan.md`, `qa-agent-plan.md`). Read the plan and the module docstring before changing an agent; the docstrings are the specification.
 
@@ -680,7 +683,7 @@ Per-agent design plans are in `docs/` (`pacing-desk-input.md`, `segment-analysis
 `GOOGLE_ADS_DEVELOPER_TOKEN`, `GOOGLE_ADS_CLIENT_ID`, `GOOGLE_ADS_CLIENT_SECRET`, `GOOGLE_ADS_REFRESH_TOKEN`, `GOOGLE_ADS_LOGIN_CUSTOMER_ID` (optional, defaults to the Position2 MCC), `GOOGLE_ADS_LAST_CLICK` (optional); `META_ADS_ACCESS_TOKEN`, `META_BUSINESS_ID` (optional), `META_API_VERSION` (optional, v23.0); `CALLRAIL_API_KEY`; `PAGESPEED_API_KEY` (optional, not set); `PACING_SEED_SECRET`, `PACING_CHANNEL` (set per run by the app); the feedback agent's `FEEDBACK_*` and `SLACK_CLIENT_ID`/`SLACK_CLIENT_SECRET`; plus the shared `DATABASE_URL`, `SECRET_KEY`, `ANTHROPIC_API_KEY`/`ANTHROPIC_MODEL`. The Google OAuth redirect URIs for the feedback agent were still owed at last check.
 
 ### Paid Marketing tables
-`pm_gads_days`, `pm_gads_cache`, `pm_gads_usage`, `pm_pacing_clients`, `pm_pacing_snapshots`, `pm_pacing_moves`, `pm_pacing_budgets`, `pm_pacing_meta`, `pm_oauth_tokens`, `pm_feedback_jobs`, `pm_audit_history`, `pm_qc_launches`, `pm_qc_checks`, `pm_strategies`, `pm_strategy_runs`. Created on demand (`CREATE TABLE IF NOT EXISTS`); keep every `ALTER TABLE ... IF NOT EXISTS` migration so an existing database never breaks.
+`pm_gads_days`, `pm_gads_cache`, `pm_gads_usage`, `pm_pacing_clients`, `pm_pacing_snapshots`, `pm_pacing_moves`, `pm_pacing_budgets`, `pm_pacing_meta`, `pm_oauth_tokens`, `pm_feedback_jobs`, `pm_audit_history`, `pm_qc_launches`, `pm_qc_checks`, `pm_strategies`, `pm_strategy_runs` (Strategy, Business Research, Keyword Research and Ad Copy builds). Created on demand (`CREATE TABLE IF NOT EXISTS`); keep every `ALTER TABLE ... IF NOT EXISTS` migration so an existing database never breaks.
 
 ### Gotchas specific to this section
 - A probe once wrote real client JSON into the repo tree (`probe.py` changed directory); never run probes with the repo as working directory, and never commit client data.
@@ -963,7 +966,7 @@ Details that are load-bearing:
 34. **Pacing for Meta needs allocation rows.** Open the Pacing Desk Allocations panel, add rows with Channel = Meta and the Meta ad account's name, and Save (the October allocations were still "seeded, not saved"). Then watch the first full production run: the Meta pacing path has only been verified through the read probe and local fakes.
 35. **Rotate the CallRail API key** (it was pasted in chat) and set `CALLRAIL_API_KEY` on Railway if not set; **rotate the Google client secret** too. Optionally set `PAGESPEED_API_KEY`.
 36. **`origin/Divith` needs a rebase onto `main`** (tell Divith).
-37. **Run each model-driven Paid Marketing agent once on purpose** (Keyword Research, Business Research, Campaign Book, QA, and the Audit/Landing Page Claude reads) and record the cost; they were reviewed by code and tests only.
+37. **Run each model-driven Paid Marketing agent once on purpose** (Keyword Research, Business Research, Campaign Book, Ad Copy, QA, and the Audit/Landing Page Claude reads) and record the cost; they were reviewed by code and tests only.
 38. **Feedback agent OAuth redirect URIs** (Slack and Google) are still owed.
 39. **Known and left in Paid Marketing** (see that section): keyword key symbol merging, PMax business-name fallback, Campaign Book video limits, weekly overlay on partial weeks, Segment Analysis "All" CPL on Meta, Google speed score empty on the test account.
 40. **Client-policy decisions remain open** for the SQR client rulebooks (what to do with each client's edge cases); they need the account team, not code.
