@@ -599,10 +599,15 @@ def _demographics(c, kind):
     return sorted(short(x) for x in inc - {None}), sorted(short(x) for x in exc - {None})
 
 
+DG_DEMOGRAPHICS = "Demand Gen sets this on its ad groups, which this check does not read yet. Look at it in Google Ads."
+
+
 @rule("1.11")
 def r_genders(c):
     if c.unread("criteria"):
         return c.unread("criteria")
+    if c.channel == "DEMAND_GEN":
+        return F(None, DG_DEMOGRAPHICS)
     inc, exc = _demographics(c, "GENDER")
     return F(None, "Genders: %s; excluded: %s." % (_list(inc) or "no gender setting", _list(exc) or "none"))
 
@@ -611,6 +616,8 @@ def r_genders(c):
 def r_income(c):
     if c.unread("criteria"):
         return c.unread("criteria")
+    if c.channel == "DEMAND_GEN":
+        return F(None, DG_DEMOGRAPHICS)
     inc, exc = _demographics(c, "INCOME_RANGE")
     return F(None, "Household income: %s; excluded: %s." % (_list(inc) or "no income setting, so all", _list(exc) or "none"))
 
@@ -624,6 +631,11 @@ def r_audience_exclusion(c):
            if (r.get("campaignCriterion") or {}).get("type") in kinds and (r.get("campaignCriterion") or {}).get("negative")]
     out += [(r.get("adGroup", {}).get("name") or "an ad group", (r.get("adGroupCriterion") or {}).get("type")) for r in c.rows("ag_criteria")
             if (r.get("adGroupCriterion") or {}).get("type") in kinds and (r.get("adGroupCriterion") or {}).get("negative")]
+    dg_kinds = kinds + ("CUSTOM_INTENT", "AUDIENCE")              # Demand Gen keeps its ad group audiences in their own read
+    out += [(r.get("adGroup", {}).get("name") or "an ad group", (r.get("adGroupCriterion") or {}).get("type")) for r in c.rows("ag_audiences")
+            if (r.get("adGroupCriterion") or {}).get("type") in dg_kinds and (r.get("adGroupCriterion") or {}).get("negative")]
+    if not out and c.channel == "DEMAND_GEN" and c.unread("ag_audiences"):
+        return c.unread("ag_audiences")                          # not read: never a pass
     if out:
         return F("fail", "%d audience exclusion%s found: %s. The campaign book wants none." % (len(out), "" if len(out) == 1 else "s",
                                                                                        _list("%s on %s" % (k.replace("_", " ").lower(), where) for where, k in out)))
@@ -662,7 +674,7 @@ def r_language(c):
     if not ids:
         return F("fail", "No language is set, so the campaign targets all languages. It should be English only.")
     names = [(c.d.get("_lang") or {}).get(i) or "language " + i for i in ids]
-    if names == ["English"]:
+    if names == ["English"] or ids == ["1000"]:                 # 1000 is Google's id for English, so a failed name lookup does not turn it into a fail
         return F("pass", "Language targeting is English only.")
     return F("fail", "Language targeting is %s. It should be English only." % _list(names))
 
@@ -671,6 +683,8 @@ def r_language(c):
 def r_age(c):
     if c.unread("criteria"):
         return c.unread("criteria")
+    if c.channel == "DEMAND_GEN":
+        return F(None, DG_DEMOGRAPHICS)
     inc, exc = _demographics(c, "AGE_RANGE")
     return F(None, "Ages targeted: %s; excluded: %s." % (_list(inc) or "no age setting, so all ages", _list(exc) or "none"))
 
@@ -807,10 +821,17 @@ def r_final_url(c):
     if http:
         return F("fail", "Not HTTPS: %s. %s" % (_list(http), text))
     pages = c.d.get("_pages") or []
-    broken = ["%s (%s)" % (p["url"], p.get("status") or (p.get("error") or "unreadable")[:60]) for p in pages
-              if p.get("error") or (p.get("status") or 0) >= 400]
+    # A page is broken only when the site says so (not found, gone, a server error). A site that refuses our visit (401, 403, 429, 503) or a visit that
+    # timed out from here says nothing about the visitors the ad sends: that is "could not confirm", never a crossed box.
+    def gone(p):
+        st = p.get("status") or 0
+        return not p.get("error") and (st in (404, 410) or (500 <= st < 600 and st != 503) or (400 <= st < 500 and st not in (401, 403, 407, 408, 429)))
+    broken = ["%s (%s)" % (p["url"], p.get("status")) for p in pages if gone(p)]
     if broken:
         return F("fail", "These pages do not load: %s. %s" % (_list(broken, 4), text))
+    unsure = ["%s (%s)" % (p["url"], p.get("status") or (p.get("error") or "unreadable")[:60]) for p in pages if p.get("error") or (p.get("status") or 0) >= 400]
+    if unsure:
+        return F(None, "%s All HTTPS. These could not be confirmed to load, and the site may only be refusing automated visits: %s." % (text, _list(unsure, 4)))
     if pages and len(pages) >= len(urls):
         return F("pass", text + " All HTTPS and all load.")
     if pages:
@@ -926,11 +947,14 @@ for _i in range(1, 22):
 
 # 5. Account automation ------------------------------------------------------
 
+WANTED_AUTO = {"BUSINESS_NAME", "BUSINESS_LOGO", "LOGO"}        # the automatically created assets the checklist wants switched on (3.4 business logo, 3.5 business name)
+
+
 @rule("5.1")
 def r_generated_assets(c):
     if c.unread("camp_assets", "cust_assets", "campaign"):
         return c.unread("camp_assets", "cust_assets", "campaign")
-    made = _auto_created(c)
+    made = [m for m in _auto_created(c) if m[1] not in WANTED_AUTO]          # 3.4 and 3.5 ask for these ON, so 5.1 must not count them against the campaign
     on = [k for k, v in _automation(c).items() if v == "OPTED_IN"]
     if made or on:
         bits = []

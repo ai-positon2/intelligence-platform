@@ -225,6 +225,9 @@ def test_language_targeting_must_be_english_only():
     assert auto.evaluate(d)["1.15"]["result"] == "fail"
     none = find("1.15", campaign=campaign())
     assert none["result"] == "fail" and "all languages" in none["found"]
+    d = rows(campaign=campaign(), criteria=lang("1000"))
+    d["_lang"] = {}                                              # the language names could not be looked up: English is still English
+    assert auto.evaluate(d)["1.15"]["result"] == "pass"
 
 
 def test_dynamic_keyword_insertion_is_found_in_headlines_descriptions_and_paths():
@@ -306,7 +309,11 @@ def test_final_urls_must_be_https_and_load():
     ok = find("1.25", _pages=[page()], **g)
     assert ok["result"] == "pass" and "All HTTPS and all load" in ok["found"]
     assert find("1.25", _pages=[page(status=404)], **g)["result"] == "fail"
-    assert find("1.25", _pages=[page(error="TimeoutError: slow", status=None)], **g)["result"] == "fail"
+    assert find("1.25", _pages=[page(status=500)], **g)["result"] == "fail" and find("1.25", _pages=[page(status=410)], **g)["result"] == "fail"
+    for refused in (page(status=403), page(status=429), page(status=503), page(status=401), page(error="TimeoutError: slow", status=None)):
+        f = find("1.25", _pages=[refused], **g)                  # our visit was refused or timed out: that says nothing about the people the ad sends
+        assert f["result"] is None and "could not be confirmed to load" in f["found"], refused
+    assert find("1.25", _pages=[page(status=403), page(status=404)], **g)["result"] == "fail"       # one page that is really gone still fails the box
     assert find("1.25", _pages=[], adgroups=[ad_group()], ads=[rsa(urls=("http://example.com/",))])["result"] == "fail"
     none = find("1.25", **g)
     assert none["result"] is None and "could not be opened" in none["found"]                  # no page evidence: not ticked
@@ -689,3 +696,34 @@ def test_a_printed_fact_does_not_ask_for_a_book_the_campaign_type_does_not_have(
     assert "judged on the spot" in f["1.2"]["found"]
     se = auto.evaluate(rows(campaign=campaign(biddingStrategyType="MAXIMIZE_CONVERSIONS")))
     assert se["1.8"]["found"].endswith("The campaign book names no bid strategy to compare with.")
+
+
+def test_5_1_does_not_fail_a_campaign_for_the_business_name_and_logo_that_3_4_and_3_5_want_on():
+    """A correctly set campaign (dynamic logo and name on) was marked NOT READY by 5.1, which counted those assets as generated assets that should be off."""
+    ok = find("5.1", campaign=campaign(), camp_assets=[made("BUSINESS_NAME"), made("BUSINESS_LOGO"), made("LOGO", "campaign")], cust_assets=[made("BUSINESS_NAME", "account")])
+    assert ok["result"] is None
+    bad = find("5.1", campaign=campaign(), camp_assets=[made("BUSINESS_NAME"), made("SITELINK")])
+    assert bad["result"] == "fail" and "1 automatically created asset " in bad["found"] and "SITELINK" in bad["found"] and "BUSINESS_NAME" not in bad["found"]
+
+
+DG = dict(_channel="DEMAND_GEN")
+
+
+def test_a_demand_gen_campaign_with_an_excluded_audience_does_not_pass_check_1_13():
+    """Demand Gen audiences are read on their own; the check looked only at the Search read and passed with an excluded list sitting there."""
+    excl = [{"adGroup": {"id": "11", "name": "Leads"}, "adGroupCriterion": {"type": "USER_LIST", "negative": True}}]
+    f = find("1.13", campaign=campaign(), ag_audiences=excl, **DG)
+    assert f["result"] == "fail" and "1 audience exclusion found" in f["found"] and "user list on Leads" in f["found"]
+    custom = [{"adGroup": {"id": "11", "name": "Leads"}, "adGroupCriterion": {"type": "CUSTOM_INTENT", "negative": True}}]
+    assert find("1.13", campaign=campaign(), ag_audiences=custom, **DG)["result"] == "fail"
+    assert find("1.13", campaign=campaign(), ag_audiences=[], **DG)["result"] == "pass"
+    unread = find("1.13", campaign=campaign(), ag_audiences=None, _errors={"ag_audiences": "Google would not answer"}, **DG)
+    assert unread["result"] is None                                                       # an audience read that failed is never a pass
+
+
+def test_demographics_are_not_reported_as_unset_for_demand_gen_whose_ad_group_settings_are_not_read():
+    for check in ("1.11", "1.12", "1.16"):
+        f = find(check, campaign=campaign(), **DG)
+        assert f["result"] is None and "Demand Gen sets this on its ad groups" in f["found"], check
+        s = find(check, campaign=campaign())
+        assert "Demand Gen" not in s["found"], check                                       # Search still says what it reads
