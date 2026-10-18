@@ -627,7 +627,8 @@ function paintTrend(){
   var key=c.hasValue?"value":"conversions", main=b.totals.map(function(x){return P.mval(key,x);}), cost=b.totals.map(function(x){return x[A.COST];});
   var prev=cb?cb.totals.map(function(x){return P.mval(key,x);}):null;
   el.innerHTML='<div class="ps-card-h"><div class="ps-card-t"><span class="ps-title">Spend and '+(c.hasValue?"revenue":"conversions")+' over time</span>'+
-    '<span class="ps-sub">'+(grain==="day"?"Each day":grain==="week"?"Each week":"Each month")+', all products together'+(cb?'. The dashed line is the comparison period.':'')+'</span></div></div>'+
+    '<span class="ps-sub">'+(grain==="day"?"Each day":grain==="week"?"Each week":"Each month")+(S.acct&&S.acct.platform==="meta"?', all Sales campaigns together (Meta cannot split a trend by product, so this is more than the catalog products below)':
+      S.acct&&S.acct.platform==="both"?', all Google products and Meta Sales campaigns together (the Meta part is every Sales campaign, not only catalog products)':', all products together')+(cb?'. The dashed line is the comparison period.':'')+'</span></div></div>'+
     '<div class="ps-wrap"><canvas id="cvTrend" aria-label="Spend and '+(c.hasValue?"revenue":"conversions")+' over time"></canvas></div>';
   var ds=[{type:"bar",label:"Spend",data:cost,backgroundColor:alpha("#fbbf24",.55),borderRadius:4,borderWidth:0,yAxisID:"y",order:3},
     {type:"line",label:c.hasValue?"Revenue":"Conversions",data:main,borderColor:col("#34d399"),backgroundColor:"transparent",borderWidth:2.4,pointRadius:0,pointHoverRadius:5,tension:.3,yAxisID:"y2",order:1}];

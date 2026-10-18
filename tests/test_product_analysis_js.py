@@ -444,3 +444,11 @@ def test_a_days_series_is_read_by_item_id_in_any_case_and_missing_means_not_read
     assert got("cost") == [5.0, 0] and got("value") == [50.0, 0] and got("roas") == [10.0, None] and got("ctr") == [0.1, None]
     assert got("cost", "other") is None
     assert run("A.seriesValues(null,'a','cost')") is None and run("A.seriesValues({},'a','cost')") is None
+
+
+def test_the_trend_chart_does_not_call_a_meta_sales_trend_all_products():
+    """On Meta the trend is every Sales campaign by day, while the table beside it is only the catalog products: the subtitle must say so."""
+    page = open(os.path.join(ROOT, "static", "js", "product_analysis.js"), encoding="utf-8").read()
+    chart = page[page.index("Each day"):][:900]
+    assert 'S.acct.platform==="meta"' in chart and "all Sales campaigns together" in chart and "all products together" in chart
+    assert chart.index('S.acct.platform==="meta"') < chart.index("all products together")
