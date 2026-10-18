@@ -574,7 +574,7 @@ function buildPlan(spec){
     if(S.extras.error) return {error:plat()+" would not give the "+D.l.toLowerCase()+" split: "+S.extras.error};
     if(S.filter.length) pl.note="This split is for the whole account; it cannot be narrowed to campaigns.";
     if(dim==="hour"){
-      var g=P.hourGrid(S.extras.dowHour); pl.cur=P.byHour(g); for(var h=0;h<24;h++) pl.labels.push(HOURLBL(h));
+      var g=P.hourGrid(P.hourRows(S.extras)); pl.cur=P.byHour(g); for(var h=0;h<24;h++) pl.labels.push(HOURLBL(h));
       return pl;
     }
   }
@@ -1144,7 +1144,8 @@ function paintHeat(){
     '<div class="ps-hstat"><span>Weekends</span><b>'+(wShare==null?"\u2013":Math.round(wShare*100)+"%")+'</b><small>'+(wShare==null?(hoursOnly?"Meta has no day split":"not a total"):"of the "+esc(def.label.toLowerCase()))+'</small></div></div>';
   el.innerHTML=head+'<div class="ps-heat"><div class="ps-hgrid">'+axis+cells+'</div><div class="ps-htip" hidden></div></div>'+stats+
     '<p class="ps-note">'+(top?'Strongest windows for '+esc(def.label.toLowerCase())+': <b>'+esc(top)+'</b>.':'Not enough activity to show a pattern.')+
-    (hoursOnly?' Meta reports the hour of the day, not the day of the week, so this is one row for every day.':'')+' Times are in the account’s own time zone'+(S.acct.tz?' ('+esc(S.acct.tz)+')':'')+'.</p>';
+    (hoursOnly?' Meta reports the hour of the day, not the day of the week, so this is one row for every day.':
+      (S.extras.hour&&S.extras.hour.length?' Meta reports the hour of the day but not the day of the week, so Meta is left out of this grid (it is in the Hour of day chart).':''))+' Times are in the account’s own time zone'+(S.acct.tz?' ('+esc(S.acct.tz)+')':'')+'.</p>';
   bindHeat(el,g,def,RL);
 }
 function bindHeat(el,g,def,RL){

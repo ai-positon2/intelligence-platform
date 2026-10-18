@@ -315,3 +315,17 @@ def test_the_share_of_spend_is_against_the_spend_that_can_bring_a_conversion():
     # Leads $1,000 of the $4,000 spent brings every conversion; the $3,000 of awareness could not have brought any
     out = dict(_meta(("META_LEADS", 1000, 40), ("META_AWARENESS", 3000, 0)))
     assert "concentration" not in out                              # 100% of conversions from 100% of the spend that can bring one: nothing stands out
+
+
+def test_the_hour_rows_hold_googles_weekday_hours_and_metas_hours_alike():
+    # Meta sends [hour, ...], Google [weekday, hour, ...]: a total by hour counts both, and Meta alone is not an empty chart
+    assert run("P.hourRows({dowHour:[[2,9,5,1,1,1,1]],hour:[[9,7,2,2,2,2]]})") == [[2, 9, 5, 1, 1, 1, 1], [0, 9, 7, 2, 2, 2, 2]]
+    assert run("P.hourRows({dowHour:[],hour:[[9,7,2,2,2,2]]})") == [[0, 9, 7, 2, 2, 2, 2]]
+    assert run("P.hourRows({dowHour:[[2,9,5,1,1,1,1]]})") == [[2, 9, 5, 1, 1, 1, 1]] and run("P.hourRows(null)") == []
+    r = run("(()=>{const e={dowHour:[[2,9,10,1,1,1,1]],hour:[[9,7,2,2,2,2]]};return P.byHour(P.hourGrid(P.hourRows(e)))[9].slice(0,4)})()")
+    assert r == [17, 3, 3, 3]
+
+
+def test_the_hour_of_day_chart_reads_the_hours_of_both_platforms():
+    page = open(os.path.join(ROOT, "static", "js", "performance_summarizer.js"), encoding="utf-8").read()
+    assert "P.hourGrid(P.hourRows(S.extras))" in page and "P.hourGrid(S.extras.dowHour)" not in page

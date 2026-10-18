@@ -336,6 +336,12 @@ function hourGrid(rows){
   (rows||[]).forEach(function(r){if(grid[r[0]]&&grid[r[0]][r[1]]) addTo(grid[r[0]][r[1]],r.slice(2,2+NB));});
   return grid;
 }
+/* The rows of the day and hour grid for what the server sent: Google's [weekday, hour, ...] rows and Meta's [hour, ...] rows (Meta does not say the
+   weekday, so its hours go on the first row: a total by hour is right, a grid by weekday is Google's alone). */
+function hourRows(extras){
+  extras=extras||{};
+  return (extras.dowHour||[]).concat((extras.hour||[]).map(function(r){return [0].concat(r);}));
+}
 function byHour(grid){
   var out=[];for(var h=0;h<24;h++){var t=zero();for(var d=0;d<7;d++)addTo(t,grid[d][h]);out.push(t);}
   return out;
@@ -593,7 +599,7 @@ var api = {
   METRICS:METRICS,METRIC_ORDER:METRIC_ORDER,METRIC_ALL:METRIC_ALL,GROUPS:GROUPS,KPI_DEFAULT:KPI_DEFAULT,kpiCols:kpiCols,METRIC_COLOR:METRIC_COLOR,SERIES:SERIES,mval:mval,noData:noData,
   fmt:fmt,fmtMetric:fmtMetric,sym:sym,compact:compact,change:change,
   zero:zero,addTo:addTo,filterSet:filterSet,total:total,daily:daily,perCampaign:perCampaign,campaignDaily:campaignDaily,byType:byType,
-  bucket:bucket,byWeekday:byWeekday,hourGrid:hourGrid,byHour:byHour,DOW:DOW,
+  bucket:bucket,byWeekday:byWeekday,hourGrid:hourGrid,hourRows:hourRows,byHour:byHour,DOW:DOW,
   TYPE_LABEL:TYPE_LABEL,DEVICE_LABEL:DEVICE_LABEL,NETWORK_LABEL:NETWORK_LABEL,label:label,
   DIMS:DIMS,DIM:DIM,TYPES:TYPES,TYPE:TYPE,ADDITIVE:ADDITIVE,SERIES_TYPES:SERIES_TYPES,SERIES_KINDS:SERIES_KINDS,
   typeBlock:typeBlock,withType:withType,defaultType:defaultType,fixType:fixType,typeNeeds:typeNeeds,seriesAllowed:seriesAllowed,relative:relative,foldTop:foldTop,seriesGroups:seriesGroups,
