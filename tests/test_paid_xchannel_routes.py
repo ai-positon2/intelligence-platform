@@ -125,3 +125,37 @@ def test_a_file_that_cannot_be_made_is_said_in_words(monkeypatch, report):
 def test_the_assistant_knows_about_the_agent():
     src = open(os.path.join(ROOT, "app.py")).read()
     assert "Cross-Channel & Attribution Analysis (/p2/paid-marketing/cross-channel)" in src
+
+
+def test_the_page_renders_for_staff_and_is_closed_to_everyone_else():
+    html = client_as(STAFF).get(PAGE).get_data(as_text=True)
+    assert "<title>Cross-Channel &amp; Attribution" in html and "cross_channel.js" in html and "cross_channel.css" in html and "xch_data.js" in html and "pm_platform.js" in html
+    for el in ('id="acctPick"', 'id="ranges"', 'id="measures"', 'id="fConv"', 'id="fValue"', 'id="finds"', 'id="channels"', 'id="types"', 'id="chartCost"', 'id="rec"', 'id="dlXlsx"'):
+        assert el in html, el
+    assert client_as(None).get(PAGE).status_code == 302 and client_as("someone@gmail.com").get(PAGE).status_code == 302
+
+
+def test_every_address_the_page_script_uses_is_a_route():
+    js = open(os.path.join(ROOT, "static", "js", "cross_channel.js"), encoding="utf-8").read()
+    rules = {r.rule for r in app_module.app.url_map.iter_rules()}
+    for path in ("/p2/paid-marketing/api/xchannel/report", "/p2/paid-marketing/api/xchannel/download", "/p2/paid-marketing/api/gads/accounts", PAGE):
+        assert path in rules, path
+    assert 'API = "/p2/paid-marketing/api/xchannel"' in js and 'BASE = "/p2/paid-marketing/api/gads"' in js and '"/report?"' in js and '"/download?"' in js and 'BASE + "/accounts"' in js
+
+
+def test_the_agent_is_on_the_paid_marketing_page_the_palette_and_the_hub_counts_it():
+    import re
+    root = os.path.join(ROOT, "templates")
+    for name in ("paid_marketing.html", "_paid_kpal.html"):
+        assert "/p2/paid-marketing/cross-channel" in open(os.path.join(root, name), encoding="utf-8").read(), name
+    page = open(os.path.join(root, "paid_marketing.html"), encoding="utf-8").read()
+    assert "c-xch" in page and "Cross-Channel &amp; Attribution Analysis" in page
+    assert ".c-xch" in open(os.path.join(ROOT, "static", "css", "paid_marketing.css"), encoding="utf-8").read()
+    hub = re.sub(r"<!--.*?-->", "", open(os.path.join(root, "hub.html"), encoding="utf-8").read(), flags=re.S)
+    assert 'data-lxn="48"' in hub and "<span>21</span> dashboards" in hub and "Google and Meta compared side by side" in hub
+
+
+def test_the_stylesheet_and_the_scripts_are_served():
+    c = client_as(STAFF)
+    for path in ("/static/css/cross_channel.css", "/static/js/xch_data.js", "/static/js/cross_channel.js"):
+        assert c.get(path).status_code == 200, path

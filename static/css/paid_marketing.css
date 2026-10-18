@@ -1293,6 +1293,13 @@ details.sq-fallback .sq-drops{margin-top:10px}
   --icon-glow:rgba(244,114,182,.5);--card-border:rgba(244,114,182,.35);
   --card-glow:0 0 40px rgba(244,114,182,.10);--arrow-color:#fbcfe8}
 
+/* ═══ Cross-Channel & Attribution Analysis card ═══ */
+.c-xch{--card-accent:#a78bfa;
+  --band:linear-gradient(90deg,#60a5fa,#a78bfa,#f472b6);
+  --thumb:linear-gradient(135deg,#0b1030 0%,#1a0f33 100%);
+  --icon-glow:rgba(167,139,250,.5);--card-border:rgba(167,139,250,.35);
+  --card-glow:0 0 40px rgba(167,139,250,.10);--arrow-color:#ddd6fe}
+
 /* ═══ Account Audit card ═══ */
 .c-aud{--card-accent:#34d399;
   --band:linear-gradient(90deg,#34d399,#38bdf8,#818cf8);
