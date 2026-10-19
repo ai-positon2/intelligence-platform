@@ -1,0 +1,110 @@
+{% extends "_paid_base.html" %}
+{% block title %}Unknown Domains Alert{% endblock %}
+{% block content %}
+<div class="pm pm-ud" id="ud">
+  <section class="pm-hero">
+    <div class="pm-hero-l">
+      <span class="pm-eyebrow"><span class="d"></span>Paid Marketing · Account safety</span>
+      <h1 class="pm-title">An ad that points <span class="pm-grad">somewhere it should not.</span></h1>
+      <p class="pm-sub">Every 12 hours the agent reads <b>every enabled ad in every Google Ads and Meta Ads account</b> and checks where it sends people against the
+        <b>domain database</b> below. An address nobody approved is either an <b>ad launched under the wrong account</b> or the first sign of an
+        <b>account that has been taken over</b>, and either way the team hears about it by <b>email and Slack</b>. It only reads. It never pauses or changes an ad.</p>
+    </div>
+  </section>
+
+  <div id="msg"></div>
+  <div id="skel" class="pd-skel-wrap"><div class="pd-skel"></div><div class="pd-skel"></div></div>
+
+  <div id="out" hidden>
+    <div class="pd-strip" id="kpis"></div>
+
+    <section class="pm-panel ud-scan" id="scanCard">
+      <div class="ud-scan-row">
+        <p class="pd-fresh" id="fresh"></p>
+        <button class="pm-btn" id="scanBtn" type="button">Scan now</button>
+      </div>
+      <div id="progress" class="ud-progress" hidden><i></i><span></span></div>
+      <div id="problems"></div>
+    </section>
+
+    <section class="pm-panel ud-base" id="baseCard" hidden>
+      <div class="pm-panel-h"><span class="pm-panel-t">Set the baseline before alerts start</span><span class="pm-panel-s">nothing is sent until you do</span></div>
+      <p class="ud-p">The domain database starts empty, so the first scan finds every address in every account. Look through what each account points at today
+        and approve the ones that are right: <b>Trust what the accounts use today</b> adds every domain below to the database, for the account that uses it, and from then on
+        anything new alerts. Trusting everything also trusts an account that has already been taken over, so look through the list first.</p>
+      <div class="ud-actions">
+        <button class="pm-btn" id="trustAll" type="button">Trust what the accounts use today</button>
+        <button class="pm-btn-ghost" id="trustNone" type="button">Start alerting without trusting anything</button>
+      </div>
+      <div class="ud-tools"><input type="text" id="useFilter" placeholder="Search accounts or domains…" aria-label="Search what accounts use" autocomplete="off"></div>
+      <div class="pm-scroll"><table id="useTbl"></table></div>
+    </section>
+
+    <section class="pm-panel" id="findCard">
+      <div class="pm-panel-h"><span class="pm-panel-t">Findings</span><span class="pm-panel-s" id="findNote"></span></div>
+      <div class="ud-tools">
+        <input type="text" id="findFilter" placeholder="Search by account, domain, campaign or ad…" aria-label="Search findings" autocomplete="off">
+        <div class="pm-chips" id="stChips" aria-label="Status"></div>
+        <div class="pm-chips" id="svChips" aria-label="Severity"></div>
+      </div>
+      <div class="pm-scroll"><table id="findTbl"></table></div>
+      <button type="button" class="pm-btn-ghost sg-more" id="findMore" hidden></button>
+    </section>
+
+    <section class="pm-panel" id="dbCard">
+      <div class="pm-panel-h"><span class="pm-panel-t">Domain database</span><span class="pm-panel-s" id="dbNote"></span></div>
+      <p class="ud-p">A domain, and who may send people to it: one account, a client (every account under its manager account) or everyone. An entry for
+        <code>example.com</code> covers <code>www.example.com</code> and every other subdomain.</p>
+      <form class="ud-add" id="addForm" autocomplete="off">
+        <label><span class="pd-dd-k">Domain</span><input type="text" id="addDomain" placeholder="example.com" required aria-label="Domain"></label>
+        <label><span class="pd-dd-k">For</span><select id="addScope" aria-label="Who the domain is for"></select></label>
+        <label class="ud-grow"><span class="pd-dd-k">Note (optional)</span><input type="text" id="addNote" maxlength="200" placeholder="Main website" aria-label="Note"></label>
+        <button class="pm-btn" type="submit">Add</button>
+      </form>
+      <details class="ud-import">
+        <summary>Import a list, or export this one</summary>
+        <div class="ud-import-b">
+          <p class="ud-p">Columns: <code>domain</code>, then <code>account</code> or <code>client</code> (a name or an id; blank means everyone), then <code>note</code>.
+            Upload a CSV, paste it, or give a Google Sheet link shared as <b>anyone with the link can view</b>.</p>
+          <div class="ud-actions">
+            <input type="file" id="impFile" accept=".csv,text/csv" aria-label="CSV file">
+            <input type="text" id="impSheet" class="ud-grow" placeholder="https://docs.google.com/spreadsheets/d/…" aria-label="Google Sheet link">
+            <button class="pm-btn-ghost" id="impSheetGo" type="button">Import the sheet</button>
+          </div>
+          <textarea id="impText" rows="4" placeholder="domain,account,note&#10;example.com,,Main website" aria-label="Paste CSV"></textarea>
+          <div class="ud-actions"><button class="pm-btn-ghost" id="impGo" type="button">Import the pasted list</button>
+            <a class="pm-btn-ghost" id="expLink" href="/p2/paid-marketing/api/domains/known.csv">Export CSV</a></div>
+          <div id="impRes"></div>
+        </div>
+      </details>
+      <div class="ud-tools"><input type="text" id="dbFilter" placeholder="Search domains, accounts or notes…" aria-label="Search the domain database" autocomplete="off"></div>
+      <div class="pm-scroll"><table id="dbTbl"></table></div>
+      <button type="button" class="pm-btn-ghost sg-more" id="dbMore" hidden></button>
+    </section>
+
+    <section class="pm-panel" id="alertCard">
+      <div class="pm-panel-h"><span class="pm-panel-t">Where alerts go</span><span class="pm-panel-s" id="sendNote"></span></div>
+      <form class="ud-add" id="setForm" autocomplete="off">
+        <label class="ud-grow"><span class="pd-dd-k">Email addresses (comma separated)</span><input type="text" id="setEmails" placeholder="team@example.com, lead@example.com" aria-label="Email addresses"></label>
+        <label><span class="pd-dd-k">Slack channel</span><input type="text" id="setSlack" placeholder="#ppc-alerts" aria-label="Slack channel"></label>
+        <button class="pm-btn" type="submit">Save</button>
+        <button class="pm-btn-ghost" id="testBtn" type="button">Send a test alert</button>
+      </form>
+      <p class="ud-p dim">Each finding is alerted once, as one email and one Slack message per scan. The Slack bot has to be a member of the channel.</p>
+      <div id="setRes"></div>
+    </section>
+
+    <section class="pm-panel" id="runsCard">
+      <div class="pm-panel-h"><span class="pm-panel-t">Recent scans</span><span class="pm-panel-s">the last 10</span></div>
+      <div class="pm-scroll"><table id="runsTbl"></table></div>
+    </section>
+
+    <p class="pd-foot">Read only: the agent never pauses an ad or changes an account, so a suspected takeover is for a person to act on. It reads the final URLs of enabled
+      ads (and the sitelinks, Performance Max asset groups and tracking templates around them) on Google Ads and the website of every active Meta ad. Paused ads,
+      who changed what, new users and billing changes are not read. Addresses on Facebook, Instagram, WhatsApp and the app stores are never findings.</p>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/unknown_domains.js') }}?v=1"></script>
+{% endblock %}

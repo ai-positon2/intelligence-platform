@@ -32,7 +32,7 @@ def test_the_page_shows_none_of_the_five_and_every_other_card():
     page = H.rendered("/p2/paid-marketing")
     shown = _cards(page)
     assert not [u for u in shown if u.rsplit("/", 1)[1] in NAMES]
-    assert len(shown) == 21 - 5
+    assert len(shown) == 22 - 5
     for slug, title in NAMES.items():
         assert title not in re.sub(r"<!--.*?-->|<script.*?</script>", "", page, flags=re.S), title
 
@@ -48,8 +48,8 @@ def test_the_command_palette_lists_none_of_the_five():
 
 def test_the_hub_counts_and_text_follow_the_switch():
     hub = re.sub(r"<!--.*?-->", "", H.rendered("/p2/hub"), flags=re.S)
-    assert "<span>16</span> dashboards" in hub and "<span>16</span> live" in hub
-    assert 'data-lxn="43"' in hub
+    assert "<span>17</span> dashboards" in hub and "<span>17</span> live" in hub
+    assert 'data-lxn="44"' in hub
     assert "ad copy checked against" not in hub and "compared side by side" not in hub
 
 
@@ -82,11 +82,11 @@ def test_the_pages_and_apis_still_answer_so_nothing_is_lost():
 def test_emptying_the_switch_brings_every_card_and_count_back(monkeypatch):
     monkeypatch.setattr(appmod, "PAID_HIDDEN_SLUGS", frozenset())
     page = H.rendered("/p2/paid-marketing")
-    assert {u.rsplit("/", 1)[1] for u in _cards(page)} >= set(NAMES) and len(_cards(page)) == 21
+    assert {u.rsplit("/", 1)[1] for u in _cards(page)} >= set(NAMES) and len(_cards(page)) == 22
     for slug in NAMES:
         assert "u:'/p2/paid-marketing/%s'" % slug in page, slug
     hub = re.sub(r"<!--.*?-->", "", H.rendered("/p2/hub"), flags=re.S)
-    assert "<span>21</span> dashboards" in hub and 'data-lxn="48"' in hub
+    assert "<span>22</span> dashboards" in hub and 'data-lxn="49"' in hub
     assert "ad copy checked against" in hub and "Google and Meta compared side by side" in hub
 
 

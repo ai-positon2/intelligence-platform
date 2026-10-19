@@ -12,7 +12,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-tokens.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-components.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/gtm.css') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/paid_marketing.css') }}?v=39">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/paid_marketing.css') }}?v=42">
   <script src="/static/js/theme.js"></script>
   <link rel="stylesheet" href="/static/css/aurora-app.css?v=3">
   <script src="/static/js/aurora.js?v=1" defer></script>
@@ -508,6 +508,26 @@
       </a>
       {% endif %}
 
+      <!-- 21. Unknown Domains Alert (2026-10-19): an ad that points at a domain nobody approved, by email and Slack -->
+      <a href="/p2/paid-marketing/unknown-domains" class="dash-card active c-ud">
+        <div class="card-band"></div>
+        <div class="card-thumb">
+          <div class="card-thumb-icon"><svg class="au-ic" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 3l8 3v6c0 4.4-3.1 8.2-8 9-4.9-.8-8-4.6-8-9V6l8-3z"/><path d="M12 8v5"/><path d="M12 16.5v.01"/></svg></div>
+          <div class="card-thumb-badge tb-live"><span class="tb-dot live"></span> Live</div>
+        </div>
+        <div class="card-body">
+          <div class="card-name">Unknown Domains Alert</div>
+          <div class="card-desc">
+            Reads every enabled ad in every Google Ads and Meta Ads account and checks where it sends people against the domain database. An address nobody approved is an ad
+            launched under the wrong account, or the first sign of a hacked account, and the team is told by email and Slack. Read only.
+          </div>
+          <div class="card-footer">
+            <div class="card-tags"><span class="tag">Alerts</span><span class="tag">Account safety</span></div>
+            <span class="card-arrow">→</span>
+          </div>
+        </div>
+      </a>
+
     </div>
 
     <p class="footer-note">Position2 · Internal use only</p>
@@ -556,6 +576,7 @@
     {t:'Account Audit',d:'Is the account set up to win: settings, tracking, structure, ads',u:'/p2/paid-marketing/account-audit',i:'✔'},
     {% if 'landing-page-check' not in paid_hidden %}    {t:'Landing Page & Relevancy Check',d:'Does each landing page keep the promise the ad made',u:'/p2/paid-marketing/landing-page-check',i:'▤'},{% endif %}
     {% if 'experiment-tracker' not in paid_hidden %}    {t:'Test & Experiment Tracker',d:'Which tests have a result, and what to do about each',u:'/p2/paid-marketing/experiment-tracker',i:'⚗'},{% endif %}
+    {t:'Unknown Domains Alert',d:'Ads pointing at a domain nobody approved, by email and Slack',u:'/p2/paid-marketing/unknown-domains',i:'⚠'},
     {t:'QA Agent',d:'Campaign launch QC checklist',u:'/p2/paid-marketing/qa-agent',i:'✓'}
   ];
   var ITEMS=(window.__KP_ITEMS||[]).concat(BASE);

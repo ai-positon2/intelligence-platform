@@ -1,0 +1,39 @@
+name: Unknown Domains Scan
+
+# Starts the Unknown Domains Alert scan on the platform every 12 hours. The scan itself runs on the
+# platform (it reads the Google Ads and Meta accounts and sends the email and Slack alerts); this
+# only calls its secret-guarded address, which answers at once and runs the scan in the background.
+#
+# Needs one GitHub Actions secret, DOMAIN_ALERT_SECRET, the same value as the DOMAIN_ALERT_SECRET
+# variable set on Railway. The platform's address is the repository variable PLATFORM_BASE_URL
+# (default https://intelligence.position2.com).
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 */12 * * *'   # 00:17 and 12:17 UTC
+
+permissions:
+  contents: read
+
+concurrency:
+  group: unknown-domains-scan
+  cancel-in-progress: false
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Start the scan
+        env:
+          BASE_URL: ${{ vars.PLATFORM_BASE_URL || 'https://intelligence.position2.com' }}
+          SECRET: ${{ secrets.DOMAIN_ALERT_SECRET }}
+        run: |
+          if [ -z "$SECRET" ]; then
+            echo "::error::The DOMAIN_ALERT_SECRET secret is not set on this repository."
+            exit 1
+          fi
+          curl --fail-with-body --silent --show-error --max-time 60 --retry 3 --retry-delay 20 --retry-all-errors \
+            -X POST "${BASE_URL%/}/p2/paid-marketing/api/domains/scheduled" \
+            -H "X-Domain-Secret: $SECRET" -H "Content-Type: application/json" -d '{}'
+          echo

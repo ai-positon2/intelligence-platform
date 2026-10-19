@@ -6803,6 +6803,209 @@ def paid_qa_set_check(launch_id, check_id):
         return _pm_store_error(e)
 
 
+# ── Unknown Domains Alert ───────────────────────────────────────────────────────
+# Every ad account is read for the web addresses its enabled ads point at
+# (tracker/paid_domains_read.py) and each domain is held against the domain database
+# (tracker/paid_domains.py); an address nobody approved is a finding, and a new one is
+# alerted by email and Slack (tracker/paid_domains_scan.py). The database, the findings,
+# the settings and the scan lock are in tracker/paid_domains_store.py. A scan runs in
+# the background, started by the page's Scan now or, every 12 hours, by a GitHub
+# Actions workflow that calls the secret-guarded address below. The account list is
+# Segment Analysis's, with Meta's added.
+
+_DOM_LOCK = threading.Lock()
+
+
+def _dom_store():
+    from tracker import paid_domains_store
+    return paid_domains_store
+
+
+def _dom_deliver():
+    from tracker import market_radar_deliver
+    return market_radar_deliver
+
+
+def _dom_inventory(store):
+    from tracker import paid_domains_scan
+    return paid_domains_scan.inventory(store)
+
+
+def _dom_spawn(fn):
+    """Run a scan in the background. (Tests run it inline by replacing this.)"""
+    threading.Thread(target=fn, daemon=True, name="domains-scan").start()
+
+
+def _dom_link():
+    return "https://%s%s/unknown-domains" % (request.host, _PM_PREFIX)
+
+
+def _dom_start_scan(trigger):
+    """(started, why_not): start a scan in the background unless one is already going."""
+    from tracker import paid_domains_scan as scan
+    store, deliver, link = _dom_store(), _dom_deliver(), _dom_link()
+    progress = store.state_get("progress") or {}
+    if progress.get("running"):
+        try:
+            if (datetime.now(timezone.utc) - datetime.fromisoformat(progress.get("startedAt") or "")).total_seconds() < scan.LOCK_TTL_S:
+                return False, "A scan is already running."
+        except ValueError:
+            pass
+    store.state_set("progress", {"running": True, "startedAt": datetime.now(timezone.utc).isoformat(), "done": 0, "total": 0})
+    _dom_spawn(lambda: scan.run_scan(store, trigger=trigger, link=link, deliver=deliver, inventory_fn=_dom_inventory))
+    return True, ""
+
+
+def _dom_run(fn):
+    """Run fn(store, scan) and turn a bad request and an unavailable store into answers."""
+    from tracker import paid_domains_scan as scan
+    store = _dom_store()
+    try:
+        return fn(store, scan)
+    except scan.BadRequest as e:
+        return jsonify(error=str(e)), 400
+    except store.StoreUnavailable as e:
+        return _pm_store_error(e)
+
+
+@app.route("/p2/paid-marketing/unknown-domains")
+@position2_required
+def unknown_domains():
+    return render_template("unknown_domains.html", user=_get_user())
+
+
+@app.route("/p2/paid-marketing/api/domains/state")
+@position2_required
+def paid_domains_state():
+    def go(store, scan):
+        accounts, groups, problems = _dom_inventory(store)
+        return jsonify(scan.snapshot(store, accounts, groups, problems, _dom_deliver()))
+    return _dom_run(go)
+
+
+@app.route("/p2/paid-marketing/api/domains/scan", methods=["POST"])
+@position2_required
+def paid_domains_scan_now():
+    def go(store, scan):
+        with _DOM_LOCK:
+            started, why = _dom_start_scan("page by " + _pm_user_email())
+        return (jsonify(started=True), 202) if started else (jsonify(error=why), 409)
+    return _dom_run(go)
+
+
+@app.route("/p2/paid-marketing/api/domains/scheduled", methods=["POST"])
+def paid_domains_scheduled():
+    """The 12-hourly scan. No session: a shared secret in X-Domain-Secret, and with DOMAIN_ALERT_SECRET unset every call is refused."""
+    import hmac
+    secret = os.environ.get("DOMAIN_ALERT_SECRET", "")
+    given = request.headers.get("X-Domain-Secret", "")
+    if not secret or not hmac.compare_digest(given.encode("utf-8"), secret.encode("utf-8")):
+        return jsonify(error="Forbidden."), 403
+
+    def go(store, scan):
+        with _DOM_LOCK:
+            started, why = _dom_start_scan("schedule")
+        return (jsonify(started=True), 202) if started else (jsonify(started=False, reason=why), 200)
+    return _dom_run(go)
+
+
+@app.route("/p2/paid-marketing/api/domains/known", methods=["POST"])
+@position2_required
+def paid_domains_known_add():
+    def go(store, scan):
+        body = request.get_json(silent=True) or {}
+        accounts, groups, _problems = _dom_inventory(store)
+        row, created = scan.add_known(store, body.get("domain"), body.get("scope"), body.get("note"), _pm_user_email(), accounts, groups)
+        return jsonify(entry=row, created=created), (201 if created else 200)
+    return _dom_run(go)
+
+
+@app.route("/p2/paid-marketing/api/domains/known/import", methods=["POST"])
+@position2_required
+def paid_domains_known_import():
+    """{text: CSV} or {sheetUrl: a Google Sheet shared as anyone with the link can view}."""
+    def go(store, scan):
+        body = request.get_json(silent=True) or {}
+        text = scan.fetch_sheet(body["sheetUrl"]) if body.get("sheetUrl") else str(body.get("text") or "")
+        if len(text) > 2 * 1024 * 1024:
+            raise scan.BadRequest("That file is over 2 MB.")
+        accounts, groups, _problems = _dom_inventory(store)
+        return jsonify(scan.import_known(store, scan.parse_csv(text), _pm_user_email(), accounts, groups))
+    return _dom_run(go)
+
+
+@app.route("/p2/paid-marketing/api/domains/known/<int:entry_id>", methods=["DELETE"])
+@position2_required
+def paid_domains_known_remove(entry_id):
+    def go(store, scan):
+        if not store.known_remove(entry_id):
+            abort(404)
+        return jsonify(ok=True)
+    return _dom_run(go)
+
+
+@app.route("/p2/paid-marketing/api/domains/known.csv")
+@position2_required
+def paid_domains_known_export():
+    def go(store, scan):
+        accounts, groups, _problems = _dom_inventory(store)
+        resp = make_response(scan.export_csv(store.known_list(), accounts, groups))
+        resp.mimetype = "text/csv"
+        resp.headers["Content-Disposition"] = 'attachment; filename="domain-database.csv"'
+        return resp
+    return _dom_run(go)
+
+
+@app.route("/p2/paid-marketing/api/domains/findings/<fingerprint>/<action>", methods=["POST"])
+@position2_required
+def paid_domains_finding(fingerprint, action):
+    """approve {who: account|group|everyone}, dismiss, reopen."""
+    if not re.fullmatch(r"[0-9a-f]{24}", fingerprint) or action not in ("approve", "dismiss", "reopen"):
+        abort(404)
+
+    def go(store, scan):
+        if action == "approve":
+            accounts, groups, _problems = _dom_inventory(store)
+            n = scan.approve(store, fingerprint, str((request.get_json(silent=True) or {}).get("who") or ""), _pm_user_email(), accounts, groups)
+            return jsonify(approved=n)
+        scan.decide(store, fingerprint, "dismissed" if action == "dismiss" else "open", _pm_user_email())
+        return jsonify(ok=True)
+    return _dom_run(go)
+
+
+@app.route("/p2/paid-marketing/api/domains/baseline", methods=["POST"])
+@position2_required
+def paid_domains_baseline():
+    """{trust: "all" | [account ids]}: start alerting, trusting what those accounts use today ([] trusts nothing)."""
+    def go(store, scan):
+        trust = (request.get_json(silent=True) or {}).get("trust") or []
+        if trust != "all" and not (isinstance(trust, list) and all(isinstance(t, str) for t in trust)):
+            raise scan.BadRequest("Say which accounts to trust.")
+        accounts, _groups, _problems = _dom_inventory(store)
+        if not store.state_get("inuse"):
+            raise scan.BadRequest("Run a scan first, so there is something to set the baseline from.")
+        return jsonify(scan.set_baseline(store, _pm_user_email(), accounts, trust))
+    return _dom_run(go)
+
+
+@app.route("/p2/paid-marketing/api/domains/settings", methods=["POST"])
+@position2_required
+def paid_domains_settings():
+    def go(store, scan):
+        saved = scan.clean_settings(request.get_json(silent=True) or {})
+        store.state_set("settings", saved)
+        return jsonify(saved)
+    return _dom_run(go)
+
+
+@app.route("/p2/paid-marketing/api/domains/test-alert", methods=["POST"])
+@position2_required
+def paid_domains_test_alert():
+    def go(store, scan):
+        return jsonify(scan.test_alert(store, _dom_link(), _dom_deliver()))
+    return _dom_run(go)
+
+
 # ── Embedded dashboards ─────────────────────────────────────────────────────────
 _SERP_BASE = "https://seo-apps-production-37a6.up.railway.app"
 
@@ -20734,7 +20937,7 @@ PAID_HIDDEN_AGENTS = {
     "keyword-research": "Keyword Research",
 }
 PAID_HIDDEN_SLUGS = frozenset(PAID_HIDDEN_AGENTS)
-PAID_AGENT_TOTAL = 21  # Paid Marketing agents built, hidden ones included
+PAID_AGENT_TOTAL = 22  # Paid Marketing agents built, hidden ones included
 
 
 def _without_hidden_paid(text):
@@ -20834,6 +21037,8 @@ can confirm or overrule any check. The verdict: NOT READY if any check is flagge
 verified, otherwise READY TO LAUNCH. Each QC is saved per campaign. Geo Performance (/p2/paid-marketing/geo-performance): pick a Google Ads account or MCC, a Meta ad account, or a Google and a Meta account together, a date range and a location level (country, region, metro area, city, county or postal code; Meta has country, region and DMA), and it reads the platform live to show performance by place. Each place is judged against the account's own average (an efficiency index of 100 is average, from return on ad spend when the account has conversion value, otherwise cost per conversion) as strong, above average, on par, below average, weak, leaking spend, or too little data to judge, and where there are at least 5 conversions it suggests a geo bid adjustment (80% of the gap, in 5% steps, capped at +40% and -50%), a starting point to apply gradually. Places are where people were when they saw the ad, so a place can appear that is not targeted. Charts to choose from: ranked bars, spend against results, share of spend against conversions, share of a total, and efficiency against spend, with a table and CSV export. A short summary is written by Claude from the computed insights only. Seasonality Analysis (/p2/paid-marketing/seasonality-analysis): pick a Google Ads account, a Meta ad account or one of each, and it reads two or three years of daily numbers to show the shape of the year: a seasonal index for each calendar month (100 is an average month, after taking out growth with a centred 12-month moving average, so it needs 13 months in a row of history), the same for the days of the week, what each US retail holiday did to conversions, spend and cost per conversion against the ordinary days before it, this year against last year, and for the next three months the expected demand, the expected cost per conversion and a starting budget change in 5% steps. Every figure is plain arithmetic, no model is asked to find a pattern; a promotion or an outage in a month looks like a season, so a single year of history is shown as a lead, not a rule. Call Transcript Analyzer (/p2/paid-marketing/call-transcript-analyzer): reads CallRail (the agency's two accounts, OIA and 42 North Dental, and their locations) to show every call of a range counted by CallRail itself (calls, answered, missed, first-time callers, CallRail leads) by source, campaign, keyword and location, with the locations whose missed calls stand out, and a read of a sample of the transcribed calls by plain keyword rules (not a model): what callers wanted (new patient, pain, treatment, existing appointment, insurance, records), how many people looking for care ended in an appointment, the likeliest reason for the ones that did not, CallRail's own lead score and sentiment, and the calls that look like lost opportunities with a link to open each in CallRail. These are HIPAA accounts: no caller name, number, summary or transcript is shown, stored or sent to an AI model. OIA has no recordings, so it shows counts only. Ad Strength Analysis (/p2/paid-marketing/ad-strength): pick a Google Ads account or MCC and it reads Google's ad strength rating (Poor, Average, Good, Excellent) for every live Responsive Search Ad and Performance Max asset group, with Google's own tips for each ad (for example to include more keywords in the headlines, or to add sitelinks), every headline and description with Google's rating of it, and the new ad text Google itself recommends where it has some. The ads below Good are listed worst and busiest first (last 30 days of impressions). On request for one ad, Claude suggests which headlines and descriptions to replace or add; the code holds every suggestion to Google's character limits and to facts the ad already states. Performance Max tips and per-asset ratings are not in Google's API, so for those the asset counts are held against what Google accepts. It only recommends: nothing is changed in Google Ads, and Google does not publish how it scores strength, so a change is not guaranteed to reach Good or Excellent. Audience Segment Analysis (/p2/paid-marketing/audience-segments): pick a Google Ads account or MCC, a Meta ad account, or a Google and a Meta account of the same currency together, and a date range, and it reads Google Ads and Meta Ads to compare the audiences the account uses (Google: in-market, affinity, remarketing, customer match, similar and custom segments wherever they are attached, ad groups and campaigns; Meta: custom audiences, lookalikes, interests and behaviors, where Meta reports results per ad set, not per audience, so an audience's numbers are those of the ad sets aimed at it and an ad set aimed at two audiences counts under both), each judged against the account's own average for the same campaign type (an efficiency index of 100 is average, from return on ad spend when conversion value is tracked, otherwise cost per conversion; under 5 conversions is too little data). It says whether each audience observes or targets, its current bid adjustment, and a suggested adjustment, but only where the campaign can take one: Smart Bidding, Demand Gen and Performance Max ignore audience bid adjustments, so there the advice is an ad group, a budget or an exclusion; Meta has no audience bid adjustment at all, so its advice is an ad set of its own, a budget or the targeting (an ad set on Advantage+ audience treats its audiences as suggestions). It also compares the kinds with each other, lists the account's audience lists with their sizes (a list under about 1,000 members cannot serve on Search) and which are unused, and lists the excluded audiences. Performance Max audience signals report no results in Google's API, so they are not in it. Asset Coverage Audit (/p2/paid-marketing/asset-coverage): pick a Google Ads account or MCC and it reads every asset the live campaigns carry, from the ad group, the campaign and the account, and holds each Search and Performance Max campaign against the sitelinks, callouts, structured snippets, call, images, business name, logo and location assets it should have, each Performance Max asset group against the headlines, descriptions, images, logo, business name and video it needs, and each Display and Demand Gen ad against its images, logos, videos, headlines, descriptions and business name. It lists what to add, how many, worst gap and busiest campaign first (last 30 days of impressions), plus assets that are disapproved, paused, past their end date or never shown, coverage bars per kind of asset, and the account-wide assets. Everything on it opens onto the assets themselves: a card or a coverage bar opens every asset behind it (the picture of an image, the text and lines of a sitelink, a snippet's values, a promotion's terms, a video's thumbnail, with whether each is live, disapproved, paused or past its end date, which campaigns use it and its impressions and clicks over the last 30 days), and each kind of asset in an opened campaign, Performance Max asset group or Display and Demand Gen ad opens onto the assets it holds. Minimums are what Google needs for the format to show; targets are Position2's rule of thumb and say so. Shopping, Video, Smart, Local Services and app campaigns are not audited (their assets are built from a feed or managed by Google). It only recommends: nothing is changed in Google Ads. Strategy & Campaign Book (/p2/paid-marketing/campaign-book): give it a client (a website, a client brief, optionally a Google Ads account), the monthly budget and the goal, choose which research to run (the client's website, the competitors' websites, Social Media Intelligence for what the brand posts on its own, the Google Ads account's history, Google Keyword Planner, the account's seasonality, and a web search for the market and its advertising rules), and it writes a full strategy and a campaign book in the background: the business and its proof, the competitors compared, objectives with a forecast worked out in code, channels and budget by campaign, bidding path, targeting, messaging, measurement, tests, a 90 day roadmap and risks, and for every campaign its ad groups, keywords, negative keywords, responsive search ad copy held to Google's character limits, sitelinks, callouts and snippets (or Performance Max asset groups with audience signals and search themes, or Demand Gen, Display and Video ad groups). Each campaign also gets its Campaign Book in the layout the QA Agent checks a launched campaign against (Field, Value, Other things to check), so the downloaded book can be added to the QA Agent unchanged. It downloads as Excel, CSV and PDF. Facts used in ads are quoted from the client's own pages, claims not found there are listed for the client to confirm, and it only recommends: nothing is changed in Google Ads. Business Research (/p2/paid-marketing/business-research): the first step with a new client, before any audit or strategy. Give it a client (a website, a client brief, optionally a Google Ads account), choose which research to run (the client's website, including which analytics, ad, call tracking and booking tags its pages carry; a web search for reviews, press, awards and who is behind the business; Social Media Intelligence; the Google Ads account's history; up to three competitors' websites; and a web search for the market and its advertising rules), and it writes up, in the background, the business (what it sells with a priority for paid search, what sets it apart with the quote that proves each point, the voice, the advertising rules that touch it, the facts an ad may state and what its website gets wrong), who buys and why (audiences with what they search and what worries them, the journey from search to customer, objections and answers, places and seasons), and what it means for paid media (what to advertise first and what to hold back, angles and tests to try, how the client compares with the competitors that were read, what the reviews and the brand's own posts say, what to check about tracking, the questions to put to the client grouped by area and urgency, risks and next steps). The tags a site carries are read by code from its pages, and ratings and review counts are transcribed from what the web search found (marked when no page it read confirms them), never worked out by the model; facts and points of difference are marked when their quote cannot be found word for word on a page (a point backed only by the web search says so), and claims not found on the client's pages or in what the search found are listed for the client to confirm. It downloads as Excel, CSV (the questions for the client) and PDF, and a zip of every table as CSV. It only recommends: nothing is changed in Google Ads. Keyword Research (/p2/paid-marketing/keyword-research): finds the searches an account is not bidding on yet. Give it a client (what it sells, a website, optionally a Google Ads account, where it serves customers, up to three competitors, what to stay away from and the smallest monthly search volume worth looking at), choose what to read first (the latest finished Business Research of the same client, the client's website, the account's keywords, negative keywords and 90 days of search terms, and the competitors' websites), and it asks Google Keyword Planner for ideas for each thing the client sells, for the site, for each competitor's site and for what already converted. Every idea is compared with the account: it is already a keyword, already matched by a broader phrase or broad match keyword (plurals do not hide a duplicate), blocked by a negative keyword in a campaign or a shared list (an idea blocked in every campaign is left out, one blocked in only some says so), or new. Close variants are merged, a keyword that holds the client's own name is brand and one that holds a named competitor's name is competitor (set by code, and competitor keywords are never put in the Google Ads Editor file). Claude then groups the market into themes (tied to the account's existing campaigns where one fits), judges each keyword's fit, intent, theme, match type and priority in chunks (each chunk saved as it finishes, so a build that stops asks only about the rest), and writes the read, first moves, negative keywords to add, tests, questions for the client and risks. Every number (searches a month, competition, bids, the twelve months, the peak month, rising or falling) is Keyword Planner's and is worked out in code, never by the model (a number the model writes that it was not given is listed in the checks); searches are counted in the places given (or the whole country of the account's currency, or the United States, and the result says which); the coverage headline is the share of the searches for every idea that shares a word with what the client sells that the account already bids on or matches (not only the keywords judged); a negative the model suggests is dropped when it would block a keyword the account bids on or the research recommends, or an existing negative already blocks everything it would; a keyword is not put in the Google Ads Editor file for a campaign that blocks it with a negative, and if the account's keywords could not be read nothing is recommended for adding and no file is made. One year of monthly figures is a lead for planning, not a rule. It downloads as Excel, CSV (every table, in a zip), PDF, and a CSV for Google Ads Editor (Campaign, Ad group, Keyword, Criterion Type, Status Paused) holding only keywords judged a fit and new to the account. It only recommends: nothing is changed in Google Ads. Account Audit (/p2/paid-marketing/account-audit): is the account set up to win, before a strategy is built on it. Pick a Google Ads account, a Meta ad account or one of each (an MCC is not audited) and it reads the account live and holds it against a written checklist of about fifty checks. For Google Ads: the account settings (active, auto-tagging, who owns conversion tracking, the Google tag, enhanced conversions, call reporting), conversion tracking (a primary action that records conversions, actions that recorded nothing, lead and purchase counting, a tag and a GA4 import counting the same event, value bidding with no values, attribution, lookback windows, the GA4 link inferred from imported actions because the API does not show it), links and audience lists, structure and bidding (locations, the Display Network on Search, Search Partners judged on cost per conversion, budget limits, Google's own status reasons, learning, Smart Bidding with too few conversions, spend with no conversions, impression share lost to rank), keywords and search terms (negative keywords, broad match under Smart Bidding, Quality Score and which of its three parts is weak, duplicate keywords, keywords that spent and never converted, the share of search term spend that never converted, ad groups with no or too many keywords), and ads and landing pages (an ad group with no live ad, a single ad, Poor ad strength, disapproved ads, retired formats, pinning, and the landing pages fetched to see that they load). For Meta Ads: the ad account's status and spend cap, the pixel (installed, last fired, conversion events and not only page views, advanced matching, Conversions API events), learning limited ad sets, issues Meta flags, spend with no results, ad sets optimising for clicks in lead and sales campaigns, frequency, disapproved ads, and ad sets with no ad or a single ad. Every check has a severity (critical, high, medium, low) and a result (pass, warning, fail, not applicable, or could not check): a part the platform would not read is reported as could not check and is never passed or failed. Every figure is plain arithmetic on what the platform returned and no model is asked to find problems. The score is the share of the checks' weight that passed (a warning counts half), shown for each section, each platform and the whole account, and a failed critical check keeps the grade at C or below. The page lists the checks to fix first, every section's findings with why it matters, what to do and the affected campaigns, ad groups or keywords, and what the audit could not see (account-level negative keywords and the GA4 link are not in Google's API). It downloads as Excel, PDF and a zip of CSV files. It only reads: nothing is changed in Google Ads or Meta.
 
 Landing Page & Relevancy Check (/p2/paid-marketing/landing-page-check): does the page keep the promise the ad made. Pick a Google Ads account (an MCC is not checked), a Meta ad account or one of each (a page both platforms send people to is one page, fetched once) and it reads, read only, what each landing page took over the last 30 days (spend, clicks, conversions, the phone and desktop split, Google's own mobile speed score where it gives one) and the ads, keywords with their Quality Score parts and search terms of the ad groups that send people there, then fetches the busiest 40 pages (the platform's guarded fetch, HTML only, as a browser first receives it) and holds each one against a written checklist of 39 checks in six sections (35 apply to a page Google's ads send people to, 30 to a page Meta's ads send people to, and all 39 to one both send people to): the page opens (answers, does not bounce a deep link to the home page, keeps the click id and UTM tags through a redirect, https, not a test site, not closed to Google's AdsBot), does it match the ad (the keywords, weighted by spend, are on the page and in its headline, the search terms people typed are on it, the ad headline is echoed by the page's headings, the prices, discounts and free offers in the ads are on the page, one clear H1, Google's own landing page experience and ad relevance ratings, enough to read), can a visitor act (a form, tappable phone, booking tool or buy button, a call to action in the first screen, a short form, not a maze of links), works on a phone (a mobile viewport, zoom not blocked, tap-to-call, phone against desktop conversion rate), loads fast (Google's speed score, server time, HTML weight, compression, scripts that block the first paint, script count, images without a set size, and an optional lab test), and tracking and trust (a Google tag or Tag Manager, a privacy link, contact details, proof). Every check has a severity and a result (pass, warning, fail, not applicable, could not check). A page that refuses automated requests is reported as not verified, never as broken, and a page built by scripts, or cut at the reading limit, leaves the checks that need its HTML as could not check. A page that does not open scores 0. Every figure is arithmetic on what Google Ads and the page returned and no model is asked to find problems. Each page gets a score and grade, the account's score weights the pages by what they spent, and the Fix first list is one row per check across the pages with what the pages it fails on spent. Each page opens to its checks, its ad groups (each keyword and search term marked as in the headline, on the page, partly there or not on the page, and each promise in the ads marked as on the page or not), what the page was seen to say and offer, and its device split. Two optional steps run only when someone asks, for one page at a time: a lab speed test (Google's PageSpeed Insights on a mobile profile, only when PAGESPEED_API_KEY is set) and Read it like a person, where Claude is shown the ad copy, keywords, search terms and the page's own visible text (phone numbers, emails and long numbers masked) and says whether the page keeps the promise, what is missing and what to change; any number it writes that it was not shown sends it back once and then falls back to the checks' own words, and it never changes a score. For a page Meta's ads reach, the ads' headline, primary text and description are held against the page in place of keywords and search terms (Meta has none), Meta's own conversion rate and quality ratings of the ads that reach it stand in for Quality Score (Meta rates only ads with enough impressions), the Meta pixel and Meta's click id (fbclid) through a redirect stand in for Google's tag and click id, and Google's own speed score, AdsBot check and keyword checks are not applied; Meta spend that reaches no web page of the client's (an instant form, a message, a call, an app, a post whose link the ad record does not carry) is counted and named, not checked. One platform that will not answer is a warning and the report is the other's; a Google and a Meta account are read together only when they bill in the same currency. It downloads as Excel, PDF and a zip of CSV files. Test & Experiment Tracker (/p2/paid-marketing/experiment-tracker): what is being tested in an account, whether each test has said anything yet, and what to do. Pick a Google Ads account (an MCC is not read), a Meta ad account or one of each and it reads, read only, every Google Ads experiment that is not removed (its status, dates, and what its control and trial arms did on every day from the start to yesterday), every Meta A/B test (its cells, the campaigns or ad sets each holds and what they did on every day of the test; the first cell is the control and a test of three or more is compared on its first two; lift studies are listed without a result) and every ad group or Meta ad set that has two or more live ads, which is a copy test whether or not anyone planned it (the last 30 days). Each test gets a verdict and a plain next step: winner or behind (the trial or an ad is ahead or behind by more than chance), no difference, too early, no data, or not measured (an ad variations experiment has no arms in the Google Ads API). The verdict is a two-sided two-proportion z-test at 95 percent confidence on conversion rate (conversions per click) or, when there are no conversions to look at, click rate, and a test is never called before it has 7 days and enough to count (100 clicks in each arm and 30 conversions together, or 1,000 impressions in each arm for click rate); too early says what is still needed and how many days that is at the current pace. Several ads in one ad group are each held against the best one at a stricter bar so picking the best of many is not read as a win, and a result of no difference says the smallest gap that much data could have seen. A running experiment is flagged when it is ahead (apply it), behind (end it), past its end date, ending within 7 days, or when an arm did not get the traffic its split promised. Cost per conversion and conversion value are shown but never decide a verdict. Every figure is arithmetic and no model is asked whether a test won. Meta shows the ad it expects to do best more often, so an ad test between ads of one Meta ad set reads what happened and is a lead, not a fair test (a Meta A/B test is); what Meta counts as a conversion depends on the campaign's objective. One platform that will not answer is a warning and the report is the other's; a Google and a Meta account are read together only when they bill in the same currency. The way Meta describes a test's cells could not be tried against a live account from the development machine, so a test whose cells Meta would not describe is listed as not measured with the reason. It downloads as Excel, PDF and a zip of CSV files. It only reads: nothing is changed in Google Ads or Meta.
+
+Unknown Domains Alert (/p2/paid-marketing/unknown-domains): alerts by email and Slack when an ad points at a web address nobody approved, which catches an ad launched under the wrong account and is the first check that an ad account has been taken over. It reads, read only, every enabled ad in every Google Ads account under Position2's manager account (final and mobile final URLs, the tracking templates of the ad, ad group, campaign and account, Performance Max asset group addresses and the sitelinks and other assets attached to campaigns and accounts) and every active Meta ad (the website of its creative), and holds each domain against the domain database managed on the page: a domain and who may send people to it (one account, a client which is an MCC, or everyone), where an entry for example.com covers every subdomain, added one at a time or imported from a CSV or a shared Google Sheet and exported as CSV. A domain in nobody's list is an Unknown domain (Critical when it looks like an approved domain, a letter or a look-alike character off, or when a tracking template sends people through it, else High); a domain in the database for other accounts only is Wrong account. Three or more new unknown domains in one account in one scan is flagged as a possible account takeover at the top of the alert. Nothing is alerted until a baseline is set on the page (Trust what the accounts use today adds each account's current domains), after that each new finding is alerted once as one digest by email and Slack to the recipients and channel set on the page; a send that fails or has nowhere to go is recorded and tried again at the next scan. Findings can be approved for the account, its client or everyone, dismissed, reopened, and go Gone when fixed. It scans every 12 hours (a GitHub Actions workflow calling a secret-guarded address) and on Scan now. Addresses on Facebook, Instagram, WhatsApp and the app stores are never findings, and paused ads, who changed what, new users and billing are not read. It never pauses or changes anything.
 
 Ad Copy & Creative Generator (/p2/paid-marketing/ad-copy): ad copy that is ready to paste, and the creative briefs for formats that need an image or a video. Give it the client (a name, what the ads are for, optionally a website and a Google Ads account), the formats (Google Search responsive search ad, Performance Max asset group, Demand Gen, Responsive Display, Meta feed, Meta Stories and Reels), up to five angles (benefit, problem, proof, offer, urgency, question, local, action), a tone, the facts the client confirmed, keywords to work in, words to avoid and competitors never to name. It reads the client's website (the platform's guarded fetch) and, with an account, the keywords and the best existing responsive search ads, then Claude writes each format on its own from only that evidence and the facts given. What is kept is decided in code, never by the model: a line over the format's limit is dropped, not cut (Google headlines 30, descriptions 90, long headlines 90, Performance Max short description 60, Demand Gen headlines 40, Meta primary text 125, headline 40, link description 30); a line Google Ads would refuse is dropped (emoji, an exclamation mark in a headline, a word in capitals, doubled punctuation, a phone number or web address); copy that tells a Meta viewer something about their personal attributes is dropped; a line that names a competitor, holds an avoid word or repeats another is dropped; Google headlines are in Start Case; and a claim the client's pages and the confirmed facts do not hold (a price, a percentage, years or reviews, a rating, free, a guarantee, best, same day, a health claim) does not drop the line but marks it Confirm, lists the exact claim, and leaves it out of the file for Google Ads Editor until the client confirms it. A format that comes out short is asked once more for exactly what is missing and the result says if it is still short. Each line shows its length against the limit, its angle and whether it is ready; lines can be copied one at a time or all the ready ones in a field. A brief gives the concept, the hook, the visual direction, a script for video, what to ask the client for, do and do not, and the published image and video sizes. It downloads as Excel (a sheet per format), a zip of CSV files, PDF, and a CSV of the ready search ad for Google Ads Editor, Paused. It runs in the background and shares its table of saved builds and its daily cap with Strategy & Campaign Book, Business Research and Keyword Research. It only writes: nothing is created or changed in Google Ads or Meta, and it does not make images or video. Meta lengths are Meta's recommended lengths as published, and image and video sizes should be checked on the platform before a brief goes to a designer.
 Cross-Channel & Attribution Analysis (/p2/paid-marketing/cross-channel): how Google Ads and Meta Ads compare and what they add up to. Pick a Google Ads account, a Meta ad account or one of each (they must bill in the same currency), a range (the last 30, 60 or 90 days, last month or the month so far) and a conversion measure (the conversions each platform bids on, or all conversions), and it reads each platform's daily numbers and shows the platforms side by side and blended against the period of the same length before: spend, clicks, conversions, value, cost per conversion and return on ad spend, with each platform's share of the spend beside its share of the conversions and the value. It splits any change in the blended cost per conversion exactly into what each platform's own cost did and what moving conversions between platforms did, shows the campaign types (Search, Performance Max, Demand Gen, Display, Video, Shopping; Meta by objective) each labelled by what it is usually for (captures demand, creates demand, mixed: a rule of thumb, and a campaign that creates demand is not fairly judged on last-click cost per conversion), and with eleven or more whole weeks (the last 90 days) tests whether one platform's spend moves with the other's conversions, in the same week or a week later, with a strict bar (p below 0.0125 and a correlation of 0.5 or more either way) and says it is a pattern, not proof. It also reads how each platform counts a conversion (Google's primary conversion actions with their click and view lookback windows and attribution model, Meta's attribution window of each ad set weighted by spend) and says in words what makes the two incomparable: different click windows (the longer window counts more), Meta counting people who saw the ad and did not click while Google's Conversions counts clicks only, each platform crediting itself so a person who clicked both is counted by both, and different goals (leads against sales). A person can type the conversions and the revenue their own system recorded for the range; it then says whether the platforms claim more than happened (so some are counted twice) and shows each platform's cost per conversion and return scaled down by the same factor, and the spend per recorded conversion; if the platforms claim less than happened it says the rest came from elsewhere and scales nothing. A platform with under 30 conversions is not ranked. Findings are ranked high, medium, low and information, each with the figures and what to do (a cost per conversion gap of 1.5 times or more suggests testing a move of 10 to 20 percent of the dearer platform's budget, judged on the person's own recorded conversions). It downloads as Excel, PDF and a zip of CSV files. It only reads: nothing is changed in Google Ads or Meta, and no model is asked, every figure is arithmetic. GA4, LinkedIn Ads, programmatic, a CRM and offline sales are not read yet, so a conversion neither platform claims cannot be seen; the reconciliation uses the person's own number instead.
