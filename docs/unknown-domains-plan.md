@@ -72,9 +72,9 @@ an approved, dismissed or gone finding is not alerted again. A **test alert** bu
 
 ## When it scans
 
-- **Every 12 hours** by a GitHub Actions workflow that calls a secret-guarded address on the platform (the same pattern as the Pacing seed). It needs
+- **Every 4 hours** by a GitHub Actions workflow that calls a secret-guarded address on the platform (the same pattern as the Pacing seed). It needs
   two things from you: a `DOMAIN_ALERT_SECRET` set both on Railway and as a GitHub Actions secret, and the platform's base URL as a GitHub variable.
-  Twelve hours is about 500 Google Ads reads a day of the roughly 2,900 the platform may use; say if you want it more or less often.
+  Every 4 hours is six scans a day, about 250 Google Ads reads each (roughly 1,500 a day) of the roughly 2,900 the platform may use, shared with every other agent; say if you want it less often.
 - **Scan now** on the page (staff), which alerts too.
 
 A scan runs in the background; two never run at once; an account that cannot be read is named on the scan, not skipped silently.
