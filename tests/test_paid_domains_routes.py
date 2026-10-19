@@ -18,9 +18,10 @@ os.environ.setdefault("GOOGLE_CLIENT_SECRET", "test")
 os.environ.setdefault("FLASK_SECRET_KEY", "test")
 
 import app as appmod  # noqa: E402
-from domains_fakes import Deliver, MemStore  # noqa: E402
+from domains_fakes import Deliver, MemStore, Site  # noqa: E402
 from tracker import paid_domains as d  # noqa: E402
 from tracker import paid_domains_scan as sc  # noqa: E402
+from tracker import paid_links as pl  # noqa: E402
 
 STAFF = "someone@position2.com"
 API = "/p2/paid-marketing/api/domains"
@@ -52,6 +53,7 @@ def world(monkeypatch):
     monkeypatch.setattr(appmod, "_dom_inventory", lambda s: ([A, B], GROUPS, []))
     monkeypatch.setattr(appmod, "_dom_spawn", lambda fn: fn())
     monkeypatch.setattr(sc, "read_account", lambda a, s: ([ad(a, u, i) for i, u in enumerate(ads[a["id"]])], {"ads": len(ads[a["id"]]), "assetGroups": 0, "assets": 0}))
+    monkeypatch.setattr(pl, "default_fetch", lambda: Site())
     monkeypatch.setenv("DOMAIN_ALERT_SECRET", "s3cret")
     store.state_set("settings", {"emails": ["ppc@example.com"], "slackChannel": "#alerts"})
     return type("W", (), {"store": store, "deliver": deliver, "ads": ads})()
@@ -206,3 +208,21 @@ def test_an_unavailable_store_is_a_503(monkeypatch):
     monkeypatch.setattr(appmod, "_dom_inventory", lambda s: ([A], GROUPS, []))
     r = client_as(STAFF).get(API + "/state")
     assert r.status_code == 503 and "unavailable" in r.get_json()["error"]
+
+
+def test_the_url_checker_state_dismiss_reopen_and_the_sheet(world, monkeypatch):
+    monkeypatch.setattr(pl, "default_fetch", lambda: Site({"https://strange.example/": 404, "https://acme-garden.com/": "https://elsewhere.example/"}))
+    monkeypatch.setattr(pl.time, "sleep", lambda s: None)
+    assert post("/scan").status_code == 202
+    j = client_as(STAFF).get(API + "/state").get_json()
+    assert j["linkCounts"]["open"] == 2 and {f["kind"] for f in j["links"]} == {"broken", "redirect_domain"}
+    broken = next(f for f in j["links"] if f["kind"] == "broken")
+    assert post("/links/%s/dismiss" % broken["fingerprint"]).status_code == 200 and world.store.links[broken["fingerprint"]]["status"] == "dismissed"
+    assert post("/links/%s/reopen" % broken["fingerprint"]).status_code == 200 and world.store.links[broken["fingerprint"]]["status"] == "open"
+    assert post("/links/nothex/dismiss").status_code == 404
+    assert post("/links/%s/delete" % broken["fingerprint"]).status_code == 404
+    assert post("/links/%s/dismiss" % ("0" * 24)).status_code == 400
+    r = client_as(STAFF).get(API + "/links.xlsx")
+    assert r.status_code == 200 and "spreadsheetml" in r.mimetype and r.data[:2] == b"PK" and "broken-links.xlsx" in r.headers["Content-Disposition"]
+    assert client_as(None).get(API + "/links.xlsx").status_code == 302
+    assert post("/links/%s/dismiss" % broken["fingerprint"], headers={"Origin": "https://evil.example"}).status_code == 403

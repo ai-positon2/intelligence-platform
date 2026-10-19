@@ -1412,6 +1412,7 @@ details.sq-fallback .sq-drops{margin-top:10px}
 .ud-sev.medium{color:var(--under);background:var(--under-d);border-color:var(--under-l)}
 .ud-sev.redirect{margin-top:4px;color:var(--bad);border-color:var(--bad-l)}
 #findTbl{min-width:1100px}
+#linkTbl{min-width:1000px}
 .ud-why{max-width:300px;font-size:12.5px;line-height:1.5;color:var(--pm-ink2)}
 .ud-url{max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ud-act{white-space:nowrap}
