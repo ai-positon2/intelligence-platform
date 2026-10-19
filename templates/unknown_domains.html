@@ -6,7 +6,7 @@
     <div class="pm-hero-l">
       <span class="pm-eyebrow"><span class="d"></span>Paid Marketing · Account safety</span>
       <h1 class="pm-title">An ad that points <span class="pm-grad">somewhere it should not.</span></h1>
-      <p class="pm-sub">Every 4 hours the agent reads <b>every enabled ad in every Google Ads and Meta Ads account</b> and checks where it sends people against the
+      <p class="pm-sub">Every 4 hours the agent reads <b>every enabled ad in every Google Ads and Meta Ads account</b>, checks that its link <b>works and does not redirect</b>, and checks where it sends people against the
         <b>domain database</b> below. An address nobody approved is either an <b>ad launched under the wrong account</b> or the first sign of an
         <b>account that has been taken over</b>, and either way the team hears about it by <b>email and Slack</b>. It only reads. It never pauses or changes an ad.</p>
     </div>
@@ -49,6 +49,21 @@
       </div>
       <div class="pm-scroll"><table id="findTbl"></table></div>
       <button type="button" class="pm-btn-ghost sg-more" id="findMore" hidden></button>
+    </section>
+
+    <section class="pm-panel" id="linkCard">
+      <div class="pm-panel-h"><span class="pm-panel-t">URL Checker</span><span class="pm-panel-s" id="linkNote"></span></div>
+      <p class="ud-p">Every scan also opens the final URL of every enabled ad and lists the ones that are <b>broken</b> (page not found, a server error, a domain that does not resolve, a bad
+        certificate, no answer) or that <b>redirect</b> somewhere else. New ones are emailed as a sheet so the affected campaigns can be paused and fixed. A change that only moves a page from
+        http to https, adds or drops <code>www</code> or a trailing slash is not a redirect. A site that refuses automated checks is counted as not verified, never as broken.</p>
+      <div class="ud-actions"><a class="pm-btn-ghost" id="linkSheet" href="/p2/paid-marketing/api/domains/links.xlsx" hidden>Download the sheet</a><span class="dim" id="linkRun"></span></div>
+      <div class="ud-tools">
+        <input type="text" id="linkFilter" placeholder="Search by account, campaign, ad or link…" aria-label="Search broken links" autocomplete="off">
+        <div class="pm-chips" id="lkStChips" aria-label="Status"></div>
+        <div class="pm-chips" id="lkKindChips" aria-label="Kind of problem"></div>
+      </div>
+      <div class="pm-scroll"><table id="linkTbl"></table></div>
+      <button type="button" class="pm-btn-ghost sg-more" id="linkMore" hidden></button>
     </section>
 
     <section class="pm-panel" id="dbCard">
@@ -106,5 +121,6 @@
 </div>
 {% endblock %}
 {% block scripts %}
-<script src="{{ url_for('static', filename='js/unknown_domains.js') }}?v=1"></script>
+<script src="{{ url_for('static', filename='js/url_checker.js') }}?v=1"></script>
+<script src="{{ url_for('static', filename='js/unknown_domains.js') }}?v=2"></script>
 {% endblock %}

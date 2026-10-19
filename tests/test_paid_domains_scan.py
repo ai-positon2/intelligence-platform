@@ -15,7 +15,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from domains_fakes import Deliver, MemStore  # noqa: E402
+from domains_fakes import Deliver, MemStore, Site  # noqa: E402
 from tracker import paid_domains as d  # noqa: E402
 from tracker import paid_domains_scan as sc  # noqa: E402
 
@@ -50,8 +50,9 @@ def strange(store):
     return next(f for f in store.found.values() if f["host"] == "strange.example")
 
 
-def scan(store, world, deliver, trigger="test"):
-    return sc.run_scan(store, trigger=trigger, link=LINK, deliver=deliver, inventory_fn=world.inventory, read_fn=world.read, workers=2)
+def scan(store, world, deliver, trigger="test", site=None):
+    return sc.run_scan(store, trigger=trigger, link=LINK, deliver=deliver, inventory_fn=world.inventory, read_fn=world.read, workers=2,
+                       fetch_fn=site or Site(), sleep_fn=lambda s: None)
 
 
 def configured():
@@ -232,7 +233,7 @@ def test_a_scan_that_breaks_is_recorded_and_the_lock_released():
 
     def boom(store):
         raise RuntimeError("inventory down")
-    run = sc.run_scan(s, trigger="t", link=LINK, deliver=dv, inventory_fn=boom, read_fn=w.read)
+    run = sc.run_scan(s, trigger="t", link=LINK, deliver=dv, inventory_fn=boom, read_fn=w.read, fetch_fn=Site())
     assert run["status"] == "failed" and "inventory down" in run["error"] and sc.LOCK not in s.locks
     assert s.state_get("runs")[0]["status"] == "failed"
 
@@ -247,7 +248,7 @@ def test_a_quota_error_stops_reading_google():
     def read(account, store):
         seen.append(account["id"])
         raise Quota("out of reads")
-    run = sc.run_scan(s, trigger="t", link=LINK, deliver=dv, inventory_fn=w.inventory, read_fn=read, workers=1)
+    run = sc.run_scan(s, trigger="t", link=LINK, deliver=dv, inventory_fn=w.inventory, read_fn=read, workers=1, fetch_fn=Site())
     assert seen == [A["id"]] and run["unreadableCount"] == 2 and "budget" in run["unreadable"][1]["error"]
 
 

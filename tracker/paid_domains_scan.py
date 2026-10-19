@@ -17,11 +17,13 @@ from __future__ import annotations
 import csv
 import io
 import re
+import time
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 
 from . import paid_domains as dom
 from . import paid_domains_read as rd
+from . import paid_links, paid_links_scan
 
 LOCK = "scan-lock"
 LOCK_TTL_S = 30 * 60
@@ -112,7 +114,8 @@ def send(store, message, deliver):
     """Send an alert message ({subject, text, html, slack_text, slack_blocks}) to the saved recipients and channel: {email: {status, error?}, slack: {...}},
     and `sent` True when at least one channel took it."""
     s = settings(store)
-    email = (deliver.attempt(lambda: deliver.send_email(message["subject"], message["text"], message["html"], s["emails"]))
+    extra = {"attachments": message["attachments"]} if message.get("attachments") else {}
+    email = (deliver.attempt(lambda: deliver.send_email(message["subject"], message["text"], message["html"], s["emails"], **extra))
              if s["emails"] else {"status": "not_configured", "error": "No email address is set."})
     slack = (deliver.attempt(lambda: deliver.send_slack(s["slackChannel"], message["slack_text"], message["slack_blocks"]))
              if s["slackChannel"] else {"status": "not_configured", "error": "No Slack channel is set."})
@@ -329,7 +332,7 @@ def _keep_run(store, run):
     store.state_set("runs", runs[:RUNS_KEPT])
 
 
-def run_scan(store, *, trigger, link, deliver, inventory_fn=None, read_fn=None, now_fn=None, workers=WORKERS):
+def run_scan(store, *, trigger, link, deliver, inventory_fn=None, read_fn=None, now_fn=None, workers=WORKERS, fetch_fn=None, sleep_fn=None, check_links=True):
     """One scan. Returns the run record ({status: "busy"} when another is going)."""
     now_fn = now_fn or (lambda: datetime.now(timezone.utc))
     if not store.claim(LOCK, LOCK_TTL_S):
@@ -418,6 +421,16 @@ def run_scan(store, *, trigger, link, deliver, inventory_fn=None, read_fn=None, 
                     when = _iso(now_fn())
                     store.findings_put([dict(f, alertedAt=when, alert={"email": res["email"]["status"], "slack": res["slack"]["status"]}) for f in pending])
                     run["alerted"] = len(pending)
+        if check_links:
+            try:
+                def progress(n, total):
+                    if n % 50 == 0:
+                        _progress(store, running=True, startedAt=_iso(started), phase="links", done=n, total=total)
+                _progress(store, running=True, startedAt=_iso(started), phase="links", done=0, total=0)
+                run["links"] = paid_links_scan.run_check(store, sightings, ok_ids, link=link, send=send, deliver=deliver, fetch=fetch_fn or paid_links.default_fetch(),
+                                                         sleep=sleep_fn or time.sleep, now_fn=now_fn, on_progress=progress)
+            except Exception as e:                                                  # noqa: BLE001 (a failed URL check never costs the domain scan)
+                run["links"] = {"error": ("%s: %s" % (type(e).__name__, e))[:300]}
         _keep_run(store, run)
         return run
     except Exception as e:                                                          # noqa: BLE001
@@ -442,4 +455,4 @@ def snapshot(store, accounts, groups, problems, deliver):
     runs = store.state_get("runs") or []
     return {"accounts": accounts, "groups": groups, "problems": problems, "known": store.known_list(), "findings": findings, "counts": counts,
             "settings": settings(store), "senders": deliver.ready(), "baseline": baseline(store), "inUse": in_use(store), "runs": runs[:10],
-            "progress": store.state_get("progress") or {}}
+            "progress": store.state_get("progress") or {}, **paid_links_scan.snapshot(store)}

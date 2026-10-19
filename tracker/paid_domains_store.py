@@ -1,10 +1,12 @@
 """Paid Marketing Agents: Unknown Domains Alert, what is saved.
 
-Three tables in the platform's Postgres, prefixed pm_dom_ like the rest of Paid Marketing's:
+Five tables in the platform's Postgres, prefixed pm_dom_ like the rest of Paid Marketing's:
 
   pm_dom_known      the domain database: a domain and who may send people to it (one account, an MCC group, or everyone ("*")), who added it and when
   pm_dom_findings   every address the scans found that is not approved: where it is, why it is flagged, its status (open, approved, dismissed, gone), when it
                     was first and last seen and when it was alerted
+  pm_dom_urls       the URL Checker's last answer for each address
+  pm_dom_links      the URL Checker's findings: a broken or redirecting address in one place (an ad, an asset group, a sitelink)
   pm_dom_state      small named values: the alert settings, the last scan's progress and the domains in use (for the baseline), the list of recent scans,
                     and the lock that keeps two scans from running at once
 
@@ -68,6 +70,42 @@ CREATE TABLE IF NOT EXISTS pm_dom_state (
 );
 """
 
+SCHEMA_LINKS = """
+CREATE TABLE IF NOT EXISTS pm_dom_urls (
+    url        TEXT PRIMARY KEY,
+    verdict    TEXT NOT NULL,
+    problem    TEXT NOT NULL DEFAULT '',
+    code       INTEGER,
+    final_url  TEXT NOT NULL DEFAULT '',
+    checked_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS pm_dom_links (
+    fingerprint  TEXT PRIMARY KEY,
+    kind         TEXT NOT NULL DEFAULT 'broken',
+    platform     TEXT NOT NULL,
+    account_id   TEXT NOT NULL,
+    account_name TEXT NOT NULL DEFAULT '',
+    place        TEXT NOT NULL DEFAULT '',
+    object_id    TEXT NOT NULL DEFAULT '',
+    object_name  TEXT NOT NULL DEFAULT '',
+    campaign     TEXT NOT NULL DEFAULT '',
+    ad_group     TEXT NOT NULL DEFAULT '',
+    url          TEXT NOT NULL,
+    host         TEXT NOT NULL DEFAULT '',
+    problem      TEXT NOT NULL DEFAULT '',
+    target       TEXT NOT NULL DEFAULT '',
+    code         INTEGER,
+    status       TEXT NOT NULL DEFAULT 'open',
+    first_seen   TIMESTAMPTZ NOT NULL DEFAULT now(),
+    last_seen    TIMESTAMPTZ NOT NULL DEFAULT now(),
+    alerted_at   TIMESTAMPTZ,
+    alert        JSONB NOT NULL DEFAULT '{}'::jsonb,
+    decided_by   TEXT,
+    decided_at   TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS pm_dom_links_status ON pm_dom_links (status, last_seen DESC);
+"""
+
 _COLS = ("fingerprint", "kind", "severity", "platform", "account_id", "account_name", "place", "object_id", "object_name", "campaign", "ad_group", "url", "host",
          "domain", "redirect", "lookalike", "owners", "why", "status", "first_seen", "last_seen", "alerted_at", "alert", "decided_by", "decided_at")
 # The same columns as the keys a finding has in tracker/paid_domains.py (camelCase there, snake_case here).
@@ -89,6 +127,7 @@ def ensure_tables():
         try:
             with conn.cursor() as cur:
                 cur.execute(SCHEMA)
+                cur.execute(SCHEMA_LINKS)
             conn.commit()
         finally:
             conn.close()
@@ -204,6 +243,77 @@ def findings_put(rows):
                 vals.append(v)
             cur.execute("INSERT INTO pm_dom_findings (" + ", ".join(_COLS) + ") VALUES (" + ", ".join(["%s"] * len(_COLS)) + ") "
                         "ON CONFLICT (fingerprint) DO UPDATE SET " + ", ".join("%s = EXCLUDED.%s" % (c, c) for c in _COLS[1:]), vals)
+
+
+# ── URL Checker: the last answer for each address, and the broken-link findings ──
+
+_LCOLS = ("fingerprint", "kind", "platform", "account_id", "account_name", "place", "object_id", "object_name", "campaign", "ad_group", "url", "host", "problem", "target", "code",
+          "status", "first_seen", "last_seen", "alerted_at", "alert", "decided_by", "decided_at")
+_LKEYS = ("fingerprint", "kind", "platform", "accountId", "accountName", "where", "objectId", "objectName", "campaign", "adGroup", "url", "host", "problem", "target", "code",
+          "status", "firstSeen", "lastSeen", "alertedAt", "alert", "decidedBy", "decidedAt")
+
+
+def urls_all():
+    """{url: {verdict, problem, code, finalUrl, checkedAt (epoch seconds)}}."""
+    with _tx() as cur:
+        cur.execute("SELECT url, verdict, problem, code, final_url, EXTRACT(EPOCH FROM checked_at) FROM pm_dom_urls")
+        return {r[0]: {"verdict": r[1], "problem": r[2], "code": r[3], "finalUrl": r[4], "checkedAt": float(r[5])} for r in cur.fetchall()}
+
+
+def urls_put(rows):
+    """Save the latest answers: {url: {verdict, problem, code, finalUrl, checkedAt (epoch seconds)}}."""
+    if not rows:
+        return
+    with _tx() as cur:
+        for u, r in rows.items():
+            cur.execute("INSERT INTO pm_dom_urls (url, verdict, problem, code, final_url, checked_at) VALUES (%s, %s, %s, %s, %s, to_timestamp(%s)) "
+                        "ON CONFLICT (url) DO UPDATE SET verdict = EXCLUDED.verdict, problem = EXCLUDED.problem, code = EXCLUDED.code, "
+                        "final_url = EXCLUDED.final_url, checked_at = EXCLUDED.checked_at",
+                        (u, r["verdict"], r.get("problem") or "", r.get("code"), r.get("finalUrl") or "", r["checkedAt"]))
+
+
+def urls_prune(before_epoch):
+    """Forget addresses not checked since then (an ad that no longer uses one)."""
+    with _tx() as cur:
+        cur.execute("DELETE FROM pm_dom_urls WHERE checked_at < to_timestamp(%s)", (before_epoch,))
+
+
+def _link(r):
+    d = dict(zip(_LKEYS, r))
+    for k in _TIMES:
+        d[k] = _iso(d[k])
+    d["alert"] = d["alert"] or {}
+    return d
+
+
+def links_all():
+    with _tx() as cur:
+        cur.execute("SELECT " + ", ".join(_LCOLS) + " FROM pm_dom_links ORDER BY last_seen DESC")
+        return [_link(r) for r in cur.fetchall()]
+
+
+def link_get(fingerprint):
+    with _tx() as cur:
+        cur.execute("SELECT " + ", ".join(_LCOLS) + " FROM pm_dom_links WHERE fingerprint = %s", (fingerprint,))
+        row = cur.fetchone()
+    return _link(row) if row else None
+
+
+def links_put(rows):
+    if not rows:
+        return
+    with _tx() as cur:
+        for f in rows:
+            vals = []
+            for k in _LKEYS:
+                v = f.get(k)
+                if k == "alert":
+                    v = json.dumps(v or {})
+                elif k in _TIMES:
+                    v = _ts(v)
+                vals.append(v)
+            cur.execute("INSERT INTO pm_dom_links (" + ", ".join(_LCOLS) + ") VALUES (" + ", ".join(["%s"] * len(_LCOLS)) + ") "
+                        "ON CONFLICT (fingerprint) DO UPDATE SET " + ", ".join("%s = EXCLUDED.%s" % (c, c) for c in _LCOLS[1:]), vals)
 
 
 # ── Named values and the scan lock ──────────────────────────────────────────

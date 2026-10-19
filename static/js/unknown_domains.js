@@ -71,6 +71,7 @@ function paintKpis(){
     ['Possible takeovers', take, take?"warn":"good", take?"accounts with 3 or more unknown domains":"none"],
     ['Domains approved', d.known.length, "", "in the database"],
     ['Accounts read', run&&run.read!=null?(run.read+" of "+run.accounts):"Na", run&&run.unreadableCount?"warn":"", run&&run.unreadableCount?(run.unreadableCount+" could not be read"):"at the last scan"],
+    ['Links to fix', (d.linkCounts||{}).open||0, (d.linkCounts||{}).open?"warn":"good", "broken or redirecting"],
     ['Alerts', d.baseline?"On":"Off", d.baseline?"good":"warn", d.baseline?"set by "+esc((d.baseline.by||"").split("@")[0]):"set the baseline first"]
   ];
   $("#kpis").innerHTML=cards.map(function(k){
@@ -91,7 +92,7 @@ function paintScan(){
   if(busy){
     var pct=p.total?Math.round(100*p.done/p.total):4;
     pr.querySelector("i").style.width=Math.max(4,pct)+"%";
-    pr.querySelector("span").textContent=p.total?("Reading account "+p.done+" of "+p.total):"Listing the accounts…";
+    pr.querySelector("span").textContent=p.phase==="links"?(p.total?("Checking links, "+p.done+" of "+p.total):"Checking links…"):p.total?("Reading account "+p.done+" of "+p.total):"Listing the accounts…";
   }
   var out=[];
   (S.data.problems||[]).forEach(function(t){out.push('<div class="pm-note warn">'+esc(t)+'</div>');});
@@ -226,6 +227,7 @@ function paintAlerts(){
 
 function render(){
   paintKpis();paintScan();paintBase();paintFindings();paintDb();paintAlerts();
+  if(window.UDLinks) window.UDLinks.paint(S.data);
   $("#skel").hidden=true;$("#out").hidden=false;
 }
 function load(){
@@ -317,5 +319,6 @@ function doImport(body){
     return load();
   }).catch(function(e){$("#impRes").innerHTML='<div class="pm-err">'+esc(e.message)+'</div>';});
 }
+window.UDLoad=load;
 load();
 })();

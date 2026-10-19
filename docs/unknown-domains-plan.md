@@ -134,3 +134,31 @@ A scan runs in the background; two never run at once; an account that cannot be 
 - The Postgres store against a real Postgres (no database here; the SQL is plain upserts and a lock claim). The tables are created on first use.
 - Meta Ads reading against a live account (no Meta token on the development machine); it reuses the Landing Page Check's reader.
 - Real email and Slack sends, and the GitHub Actions run (they need the secret and a deploy).
+
+## URL Checker (added 2026-10-19, same agent and page)
+
+Checks the final URLs of every enabled ad in every account for **broken links and redirects** and emails a **sheet** of them (with Slack as a short note) so the
+affected campaigns can be paused and fixed.
+
+- **Same scan, no extra reads.** The scan already reads every ad's final URLs (the ads, Performance Max asset groups, sitelinks and Meta creatives; tracking
+  templates are not final URLs). The URL Checker runs inside it on those addresses. Every address is checked once a day (20 hours between checks); an address
+  that is broken is checked again at every scan until it works. Scans are every 4 hours, so a link that breaks is found within the day and one that was found broken is
+  re-judged within 4 hours.
+- **What counts as broken:** page not found (404, 410), server error (5xx), the domain does not resolve, the secure connection or certificate fails, no
+  connection, no answer within 12 seconds, a redirect loop. A page that refuses automated checks (401, 403, 429 and similar) is **not verified**, never reported as broken.
+  An address with a non-standard port, or that resolves to a private address, is not checked.
+- **A redirect is a finding** (asked for by the team): the address ends up somewhere other than where it started. Two kinds: to another page of the same domain
+  (a moved page, an expired offer sent to the home page) and **to another domain** (the one to look at first). Only a change that merely normalises the same page
+  is ignored: http to https, adding or dropping `www.`, a trailing slash, capital letters, a query string. The guarded fetch follows up to 6 redirects and reports where
+  the address ends; it does not report the hops in between.
+- **No false alarms from a blip:** a broken answer is asked again after 2 seconds, and every broken address is asked a third time after the whole pass, minutes
+  later. It is broken only if it fails both times.
+- **The fetch** is the platform's guarded one (the Landing Page Check's): public addresses only, standard ports, every redirect checked again. It never reads the page body.
+- **Findings:** one per address per place (ad, asset group, sitelink). Open, fixed (it works now, or the ad is gone), dismissed (a person looked). Dismiss and
+  reopen on the page.
+- **The email** goes to the recipients saved for the domain alerts, with `broken-links.xlsx` attached: account, platform, campaign, ad group, where, ad, URL, problem, status
+  code, broken since, new this check, and a blank column to fill in. Slack gets the count and the worst few. Alerted once per finding, no baseline needed (a
+  broken link is wrong whoever launched it); the first check alerts everything broken today.
+- **Limits:** at most 4,000 addresses and 12 minutes per scan (the rest are checked at the next scan); soft 404s (a missing page that answers 200) and
+  pages that load but are blank are not detected.
+- Storage: tables `pm_dom_urls` (the last answer for each address) and `pm_dom_links` (findings). Code: `tracker/paid_links.py`, `paid_links_scan.py`.
