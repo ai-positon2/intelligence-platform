@@ -48,7 +48,7 @@ def inventory(store):
     """(accounts, groups, problems): every ad account the platform's logins see, as {id, name, platform, group}, the MCC groups ({id, name, accountIds}) and,
     for a platform that could not be listed, a sentence saying so (the scan goes on with the other)."""
     from . import paid_gads_segments as g
-    from . import paid_meta
+    from . import paid_meta, paid_store
     accounts, groups, problems = [], [], []
     if g.config_problem():
         problems.append("Google Ads is not connected: %s" % g.config_problem())
@@ -63,7 +63,7 @@ def inventory(store):
         problems.append("Meta Ads is not connected: %s" % paid_meta.config_problem())
     else:
         try:
-            accounts += [{"id": a["id"], "name": a["name"], "platform": "meta", "group": ""} for a in paid_meta.list_accounts(store)
+            accounts += [{"id": a["id"], "name": a["name"], "platform": "meta", "group": ""} for a in paid_meta.list_accounts(paid_store)
                          if a.get("status") in ("ACTIVE", "UNKNOWN", "")]
         except Exception as e:                                                      # noqa: BLE001
             problems.append("Meta Ads accounts could not be listed: %s" % e)
@@ -73,8 +73,8 @@ def inventory(store):
 def read_account(account, store):
     """(sightings, counts) of one account, read through the platform's own readers."""
     if account["platform"] == "meta":
-        from . import paid_meta
-        return rd.meta_sightings(account, lambda path, params: paid_meta._pages(path, params, store))
+        from . import paid_meta, paid_store
+        return rd.meta_sightings(account, lambda path, params: paid_meta._pages(path, params, paid_store))
     from . import paid_gads_segments as g
     return rd.google_sightings(account, g.search)
 
