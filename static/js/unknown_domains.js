@@ -83,7 +83,7 @@ function paintScan(){
   f.className="pd-fresh"+(run&&run.status==="done"?"":" stale");
   f.innerHTML=run?('<span class="live"></span><span>Last scan <b>'+esc(ago(run.finishedAt))+'</b>'+(run.status==="done"?
     ', '+run.sightings+' addresses in '+run.read+' accounts, '+run.new+' new finding'+(run.new===1?"":"s"):', it failed')+'</span>'):
-    '<span class="live"></span><span>No scan has run yet. Scan now, or wait for the next 12-hourly scan.</span>';
+    '<span class="live"></span><span>No scan has run yet. Scan now, or wait for the next scan (every 4 hours).</span>';
   $("#scanBtn").disabled=busy;
   $("#scanBtn").textContent=busy?"Scanning…":"Scan now";
   var pr=$("#progress");

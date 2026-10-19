@@ -1,6 +1,6 @@
 name: Unknown Domains Scan
 
-# Starts the Unknown Domains Alert scan on the platform every 12 hours. The scan itself runs on the
+# Starts the Unknown Domains Alert scan on the platform every 4 hours. The scan itself runs on the
 # platform (it reads the Google Ads and Meta accounts and sends the email and Slack alerts); this
 # only calls its secret-guarded address, which answers at once and runs the scan in the background.
 #
@@ -11,7 +11,7 @@ name: Unknown Domains Scan
 on:
   workflow_dispatch:
   schedule:
-    - cron: '17 */12 * * *'   # 00:17 and 12:17 UTC
+    - cron: '17 */4 * * *'   # 00:17, 04:17, 08:17, 12:17, 16:17 and 20:17 UTC
 
 permissions:
   contents: read

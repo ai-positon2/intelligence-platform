@@ -1417,6 +1417,10 @@ details.sq-fallback .sq-drops{margin-top:10px}
 .ud-act{white-space:nowrap}
 .ud-appr{height:34px;padding:0 8px;border-radius:10px;border:1px solid var(--pm-line2);background:var(--pm-panel2);color:var(--pm-ink);font:600 12.5px 'Space Grotesk',sans-serif;color-scheme:dark;margin-right:6px}
 [data-theme="light"] .ud-appr{color-scheme:light}
+.ud-add select option,.ud-add select optgroup,.ud-appr option{background:#12162a;color:#e8ecf8}
+.ud-add select optgroup{font-weight:700;color:#8b94be}
+[data-theme="light"] .ud-add select option,[data-theme="light"] .ud-appr option{background:#fff;color:#17213a}
+[data-theme="light"] .ud-add select optgroup{color:#4d5680}
 tr.ud-dismissed td,tr.ud-gone td{opacity:.62}
 .ud-ok{color:var(--ok);font-weight:700}
 .ud-bad{color:var(--bad);font-weight:700}
