@@ -1427,6 +1427,14 @@ tr.ud-dismissed td,tr.ud-gone td{opacity:.62}
 .ud-bad{color:var(--bad);font-weight:700}
 .ud-wait{color:var(--over);font-weight:600}
 
+.c-da{--card-accent:#f97316;
+  --band:linear-gradient(90deg,#f97316,#ef4444,#a855f7);
+  --thumb:linear-gradient(135deg,#2a1205 0%,#2a0b14 100%);
+  --icon-glow:rgba(249,115,22,.5);--card-border:rgba(249,115,22,.35);
+  --card-glow:0 0 40px rgba(249,115,22,.10);--arrow-color:#fed7aa}
+.pm.pm-da{--pm-a:#f97316;--pm-a2:#ef4444;--bad:#f87171;--bad-d:rgba(248,113,113,.12);--bad-l:rgba(248,113,113,.45)}
+[data-theme="light"] .pm.pm-da{--pm-a:#ea580c;--bad:#dc2626;--bad-d:rgba(220,38,38,.08);--bad-l:rgba(220,38,38,.4)}
+#daTbl{min-width:1050px}
 .c-ud{--card-accent:#fb7185;
   --band:linear-gradient(90deg,#fb7185,#f59e0b,#a78bfa);
   --thumb:linear-gradient(135deg,#2a0b14 0%,#1f1208 100%);

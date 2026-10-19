@@ -1,0 +1,68 @@
+{% extends "_paid_base.html" %}
+{% block title %}Disapproved Ads Agent{% endblock %}
+{% block content %}
+<div class="pm pm-da" id="da">
+  <section class="pm-hero">
+    <div class="pm-hero-l">
+      <span class="pm-eyebrow"><span class="d"></span>Paid Marketing · Policy</span>
+      <h1 class="pm-title">Ads that are <span class="pm-grad">not running.</span></h1>
+      <p class="pm-sub">Once a day the agent reads <b>every active ad account</b> for ads <b>Google or Meta has disapproved</b> and tells the team by <b>email and Slack</b>, with the policy behind
+        each one and a sheet to work from. It looks only at what is <b>live</b>: the campaign, the ad group and the ad must all be enabled, so paused campaigns and ad groups never add noise.
+        It only reads. It never pauses, edits or appeals an ad.</p>
+    </div>
+  </section>
+
+  <div id="msg"></div>
+  <div id="skel" class="pd-skel-wrap"><div class="pd-skel"></div><div class="pd-skel"></div></div>
+
+  <div id="out" hidden>
+    <div class="pd-strip" id="kpis"></div>
+
+    <section class="pm-panel ud-scan" id="scanCard">
+      <div class="ud-scan-row">
+        <p class="pd-fresh" id="fresh"></p>
+        <button class="pm-btn" id="scanBtn" type="button">Scan now</button>
+      </div>
+      <div id="progress" class="ud-progress" hidden><i></i><span></span></div>
+      <div id="problems"></div>
+    </section>
+
+    <section class="pm-panel" id="findCard">
+      <div class="pm-panel-h"><span class="pm-panel-t">Disapproved ads</span><span class="pm-panel-s" id="findNote"></span></div>
+      <div class="ud-actions"><a class="pm-btn-ghost" id="sheetLink" href="/p2/paid-marketing/api/disapproved/sheet.xlsx" hidden>Download the sheet</a></div>
+      <div class="ud-tools">
+        <input type="text" id="findFilter" placeholder="Search by account, campaign, ad or reason…" aria-label="Search disapproved ads" autocomplete="off">
+        <div class="pm-chips" id="stChips" aria-label="Status"></div>
+        <div class="pm-chips" id="whChips" aria-label="What was disapproved"></div>
+        <div class="pm-chips" id="plChips" aria-label="Platform"></div>
+      </div>
+      <div class="pm-scroll"><table id="daTbl"></table></div>
+      <button type="button" class="pm-btn-ghost sg-more" id="findMore" hidden></button>
+    </section>
+
+    <section class="pm-panel" id="alertCard">
+      <div class="pm-panel-h"><span class="pm-panel-t">Where alerts go</span><span class="pm-panel-s" id="sendNote"></span></div>
+      <form class="ud-add" id="setForm" autocomplete="off">
+        <label class="ud-grow"><span class="pd-dd-k">Email addresses (comma separated)</span><input type="text" id="setEmails" placeholder="team@example.com, lead@example.com" aria-label="Email addresses"></label>
+        <label><span class="pd-dd-k">Slack channel</span><input type="text" id="setSlack" placeholder="#ppc-alerts or a channel id" aria-label="Slack channel"></label>
+        <button class="pm-btn" type="submit">Save</button>
+        <button class="pm-btn-ghost" id="testBtn" type="button">Send a test alert</button>
+      </form>
+      <p class="ud-p dim" id="setHint">Each disapproved ad is alerted once, as one email (with the sheet attached) and one Slack message per scan. The Slack bot has to be a member of the channel.</p>
+      <div id="setRes"></div>
+    </section>
+
+    <section class="pm-panel" id="runsCard">
+      <div class="pm-panel-h"><span class="pm-panel-t">Recent scans</span><span class="pm-panel-s">the last 10, one a day</span></div>
+      <div class="pm-scroll"><table id="runsTbl"></table></div>
+    </section>
+
+    <p class="pd-foot">Read only. Google Ads: each live ad's policy status and the policy topics behind it, the Performance Max asset groups Google marks not eligible because they are
+      disapproved, and disapproved assets inside Performance Max asset groups (shown as lower severity, since the asset group keeps serving). Meta Ads: active ads Meta has disapproved,
+      in active ad sets and campaigns. Ads that are approved with limits, keywords and sitelinks are not read. An ad that is approved, paused or removed is marked fixed at the next scan.</p>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/disapproved_ads.js') }}?v=1"></script>
+{% endblock %}

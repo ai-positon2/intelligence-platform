@@ -1,0 +1,39 @@
+name: Disapproved Ads Scan
+
+# Starts the Disapproved Ads Agent's scan on the platform once a day. The scan itself runs on the platform
+# (it reads the active Google Ads and Meta accounts and sends the email and Slack alerts); this only calls
+# its secret-guarded address, which answers at once and runs the scan in the background.
+#
+# Uses the same GitHub Actions secret as the Unknown Domains Scan, DOMAIN_ALERT_SECRET (the same value as
+# the DOMAIN_ALERT_SECRET variable on Railway), and the same repository variable PLATFORM_BASE_URL
+# (default https://intelligence.position2.com).
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '7 6 * * *'   # daily, 06:07 UTC
+
+permissions:
+  contents: read
+
+concurrency:
+  group: disapproved-ads-scan
+  cancel-in-progress: false
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Start the scan
+        env:
+          BASE_URL: ${{ vars.PLATFORM_BASE_URL || 'https://intelligence.position2.com' }}
+          SECRET: ${{ secrets.DOMAIN_ALERT_SECRET }}
+        run: |
+          if [ -z "$SECRET" ]; then
+            echo "::error::The DOMAIN_ALERT_SECRET secret is not set on this repository."
+            exit 1
+          fi
+          curl --fail-with-body --silent --show-error --max-time 60 --retry 3 --retry-delay 20 --retry-all-errors \
+            -X POST "${BASE_URL%/}/p2/paid-marketing/api/disapproved/scheduled" \
+            -H "X-Domain-Secret: $SECRET" -H "Content-Type: application/json" -d '{}'
+          echo
