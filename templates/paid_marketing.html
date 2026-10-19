@@ -12,7 +12,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-tokens.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-components.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/gtm.css') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/paid_marketing.css') }}?v=44">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/paid_marketing.css') }}?v=45">
   <script src="/static/js/theme.js"></script>
   <link rel="stylesheet" href="/static/css/aurora-app.css?v=3">
   <script src="/static/js/aurora.js?v=1" defer></script>
@@ -528,6 +528,26 @@
         </div>
       </a>
 
+      <!-- 22. Disapproved Ads Agent (2026-10-20): live ads Google or Meta has disapproved, daily, by email and Slack -->
+      <a href="/p2/paid-marketing/disapproved-ads" class="dash-card active c-da">
+        <div class="card-band"></div>
+        <div class="card-thumb">
+          <div class="card-thumb-icon"><svg class="au-ic" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M6 6l12 12"/></svg></div>
+          <div class="card-thumb-badge tb-live"><span class="tb-dot live"></span> Live</div>
+        </div>
+        <div class="card-body">
+          <div class="card-name">Disapproved Ads Agent</div>
+          <div class="card-desc">
+            Once a day, reads every active ad account for ads Google or Meta has disapproved, looking only at live campaigns and ad groups, and tells the team by email and Slack
+            which ad, which policy and why, with a sheet to work from. Read only.
+          </div>
+          <div class="card-footer">
+            <div class="card-tags"><span class="tag">Policy</span><span class="tag">Alerts</span></div>
+            <span class="card-arrow">→</span>
+          </div>
+        </div>
+      </a>
+
     </div>
 
     <p class="footer-note">Position2 · Internal use only</p>
@@ -577,6 +597,7 @@
     {% if 'landing-page-check' not in paid_hidden %}    {t:'Landing Page & Relevancy Check',d:'Does each landing page keep the promise the ad made',u:'/p2/paid-marketing/landing-page-check',i:'▤'},{% endif %}
     {% if 'experiment-tracker' not in paid_hidden %}    {t:'Test & Experiment Tracker',d:'Which tests have a result, and what to do about each',u:'/p2/paid-marketing/experiment-tracker',i:'⚗'},{% endif %}
     {t:'Unknown Domains Alert',d:'Ads pointing at a domain nobody approved, by email and Slack',u:'/p2/paid-marketing/unknown-domains',i:'⚠'},
+    {t:'Disapproved Ads Agent',d:'Live ads Google or Meta has disapproved, daily, by email and Slack',u:'/p2/paid-marketing/disapproved-ads',i:'⊘'},
     {t:'QA Agent',d:'Campaign launch QC checklist',u:'/p2/paid-marketing/qa-agent',i:'✓'}
   ];
   var ITEMS=(window.__KP_ITEMS||[]).concat(BASE);
