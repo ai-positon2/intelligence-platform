@@ -127,6 +127,15 @@ def parse_overrides(brand=None, not_brand=None):
     return out
 
 
+def overall(accounts):
+    """The brand share across every account that could be judged last week, put together by eligible searches like campaigns are:
+    {share, eligible, accounts}; share is None when no account could be judged."""
+    judged = [a for a in accounts if a["status"] in ("ok", "below")]
+    measured = sum(a["brand"]["measured"] for a in judged)
+    eligible = sum(a["brand"]["eligible"] for a in judged)
+    return {"share": round(measured / eligible, 4) if eligible > 0 else None, "eligible": eligible, "accounts": len(judged)}
+
+
 def assemble(raw, account, today, threshold, overrides):
     accounts = []
     for a in raw["accounts"]:
@@ -143,7 +152,7 @@ def assemble(raw, account, today, threshold, overrides):
         "window": {"from": wk[0][0].isoformat(), "to": wk[-1][1].isoformat(), "weeks": len(wk), "latestFrom": wk[-1][0].isoformat(), "latestTo": wk[-1][1].isoformat()},
         "threshold": threshold, "generatedAt": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"),
         "warnings": list(raw.get("warnings") or []), "accounts": accounts,
-        "summary": {"counts": counts, "accounts": len(accounts), "below": counts["below"],
+        "summary": {"counts": counts, "accounts": len(accounts), "below": counts["below"], "overall": overall(accounts),
                     "high": sum(1 for a in accounts if a["findings"] and a["findings"][0]["level"] == "high"),
                     "dropped": sum(1 for a in accounts if any(f["kind"] == "dropped" for f in a["findings"]))},
     }

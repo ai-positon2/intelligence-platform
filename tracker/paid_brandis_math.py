@@ -55,7 +55,7 @@ def split_campaigns(campaigns, overrides=None):
         cid = str(c["id"])
         forced = overrides.get(cid)
         put = bool(forced) if forced is not None else is_brand(c["name"])
-        item = dict(c, id=cid, brand=put, byOverride=forced is not None)
+        item = dict(c, id=cid, brand=put, byOverride=forced is not None, byName=is_brand(c.get("name")))
         (brand if put else other).append(item)
     return brand, other
 
@@ -170,7 +170,7 @@ def analyse(campaign_rows, today, *, threshold=DEFAULT_THRESHOLD, overrides=None
     out = {"status": status, "threshold": threshold, "brand": now, "previous": before, "delta": delta, "cause": why, "trend": trend,
            "weekFrom": latest.isoformat(), "weekTo": wk[-1][1].isoformat(),
            "brandCampaigns": campaigns,
-           "otherCampaigns": [{"id": c["id"], "name": c["name"], "byOverride": c["byOverride"]} for c in sorted(other, key=lambda c: c["name"].lower())]}
+           "otherCampaigns": [{"id": c["id"], "name": c["name"], "byOverride": c["byOverride"], "byName": c["byName"]} for c in sorted(other, key=lambda c: c["name"].lower())]}
     out["findings"] = findings(out)
     return out
 

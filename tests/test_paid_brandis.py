@@ -146,6 +146,8 @@ def test_the_report_says_which_week_which_threshold_and_what_it_found(cache):
     assert rep["window"] == {"from": "2026-08-24", "to": "2026-10-18", "weeks": 8, "latestFrom": NOW, "latestTo": "2026-10-18"}
     a = rep["accounts"][0]
     assert a["status"] == "below" and a["brand"]["share"] == 0.7 and a["cause"] == "budget" and a["findings"][0]["level"] == "high" and a["campaignCount"] == 1
+    overall = rep["summary"].pop("overall")
+    assert overall["share"] == pytest.approx(0.7, abs=0.001) and overall["eligible"] == 1429 and overall["accounts"] == 1          # whole searches, so a hair off 70%
     assert rep["summary"] == {"counts": {"below": 1, "unmeasured": 0, "thin": 0, "none": 0, "ok": 0}, "accounts": 1, "below": 1, "high": 1, "dropped": 1}
     assert rep["readAt"]
 
@@ -220,3 +222,14 @@ def test_with_no_saved_read_a_spent_quota_is_raised(cache):
 def test_an_account_that_is_not_position2s_is_refused(cache):
     with pytest.raises(b.BadRequest):
         b.report_for("9999999999", accounts_fn=lambda: [ACCT], groups_fn=lambda: [], search_fn=searcher(), today=TODAY)
+
+
+def test_the_overall_share_puts_the_judged_accounts_together_by_eligible_searches_and_leaves_out_the_rest(cache):
+    accounts = [ACCT, ACCT2, {"id": "3333333333", "name": "Gamma", "currency": "USD"}, {"id": "4444444444", "name": "Delta", "currency": "USD"}]
+    rep = b.report_for("mcc-9923720096-USD", accounts_fn=lambda: accounts,
+                       groups_fn=lambda: [{"id": "mcc-9923720096-USD", "name": "G", "currency": "USD", "accountIds": [a["id"] for a in accounts]}],
+                       search_fn=searcher({ACCT["id"]: [api(impr="900", share=0.9)], ACCT2["id"]: [api(cid="22", impr="100", share=0.5)],
+                                           "3333333333": [api(cid="33", name="Core", impr="5000", share=0.1)],          # no brand campaign: not judged
+                                           "4444444444": [api(cid="44", impr="10", share=0.9)]}), today=TODAY)         # too few searches: not judged
+    assert rep["summary"]["overall"] == {"share": round(1000 / 1200, 4), "eligible": 1200, "accounts": 2}
+    assert b.overall([]) == {"share": None, "eligible": 0, "accounts": 0}

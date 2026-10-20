@@ -45,6 +45,7 @@ def test_an_override_beats_the_name_either_way_and_is_marked():
     brand, other = m.split_campaigns(camps, {"1": False, "2": True})
     assert [c["id"] for c in brand] == ["2", "3"] and [c["id"] for c in other] == ["1"]
     assert {c["id"]: c["byOverride"] for c in brand + other} == {"1": True, "2": True, "3": False}
+    assert {c["id"]: c["byName"] for c in brand + other} == {"1": True, "2": False, "3": True}              # what the name alone says, so a page can tell an override from the rule
     brand, other = m.split_campaigns(camps)
     assert [c["id"] for c in brand] == ["1", "3"] and not any(c["byOverride"] for c in brand + other)
 

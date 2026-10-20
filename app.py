@@ -5318,6 +5318,35 @@ def paid_adstrength_report():
     return err if err else jsonify(report)
 
 
+# ── Brand IS Monitor (sheet item #25, 2026-10-20) ─────────────────────────────────────────────────────────────
+# The weekly Search impression share of the brand campaigns of a Google Ads account or an MCC's accounts, against a threshold, with why it is
+# short (budget or rank) and what moved. The plan is docs/brand-is-plan.md, the arithmetic tracker/paid_brandis_math.py, the read and report
+# tracker/paid_brandis.py. The account list is Segment Analysis's (api/segments/accounts). Read only.
+
+@app.route("/p2/paid-marketing/brand-is")
+@position2_required
+def paid_brand_is():
+    return render_template("brand_is.html", user=_get_user())
+
+
+@app.route("/p2/paid-marketing/api/brandis/report")
+@position2_required
+def paid_brandis_report():
+    from tracker import paid_gads as paid_gads_base, paid_gads_segments as paid_gads, paid_brandis
+    src = request.args
+    try:
+        extra = {"force": True} if str(src.get("refresh") or "") in ("1", "true") else {}      # the Refresh button
+        report = paid_brandis.report_for(src.get("account"), threshold=src.get("threshold"),
+                                         overrides=paid_brandis.parse_overrides(src.get("brand"), src.get("notbrand")), **extra)
+        return jsonify(report)
+    except paid_brandis.BadRequest as e:
+        return jsonify(error=str(e)), 400
+    except paid_gads_base.RefreshTooSoon as e:
+        return jsonify(error=str(e), kind="cooldown", retryIn=e.retry_in), 429
+    except paid_gads.GadsError as e:
+        return _pm_gads_error(e)
+
+
 @app.route("/p2/paid-marketing/api/adstrength/suggest", methods=["POST"])
 @position2_required
 def paid_adstrength_suggest():

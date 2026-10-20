@@ -1,0 +1,53 @@
+{% extends "_paid_base.html" %}
+{% block title %}Brand IS Monitor{% endblock %}
+{% block content %}
+<div class="pm pm-bi" id="bi">
+  <section class="pm-hero">
+    <div class="pm-hero-l">
+      <span class="pm-eyebrow"><span class="d"></span>Paid Marketing · Monitoring</span>
+      <h1 class="pm-title">Is the brand shown <span class="pm-grad">when someone searches for it?</span></h1>
+      <p class="pm-sub">Pick an account, or an MCC to check every account in one go. The agent reads the <b>Search impression share of the brand campaigns</b>
+        for the last whole week, says which accounts are under your threshold, <b>whether budget or rank is costing the searches</b>, and what moved since the week before.</p>
+    </div>
+  </section>
+
+  <section class="pm-panel pd-cmd bi-cmd" id="cmd">
+    <div class="bi-cmd-row">
+      <div id="acctPick"></div>
+      <label class="bi-th"><span class="pd-dd-k">Alert under</span>
+        <span class="bi-th-in"><input type="number" id="threshold" min="50" max="99" step="1" value="90" inputmode="numeric" aria-label="Threshold, a percentage of brand searches shown"><b>%</b></span></label>
+      <p class="bi-scope">Google Ads only (Meta has no impression share). Enabled Search campaigns whose name says brand; you can change which count.</p>
+    </div>
+  </section>
+
+  <div id="msg"></div>
+
+  <div id="empty" class="pm-panel sg-empty">
+    <div class="sg-empty-ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-8M22 20H2"/></svg></div>
+    <h2>Choose an account to begin</h2>
+    <p>The numbers come straight from Google Ads. Nothing is changed there: the agent only reports.</p>
+  </div>
+  <div id="skel" hidden><div class="pd-skel"></div><div class="pd-skel"></div><div class="pd-skel"></div></div>
+
+  <div id="out" hidden>
+    <div class="sg-head">
+      <p class="pd-fresh" id="fresh"></p>
+      <button class="pm-btn-ghost" id="refreshBtn" type="button" title="Read Google Ads again"><svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.3-5.6M20 4v5h-5"/></svg>Refresh</button>
+      <button class="pm-btn-ghost" id="exportBtn" type="button"><svg viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>Export CSV</button>
+    </div>
+    <div class="pd-strip" id="kpis"></div>
+
+    <section class="pm-panel" id="listCard">
+      <div class="pm-panel-h"><span class="pm-panel-t">Accounts</span><span class="pm-panel-s" id="listNote"></span></div>
+      <div class="bi-tools"><div class="pm-chips" id="views" role="radiogroup" aria-label="Which accounts"></div></div>
+      <div id="list"></div>
+    </section>
+    <p class="pd-foot" id="foot"></p>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/pm_picker.js') }}?v=1"></script>
+<script src="{{ url_for('static', filename='js/brand_is_data.js') }}?v=1"></script>
+<script src="{{ url_for('static', filename='js/brand_is.js') }}?v=1"></script>
+{% endblock %}
