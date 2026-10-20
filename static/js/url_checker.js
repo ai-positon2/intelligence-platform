@@ -17,6 +17,25 @@ var KINDS = [["broken","Broken"],["redirect","Redirects"],["redirect_domain","Re
 var KIND_PILL = {broken:["Broken","critical"], redirect:["Redirect","medium"], redirect_domain:["Redirect, other domain","high"]};
 var S = {data:null, st:"open", kind:"all", q:"", limit:PAGE};
 
+/* How to put a link right, from what the scan found: where the address is held decides where to edit it, and the kind of finding decides what to do about it. */
+function fixSteps(f){
+  var meta=f.platform==="meta", where=String(f.where||""), name=f.objectName?" ("+f.objectName+")":"", camp=f.campaign?" in "+f.campaign:"", steps=[];
+  if(meta) steps.push("In Meta Ads Manager open the ad"+name+", then Edit, and change the Website URL under Destination.");
+  else if(where==="ad") steps.push("In Google Ads open Ads, find the ad"+name+camp+", click the pencil, and change the Final URL. An edited ad goes back through review for about a day.");
+  else if(where==="asset group") steps.push("In Google Ads open Campaigns, then"+(f.campaign?" "+f.campaign+", then":"")+" Asset groups, open the asset group"+name+", and change its Final URL.");
+  else if(/^tracking template/.test(where)) steps.push("In Google Ads open the Settings of the level named in the finding ("+where.replace(/^tracking template \(|\)$/g,"")+"), then Tracking template, and correct it.");
+  else steps.push("In Google Ads open Ads & assets, then Assets, find the "+where.replace(/ \(.*$/,"")+name+", and change its final URL. It is attached at "+((where.match(/\((\w+) level\)/)||[])[1]||"a")+" level, so the change applies everywhere it is used.");
+  if(f.kind==="broken"){
+    steps.push("Open "+f.url+" in a browser first to confirm: some sites refuse automated checks. If the page is really gone, replace the link with the page that now holds that content.");
+    steps.push("While it is broken every click is paid for and goes nowhere, so pause the ad until it is fixed if that will take more than a day.");
+  }else if(f.kind==="redirect_domain"){
+    steps.push("The link ends on another domain ("+(f.target||"")+"). If the client moved to it, use that address as the link and update every ad still pointing at the old one; if it is not expected, find out why before more clicks are paid for.");
+    steps.push("Expect the Unknown Domains check to flag the new domain until it is approved on this page.");
+  }else{
+    steps.push("The link redirects to "+(f.target||"another page")+". Use that address as the ad's link so each click skips the extra hop and the tracking parameters are not lost. Keep the old address only if the redirect is deliberate (a short link or a tracking step).");
+  }
+  return steps;
+}
 function ago(iso){
   var t=new Date(iso), ms=Date.now()-t.getTime();
   if(!iso||isNaN(t.getTime())) return "";
@@ -61,7 +80,7 @@ function paint(data){
   $("#linkTbl").innerHTML='<thead><tr><th>Problem</th><th>Account</th><th>Campaign / ad</th><th>Link in the ad</th><th>Since</th><th>Alert</th><th></th></tr></thead><tbody>'+
     rows.slice(0,S.limit).map(function(f){
       var pill=KIND_PILL[f.kind]||[f.kind,""], place=[f.campaign,f.adGroup].filter(Boolean).join(" / ");
-      return '<tr class="ud-'+(f.status==="open"?"open":f.status)+'"><td><span class="ud-sev '+pill[1]+'">'+esc(pill[0])+'</span><span class="gp-sub ud-why">'+esc(f.problem)+'</span></td>'+
+      return '<tr class="ud-'+(f.status==="open"?"open":f.status)+'"><td><span class="ud-sev '+pill[1]+'">'+esc(pill[0])+'</span><span class="gp-sub ud-why">'+esc(f.problem)+'</span>'+(f.status==="open"?'<details class="pd-how"><summary>How to fix</summary><ol>'+fixSteps(f).map(function(s){return '<li>'+esc(s)+'</li>';}).join("")+'</ol></details>':"")+'</td>'+
         '<td>'+esc(f.accountName)+' '+plat(f.platform)+'</td>'+
         '<td>'+esc(f.where)+(f.objectName?'<span class="gp-sub">'+esc(f.objectName)+'</span>':"")+(place?'<span class="gp-sub">'+esc(place)+'</span>':"")+'</td>'+
         '<td><b class="ud-url" title="'+esc(f.url)+'">'+esc(f.url)+'</b>'+(f.target?'<span class="gp-sub ud-url" title="'+esc(f.target)+'">goes to '+esc(f.target)+'</span>':"")+'</td>'+
