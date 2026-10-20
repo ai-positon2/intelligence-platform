@@ -139,7 +139,7 @@ def overall(accounts):
 def assemble(raw, account, today, threshold, overrides):
     accounts = []
     for a in raw["accounts"]:
-        result = m.analyse(a["rows"], today, threshold=threshold, overrides=overrides)
+        result = m.analyse(a["rows"], today, threshold=threshold, overrides=overrides, currency=a["currency"])
         accounts.append(dict(result, id=a["id"], name=a["name"], currency=a["currency"], campaignCount=len({r["id"] for r in a["rows"]})))
     accounts.sort(key=lambda a: (_RANK[a["status"]], a["brand"]["share"] if a["status"] == "below" else 0, a["name"].lower()))
     counts = {k: 0 for k in _RANK}

@@ -166,8 +166,20 @@ function campaignsHtml(a){
   }
   return h;
 }
+function planHtml(a){
+  var p=a.plan||{}, steps=p.steps||[];
+  if(!steps.length) return "";
+  return '<div class="bi-plan"><h4>Fix plan</h4>'+(p.note?'<p class="bi-plan-note">'+esc(p.note)+'</p>':"")+
+    '<ol class="bi-steps">'+steps.map(function(s,i){
+      var l=D.levelInfo(s.level);
+      return '<li><details'+(i===0?' open':'')+'><summary><span class="bi-sn">'+s.n+'</span><span class="bi-st"><b>'+esc(s.title)+'</b>'+(s.effect?'<span class="bi-eff">'+esc(s.effect)+'</span>':"")+'</span>'+
+        '<span class="bi-lv '+l.tone+'">'+esc(l.label)+'</span></summary>'+
+        '<div class="bi-sb"><p class="bi-why-t"><b>Why this applies.</b> '+esc(s.why)+'</p><p class="bi-how-h">What to do</p><ol class="bi-how">'+s.how.map(function(h){return '<li>'+esc(h)+'</li>';}).join("")+'</ol>'+
+        (s.campaigns&&s.campaigns.length?'<p class="bi-on">Applies to: '+s.campaigns.map(function(c){return '<span class="bi-chip">'+esc(c)+'</span>';}).join(" ")+'</p>':"")+'</div></details></li>';
+    }).join("")+'</ol></div>';
+}
 function body(a){
-  return '<div class="bi-body"><div class="bi-cols"><div><h4>Brand impression share by week</h4>'+trendHtml(a)+'</div><div><h4>What it means</h4>'+findingsHtml(a)+'</div></div>'+campaignsHtml(a)+'</div>';
+  return '<div class="bi-body"><div class="bi-cols"><div><h4>Brand impression share by week</h4>'+trendHtml(a)+'</div><div><h4>What it means</h4>'+findingsHtml(a)+'</div></div>'+planHtml(a)+campaignsHtml(a)+'</div>';
 }
 $("#list").addEventListener("click",function(e){
   var mk=e.target.closest("[data-mark]");

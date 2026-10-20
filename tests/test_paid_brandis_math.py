@@ -124,7 +124,7 @@ def test_the_finding_names_the_figures_the_cause_and_one_next_step():
     f = m.analyse(week_of(0.70, lb=0.25, lr=0.05, prev=0.95), TODAY)["findings"]
     top = f[0]
     assert top["kind"] == "below" and "70%" in top["title"] and "90%" in top["title"] and "20 points under" in top["detail"]
-    assert "25% lost to budget" in top["detail"] and "5% lost to rank" in top["detail"] and "budget" in top["nextStep"].lower()
+    assert "25% lost to budget" in top["detail"] and "5% lost to rank" in top["detail"] and top["nextStep"].startswith("Start with: Find out what changed last week.")      # a 25 point fall: the cause comes first
     assert any(x["kind"] == "dropped" for x in f)
 
 

@@ -26,6 +26,10 @@ ACCOUNTS = [T.ACCT, T.ACCT2, {"id": "3333333333", "name": "Gamma <b>&</b> Co", "
             {"id": "5555555555", "name": "Epsilon", "currency": "USD"}]
 
 
+def esc(s):
+    return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;").replace("'", "&#39;")
+
+
 def run(expr, **data):
     pre = "".join("const %s=%s;" % (k, json.dumps(v)) for k, v in data.items())
     code = "const X=require(%s);%sconst out=(%s);console.log(JSON.stringify(out===undefined?null:out));" % (json.dumps(DATA), pre, expr)
@@ -167,7 +171,10 @@ def test_the_csv_has_a_line_per_brand_campaign_and_a_line_for_an_account_with_no
     assert "Brand Core" in names and "Brand Exact" in names and "NonBrand Core" not in names and names.count("(no brand campaign)") == 1
     core = next(r for r in body if r[4] == "Brand Core")
     assert core[0] == "Beta Clinic" and core[1] == "Below threshold" and core[5] == "62%" and core[7] == "30%" and core[8] == "8%" and core[11] == "Lost to budget"
-    assert all(len(r) == len(run("X.HEAD")) for r in body)
+    assert all(len(r) == len(run("X.HEAD")) for r in body) and run("X.HEAD")[-1] == "Fix plan"
+    plan = core[-1]
+    assert plan.startswith("1. ") and " | 2. " in plan and plan == run("X.planTitles(A)", A=next(a for a in reports["mcc"]["accounts"] if a["name"] == "Beta Clinic"))
+    assert run("X.planTitles(A)", A={"plan": None}) == "" and run("X.planTitles(A)", A={}) == ""
 
 
 # ── the page script ─────────────────────────────────────────────────────────
@@ -293,9 +300,37 @@ def test_a_single_account_opens_on_its_trend_findings_and_campaigns(reports):
     out = opened(reports["one"])
     lst = out["el"]["#list"]["html"]
     assert 'class="bi-row below open"' in lst and "Brand impression share by week" in lst and lst.count('class="bi-w ') == 8
-    assert "Brand impression share is 68%, under 90%" in lst and "The brand campaigns run out of budget" in lst and "Brand Exact is at" not in lst
+    assert "Brand impression share is 68%, under 90%" in lst and "Start with: Find out what changed last week." in lst and "Raise the daily budget of the brand campaigns" in lst and "Brand Core is at 62% while Brand Exact is at 90%" in lst
     assert "Brand Core" in lst and "Brand Exact" in lst and "NonBrand Core" in lst and "Do not count" in lst and "Count as brand" in lst
     assert "maximize clicks" in lst and "Daily budget" in lst
+
+
+def test_an_opened_account_draws_its_fix_plan_with_the_first_step_open_and_every_how_to(reports):
+    out = opened(reports["one"])
+    lst = out["el"]["#list"]["html"]
+    plan = reports["one"]["accounts"][0]["plan"]
+    assert len(plan["steps"]) >= 4 and 'class="bi-plan"' in lst and "<h4>Fix plan</h4>" in lst
+    assert lst.count("<details") == len(plan["steps"]) and lst.count("<details open>") == 1 and lst.index("<details open>") < lst.index("<details>")
+    first = plan["steps"][0]
+    assert first["title"] in lst and "Why this applies." in lst and "What to do" in lst
+    for s in plan["steps"]:
+        assert ('<span class="bi-sn">%d</span>' % s["n"]) in lst and esc(s["title"]) in lst
+        for h in s["how"]:
+            assert esc(h) in lst
+    assert "Applies to:" in lst and '<span class="bi-chip">' in lst and "bi-eff" in lst
+
+
+def test_a_step_that_holds_markup_is_escaped_and_an_account_with_no_plan_draws_none(reports):
+    risky = json.loads(json.dumps(reports["one"]))
+    risky["accounts"][0]["plan"]["steps"][0]["title"] = "<img src=x onerror=1>"
+    risky["accounts"][0]["plan"]["steps"][0]["how"][0] = "<b>open</b> it"
+    risky["accounts"][0]["plan"]["note"] = "It has been low for <3 weeks"
+    lst = opened(risky)["el"]["#list"]["html"]
+    assert "&lt;img src=x onerror=1&gt;" in lst and "<img" not in lst and "&lt;b&gt;open&lt;/b&gt; it" in lst and "low for &lt;3 weeks" in lst
+    quiet = json.loads(json.dumps(reports["one"]))
+    quiet["accounts"][0]["plan"] = {"note": None, "steps": []}
+    assert "bi-plan" not in opened(quiet)["el"]["#list"]["html"]
+    assert "bi-plan" not in opened(dict(quiet, accounts=[dict(quiet["accounts"][0], plan=None)]))["el"]["#list"]["html"]
 
 
 def test_a_row_opens_and_closes_on_a_click(reports):

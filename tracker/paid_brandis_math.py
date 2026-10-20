@@ -134,7 +134,7 @@ def week_rows(rows, monday):
     return [r for r in rows if r.get("week") == key]
 
 
-def analyse(campaign_rows, today, *, threshold=DEFAULT_THRESHOLD, overrides=None):
+def analyse(campaign_rows, today, *, threshold=DEFAULT_THRESHOLD, overrides=None, currency="USD"):
     """The reading of one account from its rows (every enabled Search campaign, every week of the window):
     {status, threshold, brand (the latest week combined), previous, delta, cause, trend, campaigns, brandCampaigns, otherCampaigns, findings}.
     status: "ok", "below", "thin" (too few searches to judge), "unmeasured" (impressions but no share) or "none" (no brand campaign)."""
@@ -171,6 +171,8 @@ def analyse(campaign_rows, today, *, threshold=DEFAULT_THRESHOLD, overrides=None
            "weekFrom": latest.isoformat(), "weekTo": wk[-1][1].isoformat(),
            "brandCampaigns": campaigns,
            "otherCampaigns": [{"id": c["id"], "name": c["name"], "byOverride": c["byOverride"], "byName": c["byName"]} for c in sorted(other, key=lambda c: c["name"].lower())]}
+    from . import paid_brandis_plan
+    out["plan"] = paid_brandis_plan.build(out, currency)
     out["findings"] = findings(out)
     return out
 
@@ -185,16 +187,18 @@ def _status(c, threshold):
 
 # ── What to tell the person ─────────────────────────────────────────────────
 
-_NEXT = {
-    "budget": "The brand campaigns run out of budget before the day is over. Brand searches are usually the cheapest clicks in the account, so raise their daily "
-              "budget (or take it from a campaign that earns less), and check they do not share a budget with a broader campaign.",
-    "rank": "The brand ads lose the auction on rank, not budget. Check the bids (a Target impression share strategy with a low bid ceiling is a common cause), the "
-            "Quality Score and the ad and landing page for the brand terms, and open Auction Insights in Google Ads to see who else is bidding on the brand "
-            "(Auction Insights is not available to this agent).",
-    "both": "Both budget and rank are costing searches. Fix the budget first (it is the quicker one to check), then look at the bids, the Quality Score and "
-            "Auction Insights in Google Ads to see who else is bidding on the brand (Auction Insights is not available to this agent).",
-    None: "Open the campaigns in Google Ads and check the bids, the budget and the status of the brand ads.",
-}
+def _first(a, *ids):
+    """The title of the first step of the plan with one of these ids (or the first step at all), for a finding to point at."""
+    steps = (a.get("plan") or {}).get("steps") or []
+    for s in steps:
+        if not ids or s["id"] in ids:
+            return s["title"]
+    return steps[0]["title"] if steps else None
+
+
+def _next(a, *ids):
+    title = _first(a, *ids)
+    return ("Start with: %s. The fix plan below has every step, how to do it and what it is worth." % title) if title else "Open the campaigns in Google Ads and check the bids, the budget and the status of the brand ads."
 
 
 def _loss_line(c):
@@ -229,18 +233,18 @@ def findings(a):
             pct(now["share"]), a["weekFrom"], a["weekTo"], points(gap), pct(th))
         loss = _loss_line(now)
         out.append({"level": level, "kind": "below", "title": "Brand impression share is %s, under %s" % (pct(now["share"]), pct(th)),
-                    "detail": detail + (": " + loss if loss else "") + ".", "nextStep": _NEXT[a["cause"]]})
+                    "detail": detail + (": " + loss if loss else "") + ".", "nextStep": _next(a)})
     d = a["delta"]
     if d is not None and d <= -DROP + 1e-9:
         out.append({"level": "medium" if a["status"] != "below" else "low", "kind": "dropped",
                     "title": "Brand impression share fell %s on the week before" % points(d),
                     "detail": "%s last week, %s the week before." % (pct(now["share"]), pct(a["previous"]["share"])),
-                    "nextStep": "Look for what changed last week: a budget cut, a bid or strategy change, a new competitor, ads disapproved or paused."})
+                    "nextStep": ("Start with: %s. The fix plan below has every step." % _first(a, "changed")) if _first(a, "changed") and any(s["id"] == "changed" for s in a["plan"]["steps"]) else _next(a)})
     for c in a["brandCampaigns"]:
         if c["status"] == "below" and a["status"] != "none" and len(a["brandCampaigns"]) > 1:
             out.append({"level": "low", "kind": "campaign", "title": "%s is at %s" % (c["name"], pct(c["share"])),
                         "detail": "Eligible for about %s searches last week, %s." % (format(c["eligible"], ","), _loss_line(c) or "no loss breakdown"),
-                        "nextStep": _NEXT[c["cause"]]})
+                        "nextStep": "Work through the fix plan on this campaign first: it is the one furthest from the threshold."})
         elif c["status"] == "unmeasured":
             out.append({"level": "info", "kind": "campaign-unmeasured", "title": "%s had impressions but no impression share" % c["name"],
                         "detail": "%s impressions last week." % format(c["unmeasured"], ","), "nextStep": "Read again in a week."})

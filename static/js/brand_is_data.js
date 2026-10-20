@@ -98,12 +98,12 @@ function mark(over, campaign, makeBrand){
 }
 
 /* the CSV: one line per brand campaign, and one per account that has none */
-var HEAD = ["Account", "Status", "Week from", "Week to", "Campaign", "Brand share", "Eligible searches", "Lost to budget", "Lost to rank", "Top of page", "Absolute top", "Why", "Bidding strategy", "Daily budget", "First finding", "Next step"];
+var HEAD = ["Account", "Status", "Week from", "Week to", "Campaign", "Brand share", "Eligible searches", "Lost to budget", "Lost to rank", "Top of page", "Absolute top", "Why", "Bidding strategy", "Daily budget", "First finding", "Next step", "Fix plan"];
 function csvRows(report){
   var rows = [["Brand IS Monitor", report.account.name], ["Week", report.window.latestFrom + " to " + report.window.latestTo], ["Threshold", pct(report.threshold)], [], HEAD];
   report.accounts.forEach(function(a){
     var f = (a.findings || [])[0] || {}, base = [a.name, statusInfo(a.status).label, a.weekFrom, a.weekTo];
-    var tail = [f.title || "", f.nextStep || ""];
+    var tail = [f.title || "", f.nextStep || "", planTitles(a)];
     if (!a.brandCampaigns.length) { rows.push(base.concat(["(no brand campaign)", "", "", "", "", "", "", causeText(a.cause), "", ""], tail)); return; }
     a.brandCampaigns.forEach(function(c){
       rows.push(base.concat([c.name, c.share == null ? "" : Math.round(c.share * 1000) / 10 + "%", c.eligible, pctOrBlank(c.lostBudget), pctOrBlank(c.lostRank), pctOrBlank(c.top), pctOrBlank(c.absTop),
@@ -112,9 +112,13 @@ function csvRows(report){
   });
   return rows;
 }
+/* the plan's step titles in order, for the CSV and the account's line: "1. Raise the daily budget ... | 2. ..." */
+function planTitles(a){
+  return ((a.plan && a.plan.steps) || []).map(function(s){ return s.n + ". " + s.title; }).join(" | ");
+}
 function pctOrBlank(v){ return v == null ? "" : Math.round(v * 1000) / 10 + "%"; }
 
 var api = {STATUS: STATUS, LEVEL: LEVEL, VIEWS: VIEWS, statusInfo: statusInfo, levelInfo: levelInfo, causeText: causeText, pct: pct, int: int, points: points, delta: delta,
-  meter: meter, trendBars: trendBars, tiles: tiles, viewCount: viewCount, shown: shown, firstView: firstView, needsLook: needsLook, query: query, mark: mark, csvRows: csvRows, HEAD: HEAD};
+  meter: meter, trendBars: trendBars, tiles: tiles, viewCount: viewCount, shown: shown, firstView: firstView, needsLook: needsLook, query: query, mark: mark, csvRows: csvRows, planTitles: planTitles, HEAD: HEAD};
 if (typeof module !== "undefined" && module.exports) module.exports = api; else root.BIData = api;
 })(typeof window !== "undefined" ? window : globalThis);
