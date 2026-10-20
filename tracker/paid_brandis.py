@@ -172,3 +172,28 @@ def report_for(account_id, *, threshold=None, overrides=None, accounts_fn=None, 
     if raw.get("readAt"):
         report["readAt"] = raw["readAt"]
     return dict(report, stale=stale) if stale else report
+
+
+def diagnose_for(account_id, *, threshold=None, overrides=None, accounts_fn=None, groups_fn=None, search_fn=None, now=None, force=False, store=None, today=None):
+    """One account's report with its fix plan rebuilt from what its brand campaigns actually have (tracker/paid_brandis_diag.py):
+    {account, readAt, warnings, item} where item is the account as report_for gives it plus `facts` and `diagnosed`. Five small reads for the brand
+    campaigns only, kept like the rest. `force` (Refresh) skips the saved read of the settings, at most once per paid_gads.REFRESH_COOLDOWN_S."""
+    import hashlib
+    from . import paid_brandis_diag as diag
+    from . import paid_brandis_plan as plan
+    from . import paid_geo, paid_store
+    store = store or paid_store
+    day = today or dt.date.today()
+    report = report_for(account_id, threshold=threshold, overrides=overrides, accounts_fn=accounts_fn, groups_fn=groups_fn, search_fn=search_fn, now=now, store=store, today=day)
+    if report["account"]["isGroup"]:
+        raise BadRequest("Check the settings of one account at a time: open the account in the list.")
+    item = report["accounts"][0]
+    ids = [c["id"] for c in item["brandCampaigns"]]
+    if not ids:
+        raise BadRequest("This account has no brand campaign to check.")
+    key = "%s:%s" % (item["id"], hashlib.md5(",".join(sorted(ids)).encode()).hexdigest()[:10])
+    raw, stale = paid_geo._cached("brandis-diag", key, "x", day, day, lambda: diag.read(item["id"], ids, search_fn=search_fn), force=force, store=store, now=now)
+    out = {"account": report["account"], "item": plan.refine(item, raw["campaigns"], item["currency"]), "warnings": list(raw.get("warnings") or []) + list(report.get("warnings") or [])}
+    if raw.get("readAt"):
+        out["readAt"] = raw["readAt"]
+    return dict(out, stale=stale) if stale else out

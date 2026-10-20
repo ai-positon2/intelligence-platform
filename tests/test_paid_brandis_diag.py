@@ -292,3 +292,88 @@ def test_facts_for_other_campaigns_leave_the_bid_and_budget_steps_as_they_were()
     r = p.refine(a, {"999": facts()["1"]}, "USD")
     after = {s["id"]: s for s in r["plan"]["steps"]}
     assert after["budget"] == before["budget"] and after["bids"] == before["bids"] and r["facts"] == []
+
+
+# ── The report for one account, rebuilt from the settings ───────────────────
+
+from tests import test_paid_brandis as T  # noqa: E402
+from tracker import paid_brandis as b  # noqa: E402
+from tracker import paid_gads as base  # noqa: E402
+from tracker import paid_store  # noqa: E402
+
+
+@pytest.fixture
+def cache(monkeypatch):
+    saved = {}
+    monkeypatch.setattr(paid_store, "get_gads_cache", lambda key, ttl: saved.get(key))
+    monkeypatch.setattr(paid_store, "put_gads_cache", lambda key, value: saved.update({key: value}))
+    from tracker import paid_geo
+    paid_geo.clear_cache()
+    base.reset_state()
+    base.forget("")
+    yield saved
+    paid_geo.clear_cache()
+    base.forget("")
+
+
+def both(log=None, fail=()):
+    """Weekly rows for the report and the diagnosis answers, by query."""
+    weekly = T.searcher({T.ACCT["id"]: [T.api(cid="1", share=0.60, lb=0.0, lr=0.30, strategy="TARGET_IMPRESSION_SHARE"), T.api(cid="1", week=T.BEFORE, share=0.61)]})
+    diag = searcher(log, fail)
+
+    def search(cid, q):
+        return weekly(cid, q) if "segments.week" in q else diag(cid, q)
+    return search
+
+
+def diagnose(search, **kw):
+    return b.diagnose_for("1234567890", accounts_fn=lambda: [T.ACCT], groups_fn=lambda: [], search_fn=search, today=T.TODAY, **kw)
+
+
+def test_the_diagnosis_is_the_account_with_its_plan_rebuilt_and_the_facts_and_is_kept(cache):
+    log = []
+    out = diagnose(both(log))
+    item = out["item"]
+    assert item["diagnosed"] is True and item["id"] == "1234567890" and item["facts"][0]["name"] == "P2_Brand" and out["account"]["name"] == "Acme Dental" and out["warnings"] == [] and out["readAt"]
+    s = step(item, "bids")
+    assert "What Google Ads shows: P2_Brand: target impression share 60%, anywhere on page, bid limit $1.50." in s["why"] and s["how"][0] == "This is what is wrong in these campaigns:"
+    n = len(log)
+    assert n == 5
+    diagnose(both(log))
+    assert len(log) == n                                                      # the second ask reads nothing new
+    diagnose(both(log), force=True)
+    assert len(log) > n
+
+
+def test_an_mcc_and_an_account_with_no_brand_campaign_are_refused_in_words(cache):
+    with pytest.raises(b.BadRequest, match="one account at a time"):
+        b.diagnose_for("mcc-9923720096-USD", accounts_fn=lambda: [T.ACCT], groups_fn=lambda: [{"id": "mcc-9923720096-USD", "name": "G", "currency": "USD", "accountIds": [T.ACCT["id"]]}],
+                       search_fn=both(), today=T.TODAY)
+    with pytest.raises(b.BadRequest, match="no brand campaign"):
+        diagnose(both(), overrides={"1": False})
+
+
+def test_a_part_that_could_not_be_read_is_a_warning_and_the_rest_still_helps(cache):
+    out = diagnose(both(fail=("FROM ad_group_ad",)))
+    assert [w.split(" could")[0] for w in out["warnings"]] == ["The brand ads"] and out["item"]["diagnosed"] is True
+    assert "live ads" not in step(out["item"], "relevance")["why"] and "enabled brand keywords" in step(out["item"], "relevance")["why"]
+
+
+def test_the_threshold_and_the_marks_the_page_chose_decide_what_is_diagnosed(cache):
+    out = diagnose(both(), threshold="50")
+    assert out["item"]["status"] == "ok" and out["item"]["plan"]["steps"] == [] and out["item"]["diagnosed"] is True and len(out["item"]["facts"]) == 1
+    with pytest.raises(b.BadRequest, match="between 50% and 99%"):
+        diagnose(both(), threshold="10")
+
+
+def test_a_different_set_of_brand_campaigns_is_a_different_read_not_the_saved_one(cache):
+    log = []
+    weekly = T.searcher({T.ACCT["id"]: [T.api(cid="1", share=0.60, lb=0.0, lr=0.30), T.api(cid="2", name="Core", share=0.60, lb=0.0, lr=0.30)]})
+    diag = searcher(log)
+    search = lambda cid, q: weekly(cid, q) if "segments.week" in q else diag(cid, q)       # noqa: E731
+    diagnose(search)
+    n = len(log)
+    diagnose(search)
+    assert len(log) == n
+    diagnose(search, overrides={"2": True})
+    assert len(log) == n + 5 and any("campaign.id IN (1, 2)" in q for _c, q in log)

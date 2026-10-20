@@ -22,7 +22,7 @@ function ago(iso){
 }
 function store(k,v){try{if(v===undefined)return localStorage.getItem(k)||"";localStorage.setItem(k,v);}catch(e){return "";}}
 
-var S = {accounts:[], groups:[], account:"", report:null, seq:0, view:"attention", open:{}, over:{}, threshold:"90"};
+var S = {accounts:[], groups:[], account:"", report:null, seq:0, view:"attention", open:{}, over:{}, threshold:"90", diag:{}};
 
 var picker = window.PMPicker($("#acctPick"),{label:"Google Ads account",search:true,onChange:function(v){
   S.account=v; store("bi_account",v); S.over=loadOver(); run();
@@ -73,7 +73,7 @@ function run(refresh){
       setMsg(esc((r.j&&r.j.error)||("The report could not be built (HTTP "+r.status+")."))+hint);
       return;
     }
-    S.report=r.j; S.open={}; S.view=D.firstView(r.j);
+    S.report=r.j; S.open={}; S.diag={}; S.view=D.firstView(r.j);
     if(r.j.accounts.length===1) S.open[r.j.accounts[0].id]=true;
     show("out");
     try{render();}catch(e){setMsg("The report was read but could not be drawn: "+esc(String(e&&e.message||e)));}
@@ -178,10 +178,41 @@ function planHtml(a){
         (s.campaigns&&s.campaigns.length?'<p class="bi-on">Applies to: '+s.campaigns.map(function(c){return '<span class="bi-chip">'+esc(c)+'</span>';}).join(" ")+'</p>':"")+'</div></details></li>';
     }).join("")+'</ol></div>';
 }
+function diagHtml(a){
+  var st=S.diag[a.id]||{};
+  if(a.diagnosed){
+    return '<div class="bi-facts"><h4>What Google Ads shows for the brand campaigns</h4>'+a.facts.map(function(f){
+      return '<div class="bi-fact"><b>'+esc(f.name)+'</b><ul>'+f.lines.map(function(l){return '<li>'+esc(l)+'</li>';}).join("")+'</ul></div>';
+    }).join("")+(st.warnings&&st.warnings.length?'<p class="bi-fact-note">'+esc(st.warnings.join(" "))+'</p>':"")+
+      '<p class="bi-fact-note">The fix plan below was rebuilt from these settings.</p></div>';
+  }
+  if(!a.brandCampaigns.length||(a.status!=="below"&&!(a.plan&&a.plan.steps&&a.plan.steps.length))) return "";
+  return '<div class="bi-check"><div><b>Check what these campaigns are set to</b><span>Reads the brand campaigns\' status, bidding target and bid limit, budget, keywords and ads (five small reads) and rebuilds the plan from what is really set. Nothing is changed.</span></div>'+
+    '<button type="button" class="pm-btn bi-diag" data-diag="'+esc(a.id)+'"'+(st.busy?' disabled':'')+'>'+(st.busy?"Reading…":"Check the settings")+'</button></div>'+
+    (st.error?'<p class="pm-err bi-diag-err">'+esc(st.error)+'</p>':"");
+}
 function body(a){
-  return '<div class="bi-body"><div class="bi-cols"><div><h4>Brand impression share by week</h4>'+trendHtml(a)+'</div><div><h4>What it means</h4>'+findingsHtml(a)+'</div></div>'+planHtml(a)+campaignsHtml(a)+'</div>';
+  return '<div class="bi-body"><div class="bi-cols"><div><h4>Brand impression share by week</h4>'+trendHtml(a)+'</div><div><h4>What it means</h4>'+findingsHtml(a)+'</div></div>'+diagHtml(a)+planHtml(a)+campaignsHtml(a)+'</div>';
+}
+function diagnose(id){
+  var seq=S.seq, st=S.diag[id]=S.diag[id]||{};
+  st.busy=true; st.error=""; paintList();
+  getJson(API+"/diagnose?"+D.query(id,S.threshold,S.over,false)).then(function(r){
+    if(seq!==S.seq) return;
+    st.busy=false;
+    if(!r.ok){
+      st.error=(r.j&&r.j.error)||("The settings could not be read (HTTP "+r.status+").");
+      if(r.j&&r.j.kind==="quota") st.error+=" The platform limits how fast this app can read, so this clears on its own.";
+    }else{
+      st.warnings=r.j.warnings||[];
+      S.report.accounts=S.report.accounts.map(function(a){return a.id===id?r.j.item:a;});
+    }
+    paintList();
+  }).catch(function(){ if(seq!==S.seq) return; st.busy=false; st.error="The server could not be reached. Try again."; paintList(); });
 }
 $("#list").addEventListener("click",function(e){
+  var dg=e.target.closest("[data-diag]");
+  if(dg){ diagnose(dg.dataset.diag); return; }
   var mk=e.target.closest("[data-mark]");
   if(mk){
     var a=S.report.accounts.filter(function(x){return x.id===mk.dataset.acct;})[0]; if(!a) return;

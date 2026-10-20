@@ -196,7 +196,7 @@ function respond(url) {
   const hits = responses.filter(r => url.includes(r.match));
   if (!hits.length) return { status: 404, body: { error: "no stub for " + url } };
   const r = hits[0], i = Array.isArray(r.sequence) ? Math.min(r.n++, r.sequence.length - 1) : 0;
-  const body = Array.isArray(r.sequence) ? r.sequence[i] : r.body;
+  const body = JSON.parse(JSON.stringify(Array.isArray(r.sequence) ? r.sequence[i] : r.body));       // a fresh object for every answer, as the network gives
   const answer = { status: (r.statuses ? r.statuses[i] : r.status) || 200, body };
   if (r.hold && !r.released) return new Promise(res => held.push(() => { r.released = true; res(answer); }));
   return answer;
@@ -333,6 +333,67 @@ def test_a_step_that_holds_markup_is_escaped_and_an_account_with_no_plan_draws_n
     assert "bi-plan" not in opened(dict(quiet, accounts=[dict(quiet["accounts"][0], plan=None)]))["el"]["#list"]["html"]
 
 
+def diagnosed_item(report):
+    """The account as the diagnosis route would send it back: its plan rebuilt from what the brand campaigns have."""
+    from tests.test_paid_brandis_diag import facts as make_facts
+    from tracker import paid_brandis_plan as plan
+    item = json.loads(json.dumps(report["accounts"][0]))
+    f1 = make_facts(settings={"tisLocation": "ANYWHERE_ON_PAGE", "tisTarget": 0.6, "tisCeiling": 1.0, "spendCeiling": None, "enhancedCpc": None})["1"]
+    got = {c["id"]: dict(f1, name=c["name"]) for c in item["brandCampaigns"]}
+    return json.loads(json.dumps(plan.refine(item, got, "USD")))
+
+
+def test_an_account_below_the_threshold_offers_to_check_its_settings_and_one_on_target_does_not(reports):
+    lst = opened(reports["one"])["el"]["#list"]["html"]
+    assert 'class="bi-check"' in lst and "Check what these campaigns are set to" in lst and 'data-diag="2222222222"' in lst and "Check the settings" in lst and "five small reads" in lst
+    ok = opened(reports["ok"], [], responses=[{"match": "/segments/accounts", "body": ACCTS}, {"match": "/brandis/report", "body": reports["ok"]}])["el"]["#list"]["html"]
+    assert "bi-check" not in ok and "data-diag" not in ok
+    none = json.loads(json.dumps(reports["one"]))
+    none["accounts"][0].update(status="none", brandCampaigns=[], plan={"note": None, "steps": []}, findings=[])
+    assert "data-diag" not in opened(none)["el"]["#list"]["html"]
+
+
+def test_checking_the_settings_reads_the_account_with_the_threshold_and_marks_and_redraws_its_plan_and_facts(reports):
+    item = diagnosed_item(reports["one"])
+    sc = {"responses": [{"match": "/segments/accounts", "body": ACCTS}, {"match": "/brandis/diagnose", "body": {"account": reports["one"]["account"], "item": item, "warnings": ["The brand ads could not be read (no)."]}},
+                        {"match": "/brandis/report", "body": reports["one"]}],
+          "stored": {"bi_threshold": "85", "bi_over": json.dumps({"2222222222": {"24": True}})},
+          "steps": [{"pick": "2222222222"}, {"fire": ["#list", {"[data-diag]": {"dataset": {"diag": "2222222222"}}}]}]}
+    out = page(sc)
+    reads = [c for c in out["calls"] if "/brandis/diagnose" in c]
+    assert reads == ["/p2/paid-marketing/api/brandis/diagnose?account=2222222222&threshold=85&brand=24"]
+    lst = out["el"]["#list"]["html"]
+    assert "What Google Ads shows for the brand campaigns" in lst and "Brand Core" in lst and "Bidding: target impression share, target 60% anywhere on page, bid limit $1.00" in lst
+    assert "The fix plan below was rebuilt from these settings." in lst and "The brand ads could not be read (no)." in lst and "bi-check" not in lst
+    assert "This is what is wrong in these campaigns:" in lst and "change the location to Top of page or Absolute top of page" in lst
+    assert out["calls"].count([c for c in out["calls"] if "/brandis/report" in c][0]) == 1
+
+
+def test_the_check_is_disabled_while_it_reads_and_a_failure_is_said_and_can_be_tried_again(reports):
+    item = diagnosed_item(reports["one"])
+    base = [{"match": "/segments/accounts", "body": ACCTS}, {"match": "/brandis/report", "body": reports["one"]}]
+    held = page({"responses": base + [{"match": "/brandis/diagnose", "body": {"account": {}, "item": item, "warnings": []}, "hold": True}],
+                 "steps": [{"pick": "2222222222"}, {"fire": ["#list", {"[data-diag]": {"dataset": {"diag": "2222222222"}}}]}]})
+    assert "Reading…" in held["el"]["#list"]["html"] and "disabled" in held["el"]["#list"]["html"]
+    done = page({"responses": base + [{"match": "/brandis/diagnose", "body": {"account": {}, "item": item, "warnings": []}, "hold": True}],
+                 "steps": [{"pick": "2222222222"}, {"fire": ["#list", {"[data-diag]": {"dataset": {"diag": "2222222222"}}}]}, {"release": True}]})
+    assert "What Google Ads shows" in done["el"]["#list"]["html"]
+    bad = page({"responses": base + [{"match": "/brandis/diagnose", "status": 429, "body": {"error": "The daily limit is used up.", "kind": "quota"}}],
+                "steps": [{"pick": "2222222222"}, {"fire": ["#list", {"[data-diag]": {"dataset": {"diag": "2222222222"}}}]}]})
+    lst = bad["el"]["#list"]["html"]
+    assert "The daily limit is used up. The platform limits how fast" in lst and "Check the settings" in lst and "bi-diag-err" in lst and "disabled" not in lst
+    down = page({"responses": base, "reject": "/brandis/diagnose", "steps": [{"pick": "2222222222"}, {"fire": ["#list", {"[data-diag]": {"dataset": {"diag": "2222222222"}}}]}]})
+    assert "The server could not be reached. Try again." in down["el"]["#list"]["html"]
+
+
+def test_a_new_read_of_the_account_drops_the_old_diagnosis(reports):
+    item = diagnosed_item(reports["one"])
+    sc = {"responses": [{"match": "/segments/accounts", "body": ACCTS}, {"match": "/brandis/report", "body": reports["one"]}, {"match": "/brandis/diagnose", "body": {"account": {}, "item": item, "warnings": []}}],
+          "steps": [{"pick": "2222222222"}, {"fire": ["#list", {"[data-diag]": {"dataset": {"diag": "2222222222"}}}]}, {"click": "#refreshBtn"}]}
+    lst = page(sc)["el"]["#list"]["html"]
+    assert "What Google Ads shows" not in lst and "Check the settings" in lst
+
+
 def test_a_row_opens_and_closes_on_a_click(reports):
     steps = [{"pick": GROUP}, {"fire": ["#list", {".bi-head": {}, ".bi-row": {"dataset": {"id": "2222222222"}}}]}]
     out = opened(reports["mcc"], steps)
@@ -420,3 +481,11 @@ def test_no_account_shows_the_empty_state():
     assert out["el"]["#empty"]["hidden"] is False and out["el"]["#skel"]["hidden"] is True and out["el"]["#out"]["hidden"] is True
     bad = page({"responses": [{"match": "/segments/accounts", "status": 503, "body": {"error": "Google Ads is not connected."}}]})
     assert "Google Ads is not connected." in bad["el"]["#msg"]["html"]
+
+
+def test_an_old_failure_to_check_the_settings_is_gone_after_the_account_is_read_again(reports):
+    sc = {"responses": [{"match": "/segments/accounts", "body": ACCTS}, {"match": "/brandis/report", "body": reports["one"]},
+                        {"match": "/brandis/diagnose", "status": 502, "body": {"error": "Google is down"}}],
+          "steps": [{"pick": "2222222222"}, {"fire": ["#list", {"[data-diag]": {"dataset": {"diag": "2222222222"}}}]}, {"click": "#refreshBtn"}]}
+    lst = page(sc)["el"]["#list"]["html"]
+    assert "Google is down" not in lst and "bi-diag-err" not in lst and "Check the settings" in lst

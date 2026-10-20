@@ -38,6 +38,19 @@ to rank are weighted by eligible searches the same way. A week with fewer than 1
 - **No brand campaign found**, **too few searches**, **no share reported**: said as they are, never as a pass.
 Every finding carries the figures and one next step. A next step is a suggestion for a person; the agent changes nothing.
 
+## The fix plan (added 2026-10-20)
+
+An account under the threshold gets an ordered plan (`tracker/paid_brandis_plan.py`). Each step has why it applies (the figures behind it), how to do it in Google Ads and
+what it is worth. Chosen and sized from what was read: the loss to budget (the extra spend a day to win it back, from last week's spend at its cost per impression, and the
+budget against the spend), the loss to rank by the bidding strategy in use (target impression share, smart bidding with or without a target, maximize clicks, manual CPC),
+Quality Score, Auction Insights, what changed when the share fell 5 points or more, and the one brand campaign holding the share down. The order is: what changed (when
+the fall is 15 points or more), budget, bids, the lagging campaign, quality, competition.
+
+**Check the settings** (`tracker/paid_brandis_diag.py`, `/api/brandis/diagnose`, one account at a time): five small read only reads for the brand campaigns (Google's status
+and its reasons, the bidding target, location and bid limit, the budget and whether it is shared, the keywords' Quality Score and its three parts, the ads' strength and
+approval) and the plan is rebuilt from them: the real target and bid limit against last week's CPC, the named weak keywords and ads, Google's own status as the first step,
+and a step that is known not to apply is said not to apply.
+
 ## Not in this version (said out loud)
 
 - **Competitors bidding on the brand terms**: Auction Insights is not available through the Google Ads API. The finding points to it in the Google Ads screen.

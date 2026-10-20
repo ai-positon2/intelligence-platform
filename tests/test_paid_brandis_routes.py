@@ -83,3 +83,24 @@ def test_the_agent_is_on_the_paid_marketing_page_the_palette_the_hub_counts_and_
     assert "Brand IS Monitor (/p2/paid-marketing/brand-is)" in app_module._VIMI_PLATFORM_KNOWLEDGE and "Auction Insights" in app_module._VIMI_PLATFORM_KNOWLEDGE
     card = paid.split('href="/p2/paid-marketing/brand-is" class="dash-card', 1)[1].split("</a>", 1)[0]
     assert "\u2014" not in card and "\u2013" not in card
+
+
+def test_the_diagnose_route_passes_what_the_page_sent_and_maps_failures(monkeypatch):
+    seen = []
+    monkeypatch.setattr(b, "diagnose_for", lambda *x, **k: seen.append((x, k)) or {"item": {}})
+    r = client_as(STAFF).get(API + "/diagnose?account=1234567890&threshold=85&brand=1&notbrand=2&refresh=1")
+    assert r.status_code == 200 and r.get_json() == {"item": {}}
+    assert seen[0] == (("1234567890",), {"threshold": "85", "overrides": {"1": True, "2": False}, "force": True})
+    assert client_as(None).get(API + "/diagnose?account=1234567890").status_code == 302
+
+    def boom(exc):
+        def f(*x, **k):
+            raise exc
+        return f
+    for err, status in ((gads.GadsError("quota", "slow down"), 429), (gads.GadsError("not_configured", "not set"), 503), (b.BadRequest("one account at a time"), 400)):
+        monkeypatch.setattr(b, "diagnose_for", boom(err))
+        r = client_as(STAFF).get(API + "/diagnose?account=1234567890")
+        assert r.status_code == status and str(err) in r.get_json()["error"]
+    monkeypatch.setattr(b, "diagnose_for", boom(base.RefreshTooSoon("Refreshed a moment ago.", 60)))
+    r = client_as(STAFF).get(API + "/diagnose?account=1234567890&refresh=1")
+    assert r.status_code == 429 and r.get_json()["kind"] == "cooldown"
