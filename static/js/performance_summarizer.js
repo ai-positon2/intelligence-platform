@@ -1034,10 +1034,11 @@ $("#studioBtn").addEventListener("click",function(){
 /* ── What stands out ──────────────────────────────────────────── */
 var IC={good:'<path d="m5 12 5 5L20 7"/>',warn:'<path d="M12 4 3 20h18z"/><path d="M12 10v5M12 18v.5"/>',info:'<circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/>'};
 function paintInsights(){
-  var list=P.insights({cur:S.cur,cmp:S.cmp,set:setCur(),sis:S.filter.length?null:S.sis,currency:cur()});
+  var list=P.insights({cur:S.cur,cmp:S.cmp,set:setCur(),sis:S.filter.length?null:S.sis,shares:S.filter.length?null:S.shares.cur,currency:cur()});
   $("#insights").innerHTML='<div class="pm-panel ps-card"><div class="ps-card-h"><div class="ps-card-t"><span class="ps-title">What stands out</span><span class="ps-sub">Worked out from the numbers, not guessed</span></div></div><div class="ps-ins">'+
     list.map(function(x,i){
       return '<div class="ps-in '+x.tone+'" style="--i:'+i+'"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true">'+IC[x.tone]+'</svg><div><b>'+esc(x.title)+'</b><p>'+esc(x.text)+'</p>'+
+        (x.steps&&x.steps.length?'<details class="ps-do"><summary>What to do</summary><ol>'+x.steps.map(function(s){return '<li>'+esc(s)+'</li>';}).join("")+'</ol>'+(x.worth?'<p class="ps-worth"><b>Worth</b> '+esc(x.worth)+'</p>':"")+'</details>':"")+
         (x.action?'<button type="button" data-i="'+i+'">Show me <span>→</span></button>':'')+'</div></div>';}).join("")+'</div></div>';
   $$("#insights button[data-i]").forEach(function(b){
     b.onclick=function(){

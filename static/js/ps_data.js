@@ -407,7 +407,12 @@ function insights(ctx){
       out.push({id:"waste",tone:"warn",title:"Spend without a conversion",
         text:dead.length+(dead.length===1?" campaign spent ":" campaigns spent ")+money(dc)+" ("+Math.round(dc/tc[COST]*100)+"% of spend) with no conversions: "+
           dead.slice().sort(function(a,b){return b.t[COST]-a.t[COST];}).slice(0,2).map(function(p){return p.c.name;}).join(", ")+(dead.length>2?" and more":"")+".",
-        action:{kind:"filter",ids:dead.map(function(p){return p.c.id;})}});
+        action:{kind:"filter",ids:dead.map(function(p){return p.c.id;})},
+        steps:["Check the conversion tracking first: open Goals, then Conversions, then Summary, and see whether each conversion action shows Recording conversions. If the tag or the import is broken, nothing below matters yet.",
+          "Look at what the clicks searched: open "+dead.slice().sort(function(a,b){return b.t[COST]-a.t[COST];})[0].c.name+", then Insights and reports, then Search terms, and add negative keywords for the terms that cannot convert (the Search Query Analysis agent lists them).",
+          "Check the landing page loads on a phone and matches the ad (the Landing Page Check agent does this for the whole account).",
+          "If the tracking is fine and the terms and page are right, pause the campaign or cut its budget and move the money to one that converts."],
+        worth:"Pausing all of them would save about "+money(dc*30/Math.max(1,cur.days.length))+" a month at this rate ("+money(dc)+" over "+cur.days.length+" days). Settle the tracking question first: a campaign that converts but is not measured looks the same."});
     }
   }
 
@@ -457,7 +462,10 @@ function insights(ctx){
       var lo=rows[0], hi=rows[rows.length-1];
       if(hi.cpa>=lo.cpa*1.25) out.push({id:"weekday",tone:"info",title:"Day of week",
         text:DOW[lo.i]+" is your cheapest day to convert ("+money2(lo.cpa)+" each) and "+DOW[hi.i]+" the dearest ("+money2(hi.cpa)+").",
-        action:{kind:"explore",metrics:["cpa","conversions"],dim:"dow"}});
+        action:{kind:"explore",metrics:["cpa","conversions"],dim:"dow"},
+        steps:["On campaigns that bid by hand or for clicks, open the campaign, then Ad schedule, then Edit ad schedule, and set a positive adjustment for "+DOW[lo.i]+" and a negative one for "+DOW[hi.i]+".",
+          "On Smart Bidding campaigns an adjustment is mostly ignored: use an ad schedule that leaves "+DOW[hi.i]+" out, or make sure the budget lasts through "+DOW[lo.i]+".",
+          "Judge it over at least four weeks: a day of the week needs several weeks of data before it means anything. The Segment Analysis agent says which of your campaigns each option applies to."]});
     }
   }
 
@@ -468,14 +476,28 @@ function insights(ctx){
     costs.forEach(function(v,i){if(v>costs[mx])mx=i;});
     if(sd>0&&costs[mx]>mean+2*sd&&costs[mx]>=mean*1.5) out.push({id:"spike",tone:"warn",title:"A day that stands out",
       text:"Spend peaked on "+dayLabel(cur.days[mx])+" at "+money(costs[mx])+", "+(costs[mx]/mean).toFixed(1)+"x the daily average.",
-      action:{kind:"explore",metrics:["cost"],dim:"day"}});
+      action:{kind:"explore",metrics:["cost"],dim:"day"},
+      steps:["Open Tools, then Change history, set that day and the day before, and look for a budget raise, a new campaign or a bidding change.",
+        "Open Campaigns for that day and sort by cost: Google may spend up to twice a campaign's daily budget on a busy day, so a single campaign may explain it.",
+        "If nothing in the account changed, look at the search terms of the biggest spender for that day: a sudden burst of clicks on terms that do not convert is the usual cause, and a reason to add negatives."]});
   }
 
   /* 7. Search impression share */
   if(ctx.sis&&ctx.sis.account!=null&&ctx.sis.account<0.6&&tc[COST]>0){
+    var sh=ctx.shares||{}, lb=sh.search_budget_lost_impression_share, lr=sh.search_rank_lost_impression_share, share=ctx.sis.account;
+    var known=lb!=null&&lr!=null, days=Math.max(1,cur.days.length), extra=known&&share>0?tc[COST]/days*lb/share:null;
+    var steps=[], worth=null;
+    if(known&&lb>=0.05){
+      steps.push("Budget: "+Math.round(lb*100)+"% of the searches were lost to budget. Open Campaigns, find the campaigns that convert and show Limited by budget in the Status column, and raise their daily budgets (about "+money(extra)+" more a day in all at this rate: an estimate), taking it from campaigns that spend without converting.");
+      worth="Winning back the budget loss would take about "+money(extra)+" more a day ("+money(extra*30)+" a month): an estimate that assumes the extra searches cost and convert like the rest.";
+    }
+    if(known&&lr>=0.05){
+      steps.push("Rank: "+Math.round(lr*100)+"% were lost to rank. Fix the Quality Score first (Keywords, then add the Quality Score, Exp. CTR, Ad relevance and Landing page exp. columns), then raise bids or loosen the target on the campaigns that convert, and check Auction Insights to see who outranks you.");
+    }
+    if(!known) steps.push("This account did not report how much was lost to budget and how much to rank, so the cause cannot be told from here: open Campaigns, add the Search lost IS (budget) and Search lost IS (rank) columns, and fix the larger one first.");
     out.push({id:"sis",tone:"info",title:"Room to grow",
-      text:"Your ads show for "+Math.round(ctx.sis.account*100)+"% of the Google searches they could match, so there is demand you are not capturing yet.",
-      action:{kind:"explore",metrics:["impressions","clicks"],dim:"day"}});
+      text:"Your ads show for "+Math.round(share*100)+"% of the Google searches they could match, so there is demand you are not capturing yet."+(known?" Of the searches lost, "+Math.round(lb*100)+"% went to budget and "+Math.round(lr*100)+"% to rank.":""),
+      action:{kind:"explore",metrics:["impressions","clicks"],dim:"day"},steps:steps,worth:worth});
   }
   return out.slice(0,7);
 }
