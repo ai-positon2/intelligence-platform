@@ -67,7 +67,7 @@ def test_the_page_shows_none_of_the_five_and_every_other_card(hide):
     page = H.rendered("/p2/paid-marketing")
     shown = _cards(page)
     assert not [u for u in shown if u.rsplit("/", 1)[1] in NAMES]
-    assert len(shown) == 22 - 5
+    assert len(shown) == TOTAL - 5
     for slug, title in NAMES.items():
         assert title not in re.sub(r"<!--.*?-->|<script.*?</script>", "", page, flags=re.S), title
 
@@ -83,8 +83,8 @@ def test_the_command_palette_lists_none_of_the_five(hide):
 
 def test_the_hub_counts_and_text_follow_the_switch(hide):
     hub = re.sub(r"<!--.*?-->", "", H.rendered("/p2/hub"), flags=re.S)
-    assert "<span>17</span> dashboards" in hub and "<span>17</span> live" in hub
-    assert 'data-lxn="44"' in hub
+    assert "<span>%d</span> dashboards" % (TOTAL - 5) in hub and "<span>%d</span> live" % (TOTAL - 5) in hub
+    assert 'data-lxn="%d"' % (BAND - 5) in hub
     assert "ad copy checked against" not in hub and "compared side by side" not in hub
 
 

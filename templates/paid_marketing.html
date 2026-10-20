@@ -528,6 +528,25 @@
         </div>
       </a>
 
+      <a href="/p2/paid-marketing/brand-is" class="dash-card active c-bi">
+        <div class="card-band"></div>
+        <div class="card-thumb">
+          <div class="card-thumb-icon"><svg class="au-ic" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M3 12s3.5-6 9-6 9 6 9 6-3.5 6-9 6-9-6-9-6z"/><circle cx="12" cy="12" r="2.6"/></svg></div>
+          <div class="card-thumb-badge tb-live"><span class="tb-dot live"></span> Live</div>
+        </div>
+        <div class="card-body">
+          <div class="card-name">Brand IS Monitor</div>
+          <div class="card-desc">
+            Reads the Search impression share of the brand campaigns of an account, or of every account of an MCC, for the last whole week. Says which are under your threshold,
+            whether budget or rank is costing the searches, and what moved since the week before. Read only.
+          </div>
+          <div class="card-footer">
+            <div class="card-tags"><span class="tag">Monitoring</span><span class="tag">Impression share</span></div>
+            <span class="card-arrow">→</span>
+          </div>
+        </div>
+      </a>
+
     </div>
 
     <p class="footer-note">Position2 · Internal use only</p>
@@ -577,6 +596,7 @@
     {% if 'landing-page-check' not in paid_hidden %}    {t:'Landing Page & Relevancy Check',d:'Does each landing page keep the promise the ad made',u:'/p2/paid-marketing/landing-page-check',i:'▤'},{% endif %}
     {% if 'experiment-tracker' not in paid_hidden %}    {t:'Test & Experiment Tracker',d:'Which tests have a result, and what to do about each',u:'/p2/paid-marketing/experiment-tracker',i:'⚗'},{% endif %}
     {t:'Unknown Domains Alert',d:'Ads pointing at a domain nobody approved, by email and Slack',u:'/p2/paid-marketing/unknown-domains',i:'⚠'},
+    {t:'Brand IS Monitor',d:'Is the brand shown when someone searches for it',u:'/p2/paid-marketing/brand-is',i:'◉'},
     {t:'QA Agent',d:'Campaign launch QC checklist',u:'/p2/paid-marketing/qa-agent',i:'✓'}
   ];
   var ITEMS=(window.__KP_ITEMS||[]).concat(BASE);
