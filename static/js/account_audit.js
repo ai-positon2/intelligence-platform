@@ -133,12 +133,21 @@ function viewChips(sec){
     return '<button type="button" class="pm-chip' + (cur === v.key ? " on" : "") + '" role="radio" aria-checked="' + (cur === v.key) + '" data-sec="' + esc(sec.key) + '" data-view="' + v.key + '">' + esc(v.label) + ' · ' + n + '</button>';
   }).join("");
 }
+function planHtml(f){
+  var steps = f.plan || [];
+  if(!steps.length) return "";
+  return '<h4>Steps for this account</h4><ol class="au-plan">' + steps.map(function(s){
+    return '<li><b>' + esc(s.title) + '</b>' + (s.effect ? '<span class="au-eff">' + esc(s.effect) + '</span>' : '') +
+      '<p>' + esc(s.why) + '</p><ul>' + (s.how || []).map(function(h){return '<li>' + esc(h) + '</li>';}).join("") + '</ul></li>';
+  }).join("") + '</ol>';
+}
 function findingHtml(f, open){
   var tone = (D.RESULT[f.result] || {}).tone || "";
   var aff = (f.items || []);
   var body = '<div class="au-fb"' + (open ? "" : " hidden") + '>' +
     '<h4>Why it matters</h4><p>' + esc(f.why) + '</p>' +
-    ((f.result === "fail" || f.result === "warn" || f.result === "unknown") ? '<h4>What to do</h4><p>' + esc(f.fix) + '</p>' : '') +
+    ((f.result === "fail" || f.result === "warn") ? '<h4>What to do</h4><p>' + esc(f.fix) + '</p>' + planHtml(f) : '') +
+    (f.result === "unknown" ? '<p class="au-none">This could not be checked, so there is nothing to fix yet. Read the account again.</p>' : '') +
     (aff.length ? '<h4>Affected (' + esc(f.count) + ')</h4><ul>' + aff.map(function(i){return '<li>' + esc(i) + '</li>';}).join("") + '</ul>' +
       ((f.count || aff.length) > aff.length ? '<p class="au-more">and ' + esc((f.count) - aff.length) + ' more. The Excel file lists everything the read kept.</p>' : '') : '') +
     '</div>';

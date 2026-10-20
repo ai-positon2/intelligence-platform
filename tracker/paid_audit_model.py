@@ -62,10 +62,10 @@ def register(entries):
         CATALOG[e["id"]] = dict(e)
 
 
-def make(check_id, result, found, *, items=None, count=None, severity=None, detail=None, caps=None):
+def make(check_id, result, found, *, items=None, count=None, severity=None, detail=None, caps=None, plan=None):
     """One finding. `found` is the sentence that says what was seen, with its numbers. `items` names the affected things (campaigns,
     ad groups, keywords), capped; `count` is how many there really are when that is more than the items shown. `severity` overrides the
-    catalog's for this finding (a failure that is costing a lot is more severe than the same failure on a quiet account). `caps` is a short
+    catalog's for this finding (a failure that is costing a lot is more severe than the same failure on a quiet account). `plan` is the account's own fix steps for a failed or warned check. `caps` is a short
     reason (a sentence fragment) that holds the grade at C or below for as long as this finding stands."""
     spec = CATALOG.get(check_id)
     if spec is None:
@@ -83,6 +83,8 @@ def make(check_id, result, found, *, items=None, count=None, severity=None, deta
            "items": shown, "count": total}
     if detail:
         out["detail"] = detail
+    if plan and result in ("fail", "warn"):
+        out["plan"] = plan                      # ordered steps for this account (tracker/paid_audit_plans.py): why, how, what it is worth
     if caps:
         out["caps"] = str(caps)
     return out

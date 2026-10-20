@@ -9,6 +9,7 @@ from __future__ import annotations
 import logging
 
 from . import paid_audit_model as model
+from . import paid_audit_plans as plans
 from .paid_audit_model import names, pct, plural, share, verb  # noqa: F401  (the helpers every checklist uses)
 from .paid_audit_google_read import LEGACY_ADS, SEARCH_LIST_MIN
 from .paid_audit_pages import TIMED_OUT
@@ -540,7 +541,8 @@ def str_partners(ctx):
     cpa_p = cost_p / conv_p if conv_p else None
     if conv_p == 0 or (cpa_s is not None and cpa_p is not None and cpa_p >= PARTNER_WORSE_BY * cpa_s):
         how = "recorded no conversions" if conv_p == 0 else "cost %s per conversion against %s on Google Search" % (ctx.money(cpa_p), ctx.money(cpa_s))
-        return make("G-STR-03", "warn", "Search Partners took %d%% of Search spend (%s) and %s." % (taken, ctx.money(cost_p), how))
+        return make("G-STR-03", "warn", "Search Partners took %d%% of Search spend (%s) and %s." % (taken, ctx.money(cost_p), how),
+                    plan=plans.partner_plan(cost_p, conv_p, cpa_p, cpa_s, ctx.money))
     return make("G-STR-03", "pass", "Search Partners took %d%% of Search spend at a cost per conversion in line with Google Search." % taken)
 
 
@@ -566,8 +568,11 @@ def str_budget(ctx):
     if not held:
         return make("G-STR-04", "pass", "No converting campaign is held back by budget.")
     held.sort(key=lambda h: (-h[0]["metrics"]["cost"], h[0]["name"]))
+    dead = [x for x in live if x["metrics"]["clicks"] >= NO_CONVERSION_CLICKS and x["metrics"]["conversions"] == 0]
+    dead.sort(key=lambda x: (-x["metrics"]["cost"], x["name"]))
     return make("G-STR-04", "warn", "%s converting and held back by budget." % (plural(len(held), "campaign") + (" is" if len(held) == 1 else " are")),
-                items=["%s%s" % (x["name"], " (%d%% of impressions lost to budget)" % round(lost) if lost is not None else " (budget limited)") for x, lost in held])
+                items=["%s%s" % (x["name"], " (%d%% of impressions lost to budget)" % round(lost) if lost is not None else " (budget limited)") for x, lost in held],
+                plan=plans.budget_plan([(x, lost if lost is not None else 0) for x, lost in held], ctx.money, dead))
 
 
 @check("G-STR-05", "structure", "No campaign is flagged by Google as misconfigured or limited by policy", "high",
@@ -649,7 +654,7 @@ def str_smart_data(ctx):
                 x["name"], plural(round(p["conversions"]), "conversion"), plural(p["campaigns"] - 1, "campaign"), _needs(x))
         return "%s (%s, about %d suggested)" % (x["name"], plural(round(x["metrics"]["conversions"]), "conversion"), _needs(x))
     return make("G-STR-07", "warn", "%d of %s had fewer conversions in 30 days than Google suggests." % (len(thin), plural(len(smart), "Smart Bidding campaign")),
-                items=[line(x) for x in thin])
+                items=[line(x) for x in thin], plan=plans.thin_plan(thin, _needs, ctx.money))
 
 
 @check("G-STR-08", "structure", "Campaigns with plenty of conversions use Smart Bidding", "medium",
@@ -670,7 +675,8 @@ def str_manual(ctx):
     ready.sort(key=lambda x: (-x["metrics"]["conversions"], x["name"]))
     return make("G-STR-08", "warn", "%d of %s on manual or click-based bidding already record %d or more conversions a month." %
                 (len(ready), plural(len(click), "Search campaign"), MIN_CONVERSIONS["smart"]),
-                items=["%s (%s, %s)" % (x["name"], _say(x["bidding"]), plural(round(x["metrics"]["conversions"]), "conversion")) for x in ready])
+                items=["%s (%s, %s)" % (x["name"], _say(x["bidding"]), plural(round(x["metrics"]["conversions"]), "conversion")) for x in ready],
+                plan=plans.manual_plan(ready, ctx.money))
 
 
 @check("G-STR-09", "structure", "Campaigns that spend are converting", "high",
@@ -693,7 +699,8 @@ def str_no_conversions(ctx):
     found = "%s %d or more clicks and no conversion in 30 days, %s (%d%% of spend)." % (plural(len(dead), "campaign") + (" has" if len(dead) == 1 else " have"),
                                                                                           NO_CONVERSION_CLICKS, ctx.money(cost), round(exact))
     return make("G-STR-09", "fail" if exact >= NO_CONVERSION_FAIL_SHARE else "warn", found,
-                items=["%s (%s, %s clicks)" % (x["name"], ctx.money(x["metrics"]["cost"]), format(x["metrics"]["clicks"], ",")) for x in dead])
+                items=["%s (%s, %s clicks)" % (x["name"], ctx.money(x["metrics"]["cost"]), format(x["metrics"]["clicks"], ",")) for x in dead],
+                plan=plans.dead_plan(dead, ctx.spend, ctx.money))
 
 
 @check("G-STR-10", "structure", "Search campaigns are not losing much reach to rank", "medium",
@@ -713,7 +720,7 @@ def str_rank(ctx):
         return make("G-STR-10", "pass", "No big Search campaign loses %d%% or more of its impressions to rank." % RANK_LOST_PCT)
     big.sort(key=lambda x: (-x["metrics"]["cost"], x["name"]))
     return make("G-STR-10", "warn", "%s losing %d%% or more of impressions to rank." % (plural(len(big), "big Search campaign") + (" is" if len(big) == 1 else " are"), RANK_LOST_PCT),
-                items=["%s (%d%% lost to rank)" % (x["name"], round(x["metrics"]["rankLost"])) for x in big])
+                items=["%s (%d%% lost to rank)" % (x["name"], round(x["metrics"]["rankLost"])) for x in big], plan=plans.rank_plan(big, ctx.money))
 
 
 @check("G-STR-11", "structure", "The account is not buried in paused campaigns", "low",
