@@ -239,3 +239,227 @@ def build(a, currency="USD"):
     if n >= 2:
         note = "The brand has been under %s for %d weeks in a row, so this is not a one-off." % (m.pct(a["threshold"]), n)
     return {"note": note, "steps": steps}
+
+
+# ── With the campaigns' own settings (tracker/paid_brandis_diag.py) ─────────
+
+REASONS = {
+    "BUDGET_CONSTRAINED": "Google marks it Limited by budget",
+    "BIDDING_STRATEGY_CONSTRAINED": "The bidding strategy is held back by its own settings (a target or a bid limit)",
+    "BIDDING_STRATEGY_LEARNING": "The bidding strategy is still learning after a recent change",
+    "BIDDING_STRATEGY_MISCONFIGURED": "The bidding strategy is set up wrongly",
+    "BIDDING_STRATEGY_PENDING": "A bidding strategy change is not in effect yet",
+    "HAS_ADS_DISAPPROVED": "Some ads are disapproved",
+    "HAS_ADS_LIMITED_BY_POLICY": "Some ads are limited by policy",
+    "MOST_ADS_UNDER_REVIEW": "Most ads are under review",
+    "SEARCH_VOLUME_LIMITED": "Few searches match the keywords",
+    "NO_ACTIVE_AD_GROUP_ADS": "An ad group has no live ads",
+    "NO_ACTIVE_AD_GROUPS": "The campaign has no live ad group",
+    "AD_GROUPS_PAUSED": "Ad groups are paused",
+}
+_POLICY = ("HAS_ADS_DISAPPROVED", "HAS_ADS_LIMITED_BY_POLICY", "BIDDING_STRATEGY_MISCONFIGURED", "NO_ACTIVE_AD_GROUP_ADS", "NO_ACTIVE_AD_GROUPS")
+_REASON_FIX = {
+    "BIDDING_STRATEGY_LEARNING": "Leave the bids, the targets and the budget alone for one to two weeks after the change: every further change restarts the learning, and the share is unstable until it ends.",
+    "BIDDING_STRATEGY_CONSTRAINED": "A target or a bid limit is stopping the strategy from bidding what it needs: loosen it (the bidding step says how).",
+    "BIDDING_STRATEGY_MISCONFIGURED": "Open Settings, then Bidding: the strategy needs something it does not have, usually conversion tracking or a valid target. Fix it or choose another strategy.",
+    "BIDDING_STRATEGY_PENDING": "Wait for the change to take effect before judging the share.",
+    "BUDGET_CONSTRAINED": "Google itself says the budget is the limit: the budget step is the one to do first.",
+    "HAS_ADS_DISAPPROVED": "Open Ads, filter by Status, and fix or appeal each disapproved ad (the policy topic is shown on the ad). A brand campaign with disapproved ads loses searches it should win.",
+    "HAS_ADS_LIMITED_BY_POLICY": "Open Ads, filter by Status, and look at the ads marked Approved (limited): the policy topic says where they cannot show.",
+    "MOST_ADS_UNDER_REVIEW": "Ads under review do not show. Reviews take about a day: check again tomorrow, and if the ads stay under review, contact Google Ads support.",
+    "SEARCH_VOLUME_LIMITED": "Few searches match the keywords: add the other ways people write the brand name (misspellings, the name with the product or the location).",
+}
+
+
+def _reason(r):
+    return REASONS.get(r) or str(r).replace("_", " ").capitalize()
+
+
+def status_step(a, cur, facts):
+    bad = []
+    for c in a["brandCampaigns"]:
+        f = facts.get(c["id"])
+        if not f:
+            continue
+        reasons = [r for r in f["reasons"] if r]
+        if f["primaryStatus"] not in ("", "ELIGIBLE") or reasons:
+            bad.append((c, f, reasons))
+    if not bad:
+        return None
+    lines = ["%s: %s%s." % (c["name"], f["primaryStatus"].replace("_", " ").lower() or "not eligible", " (%s)" % "; ".join(_reason(r).lower() for r in reasons) if reasons else "") for c, f, reasons in bad]
+    all_reasons = []
+    for _c, _f, reasons in bad:
+        all_reasons += [r for r in reasons if r not in all_reasons]
+    how = ["In Google Ads open Campaigns and read the Status column of %s; hover over it for the reason." % _names([c for c, _f, _r in bad])]
+    how += [_REASON_FIX[r] for r in all_reasons if r in _REASON_FIX]
+    if len(how) == 1:
+        how.append("Open the campaign and follow the message under its status: it names what to fix.")
+    level = "high" if any(r in _POLICY for r in all_reasons) else "medium"
+    return _step("status", level, "Fix what Google Ads says about the brand campaigns", "Google Ads reports these statuses: " + " ".join(lines), how,
+                 "A campaign Google flags is losing searches for a reason it names.", None, [c["name"] for c, _f, _r in bad])
+
+
+def _dominant(a, facts):
+    groups = {}
+    for c in a["brandCampaigns"]:
+        f = facts.get(c["id"])
+        if f:
+            groups.setdefault(f["bidding"] or c.get("strategy") or "", []).append((c, f))
+    if not groups:
+        return "", []
+    key = max(groups, key=lambda k: sum(c["eligible"] for c, _f in groups[k]))
+    return key, groups[key]
+
+
+def refine_bids(step, a, cur, facts):
+    """The bid step with what the campaigns actually have: the real target, location and bid limit against last week's CPC."""
+    strategy, group = _dominant(a, facts)
+    if not group:
+        return step
+    cpc = _cpc(a)
+    ceiling = cpc * CPC_CEILING_X if cpc else None
+    shown, fixes = [], []
+    for c, f in group:
+        s = f.get("settings") or {}
+        if strategy == "TARGET_IMPRESSION_SHARE":
+            tgt, loc, lim = s.get("tisTarget"), s.get("tisLocation"), s.get("tisCeiling")
+            shown.append("%s: target impression share %s, %s, bid limit %s" % (c["name"], m.pct(tgt) if tgt is not None else "not read",
+                         (loc or "location not read").replace("_", " ").lower(), money(lim, cur) if lim else "none set"))
+            if tgt is not None and tgt < 0.90 - 1e-9:
+                fixes.append("%s: raise the target from %s to 90%% to 95%%." % (c["name"], m.pct(tgt)))
+            if loc == "ANYWHERE_ON_PAGE":
+                fixes.append("%s: the target counts any place on the page, so the ad can show low down; change the location to Top of page or Absolute top of page." % c["name"])
+            if lim and cpc and lim < cpc * 1.2:
+                fixes.append("%s: the bid limit (%s) is not far above last week's average CPC (%s), so it caps the bids; raise it to about %s and lower it once the share holds." % (
+                    c["name"], money(lim, cur), money(cpc, cur), money(ceiling, cur)))
+        elif strategy == "TARGET_SPEND":
+            lim = s.get("spendCeiling")
+            shown.append("%s: maximize clicks, bid limit %s" % (c["name"], money(lim, cur) if lim else "none set"))
+            if lim and cpc and lim < cpc * 1.2:
+                fixes.append("%s: the maximum CPC limit (%s) is close to last week's average CPC (%s); raise it to about %s." % (c["name"], money(lim, cur), money(cpc, cur), money(ceiling, cur)))
+            elif not lim:
+                fixes.append("%s: there is no maximum CPC limit, so the limit is not what holds the bids back; look at quality and competition next." % c["name"])
+        elif strategy in SMART:
+            tk, tv = f.get("targetKind"), f.get("target")
+            shown.append("%s: %s%s" % (c["name"], strategy.replace("_", " ").lower(), (", target %s %s" % (tk.upper(), money(tv, cur) if tk == "cpa" else "%.2f" % tv)) if tk and tv else ", no target"))
+            if tk == "cpa" and tv:
+                fixes.append("%s: the target CPA is %s. Raise it by about 30%% (to about %s) or remove it, and read this page again in a week." % (c["name"], money(tv, cur), money(tv * 1.3, cur)))
+            elif tk == "roas" and tv:
+                fixes.append("%s: the target ROAS is %.2f. Lower it by about 30%% (to about %.2f) or remove it, and read this page again in a week." % (c["name"], tv, tv * 0.7))
+        elif strategy == "MANUAL_CPC":
+            e = s.get("enhancedCpc")
+            shown.append("%s: manual CPC, enhanced CPC %s" % (c["name"], "on" if e else "off" if e is not None else "not read"))
+        if f.get("portfolio"):
+            fixes.append("%s uses a shared (portfolio) bid strategy, which also runs other campaigns: a change to it changes them all. Give the brand campaign its own strategy first." % c["name"])
+    out = dict(step)
+    if shown:
+        out["why"] = step["why"] + " What Google Ads shows: " + "; ".join(shown) + "."
+    if fixes:
+        out["how"] = ["This is what is wrong in these campaigns:"] + fixes + ["Then the general steps:"] + step["how"]
+        out["found"] = fixes
+    elif shown and strategy in ("TARGET_IMPRESSION_SHARE", "TARGET_SPEND"):
+        out["how"] = ["The target, the location and the bid limit look right in these campaigns, so the loss is more likely quality or competition (the next two steps)."] + step["how"]
+        out["level"] = "low" if step["level"] != "high" else "medium"
+    return out
+
+
+def refine_relevance(step, a, cur, facts):
+    """The quality step with the actual weak keywords and ads, or told it is not the cause when none are weak."""
+    enabled, ad_total = 0, 0
+    known_kw = known_ads = False
+    weak, rarely, bad_ads, rsa = [], [], 0, 0
+    for c in a["brandCampaigns"]:
+        f = facts.get(c["id"]) or {}
+        k, ads = f.get("keywords"), f.get("adFacts")
+        if k is not None:
+            known_kw = True
+            enabled += k["enabled"]
+            weak += [dict(w, campaign=c["name"]) for w in k["weak"]]
+            rarely += k["rarelyServed"]
+        if ads is not None:
+            known_ads = True
+            ad_total += ads["ads"]
+            rsa += ads["rsa"]
+            bad_ads += ads["strength"].get("POOR", 0) + ads["strength"].get("AVERAGE", 0)
+    if not known_kw and not known_ads:
+        return step
+    seen, bits = [], []
+    if known_kw:
+        weak.sort(key=lambda w: (-w["impressions"], w["text"]))
+        for w in weak[:3]:
+            parts = [n for key, n in (("expectedCtr", "expected CTR"), ("adRelevance", "ad relevance"), ("landingPage", "landing page")) if w.get(key) == "BELOW_AVERAGE"]
+            seen.append("\"%s\" (%s%s)" % (w["text"], "Quality Score %d" % w["qs"] if w["qs"] else "no score", ", below average: " + ", ".join(parts) if parts else ""))
+        bits.append("%d enabled brand keywords%s" % (enabled, (", %d weak: %s" % (len(weak), "; ".join(seen))) if weak else ", none with a weak Quality Score"))
+        if rarely:
+            bits.append("%d rarely served (Google says their quality is too low to show them often): %s" % (len(rarely), ", ".join(rarely[:3])))
+    if known_ads:
+        bits.append("%d live ads%s" % (ad_total, (", %d of %d responsive search ads rated Poor or Average" % (bad_ads, rsa)) if rsa and bad_ads else ", none rated Poor or Average" if rsa else ""))
+    out = dict(step)
+    out["why"] = step["why"] + " What Google Ads shows: " + "; ".join(bits) + "."
+    if (known_kw and not weak and not rarely) and (not known_ads or not bad_ads):
+        out["how"] = ["Quality does not look like the cause: no brand keyword has a weak Quality Score and the ads are not rated Poor or Average. Spend the effort on the bids and on who else is bidding."] + step["how"]
+        out["level"] = "low"
+    elif weak or rarely or bad_ads:
+        out["how"] = ["Start with the keywords and ads named above: they are the ones holding the quality down."] + step["how"]
+    return out
+
+
+def refine_budget(step, a, cur, facts):
+    shared = [c["name"] for c in a["brandCampaigns"] if (facts.get(c["id"]) or {}).get("budgetShared")]
+    checked = [c for c in a["brandCampaigns"] if facts.get(c["id"])]
+    if not checked:
+        return step
+    out = dict(step)
+    if shared:
+        out["why"] = step["why"] + " %s use%s a shared budget, so another campaign can spend it first." % (", ".join(shared[:3]), "s" if len(shared) == 1 else "")
+        out["how"] = list(step["how"])
+        out["how"].insert(1, "Give %s a budget of its own (Budget, then Create a new budget): it is on a shared one." % ", ".join(shared[:3]))
+    else:
+        out["how"] = [h for h in step["how"] if "shared budget" not in h]
+    return out
+
+
+def describe(c, f, cur):
+    """The lines the page shows for one brand campaign: what Google Ads says about it."""
+    s = f.get("settings") or {}
+    lines = ["Status: %s%s" % ((f["primaryStatus"] or "unknown").replace("_", " ").lower(), " (%s)" % "; ".join(_reason(r).lower() for r in f["reasons"]) if f["reasons"] else "")]
+    b = (f["bidding"] or "unknown").replace("_", " ").lower()
+    if f["bidding"] == "TARGET_IMPRESSION_SHARE" and s.get("tisTarget") is not None:
+        b += ", target %s %s, bid limit %s" % (m.pct(s["tisTarget"]), (s.get("tisLocation") or "").replace("_", " ").lower(), money(s.get("tisCeiling"), cur) if s.get("tisCeiling") else "none")
+    elif f["bidding"] == "TARGET_SPEND":
+        b += ", bid limit %s" % (money(s.get("spendCeiling"), cur) if s.get("spendCeiling") else "none")
+    elif f["targetKind"] and f["target"]:
+        b += ", target %s" % (money(f["target"], cur) if f["targetKind"] == "cpa" else "%.2f ROAS" % f["target"])
+    if f.get("portfolio"):
+        b += ", shared bid strategy"
+    lines.append("Bidding: " + b)
+    lines.append("Budget: %s a day%s" % (money(f["budget"], cur) if f["budget"] is not None else "not read", ", shared with other campaigns" if f["budgetShared"] else ""))
+    k = f.get("keywords")
+    if k is not None:
+        lines.append("Keywords: %d enabled%s%s" % (k["enabled"], ", %d weak" % len(k["weak"]) if k["weak"] else "", ", %d rarely served" % len(k["rarelyServed"]) if k["rarelyServed"] else ""))
+    ads = f.get("adFacts")
+    if ads is not None:
+        st = ", ".join("%d %s" % (n, r.lower()) for r, n in sorted(ads["strength"].items()))
+        lines.append("Ads: %d live%s%s%s" % (ads["ads"], " (%s)" % st if st else "", ", %d disapproved" % ads["disapproved"] if ads["disapproved"] else "", ", %d limited" % ads["limited"] if ads["limited"] else ""))
+    return lines
+
+
+def refine(a, facts, currency="USD"):
+    """The account with its plan rebuilt from what the brand campaigns actually have: {**a, plan, facts, diagnosed}. `facts` is paid_brandis_diag.read()["campaigns"]."""
+    plan = dict(a["plan"])
+    steps = []
+    for s in plan["steps"]:
+        if s["id"] == "bids":
+            s = refine_bids(s, a, currency, facts)
+        elif s["id"] == "relevance":
+            s = refine_relevance(s, a, currency, facts)
+        elif s["id"] == "budget":
+            s = refine_budget(s, a, currency, facts)
+        steps.append(s)
+    lead = status_step(a, currency, facts) if a["status"] in ("below", "ok") else None
+    if lead and a["status"] == "below":
+        steps.insert(0, lead)
+    for i, s in enumerate(steps, 1):
+        s["n"] = i
+    shown = [{"id": c["id"], "name": c["name"], "lines": describe(c, facts[c["id"]], currency)} for c in a["brandCampaigns"] if c["id"] in facts]
+    return dict(a, plan=dict(plan, steps=steps), facts=shown, diagnosed=True)
