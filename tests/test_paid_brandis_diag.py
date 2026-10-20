@@ -58,6 +58,15 @@ def test_a_campaign_is_read_with_its_status_bidding_target_and_budget():
     assert d.parse_campaigns([camp_row(strategy="MAXIMIZE_CONVERSIONS")])["1"]["targetKind"] == "" and d.parse_campaigns([{"campaign": {}}]) == {}
 
 
+def test_a_reason_google_cannot_name_is_no_reason_and_the_status_step_does_not_say_unknown():
+    out = d.parse_campaigns([camp_row(status="LIMITED", reasons=["UNKNOWN", "BUDGET_CONSTRAINED", "UNSPECIFIED"])])["1"]
+    assert out["reasons"] == ["BUDGET_CONSTRAINED"]
+    only = d.parse_campaigns([camp_row(status="LIMITED", reasons=["UNKNOWN"])])["1"]
+    assert only["reasons"] == []
+    r = p.refine(rank_account(), facts(primaryStatus="LIMITED", reasons=only["reasons"]), "USD")
+    assert "unknown" not in r["plan"]["steps"][0]["why"].lower() and "unknown" not in " ".join(r["facts"][0]["lines"]).lower()
+
+
 def test_the_bid_settings_are_read_as_shares_and_money_and_a_missing_one_is_none():
     s = d.parse_settings([set_row(spend="2000000", ecpc=True)])["1"]
     assert s == {"tisLocation": "ANYWHERE_ON_PAGE", "tisTarget": 0.6, "tisCeiling": 1.5, "spendCeiling": 2.0, "enhancedCpc": True}

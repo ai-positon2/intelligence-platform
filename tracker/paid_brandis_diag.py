@@ -14,6 +14,7 @@ from . import paid_gads_segments as gads
 KEYWORDS_SHOWN = 6
 WEAK_QS = 6                      # a Quality Score at or under this is weak
 BELOW = "BELOW_AVERAGE"
+NO_REASON = ("UNKNOWN", "UNSPECIFIED")          # what Google sends when it has a reason this API version cannot name: said as no reason, not as "unknown"
 
 
 def _ids(campaign_ids):
@@ -89,7 +90,7 @@ def parse_campaigns(rows):
         cpa = _get(c, "targetCpa", "targetCpaMicros", default=_get(c, "maximizeConversions", "targetCpaMicros"))
         roas = _get(c, "targetRoas", "targetRoas", default=_get(c, "maximizeConversionValue", "targetRoas"))
         kind, target = ("cpa", _units(cpa)) if _num(cpa) else ("roas", round(_num(roas), 2)) if _num(roas) else ("", None)
-        out[cid] = {"name": c.get("name") or "", "primaryStatus": c.get("primaryStatus") or "", "reasons": list(c.get("primaryStatusReasons") or []),
+        out[cid] = {"name": c.get("name") or "", "primaryStatus": c.get("primaryStatus") or "", "reasons": [r for r in (c.get("primaryStatusReasons") or []) if r not in NO_REASON],
                     "serving": c.get("servingStatus") or "", "bidding": c.get("biddingStrategyType") or "", "biddingStatus": c.get("biddingStrategySystemStatus") or "",
                     "portfolio": bool(c.get("biddingStrategy")), "targetKind": kind, "target": target,
                     "budget": _units(b.get("amountMicros")), "budgetShared": bool(b.get("explicitlyShared"))}
