@@ -15,7 +15,7 @@ from __future__ import annotations
 import datetime as dt
 import logging
 
-from . import paid_qa, paid_qa_ai, paid_qa_auto, paid_qa_book
+from . import paid_qa, paid_qa_ai, paid_qa_auto, paid_qa_book, paid_qa_fixes
 
 log = logging.getLogger(__name__)
 
@@ -62,7 +62,7 @@ def run_review(launch_id, *, store, search, geo_fn=None, web_fn=None, call=None,
         ai, problems = paid_qa_ai.review(
             ask, ev, rules, meta, call=call,
             progress=lambda done, total: store.set_progress(launch_id, "The AI is reviewing the checklist", done, total))
-        combined = paid_qa_ai.combine(rules, ai, ids)
+        combined = paid_qa_fixes.attach(paid_qa_ai.combine(rules, ai, ids), checks, camp["channel"])
         store.finish_review(launch_id, combined, campaign_name=camp["name"] or launch["campaign_name"], channel=camp["channel"],
                             campaign_types=types, note=_note(problems, sections))
     except Exception as e:                                  # noqa: BLE001 (saved for the page, never lost in a thread)
