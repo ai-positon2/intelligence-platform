@@ -30,6 +30,8 @@ import re
 import threading
 import time
 
+from . import paid_bidding as bidding
+from . import paid_geo_insights as gi
 from . import paid_segments as seg
 
 # Below these, a table cannot say which segment is better, only that it is small.
@@ -109,7 +111,7 @@ class _Ctx:
     def money(self, v):
         return money(v, self.cur)
 
-    def add(self, dim, kind, severity, headline, evidence, action, confidence, rows, ident, group=None):
+    def add(self, dim, kind, severity, headline, evidence, action, confidence, rows, ident, group=None, how=None, worth=None):
         s = _sum(rows) if rows else {"cost": 0, "conv": 0}
         table_cost = (group or {}).get("cost") or self.total["cost"] or 1
         self.out.append({
@@ -118,6 +120,7 @@ class _Ctx:
             "headline": headline, "evidence": evidence, "action": action, "confidence": confidence,
             "spend": round(s["cost"], 2), "spendShare": s["cost"] / table_cost if table_cost else None,
             "conversions": round(s["conv"], 2), "labels": [r["label"] for r in rows],
+            "how": list(how or []), "worth": worth,
         })
 
 
@@ -212,6 +215,107 @@ def _costly_google(dim, label):
     }.get(dim["key"], "Lower bids or reduce the budget share for %s." % label)
 
 
+# ── What can be done depends on the bidding (tracker/paid_bidding.py) ───────
+
+DAYS_A_MONTH = 30
+WHERE = {
+    "day": "Open the campaign, then Ad schedule, then Edit ad schedule (the pencil), and find the day.",
+    "hour": "Open the campaign, then Ad schedule, then Edit ad schedule (the pencil), and add or change the hours.",
+    "age": "Open the campaign, then Audiences, then Demographics, then Age.",
+    "gender": "Open the campaign, then Audiences, then Demographics, then Gender.",
+    "city": "Open the campaign, then Locations, and open the list of locations (Excluded locations is under the same menu).",
+    "device": "Open the campaign, then Settings, then Devices.",
+}
+TIME_DIMS = ("day", "hour")
+PAR_LOW, PAR_HIGH = 0.9, 1.1                                      # a segment this close to the table's average cost per conversion is left alone
+
+
+def suggested(avg_cpl, cpl):
+    """A bid adjustment worth trying for a segment that costs `cpl` per conversion against the table's `avg_cpl`: Geo Performance's rule (tracker/paid_geo_insights.py
+    adjustment_for): most of the gap in steps of 5%, +40% at most, -50% at least, and none for a segment on par."""
+    if not avg_cpl or not cpl:
+        return 0.0
+    idx = avg_cpl / cpl
+    return 0.0 if PAR_LOW <= idx <= PAR_HIGH else gi.adjustment_for(idx)
+
+
+def _signed(v):
+    return "%+d%%" % round(v * 100)
+
+
+def _share_note(bid, mode):
+    """A line saying how much of the table's spend is on bidding where a hand-set adjustment does little, or "" ."""
+    if not bid or mode not in ("mixed", "adjustable"):
+        return ""
+    other = bid.get(bidding.SMART, 0.0) + bid.get(bidding.AUTO, 0.0)
+    if other < 0.2:
+        return ""
+    return "%s of this table's spend is on Smart Bidding or Performance Max, where hand-set adjustments are mostly ignored: apply this to the campaigns on manual or maximize clicks bidding, and use the exclusion steps for the rest." % pct(other)
+
+
+def levers(ctx, dim, kind, label, rows, mode, bid, avg_cpl, table_cost):
+    """(action to replace the fixed one or None, steps, what it is worth or None) for a Google table, chosen by the bidding the spend is on. The fixed action stands when the
+    spend is on bidding that honours adjustments, or when the bidding is not known."""
+    key = dim["key"]
+    where = WHERE.get(key)
+    s = _sum(rows)
+    days = max(1, (ctx.report.get("range") or {}).get("days") or 1)
+    worth = None
+    if kind == "waste" and s["cost"] > 0:
+        worth = "%s went on this with no conversion in %d days, about %s a month. Cutting it frees that, though a share of such spend may be reaching people who convert later." % (
+            ctx.money(s["cost"]), days, ctx.money(s["cost"] * DAYS_A_MONTH / days))
+    if kind == "costly" and s["conv"] and avg_cpl:
+        saved = s["cost"] - s["conv"] * avg_cpl
+        if saved > 0:
+            worth = "At the table's average cost per conversion the same %s conversions would have cost about %s less over %d days: an estimate." % (_n(round(s["conv"], 1)), ctx.money(saved), days)
+    note = _share_note(bid, mode)
+    steps, action = [], None
+    if mode in (None, "adjustable", "mixed", "other"):
+        if where and kind in ("best", "costly", "waste") and key in WHERE:
+            steps.append(where)
+        adj = suggested(avg_cpl, s["cost"] / s["conv"]) if s["conv"] else None
+        if kind == "best" and adj:
+            steps.append("Set the bid adjustment for %s to about %s (most of the gap to the table's average cost per conversion). Try it for two weeks and check the cost per conversion stays under the average." % (label, _signed(max(adj, gi.STEP))))
+        elif kind == "costly" and adj:
+            steps.append("Set the bid adjustment for %s to about %s, and check it again after two weeks." % (label, _signed(min(adj, -gi.STEP))))
+        elif kind == "waste":
+            steps.append("%s Start with about %s so the segment still gets a chance to convert, and exclude it after two weeks if it still has nothing." % (
+                "Exclude the location if it is not one the business serves." if key == "city" else "A bid adjustment of -100% stops ads on %s." % label if key == "device" else "", _signed(gi.MAX_DOWN)))
+        if note:
+            steps.append(note)
+        return None, [x for x in (steps) if x.strip()], worth
+    if mode == bidding.SMART:
+        if kind == "best":
+            action = ("Smart Bidding already bids more where a search is likely to convert and mostly ignores hand-set adjustments, so a positive adjustment for %s would do little." % label)
+            steps = ["Make sure the campaign is not limited by budget at the times and places that convert best (Campaigns, Status column and the lost impression share): a capped campaign stops early and misses them."
+                     if key in TIME_DIMS else "To put more behind %s, give it a campaign of its own with its own budget and target, so it is not starved by the rest." % label]
+        elif kind == "waste":
+            action = {"day": "Smart Bidding ignores a day adjustment, so leave %s out with an ad schedule." % label, "hour": "Smart Bidding ignores an hour adjustment, so leave %s out with an ad schedule." % label,
+                      "age": "Smart Bidding ignores an age adjustment, so exclude %s." % label, "gender": "Smart Bidding ignores a gender adjustment, so exclude %s." % label,
+                      "city": "Smart Bidding ignores a location adjustment, so exclude these locations.", "device": "Smart Bidding ignores most device adjustments, so exclude %s with -100%%." % label}.get(key, "Smart Bidding ignores hand-set adjustments, so exclude %s." % label)
+            steps = [where] if where else []
+            steps.append({"day": "Add an ad schedule that covers every other day, so ads do not run on %s." % label, "hour": "Add an ad schedule for the other hours, or set a -100% schedule adjustment on these.",
+                          "age": "Tick the age range as excluded (a red minus) so ads are not shown to it.", "gender": "Tick the gender as excluded so ads are not shown to it.",
+                          "city": "Add the places as excluded locations, and move the budget to the cities that convert.", "device": "Set the device adjustment to -100% (the one adjustment Smart Bidding honours) to stop it."}.get(key, ""))
+        else:
+            action = "Smart Bidding sets bids per search, so lowering an adjustment for %s will not help: the cost per conversion reflects the target." % label
+            steps = ["Check the campaign's target CPA or ROAS against what this group costs: a target tighter than the group can meet leaves it paying more than the average.",
+                     "Or move %s into a campaign of its own with its own target and budget, so it can be judged and limited on its own." % label]
+    elif mode == bidding.AUTO:
+        if key in TIME_DIMS:
+            action = "Performance Max and Demand Gen set their own bids and take no adjustment, but an ad schedule works: use it to leave %s out." % label if kind == "waste" else \
+                "Performance Max and Demand Gen set their own bids and take no adjustment for %s: check the campaign is not limited by budget in that window." % label
+            steps = [where, "Add an ad schedule that leaves %s out." % label] if kind == "waste" else ["Check the campaign's Status and its lost impression share: a campaign limited by budget stops early and misses the best hours."]
+        elif key == "city":
+            action = "Performance Max and Demand Gen take no location adjustment: exclude the places that do not convert, in the campaign's location settings." if kind != "best" else \
+                "Performance Max and Demand Gen take no location adjustment: put %s in its own campaign if it should have its own budget." % label
+            steps = [where] if kind != "best" else ["Create a campaign for %s with its own budget and location, and keep it out of the others by excluding it there." % label]
+        else:
+            action = "Performance Max and Demand Gen take no adjustment for %s, and cannot exclude by it: steer it with audience signals, the assets and the landing page." % label
+            steps = ["Open the asset group, then Audience signal, and add the audiences that fit the people who convert; change the images and text to speak to them."]
+    return action, [x for x in steps if x and x.strip()], worth
+
+
 # ── Grouping zero-conversion rows ───────────────────────────────────────────
 
 def _hour_runs(rows):
@@ -267,6 +371,8 @@ def _table_rules(ctx, dim, view):
     avg_cpl = tot["cpl"]
     key = dim["key"]
     flagged = set()
+    bid = view.get("bidding") if ctx.platform in ("google", "both") else None
+    mode = bidding.mode(bid)
 
     # waste: spend with no conversions, grouped
     zero = [r for r in rows if r["conversions"] <= 0 and r["cost"] > 0
@@ -278,13 +384,17 @@ def _table_rules(ctx, dim, view):
             continue
         ctr_high = bool(tot["ctr"]) and s["imp"] and (s["clicks"] / s["imp"]) >= 1.5 * tot["ctr"] and s["clicks"] >= 50
         flagged.update(r["label"] for r in grp)
+        action = _waste_action(dim, label, grp, ctr_high, ctx.platform)
+        override, how, worth = levers(ctx, dim, "waste", label, grp, mode, bid, avg_cpl, table_cost) if ctx.platform != "meta" else (None, [], None)
+        if override:
+            action = (("Clicks are arriving but not converting, so check the landing page and conversion tracking before cutting bids. ") if ctr_high else "") + override
         ctx.add(dim, "waste", "action",
                 "%s: %s of spend, no conversions" % (label, pct(share)),
                 "%s spent in this range with 0 conversions, while this table as a whole produced %s."
                 % (ctx.money(s["cost"]), _n(round(table_conv, 1))),
-                _waste_action(dim, label, grp, ctr_high, ctx.platform),
+                action,
                 "high" if table_conv >= HIGH_TABLE_CONV and share >= 0.10 else "directional",
-                grp, "zero-" + re.sub(r"\W+", "-", label.lower())[:30], group=tot)
+                grp, "zero-" + re.sub(r"\W+", "-", label.lower())[:30], group=tot, how=how, worth=worth)
 
     if table_conv < MIN_TABLE_CONV or not avg_cpl:
         return
@@ -300,24 +410,27 @@ def _table_rules(ctx, dim, view):
             s = _sum(grp)
             label = _window(grp) if key == "hour" else best["label"]
             cpl = s["cost"] / s["conv"] if s["conv"] else best["cpl"]
+            best_action = _best_action(dim, label, ctx.platform)
+            override, how, worth = levers(ctx, dim, "best", label, grp, mode, bid, avg_cpl, table_cost) if ctx.platform != "meta" else (None, [], None)
             ctx.add(dim, "best", "action",
                     "%s converts cheapest" % label,
                     "%s per conversion against %s for the whole table: %s of the conversions on %s of the spend (%s conversions)."
                     % (ctx.money(cpl), ctx.money(avg_cpl), pct(s["conv"] / table_conv), pct(s["cost"] / table_cost),
                        _n(round(s["conv"], 1))),
-                    _best_action(dim, label, ctx.platform), _conf(table_conv, s["conv"]), grp, "best", group=tot)
+                    override or best_action, _conf(table_conv, s["conv"]), grp, "best", group=tot, how=how, worth=worth)
 
     # costly: converting, but dear
     for r in rows:
         if (r["cpl"] is not None and r["conversions"] >= 1 and r["cost"] / table_cost >= COSTLY_SHARE
                 and r["cpl"] >= COSTLY_EDGE * avg_cpl and r["label"] not in flagged
                 and not (key in ("age", "gender") and r["label"] == "Undetermined")):
+            override, how, worth = levers(ctx, dim, "costly", r["label"], [r], mode, bid, avg_cpl, table_cost) if ctx.platform != "meta" else (None, [], None)
             ctx.add(dim, "costly", "action",
                     "%s converts at %.1fx the average cost" % (r["label"], r["cpl"] / avg_cpl),
                     "%s per conversion against %s for the table, on %s of the spend."
                     % (ctx.money(r["cpl"]), ctx.money(avg_cpl), pct(r["cost"] / table_cost)),
-                    _costly_action(dim, r["label"], ctx.platform), _conf(table_conv, r["conversions"]), [r],
-                    "costly-" + re.sub(r"\W+", "-", r["label"].lower())[:30], group=tot)
+                    override or _costly_action(dim, r["label"], ctx.platform), _conf(table_conv, r["conversions"]), [r],
+                    "costly-" + re.sub(r"\W+", "-", r["label"].lower())[:30], group=tot, how=how, worth=worth)
 
 
 def _type_rules(ctx):

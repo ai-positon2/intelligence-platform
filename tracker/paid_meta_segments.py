@@ -224,7 +224,8 @@ def _merge_view(av, bv, order, account_cost):
         row = seg.derive(m, total["cost"])
         row.update(key=e["key"], label=e["label"], sub=e["sub"])
         rows.append(row)
-    return {"rows": rows, "total": seg.derive(total, total["cost"]), "coverage": seg._div(total["cost"], account_cost)}
+    return {"rows": rows, "total": seg.derive(total, total["cost"]), "coverage": seg._div(total["cost"], account_cost),
+            "bidding": (av or {}).get("bidding")}                # the Google half's: Meta has no bid adjustments, so the Google advice is judged on the Google spend
 
 
 def merge_reports(g, m, account):

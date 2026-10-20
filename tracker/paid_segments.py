@@ -30,6 +30,7 @@ import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 
+from . import paid_bidding as bidding
 from . import paid_gads as base
 from . import paid_gads_segments as gads
 
@@ -118,7 +119,7 @@ def _x_network(row):
 
 
 _METRICS = "metrics.impressions, metrics.clicks, metrics.cost_micros, metrics.conversions"
-_CAMPAIGN = "campaign.name, campaign.advertising_channel_type"
+_CAMPAIGN = "campaign.name, campaign.advertising_channel_type, campaign.bidding_strategy_type"
 
 # key, label, FROM, the segment fields to select, row reader, row order
 # ("natural": the reader's sort key, "cost": biggest spender first)
@@ -234,9 +235,13 @@ def _read(rows, dim):
         sort, label, sub = dim["read"](row)
         ctype = campaign_type(_get(row, "campaign", "name"), _get(row, "campaign", "advertisingChannelType"))
         seg = segs.setdefault(sort if dim["key"] == "city" else label,
-                              {"sort": sort, "label": label, "sub": sub, "all": _zero(), "types": {}})
+                              {"sort": sort, "label": label, "sub": sub, "all": _zero(), "types": {}, "bid": {}, "bidTypes": {}})
         _add(seg["all"], vals)
         _add(seg["types"].setdefault(ctype, _zero()), vals)
+        cls = bidding.class_of(_get(row, "campaign", "advertisingChannelType"), _get(row, "campaign", "biddingStrategyType"))
+        seg["bid"][cls] = seg["bid"].get(cls, 0.0) + vals["cost"]
+        by = seg["bidTypes"].setdefault(ctype, {})
+        by[cls] = by.get(cls, 0.0) + vals["cost"]
     return segs
 
 
@@ -259,11 +264,12 @@ def _name_cities(segs, geo_fn):
 
 def _view(segs, dim, ctype, account_cost):
     """One table: every segment's row for `ctype` (ALL for no filter)."""
-    picked = []
+    picked, spend_by_class = [], []
     for seg in segs.values():
         m = seg["all"] if ctype == ALL else seg["types"].get(ctype)
         if m and not _is_empty(m):
             picked.append((seg, m))
+            spend_by_class.append(seg.get("bid") if ctype == ALL else (seg.get("bidTypes") or {}).get(ctype))
     total = _zero()
     for _seg, m in picked:
         _add(total, m)
@@ -277,7 +283,7 @@ def _view(segs, dim, ctype, account_cost):
         row.update(key=str(seg["sort"]), label=seg["label"], sub=seg["sub"])
         rows.append(row)
     return {"rows": rows, "total": derive(total, total["cost"]),
-            "coverage": _div(total["cost"], account_cost)}
+            "coverage": _div(total["cost"], account_cost), "bidding": bidding.shares(bidding.merge(spend_by_class))}
 
 
 def parse_range(start, end):
