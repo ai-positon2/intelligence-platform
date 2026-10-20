@@ -33,6 +33,7 @@ import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 
+from . import paid_bidding as bidding
 from . import paid_gads as base
 from . import paid_gads_segments as gads
 from . import paid_geo_insights as insights
@@ -110,7 +111,7 @@ def derive(m, total_cost, total_conv):
 # ── Google Ads ──────────────────────────────────────────────────────────────
 
 _METRICS = "metrics.impressions, metrics.clicks, metrics.cost_micros, metrics.conversions, metrics.conversions_value"
-_CAMPAIGN = "campaign.name, campaign.advertising_channel_type"
+_CAMPAIGN = "campaign.name, campaign.advertising_channel_type, campaign.bidding_strategy_type"
 
 
 def gaql(level, start, end):
@@ -151,9 +152,14 @@ def read_google(rows, level):
         vals = _g_vals(row)
         if is_empty(vals):
             continue
-        s = segs.setdefault(_g_key(row, level), {"all": zero(), "types": {}})
+        s = segs.setdefault(_g_key(row, level), {"all": zero(), "types": {}, "bid": {}, "bidTypes": {}})
         add(s["all"], vals)
         add(s["types"].setdefault(_g_type(row), zero()), vals)
+        c = (row or {}).get("campaign") or {}
+        cls = bidding.class_of(c.get("advertisingChannelType"), c.get("biddingStrategyType"))
+        s["bid"][cls] = s["bid"].get(cls, 0.0) + vals["cost"]
+        by = s["bidTypes"].setdefault(_g_type(row), {})
+        by[cls] = by.get(cls, 0.0) + vals["cost"]
     return segs
 
 
@@ -170,10 +176,13 @@ def read_google_totals(rows):
 def _fold(into, other):
     """Add one read's places (and types) into another's."""
     for key, s in other.items():
-        d = into.setdefault(key, {"all": zero(), "types": {}})
+        d = into.setdefault(key, {"all": zero(), "types": {}, "bid": {}, "bidTypes": {}})
         add(d["all"], s["all"])
         for t, m in s["types"].items():
             add(d["types"].setdefault(t, zero()), m)
+        d["bid"] = bidding.merge([d.get("bid"), s.get("bid")])
+        for t, costs in (s.get("bidTypes") or {}).items():
+            d.setdefault("bidTypes", {})[t] = bidding.merge([d["bidTypes"].get(t), costs])
 
 
 def _split_canonical(canonical):
@@ -318,7 +327,8 @@ def _place_norm(label):
 
 def _copy_place(p):
     """A place with its own sums: a read comes out of the cache shared, so adding two reads must never change either."""
-    return dict(p, all=dict(p["all"]), types={t: dict(v) for t, v in p["types"].items()})
+    return dict(p, all=dict(p["all"]), types={t: dict(v) for t, v in p["types"].items()}, bid=dict(p.get("bid") or {}),
+                bidTypes={t: dict(v) for t, v in (p.get("bidTypes") or {}).items()})
 
 
 def merge_raw(g, m):
@@ -363,11 +373,12 @@ def _mixed_results(totals):
 
 
 def _view(places, ctype, account_cost, account_conv):
-    picked = []
+    picked, spend_by_class = [], []
     for key, p in places.items():
         m = p["all"] if ctype == ALL else p["types"].get(ctype)
         if m and not is_empty(m):
             picked.append((key, p, m))
+            spend_by_class.append(p.get("bid") if ctype == ALL else (p.get("bidTypes") or {}).get(ctype))
     total = zero()
     for _k, _p, m in picked:
         add(total, m)
@@ -381,7 +392,7 @@ def _view(places, ctype, account_cost, account_conv):
                                 if ctype == ALL and not is_empty(v)}
         rows.append(row)
     tot = derive(total, total["cost"], total["conv"])
-    return {"rows": rows, "total": tot, "coverage": _div(total["cost"], account_cost)}
+    return {"rows": rows, "total": tot, "coverage": _div(total["cost"], account_cost), "bidding": bidding.shares(bidding.merge(spend_by_class))}
 
 
 def assemble(raw, account, start, end):
@@ -402,7 +413,7 @@ def assemble(raw, account, start, end):
         v = _view(raw["places"], t, cost, conv)
         v["account"] = derive(acct if t == ALL else totals.get(t, zero()), cost or 0, conv or 0)
         views[t] = insights.analyse(v, level=raw["level"], currency=account.get("currency") or "USD", platform=platform,
-                                    mixed=t == ALL and platform == "meta" and _mixed_results(totals))
+                                    mixed=t == ALL and platform == "meta" and _mixed_results(totals), days=(end - start).days + 1)
     return {
         "account": {"id": account["id"], "name": account["name"], "currency": account.get("currency") or "USD", "platform": platform,
                     "isGroup": bool(raw.get("members")), "accountCount": len(raw.get("members") or []) or 1, "accounts": raw.get("members") or []},

@@ -23,6 +23,8 @@ The judgement, and why it is built this way:
 """
 from __future__ import annotations
 
+from . import paid_bidding as bidding
+
 MIN_CONV = 5
 STAR, GOOD, BELOW, WEAK = 1.3, 1.1, 0.9, 0.75
 DAMPEN, STEP, MAX_UP, MAX_DOWN = 0.8, 0.05, 0.40, -0.50
@@ -119,7 +121,7 @@ def _label(row):
     return row["label"]
 
 
-def analyse(view, *, level="region", currency="USD", platform="google", mixed=False):
+def analyse(view, *, level="region", currency="USD", platform="google", mixed=False, days=None):
     """The view with every row judged, and `insights`, `basis` and `average` added. `view` is
     {rows, total, coverage, account} as tracker/paid_geo.py builds it."""
     total = dict(view["total"], _cur=currency)
@@ -132,7 +134,8 @@ def analyse(view, *, level="region", currency="USD", platform="google", mixed=Fa
         rows.append(dict(r, verdict=verdict, verdictLabel=VERDICT_LABEL[verdict], index=None if idx is None else round(idx * 100),
                          adjustment=adj, confidence=conf, why=why))
     out = dict(view, rows=rows, basis=basis)
-    out["insights"] = make_insights(rows, view["total"], view.get("coverage"), basis, level, currency, platform, mixed)
+    out["insights"] = make_insights(rows, view["total"], view.get("coverage"), basis, level, currency, platform, mixed,
+                                    bid=None if platform == "meta" else view.get("bidding"), days=days)
     out["counts"] = {v: sum(1 for r in rows if r["verdict"] == v) for v in VERDICT_LABEL if any(r["verdict"] == v for r in rows)}
     return out
 
@@ -143,7 +146,55 @@ def _basis_words(r, total, basis, currency):
     return "CPA %s against %s for the account" % (money(r["cpa"], currency, 2) if r["cpa"] else "Na", money(total["cpa"], currency, 2))
 
 
-def make_insights(rows, total, coverage, basis, level, currency, platform="google", mixed=False):
+def _signed(v):
+    return "%+d%%" % round(v * 100)
+
+
+def _other_note(bid, mode):
+    """A line saying how much of the spend is on bidding where a location adjustment does little, or ""."""
+    if not bid or mode not in ("mixed", "adjustable"):
+        return ""
+    other = bid.get(bidding.SMART, 0.0) + bid.get(bidding.AUTO, 0.0)
+    return ("%s of this table's spend is on Smart Bidding or Performance Max, where a location adjustment is mostly ignored: set it on the campaigns that bid by hand or for clicks, and exclude or split the rest." % pct(other)) if other >= 0.2 else ""
+
+
+def location_levers(kind, label, adj, cost, mode, bid, noun, currency, days):
+    """(action or None, steps, worth) for a place on Google: what to do given the bidding the spend is on. None for the action means the fixed wording stands (the spend is on bidding that honours a
+    location adjustment, or it is not known)."""
+    where = "Open the campaign, then Locations, then the list of locations, and find %s" % label
+    note = _other_note(bid, mode)
+    worth = None
+    if kind in ("exclude", "trim") and cost and days:
+        worth = "%s went to %s in %d days%s, about %s a month at that rate." % (money(cost, currency), label, days, " with no conversion" if kind == "exclude" else "", money(cost * 30.0 / days, currency))
+    if mode in (None, "adjustable", "mixed", "other"):
+        steps = []
+        if kind in ("push", "trim") and adj:
+            steps.append("%s, click the Bid adj. cell on its row and set %s. (A place the campaign does not target yet has no cell: add it first with Enter another location.)" % (where, _signed(adj)))
+            steps.append("Check the cost per conversion for %s after two weeks and move the adjustment one step (5%%) at a time." % label)
+        elif kind == "exclude":
+            steps.append("Open the campaign, then Locations, then the + button, and add %s under Excluded locations (or set its bid adjustment to -100%% to keep it targeted but stop the bidding)." % label)
+        if note:
+            steps.append(note)
+        return None, steps, worth
+    if mode == bidding.SMART:
+        if kind == "push":
+            return ("Smart Bidding mostly ignores a location adjustment, so %s for %s would do little. To give it more money, put it in a campaign of its own with its own budget and target." % (_signed(adj), label),
+                    ["Create a campaign that targets only %s (Campaigns, then the + button, then New campaign, then Locations)." % label,
+                     "Exclude %s from the original campaign (Locations, then Excluded locations) so the two do not bid against each other." % label,
+                     "Give the new campaign a budget near what %s takes now and read it again after two weeks." % label], None)
+        return ("Smart Bidding mostly ignores a location adjustment, so exclude %s%s." % (label, "" if kind == "exclude" else " or move it to a campaign with a smaller budget"),
+                ["Open the campaign, then Locations, then the + button, and add %s under Excluded locations." % label] +
+                (["Or create a campaign for %s alone with a smaller budget, and exclude it from this one." % label] if kind == "trim" else []), worth)
+    if mode == bidding.AUTO:
+        if kind == "push":
+            return ("Performance Max and Demand Gen take no location adjustment. To give %s more money, put it in a campaign of its own with its own budget." % label,
+                    ["Create a campaign that targets only %s and exclude it from the original (Locations, then Excluded locations)." % label], None)
+        return ("Performance Max and Demand Gen take no location adjustment, so exclude %s in the campaign's location settings." % label,
+                ["Open the campaign, then Locations, then the + button, and add %s under Excluded locations." % label], worth)
+    return None, [], worth
+
+
+def make_insights(rows, total, coverage, basis, level, currency, platform="google", mixed=False, bid=None, days=None):
     """On Meta there is no bid adjustment by place: the same index says how much more or less budget a place deserves, and the advice is in ad sets and
     location targeting. (On Google, and on the two added together, it is Google's bid adjustment.)"""
     noun = LEVEL_NOUN.get(level, "location")
@@ -152,9 +203,11 @@ def make_insights(rows, total, coverage, basis, level, currency, platform="googl
     if not rows:
         return out
 
-    def add_(kind, severity, headline, evidence, action, conf, keys):
+    mode = bidding.mode(bid)
+
+    def add_(kind, severity, headline, evidence, action, conf, keys, how=None, worth=None):
         out.append({"kind": kind, "severity": severity, "headline": headline, "evidence": evidence, "action": action,
-                    "confidence": conf, "keys": keys})
+                    "confidence": conf, "keys": keys, "how": list(how or []), "worth": worth})
 
     if mixed:
         add_("mixed", "watch", "Campaign types with different results are added together here",
@@ -183,11 +236,12 @@ def make_insights(rows, total, coverage, basis, level, currency, platform="googl
                      if r["pctCost"] and r["pctCost"] < 0.03 else "It already takes a real share of the spend"),
                  r["confidence"], [r["key"]])
             continue
+        override, how, worth = location_levers("push", _label(r), r["adjustment"], r["cost"], mode, bid, noun, currency, days)
         add_("push", "action", "Raise bids in %s by about %d%%" % (_label(r), round(r["adjustment"] * 100)),
-             ev(r), "Add a +%d%% location bid adjustment for %s and check it after two weeks. %s." % (
+             ev(r), override or "Add a +%d%% location bid adjustment for %s and check it after two weeks. %s." % (
                  round(r["adjustment"] * 100), _label(r), "It is also worth a campaign of its own if the budget is capped"
                  if r["pctCost"] and r["pctCost"] < 0.03 else "It already takes a real share of the spend"),
-             r["confidence"], [r["key"]])
+             r["confidence"], [r["key"]], how, worth)
 
     trims = sorted([r for r in rows if r["verdict"] in ("weak", "below") and (r["adjustment"] or 0) <= -0.10],
                    key=lambda r: -r["cost"])[:3]
@@ -197,18 +251,20 @@ def make_insights(rows, total, coverage, basis, level, currency, platform="googl
                  ev(r), "Cut its share of the budget by about %d%% (an ad set of its own makes that possible). If it stays weak after a month, exclude %s from the location targeting."
                  % (round(-r["adjustment"] * 100), _label(r)), r["confidence"], [r["key"]])
             continue
+        override, how, worth = location_levers("trim", _label(r), r["adjustment"], r["cost"], mode, bid, noun, currency, days)
         add_("trim", "action", "Lower bids in %s by about %d%%" % (_label(r), round(-r["adjustment"] * 100)),
-             ev(r), "Add a %d%% location bid adjustment for %s. If it stays weak after a month, exclude it." % (round(r["adjustment"] * 100), _label(r)),
-             r["confidence"], [r["key"]])
+             ev(r), override or "Add a %d%% location bid adjustment for %s. If it stays weak after a month, exclude it." % (round(r["adjustment"] * 100), _label(r)),
+             r["confidence"], [r["key"]], how, worth)
 
     leaks = sorted([r for r in rows if r["verdict"] == "leak"], key=lambda r: -r["cost"])[:3]
     for r in leaks:
+        override, how, worth = (None, [], None) if meta else location_levers("exclude", _label(r), -0.5, r["cost"], mode, bid, noun, currency, days)
         add_("exclude", "action", "%s spent %s and did not convert" % (_label(r), money(r["cost"], currency)),
              "%s: %s on %s clicks, no conversions; the account's CPA is %s, so this is %s times a normal conversion's cost." % (
                  _label(r), money(r["cost"], currency), num(r["clicks"]), money(total["cpa"], currency, 2),
                  format(r["cost"] / total["cpa"], ".1f") if total.get("cpa") else "Na"),
-             "Exclude %s, or cut its %s by half, unless it matters for a reason the numbers cannot show (a new market, brand awareness)." % (_label(r), "budget" if meta else "bid"),
-             "medium", [r["key"]])
+             override or "Exclude %s, or cut its %s by half, unless it matters for a reason the numbers cannot show (a new market, brand awareness)." % (_label(r), "budget" if meta else "bid"),
+             "medium", [r["key"]], how, worth)
 
     top = rows[:3]
     if len(rows) >= 4:

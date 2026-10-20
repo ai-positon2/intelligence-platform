@@ -281,7 +281,9 @@ function paintInsights(){
         '<div class="sg-card-top"><span class="sg-tag">'+esc({push:budgetWords()?"More budget":"Raise bids",trim:budgetWords()?"Less budget":"Lower bids",exclude:"Exclude",concentration:"Concentration",mixed:"Mixed results",thin:"Thin data",coverage:"Coverage",nodata:"No data"}[i.kind]||i.kind)+'</span>'+
         (i.severity==="info"?"":'<span class="sg-conf '+(i.confidence==="high"?"high":"")+'">'+(i.confidence==="high"?"High confidence":i.confidence==="medium"?"Medium confidence":"Directional")+'</span>')+'</div>'+
         '<h4>'+esc(i.headline)+'</h4><p class="ev">'+esc(i.evidence)+'</p>'+
-        '<p class="ac"><b>'+(i.severity==="info"?"Note":"Do")+'</b> '+esc(i.action)+'</p></article>';
+        '<p class="ac"><b>'+(i.severity==="info"?"Note":"Do")+'</b> '+esc(i.action)+'</p>'+
+        (i.how&&i.how.length?'<ol class="how">'+i.how.map(function(h){return '<li>'+esc(h)+'</li>';}).join("")+'</ol>':"")+
+        (i.worth?'<p class="worth"><b>Worth</b> '+esc(i.worth)+'</p>':"")+'</article>';
     }).join("")+'</div>';
   });
   $("#insList").innerHTML=html;

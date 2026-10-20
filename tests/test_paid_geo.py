@@ -77,7 +77,7 @@ TOTALS = [{"campaign": {"name": "Brand_Search", "advertisingChannelType": "SEARC
                                          ("postal_code", "segments.geo_target_postal_code")])
 def test_each_level_below_a_country_reads_the_user_location_report_with_its_segment(level, field):
     q = g.gaql(level, START, END)
-    assert q.startswith("SELECT campaign.name, campaign.advertising_channel_type, %s," % field)
+    assert q.startswith("SELECT campaign.name, campaign.advertising_channel_type, campaign.bidding_strategy_type, %s," % field)
     assert "FROM user_location_view" in q and "BETWEEN '2026-06-01' AND '2026-06-30'" in q
     for m in ("impressions", "clicks", "cost_micros", "conversions", "conversions_value"):
         assert "metrics." + m in q
