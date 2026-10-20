@@ -139,7 +139,7 @@ function row(a){
 function trendHtml(a){
   var bars=D.trendBars(a);
   return '<div class="bi-trend" role="img" aria-label="Brand impression share, the last '+bars.length+' weeks">'+bars.map(function(w){
-    return '<span class="bi-w '+w.tone+'" title="'+esc(w.title)+'"><i style="height:'+w.height+'%"></i><em>'+(w.has?D.pct(w.share):"–")+'</em><small>'+esc(w.from.slice(5))+'</small></span>';
+    return '<span class="bi-w '+w.tone+'" title="'+esc(w.title)+'"><i style="height:'+w.height+'%"></i><em>'+(w.has?D.pct(w.share):"-")+'</em><small>'+esc(w.from.slice(5))+'</small></span>';
   }).join("")+'<span class="bi-th-line" style="bottom:'+Math.round(a.threshold*100)+'%" title="Threshold"></span></div>';
 }
 function findingsHtml(a){
