@@ -400,7 +400,7 @@ function movesTable(a){
     rows.map(function(r){var m=r.m;
       return '<tr class="'+(r.st?'pd-done':'')+'" data-move-id="'+esc(r.id)+'" data-loc="'+esc(r.loc)+'" data-from="'+esc(m.from)+'" data-to="'+esc(m.to)+'" data-amt="'+m.amt+'">'+
         (multi?'<td>'+esc(r.loc)+'</td>':'')+'<td class="r pd-amt">'+m0(m.amt)+'</td>'+
-        '<td class="cn">'+esc(m.from)+'</td><td class="pd-arrow">→</td><td class="cn">'+esc(m.to)+'</td><td class="why">'+esc(m.why)+'</td>'+
+        '<td class="cn">'+esc(m.from)+'</td><td class="pd-arrow">→</td><td class="cn">'+esc(m.to)+'</td><td class="why">'+esc(m.why)+(m.how&&m.how.length?'<details class="pd-how"><summary>Steps</summary><ol>'+m.how.map(function(h){return '<li>'+esc(h)+'</li>';}).join("")+'</ol></details>':"")+'</td>'+
         '<td class="r"><label class="pd-toggle" title="Mark this move applied for everyone"><input type="checkbox" aria-label="Mark move applied"'+(r.st?' checked':'')+'><i></i></label>'+
         (r.st&&r.st.appliedBy?'<span class="pd-by">'+esc(r.st.appliedBy.split("@")[0])+'</span>':'')+'</td></tr>';
     }).join("")+'</tbody></table></div>';

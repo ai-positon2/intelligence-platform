@@ -1549,3 +1549,6 @@ tr.ud-dismissed td,tr.ud-gone td{opacity:.62}
 .ps-do ol{margin:8px 0 0;padding-left:18px;display:flex;flex-direction:column;gap:6px;line-height:1.55}
 .ps-worth{margin:8px 0 0;color:var(--pm-muted)}
 .ps-worth b{color:var(--pm-ink)}
+.pd-how{margin:6px 0 0;font-size:12px}
+.pd-how summary{cursor:pointer;color:var(--pm-a);font-weight:600}
+.pd-how ol{margin:6px 0 0;padding-left:18px;display:flex;flex-direction:column;gap:5px;line-height:1.5;color:var(--pm-ink2)}

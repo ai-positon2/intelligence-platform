@@ -531,6 +531,13 @@ def analyse_account(client: str, account: str, alloc: float,
     roas = (conv_value_total / spend) if (not target_is_cpa and spend > 0
                                           and conv_value_total > 0) else None
 
+    # A campaign's recommended daily budget: the move is decided per category (the unit money moves between), so each campaign in it takes the category's
+    # change in proportion to its own budget. Without this every campaign read a recommended budget of zero and the page showed a cut of its whole budget.
+    scale = {(c.location, c.campaign): (c.new_daily / c.cur_daily if c.cur_daily > 0 else 1.0) for c in catlist}
+    for r in rows:
+        ratio = scale.get((r.location or account, r.category or "Other"), 1.0) if r.active else 1.0
+        r.new_daily = round(r.budget * ratio, 2)
+
     res = AccountResult(
         client=client, account=account, allocated=alloc, spend=spend, conv=conv,
         target_cpa=target_cpa, schedule_txt=schedule_txt or "All days",
