@@ -36,7 +36,7 @@ def test_the_steps_are_written_for_a_person_in_the_google_ads_screens_and_have_n
     for cid, v in fx.HOW.items():
         for text in (v.values() if isinstance(v, dict) else [v]):
             assert len(text) > 40 and text.endswith("."), cid
-            assert "—" not in text and "–" not in text and "%s" not in text and "{}" not in text, cid
+            assert "\u2014" not in text and "\u2013" not in text and "%s" not in text and "{}" not in text, cid
             assert any(w in text for w in ("Open", "Create", "Set ", "Google Ads does not show")), cid
 
 
