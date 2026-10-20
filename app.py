@@ -20949,20 +20949,14 @@ def _cap_rows(lines: list, key: str) -> tuple:
 # with CONTEXT_FOR_NEW_CHAT_V17.md when that doc changes; it is intentionally short
 # (cheap to inject on every request) and internal-only (this prompt only reaches
 # @position2_required routes).
-# Paid Marketing agents withdrawn from the listings (2026-10-18, on the owner's
-# word, to be brought back on their word). Slug -> the title the assistant text
-# and the cards use. Unlisted, not gone: the pages, APIs, tests and saved
-# results all still work, so a bookmark keeps working. To RESTORE, empty this
-# dict; every card, command-palette entry, hub count and assistant paragraph
-# below follows it. The hand-written hub card text is the one thing that does not
-# (see the HIDDEN-PAID note in templates/hub.html).
-PAID_HIDDEN_AGENTS = {
-    "experiment-tracker": "Test & Experiment Tracker",
-    "ad-copy": "Ad Copy & Creative Generator",
-    "landing-page-check": "Landing Page & Relevancy Check",
-    "cross-channel": "Cross-Channel & Attribution Analysis",
-    "keyword-research": "Keyword Research",
-}
+# Paid Marketing agents withdrawn from the listings: slug -> the title the
+# assistant text and the cards use. EMPTY now: the five hidden on 2026-10-18
+# (experiment-tracker, ad-copy, landing-page-check, cross-channel,
+# keyword-research) were restored on 2026-10-20 at the owner's word. To hide
+# agents again, put "slug": "Title" entries here; every card, command-palette
+# entry, hub count (21 and 48 minus the hidden) and assistant paragraph follows
+# it. Unlisted, not gone: the pages, APIs and saved results keep working.
+PAID_HIDDEN_AGENTS = {}
 PAID_HIDDEN_SLUGS = frozenset(PAID_HIDDEN_AGENTS)
 PAID_AGENT_TOTAL = 22  # Paid Marketing agents built, hidden ones included
 

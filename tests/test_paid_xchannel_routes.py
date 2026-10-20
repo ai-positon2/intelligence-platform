@@ -155,7 +155,8 @@ def test_the_agent_is_on_the_paid_marketing_page_the_palette_and_the_hub_counts_
     hub = re.sub(r"<!--.*?-->", "", hidden_paid.rendered("/p2/hub"), flags=re.S)
     shown = "cross-channel" not in hidden_paid.hidden()
     assert ("Google and Meta compared side by side" in hub) == shown
-    assert ('data-lxn="%d"' % (48 - len(hidden_paid.hidden()))) in hub and ("<span>%d</span> dashboards" % (21 - len(hidden_paid.hidden()))) in hub
+    n = len(re.findall(r'class="dash-card', hidden_paid.rendered("/p2/paid-marketing")))
+    assert ("<span>%d</span> dashboards" % n) in hub              # the hub's paid count is the page's own (held by tests/test_hub_card_counts.py)
 
 
 def test_the_stylesheet_and_the_scripts_are_served():

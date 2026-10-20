@@ -1,5 +1,7 @@
-"""Five Paid Marketing agents are withdrawn from the listings and come back when
-PAID_HIDDEN_AGENTS in app.py is emptied. Unlisted, not gone: their pages answer.
+"""The hide switch (PAID_HIDDEN_AGENTS in app.py). It is EMPTY now (the five agents
+hidden on 2026-10-18 were restored on 2026-10-20), so the first tests pin the
+restored state and the rest put the five back in the switch to prove it still
+hides everything it should. Unlisted, not gone: hidden pages still answer.
 """
 import re
 
@@ -19,16 +21,49 @@ NAMES = {
 PLAIN = {k: v.replace("&amp;", "&") for k, v in NAMES.items()}
 
 
+def _raw(name):
+    return open(H.os.path.join(H.ROOT, "templates", name), encoding="utf-8").read()
+
+
+# Every card the template can show, hidden or not; and the two totals the hub
+# template subtracts the hidden ones from (so a new agent bumps them there).
+TOTAL = len(re.findall(r'<a href="/p2/paid-marketing/[a-z\-]+" class="dash-card', re.sub(r"<!--.*?-->", "", _raw("paid_marketing.html"), flags=re.S)))
+_hub_raw = _raw("hub.html")
+BAND = int(re.search(r'data-lxn="\{\{ (\d+) - paid_hidden\|length \}\}"', _hub_raw).group(1))
+CARD = int(re.search(r'<span>\{\{ (\d+) - paid_hidden\|length \}\}</span> dashboards', _hub_raw).group(1))
+
+
+def test_the_hub_totals_are_the_number_of_cards_the_template_holds():
+    assert CARD == TOTAL
+
+
 def _cards(html):
     return re.findall(r'<a href="(/p2/paid-marketing/[a-z\-]+)" class="dash-card', html)
 
 
-def test_the_switch_names_exactly_the_five_the_owner_withdrew():
-    assert set(appmod.PAID_HIDDEN_AGENTS) == set(NAMES)
-    assert appmod.PAID_HIDDEN_SLUGS == frozenset(NAMES)
+FIVE = {s: PLAIN[s] for s in NAMES}
 
 
-def test_the_page_shows_none_of_the_five_and_every_other_card():
+@pytest.fixture
+def hide(monkeypatch):
+    monkeypatch.setattr(appmod, "PAID_HIDDEN_AGENTS", dict(FIVE))
+    monkeypatch.setattr(appmod, "PAID_HIDDEN_SLUGS", frozenset(FIVE))
+
+
+def test_nothing_is_hidden_now_and_every_card_is_listed():
+    assert appmod.PAID_HIDDEN_AGENTS == {} and appmod.PAID_HIDDEN_SLUGS == frozenset()
+    page = H.rendered("/p2/paid-marketing")
+    assert len(_cards(page)) == TOTAL and {u.rsplit("/", 1)[1] for u in _cards(page)} >= set(NAMES)
+    for slug in NAMES:
+        assert "u:'/p2/paid-marketing/%s'" % slug in page, slug
+    hub = re.sub(r"<!--.*?-->", "", H.rendered("/p2/hub"), flags=re.S)
+    assert "<span>%d</span> dashboards" % TOTAL in hub and 'data-lxn="%d"' % BAND in hub
+    assert "ad copy checked against" in hub and "Google and Meta compared side by side" in hub
+    for slug, title in PLAIN.items():
+        assert "%s (/p2/paid-marketing/%s)" % (title, slug) in appmod._VIMI_PLATFORM_KNOWLEDGE, slug
+
+
+def test_the_page_shows_none_of_the_five_and_every_other_card(hide):
     page = H.rendered("/p2/paid-marketing")
     shown = _cards(page)
     assert not [u for u in shown if u.rsplit("/", 1)[1] in NAMES]
@@ -37,7 +72,7 @@ def test_the_page_shows_none_of_the_five_and_every_other_card():
         assert title not in re.sub(r"<!--.*?-->|<script.*?</script>", "", page, flags=re.S), title
 
 
-def test_the_command_palette_lists_none_of_the_five():
+def test_the_command_palette_lists_none_of_the_five(hide):
     page = H.rendered("/p2/paid-marketing")
     for slug, title in PLAIN.items():
         assert "u:'/p2/paid-marketing/%s'" % slug not in page, slug
@@ -46,15 +81,15 @@ def test_the_command_palette_lists_none_of_the_five():
     assert "u:'/p2/paid-marketing/ad-copy'" not in H.rendered("/p2/paid-marketing/pacing-desk")
 
 
-def test_the_hub_counts_and_text_follow_the_switch():
+def test_the_hub_counts_and_text_follow_the_switch(hide):
     hub = re.sub(r"<!--.*?-->", "", H.rendered("/p2/hub"), flags=re.S)
     assert "<span>17</span> dashboards" in hub and "<span>17</span> live" in hub
     assert 'data-lxn="44"' in hub
     assert "ad copy checked against" not in hub and "compared side by side" not in hub
 
 
-def test_the_assistant_no_longer_describes_them_and_still_describes_the_rest():
-    k = appmod._VIMI_PLATFORM_KNOWLEDGE
+def test_the_assistant_no_longer_describes_them_and_still_describes_the_rest(hide):
+    k = appmod._without_hidden_paid(appmod._VIMI_PLATFORM_KNOWLEDGE)
     for slug, title in PLAIN.items():
         assert "(/p2/paid-marketing/%s)" % slug not in k, slug
     for kept in ("Account Audit (/p2/paid-marketing/account-audit)", "Business Research (/p2/paid-marketing/business-research)",
@@ -63,7 +98,7 @@ def test_the_assistant_no_longer_describes_them_and_still_describes_the_rest():
         assert kept in k, kept
 
 
-def test_filtering_only_removes_the_hidden_entries():
+def test_filtering_only_removes_the_hidden_entries(hide):
     text = ("Intro.\nBusiness Research (/p2/paid-marketing/business-research): kept one. Keyword Research (/p2/paid-marketing/keyword-research): gone, "
             "with Sentence two. Account Audit (/p2/paid-marketing/account-audit): kept two.\n"
             "Ad Copy & Creative Generator (/p2/paid-marketing/ad-copy): gone too.\nTail.")
@@ -72,22 +107,11 @@ def test_filtering_only_removes_the_hidden_entries():
     assert "kept one" in out and "kept two" in out and "Intro." in out and "Tail." in out
 
 
-def test_the_pages_and_apis_still_answer_so_nothing_is_lost():
+def test_the_pages_and_apis_still_answer_so_nothing_is_lost(hide):
     for slug in NAMES:
         r = appmod.app.test_client().get("/p2/paid-marketing/%s" % slug)
         assert r.status_code == 302                    # signed out is sent to sign in, as for any page: the route is there
         assert H.rendered("/p2/paid-marketing/%s" % slug)
-
-
-def test_emptying_the_switch_brings_every_card_and_count_back(monkeypatch):
-    monkeypatch.setattr(appmod, "PAID_HIDDEN_SLUGS", frozenset())
-    page = H.rendered("/p2/paid-marketing")
-    assert {u.rsplit("/", 1)[1] for u in _cards(page)} >= set(NAMES) and len(_cards(page)) == 22
-    for slug in NAMES:
-        assert "u:'/p2/paid-marketing/%s'" % slug in page, slug
-    hub = re.sub(r"<!--.*?-->", "", H.rendered("/p2/hub"), flags=re.S)
-    assert "<span>22</span> dashboards" in hub and 'data-lxn="49"' in hub
-    assert "ad copy checked against" in hub and "Google and Meta compared side by side" in hub
 
 
 def test_the_withdrawn_paragraphs_are_still_in_the_source_to_restore_from():
