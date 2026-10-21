@@ -87,6 +87,11 @@ def _daily_from_days(days):
     return {"days": days["days"], "rows": [[round(x, 4) if isinstance(x, float) else x for x in r] for r in out]}
 
 
+def mix_of(products):
+    """The campaign mix in paid_products.parse_mix's shape for a Meta feed: all of a product's spend is Meta's (slot 4), and there is no campaign list."""
+    return {"campaigns": [], "by": {p[0]: [0, 0, 0, 0, round(p[8], 2)] for p in products if p[8] > 0}, "top": {}}
+
+
 def fetch(store, act, start, end, *, currency="USD", with_series=True, notes=None, force=False, stamps=None, http=None):
     """One range of products for a Meta ad account, in paid_products.fetch's shape."""
     ttl = g._ttl(end)
@@ -106,6 +111,7 @@ def fetch(store, act, start, end, *, currency="USD", with_series=True, notes=Non
     out = dict(res[0])
     out["daily"] = _daily_from_days(res[1])
     out["outOfStock"] = None
+    out["mix"] = mix_of(out["products"])
     out["series"] = None          # Meta cannot filter a product breakdown by id, and a daily split of every product is one row per product per day
     return out
 

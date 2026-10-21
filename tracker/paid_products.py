@@ -16,7 +16,9 @@ more than 10,000 products):
   * the same range one day at a time for each of the SERIES_TOP products that
     spent the most, so the page can show how each one performed;
   * the product ids Merchant Center says are out of stock (soft: a missing
-    Merchant Center link just means that section says so).
+    Merchant Center link just means that section says so);
+  * how each product's spend splits across the kinds of campaign it runs in (soft: without it the page gives steps for
+    every kind of campaign, because a bid change is wrong on Performance Max and on Smart Bidding).
 
 Orders, units sold, cost of goods and gross profit ride along when the account
 reports them. Like the Performance Summarizer's optional metrics, one that
@@ -32,6 +34,7 @@ import datetime as dt
 import logging
 import re
 
+from tracker import paid_bidding as bidding
 from tracker import paid_gads as g
 
 log = logging.getLogger(__name__)
@@ -52,6 +55,13 @@ _BAD = set()                         # optional metrics Google named in a refusa
 
 DIMS = ["segments.product_item_id", "segments.product_title", "segments.product_brand",
         "segments.product_type_l1", "segments.product_type_l2", "segments.product_type_l3"]
+
+
+MIX_AT = {bidding.ADJUSTABLE: 0, bidding.SMART: 1, bidding.AUTO: 2, bidding.OTHER: 3}      # a product's spend by kind of bidding; slot 4 is Meta's
+CHANNELS = {"SHOPPING": "Shopping", "PERFORMANCE_MAX": "Performance Max", "SMART_CAMPAIGN": "Smart campaign"}
+STRATEGIES = {"MANUAL_CPC": "Manual CPC", "TARGET_SPEND": "Maximize clicks", "TARGET_ROAS": "Target ROAS", "TARGET_CPA": "Target CPA",
+              "MAXIMIZE_CONVERSIONS": "Maximize conversions", "MAXIMIZE_CONVERSION_VALUE": "Maximize conversion value", "MANUAL_CPM": "Manual CPM",
+              "PERCENT_CPC": "Percent CPC"}
 
 
 def reset_state():
@@ -81,6 +91,12 @@ def q_product_days(start, end, ids, fields=()):
     return ("SELECT segments.product_item_id, segments.date, %s FROM shopping_performance_view "
             "WHERE segments.date BETWEEN '%s' AND '%s' AND segments.product_item_id IN (%s)"
             % (_metrics(fields), start, end, ", ".join("'%s'" % i for i in ids)))
+
+
+def q_product_campaigns(start, end):
+    """Each product's spend in each campaign, with the campaign's channel and bidding strategy (only rows that spent)."""
+    return ("SELECT segments.product_item_id, campaign.id, campaign.name, campaign.advertising_channel_type, campaign.bidding_strategy_type, "
+            "metrics.cost_micros FROM shopping_performance_view WHERE segments.date BETWEEN '%s' AND '%s' AND metrics.cost_micros > 0" % (start, end))
 
 
 def q_out_of_stock():
@@ -187,6 +203,40 @@ def parse_series(rows, start, end, ids):
     return {"days": days, "ids": want, "rows": {i: [[round(x, 4) if isinstance(x, float) else x for x in n] for n in v] for i, v in out.items()}}
 
 
+def _label(table, enum):
+    enum = str(enum or "")
+    return table.get(enum) or enum.replace("_", " ").capitalize()
+
+
+def parse_mix(rows, keep=None):
+    """{"campaigns": [[name, channel, strategy, class, spend], ...] biggest first, "by": {item id: [spend on adjustable bids, on Smart Bidding, on Performance Max,
+    on other bidding, on Meta]}, "top": {item id: index of the campaign it spends most in}}. `keep` limits the products (the ones the page is sent one by one)."""
+    camps, per = {}, {}
+    for r in rows:
+        s, c = r.get("segments") or {}, r.get("campaign") or {}
+        pid, cid = _clean(s.get("productItemId")).lower(), str(c.get("id") or "")
+        cost = g._f((r.get("metrics") or {}).get("costMicros")) / 1e6
+        if not pid or not cid or cost <= 0:
+            continue
+        cls = bidding.class_of(c.get("advertisingChannelType"), c.get("biddingStrategyType"))
+        slot = camps.setdefault(cid, [_clean(c.get("name")) or cid, _label(CHANNELS, c.get("advertisingChannelType")), _label(STRATEGIES, c.get("biddingStrategyType")), cls, 0.0])
+        slot[4] += cost
+        d = per.setdefault(pid, {})
+        d[cid] = d.get(cid, 0.0) + cost
+    order = sorted(camps, key=lambda i: (-camps[i][4], i))
+    at = {cid: i for i, cid in enumerate(order)}
+    by, top = {}, {}
+    for pid, d in per.items():
+        if keep is not None and pid not in keep:
+            continue
+        v = [0.0] * 5
+        for cid, cost in d.items():
+            v[MIX_AT[camps[cid][3]]] += cost
+        by[pid] = [round(x, 2) for x in v]
+        top[pid] = at[min(d, key=lambda i: (-d[i], at[i]))]
+    return {"campaigns": [camps[i][:4] + [round(camps[i][4], 2)] for i in order], "by": by, "top": top}
+
+
 def parse_out_of_stock(rows):
     return sorted({_clean((r.get("shoppingProduct") or {}).get("itemId")).lower() for r in rows} - {""})
 
@@ -197,8 +247,9 @@ def _read(store, customer_id, build, http):
     return g.search_pruned(customer_id, build, [o[0] for o in OPTIONAL], _BAD, store, http=http)
 
 
-def fetch(store, customer_id, start, end, *, with_stock=True, with_series=True, notes=None, force=False, stamps=None, http=None):
-    """One range: the products, the days, (for the main range) the out-of-stock ids and each top product's days."""
+def fetch(store, customer_id, start, end, *, with_stock=True, with_series=True, with_mix=None, notes=None, force=False, stamps=None, http=None):
+    """One range: the products, the days, (for the main range) the out-of-stock ids, each top product's days and which campaigns they spend in."""
+    with_mix = with_series if with_mix is None else with_mix
     def make_products():
         rows, used = _read(store, customer_id, lambda f: q_products(start, end, f), http)
         return parse_products(rows, start, end, used)
@@ -233,13 +284,26 @@ def fetch(store, customer_id, start, end, *, with_stock=True, with_series=True, 
     out["daily"] = res[1]
     if with_stock:
         out["outOfStock"] = res[2]          # None: could not be read
-    if with_series:                         # needs the products first: it asks for the ones that spent the most
+    if with_series or with_mix:             # these need the products first: the series asks for the ones that spent the most, the mix for the ones sent one by one
         top = [p[0] for p in out["products"][:SERIES_TOP] if ID_SAFE.match(p[0])]
+        kept = {p[0] for p in out["products"]}
 
         def make_series():
             rows, _ = _read(store, customer_id, lambda f: q_product_days(start, end, top, f), http)
             return parse_series(rows, start, end, top)
-        out["series"] = soft(lambda: g._cached(store, key("pser"), ttl, make_series, notes, force=force, stamps=stamps), None)() if top else None
+
+        def make_mix():
+            return parse_mix(g.search(customer_id, q_product_campaigns(start, end), store, http=http), kept)
+        later = []
+        if with_series:
+            later.append(soft(lambda: g._cached(store, key("pser"), ttl, make_series, notes, force=force, stamps=stamps), None) if top else (lambda: None))
+        if with_mix:
+            later.append(soft(lambda: g._cached(store, key("pmix"), ttl, make_mix, notes, force=force, stamps=stamps), None))
+        res2 = iter(g._par(later))
+        if with_series:
+            out["series"] = next(res2)
+        if with_mix:
+            out["mix"] = next(res2)             # None: could not be read
     return out
 
 

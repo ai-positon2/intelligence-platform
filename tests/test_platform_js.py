@@ -197,6 +197,43 @@ def test_each_products_days_are_added_where_both_platforms_have_the_product():
     assert only["ids"] == ["a"]
 
 
+def mixed(feed_, by, campaigns=(), top=None):
+    feed_["mix"] = {"campaigns": [list(c) for c in campaigns], "by": by, "top": top or {}}
+    return feed_
+
+
+def test_the_campaign_mix_adds_across_platforms_and_keeps_googles_campaigns():
+    g = mixed(feed([("a", "A", "", ["", "", ""], nums(1, 1, 5.0)), ("b", "B", "", ["", "", ""], nums(1, 1, 2.0))]),
+              {"a": [3.0, 0, 2.0, 0, 0], "b": [2.0, 0, 0, 0, 0]}, [("Shop", "Shopping", "Manual CPC", "adjustable", 5.0), ("Max", "Performance Max", "Maximize conversion value", "auto", 2.0)], {"a": 0, "b": 0})
+    m = mixed(feed([("a", "a", "", ["", "", ""], nums(1, 1, 4.0)), ("c", "c", "", ["", "", ""], nums(1, 1, 1.0))]), {"a": [0, 0, 0, 0, 4.0], "c": [0, 0, 0, 0, 1.0]})
+    out = run("P.mergeProducts(g,m).mix", "const g=%s,m=%s" % (json.dumps(g), json.dumps(m)))
+    assert out["by"] == {"a": [3.0, 0, 2.0, 0, 4.0], "b": [2.0, 0, 0, 0, 0], "c": [0, 0, 0, 0, 1.0]}
+    assert [c[0] for c in out["campaigns"]] == ["Shop", "Max"] and out["top"] == {"a": 0, "b": 0}
+
+
+def test_a_second_feeds_campaign_indexes_are_shifted_past_the_first_feeds():
+    camp = lambda n: (n, "Shopping", "Manual CPC", "adjustable", 1.0)
+    g = mixed(feed([("a", "A", "", ["", "", ""], nums(1, 1, 1.0))]), {"a": [1.0, 0, 0, 0, 0]}, [camp("G1"), camp("G2")], {"a": 1})
+    m = mixed(feed([("a", "a", "", ["", "", ""], nums(1, 1, 1.0)), ("z", "z", "", ["", "", ""], nums(1, 1, 1.0))]), {"a": [1.0, 0, 0, 0, 0], "z": [1.0, 0, 0, 0, 0]}, [camp("M1")], {"a": 0, "z": 0})
+    out = run("P.mergeProducts(g,m).mix", "const g=%s,m=%s" % (json.dumps(g), json.dumps(m)))
+    assert [c[0] for c in out["campaigns"]] == ["G1", "G2", "M1"] and out["top"] == {"a": 1, "z": 2}          # a keeps the first feed's campaign, z points at the second feed's
+
+
+def test_a_feed_whose_campaign_mix_could_not_be_read_makes_the_whole_mix_unknown():
+    g = feed([("a", "A", "", ["", "", ""], nums(1, 1, 1.0))])
+    g["mix"] = None
+    m = mixed(feed([("a", "a", "", ["", "", ""], nums(1, 1, 1.0))]), {"a": [0, 0, 0, 0, 1.0]})
+    assert run("P.mergeProducts(g,m).mix", "const g=%s,m=%s" % (json.dumps(g), json.dumps(m))) is None
+    empty_meta = mixed(feed([]), {})
+    ok = mixed(feed([("a", "A", "", ["", "", ""], nums(1, 1, 1.0))]), {"a": [1.0, 0, 0, 0, 0]})
+    out = run("P.mergeProducts(g,m).mix", "const g=%s,m=%s" % (json.dumps(ok), json.dumps(empty_meta)))
+    assert out["by"] == {"a": [1.0, 0, 0, 0, 0]}                                                             # a feed with no products does not spoil it
+    nothing = feed([])
+    nothing["mix"] = None                                                                                    # ... even when its own read failed
+    out = run("P.mergeProducts(g,m).mix", "const g=%s,m=%s" % (json.dumps(ok), json.dumps(nothing)))
+    assert out["by"] == {"a": [1.0, 0, 0, 0, 0]}
+
+
 def test_a_note_on_either_feed_reaches_the_merged_one():
     g = feed([("a", "A", "", ["", "", ""], nums(1, 1, 1.0))])
     m = dict(feed([("a", "a", "", ["", "", ""], nums(1, 1, 1.0))]), note="Meta credits purchases only in part")

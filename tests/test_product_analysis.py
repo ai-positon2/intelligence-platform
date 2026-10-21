@@ -122,6 +122,27 @@ def test_out_of_stock_ids_are_lowercased_and_unique():
     assert pp.parse_out_of_stock(rows) == ["a-1", "sku-9"]
 
 
+def test_the_mix_splits_each_products_spend_by_the_kind_of_bidding_it_runs_on():
+    mix = pp.parse_mix(MIX_ROWS + [mrow("sku-1", "11", "Shop Main", "SHOPPING", "MANUAL_CPC", 1.5), mrow("SKU-3", "33", "Smart Shop", "SHOPPING", "TARGET_ROAS", 2),
+                                   mrow("SKU-4", "44", "Odd", "SHOPPING", "SOMETHING_NEW", 1)])
+    assert mix["by"]["sku-1"] == [7.5, 0, 4.0, 0, 0] and mix["by"]["sku-2"] == [0, 0, 3.0, 0, 0]           # ids lowercased, the two rows for one campaign added
+    assert mix["by"]["sku-3"] == [0, 2.0, 0, 0, 0] and mix["by"]["sku-4"] == [0, 0, 0, 1.0, 0]              # target ROAS is Smart Bidding, an unknown strategy is "other"
+    assert [c[0] for c in mix["campaigns"]] == ["Shop Main", "Max PMax", "Smart Shop", "Odd"]               # biggest spend first
+    assert mix["campaigns"][0] == ["Shop Main", "Shopping", "Manual CPC", "adjustable", 7.5] and mix["campaigns"][1][1:4] == ["Performance Max", "Maximize conversion value", "auto"]
+    assert mix["campaigns"][3][2] == "Something new"                                                          # a strategy with no label is still readable
+    assert mix["top"] == {"sku-1": 0, "sku-2": 1, "sku-3": 2, "sku-4": 3}                                     # the campaign each product spends most in
+
+
+def test_the_mix_ignores_rows_that_cannot_be_placed_and_keeps_only_the_products_asked_for():
+    rows = [mrow("", "11", "A", "SHOPPING", "MANUAL_CPC", 5), mrow("x", "", "B", "SHOPPING", "MANUAL_CPC", 5), mrow("y", "11", "A", "SHOPPING", "MANUAL_CPC", 0),
+            mrow("keep", "11", "A", "SHOPPING", "MANUAL_CPC", 2), mrow("drop", "11", "A", "SHOPPING", "MANUAL_CPC", 9)]
+    mix = pp.parse_mix(rows, keep={"keep"})
+    assert list(mix["by"]) == ["keep"] and "y" not in mix["by"] and mix["campaigns"][0][4] == 11.0                                      # the campaign's own spend still counts every product
+    assert pp.parse_mix([mrow("z", "11", "A", "SHOPPING", "MANUAL_CPC", 0)]) == {"campaigns": [], "by": {}, "top": {}}       # a row that spent nothing is not a campaign the product runs in
+    assert pp.parse_mix([]) == {"campaigns": [], "by": {}, "top": {}}
+    assert pp.parse_mix([row("a", "A", 3)])["by"] == {}                                                        # a products row has no campaign: nothing to place
+
+
 # ── The queries ────────────────────────────────────────────────────────────
 
 def test_the_queries_ask_for_what_the_parsers_read():
@@ -135,17 +156,34 @@ def test_the_queries_ask_for_what_the_parsers_read():
     assert "metrics.units_sold" not in q                                    # only the optional metrics asked for
     assert "segments.date" in pp.q_daily("2026-10-01", "2026-10-07") and "segments.product_item_id" not in pp.q_daily("a", "b")
     assert "OUT_OF_STOCK" in pp.q_out_of_stock()
+    m = pp.q_product_campaigns("2026-10-01", "2026-10-07")
+    for f in ("segments.product_item_id", "campaign.id", "campaign.name", "campaign.advertising_channel_type", "campaign.bidding_strategy_type", "metrics.cost_micros"):
+        assert f in m, f                                                                                       # what parse_mix reads
+    assert "FROM shopping_performance_view" in m and "BETWEEN '2026-10-01' AND '2026-10-07'" in m and "metrics.cost_micros > 0" in m
 
 
 # ── The calls ──────────────────────────────────────────────────────────────
 
-def make_http(log, refuse=None, stock_error=None, quota=None):
-    """A Google that answers each of the three reads, recording the queries."""
+def mrow(pid, cid, name, channel, strategy, cost):
+    return {"segments": {"productItemId": pid}, "campaign": {"id": cid, "name": name, "advertisingChannelType": channel, "biddingStrategyType": strategy},
+            "metrics": {"costMicros": str(int(cost * 1_000_000))}}
+
+
+MIX_ROWS = [mrow("SKU-1", "11", "Shop Main", "SHOPPING", "MANUAL_CPC", 6), mrow("SKU-1", "22", "Max PMax", "PERFORMANCE_MAX", "MAXIMIZE_CONVERSION_VALUE", 4),
+            mrow("SKU-2", "22", "Max PMax", "PERFORMANCE_MAX", "MAXIMIZE_CONVERSION_VALUE", 3)]
+
+
+def make_http(log, refuse=None, stock_error=None, quota=None, mix_error=None):
+    """A Google that answers each of the four reads, recording the queries."""
     def http(url, headers=None, data=None, **k):
         q = json.loads(data)["query"]
         log.append(q)
         if quota:
             return Resp(429, quota)
+        if "campaign.advertising_channel_type" in q:
+            if mix_error:
+                return Resp(mix_error, {"error": {"message": "not allowed"}})
+            return Resp(200, {"results": MIX_ROWS})
         if "shopping_product" in q:
             if stock_error:
                 return Resp(stock_error, {"error": {"message": "no Merchant Center link"}})
@@ -165,11 +203,22 @@ def test_a_range_reads_products_days_and_stock_and_a_repeat_view_costs_nothing()
     s, log = FakeStore(), []
     http = make_http(log)
     out = pp.fetch(s, "1234567890", "2026-10-01", "2026-10-07", http=http)
-    assert len(log) == 4 and [p[0] for p in out["products"]] == ["sku-1", "sku-2"]
+    assert len(log) == 5 and [p[0] for p in out["products"]] == ["sku-1", "sku-2"]
     assert out["daily"]["days"][0] == "2026-10-01" and out["outOfStock"] == ["sku-2"]
     assert out["series"]["ids"] == ["sku-1", "sku-2"] and out["series"]["rows"]["sku-1"][1][2] == 5.0
     pp.fetch(s, "1234567890", "2026-10-01", "2026-10-07", http=lambda *a, **k: pytest.fail("a repeat view went to Google"))
-    assert len(log) == 4
+    assert len(log) == 5
+
+
+def test_the_campaign_mix_is_read_for_the_main_range_and_is_for_the_products_sent():
+    out = pp.fetch(FakeStore(), "1234567890", "2026-10-01", "2026-10-07", http=make_http([]))
+    assert out["mix"]["by"] == {"sku-1": [6.0, 0, 4.0, 0, 0], "sku-2": [0, 0, 3.0, 0, 0]} and out["mix"]["campaigns"][0][0] == "Max PMax"
+    assert "mix" not in pp.fetch(FakeStore(), "1234567890", "2026-10-01", "2026-10-07", with_series=False, http=make_http([]))
+
+
+def test_a_campaign_mix_google_refuses_leaves_the_page_whole_and_says_it_is_unknown():
+    out = pp.fetch(FakeStore(), "1234567890", "2026-10-01", "2026-10-07", http=make_http([], mix_error=403))
+    assert [p[0] for p in out["products"]] == ["sku-1", "sku-2"] and out["mix"] is None and out["series"] and out["outOfStock"] == ["sku-2"]
 
 
 def test_only_the_twenty_top_spenders_get_their_days():
@@ -211,7 +260,8 @@ def test_the_comparison_needs_no_stock_check():
     s, log = FakeStore(), []
     cur, cmp, saved = pp.analysis(s, "1234567890", ("2026-10-01", "2026-10-07"), ("2026-09-24", "2026-09-30"), http=make_http(log))
     assert "outOfStock" in cur and "outOfStock" not in cmp and saved == []
-    assert sum("shopping_product" in q for q in log) == 1 and sum("IN (" in q for q in log) == 1 and len(log) == 6      # the series and the stock are for the main range only
+    assert sum("shopping_product" in q for q in log) == 1 and sum("IN (" in q for q in log) == 1 and len(log) == 7      # the series, the stock and the campaign mix are for the main range only
+    assert sum("campaign.advertising_channel_type" in q for q in log) == 1 and "mix" in cur and "mix" not in cmp
     assert pp.analysis(s, "1234567890", ("2026-10-01", "2026-10-07"), None, http=make_http([]))[1] is None
 
 

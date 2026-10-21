@@ -952,6 +952,12 @@ def test_meta_products_are_listed_and_say_what_meta_does_not_give():
     assert out["missing"] == [8, 9, 10] and out["outOfStock"] is None and out["series"] is None
     assert out["total"][2] == 10.0 and out["total"][3] == 2                          # spend, purchases (the second product had none)
     assert "only in part" in out["note"]
+    assert out["mix"]["campaigns"] == [] and out["mix"]["by"]["sku-1"] == [0, 0, 0, 0, out["products"][0][8]]      # all of a Meta product's spend is Meta's, and bid advice is not Google's
+
+
+def test_a_meta_product_with_no_spend_has_no_mix():
+    rows = [["a", "A", 0, 0, 0, 0, 5, 1, 0.0], ["b", "B", 0, 0, 0, 0, 5, 1, 3.456]]
+    assert mp.mix_of(rows) == {"campaigns": [], "by": {"b": [0, 0, 0, 0, 3.46]}, "top": {}}
 
 
 def test_the_trend_is_the_accounts_sales_campaigns_by_day():

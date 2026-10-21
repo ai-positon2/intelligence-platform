@@ -120,7 +120,22 @@ function mergeProducts(a,b){
     total:sum(a.total,b.total).map(r4),missing:(a.missing||[]).filter(function(i){return (b.missing||[]).indexOf(i)>=0;}),
     daily:a.daily&&b.daily?{days:a.daily.days,rows:a.daily.rows.map(function(r,i){return addN(r,b.daily.rows[i]||[]).map(r4);})}:(a.daily||b.daily),
     outOfStock:a.outOfStock||b.outOfStock?Array.from(new Set((a.outOfStock||[]).concat(b.outOfStock||[]))).sort():(a.outOfStock===null&&b.outOfStock===null?null:[]),
-    series:mergeSeries(a.series,b.series),note:a.note||b.note||undefined};
+    series:mergeSeries(a.series,b.series),mix:mergeMix(a,b),note:a.note||b.note||undefined};
+}
+/* Which campaigns each product spends in (Google's read, with Meta's spend in the last slot): two feeds as one. A feed that has products but
+   no mix (the read failed) makes the whole mix unknown, because advice built on half of a product's spend would be wrong. */
+function mergeMix(a,b){
+  var xs=[a,b].filter(function(s){return s.products&&s.products.length;});
+  if(xs.some(function(s){return !s.mix;})) return null;
+  if(!xs.length) return a.mix||b.mix||null;
+  var out={campaigns:[],by:{},top:{}};
+  xs.forEach(function(s){
+    var off=out.campaigns.length;
+    out.campaigns=out.campaigns.concat(s.mix.campaigns||[]);
+    Object.keys(s.mix.by||{}).forEach(function(id){out.by[id]=addN(out.by[id]||[0,0,0,0,0],s.mix.by[id]).map(r4);});
+    Object.keys(s.mix.top||{}).forEach(function(id){if(!(id in out.top)) out.top[id]=s.mix.top[id]+off;});
+  });
+  return out;
 }
 function mergeSeries(a,b){
   if(!a||!b) return a||b||null;
