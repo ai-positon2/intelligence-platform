@@ -34,7 +34,11 @@ def _worth(dead, cur, known):
     text = "Before, these ad groups made about %s clicks a week and spent about %s; last week they made %s" % (format(usual, ","), m.money(cost, cur), format(last, ","))
     if lost:
         text += ", so about %s clicks a week are not coming. The money is not lost (the budget goes to other ad groups), but the searches these ad groups answered are not answered: an estimate from the last 5 whole weeks" % format(lost, ",")
-    return text + "."
+    text += "."
+    so_far = [g for g in dead if g.get("lostSoFar")]
+    if so_far:
+        text += " The oldest has been stopped for %s: about %s clicks lost since, at the usual pace." % (m.plural(max(g["ageDays"] for g in so_far), "day"), format(sum(g["lostSoFar"] for g in so_far), ","))
+    return text
 
 
 def _cover_step(a, cur):
@@ -58,6 +62,10 @@ def _topic_step(t, a, cur):
     if t["examples"]:
         why += " Google pointed at: %s." % "; ".join('"%s"' % e for e in t["examples"])
     why = "%s flagged for this%s. %s" % (m.plural(t["ads"], "ad is", "ads are"), " (in %s with no approved ad)" % m.plural(t["dead"], "ad group") if t["dead"] else "", why)
+    if t.get("ageDays"):
+        why += " It has been flagged for %s." % m.plural(t["ageDays"], "day")
+    if t.get("reopened"):
+        why += " It has come back %s after being fixed: look in Tools, then Change history for who or what puts it back (a template, a bulk upload, a rule)." % m.plural(t["reopened"], "time")
     how = [POLICY_PATH,
            "Open one flagged ad (Ads & assets, then Ads) and point at the status in the Status column: it names the policy and, when Google gives it, the text or the page it objects to.",
            "Edit that one ad to take the problem out and save it: a changed ad is reviewed again, usually within a business day. Check it comes back approved before you change the rest, so one wrong guess does not flag them all.",
@@ -68,6 +76,33 @@ def _topic_step(t, a, cur):
     return _step("topic-" + t["topic"].lower(), title, why, how, None, "high" if t["dead"] else ("medium" if t["disapproved"] else "low"), t["campaigns"][:3])
 
 
+def _common_step(a, cur):
+    sus = a["suspects"]
+    top = sus[0]
+    lines = []
+    for x in sus[:3]:
+        what = {"headline": 'the headline "%s"' % x["text"], "evidence": 'the text "%s"' % x["text"], "url": "the page %s" % x["text"]}[x["kind"]]
+        lines.append("%s is in %d of %d" % (what, x["ads"], x["of"]))
+    how = ["In Google Ads open Ads & assets, then Ads, and filter the ads by the text (the Headline contains filter) so that only the ones that share it are shown.",
+           "Edit the text once for all of them: select the ads, choose Edit, then Find and replace text in ads (in Google Ads Editor, Make multiple changes, then Find and replace). Replace it with wording that follows the policy, and save.",
+           "Keep a copy of the old wording to see whether it comes back (a template, a bulk upload or a rule may put it there again)."]
+    if top["kind"] == "url":
+        how = ["Open the page %s in a private window and on a phone: it must load, match the ads and not send people elsewhere." % top["text"],
+               "Fix the page once; every ad that points at it is reviewed again. If the page cannot be fixed, change the final URL of those ads together (Ads & assets, then Ads, select them, Edit, then Change final URLs)."]
+    return _step("common", "Fix the shared cause once", "Among the flagged ads, %s. One shared cause is the likeliest reason so many are flagged together, so one change can clear many." % "; ".join(lines),
+                 how, "Up to %s of the %s flagged ads could clear with this one change." % (top["ads"], top["of"]), "high" if a["deadGroups"] else "medium")
+
+
+def _keywords_step(a, cur):
+    kws = [i for i in a["items"] if i["state"] == "keyword"]
+    topics = ", ".join("%s (%s)" % (t["label"].lower(), t["keywords"]) for t in a["keywordTopics"][:3])
+    return _step("keywords", "Fix the disapproved keywords",
+                 "%s disapproved%s. A disapproved keyword cannot trigger any ad, so the searches it was meant for are not answered." % (m.plural(len(kws), "keyword is", "keywords are"), (": " + topics) if topics else ""),
+                 ["In Google Ads open Keywords (Campaigns, then Keywords), and filter the Status column to Disapproved. Point at the status of one: it names the policy.",
+                  "Change the keyword to words that follow the policy (a keyword that names a medicine, a trademark or a restricted service often needs rewording), or remove it if the searches are not worth the effort; a change is reviewed again.",
+                  "If the keyword is fine as written, use Appeal in Policy manager. Watch the Disapproved count here the next day."], None, "medium", sorted({i["campaign"] for i in kws})[:3])
+
+
 def build(a, currency="USD"):
     """{steps, note} for one analysed account (the dict analyse() builds before the plan and the findings are added). No steps for a clear account."""
     if a["status"] == "clear":
@@ -75,6 +110,10 @@ def build(a, currency="USD"):
     steps = []
     if a["deadGroups"]:
         steps.append(_cover_step(a, currency))
+    if a.get("suspects") and len([i for i in a["items"] if i["kind"] != "keyword"]) >= 3:
+        steps.append(_common_step(a, currency))
+    if a["counts"].get("keywords"):
+        steps.append(_keywords_step(a, currency))
     for t in a["topics"][:MAX_TOPIC_STEPS]:
         steps.append(_topic_step(t, a, currency))
     steps.append(_step("again", "Check again the next business day",

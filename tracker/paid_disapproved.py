@@ -14,6 +14,7 @@ import datetime as dt
 from concurrent.futures import ThreadPoolExecutor
 
 from . import paid_brandis_math as bis
+from . import paid_disapproved_extra as ex
 from . import paid_disapproved_math as m
 from . import paid_gads_segments as gads
 from . import paid_segments as seg
@@ -120,36 +121,85 @@ def _batches(ids):
         yield ids[n:n + BATCH]
 
 
-def read_account(account_id, today, search):
-    """{ads, cover, weekly, warnings, truncated}: one account. The ads are raised on failure; the cover and the weight are soft."""
-    ads = read_ads(search(account_id, GAQL_ADS))
-    truncated = len(ads) > MAX_ADS
-    ads = ads[:MAX_ADS]
-    warnings, cover, weekly = [], None, None
-    if not ads:
-        return {"ads": [], "cover": {}, "weekly": {}, "warnings": [], "truncated": False}
-    groups = sorted({a["adGroupId"] for a in ads})
-    checked = groups[:MAX_GROUPS]
-    wk = weeks(today)
+def _soft(warnings, what, fn, default):
+    """fn() or `default`, with a sentence in `warnings` saying what could not be read when Google refused."""
     try:
-        counts = {}
+        return fn()
+    except gads.GadsError as e:
+        warnings.append("%s could not be read (%s)." % (what, e))
+        return default
+
+
+def read_account(account_id, today, search):
+    """{ads, cover, weekly, warnings, truncated}: one account. The ads are raised on failure; the Performance Max assets, the keywords, the cover and the weight are soft.
+    `ads` holds every flagged item (ads, assets, keywords); `cover` is {ad group id or "pmax:<asset group>:<FIELD>": approved ones}."""
+    ads = read_ads(search(account_id, GAQL_ADS))
+    warnings = []
+    assets = _soft(warnings, "The assets of Performance Max asset groups", lambda: ex.read_assets(search(account_id, ex.GAQL_ASSETS)), [])
+    try:
+        kws = ex.read_keywords(search(account_id, ex.GAQL_KEYWORDS))
+    except gads.GadsError:                                                          # the policy topics of a keyword are the part Google may refuse: ask for the keywords without them
+        kws = _soft(warnings, "The disapproved keywords", lambda: ex.read_keywords(search(account_id, ex.GAQL_KEYWORDS_PLAIN)), [])
+    items = ads + assets + kws
+    truncated = len(items) > MAX_ADS
+    items = items[:MAX_ADS]
+    if not items:
+        return {"ads": [], "cover": {}, "weekly": {}, "warnings": warnings, "truncated": False}
+    ad_groups = sorted({i["adGroupId"] for i in items if i.get("kind", "ad") == "ad"})
+    asset_groups = sorted({i["adGroupId"].split(":")[1] for i in items if i.get("kind") == "asset"})
+    checked = ad_groups[:MAX_GROUPS]
+    wk = weeks(today)
+    cover, weekly = None, None
+    try:
+        counts, acounts = {}, {}
         for ids in _batches(checked):
             counts.update(read_cover(search(account_id, gaql_cover(ids))))
-        cover = {g: (counts.get(g, 0) if g in checked else None) for g in groups}
-        if len(groups) > MAX_GROUPS:
-            warnings.append("Only the first %d of %d ad groups with a flagged ad were checked for another approved ad." % (MAX_GROUPS, len(groups)))
+        for ids in _batches(asset_groups):
+            acounts.update(ex.read_asset_cover(search(account_id, ex.gaql_asset_cover(ids))))
+        cover = {g: (counts.get(g, 0) if g in checked else None) for g in ad_groups}
+        cover.update({i["adGroupId"]: acounts.get(i["adGroupId"], 0) for i in items if i.get("kind") == "asset"})
+        if len(ad_groups) > MAX_GROUPS:
+            warnings.append("Only the first %d of %d ad groups with a flagged ad were checked for another approved ad." % (MAX_GROUPS, len(ad_groups)))
     except gads.GadsError as e:
         warnings.append("Whether other ads cover the flagged ones could not be read (%s)." % e)
     try:
         weekly = {}
         for ids in _batches(checked):
             weekly.update(read_weekly(search(account_id, gaql_weekly(ids, wk[0][0], wk[-1][1])), wk))
+        by_group = {}
+        for i in items:
+            if i.get("kind") == "asset":
+                by_group.setdefault(i["adGroupId"].split(":")[1], []).append(i["adGroupId"])
+        for ids in _batches(asset_groups):
+            weekly.update(ex.read_asset_weekly(search(account_id, ex.gaql_asset_weekly(ids, wk[0][0], wk[-1][1])), wk, {g: sorted(set(k)) for g, k in by_group.items()}))
     except gads.GadsError as e:
         weekly = None
         warnings.append("What the ad groups used to bring could not be read (%s)." % e)
     if truncated:
+        warnings.append("More than %d flagged items: the first %d are shown." % (MAX_ADS, MAX_ADS))
+    return {"ads": items, "cover": cover, "weekly": weekly, "warnings": warnings, "truncated": truncated}
+
+
+def read_meta_account(act, pages):
+    """{ads, cover, weekly, warnings, truncated} for a Meta ad account. `pages(path, params)` returns the list Meta's answer holds (all its pages). The rejected ads are raised on failure;
+    the active ads that cover them are soft. Meta's clicks per ad set are not read, so nothing is sized."""
+    path, params = ex.meta_ads_request(act)
+    items = ex.read_meta_ads(pages(path, params))
+    warnings, cover = [], None
+    if not items:
+        return {"ads": [], "cover": {}, "weekly": None, "warnings": [], "truncated": False}
+    truncated = len(items) > MAX_ADS
+    items = items[:MAX_ADS]
+    try:
+        path, params = ex.meta_active_request(act)
+        counts = ex.read_meta_cover(pages(path, params))
+        cover = {i["adGroupId"]: counts.get(i["adGroupId"], 0) for i in items}
+    except Exception as e:                                                          # noqa: BLE001 (Meta's errors have their own class; a soft read never costs the report)
+        warnings.append("Whether other active ads cover the rejected ones could not be read (%s)." % e)
+    warnings.append("Meta's clicks per ad set are not read, so what a stopped ad set used to bring is not sized.")
+    if truncated:
         warnings.append("More than %d flagged ads: the first %d are shown." % (MAX_ADS, MAX_ADS))
-    return {"ads": ads, "cover": cover, "weekly": weekly, "warnings": warnings, "truncated": truncated}
+    return {"ads": items, "cover": cover, "weekly": None, "warnings": warnings, "truncated": truncated}
 
 
 def google_raw(account, today, *, search_fn=None, workers=6):
@@ -176,40 +226,102 @@ def google_raw(account, today, *, search_fn=None, workers=6):
 # ── The report ──────────────────────────────────────────────────────────────
 
 _RANK = {"stopped": 0, "disapproved": 1, "limited": 2, "clear": 3}
+TOP_PATTERNS = 5
 
 
-def assemble(raw, account, today):
+def ages_of(issues):
+    """{fingerprint: {firstSeen, reopened}} of the open issues the monitor keeps: what gives a stopped ad group and a policy its age."""
+    return {i["fingerprint"]: {"firstSeen": i["firstSeen"], "reopened": i.get("reopened") or 0} for i in issues if i.get("status") == "open"}
+
+
+def fix_times(issues):
+    """How long the problems the monitor saw were open before they were fixed: {fixed, median, longest} in days over the resolved issues, or None when none was fixed yet."""
+    from . import paid_monitor
+    days = []
+    for i in issues:
+        if i.get("status") == "resolved" and i.get("resolvedAt"):
+            d = paid_monitor.age_days(i["firstSeen"], paid_monitor._parse(i["resolvedAt"]))
+            if d is not None:
+                days.append(d)
+    if not days:
+        return None
+    return {"fixed": len(days), "median": m.median(days), "longest": max(days)}
+
+
+def patterns(accounts):
+    """The policies that flagged ads in more than one account, the most accounts first: [{topic, label, accounts: [names], ads}]. The same policy in many accounts is usually one cause:
+    a policy change, or one piece of ad copy that is shared between clients."""
+    by = {}
+    for a in accounts:
+        for t in a["topics"]:
+            if t["topic"] == m.NO_TOPIC:
+                continue
+            p = by.setdefault(t["topic"], {"topic": t["topic"], "label": t["label"], "accounts": [], "ads": 0})
+            p["accounts"].append(a["name"])
+            p["ads"] += t["ads"]
+    out = [p for p in by.values() if len(p["accounts"]) >= 2]
+    out.sort(key=lambda p: (-len(p["accounts"]), -p["ads"], p["label"].lower()))
+    return out[:TOP_PATTERNS]
+
+
+def assemble(raw, account, today, issues=None, now=None):
+    """The report from the raw read. `issues` are the monitor's saved ones (paid_monitor_store.issues_all): they give the age of what is open, how often it came back and how long fixes took."""
     accounts, warnings = [], list(raw.get("warnings") or [])
+    ages = ages_of(issues) if issues is not None else None
     for a in raw["accounts"]:
-        result = m.analyse(a["ads"], a["cover"], a["weekly"], currency=a["currency"])
-        accounts.append(dict(result, id=a["id"], name=a["name"], currency=a["currency"]))
+        result = m.analyse(a["ads"], a["cover"], a["weekly"], currency=a["currency"], account_id=a["id"], ages=ages, now=now if issues is not None else None)
+        accounts.append(dict(result, id=a["id"], name=a["name"], currency=a["currency"], platform=a.get("platform") or "google"))
         warnings += ["%s: %s" % (a["name"], w) if account.get("members") else w for w in a.get("warnings") or []]
-    accounts.sort(key=lambda a: (_RANK[a["status"]], -a["counts"]["stoppedGroups"], -a["counts"]["disapproved"], -a["counts"]["limited"], a["name"].lower()))
+    accounts.sort(key=lambda a: (_RANK[a["status"]], -a["counts"]["stoppedGroups"], -a["counts"]["disapproved"], -a["counts"]["keywords"], -a["counts"]["limited"], a["name"].lower()))
     counts = {k: 0 for k in _RANK}
     for a in accounts:
         counts[a["status"]] += 1
     wk = weeks(today)
     return {
-        "account": {"id": account["id"], "name": account["name"], "currency": account.get("currency") or "USD", "platform": "google",
+        "account": {"id": account["id"], "name": account["name"], "currency": account.get("currency") or "USD", "platform": account.get("platform") or "google",
                     "isGroup": bool(account.get("members")), "accountCount": len(account.get("members") or [])},
         "window": {"from": wk[0][0].isoformat(), "to": wk[-1][1].isoformat(), "weeks": len(wk)},
         "generatedAt": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"), "warnings": warnings, "accounts": accounts,
+        "patterns": patterns(accounts), "fixTimes": fix_times(issues or []) if issues is not None else None, "agesKnown": issues is not None,
         "summary": {"counts": counts, "accounts": len(accounts), "needsLook": counts["stopped"] + counts["disapproved"],
                     "stoppedGroups": sum(a["counts"]["stoppedGroups"] for a in accounts), "disapproved": sum(a["counts"]["disapproved"] for a in accounts),
-                    "limited": sum(a["counts"]["limited"] for a in accounts), "waiting": sum(a["counts"]["appeal"] + a["counts"]["reviewing"] for a in accounts),
+                    "keywords": sum(a["counts"]["keywords"] for a in accounts), "limited": sum(a["counts"]["limited"] for a in accounts),
+                    "waiting": sum(a["counts"]["appeal"] + a["counts"]["reviewing"] for a in accounts),
                     "lostClicks": sum((g["weight"] or {}).get("lostClicks") or 0 for a in accounts for g in a["deadGroups"])},
     }
 
 
-def report_for(account_id, *, accounts_fn=None, groups_fn=None, search_fn=None, now=None, force=False, store=None, today=None):
-    """The Disapproved Ads report for a Google Ads account or an MCC the root MCC holds. `force` (Refresh) skips the saved read, at most once per
-    paid_gads.REFRESH_COOLDOWN_S for the account."""
-    from . import paid_geo, paid_store
+def meta_raw(act, *, pages_fn, account_fn):
+    """The raw read of one Meta ad account in the shape google_raw gives, or the error of the ads read."""
+    acct = account_fn(act)
+    got = read_meta_account(act, pages_fn)
+    return {"accounts": [dict(got, id=act, name=acct.get("name") or act, currency=acct.get("currency") or "USD", platform="meta")], "warnings": [], "members": []}
+
+
+def report_for(account_id, *, accounts_fn=None, groups_fn=None, search_fn=None, now=None, force=False, store=None, today=None, mon=None, meta_pages_fn=None, meta_account_fn=None):
+    """The Disapproved Ads report for a Google Ads account or an MCC the root MCC holds, or for a Meta ad account (act_...). `force` (Refresh) skips the saved read, at most once per
+    paid_gads.REFRESH_COOLDOWN_S for the account. `mon` is the monitors' store: with it each stopped ad group and policy has its age, how often it came back and how long fixes took."""
+    from . import paid_geo, paid_meta, paid_store
     store = store or paid_store
     day = today or dt.date.today()
-    account = seg.resolve_target(account_id, accounts_fn=accounts_fn, groups_fn=groups_fn)
-    raw, stale = paid_geo._cached("disapproved", account["id"], "ads", day, day, lambda: google_raw(account, day, search_fn=search_fn), force=force, store=store, now=now)
-    report = assemble(raw, account, day)
+    stamp = dt.datetime.now(dt.timezone.utc)
+    if paid_meta.is_meta(str(account_id or "")):
+        act = paid_meta.norm_id(account_id)
+        pages = meta_pages_fn or (lambda path, params: paid_meta._pages(path, params, store))
+        acct_fn = meta_account_fn or (lambda a: paid_meta.account_by_id(store, a) or {})
+        account = {"id": act, "name": (acct_fn(act) or {}).get("name") or act, "currency": (acct_fn(act) or {}).get("currency") or "USD", "platform": "meta"}
+        raw, stale = paid_geo._cached("disapproved", act, "ads", day, day, lambda: meta_raw(act, pages_fn=pages, account_fn=acct_fn), force=force, store=store, now=now)
+    else:
+        account = seg.resolve_target(account_id, accounts_fn=accounts_fn, groups_fn=groups_fn)
+        raw, stale = paid_geo._cached("disapproved", account["id"], "ads", day, day, lambda: google_raw(account, day, search_fn=search_fn), force=force, store=store, now=now)
+    warnings, issues = [], None
+    if mon is not None:
+        try:
+            issues = mon.issues_all("disapproved")
+        except Exception as e:                                                       # noqa: BLE001
+            warnings.append("The history of what was flagged before could not be read (%s), so no age is shown." % e)
+    report = assemble(raw, account, day, issues=issues, now=stamp)
+    report["warnings"] = warnings + report["warnings"]
     if raw.get("readAt"):
         report["readAt"] = raw["readAt"]
     return dict(report, stale=stale) if stale else report

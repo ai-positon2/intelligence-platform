@@ -7,6 +7,7 @@ import pytest
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from tracker import paid_disapproved as d  # noqa: E402
 from tracker import paid_gads as base  # noqa: E402
@@ -30,7 +31,10 @@ def week_row(group, week, clicks, cost_micros):
     return {"adGroup": {"id": group}, "segments": {"week": week}, "metrics": {"clicks": str(clicks), "costMicros": str(cost_micros)}}
 
 
-def searcher(ads=None, cover=None, weekly=None, log=None, fail=(), fail_cover=False, fail_weekly=False):
+def searcher(ads=None, cover=None, weekly=None, log=None, fail=(), fail_cover=False, fail_weekly=False, assets=None, asset_cover=None, asset_weekly=None, keywords=None, fail_assets=False,
+             fail_keywords=False, fail_policy=False):
+    """A stand-in for the Google Ads read: the flagged ads by account and, for the other reads, what each returns (the cover and the weeks of ad groups, the Performance Max assets and
+    their cover and weeks, the disapproved keywords); the flags make a read refuse."""
     ads = ads if ads is not None else {ACCT["id"]: [api()]}
 
     def search(cid, q):
@@ -38,10 +42,18 @@ def searcher(ads=None, cover=None, weekly=None, log=None, fail=(), fail_cover=Fa
             log.append((cid, q))
         if cid in fail:
             raise gads.GadsError("api", "Account %s cannot be read." % cid)
+        if "FROM asset_group_asset" in q:
+            if fail_assets:
+                raise gads.GadsError("api", "no assets")
+            return ((asset_cover if "'APPROVED'" in q else assets) or {}).get(cid, [])
+        if "FROM ad_group_criterion" in q:
+            if fail_keywords or (fail_policy and "policy_summary" in q):
+                raise gads.GadsError("api", "no keywords")
+            return (keywords or {}).get(cid, [])
         if "segments.week" in q:
             if fail_weekly:
                 raise gads.GadsError("api", "no weeks")
-            return (weekly or {}).get(cid, [])
+            return ((asset_weekly if "FROM asset_group " in q else weekly) or {}).get(cid, [])
         if "'APPROVED'" in q:
             if fail_cover:
                 raise gads.GadsError("api", "no cover")
@@ -99,7 +111,7 @@ def test_the_cover_counts_ads_per_group_and_the_weeks_fill_the_gaps_with_nothing
 def test_an_account_with_no_flagged_ad_is_read_once_and_asks_nothing_more():
     log = []
     r = d.read_account("1234567890", TODAY, searcher({"1234567890": []}, log=log))
-    assert r == {"ads": [], "cover": {}, "weekly": {}, "warnings": [], "truncated": False} and len(log) == 1
+    assert r == {"ads": [], "cover": {}, "weekly": {}, "warnings": [], "truncated": False} and len(log) == 3                  # the ads, the Performance Max assets and the keywords
 
 
 def test_the_cover_and_the_weeks_are_read_only_for_the_groups_with_a_flagged_ad():
@@ -107,7 +119,8 @@ def test_the_cover_and_the_weeks_are_read_only_for_the_groups_with_a_flagged_ad(
     keys = [w[0].isoformat() for w in WEEKS]
     r = d.read_account("1234567890", TODAY, searcher({"1234567890": [api(ad="1", group="10"), api(ad="2", group="10"), api(ad="3", group="11")]},
                                                      cover={"1234567890": [{"adGroup": {"id": "11"}}]}, weekly={"1234567890": [week_row("10", keys[0], 5, 1_000_000)]}, log=log))
-    assert [n for n in ("ad_group.id IN (10, 11)",) if all(n in q for _c, q in log[1:])] == ["ad_group.id IN (10, 11)"] and len(log) == 3
+    later = [q for _c, q in log if "'APPROVED'" in q or "segments.week" in q]
+    assert len(later) == 2 and all("ad_group.id IN (10, 11)" in q for q in later) and len(log) == 5
     assert r["cover"] == {"10": 0, "11": 1} and r["weekly"]["10"][0] == {"clicks": 5.0, "cost": 1.0} and r["warnings"] == [] and len(r["ads"]) == 3
 
 
@@ -128,7 +141,7 @@ def test_ad_groups_beyond_the_cap_are_not_checked_and_the_account_says_so(monkey
     ads = [api(ad=str(i), group=str(10 + i)) for i in range(5)]
     r = d.read_account("1234567890", TODAY, searcher({"1234567890": ads}, log=log))
     assert r["cover"] == {"10": 0, "11": 0, "12": None, "13": None, "14": None} and "Only the first 2 of 5 ad groups" in r["warnings"][0]
-    assert all("12" not in q.split("ad_group.id IN")[-1] for _c, q in log[1:])
+    assert all("12" not in q.split("ad_group.id IN")[-1] for _c, q in log if "ad_group.id IN" in q)
 
 
 def test_the_default_cap_is_three_hundred_ad_groups_and_the_rest_are_not_checked():
@@ -142,7 +155,7 @@ def test_the_default_cap_is_three_hundred_ad_groups_and_the_rest_are_not_checked
 def test_a_very_long_list_of_flagged_ads_is_cut_and_said(monkeypatch):
     monkeypatch.setattr(d, "MAX_ADS", 3)
     r = d.read_account("1234567890", TODAY, searcher({"1234567890": [api(ad=str(i), group="10") for i in range(5)]}))
-    assert len(r["ads"]) == 3 and r["truncated"] is True and "More than 3 flagged ads: the first 3 are shown." in r["warnings"]
+    assert len(r["ads"]) == 3 and r["truncated"] is True and "More than 3 flagged items: the first 3 are shown." in r["warnings"]
 
 
 def test_an_mcc_reads_every_account_and_says_the_one_it_could_not_read():
@@ -183,7 +196,7 @@ def test_the_report_says_which_weeks_and_what_it_found(cache):
     assert rep["account"]["name"] == "Acme Dental" and rep["account"]["isGroup"] is False and rep["window"] == {"from": "2026-09-14", "to": "2026-10-18", "weeks": 5}
     a = rep["accounts"][0]
     assert a["status"] == "stopped" and a["deadGroups"][0]["weight"]["lostClicks"] == 100 and a["findings"][0]["level"] == "high" and a["id"] == "1234567890" and a["currency"] == "USD"
-    assert rep["summary"] == {"counts": {"stopped": 1, "disapproved": 0, "limited": 0, "clear": 0}, "accounts": 1, "needsLook": 1, "stoppedGroups": 1, "disapproved": 1, "limited": 0, "waiting": 0, "lostClicks": 100}
+    assert rep["summary"] == {"counts": {"stopped": 1, "disapproved": 0, "limited": 0, "clear": 0}, "accounts": 1, "needsLook": 1, "stoppedGroups": 1, "disapproved": 1, "keywords": 0, "limited": 0, "waiting": 0, "lostClicks": 100}
     assert rep["readAt"] and rep["warnings"] == []
 
 
@@ -259,3 +272,122 @@ def test_with_no_saved_read_a_spent_quota_is_raised(cache):
 def test_an_account_that_is_not_position2s_is_refused(cache):
     with pytest.raises(d.BadRequest):
         d.report_for("9999999999", accounts_fn=lambda: [ACCT], groups_fn=lambda: [], search_fn=searcher(), today=TODAY)
+
+
+# ── Performance Max assets, keywords and Meta in the read ───────────────────
+
+from tests import test_paid_disapproved_extra as X  # noqa: E402
+from tracker import paid_disapproved_extra as ex  # noqa: E402
+
+
+def test_the_assets_of_performance_max_are_read_with_their_cover_and_their_weeks_and_are_stopped_when_a_field_is_short():
+    keys = [w[0].isoformat() for w in WEEKS]
+    a = ACCT["id"]
+    r = d.read_account(a, TODAY, searcher({a: []}, assets={a: [X.arow(aid="900"), X.arow(aid="901")]}, asset_cover={a: [X.arow()] * 1},
+                                          asset_weekly={a: [{"assetGroup": {"id": "7"}, "segments": {"week": keys[i]}, "metrics": {"clicks": "40", "costMicros": "10000000"}} for i in range(4)]}))
+    assert [i["id"] for i in r["ads"]] == ["asset:7:900:HEADLINE", "asset:7:901:HEADLINE"] and r["cover"] == {"pmax:7:HEADLINE": 1} and r["warnings"] == []
+    assert r["weekly"]["pmax:7:HEADLINE"][0] == {"clicks": 40.0, "cost": 10.0}
+    from tracker import paid_disapproved_math as m
+    an = m.analyse(r["ads"], r["cover"], r["weekly"])
+    assert an["status"] == "stopped" and an["deadGroups"][0]["name"] == "Summer (headlines)" and an["deadGroups"][0]["weight"]["lostClicks"] == 40
+
+
+def test_keywords_are_read_and_a_refused_policy_field_is_asked_again_without_it():
+    a = ACCT["id"]
+    log = []
+    r = d.read_account(a, TODAY, searcher({a: []}, keywords={a: [X.krow()]}, fail_policy=True, log=log))
+    assert [i["id"] for i in r["ads"]] == ["kw:3:11"] and r["warnings"] == [] and len([q for _c, q in log if "FROM ad_group_criterion" in q]) == 2
+    both = d.read_account(a, TODAY, searcher({a: []}, keywords={a: [X.krow()]}, fail_keywords=True))
+    assert both["ads"] == [] and both["warnings"] == ["The disapproved keywords could not be read (no keywords)."]
+
+
+def test_assets_that_cannot_be_read_are_said_and_the_ads_still_come():
+    r = d.read_account(ACCT["id"], TODAY, searcher(fail_assets=True))
+    assert len(r["ads"]) == 1 and r["warnings"] == ["The assets of Performance Max asset groups could not be read (no assets)."]
+
+
+def test_flagged_assets_alone_are_enough_to_ask_for_the_cover_and_keywords_never_are():
+    a = ACCT["id"]
+    log = []
+    d.read_account(a, TODAY, searcher({a: []}, keywords={a: [X.krow()]}, log=log))
+    assert not [q for _c, q in log if "'APPROVED'" in q or "segments.week" in q]
+
+
+def test_a_meta_ad_account_is_read_for_rejected_ads_and_the_active_ones_that_cover_them():
+    asked = []
+
+    def pages(path, params):
+        asked.append((path, params["effective_status"]))
+        return [{"id": "9", "adset_id": "55"}] if params["effective_status"] == '["ACTIVE"]' else [X.mad("1", adset="55"), X.mad("2", adset="56")]
+    r = d.read_meta_account("act_123", pages)
+    assert [i["id"] for i in r["ads"]] == ["meta:1", "meta:2"] and r["cover"] == {"meta:55": 1, "meta:56": 0} and r["weekly"] is None
+    assert r["warnings"] == ["Meta's clicks per ad set are not read, so what a stopped ad set used to bring is not sized."] and asked == [("/act_123/ads", '["DISAPPROVED", "WITH_ISSUES"]'), ("/act_123/ads", '["ACTIVE"]')]
+    none = d.read_meta_account("act_123", lambda p, q: [])
+    assert none == {"ads": [], "cover": {}, "weekly": None, "warnings": [], "truncated": False}
+
+
+def test_a_meta_cover_that_cannot_be_read_is_none_and_said():
+    def pages(path, params):
+        if params["effective_status"] == '["ACTIVE"]':
+            raise RuntimeError("meta says no")
+        return [X.mad()]
+    r = d.read_meta_account("act_123", pages)
+    assert r["cover"] is None and r["warnings"][0] == "Whether other active ads cover the rejected ones could not be read (meta says no)."
+
+
+def test_the_report_for_a_meta_account_names_its_stopped_ad_sets(cache):
+    def pages(path, params):
+        return [] if params["effective_status"] == '["ACTIVE"]' else [X.mad("1", adset="55", feedback={"ADULT_CONTENT": "Too much skin"})]
+    rep = d.report_for("act_1234567", search_fn=searcher(), meta_pages_fn=pages, meta_account_fn=lambda act: {"name": "Beta Meta", "currency": "EUR"}, today=TODAY)
+    a = rep["accounts"][0]
+    assert rep["account"]["platform"] == "meta" and rep["account"]["name"] == "Beta Meta" and a["platform"] == "meta" and a["status"] == "stopped" and a["currency"] == "EUR" and a["counts"]["meta"] == 1
+    assert a["deadGroups"][0]["name"] == "Ad set 55" and a["plan"]["steps"][0]["worth"] == "How many clicks these ad groups used to bring could not be read, so it is not sized here."
+    assert "Adult content" in [t["label"] for t in a["topics"]]
+
+
+# ── Age, patterns and how long fixes take ───────────────────────────────────
+
+def issue(fp, status="open", first="2026-10-14T07:00:00+00:00", resolved=None, reopened=0):
+    return {"agent": "disapproved", "fingerprint": fp, "status": status, "firstSeen": first, "lastSeen": resolved or "2026-10-20T07:00:00+00:00", "resolvedAt": resolved, "reopened": reopened}
+
+
+def test_the_ages_come_from_the_open_issues_the_monitor_keeps_and_not_from_resolved_ones():
+    got = d.ages_of([issue("group:1:10", reopened=2), issue("topic:1:X", status="resolved", resolved="2026-10-16T07:00:00+00:00")])
+    assert got == {"group:1:10": {"firstSeen": "2026-10-14T07:00:00+00:00", "reopened": 2}}
+
+
+def test_how_long_fixes_took_is_the_middle_and_the_longest_of_the_resolved_issues():
+    done = [issue("a", "resolved", "2026-10-01T07:00:00+00:00", "2026-10-03T07:00:00+00:00"), issue("b", "resolved", "2026-10-01T07:00:00+00:00", "2026-10-08T07:00:00+00:00"),
+            issue("c", "resolved", "2026-10-01T07:00:00+00:00", "2026-10-02T07:00:00+00:00"), issue("d")]
+    assert d.fix_times(done) == {"fixed": 3, "median": 2, "longest": 7} and d.fix_times([issue("d")]) is None and d.fix_times([]) is None
+
+
+def test_the_report_gives_a_stopped_group_its_age_from_the_monitors_issues(cache):
+    from monitor_fakes import MemStore
+    mon = MemStore()
+    mon.issues_put([issue("group:1234567890:10", first="2026-10-14T07:00:00+00:00")])
+    keys = [w[0].isoformat() for w in WEEKS]
+    rep = d.report_for("1234567890", accounts_fn=lambda: [ACCT], groups_fn=lambda: [], search_fn=searcher(weekly={"1234567890": [week_row("10", keys[i], 70, 35_000_000) for i in range(4)]}), today=TODAY, mon=mon)
+    g = rep["accounts"][0]["deadGroups"][0]
+    assert rep["agesKnown"] is True and g["ageDays"] is not None and g["ageDays"] >= 1 and rep["fixTimes"] is None
+    plain = d.report_for("1234567890", accounts_fn=lambda: [ACCT], groups_fn=lambda: [], search_fn=searcher(), today=TODAY)
+    assert plain["agesKnown"] is False and plain["fixTimes"] is None and plain["accounts"][0]["deadGroups"][0]["ageDays"] is None
+
+
+def test_an_unreadable_history_is_said_and_the_report_stands(cache):
+    class Broken:
+        def issues_all(self, agent):
+            raise RuntimeError("down")
+    rep = d.report_for("1234567890", accounts_fn=lambda: [ACCT], groups_fn=lambda: [], search_fn=searcher(), today=TODAY, mon=Broken())
+    assert rep["warnings"][0] == "The history of what was flagged before could not be read (down), so no age is shown." and rep["agesKnown"] is False
+
+
+def test_a_policy_that_flags_ads_in_several_accounts_is_a_pattern_the_most_accounts_first(cache):
+    accounts = [ACCT, ACCT2, {"id": "3333333333", "name": "Gamma", "currency": "USD"}]
+    ads = {ACCT["id"]: [api(topics=(("TRADEMARKS_IN_AD_TEXT", "LIMITED", []), ("DESTINATION_NOT_WORKING", "PROHIBITED", [])))], ACCT2["id"]: [api(ad="2", group="20", topics=(("TRADEMARKS_IN_AD_TEXT", "LIMITED", []),))],
+           "3333333333": [api(ad="3", group="30", topics=(("TRADEMARKS_IN_AD_TEXT", "LIMITED", []), ("ONLY_HERE", "LIMITED", [])))]}
+    rep = d.report_for("mcc-9923720096-USD", accounts_fn=lambda: accounts, groups_fn=lambda: [{"id": "mcc-9923720096-USD", "name": "G", "currency": "USD", "accountIds": [a["id"] for a in accounts]}],
+                       search_fn=searcher(ads), today=TODAY)
+    [p] = rep["patterns"]
+    assert p["topic"] == "TRADEMARKS_IN_AD_TEXT" and p["label"] == "Trademarks in ad text" and sorted(p["accounts"]) == ["Acme Dental", "Beta Clinic", "Gamma"] and p["ads"] == 3
+    assert d.patterns([]) == []

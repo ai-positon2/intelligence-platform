@@ -50,7 +50,7 @@ def test_a_disapproved_ad_with_no_approved_ad_beside_it_is_stopped_and_one_with_
     a = m.analyse([ad(1, "G1"), ad(2, "G1"), ad(3, "G2", "Brand")], {"G1": 0, "G2": 1}, W)
     st = {i["id"]: i["state"] for i in a["items"]}
     assert st == {"1": "dead", "2": "dead", "3": "covered"} and a["status"] == "stopped"
-    assert a["counts"] == {"disapproved": 3, "limited": 0, "stoppedGroups": 1, "appeal": 0, "reviewing": 0} and a["campaigns"] == 2 and a["adGroups"] == 2
+    assert a["counts"] == {"disapproved": 3, "limited": 0, "keywords": 0, "stoppedGroups": 1, "appeal": 0, "reviewing": 0, "assets": 0, "meta": 0} and a["campaigns"] == 2 and a["adGroups"] == 2
     g = a["deadGroups"][0]
     assert g["id"] == "G1" and g["ads"] == 2 and g["name"] == "Group G1" and g["topics"] == ["DESTINATION_NOT_WORKING"] and g["weight"]["lostClicks"] == 100
 
@@ -218,3 +218,156 @@ def test_every_step_has_a_title_a_reason_and_how_and_nothing_has_a_dash_or_an_un
     text = "\n".join(seen)
     assert text.strip() and "—" not in text and "–" not in text
     assert not re.search(r"%[sd]|\{|None|nan", text)
+
+
+# ── Assets, keywords and Meta ───────────────────────────────────────────────
+
+def asset(i, group="pmax:7:HEADLINE", name="Summer (headlines)", approval="DISAPPROVED", need=3, text="Free whitening!!!", topics=(("PUNCTUATION_AND_SYMBOLS", "LIMITED"),), camp="PMax All"):
+    return dict(ad(i, group, camp, approval, topics, name=name), kind="asset", need=need, type="ASSET_HEADLINE", headlines=[text], url="")
+
+
+def kw(i, group="G1", text="[cheap implants]", topics=(("HEALTHCARE_AND_MEDICINES", "LIMITED"),)):
+    return dict(ad(i, group, "Core Search", "DISAPPROVED", topics), kind="keyword", type="KEYWORD", headlines=[text], url="")
+
+
+def test_a_performance_max_field_with_fewer_approved_assets_than_it_needs_is_stopped():
+    a = m.analyse([asset(1)], {"pmax:7:HEADLINE": 2}, None)                         # headlines need three approved, two are
+    assert a["items"][0]["state"] == "dead" and a["items"][0]["kind"] == "asset" and a["status"] == "stopped" and a["deadGroups"][0]["name"] == "Summer (headlines)"
+    assert a["findings"][0]["title"] == "1 ad group cannot show any ad" and "Summer (headlines) in PMax All" in a["findings"][0]["detail"]
+    ok = m.analyse([asset(1)], {"pmax:7:HEADLINE": 3}, None)
+    assert ok["items"][0]["state"] == "covered" and ok["status"] == "disapproved"
+    assert "1 asset is disapproved" == ok["findings"][0]["title"] and "Each has another approved asset in its asset group, so the ad group still shows." in ok["findings"][0]["detail"]
+    mixed = m.analyse([asset(1), ad(2, "G1")], {"pmax:7:HEADLINE": 3, "G1": 1}, None)
+    assert mixed["findings"][0]["title"] == "2 ads and assets are disapproved" and mixed["counts"]["assets"] == 1
+
+
+def test_a_field_that_needs_no_assets_is_never_stopped_by_losing_one():
+    a = m.analyse([asset(1, need=0)], {"pmax:7:HEADLINE": 0}, None)
+    assert a["items"][0]["state"] == "covered" and a["deadGroups"] == []
+
+
+def test_a_disapproved_keyword_is_counted_apart_never_stops_an_ad_group_and_has_its_own_finding_and_step():
+    a = m.analyse([kw(1), kw(2, "G2", "[bleaching kit]", topics=(("TRADEMARKS_IN_AD_TEXT", "LIMITED"),)), ad(3, "G3")], {"G1": 0, "G2": 0, "G3": 1}, None)
+    assert [i["state"] for i in a["items"]] == ["covered", "keyword", "keyword"] and a["deadGroups"] == [] and a["counts"]["keywords"] == 2 and a["counts"]["disapproved"] == 1
+    assert [t["topic"] for t in a["topics"]] == ["DESTINATION_NOT_WORKING"] and a["keywordTopics"] == [{"topic": "HEALTHCARE_AND_MEDICINES", "label": "Healthcare and medicines", "keywords": 1},
+                                                                                                       {"topic": "TRADEMARKS_IN_AD_TEXT", "label": "Trademarks in ad text", "keywords": 1}]
+    f = [x for x in a["findings"] if x["kind"] == "keywords"][0]
+    assert f["level"] == "medium" and f["title"] == "2 keywords are disapproved" and '[cheap implants]' in f["detail"] and f["nextStep"] == "Start with: Fix the disapproved keywords."
+    s = [x for x in a["plan"]["steps"] if x["id"] == "keywords"][0]
+    assert "healthcare and medicines (1), trademarks in ad text (1)" in s["why"] and "Appeal in Policy manager" in " ".join(s["how"]) and s["campaigns"] == ["Core Search"]
+
+
+def test_an_account_with_only_disapproved_keywords_is_disapproved_and_not_stopped():
+    a = m.analyse([kw(1)], {"G1": 0}, None)
+    assert a["status"] == "disapproved" and a["counts"]["disapproved"] == 0 and a["counts"]["keywords"] == 1 and [f["kind"] for f in a["findings"]] == ["keywords"]
+
+
+def test_a_meta_ad_is_an_ad_with_the_same_cover_rule():
+    ma = dict(ad(1, "meta:55", "Spring leads", name="Ad set 55"), kind="meta", platform="meta", type="META_AD", url="")
+    a = m.analyse([ma], {"meta:55": 0}, None)
+    assert a["items"][0]["state"] == "dead" and a["items"][0]["platform"] == "meta" and a["counts"]["meta"] == 1
+
+
+# ── Age, what they share and coming back ────────────────────────────────────
+
+NOW = __import__("datetime").datetime(2026, 10, 21, 7, 0, tzinfo=__import__("datetime").timezone.utc)
+
+
+def ages(**kw_):
+    return {fp: {"firstSeen": since, "reopened": n} for fp, (since, n) in kw_.items()}
+
+
+def test_a_stopped_group_and_a_policy_carry_how_long_they_have_been_open_and_the_clicks_lost_since():
+    a = m.analyse([ad(1, "G1")], {"G1": 0}, W, account_id="111", ages={"group:111:G1": {"firstSeen": "2026-10-14T07:00:00+00:00", "reopened": 0}, "topic:111:DESTINATION_NOT_WORKING": {"firstSeen": "2026-10-17T07:00:00+00:00", "reopened": 2}}, now=NOW)
+    g = a["deadGroups"][0]
+    assert g["fp"] == "group:111:G1" and g["ageDays"] == 7 and g["lostSoFar"] == 100 and a["agesKnown"] is True          # 100 clicks a week, 7 days
+    t = a["topics"][0]
+    assert t["fp"] == "topic:111:DESTINATION_NOT_WORKING" and t["ageDays"] == 4 and t["reopened"] == 2
+    assert "The longest has been stopped for 7 days (about 100 clicks lost since)." in a["findings"][0]["detail"]
+    cover = a["plan"]["steps"][0]
+    assert "The oldest has been stopped for 7 days: about 100 clicks lost since, at the usual pace." in cover["worth"]
+    topic = [s for s in a["plan"]["steps"] if s["id"].startswith("topic-")][0]
+    assert "It has been flagged for 4 days." in topic["why"] and "It has come back 2 times after being fixed" in topic["why"]
+    rec = [f for f in a["findings"] if f["kind"] == "recurring"][0]
+    assert rec["title"] == "Destination not working has come back 2 times after it was fixed" and rec["level"] == "medium"
+
+
+def test_without_ages_nothing_is_said_about_age_and_a_limited_topic_has_its_own_fingerprint():
+    a = m.analyse([ad(1, "G1")], {"G1": 0}, W, account_id="111")
+    assert a["deadGroups"][0]["ageDays"] is None and a["deadGroups"][0]["lostSoFar"] is None and a["agesKnown"] is False and "stopped for" not in a["findings"][0]["detail"] and "lost since" not in a["plan"]["steps"][0]["worth"]
+    lim = m.analyse([ad(1, approval="APPROVED_LIMITED")], {"G1": 1}, None, account_id="111")
+    assert lim["topics"][0]["fp"] == "limited:111:DESTINATION_NOT_WORKING"
+    new = m.analyse([ad(1, "G1")], {"G1": 0}, W, account_id="111", ages={}, now=NOW)
+    assert new["deadGroups"][0]["ageDays"] is None and new["agesKnown"] is True
+
+
+def test_an_issue_first_seen_today_has_no_age_to_say():
+    a = m.analyse([ad(1, "G1")], {"G1": 0}, W, account_id="111", ages={"group:111:G1": {"firstSeen": "2026-10-21T06:00:00+00:00", "reopened": 0}}, now=NOW)
+    assert a["deadGroups"][0]["ageDays"] == 0 and a["deadGroups"][0]["lostSoFar"] is None
+    assert "stopped for" not in a["findings"][0]["detail"]
+
+
+def flagged(n, headline="Book today", url="https://example.com/a", **kw_):
+    return [dict(ad(i, "G%d" % i, **kw_), headlines=[headline, "Unique %d" % i], url=url) for i in range(1, n + 1)]
+
+
+def test_a_headline_in_most_of_the_flagged_ads_is_the_one_cause_to_fix_once():
+    a = m.analyse(flagged(6), {"G%d" % i: 1 for i in range(1, 7)}, None)
+    assert a["suspects"][0] == {"kind": "headline", "text": "Book today", "ads": 6, "of": 6} and {"kind": "url", "text": "https://example.com/a", "ads": 6, "of": 6} in a["suspects"]
+    f = [x for x in a["findings"] if x["kind"] == "common"][0]
+    assert f["level"] == "medium" and f["title"] == 'The headline "Book today" is in 6 of the 6 flagged ads that have one' and f["nextStep"] == "Start with: Fix the shared cause once."
+    s = [x for x in a["plan"]["steps"] if x["id"] == "common"][0]
+    assert s["why"].startswith('Among the flagged ads, the headline "Book today" is in 6 of 6; the page https://example.com/a is in 6 of 6.') and "Find and replace" in " ".join(s["how"]) and s["worth"] == "Up to 6 of the 6 flagged ads could clear with this one change."
+
+
+def test_a_text_in_too_few_ads_or_too_small_a_share_is_not_a_suspect_and_a_url_needs_three():
+    few = flagged(2, headline="Book today", url="https://x.example/")
+    assert [x["kind"] for x in m.analyse(few, {}, None)["suspects"]] == ["headline"]                          # two ads: a headline counts, a page needs three
+    many = [dict(ad(i, "G%d" % i), headlines=["Head %d" % i], url="https://example.com/%d" % i) for i in range(1, 11)]
+    many[0]["headlines"] = ["Shared"]
+    many[1]["headlines"] = ["Shared"]
+    assert m.analyse(many, {}, None)["suspects"] == []                                                         # 2 of 10 is under the share
+    assert [f for f in m.analyse(flagged(2), {}, None)["findings"] if f["kind"] == "common"] == []              # and under three flagged ads nothing is said
+
+
+def test_the_text_google_points_at_is_a_suspect_too_and_a_keyword_is_never_counted_in_them():
+    ads = [ad(i, "G%d" % i, evidence=("Free!!!",)) for i in range(1, 5)] + [kw(9)]
+    a = m.analyse(ads, {}, None)
+    assert {"kind": "evidence", "text": "Free!!!", "ads": 4, "of": 4} in a["suspects"] and all(s["kind"] != "headline" or "cheap" not in s["text"] for s in a["suspects"])
+    assert max(s["of"] for s in a["suspects"]) == 4
+
+
+def test_at_most_four_suspects_the_most_shared_first():
+    ads = [dict(ad(i, "G%d" % i, evidence=("E1", "E2")), headlines=["H1", "H2", "H3"], url="https://example.com/") for i in range(1, 5)]
+    sus = m.analyse(ads, {}, None)["suspects"]
+    assert len(sus) == 4 and all(s["ads"] == 4 for s in sus)
+
+
+def test_how_often_it_came_back_is_known_even_when_the_time_of_the_read_is_not():
+    a = m.analyse([ad(1, "G1")], {"G1": 0}, W, account_id="111", ages={"group:111:G1": {"firstSeen": "2026-10-14T07:00:00+00:00", "reopened": 3}}, now=None)
+    g = a["deadGroups"][0]
+    assert g["ageDays"] is None and g["reopened"] == 3 and a["agesKnown"] is False
+    b = m.analyse([ad(1, "G1")], {"G1": 0}, W, account_id="111", ages={"group:111:G1": {"reopened": 1}}, now=NOW)
+    assert b["deadGroups"][0]["ageDays"] is None and b["deadGroups"][0]["reopened"] == 1
+
+
+def test_the_most_shared_suspect_comes_first_whatever_the_alphabet_says():
+    ads = [dict(ad(i, "G%d" % i), headlines=(["Alpha"] if i <= 3 else []) + ["Zulu"], url="") for i in range(1, 6)]
+    sus = m.analyse(ads, {}, None)["suspects"]
+    assert [(s["text"], s["ads"]) for s in sus] == [("Zulu", 5), ("Alpha", 3)]
+
+
+def test_a_shared_cause_in_four_ads_is_low_and_in_five_is_medium():
+    low = m.analyse(flagged(4), {}, None)
+    assert [f["level"] for f in low["findings"] if f["kind"] == "common"] == ["low"]
+    assert [f["level"] for f in m.analyse(flagged(5), {}, None)["findings"] if f["kind"] == "common"] == ["medium"]
+
+
+def test_a_stopped_group_that_came_back_is_named_and_the_one_that_came_back_most_is_the_one_said():
+    a = m.analyse([ad(1, "G1"), ad(2, "G2", "Brand", topics=(("TRADEMARKS_IN_AD_TEXT", "LIMITED"),))], {"G1": 0, "G2": 1}, W, account_id="111",
+                  ages={"group:111:G1": {"firstSeen": "2026-10-14T07:00:00+00:00", "reopened": 1}, "topic:111:TRADEMARKS_IN_AD_TEXT": {"firstSeen": "2026-10-14T07:00:00+00:00", "reopened": 3},
+                                                         "topic:111:DESTINATION_NOT_WORKING": {"firstSeen": "2026-10-14T07:00:00+00:00", "reopened": 2}}, now=NOW)
+    rec = [f for f in a["findings"] if f["kind"] == "recurring"]
+    assert len(rec) == 1 and rec[0]["title"] == "Trademarks in ad text has come back 3 times after it was fixed"            # the topics are listed first, so the first of them is not the worst
+    only = m.analyse([ad(1, "G1")], {"G1": 0}, W, account_id="111", ages={"group:111:G1": {"firstSeen": "2026-10-14T07:00:00+00:00", "reopened": 1}}, now=NOW)
+    assert [f["title"] for f in only["findings"] if f["kind"] == "recurring"] == ["Group G1 has come back 1 time after it was fixed"]
