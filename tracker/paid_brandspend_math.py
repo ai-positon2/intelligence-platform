@@ -176,10 +176,10 @@ def analyse(campaign_rows, today, *, limit=DEFAULT_LIMIT, overrides=None, curren
     settings = extra.get("settings") or {}
     wk = weeks(today)
     names = {}
-    for c in extra.get("campaigns") or []:
-        names.setdefault(str(c["id"]), {"id": str(c["id"]), "name": c.get("name") or "", "strategy": "", "budget": None})
     for r in campaign_rows:
         names.setdefault(str(r["id"]), {"id": str(r["id"]), "name": r.get("name") or "", "strategy": r.get("strategy") or "", "budget": r.get("budget")})
+    for c in extra.get("campaigns") or []:                      # the campaigns Google lists that have no row (a brand campaign that never spent)
+        names.setdefault(str(c["id"]), {"id": str(c["id"]), "name": c.get("name") or "", "strategy": "", "budget": None})
     brand, other = split_campaigns(list(names.values()), overrides)
     ids = {c["id"] for c in brand}
     in_brand = [r for r in campaign_rows if str(r["id"]) in ids]

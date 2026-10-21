@@ -20,9 +20,12 @@ ACCT2 = {"id": "2222222222", "name": "Beta Clinic", "currency": "USD"}
 USUAL = [203, 196, 210, 189, 203, 210, 196]
 
 
-def api(cid="11", name="P2_Brand", date="2026-10-14", cost="29000000", clicks="10", impr="100", status="ENABLED", strategy="MAXIMIZE_CLICKS", budget="40000000"):
+def api(cid="11", name="P2_Brand", date="2026-10-14", cost="29000000", clicks="10", impr="100", status="ENABLED", strategy="MAXIMIZE_CLICKS", budget="40000000", conv="2", share=0.9, lb=0.02, lr=0.03):
     row = {"campaign": {"id": cid, "name": name, "status": status, "biddingStrategyType": strategy}, "segments": {"date": date},
-           "metrics": {"impressions": impr, "clicks": clicks, "costMicros": cost}}
+           "metrics": {"impressions": impr, "clicks": clicks, "costMicros": cost, "conversions": conv}}
+    for k, v in (("searchImpressionShare", share), ("searchBudgetLostImpressionShare", lb), ("searchRankLostImpressionShare", lr)):
+        if v is not None:
+            row["metrics"][k] = v
     if budget is not None:
         row["campaignBudget"] = {"amountMicros": budget}
     return row
@@ -41,7 +44,13 @@ def weeks_of(cid="11", name="P2_Brand", weekly=None, clicks=70, **kw):
     return out
 
 
-def searcher(by_account=None, log=None, fail=()):
+def term_row(cid="12", camp="NonBrand Implants", term="northwind dental near me", cost="60000000", clicks="20", conv="2"):
+    return {"campaign": {"id": cid, "name": camp}, "searchTermView": {"searchTerm": term}, "metrics": {"costMicros": cost, "clicks": clicks, "conversions": conv}}
+
+
+def searcher(by_account=None, log=None, fail=(), campaigns=None, terms=None, fail_campaigns=False, fail_terms=False):
+    """A stand-in for the Google Ads read: the day rows by account, and for the other two reads the campaign list (the campaigns of the rows unless `campaigns` says otherwise)
+    and the search terms (`terms`, by account)."""
     by_account = by_account if by_account is not None else {ACCT["id"]: weeks_of()}
 
     def search(cid, query):
@@ -49,6 +58,19 @@ def searcher(by_account=None, log=None, fail=()):
             log.append((cid, query))
         if cid in fail:
             raise gads.GadsError("api", "Account %s cannot be read." % cid)
+        if "FROM search_term_view" in query:
+            if fail_terms:
+                raise gads.GadsError("api", "no terms")
+            return (terms or {}).get(cid, [])
+        if "FROM campaign WHERE" in query and "segments.date" not in query:
+            if fail_campaigns:
+                raise gads.GadsError("api", "no campaigns")
+            if campaigns is not None:
+                return [{"campaign": c} for c in campaigns.get(cid, [])]
+            seen = {}
+            for r in by_account.get(cid, []):
+                seen[r["campaign"]["id"]] = {"id": r["campaign"]["id"], "name": r["campaign"]["name"], "status": r["campaign"]["status"]}
+            return [{"campaign": c} for c in seen.values()]
         return by_account.get(cid, [])
     return search
 
@@ -57,7 +79,10 @@ def searcher(by_account=None, log=None, fail=()):
 
 def test_a_row_is_read_into_the_shape_the_arithmetic_wants():
     r = b.read_rows([api()])[0]
-    assert r == {"id": "11", "name": "P2_Brand", "date": "2026-10-14", "status": "ENABLED", "strategy": "MAXIMIZE_CLICKS", "budget": 40.0, "impressions": 100, "clicks": 10, "cost": 29.0}
+    assert r == {"id": "11", "name": "P2_Brand", "date": "2026-10-14", "status": "ENABLED", "strategy": "MAXIMIZE_CLICKS", "budget": 40.0, "impressions": 100, "clicks": 10, "cost": 29.0,
+                 "conversions": 2.0, "share": 0.9, "lostBudget": 0.02, "lostRank": 0.03}
+    bare = b.read_rows([api(conv=None, share=None, lb=None, lr=None)])[0]
+    assert bare["conversions"] == 0.0 and bare["share"] is None and bare["lostBudget"] is None and bare["lostRank"] is None
 
 
 def test_a_missing_budget_stays_none_and_strings_are_numbers():
@@ -76,7 +101,8 @@ def test_the_query_asks_for_search_campaigns_not_removed_by_day_from_the_oldest_
     q = b.gaql(first, last)
     assert "campaign.advertising_channel_type = 'SEARCH'" in q and "campaign.status != 'REMOVED'" in q and "segments.date" in q and "campaign.status," in q
     assert "BETWEEN '2026-08-24' AND '2026-10-19'" in q
-    for f in ("metrics.cost_micros", "metrics.clicks", "metrics.impressions", "bidding_strategy_type", "campaign_budget.amount_micros"):
+    for f in ("metrics.cost_micros", "metrics.clicks", "metrics.impressions", "metrics.conversions", "metrics.search_impression_share", "metrics.search_budget_lost_impression_share",
+              "metrics.search_rank_lost_impression_share", "bidding_strategy_type", "campaign_budget.amount_micros"):
         assert f in q
 
 
@@ -85,8 +111,30 @@ def test_the_query_asks_for_search_campaigns_not_removed_by_day_from_the_oldest_
 def test_one_account_is_read_once():
     log = []
     raw = b.google_raw(ACCT, TODAY, search_fn=searcher(log=log))
-    assert len(log) == 1 and log[0][0] == "1234567890" and raw["members"] == [] and raw["warnings"] == []
+    assert len(log) == 2 and log[0][0] == "1234567890" and "segments.date" in log[0][1] and "FROM campaign WHERE" in log[1][1] and raw["members"] == [] and raw["warnings"] == []
+    assert raw["accounts"][0]["campaigns"] == [{"id": "11", "name": "P2_Brand", "status": "ENABLED"}] and raw["accounts"][0]["warnings"] == []
     assert raw["accounts"][0]["name"] == "Acme Dental" and len(raw["accounts"][0]["rows"]) == 56
+
+
+def test_a_campaign_list_that_cannot_be_read_is_left_out_with_a_warning_and_the_rows_still_come():
+    raw = b.google_raw(ACCT, TODAY, search_fn=searcher(fail_campaigns=True))
+    a = raw["accounts"][0]
+    assert a["campaigns"] is None and len(a["rows"]) == 56 and "The list of campaigns could not be read (no campaigns), so a brand campaign that never spent cannot be seen." == a["warnings"][0]
+
+
+def test_the_campaign_list_and_the_search_terms_are_read_into_plain_shapes():
+    rows = [{"campaign": {"id": "11", "name": "A", "status": "ENABLED"}}, {"campaign": {"id": "11", "name": "A", "status": "ENABLED"}}, {"campaign": {"id": "12", "name": "B", "status": "PAUSED"}}, {"campaign": {}}, {}]
+    assert b.read_campaigns(rows) == [{"id": "11", "name": "A", "status": "ENABLED"}, {"id": "12", "name": "B", "status": "PAUSED"}]
+    t = b.read_terms([term_row(), {"campaign": {}, "searchTermView": {"searchTerm": "x"}}, {"campaign": {"id": "9"}, "searchTermView": {}}, term_row("13", "PMax", "x y", "1500000", "3", "0.5")])
+    assert t == [{"campaignId": "12", "campaign": "NonBrand Implants", "term": "northwind dental near me", "cost": 60.0, "clicks": 20, "conversions": 2.0},
+                 {"campaignId": "13", "campaign": "PMax", "term": "x y", "cost": 1.5, "clicks": 3, "conversions": 0.5}]
+
+
+def test_the_search_term_query_asks_for_the_dearest_terms_of_the_last_thirty_days():
+    first, last = b.leak_window(TODAY)
+    q = b.gaql_terms(first, last)
+    assert (first, last) == (dt.date(2026, 9, 20), dt.date(2026, 10, 19)) and "FROM search_term_view" in q and "BETWEEN '2026-09-20' AND '2026-10-19'" in q and "metrics.cost_micros > 0" in q
+    assert "ORDER BY metrics.cost_micros DESC LIMIT 5000" in q and "search_term_view.search_term" in q and "campaign.advertising_channel_type = 'SEARCH'" in q
 
 
 def test_an_mcc_reads_every_account_and_says_the_one_it_could_not_read():
@@ -239,5 +287,5 @@ def test_this_week_so_far_is_counted_only_for_an_account_that_is_otherwise_on_it
                        search_fn=search, today=thu)
     by = {a["name"]: a for a in rep["accounts"]}
     assert by["Acme Dental"]["status"] == "ok" and by["Acme Dental"]["partial"]["status"] == "over" and by["Beta Clinic"]["status"] == "over" and by["Beta Clinic"]["partial"]["status"] == "over"
-    assert rep["summary"]["thisWeek"] == 1 and rep["summary"]["needsLook"] == 1                  # Beta is already counted as over; only Acme is a part week on its own
+    assert rep["summary"]["thisWeek"] == 1 and rep["summary"]["needsLook"] == 2                  # Beta is over; Acme is a part week off pace on its own (counted once in thisWeek, and it needs a look)
     assert b.overall([]) == {"cost": None, "expected": None, "accounts": 0}
