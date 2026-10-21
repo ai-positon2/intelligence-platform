@@ -2,7 +2,7 @@
 
 An ad is one enabled ad of an enabled ad group of an enabled campaign that Google has disapproved or limited:
     {id, campaignId, campaign, adGroupId, adGroup, type, approval, review, topics: [{t, ty, ev: [text]}], headlines: [text], url}
-`cover` is {ad group id: how many approved enabled ads it has} (None when it could not be read) and `weekly` is {ad group id: [{clicks, cost}] for the last five whole
+`cover` is {ad group id: how many approved enabled ads it has, or None for a group it was not read for} (None when it could not be read at all) and `weekly` is {ad group id: [{clicks, cost}] for the last five whole
 weeks, oldest first} (None when it could not be read).
 
 The question the numbers answer is not "how many ads are disapproved" but "which ad groups can show nothing", so a disapproved ad is serious only when no approved ad covers it.
@@ -58,9 +58,10 @@ def weight(weeks):
 def _state(ad, cover):
     if ad["approval"] != DISAPPROVED:
         return "limited"
-    if cover is None:
+    n = None if cover is None else cover.get(ad["adGroupId"], 0)             # None: this ad group's cover was not read
+    if n is None:
         return "unchecked"
-    return "dead" if cover.get(ad["adGroupId"], 0) == 0 else "covered"
+    return "dead" if n == 0 else "covered"
 
 
 def _topic_key(ad):
