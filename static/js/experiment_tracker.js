@@ -90,9 +90,15 @@ function platformTag(k){
 function stateChip(e){
   return '<span class="ex-state ex-s-' + esc(String(e.state).replace(/\s+/g, "-")) + '">' + esc(X.stateInfo(e.state)) + '</span>';
 }
+/* How to do what the action says, and what it is worth (the server works both out: tracker/paid_exp_plans.py). Collapsed, so a long list of tests stays short. */
+function planHtml(p){
+  if(!p || !p.steps || !p.steps.length) return "";
+  return '<details class="ex-plan"><summary>How to do it</summary><ol>' + p.steps.map(function(s){return '<li>' + esc(s) + '</li>';}).join("") + '</ol>' +
+    (p.worth ? '<p class="ex-worth"><b>Worth</b> ' + esc(p.worth) + '</p>' : "") + (p.note ? '<p class="ex-fine">' + esc(p.note) + '</p>' : "") + '</details>';
+}
 function actionBox(a, tone){
   var k = X.kindInfo(a.kind);
-  return '<div class="ex-do ex-t-' + (tone || k.tone) + '">' + ic(k.icon) + '<div><em>' + esc(a.label || (k.label === "Look" ? "What to do" : k.label)) + '</em><p>' + esc(a.text) + '</p></div></div>';
+  return '<div class="ex-do ex-t-' + (tone || k.tone) + '">' + ic(k.icon) + '<div><em>' + esc(a.label || (k.label === "Look" ? "What to do" : k.label)) + '</em><p>' + esc(a.text) + '</p>' + planHtml(a.plan) + '</div></div>';
 }
 function ruler(c){
   var r = X.ruler(c); if(!r) return "";
@@ -122,7 +128,7 @@ function paintNeeds(rep){
     return '<li class="ex-nd ex-t-' + k.tone + '" style="--i:' + i + '">' +
       '<div class="ex-nd-h"><span class="ex-nd-k">' + ic(k.icon) + esc(x.label || k.label) + '</span><span class="ex-what">' + esc(what) + '</span>' + platformTag(X.isMetaId(x.ref.id) ? "meta" : "google") +
       '<b class="ex-nd-t">' + esc(x.title) + '</b><span class="ex-nd-m">' + esc(X.money(x.spend, cur())) + '</span></div>' +
-      '<p>' + esc(x.text) + '</p>' +
+      '<p>' + esc(x.text) + '</p>' + planHtml(x.plan) +
       '<button type="button" class="ex-go" data-jump="' + esc(x.ref.type) + ':' + esc(x.ref.id) + '">Open it' + ic("arrow") + '</button></li>';
   }).join("");
 }

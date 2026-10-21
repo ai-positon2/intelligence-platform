@@ -368,3 +368,42 @@ def test_the_page_offers_all_three_platforms_marks_each_test_and_styles_what_it_
     assert ".ex-plat" in css and ".ex-plat.meta" in css and ".ex-plat.google" in css
     assert "Meta's A/B tests" in tpl and "ad set" in tpl
     assert "x.label || k.label" in page
+
+
+# ── The plan under an action, run from the page script ────────────────────
+
+def _page_fn(expr, **data):
+    """planHtml and actionBox cut out of the page script (an IIFE that needs a browser) and run with the page's own escaping."""
+    code = ("const fs=require('fs');const src=fs.readFileSync(%s,'utf8');"
+            "const a=src.indexOf('/* How to do what the action says'), b=src.indexOf('function ruler(c)');"
+            "if(a<0||b<a) throw new Error('functions not found');"
+            "const esc=function(s){return String(s==null?'':s).replace(/[&<>\"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',\"'\":'&#39;'}[c];});};"
+            "const ic=function(n){return '<svg data-i=\"'+n+'\"></svg>';};const X={kindInfo:function(k){return {tone:'good',icon:'check',label:k==='apply'?'Apply it':'Look'};}};"
+            "const f=new Function('esc','ic','X',src.slice(a,b)+';return {planHtml:planHtml,actionBox:actionBox};')(esc,ic,X);"
+            % json.dumps(PAGE))
+    pre = "".join("const %s=%s;" % (k, json.dumps(v)) for k, v in data.items())
+    r = subprocess.run(["node", "-e", code + pre + "console.log(JSON.stringify(" + expr + "));"], capture_output=True, text=True, timeout=30)
+    assert r.returncode == 0, r.stderr
+    return json.loads(r.stdout)
+
+
+PLAN = {"steps": ["Open Google Ads, then Experiments.", "Click <Apply>."], "worth": "About 86 more conversions a month.", "note": "It would take 5 days."}
+
+
+def test_an_actions_plan_is_collapsed_under_it_with_the_worth_and_the_note():
+    html = _page_fn("f.actionBox(A,undefined)", A={"kind": "apply", "text": "The trial is ahead.", "plan": PLAN})
+    assert '<p>The trial is ahead.</p><details class="ex-plan"><summary>How to do it</summary><ol><li>Open Google Ads, then Experiments.</li><li>Click &lt;Apply&gt;.</li></ol>' in html
+    assert '<p class="ex-worth"><b>Worth</b> About 86 more conversions a month.</p><p class="ex-fine">It would take 5 days.</p></details>' in html
+
+
+def test_an_action_without_a_plan_is_drawn_as_before_and_an_empty_plan_draws_nothing():
+    assert "ex-plan" not in _page_fn("f.actionBox(A,undefined)", A={"kind": "apply", "text": "Done."})
+    assert _page_fn("f.planHtml(P)", P={"steps": []}) == "" and _page_fn("f.planHtml(P)", P=None) == ""
+    only = _page_fn("f.planHtml(P)", P={"steps": ["One."], "worth": None})
+    assert "ex-worth" not in only and "ex-fine" not in only and "<li>One.</li>" in only
+
+
+def test_the_needs_list_draws_the_plan_too():
+    src = open(PAGE, encoding="utf-8").read()
+    assert "'<p>' + esc(x.text) + '</p>' + planHtml(x.plan) +" in src
+    assert src.count('<details class="ex-plan">') == 1                                           # the markup lives in one function
