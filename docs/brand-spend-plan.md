@@ -46,13 +46,23 @@ get the change history; a ceiling to put the spend back where it belongs. For a 
 brand is shown (the Brand IS Monitor). The worth is the arithmetic of the figures (the extra spent in a week against the usual week, the clicks missing), labelled an
 estimate where it assumes anything. A rise is not always a fault: a launch, an event or press brings more people searching for the brand, and the plan says to check that first.
 
-## Not in this version (said out loud)
+## Built after the first version (2026-10-21)
 
-- **Alerts** (email, Slack, the scheduled run): the same later slice as the Brand IS Monitor's, to be built once for every monitor (sheet #37 Client Master Config and
-  #38 Alert Hub), on the pattern of the Unknown Domains Alert. This version is the page and the arithmetic an alert will use.
-- **Brand terms in non-brand campaigns** (leakage): needs the brand's words from a client config; not read.
-- **Meta**: the agent is Google Ads only (Meta brand campaigns have no fixed name rule or brand keywords).
-- **Fixed limits** (a budget the client agreed): there is no place yet to keep them for the team; the limit is the account's own history.
+- **Alerts, the daily run, new since yesterday**: the shared monitor layer (`tracker/paid_monitor*.py`, tables `pm_mon_state`, `pm_mon_issues`, `pm_mon_snaps`). Each finding has a stable
+  fingerprint; events are new, worse, reminder (a high issue still open after 7 days) and resolved. The first run of a monitor sets a baseline and sends nothing. Only medium and high
+  are alerted; an alert counts as sent only when a channel took it. A weekly summary goes out on Mondays. A GitHub Actions workflow (`paid-monitors.yml`, daily) calls the
+  secret-guarded `/p2/paid-marketing/api/monitors/scheduled`.
+- **Fixed limits**: saved by the team per account (weekly minimum and maximum, a monthly budget), with a change log, in `settings:brandspend`. A breach is a high finding.
+- **Brand words in non-brand campaigns (leak)**: from search terms of the last 30 days for accounts with saved brand words (the page suggests words from the campaign names).
+- **Campaigns that never spent**: enabled brand campaigns with no spend in 8 weeks, from a separate campaign list read.
+- **Insight**: conversions and cost per conversion against usual, impression share and what it lost to (rank or budget), month pace against the budget, days far above the usual with
+  whether their clicks converted, the days in a row outside the band.
+
+## Still not built (said out loud)
+
+- **Performance Max leak**: `search_term_view` excludes Performance Max, so brand searches paid for there are not seen.
+- **Meta**: the agent is Google Ads only.
+- **Live verification**: none of the new queries (conversions and share fields, the campaign list, search_term_view) has been run against the real Google API from here.
 
 ## Phases
 

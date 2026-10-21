@@ -40,13 +40,21 @@ Stopped ad groups first: put an approved ad in so they serve while the flagged o
 what it usually means, how to see the reason in Google Ads (Ads, the status of the ad; Tools, Policy manager), how to fix it (edit the ad or the page; an edited ad is reviewed
 again), and when to appeal instead (only when the ad complies as written). Then the check the next day.
 
-## Not in this version (said out loud)
+## Built after the first version (2026-10-21)
 
-- **Alerts** (email, Slack, a daily run, "new since yesterday"): the same later slice as the other monitors (build the alert layer once with #37 and #38). Nothing here is saved
-  between reads, so it cannot yet say which problem is new.
-- **Ads in Performance Max, Demand Gen, Shopping and app campaigns**: asset groups and product feeds are not ads in this read. The Asset Coverage Audit reads asset policy.
-- **Meta**: Meta rejections are not read (the tracker is Google Ads only).
-- Keywords with a disapproval (`approval_status` on a keyword) and sitelink or other assets are not in this version.
+- **Alerts, the daily run, new since yesterday**: the shared monitor layer (see `docs/brand-spend-plan.md`). A stopped ad group is high, a covered policy topic medium, a limited one
+  low, a disapproved keyword medium. Ages ("stopped for 3 days"), "came back" counts and how long fixes took come from the saved issues.
+- **Performance Max asset policy**: disapproved or limited assets of enabled asset groups; an asset-group field is stopped when approved assets fall below what Google needs
+  (3 headlines, 1 long headline, 2 descriptions, 1 landscape and 1 square image, 1 business name).
+- **Keyword disapprovals**: disapproved keywords of enabled ad groups (retried without the policy field if Google refuses it).
+- **Meta**: rejected (DISAPPROVED) and flagged (WITH_ISSUES) ads, an ad set stopped when it has no active ad left; Meta accounts are in the picker.
+- **Insight**: what the flagged ads have in common (a headline, a page, the text Google points at), policies that flag ads in several accounts, clicks lost since the stop.
+
+## Still not built (said out loud)
+
+- **Demand Gen, Shopping and app campaigns**: Merchant Center feed disapprovals are not read.
+- **Meta sizing**: clicks lost per ad set are not estimated.
+- **Live verification**: no new query (asset_group_asset policy, keyword policy_summary, the Meta ad fields) has been run against the real Google or Meta APIs from here.
 
 ## Phases
 
