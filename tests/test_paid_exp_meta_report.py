@@ -248,9 +248,9 @@ def test_a_report_of_both_platforms_names_both_accounts_and_marks_each_test_with
     rows = dict(t["Summary"][1])
     assert rows["Google Ads account"].endswith("(1112223334)") and rows["Meta ad account"].endswith("(act_1234567890)")
     head, exps = t["Experiments"]
-    assert head[-2:] == ["Platform", "Why there is no result"] and {r[-2] for r in exps} == {"Google Ads", "Meta Ads"}
+    assert head[-4:-2] == ["Platform", "Why there is no result"] and {r[head.index("Platform")] for r in exps} == {"Google Ads", "Meta Ads"}
     head, tests = t["Ad tests"]
-    assert head[0] == "Ad group or ad set" and head[-1] == "Platform" and {r[-1] for r in tests} == {"Google Ads", "Meta Ads"}
+    assert head[0] == "Ad group or ad set" and head[-3] == "Platform" and {r[head.index("Platform")] for r in tests} == {"Google Ads", "Meta Ads"}
     assert t["Ads"][0][0] == "Ad group or ad set"
     for name, (header, body) in t.items():
         assert all(len(r) == len(header) for r in body), name
@@ -260,7 +260,7 @@ def test_a_meta_test_with_no_result_gives_its_reason_in_the_file():
     from tracker import paid_exp_export as export
     out = run(ACT, graph=two_ads(fail=["nested", "days"]), search_fn=no_google)
     head, rows = export.tables(out)["Experiments"]
-    assert rows[0][-2] == "Meta Ads" and rows[0][-1] == "Meta did not say which campaigns or ad sets each cell holds."
+    assert rows[0][head.index("Platform")] == "Meta Ads" and rows[0][head.index("Why there is no result")] == "Meta did not say which campaigns or ad sets each cell holds."
 
 
 def test_the_needs_list_carries_a_winners_own_label_into_the_file():
