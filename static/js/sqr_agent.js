@@ -8,7 +8,7 @@
  */
 (function(){
 "use strict";
-const Core = window.SQRCore, RULESETS = Core.RULESETS, P = window.PSData, PL = window.PMPlatform;
+const Plan = window.SQRPlan, Core = window.SQRCore, RULESETS = Core.RULESETS, P = window.PSData, PL = window.PMPlatform;
 const BASE = "/p2/paid-marketing/api";
 
 function esc(s){ return String(s == null ? "" : s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
@@ -408,6 +408,12 @@ function tbl(h, rows){ return '<div class="pm-scroll"><table><thead><tr>' + h.ma
 const none = t => '<p class="pm-empty">' + (t || "None found.") + '</p>';
 const hint = t => '<p class="sq-hint">' + t + '</p>';
 
+/* How to apply what was found and what it is worth (static/js/sqr_plan.js works both out): folded away under the table's own hint. */
+function planHtml(p){
+  if (!p || !p.steps || !p.steps.length) return "";
+  return '<details class="ps-do"><summary>How to do it</summary><ol>' + p.steps.map(t => '<li>' + esc(t) + '</li>').join("") + '</ol>' +
+    (p.worth ? '<p class="ps-worth"><b>Worth</b> ' + esc(p.worth) + '</p>' : "") + '</details>';
+}
 function renderResults(r){
   const s = r.summary, N = s.totalRows, ran = S.ran || {};
   const kpi = (v, l) => '<div class="sq-kpi"><div class="v">' + v + '</div><div class="l">' + l + '</div></div>';
@@ -457,7 +463,7 @@ function negRow(n){
 }
 function paneNegs(r){
   const ref = r.allNegatives.slice(0, 1000).map(n => '<tr><td class="sq-term">' + esc(n.text) + '</td><td>' + esc(n.matchType) + '</td><td>' + esc(where(n)) + '</td><td class="r num">' + money(n.cost, false) + '</td><td class="r num">' + money(n.wasted, false) + '</td><td class="r num">' + fmtConv(n.conversions) + '</td><td>' + (n.risks.length ? esc(n.risks.join(", ")) : "") + '</td></tr>').join("");
-  return '<div class="pane" id="pane-negs" hidden>' + hint("Ranked by the money spent on these terms that never converted. A negative whose terms did convert, that would also stop a relevant term or a keyword the account bids on, or that names a competitor the account bids on (or blocks competitors account-wide when the account runs a competitor campaign), is not here: it is under Check before blocking. A negative with no money wasted is in the full list below.") +
+  return '<div class="pane" id="pane-negs" hidden>' + planHtml(Plan.negativePlan(r, (S.ran || {}).range, v => money(v))) + hint("Ranked by the money spent on these terms that never converted. A negative whose terms did convert, that would also stop a relevant term or a keyword the account bids on, or that names a competitor the account bids on (or blocks competitors account-wide when the account runs a competitor campaign), is not here: it is under Check before blocking. A negative with no money wasted is in the full list below.") +
     (r.priorityNegatives.length ? tbl([["Negative"], ["Match"], ["Where"], ["Why"], ["Cost", 1], ["Wasted", 1], ["Clicks", 1], ["Conv", 1], ["Terms", 1]], r.priorityNegatives.map(negRow).join("")) : none()) +
     (ref ? '<details class="sq-ref"><summary>All negatives (' + r.allNegatives.length + ')</summary>' + tbl([["Negative"], ["Match"], ["Where"], ["Cost", 1], ["Wasted", 1], ["Conv", 1], ["Check"]], ref) +
       (r.allNegatives.length > 1000 ? '<p class="pm-panel-s" style="margin-top:10px">Showing the first 1,000. The workbook has every one.</p>' : "") + '</details>' : "") + '</div>';
@@ -468,14 +474,14 @@ function paneCheck(r){
     '</td><td>' + n.risks.map(x => '<span class="pm-pill unclear">' + esc(x) + '</span>').join(" ") +
     (n.collateral.n ? '<small class="sq-ex">would also stop ' + esc(n.collateral.ex.join(", ")) + (n.collateral.n > n.collateral.ex.length ? " and " + (n.collateral.n - n.collateral.ex.length) + " more" : "") + '</small>' : '') +
     (n.conflicts.length ? '<small class="sq-ex">stops keyword ' + esc(n.conflicts.join(", ")) + '</small>' : '') + '</td><td class="r num">' + money(n.cost, false) + '</td><td class="r num">' + fmtConv(n.conversions) + '</td></tr>').join("");
-  return '<div class="pane" id="pane-check" hidden>' + hint("These look like negatives, but a person should look first: the terms converted, or the negative would also stop terms judged relevant or a keyword the account bids on.") +
+  return '<div class="pane" id="pane-check" hidden>' + planHtml(Plan.checkPlan(r)) + hint("These look like negatives, but a person should look first: the terms converted, or the negative would also stop terms judged relevant or a keyword the account bids on.") +
     (rows ? tbl([["Negative"], ["Match"], ["Where"], ["Why"], ["Check"], ["Cost", 1], ["Conv", 1]], rows) : none()) + '</div>';
 }
 function paneKws(r){
   const rows = r.priorityKeywords.map(k => '<tr><td class="sq-term">' + esc(k.term) + '</td><td>' + esc(k.assetType) + '</td><td>' + esc(k.matchType) + '</td><td>' + esc(k.whereToAdd) + '</td><td class="r num">' + fmtConv(k.conversions) +
     '</td><td class="r num">' + money(k.cost, false) + '</td><td class="r num">' + (k.cpa == null ? "–" : money(k.cpa, false)) + '</td><td class="r num">' + (k.ctr * 100).toFixed(1) + '%</td><td class="r num">' + num(k.clicks) + '</td><td class="r num">' + convRate(k.conversions, k.clicks) + '</td><td><span class="pm-pill ' + (k.tier === 1 ? "ok" : "under") + '">Tier ' + k.tier + '</span></td></tr>').join("");
   const ref = r.allKeywords.slice(PRIORITY_N).map(k => '<tr><td class="sq-term">' + esc(k.term) + '</td><td>' + esc(k.assetType) + '</td><td class="r num">' + fmtConv(k.conversions) + '</td><td class="r num">' + money(k.cost, false) + '</td><td class="r num">' + convRate(k.conversions, k.clicks) + '</td></tr>').join("");
-  return '<div class="pane" id="pane-kws" hidden>' + hint("Relevant terms the account does not bid on yet. Tier 1 converted at least once; tier 2 drew clicks at a good click rate (or a partial conversion). Ranked by tier, conversions, then clicks.") +
+  return '<div class="pane" id="pane-kws" hidden>' + planHtml(Plan.keywordPlan(r)) + hint("Relevant terms the account does not bid on yet. Tier 1 converted at least once; tier 2 drew clicks at a good click rate (or a partial conversion). Ranked by tier, conversions, then clicks.") +
     (rows ? tbl([["Term"], ["Type"], ["Match"], ["Where to add"], ["Conv", 1], ["Cost", 1], ["Cost / conv", 1], ["CTR", 1], ["Clicks", 1], ["Conv rate", 1], ["Tier"]], rows) : none()) +
     (ref ? '<details class="sq-ref"><summary>All eligible keywords (' + r.allKeywords.length + ')</summary>' + tbl([["Term"], ["Type"], ["Conv", 1], ["Cost", 1], ["Conv rate", 1]], ref) + '</details>' : "") + '</div>';
 }
@@ -503,7 +509,7 @@ $id("dlBtn").addEventListener("click", () => {
     ["Total conversions", fmtConv(r.summary.totalConv)], ["Spend on not-relevant terms with no conversions", r.summary.wastedSpend.toFixed(2)], ["Spend on competitor terms", r.summary.competitorSpend.toFixed(2)],
     ["Share of spend on relevant terms %", r.summary.relevantSpendPct == null ? "" : r.summary.relevantSpendPct], ["Relevant rows %", r.summary.relevantPct],
     ["Rows settled by rules", r.summary.byRule], ["Rows settled by the model", r.summary.byModel], ["Rows the model failed on (fallback)", r.summary.fallback],
-    ["Rows not read (no clicks, or over the review limit)", r.summary.skipped], ...Object.entries(r.summary.byStatus)]);
+    ["Rows not read (no clicks, or over the review limit)", r.summary.skipped], ...(Plan.saving(r, ran.range, v => money(v)) ? [["What the priority negatives are worth", Plan.saving(r, ran.range, v => money(v))]] : []), ...Object.entries(r.summary.byStatus)]);
   const negHead = ["Negative Text", "Match Type", "Level", "Campaign", "Reason", "Decided by", "Wasted Spend", "Total Cost", "Clicks", "Conversions", "Distinct Terms"];
   const negRowX = n => [n.text, n.matchType, n.level, w(n), n.reason, source(n), n.wasted.toFixed(2), n.cost.toFixed(2), n.clicks, fmtConv(n.conversions), n.terms];
   add("Negatives to Add (Priority)", [negHead, ...r.priorityNegatives.map(negRowX)]);

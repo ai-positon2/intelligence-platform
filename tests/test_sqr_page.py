@@ -4,6 +4,7 @@ The rules and the arithmetic are in sqr_core.js (tests/test_sqr_core_js.py runs 
 syntax-checked, every element it reaches for must exist in the template, the scripts load in the order they depend on, the page needs no
 export to start (Google Ads is read), and none of the copy has an em dash in it.
 """
+import json
 import os
 import re
 import shutil
@@ -122,9 +123,9 @@ def test_the_keyword_tables_show_what_each_term_spent():
         assert m, name + " not found in the page script"
         return m.group(0)
 
-    src = "\n".join(grab(n) for n in ("esc", "money", "num", "convRate", "none", "hint", "tbl", "paneKws"))
+    src = "\n".join(grab(n) for n in ("esc", "money", "num", "convRate", "none", "hint", "tbl", "planHtml", "paneKws"))
     harness = (
-        "const S = { currency: 'USD' }; const fmtConv = v => String(v); const PRIORITY_N = 1; const Core = {};\n" + src + "\n"
+        "const Plan = require(" + json.dumps(os.path.join(JS, "sqr_plan.js")) + "); const S = { currency: 'USD' }; const fmtConv = v => String(v); const PRIORITY_N = 1; const Core = {};\n" + src + "\n"
         "const k = { term: 'beta bionic ilet pump', assetType: 'Keyword', matchType: 'Exact Match', whereToAdd: 'Brand / Branded', conversions: 5, cost: 73.7, cpa: 14.74, ctr: 0.336, clicks: 43, tier: 1 };\n"
         "const k2 = { term: 'ilet pump cost', assetType: 'Keyword', matchType: 'Exact Match', whereToAdd: 'X / Y', conversions: 2, cost: 1234.5, cpa: 617.25, ctr: 0.1, clicks: 9, tier: 2 };\n"
         "process.stdout.write(paneKws({ priorityKeywords: [k, k2], allKeywords: [k, k2] }));"
@@ -157,9 +158,9 @@ def test_the_negative_tables_show_total_cost_next_to_the_wasted_part():
         assert m, name + " not found in the page script"
         return m.group(0)
 
-    src = "\n".join(grab(n) for n in ("esc", "money", "num", "none", "hint", "tbl", "negRow", "paneNegs"))
+    src = "\n".join(grab(n) for n in ("esc", "money", "num", "none", "hint", "tbl", "planHtml", "negRow", "paneNegs"))
     harness = (
-        "const S = { currency: 'USD' }; const fmtConv = v => String(v); const where = n => 'Account'; const source = n => 'rule';\n" + src + "\n"
+        "const Plan = require(" + json.dumps(os.path.join(JS, "sqr_plan.js")) + "); const S = { currency: 'USD' }; const fmtConv = v => String(v); const where = n => 'Account'; const source = n => 'rule';\n" + src + "\n"
         "const n1 = { text: 'free trial', matchType: 'Phrase', reason: 'freebie', examples: ['free trial pump'], cost: 120.5, wasted: 80.25, clicks: 30, terms: 4, conversions: 3, risks: [], level: 'Account' };\n"
         "const n2 = { text: 'heat pump', matchType: 'Phrase', reason: 'other', examples: [], cost: 9.5, wasted: 9.5, clicks: 2, terms: 1, conversions: 0, risks: ['x'], level: 'Account' };\n"
         "process.stdout.write(paneNegs({ priorityNegatives: [n1], allNegatives: [n1, n2] }));"
@@ -184,9 +185,9 @@ def test_every_table_calls_the_money_column_cost():
         assert m, name + " not found in the page script"
         return m.group(0)
 
-    src = "\n".join(grab(n) for n in ("esc", "money", "num", "none", "hint", "tbl", "paneCheck", "paneReview"))
+    src = "\n".join(grab(n) for n in ("esc", "money", "num", "none", "hint", "tbl", "planHtml", "paneCheck", "paneReview"))
     harness = (
-        "const S = { currency: 'USD' }; const fmtConv = v => String(v); const where = n => 'Account';\n" + src + "\n"
+        "const Plan = require(" + json.dumps(os.path.join(JS, "sqr_plan.js")) + "); const S = { currency: 'USD' }; const fmtConv = v => String(v); const where = n => 'Account';\n" + src + "\n"
         "const n = { text: 'free trial', matchType: 'Phrase', reason: 'r', risks: ['converted'], collateral: { n: 0, ex: [] }, conflicts: [], cost: 42.5, conversions: 2 };\n"
         "const c = { subtype: 'Medicaid', count: 3, cost: 99.25, conversions: 1, examples: ['a'] };\n"
         "process.stdout.write(paneCheck({ reviewNegatives: [n] }) + '|||' + paneReview({ clientReview: [c] }));"
