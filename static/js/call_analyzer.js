@@ -214,6 +214,22 @@ function load(){
   }).catch(function(err){if(seq===S.seq){S.anErr=err; paintAnalysis();}});
 }
 
+/* ── What to do (tracker/paid_calls_plans.py works the steps and the worth out from counts only: nothing a caller said) ── */
+function planHtml(p,title){
+  if(!p||!p.steps||!p.steps.length) return "";
+  return '<details class="ca-plan"><summary>'+esc(title)+'</summary><ol>'+p.steps.map(function(t){return '<li>'+esc(t)+'</li>';}).join("")+'</ol>'+
+    (p.worth?'<p class="ca-worth"><b>Worth</b> '+esc(p.worth)+'</p>':"")+'</details>';
+}
+function plansHtml(a){
+  var pl=a.plans||{}, rows=[];
+  (a.reasons||[]).forEach(function(r){
+    var p=(pl.reasons||{})[r.key];
+    if(p) rows.push(planHtml(p,r.label+" ("+D.num(r.n)+" of "+D.num(a.read)+" calls read)"));
+  });
+  rows.push(planHtml(pl.notAPatient,"Vendors, wrong numbers and job seekers"));      /* nothing when there is no plan */
+  return rows.join("");
+}
+
 /* ── The overview ────────────────────────────────────────────── */
 function delta(now,was,low){
   var ch=D.change(now,was);
@@ -235,6 +251,7 @@ function paintKpis(){
     return '<div class="ps-kpi ps-kpi-static" style="--kc:'+x.c+'"><div class="ps-kpi-h"><span class="k">'+esc(x.k)+'</span></div><span class="v">'+x.v+'</span>'+x.d+'<div class="ps-kpi-f"></div></div>';
   }).join("");
   $("#kpiHint").textContent=(S.src?S.src+": ":"All sources: ")+"counted by CallRail for every call in the range. Leads are CallRail's own count.";
+  $("#missPlan").innerHTML=S.ov.plan?'<div class="ca-planbox">'+planHtml(S.ov.plan,"What to do about the missed calls")+'</div>':"";
 }
 function table(rows,head,opts){
   opts=opts||{};
@@ -310,6 +327,8 @@ function paintAnalysis(){
   h+='<div class="ca-warnthin"'+(D.thin(a)?"":" hidden")+'><b>A small sample.</b> Fewer than 30 calls could be read, so treat the shares below as a rough guide.</div>';
   h+='<div class="ps-two"><section class="pm-panel ps-card" id="anIntents"></section><section class="pm-panel ps-card" id="anOutcome"></section></div>';
   h+='<div class="ps-two"><section class="pm-panel ps-card" id="anTopics"></section><section class="pm-panel ps-card" id="anMore"></section></div>';
+  var todo=plansHtml(a);
+  if(todo) h+='<div class="ps-sec-h"><div><h2>What to do about it</h2><span class="ps-hint ps-hint-b">One plan for each reason calls did not end in an appointment, with what it is worth.</span></div></div><section class="pm-panel ps-card ca-plans">'+todo+'</section>';
   h+='<div class="ps-sec-h"><div><h2>Calls that looked like lost opportunities</h2><span class="ps-hint ps-hint-b" id="lostHint"></span></div></div>';
   h+='<section class="pm-panel ps-card ps-tablecard" id="anLost"></section>';
   h+='<p class="ca-method"><b>How it reads a call.</b> Plain keyword rules, not a model: what the caller said decides what they wanted, the practice\'s own tags (Booked Appointment, Not Booked) and what the agent said decide whether an '+

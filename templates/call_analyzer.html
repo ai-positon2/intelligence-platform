@@ -2,7 +2,7 @@
 {% block title %}Call Transcript Analyzer{% endblock %}
 {% block head %}
   <link rel="stylesheet" href="{{ url_for('static', filename='css/performance_summarizer.css') }}?v=10">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/call_analyzer.css') }}?v=3">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/call_analyzer.css') }}?v=4">
 {% endblock %}
 {% block content %}
 <div class="pm pm-ps pm-ca" id="ca">
@@ -52,6 +52,7 @@
   <div id="dash" hidden>
     <div class="ps-sec-h"><div><h2>Key numbers</h2><span class="ps-hint ps-hint-b" id="kpiHint"></span></div></div>
     <section class="ps-kpis" id="kpis"></section>
+    <div id="missPlan"></div>
 
     <div class="ps-sec-h"><div><h2>Where the calls come from</h2><span class="ps-hint ps-hint-b">Click a source to look at it alone. Paid sources are marked.</span></div></div>
     <div class="ps-two ca-split">
@@ -79,5 +80,5 @@
 <script src="{{ url_for('static', filename='vendor/chart.umd.js') }}"></script>
 <script src="{{ url_for('static', filename='js/ps_data.js') }}?v=8"></script>
 <script src="{{ url_for('static', filename='js/cr_data.js') }}?v=3"></script>
-<script src="{{ url_for('static', filename='js/call_analyzer.js') }}?v=2"></script>
+<script src="{{ url_for('static', filename='js/call_analyzer.js') }}?v=3"></script>
 {% endblock %}

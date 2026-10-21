@@ -25,6 +25,7 @@ import threading
 import time
 
 from . import paid_gads as g
+from . import paid_calls_plans as plans
 from . import paid_calls_topics as topics
 from .paid_gads import AdsError, OverQuota, RefreshTooSoon, NotConfigured  # noqa: F401  (the page handles one set of errors)
 
@@ -43,7 +44,7 @@ TOP = 25                       # rows kept for the campaign and keyword tables
 HOURLY_STOP, DAILY_STOP = 900, 9000     # of the 1,000 an hour and 10,000 a day CallRail allows
 TTL_VIEW = 15 * 60
 TTL_LISTS = 60 * 60
-CACHE_V = "v1:"
+CACHE_V = "v2:"
 SUMMARY_FIELDS = "total_calls,answered_calls,missed_calls,abandoned_calls,first_time_callers,average_duration,leads"
 SAMPLE_FIELDS = ("transcription,call_summary,sentiment,lead_score,tags,source,campaign,company_name,duration,answered,call_type,"
                  "start_time,timeline_url")
@@ -283,6 +284,7 @@ def overview(store, account_id, start, end, *, company_id="", source="", http=No
                "keywords": [r for r in sorted(kws, key=lambda x: -x["calls"]) if r["key"]][:TOP]}
         if not company_id:
             out["locations"] = [dict(r, key=r["key"] or "Unknown") for r in sorted(res[4][0], key=lambda x: -x["calls"])]
+        out["plan"] = plans.missed_plan(total)
         return out
     return g._cached(store, ck, TTL_VIEW, make, notes, force=force, stamps=stamps)
 
@@ -333,5 +335,6 @@ def analysis(store, account_id, start, end, *, company_id="", source="", http=No
         out = topics.analyze(calls)
         out.update({"start": start, "end": end, "company": company_id, "source": source, "matching": total, "minSeconds": MIN_SAMPLE_SECONDS, "pages": len(pages),
                     "withTranscript": sum(1 for c in calls if c["transcript"]), "withSummary": sum(1 for c in calls if c["summary"])})
+        out["plans"] = plans.plans(out)
         return out
     return g._cached(store, ck, TTL_VIEW, make, notes, force=force, stamps=stamps)

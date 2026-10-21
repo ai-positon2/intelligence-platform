@@ -127,3 +127,40 @@ def test_the_page_loads_its_scripts_in_order_with_versions_and_says_it_is_privat
 def test_no_page_copy_uses_an_em_dash():
     for f in (PAGE, DATA, TEMPLATE):
         assert "—" not in open(f).read(), f
+
+
+# ── The plans under the missed calls and the lost opportunities, run from the page script ──
+
+def _plan_fn(expr, **data):
+    """planHtml and plansHtml cut out of the page script (an IIFE that needs a browser) and run with the page's own escaping and the real cr_data.js."""
+    code = ("const fs=require('fs');const D=require(%s);const src=fs.readFileSync(%s,'utf8');"
+            "const a=src.indexOf('/* ── What to do (tracker/paid_calls_plans.py'), b=src.indexOf('/* ── The overview');"
+            "if(a<0||b<a) throw new Error('functions not found');"
+            "const esc=function(s){return String(s==null?'':s).replace(/[&<>\"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',\"'\":'&#39;'}[c];});};"
+            "const f=new Function('esc','D',src.slice(a,b)+';return {planHtml:planHtml,plansHtml:plansHtml};')(esc,D);" % (json.dumps(DATA), json.dumps(PAGE)))
+    pre = "".join("const %s=%s;" % (k, json.dumps(v)) for k, v in data.items())
+    r = subprocess.run(["node", "-e", code + pre + "console.log(JSON.stringify(" + expr + "));"], capture_output=True, text=True, timeout=30)
+    assert r.returncode == 0, r.stderr
+    return json.loads(r.stdout)
+
+
+def test_a_plan_is_folded_with_its_steps_and_worth_and_escaped():
+    html = _plan_fn("f.planHtml(P,T)", P={"steps": ["Open <CallRail>.", "Call back."], "worth": "About 120."}, T="Missed <calls>")
+    assert html == '<details class="ca-plan"><summary>Missed &lt;calls&gt;</summary><ol><li>Open &lt;CallRail&gt;.</li><li>Call back.</li></ol><p class="ca-worth"><b>Worth</b> About 120.</p></details>'
+    assert _plan_fn("f.planHtml(P,T)", P={"steps": ["One."], "worth": None}, T="x").count("ca-worth") == 0
+    assert _plan_fn("f.planHtml(P,T)", P=None, T="x") == "" and _plan_fn("f.planHtml(P,T)", P={"steps": []}, T="x") == ""
+
+
+def test_each_reason_that_occurred_gets_its_plan_in_the_order_of_how_many_calls_it_cost_and_the_unknown_gets_none():
+    a = {"read": 60, "reasons": [{"key": "price", "label": "Asked about price", "n": 9}, {"key": "insurance", "label": "Insurance not accepted", "n": 4}, {"key": "new", "label": "x", "n": 1}],
+         "plans": {"reasons": {"price": {"steps": ["P."], "worth": None}, "insurance": {"steps": ["I."], "worth": None}}, "notAPatient": {"steps": ["V."], "worth": None}}}
+    html = _plan_fn("f.plansHtml(A)", A=a)
+    assert html.index("Asked about price (9 of 60 calls read)") < html.index("Insurance not accepted (4 of 60 calls read)") < html.index("Vendors, wrong numbers and job seekers")
+    assert html.count("<details") == 3
+    assert _plan_fn("f.plansHtml(A)", A={"read": 5, "reasons": [], "plans": {"reasons": {}, "notAPatient": None}}) == "" and _plan_fn("f.plansHtml(A)", A={"read": 5, "reasons": []}) == ""
+
+
+def test_the_missed_call_plan_and_the_what_to_do_section_are_drawn_where_they_belong():
+    js = open(PAGE, encoding="utf-8").read()
+    assert '$("#missPlan").innerHTML=S.ov.plan?' in js and 'id="missPlan"' in open(TEMPLATE, encoding="utf-8").read()
+    assert "var todo=plansHtml(a);" in js and js.index("What to do about it") < js.index("Calls that looked like lost opportunities")
