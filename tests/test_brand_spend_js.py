@@ -66,9 +66,20 @@ def reports():
         return b.report_for(account, accounts_fn=lambda: ACCOUNTS, groups_fn=lambda: [{"id": GROUP, "name": "Group", "currency": "USD", "accountIds": [a["id"] for a in ACCOUNTS]}],
                             search_fn=search or T.searcher(rows), today=today, **kw)
     part = [T.api(date=(dt.date(2026, 10, 19) + dt.timedelta(days=d)).isoformat(), cost="87000000", clicks="10") for d in range(3)]
+    from tests.monitor_fakes import MemStore
+    from tracker import paid_brandspend_settings as st
+    mon = MemStore()
+    st.save_account(mon, "1234567890", {"weeklyMax": 250, "monthlyBudget": 800, "brandTerms": "acme"}, "ana@position2.com")
+    mon.snaps_put("brandspend", "2026-10-19", {"1234567890": {"status": "over", "cost": 301}})
+    mon.snaps_put("brandspend", "2026-10-20", {"1234567890": {"status": "over", "cost": 301}})
+    rich_rows = T.weeks_of(weekly=T.USUAL + [301])
+    spike = next(r for r in rich_rows if r["segments"]["date"] == "2026-10-07")
+    spike["metrics"].update(costMicros="150000000", clicks="40", conversions="0")
+    terms = {"1234567890": [T.term_row("12", "NonBrand Implants", "acme dental near me", "300000000", "60", "2")]}
+    rich = go("1234567890", search=T.searcher({"1234567890": rich_rows}, terms=terms), mon=mon)
     out = {"mcc": json.loads(json.dumps(go(GROUP))), "one": json.loads(json.dumps(go("2222222222"))), "ok": json.loads(json.dumps(go("1234567890"))),
            "marked": json.loads(json.dumps(go("2222222222", overrides={"24": True, "22": False}))),
-           "part": json.loads(json.dumps(go("1234567890", today=THU, search=T.searcher({"1234567890": T.weeks_of(weekly=T.USUAL + [203]) + part}))))}
+           "rich": json.loads(json.dumps(rich)), "part": json.loads(json.dumps(go("1234567890", today=THU, search=T.searcher({"1234567890": T.weeks_of(weekly=T.USUAL + [203]) + part}))))}
     mp.undo()
     paid_geo.clear_cache()
     T.base.forget("")
@@ -164,24 +175,42 @@ def test_the_views_filter_the_accounts_and_open_on_the_first_with_something_in_i
     assert run("X.viewCount(R,'all')", R=r) == 6 and run("X.viewCount(R,'outside')", R=r) == 3 and run("X.viewCount(R,'attention')", R=r) == 3
     assert [a["name"] for a in run("X.shown(R,'attention')", R=r)] == ["Delta", "Beta Clinic", "Epsilon"] and run("X.firstView(R)", R=r) == "attention"
     assert run("X.firstView(R)", R=reports["ok"]) == "all"
-    assert run("X.needsLook(A)", A={"status": "ok", "partial": {"status": "over"}}) is True and run("X.needsLook(A)", A={"status": "new", "partial": {"status": "under"}}) is True
-    assert run("X.needsLook(A)", A={"status": "none", "partial": {"status": "over"}}) is False and run("X.needsLook(A)", A={"status": "ok", "partial": {"status": "ok"}}) is False
-    assert run("X.needsLook(A)", A={"status": "ok", "partial": None}) is False
+    assert run("X.needsLook(A)", A={"status": "ok", "findings": [{"level": "medium"}]}) is True and run("X.needsLook(A)", A={"status": "new", "findings": [{"level": "high"}]}) is True
+    assert run("X.needsLook(A)", A={"status": "none", "findings": [{"level": "info"}]}) is False and run("X.needsLook(A)", A={"status": "ok", "findings": [{"level": "low"}]}) is False
+    assert run("X.needsLook(A)", A={"status": "ok", "findings": []}) is False and run("X.needsLook(A)", A={"status": "over", "findings": []}) is True and run("X.needsLook(A)", A={"status": "ok"}) is False
     p = reports["part"]
     assert run("X.viewCount(R,'attention')", R=p) == 1 and run("X.viewCount(R,'outside')", R=p) == 0 and run("X.firstView(R)", R=p) == "attention"
 
 
-def test_the_address_carries_the_account_the_limit_the_marks_and_refresh():
-    assert run("X.query('1234567890','30',{},false)") == "account=1234567890&limit=30"
-    assert run("X.query('mcc-1','25',{'5':true,'7':true,'9':false},true)") == "account=mcc-1&limit=25&brand=5,7&notbrand=9&refresh=1"
-    assert run("X.query('a b&c','30',{},false)").startswith("account=a%20b%26c")
+def test_the_address_carries_only_the_account_and_refresh_because_the_server_applies_what_the_team_saved():
+    assert run("X.query('1234567890',false)") == "account=1234567890" and run("X.query('mcc-1',true)") == "account=mcc-1&refresh=1" and run("X.query('a b&c',false)").startswith("account=a%20b%26c")
 
 
-def test_marking_a_campaign_adds_the_mark_and_drops_it_when_it_only_restates_the_name():
+def test_marking_a_campaign_sends_the_value_and_nothing_when_it_only_restates_the_name():
     c = {"id": "7", "byName": False}
-    assert run("X.mark({}, C, true)", C=c) == {"7": True} and run("X.mark({'7':true}, C, false)", C=c) == {}
+    assert run("X.markBody(C, true)", C=c) == {"campaign": "7", "value": True} and run("X.markBody(C, false)", C=c) == {"campaign": "7", "value": None}
     brand = {"id": "8", "byName": True}
-    assert run("X.mark({}, C, false)", C=brand) == {"8": False} and run("X.mark({'8':false,'1':true}, C, true)", C=brand) == {"1": True}
+    assert run("X.markBody(C, false)", C=brand) == {"campaign": "8", "value": False} and run("X.markBody(C, true)", C=brand) == {"campaign": "8", "value": None}
+
+
+def test_the_limits_form_sends_the_account_and_the_typed_text_unchanged():
+    assert run("X.limitsBody('111', T)", T={"weeklyMin": "150", "weeklyMax": "", "monthlyBudget": "5,000", "brandTerms": "acme, acme dental", "other": 1}) == {
+        "account": "111", "weeklyMin": "150", "weeklyMax": "", "monthlyBudget": "5,000", "brandTerms": "acme, acme dental"}
+
+
+def test_the_month_is_a_bar_of_spent_projected_and_budget_on_one_scale_and_has_no_bar_without_a_budget():
+    mo = {"spent": 570, "projected": 930, "budget": 800, "status": "pace-over"}
+    assert run("X.monthBar(A)", A={"month": mo}) == {"spent": 61, "projected": 100, "budget": 86, "tone": "warn"}
+    assert run("X.monthBar(A)", A={"month": dict(mo, budget=1300, status="pace-under")}) == {"spent": 44, "projected": 72, "budget": 100, "tone": "low"}
+    assert run("X.monthBar(A)", A={"month": dict(mo, budget=500, status="over")})["tone"] == "bad" and run("X.monthBar(A)", A={"month": dict(mo, budget=930, status="ok")})["tone"] == "ok"
+    assert run("X.monthBar(A)", A={"month": dict(mo, budget=None)}) is None and run("X.monthBar(A)", A={"month": None}) is None and run("X.monthBar(A)", A={}) is None
+
+
+def test_the_history_is_a_row_of_days_coloured_by_how_they_stood():
+    a = {"history": {"statuses": [{"day": "2026-10-19", "status": "ok", "cost": 203}, {"day": "2026-10-20", "status": "over", "cost": 301}, {"day": "2026-10-21", "status": "stopped", "cost": 0}, {"day": "2026-10-22", "status": "new", "cost": None}, {"day": "2026-10-23", "status": "weird", "cost": 5}]}}
+    cells = run("X.historyCells(A)", A=a)
+    assert [c["tone"] for c in cells] == ["ok", "over", "bad", "unk", "unk"] and cells[1]["title"] == "2026-10-20: Over the usual, 301 spent" and cells[3]["title"] == "2026-10-22: Too new to judge" and cells[4]["title"] == "2026-10-23: weird, 5 spent"
+    assert run("X.historyCells(A)", A={"history": None}) == [] and run("X.historyCells(A)", A={}) == []
 
 
 def test_the_csv_has_a_line_per_brand_campaign_and_a_line_for_an_account_with_none(reports):
@@ -207,7 +236,7 @@ def test_the_csv_has_a_line_per_brand_campaign_and_a_line_for_an_account_with_no
 HARNESS = r"""
 const fs = require("fs"), vm = require("vm");
 const paths = JSON.parse(process.argv[1]), sc = JSON.parse(process.argv[2]);
-const els = {}, calls = [], hist = [], store = {}, downloads = [], held = [];
+const els = {}, calls = [], hist = [], store = {}, downloads = [], held = [], bodies = [], typed = {}, panels = [];
 function el(sel) {
   if (!els[sel]) els[sel] = { sel, innerHTML: "", textContent: "", value: (sc.values || {})[sel] || "", hidden: false, href: "", handlers: {},
     addEventListener(ev, fn) { this.handlers[ev] = fn; }, setAttribute() {}, getAttribute() { return null; } };
@@ -227,20 +256,22 @@ function respond(url) {
   return answer;
 }
 let picker = null; const sets = [];
-const win = { PMPicker: (host, o) => { picker = { onChange: o.onChange, set(items, v, dis) { sets.push({ items, v, dis }); } }; return picker; } };
+const win = { MonitorPanel: { mount: (host, o) => panels.push(o) }, PMPicker: (host, o) => { picker = { onChange: o.onChange, set(items, v, dis) { sets.push({ items, v, dis }); } }; return picker; } };
 const ctx = { window: win, document: doc, history: { replaceState(a, b, u) { hist.push(u); } }, location: { search: sc.search || "", pathname: "/p2/paid-marketing/brand-spend" },
   localStorage: { getItem: k => (k in store ? store[k] : (sc.stored || {})[k] || null), setItem: (k, v) => { store[k] = v; } },
   URLSearchParams, URL: { createObjectURL: b => { downloads.blob = b; return "blob:x"; }, revokeObjectURL() {} }, Blob: class { constructor(p) { this.text = p.join(""); } },
   setTimeout: fn => fn(), Intl, Date, Math, JSON, Object, Array, String, Number, Promise, RegExp, encodeURIComponent, console, isNaN, parseInt, parseFloat,
-  fetch: url => (sc.reject && url.includes(sc.reject) ? (calls.push(url), Promise.reject(new Error("down"))) :
-    Promise.resolve(respond(url)).then(r => ({ ok: r.status < 400, status: r.status, json: () => Promise.resolve(r.body) }))) };
+  fetch: (url, o) => { if (o && o.method) bodies.push({ url, method: o.method, body: JSON.parse(o.body || "null") });
+    return sc.reject && url.includes(sc.reject) ? (calls.push(url), Promise.reject(new Error("down"))) :
+      Promise.resolve(respond(url)).then(r => ({ ok: r.status < 400, status: r.status, json: () => Promise.resolve(r.body) })); } };
 ctx.window.document = doc;
 vm.createContext(ctx);
 for (const p of paths) vm.runInContext(fs.readFileSync(p, "utf8"), ctx);
 const tick = () => new Promise(r => setImmediate(r));
 function target(spec) {
   spec = spec || {};
-  const make = s => ({ dataset: s.dataset || {}, closest: q => (spec.closest && spec.closest[q] ? make(spec.closest[q]) : null) });
+  const make = s => ({ dataset: s.dataset || {}, closest: q => (spec.closest && spec.closest[q] ? make(spec.closest[q]) : null),
+    querySelector: q => { const k = "q:" + q; typed[k] = typed[k] || { value: (s.fields || {})[q] || "" }; return typed[k]; } });
   return make(spec);
 }
 (async () => {
@@ -254,7 +285,7 @@ function target(spec) {
     if (step.fire) { const [sel, closest] = step.fire; el(sel).handlers.click({ target: target({ closest }) }); }
     for (let i = 0; i < 6; i++) await tick();
   }
-  const out = { calls, hist, store, sets, downloads: downloads.map(d => ({ name: d.name })), blob: downloads.blob ? downloads.blob.text : "", el: {} };
+  const out = { calls, bodies, panels, typed: Object.fromEntries(Object.entries(typed).map(([k, v]) => [k, v.value])), hist, store, sets, downloads: downloads.map(d => ({ name: d.name })), blob: downloads.blob ? downloads.blob.text : "", el: {} };
   for (const k of Object.keys(els)) out.el[k] = { html: els[k].innerHTML, text: els[k].textContent, hidden: els[k].hidden, value: els[k].value };
   process.stdout.write(JSON.stringify(out));
 })();
@@ -291,9 +322,9 @@ def test_the_accounts_are_loaded_into_the_picker_with_the_mcc_first_and_nothing_
     assert not any("/brandspend/report" in c for c in out["calls"]) and out["el"]["#empty"]["hidden"] is False and out["el"]["#out"]["hidden"] is True
 
 
-def test_choosing_an_account_reads_the_report_with_the_limit_and_remembers_the_account(reports):
+def test_choosing_an_account_reads_the_report_and_remembers_the_account_and_the_alert_panel_is_mounted(reports):
     out = opened(reports["one"])
-    assert [c for c in out["calls"] if "/brandspend/report" in c] == ["/p2/paid-marketing/api/brandspend/report?account=2222222222&limit=30"]
+    assert [c for c in out["calls"] if "/brandspend/report" in c] == ["/p2/paid-marketing/api/brandspend/report?account=2222222222"] and out["panels"] == [{"agent": "brandspend", "label": "Brand Spend Alert"}]
     assert out["store"]["bs_account"] == "2222222222" and out["hist"][-1] == "/p2/paid-marketing/brand-spend?account=2222222222" and out["el"]["#out"]["hidden"] is False
 
 
@@ -378,32 +409,38 @@ def test_a_row_opens_and_closes_on_a_click(reports):
     assert 'class="bi-row over open"' not in closed["el"]["#list"]["html"]
 
 
-def test_marking_a_campaign_reads_again_with_the_mark_and_remembers_it_for_the_account(reports):
+def test_marking_a_campaign_saves_it_for_the_team_and_reads_again(reports):
     steps = [{"fire": ["#list", {"[data-mark]": {"dataset": {"mark": "24", "to": "brand", "acct": "2222222222"}}}]}]
-    out = opened(reports["one"], steps)
-    reads = [c for c in out["calls"] if "/brandspend/report" in c]
-    assert reads[-1] == "/p2/paid-marketing/api/brandspend/report?account=2222222222&limit=30&brand=24" and len(reads) == 2
-    assert json.loads(out["store"]["bs_over"]) == {"2222222222": {"24": True}}
-    back = opened(reports["marked"], steps + [{"fire": ["#list", {"[data-mark]": {"dataset": {"mark": "24", "to": "not", "acct": "2222222222"}}}]}])
-    assert [c for c in back["calls"] if "/brandspend/report" in c][-1].endswith("limit=30")                      # the mark that only restates the name is dropped
-    assert json.loads(back["store"]["bs_over"]) == {"2222222222": {}}
+    out = opened(reports["one"], steps, responses=[{"match": "/segments/accounts", "body": ACCTS}, {"match": "/brandspend/report", "body": reports["one"]}, {"match": "/settings/mark", "body": {"marks": {"24": True}}}])
+    assert out["bodies"] == [{"url": "/p2/paid-marketing/api/brandspend/settings/mark", "method": "POST", "body": {"campaign": "24", "value": True}}] and len([c for c in out["calls"] if "/brandspend/report" in c]) == 2
+    assert "bs_over" not in out["store"]
+    back = opened(reports["marked"], [{"fire": ["#list", {"[data-mark]": {"dataset": {"mark": "24", "to": "not", "acct": "2222222222"}}}]}],
+                  responses=[{"match": "/segments/accounts", "body": ACCTS}, {"match": "/brandspend/report", "body": reports["marked"]}, {"match": "/settings/mark", "body": {"marks": {}}}])
+    assert back["bodies"][0]["body"] == {"campaign": "24", "value": None}                                          # 24 is a non-brand campaign by its name: counting it and then not counting it is the name again
 
 
-def test_a_saved_limit_is_used_and_a_changed_one_is_checked_saved_and_sent(reports):
-    out = opened(reports["one"], stored={"bs_limit": "25"})
-    assert [c for c in out["calls"] if "/brandspend/report" in c] == ["/p2/paid-marketing/api/brandspend/report?account=2222222222&limit=25"] and out["el"]["#limit"]["value"] == "25"
-    ch = opened(reports["one"], [{"set": ["#limit", "40"]}, {"change": "#limit"}])
-    assert [c for c in ch["calls"] if "/brandspend/report" in c][-1].endswith("limit=40") and ch["store"]["bs_limit"] == "40"
+def test_a_refused_save_is_said_and_nothing_is_read_again(reports):
+    steps = [{"fire": ["#list", {"[data-mark]": {"dataset": {"mark": "24", "to": "brand", "acct": "2222222222"}}}]}]
+    out = opened(reports["one"], steps, responses=[{"match": "/segments/accounts", "body": ACCTS}, {"match": "/brandspend/report", "body": reports["one"]}, {"match": "/settings/mark", "status": 503, "body": {"error": "The Paid Marketing store is unavailable: x"}}])
+    assert "The Paid Marketing store is unavailable: x" in out["el"]["#msg"]["html"] and len([c for c in out["calls"] if "/brandspend/report" in c]) == 1
+    down = opened(reports["one"], steps, reject="/settings/mark")
+    assert "The server could not be reached. Try again." in down["el"]["#msg"]["html"]
+
+
+def test_the_limit_shown_is_the_one_the_server_used_and_a_changed_one_is_checked_saved_for_the_team_and_read_again(reports):
+    out = opened(dict(reports["one"], limit=0.25))
+    assert out["el"]["#limit"]["value"] == "25"
+    ok = {"match": "/settings/limit", "body": {"limit": 0.4}}
+    ch = opened(reports["one"], [{"set": ["#limit", "40"]}, {"change": "#limit"}], responses=[{"match": "/segments/accounts", "body": ACCTS}, {"match": "/brandspend/report", "body": reports["one"]}, ok])
+    assert ch["bodies"] == [{"url": "/p2/paid-marketing/api/brandspend/settings/limit", "method": "POST", "body": {"limit": "40"}}] and len([c for c in ch["calls"] if "/brandspend/report" in c]) == 2
     for bad in ("9", "91", "abc", "", "12.5", "-3"):
-        r = opened(reports["one"], [{"set": ["#limit", bad]}, {"change": "#limit"}])
-        assert "The limit is a whole percentage from 10 to 90." in r["el"]["#msg"]["html"] and r["el"]["#limit"]["value"] == "30" and len([c for c in r["calls"] if "/brandspend/report" in c]) == 1
-    junk = opened(reports["one"], stored={"bs_limit": "5"})
-    assert [c for c in junk["calls"] if "/brandspend/report" in c][0].endswith("limit=30")
+        r = opened(reports["one"], [{"set": ["#limit", bad]}, {"change": "#limit"}], responses=[{"match": "/segments/accounts", "body": ACCTS}, {"match": "/brandspend/report", "body": reports["one"]}, ok])
+        assert "The limit is a whole percentage from 10 to 90." in r["el"]["#msg"]["html"] and r["el"]["#limit"]["value"] == "30" and r["bodies"] == []
 
 
 def test_refresh_reads_again_and_a_cooldown_is_said_with_the_servers_words(reports):
     out = opened(reports["one"], [{"click": "#refreshBtn"}])
-    assert [c for c in out["calls"] if "/brandspend/report" in c][-1].endswith("limit=30&refresh=1")
+    assert [c for c in out["calls"] if "/brandspend/report" in c][-1].endswith("account=2222222222&refresh=1")
     sc = {"responses": [{"match": "/segments/accounts", "body": ACCTS}, {"match": "/brandspend/report", "sequence": [reports["one"], {"error": "Refreshed a moment ago. Try again in 90 seconds.", "kind": "cooldown", "retryIn": 90}], "statuses": [200, 429]}],
           "steps": [{"pick": "2222222222"}, {"click": "#refreshBtn"}]}
     c = page(sc)
@@ -429,7 +466,7 @@ def test_a_copy_saved_while_google_was_not_answering_says_so_and_warnings_are_sh
 
 def test_the_footnote_says_where_the_usual_comes_from_with_the_limit_of_the_read(reports):
     foot = opened(reports["one"])["el"]["#foot"]["html"]
-    assert "the account's own history" in foot and "band of 30% either way" in foot and "Nothing here is a budget the client set" in foot and "never spent has no row" in foot
+    assert "the account's own history" in foot and "band of 30% either way" in foot and "Nothing here is a budget the client set" in foot and "saved for everyone" in foot and "only in accounts whose brand words are saved" in foot
     assert "—" not in foot and "–" not in foot
 
 
@@ -447,3 +484,79 @@ def test_nothing_the_page_writes_has_a_dash_or_an_unfilled_slot(reports):
         {"fire": ["#list", {".bi-head": {}, ".bi-row": {"dataset": {"id": a["id"]}}}]} for a in reports["mcc"]["accounts"]])
     text = re.sub(r"<[^>]+>", " ", out["el"]["#list"]["html"] + out["el"]["#kpis"]["html"] + out["el"]["#foot"]["html"])
     assert "—" not in text and "–" not in text and "undefined" not in text and "NaN" not in text and "[object" not in text and "null" not in text.replace("nullable", "")
+
+
+# ── What else the readings show, and the form for what the team agreed ──────
+
+def rich_open(reports, steps=None, **kw):
+    return page(dict({"responses": [{"match": "/segments/accounts", "body": ACCTS}, {"match": "/brandspend/report", "body": reports["rich"]}, {"match": "/settings/", "body": {}}],
+                      "steps": [{"pick": "1234567890"}] + (steps or [])}, **kw))
+
+
+def test_an_account_with_readings_draws_the_facts_the_month_the_leak_the_spikes_and_the_days(reports):
+    a = reports["rich"]["accounts"][0]
+    lst = rich_open(reports)["el"]["#list"]["html"]
+    e, sh = a["efficiency"], a["share"]
+    assert "What else the figures show" in lst and "<b>Conversions</b> %s last week against a usual %s" % (int(e["conv"]), int(e["usualConv"])) in lst
+    assert "<b>Impression share</b> 90% against a usual 90%" in lst and "<b>Agreed weekly limit</b> up to $250 · last week $301 (over by $51.00)" in lst
+    mo = a["month"]
+    assert mo["status"] == "pace-over" and mo["budget"] == 800.0
+    assert "<h4>The month</h4>" in lst and ("heading for $%s against the budget of $800" % format(round(mo["projected"]), ",")) in lst and ("the budget runs out on %s" % mo["runsOutOn"]) in lst
+    assert 'class="bs-mbar warn"' in lst and 'style="left:' in lst and ("%d days (" % mo["days"]) in lst
+    assert "<h4>Brand searches other campaigns paid for" in lst and "NonBrand Implants" in lst and "acme dental near me" in lst and ("$300 in all at $5.00 a click against %s in the brand campaigns, about %s more than the same clicks cost there" % (m.money(a["leak"]["brandCpc"], "USD"), m.money(a["leak"]["overpay"], "USD"))) in lst
+    assert "<h4>Days far above the usual</h4>" in lst and "<b>Wednesday 2026-10-07</b> $150 against a usual $29.00 · 40 clicks (usually 10) · 0 conversions" in lst and "clicks that did not convert" in lst
+    assert "<h4>Day by day" in lst and lst.count('<i class="over"') == 2 and "Outside its band for 2 days in a row, since 2026-10-19." in lst
+
+
+def test_the_form_shows_what_the_team_saved_and_saves_the_typed_figures_for_the_account(reports):
+    steps = [{"fire": ["#list", {"[data-save]": {"dataset": {"save": "1234567890"}}, ".bi-row": {"fields": {'[data-f="weeklyMin"]': "100", '[data-f="weeklyMax"]': "260", '[data-f="monthlyBudget"]': "900", '[data-f="brandTerms"]': "acme, acme dental"}}}]}]
+    out = rich_open(reports, steps)
+    lst = out["el"]["#list"]["html"]
+    assert "Agreed limits and brand words" in lst and "(saved for the whole team)" in lst and 'data-f="weeklyMax" value="250"' in lst and 'data-f="monthlyBudget" value="800"' in lst and 'data-f="brandTerms" value="acme"' in lst and 'data-f="weeklyMin" value=""' in lst
+    assert 'data-save="1234567890">Save for the team' in lst and "disabled" not in lst.split("data-save=")[1].split(">")[0]
+    assert out["bodies"] == [{"url": "/p2/paid-marketing/api/brandspend/settings/account", "method": "POST",
+                              "body": {"account": "1234567890", "weeklyMin": "100", "weeklyMax": "260", "monthlyBudget": "900", "brandTerms": "acme, acme dental"}}] and len([c for c in out["calls"] if "/brandspend/report" in c]) == 2
+
+
+def test_brand_words_the_campaign_names_suggest_are_offered_and_a_click_adds_one_without_repeating_it(reports):
+    one = reports["one"]
+    assert one["accounts"][0]["suggestedTerms"] == []                              # "Brand Core" and "Brand Exact" say no word that is a name
+    r = json.loads(json.dumps(reports["one"]))
+    r["accounts"][0]["suggestedTerms"] = ["northwind", "acme"]
+    lst = opened(r)["el"]["#list"]["html"]
+    assert "The campaign names suggest:" in lst and 'data-term="northwind">northwind</button>' in lst and 'data-term="acme">acme</button>' in lst
+    click = lambda term, have: opened(r, [{"fire": ["#list", {"[data-term]": {"dataset": {"term": term}}, ".bi-row": {"fields": {'[data-f="brandTerms"]': have}}}]}])["typed"]['q:[data-f="brandTerms"]']
+    assert click("northwind", "") == "northwind" and click("acme", "northwind") == "northwind, acme" and click("acme", "northwind, acme") == "northwind, acme"
+
+
+def test_when_the_teams_settings_cannot_be_read_the_form_cannot_save_and_says_why(reports):
+    r = json.loads(json.dumps(reports["one"]))
+    r["saved"]["teamSettings"] = False
+    lst = opened(r)["el"]["#list"]["html"]
+    assert 'data-save="2222222222" disabled' in lst and "The team settings are not available, so nothing can be saved now." in lst
+
+
+def test_an_account_with_no_extra_readings_draws_none_of_them_and_a_brand_word_search_that_found_nothing_says_so(reports):
+    lst = opened(reports["ok"], [], responses=[{"match": "/segments/accounts", "body": ACCTS}, {"match": "/brandspend/report", "body": reports["ok"]}])["el"]["#list"]["html"]
+    for absent in ("Brand searches other campaigns paid for", "Days far above the usual", "Day by day", "Agreed weekly limit", 'class="bs-mbar'):
+        assert absent not in lst, absent
+    assert "Agreed limits and brand words" in lst and "Save a monthly budget below to judge it." in lst
+    r = json.loads(json.dumps(reports["ok"]))
+    r["accounts"][0].update(leakRead="read", leak=None, terms=["acme"])
+    assert 'None found in the last 30 days for "acme".' in opened(r, [], responses=[{"match": "/segments/accounts", "body": ACCTS}, {"match": "/brandspend/report", "body": r}])["el"]["#list"]["html"]
+    r["accounts"][0].update(leakRead="not read")
+    assert "The search terms could not be read, so this was not looked for." in opened(r, [], responses=[{"match": "/segments/accounts", "body": ACCTS}, {"match": "/brandspend/report", "body": r}])["el"]["#list"]["html"]
+
+
+def test_the_csv_names_the_other_findings_after_the_first(reports):
+    rows = run("X.csvRows(R)", R=reports["rich"])
+    head = run("X.HEAD")
+    assert head[-2] == "Other findings" and head[-1] == "Fix plan" and all(len(r) == len(head) for r in rows[5:])
+    first = rows[5]
+    titles = [f["title"] for f in reports["rich"]["accounts"][0]["findings"]]
+    assert first[14] == titles[0] and first[-2] == " | ".join(titles[1:]) and len(titles) >= 4
+
+
+def test_the_alert_panel_has_a_place_on_the_page():
+    html = open(TEMPLATE, encoding="utf-8").read()
+    assert html.index('id="monPanel"') > html.index('id="out"') and html.index("monitor_panel.js") < html.index("brand_spend_data.js")

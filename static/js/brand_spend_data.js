@@ -82,7 +82,7 @@ function tiles(report){
 /* which accounts a view shows, and how many each holds */
 var VIEWS = [["attention", "Needs a look"], ["outside", "Outside the usual"], ["all", "All"]];
 function outside(a){ return a.status === "stopped" || a.status === "over" || a.status === "under"; }
-function needsLook(a){ return outside(a) || !!(a.partial && a.partial.status !== "ok" && (a.status === "ok" || a.status === "new")); }
+function needsLook(a){ return outside(a) || (a.findings || []).some(function(f){ return f.level === "high" || f.level === "medium"; }); }
 function shown(report, key){
   var list = report.accounts || [];
   return key === "all" ? list : key === "outside" ? list.filter(outside) : list.filter(needsLook);
@@ -91,22 +91,35 @@ function viewCount(report, key){ return shown(report, key).length; }
 /* the view to open on: the first one with anything in it */
 function firstView(report){ return viewCount(report, "attention") ? "attention" : "all"; }
 
-/* the address of a read: account, limit (a whole percentage) and the campaigns marked brand or not brand */
-function query(account, limitPercent, over, refresh){
-  var brand = [], not = [];
-  Object.keys(over || {}).forEach(function(id){ (over[id] ? brand : not).push(id); });
-  var q = "account=" + encodeURIComponent(account) + "&limit=" + encodeURIComponent(String(limitPercent));
-  if (brand.length) q += "&brand=" + brand.join(",");
-  if (not.length) q += "&notbrand=" + not.join(",");
-  return q + (refresh ? "&refresh=1" : "");
+/* the address of a read: the account (what the team saved, the limit and the marks, is applied by the server) and Refresh */
+function query(account, refresh){
+  return "account=" + encodeURIComponent(account) + (refresh ? "&refresh=1" : "");
 }
 
-/* what pressing "count as brand" or "do not count" on a campaign does to the marks: the new marks, with the mark dropped when it only restates the name's rule */
-function mark(over, campaign, makeBrand){
-  var next = {};
-  Object.keys(over || {}).forEach(function(k){ next[k] = over[k]; });
-  if (makeBrand === campaign.byName) delete next[campaign.id]; else next[campaign.id] = makeBrand;
-  return next;
+/* what pressing "count as brand" or "do not count" on a campaign saves for the team: the value to send, null when it only restates what the name says (that takes the mark away) */
+function markBody(campaign, makeBrand){
+  return {campaign: campaign.id, value: makeBrand === campaign.byName ? null : makeBrand};
+}
+
+/* the figures of the agreed limits form: what the page sends to save them, from the typed text */
+function limitsBody(account, text){
+  return {account: account, weeklyMin: text.weeklyMin, weeklyMax: text.weeklyMax, monthlyBudget: text.monthlyBudget, brandTerms: text.brandTerms};
+}
+
+/* the month as a bar: spent so far, where it is heading and the budget, as shares of the longest of them */
+function monthBar(a){
+  var m = a.month;
+  if (!m || !m.budget) return null;
+  var top = Math.max(m.budget, m.projected, m.spent) || 1;
+  return {spent: Math.round(m.spent / top * 100), projected: Math.round(m.projected / top * 100), budget: Math.round(m.budget / top * 100), tone: m.status === "over" ? "bad" : m.status === "pace-over" ? "warn" : m.status === "pace-under" ? "low" : "ok"};
+}
+
+/* the daily history as cells, oldest first: the day, how it stood and a title */
+var CELL_TONE = {ok: "ok", over: "over", under: "under", stopped: "bad", "new": "unk", idle: "unk", none: "unk"};
+function historyCells(a){
+  var h = a.history;
+  if (!h) return [];
+  return (h.statuses || []).map(function(d){ return {day: d.day, tone: CELL_TONE[d.status] || "unk", title: d.day + ": " + (STATUS[d.status] ? STATUS[d.status].label : String(d.status)) + (d.cost != null ? ", " + int(d.cost) + " spent" : "")}; });
 }
 
 /* the plan's step titles in order, for the CSV: "1. Check the brand campaigns are running | 2. ..." */
@@ -115,13 +128,13 @@ function planTitles(a){
 }
 
 /* the CSV: one line per brand campaign, and one per account that has none */
-var HEAD = ["Account", "Status", "Week from", "Week to", "Campaign", "Spend last week", "Usual week", "Change", "Clicks", "Cost per click", "Campaign status", "Bidding strategy", "Daily budget", "Cause", "First finding", "Next step", "Fix plan"];
+var HEAD = ["Account", "Status", "Week from", "Week to", "Campaign", "Spend last week", "Usual week", "Change", "Clicks", "Cost per click", "Campaign status", "Bidding strategy", "Daily budget", "Cause", "First finding", "Next step", "Other findings", "Fix plan"];
 function csvRows(report){
   var cur = report.account.currency;
   var rows = [["Brand Spend Alert", report.account.name], ["Week", report.window.latestFrom + " to " + report.window.latestTo], ["Limit", "plus or minus " + pct(report.limit) + " of a usual week"], [], HEAD];
   report.accounts.forEach(function(a){
     var f = (a.findings || [])[0] || {}, base = [a.name, statusInfo(a.status).label, a.weekFrom, a.weekTo];
-    var tail = [causeText(a.status, a.cause), f.title || "", f.nextStep || "", planTitles(a)];
+    var tail = [causeText(a.status, a.cause), f.title || "", f.nextStep || "", (a.findings || []).slice(1).map(function(x){ return x.title; }).join(" | "), planTitles(a)];
     if (!a.campaigns.length) { rows.push(base.concat(["(no brand campaign)", "", "", "", "", "", "", "", ""], tail)); return; }
     a.campaigns.forEach(function(c){
       rows.push(base.concat([c.name, c.cost, c.usual == null ? "" : c.usual, c.diff == null ? "" : c.diff, c.clicks, c.cpc == null ? "" : Math.round(c.cpc * 100) / 100, c.status || "", c.strategy || "", c.budget == null ? "" : c.budget], tail));
@@ -132,6 +145,6 @@ function csvRows(report){
 
 var api = {STATUS: STATUS, LEVEL: LEVEL, VIEWS: VIEWS, statusInfo: statusInfo, levelInfo: levelInfo, causeText: causeText, int: int, pct: pct, money: money, change: change,
   partialText: partialText, trendBars: trendBars, tiles: tiles, shown: shown, viewCount: viewCount, firstView: firstView, needsLook: needsLook, outside: outside, query: query,
-  mark: mark, planTitles: planTitles, csvRows: csvRows, HEAD: HEAD};
+  markBody: markBody, limitsBody: limitsBody, monthBar: monthBar, historyCells: historyCells, planTitles: planTitles, csvRows: csvRows, HEAD: HEAD};
 if (typeof module !== "undefined" && module.exports) module.exports = api; else root.BSData = api;
 })(typeof window !== "undefined" ? window : globalThis);

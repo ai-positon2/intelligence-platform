@@ -15,9 +15,9 @@
   <section class="pm-panel pd-cmd bi-cmd" id="cmd">
     <div class="bi-cmd-row">
       <div id="acctPick"></div>
-      <label class="bi-th"><span class="pd-dd-k">Alert outside</span>
+      <label class="bi-th"><span class="pd-dd-k">Alert outside (team)</span>
         <span class="bi-th-in"><b>±</b><input type="number" id="limit" min="10" max="90" step="1" value="30" inputmode="numeric" aria-label="How far from a usual week the brand spend can be, a percentage"><b>%</b></span></label>
-      <p class="bi-scope">Google Ads only. Search campaigns whose name says brand; you can change which count. A usual week is the middle of the account's own last weeks with spend.</p>
+      <p class="bi-scope">Google Ads only. Search campaigns whose name says brand; you can change which count, and what you save is kept for the whole team. A usual week is the middle of the account's own last weeks with spend.</p>
     </div>
   </section>
 
@@ -45,10 +45,12 @@
     </section>
     <p class="pd-foot" id="foot"></p>
   </div>
+  <div id="monPanel"></div>
 </div>
 {% endblock %}
 {% block scripts %}
 <script src="{{ url_for('static', filename='js/pm_picker.js') }}?v=1"></script>
-<script src="{{ url_for('static', filename='js/brand_spend_data.js') }}?v=1"></script>
-<script src="{{ url_for('static', filename='js/brand_spend.js') }}?v=1"></script>
+<script src="{{ url_for('static', filename='js/monitor_panel.js') }}?v=1"></script>
+<script src="{{ url_for('static', filename='js/brand_spend_data.js') }}?v=2"></script>
+<script src="{{ url_for('static', filename='js/brand_spend.js') }}?v=2"></script>
 {% endblock %}
