@@ -123,7 +123,7 @@ def extra_findings(a, cur):
                      "converting": "its clicks were %.1f times the usual and they converted (%s conversions against a usual %s a day): a real burst of demand" % (
                          top["clicks"] / max(1, top["usualClicks"]), _num(top["conversions"]), _num(top["usualConv"])),
                      "price": "the clicks were not unusual (%d against a usual %d), so each cost far more than usual" % (top["clicks"], top["usualClicks"])}[top["kind"]]
-        out.append({"level": "medium" if bad else "low", "kind": "spike", "title": "%s %s: %s spent against a usual day of %s" % (top["weekday"], top["date"], _money(top["cost"], cur), _money(top["usual"], cur)),
+        out.append({"level": "medium" if bad else "low", "kind": "spike", "key": top["date"], "title": "%s %s: %s spent against a usual day of %s" % (top["weekday"], top["date"], _money(top["cost"], cur), _money(top["usual"], cur)),
                     "detail": "%s%s." % (kind_text[0].upper() + kind_text[1:], (" (%d more day%s above the usual in the last 4 weeks)" % (len(sp) - 1, "" if len(sp) == 2 else "s")) if len(sp) > 1 else ""),
                     "nextStep": _next(a, "spike", "Open the search terms and the invalid clicks for that day.")})
     s = a.get("share")
@@ -133,11 +133,11 @@ def extra_findings(a, cur):
                     "nextStep": _next(a, "defend", "Open Auction Insights for the brand campaign to see who is bidding.")})
     for c in a.get("silent") or []:
         if c["status"] == "ENABLED":
-            out.append({"level": "medium", "kind": "silent", "title": "%s is enabled but has not spent in the last 8 weeks" % c["name"],
+            out.append({"level": "medium", "kind": "silent", "key": c["id"], "title": "%s is enabled but has not spent in the last 8 weeks" % c["name"],
                         "detail": "Google lists it as enabled, yet it has no spend on any day read. A brand campaign that is on and silent usually has a budget of zero, a refused ad, no billing, a bid too low to enter the auction or keywords with too little search volume.",
                         "nextStep": _next(a, "nospend", "Open the campaign's status in Google Ads and read the reason beside it.")})
         else:
-            out.append({"level": "low", "kind": "silent-paused", "title": "%s is %s and has not spent in the last 8 weeks" % (c["name"], (c["status"] or "not enabled").lower()),
+            out.append({"level": "low", "kind": "silent-paused", "key": c["id"], "title": "%s is %s and has not spent in the last 8 weeks" % (c["name"], (c["status"] or "not enabled").lower()),
                         "detail": "A paused brand campaign that never spent in the window is not a problem if it is meant to be off.",
                         "nextStep": "If it should be running, enable it and check its budget and ads."})
     return out
