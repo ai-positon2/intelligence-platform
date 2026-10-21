@@ -102,6 +102,11 @@ def test_a_waste_plan_excludes_and_says_what_the_money_would_return():
     assert "an estimate" in p["worth"] and p["reach"] == ""                                       # an exclusion reaches every kind of spend
 
 
+def test_a_single_waste_product_is_not_said_to_be_each():
+    p = plan("waste", [prod("a", cost=100.0)], mixof({"a": ADJ}))
+    assert p["lead"] == "1 product spent $100 without a sale, more than the $20 a typical sale costs here."
+
+
 def test_a_waste_plan_names_two_campaigns_when_the_products_are_in_two():
     rows = [prod("a", cost=100.0), prod("b", cost=50.0)]
     camps = [("Shop Main", "Shopping", "Manual CPC", "adjustable", 100.0), ("Shop Sale", "Shopping", "Maximize clicks", "adjustable", 50.0)]
@@ -240,6 +245,14 @@ def test_a_drag_plan_lowers_the_bid_by_the_rule_and_counts_the_saving_only_on_sp
 def test_a_drag_plan_for_a_product_barely_under_target_still_suggests_a_small_cut():
     p = plan("drag", [prod("a", cost=100.0, conv=10, val=396.0)], mixof({"a": ADJ}))               # 0.99 of the target: the rule gives none, so the cut is the default 10%
     assert "Lower their bids by about -10%" in text(p) and p["worth"].startswith("Trimming bids 10% on the $100")
+
+
+def test_a_reason_given_once_is_not_repeated_inside_the_exclusion_steps():
+    rows = [prod("a", cost=100.0, conv=10, val=300.0)]
+    assert text(plan("drag", rows, mixof({"a": SMART}))).count("a lower bid does nothing") == 1
+    leak_auto = plan("leak", [prod("a", clicks=100, cost=100.0, conv=2.0, val=400.0)], mixof({"a": AUTO}))
+    assert text(leak_auto).count("no bid for a single product") == 0 and "Exclude them: open the campaign, then Asset groups" in text(leak_auto)
+    assert text(plan("waste", rows, mixof({"a": SMART}))).count("a lower bid does nothing") == 1                  # but a plan that has not said it yet does
 
 
 def test_a_drag_plan_on_automatic_bidding_moves_the_products_instead():

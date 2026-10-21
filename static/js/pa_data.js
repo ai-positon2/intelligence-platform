@@ -59,8 +59,10 @@ function totals(data){return data&&data.total?data.total.slice():zero();}
    against the account's own: either way e is 1.0 at the target and higher is better. The auto target is the account's
    own ROAS, so by default half the money is above it and half below. */
 function context(its,total,opts){
-  var o={target:opts&&opts.target>0?+opts.target:null, minClicks:opts&&opts.minClicks>=0?+opts.minClicks:DEFAULTS.minClicks,
-         minSpend:opts&&opts.minSpend>=0?+opts.minSpend:null};
+  /* "Automatic" arrives as null (or a blank): in JavaScript null >= 0 is true, so each setting is checked for being set before it is compared. */
+  function set(v){return v!=null&&v!==""&&v>=0;}
+  var o={target:opts&&opts.target>0?+opts.target:null, minClicks:opts&&set(opts.minClicks)?+opts.minClicks:DEFAULTS.minClicks,
+         minSpend:opts&&set(opts.minSpend)?+opts.minSpend:null};
   var hasValue=total[VAL]>0, acctRoas=ratio(total[VAL],total[COST]), acctCpa=ratio(total[COST],total[CONV]);
   var target=hasValue?(o.target||acctRoas):null;
   var minSpend=o.minSpend!=null?o.minSpend:(acctCpa||0);     // "more than a typical sale costs, and sold nothing"

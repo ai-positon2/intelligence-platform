@@ -141,3 +141,4 @@ body.pa-lock{overflow:hidden}
 .pa-dr-plan{margin:14px 0 0}
 .pa-dr-plan summary{cursor:pointer;font-weight:600;font-size:13px;color:var(--pm-a)}
 .pa-dr-plan .pa-plan{margin:10px 0 0;padding:12px 14px}
+.pa-dr-plan .pa-plan-h span{display:none}

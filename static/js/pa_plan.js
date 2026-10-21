@@ -95,13 +95,13 @@ function medianIndex(rows,ctx){
 }
 
 /* ── Steps shared by the kinds ── */
-function excludeSteps(rows,mix,kind){
+function excludeSteps(rows,mix,kind,quiet){
   var where=inCamp(rows,mix,kind);
   if(kind==="adjustable"||kind==="smart")
     return "Open "+where.replace(/^in /,"")+", then Ad groups, the ad group, then Product groups. Click the plus beside All products, subdivide by Item ID, and set each of these item ids to Excluded"+
-      (kind==="adjustable"?" (or cut its bid to a few cents to keep it in rotation).":" (a lower bid does nothing under Smart Bidding, so an exclusion is the lever).");
+      (kind==="adjustable"?" (or cut its bid to a few cents to keep it in rotation).":quiet?".":" (a lower bid does nothing under Smart Bidding, so an exclusion is the lever).");
   if(kind==="auto")
-    return "Performance Max has no bid for a single product, so exclude them: open "+where.replace(/^in /,"")+", then Asset groups, the asset group, Listing groups, Edit, subdivide by Item ID and exclude each of these item ids.";
+    return (quiet?"Exclude them: open ":"Performance Max has no bid for a single product, so exclude them: open ")+where.replace(/^in /,"")+", then Asset groups, the asset group, Listing groups, Edit, subdivide by Item ID and exclude each of these item ids.";
   return "In Commerce Manager open Catalog, then Sets, and make a set of the products that sell. In Ads Manager open the ad set, choose that set as its product set, and the ones that spend without selling drop out.";
 }
 var LABEL_STEP = "With more than a handful, give them one custom label in a supplemental feed (Merchant Center, Products, Data sources, add a supplemental feed, custom label 0) and exclude that label once, instead of item by item.";
@@ -143,7 +143,7 @@ BUILD.waste = function(rows,ctx,env){
   steps=steps.concat(byKind(rows,env.g,kind,env.mix,function(k){return [excludeSteps(rows,env.mix,k)];}));
   if(rows.length>10) steps.push(LABEL_STEP);
   var avg=accountAverage(ctx,cur), ret=returnOf(cost,ctx,cur);
-  return {lead:products(rows.length,["spent","spent"])+" "+money(cost,cur)+" without a sale"+(ctx.minSpend?", each more than the "+money(ctx.minSpend,cur,true)+" a typical sale costs here":"")+".",
+  return {lead:products(rows.length,["spent","spent"])+" "+money(cost,cur)+" without a sale"+(ctx.minSpend?(rows.length>1?", each more than the ":", more than the ")+money(ctx.minSpend,cur,true)+" a typical sale costs here":"")+".",
     steps:steps,
     worth:"Excluding them frees "+money(cost,cur)+" for the range"+(ret?"; at "+avg+" that money would return "+ret:"")+": an estimate, since the next dollars on other products usually earn less, and a product you fix instead of exclude may sell."};
 };
@@ -186,7 +186,7 @@ BUILD.leak = function(rows,ctx,env){
   steps=steps.concat(byKind(rows,env.g,env.kind,env.mix,function(k){
     var where=inCamp(rows,env.mix,k).replace(/^in /,"");
     if(k==="adjustable") return ["While you fix it, pay for fewer of these clicks: "+where+", Product groups, subdivide by Item ID, and lower the Max. CPC by about "+signed(adj||MAX_DOWN)+"."];
-    return ["A bid cannot be lowered for one product here, so fix the page and price first. If it still converts well under the account rate after two weeks, exclude it: "+excludeSteps(rows,env.mix,k)];
+    return ["A bid cannot be lowered for one product here, so fix the page and price first. If it still converts well under the account rate after two weeks, exclude it: "+excludeSteps(rows,env.mix,k,true)];
   }));
   var gap=rows.reduce(function(s,it){return s+Math.max(0,it.n[CLK]*(ctx.acctCvr||0)-it.n[CONV]);},0);
   var aov=conv>0&&ctx.hasValue?sum(rows,VAL)/conv:(ctx.hasValue&&ctx.acctRoas&&ctx.acctCpa?ctx.acctRoas*ctx.acctCpa:0);
@@ -213,7 +213,7 @@ BUILD.drag = function(rows,ctx,env){
   var steps=byKind(rows,env.g,kind,env.mix,function(k){
     var where=inCamp(rows,env.mix,k).replace(/^in /,"");
     if(k==="adjustable") return ["Lower their bids by about "+signed(down)+": open "+where+", Ad groups, the ad group, Product groups, subdivide by Item ID if they are not split out, and lower each one's Max. CPC."];
-    if(k==="smart") return ["Smart Bidding sets the bid, so a lower bid does nothing. Move these item ids into a campaign of their own with a higher Target ROAS than the main one (start about 10% higher), or exclude the worst: "+excludeSteps(rows,env.mix,k)];
+    if(k==="smart") return ["Smart Bidding sets the bid, so a lower bid does nothing. Move these item ids into a campaign of their own with a higher Target ROAS than the main one (start about 10% higher), or exclude the worst: "+excludeSteps(rows,env.mix,k,true)];
     if(k==="auto") return ["Performance Max has no bid for a single product. Move these into an asset group or campaign with a higher target ROAS (open "+where+", Asset groups, and subdivide the Listing groups by Item ID), or exclude the worst of them."];
     return ["Move them to an ad set of their own with a smaller budget, so they stop taking money from the products that earn more."];
   });

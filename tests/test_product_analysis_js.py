@@ -118,6 +118,17 @@ def test_a_target_the_user_sets_replaces_the_accounts_own():
     assert classified(account(), {"target": "x"})["ctx"]["autoTarget"]
 
 
+def test_the_pages_automatic_settings_are_the_defaults_not_zero():
+    """The page sends its automatic settings as null. null >= 0 is true in JavaScript, so the waste bar once became $0 and every product with 25 clicks and no sale was
+    called wasted, however little it spent."""
+    ps = [prod("cheap", clicks=300, cost=5, conv=0), prod("both", clicks=300, cost=500, conv=0), prod("sells", clicks=300, cost=100, conv=5, val=500)]
+    auto = classified(ps, {"target": None, "minClicks": 25, "minSpend": None})
+    assert auto["seg"]["cheap"] == "thin" and auto["seg"]["both"] == "waste" and auto["ctx"]["minSpend"] == 121.0      # one typical sale: the account spent 605 for 5 sales
+    blank = classified(ps, {"target": None, "minClicks": None, "minSpend": ""})
+    assert blank["ctx"]["minClicks"] == 25 and blank["ctx"]["minSpend"] == 121.0 and blank["seg"]["cheap"] == "thin"      # unset or blank is the default, too
+    assert classified(ps, {"minSpend": 0})["seg"]["cheap"] == "waste"                                                  # a zero someone typed is still a zero
+
+
 def test_wasted_spend_needs_both_enough_clicks_and_enough_spend():
     ps = [prod("few", clicks=10, cost=500, conv=0), prod("cheap", clicks=300, cost=5, conv=0), prod("both", clicks=300, cost=500, conv=0),
           prod("sells", clicks=300, cost=100, conv=5, val=500)]
