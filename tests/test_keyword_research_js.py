@@ -9,6 +9,7 @@ import os
 import re
 import shutil
 import subprocess
+import tempfile
 
 import pytest
 
@@ -22,8 +23,9 @@ pytestmark = pytest.mark.skipif(not shutil.which("node"), reason="node is not in
 
 HARNESS = (BASE_HARNESS.replace("/p2/paid-marketing/campaign-book", "/p2/paid-marketing/keyword-research")
            .replace("console, Promise, isNaN", "navigator: { clipboard: { writeText: t => { (global.copied = global.copied || []).push(t); return sc.noclipboard ? Promise.reject(new Error('no')) : Promise.resolve(); } } }, console, Promise, isNaN")
-           .replace("const out = { calls,", "const out = { copied: global.copied || [], calls,"))
-assert "navigator" in HARNESS and "copied" in HARNESS and "keyword-research" in HARNESS
+           .replace("const out = { calls,", "const out = { copied: global.copied || [], calls,")
+           .replace("JSON.parse(process.argv[2])", "JSON.parse(fs.readFileSync(process.argv[2], 'utf8'))"))      # a long list is a scenario too big for one argument on Linux
+assert "navigator" in HARNESS and "copied" in HARNESS and "keyword-research" in HARNESS and "readFileSync(process.argv[2]" in HARNESS
 
 OPTIONS = {"cards": pk.CARDS, "goals": ps.GOALS, "minSearches": [10, 50, 100, 500], "defaultMin": 10, "buildsPerDay": 12, "modelReady": True}
 ACCOUNTS = {"accounts": [{"id": "1234567890", "name": "Acme Dental", "currency": "USD"}, {"id": "2345678901", "name": "Northwind <b>Dental</b>", "currency": "USD"}], "groups": []}
@@ -44,7 +46,12 @@ def run(scenario):
     base = [{"match": "/keywords/options", "body": OPTIONS}, {"match": "/segments/accounts", "body": ACCOUNTS}, {"match": "/keywords/list", "body": {"builds": []}}]
     scenario = dict(scenario)
     scenario["responses"] = scenario.get("responses", []) + base
-    out = subprocess.run(["node", "-e", HARNESS, JS, json.dumps(scenario)], capture_output=True, text=True, timeout=60)
+    with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as f:
+        json.dump(scenario, f)
+    try:
+        out = subprocess.run(["node", "-e", HARNESS, JS, f.name], capture_output=True, text=True, timeout=60)
+    finally:
+        os.unlink(f.name)
     assert out.returncode == 0, out.stderr
     return json.loads(out.stdout)
 
