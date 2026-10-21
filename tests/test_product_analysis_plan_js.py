@@ -253,6 +253,7 @@ def test_a_drag_plan_on_automatic_bidding_moves_the_products_instead():
 
 def test_a_plan_is_made_only_for_a_real_group_and_ignores_the_folded_row():
     assert plan("waste", [], mixof({})) is None and plan("nonsense", [prod("a")], mixof({})) is None
+    assert plan("constructor", [prod("a")], mixof({})) is None and plan("__proto__", [prod("a")], mixof({})) is None      # a key from the address bar is not a plan
     folded = dict(prod("x", cost=900.0), other=True)
     p = plan("waste", [prod("a", cost=50.0), folded], mixof({"a": ADJ}))
     assert p["lead"].startswith("1 product spent $50 without")                                         # the "all other products" row is many products, not one

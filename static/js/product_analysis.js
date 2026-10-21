@@ -12,7 +12,7 @@
 (function(){
 "use strict";
 
-var P = window.PSData, A = window.PAData, BASE = "/p2/paid-marketing/api/gads";
+var P = window.PSData, A = window.PAData, Q = window.PAPlan, BASE = "/p2/paid-marketing/api/gads";
 var $ = function(s,r){return (r||document).querySelector(s);};
 var $$ = function(s,r){return Array.prototype.slice.call((r||document).querySelectorAll(s));};
 var esc = function(s){return String(s==null?"":s).replace(/[&<>"']/g,function(c){
@@ -414,6 +414,25 @@ function setSeg(key,scroll){
   if(scroll) $("#prods").scrollIntoView({behavior:document.hidden||reduceMotion?"auto":"smooth",block:"start"});
 }
 
+/* What to do about a group of products: the steps from pa_plan.js, chosen from the kind of campaign the group's spend is in. */
+var PLAN_TITLE = {waste:"Stop paying for products that do not sell",oos:"Out of stock, still being advertised",gem:"Give your best earners more room",
+  leak:"Fix the page or the price",window:"Make the listing worth a click",drag:"Trim what sells below target"};
+function planOf(key,list){
+  return Q.build(key,list,S.cls.ctx,S.data&&S.data.mix||null,{currency:cur()});
+}
+function planHtml(p,title){
+  return '<div class="pa-plan"><div class="pa-plan-h"><b>'+esc(title)+'</b><span>What to do</span></div><p class="pa-plan-lead">'+esc(p.lead)+'</p>'+
+    (p.reach?'<p class="pa-plan-reach">'+esc(p.reach)+'</p>':"")+
+    '<ol>'+p.steps.map(function(s){return '<li>'+esc(s)+'</li>';}).join("")+'</ol>'+
+    (p.worth?'<p class="ps-worth"><b>Worth</b> '+esc(p.worth)+'</p>':"")+'</div>';
+}
+/* The plan for the group the table is showing, when it is one of the recommendations. */
+function groupPlan(){
+  if(!Object.prototype.hasOwnProperty.call(PLAN_TITLE,S.seg)) return "";
+  var p=planOf(S.seg,A.filterItems(S.items,S.seg,S.cls.ctx,S.oos?new Set(S.oos):null));
+  return p?planHtml(p,PLAN_TITLE[S.seg]):"";
+}
+
 /* The 80/20 curve */
 function paintPareto(){
   var c=S.cls.ctx, pa=A.pareto(S.items,c), el=$("#paretoCard"), unit=c.hasValue?"revenue":"conversions", t=theme();
@@ -694,7 +713,7 @@ function paintTable(){
   }).join("");
   var totRow='<tr class="tot"><td class="name"><span class="cn">'+(S.seg!=="all"||S.q?"Matching products":"All products")+' ('+rows.length.toLocaleString("en-US")+')</span></td><td></td>'+
     cols.map(function(k){return (k.key==="value"||k.key==="roas")&&!c.hasValue?"":cell({n:tot},k);}).join("")+'</tr>';
-  el.innerHTML='<div class="ps-tools"><label class="ps-search"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"/><path d="m20 20-4-4"/></svg><input id="pq" placeholder="Find a product, brand or item id…" value="'+esc(S.q)+'" autocomplete="off"></label>'+
+  el.innerHTML=groupPlan()+'<div class="ps-tools"><label class="ps-search"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"/><path d="m20 20-4-4"/></svg><input id="pq" placeholder="Find a product, brand or item id…" value="'+esc(S.q)+'" autocomplete="off"></label>'+
     '<div class="pa-chips" role="group" aria-label="Show">'+chips+'</div></div>'+
     '<div class="ps-tscroll"><table class="ps-table pa-table"><thead><tr>'+th+'</tr></thead><tbody>'+
     (body||'<tr><td colspan="12" class="empty">No products match.</td></tr>')+'</tbody><tfoot>'+totRow+'</tfoot></table></div>'+
@@ -720,6 +739,15 @@ function whyLine(it){
   }
   return "";
 }
+/* What to do about this one product: the plan for each recommendation it falls under (at most two, the most urgent first). */
+function drawerPlans(it){
+  var c=S.cls.ctx, oos=S.oos?new Set(S.oos):null, out=[];
+  ["oos","waste","gem","leak","window","drag"].forEach(function(k){
+    if(out.length>=2||!A.filterItems([it],k,c,oos).length) return;
+    var p=planOf(k,[it]); if(p) out.push(planHtml(p,PLAN_TITLE[k]));
+  });
+  return out.length?'<details class="pa-dr-plan"><summary>What to do</summary>'+out.join("")+'</details>':"";
+}
 function openDrawer(it){
   var el=$("#drawer"), c=S.cls.ctx, n=it.n, pm=S.cmpItems.filter(function(i){return i.id===it.id&&!i.other;})[0], pn=pm?pm.n:null, seg=A.SEG[it.seg];
   S.open=it.id;
@@ -729,7 +757,7 @@ function openDrawer(it){
   el.innerHTML='<div class="pa-dr-bg" data-close></div><aside class="pa-dr" role="dialog" aria-modal="true" aria-label="Product detail"><button type="button" class="pa-dr-x" data-close aria-label="Close">×</button>'+
     '<span class="pa-badge" style="--cc:'+col(SEG_COLOR[it.seg]||"#8b94be")+'">'+esc(seg?seg.label:"")+(it.gem?" ★ underfunded":"")+'</span>'+(oos?' <span class="pa-badge" style="--cc:'+col("#fb7185")+'">Out of stock</span>':"")+
     '<h3>'+esc(it.title)+'</h3><p class="pa-dr-m">'+esc(it.id)+(it.brand?" · "+esc(it.brand):"")+(it.type?" · "+esc(it.type):"")+'</p>'+
-    (whyLine(it)?'<p class="pa-dr-why">'+esc(whyLine(it))+'</p>':"")+
+    (whyLine(it)?'<p class="pa-dr-why">'+esc(whyLine(it))+'</p>':"")+drawerPlans(it)+
     '<div class="pa-dr-g">'+tiles.map(function(x){
       var t=A.asTotal(n), v=x[1]==="value"?n[VAL]:P.mval(x[1],t), pv=pn?(x[1]==="value"?pn[VAL]:P.mval(x[1],A.asTotal(pn))):null;
       var ch=pn&&v!=null&&pv!=null?P.change(x[1],v,pv):null;

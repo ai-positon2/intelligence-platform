@@ -129,3 +129,15 @@ body.pa-lock{overflow:hidden}
 .pa-dr-ch{margin-top:16px}
 .pa-dr-h{display:block;font-size:10px;font-weight:700;letter-spacing:var(--ls-caps);text-transform:uppercase;color:var(--pm-faint);margin-bottom:8px}
 .pa-dr-cw{position:relative;height:190px}
+
+/* What to do about a group of products (pa_plan.js) */
+.pa-plan{margin:0 0 16px;padding:16px 18px;border-radius:16px;border:1px solid var(--pm-line);background:var(--pm-panel2);font-size:13px;line-height:1.6;color:var(--pm-ink2)}
+.pa-plan-h{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;margin-bottom:6px}
+.pa-plan-h b{font-size:14.5px;color:var(--pm-ink)}
+.pa-plan-h span{font-size:11px;font-weight:700;letter-spacing:var(--ls-caps);text-transform:uppercase;color:var(--pm-a)}
+.pa-plan-lead{margin:0 0 6px;color:var(--pm-ink)}
+.pa-plan-reach{margin:0 0 8px;font-size:12.5px;color:var(--pm-muted)}
+.pa-plan ol{margin:8px 0 0;padding-left:20px;display:flex;flex-direction:column;gap:8px}
+.pa-dr-plan{margin:14px 0 0}
+.pa-dr-plan summary{cursor:pointer;font-weight:600;font-size:13px;color:var(--pm-a)}
+.pa-dr-plan .pa-plan{margin:10px 0 0;padding:12px 14px}

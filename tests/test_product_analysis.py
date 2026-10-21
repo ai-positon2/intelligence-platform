@@ -376,11 +376,11 @@ def test_the_script_only_reaches_for_elements_the_template_has():
     used = set(re.findall(r'\$\("#([A-Za-z]+)"\)', js))
     have = set(re.findall(r'id="([A-Za-z]+)"', html))
     assert not (used - have - made_by_script), sorted(used - have - made_by_script)
-    for name in ("pm_picker.js", "ps_data.js", "pa_data.js", "product_analysis.js", "chart.umd.js", "product_analysis.css", "performance_summarizer.css"):
+    for name in ("pm_picker.js", "ps_data.js", "pa_data.js", "pa_plan.js", "product_analysis.js", "chart.umd.js", "product_analysis.css", "performance_summarizer.css"):
         assert name in html
         assert os.path.exists(os.path.join(ROOT, "static", "vendor" if name == "chart.umd.js" else
                                            "css" if name.endswith(".css") else "js", name)), name
-    assert html.index("ps_data.js") < html.index("pa_data.js") < html.index("product_analysis.js")      # each needs the one before
+    assert html.index("ps_data.js") < html.index("pa_data.js") < html.index("pa_plan.js") < html.index("product_analysis.js")      # each needs the one before
 
 
 def test_the_script_reads_only_routes_that_exist():
@@ -398,6 +398,6 @@ def test_the_agent_is_listed_wherever_the_others_are():
 
 
 def test_no_em_dash_in_what_this_agent_shows():
-    for p in (("static", "js", "product_analysis.js"), ("static", "js", "pa_data.js"), ("templates", "product_analysis.html"),
-              ("static", "css", "product_analysis.css"), ("tracker", "paid_products.py")):
+    for p in (("static", "js", "product_analysis.js"), ("static", "js", "pa_data.js"), ("static", "js", "pa_plan.js"), ("templates", "product_analysis.html"),
+              ("static", "css", "product_analysis.css"), ("tracker", "paid_products.py"), ("tracker", "paid_meta_products.py")):
         assert "—" not in _read(*p), p

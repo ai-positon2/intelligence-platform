@@ -227,7 +227,7 @@ BUILD.drag = function(rows,ctx,env){
 function build(key,products,ctx,mix,o){
   o=o||{};
   var rows=(products||[]).filter(function(i){return !i.other;});
-  if(!rows.length||!BUILD[key]) return null;
+  if(!rows.length||!Object.prototype.hasOwnProperty.call(BUILD,key)) return null;
   var g=groupMix(rows,mix), kind=kindOf(g), env={cur:o.currency||"USD",g:g,kind:kind,mix:mix};
   var plan=BUILD[key](rows,ctx,env);
   plan.kind=kind;
