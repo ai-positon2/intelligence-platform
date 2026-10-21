@@ -125,9 +125,11 @@ def tables(report):
             rows += [["%s return%s" % (_name(p), " scaled to what was recorded" if v["over"] else ""), _r(x.get("roas"), 3)] for p, x in v["perPlatform"].items()]
         out["Reconciliation"] = (["Item", "Value"], rows)
 
-    frows = [[LEVEL_TEXT.get(f["level"], f["level"]), f["title"], f["text"], "; ".join(f.get("evidence") or []), f.get("action") or ""] for f in report.get("findings") or []]
+    frows = [[LEVEL_TEXT.get(f["level"], f["level"]), f["title"], f["text"], "; ".join(f.get("evidence") or []), f.get("action") or "",
+              "\n".join("%d. %s" % (i + 1, t) for i, t in enumerate((f.get("plan") or {}).get("steps") or [])),
+              " ".join(x for x in ((f.get("plan") or {}).get("worth"), (f.get("plan") or {}).get("note")) if x)] for f in report.get("findings") or []]
     if frows:
-        out["Findings"] = (["Level", "Finding", "Detail", "Figures", "What to do"], frows)
+        out["Findings"] = (["Level", "Finding", "Detail", "Figures", "What to do", "How to do it", "What it is worth"], frows)
 
     notes = [["Note", n] for n in report.get("notes") or []] + [["Part that could not be read", w] for w in report.get("warnings") or []]
     if report.get("stale"):

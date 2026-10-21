@@ -62,6 +62,48 @@ def read_google(search, start, end):
     return gread.parse_conversions(actions, volume)
 
 
+# How long after the click Google's conversions came (click through only): Google's own buckets, which are named by their lower and upper day ("SIX_TO_SEVEN_DAYS").
+_WORD = {"ONE": 1, "TWO": 2, "THREE": 3, "FOUR": 4, "FIVE": 5, "SIX": 6, "SEVEN": 7, "EIGHT": 8, "NINE": 9, "TEN": 10, "ELEVEN": 11, "TWELVE": 12, "THIRTEEN": 13, "FOURTEEN": 14,
+         "FIFTEEN": 15, "SIXTEEN": 16, "SEVENTEEN": 17, "EIGHTEEN": 18, "NINETEEN": 19, "TWENTY": 20, "THIRTY": 30, "FORTY": 40, "FIFTY": 50, "SIXTY": 60, "SEVENTY": 70, "EIGHTY": 80, "NINETY": 90}
+
+
+def lag_gaql(start, end):
+    return "SELECT segments.conversion_lag_bucket, metrics.conversions FROM customer WHERE segments.date BETWEEN '%s' AND '%s'" % (start, end)
+
+
+def bucket_days(name):
+    """The day a lag bucket starts on (LESS_THAN_ONE_DAY is 0, ONE_TO_TWO_DAYS 1, TWENTY_ONE_TO_THIRTY_DAYS 21), or None when the name is not one this understands."""
+    n = str(name or "").upper()
+    if n.startswith("LESS_THAN"):
+        return 0
+    head = n.split("_TO_")[0]
+    if head == n:
+        return None
+    parts = [_WORD.get(w) for w in head.split("_")]
+    return sum(parts) if parts and all(p is not None for p in parts) else None
+
+
+def read_lag(search, start, end):
+    """{buckets: {start day: conversions}, total} for Google's conversions over start..end by how long after the click they came, or None when there is nothing to say."""
+    rows = search(lag_gaql(start, end))
+    out, total = {}, 0.0
+    for r in rows:
+        n = _f((r.get("metrics") or {}).get("conversions"))
+        day = bucket_days((r.get("segments") or {}).get("conversionLagBucket"))
+        total += n
+        if day is not None:
+            out[day] = out.get(day, 0.0) + n
+    return {"buckets": {str(k): round(v, 4) for k, v in sorted(out.items())}, "total": round(total, 4)} if total > 0 and out else None
+
+
+def window_share(lag, days):
+    """The share of Google's conversions that came `days` days or more after the click (what a window of that many days would not count), or None when it cannot be told."""
+    if not lag or not lag.get("total") or days is None:
+        return None
+    later = sum(v for k, v in lag["buckets"].items() if int(k) >= days)
+    return round(later / lag["total"], 4)
+
+
 def category_kind(category):
     c = str(category or "").upper()
     return "leads" if c in LEAD_CATEGORIES else "sales" if c in SALES_CATEGORIES else "other"

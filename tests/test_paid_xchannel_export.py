@@ -76,7 +76,18 @@ def test_the_weekly_links_sheet_has_the_four_tests():
 
 def test_the_findings_sheet_has_a_level_a_detail_and_what_to_do():
     h, rows = ex.tables(full())["Findings"]
-    assert h == ["Level", "Finding", "Detail", "Figures", "What to do"] and rows[0][0] == "High" and any(r[4] for r in rows)
+    assert h == ["Level", "Finding", "Detail", "Figures", "What to do", "How to do it", "What it is worth"] and rows[0][0] == "High" and any(r[4] for r in rows)
+
+
+def test_a_finding_with_a_plan_carries_its_steps_and_worth_into_the_sheet_and_one_without_leaves_them_empty():
+    h, rows = ex.tables(full())["Findings"]
+    by = {r[1]: r for r in rows}
+    gap = next(r for r in rows if "costs" in r[1] and "per conversion" in r[1])
+    assert gap[5].startswith("1. In Ads Manager open the campaign's ad sets") and "\n2. In Google Ads open Campaigns" in gap[5] and "upper bound" in gap[6]
+    view = next(r for r in rows if "saw the ad" in r[1])
+    assert "Compare attribution settings" in view[5] and view[6].startswith("There is no figure for how many of Meta's conversions were view-through")          # a note rides in the worth column
+    idle = next(r for r in rows if "recorded no conversions" in r[1])
+    assert idle[5] == "" and idle[6] == ""
 
 
 def test_the_excel_file_has_a_sheet_per_table_with_numbers_kept_as_numbers():

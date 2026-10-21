@@ -25,13 +25,14 @@ import math
 from . import paid_gads as base
 from . import paid_xchannel_findings as fd
 from . import paid_xchannel_math as m
+from . import paid_xchannel_plans as plans
 from . import paid_xchannel_settings as sx
 from .paid_accounts import targets as _targets_of
 
 BadRequest = m.BadRequest
 log = logging.getLogger(__name__)
 
-CACHE_VERSION = "1"                              # bump when the shape of a saved settings read changes
+CACHE_VERSION = "2"                              # bump when the shape of a saved settings read changes
 SETTINGS_TTL_S = 3600
 MEASURES = ("primary", "all")
 MEASURE_LABEL = {"primary": "Conversions (what each platform bids on)", "all": "All conversions"}
@@ -115,6 +116,10 @@ def read_settings(targets, start, end, *, store, force=False, search_fn=None, pa
             else:
                 sf = search_fn or (lambda gaql, cid=t["id"]: base.search(cid, gaql, store))
                 out["google"] = base._cached(store, key, SETTINGS_TTL_S, lambda: sx.read_google(sf, start, end), notes=notes, force=force, stamps=stamps)
+                try:                                     # how long Google's conversions lag the click: sizes the window gap, and is left out quietly when Google will not say
+                    out["googleLag"] = base._cached(store, key + ":lag", SETTINGS_TTL_S, lambda: sx.read_lag(sf, start, end) or {}, notes=notes, force=force, stamps=stamps) or None
+                except Exception as e:                   # noqa: BLE001
+                    log.warning("xchannel: Google's conversion lag could not be read (%s)", e)
         except Exception as e:                           # noqa: BLE001 (the settings are a nicety: the numbers stand without them)
             log.warning("xchannel: %s settings could not be read (%s)", plat, e)
             warnings.append("How %s counts conversions could not be read, so the attribution comparison leaves it out (%s)." % (m.PLATFORM_NAME[plat], str(e)[:160]))
@@ -200,6 +205,10 @@ def assemble(raw, *, measure="primary", actual_conv=None, actual_value=None, now
             meta_kinds[k] = meta_kinds.get(k, 0.0) + t["cost"]
     gview = channels["google"]["view"] if "google" in channels else None
     attribution_notes = sx.compare(gsum, msum, meta_kinds=meta_kinds, google_view=gview) if len(plats) == 2 else []
+    window = None
+    if gsum and msum and gsum.get("dominantClick") is not None and (msum.get("dominant") or {}).get("click") is not None:
+        gc, mc = gsum["dominantClick"], msum["dominant"]["click"]
+        window = {"google": gc, "meta": mc, "later": sx.window_share((raw.get("settings") or {}).get("googleLag"), mc) if gc > mc else None}
     reconciliation = m.reconcile(cur, actual_conv, actual_value)
     currency = next((a.get("currency") for a in raw["accounts"] if a.get("currency")), "") or ""
     report = {
@@ -208,12 +217,17 @@ def assemble(raw, *, measure="primary", actual_conv=None, actual_value=None, now
         "platforms": plats, "range": {"preset": raw["preset"], "label": m.PRESET_LABEL[raw["preset"]], "start": cs, "end": ce, "days": raw["periods"]["days"]},
         "previous": {"start": ps, "end": pe}, "measure": measure, "measureLabel": MEASURE_LABEL[measure], "measureUsed": used,
         "channels": channels, "blended": blended, "decomposition": decomposition, "weeks": week_rows, "links": links,
-        "attribution": {"google": gsum, "meta": msum, "notes": attribution_notes},
+        "attribution": {"google": gsum, "meta": msum, "notes": attribution_notes, "window": window},
         "reconciliation": reconciliation, "warnings": warnings, "stale": raw.get("stale"), "readAt": raw.get("readAt"),
         "notes": list(NOTES) + (NOTES_GOOGLE if "google" in plats else []) + (NOTES_META if "meta" in plats else []),
         "generatedAt": (now or dt.datetime.now(dt.timezone.utc)).isoformat()}
-    report["findings"] = fd.findings({"currency": currency, "channels": {p: {"cur": channels[p]["cur"], "prev": channels[p]["prev"], "types": channels[p]["types"]} for p in plats},
-                                      "blended": {"cur": bc, "prev": bp}, "decomposition": decomposition, "links": links, "notes": attribution_notes, "reconcile": reconciliation})
+    finding_input = {"currency": currency, "channels": {p: {"cur": channels[p]["cur"], "prev": channels[p]["prev"], "types": channels[p]["types"]} for p in plats},
+                     "blended": {"cur": bc, "prev": bp}, "decomposition": decomposition, "links": links, "notes": attribution_notes, "reconcile": reconciliation, "window": window}
+    report["findings"] = fd.findings(finding_input)
+    for f in report["findings"]:
+        p = plans.plan_for(f, finding_input)
+        if p:
+            f["plan"] = p
     report["summary"] = {"spend": bc["cost"], "conversions": bc["conv"], "value": bc["value"], "cpa": bc["cpa"], "roas": bc["roas"], "findings": len(report["findings"]),
                          "high": sum(1 for f in report["findings"] if f["level"] == "high")}
     return report

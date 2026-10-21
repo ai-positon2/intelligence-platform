@@ -449,3 +449,26 @@ def test_a_share_outside_zero_to_a_hundred_cannot_break_the_bar(reports):
 def test_the_script_is_valid_javascript():
     r = subprocess.run(["node", "--check", PAGE], capture_output=True, text=True)
     assert r.returncode == 0, r.stderr
+
+
+def _plan_html(expr, **data):
+    """planHtml cut out of the page script (an IIFE that needs a browser) and run with the page's own escaping."""
+    code = ("const fs=require('fs');const src=fs.readFileSync(%s,'utf8');"
+            "const a=src.indexOf('/* How to act on a finding'), b=src.indexOf('function paintFindings(rep){');"
+            "if(a<0||b<a) throw new Error('function not found');"
+            "const esc=function(s){return String(s==null?'':s).replace(/[&<>\"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',\"'\":'&#39;'}[c];});};"
+            "const f=new Function('esc',src.slice(a,b)+';return {planHtml:planHtml};')(esc);" % json.dumps(PAGE))
+    pre = "".join("const %s=%s;" % (k, json.dumps(v)) for k, v in data.items())
+    r = subprocess.run(["node", "-e", code + pre + "console.log(JSON.stringify(" + expr + "));"], capture_output=True, text=True, timeout=30)
+    assert r.returncode == 0, r.stderr
+    return json.loads(r.stdout)
+
+
+def test_a_findings_plan_is_folded_under_it_escaped_with_its_worth_and_note():
+    p = {"steps": ["Open <Goals>.", "Set it."], "worth": "About 40%.", "note": "Not sized."}
+    html = _plan_html("f.planHtml(P)", P=p)
+    assert html == ('<details class="xc-plan"><summary>How to do it</summary><ol><li>Open &lt;Goals&gt;.</li><li>Set it.</li></ol>'
+                    '<p class="xc-worth"><b>Worth</b> About 40%.</p><p class="xc-worth">Not sized.</p></details>')
+    assert _plan_html("f.planHtml(P)", P={"steps": ["One."]}).count("xc-worth") == 0
+    assert _plan_html("f.planHtml(P)", P=None) == "" and _plan_html("f.planHtml(P)", P={"steps": []}) == ""
+    assert "planHtml(x.plan) + '</li>'" in open(PAGE, encoding="utf-8").read()                      # drawn after the action, in the finding's own item

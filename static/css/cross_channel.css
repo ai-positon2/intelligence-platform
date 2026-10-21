@@ -109,3 +109,10 @@ path.xc-line.xc-l-google{stroke:var(--xc-google);background:none}path.xc-line.xc
 .xc-rec div{display:flex;justify-content:space-between;gap:16px;padding:9px 2px;border-bottom:1px solid var(--pm-line);font-size:14px}
 .xc-rec dt{color:var(--pm-muted)}
 .xc-rec dd{margin:0;font-weight:700;font-variant-numeric:tabular-nums;color:var(--c,var(--pm-ink))}
+
+/* how to do it and what it is worth, under a finding (tracker/paid_xchannel_plans.py) */
+.xc-plan{margin:10px 0 0;font-size:13px;color:var(--pm-ink2)}
+.xc-plan summary{cursor:pointer;font-weight:600;color:var(--pm-a)}
+.xc-plan ol{margin:8px 0 0;padding-left:20px;display:flex;flex-direction:column;gap:6px;line-height:1.55;max-width:80ch}
+.xc-worth{margin:8px 0 0;line-height:1.55;color:var(--pm-muted);max-width:80ch}
+.xc-worth b{color:var(--pm-ink)}

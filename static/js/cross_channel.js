@@ -88,6 +88,12 @@ function paintTop(rep){
 }
 
 /* ── Findings ─────────────────────────────────────────────── */
+/* How to act on a finding and what it is worth (the server works both out: tracker/paid_xchannel_plans.py), folded away under it. */
+function planHtml(p){
+  if(!p || !p.steps || !p.steps.length) return "";
+  return '<details class="xc-plan"><summary>How to do it</summary><ol>' + p.steps.map(function(t){return '<li>' + esc(t) + '</li>';}).join("") + '</ol>' +
+    (p.worth ? '<p class="xc-worth"><b>Worth</b> ' + esc(p.worth) + '</p>' : "") + (p.note ? '<p class="xc-worth">' + esc(p.note) + '</p>' : "") + '</details>';
+}
 function paintFindings(rep){
   var f = rep.findings || [];
   $("#findCard").hidden = !f.length;
@@ -97,7 +103,7 @@ function paintFindings(rep){
     return '<li class="xc-f xc-t-' + esc(l.tone) + '" style="--i:' + i + '"><div class="xc-f-h"><span class="xc-badge">' + esc(l.label) + '</span><b>' + esc(x.title) + '</b></div>' +
       '<p>' + esc(x.text) + '</p>' +
       (x.evidence && x.evidence.length ? '<div class="xc-ev">' + x.evidence.map(function(e){return '<span>' + esc(e) + '</span>';}).join("") + '</div>' : "") +
-      (x.action ? '<div class="xc-do"><em>What to do</em><p>' + esc(x.action) + '</p></div>' : "") + '</li>';
+      (x.action ? '<div class="xc-do"><em>What to do</em><p>' + esc(x.action) + '</p></div>' : "") + planHtml(x.plan) + '</li>';
   }).join("");
 }
 
