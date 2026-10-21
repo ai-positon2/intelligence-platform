@@ -5364,6 +5364,35 @@ def paid_brandis_diagnose():
         return _pm_gads_error(e)
 
 
+# ── Brand Spend Alert (sheet item #26, 2026-10-21) ─────────────────────────────────────────────────────────────
+# What the brand campaigns of a Google Ads account or an MCC's accounts spent last whole week against a usual week from the account's own history, whether the
+# move is more clicks or dearer ones, which campaign moved, and what to do. The plan is docs/brand-spend-plan.md, the arithmetic tracker/paid_brandspend_math.py, the
+# fix plan paid_brandspend_plan.py, the read and report tracker/paid_brandspend.py. The account list is Segment Analysis's. Read only.
+
+@app.route("/p2/paid-marketing/brand-spend")
+@position2_required
+def paid_brand_spend():
+    return render_template("brand_spend.html", user=_get_user())
+
+
+@app.route("/p2/paid-marketing/api/brandspend/report")
+@position2_required
+def paid_brandspend_report():
+    from tracker import paid_gads as paid_gads_base, paid_gads_segments as paid_gads, paid_brandspend
+    src = request.args
+    try:
+        extra = {"force": True} if str(src.get("refresh") or "") in ("1", "true") else {}      # the Refresh button
+        report = paid_brandspend.report_for(src.get("account"), limit=src.get("limit"),
+                                            overrides=paid_brandspend.parse_overrides(src.get("brand"), src.get("notbrand")), **extra)
+        return jsonify(report)
+    except paid_brandspend.BadRequest as e:
+        return jsonify(error=str(e)), 400
+    except paid_gads_base.RefreshTooSoon as e:
+        return jsonify(error=str(e), kind="cooldown", retryIn=e.retry_in), 429
+    except paid_gads.GadsError as e:
+        return _pm_gads_error(e)
+
+
 @app.route("/p2/paid-marketing/api/adstrength/suggest", methods=["POST"])
 @position2_required
 def paid_adstrength_suggest():

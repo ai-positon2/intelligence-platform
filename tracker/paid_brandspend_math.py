@@ -53,7 +53,10 @@ def median(values):
 
 
 def money(v, currency="USD"):
+    """The Brand IS Monitor's money, with a half rounded up from 100 on (Python rounds 1234.5 down, the page rounds it up, and the page and the server must write the same figure)."""
     from .paid_brandis_plan import money as _money
+    if v is not None and abs(v) >= 100:
+        v = math.floor(abs(v) + 0.5) * (1 if v >= 0 else -1)
     return _money(v, currency)
 
 

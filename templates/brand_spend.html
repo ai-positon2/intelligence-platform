@@ -1,0 +1,54 @@
+{% extends "_paid_base.html" %}
+{% block title %}Brand Spend Alert{% endblock %}
+{% block content %}
+<div class="pm pm-bs" id="bs">
+  <section class="pm-hero">
+    <div class="pm-hero-l">
+      <span class="pm-eyebrow"><span class="d"></span>Paid Marketing · Monitoring</span>
+      <h1 class="pm-title">Is the brand spend <span class="pm-grad">where it should be?</span></h1>
+      <p class="pm-sub">Pick an account, or an MCC to check every account in one go. The agent reads what the <b>brand campaigns spent</b> and holds the last whole week against
+        a usual week from the account's own history. It says which accounts are outside it, <b>whether the money went on more clicks or dearer ones</b>, which campaign moved,
+        and what to do about it.</p>
+    </div>
+  </section>
+
+  <section class="pm-panel pd-cmd bi-cmd" id="cmd">
+    <div class="bi-cmd-row">
+      <div id="acctPick"></div>
+      <label class="bi-th"><span class="pd-dd-k">Alert outside</span>
+        <span class="bi-th-in"><b>±</b><input type="number" id="limit" min="10" max="90" step="1" value="30" inputmode="numeric" aria-label="How far from a usual week the brand spend can be, a percentage"><b>%</b></span></label>
+      <p class="bi-scope">Google Ads only. Search campaigns whose name says brand; you can change which count. A usual week is the middle of the account's own last weeks with spend.</p>
+    </div>
+  </section>
+
+  <div id="msg"></div>
+
+  <div id="empty" class="pm-panel sg-empty">
+    <div class="sg-empty-ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-8M22 20H2"/></svg></div>
+    <h2>Choose an account to begin</h2>
+    <p>The numbers come straight from Google Ads. Nothing is changed there: the agent only reports.</p>
+  </div>
+  <div id="skel" hidden><div class="pd-skel"></div><div class="pd-skel"></div><div class="pd-skel"></div></div>
+
+  <div id="out" hidden>
+    <div class="sg-head">
+      <p class="pd-fresh" id="fresh"></p>
+      <button class="pm-btn-ghost" id="refreshBtn" type="button" title="Read Google Ads again"><svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.3-5.6M20 4v5h-5"/></svg>Refresh</button>
+      <button class="pm-btn-ghost" id="exportBtn" type="button"><svg viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>Export CSV</button>
+    </div>
+    <div class="pd-strip" id="kpis"></div>
+
+    <section class="pm-panel" id="listCard">
+      <div class="pm-panel-h"><span class="pm-panel-t">Accounts</span><span class="pm-panel-s" id="listNote"></span></div>
+      <div class="bi-tools"><div class="pm-chips" id="views" role="radiogroup" aria-label="Which accounts"></div></div>
+      <div id="list"></div>
+    </section>
+    <p class="pd-foot" id="foot"></p>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/pm_picker.js') }}?v=1"></script>
+<script src="{{ url_for('static', filename='js/brand_spend_data.js') }}?v=1"></script>
+<script src="{{ url_for('static', filename='js/brand_spend.js') }}?v=1"></script>
+{% endblock %}

@@ -1552,3 +1552,25 @@ tr.ud-dismissed td,tr.ud-gone td{opacity:.62}
 .pd-how{margin:6px 0 0;font-size:12px}
 .pd-how summary{cursor:pointer;color:var(--pm-a);font-weight:600}
 .pd-how ol{margin:6px 0 0;padding-left:18px;display:flex;flex-direction:column;gap:5px;line-height:1.5;color:var(--pm-ink2)}
+
+/* Brand Spend Alert: it draws with the Brand IS Monitor's pieces (.bi-*) and adds its own accent, the usual band behind the weekly bars and the spend figure */
+.pm.pm-bs{--pm-a:#f59e0b;--pm-a2:#fb7185}
+[data-theme="light"] .pm.pm-bs{--pm-a:#b45309}
+.bi-pill.under{color:var(--under);background:var(--under-d);border-color:var(--under-l)}
+.bi-pill.bad{color:var(--bad);background:var(--bad-d);border-color:var(--bad-l)}
+.bs-fig{display:flex;flex-direction:column;gap:2px;min-width:0}
+.bs-fig .bi-n{font-size:20px}
+.bs-fig.over .bi-n,.bs-fig.stopped .bi-n{color:var(--over)}
+.bs-fig.under .bi-n{color:var(--under)}
+.bs-sub{font-size:11.5px;color:var(--pm-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bi-w.under i{background:var(--under)}
+.bs-band{position:absolute;left:0;right:0;border-top:1px dashed color-mix(in srgb,var(--ok) 60%,transparent);border-bottom:1px dashed color-mix(in srgb,var(--ok) 60%,transparent);background:color-mix(in srgb,var(--ok) 12%,transparent);pointer-events:none}
+.bs-legend{margin:8px 0 0;font-size:11.5px;color:var(--pm-muted)}
+.bs-key{display:inline-block;width:14px;height:8px;margin-right:4px;border-radius:2px;vertical-align:middle;background:color-mix(in srgb,var(--ok) 30%,transparent)}
+.bs-worth{margin:12px 0 0;padding:10px 12px;border-left:3px solid var(--pm-a);border-radius:0 10px 10px 0;background:color-mix(in srgb,var(--pm-a) 8%,transparent)}
+.bs-worth b{color:var(--pm-ink)}
+.c-bs{--card-accent:#f59e0b;
+  --band:linear-gradient(90deg,#f59e0b,#fb7185,#f472b6);
+  --thumb:linear-gradient(135deg,#2a1a06 0%,#2e0f1a 100%);
+  --icon-glow:rgba(245,158,11,.5);--card-border:rgba(245,158,11,.35);
+  --card-glow:0 0 40px rgba(245,158,11,.10);--arrow-color:#fde68a}
