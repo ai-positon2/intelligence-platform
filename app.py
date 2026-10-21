@@ -5574,6 +5574,104 @@ def paid_disapproved_report():
         return _pm_gads_error(e)
 
 
+# ── Ad Copy Checker (sheet item #28, 2026-10-22) ────────────────────────────────────────────────────────────────────
+# What is wrong with the words of the live ads of a Google Ads account, an MCC's accounts or a Meta ad account: misspellings, placeholders nobody filled in, damaged characters, repeated
+# words, spacing, doubled punctuation, capitals, a phone number that is not on the account's list, a place saved for another account, the brand written two ways. The rules are
+# tracker/paid_copycheck_rules.py, the answer paid_copycheck_analyse.py, the read and report paid_copycheck.py, the fix plan paid_copycheck_plan.py, what the team saved
+# paid_copycheck_settings.py and the weekly run paid_copycheck_monitor.py. The account list is Segment Analysis's. Read only: nothing is changed in an ad account.
+
+@app.route("/p2/paid-marketing/ad-copy-checker")
+@position2_required
+def paid_ad_copy_checker():
+    return render_template("ad_copy_checker.html", user=_get_user())
+
+
+@app.route("/p2/paid-marketing/api/copycheck/report")
+@position2_required
+def paid_copycheck_report():
+    from tracker import paid_gads as paid_gads_base, paid_gads_segments as paid_gads, paid_copycheck
+    src = request.args
+    try:
+        extra = {"force": True} if str(src.get("refresh") or "") in ("1", "true") else {}      # the Refresh button
+        return jsonify(paid_copycheck.report_for(src.get("account"), mon=_mon_store(), **extra))
+    except paid_copycheck.BadRequest as e:
+        return jsonify(error=str(e)), 400
+    except paid_gads_base.RefreshTooSoon as e:
+        return jsonify(error=str(e), kind="cooldown", retryIn=e.retry_in), 429
+    except paid_gads.GadsError as e:
+        return _pm_gads_error(e)
+
+
+COPYCHECK_GRAMMAR_DAILY_CAP = 30
+_COPYCHECK_USES = {}
+
+
+@app.route("/p2/paid-marketing/api/copycheck/grammar", methods=["POST"])
+@position2_required
+def paid_copycheck_grammar():
+    """Claude's read of the grammar and wording of one account's ad lines, on request. The page sends only the account; the lines are rebuilt here from the saved read of its ads, and every
+    error Claude names is checked against the line it points at (tracker/paid_copycheck_ai.py)."""
+    from tracker import paid_gads as paid_gads_base, paid_gads_segments as paid_gads, paid_copycheck, paid_copycheck_ai
+    account = str((request.get_json(silent=True) or {}).get("account") or "")
+    if paid_gads.GROUP_ID_RE.match(account):
+        return jsonify(error="Pick one account: Claude reads the lines of one account at a time."), 400
+    email, today = _pm_user_email(), datetime.now(timezone.utc).date().isoformat()
+    day, used = _COPYCHECK_USES.get(email, (today, 0))
+    if day != today:
+        used = 0
+    if used >= COPYCHECK_GRAMMAR_DAILY_CAP:
+        return jsonify(error="That is %d grammar reads in a day, the most this allows." % used), 429
+    try:
+        raw, stale, acct = paid_copycheck.load_raw(account)
+    except paid_copycheck.BadRequest as e:
+        return jsonify(error=str(e)), 400
+    except paid_gads.GadsError as e:
+        return _pm_gads_error(e)
+    _COPYCHECK_USES[email] = (today, used + 1)
+    out = paid_copycheck_ai.cached_proofread(acct["id"], paid_copycheck_ai.lines_of(raw["accounts"]), generated_at=raw.get("readAt") or "")
+    return jsonify(dict(out, account={"id": acct["id"], "name": acct["name"]}, readAt=raw.get("readAt")))
+
+
+@app.route("/p2/paid-marketing/api/copycheck/settings")
+@position2_required
+def paid_copycheck_settings():
+    from tracker import paid_copycheck_settings as st
+    store = _mon_store()
+    try:
+        return jsonify(st.view(store))
+    except store.StoreUnavailable as e:
+        return _pm_store_error(e)
+
+
+def _cc_save(fn):
+    from tracker import paid_copycheck_settings as st
+    store = _mon_store()
+    try:
+        return jsonify(fn(st, store, request.get_json(silent=True) or {}))
+    except st.BadRequest as e:
+        return jsonify(error=str(e)), 400
+    except store.StoreUnavailable as e:
+        return _pm_store_error(e)
+
+
+@app.route("/p2/paid-marketing/api/copycheck/settings/account", methods=["POST"])
+@position2_required
+def paid_copycheck_settings_account():
+    return _cc_save(lambda st, store, body: {"account": st.save_account(store, body.get("account"), body.get("name"), body, _pm_user_email())})
+
+
+@app.route("/p2/paid-marketing/api/copycheck/settings/allow", methods=["POST"])
+@position2_required
+def paid_copycheck_settings_allow():
+    return _cc_save(lambda st, store, body: {"allow": st.save_allow(store, body.get("words"), _pm_user_email())})
+
+
+@app.route("/p2/paid-marketing/api/copycheck/settings/allowed-word", methods=["POST"])
+@position2_required
+def paid_copycheck_settings_allowed_word():
+    return _cc_save(lambda st, store, body: {"account": st.add_allowed(store, body.get("account"), body.get("words"), _pm_user_email())})
+
+
 @app.route("/p2/paid-marketing/api/adstrength/suggest", methods=["POST"])
 @position2_required
 def paid_adstrength_suggest():
@@ -21319,6 +21417,7 @@ Unknown Domains Alert (/p2/paid-marketing/unknown-domains): alerts by email and 
 Brand IS Monitor (/p2/paid-marketing/brand-is): is the brand being shown when someone searches for it. Pick a Google Ads account, or an MCC to check every account of it in one go, and a threshold (90% unless changed, 50 to 99), and it reads, read only, the Search impression share of the brand campaigns for the last whole week (Monday to Sunday) and the seven before it. A brand campaign is an enabled Search campaign whose name says brand (and not non-brand, nonbrand, NB, generic, competitor or conquest); the page lists every campaign it counted and every one it did not, with a button to count or not count any of them. Several campaigns are put together by the searches each was eligible for (impressions divided by impression share), not by a plain average, and a week with fewer than 100 eligible searches is not judged. For each account it says whether the brand is on target, below the threshold (high when 10 points or more under), too small to judge, without a reported share or without a brand campaign, which part of the loss is budget and which is rank (60% or more from one side names the cause), whether the share fell 5 points or more on the week before, and one next step: a budget shortfall points to the budget, a rank shortfall to the bids, the Quality Score and Auction Insights in Google Ads (which the agent cannot read, so who else is bidding on the brand is not shown). It shows eight weekly bars with the threshold marked, the brand campaigns with their share, eligible searches, shares lost to budget and rank, top of page share, bidding strategy and daily budget, and downloads CSV. It changes nothing in Google Ads. Meta has no impression share, so it is Google Ads only. For an account under the threshold it gives a fix plan, ordered, each step with why it applies (the figures behind it), how to do it in Google Ads and what it is worth: raise the daily budget (with the extra spend a day worked out from last week), change the bidding for the strategy in use (target impression share target, location and bid limit; smart bidding targets; maximize clicks limit; manual bids), check Quality Score, see who else is bidding (Auction Insights), find what changed when the share fell, and the one campaign holding the share down. A Check the settings button reads, read only, what the brand campaigns are set to (Google's own status and reasons, bidding target and bid limit, budget and whether it is shared, the Quality Score of the brand keywords, the state of the ads) and rebuilds the plan from it. The scheduled Monday run and the email and Slack alerts are not built yet.
 Brand Spend Alert (/p2/paid-marketing/brand-spend): is the brand spend where it should be. Pick a Google Ads account, or an MCC to check every account of it in one go, and a limit (30% either way unless changed, 10 to 90), and it reads, read only, what the brand campaigns spent each day of the last 8 whole weeks (Monday to Sunday) and this week so far. A brand campaign is a Search campaign whose name says brand (and not non-brand, nonbrand, NB, generic, competitor or conquest), the same rule as the Brand IS Monitor; the page lists every campaign it counted and every one it did not, with a button to count or not count any of them. Nothing on the sheet gives the expected limits, so a usual week is the account's own history: the middle of the weekly brand spend of the up to 7 weeks before the last one (at least 4 of them with spend), with the band around it; a swing smaller than 25 in the account's currency is not flagged. An account is as usual, over, under, stopped (nothing last week after weeks of spend, always high), too new to judge (fewer than 4 weeks of spend), without spend or without a brand campaign; twice the limit away is high. It says whether the move is more clicks, dearer clicks or both (spend is clicks times cost per click, split in logs, 60% or more names the cause), names the campaign that moved most, and holds this week so far (from the third day) to the same band pro rata, as a lower level. A fix plan follows from the cause: for more clicks, rule out a good reason (a launch, an event, press), the search terms and the invalid clicks; for dearer clicks, Auction Insights, the bidding and bid limit and the Quality Score; the change history; a ceiling on the budget or bid limit if the rise is not wanted, with the extra spent and what it would be a month if every week were like it (labelled an estimate); for a fall or a stop, whether the campaigns are running (status, ads, dates, billing), whether the brand is still being shown (the Brand IS Monitor), and the clicks that did not happen. It shows eight weekly bars with the usual band behind them, the brand campaigns with last week against their usual week, and downloads CSV. It changes nothing in Google Ads. Google Ads only. It also reads conversions and cost per conversion against usual, the brand's impression share and what it lost to, the month's spend against a saved monthly budget, days far above the usual, brand words found in searches of non-brand campaigns (for accounts with saved brand words) and brand campaigns that never spent. The team can save agreed weekly limits per account. Alerts by email and Slack and a daily run are on the page's Alerts and history panel: the first run sets a baseline and sends nothing, only medium and high issues are alerted, and a summary goes out on Mondays. Performance Max searches are not seen in the brand-word check.
 Disapproved Ads Tracker (/p2/paid-marketing/disapproved-ads): which ads has Google refused to show. Pick a Google Ads account, or an MCC to check every account of it in one go, and it reads, read only, the enabled ads (in enabled ad groups of enabled campaigns) that are disapproved, limited or area-of-interest only, with the policy topics Google named, the text it points at when it names it, the review status (under appeal, being reviewed), the ad's type, first headlines and final URL. For the ad groups those ads sit in it then reads, softly, how many approved ads each has (the cover) and its clicks by whole week for five weeks. An ad group is stopped when every enabled ad in it is disapproved (nothing in it can show, whatever its keywords, high); a disapproved ad with another approved ad beside it is medium; a limited ad is low (it still shows); under appeal and in review are said as they are and never counted as fixed. When the cover could not be read, nothing is called stopped and the page says so. It groups the ads by policy, with the type (a prohibited use is rarely approved on appeal), the plain-words hint for the usual fix and the text Google points at; sizes a stopped ad group by the middle of its clicks in the four weeks before the last against the last week (an estimate of the clicks not coming, the budget is not lost, it goes to other ad groups); and gives a fix plan: put an approved ad in each stopped ad group first (a plain responsive search ad) so it shows while the flagged ad is fixed, then one step per policy (see the reason in the Status column or Tools, Policy manager; edit one ad and check it is approved before changing the rest; appeal only when the ad already follows the policy; a destination problem is fixed on the page), then check again the next business day. It shows the policy table, the stopped ad groups and the flagged ads (the first 40; the CSV has all), and downloads CSV. It changes nothing in Google Ads. It also reads Performance Max assets Google disapproved or limited (an asset group field is stopped when it has fewer approved assets than Google needs), disapproved keywords, and Meta ads that were rejected or flagged. Problems are saved between runs, so it says how long each has been open, whether it came back, and which are new; alerts by email and Slack and a daily run are on the page's Alerts and history panel (the first run sets a baseline and sends nothing). Demand Gen, Shopping and app feeds are not read.
+Ad Copy Checker (/p2/paid-marketing/ad-copy-checker): is the copy of the live ads clean. Pick a Google Ads account, an MCC to check every account in one go, or a Meta ad account, and it reads, read only, the text of the live ads: Search ads (responsive and the old expanded kind), Display ads, the text assets of Performance Max asset groups, the sitelinks, callouts and structured snippets of live campaigns and of the account, and for Meta the primary text, headline and description of every active ad. Plain rules (no model) point at the exact characters that are wrong: a placeholder nobody filled in (high), a damaged character such as an apostrophe saved as three odd letters, a misspelling (a word the dictionary does not know that is one or two letters from one it does, with the correction; the account's own words, its brand, the words of its web address, words used spelt the same way in three or more ads and the team's allowed words are not doubted), a repeated word, no space after a comma or a space before one, doubled punctuation, a whole line or a word in capitals, a line that starts with a small letter, a capital inside a word, descriptions of one ad that disagree on ending with a full stop, headlines of one ad that mix Title Case and sentence case, a phone number that is not on the account's saved list (high), a place saved for another account, and the brand written two ways or not the way the team saved it. Each ad shows its lines with the marked characters, what is wrong and the fix, worst first, with a fix plan, a table of the problems, the phone numbers the ads carry and the words used often that the dictionary does not know. The team saves, per account, its phone numbers, places, brand spelling and allowed words on the page (the Client Master Config is not built yet, so phone and place checks only run against what is saved), and a button "This is right" teaches a word. The rules do not judge grammar or meaning (the dictionary is general English, so a product name can look like a typo), but a button on an account, Read the grammar with Claude, asks Claude on request to read the account's distinct lines for errors of grammar and wording (a wrong word, a missing word); every error it names is checked against the line it points at, it reads one account at a time, 30 reads a person a day, and it is not part of the weekly alerts. Problems are saved between runs: it says how long each ad has been wrong and whether it came back, a weekly run on Mondays alerts by email and Slack to the recipients saved on the page's Alerts and history panel (the first run sets a baseline and sends nothing; small things are counted, never alerted), and it downloads CSV. It changes nothing in any ad account.
 
 Ad Copy & Creative Generator (/p2/paid-marketing/ad-copy): ad copy that is ready to paste, and the creative briefs for formats that need an image or a video. Give it the client (a name, what the ads are for, optionally a website and a Google Ads account), the formats (Google Search responsive search ad, Performance Max asset group, Demand Gen, Responsive Display, Meta feed, Meta Stories and Reels), up to five angles (benefit, problem, proof, offer, urgency, question, local, action), a tone, the facts the client confirmed, keywords to work in, words to avoid and competitors never to name. It reads the client's website (the platform's guarded fetch) and, with an account, the keywords and the best existing responsive search ads, then Claude writes each format on its own from only that evidence and the facts given. What is kept is decided in code, never by the model: a line over the format's limit is dropped, not cut (Google headlines 30, descriptions 90, long headlines 90, Performance Max short description 60, Demand Gen headlines 40, Meta primary text 125, headline 40, link description 30); a line Google Ads would refuse is dropped (emoji, an exclamation mark in a headline, a word in capitals, doubled punctuation, a phone number or web address); copy that tells a Meta viewer something about their personal attributes is dropped; a line that names a competitor, holds an avoid word or repeats another is dropped; Google headlines are in Start Case; and a claim the client's pages and the confirmed facts do not hold (a price, a percentage, years or reviews, a rating, free, a guarantee, best, same day, a health claim) does not drop the line but marks it Confirm, lists the exact claim, and leaves it out of the file for Google Ads Editor until the client confirms it. A format that comes out short is asked once more for exactly what is missing and the result says if it is still short. Each line shows its length against the limit, its angle and whether it is ready; lines can be copied one at a time or all the ready ones in a field. A brief gives the concept, the hook, the visual direction, a script for video, what to ask the client for, do and do not, and the published image and video sizes. It downloads as Excel (a sheet per format), a zip of CSV files, PDF, and a CSV of the ready search ad for Google Ads Editor, Paused. It runs in the background and shares its table of saved builds and its daily cap with Strategy & Campaign Book, Business Research and Keyword Research. It only writes: nothing is created or changed in Google Ads or Meta, and it does not make images or video. Meta lengths are Meta's recommended lengths as published, and image and video sizes should be checked on the platform before a brief goes to a designer.
 Cross-Channel & Attribution Analysis (/p2/paid-marketing/cross-channel): how Google Ads and Meta Ads compare and what they add up to. Pick a Google Ads account, a Meta ad account or one of each (they must bill in the same currency), a range (the last 30, 60 or 90 days, last month or the month so far) and a conversion measure (the conversions each platform bids on, or all conversions), and it reads each platform's daily numbers and shows the platforms side by side and blended against the period of the same length before: spend, clicks, conversions, value, cost per conversion and return on ad spend, with each platform's share of the spend beside its share of the conversions and the value. It splits any change in the blended cost per conversion exactly into what each platform's own cost did and what moving conversions between platforms did, shows the campaign types (Search, Performance Max, Demand Gen, Display, Video, Shopping; Meta by objective) each labelled by what it is usually for (captures demand, creates demand, mixed: a rule of thumb, and a campaign that creates demand is not fairly judged on last-click cost per conversion), and with eleven or more whole weeks (the last 90 days) tests whether one platform's spend moves with the other's conversions, in the same week or a week later, with a strict bar (p below 0.0125 and a correlation of 0.5 or more either way) and says it is a pattern, not proof. It also reads how each platform counts a conversion (Google's primary conversion actions with their click and view lookback windows and attribution model, Meta's attribution window of each ad set weighted by spend) and says in words what makes the two incomparable: different click windows (the longer window counts more), Meta counting people who saw the ad and did not click while Google's Conversions counts clicks only, each platform crediting itself so a person who clicked both is counted by both, and different goals (leads against sales). A person can type the conversions and the revenue their own system recorded for the range; it then says whether the platforms claim more than happened (so some are counted twice) and shows each platform's cost per conversion and return scaled down by the same factor, and the spend per recorded conversion; if the platforms claim less than happened it says the rest came from elsewhere and scales nothing. A platform with under 30 conversions is not ranked. Findings are ranked high, medium, low and information, each with the figures and what to do (a cost per conversion gap of 1.5 times or more suggests testing a move of 10 to 20 percent of the dearer platform's budget, judged on the person's own recorded conversions). It downloads as Excel, PDF and a zip of CSV files. It only reads: nothing is changed in Google Ads or Meta, and no model is asked, every figure is arithmetic. GA4, LinkedIn Ads, programmatic, a CRM and offline sales are not read yet, so a conversion neither platform claims cannot be seen; the reconciliation uses the person's own number instead.

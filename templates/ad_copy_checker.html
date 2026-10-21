@@ -1,0 +1,60 @@
+{% extends "_paid_base.html" %}
+{% block title %}Ad Copy Checker{% endblock %}
+{% block content %}
+<div class="pm pm-cc" id="cc">
+  <section class="pm-hero">
+    <div class="pm-hero-l">
+      <span class="pm-eyebrow"><span class="d"></span>Paid Marketing · Monitoring</span>
+      <h1 class="pm-title">Is the ad copy <span class="pm-grad">clean?</span></h1>
+      <p class="pm-sub">Pick an account, or an MCC to check every account in one go. The agent reads the <b>live ads</b> and points at the exact characters that are wrong: <b>misspellings</b>, placeholders nobody filled in,
+        damaged characters, repeated words, spacing, doubled punctuation and capitals, plus <b>phone numbers</b> and <b>places</b> that do not match what the team saved for the account, and the brand written two ways.</p>
+    </div>
+  </section>
+
+  <section class="pm-panel pd-cmd bi-cmd" id="cmd">
+    <div class="bi-cmd-row da-cmd-row">
+      <div id="acctPick"></div>
+      <p class="bi-scope">Google Ads (Search, Display, Performance Max text, sitelinks, callouts, snippets) and Meta (primary text, headline, description). Only live ads are read. Nothing is changed in an account.</p>
+    </div>
+  </section>
+
+  <div id="msg"></div>
+
+  <div id="empty" class="pm-panel sg-empty">
+    <div class="sg-empty-ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5h14M5 10h14M5 15h8"/><path d="M15 18l2 2 4-5"/></svg></div>
+    <h2>Choose an account to begin</h2>
+    <p>The ads come straight from Google Ads or Meta. Nothing is changed there: the agent only reports.</p>
+  </div>
+  <div id="skel" hidden><div class="pd-skel"></div><div class="pd-skel"></div><div class="pd-skel"></div></div>
+
+  <div id="out" hidden>
+    <div class="sg-head">
+      <p class="pd-fresh" id="fresh"></p>
+      <button class="pm-btn-ghost" id="refreshBtn" type="button" title="Read the ads again"><svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.3-5.6M20 4v5h-5"/></svg>Refresh</button>
+      <button class="pm-btn-ghost" id="exportBtn" type="button"><svg viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>Export CSV</button>
+    </div>
+    <div class="pd-strip" id="kpis"></div>
+    <div id="insights"></div>
+
+    <section class="pm-panel" id="listCard">
+      <div class="pm-panel-h"><span class="pm-panel-t">Accounts</span><span class="pm-panel-s" id="listNote"></span></div>
+      <div class="bi-tools"><div class="pm-chips" id="views" role="radiogroup" aria-label="Which accounts"></div></div>
+      <div id="list"></div>
+    </section>
+
+    <section class="pm-panel cc-global">
+      <div class="pm-panel-h"><span class="pm-panel-t">Words that are right in every account</span></div>
+      <p class="bi-sub">Words the dictionary does not know that no account should be told about (a product, a drug, a person). Separate them with commas.</p>
+      <div class="cc-set-b"><textarea id="globalAllow" rows="2" spellcheck="false" placeholder="invisalign, zoomwhitening"></textarea><button class="pm-btn" id="globalSave" type="button">Save</button><span class="bi-sub" id="globalOut"></span></div>
+    </section>
+    <p class="pd-foot" id="foot"></p>
+  </div>
+  <div id="monPanel"></div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/pm_picker.js') }}?v=1"></script>
+<script src="{{ url_for('static', filename='js/monitor_panel.js') }}?v=1"></script>
+<script src="{{ url_for('static', filename='js/copycheck_data.js') }}?v=1"></script>
+<script src="{{ url_for('static', filename='js/copycheck.js') }}?v=1"></script>
+{% endblock %}
