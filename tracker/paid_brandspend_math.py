@@ -67,11 +67,11 @@ def pct(v, digits=0):
 # ── Totals ──────────────────────────────────────────────────────────────────
 
 def total(rows):
-    """{cost, clicks, impressions, cpc, days}: the rows put together; `days` is how many different days had spend; cpc is None without clicks."""
+    """{cost, clicks, impressions, conversions, cpc, days}: the rows put together; `days` is how many different days had spend; cpc is None without clicks."""
     cost = sum(_f(r.get("cost")) for r in rows)
     clicks = sum(_f(r.get("clicks")) for r in rows)
     out = {"cost": round(cost, 2), "clicks": int(round(clicks)), "impressions": int(round(sum(_f(r.get("impressions")) for r in rows))),
-           "days": len({r.get("date") for r in rows if _f(r.get("cost")) > 0})}
+           "conversions": round(sum(_f(r.get("conversions")) for r in rows), 2), "days": len({r.get("date") for r in rows if _f(r.get("cost")) > 0})}
     out["cpc"] = round(cost / clicks, 4) if clicks > 0 else None
     return out
 
