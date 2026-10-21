@@ -257,6 +257,21 @@ function paintKpis(){
   }).join("");
 }
 
+/* What the change comes to in dollars and how to make it (the server works it out: tracker/paid_season_plans.py): the worth is shown, the steps are folded away. */
+function stepsList(steps){return '<ol>'+steps.map(function(t){return '<li>'+esc(t)+'</li>';}).join("")+'</ol>';}
+function signedPct(v){return (v>0?"+":"")+v+"%";}
+function monthPlanHtml(p){
+  if(!p) return "";
+  var out="";
+  if(p.worth) out+='<p class="sa-worth"><b>Worth</b> '+esc(p.worth)+'</p>';
+  if(p.note) out+='<p class="sa-small">'+esc(p.note)+'</p>';
+  if(p.steps&&p.steps.length) out+='<details class="sa-plan"><summary>How to make the change</summary>'+stepsList(p.steps)+'</details>';
+  (p.events||[]).forEach(function(e){
+    if(e.eligible) out+='<details class="sa-plan"><summary>Seasonality adjustment for '+esc(e.name)+' ('+esc(signedPct(e.modifier))+')</summary>'+stepsList(e.steps)+'</details>';
+    else if(e.why) out+='<p class="sa-small"><b>'+esc(e.name)+'.</b> '+esc(e.why)+'</p>';
+  });
+  return out;
+}
 function paintAhead(){
   var u=S.data.upcoming||[], sec=$("#aheadSec"), el=$("#ahead");
   if(!u.length){
@@ -277,7 +292,7 @@ function paintAhead(){
         idxTile("Conversions",m.conv,"conv")+idxTile("Cost per conversion",m.cpa,"cpa")+idxTile("Spend",m.cost,"cost")+
       '</div>'+
       '<p class="sa-adv">'+esc(m.advice)+'</p>'+
-      '<p class="sa-bud"><b>'+esc(D.budgetText(m.budget))+'</b></p>'+
+      '<p class="sa-bud"><b>'+esc(D.budgetText(m.budget))+'</b></p>'+monthPlanHtml(m.plan)+
       (m.n<=1&&m.conv!=null?'<p class="sa-small">One year of history behind this month, so treat it as a lead.</p>':'')+
       (ev?'<ul class="sa-ev">'+ev+'</ul>':'')+
     '</article>';

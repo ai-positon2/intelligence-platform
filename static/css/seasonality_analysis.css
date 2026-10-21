@@ -79,3 +79,10 @@ select.ps-sel option{color:#111;background:#fff}
   .sa-idx{grid-template-columns:repeat(3,minmax(0,1fr))}
   .sa-it b{font-size:19px}
 }
+
+/* the change in dollars and how to make it (tracker/paid_season_plans.py) */
+.sa-worth{margin:0;font-size:13px;line-height:1.55;color:var(--pm-muted)}
+.sa-worth b{color:var(--pm-ink)}
+.sa-plan{margin:0;font-size:13px;color:var(--pm-ink2)}
+.sa-plan summary{cursor:pointer;font-weight:600;color:var(--pm-a)}
+.sa-plan ol{margin:8px 0 0;padding-left:20px;display:flex;flex-direction:column;gap:6px;line-height:1.55}

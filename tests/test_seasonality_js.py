@@ -185,3 +185,45 @@ def test_the_current_part_month_is_not_laid_against_whole_months():
 
 def test_a_missing_figure_is_not_a_change_of_minus_one_hundred_percent():
     assert run("D.change(null, 100)") is None and run("D.change(0, 100)") == -1                # no figure is not the same as none of it
+
+
+# ── The plan under a month ahead, run from the page script ────────────────
+
+def _page_fn(expr, **data):
+    """monthPlanHtml cut out of the page script (an IIFE that needs a browser) and run with the page's own escaping."""
+    code = ("const fs=require('fs');const src=fs.readFileSync(%s,'utf8');"
+            "const a=src.indexOf('/* What the change comes to in dollars'), b=src.indexOf('function paintAhead(){');"
+            "if(a<0||b<a) throw new Error('functions not found');"
+            "const esc=function(s){return String(s==null?'':s).replace(/[&<>\"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',\"'\":'&#39;'}[c];});};"
+            "const f=new Function('esc',src.slice(a,b)+';return {monthPlanHtml:monthPlanHtml};')(esc);" % json.dumps(PAGE))
+    pre = "".join("const %s=%s;" % (k, json.dumps(v)) for k, v in data.items())
+    r = subprocess.run(["node", "-e", code + pre + "console.log(JSON.stringify(" + expr + "));"], capture_output=True, text=True, timeout=30)
+    assert r.returncode == 0, r.stderr
+    return json.loads(r.stdout)
+
+
+PLAN = {"steps": ["Open Campaigns.", "Raise <budgets>."], "worth": "About $260 a day.", "note": None,
+        "events": [{"name": "Black Friday", "eligible": True, "modifier": 20, "steps": ["Open the tool.", "Set +20%."]},
+                   {"name": "Back to school", "eligible": False, "why": "It runs 28 days."},
+                   {"name": "No reason", "eligible": False}]}
+
+
+def test_the_worth_is_shown_and_the_steps_and_each_adjustment_are_folded_away():
+    html = _page_fn("f.monthPlanHtml(P)", P=PLAN)
+    assert html.startswith('<p class="sa-worth"><b>Worth</b> About $260 a day.</p>')
+    assert '<details class="sa-plan"><summary>How to make the change</summary><ol><li>Open Campaigns.</li><li>Raise &lt;budgets&gt;.</li></ol></details>' in html
+    assert '<details class="sa-plan"><summary>Seasonality adjustment for Black Friday (+20%)</summary><ol><li>Open the tool.</li><li>Set +20%.</li></ol></details>' in html
+    assert '<p class="sa-small"><b>Back to school.</b> It runs 28 days.</p>' in html and "No reason" not in html
+
+
+def test_a_note_replaces_the_steps_and_no_plan_draws_nothing():
+    html = _page_fn("f.monthPlanHtml(P)", P={"steps": [], "worth": None, "note": "Spend already follows demand.", "events": []})
+    assert html == '<p class="sa-small">Spend already follows demand.</p>'
+    assert _page_fn("f.monthPlanHtml(P)", P=None) == ""
+    assert _page_fn("f.monthPlanHtml(P)", P={"steps": [], "events": []}) == ""
+    assert _page_fn("f.monthPlanHtml(P)", P={"steps": ["One."], "events": [{"name": "X", "eligible": True, "modifier": -15, "steps": ["Two."]}]}).count("(-15%)") == 1
+
+
+def test_each_month_card_draws_its_plan_after_the_budget_line():
+    src = open(PAGE, encoding="utf-8").read()
+    assert "esc(D.budgetText(m.budget))+'</b></p>'+monthPlanHtml(m.plan)+" in src
