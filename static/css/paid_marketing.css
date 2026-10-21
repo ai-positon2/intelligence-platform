@@ -1624,3 +1624,8 @@ tr.ud-dismissed td,tr.ud-gone td{opacity:.62}
 .bs-edit-row label.wide{grid-column:1 / -1}
 .bs-edit-row input{height:40px;padding:0 12px;border-radius:12px;border:1px solid var(--pm-line2);background:var(--pm-panel2);color:var(--pm-ink);font:500 14px 'Space Grotesk',sans-serif;text-transform:none;letter-spacing:0}
 @media (max-width:700px){.bs-edit-row{grid-template-columns:minmax(0,1fr)}}
+
+/* Disapproved Ads Tracker: what shows across accounts and across time */
+.da-ins ul{margin:0;padding:0 0 4px;list-style:none;display:flex;flex-direction:column;gap:10px}
+.da-ins li{font-size:13px;line-height:1.55;color:var(--pm-ink2);padding-left:12px;border-left:3px solid var(--pm-a)}
+.da-ins li.fixes{border-left-color:var(--ok)}

@@ -4,6 +4,7 @@ The server reads Google Ads, decides which ad groups can show nothing and ranks 
 and a sum read, which accounts a view shows and the CSV come from disapproved_data.js (executed here, not read), and disapproved.js is run for real: it loads the accounts, draws the
 report the server built and says what went wrong in words. The HTML it writes is read back.
 """
+import datetime as dt
 import json
 import os
 import re
@@ -13,6 +14,7 @@ import subprocess
 import pytest
 
 from tests import test_paid_disapproved as T
+from tests import test_paid_disapproved_extra as X
 from tracker import paid_assets_plans as ap
 from tracker import paid_brandspend_math as bm
 from tracker import paid_disapproved as d
@@ -57,12 +59,21 @@ def reports():
            "4444444444": []}
     cover = {T.ACCT["id"]: [{"adGroup": {"id": "11"}}], T.ACCT2["id"]: [{"adGroup": {"id": "20"}}], "3333333333": [{"adGroup": {"id": "30"}}]}
     weekly = {T.ACCT["id"]: [T.week_row("10", keys[i], 100, 50_000_000) for i in range(4)]}
+    assets = {T.ACCT2["id"]: [X.arow(aid="900"), X.arow(aid="901")]}
+    asset_cover = {T.ACCT2["id"]: [X.arow(aid="a"), X.arow(aid="b"), X.arow(aid="c")]}
+    keywords = {T.ACCT2["id"]: [X.krow()]}
+    from tests.monitor_fakes import MemStore
+    mon = MemStore()
+    mon.issues_put([{"agent": "disapproved", "fingerprint": "group:1234567890:10", "status": "open", "firstSeen": "2026-10-18T07:00:00+00:00", "lastSeen": "2026-10-21T07:00:00+00:00", "reopened": 1, "resolvedAt": None},
+                    {"agent": "disapproved", "fingerprint": "topic:1234567890:DESTINATION_NOT_WORKING", "status": "open", "firstSeen": "2026-10-19T07:00:00+00:00", "lastSeen": "2026-10-21T07:00:00+00:00", "reopened": 0, "resolvedAt": None},
+                    {"agent": "disapproved", "fingerprint": "old:1", "status": "resolved", "firstSeen": "2026-10-10T07:00:00+00:00", "lastSeen": "2026-10-12T07:00:00+00:00", "reopened": 0, "resolvedAt": "2026-10-12T07:00:00+00:00"}])
+    asof = dt.datetime(2026, 10, 21, 7, 0, tzinfo=dt.timezone.utc)
 
     def go(account, **kw):
         paid_geo.clear_cache()
         T.base.forget("")
         return d.report_for(account, accounts_fn=lambda: ACCOUNTS, groups_fn=lambda: [{"id": GROUP, "name": "Group", "currency": "USD", "accountIds": [a["id"] for a in ACCOUNTS]}],
-                            search_fn=T.searcher(ads, cover=cover, weekly=weekly), today=T.TODAY, **kw)
+                            search_fn=T.searcher(ads, cover=cover, weekly=weekly, assets=assets, asset_cover=asset_cover, keywords=keywords), today=T.TODAY, mon=mon, asof=asof, **kw)
     out = {"mcc": json.loads(json.dumps(go(GROUP))), "one": json.loads(json.dumps(go("1234567890"))), "clear": json.loads(json.dumps(go("4444444444")))}
     mp.undo()
     paid_geo.clear_cache()
@@ -78,7 +89,7 @@ def test_every_status_and_state_the_server_can_send_has_a_label_and_a_tone_and_t
     for s in seen:
         assert run("X.STATUS[%s]" % json.dumps(s)) is not None
     states = {i["state"] for a in reports["mcc"]["accounts"] for i in a["items"]}
-    assert states == {"dead", "covered", "limited"}
+    assert states == {"dead", "covered", "limited", "keyword"}
     for s in states | {"unchecked"}:
         assert run("X.STATE[%s]" % json.dumps(s)) is not None
     levels = {f["level"] for a in reports["mcc"]["accounts"] for f in a["findings"]} | {s["level"] for a in reports["mcc"]["accounts"] for s in a["plan"]["steps"]}
@@ -114,7 +125,7 @@ def test_the_tiles_are_the_servers_numbers_in_words(reports):
     assert t[0][1] == "4" and "last 5 whole weeks" in t[0][2]
     assert t[1][1] == "2" and t[1][3] == "warn" and "1 with an ad group stopped" in t[1][2]
     assert t[2][1] == "1" and t[2][3] == "warn" and "about 100 clicks a week not coming" in t[2][2]
-    assert t[3][1] == "4" and "1 under appeal or in review" in t[3][2] and t[4][1] == "1"
+    assert t[3][1] == "6" and t[3][2] == "1 keyword too, 1 under appeal or in review" and t[4][1] == "1"
     quiet = run("X.tiles(R)", R=reports["clear"])
     assert quiet[1][1] == "0" and quiet[1][3] == "good" and "no ad is disapproved" in quiet[1][2] and quiet[2][3] == "good" and "none has all its ads disapproved" in quiet[2][2] and "none waiting on Google" in quiet[3][2]
     nolost = json.loads(json.dumps(reports["mcc"]))
@@ -133,21 +144,45 @@ def test_the_address_carries_the_account_and_refresh():
     assert run("X.query('1234567890',false)") == "account=1234567890" and run("X.query('mcc-1',true)") == "account=mcc-1&refresh=1" and run("X.query('a b&c',false)") == "account=a%20b%26c"
 
 
-def test_the_csv_has_a_line_per_flagged_ad_and_a_line_for_an_account_with_none(reports):
+def test_the_csv_has_a_line_per_flagged_item_and_a_line_for_an_account_with_none(reports):
     rows = run("X.csvRows(R)", R=reports["mcc"])
     head = run("X.HEAD")
-    assert rows[0] == ["Disapproved Ads Tracker", "Group"] and rows[1] == ["Weeks", "2026-09-14 to 2026-10-18"] and rows[3] == head
+    assert rows[0] == ["Disapproved Ads Tracker", "Group"] and rows[1] == ["Weeks", "2026-09-14 to 2026-10-18"] and rows[3] == head and head[5] == "Kind" and head[16] == "Stopped for days"
     body = rows[4:]
-    assert all(len(r) == len(head) for r in body) and head[-1] == "Fix plan" and len(body) == 6              # 3 + 1 + 1 flagged ads and one line for the clear account
+    assert all(len(r) == len(head) for r in body) and head[-1] == "Fix plan" and len(body) == 9              # 3 + 1 + 1 ads, two assets, a keyword and one line for the clear account
     first = next(r for r in body if r[4] == "1")
-    assert first[:4] == ["Acme Dental", "Ad groups stopped", "Core <Search>", "Group 10"] and first[5] == "responsive search ad" and first[6] == "Disapproved" and first[7] == "" and first[8] == "No approved ad in the ad group"
-    assert first[9] == "Destination not working" and first[10] == "Click here!!!" and first[11] == "Dentist near you | Book today" and first[12] == "https://example.com/a" and first[13] == 100 and first[14] == 0
-    assert next(r for r in body if r[4] == "4")[7] == "Under appeal" and next(r for r in body if r[4] == "5")[8] == "Limited, still shows" and next(r for r in body if r[4] == "3")[13] == ""
+    assert first[:4] == ["Acme Dental", "Ad groups stopped", "Core <Search>", "Group 10"] and first[5] == "Ad" and first[6] == "responsive search ad" and first[7] == "Disapproved" and first[8] == "" and first[9] == "No approved ad in the ad group"
+    assert first[10] == "Destination not working" and first[11] == "Click here!!!" and first[12] == "Dentist near you | Book today" and first[13] == "https://example.com/a" and first[14] == 100 and first[15] == 0 and first[16] == 3
+    assert next(r for r in body if r[4] == "4")[8] == "Under appeal" and next(r for r in body if r[4] == "5")[9] == "Limited, still shows" and next(r for r in body if r[4] == "3")[14] == "" and next(r for r in body if r[4] == "3")[16] == ""
+    asset = next(r for r in body if r[4].startswith("asset:"))
+    assert asset[5] == "Performance Max asset" and asset[3] == "Summer (headlines)" and asset[12] == "Free whitening!!!"
+    kw = next(r for r in body if r[4].startswith("kw:"))
+    assert kw[5] == "Keyword" and kw[12] == "[cheap implants]" and kw[9] == "Keyword cannot show"
     clear = next(r for r in body if r[0] == "Delta")
-    assert clear[1] == "All clear" and clear[2] == "(no flagged ad)" and clear[-1] == ""
+    assert clear[1] == "All clear" and clear[2] == "(no flagged ad)" and clear[-1] == "" and len(clear) == len(head)
     acme = next(a for a in reports["mcc"]["accounts"] if a["name"] == "Acme Dental")
     assert first[-1].startswith("1. Get the ad groups that cannot show an ad running again | 2. ") and first[-1] == run("X.planTitles(A)", A=acme)
     assert run("X.planTitles(A)", A={"plan": None}) == "" and run("X.planTitles(A)", A={}) == ""
+
+
+def test_what_shows_across_accounts_and_over_time_is_said_in_sentences():
+    r = {"patterns": [{"topic": "T", "label": "Trademarks in ad text", "accounts": ["A", "B", "C", "D", "E", "F"], "ads": 9}, {"topic": "U", "label": "Destination mismatch", "accounts": ["A", "B"], "ads": 2}], "fixTimes": {"fixed": 1, "median": 1, "longest": 1}}
+    got = run("X.insights(R)", R=r)
+    assert [g["kind"] for g in got] == ["pattern", "pattern", "fixes"]
+    assert got[0]["text"].startswith("Trademarks in ad text flags ads in 6 accounts (A, B, C, D and 2 more), 9 ads in all. The same policy in many accounts is usually one cause") and got[1]["text"].startswith("Destination mismatch flags ads in 2 accounts (A, B), 2 ads in all.")
+    assert got[2]["text"] == "Of the 1 problem fixed since the monitor began, the middle one took 1 day and the longest 1."
+    assert run("X.insights(R)", R={"patterns": [], "fixTimes": {"fixed": 3, "median": 2, "longest": 7}})[0]["text"] == "Of the 3 problems fixed since the monitor began, the middle one took 2 days and the longest 7."
+    assert run("X.insights(R)", R={}) == [] and run("X.insights(R)", R={"patterns": [], "fixTimes": None}) == []
+
+
+def test_five_accounts_say_one_more_and_four_say_no_more():
+    five = run("X.insights(R)", R={"patterns": [{"label": "P", "accounts": list("ABCDE"), "ads": 5}]})[0]["text"]
+    four = run("X.insights(R)", R={"patterns": [{"label": "P", "accounts": list("ABCD"), "ads": 4}]})[0]["text"]
+    assert "(A, B, C, D and 1 more)" in five and "(A, B, C, D)" in four and "more)" not in four
+
+
+def test_each_kind_of_flagged_thing_has_its_name():
+    assert [run("X.kindText(%s)" % json.dumps(k)) for k in ("ad", "asset", "keyword", "meta", None, "zzz")] == ["Ad", "Performance Max asset", "Keyword", "Meta ad", "Ad", "Ad"]
 
 
 # ── the page script ─────────────────────────────────────────────────────────
@@ -155,7 +190,7 @@ def test_the_csv_has_a_line_per_flagged_ad_and_a_line_for_an_account_with_none(r
 HARNESS = r"""
 const fs = require("fs"), vm = require("vm");
 const paths = JSON.parse(process.argv[1]), sc = JSON.parse(process.argv[2]);
-const els = {}, calls = [], hist = [], store = {}, downloads = [], held = [];
+const els = {}, calls = [], hist = [], store = {}, downloads = [], held = [], panels = [];
 function el(sel) {
   if (!els[sel]) els[sel] = { sel, innerHTML: "", textContent: "", value: (sc.values || {})[sel] || "", hidden: false, href: "", handlers: {},
     addEventListener(ev, fn) { this.handlers[ev] = fn; }, setAttribute() {}, getAttribute() { return null; } };
@@ -175,7 +210,7 @@ function respond(url) {
   return answer;
 }
 let picker = null; const sets = [];
-const win = { PMPicker: (host, o) => { picker = { onChange: o.onChange, set(items, v, dis) { sets.push({ items, v, dis }); } }; return picker; } };
+const win = { MonitorPanel: { mount: (host, o) => panels.push(o) }, PMPicker: (host, o) => { picker = { onChange: o.onChange, set(items, v, dis) { sets.push({ items, v, dis }); } }; return picker; } };
 const ctx = { window: win, document: doc, history: { replaceState(a, b, u) { hist.push(u); } }, location: { search: sc.search || "", pathname: "/p2/paid-marketing/disapproved-ads" },
   localStorage: { getItem: k => (k in store ? store[k] : (sc.stored || {})[k] || null), setItem: (k, v) => { store[k] = v; } },
   URLSearchParams, URL: { createObjectURL: b => { downloads.blob = b; return "blob:x"; }, revokeObjectURL() {} }, Blob: class { constructor(p) { this.text = p.join(""); } },
@@ -200,7 +235,7 @@ function target(spec) {
     if (step.fire) { const [sel, closest] = step.fire; el(sel).handlers.click({ target: target({ closest }) }); }
     for (let i = 0; i < 6; i++) await tick();
   }
-  const out = { calls, hist, store, sets, downloads: downloads.map(d => ({ name: d.name })), blob: downloads.blob ? downloads.blob.text : "", el: {} };
+  const out = { calls, panels, hist, store, sets, downloads: downloads.map(d => ({ name: d.name })), blob: downloads.blob ? downloads.blob.text : "", el: {} };
   for (const k of Object.keys(els)) out.el[k] = { html: els[k].innerHTML, text: els[k].textContent, hidden: els[k].hidden, value: els[k].value };
   process.stdout.write(JSON.stringify(out));
 })();
@@ -250,7 +285,7 @@ def test_the_whole_report_is_drawn_most_serious_first_with_markup_escaped(report
         assert text in kp, text
     assert lst.index("Acme Dental") < lst.index("Beta Clinic") and "Gamma" not in lst and "Delta" not in lst              # "Needs a look" holds the two that need one
     assert "bi-pill bad" in lst and "Ad groups stopped" in lst and "bi-pill over" in lst and "Ads disapproved" in lst and "Destination not working" in lst and "1 under appeal" in lst
-    assert '<span class="bi-n">1</span><span class="bs-sub">ad group with nothing to show</span>' in lst and '<span class="bi-n">1</span><span class="bs-sub">ad disapproved, others cover</span>' in lst
+    assert '<span class="bi-n">1</span><span class="bs-sub">ad group with nothing to show · the oldest for 3 days</span>' in lst and '<span class="bi-n">3</span><span class="bs-sub">ads disapproved, others cover</span>' in lst
     views = out["el"]["#views"]["html"]
     assert "Needs a look <span class=\"n\">2</span>" in views and "All <span class=\"n\">4</span>" in views and 'class="pm-chip on" data-v="attention"' in views
     assert "MCC · 4 accounts checked together" in out["el"]["#fresh"]["html"] and "most serious first" in out["el"]["#listNote"]["text"]
@@ -354,7 +389,7 @@ def test_a_copy_saved_while_google_was_not_answering_says_so_and_warnings_are_sh
 
 def test_the_footnote_says_what_stopped_means_and_that_the_hints_are_not_a_ruling(reports):
     foot = opened(reports["one"])["el"]["#foot"]["html"]
-    assert "stopped</b> when every enabled ad in it is disapproved" in foot and "not a ruling" in foot and "Performance Max, Demand Gen, Shopping" in foot
+    assert "stopped</b> when every enabled ad in it is disapproved" in foot and "not a ruling" in foot and "In Performance Max the unit is a field of an asset group" in foot and "Merchant Center" in foot and "no age" in foot
     assert "—" not in foot and "–" not in foot
 
 
@@ -372,3 +407,79 @@ def test_nothing_the_page_writes_has_a_dash_or_an_unfilled_slot(reports):
         {"fire": ["#list", {".bi-head": {}, ".bi-row": {"dataset": {"id": a["id"]}}}]} for a in reports["mcc"]["accounts"]])
     text = re.sub(r"<[^>]+>", " ", out["el"]["#list"]["html"] + out["el"]["#kpis"]["html"] + out["el"]["#foot"]["html"])
     assert "—" not in text and "–" not in text and "undefined" not in text and "NaN" not in text and "[object" not in text and "null" not in text
+
+
+# ── Age, shared causes, keywords, assets, Meta and the panel ────────────────
+
+def test_the_page_says_what_shows_across_accounts_and_over_time(reports):
+    out = opened(reports["mcc"], [{"pick": GROUP}])
+    ins = out["el"]["#insights"]["html"]
+    rep = reports["mcc"]
+    assert rep["patterns"][0]["label"] == "Punctuation and symbols" and sorted(rep["patterns"][0]["accounts"]) == ["Beta Clinic", "Gamma <b>&</b> Co"]
+    assert "Across the accounts" in ins and "Punctuation and symbols flags ads in 2 accounts (" in ins and "Gamma &lt;b&gt;&amp;&lt;/b&gt; Co" in ins and "<b>&</b>" not in ins
+    assert "Of the 1 problem fixed since the monitor began, the middle one took 2 days and the longest 2." in ins
+    quiet = opened(reports["clear"])["el"]["#insights"]["html"]
+    assert "fixed since the monitor began" in quiet and "flags ads in" not in quiet                   # one account has no pattern across accounts, the fix times are the monitor's
+    none = json.loads(json.dumps(reports["clear"]))
+    none["fixTimes"] = None
+    assert opened(none)["el"]["#insights"]["html"] == ""
+
+
+def test_a_stopped_group_and_a_policy_show_how_long_they_have_been_open_and_that_they_came_back(reports):
+    lst = opened(reports["one"])["el"]["#list"]["html"]
+    assert "ad group with nothing to show · the oldest for 3 days" in lst
+    assert '<span class="bi-mk">came back 1x</span>' in lst and "<th class=\"r\">Stopped for</th><th class=\"r\">Lost since</th>" in lst and ">3 days<" in lst and "about 43 clicks" in lst
+    assert "<th class=\"r\">Flagged for</th>" in lst and ">2 days<" in lst
+    assert "It has been flagged for 2 days." in lst and "The longest has been stopped for 3 days (about 43 clicks lost since)." in lst
+
+
+def test_a_performance_max_asset_a_keyword_and_a_meta_badge_are_drawn(reports):
+    beta = next(a for a in reports["mcc"]["accounts"] if a["name"] == "Beta Clinic")
+    out = opened(dict(reports["mcc"], accounts=[beta]), [{"pick": GROUP}])
+    lst = out["el"]["#list"]["html"]
+    assert 'class="bi-mk">Performance Max asset</span> Free whitening!!!' in lst and "<h4>Disapproved keywords <span class=\"dim\">(1)</span></h4>" in lst and "[cheap implants]" in lst and "Healthcare and medicines" in lst
+    assert "3 ads and assets are disapproved" in lst and "Each has another approved ad or asset in its ad group, so the ad group still shows." in lst
+    meta = json.loads(json.dumps(beta))
+    meta["platform"] = "meta"
+    assert 'Beta Clinic <span class="bi-mk">Meta</span>' in opened(dict(reports["mcc"], accounts=[meta]), [{"pick": GROUP}])["el"]["#list"]["html"]
+
+
+def test_what_the_flagged_ads_share_is_drawn_as_a_table(reports):
+    r = json.loads(json.dumps(reports["one"]))
+    r["accounts"][0]["suspects"] = [{"kind": "headline", "text": "Book today <now>", "ads": 6, "of": 8}, {"kind": "url", "text": "https://example.com/a", "ads": 4, "of": 8}, {"kind": "evidence", "text": "Free!!!", "ads": 3, "of": 8}]
+    lst = opened(r)["el"]["#list"]["html"]
+    assert "What the flagged ads have in common" in lst and "<td>Headline</td><td>Book today &lt;now&gt;</td><td class=\"r\">6 of 8 flagged ads</td>" in lst and "<td>Page</td>" in lst and "<td>Text Google points at</td>" in lst
+    plain = json.loads(json.dumps(reports["one"]))
+    plain["accounts"][0]["suspects"] = []
+    assert "What the flagged ads have in common" not in opened(plain)["el"]["#list"]["html"]
+
+
+def test_meta_ad_accounts_are_in_the_list_after_the_google_ones_and_a_meta_list_that_fails_costs_nothing(reports):
+    meta = {"accounts": [{"id": "act_1234567", "name": "Meta Co", "currency": "USD", "platform": "meta"}, {"id": "other", "name": "Not Meta", "platform": "google"}]}
+    out = page({"responses": [{"match": "/segments/accounts", "body": ACCTS}, {"match": "/gads/accounts", "body": meta}]})
+    items = out["sets"][-1]["items"]
+    assert [i["label"] for i in items][-1] == "Meta Co" and items[-1]["group"] == "Meta ad accounts" and items[-1]["value"] == "act_1234567" and "Meta" in items[-1]["badge"] and len(items) == 7
+    assert [c for c in out["calls"] if "gads/accounts" in c] == ["/p2/paid-marketing/api/gads/accounts?platform=meta"]
+    down = page({"responses": [{"match": "/segments/accounts", "body": ACCTS}], "reject": "/gads/accounts"})
+    assert len(down["sets"][-1]["items"]) == 6
+    bad = page({"responses": [{"match": "/segments/accounts", "body": ACCTS}, {"match": "/gads/accounts", "status": 409, "body": {"error": "Meta is not connected"}}]})
+    assert len(bad["sets"][-1]["items"]) == 6
+
+
+def test_the_alert_panel_is_mounted_for_this_monitor_and_has_a_place_in_the_template(reports):
+    assert opened(reports["one"])["panels"] == [{"agent": "disapproved", "label": "Disapproved Ads Tracker"}]
+    html = open(TEMPLATE, encoding="utf-8").read()
+    assert 'id="insights"' in html and html.index('id="monPanel"') > html.index('id="out"') and html.index("monitor_panel.js") < html.index("disapproved_data.js")
+
+
+def test_a_policy_that_came_back_says_so_in_the_table_and_an_account_without_keywords_has_no_keyword_table(reports):
+    r = json.loads(json.dumps(reports["one"]))
+    r["accounts"][0]["topics"][0]["reopened"] = 2
+    lst = opened(r)["el"]["#list"]["html"]
+    assert '<span class="bi-mk">came back 2x</span>' in lst and "Disapproved keywords" not in lst
+
+
+def test_a_keyword_is_in_the_keyword_table_and_not_among_the_flagged_ads(reports):
+    beta = next(a for a in reports["mcc"]["accounts"] if a["name"] == "Beta Clinic")
+    lst = opened(dict(reports["mcc"], accounts=[beta]), [{"pick": GROUP}])["el"]["#list"]["html"]
+    assert lst.count("<td>[cheap implants]</td>") == 1 and "Keyword</span> [cheap implants]" not in lst and "Disapproved keywords" in lst

@@ -14,7 +14,7 @@
   <section class="pm-panel pd-cmd bi-cmd" id="cmd">
     <div class="bi-cmd-row da-cmd-row">
       <div id="acctPick"></div>
-      <p class="bi-scope">Google Ads only. Enabled ads in enabled ad groups of enabled campaigns. Performance Max, Demand Gen and Shopping are not ads in this read.</p>
+      <p class="bi-scope">Google Ads and Meta. Enabled ads in enabled ad groups of enabled campaigns. Performance Max assets and disapproved keywords are read too. Meta ad accounts are in the list.</p>
     </div>
   </section>
 
@@ -34,6 +34,7 @@
       <button class="pm-btn-ghost" id="exportBtn" type="button"><svg viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>Export CSV</button>
     </div>
     <div class="pd-strip" id="kpis"></div>
+    <div id="insights"></div>
 
     <section class="pm-panel" id="listCard">
       <div class="pm-panel-h"><span class="pm-panel-t">Accounts</span><span class="pm-panel-s" id="listNote"></span></div>
@@ -42,10 +43,12 @@
     </section>
     <p class="pd-foot" id="foot"></p>
   </div>
+  <div id="monPanel"></div>
 </div>
 {% endblock %}
 {% block scripts %}
 <script src="{{ url_for('static', filename='js/pm_picker.js') }}?v=1"></script>
-<script src="{{ url_for('static', filename='js/disapproved_data.js') }}?v=1"></script>
-<script src="{{ url_for('static', filename='js/disapproved.js') }}?v=1"></script>
+<script src="{{ url_for('static', filename='js/monitor_panel.js') }}?v=1"></script>
+<script src="{{ url_for('static', filename='js/disapproved_data.js') }}?v=2"></script>
+<script src="{{ url_for('static', filename='js/disapproved.js') }}?v=2"></script>
 {% endblock %}

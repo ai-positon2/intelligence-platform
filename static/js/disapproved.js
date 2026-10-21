@@ -22,7 +22,7 @@ function ago(iso){
 }
 function store(k,v){try{if(v===undefined)return localStorage.getItem(k)||"";localStorage.setItem(k,v);}catch(e){return "";}}
 
-var S = {accounts:[], groups:[], account:"", report:null, seq:0, view:"attention", open:{}};
+var S = {accounts:[], groups:[], account:"", report:null, seq:0, view:"attention", open:{}, meta:[]};
 
 var picker = window.PMPicker($("#acctPick"),{label:"Google Ads account",search:true,onChange:function(v){
   S.account=v; store("da_account",v); run();
@@ -42,7 +42,8 @@ function setAccounts(list, groups){
   list.filter(function(a){return !seen[a.id];}).forEach(function(a){
     items.push({value:a.id,label:a.name,avatar:inits(a.name),hue:hueOf(a.name),group:S.groups.length?"Other accounts":"",sub:dashed(a.id)});
   });
-  if(!list.some(function(a){return a.id===S.account;})&&!groupOf(S.account)) S.account="";
+  S.meta.forEach(function(a){ items.push({value:a.id,label:a.name,avatar:inits(a.name),hue:hueOf(a.name),group:"Meta ad accounts",badge:'<span class="badge pm-pill">Meta</span>',sub:a.id}); });
+  if(!list.some(function(a){return a.id===S.account;})&&!groupOf(S.account)&&!S.meta.some(function(a){return a.id===S.account;})) S.account="";
   picker.set(items,S.account);
 }
 
@@ -91,17 +92,22 @@ function render(){
     (rep.account.isGroup?' <span class="sg-mcc">MCC · '+rep.account.accountCount+' accounts checked together</span>':"")+
     ' · read from Google Ads '+esc(ago(rep.readAt||rep.generatedAt))+
     (rep.stale?' <span class="sg-mcc">Google Ads is not answering, so this is the copy saved '+esc(ago(rep.stale))+'</span>':"");
-  paintKpis(); paintViews(); paintList();
+  paintKpis(); paintInsights(); paintViews(); paintList();
   $("#foot").innerHTML="Source: Google Ads, saved so the same report opens instantly. An ad group is <b>stopped</b> when every enabled ad in it is disapproved: nothing in it can show, whatever its keywords. "+
     "A disapproved ad with another approved ad beside it is not stopped (the rotation is smaller and one fix clears it). <b>What an ad group used to bring</b> is the middle of its clicks in the four whole weeks before the last, "+
     "for the weeks that had any; it is an estimate of what is not coming, not a count. The policy hints are the usual fixes, not a ruling: the text in Policy manager is the ruling. "+
-    "Only enabled ads in enabled ad groups and campaigns are read; Performance Max, Demand Gen, Shopping and app campaigns are not ads in this read. Nothing is changed in Google Ads.";
+    "Only enabled ads in enabled ad groups and campaigns are read. In Performance Max the unit is a field of an asset group, stopped when it has fewer approved assets than Google needs to serve it (three headlines, two descriptions, a long headline, a landscape and a square image, a business name). "+
+    "How long something has been open comes from the daily run: a problem seen for the first time today has no age. Shopping product feeds (Merchant Center) are not in the Google Ads API. Nothing is changed in Google Ads.";
 }
 function paintKpis(){
   $("#kpis").innerHTML=D.tiles(S.report).map(function(c){
     var cls=c[3]==="good"||c[3]==="warn"?c[3]:"";
     return '<div class="pd-kpi '+cls+'"><div class="k">'+esc(c[0])+'</div><div class="v">'+esc(c[1])+'</div><div class="s">'+esc(c[2])+'</div></div>';
   }).join("");
+}
+function paintInsights(){
+  var list=D.insights(S.report), host=$("#insights");
+  host.innerHTML=list.length?'<section class="pm-panel da-ins"><div class="pm-panel-h"><span class="pm-panel-t">Across the accounts</span></div><ul>'+list.map(function(i){return '<li class="'+i.kind+'">'+esc(i.text)+'</li>';}).join("")+'</ul></section>':"";
 }
 function paintViews(){
   $("#views").innerHTML=D.VIEWS.map(function(v){
@@ -122,7 +128,10 @@ function paintList(){
 function figHtml(a){
   var c=a.counts;
   if(a.status==="clear") return '<div class="bs-fig ok"><span class="bi-n">0</span><span class="bs-sub">no flagged ad</span></div>';
-  if(a.status==="stopped") return '<div class="bs-fig stopped"><span class="bi-n">'+D.int(c.stoppedGroups)+'</span><span class="bs-sub">ad group'+(c.stoppedGroups===1?"":"s")+' with nothing to show</span></div>';
+  if(a.status==="stopped"){
+    var ages=a.deadGroups.map(function(g){return g.ageDays;}).filter(function(x){return x!=null&&x>=1;});
+    return '<div class="bs-fig stopped"><span class="bi-n">'+D.int(c.stoppedGroups)+'</span><span class="bs-sub">ad group'+(c.stoppedGroups===1?"":"s")+' with nothing to show'+(ages.length?' · the oldest for '+Math.max.apply(null,ages)+' days':"")+'</span></div>';
+  }
   if(a.status==="disapproved") return '<div class="bs-fig over"><span class="bi-n">'+D.int(c.disapproved)+'</span><span class="bs-sub">ad'+(c.disapproved===1?"":"s")+' disapproved, others cover</span></div>';
   return '<div class="bs-fig under"><span class="bi-n">'+D.int(c.limited)+'</span><span class="bs-sub">ad'+(c.limited===1?"":"s")+' limited</span></div>';
 }
@@ -132,7 +141,7 @@ function row(a){
   if(c.reviewing) wait.push(c.reviewing+" in review");
   return '<article class="bi-row '+a.status+(open?" open":"")+'" data-id="'+esc(a.id)+'">'+
     '<button type="button" class="bi-head" aria-expanded="'+open+'">'+pill(a)+
-      '<span class="bi-name"><b>'+esc(a.name)+'</b><span class="bi-sub">'+(a.items.length?a.items.length+" flagged ad"+(a.items.length===1?"":"s")+" in "+a.adGroups+" ad group"+(a.adGroups===1?"":"s")+" of "+a.campaigns+" campaign"+(a.campaigns===1?"":"s"):"no flagged ad")+'</span></span>'+
+      '<span class="bi-name"><b>'+esc(a.name)+(a.platform==="meta"?' <span class="bi-mk">Meta</span>':"")+'</b><span class="bi-sub">'+(a.items.length?a.items.length+" flagged ad"+(a.items.length===1?"":"s")+" in "+a.adGroups+" ad group"+(a.adGroups===1?"":"s")+" of "+a.campaigns+" campaign"+(a.campaigns===1?"":"s"):"no flagged ad")+'</span></span>'+
       figHtml(a)+
       '<span class="bi-delta bad">'+(top?esc(D.topicLabel(top.topic)):"")+'</span>'+
       '<span class="bi-why">'+esc(wait.join(", "))+'</span><span class="bi-chev" aria-hidden="true"></span></button>'+
@@ -140,9 +149,10 @@ function row(a){
 }
 function topicsHtml(a){
   if(!a.topics.length) return "";
-  return '<h4>By policy</h4><div class="bi-tbl"><table><thead><tr><th>Policy</th><th>Type</th><th class="r">Ads</th><th class="r">Ad groups</th><th class="r">Stopped</th></tr></thead><tbody>'+
+  return '<h4>By policy</h4><div class="bi-tbl"><table><thead><tr><th>Policy</th><th>Type</th><th class="r">Ads</th><th class="r">Ad groups</th><th class="r">Stopped</th><th class="r">Flagged for</th></tr></thead><tbody>'+
     a.topics.map(function(t){
-      return '<tr><td>'+esc(t.label)+'</td><td>'+esc(String(t.type||"").replace(/_/g," ").toLowerCase())+'</td><td class="r">'+D.int(t.ads)+'</td><td class="r">'+D.int(t.adGroups)+'</td><td class="r">'+(t.dead?D.int(t.dead):"")+'</td></tr>';
+      var age=t.ageDays==null?"":t.ageDays<1?"today":t.ageDays+" day"+(t.ageDays===1?"":"s");
+      return '<tr><td>'+esc(t.label)+(t.reopened?' <span class="bi-mk">came back '+t.reopened+'x</span>':"")+'</td><td>'+esc(String(t.type||"").replace(/_/g," ").toLowerCase())+'</td><td class="r">'+D.int(t.ads)+'</td><td class="r">'+D.int(t.adGroups)+'</td><td class="r">'+(t.dead?D.int(t.dead):"")+'</td><td class="r">'+esc(age)+'</td></tr>';
     }).join("")+'</tbody></table></div>';
 }
 function findingsHtml(a){
@@ -154,19 +164,35 @@ function findingsHtml(a){
 }
 function deadHtml(a){
   if(!a.deadGroups.length) return "";
-  return '<h4>Ad groups with nothing to show</h4><div class="bi-tbl"><table><thead><tr><th>Ad group</th><th>Campaign</th><th class="r">Ads flagged</th><th class="r">Clicks a week before</th><th class="r">Last week</th><th class="r">Not coming</th></tr></thead><tbody>'+
+  return '<h4>Ad groups with nothing to show</h4><div class="bi-tbl"><table><thead><tr><th>Ad group</th><th>Campaign</th><th class="r">Ads flagged</th><th class="r">Clicks a week before</th><th class="r">Last week</th><th class="r">Not coming</th><th class="r">Stopped for</th><th class="r">Lost since</th></tr></thead><tbody>'+
     a.deadGroups.map(function(g){
       var w=g.weight;
-      return '<tr><td>'+esc(g.name)+'</td><td>'+esc(g.campaign)+'</td><td class="r">'+D.int(g.ads)+'</td><td class="r">'+(w?D.int(w.usualClicks):"n/a")+'</td><td class="r">'+(w?D.int(w.lastClicks):"n/a")+'</td><td class="r">'+(w?D.int(w.lostClicks):"n/a")+'</td></tr>';
+      return '<tr><td>'+esc(g.name)+(g.reopened?' <span class="bi-mk">came back '+g.reopened+'x</span>':"")+'</td><td>'+esc(g.campaign)+'</td><td class="r">'+D.int(g.ads)+'</td><td class="r">'+(w?D.int(w.usualClicks):"n/a")+'</td><td class="r">'+(w?D.int(w.lastClicks):"n/a")+'</td><td class="r">'+(w?D.int(w.lostClicks):"n/a")+'</td><td class="r">'+(g.ageDays==null?"n/a":g.ageDays<1?"today":g.ageDays+" day"+(g.ageDays===1?"":"s"))+'</td><td class="r">'+(g.lostSoFar==null?"n/a":"about "+D.int(g.lostSoFar)+" clicks")+'</td></tr>';
     }).join("")+'</tbody></table></div>';
 }
+function suspectsHtml(a){
+  var sus=a.suspects||[];
+  if(!sus.length) return "";
+  var what={headline:"Headline",evidence:"Text Google points at",url:"Page"};
+  return '<h4>What the flagged ads have in common</h4><div class="bi-tbl"><table><thead><tr><th>Kind</th><th>Text</th><th class="r">In</th></tr></thead><tbody>'+sus.map(function(x){
+    return '<tr><td>'+esc(what[x.kind]||x.kind)+'</td><td>'+esc(x.text)+'</td><td class="r">'+x.ads+' of '+x.of+' flagged ads</td></tr>';
+  }).join("")+'</tbody></table></div>';
+}
+function keywordsHtml(a){
+  var kws=a.items.filter(function(i){return i.kind==="keyword";});
+  if(!kws.length) return "";
+  return '<h4>Disapproved keywords <span class="dim">('+kws.length+')</span></h4><div class="bi-tbl"><table><thead><tr><th>Keyword</th><th>Campaign and ad group</th><th>Policy</th></tr></thead><tbody>'+kws.slice(0,SHOWN_ADS).map(function(i){
+    return '<tr><td>'+esc((i.headlines||[])[0]||i.id)+'</td><td>'+esc(i.campaign)+'<br><span class="bi-sub">'+esc(i.adGroup)+'</span></td><td>'+(i.topics.length?i.topics.map(function(t){return esc(D.topicLabel(t.t));}).join(", "):'<span class="bi-sub">not named</span>')+'</td></tr>';
+  }).join("")+'</tbody></table></div>'+(kws.length>SHOWN_ADS?'<p class="bs-note">The first '+SHOWN_ADS+' of '+kws.length+'; the CSV has all.</p>':"");
+}
 function adsHtml(a){
-  if(!a.items.length) return "";
-  var list=a.items.slice(0,SHOWN_ADS);
-  return '<h4>Flagged ads'+(a.items.length>SHOWN_ADS?' <span class="dim">(the first '+SHOWN_ADS+' of '+a.items.length+'; the CSV has all)</span>':"")+'</h4><div class="bi-tbl"><table><thead><tr><th>Ad</th><th>Campaign and ad group</th><th>Status</th><th>Policy</th></tr></thead><tbody>'+
+  var flagged=a.items.filter(function(i){return i.kind!=="keyword";});
+  if(!flagged.length) return "";
+  var list=flagged.slice(0,SHOWN_ADS);
+  return '<h4>Flagged ads'+(flagged.length>SHOWN_ADS?' <span class="dim">(the first '+SHOWN_ADS+' of '+flagged.length+'; the CSV has all)</span>':"")+'</h4><div class="bi-tbl"><table><thead><tr><th>Ad</th><th>Campaign and ad group</th><th>Status</th><th>Policy</th></tr></thead><tbody>'+
     list.map(function(i){
       var st=D.stateInfo(i.state), rv=D.reviewText(i.review);
-      return '<tr><td>'+esc((i.headlines||[]).join(" | ")||String(i.type||"").replace(/_/g," ").toLowerCase()||("Ad "+i.id))+(i.url?'<br><span class="bi-sub">'+esc(i.url)+'</span>':"")+'</td>'+
+      return '<tr><td>'+(i.kind!=="ad"?'<span class="bi-mk">'+esc(D.kindText(i.kind))+'</span> ':"")+esc((i.headlines||[]).join(" | ")||String(i.type||"").replace(/_/g," ").toLowerCase()||("Ad "+i.id))+(i.url?'<br><span class="bi-sub">'+esc(i.url)+'</span>':"")+'</td>'+
         '<td>'+esc(i.campaign)+'<br><span class="bi-sub">'+esc(i.adGroup)+'</span></td>'+
         '<td><span class="bi-pill '+st.tone+'">'+esc(st.label)+'</span><br><span class="bi-sub">'+esc(D.approvalText(i.approval))+(rv?" · "+esc(rv):"")+'</span></td>'+
         '<td>'+(i.topics.length?i.topics.map(function(t){return esc(D.topicLabel(t.t))+(t.ev&&t.ev.length?'<br><span class="bi-sub">'+esc(t.ev.map(function(x){return '"'+x+'"';}).join(", "))+'</span>':"");}).join("<br>"):'<span class="bi-sub">not named</span>')+'</td></tr>';
@@ -186,7 +212,7 @@ function planHtml(a){
     }).join("")+'</ol></div>';
 }
 function body(a){
-  return '<div class="bi-body"><h4>What it means</h4>'+findingsHtml(a)+planHtml(a)+topicsHtml(a)+deadHtml(a)+adsHtml(a)+'</div>';
+  return '<div class="bi-body"><h4>What it means</h4>'+findingsHtml(a)+planHtml(a)+topicsHtml(a)+suspectsHtml(a)+deadHtml(a)+keywordsHtml(a)+adsHtml(a)+'</div>';
 }
 $("#list").addEventListener("click",function(e){
   var head=e.target.closest(".bi-head"); if(head){
@@ -208,10 +234,13 @@ $("#exportBtn").addEventListener("click",function(){
 /* ── Start ────────────────────────────────────────────────── */
 (function start(){
   var want=new URLSearchParams(location.search).get("account")||store("da_account")||"";
+  if(window.MonitorPanel&&$("#monPanel")) window.MonitorPanel.mount($("#monPanel"),{agent:"disapproved",label:"Disapproved Ads Tracker"});
   S.account=want;
   picker.set([{value:"",label:"Loading accounts…",sub:"",avatar:"…",hue:200}],"",true);
-  getJson("/p2/paid-marketing/api/segments/accounts").then(function(r){
+  Promise.all([getJson("/p2/paid-marketing/api/segments/accounts"),getJson("/p2/paid-marketing/api/gads/accounts?platform=meta").catch(function(){return {ok:false,j:{}};})]).then(function(rs){
+    var r=rs[0], meta=rs[1];
     if(!r.ok){picker.set([{value:"",label:"Accounts unavailable",sub:"",avatar:"!",hue:0}],"",true);setMsg(esc((r.j&&r.j.error)||"The account list could not be read."));return;}
+    S.meta=meta.ok?(meta.j.accounts||[]).filter(function(a){return a.platform==="meta"||/^act_\d+$/.test(a.id);}):[];
     setAccounts(r.j.accounts||[],r.j.groups||[]); run();
   }).catch(function(){setMsg("The server could not be reached. Try again.");});
 })();

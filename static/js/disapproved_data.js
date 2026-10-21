@@ -16,8 +16,10 @@ var STATE = {
   dead: {label: "No approved ad in the ad group", tone: "bad"},
   covered: {label: "Another ad is showing", tone: "over"},
   unchecked: {label: "Not checked for cover", tone: "unk"},
+  keyword: {label: "Keyword cannot show", tone: "over"},
   limited: {label: "Limited, still shows", tone: "under"}
 };
+var KIND = {ad: "Ad", asset: "Performance Max asset", keyword: "Keyword", meta: "Meta ad"};
 var LEVEL = {high: {label: "High", tone: "bad"}, medium: {label: "Medium", tone: "warn"}, low: {label: "Low", tone: "wait"}, info: {label: "Info", tone: "unk"}};
 var APPROVAL = {DISAPPROVED: "Disapproved", APPROVED_LIMITED: "Limited", AREA_OF_INTEREST_ONLY: "Area of interest only"};
 var REVIEW = {UNDER_APPEAL: "Under appeal", REVIEW_IN_PROGRESS: "Being reviewed"};
@@ -26,6 +28,7 @@ var SYMBOL = {USD: "$", EUR: "€", GBP: "£", CAD: "CA$", AUD: "A$", INR: "₹"
 function statusInfo(s){ return STATUS[s] || {label: String(s), tone: "unk"}; }
 function stateInfo(s){ return STATE[s] || {label: String(s), tone: "unk"}; }
 function levelInfo(l){ return LEVEL[l] || {label: String(l), tone: "unk"}; }
+function kindText(k){ return KIND[k] || "Ad"; }
 function approvalText(a){ return APPROVAL[a] || String(a || ""); }
 function reviewText(r){ return REVIEW[r] || ""; }
 
@@ -50,7 +53,7 @@ function tiles(report){
     ["Accounts read", int(s.accounts), "last " + report.window.weeks + " whole weeks read for the ad groups", ""],
     ["Need a look", int(s.needsLook), s.needsLook ? int(c.stopped || 0) + " with an ad group stopped" : "no ad is disapproved", s.needsLook ? "warn" : "good"],
     ["Ad groups stopped", int(s.stoppedGroups), s.stoppedGroups ? (s.lostClicks ? "about " + int(s.lostClicks) + " clicks a week not coming" : "every ad in them is disapproved") : "none has all its ads disapproved", s.stoppedGroups ? "warn" : "good"],
-    ["Ads disapproved", int(s.disapproved), s.waiting ? int(s.waiting) + " under appeal or in review" : "none waiting on Google", ""],
+    ["Ads disapproved", int(s.disapproved), (s.keywords ? int(s.keywords) + " keyword" + (s.keywords === 1 ? "" : "s") + " too, " : "") + (s.waiting ? int(s.waiting) + " under appeal or in review" : "none waiting on Google"), ""],
     ["Ads limited", int(s.limited), "they still show, with limits", ""]
   ];
 }
@@ -64,29 +67,40 @@ function firstView(report){ return viewCount(report, "attention") ? "attention" 
 
 function query(account, refresh){ return "account=" + encodeURIComponent(account) + (refresh ? "&refresh=1" : ""); }
 
+/* what only shows across accounts and across time, in sentences: the policies that flag ads in several accounts, and how long fixes have taken */
+function insights(report){
+  var out = [];
+  (report.patterns || []).forEach(function(p){
+    out.push({kind: "pattern", text: p.label + " flags ads in " + p.accounts.length + " accounts (" + p.accounts.slice(0, 4).join(", ") + (p.accounts.length > 4 ? " and " + (p.accounts.length - 4) + " more" : "") + "), " + p.ads + " ads in all. The same policy in many accounts is usually one cause, such as a policy change or one piece of copy shared between clients: fix it once and copy the fix."});
+  });
+  var f = report.fixTimes;
+  if (f) out.push({kind: "fixes", text: "Of the " + f.fixed + " problem" + (f.fixed === 1 ? "" : "s") + " fixed since the monitor began, the middle one took " + f.median + " day" + (f.median === 1 ? "" : "s") + " and the longest " + f.longest + "."});
+  return out;
+}
+
 /* the plan's step titles in order, for the CSV */
 function planTitles(a){
   return ((a.plan && a.plan.steps) || []).map(function(s){ return s.n + ". " + s.title; }).join(" | ");
 }
 
 /* the CSV: one line per flagged ad, and one per account with none */
-var HEAD = ["Account", "Status", "Campaign", "Ad group", "Ad id", "Ad type", "Approval", "Review", "What it means", "Policy", "Text Google points at", "Headlines", "Final URL", "Clicks a week before", "Clicks last week", "Fix plan"];
+var HEAD = ["Account", "Status", "Campaign", "Ad group", "Ad id", "Kind", "Ad type", "Approval", "Review", "What it means", "Policy", "Text Google points at", "Headlines", "Final URL", "Clicks a week before", "Clicks last week", "Stopped for days", "Fix plan"];
 function csvRows(report){
   var rows = [["Disapproved Ads Tracker", report.account.name], ["Weeks", report.window.from + " to " + report.window.to], [], HEAD];
   report.accounts.forEach(function(a){
     var base = [a.name, statusInfo(a.status).label];
-    if (!a.items.length) { rows.push(base.concat(["(no flagged ad)", "", "", "", "", "", "", "", "", "", "", "", ""], [planTitles(a)])); return; }
+    if (!a.items.length) { rows.push(base.concat(["(no flagged ad)", "", "", "", "", "", "", "", "", "", "", "", "", "", ""], [planTitles(a)])); return; }
     a.items.forEach(function(i){
-      var w = i.weight || {};
-      rows.push(base.concat([i.campaign, i.adGroup, i.id, String(i.type || "").replace(/_/g, " ").toLowerCase(), approvalText(i.approval), reviewText(i.review), stateInfo(i.state).label,
+      var w = i.weight || {}, g = (a.deadGroups || []).filter(function(x){ return x.id === i.adGroupId; })[0];
+      rows.push(base.concat([i.campaign, i.adGroup, i.id, kindText(i.kind), String(i.type || "").replace(/_/g, " ").toLowerCase(), approvalText(i.approval), reviewText(i.review), stateInfo(i.state).label,
         i.topics.map(function(t){ return topicLabel(t.t); }).join("; "), [].concat.apply([], i.topics.map(function(t){ return t.ev || []; })).join("; "), (i.headlines || []).join(" | "), i.url || "",
-        w.usualClicks == null ? "" : w.usualClicks, w.lastClicks == null ? "" : w.lastClicks, planTitles(a)]));
+        w.usualClicks == null ? "" : w.usualClicks, w.lastClicks == null ? "" : w.lastClicks, g && g.ageDays != null ? g.ageDays : "", planTitles(a)]));
     });
   });
   return rows;
 }
 
-var api = {STATUS: STATUS, STATE: STATE, LEVEL: LEVEL, VIEWS: VIEWS, statusInfo: statusInfo, stateInfo: stateInfo, levelInfo: levelInfo, approvalText: approvalText, reviewText: reviewText, int: int,
+var api = {STATUS: STATUS, STATE: STATE, LEVEL: LEVEL, VIEWS: VIEWS, KIND: KIND, kindText: kindText, insights: insights, statusInfo: statusInfo, stateInfo: stateInfo, levelInfo: levelInfo, approvalText: approvalText, reviewText: reviewText, int: int,
   money: money, topicName: topicName, topicLabel: topicLabel, tiles: tiles, shown: shown, viewCount: viewCount, firstView: firstView, needsLook: needsLook, query: query, planTitles: planTitles,
   csvRows: csvRows, HEAD: HEAD};
 if (typeof module !== "undefined" && module.exports) module.exports = api; else root.DAData = api;

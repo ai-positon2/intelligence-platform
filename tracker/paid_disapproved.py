@@ -298,13 +298,13 @@ def meta_raw(act, *, pages_fn, account_fn):
     return {"accounts": [dict(got, id=act, name=acct.get("name") or act, currency=acct.get("currency") or "USD", platform="meta")], "warnings": [], "members": []}
 
 
-def report_for(account_id, *, accounts_fn=None, groups_fn=None, search_fn=None, now=None, force=False, store=None, today=None, mon=None, meta_pages_fn=None, meta_account_fn=None):
+def report_for(account_id, *, accounts_fn=None, groups_fn=None, search_fn=None, now=None, force=False, store=None, today=None, mon=None, meta_pages_fn=None, meta_account_fn=None, asof=None):
     """The Disapproved Ads report for a Google Ads account or an MCC the root MCC holds, or for a Meta ad account (act_...). `force` (Refresh) skips the saved read, at most once per
-    paid_gads.REFRESH_COOLDOWN_S for the account. `mon` is the monitors' store: with it each stopped ad group and policy has its age, how often it came back and how long fixes took."""
+    paid_gads.REFRESH_COOLDOWN_S for the account. `mon` is the monitors' store: with it each stopped ad group and policy has its age (counted to `asof`, now by default), how often it came back and how long fixes took."""
     from . import paid_geo, paid_meta, paid_store
     store = store or paid_store
     day = today or dt.date.today()
-    stamp = dt.datetime.now(dt.timezone.utc)
+    stamp = asof or dt.datetime.now(dt.timezone.utc)
     if paid_meta.is_meta(str(account_id or "")):
         act = paid_meta.norm_id(account_id)
         pages = meta_pages_fn or (lambda path, params: paid_meta._pages(path, params, store))
