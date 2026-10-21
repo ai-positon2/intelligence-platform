@@ -491,6 +491,8 @@ def test_the_checks_tab_names_each_negative_in_the_way_with_what_to_do_about_it_
     html = page(r, "checks")
     assert 'summary>&quot;free &lt;b&gt;&quot; (phrase) stops 2 keywords, about 1,500 searches a month</summary><ol><li>Open &lt;Negatives&gt;.</li><li>Narrow it.</li></ol><p class="kr-worth"><b>Worth</b> It stops 2 keywords.</p>' in html
     assert "<b>" not in html.split("Blocked in some campaigns")[1].split("</section>")[0].replace("<b>Worth</b>", "")
+    r["plan"]["plans"]["unblock"][0]["count"] = 1
+    assert "(phrase) stops 1 keyword, about" in page(r, "checks")                                                    # one keyword is not "1 keywords"
     quiet = json.loads(json.dumps(rec))
     quiet["plan"]["checks"]["blockedInSomeCampaigns"] = 0
     assert "Negatives in the way" not in page(quiet, "checks") and "stops 2 keywords" not in page(quiet, "checks")
