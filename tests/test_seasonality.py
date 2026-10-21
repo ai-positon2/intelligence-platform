@@ -739,5 +739,6 @@ def test_the_warm_route_counts_more_parts_for_a_meta_account_than_for_a_google_o
     c = client_as(STAFF)
     g_parts = c.get("/p2/paid-marketing/api/gads/seasonality/warm?account=" + CID).get_json()["parts"]
     m_parts = c.get("/p2/paid-marketing/api/gads/seasonality/warm?account=" + ACT).get_json()["parts"]
-    assert (g_parts, m_parts) == (3, 12)
-    assert c.get("/p2/paid-marketing/api/gads/seasonality/warm?account=%s%%2B%s" % (CID, ACT)).get_json()["parts"] == 12
+    meta_slices = len(S.slices(*S.window(36, dt.date.today()), S.SLICE_DAYS_META))               # the route reads up to today, so the count moves with the calendar (12 one day, 13 the next)
+    assert (g_parts, m_parts) == (3, meta_slices) and meta_slices in (12, 13)
+    assert c.get("/p2/paid-marketing/api/gads/seasonality/warm?account=%s%%2B%s" % (CID, ACT)).get_json()["parts"] == meta_slices
