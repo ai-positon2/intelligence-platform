@@ -1574,3 +1574,14 @@ tr.ud-dismissed td,tr.ud-gone td{opacity:.62}
   --thumb:linear-gradient(135deg,#2a1a06 0%,#2e0f1a 100%);
   --icon-glow:rgba(245,158,11,.5);--card-border:rgba(245,158,11,.35);
   --card-glow:0 0 40px rgba(245,158,11,.10);--arrow-color:#fde68a}
+
+/* Disapproved Ads Tracker: the Brand IS Monitor's pieces (.bi-*) and the Brand Spend Alert's figure (.bs-fig) with its own accent and a one-column command row */
+.pm.pm-da{--pm-a:#f43f5e;--pm-a2:#fb923c}
+[data-theme="light"] .pm.pm-da{--pm-a:#be123c}
+.da-cmd-row{grid-template-columns:minmax(0,420px) minmax(0,1fr)}
+@media (max-width:900px){.da-cmd-row{grid-template-columns:minmax(0,1fr)}}
+.c-da{--card-accent:#f43f5e;
+  --band:linear-gradient(90deg,#f43f5e,#fb923c,#fbbf24);
+  --thumb:linear-gradient(135deg,#2e0a14 0%,#2a1606 100%);
+  --icon-glow:rgba(244,63,94,.5);--card-border:rgba(244,63,94,.35);
+  --card-glow:0 0 40px rgba(244,63,94,.10);--arrow-color:#fecdd3}

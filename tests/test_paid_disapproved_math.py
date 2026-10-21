@@ -117,6 +117,11 @@ def test_the_text_google_points_at_is_kept_three_at_most_without_repeats():
     assert t["examples"] == ["Free!!!", "Best price", "Cheapest"]
 
 
+def test_a_topic_that_disapproves_ads_comes_before_one_that_only_limits_them_whatever_their_counts():
+    ads = [ad(1, "G1", approval="APPROVED_LIMITED", topics=(("L_TOPIC", "LIMITED"),)), ad(2, "G2", approval="APPROVED_LIMITED", topics=(("L_TOPIC", "LIMITED"),)), ad(3, "G3", topics=(("D_TOPIC", "LIMITED"),))]
+    assert [t["topic"] for t in m.analyse(ads, {"G1": 1, "G2": 1, "G3": 1}, None)["topics"]] == ["D_TOPIC", "L_TOPIC"]
+
+
 def test_an_ad_with_no_named_policy_is_a_topic_of_its_own_with_an_honest_hint():
     t = m.analyse([ad(1, topics=())], {"G1": 1}, None)["topics"][0]
     assert t["topic"] == "NOT_NAMED" and t["label"] == "Reason not named" and "did not name the policy" in t["hint"]

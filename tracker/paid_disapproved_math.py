@@ -94,7 +94,7 @@ def dead_groups(items):
 
 
 def topics_of(items):
-    """[{topic, label, type, ads, adGroups, campaigns, dead (ad groups with no approved ad), disapproved (ads), examples, hint}], the topic with the most stopped ad groups first, then the most ads."""
+    """[{topic, label, type, ads, adGroups, campaigns, dead (ad groups with no approved ad), disapproved (ads), examples, hint}], the topic with the most stopped ad groups first, then the most disapproved ads, then the most ads."""
     by = {}
     for i in items:
         entries = i["topics"] or [{"t": NO_TOPIC, "ty": "", "ev": []}]
@@ -119,7 +119,7 @@ def topics_of(items):
         out.append({"topic": g["topic"], "label": "Reason not named" if none else ap.topic_name(g["topic"]), "type": g["type"], "ads": len(g["ads"]), "adGroups": len(g["groups"]),
                     "campaigns": sorted(g["camps"]), "dead": len(g["dead"]), "disapproved": len(g["dis"]), "examples": g["examples"],
                     "hint": "Google did not name the policy in the read, so open the ad in Policy manager and read the reason beside it." if none else ap.topic_hint(g["topic"])})
-    out.sort(key=lambda t: (-t["dead"], -t["ads"], t["label"].lower()))
+    out.sort(key=lambda t: (-t["dead"], -t["disapproved"], -t["ads"], t["label"].lower()))
     return out
 
 
