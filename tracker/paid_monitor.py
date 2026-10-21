@@ -291,3 +291,45 @@ def run_monitor(store, spec, *, trigger, link, deliver, accounts, groups, proble
         return run
     finally:
         store.release("lock:" + agent)
+
+
+# ── The weekly summary ──────────────────────────────────────────────────────
+
+DIGEST_OPEN = 15                 # open issues the weekly summary lists
+DIGEST_FIXED = 10
+FIXED_WINDOW_DAYS = 7
+
+
+def weekly_digest(label, issues, now, link):
+    """{subject, text, html, slack_text, slack_blocks, open, fixed} for the week: every open issue (low ones too, which are never alerted one by one) and what was fixed in the last seven
+    days with how long it had been open, or None when there is nothing to say. Sending it marks nothing alerted."""
+    opened = sorted([i for i in issues if i["status"] == "open"], key=lambda i: (-rank(i["level"]), i["accountName"].lower(), i["title"]))
+    cut = now - timedelta(days=FIXED_WINDOW_DAYS)
+    fixed = sorted([i for i in issues if i["status"] == "resolved" and (_parse(i.get("resolvedAt")) or cut) > cut], key=lambda i: (i["accountName"].lower(), i["title"]))
+    if not opened and not fixed:
+        return None
+    high = sum(1 for i in opened if i["level"] == "high")
+    subject = "%s: weekly summary, %d open%s, %d fixed this week" % (label, len(opened), (" (%d high)" % high) if high else "", len(fixed))
+    shown, shown_fixed = opened[:DIGEST_OPEN], fixed[:DIGEST_FIXED]
+
+    def line(i):
+        age = age_days(i["firstSeen"], now)
+        return "- [%s] %s: %s%s" % (i["level"].upper(), i["accountName"], i["title"], (" (open %s)" % plural(age, "day")) if age else "")
+
+    def fixed_line(i):
+        age = age_days(i["firstSeen"], _parse(i["resolvedAt"]))
+        return "- %s: %s%s" % (i["accountName"], i["title"], (" (was open %s)" % plural(age, "day")) if age else "")
+    text = "\n".join(["%d open, %d of them high; %d fixed in the last 7 days." % (len(opened), high, len(fixed)), ""]
+                     + (["Open:"] + [line(i) for i in shown] + (["...and %d more on the page." % (len(opened) - len(shown))] if len(opened) > len(shown) else []) + [""] if shown else [])
+                     + (["Fixed this week:"] + [fixed_line(i) for i in shown_fixed] + [""] if shown_fixed else []) + ["Open the page: " + link])
+    e = _html.escape
+    html_body = ("<div style=\"font-family:Arial,sans-serif;font-size:14px;line-height:1.5\"><p><b>%s</b></p>%s%s<p><a href=\"%s\">Open the page</a></p></div>" % (
+        e(subject), ("<p><b>Open</b></p><ul>%s</ul>%s" % ("".join("<li>%s</li>" % e(line(i)[2:]) for i in shown), ("<p>...and %d more on the page.</p>" % (len(opened) - len(shown))) if len(opened) > len(shown) else "")) if shown else "",
+        ("<p><b>Fixed this week</b></p><ul>%s</ul>" % "".join("<li>%s</li>" % e(fixed_line(i)[2:]) for i in shown_fixed)) if shown_fixed else "", e(link)))
+    blocks = [{"type": "header", "text": {"type": "plain_text", "text": subject[:150]}}]
+    if shown:
+        blocks.append({"type": "section", "text": {"type": "mrkdwn", "text": "*Open*\n" + "\n".join(line(i) for i in shown)[:2900]}})
+    if shown_fixed:
+        blocks.append({"type": "section", "text": {"type": "mrkdwn", "text": "*Fixed this week*\n" + "\n".join(fixed_line(i) for i in shown_fixed)[:2900]}})
+    blocks.append({"type": "section", "text": {"type": "mrkdwn", "text": "<%s|Open the page>" % link}})
+    return {"subject": subject, "text": text, "html": html_body, "slack_text": "*%s*" % subject, "slack_blocks": blocks, "open": len(opened), "fixed": len(fixed)}

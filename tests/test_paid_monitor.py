@@ -277,3 +277,46 @@ def test_the_test_alert_goes_through_the_real_senders_and_says_it_is_a_test():
 @pytest.mark.parametrize("since, want", [("2026-10-20T07:00:00+00:00", 3), ("2026-10-23T06:59:00+00:00", 0), ("2026-10-22T07:00:00+00:00", 1), (None, None), ("garbage", None), ("2026-10-30T00:00:00+00:00", 0)])
 def test_the_age_of_an_issue_is_whole_days_never_negative(since, want):
     assert mon.age_days(since, datetime(2026, 10, 23, 7, 0, tzinfo=timezone.utc)) == want
+
+
+# ── The weekly summary ──────────────────────────────────────────────────────
+
+def stored(fp, level="medium", status="open", first="2026-10-10T07:00:00+00:00", resolved=None, acct="Acme <Dental>", title="Brand spend is $301"):
+    return {"fingerprint": fp, "level": level, "status": status, "firstSeen": first, "resolvedAt": resolved, "accountName": acct, "title": title}
+
+
+def test_the_weekly_summary_lists_every_open_issue_highest_first_and_what_was_fixed_this_week():
+    now = datetime(2026, 10, 20, 7, 0, tzinfo=timezone.utc)
+    issues = [stored("a", "low", title="A small thing"), stored("b", "high", title="Stopped", acct="Beta"), stored("c", "medium", title="Over", acct="Acme <Dental>"),
+              stored("d", status="resolved", resolved="2026-10-18T07:00:00+00:00", title="Was over", first="2026-10-14T07:00:00+00:00"),
+              stored("e", status="resolved", resolved="2026-10-01T07:00:00+00:00", title="Fixed long ago"),
+              stored("g", status="resolved", resolved="2026-10-12T19:00:00+00:00", title="Fixed seven and a half days ago")]
+    m = mon.weekly_digest("Brand Spend Alert", issues, now, LINK)
+    assert m["subject"] == "Brand Spend Alert: weekly summary, 3 open (1 high), 1 fixed this week" and m["open"] == 3 and m["fixed"] == 1
+    lines = m["text"].split("\n")
+    assert lines[0] == "3 open, 1 of them high; 1 fixed in the last 7 days."
+    assert lines[2:6] == ["Open:", "- [HIGH] Beta: Stopped (open 10 days)", "- [MEDIUM] Acme <Dental>: Over (open 10 days)", "- [LOW] Acme <Dental>: A small thing (open 10 days)"]
+    assert "Fixed this week:\n- Acme <Dental>: Was over (was open 4 days)" in m["text"] and "Fixed long ago" not in m["text"] and "seven and a half days ago" not in m["text"] and m["text"].endswith("Open the page: " + LINK)
+    assert "Acme &lt;Dental&gt;" in m["html"] and "<Dental>" not in m["html"] and m["slack_text"] == "*%s*" % m["subject"] and m["slack_blocks"][0]["type"] == "header" and "*Open*" in m["slack_blocks"][1]["text"]["text"]
+
+
+def test_the_weekly_summary_caps_its_lists_and_says_how_many_more_there_are():
+    now = datetime(2026, 10, 20, 7, 0, tzinfo=timezone.utc)
+    issues = [stored("i%d" % n, title="Issue %d" % n) for n in range(20)] + [stored("f%d" % n, status="resolved", resolved="2026-10-19T07:00:00+00:00", title="Fixed %d" % n) for n in range(12)]
+    m = mon.weekly_digest("X", issues, now, LINK)
+    assert "...and 5 more on the page." in m["text"] and m["text"].count("\n- [MEDIUM]") == 15 and m["text"].split("Fixed this week:")[1].count("\n- Acme") == 10 and m["subject"] == "X: weekly summary, 20 open, 12 fixed this week"
+
+
+def test_a_quiet_week_has_no_summary_and_a_week_with_only_fixes_has_one():
+    now = datetime(2026, 10, 20, 7, 0, tzinfo=timezone.utc)
+    assert mon.weekly_digest("X", [], now, LINK) is None and mon.weekly_digest("X", [stored("e", status="resolved", resolved="2026-10-01T07:00:00+00:00")], now, LINK) is None
+    only = mon.weekly_digest("X", [stored("d", status="resolved", resolved="2026-10-18T07:00:00+00:00")], now, LINK)
+    assert only["subject"] == "X: weekly summary, 0 open, 1 fixed this week" and "Open:" not in only["text"] and "Fixed this week:" in only["text"]
+    assert mon.weekly_digest("X", [stored("d", status="resolved", resolved=None)], now, LINK) is None                 # a resolved issue with no time is not counted as fixed this week
+
+
+def test_the_weekly_summary_goes_through_the_same_senders():
+    s, dv = configured(), Deliver()
+    now = datetime(2026, 10, 20, 7, 0, tzinfo=timezone.utc)
+    m = mon.weekly_digest("X", [stored("a")], now, LINK)
+    assert mon.send(s, m, dv)["sent"] is True and dv.emails[0]["subject"] == m["subject"] and dv.slacks[0]["channel"] == "#alerts"
