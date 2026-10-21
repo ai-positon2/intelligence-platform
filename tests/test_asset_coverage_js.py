@@ -117,6 +117,10 @@ CAMPAIGNS = [
      "ads": [{"id": "9", "adGroup": "Level 1", "type": "RESPONSIVE_DISPLAY_AD", "typeLabel": "Responsive display ad", "severity": "low", "slots": [slot("YOUTUBE_VIDEO", "Videos", 0, 1, "missing", "low", add=1)]}],
      "gaps": [gap("Videos", "low", "Responsive display ad: Level 1", "No live videos. Add 1.", 1)]},
 ]
+CAMPAIGNS[0]["gaps"][0]["plan"] = {"steps": ["Open Google Ads, then Campaigns, click \"Hudson_Broad\".", "Click the +, choose <Sitelink>."], "worth": "The campaign had 2,217 impressions in the last 30 days with none live."}
+CAMPAIGNS[0]["gaps"][1]["plan"] = {"steps": [], "worth": "Never shown: a plan with no steps draws nothing."}
+CAMPAIGNS[1]["groups"][0]["slots"][0]["bad"] = [{"label": "Tour", "state": "disapproved", "why": [{"t": "HEALTH_IN_PERSONALIZED_ADS", "ty": "PROHIBITED"}, {"t": "PUNCTUATION_AND_SYMBOLS", "ty": "LIMITED"}]}]
+CAMPAIGNS[1]["groups"][0]["slots"][0]["fix"] = {"steps": ["Open Google Ads, then Tools, then Policy manager.", "Edit the <text>."]}
 REPORT = {"account": {"id": "1234567890", "name": "Acme Dental", "currency": "USD", "platform": "google", "isGroup": False, "accountCount": 0},
           "window": {"days": 30, "from": "2026-09-17", "to": "2026-10-16"}, "generatedAt": "2026-10-16T10:00:00+00:00", "warnings": [], "campaigns": CAMPAIGNS,
           "accountAssets": [{"account": "Acme Dental", "accountId": "1", "locations": 2, "slots": [{"key": "CALLOUT", "label": "Callouts", "have": 5, "disapproved": 1, "paused": 0, "pending": 0, "expired": 0,
@@ -186,7 +190,7 @@ def test_an_opened_campaign_says_what_to_add_what_it_holds_and_what_is_wrong_wit
     assert "Campaign assets" in h and "1 past end date" in h and "Free Teeth Whitening (past end date)" in h and "the account" in h
     out = run({"steps": [{"click": ["#sevs", "s", "medium"]}, {"open": "1:12"}]})
     h = out["#list"]
-    assert "Asset groups (1)" in h and "Crowns" in h and "Tour (disapproved)" in h and "2 not shown in 30 days" in h
+    assert "Asset groups (1)" in h and "Crowns" in h and "Tour (disapproved: Health in personalized ads, Punctuation and symbols)" in h and "2 not shown in 30 days" in h
 
 
 def test_account_wide_assets_are_listed_once_with_their_problems():
@@ -217,8 +221,9 @@ def test_the_csv_has_one_row_per_gap_with_the_numbers_and_quotes_what_needs_it()
     assert 'Acme,"PMax, ""Spring""",Performance Max' in quoted
     out = run({"steps": [{"button": "#exportBtn"}]})
     lines = out["csv"].lstrip("﻿").split("\r\n")
-    assert lines[0] == "Account,Acme Dental" and lines[1] == "Window,2026-09-17 to 2026-10-16" and lines[3].startswith("Account,Campaign,Kind of campaign,Where,Asset,Priority")
-    assert lines[4] == 'Acme,Hudson_Broad,Search,Campaign,Sitelinks,Fix first,0,4,4,No live sitelinks. Add 4. 1 past their end date.,2217,90,200.5'
+    assert lines[0] == "Account,Acme Dental" and lines[1] == "Window,2026-09-17 to 2026-10-16" and lines[3].startswith("Account,Campaign,Kind of campaign,Where,Asset,Priority") and lines[3].endswith(",How to add them")
+    assert lines[4] == 'Acme,Hudson_Broad,Search,Campaign,Sitelinks,Fix first,0,4,4,No live sitelinks. Add 4. 1 past their end date.,2217,90,200.5,"Open Google Ads, then Campaigns, click ""Hudson_Broad"". Click the +, choose <Sitelink>."'
+    assert lines[5].endswith(",2217,90,200.5,")                                                                  # a gap with no plan leaves the cell empty
     assert len(lines) == 4 + 4 and out["download"]["name"] == "asset-coverage-Acme-Dental-2026-10-16.csv"
     assert any(l.startswith("Acme,PMax <Spring>,Performance Max,Asset group: Crowns,Videos,Add,0,1,1,") for l in lines)
 
@@ -611,3 +616,19 @@ def test_the_assets_drawer_counts_assets_and_how_many_of_them_are_different():
     assert out["el"]["#acdS"]["text"] == "2 assets"
     body.update(total=1, assetCount=1)
     assert run({"responses": [{"match": LIB + "&kind=&state=expired", "body": body}], "steps": [card("expired")]})["el"]["#acdS"]["text"] == "1 asset"
+
+
+def test_a_gap_carries_how_to_add_it_and_a_problem_asset_how_to_fix_it_folded_away_and_escaped():
+    h = run({"steps": [{"open": "1:11"}]})["#list"]
+    assert '<details class="ac-plan"><summary>How to add them</summary><ol><li>Open Google Ads, then Campaigns, click &quot;Hudson_Broad&quot;.</li><li>Click the +, choose &lt;Sitelink&gt;.</li></ol>' in h
+    assert '<p class="ac-worth"><b>Worth</b> The campaign had 2,217 impressions in the last 30 days with none live.</p></details>' in h
+    assert h.count("How to add them") == 1 and "Never shown" not in h                                               # the second gap has a plan with no steps: no empty box
+    g = run({"steps": [{"click": ["#sevs", "s", "medium"]}, {"open": "1:12"}]})["#list"]
+    assert '<summary>How to fix</summary><ol><li>Open Google Ads, then Tools, then Policy manager.</li><li>Edit the &lt;text&gt;.</li></ol></details>' in g and "<text>" not in g
+
+
+def test_a_topic_google_gave_is_shown_as_words_and_an_odd_one_cannot_break_the_row():
+    evil = json.loads(json.dumps(REPORT))
+    evil["campaigns"][1]["groups"][0]["slots"][0]["bad"][0]["why"] = [{"t": "<b>BAD_TOPIC</b>"}]
+    h = run({"report": lambda u: {"status": 200, "body": evil}, "steps": [{"click": ["#sevs", "s", "medium"]}, {"open": "1:12"}]})["#list"]
+    assert "Tour (disapproved: &lt;b&gt;bad topic&lt;/b&gt;)" in h and "<b>bad" not in h

@@ -24,6 +24,7 @@ import datetime as dt
 from concurrent.futures import ThreadPoolExecutor
 
 from . import paid_assets_detail as detail
+from . import paid_assets_plans as plans
 from . import paid_assets_rules as rules
 from . import paid_gads_segments as gads
 from . import paid_segments as seg
@@ -158,7 +159,7 @@ def bucket(links, today=None, shown=None, scope=None):
         if which and l.get("a") and l["a"] not in out[which]:
             out[which].append(l["a"])
         if state in ("disapproved", "expired") and len(out["bad"]) < BAD_EXAMPLES:
-            out["bad"].append({"label": l.get("l") or "(unnamed)", "state": state})
+            out["bad"].append({"label": l.get("l") or "(unnamed)", "state": state, "a": l.get("a") or ""})
         if state in ("live", "pending") and shown is not None and l["f"] in rules.SHOWN_FIELDS and (scope, l.get("a")) not in shown:
             out["notShown"] += 1
     return out
@@ -360,7 +361,53 @@ def read_ads(ad_type, rows, sink=None):
 
 
 ASSET_BATCH = 150
+POLICY_MAX = 60                       # disapproved assets whose policy topics are asked for, per account
+POLICY_TOPICS_MAX = 3
+POLICY_GAQL = "SELECT asset.id, asset.policy_summary.approval_status, asset.policy_summary.policy_topic_entries FROM asset WHERE asset.id IN (%s)"
 ASSET_BY_ID_GAQL = "SELECT asset.id, asset.type, asset.name, " + _DETAIL_FIELDS + ", asset.text_asset.text, asset.youtube_video_asset.youtube_video_title FROM asset WHERE asset.id IN (%s)"
+
+
+def disapproved_ids(*sources):
+    """The asset ids of the disapproved links in any of these: {key: {field: bucket}} maps, a list of {assets: {field: bucket}} groups or a {field: bucket} map."""
+    out = set()
+
+    def buckets(x):
+        if isinstance(x, dict) and "ids" in x:
+            yield x
+        elif isinstance(x, dict):
+            for v in x.values():
+                yield from buckets(v)
+        elif isinstance(x, list):
+            for v in x:
+                yield from buckets(v)
+    for src in sources:
+        for b in buckets(src):
+            out.update(i for i in b.get("ids", []) if i)
+    return sorted(out, key=lambda v: (len(v), v))
+
+
+def read_policy(rows):
+    """{asset id: [{t: policy topic, ty: type}]} from asset.policy_summary: the reasons Google gave, at most three an asset, the most serious first."""
+    out = {}
+    for r in rows:
+        aid = str(_get(r, "asset", "id", default=""))
+        entries = _get(r, "asset", "policySummary", "policyTopicEntries", default=[]) or []
+        topics = []
+        for e in entries:
+            t = str(e.get("topic") or "")
+            if t and all(x["t"] != t for x in topics):
+                topics.append({"t": t, "ty": str(e.get("type") or "").upper()})
+        if aid and topics:
+            topics.sort(key=lambda x: 0 if x["ty"] == "PROHIBITED" else 1)
+            out[aid] = topics[:POLICY_TOPICS_MAX]
+    return out
+
+
+def read_policy_for(search, cid, ids):
+    out = {}
+    for n in range(0, len(ids[:POLICY_MAX]), ASSET_BATCH):
+        out.update(read_policy(search(cid, POLICY_GAQL % ", ".join(ids[:POLICY_MAX][n:n + ASSET_BATCH]))))
+    return out
 
 
 def read_ad_assets(sink, search, cid):
@@ -407,9 +454,11 @@ def read_account(member, *, search_fn=None, today=None, sink=None):
             ads += part("ads:" + ad_type, "the %s ads" % rules.AD_SPECS[ad_type][2].lower(), lambda t=ad_type: read_ads(t, search(cid, ADS_GAQL[t]), sink), [])
     if sink is not None and sink.ads:
         part("adAssets", "the pictures and videos of the Display and Demand Gen ads", lambda: read_ad_assets(sink, search, cid), None)
+    wanted = disapproved_ids(campaign_assets, customer_assets, groups)
+    policy = part("policy", "the policy reasons for disapproved assets", lambda: read_policy_for(search, cid, wanted), {}) if wanted else {}
     sets = part("sets", "the location sets", lambda: read_sets(search(cid, CAMPAIGN_SETS_GAQL), search(cid, CUSTOMER_SETS_GAQL), sink), {"account": 0, "campaigns": {}})
     return {"id": cid, "name": name, "campaigns": campaigns, "metrics": metrics, "campaignAssets": campaign_assets, "customerAssets": customer_assets,
-            "adGroupAssets": ad_group_assets, "adGroupCounts": ad_group_counts, "groups": groups, "ads": ads, "sets": sets, "ok": ok, "warnings": warnings}
+            "adGroupAssets": ad_group_assets, "adGroupCounts": ad_group_counts, "groups": groups, "ads": ads, "sets": sets, "policy": policy, "ok": ok, "warnings": warnings}
 
 
 def google_raw(account, *, search_fn=None, workers=6, today=None, detail_save=None):
@@ -545,6 +594,24 @@ def _fold(gaps, noun):
     return out
 
 
+def explain(slots, policy):
+    """Puts Google's policy topics on the disapproved assets a slot names and gives the slot the steps to fix what is wrong with its assets (tracker/paid_assets_plans.py).
+    The asset ids the read carried only to find the topics are dropped."""
+    for s in slots:
+        if s.get("bad"):
+            s["bad"] = [dict(b) for b in s["bad"]]            # the read is kept and analysed again on every view: never change what it holds
+        for b in s.get("bad") or []:
+            if b.get("state") == "disapproved" and policy.get(b.get("a")):
+                b["why"] = policy[b["a"]]
+        if any(s.get(k) for k in ("disapproved", "expired", "paused", "pending")):
+            fix = plans.problem_fix(s)
+            if fix:
+                s["fix"] = fix
+        for b in s.get("bad") or []:
+            b.pop("a", None)
+    return slots
+
+
 def analyse_account(a, today=None):
     """[campaign item] for the audited campaigns of one read account, plus the account-level view."""
     ok, camps = a.get("ok") or {}, a["campaigns"]
@@ -599,6 +666,10 @@ def analyse_account(a, today=None):
         counts = {k: sum(1 for x in gaps if x["severity"] == k) for k in (rules.HIGH, rules.MEDIUM, rules.LOW)}
         problems = {k: sum(s.get(k, 0) for s in slots) + sum(s.get(k, 0) for g in groups for s in g["slots"]) for k in ("disapproved", "paused", "pending", "expired")}
         not_shown = sum(s.get("notShown", 0) for s in slots)
+        policy = a.get("policy") or {}
+        explain(slots, policy)
+        for g in groups:
+            explain(g["slots"], policy)
         slots = _slim(slots)
         for g in groups:
             g["slots"] = _slim(g["slots"])
@@ -616,7 +687,8 @@ def analyse_account(a, today=None):
             b = merge(*[acct_b.get(f) for f in (spec.get("fields") or (key,))])
             if b["live"] + b["pending"] + b["disapproved"] + b["paused"] + b["expired"]:
                 account_assets.append({"key": key, "label": spec["label"], "have": b["have"], "disapproved": b["disapproved"], "paused": b["paused"],
-                                       "pending": b["pending"], "expired": b["expired"], "bad": b["bad"]})
+                                       "pending": b["pending"], "expired": b["expired"], "bad": [dict(x) for x in b["bad"]]})
+        explain(account_assets, a.get("policy") or {})
     return {"items": items, "notAudited": not_audited, "disapproved": sorted(disapproved), "expired": sorted(expired),
             "accountAssets": {"account": a["name"], "accountId": a["id"], "slots": account_assets, "locations": (a.get("sets") or {}).get("account", 0)}}
 
@@ -650,8 +722,14 @@ def assemble(raw, account, today):
             not_audited[k] = not_audited.get(k, 0) + n
     disapproved = {i for p in per for i in p["disapproved"]}
     expired = {i for p in per for i in p["expired"]}
-    gaps = [g for i in items for g in i["gaps"]]
     imps = sum(i["impressions"] for i in items)
+    for i in items:
+        ctx = {"name": i["name"], "type": i["type"], "impressions": i["impressions"], "share": (i["impressions"] / imps) if imps else None}
+        for g in i["gaps"]:
+            p = plans.gap_plan(g, ctx)
+            if p:
+                g["plan"] = p
+    gaps = [g for i in items for g in i["gaps"]]
     fix_first = [i for i in items if i["severity"] == rules.HIGH]
     summary = {
         "campaigns": len(items), "withGaps": sum(1 for i in items if i["gaps"]), "fixFirst": len(fix_first),

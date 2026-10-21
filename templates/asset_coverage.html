@@ -1,7 +1,7 @@
 {% extends "_paid_base.html" %}
 {% block title %}Asset Coverage Audit{% endblock %}
 {% block head %}
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/asset_coverage.css') }}?v=6">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/asset_coverage.css') }}?v=7">
 {% endblock %}
 {% block content %}
 <div class="pm pm-ac" id="ac">
@@ -90,5 +90,5 @@
 {% block scripts %}
 <script src="{{ url_for('static', filename='js/pm_picker.js') }}?v=1"></script>
 <script src="{{ url_for('static', filename='js/asset_tiles.js') }}?v=1"></script>
-<script src="{{ url_for('static', filename='js/asset_coverage.js') }}?v=5"></script>
+<script src="{{ url_for('static', filename='js/asset_coverage.js') }}?v=6"></script>
 {% endblock %}

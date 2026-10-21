@@ -179,7 +179,7 @@ def test_a_bucket_counts_states_names_the_problem_assets_and_finds_the_ones_neve
              {"f": "SITELINK", "st": "ENABLED", "ps": "ELIGIBLE", "rs": [], "a": "5", "l": "Old offer", "e": "2026-05-31"}]
     b = a.bucket(links, TODAY, shown={("9", "1")}, scope="9")
     assert (b["live"], b["disapproved"], b["paused"], b["expired"], b["notShown"]) == (2, 1, 1, 1, 1)
-    assert b["bad"] == [{"label": "Bad", "state": "disapproved"}, {"label": "Old offer", "state": "expired"}]
+    assert b["bad"] == [{"label": "Bad", "state": "disapproved", "a": "3"}, {"label": "Old offer", "state": "expired", "a": "5"}]
     assert b["ids"] == ["3"] and b["expiredIds"] == ["5"]                              # a disapproved asset and one past its end date are named apart
     assert a.bucket(links, TODAY, shown=None)["notShown"] == 0                           # shown could not be read: nothing is called unshown
     assert a.bucket([dict(links[0], f="BUSINESS_NAME")], TODAY, shown=set(), scope="9")["notShown"] == 0     # not a kind Google reports shows for
@@ -198,8 +198,8 @@ def test_campaign_and_account_assets_are_read_with_their_labels_and_end_dates():
             link_row("5", "PROMOTION", "p1", asset={"promotionAsset": {"promotionTarget": "Free whitening", "endDate": "2026-05-31"}})]
     ca = a.read_campaign_assets(rows, {("5", "sl1")}, TODAY)["5"]
     assert ca["SITELINK"]["live"] == 1 and ca["SITELINK"]["notShown"] == 0
-    assert ca["CALLOUT"]["bad"] == [{"label": "Open Saturdays", "state": "disapproved"}]
-    assert ca["PROMOTION"]["expired"] == 1 and ca["PROMOTION"]["bad"] == [{"label": "Free whitening", "state": "expired"}]
+    assert ca["CALLOUT"]["bad"] == [{"label": "Open Saturdays", "state": "disapproved", "a": "c1"}]
+    assert ca["PROMOTION"]["expired"] == 1 and ca["PROMOTION"]["bad"] == [{"label": "Free whitening", "state": "expired", "a": "p1"}]
     cu = a.read_customer_assets([link_row(None, "CALLOUT", "c9", level="customerAsset")], TODAY)
     assert cu["CALLOUT"]["live"] == 1
 
@@ -225,7 +225,7 @@ def test_an_asset_group_is_read_with_its_assets_per_kind_and_a_group_listed_twic
              {"assetGroup": {"id": "999"}, "assetGroupAsset": {"fieldType": "HEADLINE", "status": "ENABLED"}, "asset": {"id": "x"}}]      # a group that is not live
     g = a.read_groups(groups, rows, TODAY)
     assert len(g) == 1 and g[0]["campaignId"] == "6" and g[0]["name"] == "Crowns"
-    assert g[0]["assets"]["HEADLINE"]["live"] == 3 and g[0]["assets"]["YOUTUBE_VIDEO"]["bad"] == [{"label": "Tour", "state": "disapproved"}]
+    assert g[0]["assets"]["HEADLINE"]["live"] == 3 and g[0]["assets"]["YOUTUBE_VIDEO"]["bad"] == [{"label": "Tour", "state": "disapproved", "a": "v1"}]
 
 
 def test_ads_are_read_as_counts_per_kind_whatever_the_format():

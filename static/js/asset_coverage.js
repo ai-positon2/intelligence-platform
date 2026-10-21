@@ -228,8 +228,18 @@ function noteBits(s){
   if(s.adGroups) bits.push('<span class="ac-t">'+s.adGroups+' ad group'+(s.adGroups===1?"":"s")+' with their own</span>');
   return bits.join(" ");
 }
+/* Google's policy topic as words: HEALTH_IN_PERSONALIZED_ADS is "Health in personalized ads". */
+function topicWords(t){var w=String(t||"").replace(/_/g," ").toLowerCase().trim(); return w.charAt(0).toUpperCase()+w.slice(1);}
 function badNames(s){
-  return (s.bad&&s.bad.length)?'<span class="ac-names">'+s.bad.map(function(b){return esc(b.label)+" ("+(b.state==="expired"?"past end date":"disapproved")+")";}).join(", ")+'</span>':"";
+  return (s.bad&&s.bad.length)?'<span class="ac-names">'+s.bad.map(function(b){
+    var why=(b.why&&b.why.length)?": "+b.why.map(function(x){return topicWords(x.t);}).join(", "):"";
+    return esc(b.label)+" ("+(b.state==="expired"?"past end date":"disapproved"+esc(why))+")";}).join(", ")+'</span>':"";
+}
+/* How to do it (tracker/paid_assets_plans.py works the steps out): folded away under the gap or the asset that needs it. */
+function planBlock(p,title){
+  if(!p||!p.steps||!p.steps.length) return "";
+  return '<details class="ac-plan"><summary>'+esc(title)+'</summary><ol>'+p.steps.map(function(t){return '<li>'+esc(t)+'</li>';}).join("")+'</ol>'+
+    (p.worth?'<p class="ac-worth"><b>Worth</b> '+esc(p.worth)+'</p>':"")+'</details>';
 }
 function sectionMap(secs){var m={}; (secs||[]).forEach(function(x){m[x.key]=x;}); return m;}
 function strip(sec,id,open){
@@ -249,7 +259,7 @@ function slotTable(slots,fromCol,secs,ns){
     known[s.key]=1;
     var have=s.have==null?"Na":s.have, cls=s.status==="ok"?"ok":s.status==="unknown"?"unk":(s.severity||"low"), sec=by[s.key], id=ns+"|"+s.key;
     return '<tr class="'+cls+'"><td>'+esc(s.label)+'</td><td class="r c">'+have+'</td><td class="r c">'+(s.min&&s.min!==s.target?s.min+" to "+s.target:s.target)+'</td>'+
-      (fromCol?'<td class="c">'+esc(SOURCE[s.source]||s.source)+'</td>':'')+'<td>'+noteBits(s)+badNames(s)+'</td></tr>'+
+      (fromCol?'<td class="c">'+esc(SOURCE[s.source]||s.source)+'</td>':'')+'<td>'+noteBits(s)+badNames(s)+planBlock(s.fix,"How to fix")+'</td></tr>'+
       (sec&&sec.tiles.length?strip(Object.assign({cols:ncol},sec),id,!!S.openK[id]):"");
   }).join("");
   var more=(secs||[]).filter(function(x){return !known[x.key]&&x.tiles.length;}).map(function(x){return extra(x,ns+"|"+x.key);}).join("");
@@ -263,7 +273,7 @@ function detailNote(dt){
 function gapList(gaps){
   return gaps.length?'<ul class="ac-gaps">'+gaps.map(function(g){
     var d=SEV[g.severity]||["",""];
-    return '<li class="'+d[1]+'"><span class="ac-pill '+d[1]+'">'+d[0]+'</span><span class="ac-gl"><b>'+esc(g.label)+'</b> <span class="ac-sc">'+esc(g.scope)+'</span><br>'+esc(g.message)+'</span>'+
+    return '<li class="'+d[1]+'"><span class="ac-pill '+d[1]+'">'+d[0]+'</span><span class="ac-gl"><b>'+esc(g.label)+'</b> <span class="ac-sc">'+esc(g.scope)+'</span><br>'+esc(g.message)+planBlock(g.plan,"How to add them")+'</span>'+
       (g.add?'<span class="ac-add">+'+g.add+'</span>':"")+'</li>';
   }).join("")+'</ul>':'<p class="pm-empty">Nothing to add.</p>';
 }
@@ -471,10 +481,10 @@ $("#refreshBtn").addEventListener("click",function(){run(true);});
 $("#exportBtn").addEventListener("click",function(){
   var rep=S.report; if(!rep) return;
   var lines=[["Account",rep.account.name],["Window",rep.window.from+" to "+rep.window.to],[],
-    ["Account","Campaign","Kind of campaign","Where","Asset","Priority","Live now","Target","To add","What is wrong","Impressions (30 days)","Clicks","Cost"]];
+    ["Account","Campaign","Kind of campaign","Where","Asset","Priority","Live now","Target","To add","What is wrong","Impressions (30 days)","Clicks","Cost","How to add them"]];
   rep.campaigns.forEach(function(it){
     it.gaps.forEach(function(g){
-      lines.push([it.account,it.name,it.typeLabel,g.scope,g.label,(SEV[g.severity]||[""])[0],g.have==null?"":g.have,g.target,g.add,g.message,it.impressions,it.clicks,it.cost]);
+      lines.push([it.account,it.name,it.typeLabel,g.scope,g.label,(SEV[g.severity]||[""])[0],g.have==null?"":g.have,g.target,g.add,g.message,it.impressions,it.clicks,it.cost,g.plan?g.plan.steps.join(" "):""]);
     });
   });
   download(lines,"asset-coverage");

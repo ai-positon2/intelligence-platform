@@ -186,3 +186,10 @@ html.ac-lock{overflow:hidden}
 .ac-zoom{position:fixed;inset:0;z-index:2100;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:20px;background:rgba(2,6,23,.9)}
 .ac-zoom img{max-width:min(94vw,1100px);max-height:78vh;object-fit:contain;border-radius:10px;background:repeating-conic-gradient(#334155 0 25%,#1e293b 0 50%) 0 0/16px 16px}
 .ac-zoom p{margin:0;color:#e2e8f0;font-size:13px;text-align:center;max-width:90vw;overflow-wrap:anywhere}
+
+/* how to add what is missing and how to fix what is not working (tracker/paid_assets_plans.py) */
+.ac-plan{margin:6px 0 0;font-size:12.5px;color:var(--pm-ink2);font-weight:400}
+.ac-plan summary{cursor:pointer;font-weight:600;color:var(--pm-a)}
+.ac-plan ol{margin:6px 0 0;padding-left:18px;display:flex;flex-direction:column;gap:5px;line-height:1.55}
+.ac-worth{margin:6px 0 0;line-height:1.55;color:var(--pm-muted)}
+.ac-worth b{color:var(--pm-ink)}
