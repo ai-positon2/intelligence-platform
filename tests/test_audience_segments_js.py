@@ -66,3 +66,27 @@ def test_the_page_script_asks_for_meta_accounts_and_sends_a_combined_account_str
 def test_a_row_that_joins_audiences_names_them_and_says_why_they_share_numbers():
     page = open(PAGE, encoding="utf-8").read()
     assert "audiences always used together:" in page and "r.members.map(esc).join" in page and "cannot tell them apart" in page
+
+
+# ── The plan under the advice, run from the page script ───────────────────
+
+def _plan_html(plan):
+    src = open(PAGE, encoding="utf-8").read()
+    esc = ('var esc=function(s){return String(s==null?"":s).replace(/[&<>"\']/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",\'"\':"&quot;","\'":"&#39;"}[c];});};')
+    r = subprocess.run(["node", "-e", esc + _function(src, "planHtml") + ";console.log(JSON.stringify(planHtml(%s)))" % json.dumps(plan)], capture_output=True, text=True, timeout=30)
+    assert r.returncode == 0, r.stderr
+    return json.loads(r.stdout)
+
+
+@node
+def test_a_plan_is_folded_under_the_advice_escaped_with_its_worth():
+    html = _plan_html({"steps": ["Open <Campaigns>.", "Save."], "worth": "About $100."})
+    assert html == '<details class="ps-do"><summary>How to do it</summary><ol><li>Open &lt;Campaigns&gt;.</li><li>Save.</li></ol><p class="ps-worth"><b>Worth</b> About $100.</p></details>'
+    assert "ps-worth" not in _plan_html({"steps": ["One."], "worth": None})
+    assert _plan_html(None) == "" and _plan_html({"steps": []}) == ""
+
+
+def test_the_plan_is_drawn_in_the_insight_cards_the_row_detail_the_list_table_and_the_csv():
+    page = open(PAGE, encoding="utf-8").read()
+    assert "esc(i.action)+'</p>'+planHtml(i.plan)+'</article>'" in page and "esc(r.action.text)+'</p>'+planHtml(r.action.plan)" in page
+    assert 'l.problems.map(esc).join("<br>")+planHtml(l.plan)' in page and '"What to do","How to do it"]]' in page and "r.action.plan.steps.join" in page

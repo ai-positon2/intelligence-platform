@@ -233,6 +233,12 @@ $("#types").addEventListener("click",function(e){
   var b=e.target.closest("button"); if(!b) return; S.type=b.dataset.t; S.tbl.verdict="all"; S.tbl.limit=50; S.tbl.open={}; render();
 });
 var GROUPS=[["action","Do this"],["watch","Keep an eye on"],["info","Good to know"]];
+/* How to do it and what it is worth (tracker/paid_audiences_plans.py works both out), folded away under the advice. */
+function planHtml(p){
+  if(!p||!p.steps||!p.steps.length) return "";
+  return '<details class="ps-do"><summary>How to do it</summary><ol>'+p.steps.map(function(t){return '<li>'+esc(t)+'</li>';}).join("")+'</ol>'+
+    (p.worth?'<p class="ps-worth"><b>Worth</b> '+esc(p.worth)+'</p>':"")+'</details>';
+}
 function paintInsights(){
   var items=(view()&&view().insights)||[], html="";
   $("#insNote").textContent=items.length?"Every one is computed from the tables below":"";
@@ -245,7 +251,7 @@ function paintInsights(){
       return '<article class="sg-card '+i.severity+(link?" link":"")+'"'+link+'><div class="sg-card-top"><span class="sg-tag">'+esc({push:"Raise",trim:"Lower",exclude:"Exclude",kinds:"Kinds",
         smart:"Smart Bidding",meta:"Meta Ads",thin:"Thin data",lists:"Lists",unused:"Unused lists",exclusions:"Exclusions",pmax:"Not included",nodata:"No data"}[i.kind]||i.kind)+'</span>'+
         (i.severity==="info"?"":'<span class="sg-conf '+(i.confidence==="high"?"high":"")+'">'+(i.confidence==="high"?"High confidence":i.confidence==="medium"?"Medium confidence":"Directional")+'</span>')+'</div>'+
-        '<h4>'+esc(i.headline)+'</h4><p class="ev">'+esc(i.evidence)+'</p><p class="ac"><b>'+(i.severity==="info"?"Note":"Do")+'</b> '+esc(i.action)+'</p></article>';
+        '<h4>'+esc(i.headline)+'</h4><p class="ev">'+esc(i.evidence)+'</p><p class="ac"><b>'+(i.severity==="info"?"Note":"Do")+'</b> '+esc(i.action)+'</p>'+planHtml(i.plan)+'</article>';
     }).join("")+'</div>';
   });
   $("#insList").innerHTML=html;
@@ -338,7 +344,7 @@ function paintTable(){
   var more=$("#more"); more.hidden=rows.length<=S.tbl.limit; more.textContent="Show all "+rows.length+" audiences";
 }
 function detail(r){
-  var what=r.action&&r.action.text?'<p class="au-do '+r.action.kind+'"><b>'+({raise:"Raise",lower:"Lower",exclude:"Exclude",hold:"Hold"}[r.action.kind]||"")+'</b> '+esc(r.action.text)+'</p>':"";
+  var what=r.action&&r.action.text?'<p class="au-do '+r.action.kind+'"><b>'+({raise:"Raise",lower:"Lower",exclude:"Exclude",hold:"Hold"}[r.action.kind]||"")+'</b> '+esc(r.action.text)+'</p>'+planHtml(r.action.plan):"";
   var why=r.why?'<p class="au-why">'+esc(r.why)+'</p>':"";
   if(r.members&&r.members.length) why='<p class="au-why"><b>'+r.members.length+' audiences always used together:</b> '+r.members.map(esc).join(", ")+
     '. Meta reports results per ad set, and the same ad sets use every one of them, so it cannot tell them apart: they share these numbers.</p>'+why;
@@ -400,7 +406,7 @@ function paintLists(){
     (ls.length?ls.map(function(l){
       return '<tr><td class="sg-lab">'+esc(l.label)+(multi?'<span class="gp-sub">'+esc(l.account)+'</span>':"")+(l.readOnly?'<span class="gp-sub">created by Google</span>':"")+'</td><td>'+esc(l.detail)+'</td><td class="r num">'+(l.sizeSearch==null?"Not shown":int(l.sizeSearch))+'</td>'+
         (S.report.account.platform==="meta"?"":'<td class="r num">'+(l.platform==="meta"?"–":int(l.sizeDisplay))+'</td>')+'<td>'+esc(l.status==="OPEN"?"Open":l.status==="CLOSED"?"Closed":l.status==="NOT_READY"?"Not ready":l.status||"")+'</td><td>'+(l.used?"Yes":'<span class="au-no">Not used</span>')+
-        '</td><td class="au-prob">'+(l.problems.length?l.problems.map(esc).join("<br>"):"Nothing")+'</td></tr>';
+        '</td><td class="au-prob">'+(l.problems.length?l.problems.map(esc).join("<br>")+planHtml(l.plan):"Nothing")+'</td></tr>';
     }).join(""):'<tr><td colspan="7" class="pm-empty">No list matches.</td></tr>')+'</tbody>':'<tbody><tr><td class="pm-empty">The account has no audience lists.</td></tr></tbody>';
 }
 function paintExcl(){
@@ -417,11 +423,11 @@ $("#refreshBtn").addEventListener("click",function(){run(true);});
 $("#exportBtn").addEventListener("click",function(){
   var rep=S.report, v=view(); if(!rep||!v) return;
   var lines=[["Account",rep.account.name],["Date range",rep.range.from+" to "+rep.range.to],["Campaign type",S.type],[],
-    ["Audience","Platform","Kind","Detail","Impressions","Clicks","Cost","% cost","CTR","Conversions","Conv. rate","CPA","Conversion value","ROAS","Efficiency index","Verdict","Mode","Bid adjustment now","Suggested bid adjustment","What to do"]];
+    ["Audience","Platform","Kind","Detail","Impressions","Clicks","Cost","% cost","CTR","Conversions","Conv. rate","CPA","Conversion value","ROAS","Efficiency index","Verdict","Mode","Bid adjustment now","Suggested bid adjustment","What to do","How to do it"]];
   v.rows.forEach(function(r){
     lines.push([r.label,r.platform==="meta"?"Meta Ads":"Google Ads",r.kindLabel,r.detail,r.impressions,r.clicks,r.cost.toFixed(2),r.pctCost==null?"":(r.pctCost*100).toFixed(2)+"%",r.ctr==null?"":(r.ctr*100).toFixed(2)+"%",r.conversions,
       r.cvr==null?"":(r.cvr*100).toFixed(2)+"%",r.cpa==null?"":r.cpa.toFixed(2),r.value,r.roas==null?"":r.roas.toFixed(3),r.index==null?"":r.index,r.verdictLabel,modeText(r.mode,r.platform),r.platform==="meta"?"":bidText(r),
-      r.adjustment==null||!r.adjustable?"":Math.round(r.adjustment*100)+"%",(r.action&&r.action.text)||""]);
+      r.adjustment==null||!r.adjustable?"":Math.round(r.adjustment*100)+"%",(r.action&&r.action.text)||"",(r.action&&r.action.plan)?r.action.plan.steps.join(" "):""]);
   });
   var blob=new Blob(["﻿"+lines.map(function(l){return l.map(csv).join(",");}).join("\r\n")],{type:"text/csv;charset=utf-8"});
   var a=document.createElement("a"); a.href=URL.createObjectURL(blob);

@@ -95,6 +95,7 @@ def analyse(view, *, currency="USD", ctype="All", mixed=False, force_cpa=False):
     tracker/paid_audiences.py builds it. `mixed`: the view adds together results that are not the same thing (a Meta account's sales and leads), so
     nothing is ranked. `force_cpa`: Google and Meta are added, and Meta's results carry no value, so ROAS would call every Meta audience a failure: cost per
     conversion is the one measure both have."""
+    from . import paid_audiences_plans as plans
     total = dict(view["account"], _cur=currency)
     basis = None if mixed else gi.basis_of(total)
     if force_cpa and not mixed:
@@ -109,6 +110,9 @@ def analyse(view, *, currency="USD", ctype="All", mixed=False, force_cpa=False):
                    confidence=conf, why=why)
         row["adjustable"] = any(adjustable(u) for u in r["uses"])
         row["action"] = action_for(row, verdict, adj)
+        plan = plans.action_plan(row, row["action"], adj, currency)
+        if plan:
+            row["action"]["plan"] = plan
         rows.append(row)
     out = dict(view, rows=rows, basis=basis)
     out["insights"] = make_insights(rows, total, basis, currency, ctype, mixed)
@@ -184,11 +188,14 @@ def _names(rows, n=3):
 # ── Lists and the whole report ──────────────────────────────────────────────
 
 def judge_lists(lists):
-    """Each list with what stops it serving: a size under what Google needs, a closed list, or no use at all."""
+    """Each list with what stops it serving: a size under what Google needs, a closed list, or no use at all, and the steps to put that right."""
+    from . import paid_audiences_plans as plans
     out = []
     for l in lists:
         if l.get("platform") == "meta":
-            out.append(_judge_meta_list(l))
+            j = _judge_meta_list(l)
+            fix = plans.list_plan(j)
+            out.append(dict(j, plan=fix) if fix else j)
             continue
         problems = []
         if l["status"] == "CLOSED":
@@ -199,7 +206,9 @@ def judge_lists(lists):
         if l["sizeDisplay"] < DISPLAY_MIN:
             problems.append("Google reports %s on Display and YouTube; about %s are needed." % (
                 "no members" if not l["sizeDisplay"] else num(l["sizeDisplay"]) + " members", num(DISPLAY_MIN)))
-        out.append(dict(l, problems=problems, serves=not problems))
+        j = dict(l, problems=problems, serves=not problems)
+        fix = plans.list_plan(j)
+        out.append(dict(j, plan=fix) if fix else j)
     out.sort(key=lambda l: (l["serves"], l["used"], l["label"].lower()))
     return out
 
@@ -262,17 +271,21 @@ def report_insights(report, view):
                      num(worst["conversions"]), pct(worst["share"], 1)),
                  "Shift budget and bid room toward %s and look hard at %s before adding more of it." % (best["label"].lower(), worst["label"].lower()),
                  "high" if min(best["conversions"], worst["conversions"]) >= 15 else "medium")
+    from . import paid_audiences_plans as plans
     bad = [l for l in report["lists"] if l["problems"] and l["used"]]
     if bad:
         add_("lists", "watch", "%s audience list%s in use cannot serve properly" % (num(len(bad)), "" if len(bad) == 1 else "s"),
              "%s. %s" % (_names(bad, 4), bad[0]["problems"][0]),
              "A list this small shows ads to almost nobody. Let it grow, widen its rules or its window, or stop counting on it.", "high")
+        if bad[0].get("plan"):
+            out[-1]["plan"] = bad[0]["plan"]
     unused = [l for l in report["lists"] if not l["used"] and l["serves"] and not l.get("readOnly")]       # Google's own lists are not the team's to use or not
     if unused:
         add_("unused", "info", "%s audience list%s the account has but nothing uses" % (num(len(unused)), "" if len(unused) == 1 else "s"),
              "%s %s big enough to serve and %s attached to no campaign or ad group and excluded nowhere." % (
                  _names(unused, 4), "is" if len(unused) == 1 else "are", "is" if len(unused) == 1 else "are"),
              "Add them as observation audiences on the campaigns they fit to learn how they perform, or remove them.", "high")
+        out[-1]["plan"] = plans.unused_plan(", ".join('"%s"' % l["label"] for l in unused[:3]))
     if report.get("exclusions"):
         n = len(report["exclusions"])
         add_("exclusions", "info", "%s audience exclusion%s in place" % (num(n), "" if n == 1 else "s"),
