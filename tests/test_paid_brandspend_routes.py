@@ -1,5 +1,6 @@
 """Brand Spend Alert: the routes and the page (app.py, templates/brand_spend.html)."""
 import os
+import re
 
 import pytest
 
@@ -67,3 +68,18 @@ def test_a_bad_limit_and_a_bad_account_are_refused_by_the_real_report(monkeypatc
     assert r.status_code == 400 and "between 10% and 90%" in r.get_json()["error"]
     r = client_as(STAFF).get(API + "/report?account=9999999999")
     assert r.status_code == 400 and "not one of Position2" in r.get_json()["error"]
+
+
+def test_the_agent_is_on_the_paid_marketing_page_the_palette_the_hub_counts_and_the_assistant_knows_it():
+    from tests import hidden_paid
+    paid = client_as(STAFF).get("/p2/paid-marketing").get_data(as_text=True)
+    assert 'href="/p2/paid-marketing/brand-spend"' in paid and "c-bs" in paid and "Brand Spend Alert" in paid
+    assert "u:'/p2/paid-marketing/brand-spend'" in paid and "u:'/p2/paid-marketing/brand-spend'" in client_as(STAFF).get("/p2/paid-marketing/pacing-desk").get_data(as_text=True)
+    css = open(os.path.join(ROOT, "static", "css", "paid_marketing.css"), encoding="utf-8").read()
+    assert ".c-bs{" in css and ".pm.pm-bs" in css and ".bs-band{" in css
+    cards = len(re.findall(r'class="dash-card', paid))
+    hub = re.sub(r"<!--.*?-->", "", hidden_paid.rendered("/p2/hub"), flags=re.S)
+    assert ("<span>%d</span> dashboards" % cards) in hub and ("<span>%d</span> live" % cards) in hub and "brand spend watched against its usual week" in hub
+    assert "Brand Spend Alert (/p2/paid-marketing/brand-spend)" in app_module._VIMI_PLATFORM_KNOWLEDGE and "the account's own history" in app_module._VIMI_PLATFORM_KNOWLEDGE
+    card = paid.split('href="/p2/paid-marketing/brand-spend" class="dash-card', 1)[1].split("</a>", 1)[0]
+    assert "\u2014" not in card and "\u2013" not in card

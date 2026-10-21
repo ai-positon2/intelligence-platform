@@ -547,6 +547,25 @@
         </div>
       </a>
 
+      <a href="/p2/paid-marketing/brand-spend" class="dash-card active c-bs">
+        <div class="card-band"></div>
+        <div class="card-thumb">
+          <div class="card-thumb-icon"><svg class="au-ic" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M3 17l5-6 4 3 5-7 4 4"/><path d="M3 21h18"/></svg></div>
+          <div class="card-thumb-badge tb-live"><span class="tb-dot live"></span> Live</div>
+        </div>
+        <div class="card-body">
+          <div class="card-name">Brand Spend Alert</div>
+          <div class="card-desc">
+            Reads what the brand campaigns of an account, or of every account of an MCC, spent last whole week and holds it against a usual week from the account's own history.
+            Says which are outside it, whether the money went on more clicks or dearer ones, which campaign moved, and what to do. Read only.
+          </div>
+          <div class="card-footer">
+            <div class="card-tags"><span class="tag">Monitoring</span><span class="tag">Spend</span></div>
+            <span class="card-arrow">→</span>
+          </div>
+        </div>
+      </a>
+
     </div>
 
     <p class="footer-note">Position2 · Internal use only</p>
@@ -597,6 +616,7 @@
     {% if 'experiment-tracker' not in paid_hidden %}    {t:'Test & Experiment Tracker',d:'Which tests have a result, and what to do about each',u:'/p2/paid-marketing/experiment-tracker',i:'⚗'},{% endif %}
     {t:'Unknown Domains Alert',d:'Ads pointing at a domain nobody approved, by email and Slack',u:'/p2/paid-marketing/unknown-domains',i:'⚠'},
     {t:'Brand IS Monitor',d:'Is the brand shown when someone searches for it',u:'/p2/paid-marketing/brand-is',i:'◉'},
+    {t:'Brand Spend Alert',d:'Is the brand spend inside what is usual for the account',u:'/p2/paid-marketing/brand-spend',i:'$'},
     {t:'QA Agent',d:'Campaign launch QC checklist',u:'/p2/paid-marketing/qa-agent',i:'✓'}
   ];
   var ITEMS=(window.__KP_ITEMS||[]).concat(BASE);
