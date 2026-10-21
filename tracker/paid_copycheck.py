@@ -299,15 +299,29 @@ def assemble(raw, account, *, settings=None, brand_terms=None, speller=None, iss
     }
 
 
+def load_raw(account_id, *, accounts_fn=None, groups_fn=None, search_fn=None, now=None, force=False, store=None, today=None, meta_pages_fn=None, meta_account_fn=None):
+    """(raw, stale, account): the saved read of the ads of a Google Ads account, an MCC or a Meta ad account, read from the platform when there is none (or when `force`)."""
+    from . import paid_geo, paid_meta, paid_store
+    store = store or paid_store
+    day = today or dt.date.today()
+    if paid_meta.is_meta(str(account_id or "")):
+        act = paid_meta.norm_id(account_id)
+        pages = meta_pages_fn or (lambda path, params: paid_meta._pages(path, params, store))
+        acct_fn = meta_account_fn or (lambda a: paid_meta.account_by_id(store, a) or {})
+        account = {"id": act, "name": (acct_fn(act) or {}).get("name") or act, "currency": (acct_fn(act) or {}).get("currency") or "USD", "platform": "meta"}
+        raw, stale = paid_geo._cached("copycheck", act, "ads", day, day, lambda: meta_raw(act, pages_fn=pages, account_fn=acct_fn), force=force, store=store, now=now)
+    else:
+        account = seg.resolve_target(account_id, accounts_fn=accounts_fn, groups_fn=groups_fn)
+        raw, stale = paid_geo._cached("copycheck", account["id"], "ads", day, day, lambda: google_raw(account, search_fn=search_fn), force=force, store=store, now=now)
+    return raw, stale, account
+
+
 def report_for(account_id, *, accounts_fn=None, groups_fn=None, search_fn=None, now=None, force=False, store=None, today=None, mon=None, meta_pages_fn=None, meta_account_fn=None,
                asof=None, speller=None):
     """The Ad Copy Checker report for a Google Ads account or an MCC the root MCC holds, or for a Meta ad account (act_...). `force` (Refresh) skips the saved read, at most once per
     paid_gads.REFRESH_COOLDOWN_S for the account. `mon` is the monitors' store: with it the team's saved phone numbers, places, brand spellings and allowed words are applied and each
     open problem has its age."""
     from . import paid_copycheck_settings as st
-    from . import paid_geo, paid_meta, paid_store
-    store = store or paid_store
-    day = today or dt.date.today()
     stamp = asof or dt.datetime.now(dt.timezone.utc)
     warnings, settings, issues, brand_terms = [], None, None, {}
     if mon is not None:
@@ -318,15 +332,8 @@ def report_for(account_id, *, accounts_fn=None, groups_fn=None, search_fn=None, 
             brand_terms = {aid: (a.get("brandTerms") or []) for aid, a in (bs.load(mon).get("accounts") or {}).items()}
         except Exception as e:                                                       # noqa: BLE001
             warnings.append("What the team saved (phone numbers, places, brand spellings) and the history could not be read (%s), so those checks were skipped." % e)
-    if paid_meta.is_meta(str(account_id or "")):
-        act = paid_meta.norm_id(account_id)
-        pages = meta_pages_fn or (lambda path, params: paid_meta._pages(path, params, store))
-        acct_fn = meta_account_fn or (lambda a: paid_meta.account_by_id(store, a) or {})
-        account = {"id": act, "name": (acct_fn(act) or {}).get("name") or act, "currency": (acct_fn(act) or {}).get("currency") or "USD", "platform": "meta"}
-        raw, stale = paid_geo._cached("copycheck", act, "ads", day, day, lambda: meta_raw(act, pages_fn=pages, account_fn=acct_fn), force=force, store=store, now=now)
-    else:
-        account = seg.resolve_target(account_id, accounts_fn=accounts_fn, groups_fn=groups_fn)
-        raw, stale = paid_geo._cached("copycheck", account["id"], "ads", day, day, lambda: google_raw(account, search_fn=search_fn), force=force, store=store, now=now)
+    raw, stale, account = load_raw(account_id, accounts_fn=accounts_fn, groups_fn=groups_fn, search_fn=search_fn, now=now, force=force, store=store, today=today,
+                                   meta_pages_fn=meta_pages_fn, meta_account_fn=meta_account_fn)
     report = assemble(raw, account, settings=settings, brand_terms=brand_terms, speller=speller or rules.shared_speller(), issues=issues, now=stamp)
     report["warnings"] = warnings + report["warnings"]
     if raw.get("readAt"):

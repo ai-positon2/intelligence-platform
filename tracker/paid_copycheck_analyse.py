@@ -5,6 +5,9 @@ structured snippet, or a Meta ad. All of them are the same shape:
 
   {id, platform, kind, campaignId, campaign, adGroupId, adGroup, url, texts: [{slot, text}]}
 
+An ad that has findings is returned without its texts (every finding carries the slot and the text it is about, so the page can draw the lines that matter) and with the number of lines it holds:
+an account with thousands of ads must not send every line of every ad to the browser.
+
 This turns them into the account's answer: each ad with its findings, the rules ranked by how many ads they touch, the phone numbers the ads carry, the brand written two ways, and the
 words the dictionary does not know that the account uses over and over (listed quietly, never alerted). The rules themselves are tracker/paid_copycheck_rules.py; what the team told us
 (its phone numbers, places, brand spellings and words never to doubt) is passed in.
@@ -149,7 +152,7 @@ def analyse(ads, *, account, config=None, brand_terms=(), speller=None, ages=Non
             continue
         fs = sorted(fs, key=lambda f: (_level_key(f["level"]), rules.ORDER.index(f["rule"]), f["start"]))
         item = {"id": ad["id"], "platform": ad.get("platform") or "google", "kind": ad.get("kind") or "ad", "campaignId": ad.get("campaignId") or "", "campaign": ad.get("campaign") or "",
-                "adGroupId": ad.get("adGroupId") or "", "adGroup": ad.get("adGroup") or "", "url": ad.get("url") or "", "level": rules.level_of(fs), "texts": ad["texts"], "findings": fs,
+                "adGroupId": ad.get("adGroupId") or "", "adGroup": ad.get("adGroup") or "", "url": ad.get("url") or "", "level": rules.level_of(fs), "lineCount": len(ad["texts"]), "findings": fs,
                 "fingerprint": fingerprint(account["id"], ad["id"])}
         a = (ages or {}).get(item["fingerprint"])
         if a and now is not None:

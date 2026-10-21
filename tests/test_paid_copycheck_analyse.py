@@ -146,3 +146,10 @@ def test_the_accounts_own_words_choose_the_correction():
     own = [ad(i, ("headline", "Clinic near you"), ("description", "We offer implants.")) for i in range(1, 4)] + [ad(9, ("headline", "Clincs near you"), ("description", "We offer implants."))]
     r = run(own)
     assert r["items"][0]["findings"][0]["suggestion"] == "clinic"
+
+
+def test_an_ad_with_findings_is_sent_without_its_texts_but_with_how_many_lines_it_holds():
+    r = run([ad(1, ("headline", "Dentst near you"), ("headline", "Quality Dental Care"), ("description", "We offer implants."), ("description", "Book now"))])
+    it = r["items"][0]
+    assert "texts" not in it and it["lineCount"] == 4 and {f["text"] for f in it["findings"]} == {"Dentst near you", "We offer implants."}
+    assert all("slot" in f and "text" in f for f in it["findings"])
