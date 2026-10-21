@@ -304,7 +304,7 @@ def test_the_whole_report_is_drawn_with_the_worst_account_first_and_markup_escap
         assert text in kp, text
     assert lst.index("Delta") < lst.index("Beta Clinic") < lst.index("Epsilon") and "Gamma" not in lst and "Acme Dental" not in lst      # "Needs a look" holds the three that need one
     assert "bi-pill bad" in lst and "Spend stopped" in lst and "bi-pill over" in lst and "Over the usual" in lst and "bi-pill under" in lst and "Under the usual" in lst
-    assert "$196" in lst and "usual $203" in lst and "bs-fig over" in lst and "Dearer clicks" in lst
+    assert "$301" in lst and "usual $203 \u00b7 Up 48%" in lst and "bs-fig over" in lst and "Dearer clicks" in lst
     views = out["el"]["#views"]["html"]
     assert "Needs a look <span class=\"n\">3</span>" in views and "All <span class=\"n\">6</span>" in views and 'class="pm-chip on" data-v="attention"' in views
     assert "MCC · 6 accounts checked together" in out["el"]["#fresh"]["html"] and "<b>Group</b>" in out["el"]["#fresh"]["html"]
