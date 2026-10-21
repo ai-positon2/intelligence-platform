@@ -5364,6 +5364,160 @@ def paid_brandis_diagnose():
         return _pm_gads_error(e)
 
 
+# ── The monitors (Brand Spend Alert, Disapproved Ads Tracker): alerts, the daily run and what the team saved ─────────────────
+# tracker/paid_monitor.py is the engine (issues, what is new, worse, still open or fixed, the alert), tracker/paid_monitors.py runs every monitor and says what an alert panel shows,
+# tracker/paid_monitor_store.py keeps it in Postgres. A run happens on the page's Run now or, every day, from a GitHub Actions workflow that calls the secret-guarded address below
+# (the same pattern as the Unknown Domains Alert); the first run of a monitor sets its baseline and sends nothing.
+
+_MON_LOCK = threading.Lock()
+
+
+def _mon_store():
+    from tracker import paid_monitor_store
+    return paid_monitor_store
+
+
+def _mon_deliver():
+    from tracker import market_radar_deliver
+    return market_radar_deliver
+
+
+def _mon_spawn(fn):
+    """Run a monitor in the background. (Tests run it inline by replacing this.)"""
+    threading.Thread(target=fn, daemon=True, name="monitor-run").start()
+
+
+def _mon_inventory():
+    from tracker import paid_domains_scan, paid_store
+    return paid_domains_scan.inventory(paid_store)
+
+
+def _mon_base():
+    return "https://%s" % request.host
+
+
+def _mon_run(fn):
+    """Run fn(store, pm, mon) and turn a bad request and an unavailable store into answers."""
+    from tracker import paid_monitor as mon, paid_monitors as pm
+    store = _mon_store()
+    try:
+        return fn(store, pm, mon)
+    except (pm.BadRequest, mon.BadRequest) as e:
+        return jsonify(error=str(e)), 400
+    except store.StoreUnavailable as e:
+        return _pm_store_error(e)
+
+
+@app.route("/p2/paid-marketing/api/monitors/<agent>/state")
+@position2_required
+def paid_monitor_state(agent):
+    def go(store, pm, mon):
+        return jsonify(pm.state_for(store, agent, _mon_deliver()))
+    return _mon_run(go)
+
+
+@app.route("/p2/paid-marketing/api/monitors/alerts", methods=["POST"])
+@position2_required
+def paid_monitor_alerts():
+    def go(store, pm, mon):
+        return jsonify(alerts=mon.save_alert_settings(store, request.get_json(silent=True) or {}))
+    return _mon_run(go)
+
+
+@app.route("/p2/paid-marketing/api/monitors/<agent>/test-alert", methods=["POST"])
+@position2_required
+def paid_monitor_test_alert(agent):
+    def go(store, pm, mon):
+        pm.agent_of(agent)
+        return jsonify(mon.test_alert(store, pm.AGENTS[agent]["label"], pm.link_for(agent, _mon_base()), _mon_deliver()))
+    return _mon_run(go)
+
+
+def _mon_start(agent, trigger, base):
+    """(started, why_not): start one monitor's run in the background unless it is already going."""
+    from tracker import paid_monitors as pm
+    store, deliver = _mon_store(), _mon_deliver()
+    if (store.state_get("lock:" + agent) or {}).get("locked"):
+        return False, "A run is already going."
+    accounts, groups, problems = _mon_inventory()
+    _mon_spawn(lambda: pm.run_agent(agent, store, trigger=trigger, base_link=base, deliver=deliver, accounts=accounts, groups=groups, problems=problems))
+    return True, ""
+
+
+@app.route("/p2/paid-marketing/api/monitors/<agent>/run", methods=["POST"])
+@position2_required
+def paid_monitor_run(agent):
+    def go(store, pm, mon):
+        pm.agent_of(agent)
+        with _MON_LOCK:
+            started, why = _mon_start(agent, "page by " + _pm_user_email(), _mon_base())
+        return (jsonify(started=True), 202) if started else (jsonify(error=why), 409)
+    return _mon_run(go)
+
+
+@app.route("/p2/paid-marketing/api/monitors/scheduled", methods=["POST"])
+def paid_monitor_scheduled():
+    """The daily run of every monitor (and, on a Monday, the weekly summaries). No session: a shared secret in X-Monitor-Secret, and with MONITOR_ALERT_SECRET unset every call is refused."""
+    import hmac
+    secret = os.environ.get("MONITOR_ALERT_SECRET", "")
+    given = request.headers.get("X-Monitor-Secret", "")
+    if not secret or not hmac.compare_digest(given.encode("utf-8"), secret.encode("utf-8")):
+        return jsonify(error="Forbidden."), 403
+
+    def go(store, pm, mon):
+        base = _mon_base()
+        accounts, groups, problems = _mon_inventory()
+        deliver = _mon_deliver()
+        _mon_spawn(lambda: pm.run_scheduled(store, base_link=base, deliver=deliver, inventory_fn=lambda: (accounts, groups, problems)))
+        return jsonify(started=True), 202
+    return _mon_run(go)
+
+
+# ── Brand Spend Alert: what the team saved ──────────────────────────────────────────────────────────────────────────────
+
+@app.route("/p2/paid-marketing/api/brandspend/settings")
+@position2_required
+def paid_brandspend_settings():
+    from tracker import paid_brandspend_settings as st
+    store = _mon_store()
+    try:
+        return jsonify(st.view(store))
+    except store.StoreUnavailable as e:
+        return _pm_store_error(e)
+
+
+def _bs_save(fn):
+    from tracker import paid_brandspend_settings as st, paid_brandspend
+    store = _mon_store()
+    try:
+        return jsonify(fn(st, store, request.get_json(silent=True) or {}))
+    except (st.BadRequest, paid_brandspend.BadRequest) as e:
+        return jsonify(error=str(e)), 400
+    except store.StoreUnavailable as e:
+        return _pm_store_error(e)
+
+
+@app.route("/p2/paid-marketing/api/brandspend/settings/account", methods=["POST"])
+@position2_required
+def paid_brandspend_settings_account():
+    return _bs_save(lambda st, store, body: {"account": st.save_account(store, body.get("account"), body, _pm_user_email())})
+
+
+@app.route("/p2/paid-marketing/api/brandspend/settings/mark", methods=["POST"])
+@position2_required
+def paid_brandspend_settings_mark():
+    def go(st, store, body):
+        v = body.get("value")
+        return {"marks": st.set_mark(store, body.get("campaign"), None if v is None else bool(v), _pm_user_email())}
+    return _bs_save(go)
+
+
+@app.route("/p2/paid-marketing/api/brandspend/settings/limit", methods=["POST"])
+@position2_required
+def paid_brandspend_settings_limit():
+    return _bs_save(lambda st, store, body: {"limit": st.set_limit(store, body.get("limit"), _pm_user_email())})
+
+
 # ── Brand Spend Alert (sheet item #26, 2026-10-21) ─────────────────────────────────────────────────────────────
 # What the brand campaigns of a Google Ads account or an MCC's accounts spent last whole week against a usual week from the account's own history, whether the
 # move is more clicks or dearer ones, which campaign moved, and what to do. The plan is docs/brand-spend-plan.md, the arithmetic tracker/paid_brandspend_math.py, the
@@ -5382,7 +5536,7 @@ def paid_brandspend_report():
     src = request.args
     try:
         extra = {"force": True} if str(src.get("refresh") or "") in ("1", "true") else {}      # the Refresh button
-        report = paid_brandspend.report_for(src.get("account"), limit=src.get("limit"),
+        report = paid_brandspend.report_for(src.get("account"), limit=src.get("limit"), mon=_mon_store(),
                                             overrides=paid_brandspend.parse_overrides(src.get("brand"), src.get("notbrand")), **extra)
         return jsonify(report)
     except paid_brandspend.BadRequest as e:
@@ -5411,7 +5565,7 @@ def paid_disapproved_report():
     src = request.args
     try:
         extra = {"force": True} if str(src.get("refresh") or "") in ("1", "true") else {}      # the Refresh button
-        return jsonify(paid_disapproved.report_for(src.get("account"), **extra))
+        return jsonify(paid_disapproved.report_for(src.get("account"), mon=_mon_store(), **extra))
     except paid_disapproved.BadRequest as e:
         return jsonify(error=str(e)), 400
     except paid_gads_base.RefreshTooSoon as e:

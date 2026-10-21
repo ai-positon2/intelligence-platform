@@ -1,0 +1,38 @@
+name: Paid Marketing Monitors
+
+# Starts the daily run of the Paid Marketing monitors (the Brand Spend Alert and the Disapproved Ads Tracker) on the platform. The run itself happens on the platform (it reads the Google
+# Ads and Meta accounts, finds what is new, worse or fixed and sends the email and Slack alerts, and on Mondays the weekly summaries); this only calls its secret-guarded address, which
+# answers at once and runs in the background. The first run of a monitor sets its baseline and sends nothing.
+#
+# Needs one GitHub Actions secret, MONITOR_ALERT_SECRET, the same value as the MONITOR_ALERT_SECRET variable set on Railway. The platform's address is the repository variable
+# PLATFORM_BASE_URL (default https://intelligence.position2.com). Alert recipients and the Slack channel are set on each monitor's page.
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '41 5 * * *'   # 05:41 UTC every day (11:11 in India, 22:41 the evening before on the US west coast)
+
+permissions:
+  contents: read
+
+concurrency:
+  group: paid-monitors
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Start the monitors
+        env:
+          BASE_URL: ${{ vars.PLATFORM_BASE_URL || 'https://intelligence.position2.com' }}
+          SECRET: ${{ secrets.MONITOR_ALERT_SECRET }}
+        run: |
+          if [ -z "$SECRET" ]; then
+            echo "::error::The MONITOR_ALERT_SECRET secret is not set on this repository."
+            exit 1
+          fi
+          curl --fail-with-body --silent --show-error --max-time 60 --retry 3 --retry-delay 20 --retry-all-errors \
+            -X POST "${BASE_URL%/}/p2/paid-marketing/api/monitors/scheduled" \
+            -H "X-Monitor-Secret: $SECRET" -H "Content-Type: application/json" -d '{}'
+          echo

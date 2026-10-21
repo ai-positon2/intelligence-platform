@@ -33,7 +33,7 @@ def test_the_page_is_for_signed_in_staff_only():
 
 def test_the_report_route_passes_what_the_page_sent_to_the_report(monkeypatch):
     seen = []
-    monkeypatch.setattr(b, "report_for", lambda *x, **k: seen.append((x, k)) or {"accounts": []})
+    monkeypatch.setattr(b, "report_for", lambda *x, **k: seen.append((x, {a: v for a, v in k.items() if a != "mon"})) or {"accounts": []})   # the monitors' store is passed as `mon`
     r = client_as(STAFF).get(API + "/report?account=1234567890&limit=25&brand=1,2&notbrand=3&refresh=1")
     assert r.status_code == 200 and r.get_json() == {"accounts": []}
     assert seen[0] == (("1234567890",), {"limit": "25", "overrides": {"1": True, "2": True, "3": False}, "force": True})

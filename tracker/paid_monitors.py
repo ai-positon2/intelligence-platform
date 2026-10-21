@@ -93,4 +93,4 @@ def state_for(store, agent, deliver, now=None):
     return {"agent": agent, "label": AGENTS[agent]["label"], "alerts": mon.alert_settings(store), "senders": deliver.ready(), "baseline": mon.baseline(store, agent),
             "runs": (store.state_get("runs:" + agent) or [])[:10], "counts": {lv: sum(1 for i in opened if i["level"] == lv) for lv in ("high", "medium", "low")},
             "open": [row(i) for i in opened[:SHOWN_OPEN]], "openTotal": len(opened), "fixed": [row(i) for i in fixed[:SHOWN_FIXED]],
-            "digest": (store.state_get("digest:" + agent) or {}).get("day")}
+            "digest": (store.state_get("digest:" + agent) or {}).get("day"), "running": bool((store.state_get("lock:" + agent) or {}).get("locked"))}
