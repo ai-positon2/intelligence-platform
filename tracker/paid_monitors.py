@@ -1,8 +1,8 @@
-"""Paid Marketing Agents: the monitors together (the Brand Spend Alert and the Disapproved Ads Tracker), what the routes and the scheduled run use (no network of its own).
+"""Paid Marketing Agents: the monitors together (the Brand Spend Alert, the Disapproved Ads Tracker and the Ad Copy Checker), what the routes and the scheduled run use (no network of its own).
 
   spec_for      the spec the engine (tracker/paid_monitor.py) runs for one monitor, built with what the team saved
   run_agent     one monitor over the accounts it is given
-  run_scheduled every monitor, then on Mondays each one's weekly summary (once a day at most, and only when a channel took it)
+  run_scheduled every monitor (the Ad Copy Checker on Mondays only), then on Mondays each one's weekly summary (once a day at most, and only when a channel took it)
   state_for     what an alert panel on a monitor's page shows: the recipients, the senders that are set up, the baseline, the last runs, the open issues and the ones fixed lately
 """
 from __future__ import annotations
@@ -14,6 +14,7 @@ from . import paid_monitor as mon
 AGENTS = {
     "brandspend": {"label": "Brand Spend Alert", "page": "/p2/paid-marketing/brand-spend"},
     "disapproved": {"label": "Disapproved Ads Tracker", "page": "/p2/paid-marketing/disapproved-ads"},
+    "copycheck": {"label": "Ad Copy Checker", "page": "/p2/paid-marketing/ad-copy-checker", "weekdays": (0,)},          # Mondays only: ad text changes slowly and the read is five queries an account
 }
 SHOWN_OPEN = 40
 SHOWN_FIXED = 10
@@ -40,6 +41,9 @@ def spec_for(agent, store, *, today=None, search_fn=None, list_fn=None, meta_pag
         from . import paid_brandspend_monitor as bm
         from . import paid_brandspend_settings as st
         return bm.make_spec(today=day, search_fn=search_fn, list_fn=list_fn, settings=st.load(store), mon_store=store)
+    if agent == "copycheck":
+        from . import paid_copycheck_monitor as cm
+        return cm.make_spec(today=day, search_fn=search_fn, list_fn=list_fn, mon_store=store, meta_pages_fn=meta_pages_fn, meta_account_fn=meta_account_fn, now_fn=now_fn)
     from . import paid_disapproved_monitor as dm
     return dm.make_spec(today=day, search_fn=search_fn, list_fn=list_fn, mon_store=store, meta_pages_fn=meta_pages_fn, meta_account_fn=meta_account_fn, now_fn=now_fn)
 
@@ -71,6 +75,9 @@ def run_scheduled(store, *, base_link, deliver, inventory_fn, now_fn=None, **inj
     accounts, groups, problems = inventory_fn()
     out = {}
     for agent in AGENTS:
+        days = AGENTS[agent].get("weekdays")
+        if days and now_fn().weekday() not in days:
+            continue
         out[agent] = run_agent(agent, store, trigger="schedule", base_link=base_link, deliver=deliver, accounts=accounts, groups=groups, problems=problems, now_fn=now_fn, **inject)
     if now_fn().weekday() == 0:
         out["weekly"] = {agent: send_weekly(agent, store, base_link=base_link, deliver=deliver, now=now_fn()) for agent in AGENTS}

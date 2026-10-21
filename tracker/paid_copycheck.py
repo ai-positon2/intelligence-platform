@@ -18,6 +18,7 @@ import json
 from concurrent.futures import ThreadPoolExecutor
 
 from . import paid_copycheck_analyse as an
+from . import paid_copycheck_plan as plan
 from . import paid_copycheck_rules as rules
 from . import paid_gads_segments as gads
 from . import paid_segments as seg
@@ -277,7 +278,7 @@ def assemble(raw, account, *, settings=None, brand_terms=None, speller=None, iss
         res = an.analyse(a["ads"], account={"id": a["id"], "name": a["name"]}, config=cfg, brand_terms=(brand_terms or {}).get(a["id"]) or [], speller=speller, ages=ages, now=now,
                          other_places=other_places(settings, a["id"]), allowed_extra=allowed_all)
         accounts.append(dict(res, id=a["id"], name=a["name"], currency=a.get("currency") or "USD", platform=a.get("platform") or "google",
-                             saved={k: len(cfg.get(k) or []) for k in ("phones", "places", "brand", "allow")}))
+                             saved={k: len(cfg.get(k) or []) for k in ("phones", "places", "brand", "allow")}, plan=plan.build(res)))
         warnings += ["%s: %s" % (a["name"], w) if account.get("members") else w for w in a.get("warnings") or []]
         if res["truncated"]:
             warnings.append("%s: more than %d ads: the first %d were checked." % (a["name"], an.MAX_ADS, an.MAX_ADS))
@@ -326,7 +327,7 @@ def report_for(account_id, *, accounts_fn=None, groups_fn=None, search_fn=None, 
     else:
         account = seg.resolve_target(account_id, accounts_fn=accounts_fn, groups_fn=groups_fn)
         raw, stale = paid_geo._cached("copycheck", account["id"], "ads", day, day, lambda: google_raw(account, search_fn=search_fn), force=force, store=store, now=now)
-    report = assemble(raw, account, settings=settings, brand_terms=brand_terms, speller=speller or rules.Speller(), issues=issues, now=stamp)
+    report = assemble(raw, account, settings=settings, brand_terms=brand_terms, speller=speller or rules.shared_speller(), issues=issues, now=stamp)
     report["warnings"] = warnings + report["warnings"]
     if raw.get("readAt"):
         report["readAt"] = raw["readAt"]

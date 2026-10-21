@@ -106,6 +106,16 @@ class Speller:
             return None
 
 
+_SHARED = {"speller": None}
+
+
+def shared_speller():
+    """One dictionary for the whole process (loading it takes a moment and the words it has been asked about are kept)."""
+    if _SHARED["speller"] is None:
+        _SHARED["speller"] = Speller()
+    return _SHARED["speller"]
+
+
 # ── Text helpers ────────────────────────────────────────────────────────────
 
 def norm_key(s):
