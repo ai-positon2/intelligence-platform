@@ -27,6 +27,7 @@ import re
 
 from . import paid_gads as g
 from . import paid_meta as meta
+from . import paid_season_plans as plans
 
 log = logging.getLogger(__name__)
 
@@ -555,7 +556,7 @@ def upcoming(indexes, effects, today, months=3):
                 h = by_key.get(key)
                 evs.append({"key": key, "name": name, "start": a.isoformat(), "end": b.isoformat(),
                             "convLift": h["convLift"] if h else None, "spendLift": h["spendLift"] if h else None,
-                            "cpaChange": h["cpaChange"] if h else None})
+                            "cpaChange": h["cpaChange"] if h else None, "cvrChange": h["cvrChange"] if h else None, "n": h["n"] if h else 0})
         out.append({"y": m0.year, "m": m, "name": MONTHS[m], "conv": conv, "cpa": cpa, "cost": idx["cost"].get("index"),
                     "cvr": idx["cvr"].get("index"), "roas": idx["roas"].get("index"), "n": idx["conv"].get("n", 0),
                     "verdict": code, "advice": advice, "budget": step, "events": evs})
@@ -610,7 +611,7 @@ def headlines(indexes, dow, effects, yoy, spend_gap):
 
 # ── The whole analysis ──────────────────────────────────────────────────────
 
-def analyze(daily, *, today=None):
+def analyze(daily, *, today=None, platforms=("google",), currency="USD"):
     """Everything the page draws, from one account's daily totals (see daily_totals)."""
     today = today or dt.date.today()
     days = daily["days"]
@@ -640,6 +641,8 @@ def analyze(daily, *, today=None):
         spend_gap.sort(key=lambda x: -x[2])
         spend_gap = [(a, b) for a, b, _ in spend_gap]
     ahead = upcoming(indexes, effects, today) if yearly else []
+    base = plans.baseline(buckets, indexes) if yearly else None
+    plans.plans(ahead, base, today, platforms, currency)
     note = None
     if not yearly:
         note = ("Seasonality needs at least %d months in a row with spend to tell a yearly pattern from growth, and this "
@@ -664,6 +667,7 @@ def analyze(daily, *, today=None):
         "events": effects,
         "yoy": yoy,
         "upcoming": ahead,
+        "base": None if base is None else {"daily": round(base["daily"], 2), "cpa": None if base["cpa"] is None else round(base["cpa"], 2), "months": base["months"]},
         "headlines": headlines(indexes if yearly else {}, dow, effects, yoy, spend_gap),
         "labels": LABEL,
         "thresholds": {"peak": PEAK, "trough": TROUGH, "dear": DEAR},
@@ -679,7 +683,7 @@ def report(store, accts, months, *, today=None, http=None):
             raise BadRequest("The two accounts bill in different currencies, so they cannot be added together.")
     start, end = window(months, today)
     daily, problems, notes, stamps = read(store, accts, start, end, http=http)
-    out = analyze(daily, today=today)
+    out = analyze(daily, today=today, platforms=[a.get("platform") or "google" for a in accts], currency=accts[0].get("currency") or "USD")
     out["currency"] = accts[0].get("currency") or "USD"
     out["requestedStart"], out["requestedEnd"], out["months"] = start, end, months
     out["warnings"] = problems
