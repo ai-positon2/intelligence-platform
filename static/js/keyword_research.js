@@ -301,7 +301,7 @@ function tabKeywords(){
   var k=S.kw, intents=[], seen={};
   (plan().keywords||[]).forEach(function(r){if(!seen[r.intent]){seen[r.intent]=1;intents.push([r.intent,r.intent.charAt(0).toUpperCase()+r.intent.slice(1)]);}});
   var views=[["add","To add ("+viewRows("add").length+")"],["have","A fit, already covered ("+viewRows("have").length+")"],["all","Everything judged ("+viewRows("all").length+")"]];
-  return '<div class="kr-views" role="radiogroup" aria-label="Which keywords">'+views.map(function(v){
+  return planBox((plan().plans||{}).add,"How to add the keywords to the account")+'<div class="kr-views" role="radiogroup" aria-label="Which keywords">'+views.map(function(v){
       return '<button type="button" role="radio" data-kv="'+v[0]+'" class="'+(k.view===v[0]?"on":"")+'" aria-checked="'+(k.view===v[0])+'">'+esc(v[1])+'</button>';}).join("")+'</div>'+
     '<div class="kr-filters"><label><span class="pd-dd-k">Search</span><input type="text" id="kwQ" value="'+esc(k.q)+'" placeholder="Part of a keyword" autocomplete="off"></label>'+
     '<label><span class="pd-dd-k">Theme</span><select id="kwTheme">'+opts(themes().map(function(t){return [t.key,t.name];}),k.theme,"All themes")+'</select></label>'+
@@ -356,12 +356,22 @@ function tabSeason(){
   return sec("Searches a month, by theme",tbl(["Theme"].concat(head).concat(["How it moves"]),rows,"kr-heat"),"One year of Keyword Planner's monthly figures: a lead for planning budgets, not a rule")||
     '<p class="cb-fine">There is no year of figures to show.</p>';
 }
+/* How to do it and what it is worth (tracker/paid_keywords_plans.py works the steps and the figure out): folded away so the tables stay in front. */
+function planBox(p,title){
+  if(!p||!p.steps||!p.steps.length) return "";
+  return '<details class="kr-plan"><summary>'+esc(title)+'</summary><ol>'+p.steps.map(function(t){return '<li>'+esc(t)+'</li>';}).join("")+'</ol>'+(p.worth?'<p class="kr-worth"><b>Worth</b> '+esc(p.worth)+'</p>':"")+'</details>';
+}
+function unblockHtml(list){
+  return (list||[]).map(function(u){
+    return planBox({steps:u.steps,worth:u.worth},'"'+u.negative+'" ('+String(u.match||"").toLowerCase()+') stops '+num(u.count)+' keyword'+(u.count===1?"":"s")+', about '+num(u.searches)+' searches a month');
+  }).join("");
+}
 function negText(){
   return (wr().negatives||[]).map(function(n){return n.match==="exact"?"["+n.kw+"]":n.match==="phrase"?'"'+n.kw+'"':n.kw;}).join("\n");
 }
 function tabNegatives(){
   var n=wr().negatives||[], rem=(plan().checks||{}).removedNegatives||[];
-  return '<div class="cb-go"><button type="button" class="pm-btn" id="copyNeg">Copy as Google Ads negatives</button></div>'+
+  return '<div class="cb-go"><button type="button" class="pm-btn" id="copyNeg">Copy as Google Ads negatives</button></div>'+planBox((plan().plans||{}).negatives,"How to add these negatives")+
     fine("One per line, with the match type as Google Ads writes it: [exact], \"phrase\", or plain for broad. Add them at account level or in a shared list.")+
     sec("Negative keywords to add",tbl(["Negative keyword","Match","Why","Note"],n.map(function(x){return [H('<span class="kr-kw">'+esc(x.kw)+'</span>'),x.match,x.why,x.note||""];})))+
     sec("Suggested and left out",tbl(["Negative keyword","Match","Why it was left out"],rem.map(function(x){return [H('<span class="kr-kw">'+esc(x.kw)+'</span>'),x.match,x.reason];})),
@@ -399,7 +409,7 @@ function tabChecks(){
   if((c.emptySeeds||[]).length) out+=sec("Keyword Planner had no ideas for",ul(c.emptySeeds),"Google returns nothing for some phrases: try the other number (insulin pumps for insulin pump) or a nearby phrase");
   if(c.unjudged) out+=sec("Keywords not judged",'<p class="cb-p">'+c.unjudged+' keyword'+(c.unjudged===1?"":"s")+' could not be judged and '+(c.unjudged===1?"is":"are")+' shown as not judged.</p>');
   if((c.convertingNotFit||[]).length) out+=sec("Converting search terms judged not a fit",ul(c.convertingNotFit.map(function(x){return H('<span class="kr-kw">'+esc(x)+'</span>');})),"They converted in the account: check with the client whether they were real leads");
-  if(c.blockedInSomeCampaigns) out+=sec("Blocked in some campaigns",'<p class="cb-p">'+c.blockedInSomeCampaigns+' keyword'+(c.blockedInSomeCampaigns===1?" is":"s are")+' blocked by a negative keyword in only some of the account\'s campaigns. They are marked in the keywords table.</p>');
+  if(c.blockedInSomeCampaigns) out+=sec("Blocked in some campaigns",'<p class="cb-p">'+c.blockedInSomeCampaigns+' keyword'+(c.blockedInSomeCampaigns===1?" is":"s are")+' blocked by a negative keyword in only some of the account\'s campaigns. They are marked in the keywords table.</p>'+unblockHtml((plan().plans||{}).unblock),"Each negative in the way, with what to do about it");
   var left=[["Ideas below the smallest search volume",st.belowFloor],["Ideas on the avoid list",st.avoided],["Ideas blocked in every campaign by the account's negatives",st.blockedEverywhere],["Ideas merged with a close variant",st.merged]].filter(function(x){return x[1];});
   if(left.length) out+=sec("What was left out before judging",tbl(["Left out","How many"],left.map(function(x){return [x[0],{h:esc(num(x[1])),cls:"kr-num"}];})));
   out+=sec("Assumptions",ul(c.assumptions));

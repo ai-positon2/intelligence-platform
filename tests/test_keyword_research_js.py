@@ -471,3 +471,33 @@ def test_a_keyword_blocked_in_the_campaign_it_would_go_in_says_so(rec):
     k["blockedInTarget"] = True
     html, _, _ = table(r, view_="all")
     assert 'blocked in some campaigns by "dallas", including the one it would go in' in html
+
+
+# ── The plans, drawn from the result the real job made ────────────────────
+
+def test_the_keywords_tab_opens_with_how_to_add_them_and_the_negatives_tab_with_how_to_add_those(rec):
+    kw = page(rec, "keywords")
+    assert kw.startswith('<details class="kr-plan"><summary>How to add the keywords to the account</summary><ol><li>Download &quot;Keywords to add, for Google Ads Editor (CSV)&quot;')
+    assert '<p class="kr-worth"><b>Worth</b> The ' in kw and "That is the size of the market" in kw
+    neg = page(rec, "negatives")
+    assert '<details class="kr-plan"><summary>How to add these negatives</summary>' in neg and "Copy as Google Ads negatives" in neg
+
+
+def test_the_checks_tab_names_each_negative_in_the_way_with_what_to_do_about_it_and_escapes_it(rec):
+    r = json.loads(json.dumps(rec))
+    r["plan"]["checks"]["blockedInSomeCampaigns"] = 2
+    r["plan"]["plans"]["unblock"] = [{"negative": "free <b>", "match": "Phrase", "campaigns": ["A"], "count": 2, "searches": 1500, "blocks": ["x", "y"], "steps": ["Open <Negatives>.", "Narrow it."],
+                                      "worth": "It stops 2 keywords."}]
+    html = page(r, "checks")
+    assert 'summary>&quot;free &lt;b&gt;&quot; (phrase) stops 2 keywords, about 1,500 searches a month</summary><ol><li>Open &lt;Negatives&gt;.</li><li>Narrow it.</li></ol><p class="kr-worth"><b>Worth</b> It stops 2 keywords.</p>' in html
+    assert "<b>" not in html.split("Blocked in some campaigns")[1].split("</section>")[0].replace("<b>Worth</b>", "")
+    quiet = json.loads(json.dumps(rec))
+    quiet["plan"]["checks"]["blockedInSomeCampaigns"] = 0
+    assert "Negatives in the way" not in page(quiet, "checks") and "stops 2 keywords" not in page(quiet, "checks")
+
+
+def test_a_result_made_before_the_plans_existed_still_draws_without_them(rec):
+    old = json.loads(json.dumps(rec))
+    old["plan"].pop("plans")
+    assert "kr-plan" not in page(old, "keywords") and "kr-plan" not in page(old, "negatives") and "kr-plan" not in page(old, "checks")
+    assert kws(table(old)[0])                                                                                     # the keywords table is all there

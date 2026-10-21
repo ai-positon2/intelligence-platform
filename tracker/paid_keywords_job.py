@@ -12,7 +12,7 @@ import datetime as dt
 import logging
 from concurrent.futures import ThreadPoolExecutor
 
-from . import paid_keywords as pk, paid_keywords_ai as kai, paid_keywords_data as kd, paid_keywords_research as kr, paid_strategy_ai as ai
+from . import paid_keywords as pk, paid_keywords_ai as kai, paid_keywords_data as kd, paid_keywords_plans as kplans, paid_keywords_research as kr, paid_strategy_ai as ai
 from . import paid_strategy_job as job, paid_strategy_research as rs
 
 log = logging.getLogger(__name__)
@@ -177,6 +177,7 @@ class KeywordBuild(job.Build):
         out = dict(self.plan)
         out.update({"keywords": rows, "themes": themes, "coverage": coverage, "seasonal": {"head": head, "rows": season}, "editor": kd.editor_rows(rows, themes), "stats": stats, "checks": checks,
                     "currency": planner.get("currency") or inputs.get("currency") or "USD", "generatedAt": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"), "model": ai.MODEL})
+        out["plans"] = kplans.build(rows, coverage, plan, out["currency"], unread)
         self.plan = out
         self.store.save_plan(self.sid, out)
         cost = self.cost.total(research)
