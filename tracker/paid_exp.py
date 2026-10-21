@@ -19,6 +19,7 @@ import logging
 import threading
 
 from . import paid_exp_merge as mg
+from . import paid_exp_plans as pl
 from . import paid_exp_meta_read as mrd
 from . import paid_exp_read as rd
 from . import paid_exp_stats as st
@@ -270,7 +271,7 @@ def _experiment_action(e, cmp_, today):
     return {"kind": "check", "text": lead + "%s Check that %s." % (cmp_["note"], enabled)}
 
 
-def build_experiment(e, today):
+def build_experiment(e, today, cur=""):
     """One experiment's report row, with its comparison and what to do."""
     arms = []
     for a in e["arms"]:
@@ -291,6 +292,14 @@ def build_experiment(e, today):
     start, end = rd._date(e["start"]), rd._date(e["end"])
     spend = round(sum((a["total"] or {}).get("cost", 0.0) for a in arms), 2)
     action = _experiment_action(e, cmp_, today)
+    if cmp_:
+        plan = pl.experiment_plan(e, cmp_, st.arm(**control["results"]["total"]), st.arm(**trial["results"]["total"]), action, days, today, cur)
+        if plan:
+            action["plan"] = plan
+    elif e["state"] == "running":
+        plan = pl.experiment_plan(e, None, None, None, action, days, today, cur)
+        if plan:
+            action["plan"] = plan
     return {"id": e["id"], "platform": e.get("platform", "google"), "reason": e.get("reason") or "", "name": e["name"], "description": e["description"], "state": e["state"], "status": e["status"],
             "type": e["type"], "typeLabel": e["typeLabel"],
             "start": e["start"], "end": e["end"], "daysRunning": (today - start).days if start and start <= today else 0,
@@ -328,7 +337,7 @@ def _ad_action(group, rank, ads):
     return {"kind": "wait", "text": "Fewer than two of these ads were shown in this period, so there is nothing to compare."}
 
 
-def build_ad_test(group):
+def build_ad_test(group, cur=""):
     """One ad group's test report row."""
     rank = st.rank_group(group["ads"], rd.ADS_DAYS)
     ads = []
@@ -346,6 +355,9 @@ def build_ad_test(group):
         gap = st.detectable_gap(st.metric_rate(st.arm(**{k: lead[k] for k in ("impressions", "clicks", "conversions")}), rank["metric"]), min(a[key] for a in elig)) if elig else None
         rank["detectable"] = None if gap is None else round(100 * gap, 1)
     action = _ad_action(group, rank, ads)
+    plan = pl.ad_plan(group, rank, ads, action, cur)
+    if plan:
+        action["plan"] = plan
     return {"id": group["id"], "platform": group.get("platform", "google"), "name": group["name"], "campaign": group["campaign"], "campaignType": group["campaignType"], "adCount": group["adCount"], "shown": len(ads), "spend": group["cost"],
             "verdict": rank["verdict"], "metric": rank["metric"], "metricLabel": rank["metricLabel"], "leader": rank.get("leader"), "eligible": rank["eligible"], "bar": rank.get("bar"),
             "note": rank["note"], "detectable": rank.get("detectable"), "ads": ads, "action": action}
@@ -355,7 +367,7 @@ def build_ad_test(group):
 
 def _needs(items):
     """The tests that need a decision, ordered by what the decision is and then by what is spent."""
-    rows = [dict(kind=i["action"]["kind"], title=i["title"], text=i["action"]["text"], ref=i["ref"], spend=i["spend"], **({"label": i["action"]["label"]} if i["action"].get("label") else {}))
+    rows = [dict(kind=i["action"]["kind"], title=i["title"], text=i["action"]["text"], ref=i["ref"], spend=i["spend"], **({"label": i["action"]["label"]} if i["action"].get("label") else {}), **({"plan": i["action"]["plan"]} if i["action"].get("plan") else {}))
             for i in items if i["action"]["kind"] in ACTION_ORDER]
     rows.sort(key=lambda r: (ACTION_ORDER.index(r["kind"]), -r["spend"], r["title"]))
     return rows
@@ -364,8 +376,9 @@ def _needs(items):
 def assemble(raw, now=None, today=None):
     read = raw["read"]
     today = today or dt.date.fromisoformat(base._pacific_day())
-    exps = [build_experiment(e, today) for e in read["experiments"]]
-    tests = [build_ad_test(g) for g in read["adGroups"]]
+    cur = (raw.get("account") or {}).get("currency") or ""
+    exps = [build_experiment(e, today, cur) for e in read["experiments"]]
+    tests = [build_ad_test(g, cur) for g in read["adGroups"]]
     by = lambda rows, v: sum(1 for r in rows if r["verdict"] == v)       # noqa: E731
     running = [e for e in exps if e["state"] == "running"]
     needs = _needs([{"action": e["action"], "title": e["name"], "ref": {"type": "experiment", "id": e["id"]}, "spend": e["spend"]} for e in exps] +

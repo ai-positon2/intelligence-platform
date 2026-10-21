@@ -41,6 +41,16 @@ def _when(iso):
     return (iso or "")[:16].replace("T", " ")
 
 
+def _how(plan):
+    """The plan's steps as numbered lines for a cell, or ""."""
+    return "\n".join("%d. %s" % (i + 1, t) for i, t in enumerate((plan or {}).get("steps") or []))
+
+
+def _worth(plan):
+    """What acting is worth, and the note on how long a real answer would take, for a cell, or ""."""
+    return " ".join(x for x in ((plan or {}).get("worth"), (plan or {}).get("note")) if x)
+
+
 def tables(report):
     """{sheet name: (header, rows)} in the order they are shown. Empty tables are left out. Numbers stay numbers."""
     summary = report.get("summary") or {}
@@ -62,8 +72,9 @@ def tables(report):
 
     needs = report.get("needs") or []
     if needs:
-        out["Needs a decision"] = (["Order", "What to do", "Kind of test", "Test", "Detail", "Spend (%s)" % cur],
-                                   [[i + 1, n.get("label") or KIND_TEXT.get(n["kind"], n["kind"]), "Ad test" if n["ref"]["type"] == "adTest" else "Experiment", n["title"], n["text"], n["spend"]] for i, n in enumerate(needs)])
+        out["Needs a decision"] = (["Order", "What to do", "Kind of test", "Test", "Detail", "Spend (%s)" % cur, "How to do it", "What it is worth"],
+                                   [[i + 1, n.get("label") or KIND_TEXT.get(n["kind"], n["kind"]), "Ad test" if n["ref"]["type"] == "adTest" else "Experiment", n["title"], n["text"], n["spend"],
+                                     _how(n.get("plan")), _worth(n.get("plan"))] for i, n in enumerate(needs)])
 
     if exps:
         rows, days = [], []
@@ -75,13 +86,14 @@ def tables(report):
             rows.append([e["name"], STATE_TEXT.get(e["state"], e["state"]), e.get("typeLabel") or "", e.get("start") or "", e.get("end") or "", e.get("daysRead"),
                          TRIAL_TEXT.get(e["verdict"], e["verdict"]), METRIC_TEXT.get(c.get("metric"), ""), _rate(c.get("control")), _rate(c.get("trial")), c.get("relative"), c.get("confidence"),
                          c.get("p"), ct.get("impressions"), ct.get("clicks"), ct.get("conversions"), ct.get("cost"), tt.get("impressions"), tt.get("clicks"), tt.get("conversions"), tt.get("cost"),
-                         e["action"]["text"], e.get("splitNote") or "", PLATFORM_TEXT.get(e.get("platform"), ""), e.get("reason") or ""])
+                         e["action"]["text"], e.get("splitNote") or "", PLATFORM_TEXT.get(e.get("platform"), ""), e.get("reason") or "",
+                         _how(e["action"].get("plan")), _worth(e["action"].get("plan"))])
             for a in e["arms"]:
                 for d in a.get("days") or []:
                     days.append([e["name"], a["name"], "Control" if a["control"] else "Trial", d[0], d[1], d[2], d[3], d[4], d[5]])
         out["Experiments"] = (["Experiment", "Status", "Type", "Start", "End", "Days of results", "Verdict", "Compared on", "Control rate %", "Trial rate %", "Trial change %", "Confidence %",
                                "p value", "Control impressions", "Control clicks", "Control conversions", "Control spend", "Trial impressions", "Trial clicks", "Trial conversions", "Trial spend",
-                               "What to do", "Traffic split warning", "Platform", "Why there is no result"], rows)
+                               "What to do", "Traffic split warning", "Platform", "Why there is no result", "How to do it", "What it is worth"], rows)
         if days:
             out["Experiment days"] = (["Experiment", "Arm", "Role", "Date", "Impressions", "Clicks", "Spend", "Conversions", "Conversion value"], days)
 
@@ -89,13 +101,13 @@ def tables(report):
         trows, arows = [], []
         for t in tests:
             trows.append([t["name"], t["campaign"], t["adCount"], t["spend"], AD_TEXT.get(t["verdict"], t["verdict"]), METRIC_TEXT.get(t.get("metric"), ""), t.get("eligible"),
-                          t["action"]["text"], t.get("note") or "", PLATFORM_TEXT.get(t.get("platform"), "")])
+                          t["action"]["text"], t.get("note") or "", PLATFORM_TEXT.get(t.get("platform"), ""), _how(t["action"].get("plan")), _worth(t["action"].get("plan"))])
             for a in t["ads"]:
                 n = a["numbers"]
                 arows.append([t["name"], t["campaign"], a["label"], " | ".join(a.get("descriptions") or []), a.get("url") or "", a.get("strength") or "", n["impressions"], n["clicks"], n["ctr"],
                               n["conversions"], n["convRate"], n["cost"], n["cpa"], AD_TEXT.get(a["verdict"], a["verdict"]), a.get("rate"), a.get("relative"), a.get("confidence"),
                               "Yes" if a["id"] == t.get("leader") else ""])
-        out["Ad tests"] = (["Ad group or ad set", "Campaign", "Live ads", "Spend, last 30 days", "Verdict", "Compared on", "Ads compared", "What to do", "Note", "Platform"], trows)
+        out["Ad tests"] = (["Ad group or ad set", "Campaign", "Live ads", "Spend, last 30 days", "Verdict", "Compared on", "Ads compared", "What to do", "Note", "Platform", "How to do it", "What it is worth"], trows)
         out["Ads"] = (["Ad group or ad set", "Campaign", "Ad (headlines)", "Descriptions", "Final URL", "Ad strength", "Impressions", "Clicks", "Click rate %", "Conversions", "Conversion rate %", "Spend",
                        "Cost per conversion", "Verdict", "Rate compared %", "Against the leader %", "Confidence %", "Leader"], arows)
 

@@ -242,3 +242,19 @@ def test_the_pdf_carries_the_note_about_the_ad_tests_it_left_out():
         g["id"] = str(i)
     assert "ad tests that spent most are listed here" in " ".join(_pdf_text(ex_.assemble(read_with([], groups), now=NOW, today=TODAY)).split())
     assert "listed here" not in _pdf_text(make_report())
+
+
+def test_the_sheets_carry_how_to_do_it_and_what_it_is_worth(report):
+    t = ex.tables(report)
+    header, rows = t["Experiments"]
+    how, worth = header.index("How to do it"), header.index("What it is worth")
+    won = next(r for r in rows if r[header.index("Verdict")] == "Trial is ahead")
+    assert won[how].startswith("1. Open Google Ads, then Campaigns, then Experiments") and "\n2. Click Apply" in won[how] and "more conversions a month" in won[worth]
+    ended = next(r for r in rows if r[header.index("Status")] == "Ended")
+    assert ended[how] == "" and ended[worth] == ""                                                       # an ended test has nothing left to do
+    nh, nr = t["Needs a decision"]
+    assert all(r[nh.index("How to do it")].startswith("1. ") for r in nr)
+    ah, ar = t["Ad tests"]
+    assert any(r[ah.index("How to do it")].startswith("1. Open Google Ads, then Ads") for r in ar) and ah[-2:] == ["How to do it", "What it is worth"]
+    flat = next(r for r in rows if r[header.index("Verdict")] == "No difference")
+    assert "To tell a gap as small as this one" in flat[worth]                                           # the how-long note rides in the worth column
