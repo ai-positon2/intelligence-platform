@@ -164,12 +164,20 @@ def _campaign_moves(brand_rows, brand, wk, limit):
     return out
 
 
-def analyse(campaign_rows, today, *, limit=DEFAULT_LIMIT, overrides=None, currency="USD"):
+def analyse(campaign_rows, today, *, limit=DEFAULT_LIMIT, overrides=None, currency="USD", extra=None):
     """The reading of one account from its rows (every Search campaign that is not removed, every day from the oldest whole week to yesterday):
     {status, limit, brand (last week), expected, ratio, diff, cause, trend, partial, campaigns, otherCampaigns, findings, plan}.
-    status: "ok", "over", "under", "stopped" (nothing last week after weeks of spend), "new" (under MIN_BASE weeks of spend to compare), "idle" (none in the window), "none" (no brand campaign)."""
+    status: "ok", "over", "under", "stopped" (nothing last week after weeks of spend), "new" (under MIN_BASE weeks of spend to compare), "idle" (none in the window), "none" (no brand campaign).
+    `extra` is what the daily rows cannot say: {campaigns: [{id, name, status}] (every Search campaign Google lists), settings: {weeklyMin, weeklyMax, monthlyBudget, brandTerms},
+    leak: [{campaignId, campaign, term, cost, clicks, conversions}] (the search terms of the last 30 days), history: [{day, status, cost}] (the days the monitor saved)}; each reading it
+    feeds is left out, and says so, when its input is missing."""
+    from . import paid_brandspend_insight as ins
+    extra = extra or {}
+    settings = extra.get("settings") or {}
     wk = weeks(today)
     names = {}
+    for c in extra.get("campaigns") or []:
+        names.setdefault(str(c["id"]), {"id": str(c["id"]), "name": c.get("name") or "", "strategy": "", "budget": None})
     for r in campaign_rows:
         names.setdefault(str(r["id"]), {"id": str(r["id"]), "name": r.get("name") or "", "strategy": r.get("strategy") or "", "budget": r.get("budget")})
     brand, other = split_campaigns(list(names.values()), overrides)
@@ -211,6 +219,23 @@ def analyse(campaign_rows, today, *, limit=DEFAULT_LIMIT, overrides=None, curren
         for mine in out["campaigns"]:
             if mine["id"] == c["id"]:
                 mine["byOverride"], mine["byName"] = c["byOverride"], c["byName"]
+    base_weeks = [w for w in trend[:-1] if w["cost"] > 0][-BASE_MAX:]
+    out["efficiency"] = ins.efficiency(now, base_weeks, status) if brand and status != "idle" else None
+    out["share"] = ins.share_view(ins.weekly_share(in_brand, wk)) if brand else None
+    out["spikes"] = ins.spikes(in_brand, today) if brand else []
+    out["month"] = ins.month_view(in_brand, today, settings.get("monthlyBudget")) if brand else None
+    out["limits"] = ins.limits_view(now["cost"], settings.get("weeklyMin"), settings.get("weeklyMax")) if brand else None
+    spent_ids = {str(r["id"]) for r in campaign_rows if _f(r.get("cost")) > 0}
+    out["silent"] = ins.silent_campaigns(extra.get("campaigns") or [], ids, spent_ids) if brand and extra.get("campaigns") else []
+    terms = ins.terms_of(",".join(settings.get("brandTerms") or []))
+    since = (today - dt.timedelta(days=ins.LEAK_DAYS)).isoformat()
+    recent = [r for r in in_brand if since <= str(r.get("date"))[:10] < today.isoformat()]
+    t30 = total(recent)
+    out["terms"] = terms
+    out["suggestedTerms"] = [] if terms else ins.suggest_terms([c["name"] for c in brand])
+    out["leak"] = ins.leak(extra["leak"], terms, ids, t30["cpc"], t30["cost"]) if brand and terms and extra.get("leak") is not None else None
+    out["leakRead"] = None if not terms else ("not read" if extra.get("leak") is None else "read")
+    out["history"] = ins.history_view(extra.get("history"))
     from . import paid_brandspend_plan
     out["plan"] = paid_brandspend_plan.build(out, currency)
     out["findings"] = findings(out, currency)
@@ -270,6 +295,7 @@ def _change(ratio):
 
 def findings(a, currency="USD"):
     """The ranked findings of one analysed account: [{level, kind, title, detail, nextStep}], high first."""
+    from . import paid_brandspend_notes as notes
     out = []
     st, now, ex = a["status"], a["brand"], a["expected"]
     if st == "none":
@@ -278,7 +304,7 @@ def findings(a, currency="USD"):
                  "nextStep": "If one of the campaigns is a brand campaign, mark it as one below and read again."}]
     if st == "idle":
         return [{"level": "info", "kind": "idle", "title": "The brand campaigns spent nothing in the last 8 weeks",
-                 "detail": "There is nothing to compare. They may be new, paused or switched off on purpose.", "nextStep": "If they should be running, open them in Google Ads and look at their status."}]
+                 "detail": "There is nothing to compare. They may be new, paused or switched off on purpose.", "nextStep": "If they should be running, open them in Google Ads and look at their status."}] + notes.extra_findings(a, currency)
     if st == "new":
         out.append({"level": "info", "kind": "new", "title": "Not enough weeks of brand spend to say what is normal",
                     "detail": "The brand campaigns spent %s last week, and fewer than %d earlier weeks had spend to compare with." % (money(now["cost"], currency), MIN_BASE),
@@ -296,7 +322,7 @@ def findings(a, currency="USD"):
         if a["cause"]:
             detail += ": " + _CAUSE_TEXT[(st, a["cause"])] + (" (%s)" % line if line else "")
         out.append({"level": a["level"], "kind": st, "title": "Brand spend is %s, %s the usual %s" % (money(now["cost"], currency), word, money(ex["cost"], currency)),
-                    "detail": detail + ".", "nextStep": _next(a)})
+                    "detail": detail + "." + notes.detail_extras(a, currency), "nextStep": _next(a)})
     p = a.get("partial")
     if p and p["status"] != "ok" and st not in ("none", "idle"):
         word = "ahead of" if p["status"] == "over" else "behind"
@@ -314,6 +340,7 @@ def findings(a, currency="USD"):
                             money(top["cost"], currency), money(top["usual"], currency) if top["usual"] is not None else "nothing before",
                             money(abs(top["diff"]), currency), " (status in Google Ads: %s)" % top["status"].lower() if top["status"] else ""),
                         "nextStep": "Open this campaign first."})
+    out += notes.extra_findings(a, currency)
     order = {"high": 0, "medium": 1, "low": 2, "info": 3}
     out.sort(key=lambda f: order[f["level"]])
     return out

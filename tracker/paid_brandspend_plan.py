@@ -10,6 +10,7 @@ from . import paid_brandspend_math as m
 
 WEEKS_PER_MONTH = 52.0 / 12.0
 BRAND_IS_PAGE = "/p2/paid-marketing/brand-is"
+DISAPPROVED_PAGE = "/p2/paid-marketing/disapproved-ads"
 
 
 def _step(n, sid, title, why, how, worth=None, level="medium", campaigns=None):
@@ -139,34 +140,152 @@ def _cheaper_step(a, cur):
                   "If it is, nothing needs fixing. If a bid limit or target was lowered on purpose, the change history (Tools, then Change history) shows who did it."], None, "low")
 
 
+def _defend_step(a, cur):
+    sh, now, ex = a["share"], a["brand"], a["expected"]
+    worth = None
+    if sh["now"] > 0 and now["clicks"] and now["cpc"]:
+        lost = now["clicks"] * (sh["usual"] / sh["now"] - 1)
+        if lost >= 1:
+            worth = "At last week's impression share the brand got %s clicks; at the usual %s it would have got about %s more, worth about %s at the brand's own cost per click: an estimate, since the searches won back would not all click." % (
+                format(now["clicks"], ","), m.pct(sh["usual"]), format(round(lost), ","), m.money(lost * now["cpc"], cur))
+    return _step(0, "defend", "Defend the brand name against a competitor",
+                 "The impression share fell from %s to %s and the part lost to rank rose from %s to %s. That is a competitor bidding on the brand name, or a drop in the quality of the brand ads." % (
+                     m.pct(sh["usual"]), m.pct(sh["now"]), m.pct(sh["usualLostRank"]), m.pct(sh["lostRank"])),
+                 ["In Google Ads open the brand campaign, then Insights and reports, then Auction insights, and set last week against the weeks before. The names that appeared or whose overlap rate and outranking share rose are the competitors.",
+                  "Open the campaign's Settings, then Bidding. With a target impression share, raise the target toward 90 to 100% and check the maximum CPC bid limit is high enough to win; with manual bids, raise the brand keywords' bids a little at a time.",
+                  "Make the brand ad the strongest in the auction: the brand name in the first headline, sitelinks and callouts filled in, and the landing page loading fast and matching the ad.",
+                  "If a competitor uses your brand name in its ad text, Google's trademark complaint form (in Google Ads Help, search for Trademarks policy) can have those ads stopped in the markets where you hold the mark. Keep screenshots of the ads with their date."],
+                 worth, "high" if sh["drop"] >= 0.20 else "medium")
+
+
+def _leak_step(a, cur):
+    lk = a["leak"]
+    names = ", ".join('"%s"' % c["name"] for c in lk["campaigns"][:3]) + (" and %d more" % (lk["campaignCount"] - 3) if lk["campaignCount"] > 3 else "")
+    worth = None
+    if lk["overpay"]:
+        worth = "%s clicks cost %s in these campaigns and would have cost about %s in the brand campaign at its own price: about %s overpaid in %d days (about %s a month). An estimate, since sending the searches to the brand campaign also changes which of them click." % (
+            format(lk["clicks"], ","), m.money(lk["cost"], cur), m.money(lk["clicks"] * lk["brandCpc"], cur), m.money(lk["overpay"], cur), lk["days"], m.money(lk["overpay"], cur))
+    return _step(0, "leak", "Send the brand searches back to the brand campaign",
+                 "%s of the last %d days' spend in %s went on searches holding %s%s." % (
+                     m.money(lk["cost"], cur), lk["days"], names, ", ".join('"%s"' % t for t in lk["terms"]),
+                     (" (%s of the brand campaigns' own spend)" % m.pct(lk["shareOfBrand"])) if lk["shareOfBrand"] else ""),
+                 ["In Google Ads open each campaign named here, then Keywords, then Negative keywords, click +, choose the campaign, and add the brand words as exact-match negatives, like [%s]. Exact keeps the brand out without blocking searches that only share a word." % lk["terms"][0],
+                  "Check the brand campaign has those words as keywords (exact and phrase match) so the searches have somewhere to go.",
+                  "For a Performance Max campaign, negatives do not apply: use the campaign's Brand exclusions (in its settings under Brand exclusions) to keep the brand name out.",
+                  "Check the Search terms report of those campaigns in a week: the brand searches should have dropped out, and the brand campaign's clicks risen by about as many."],
+                 worth, "medium" if lk["overpay"] or (lk["shareOfBrand"] or 0) >= 0.10 else "low", [c["name"] for c in lk["campaigns"][:3]])
+
+
+def _spike_step(a, cur):
+    sp = a["spikes"][0]
+    unconverted = sp["kind"] == "unconverted"
+    return _step(0, "spike", "Find out what happened on %s %s" % (sp["weekday"], sp["date"]),
+                 "The brand campaigns spent %s that day against a usual %s%s." % (m.money(sp["cost"], cur), m.money(sp["usual"], cur),
+                                                                                  (": %s clicks against a usual %s and %s conversions" % (format(sp["clicks"], ","), format(sp["usualClicks"], ","), _n(sp["conversions"]))) if unconverted else ""),
+                 ["In Google Ads set the date range to that one day and open the brand campaign, then Insights and reports, then Search terms: the terms that took the clicks, and any odd ones, show whether it was real demand.",
+                  "Add the Invalid clicks column (Columns, Modify columns, Performance) for the day: Google credits invalid clicks back automatically, so a large number explains and softens the spend.",
+                  "Open Tools, then Change history for the day before and that day: a budget, a bid or a keyword change made then is the likeliest cause.",
+                  "If the clicks look like bots or one location, add an IP exclusion (the campaign's Settings, then IP exclusions) or exclude the location, and report the pattern to Google's support if the credit does not arrive."],
+                 "That day spent about %s more than a usual day. If the clicks were invalid it comes back as a credit; if they were real it was demand. An estimate of the gap, not of the loss." % m.money(sp["cost"] - sp["usual"], cur),
+                 "medium" if unconverted else "low")
+
+
+def _n(v):
+    return ("%d" % round(v)) if abs(v - round(v)) < 0.05 else ("%.1f" % v)
+
+
+def _agreed_step(a, cur):
+    lim = a["limits"]
+    if lim["status"] == "over":
+        daily = lim["max"] / 7.0
+        return _step(0, "agreed", "Bring the weekly brand spend back inside the agreed maximum",
+                     "Last week's %s is %s over the %s the team saved for this account." % (m.money(lim["cost"], cur), m.money(lim["by"], cur), m.money(lim["max"], cur)),
+                     ["In Google Ads open Campaigns and set the daily budgets of the brand campaigns so that together they come to about %s a day (the weekly maximum divided by 7). Google can spend up to twice a daily budget on one day, so stay a little under." % m.money(daily, cur),
+                      "If the cause is the price of a click rather than the number, put a maximum CPC bid limit on the strategy instead of cutting the budget, so impressions are not lost.",
+                      "Check the figure again at the end of the week: the page compares each whole week with the limit."],
+                     "Back inside the limit the week would have cost %s less." % m.money(lim["by"], cur), "high")
+    return _step(0, "agreed", "Bring the weekly brand spend back up to the agreed minimum",
+                 "Last week's %s is %s under the %s the team saved for this account." % (m.money(lim["cost"], cur), m.money(lim["by"], cur), m.money(lim["min"], cur)),
+                 ["In Google Ads open the brand campaigns and check each is enabled, has a budget and is not limited by budget; read the Status column's reason.",
+                  "Open the Brand IS Monitor (%s) for the account: if the brand's impression share is low, that is where the missing spend went." % BRAND_IS_PAGE,
+                  "If the brand has fewer searches than the minimum can use (a small brand), tell the account manager the limit is above what the brand can spend."],
+                 "%s of the agreed spend was not used." % m.money(lim["by"], cur), "high")
+
+
+def _pace_step(a, cur):
+    mo = a["month"]
+    left = max(1, mo["daysInMonth"] - mo["days"])
+    remaining = mo["budget"] - mo["spent"]
+    if mo["status"] == "over":
+        return _step(0, "pace", "Stop the brand spend for the rest of the month, or tell the client",
+                     "%s has been spent this month against a %s budget, with %d days left." % (m.money(mo["spent"], cur), m.money(mo["budget"], cur), left),
+                     ["Decide with the account manager whether the client agreed to go over. If not, pause the brand campaigns or set their daily budgets to the smallest amount that keeps them on, and say so to the client.",
+                      "If the brand budget is too low for the demand, put the case to the client with the figures: spend a day, searches won, conversions."],
+                     "At %s a day the rest of the month would add about %s." % (m.money(mo["perDay"], cur), m.money(mo["perDay"] * left, cur)), "high")
+    per_day = remaining / float(left)
+    return _step(0, "pace", "Slow the brand spend so the month ends on its budget",
+                 "At %s a day the month ends near %s, over the %s budget; the budget is gone on %s." % (m.money(mo["perDay"], cur), m.money(mo["projected"], cur), m.money(mo["budget"], cur), mo["runsOutOn"]),
+                 ["In Google Ads set the daily budgets of the brand campaigns so that together they come to about %s a day for the %d days left (what is left of the budget, %s, divided by the days). Google can spend up to twice a daily budget on one day, so stay a little under." % (
+                     m.money(per_day, cur), left, m.money(remaining, cur)),
+                  "If the rise is the price of a click, a maximum CPC bid limit does the same without cutting impressions.",
+                  "Check again in a week: the page re-projects the month every day."],
+                 "Left alone it ends about %s over the budget: an estimate that assumes each day goes on costing what the days so far have." % m.money(mo["projected"] - mo["budget"], cur), "medium")
+
+
+def _nospend_step(a, cur):
+    names = ", ".join('"%s"' % c["name"] for c in a["silent"] if c["status"] == "ENABLED")
+    return _step(0, "nospend", "Find out why an enabled brand campaign is not spending",
+                 "%s %s enabled but has no spend on any day of the last 8 weeks." % (names, "is" if len([c for c in a["silent"] if c["status"] == "ENABLED"]) == 1 else "are"),
+                 ["In Google Ads open Campaigns and read the Status column of the campaign: the reason beside it (Limited by budget, Eligible (limited), Not eligible, Low search volume, No ads) says what is wrong.",
+                  "Check its budget is above zero and the bid or the target is high enough to enter the auction for the brand keywords.",
+                  "Open Ads: an ad that is Disapproved stops the campaign (the Disapproved Ads Tracker, %s, lists them)." % DISAPPROVED_PAGE,
+                  "Check Billing: a declined payment pauses everything. If the brand is small enough that its keywords have no searches, Google shows Low search volume and nothing can be done but to broaden the keywords."],
+                 None, "medium", [c["name"] for c in a["silent"] if c["status"] == "ENABLED"][:3])
+
+
+def extra_steps(a, cur):
+    """The steps the readings add, in the order they should be worked: [step...]."""
+    out = []
+    if a.get("limits") and a["limits"]["status"] != "ok":
+        out.append(_agreed_step(a, cur))
+    if a.get("month") and a["month"].get("budget") and a["month"]["status"] in ("over", "pace-over"):
+        out.append(_pace_step(a, cur))
+    if a.get("share") and a["share"]["signal"] == "competitor":
+        out.append(_defend_step(a, cur))
+    if a.get("leak") and a["leak"]["cost"] >= m.MIN_SWING:
+        out.append(_leak_step(a, cur))
+    if a.get("spikes"):
+        out.append(_spike_step(a, cur))
+    if any(c["status"] == "ENABLED" for c in a.get("silent") or []):
+        out.append(_nospend_step(a, cur))
+    return out
+
+
 def build(a, currency="USD"):
-    """{steps, note} for one analysed account (the dict analyse() builds before the plan and the findings are added). No steps for an account on its usual spend."""
+    """{steps, note} for one analysed account (the dict analyse() builds before the plan and the findings are added). No steps for an account on its usual spend with nothing else to say."""
     st, p = a["status"], a.get("partial")
-    steps = []
     cur = currency
+    extras = extra_steps(a, cur)
+    pre, post = [], []
     if st == "stopped":
-        steps = [_running_step(a, cur, True), _changed_step(a)]
+        pre, post = [_running_step(a, cur, True)], [_changed_step(a)]
     elif st == "over":
         c = a["cause"]
         if c in ("clicks", "both"):
-            steps.append(_clicks_step(a, cur))
+            pre.append(_clicks_step(a, cur))
         if c in ("cpc", "both"):
-            steps.append(_cpc_step(a, cur))
-        steps += [_where_step(a, cur), _changed_step(a), _ceiling_step(a, cur)]
+            pre.append(_cpc_step(a, cur))
+        post = [_where_step(a, cur), _changed_step(a), _ceiling_step(a, cur)]
     elif st == "under":
         c = a["cause"]
-        steps = [_running_step(a, cur, False)]
-        if c == "cpc":
-            steps.append(_cheaper_step(a, cur))
-        else:
-            steps.append(_fewer_clicks_step(a, cur))
-        steps += [_where_step(a, cur), _changed_step(a)]
+        pre = [_running_step(a, cur, False), _cheaper_step(a, cur) if c == "cpc" else _fewer_clicks_step(a, cur)]
+        post = [_where_step(a, cur), _changed_step(a)]
     elif p and p["status"] != "ok":
-        steps = [_where_step(a, cur), _changed_step(a, "low")]
-    steps = [s for s in steps if s]
+        post = [_where_step(a, cur), _changed_step(a, "low")]
+    steps = [s for s in pre + extras + post if s]
     for i, s in enumerate(steps, 1):
         s["n"] = i
     note = None
-    if steps and st in ("over", "under", "stopped"):
-        note = "These steps are chosen from the figures read. The limits are the account's own history (30% either way unless changed), not a budget the client set."
+    if steps and (st in ("over", "under", "stopped") or extras):
+        note = "These steps are chosen from the figures read. The limits are the account's own history (30% either way unless changed) and what the team saved for it, not a budget the client set unless one is saved."
     return {"steps": steps, "note": note}
