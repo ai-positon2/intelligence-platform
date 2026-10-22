@@ -270,6 +270,11 @@ def analyse(account, *, config=None, other_places=None, platform="google"):
                 findings.append(_finding("setting", "campaign", "setting:%s" % cid, "%s shows to people interested in %s" % (c["name"], where),
                                          "The location option is Presence or interest, so people who only search about %s see the ads too, wherever they are.%s" % (
                                              where, " The team accepted this for the account." if config.get("acceptPresence") else ""), level=level, campaign=c))
+        if positive == "TRAVEL_IN" and any(x.get("kind") == "proximity" or x.get("targetType") not in COUNTRY_TYPES for x in inc):
+            findings.append(_finding("setting", "campaign", "setting:%s" % cid, "%s also shows to people travelling in the places" % c["name"],
+                                     "The ad set reaches people who are travelling in the places it targets, not only people who live there or were recently there.%s" % (
+                                         " The team accepted this for the account." if config.get("acceptPresence") else ""),
+                                     level="low" if config.get("acceptPresence") else "medium", campaign=c))
         if c.get("negative") == "PRESENCE" and exc:
             findings.append(_finding("setting", "campaign", "setting_excl:%s" % cid, "%s excludes only people in the excluded places" % c["name"],
                                      "The exclusion option is Presence, so people interested in an excluded place can still see the ads.", level="low", campaign=c))
