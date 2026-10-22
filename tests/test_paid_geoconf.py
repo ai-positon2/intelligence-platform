@@ -307,6 +307,35 @@ def test_more_than_the_keyword_limit_is_said(cache):
     assert rep["warnings"] == ["Only the first %d keywords were read." % g.MAX_KEYWORDS]
 
 
+def test_a_read_that_lost_a_part_is_shown_but_not_saved_for_hours(cache):
+    rep = report(searcher(fail_kinds=("schedule", "ads")))
+    assert len(rep["warnings"]) == 2                                                    # shown once, from the top of the read
+    assert cache == {}                                                                  # the saved copy is for a whole read only: the next ask in a new process reads again
+    from tracker import paid_geo
+    paid_geo.clear_cache()
+    base.forget("")
+    report(searcher())
+    assert len(cache) == 1                                                              # a whole read is saved
+
+
+def test_a_meta_read_that_lost_a_part_is_shown_but_not_saved_for_hours(cache):
+    def pages(path, params):
+        if path.endswith("/adsets"):
+            return []
+        raise RuntimeError("Meta says no")
+    rep = g.report_for("act_1234567", meta_pages_fn=pages, meta_account_fn=lambda act: {"name": "M"}, today=TODAY, search_fn=searcher())
+    assert rep["warnings"] == ["The Meta ads could not be read (Meta says no), so the ad text was not checked."]
+    assert cache == {}
+
+
+def test_a_group_names_the_account_a_warning_belongs_to_and_says_it_once(cache):
+    group = {"id": "mcc-9923720096-USD", "name": "Group", "currency": "USD", "accountIds": [ACCT["id"], ACCT2["id"]]}
+    s = searcher(camps={ACCT["id"]: [campaign()], ACCT2["id"]: [campaign()]}, locs={ACCT["id"]: [loc_row("5", QUINCY)], ACCT2["id"]: [loc_row("5", QUINCY)]}, fail_kinds=("ads",))
+    rep = g.report_for(group["id"], accounts_fn=lambda: [ACCT, ACCT2], groups_fn=lambda: [group], search_fn=s, today=TODAY)
+    assert sorted(rep["warnings"]) == ["Acme Dental: The Search ads could not be read (no ads), so that check was skipped.", "Beta Clinic: The Search ads could not be read (no ads), so that check was skipped."]
+    assert cache == {}
+
+
 # ── What the team saved ─────────────────────────────────────────────────────
 
 def test_settings_save_clean_and_log():
