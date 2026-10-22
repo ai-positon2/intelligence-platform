@@ -179,4 +179,4 @@ def unmute(store, account_id, campaign_id, who, now=None):
 
 def view(store):
     s = load(store)
-    return {"accounts": s["accounts"], "changes": s["changes"][:10], "limits": {m: list(LIMITS[m]) for m in METRICS}, "tolerance": list(TOLERANCE_LIMITS), "maxCampaigns": MAX_CAMPAIGNS}
+    return {"accounts": {aid: account_of(s, aid) for aid in s["accounts"]}, "changes": s["changes"][:10], "limits": {m: list(LIMITS[m]) for m in METRICS}, "tolerance": list(TOLERANCE_LIMITS), "maxCampaigns": MAX_CAMPAIGNS}

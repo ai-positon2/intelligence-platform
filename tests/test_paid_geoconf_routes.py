@@ -141,7 +141,7 @@ def test_the_monitor_is_known_to_the_alert_panel_and_the_agent_is_on_the_paid_ma
     css = open(os.path.join(ROOT, "static", "css", "paid_marketing.css"), encoding="utf-8").read()
     assert ".c-gc{" in css and ".gc-camp{" in css and ".gc-evid" in css
     for t in ("_paid_base.html", "paid_marketing.html"):
-        assert "paid_marketing.css') }}?v=54" in open(os.path.join(ROOT, "templates", t), encoding="utf-8").read()
+        assert "paid_marketing.css') }}?v=55" in open(os.path.join(ROOT, "templates", t), encoding="utf-8").read()
     cards = len(re.findall(r'class="dash-card', paid))
     hub = re.sub(r"<!--.*?-->", "", hidden_paid.rendered("/p2/hub"), flags=re.S)
     assert ("<span>%d</span> dashboards" % cards) in hub and ("<span>%d</span> live" % cards) in hub and "campaign locations checked against the names, ads and keywords that say a place" in hub

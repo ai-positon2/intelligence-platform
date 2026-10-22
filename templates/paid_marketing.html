@@ -12,7 +12,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-tokens.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-components.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/gtm.css') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/paid_marketing.css') }}?v=54">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/paid_marketing.css') }}?v=55">
   <script src="/static/js/theme.js"></script>
   <link rel="stylesheet" href="/static/css/aurora-app.css?v=3">
   <script src="/static/js/aurora.js?v=1" defer></script>
@@ -642,6 +642,25 @@
           </div>
         </div>
       </a>
+
+      <a href="/p2/paid-marketing/kpi-monitoring" class="dash-card active c-kp">
+        <div class="card-band"></div>
+        <div class="card-thumb">
+          <div class="card-thumb-icon"><svg class="au-ic" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.5"/></svg></div>
+          <div class="card-thumb-badge tb-live"><span class="tb-dot live"></span> Live</div>
+        </div>
+        <div class="card-body">
+          <div class="card-name">KPI Monitoring</div>
+          <div class="card-desc">
+            Holds the last 7 days of every Google Ads campaign and Meta campaign (cost per conversion, return on ad spend, conversion rate, click-through rate) against the client's targets and the week before, and flags the ones that
+            drifted, stopped converting, are stuck in learning, limited by budget or not delivering. Targets saved per account or campaign, or taken from the bid strategy. Daily alerts. Read only.
+          </div>
+          <div class="card-footer">
+            <div class="card-tags"><span class="tag">Monitoring</span><span class="tag">Targets</span></div>
+            <span class="card-arrow">→</span>
+          </div>
+        </div>
+      </a>
     </div>
 
     <p class="footer-note">Position2 · Internal use only</p>
@@ -697,6 +716,7 @@
     {t:'Ad Copy Checker',d:'Typos, placeholders, wrong numbers and capitals in the live ads',u:'/p2/paid-marketing/ad-copy-checker',i:'Aa'},
     {t:'Spend Anomaly Alert',d:'Is any account spending far more or less than it usually does today',u:'/p2/paid-marketing/spend-anomaly',i:'↗'},
     {t:'Location Conflicts',d:'Do the campaigns show where their names, ads and keywords say they do',u:'/p2/paid-marketing/location-conflicts',i:'↗'},
+    {t:'KPI Monitoring',d:'Are the campaigns hitting their cost, return and rate targets, learning and delivering',u:'/p2/paid-marketing/kpi-monitoring',i:'◎'},
     {t:'QA Agent',d:'Campaign launch QC checklist',u:'/p2/paid-marketing/qa-agent',i:'✓'}
   ];
   var ITEMS=(window.__KP_ITEMS||[]).concat(BASE);
