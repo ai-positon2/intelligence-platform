@@ -217,7 +217,8 @@ def test_what_the_team_saved_is_shown_as_the_forms_hold_it():
 
 # ── the page script ─────────────────────────────────────────────────────────
 
-SCRIPTS = [DATA, PAGE]
+SCOPE = os.path.join(JS, "pm_scope.js")
+SCRIPTS = [SCOPE, DATA, PAGE]
 ACCTS = {"accounts": [dict(a, group=GROUP) for a in ACCOUNTS], "groups": [{"id": GROUP, "name": "Group", "accountIds": [a["id"] for a in ACCOUNTS]}]}
 HARNESS_PAGE = (HARNESS.replace("/p2/paid-marketing/ad-copy-checker", "/p2/paid-marketing/kpi-monitoring")
                 .replace("JSON.parse(process.argv[2])", "JSON.parse(fs.readFileSync(process.argv[2], 'utf8'))"))      # a long report is too big for one argument on Linux (128 KB)
@@ -394,11 +395,11 @@ def test_the_quiet_campaigns_are_shown_twenty_at_a_time_too(reports):
     assert "Calm 24" in more and "The first" not in more.split("Calm 24")[1]
 
 
-def test_meta_ad_accounts_are_offered_beside_the_google_ones(reports):
-    meta = {"match": "/gads/accounts", "body": {"accounts": [{"id": "act_1234567", "name": "Beta Meta", "platform": "meta"}, {"id": "1", "name": "not meta", "platform": "google"}]}}
+def test_meta_ad_accounts_are_in_their_own_picker_beside_the_google_ones(reports):
+    meta = {"match": "/gads/accounts", "body": {"accounts": [{"id": "act_1234567", "name": "Beta Meta", "currency": "USD", "platform": "meta"}, {"id": "1", "name": "not meta", "platform": "google"}]}}
     out = page({"responses": [{"match": "/segments/accounts", "body": ACCTS}, meta, {"match": "/kpi/settings", "body": reports["settings"]}]})
-    items = out["sets"][-1]["items"]
-    assert [i for i in items if i.get("group") == "Meta ad accounts"] == [{"value": "act_1234567", "label": "Beta Meta", "avatar": "BM", "hue": items[-1]["hue"], "group": "Meta ad accounts", "badge": '<span class="badge pm-pill">Meta</span>', "sub": "act_1234567"}]
+    assert [i["label"] for i in out["sets"][-1]["items"]] == ["Choose an account", "All of Group", "Acme Dental", "Beta Clinic"]
+    assert [i["value"] for i in out["setsMeta"][-1]["items"]] == ["", "act_1234567"] and out["switchers"] == 1
 
 
 def test_what_was_shown_of_the_quiet_campaigns_starts_again_with_another_account(reports):

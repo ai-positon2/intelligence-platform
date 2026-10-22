@@ -204,7 +204,8 @@ def test_the_query_asks_for_the_account_and_a_refresh():
 
 # ── the page script ─────────────────────────────────────────────────────────
 
-SCRIPTS = [DATA, PAGE]
+SCOPE = os.path.join(JS, "pm_scope.js")
+SCRIPTS = [SCOPE, DATA, PAGE]
 ACCTS = {"accounts": [dict(a, group=GROUP) for a in ACCOUNTS], "groups": [{"id": GROUP, "name": "Group", "accountIds": [a["id"] for a in ACCOUNTS]}]}
 SETTINGS = {"accounts": {}, "sensitivity": None, "ratios": {"low": [2.5, 4.0], "normal": [1.75, 2.75], "high": [1.4, 2.0]}, "defaultSensitivity": "normal", "changes": []}
 

@@ -153,7 +153,8 @@ def test_what_the_team_saved_is_shown_as_the_form_holds_it():
 
 # ── the page script ─────────────────────────────────────────────────────────
 
-SCRIPTS = [DATA, PAGE]
+SCOPE = os.path.join(JS, "pm_scope.js")
+SCRIPTS = [SCOPE, DATA, PAGE]
 ACCTS = {"accounts": [dict(a, group=GROUP) for a in ACCOUNTS], "groups": [{"id": GROUP, "name": "Group", "accountIds": [a["id"] for a in ACCOUNTS]}]}
 SETTINGS = {"accounts": {"1234567890": {"areas": ["Greater Boston"], "ignore": ["Orange"], "acceptPresence": True, "name": "Acme Dental"}}, "changes": []}
 HARNESS_PAGE = (HARNESS.replace("/p2/paid-marketing/ad-copy-checker", "/p2/paid-marketing/location-conflicts")

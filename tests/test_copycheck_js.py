@@ -147,7 +147,7 @@ const paths = JSON.parse(process.argv[1]), sc = JSON.parse(process.argv[2]);
 const els = {}, calls = [], posts = [], hist = [], store = {}, downloads = [], held = [], panels = [];
 function el(sel) {
   if (!els[sel]) els[sel] = { sel, innerHTML: "", textContent: "", value: (sc.values || {})[sel] || "", hidden: false, href: "", handlers: {}, disabled: false,
-    addEventListener(ev, fn) { this.handlers[ev] = fn; }, setAttribute() {}, getAttribute() { return null; } };
+    addEventListener(ev, fn) { this.handlers[ev] = fn; }, setAttribute() {}, getAttribute() { return null; }, appendChild() {}, className: "" };
   return els[sel];
 }
 const doc = { querySelector: s => el(s), createElement: () => { const e = el("a" + downloads.length); e.click = () => downloads.push({ href: e.href, name: e.download }); e.remove = () => {}; return e; },
@@ -166,15 +166,19 @@ function respond(url, opts) {
   if ((r.hold || (r.holdFrom && r.count >= r.holdFrom)) && !r.released) return new Promise(res => held.push(() => { r.released = true; res(answer); }));
   return answer;
 }
-let picker = null; const sets = [];
-const win = { MonitorPanel: { mount: (host, o) => panels.push(o) }, PMPicker: (host, o) => { picker = { onChange: o.onChange, set(items, v, dis) { sets.push({ items, v, dis }); } }; return picker; } };
+let picker = null; const sets = [], setsMeta = [], pickers = [], switchers = [], platformsSet = [];
+const win = { MonitorPanel: { mount: (host, o) => panels.push(o) },
+  PMPicker: (host, o) => { const n = pickers.length, p = { onChange: o.onChange, set(items, v, dis) { (n === 0 ? sets : setsMeta).push({ items, v, dis }); } }; pickers.push(p); if (n === 0) picker = p; return p; },
+  /* the platform switch of tracker pages: records what it was asked, and finds the same client on the other platform by name and currency */
+  PMPlatform: { switcher: (host, o) => { switchers.push(o); let cur = o.value; return { set(p) { cur = p; platformsSet.push(p); }, value: () => cur, saved: () => "" }; },
+    counterpart: (a, others) => { const n = x => String(x.name || "").toLowerCase().replace(/\(.*?\)/g, "").replace(/[^a-z0-9]/g, ""); const m = others.filter(o => o.currency === a.currency && n(o) === n(a)); return m.length === 1 ? m[0] : null; } } };
 const ctx = { window: win, document: doc, history: { replaceState(a, b, u) { hist.push(u); } }, location: { search: sc.search || "", pathname: "/p2/paid-marketing/ad-copy-checker" },
   localStorage: { getItem: k => (k in store ? store[k] : (sc.stored || {})[k] || null), setItem: (k, v) => { store[k] = v; } },
   URLSearchParams, URL: { createObjectURL: b => { downloads.blob = b; return "blob:x"; }, revokeObjectURL() {} }, Blob: class { constructor(p) { this.text = p.join(""); } },
   setTimeout: fn => fn(), Intl, Date, Math, JSON, Object, Array, String, Number, Promise, RegExp, encodeURIComponent, console, isNaN, parseInt, parseFloat,
   fetch: (url, opts) => (sc.reject && url.includes(sc.reject) ? (calls.push(url), Promise.reject(new Error("down"))) :
     Promise.resolve(respond(url, opts)).then(r => ({ ok: r.status < 400, status: r.status, json: () => Promise.resolve(r.body) }))) };
-ctx.window.document = doc;
+ctx.window.document = doc; win.fetch = ctx.fetch; win.localStorage = ctx.localStorage;
 vm.createContext(ctx);
 for (const p of paths) vm.runInContext(fs.readFileSync(p, "utf8"), ctx);
 const tick = () => new Promise(r => setImmediate(r));
@@ -191,6 +195,8 @@ const targets = [];
   for (let i = 0; i < 6; i++) await tick();
   for (const step of sc.steps || []) {
     if (step.pick) picker.onChange(step.pick);
+    if (step.pickMeta) pickers[1].onChange(step.pickMeta);
+    if (step.platform) switchers[0].onChange(step.platform);
     if (step.set) el(step.set[0]).value = step.set[1];
     if (step.click) el(step.click).handlers.click({});
     if (step.release) held.splice(0).forEach(f => f());
@@ -198,13 +204,14 @@ const targets = [];
     if (step.submit) { const [sel, closest] = step.submit; const t = target({ closest }); targets.push(t); el(sel).handlers.submit({ target: t, preventDefault() {} }); }
     for (let i = 0; i < 6; i++) await tick();
   }
-  const out = { calls, posts, panels, hist, store, sets, downloads: downloads.map(d => ({ name: d.name })), blob: downloads.blob ? downloads.blob.text : "", el: {},
+  const out = { calls, posts, panels, hist, store, sets, setsMeta, platformsSet, switchers: switchers.length, downloads: downloads.map(d => ({ name: d.name })), blob: downloads.blob ? downloads.blob.text : "", el: {},
     outs: targets.map(t => Object.fromEntries(Object.entries(t.outs).map(([k, v]) => [k, v.textContent]))), disabled: targets.map(t => Object.values(t.closest ? [] : []).length) };
   for (const k of Object.keys(els)) out.el[k] = { html: els[k].innerHTML, text: els[k].textContent, hidden: els[k].hidden, value: els[k].value };
   process.stdout.write(JSON.stringify(out));
 })();
 """
-SCRIPTS = [DATA, PAGE]
+SCOPE = os.path.join(JS, "pm_scope.js")
+SCRIPTS = [SCOPE, DATA, PAGE]
 ACCTS = {"accounts": [dict(a, group=GROUP) for a in ACCOUNTS], "groups": [{"id": GROUP, "name": "Group", "accountIds": [a["id"] for a in ACCOUNTS]}]}
 SETTINGS = {"accounts": {"1234567890": {"phones": ["617-555-0100"], "places": [], "brand": [], "allow": [], "name": "Acme Dental"}}, "allow": ["zoom"], "changes": []}
 

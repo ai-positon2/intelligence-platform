@@ -14,6 +14,7 @@
 
   <section class="pm-panel pd-cmd bi-cmd" id="cmd">
     <div class="bi-cmd-row">
+      <div id="platSw" class="pm-plat"></div>
       <div id="acctPick"></div>
       <label class="bi-th"><span class="pd-dd-k">Alert outside (team)</span>
         <span class="bi-th-in"><b>±</b><input type="number" id="limit" min="10" max="90" step="1" value="30" inputmode="numeric" aria-label="How far from a usual week the brand spend can be, a percentage"><b>%</b></span></label>
@@ -50,6 +51,7 @@
 {% endblock %}
 {% block scripts %}
 <script src="{{ url_for('static', filename='js/pm_picker.js') }}?v=1"></script>
+<script src="{{ url_for('static', filename='js/pm_platform.js') }}?v=5"></script>
 <script src="{{ url_for('static', filename='js/monitor_panel.js') }}?v=1"></script>
 <script src="{{ url_for('static', filename='js/brand_spend_data.js') }}?v=2"></script>
 <script src="{{ url_for('static', filename='js/brand_spend.js') }}?v=2"></script>

@@ -25,6 +25,7 @@ function store(k,v){try{if(v===undefined)return localStorage.getItem(k)||"";loca
 
 var S = {accounts:[], groups:[], account:"", report:null, seq:0, view:"attention", open:{}, limit:"30", settings:null};
 
+if(window.PMPlatform&&$("#platSw")) window.PMPlatform.switcher($("#platSw"),{allow:["google"],value:"google"});     /* Google only: the switch says so */
 var picker = window.PMPicker($("#acctPick"),{label:"Google Ads account",search:true,onChange:function(v){
   S.account=v; store("bs_account",v); run();
 }});

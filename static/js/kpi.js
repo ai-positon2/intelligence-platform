@@ -10,9 +10,6 @@ var D = window.KPData, API = "/p2/paid-marketing/api/kpi";
 var $ = function(s){return document.querySelector(s)};
 var esc = function(s){return String(s==null?"":s).replace(/[&<>"']/g,function(c){
   return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]})};
-function hueOf(n){var h=0;for(var i=0;i<n.length;i++)h=(h*31+n.charCodeAt(i))%360;return h;}
-function inits(n){return n.replace(/\(.*?\)/g,"").split(/[\s&.,-]+/).filter(function(w){return /^[A-Za-z0-9]/.test(w)}).slice(0,2).map(function(w){return w[0]}).join("").toUpperCase()||"·";}
-function dashed(id){return id.length===10?id.slice(0,3)+"-"+id.slice(3,6)+"-"+id.slice(6):id;}
 function ago(iso){
   var t=new Date(iso), ms=Date.now()-t.getTime();
   if(isNaN(t.getTime())) return "";
@@ -23,28 +20,8 @@ function store(k,v){try{if(v===undefined)return localStorage.getItem(k)||"";loca
 
 var S = {accounts:[], groups:[], account:"", report:null, seq:0, view:"attention", open:{}, meta:[], settings:{accounts:{}}, shown:{}, quietShown:{}};
 
-var picker = window.PMPicker($("#acctPick"),{label:"Ad account",search:true,onChange:function(v){
-  S.account=v; store("kp_account",v); run();
-}});
-function groupOf(id){return S.groups.filter(function(g){return g.id===id;})[0]||null;}
-var MCC_BADGE='<span class="badge pm-pill ok">MCC</span>';
-function setAccounts(list, groups){
-  S.accounts=list; S.groups=groups||[];
-  var items=[{value:"",label:"Choose an account",sub:list.length+" accounts"+(S.groups.length?" · "+S.groups.length+" MCCs to check together":""),avatar:"?",hue:200}], seen={};
-  S.groups.forEach(function(g){
-    var head=g.name+" MCC";
-    items.push({value:g.id,label:"All of "+g.name,avatar:inits(g.name),hue:hueOf(g.name),group:head,badge:MCC_BADGE,sub:g.accountIds.length+" accounts checked together"});
-    list.filter(function(a){return a.group===g.id;}).forEach(function(a){
-      seen[a.id]=1; items.push({value:a.id,label:a.name,avatar:inits(a.name),hue:hueOf(a.name),group:head,sub:dashed(a.id)});
-    });
-  });
-  list.filter(function(a){return !seen[a.id];}).forEach(function(a){
-    items.push({value:a.id,label:a.name,avatar:inits(a.name),hue:hueOf(a.name),group:S.groups.length?"Other accounts":"",sub:dashed(a.id)});
-  });
-  S.meta.forEach(function(a){ items.push({value:a.id,label:a.name,avatar:inits(a.name),hue:hueOf(a.name),group:"Meta ad accounts",badge:'<span class="badge pm-pill">Meta</span>',sub:a.id}); });
-  if(!list.some(function(a){return a.id===S.account;})&&!groupOf(S.account)&&!S.meta.some(function(a){return a.id===S.account;})) S.account="";
-  picker.set(items,S.account);
-}
+var scope = null;
+function groupOf(id){return scope?scope.groupOf(id):null;}
 
 /* ── Loading ──────────────────────────────────────────────── */
 function setMsg(html,kind){$("#msg").innerHTML=html?'<div class="'+(kind||"pm-err")+'">'+html+'</div>':"";}
@@ -60,13 +37,13 @@ function show(which){$("#empty").hidden=which!=="empty"; $("#skel").hidden=which
 
 function run(refresh,keep){
   if(!S.account){show("empty");setMsg("");return;}
-  var seq=++S.seq, g=groupOf(S.account);
+  var seq=++S.seq, parts=window.PMScope.partsOf(S.account), g=groupOf(parts[0]), both=parts.length>1;
   try{history.replaceState(null,"",location.pathname+"?account="+encodeURIComponent(S.account));}catch(e){}
-  setMsg(g?"Reading all "+g.accountIds.length+" accounts of "+esc(g.name)+" together. This takes a little longer, about 10 to 30 seconds.":"",g?"pm-note":"");
+  setMsg(both?"Reading Google Ads and Meta Ads together. This takes a little longer.":g?"Reading all "+g.accountIds.length+" accounts of "+esc(g.name)+" together. This takes a little longer, about 10 to 30 seconds.":"",(both||g)?"pm-note":"");
   if(!keep) show("skel");
-  getJson(API+"/report?"+D.query(S.account,refresh===true)).then(function(r){
+  window.PMScope.fetchReport(API+"/report",S.account,refresh===true).then(function(r){
     if(seq!==S.seq) return;
-    if(g) setMsg("");
+    if(g||both) setMsg("");
     if(!r.ok){
       show(S.report?"out":"empty");
       if(r.j&&r.j.kind==="cooldown"){setMsg(esc(r.j.error),"pm-note");return;}
@@ -90,7 +67,7 @@ function render(){
   var rep=S.report;
   setMsg(rep.warnings&&rep.warnings.length?esc(rep.warnings.join(" · ")):"");
   $("#fresh").innerHTML='<span class="live"></span><b>'+esc(rep.account.name)+'</b>'+
-    (rep.account.isGroup?' <span class="sg-mcc">MCC · '+rep.account.accountCount+' accounts checked together</span>':"")+
+    (rep.account.isGroup?' <span class="sg-mcc">'+(rep.account.platform==="both"?"Google + Meta":"MCC")+' · '+rep.account.accountCount+' accounts checked together</span>':"")+
     ' · read '+esc(ago(rep.readAt||rep.generatedAt))+
     (rep.stale?' <span class="sg-mcc">The platform is not answering, so this is the copy saved '+esc(ago(rep.stale))+'</span>':"");
   paintKpis(); paintInsights(); paintViews(); paintList();
@@ -298,13 +275,10 @@ $("#exportBtn").addEventListener("click",function(){
 (function start(){
   var want=new URLSearchParams(location.search).get("account")||store("kp_account")||"";
   if(window.MonitorPanel&&$("#monPanel")) window.MonitorPanel.mount($("#monPanel"),{agent:"kpi",label:"KPI Monitoring"});
-  S.account=want;
-  picker.set([{value:"",label:"Loading accounts…",sub:"",avatar:"…",hue:200}],"",true);
-  Promise.all([getJson("/p2/paid-marketing/api/segments/accounts"),getJson("/p2/paid-marketing/api/gads/accounts?platform=meta").catch(function(){return {ok:false,j:{}};}),loadSettings()]).then(function(rs){
-    var r=rs[0], meta=rs[1];
-    if(!r.ok){picker.set([{value:"",label:"Accounts unavailable",sub:"",avatar:"!",hue:0}],"",true);setMsg(esc((r.j&&r.j.error)||"The account list could not be read."));return;}
-    S.meta=meta.ok?(meta.j.accounts||[]).filter(function(a){return a.platform==="meta"||/^act_\d+$/.test(a.id);}):[];
-    setAccounts(r.j.accounts||[],r.j.groups||[]); run();
-  }).catch(function(){setMsg("The server could not be reached. Try again.");});
+  S.account="";
+  (typeof loadSettings==="function"?loadSettings():Promise.resolve()).then(function(){
+    scope=window.PMScope.mount($("#acctPick"),{account:want,onChange:function(a){ S.account=a; store("kp_account",a); run(); },
+      onError:function(e){setMsg(esc((e&&e.message)||"The account list could not be read."));}});
+  });
 })();
 })();
