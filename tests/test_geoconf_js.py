@@ -9,6 +9,7 @@ import os
 import re
 import shutil
 import subprocess
+import tempfile
 import sys
 
 import pytest
@@ -155,11 +156,16 @@ def test_what_the_team_saved_is_shown_as_the_form_holds_it():
 SCRIPTS = [DATA, PAGE]
 ACCTS = {"accounts": [dict(a, group=GROUP) for a in ACCOUNTS], "groups": [{"id": GROUP, "name": "Group", "accountIds": [a["id"] for a in ACCOUNTS]}]}
 SETTINGS = {"accounts": {"1234567890": {"areas": ["Greater Boston"], "ignore": ["Orange"], "acceptPresence": True, "name": "Acme Dental"}}, "changes": []}
-HARNESS_PAGE = HARNESS.replace("/p2/paid-marketing/ad-copy-checker", "/p2/paid-marketing/location-conflicts")
+HARNESS_PAGE = HARNESS.replace("/p2/paid-marketing/ad-copy-checker", "/p2/paid-marketing/location-conflicts".replace("JSON.parse(process.argv[2])", "JSON.parse(fs.readFileSync(process.argv[2], 'utf8'))")   # a long report is too big for one argument on Linux (128 KB)
 
 
 def page(scenario):
-    out = subprocess.run(["node", "-e", HARNESS_PAGE, json.dumps(SCRIPTS), json.dumps(scenario)], capture_output=True, text=True, timeout=60)
+    with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as f:
+        json.dump(scenario, f)
+    try:
+        out = subprocess.run(["node", "-e", HARNESS_PAGE, json.dumps(SCRIPTS), f.name], capture_output=True, text=True, timeout=60)
+    finally:
+        os.unlink(f.name)
     assert out.returncode == 0, out.stderr
     return json.loads(out.stdout)
 
