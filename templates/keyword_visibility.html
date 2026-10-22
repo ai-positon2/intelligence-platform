@@ -1,0 +1,54 @@
+{% extends "_paid_base.html" %}
+{% block title %}Keyword Visibility Tracker{% endblock %}
+{% block content %}
+<div class="pm pm-gc pm-kp pm-kv" id="kv">
+  <section class="pm-hero">
+    <div class="pm-hero-l">
+      <span class="pm-eyebrow"><span class="d"></span>Paid Marketing · Monitoring</span>
+      <h1 class="pm-title">Are the best keywords <span class="pm-grad">still winning the page?</span></h1>
+      <p class="pm-sub">Pick an account, or an MCC to check every account in one go. The agent follows the <b>highest-spend keywords</b>: how often each one shows at the top of the page, how much it loses to rank and its Quality Score, the last whole week against the four before,
+        and watches the auction insights for a <b>new competitor</b> or one overlapping far more, and for a possible <b>brand hijack</b>.</p>
+    </div>
+  </section>
+
+  <section class="pm-panel pd-cmd bi-cmd" id="cmd">
+    <div class="bi-cmd-row da-cmd-row">
+      <div id="acctPick"></div>
+      <p class="bi-scope">Google Ads (the top-spend Search keywords with their weekly impression shares and Quality Score, and the auction insights). Google only: Meta has no keywords. Nothing is changed in an account.</p>
+    </div>
+  </section>
+
+  <div id="msg"></div>
+
+  <div id="empty" class="pm-panel sg-empty">
+    <div class="sg-empty-ic"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.5"/></svg></div>
+    <h2>Choose an account to begin</h2>
+    <p>The figures come straight from Google Ads. Nothing is changed there: the agent only reports.</p>
+  </div>
+  <div id="skel" hidden><div class="pd-skel"></div><div class="pd-skel"></div><div class="pd-skel"></div></div>
+
+  <div id="out" hidden>
+    <div class="sg-head">
+      <p class="pd-fresh" id="fresh"></p>
+      <button class="pm-btn-ghost" id="refreshBtn" type="button" title="Read the keywords again"><svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.3-5.6M20 4v5h-5"/></svg>Refresh</button>
+      <button class="pm-btn-ghost" id="exportBtn" type="button"><svg viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>Export CSV</button>
+    </div>
+    <div class="pd-strip" id="kpis"></div>
+    <div id="insights"></div>
+
+    <section class="pm-panel" id="listCard">
+      <div class="pm-panel-h"><span class="pm-panel-t">Accounts</span><span class="pm-panel-s" id="listNote"></span></div>
+      <div class="bi-tools"><div class="pm-chips" id="views" role="radiogroup" aria-label="Which accounts"></div></div>
+      <div id="list"></div>
+    </section>
+    <p class="pd-foot" id="foot"></p>
+  </div>
+  <div id="monPanel"></div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/pm_picker.js') }}?v=1"></script>
+<script src="{{ url_for('static', filename='js/monitor_panel.js') }}?v=1"></script>
+<script src="{{ url_for('static', filename='js/kvis_data.js') }}?v=1"></script>
+<script src="{{ url_for('static', filename='js/kvis.js') }}?v=1"></script>
+{% endblock %}

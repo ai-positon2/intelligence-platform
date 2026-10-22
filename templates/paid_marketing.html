@@ -12,7 +12,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-tokens.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-components.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/gtm.css') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/paid_marketing.css') }}?v=55">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/paid_marketing.css') }}?v=56">
   <script src="/static/js/theme.js"></script>
   <link rel="stylesheet" href="/static/css/aurora-app.css?v=3">
   <script src="/static/js/aurora.js?v=1" defer></script>
@@ -661,6 +661,25 @@
           </div>
         </div>
       </a>
+
+      <a href="/p2/paid-marketing/keyword-visibility" class="dash-card active c-kv">
+        <div class="card-band"></div>
+        <div class="card-thumb">
+          <div class="card-thumb-icon"><svg class="au-ic" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6"/><path d="M15 15l5 5"/></svg></div>
+          <div class="card-thumb-badge tb-live"><span class="tb-dot live"></span> Live</div>
+        </div>
+        <div class="card-body">
+          <div class="card-name">Keyword Visibility Tracker</div>
+          <div class="card-desc">
+            Follows the highest-spend Google Ads keywords week by week: how often each shows at the top of the page, how much it loses to rank and its Quality Score, the last week against the four before,
+            plus the auction insights for a new competitor or a possible brand hijack. Weekly alerts. Read only.
+          </div>
+          <div class="card-footer">
+            <div class="card-tags"><span class="tag">Monitoring</span><span class="tag">Keywords</span></div>
+            <span class="card-arrow">→</span>
+          </div>
+        </div>
+      </a>
     </div>
 
     <p class="footer-note">Position2 · Internal use only</p>
@@ -717,6 +736,7 @@
     {t:'Spend Anomaly Alert',d:'Is any account spending far more or less than it usually does today',u:'/p2/paid-marketing/spend-anomaly',i:'↗'},
     {t:'Location Conflicts',d:'Do the campaigns show where their names, ads and keywords say they do',u:'/p2/paid-marketing/location-conflicts',i:'↗'},
     {t:'KPI Monitoring',d:'Are the campaigns hitting their cost, return and rate targets, learning and delivering',u:'/p2/paid-marketing/kpi-monitoring',i:'◎'},
+    {t:'Keyword Visibility Tracker',d:'Are the highest-spend keywords still at the top of the page, and who is new in the auctions',u:'/p2/paid-marketing/keyword-visibility',i:'⌕'},
     {t:'QA Agent',d:'Campaign launch QC checklist',u:'/p2/paid-marketing/qa-agent',i:'✓'}
   ];
   var ITEMS=(window.__KP_ITEMS||[]).concat(BASE);
