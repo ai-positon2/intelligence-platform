@@ -289,6 +289,17 @@ def test_an_mcc_report_puts_the_accounts_to_fix_first_and_names_the_account_in_a
     assert [w.split(":")[0] for w in rep["warnings"][:2]] == ["Acme Dental", "Beta Clinic"] and all("The Display ads could not be read" in w for w in rep["warnings"][:2]) and rep["summary"]["counts"] == {"fix": 1, "check": 0, "clean": 1}
 
 
+def test_a_read_that_lost_a_part_is_shown_but_not_saved_for_hours(cache):
+    rep = report(searcher(search={ACCT["id"]: [rsa()]}, fail_kinds=("display",)))
+    assert [w for w in rep["warnings"] if "Display ads" in w] == ["The Display ads could not be read (no display), so they were not checked."]      # shown once
+    assert cache == {}                                                                  # the saved copy is for a whole read only: the next ask in a new process reads again
+    from tracker import paid_geo
+    paid_geo.clear_cache()
+    base.forget("")
+    report(searcher(search={ACCT["id"]: [rsa()]}))
+    assert len(cache) == 1                                                              # a whole read is saved
+
+
 def test_a_spent_quota_with_nothing_saved_is_raised_and_an_account_that_is_not_position2s_is_refused(cache):
     def spent(cid, q):
         raise gads.GadsError("quota", "The daily limit is used up.")

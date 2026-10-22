@@ -236,14 +236,16 @@ def google_raw(account, *, search_fn=None, workers=6):
     ok = [(mem, r) for mem, r, e in done if r is not None]
     if not ok:
         raise next(e for _m, _r, e in done if e)
+    many = bool(account.get("members"))
     return {"accounts": [dict(r, id=mem["id"], name=mem["name"], currency=mem.get("currency") or account.get("currency") or "USD", platform="google") for mem, r in ok],
-            "warnings": ["%s could not be read: %s" % (mem["name"], e) for mem, r, e in done if e], "members": [mem["name"] for mem in members] if account.get("members") else []}
+            "warnings": ["%s could not be read: %s" % (mem["name"], e) for mem, r, e in done if e] + [("%s: %s" % (mem["name"], w)) if many else w for mem, r in ok for w in r["warnings"]],
+            "members": [mem["name"] for mem in members] if many else []}                  # every warning is up here, so a read that lost a part is not kept for hours (tracker/paid_geo.py _cached)
 
 
 def meta_raw(act, *, pages_fn, account_fn):
     acct = account_fn(act) or {}
     got = read_meta_account(act, pages_fn)
-    return {"accounts": [dict(got, id=act, name=acct.get("name") or act, currency=acct.get("currency") or "USD", platform="meta")], "warnings": [], "members": []}
+    return {"accounts": [dict(got, id=act, name=acct.get("name") or act, currency=acct.get("currency") or "USD", platform="meta")], "warnings": list(got["warnings"]), "members": []}
 
 
 # ── The report ──────────────────────────────────────────────────────────────
@@ -279,7 +281,6 @@ def assemble(raw, account, *, settings=None, brand_terms=None, speller=None, iss
                          other_places=other_places(settings, a["id"]), allowed_extra=allowed_all)
         accounts.append(dict(res, id=a["id"], name=a["name"], currency=a.get("currency") or "USD", platform=a.get("platform") or "google",
                              saved={k: len(cfg.get(k) or []) for k in ("phones", "places", "brand", "allow")}, plan=plan.build(res)))
-        warnings += ["%s: %s" % (a["name"], w) if account.get("members") else w for w in a.get("warnings") or []]
         if res["truncated"]:
             warnings.append("%s: more than %d ads: the first %d were checked." % (a["name"], an.MAX_ADS, an.MAX_ADS))
     accounts.sort(key=lambda a: (_RANK[a["status"]], -a["counts"]["high"], -a["counts"]["medium"], -a["counts"]["low"], a["name"].lower()))
