@@ -35,7 +35,7 @@ SENSITIVITY = {"low": (2.5, 4.0), "normal": (1.75, 2.75), "high": (1.4, 2.0)}
 DEFAULT_SENSITIVITY = "normal"
 MIN_HOUR_FOR_PACE = 3            # before this hour of the day the spend so far says too little about the day
 SURGE_HOURS = 3
-SURGE_MID, SURGE_HIGH = 2.5, 4.0
+SURGE_MID, SURGE_HIGH = 2.5, 4.0   # at the normal sensitivity; the others scale them the way they scale the day's ratios
 LAG_HOURS = 2                    # the platform reports the latest hours late: a drop is judged on the hours before these
 DROP_FROM_HOUR = 14              # and not before the afternoon
 DROP_SHARE = 0.15                # today so far at or under this share of the usual by then is a drop
@@ -323,7 +323,7 @@ def analyse(rows, today, hour, *, currency="USD", sensitivity=None, saved=None, 
         last = sum(days[today]["hours"][hour - k:hour])
         usual_last = median([sum(days[d]["hours"][hour - k:hour]) for d in ref_t])
         s_floor = max(swing / 2.0, 0.08 * usual_day)
-        lvl = grade(last, usual_last, s_floor, SURGE_MID, SURGE_HIGH)
+        lvl = grade(last, usual_last, s_floor, SURGE_MID * mid / SENSITIVITY[DEFAULT_SENSITIVITY][0], SURGE_HIGH * high / SENSITIVITY[DEFAULT_SENSITIVITY][1])
         if lvl and LEVELS[lvl] >= LEVELS["low"]:
             c, why = trace(today, ref_t)
             findings.append(_mute(_finding("surge", today, lvl, "Spending %s its usual in the last %d hours" % (_x(_ratio(last, usual_last)), k),

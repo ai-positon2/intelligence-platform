@@ -572,3 +572,9 @@ def test_a_small_hour_needs_a_third_of_the_floor_over_its_usual_too():
     assert _started(small + today_rows(2.0, 12, boost={5: 10.4}), 12, floor=25.0) == 5               # 2.5x is 5, a third of the floor over is 10.33
     assert _started(small + today_rows(2.0, 12, boost={5: 10.2}), 12, floor=25.0) is None
     assert _started(small + today_rows(2.0, 12, boost={5: 9.0}), 12, floor=6.0) == 5                 # a smaller floor lets 9 count (2 + 2)
+
+
+def test_the_sensitivity_scales_the_surge_too():
+    rows = rows_for(14) + today_rows(10, 9) + [{"date": TODAY.isoformat(), "hour": h, "cost": 35.0} for h in (9, 10, 11)]            # the last three hours are 3.5x their usual
+    got = {s: [f["level"] for f in run(rows, 12, sensitivity=s)["findings"] if f["kind"] == "surge"] for s in ("low", "normal", "high")}
+    assert got == {"low": ["low"], "normal": ["medium"], "high": ["high"]}                       # 3.57 and 5.8 at low, 2.5 and 4 at normal, 2 and 2.9 at high
