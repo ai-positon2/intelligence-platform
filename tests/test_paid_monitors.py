@@ -47,6 +47,8 @@ class Search:
     def __call__(self, cid, q):
         if "FROM customer" in q:
             return TA.hourly_rows()
+        if "FROM keyword_view" in q or "auction_insight_domain" in q:
+            return []                                                                    # Keyword Visibility Tracker: an account with no keyword that spent has nothing to track
         if "campaign.primary_status_reasons" in q or q.startswith("SELECT customer.time_zone, campaign.id") or q.startswith("SELECT campaign.id, metrics.search_budget_lost_impression_share"):
             return []                                                                    # KPI Monitoring: an account with no campaign has nothing off target
         if "geo_target_type_setting" in q or "FROM campaign_criterion" in q or "FROM geo_target_constant" in q or "FROM ad_group WHERE" in q:
@@ -71,11 +73,11 @@ def sched(store, dv, search, now):
 
 
 def test_only_the_four_monitors_are_known_and_each_has_its_page_link():
-    assert sorted(pm.AGENTS) == ["brandspend", "copycheck", "disapproved", "geoconf", "kpi", "spend"] and pm.agent_of("brandspend") == "brandspend"
-    with pytest.raises(pm.BadRequest, match="must be one of: brandspend, copycheck, disapproved, geoconf, kpi, spend"):
+    assert sorted(pm.AGENTS) == ["brandspend", "copycheck", "disapproved", "geoconf", "kpi", "kvis", "spend"] and pm.agent_of("brandspend") == "brandspend"
+    with pytest.raises(pm.BadRequest, match="must be one of: brandspend, copycheck, disapproved, geoconf, kpi, kvis, spend"):
         pm.agent_of("other")
     assert pm.link_for("copycheck", BASE) == BASE + "/p2/paid-marketing/ad-copy-checker" and pm.AGENTS["copycheck"]["weekdays"] == (0,) and "weekdays" not in pm.AGENTS["brandspend"]
-    assert pm.AGENTS["spend"]["frequent"] is True and not [a for a in ("brandspend", "copycheck", "disapproved", "geoconf", "kpi") if pm.AGENTS[a].get("frequent")] and pm.link_for("spend", BASE) == BASE + "/p2/paid-marketing/spend-anomaly"
+    assert pm.AGENTS["spend"]["frequent"] is True and not [a for a in ("brandspend", "copycheck", "disapproved", "geoconf", "kpi", "kvis") if pm.AGENTS[a].get("frequent")] and pm.link_for("spend", BASE) == BASE + "/p2/paid-marketing/spend-anomaly"
     assert pm.link_for("brandspend", "https://p.example/") == "https://p.example/p2/paid-marketing/brand-spend" and pm.link_for("disapproved", BASE) == BASE + "/p2/paid-marketing/disapproved-ads"
 
 
@@ -83,16 +85,16 @@ def test_the_scheduled_run_runs_every_monitor_once_and_the_first_run_of_each_is_
     s, dv, se = configured(), Deliver(), Search()
     se.ads[A["id"]] = [TD.api()]
     out = sched(s, dv, se, TUE)
-    assert sorted(out) == ["brandspend", "disapproved", "geoconf", "kpi"] and "copycheck" not in out and out["brandspend"]["baseline"] and out["disapproved"]["baseline"] and not dv.emails
+    assert sorted(out) == ["brandspend", "disapproved", "geoconf", "kpi", "kvis"] and "copycheck" not in out and out["brandspend"]["baseline"] and out["disapproved"]["baseline"] and not dv.emails
     assert s.issues_all("disapproved")[0]["kind"] == "stopped" and s.state_get("baseline:brandspend") and s.state_get("baseline:disapproved")
 
 
 def test_the_ad_copy_checker_runs_on_mondays_only_and_its_first_run_is_a_baseline():
     s, dv, se = configured(), Deliver(), Search()
-    assert "copycheck" not in sched(s, dv, se, TUE)
+    assert "copycheck" not in sched(s, dv, se, TUE) and "kvis" not in sched(configured(), dv, se, MON)
     out = sched(s, dv, se, MON)
     assert sorted(k for k in out if k != "weekly") == ["brandspend", "copycheck", "disapproved", "geoconf", "kpi"] and out["copycheck"]["baseline"] is True and s.state_get("baseline:copycheck")
-    assert sorted(out["weekly"]) == ["brandspend", "copycheck", "disapproved", "geoconf", "kpi", "spend"]
+    assert sorted(out["weekly"]) == ["brandspend", "copycheck", "disapproved", "geoconf", "kpi", "kvis", "spend"]
 
 
 def test_a_problem_after_the_baseline_is_alerted_by_the_monitor_it_belongs_to_with_its_own_link():
