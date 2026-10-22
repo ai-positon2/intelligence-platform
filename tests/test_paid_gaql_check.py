@@ -55,7 +55,7 @@ def test_a_query_google_refuses_is_named_with_the_reason_and_the_rest_pass():
     bad = [r for r in got if not r["ok"]]
     assert {(r["agent"], r["label"]) for r in bad} == {("anomaly", "campaign days"), ("kpi", "campaigns")} and all("Unrecognized field" in r["error"] for r in bad)
     assert len(got) == len(sent) and all(q.endswith(" LIMIT 1") for _c, q in sent) and all(c == "1234567890" for c, _q in sent)
-    assert [r["rows"] for r in got if r["ok"]][0] == 1
+    assert [r["rows"] for r in got if r["ok"]][0] == 1 and all(isinstance(r["ms"], int) and r["ms"] >= 0 for r in got)
 
 
 def test_the_meta_reads_are_built_for_every_agent_and_cut_to_one_row():
@@ -76,7 +76,7 @@ def test_a_meta_read_that_fails_is_named_and_one_that_cannot_be_built_is_too():
     bad = [r for r in got if not r["ok"]]
     assert {r["label"] for r in bad} == {"geoconf", "kpi adsets"} and all("nonexistent field" in r["error"] for r in bad)
     odd = qc.check_meta("act_1", pages_fn=lambda p, q: [], requests=[("kpi", "campaigns", None, {"_build_error": "boom"})])
-    assert odd == [{"agent": "kpi", "label": "campaigns", "ok": False, "error": "could not be built: boom", "rows": 0}]
+    assert odd == [{"agent": "kpi", "label": "campaigns", "ok": False, "error": "could not be built: boom", "rows": 0, "ms": 0}]
 
 
 def client_as(email):

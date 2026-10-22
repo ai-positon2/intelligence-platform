@@ -8,8 +8,9 @@ are asked for one row of one account in the same way. It is the check to run aft
 from __future__ import annotations
 
 import datetime as dt
-from concurrent.futures import ThreadPoolExecutor
 import re
+import time
+from concurrent.futures import ThreadPoolExecutor
 
 from . import paid_gads_segments as gads
 
@@ -81,11 +82,12 @@ def check_google(account_id, *, search_fn=None, queries=None, workers=WORKERS):
 
     def run(item):
         agent, label, q = item
+        t0 = time.monotonic()
         try:
             rows = search(account_id, _one_row(q))
-            return {"agent": agent, "label": label, "ok": True, "error": "", "rows": len(rows)}
+            return {"agent": agent, "label": label, "ok": True, "error": "", "rows": len(rows), "ms": int((time.monotonic() - t0) * 1000)}
         except Exception as e:                                                       # noqa: BLE001 (every refusal is the answer here)
-            return {"agent": agent, "label": label, "ok": False, "error": str(e)[:300], "rows": 0}
+            return {"agent": agent, "label": label, "ok": False, "error": str(e)[:300], "rows": 0, "ms": int((time.monotonic() - t0) * 1000)}
     with ThreadPoolExecutor(max_workers=max(1, workers)) as pool:
         return list(pool.map(run, qs))
 
@@ -95,11 +97,12 @@ def check_meta(act, *, pages_fn, requests=None):
     out = []
     for agent, label, path, params in (requests if requests is not None else meta_requests(act)):
         if path is None:
-            out.append({"agent": agent, "label": label, "ok": False, "error": "could not be built: %s" % params.get("_build_error"), "rows": 0})
+            out.append({"agent": agent, "label": label, "ok": False, "error": "could not be built: %s" % params.get("_build_error"), "rows": 0, "ms": 0})
             continue
+        t0 = time.monotonic()
         try:
             rows = pages_fn(path, params)
-            out.append({"agent": agent, "label": label, "ok": True, "error": "", "rows": len(rows or [])})
+            out.append({"agent": agent, "label": label, "ok": True, "error": "", "rows": len(rows or []), "ms": int((time.monotonic() - t0) * 1000)})
         except Exception as e:                                                       # noqa: BLE001
-            out.append({"agent": agent, "label": label, "ok": False, "error": str(e)[:300], "rows": 0})
+            out.append({"agent": agent, "label": label, "ok": False, "error": str(e)[:300], "rows": 0, "ms": int((time.monotonic() - t0) * 1000)})
     return out
