@@ -219,7 +219,8 @@ def test_what_the_team_saved_is_shown_as_the_forms_hold_it():
 
 SCRIPTS = [DATA, PAGE]
 ACCTS = {"accounts": [dict(a, group=GROUP) for a in ACCOUNTS], "groups": [{"id": GROUP, "name": "Group", "accountIds": [a["id"] for a in ACCOUNTS]}]}
-HARNESS_PAGE = HARNESS.replace("/p2/paid-marketing/ad-copy-checker", "/p2/paid-marketing/kpi-monitoring".replace("JSON.parse(process.argv[2])", "JSON.parse(fs.readFileSync(process.argv[2], 'utf8'))")   # a long report is too big for one argument on Linux (128 KB)
+HARNESS_PAGE = (HARNESS.replace("/p2/paid-marketing/ad-copy-checker", "/p2/paid-marketing/kpi-monitoring")
+                .replace("JSON.parse(process.argv[2])", "JSON.parse(fs.readFileSync(process.argv[2], 'utf8'))"))      # a long report is too big for one argument on Linux (128 KB)
 
 
 def page(scenario):
