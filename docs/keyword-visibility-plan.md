@@ -50,6 +50,8 @@ Weekly (Mondays, `weekdays: (0,)`): one issue per high or medium finding, finger
 
 ## Not built or not verified
 
+* **Auction insights are refused to this app (found live, 2026-10-22):** Google Ads answers 403 "The developer doesn't have access to metrics" for every `auction_insight_*` metric, so the competitor rules (`comp_new`, `comp_up`, `brand_hijack`) cannot run until Google grants the developer token that access. The read is kept (a standing limit, said on the page, not a failure), so it starts working the day access is granted.
+
 * None of the new Google queries (keyword_view with `segments.week`, `historical_quality_score`, the auction insight metrics and segment) was run against the live API from here. In particular auction insights
   by `segments.auction_insight_domain` on `campaign` is the documented way, and the account's own row is left out when Google names it.
 * Only Search keywords are read; Performance Max has no keywords.

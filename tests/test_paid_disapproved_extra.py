@@ -88,10 +88,11 @@ def test_a_keyword_whose_policy_google_would_not_give_has_no_topics():
     assert ex.read_keywords([row])[0]["topics"] == []
 
 
-def test_the_keyword_query_asks_for_positive_enabled_disapproved_keywords_and_has_a_form_without_the_policy():
+def test_the_keyword_query_asks_for_positive_enabled_disapproved_keywords_without_the_policy_topics_google_refuses():
     q = ex.GAQL_KEYWORDS
-    assert "ad_group_criterion.approval_status = DISAPPROVED" in q and "ad_group_criterion.negative = FALSE" in q and "ad_group_criterion.status = ENABLED" in q and "policy_summary.policy_topic_entries" in q
-    assert "policy_summary" not in ex.GAQL_KEYWORDS_PLAIN and "ad_group_criterion.approval_status = DISAPPROVED" in ex.GAQL_KEYWORDS_PLAIN and "FROM ad_group_criterion" in ex.GAQL_KEYWORDS_PLAIN
+    assert "ad_group_criterion.approval_status = DISAPPROVED" in q and "ad_group_criterion.negative = FALSE" in q and "ad_group_criterion.status = ENABLED" in q and "FROM ad_group_criterion" in q
+    assert "policy_summary" not in q                                                            # "Unrecognized field in the query" on the live API
+    assert not hasattr(ex, "GAQL_KEYWORDS_PLAIN")
 
 
 # ── Meta ────────────────────────────────────────────────────────────────────

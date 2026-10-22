@@ -136,10 +136,7 @@ def read_account(account_id, today, search):
     ads = read_ads(search(account_id, GAQL_ADS))
     warnings = []
     assets = _soft(warnings, "The assets of Performance Max asset groups", lambda: ex.read_assets(search(account_id, ex.GAQL_ASSETS)), [])
-    try:
-        kws = ex.read_keywords(search(account_id, ex.GAQL_KEYWORDS))
-    except gads.GadsError:                                                          # the policy topics of a keyword are the part Google may refuse: ask for the keywords without them
-        kws = _soft(warnings, "The disapproved keywords", lambda: ex.read_keywords(search(account_id, ex.GAQL_KEYWORDS_PLAIN)), [])
+    kws = _soft(warnings, "The disapproved keywords", lambda: ex.read_keywords(search(account_id, ex.GAQL_KEYWORDS)), [])
     items = ads + assets + kws
     truncated = len(items) > MAX_ADS
     items = items[:MAX_ADS]

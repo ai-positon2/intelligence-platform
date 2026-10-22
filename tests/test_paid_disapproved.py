@@ -292,11 +292,12 @@ def test_the_assets_of_performance_max_are_read_with_their_cover_and_their_weeks
     assert an["status"] == "stopped" and an["deadGroups"][0]["name"] == "Summer (headlines)" and an["deadGroups"][0]["weight"]["lostClicks"] == 40
 
 
-def test_keywords_are_read_and_a_refused_policy_field_is_asked_again_without_it():
+def test_keywords_are_read_once_without_the_policy_topics_google_refuses_and_a_failed_read_is_said():
     a = ACCT["id"]
     log = []
-    r = d.read_account(a, TODAY, searcher({a: []}, keywords={a: [X.krow()]}, fail_policy=True, log=log))
-    assert [i["id"] for i in r["ads"]] == ["kw:3:11"] and r["warnings"] == [] and len([q for _c, q in log if "FROM ad_group_criterion" in q]) == 2
+    r = d.read_account(a, TODAY, searcher({a: []}, keywords={a: [X.krow()]}, fail_policy=True, log=log))          # a fake that refuses the policy field: the query never asks for it
+    assert [i["id"] for i in r["ads"]] == ["kw:3:11"] and r["warnings"] == [] and len([q for _c, q in log if "FROM ad_group_criterion" in q]) == 1
+    assert not any("policy_summary" in q for _c, q in log if "FROM ad_group_criterion" in q)
     both = d.read_account(a, TODAY, searcher({a: []}, keywords={a: [X.krow()]}, fail_keywords=True))
     assert both["ads"] == [] and both["warnings"] == ["The disapproved keywords could not be read (no keywords)."]
 

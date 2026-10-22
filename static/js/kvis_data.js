@@ -72,11 +72,12 @@ function ignorable(f){ return COMP_RULES[f.rule] && f.facts && f.facts.domain ? 
 /* what only shows across the keywords of an account, in sentences: [{kind, text}] */
 function insights(report){
   var out = [], group = report.account && report.account.isGroup;
+  (report.limits || []).forEach(function(t){ out.push({kind: "limit", text: t}); });
   (report.accounts || []).forEach(function(a){
     var prefix = group ? a.name + ": " : "";
     if (!a.keywords) { out.push({kind: "none", text: prefix + "No Search keyword spent in the last 28 days, so there is nothing to track."}); return; }
     if (a.notJudged) out.push({kind: "data", text: prefix + plural(a.notJudged, "keyword") + " of " + a.keywords + " had too few searches last week to be judged (at least " + (report.minimums || {}).eligible + " eligible searches are needed)."});
-    if (!a.auctionRead) out.push({kind: "auction", text: prefix + "No auction insights came back, so competitors were not checked."});
+    if (!a.auctionRead && !(report.limits || []).length) out.push({kind: "auction", text: prefix + "No auction insights came back, so competitors were not checked."});
     if (a.read > a.tracked) out.push({kind: "tracked", text: prefix + "The " + a.tracked + " highest-spend keywords of the " + a.read + " read are tracked; the number can be changed in the settings below."});
   });
   return out;

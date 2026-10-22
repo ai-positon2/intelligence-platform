@@ -36,7 +36,7 @@ def google_queries(today=None):
         ("brandis", "keyword numbers", diag.gaql_keyword_numbers(ids)), ("brandis", "ads", diag.gaql_ads(ids)),
         ("brandspend", "campaigns", bs.GAQL_CAMPAIGNS), ("brandspend", "campaign days", bs.gaql(a, b)), ("brandspend", "search terms", bs.gaql_terms(a, b)),
         ("disapproved", "ads", dis.GAQL_ADS), ("disapproved", "ad cover", dis.gaql_cover(ids)), ("disapproved", "ad weeks", dis.gaql_weekly(ids, a, b)),
-        ("disapproved", "asset group assets", dx.GAQL_ASSETS), ("disapproved", "keywords", dx.GAQL_KEYWORDS), ("disapproved", "keywords plain", dx.GAQL_KEYWORDS_PLAIN),
+        ("disapproved", "asset group assets", dx.GAQL_ASSETS), ("disapproved", "keywords", dx.GAQL_KEYWORDS),
         ("disapproved", "asset cover", dx.gaql_asset_cover(ids)), ("disapproved", "asset weeks", dx.gaql_asset_weekly(ids, a, b)),
         ("copycheck", "search ads", cc.GAQL_SEARCH), ("copycheck", "search ads plain", cc.GAQL_SEARCH_PLAIN), ("copycheck", "display ads", cc.GAQL_DISPLAY), ("copycheck", "asset group text", cc.GAQL_PMAX),
         ("copycheck", "campaign assets", cc.GAQL_CAMPAIGN_ASSETS), ("copycheck", "account assets", cc.GAQL_CUSTOMER_ASSETS),

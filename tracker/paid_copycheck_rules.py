@@ -58,6 +58,8 @@ DESCRIPTION_SLOTS = {"description", "primary", "link", "sitelinkdesc"}
 VOCAB_ADS = 3                    # an unknown word in this many ads, spelt the same way, is the account's own word
 MIN_WORD = 4                     # shorter words are not looked up
 MAX_UNKNOWN = 400                # distinct unknown words looked up for suggestions in one account
+SPELL_DISTANCE = 1               # edits from a word to a suggestion. Google Ads copy is full of brand and product names; at 2 each unknown word took 0.4 s to look up, so an account with a few hundred of
+                                 # them (a software client) took 200 to 300 s and the page timed out. A real typo is one edit from the word meant, and a suggestion two edits away is mostly a wrong guess.
 
 _MASK_VALID = re.compile(r"\{(?:KeyWord|LOCATION\([^)]*\)|=[^}]*|COUNTDOWN\([^)]*\)|CUSTOMIZER\.[^}]*|[A-Za-z_]+\.[A-Za-z_]+)(?::([^}]*))?\}", re.I)
 _PLACEHOLDER = re.compile(r"\{\{[^}]*\}\}|\{[^{}]{1,40}\}|\[[A-Za-z][A-Za-z _/-]{0,38}\]|<[A-Za-z][A-Za-z _/-]{0,38}>|\blorem ipsum\b|\b(?:TBD|TODO|XXX+|PLACEHOLDER)\b|\bINSERT (?:HERE|TEXT|CITY|NAME)\b|\bYOUR (?:CITY|NAME|BRAND|TEXT) HERE\b", re.I)
@@ -81,7 +83,7 @@ class Speller:
     """What the spelling check needs from a dictionary: unknown(words), candidates(word), correction(word). Tests pass a stand-in with the same three."""
 
     def __init__(self, inner=None):
-        self.inner = inner or (SpellChecker() if SpellChecker else None)
+        self.inner = inner or (SpellChecker(distance=SPELL_DISTANCE) if SpellChecker else None)
         self._cache = {}
 
     @property
@@ -263,7 +265,8 @@ def _spelling(text, ctx):
             continue
         near = sp.candidates(lw)
         own = ctx["own"]
-        pick = next((c for c in near if c != lw and own.get(c, 0) >= 2), None) or (sp.correction(lw) if sp.correction(lw) not in (None, lw) else None) or (near[0] if near else None)
+        fixed = sp.correction(lw)
+        pick = next((c for c in near if c != lw and own.get(c, 0) >= 2), None) or (fixed if fixed not in (None, lw) else None) or (near[0] if near else None)
         if not pick or pick == lw:
             continue
         out.append((_f("spelling", text, a, b, "\"%s\" is not a word I know. Did you mean \"%s\"?" % (w, pick), pick), lw))

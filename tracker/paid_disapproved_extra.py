@@ -29,10 +29,10 @@ GAQL_ASSETS = ("SELECT campaign.id, campaign.name, asset_group.id, asset_group.n
                "FROM asset_group_asset WHERE campaign.status = ENABLED AND asset_group.status = ENABLED AND asset_group_asset.status = ENABLED "
                "AND asset_group_asset.policy_summary.approval_status IN (%s)" % APPROVAL)
 GAQL_KEYWORDS = ("SELECT campaign.id, campaign.name, ad_group.id, ad_group.name, ad_group_criterion.criterion_id, ad_group_criterion.keyword.text, ad_group_criterion.keyword.match_type, "
-                 "ad_group_criterion.approval_status, ad_group_criterion.policy_summary.policy_topic_entries FROM ad_group_criterion "
+                 "ad_group_criterion.approval_status FROM ad_group_criterion "
                  "WHERE ad_group_criterion.type = KEYWORD AND ad_group_criterion.negative = FALSE AND ad_group_criterion.status = ENABLED AND ad_group.status = ENABLED "
                  "AND campaign.status = ENABLED AND ad_group_criterion.approval_status = DISAPPROVED")
-GAQL_KEYWORDS_PLAIN = GAQL_KEYWORDS.replace(", ad_group_criterion.policy_summary.policy_topic_entries", "")
+# Google Ads refuses ad_group_criterion.policy_summary.policy_topic_entries ("Unrecognized field", seen live 2026-10-22), so a keyword is flagged by its approval status without the policy topics.
 
 
 def _get(row, *path, default=None):

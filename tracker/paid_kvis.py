@@ -129,6 +129,23 @@ def _soft(warnings, what, fn, default):
         return default
 
 
+LIMIT_AUCTION = ("Auction insights are not available to this app: Google Ads refuses the auction insight metrics to its developer access, so competitors are not checked. "
+                 "The keywords are still followed week by week. The same metrics are in the Auction insights report in Google Ads.")
+
+
+def _auction(account_id, search, first, last, warnings, limits):
+    """The auction insights, or [] with a standing limit when Google refuses the metrics to this app's developer access (a 403 does not pass: asking again changes nothing), or a warning on any other failure."""
+    try:
+        return read_auction(search(account_id, GAQL_AUCTION % (first, last)))
+    except gads.GadsError as e:
+        if e.kind == "permission":
+            if LIMIT_AUCTION not in limits:
+                limits.append(LIMIT_AUCTION)
+            return []
+        warnings.append("The auction insights could not be read (%s), so that check was skipped." % e)
+        return []
+
+
 def _ids(keywords):
     return sorted({k["criterionId"] for k in keywords}, key=int)
 
@@ -152,10 +169,11 @@ def read_account(account_id, search, today=None):
     for k in keywords:
         k["rows"] = weeks.get(k["id"], [])
         k["qsWeeks"] = qs.get(k["id"], {})
-    auction = _soft(warnings, "The auction insights", lambda: read_auction(search(account_id, GAQL_AUCTION % (first, last))), [])
+    limits = []
+    auction = _auction(account_id, search, first, last, warnings, limits)
     names = {a["campaignId"]: a["campaign"] for a in auction}
     names.update({k["campaignId"]: k["campaign"] for k in keywords})
-    return {"keywords": keywords, "auction": auction, "brandIds": sorted(cid for cid, n in names.items() if bm.is_brand(n)), "today": today.isoformat(), "warnings": warnings}
+    return {"keywords": keywords, "auction": auction, "brandIds": sorted(cid for cid, n in names.items() if bm.is_brand(n)), "today": today.isoformat(), "warnings": warnings, "limits": limits}
 
 
 def google_raw(account, *, search_fn=None, workers=6, today=None):
@@ -177,7 +195,8 @@ def google_raw(account, *, search_fn=None, workers=6, today=None):
     many = bool(account.get("members"))
     return {"accounts": [dict(r, id=mem["id"], name=mem["name"], currency=mem.get("currency") or account.get("currency") or "USD", platform="google") for mem, r in ok],
             "warnings": ["%s could not be read: %s" % (mem["name"], e) for mem, r, e in done if e] + [("%s: %s" % (mem["name"], w)) if many else w for mem, r in ok for w in r["warnings"]],
-            "members": [mem["name"] for mem in members] if many else []}
+            "limits": sorted({x for mem, r in ok for x in r.get("limits") or []}),
+            "members": [mem["name"] for mem in members] if many else []}                  # every warning is up here, so a read that lost a part is not kept for hours (tracker/paid_geo.py _cached)
 
 
 # ── The report ──────────────────────────────────────────────────────────────
@@ -205,7 +224,7 @@ def assemble(raw, account, *, settings=None, now=None):
     return {
         "account": {"id": account["id"], "name": account["name"], "currency": account.get("currency") or "USD", "platform": "google", "isGroup": bool(account.get("members")),
                     "accountCount": len(account.get("members") or [])},
-        "generatedAt": now.isoformat(timespec="seconds"), "warnings": list(raw.get("warnings") or []), "accounts": accounts,
+        "generatedAt": now.isoformat(timespec="seconds"), "warnings": list(raw.get("warnings") or []), "limits": list(raw.get("limits") or []), "accounts": accounts,
         "rules": [{"rule": k, "label": math.RULES[k]["label"], "level": math.RULES[k]["level"], "fix": math.RULES[k]["fix"]} for k in math.ORDER],
         "minimums": {"eligible": math.MIN_ELIGIBLE, "topIs": int(math.DEFAULT_TOP_IS * 100), "qsMin": math.DEFAULT_QS_MIN, "topN": math.TOP_N, "weeks": math.WEEKS - 1},
         "summary": {"counts": counts, "accounts": len(accounts), "keywords": sum(a["keywords"] for a in accounts), "judged": sum(a["judged"] for a in accounts),

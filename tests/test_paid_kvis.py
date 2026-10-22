@@ -66,6 +66,8 @@ def searcher(top=None, weeks=None, qs=None, auction=None, log=None, fail=(), fai
                 raise gads.GadsError("api", "no history")
             return qs.get(cid, [])
         if "auction_insight_domain" in q:
+            if "auction403" in fail_kinds:
+                raise gads.GadsError("permission", "Google Ads answered 403: The developer doesn't have access to metrics: 'auction_insight_search_overlap_rate'.")
             if "auction" in fail_kinds:
                 raise gads.GadsError("api", "no auction insights")
             return auction.get(cid, [])
@@ -138,6 +140,16 @@ def test_a_keyword_with_no_weeks_is_still_there_and_the_soft_reads_say_when_they
     assert got["warnings"] == ["The Quality Score history could not be read (no history), so that check was skipped.", "The auction insights could not be read (no auction insights), so that check was skipped."]
     with pytest.raises(gads.GadsError):
         kv.read_account(ACCT["id"], searcher(fail=(ACCT["id"],)), TODAY)
+
+
+def test_auction_insights_google_refuses_to_this_app_are_a_standing_limit_not_a_failed_read():
+    got = kv.read_account(ACCT["id"], searcher(fail_kinds=("auction403",)), TODAY)
+    assert got["auction"] == [] and got["warnings"] == [] and got["limits"] == [kv.LIMIT_AUCTION]
+    assert kv.LIMIT_AUCTION.startswith("Auction insights are not available to this app") and "—" not in kv.LIMIT_AUCTION
+    other = kv.read_account(ACCT["id"], searcher(fail_kinds=("auction",)), TODAY)
+    assert other["limits"] == [] and other["warnings"] == ["The auction insights could not be read (no auction insights), so that check was skipped."]       # any other refusal is still a failed read
+    fine = kv.read_account(ACCT["id"], searcher(auction={ACCT["id"]: [auc_row()]}), TODAY)
+    assert fine["limits"] == [] and len(fine["auction"]) == 1
 
 
 # ── The report and its cache ────────────────────────────────────────────────
@@ -257,6 +269,13 @@ def test_a_read_that_lost_a_part_is_shown_with_the_account_name_and_not_saved_fo
     group = {"id": "mcc-9923720096-USD", "name": "Group", "currency": "USD", "accountIds": [ACCT["id"]]}
     many = kv.report_for(group["id"], accounts_fn=lambda: [ACCT], groups_fn=lambda: [group], search_fn=searcher(fail_kinds=("qs",)), today=TODAY, at=AT)
     assert many["warnings"] == ["Acme Dental: The Quality Score history could not be read (no history), so that check was skipped."]
+
+
+def test_the_limit_reaches_the_report_once_and_a_read_with_only_a_limit_is_saved_for_hours(cache):
+    group = {"id": "mcc-9923720096-USD", "name": "Group", "currency": "USD", "accountIds": [ACCT["id"], ACCT2["id"]]}
+    s = searcher(top={ACCT["id"]: [top_row()], ACCT2["id"]: [top_row()]}, weeks={ACCT["id"]: all_weeks(), ACCT2["id"]: all_weeks()}, fail_kinds=("auction403",))
+    rep = kv.report_for(group["id"], accounts_fn=lambda: [ACCT, ACCT2], groups_fn=lambda: [group], search_fn=s, today=TODAY, at=AT)
+    assert rep["limits"] == [kv.LIMIT_AUCTION] and rep["warnings"] == [] and len(cache) == 1                  # one limit for both accounts, and nothing to retry: the read is kept
 
 
 def test_a_meta_account_is_refused_and_so_is_one_that_is_not_position2s(cache):

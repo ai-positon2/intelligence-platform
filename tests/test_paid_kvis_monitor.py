@@ -178,6 +178,14 @@ def test_a_read_that_lost_a_part_is_not_checked_on_what_was_left_and_resolves_no
     assert r["resolved"] == 0 and r["read"] == 0
 
 
+def test_auction_insights_refused_to_the_app_do_not_make_an_account_unreadable_and_the_keywords_are_still_followed():
+    s, dv, w = configured(), Deliver(), World()
+    w.fail_kinds = ("auction403",)
+    w.top[A["id"]] = 0.3
+    r = run(s, w, dv)
+    assert r["unreadable"] == [] and r["read"] == 2 and [i["kind"] for i in s.issues_all("kvis")] == ["top_is_low"]
+
+
 def test_a_spent_quota_stops_the_accounts_after_the_first_and_says_so():
     s, dv, w = configured(), Deliver(), World()
     w.quota = True

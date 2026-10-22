@@ -149,6 +149,14 @@ def test_what_shows_only_across_the_keywords_is_said_in_sentences(reports):
     assert run("X.insights(R)", R=cut) == [{"kind": "tracked", "text": "The 25 highest-spend keywords of the 40 read are tracked; the number can be changed in the settings below."}]
 
 
+def test_a_standing_limit_is_said_first_and_replaces_the_per_account_line_about_competitors(reports):
+    limited = json.loads(json.dumps(reports["noauction"]))
+    limited["limits"] = ["Auction insights are not available to this app: reason."]
+    ins = run("X.insights(R)", R=limited)
+    assert ins[0] == {"kind": "limit", "text": "Auction insights are not available to this app: reason."} and [i["kind"] for i in ins] == ["limit", "data"]
+    assert run("X.insights(R)", R=reports["noauction"])[-1]["kind"] == "auction"
+
+
 def test_the_csv_has_one_line_per_finding_competitors_too_and_one_per_account_with_none(reports):
     rows = run("X.csvRows(R)", R=reports["mcc"])
     assert rows[0] == ["Keyword Visibility Tracker", "Group"] and rows[3] == run("X.HEAD") and len(rows[3]) == 9

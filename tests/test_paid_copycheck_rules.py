@@ -196,3 +196,39 @@ def test_check_ad_carries_the_slot_and_the_text_of_every_finding():
 
 def test_the_level_of_a_list_of_findings_is_the_highest():
     assert r.level_of([]) == "" and r.level_of([{"level": "low"}, {"level": "medium"}]) == "medium" and r.level_of([{"level": "low"}, {"level": "high"}, {"level": "medium"}]) == "high"
+
+
+# ── the real dictionary: how long a suggestion takes (found on the live platform) ───────────────────────────────────────────────────────────────────
+
+import time  # noqa: E402
+
+needs_dictionary = pytest.mark.skipif(r.SpellChecker is None, reason="pyspellchecker is not installed")
+
+
+@needs_dictionary
+def test_the_real_dictionary_looks_one_edit_away_so_a_suggestion_is_fast():
+    sp = r.Speller()
+    assert r.SPELL_DISTANCE == 1 and sp.inner.distance == 1
+    t0 = time.monotonic()
+    for w in ["workato", "integration", "automations", "dataweave", "hubspot", "salesforce", "orchestration", "interoperability", "tealium", "segmentation"] * 20:
+        sp.candidates(w + str(len(w)))
+        sp.correction(w)
+    assert time.monotonic() - t0 < 5.0                                                          # at two edits each word took 0.4 s: 200 lookups were 80 s
+
+
+@needs_dictionary
+def test_a_real_typo_still_gets_its_suggestion_and_a_product_name_two_edits_from_anything_gets_none():
+    sp = r.Speller()
+    assert sp.correction("recieve") == "receive" and "receive" in sp.candidates("recieve")
+    assert sp.correction("teh") == "the"
+    assert sp.correction("workato") in (None, "workato") and not [c for c in sp.candidates("workato") if c != "workato"]
+
+
+@needs_dictionary
+def test_a_page_of_ads_full_of_names_is_checked_in_seconds_not_minutes():
+    ctx = r.context(speller=r.Speller())
+    names = ["Workato", "Hubspot", "Snowflake", "Tealium", "Zendesk", "Marketo", "Okta", "Gainsight", "Segment", "Braze"]
+    t0 = time.monotonic()
+    for i in range(300):
+        r.check_text("Connect %s%d and %s%d with Workato automations today" % (names[i % 10], i, names[(i + 3) % 10], i), "headline", ctx)
+    assert time.monotonic() - t0 < 20.0
