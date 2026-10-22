@@ -52,8 +52,8 @@ SOURCE = {"campaign": "saved for this campaign", "account": "saved for the accou
 BLOCKED = {"NOT_ELIGIBLE", "MISCONFIGURED", "ENDED"}
 NOT_STARTED = {"PENDING"}
 OFF = {"PAUSED", "REMOVED"}
-HARD_REASONS = {"NO_ACTIVE_AD_GROUPS", "NO_ACTIVE_AD_GROUP_ADS", "BIDDING_STRATEGY_MISCONFIGURED", "MOST_ADS_UNDER_REVIEW", "HAS_ADS_DISAPPROVED"}
-REASON_TEXT = {"NO_ACTIVE_AD_GROUPS": "it has no live ad group", "NO_ACTIVE_AD_GROUP_ADS": "an ad group has no live ad", "BIDDING_STRATEGY_MISCONFIGURED": "its bid strategy is set up wrongly",
+HARD_REASONS = {"META_WITH_ISSUES", "NO_ACTIVE_AD_GROUPS", "NO_ACTIVE_AD_GROUP_ADS", "BIDDING_STRATEGY_MISCONFIGURED", "MOST_ADS_UNDER_REVIEW", "HAS_ADS_DISAPPROVED"}
+REASON_TEXT = {"META_WITH_ISSUES": "Meta reports issues with it (a rejected ad or a payment or account problem)", "NO_ACTIVE_AD_GROUPS": "it has no live ad group", "NO_ACTIVE_AD_GROUP_ADS": "an ad group has no live ad", "BIDDING_STRATEGY_MISCONFIGURED": "its bid strategy is set up wrongly",
                "MOST_ADS_UNDER_REVIEW": "most of its ads are under review", "HAS_ADS_DISAPPROVED": "some of its ads are disapproved", "AD_GROUPS_PAUSED": "its ad groups are paused",
                "BUDGET_CONSTRAINED": "it is limited by budget", "BIDDING_STRATEGY_CONSTRAINED": "its bid strategy is held back by its own settings", "BIDDING_STRATEGY_LEARNING": "its bid strategy is learning",
                "BIDDING_STRATEGY_PENDING": "a bid strategy change is not in effect yet", "HAS_ADS_LIMITED_BY_POLICY": "some of its ads are limited by policy", "SEARCH_VOLUME_LIMITED": "few searches match its keywords"}
