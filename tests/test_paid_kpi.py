@@ -25,7 +25,7 @@ ACCT2 = {"id": "2222222222", "name": "Beta Clinic", "currency": "USD"}
 
 def camp_row(i="5", name="Search Core", channel="SEARCH", status="ELIGIBLE", reasons=(), system="ENABLED", strategy="TARGET_CPA", **kw):
     c = {"id": i, "name": name, "advertisingChannelType": channel, "primaryStatus": status, "primaryStatusReasons": list(reasons), "biddingStrategySystemStatus": system,
-         "biddingStrategyType": strategy, "startDate": "2026-01-01"}
+         "biddingStrategyType": strategy, "startDateTime": "2026-01-01 00:00:00"}
     c.update(kw)
     return {"campaign": c}
 

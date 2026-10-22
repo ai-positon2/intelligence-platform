@@ -143,8 +143,8 @@ def test_schedules_devices_groups_and_keywords():
 def test_meta_ad_sets_become_campaigns_with_locations_and_the_travel_option():
     rows = [{"id": "77", "name": "Quincy adset", "campaign": {"id": "9", "name": "Leads"},
              "targeting": {"geo_locations": {"countries": ["US"], "regions": [{"name": "Massachusetts", "country": "US"}], "cities": [{"name": "Quincy", "region": "Massachusetts", "country": "US", "radius": 10, "distance_unit": "mile"}],
-                                             "zips": [{"name": "02169"}], "custom_locations": [{"name": "Clinic", "radius": 3}]},
-                           "excluded_geo_locations": {"cities": [{"name": "Boston", "region": "Massachusetts", "country": "US"}]}, "location_types": ["home", "recent", "travel_in"]}},
+                                             "zips": [{"name": "02169"}], "custom_locations": [{"name": "Clinic", "radius": 3}], "location_types": ["home", "recent", "travel_in"]},
+                           "excluded_geo_locations": {"cities": [{"name": "Boston", "region": "Massachusetts", "country": "US"}]}}},
             {"id": "78", "name": "Plain", "targeting": {}}, {"name": "no id"}]
     camps, locs = g.read_meta_adsets(rows)
     assert camps == [{"id": "77", "name": "Quincy adset", "channel": "META", "positive": "TRAVEL_IN", "negative": "", "metaCampaign": "Leads", "metaCampaignId": "9"},
@@ -269,8 +269,8 @@ def test_an_account_that_cannot_be_read_is_named_and_all_failing_is_raised(cache
 
 
 def test_a_report_for_a_meta_account_reads_the_ad_sets_and_their_ads(cache):
-    adsets = [{"id": "77", "name": "Quincy adset", "campaign": {"id": "9", "name": "Dover Leads"}, "targeting": {"geo_locations": {"cities": [{"name": "Quincy", "region": "Massachusetts", "country": "US"}]},
-                                                                                                             "location_types": ["home", "recent", "travel_in"]}},
+    adsets = [{"id": "77", "name": "Quincy adset", "campaign": {"id": "9", "name": "Dover Leads"}, "targeting": {"geo_locations": {"cities": [{"name": "Quincy", "region": "Massachusetts", "country": "US"}],
+                                                                                                                                    "location_types": ["home", "recent", "travel_in"]}}},
               {"id": "78", "name": "Dover adset", "campaign": {"id": "10", "name": "Dover B"}, "targeting": {"geo_locations": {"cities": [{"name": "Dover", "region": "New Hampshire", "country": "US"}]}}}]
     ads = [{"id": "500", "campaign": {"id": "9", "name": "Dover Leads"}, "adset": {"id": "77", "name": "Quincy adset"}, "creative": {"body": "Dentist in Quincy", "title": "Book now"}}]
 

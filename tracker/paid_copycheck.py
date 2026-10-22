@@ -44,9 +44,9 @@ GAQL_PMAX = ("SELECT campaign.id, campaign.name, asset_group.id, asset_group.nam
              "AND asset_group_asset.field_type IN ('HEADLINE', 'LONG_HEADLINE', 'DESCRIPTION')")
 _ASSET_FIELDS = ("asset.id, asset.type, asset.sitelink_asset.link_text, asset.sitelink_asset.description1, asset.sitelink_asset.description2, asset.callout_asset.callout_text, "
                  "asset.structured_snippet_asset.header, asset.structured_snippet_asset.values")
-GAQL_CAMPAIGN_ASSETS = ("SELECT campaign.id, campaign.name, campaign_asset.field_type, %s FROM campaign_asset WHERE campaign.status = ENABLED AND campaign_asset.status = ENABLED "
+GAQL_CAMPAIGN_ASSETS = ("SELECT campaign.id, campaign.name, campaign.status, campaign_asset.status, campaign_asset.field_type, %s FROM campaign_asset WHERE campaign.status = ENABLED AND campaign_asset.status = ENABLED "
                         "AND campaign_asset.field_type IN ('SITELINK', 'CALLOUT', 'STRUCTURED_SNIPPET')" % _ASSET_FIELDS)
-GAQL_CUSTOMER_ASSETS = ("SELECT customer_asset.field_type, %s FROM customer_asset WHERE customer_asset.status = ENABLED "
+GAQL_CUSTOMER_ASSETS = ("SELECT customer_asset.status, customer_asset.field_type, %s FROM customer_asset WHERE customer_asset.status = ENABLED "
                         "AND customer_asset.field_type IN ('SITELINK', 'CALLOUT', 'STRUCTURED_SNIPPET')" % _ASSET_FIELDS)
 
 META_ADS_FIELDS = ("id,name,effective_status,adset{id,name},campaign{id,name},creative{title,body,link_url,object_story_spec,asset_feed_spec}")

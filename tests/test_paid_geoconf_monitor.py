@@ -164,8 +164,8 @@ def test_an_account_whose_place_names_could_not_be_read_is_unreadable_not_clean(
 def test_a_spent_quota_stops_the_google_accounts_after_the_first_and_says_so_but_meta_is_still_read():
     s, dv, w = configured(), Deliver(), World()
     w.quota = True
-    w.meta_adsets = [{"id": "77", "name": "Quincy adset", "campaign": {"id": "9", "name": "Leads"}, "targeting": {"geo_locations": {"cities": [{"name": "Quincy", "region": "Massachusetts", "country": "US"}]},
-                                                                                                                   "location_types": ["home", "recent", "travel_in"]}}]
+    w.meta_adsets = [{"id": "77", "name": "Quincy adset", "campaign": {"id": "9", "name": "Leads"}, "targeting": {"geo_locations": {"cities": [{"name": "Quincy", "region": "Massachusetts", "country": "US"}],
+                                                                                                                                  "location_types": ["home", "recent", "travel_in"]}}}]
     r = run(s, w, dv, accounts=(A, B, M), workers=1)
     assert [u["accountId"] for u in r["unreadable"]] == [A["id"], B["id"]] and r["unreadable"][1]["error"].startswith("The Google Ads daily read budget was used up") and r["read"] == 1
     assert [(i["accountId"], i["kind"]) for i in s.issues_all("geoconf")] == [("act_1234567", "setting")] and s.issues_all("geoconf")[0]["platform"] == "meta"

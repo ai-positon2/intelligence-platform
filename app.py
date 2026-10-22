@@ -5343,6 +5343,8 @@ def paid_brandis_report():
         return jsonify(error=str(e)), 400
     except paid_gads_base.RefreshTooSoon as e:
         return jsonify(error=str(e), kind="cooldown", retryIn=e.retry_in), 429
+    except paid_gads_base.AdsError as e:                                                   # Meta answered with an error (a Meta read raises the platform's AdsError)
+        return jsonify(error=str(e), kind="meta"), 502
     except paid_gads.GadsError as e:
         return _pm_gads_error(e)
 
@@ -5360,6 +5362,8 @@ def paid_brandis_diagnose():
         return jsonify(error=str(e)), 400
     except paid_gads_base.RefreshTooSoon as e:
         return jsonify(error=str(e), kind="cooldown", retryIn=e.retry_in), 429
+    except paid_gads_base.AdsError as e:                                                   # Meta answered with an error (a Meta read raises the platform's AdsError)
+        return jsonify(error=str(e), kind="meta"), 502
     except paid_gads.GadsError as e:
         return _pm_gads_error(e)
 
@@ -5547,6 +5551,8 @@ def paid_brandspend_report():
         return jsonify(error=str(e)), 400
     except paid_gads_base.RefreshTooSoon as e:
         return jsonify(error=str(e), kind="cooldown", retryIn=e.retry_in), 429
+    except paid_gads_base.AdsError as e:                                                   # Meta answered with an error (a Meta read raises the platform's AdsError)
+        return jsonify(error=str(e), kind="meta"), 502
     except paid_gads.GadsError as e:
         return _pm_gads_error(e)
 
@@ -5574,6 +5580,8 @@ def paid_disapproved_report():
         return jsonify(error=str(e)), 400
     except paid_gads_base.RefreshTooSoon as e:
         return jsonify(error=str(e), kind="cooldown", retryIn=e.retry_in), 429
+    except paid_gads_base.AdsError as e:                                                   # Meta answered with an error (a Meta read raises the platform's AdsError)
+        return jsonify(error=str(e), kind="meta"), 502
     except paid_gads.GadsError as e:
         return _pm_gads_error(e)
 
@@ -5602,6 +5610,8 @@ def paid_copycheck_report():
         return jsonify(error=str(e)), 400
     except paid_gads_base.RefreshTooSoon as e:
         return jsonify(error=str(e), kind="cooldown", retryIn=e.retry_in), 429
+    except paid_gads_base.AdsError as e:                                                   # Meta answered with an error (a Meta read raises the platform's AdsError)
+        return jsonify(error=str(e), kind="meta"), 502
     except paid_gads.GadsError as e:
         return _pm_gads_error(e)
 
@@ -5630,6 +5640,8 @@ def paid_anomaly_report():
         return jsonify(error=str(e)), 400
     except paid_gads_base.RefreshTooSoon as e:
         return jsonify(error=str(e), kind="cooldown", retryIn=e.retry_in), 429
+    except paid_gads_base.AdsError as e:                                                   # Meta answered with an error (a Meta read raises the platform's AdsError)
+        return jsonify(error=str(e), kind="meta"), 502
     except paid_gads.GadsError as e:
         return _pm_gads_error(e)
     except paid_gads_base.AdsError as e:
@@ -5763,6 +5775,8 @@ def paid_geoconf_report():
         return jsonify(error=str(e)), 400
     except paid_gads_base.RefreshTooSoon as e:
         return jsonify(error=str(e), kind="cooldown", retryIn=e.retry_in), 429
+    except paid_gads_base.AdsError as e:                                                   # Meta answered with an error (a Meta read raises the platform's AdsError)
+        return jsonify(error=str(e), kind="meta"), 502
     except paid_gads.GadsError as e:
         return _pm_gads_error(e)
 
@@ -5824,6 +5838,8 @@ def paid_kpi_report():
         return jsonify(error=str(e)), 400
     except paid_gads_base.RefreshTooSoon as e:
         return jsonify(error=str(e), kind="cooldown", retryIn=e.retry_in), 429
+    except paid_gads_base.AdsError as e:                                                   # Meta answered with an error (a Meta read raises the platform's AdsError)
+        return jsonify(error=str(e), kind="meta"), 502
     except paid_gads.GadsError as e:
         return _pm_gads_error(e)
 
@@ -5896,6 +5912,8 @@ def paid_kvis_report():
         return jsonify(error=str(e)), 400
     except paid_gads_base.RefreshTooSoon as e:
         return jsonify(error=str(e), kind="cooldown", retryIn=e.retry_in), 429
+    except paid_gads_base.AdsError as e:                                                   # Meta answered with an error (a Meta read raises the platform's AdsError)
+        return jsonify(error=str(e), kind="meta"), 502
     except paid_gads.GadsError as e:
         return _pm_gads_error(e)
 
@@ -5932,6 +5950,26 @@ def paid_kvis_settings_account():
 @position2_required
 def paid_kvis_settings_ignore():
     return _kv_save(lambda st, store, body: {"account": st.add_ignore(store, body.get("account"), body.get("domains"), _pm_user_email())})
+
+
+@app.route("/p2/paid-marketing/api/query-check")
+@admin_required
+def paid_query_check():
+    """Send every query of the recent agents (Brand IS Monitor to Keyword Visibility) to one real account with the rows cut to one, and say which ones the platform refuses and why.
+    ?account=<Google customer id> and/or ?meta=<act_ id>. Read only; a few dozen reads of the shared Google allowance, so it is an admin's check, not a page."""
+    from tracker import paid_gaql_check as qc, paid_meta, paid_store
+    out = {}
+    acct = re.sub(r"\D", "", str(request.args.get("account") or ""))
+    if acct:
+        out["google"] = {"account": acct, "results": qc.check_google(acct)}
+    meta = paid_meta.norm_id(request.args.get("meta") or "")
+    if meta:
+        out["meta"] = {"account": meta, "results": qc.check_meta(meta, pages_fn=lambda path, params: paid_meta._pages(path, params, paid_store))}
+    if not out:
+        return jsonify(error="Give ?account=<Google customer id> and/or ?meta=<act_ id>."), 400
+    for part in out.values():
+        part["failed"] = [r for r in part["results"] if not r["ok"]]
+    return jsonify(out)
 
 
 @app.route("/p2/paid-marketing/api/adstrength/suggest", methods=["POST"])
@@ -5982,6 +6020,8 @@ def paid_audiences_report():
         return jsonify(error=str(e)), 400
     except paid_gads_base.RefreshTooSoon as e:
         return jsonify(error=str(e), kind="cooldown", retryIn=e.retry_in), 429
+    except paid_gads_base.AdsError as e:                                                   # Meta answered with an error (a Meta read raises the platform's AdsError)
+        return jsonify(error=str(e), kind="meta"), 502
     except paid_gads.GadsError as e:
         return _pm_gads_error(e)
 
@@ -6007,6 +6047,8 @@ def _paid_assets_answer(make):
         return jsonify(error=str(e)), 400
     except paid_gads_base.RefreshTooSoon as e:
         return jsonify(error=str(e), kind="cooldown", retryIn=e.retry_in), 429
+    except paid_gads_base.AdsError as e:                                                   # Meta answered with an error (a Meta read raises the platform's AdsError)
+        return jsonify(error=str(e), kind="meta"), 502
     except paid_gads.GadsError as e:
         return _pm_gads_error(e)
 
@@ -6059,6 +6101,8 @@ def _paid_audit_answer(make):
         return _pm_store_error(e)
     except paid_gads_base.RefreshTooSoon as e:
         return jsonify(error=str(e), kind="cooldown", retryIn=e.retry_in), 429
+    except paid_gads_base.AdsError as e:                                                   # Meta answered with an error (a Meta read raises the platform's AdsError)
+        return jsonify(error=str(e), kind="meta"), 502
     except paid_gads.GadsError as e:
         return _pm_gads_error(e)
 
@@ -6177,6 +6221,8 @@ def paid_audit_download():
         return jsonify(error=str(e)), 400
     except paid_gads_base.RefreshTooSoon as e:
         return jsonify(error=str(e), kind="cooldown", retryIn=e.retry_in), 429
+    except paid_gads_base.AdsError as e:                                                   # Meta answered with an error (a Meta read raises the platform's AdsError)
+        return jsonify(error=str(e), kind="meta"), 502
     except paid_gads.GadsError as e:
         return _pm_gads_error(e)
     try:
@@ -6216,6 +6262,8 @@ def paid_lp_report():
         return jsonify(error=str(e)), 400
     except paid_gads_base.RefreshTooSoon as e:
         return jsonify(error=str(e), kind="cooldown", retryIn=e.retry_in), 429
+    except paid_gads_base.AdsError as e:                                                   # Meta answered with an error (a Meta read raises the platform's AdsError)
+        return jsonify(error=str(e), kind="meta"), 502
     except paid_gads.GadsError as e:
         return _pm_gads_error(e)
 
@@ -6281,6 +6329,8 @@ def paid_lp_read_page():
         return jsonify(error=str(e)), 400
     except paid_gads_base.RefreshTooSoon as e:
         return jsonify(error=str(e), kind="cooldown", retryIn=e.retry_in), 429
+    except paid_gads_base.AdsError as e:                                                   # Meta answered with an error (a Meta read raises the platform's AdsError)
+        return jsonify(error=str(e), kind="meta"), 502
     except paid_gads.GadsError as e:
         return _pm_gads_error(e)
 
@@ -6303,6 +6353,8 @@ def paid_lp_download():
         return jsonify(error=str(e)), 400
     except paid_gads_base.RefreshTooSoon as e:
         return jsonify(error=str(e), kind="cooldown", retryIn=e.retry_in), 429
+    except paid_gads_base.AdsError as e:                                                   # Meta answered with an error (a Meta read raises the platform's AdsError)
+        return jsonify(error=str(e), kind="meta"), 502
     except paid_gads.GadsError as e:
         return _pm_gads_error(e)
     try:
@@ -6341,6 +6393,8 @@ def paid_exp_report():
         return jsonify(error=str(e)), 400
     except paid_gads_base.RefreshTooSoon as e:
         return jsonify(error=str(e), kind="cooldown", retryIn=e.retry_in), 429
+    except paid_gads_base.AdsError as e:                                                   # Meta answered with an error (a Meta read raises the platform's AdsError)
+        return jsonify(error=str(e), kind="meta"), 502
     except paid_gads.GadsError as e:
         return _pm_gads_error(e)
 
@@ -6363,6 +6417,8 @@ def paid_exp_download():
         return jsonify(error=str(e)), 400
     except paid_gads_base.RefreshTooSoon as e:
         return jsonify(error=str(e), kind="cooldown", retryIn=e.retry_in), 429
+    except paid_gads_base.AdsError as e:                                                   # Meta answered with an error (a Meta read raises the platform's AdsError)
+        return jsonify(error=str(e), kind="meta"), 502
     except paid_gads.GadsError as e:
         return _pm_gads_error(e)
     try:

@@ -44,9 +44,16 @@ GAQL_GROUPS = "SELECT campaign.id, ad_group.id, ad_group.name FROM ad_group WHER
 GAQL_KEYWORDS = ("SELECT campaign.id, ad_group.id, ad_group.name, ad_group_criterion.keyword.text FROM ad_group_criterion WHERE campaign.status = ENABLED AND ad_group.status = ENABLED "
                  "AND ad_group_criterion.status = ENABLED AND ad_group_criterion.type = KEYWORD AND ad_group_criterion.negative = FALSE LIMIT %d" % MAX_KEYWORDS)
 
-META_ADSETS_FIELDS = "id,name,effective_status,campaign{id,name},targeting{geo_locations,excluded_geo_locations,location_types}"
+META_ADSETS_FIELDS = "id,name,effective_status,campaign{id,name},targeting{geo_locations,excluded_geo_locations}"
 _MINUTE = {"ZERO": 0.0, "FIFTEEN": 0.25, "THIRTY": 0.5, "FORTY_FIVE": 0.75}
 _COUNTRY = {"US": "United States", "CA": "Canada", "GB": "United Kingdom", "AU": "Australia", "IN": "India", "MX": "Mexico"}
+
+
+def _num(v):
+    try:
+        return float(v)
+    except (TypeError, ValueError):
+        return 0.0
 
 
 def _get(row, *path, default=None):
@@ -169,7 +176,7 @@ def read_meta_adsets(rows):
         if not sid:
             continue
         tg = r.get("targeting") or {}
-        types = tg.get("location_types") or []
+        types = (tg.get("geo_locations") or {}).get("location_types") or []                     # Meta keeps the option inside geo_locations, not beside it
         camps.append({"id": sid, "name": r.get("name") or "", "channel": "META", "positive": "TRAVEL_IN" if "travel_in" in types else "PRESENCE", "negative": "",
                       "metaCampaign": (r.get("campaign") or {}).get("name") or "", "metaCampaignId": str((r.get("campaign") or {}).get("id") or "")})
         for key, negative in (("geo_locations", False), ("excluded_geo_locations", True)):
@@ -181,7 +188,7 @@ def read_meta_adsets(rows):
                 locs.append({"campaignId": sid, "negative": negative, "kind": "location", "name": reg.get("name") or "", "targetType": "State", "city": "",
                              "canonical": ",".join(x for x in (reg.get("name"), _COUNTRY.get(str(reg.get("country") or "").upper(), reg.get("country"))) if x)})
             for city in geo.get("cities") or []:
-                radius = city.get("radius")
+                radius = _num(city.get("radius"))
                 locs.append({"campaignId": sid, "negative": negative, "kind": "location", "name": city.get("name") or "", "targetType": "City", "city": "",
                              "canonical": ",".join(x for x in (city.get("name"), city.get("region"), _COUNTRY.get(str(city.get("country") or "").upper(), city.get("country"))) if x),
                              "radiusText": ("%g %s" % (radius, city.get("distance_unit") or "miles")) if radius else ""})
@@ -189,7 +196,7 @@ def read_meta_adsets(rows):
                 locs.append({"campaignId": sid, "negative": negative, "kind": "location", "name": z.get("name") or z.get("key") or "", "canonical": "", "targetType": "Postal Code", "city": ""})
             for cl in geo.get("custom_locations") or []:
                 locs.append({"campaignId": sid, "negative": negative, "kind": "proximity", "name": cl.get("name") or cl.get("address_string") or "", "city": "", "canonical": "",
-                             "targetType": "Proximity", "radiusText": ("%g %s" % (cl["radius"], cl.get("distance_unit") or "miles")) if cl.get("radius") else "radius"})
+                             "targetType": "Proximity", "radiusText": ("%g %s" % (_num(cl.get("radius")), cl.get("distance_unit") or "miles")) if _num(cl.get("radius")) else "radius"})
     return camps, locs
 
 

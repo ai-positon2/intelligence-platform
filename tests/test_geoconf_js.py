@@ -63,7 +63,7 @@ def reports():
            "mcc": report(GROUP, TG.searcher(camps=camps, locs=locs, extra=EXTRA)),
            "clean": report(TG.ACCT2["id"], TG.searcher(camps=camps, locs=locs)),
            "nonames": report(TG.ACCT2["id"], TG.searcher(camps=camps, locs=locs, fail_kinds=("names",)))}
-    adsets = [{"id": "77", "name": "Quincy adset", "campaign": {"id": "9", "name": "Dover Leads"}, "targeting": {"geo_locations": {"cities": [{"name": "Quincy", "region": "Massachusetts", "country": "US"}]}, "location_types": ["home", "travel_in"]}},
+    adsets = [{"id": "77", "name": "Quincy adset", "campaign": {"id": "9", "name": "Dover Leads"}, "targeting": {"geo_locations": {"cities": [{"name": "Quincy", "region": "Massachusetts", "country": "US"}], "location_types": ["home", "travel_in"]}}},
               {"id": "78", "name": "Dover adset", "campaign": {"id": "10", "name": "B"}, "targeting": {"geo_locations": {"cities": [{"name": "Dover", "region": "New Hampshire", "country": "US"}]}}}]
     ads = [{"id": "500", "campaign": {"id": "9", "name": "Dover Leads"}, "adset": {"id": "77", "name": "Quincy adset"}, "creative": {"body": "Dentist in Quincy"}}]
     out["meta"] = report("act_1234567", TG.searcher(), meta_pages_fn=lambda path, params: adsets if path.endswith("/adsets") else ads, meta_account_fn=lambda act: {"name": "Beta Meta", "currency": "EUR"})

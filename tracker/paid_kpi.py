@@ -30,7 +30,7 @@ AGENT = "kpi"
 
 GAQL_CAMPAIGNS = ("SELECT campaign.id, campaign.name, campaign.advertising_channel_type, campaign.primary_status, campaign.primary_status_reasons, campaign.bidding_strategy_system_status, "
                   "campaign.bidding_strategy_type, campaign.target_cpa.target_cpa_micros, campaign.maximize_conversions.target_cpa_micros, campaign.target_roas.target_roas, "
-                  "campaign.maximize_conversion_value.target_roas, campaign.start_date FROM campaign WHERE campaign.status = ENABLED")
+                  "campaign.maximize_conversion_value.target_roas, campaign.start_date_time FROM campaign WHERE campaign.status = ENABLED")
 GAQL_DAYS = ("SELECT customer.time_zone, campaign.id, segments.date, metrics.impressions, metrics.clicks, metrics.cost_micros, metrics.conversions, metrics.conversions_value FROM campaign "
              "WHERE campaign.status = ENABLED AND segments.date BETWEEN '%s' AND '%s'")
 GAQL_LOST = ("SELECT campaign.id, metrics.search_budget_lost_impression_share FROM campaign WHERE campaign.status = ENABLED AND segments.date BETWEEN '%s' AND '%s'")
@@ -70,7 +70,7 @@ def read_campaigns(rows):
         roas = _num(_get(c, "targetRoas", "targetRoas")) or _num(_get(c, "maximizeConversionValue", "targetRoas"))
         out.append({"id": cid, "name": c.get("name") or cid, "channel": c.get("advertisingChannelType") or "", "primaryStatus": c.get("primaryStatus") or "",
                     "reasons": [str(x) for x in c.get("primaryStatusReasons") or []], "systemStatus": c.get("biddingStrategySystemStatus") or "", "strategy": c.get("biddingStrategyType") or "",
-                    "targetCpa": round(micros / 1e6, 4) if micros else None, "targetRoas": round(roas, 4) if roas else None, "startDate": c.get("startDate") or ""})
+                    "targetCpa": round(micros / 1e6, 4) if micros else None, "targetRoas": round(roas, 4) if roas else None, "startDate": str(c.get("startDateTime") or "")[:10]})
     return out
 
 

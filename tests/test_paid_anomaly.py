@@ -39,10 +39,10 @@ def camps(spike=True):
     out = []
     for n in range(1, 15):
         d = (TODAY - dt.timedelta(days=n)).isoformat()
-        out += [{"campaign": {"id": "1", "name": "Brand", "startDate": "2020-01-01"}, "segments": {"date": d}, "metrics": {"costMicros": str(100 * 10 ** 6)}},
-                {"campaign": {"id": "2", "name": "Generic", "startDate": "2020-01-01"}, "segments": {"date": d}, "metrics": {"costMicros": str(140 * 10 ** 6)}}]
-    out += [{"campaign": {"id": "1", "name": "Brand", "startDate": "2020-01-01"}, "segments": {"date": TODAY.isoformat()}, "metrics": {"costMicros": str(50 * 10 ** 6)}},
-            {"campaign": {"id": "2", "name": "Generic", "startDate": "2020-01-01"}, "segments": {"date": TODAY.isoformat()}, "metrics": {"costMicros": str((520 if spike else 70) * 10 ** 6)}}]
+        out += [{"campaign": {"id": "1", "name": "Brand", "startDateTime": "2020-01-01 00:00:00"}, "segments": {"date": d}, "metrics": {"costMicros": str(100 * 10 ** 6)}},
+                {"campaign": {"id": "2", "name": "Generic", "startDateTime": "2020-01-01 00:00:00"}, "segments": {"date": d}, "metrics": {"costMicros": str(140 * 10 ** 6)}}]
+    out += [{"campaign": {"id": "1", "name": "Brand", "startDateTime": "2020-01-01 00:00:00"}, "segments": {"date": TODAY.isoformat()}, "metrics": {"costMicros": str(50 * 10 ** 6)}},
+            {"campaign": {"id": "2", "name": "Generic", "startDateTime": "2020-01-01 00:00:00"}, "segments": {"date": TODAY.isoformat()}, "metrics": {"costMicros": str((520 if spike else 70) * 10 ** 6)}}]
     return out
 
 
@@ -107,7 +107,7 @@ def test_the_daily_form_has_no_hours():
 
 
 def test_campaign_days_keep_the_start_date_and_leave_out_a_day_without_cost():
-    rows = an.parse_campaign_days([{"campaign": {"id": 7, "name": "X", "startDate": "2026-10-20"}, "segments": {"date": "2026-10-21"}, "metrics": {"costMicros": "2500000"}},
+    rows = an.parse_campaign_days([{"campaign": {"id": 7, "name": "X", "startDateTime": "2026-10-20 00:00:00"}, "segments": {"date": "2026-10-21"}, "metrics": {"costMicros": "2500000"}},
                                    {"campaign": {"id": 8}, "segments": {"date": "2026-10-21"}, "metrics": {"costMicros": "0"}}, {"segments": {"date": "2026-10-21"}, "metrics": {"costMicros": "1"}}])
     assert rows == [{"id": "7", "name": "X", "date": "2026-10-21", "cost": 2.5, "startDate": "2026-10-20"}]
 

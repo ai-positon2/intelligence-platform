@@ -38,7 +38,7 @@ EXTRA_LEVELS = ("low", "medium", "high")
 
 GAQL_HOURLY = "SELECT customer.time_zone, segments.date, segments.hour, metrics.cost_micros FROM customer WHERE segments.date BETWEEN '%s' AND '%s'"
 GAQL_DAILY = "SELECT customer.time_zone, segments.date, metrics.cost_micros FROM customer WHERE segments.date BETWEEN '%s' AND '%s'"
-GAQL_CAMPAIGN_DAYS = ("SELECT campaign.id, campaign.name, campaign.start_date, segments.date, metrics.cost_micros FROM campaign "
+GAQL_CAMPAIGN_DAYS = ("SELECT campaign.id, campaign.name, campaign.start_date_time, segments.date, metrics.cost_micros FROM campaign "
                       "WHERE segments.date BETWEEN '%s' AND '%s' AND metrics.cost_micros > 0")
 GAQL_BUDGETS = ("SELECT campaign.id, campaign_budget.id, campaign_budget.amount_micros, campaign_budget.explicitly_shared FROM campaign "
                 "WHERE campaign.status = 'ENABLED'")
@@ -76,7 +76,7 @@ def parse_campaign_days(api_rows):
         c, mt = r.get("campaign") or {}, r.get("metrics") or {}
         day, micros = str((r.get("segments") or {}).get("date") or ""), _num(mt.get("costMicros"))
         if c.get("id") and day and micros:
-            out.append({"id": str(c["id"]), "name": c.get("name") or str(c["id"]), "date": day, "cost": round(micros / 1e6, 4), "startDate": str(c.get("startDate") or "")})
+            out.append({"id": str(c["id"]), "name": c.get("name") or str(c["id"]), "date": day, "cost": round(micros / 1e6, 4), "startDate": str(c.get("startDateTime") or "")[:10]})
     return out
 
 
