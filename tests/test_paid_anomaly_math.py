@@ -371,7 +371,7 @@ def test_the_cause_is_the_one_campaign_that_spent_the_excess():
 def test_a_new_campaign_is_named_as_new():
     rows = usual_camps() + [camp("1", "Brand", TODAY, 100), camp("2", "Generic", TODAY, 140), camp("3", "Black Friday", TODAY, 400, start="2026-10-21")]
     c = m.cause_for(TODAY, rows, [TODAY - dt.timedelta(days=n) for n in range(1, 15)])
-    assert c["kind"] == "new" and c["text"] == "A campaign started on 2026-10-21 did it: \"Black Friday\" spent $400 (100% of the excess)."
+    assert c["kind"] == "new" and c["text"] == "A campaign started on 2026-10-21 is part of it: \"Black Friday\" spent $400 (100% of the excess)."
 
 
 def test_an_old_campaign_is_not_new_and_a_bad_start_date_is_ignored():

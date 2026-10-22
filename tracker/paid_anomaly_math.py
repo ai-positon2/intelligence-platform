@@ -184,7 +184,7 @@ def cause_for(date, campaign_rows, refs, currency="USD"):
     fresh = [x for x in movers if _recent(x["startDate"], date) and x["share"] >= 0.25]
     if fresh:
         x = fresh[0]
-        return {"kind": "new", "movers": movers, "text": "A campaign started on %s did it: \"%s\" spent %s (%d%% of the excess)." % (x["startDate"], x["name"], money(x["cost"], currency), round(x["share"] * 100))}
+        return {"kind": "new", "movers": movers, "text": "A campaign started on %s is part of it: \"%s\" spent %s (%d%% of the excess)." % (x["startDate"], x["name"], money(x["cost"], currency), round(x["share"] * 100))}
     if top["share"] >= CAUSE_SHARE:
         return {"kind": "one", "movers": movers, "text": "%d%% of the excess is one campaign: \"%s\" spent %s against a usual %s." % (round(top["share"] * 100), top["name"], money(top["cost"], currency), money(top["usual"], currency))}
     return {"kind": "many", "movers": movers, "text": "It is spread over campaigns: %s." % "; ".join("\"%s\" %s (usual %s)" % (x["name"], money(x["cost"], currency), money(x["usual"], currency)) for x in movers)}

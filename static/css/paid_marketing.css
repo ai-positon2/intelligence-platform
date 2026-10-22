@@ -1659,3 +1659,38 @@ tr.ud-dismissed td,tr.ud-gone td{opacity:.62}
   --thumb:linear-gradient(135deg,#06202a 0%,#1a0f2e 100%);
   --icon-glow:rgba(6,182,212,.5);--card-border:rgba(6,182,212,.35);
   --card-glow:0 0 40px rgba(6,182,212,.10);--arrow-color:#a5f3fc}
+
+/* Spend Anomaly Alert: the Disapproved Ads Tracker's pieces (.bi-*, .bs-fig, .da-cmd-row) and the Ad Copy Checker's form with their own accent, a finding with the campaigns that moved, and two charts */
+.pm.pm-sa{--pm-a:#f59e0b;--pm-a2:#ef4444}
+[data-theme="light"] .pm.pm-sa{--pm-a:#b45309}
+.sa-fs{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:minmax(0,1fr);gap:10px}
+.sa-f{min-width:0;border:1px solid var(--pm-line,rgba(255,255,255,.1));border-left:3px solid var(--pm-line2,rgba(148,163,184,.5));border-radius:10px;padding:10px 12px}
+.sa-f.lv-high{border-left-color:var(--bad,#f43f5e)}
+.sa-f.lv-medium{border-left-color:var(--over,#f59e0b)}
+.sa-f.lv-low{border-left-color:var(--under,#94a3b8)}
+.sa-f-h{display:flex;flex-wrap:wrap;gap:8px;align-items:baseline}
+.sa-f-d{margin:6px 0 4px;font-size:13.5px;line-height:1.55;overflow-wrap:anywhere}
+.sa-acts{margin:6px 0 4px;padding-left:18px;display:grid;gap:5px;font-size:13px;line-height:1.5}
+.sa-chart{width:100%;height:auto;display:block;overflow:visible}
+.sa-chart .sa-grid{stroke:var(--pm-line2,rgba(148,163,184,.3));stroke-dasharray:2 4}
+.sa-chart .sa-lbl{font:500 10.5px 'Space Grotesk',sans-serif;fill:var(--pm-faint,#94a3b8)}
+.sa-chart .sa-usual{stroke:var(--pm-muted,#94a3b8);stroke-width:2;stroke-dasharray:6 4}
+.sa-chart .sa-upper{stroke:var(--pm-faint,#94a3b8);stroke-width:1.2;opacity:.6}
+.sa-chart .sa-today{stroke:var(--pm-a);stroke-width:2.8;stroke-linejoin:round;stroke-linecap:round;filter:drop-shadow(0 0 8px var(--pm-a-g,rgba(245,158,11,.4)))}
+.sa-chart .sa-dot{fill:var(--pm-a)}
+.sa-chart .sa-now{stroke:var(--pm-line2,rgba(148,163,184,.4));stroke-dasharray:2 3}
+.sa-chart .sa-bar{fill:var(--pm-a);opacity:.85}
+.sa-chart .sa-bar.partial{opacity:.45;stroke:var(--pm-a);stroke-dasharray:3 2}
+.sa-chart .sa-usual-l{stroke:var(--pm-muted,#94a3b8);stroke-width:1.5;stroke-dasharray:6 4}
+.sa-k-today{background:var(--pm-a)}
+.sa-k-usual{background:var(--pm-muted,#94a3b8)}
+.sa-k-upper{background:var(--pm-faint,#94a3b8)}
+.sa-set{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px 14px}
+.sa-set .cc-f input{width:100%;font:inherit;font-size:13px;padding:7px 9px;border-radius:8px;border:1px solid var(--pm-line,rgba(255,255,255,.14));background:transparent;color:inherit}
+.sa-sens .pm-chips{margin:8px 0}
+@media (max-width:760px){.sa-set{grid-template-columns:minmax(0,1fr)}}
+.c-sa{--card-accent:#f59e0b;
+  --band:linear-gradient(90deg,#f59e0b,#ef4444,#d946ef);
+  --thumb:linear-gradient(135deg,#2a1a06 0%,#2e0f1a 100%);
+  --icon-glow:rgba(245,158,11,.5);--card-border:rgba(245,158,11,.35);
+  --card-glow:0 0 40px rgba(245,158,11,.10);--arrow-color:#fde68a}

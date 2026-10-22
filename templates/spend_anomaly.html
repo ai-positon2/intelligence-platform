@@ -1,0 +1,62 @@
+{% extends "_paid_base.html" %}
+{% block title %}Spend Anomaly Alert{% endblock %}
+{% block content %}
+<div class="pm pm-sa" id="sa">
+  <section class="pm-hero">
+    <div class="pm-hero-l">
+      <span class="pm-eyebrow"><span class="d"></span>Paid Marketing · Monitoring</span>
+      <h1 class="pm-title">Is spend <span class="pm-grad">behaving?</span></h1>
+      <p class="pm-sub">Pick an account, or an MCC to watch every account in one go. The agent works out what each account <b>usually spends</b> by this hour of the day, holds <b>today so far</b> and yesterday against it, and says what explains a
+        <b>spike</b>: the campaign that spent the excess, a campaign started lately, who changed a budget. It also catches a <b>surge</b> in the last three hours, a <b>drop</b> or a stop, a ceiling the team set and more than the budgets allow.
+        A monitor reads every account every two hours and alerts by email and Slack.</p>
+    </div>
+  </section>
+
+  <section class="pm-panel pd-cmd bi-cmd" id="cmd">
+    <div class="bi-cmd-row da-cmd-row">
+      <div id="acctPick"></div>
+      <p class="bi-scope">Google Ads and Meta. The usual is the account's own last 14 days (weekdays with weekdays), by hour where the platform gives it. Nothing is changed in an account.</p>
+    </div>
+  </section>
+
+  <div id="msg"></div>
+
+  <div id="empty" class="pm-panel sg-empty">
+    <div class="sg-empty-ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17l5-6 4 4 4-8 5 6"/><path d="M3 21h18"/></svg></div>
+    <h2>Choose an account to begin</h2>
+    <p>The spend comes straight from Google Ads or Meta. Nothing is changed there: the agent only reports.</p>
+  </div>
+  <div id="skel" hidden><div class="pd-skel"></div><div class="pd-skel"></div><div class="pd-skel"></div></div>
+
+  <div id="out" hidden>
+    <div class="sg-head">
+      <p class="pd-fresh" id="fresh"></p>
+      <button class="pm-btn-ghost" id="refreshBtn" type="button" title="Read the spend again"><svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.3-5.6M20 4v5h-5"/></svg>Refresh</button>
+      <button class="pm-btn-ghost" id="exportBtn" type="button"><svg viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>Export CSV</button>
+    </div>
+    <div class="pd-strip" id="kpis"></div>
+    <div id="insights"></div>
+
+    <section class="pm-panel" id="listCard">
+      <div class="pm-panel-h"><span class="pm-panel-t">Accounts</span><span class="pm-panel-s" id="listNote"></span></div>
+      <div class="bi-tools"><div class="pm-chips" id="views" role="radiogroup" aria-label="Which accounts"></div></div>
+      <div id="list"></div>
+    </section>
+
+    <section class="pm-panel sa-sens">
+      <div class="pm-panel-h"><span class="pm-panel-t">How sensitive</span></div>
+      <p class="bi-sub" id="sensText"></p>
+      <div class="pm-chips" id="sens" role="radiogroup" aria-label="Sensitivity"></div>
+      <span class="bi-sub" id="sensOut"></span>
+    </section>
+    <p class="pd-foot" id="foot"></p>
+  </div>
+  <div id="monPanel"></div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/pm_picker.js') }}?v=1"></script>
+<script src="{{ url_for('static', filename='js/monitor_panel.js') }}?v=1"></script>
+<script src="{{ url_for('static', filename='js/anomaly_data.js') }}?v=1"></script>
+<script src="{{ url_for('static', filename='js/anomaly.js') }}?v=1"></script>
+{% endblock %}

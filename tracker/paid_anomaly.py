@@ -19,6 +19,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 
 from . import paid_anomaly_math as m
+from . import paid_anomaly_plan as plan
 from . import paid_gads_segments as gads
 from . import paid_segments as seg
 
@@ -364,7 +365,7 @@ def assemble(raws, account, *, settings=None, now_utc=None):
             continue
         saved = st.account_of(settings, raw["id"])
         a = analyse_raw(raw, saved=saved, sensitivity=sens)
-        accounts.append(dict(a, id=raw["id"], name=raw["name"], currency=raw["currency"], platform=raw["platform"], tz=raw["tz"], local=raw["local"], hourly=raw["hourly"], warnings=raw["warnings"],
+        accounts.append(dict(a, plan=plan.build(a), id=raw["id"], name=raw["name"], currency=raw["currency"], platform=raw["platform"], tz=raw["tz"], local=raw["local"], hourly=raw["hourly"], warnings=raw["warnings"],
                              readAt=raw.get("readAt")))
         warnings += ["%s: %s" % (raw["name"], w) if account.get("members") or len(raws) > 1 else w for w in raw["warnings"]]
     accounts.sort(key=m.rank_key)

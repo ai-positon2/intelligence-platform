@@ -12,7 +12,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-tokens.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-components.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/gtm.css') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/paid_marketing.css') }}?v=51">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/paid_marketing.css') }}?v=52">
   <script src="/static/js/theme.js"></script>
   <link rel="stylesheet" href="/static/css/aurora-app.css?v=3">
   <script src="/static/js/aurora.js?v=1" defer></script>
@@ -604,6 +604,25 @@
         </div>
       </a>
 
+
+      <a href="/p2/paid-marketing/spend-anomaly" class="dash-card active c-sa">
+        <div class="card-band"></div>
+        <div class="card-thumb">
+          <div class="card-thumb-icon"><svg class="au-ic" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M3 17l5-6 4 4 4-8 5 6"/><path d="M3 21h18"/></svg></div>
+          <div class="card-thumb-badge tb-live"><span class="tb-dot live"></span> Live</div>
+        </div>
+        <div class="card-body">
+          <div class="card-name">Spend Anomaly Alert</div>
+          <div class="card-desc">
+            Works out what each Google Ads or Meta account usually spends by this hour of the day and flags today and yesterday when they are far above or below it: a spike, a surge in the last three hours,
+            a drop or a stop, a ceiling the team set, more than the budgets allow. A spike is traced to the campaign that spent the excess, a campaign started lately and who changed a budget. Alerts by email and Slack every two hours. Read only.
+          </div>
+          <div class="card-footer">
+            <div class="card-tags"><span class="tag">Monitoring</span><span class="tag">Spend</span></div>
+            <span class="card-arrow">→</span>
+          </div>
+        </div>
+      </a>
     </div>
 
     <p class="footer-note">Position2 · Internal use only</p>
@@ -657,6 +676,7 @@
     {t:'Brand Spend Alert',d:'Is the brand spend inside what is usual for the account',u:'/p2/paid-marketing/brand-spend',i:'$'},
     {t:'Disapproved Ads Tracker',d:'Which ads Google has refused to show, and how to fix them',u:'/p2/paid-marketing/disapproved-ads',i:'!'},
     {t:'Ad Copy Checker',d:'Typos, placeholders, wrong numbers and capitals in the live ads',u:'/p2/paid-marketing/ad-copy-checker',i:'Aa'},
+    {t:'Spend Anomaly Alert',d:'Is any account spending far more or less than it usually does today',u:'/p2/paid-marketing/spend-anomaly',i:'↗'},
     {t:'QA Agent',d:'Campaign launch QC checklist',u:'/p2/paid-marketing/qa-agent',i:'✓'}
   ];
   var ITEMS=(window.__KP_ITEMS||[]).concat(BASE);

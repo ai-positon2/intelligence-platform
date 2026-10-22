@@ -337,6 +337,7 @@ def test_the_report_names_the_account_the_status_and_what_it_found(cache):
     assert a["status"] == "over" and a["level"] in ("medium", "high") and a["id"] == ACCT["id"] and a["tz"] == TZ and a["local"] == "2026-10-22 12:00" and a["hourly"] is True and a["readAt"]
     assert rep["summary"]["counts"] == {"over": 1, "under": 0, "ok": 0, "new": 0, "none": 0} and rep["summary"]["needsLook"] == 1 and rep["warnings"] == [] and rep["sensitivity"] == "normal"
     assert rep["summary"]["overall"] == {"cost": a["today"]["cost"], "usual": a["today"]["usualByNow"], "accounts": 1, "currency": "USD"}
+    assert [s["kind"] for s in a["plan"]["steps"]] == ["surge", "spike", "recheck"] and a["plan"]["steps"][0]["evidence"] == a["findings"][0]["detail"]
 
 
 def test_a_second_ask_never_reads_again_and_refresh_does_but_not_twice_in_two_minutes(cache):
