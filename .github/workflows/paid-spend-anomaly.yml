@@ -1,0 +1,41 @@
+name: Paid Marketing Spend Anomaly Alert
+
+# Starts the Spend Anomaly Alert's run on the platform every two hours. The run itself happens on the platform (it reads every Google Ads and Meta account's spend by day and hour, holds today
+# against the account's usual, and sends the email and Slack alert for what is new or worse); this only calls the secret-guarded address, which answers at once and runs in the background.
+# The first run sets the baseline and sends nothing. The other monitors have their own daily workflow (paid-monitors.yml).
+#
+# Needs the same GitHub Actions secret as that one, MONITOR_ALERT_SECRET (the value of the MONITOR_ALERT_SECRET variable on Railway). The platform's address is the repository variable
+# PLATFORM_BASE_URL (default https://intelligence.position2.com). Alert recipients and the Slack channel are set on the Spend Anomaly Alert page.
+#
+# Every two hours is twelve reads of each account a day. Google's daily read allowance is shared by every agent: if the allowance runs short, make the cron below less frequent (every 4 hours is
+# '17 */4 * * *') rather than switching the alert off.
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 */2 * * *'   # at 17 minutes past every second hour (UTC)
+
+permissions:
+  contents: read
+
+concurrency:
+  group: paid-spend-anomaly
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Start the Spend Anomaly Alert
+        env:
+          BASE_URL: ${{ vars.PLATFORM_BASE_URL || 'https://intelligence.position2.com' }}
+          SECRET: ${{ secrets.MONITOR_ALERT_SECRET }}
+        run: |
+          if [ -z "$SECRET" ]; then
+            echo "::error::The MONITOR_ALERT_SECRET secret is not set on this repository."
+            exit 1
+          fi
+          curl --fail-with-body --silent --show-error --max-time 60 --retry 3 --retry-delay 20 --retry-all-errors \
+            -X POST "${BASE_URL%/}/p2/paid-marketing/api/monitors/scheduled" \
+            -H "X-Monitor-Secret: $SECRET" -H "Content-Type: application/json" -d '{"agents": ["spend"]}'
+          echo

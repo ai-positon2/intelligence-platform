@@ -329,7 +329,7 @@ def analyse(rows, today, hour, *, currency="USD", sensitivity=None, saved=None, 
             findings.append(_mute(_finding("surge", today, lvl, "Spending %s its usual in the last %d hours" % (_x(_ratio(last, usual_last)), k),
                                            " ".join(x for x in ("%s spent from %s to %s, against a usual %s for those hours." % (money(last, currency), _hh(hour - k), _hh(hour), money(usual_last, currency)), why) if x),
                                            "Check right now for a budget raised, a new campaign, a changed bid strategy or a user who should not have access.",
-                                           spent=round(last, 2), usual=round(usual_last, 2), ratio=_ratio(last, usual_last), hours=k, cause=c), saved))
+                                           spent=round(last, 2), usual=round(usual_last, 2), ratio=_ratio(last, usual_last), hours=k, cause=c, day="today"), saved))
 
     # a ceiling the team saved
     ceiling = _f(saved.get("maxDaily"))

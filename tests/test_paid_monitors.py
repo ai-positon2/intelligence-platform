@@ -11,6 +11,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from monitor_fakes import Deliver, MemStore  # noqa: E402
 from tests import test_paid_brandspend as TB  # noqa: E402
+from tests import test_paid_anomaly as TA  # noqa: E402
 from tests import test_paid_disapproved as TD  # noqa: E402
 from tracker import paid_brandspend_settings as st  # noqa: E402
 from tracker import paid_gads as base  # noqa: E402
@@ -44,6 +45,8 @@ class Search:
         self.rows, self.ads = {A["id"]: TB.weeks_of(weekly=TB.USUAL + [203])}, {A["id"]: []}
 
     def __call__(self, cid, q):
+        if "FROM customer" in q:
+            return TA.hourly_rows()
         if "FROM ad_group_ad WHERE" in q or "FROM asset_group_asset" in q or "FROM ad_group_criterion" in q or "FROM asset_group " in q or ("segments.week" in q) or ("FROM ad_group_ad" in q):
             return TD.searcher(self.ads)(cid, q)
         return TB.searcher(self.rows)(cid, q)
@@ -63,11 +66,12 @@ def sched(store, dv, search, now):
     return pm.run_scheduled(store, base_link=BASE, deliver=dv, inventory_fn=inventory, now_fn=lambda: now, search_fn=search, list_fn=lambda: LISTED)
 
 
-def test_only_the_three_monitors_are_known_and_each_has_its_page_link():
-    assert sorted(pm.AGENTS) == ["brandspend", "copycheck", "disapproved"] and pm.agent_of("brandspend") == "brandspend"
-    with pytest.raises(pm.BadRequest, match="must be one of: brandspend, copycheck, disapproved"):
+def test_only_the_four_monitors_are_known_and_each_has_its_page_link():
+    assert sorted(pm.AGENTS) == ["brandspend", "copycheck", "disapproved", "spend"] and pm.agent_of("brandspend") == "brandspend"
+    with pytest.raises(pm.BadRequest, match="must be one of: brandspend, copycheck, disapproved, spend"):
         pm.agent_of("other")
     assert pm.link_for("copycheck", BASE) == BASE + "/p2/paid-marketing/ad-copy-checker" and pm.AGENTS["copycheck"]["weekdays"] == (0,) and "weekdays" not in pm.AGENTS["brandspend"]
+    assert pm.AGENTS["spend"]["frequent"] is True and not [a for a in ("brandspend", "copycheck", "disapproved") if pm.AGENTS[a].get("frequent")] and pm.link_for("spend", BASE) == BASE + "/p2/paid-marketing/spend-anomaly"
     assert pm.link_for("brandspend", "https://p.example/") == "https://p.example/p2/paid-marketing/brand-spend" and pm.link_for("disapproved", BASE) == BASE + "/p2/paid-marketing/disapproved-ads"
 
 
@@ -84,7 +88,7 @@ def test_the_ad_copy_checker_runs_on_mondays_only_and_its_first_run_is_a_baselin
     assert "copycheck" not in sched(s, dv, se, TUE)
     out = sched(s, dv, se, MON)
     assert sorted(k for k in out if k != "weekly") == ["brandspend", "copycheck", "disapproved"] and out["copycheck"]["baseline"] is True and s.state_get("baseline:copycheck")
-    assert sorted(out["weekly"]) == ["brandspend", "copycheck", "disapproved"]
+    assert sorted(out["weekly"]) == ["brandspend", "copycheck", "disapproved", "spend"]
 
 
 def test_a_problem_after_the_baseline_is_alerted_by_the_monitor_it_belongs_to_with_its_own_link():
@@ -164,3 +168,42 @@ def test_the_panel_lists_forty_open_issues_at_most_and_says_how_many_there_are()
     s.issues_put(rows)
     v = pm.state_for(s, "brandspend", dv, now=TUE)
     assert len(v["open"]) == 40 and v["openTotal"] == 55 and v["counts"]["low"] == 55 and v["open"][0]["title"] == "T00"
+
+
+NOON = dt.datetime(2026, 10, 22, 19, 0, tzinfo=dt.timezone.utc)                # a Thursday, 12:00 in Los Angeles
+
+
+def test_the_daily_run_leaves_the_frequent_monitor_to_its_own_run():
+    s, dv, se = configured(), Deliver(), Search()
+    out = sched(s, dv, se, NOON)
+    assert sorted(out) == ["brandspend", "disapproved"] and not s.state_get("baseline:spend")
+
+
+def test_a_run_for_named_monitors_runs_only_those_and_sends_no_weekly_summary_even_on_a_monday():
+    s, dv, se = configured(), Deliver(), Search()
+    out = pm.run_scheduled(s, base_link=BASE, deliver=dv, inventory_fn=inventory, now_fn=lambda: MON.replace(hour=19), search_fn=se, list_fn=lambda: LISTED, only=["spend"])
+    assert sorted(out) == ["spend"] and out["spend"]["status"] == "done" and out["spend"]["baseline"] is True and s.state_get("baseline:spend") and not s.state_get("baseline:brandspend")
+    assert "weekly" not in out
+
+
+def test_named_monitors_run_whatever_the_weekday_and_an_unknown_name_is_refused():
+    s, dv, se = configured(), Deliver(), Search()
+    out = pm.run_scheduled(s, base_link=BASE, deliver=dv, inventory_fn=inventory, now_fn=lambda: NOON, search_fn=se, list_fn=lambda: LISTED, only=["copycheck", "spend"])
+    assert sorted(out) == ["copycheck", "spend"]
+    with pytest.raises(pm.BadRequest, match="must be one of"):
+        pm.run_scheduled(s, base_link=BASE, deliver=dv, inventory_fn=inventory, now_fn=lambda: NOON, search_fn=se, list_fn=lambda: LISTED, only=["other"])
+
+
+def test_an_empty_list_is_the_daily_run():
+    s, dv, se = configured(), Deliver(), Search()
+    out = pm.run_scheduled(s, base_link=BASE, deliver=dv, inventory_fn=inventory, now_fn=lambda: NOON, search_fn=se, list_fn=lambda: LISTED, only=[])
+    assert sorted(out) == ["brandspend", "disapproved"]
+
+
+def test_the_monday_summary_covers_the_spend_alert_too():
+    s, dv, se = configured(), Deliver(), Search()
+    pm.run_scheduled(s, base_link=BASE, deliver=dv, inventory_fn=inventory, now_fn=lambda: NOON, search_fn=se, list_fn=lambda: LISTED, only=["spend"])
+    s.issues_put([{"agent": "spend", "fingerprint": "x:spike:2026-10-19", "accountId": "1", "accountName": "Acme", "platform": "google", "kind": "spike", "level": "medium", "title": "t", "detail": "d",
+                   "nextStep": "n", "status": "open", "firstSeen": "2026-10-19T07:00:00+00:00", "lastSeen": "2026-10-26T06:00:00+00:00", "data": {}}])
+    sent = pm.send_weekly("spend", s, base_link=BASE, deliver=dv, now=MON)
+    assert sent["sent"] is True and dv.emails[-1]["subject"].startswith("Spend Anomaly Alert: weekly summary, 1 open") and dv.emails[-1]["text"].endswith("/p2/paid-marketing/spend-anomaly")

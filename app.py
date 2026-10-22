@@ -5457,7 +5457,8 @@ def paid_monitor_run(agent):
 
 @app.route("/p2/paid-marketing/api/monitors/scheduled", methods=["POST"])
 def paid_monitor_scheduled():
-    """The daily run of every monitor (and, on a Monday, the weekly summaries). No session: a shared secret in X-Monitor-Secret, and with MONITOR_ALERT_SECRET unset every call is refused."""
+    """The daily run of every monitor that is not "frequent" (and, on a Monday, the weekly summaries), or, with {"agents": ["spend"]} in the body, just those monitors (the Spend Anomaly Alert's own
+    run every two hours). No session: a shared secret in X-Monitor-Secret, and with MONITOR_ALERT_SECRET unset every call is refused."""
     import hmac
     secret = os.environ.get("MONITOR_ALERT_SECRET", "")
     given = request.headers.get("X-Monitor-Secret", "")
@@ -5465,10 +5466,13 @@ def paid_monitor_scheduled():
         return jsonify(error="Forbidden."), 403
 
     def go(store, pm, mon):
+        body = request.get_json(silent=True) or {}
+        named = body.get("agents") if isinstance(body, dict) else None
+        only = [pm.agent_of(a) for a in named] if isinstance(named, list) and named else None
         base = _mon_base()
         accounts, groups, problems = _mon_inventory()
         deliver = _mon_deliver()
-        _mon_spawn(lambda: pm.run_scheduled(store, base_link=base, deliver=deliver, inventory_fn=lambda: (accounts, groups, problems)))
+        _mon_spawn(lambda: pm.run_scheduled(store, base_link=base, deliver=deliver, inventory_fn=lambda: (accounts, groups, problems), only=only))
         return jsonify(started=True), 202
     return _mon_run(go)
 

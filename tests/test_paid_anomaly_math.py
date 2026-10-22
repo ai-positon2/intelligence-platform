@@ -578,3 +578,14 @@ def test_the_sensitivity_scales_the_surge_too():
     rows = rows_for(14) + today_rows(10, 9) + [{"date": TODAY.isoformat(), "hour": h, "cost": 35.0} for h in (9, 10, 11)]            # the last three hours are 3.5x their usual
     got = {s: [f["level"] for f in run(rows, 12, sensitivity=s)["findings"] if f["kind"] == "surge"] for s in ("low", "normal", "high")}
     assert got == {"low": ["low"], "normal": ["medium"], "high": ["high"]}                       # 3.57 and 5.8 at low, 2.5 and 4 at normal, 2 and 2.9 at high
+
+
+def test_every_finding_says_which_day_it_is_about_and_has_the_words_a_monitor_needs():
+    rows = rows_for(14, skip=(YESTERDAY,)) + yesterday_rows(30) + today_rows(10, 12, boost={9: 60, 10: 60, 11: 60})
+    camps_ = usual_camps() + [camp("1", "Brand", TODAY, 100), camp("2", "Generic", TODAY, 640)]
+    a = run(rows, 12, saved={"maxDaily": 100}, budget=80, campaigns=camps_)
+    assert {f["kind"] for f in a["findings"]} == {"spike", "surge", "ceiling", "budget"}
+    for f in a["findings"]:
+        assert f["day"] in ("today", "yesterday") and f["key"] == (TODAY if f["day"] == "today" else YESTERDAY).isoformat() and f["title"] and f["detail"] and f["nextStep"], f["kind"]
+    drop = run(rows_for(14), 16)["findings"][0]
+    assert drop["kind"] == "drop" and drop["day"] == "today" and drop["key"] == "2026-10-22"

@@ -35,7 +35,7 @@ def world(monkeypatch):
     monkeypatch.setattr(app_module, "_mon_inventory", lambda: ([{"id": "1", "name": "Acme", "platform": "google", "group": ""}], [], []))
     monkeypatch.setattr(app_module, "_mon_spawn", lambda fn: w.spawned.append(fn))
     monkeypatch.setattr(pm, "run_agent", lambda agent, store, **k: w.started.append((agent, k["trigger"], k["base_link"], len(k["accounts"]))) or {"status": "done"})
-    monkeypatch.setattr(pm, "run_scheduled", lambda store, **k: w.started.append(("scheduled", k["base_link"], k["inventory_fn"]())) or {})
+    monkeypatch.setattr(pm, "run_scheduled", lambda store, **k: w.started.append(("scheduled", k["base_link"], k["inventory_fn"](), k.get("only"))) or {})
     return w
 
 
@@ -145,3 +145,29 @@ def test_the_daily_workflow_calls_the_scheduled_address_with_the_secret_and_the_
     assert "workflow_dispatch" in text and "cancel-in-progress: false" in text and "PLATFORM_BASE_URL" in text and "—" not in text and "–" not in text
     code = open(os.path.join(ROOT, "app.py"), encoding="utf-8").read()
     assert 'os.environ.get("MONITOR_ALERT_SECRET", "")' in code and 'request.headers.get("X-Monitor-Secret", "")' in code
+
+
+def test_the_scheduled_address_can_be_told_which_monitors_to_run(world, monkeypatch):
+    monkeypatch.setenv("MONITOR_ALERT_SECRET", "s3cret")
+    c, h = client_as(None), {"X-Monitor-Secret": "s3cret"}
+    assert c.post(API + "/monitors/scheduled", json={"agents": ["spend"]}, headers=h).status_code == 202
+    world.spawned[0]()
+    assert world.started[0][3] == ["spend"]
+    c.post(API + "/monitors/scheduled", json={}, headers=h)
+    world.spawned[1]()
+    assert world.started[1][3] is None
+    c.post(API + "/monitors/scheduled", json={"agents": []}, headers=h)
+    world.spawned[2]()
+    assert world.started[2][3] is None
+    bad = c.post(API + "/monitors/scheduled", json={"agents": ["spend", "other"]}, headers=h)
+    assert bad.status_code == 400 and "must be one of" in bad.get_json()["error"] and len(world.spawned) == 3
+    odd = c.post(API + "/monitors/scheduled", data="not json", headers=dict(h, **{"Content-Type": "application/json"}))
+    assert odd.status_code == 202 and len(world.spawned) == 4
+
+
+def test_the_spend_alert_has_its_own_two_hourly_workflow_that_asks_for_only_itself():
+    text = open(os.path.join(ROOT, ".github", "workflows", "paid-spend-anomaly.yml"), encoding="utf-8").read()
+    assert "/p2/paid-marketing/api/monitors/scheduled" in text and "X-Monitor-Secret: $SECRET" in text and "secrets.MONITOR_ALERT_SECRET" in text and "cron: '17 */2 * * *'" in text
+    assert """-d '{"agents": ["spend"]}'""" in text and "workflow_dispatch" in text and "cancel-in-progress: false" in text and "group: paid-spend-anomaly" in text and "PLATFORM_BASE_URL" in text and "—" not in text and "–" not in text
+    daily = open(os.path.join(ROOT, ".github", "workflows", "paid-monitors.yml"), encoding="utf-8").read()
+    assert "agents" not in daily and "group: paid-monitors" in daily
