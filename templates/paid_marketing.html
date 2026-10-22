@@ -12,7 +12,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-tokens.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-components.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/gtm.css') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/paid_marketing.css') }}?v=52">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/paid_marketing.css') }}?v=54">
   <script src="/static/js/theme.js"></script>
   <link rel="stylesheet" href="/static/css/aurora-app.css?v=3">
   <script src="/static/js/aurora.js?v=1" defer></script>
@@ -623,6 +623,25 @@
           </div>
         </div>
       </a>
+
+      <a href="/p2/paid-marketing/location-conflicts" class="dash-card active c-gc">
+        <div class="card-band"></div>
+        <div class="card-thumb">
+          <div class="card-thumb-icon"><svg class="au-ic" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 21s7-6.2 7-11a7 7 0 1 0-14 0c0 4.8 7 11 7 11z"/><circle cx="12" cy="10" r="2.5"/></svg></div>
+          <div class="card-thumb-badge tb-live"><span class="tb-dot live"></span> Live</div>
+        </div>
+        <div class="card-body">
+          <div class="card-name">Location Conflicts</div>
+          <div class="card-desc">
+            Reads where each Google Ads campaign or Meta ad set is set to show and holds every name that says a place against it: a campaign or ad group named for a place it does not target, an ad that says another place than its ad group,
+            keywords outside the locations, a place both targeted and excluded, the presence or interest option, and a schedule or device setting that differs from the other campaigns. Daily alerts. Read only.
+          </div>
+          <div class="card-footer">
+            <div class="card-tags"><span class="tag">Monitoring</span><span class="tag">Locations</span></div>
+            <span class="card-arrow">→</span>
+          </div>
+        </div>
+      </a>
     </div>
 
     <p class="footer-note">Position2 · Internal use only</p>
@@ -677,6 +696,7 @@
     {t:'Disapproved Ads Tracker',d:'Which ads Google has refused to show, and how to fix them',u:'/p2/paid-marketing/disapproved-ads',i:'!'},
     {t:'Ad Copy Checker',d:'Typos, placeholders, wrong numbers and capitals in the live ads',u:'/p2/paid-marketing/ad-copy-checker',i:'Aa'},
     {t:'Spend Anomaly Alert',d:'Is any account spending far more or less than it usually does today',u:'/p2/paid-marketing/spend-anomaly',i:'↗'},
+    {t:'Location Conflicts',d:'Do the campaigns show where their names, ads and keywords say they do',u:'/p2/paid-marketing/location-conflicts',i:'↗'},
     {t:'QA Agent',d:'Campaign launch QC checklist',u:'/p2/paid-marketing/qa-agent',i:'✓'}
   ];
   var ITEMS=(window.__KP_ITEMS||[]).concat(BASE);

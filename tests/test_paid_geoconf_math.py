@@ -215,7 +215,7 @@ def test_schedule_drift_needs_three_peers_and_a_majority():
     acc = {"campaigns": [camp(i, "C%d" % i) for i in (1, 2, 3, 4)], "locations": [loc(i, "Quincy") for i in (1, 2, 3, 4)], "schedules": full + odd}
     f = findings(m.analyse(acc), "schedule")
     assert [x["campaignId"] for x in f] == ["4"] and f[0]["level"] == "medium"
-    assert "2 windows, 20 hours a week" in f[0]["detail"] and "1 window, 1 hours a week" in f[0]["detail"] and "3 of the other 3 Search" in f[0]["detail"]
+    assert "2 windows, 20 hours a week" in f[0]["detail"] and "1 window, 1 hour a week" in f[0]["detail"] and "3 of the other 3 Search" in f[0]["detail"]
     two = {"campaigns": [camp(1, "A"), camp(2, "B")], "locations": [], "schedules": [{"campaignId": "1", "day": "MONDAY", "start": 8, "end": 9}]}
     assert findings(m.analyse(two), "schedule") == []
     split = {"campaigns": [camp(i, "C%d" % i) for i in (1, 2, 3, 4)], "locations": [], "schedules": [{"campaignId": "1", "day": "MONDAY", "start": 8, "end": 9}, {"campaignId": "2", "day": "TUESDAY", "start": 8, "end": 9}]}

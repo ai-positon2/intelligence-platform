@@ -51,9 +51,11 @@ interested in the place, so the setting is not a finding). Each change is logged
 
 ## The monitor
 
-Daily on the shared monitor layer: one issue per high or medium finding, fingerprint `geoconf:<account>:<rule>:<scope>`. The first run is a baseline. Four reads an account a day.
+Daily on the shared monitor layer: one issue per high or medium finding, fingerprint `geoconf:<account>:<rule>:<scope>`. The first run is a baseline. Eight reads an account a day (campaigns, locations, place names, schedules, devices, ad groups, ads, keywords), in the daily run with the other monitors; if Google's shared read allowance runs short, move it to its own workflow like the Spend Anomaly Alert.
 
 ## Not built or not verified
+
+* Meta: the ad set's `targeting.geo_locations`, `excluded_geo_locations` and `location_types` fields are Meta's documented ones, not seen live. There is no schedule or device check for Meta, and no keyword read.
 
 * Places are matched by name against the places the account itself uses. A campaign named for a city that no campaign targets and nobody saved is not seen (Google's place search is not read).
 * The keyword read is a quarter of an account's keyword volume at most (first 5000 enabled keywords).

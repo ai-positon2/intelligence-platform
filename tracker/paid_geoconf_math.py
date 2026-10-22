@@ -154,7 +154,8 @@ def _hours_of(sched):
 def _window_text(sched):
     if not sched:
         return "all day, every day"
-    return "%d %s, %g hours a week" % (len(sched), "window" if len(sched) == 1 else "windows", _hours_of(sched))
+    hours = _hours_of(sched)
+    return "%d %s, %g %s a week" % (len(sched), "window" if len(sched) == 1 else "windows", hours, "hour" if hours == 1 else "hours")
 
 
 def _schedule_sig(sched):
