@@ -91,6 +91,9 @@ def meta_requests(act):
             out.append(("metainterests", label, path, dict(params, limit=1)))
         except Exception as e:                                                       # noqa: BLE001
             out.append(("metainterests", label, None, {"_build_error": str(e)}))
+    from . import paid_qa_meta as qm
+    for label, edge, fields in (("campaigns", "campaigns", qm.CAMPAIGN_FIELDS), ("ad sets", "adsets", qm.ADSET_FIELDS), ("ads", "ads", qm.AD_FIELDS)):
+        out.append(("metaqa", label, "/%s/%s" % (act, edge), {"fields": fields, "limit": 1}))
     return out
 
 
