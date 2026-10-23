@@ -5969,11 +5969,15 @@ def paid_query_check():
     meta = paid_meta.norm_id(request.args.get("meta") or "")
     if not acct and not meta:
         return jsonify(error="Give ?account=<Google customer id> and/or ?meta=<act_ id>."), 400
+    only = str(request.args.get("only") or "").lower()                         # ?only=google or ?only=meta: one platform per call keeps an answer inside the gateway's wait
+    agents = {a for a in re.split(r"[,\s]+", str(request.args.get("agents") or "").lower()) if a}      # ?agents=kpi,metacreative: only those agents' reads
     jobs = {}
-    if acct:
-        jobs["google"] = (acct, lambda: qc.check_google(acct))
-    if meta:
-        jobs["meta"] = (meta, lambda: qc.check_meta(meta, pages_fn=lambda path, params: paid_meta._pages(path, params, paid_store)))
+    if acct and only in ("", "google"):
+        jobs["google"] = (acct, lambda: qc.check_google(acct, queries=[q for q in qc.google_queries() if not agents or q[0] in agents]))
+    if meta and only in ("", "meta"):
+        jobs["meta"] = (meta, lambda: qc.check_meta(meta, pages_fn=lambda path, params: paid_meta._pages(path, params, paid_store), requests=[r for r in qc.meta_requests(meta) if not agents or r[0] in agents]))
+    if not jobs:
+        return jsonify(error="Nothing to check: give ?account= or ?meta= for the platform named in ?only=."), 400
     with ThreadPoolExecutor(max_workers=len(jobs)) as pool:                      # the two platforms at once: the gateway gives up on an answer after about five minutes
         futures = {k: pool.submit(fn) for k, (_a, fn) in jobs.items()}
         for k, (a, _fn) in jobs.items():

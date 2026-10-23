@@ -94,7 +94,7 @@ def test_the_route_is_for_admins_only_and_asks_for_an_account(monkeypatch):
     assert client_as("ana@position2.com").get("/p2/paid-marketing/api/query-check?account=1234567890").status_code == 403
     r = client_as(admin).get("/p2/paid-marketing/api/query-check")
     assert r.status_code == 400 and "Give ?account=" in r.get_json()["error"]
-    monkeypatch.setattr(qc, "check_google", lambda acct: [{"agent": "kpi", "label": "days", "ok": False, "error": "no", "rows": 0}, {"agent": "kpi", "label": "campaigns", "ok": True, "error": "", "rows": 1}])
+    monkeypatch.setattr(qc, "check_google", lambda acct, queries=None: [{"agent": "kpi", "label": "days", "ok": False, "error": "no", "rows": 0}, {"agent": "kpi", "label": "campaigns", "ok": True, "error": "", "rows": 1}])
     r = client_as(admin).get("/p2/paid-marketing/api/query-check?account=123-456-7890")
     j = r.get_json()
     assert r.status_code == 200 and j["google"]["account"] == "1234567890" and [f["label"] for f in j["google"]["failed"]] == ["days"] and "meta" not in j
@@ -136,3 +136,18 @@ def test_the_meta_reads_run_a_few_at_a_time_and_keep_their_order_and_a_failure_i
     got = qc.check_meta("act_1", pages_fn=pages, requests=reqs)
     assert [r["label"] for r in got] == ["r%d" % i for i in range(8)] and [r["ok"] for r in got] == [True, True, True, False, True, True, True, True]
     assert "bad field" in got[3]["error"] and peak[0] > 1 and peak[0] <= qc.META_WORKERS
+
+
+def test_the_route_can_check_one_platform_or_some_agents_so_an_answer_stays_inside_the_gateways_wait(monkeypatch):
+    from tracker import paid_meta
+    seen = {"g": [], "m": []}
+    monkeypatch.setattr(qc, "check_google", lambda acct, queries=None, **k: seen["g"].append(sorted({q[0] for q in queries})) or [{"agent": q[0], "label": q[1], "ok": True, "rows": 1, "ms": 1, "error": ""} for q in queries[:1]])
+    monkeypatch.setattr(qc, "check_meta", lambda act, pages_fn=None, requests=None, **k: seen["m"].append(sorted({r[0] for r in requests})) or [{"agent": r[0], "label": r[1], "ok": False, "rows": 0, "ms": 1, "error": "x"} for r in requests[:1]])
+    monkeypatch.setattr(paid_meta, "norm_id", lambda v: v)
+    cl = client_as(sorted(app_module.ADMIN_EMAILS)[0])
+    base = "/p2/paid-marketing/api/query-check?account=1234567890&meta=act_1"
+    assert "meta" not in cl.get(base + "&only=google").get_json() and seen["m"] == []
+    assert "google" not in cl.get(base + "&only=meta").get_json() and seen["g"][-1] == seen["g"][-1] and len(seen["m"]) == 1
+    r = cl.get(base + "&agents=kpi,metacreative").get_json()
+    assert seen["g"][-1] == ["kpi"] and seen["m"][-1] == ["kpi", "metacreative"] and r["meta"]["failed"][0]["agent"] == "kpi"       # an agent that reads both platforms is in both halves
+    assert cl.get("/p2/paid-marketing/api/query-check?account=1234567890&only=meta").status_code == 400
