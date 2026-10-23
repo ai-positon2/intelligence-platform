@@ -135,3 +135,15 @@ def test_interests_still_not_judged_after_asking_again_are_listed_as_not_judged_
     m = rec["plan"]["meta"]
     assert rec["status"] == "done" and m["coverage"]["unjudged"] == m["checks"]["unjudged"] > 0 and "could not be judged" in rec["note"]
     assert {r["fit"] for r in m["interests"] if r["id"] != "1"} == {"unjudged"}
+
+
+def test_behaviors_are_read_through_the_builds_own_ad_account():
+    paths = []
+    inner = getter()
+
+    def spy(path, params):
+        paths.append(path)
+        return inner(path, params)
+    store, sid = make()
+    rec = run(store, sid, deps(call=meta_model(seeds=dict(SEEDS, behaviorWords=["diabetes"])), meta_get=spy))
+    assert rec["status"] == "done" and [p for p in paths if "targetingbrowse" in p] == ["/act_1234567/targetingbrowse"]

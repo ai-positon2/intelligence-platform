@@ -106,19 +106,25 @@ def test_meta_is_asked_for_suggestions_from_the_interests_in_use_and_the_top_res
     km.read_interests(SEEDS, {}, get_fn=getter(calls))
     sugg = [p for _path, p in calls if p.get("type") == "adinterestsuggestion"]
     assert len(sugg) == 1 and __import__("json").loads(sugg[0]["interest_list"]) == ["Insulin pump", "Diabetes"]          # the first result of each phrase that found one
-    assert not [p for _path, p in calls if p.get("class") == "behaviors"]
+    assert not [p for _path, p in calls if p.get("limit_type") == "behaviors"]
     calls.clear()
-    km.read_interests(dict(SEEDS, behaviorWords=["diabetes"]), research(), get_fn=getter(calls))
-    assert len([p for _path, p in calls if p.get("class") == "behaviors"]) == 1
+    km.read_interests(dict(SEEDS, behaviorWords=["diabetes"]), research(), get_fn=getter(calls), act="act_9")
+    assert [path for path, p in calls if p.get("limit_type") == "behaviors"] == ["/act_9/targetingbrowse"]
     sugg = [p for _path, p in calls if p.get("type") == "adinterestsuggestion"]
     assert __import__("json").loads(sugg[0]["interest_list"])[:2] == ["Insulin pump", "Diabetes"]                        # the interests in use, biggest spend first
 
 
 def test_behaviors_are_added_only_when_words_for_them_are_given():
     seeds = dict(SEEDS, behaviorWords=["diabetes"])
-    d = km.read_interests(seeds, research(), get_fn=getter())["data"]
+    d = km.read_interests(seeds, research(), get_fn=getter(), act="act_9")["data"]
     assert "91" in {c["id"] for c in d["candidates"]} and d["behaviors"] == 2
     assert [c for c in d["candidates"] if c["id"] == "90"][0]["from"] == "in use by an ad set"                     # the travel behavior is not looked at for this client, but an ad set aims at it
+
+
+def test_with_no_ad_account_no_behavior_is_asked_for_and_the_note_says_why():
+    calls = []
+    pc = km.read_interests(dict(SEEDS, behaviorWords=["diabetes"]), research(), get_fn=getter(calls))
+    assert not [p for _path, p in calls if p.get("limit_type") == "behaviors"] and "behavior" in pc["note"].lower() + " ".join(pc["data"].get("notes") or [])
 
 
 def test_no_interest_at_all_fails_the_piece_and_says_meta_keeps_none_for_some_topics():

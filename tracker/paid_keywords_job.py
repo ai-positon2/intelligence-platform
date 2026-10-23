@@ -163,7 +163,7 @@ class KeywordBuild(job.Build):
     def write_meta(self):
         """The Meta side: which phrases to look up, Meta's interests for them, then the judging of every interest and the audiences to test."""
         seeds = self.stage("seeds", "metaSeeds", lambda: mai.write_seeds(self.inputs, self.research, self.call))
-        pc = self.piece("interests", lambda: km.read_interests(seeds, self.research, get_fn=self.deps["meta_get"]))
+        pc = self.piece("interests", lambda: km.read_interests(seeds, self.research, get_fn=self.deps["meta_get"], act=self.inputs.get("metaAccount")))
         if pc.get("state") not in ("ok", "partial"):
             raise RuntimeError(pc.get("note") or "Meta's interests could not be read.")
         cands = (pc.get("data") or {}).get("candidates") or []

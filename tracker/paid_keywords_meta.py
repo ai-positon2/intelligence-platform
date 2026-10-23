@@ -99,7 +99,7 @@ def read_meta_account(account, *, pages_fn, today=None):
     return piece("metaaccount", "partial" if notes else "ok", " ".join([note] + notes), data, time.monotonic() - started)
 
 
-def read_interests(seeds, research, *, get_fn):
+def read_interests(seeds, research, *, get_fn, act=None):
     """The interests Meta has for the phrases chosen, and which of them the account already aims at. `seeds` is {phrases, behaviorWords, avoid}. Failing to find any interest at all is
     the failure of the piece (Meta keeps no interest for some topics, for health conditions among them, and the page says so)."""
     started = time.monotonic()
@@ -115,7 +115,7 @@ def read_interests(seeds, research, *, get_fn):
         if top:
             names.append(top["name"])
     sugg, n2 = mi.suggestions(names, get_fn)
-    beh, n3 = mi.behaviors(get_fn) if (seeds or {}).get("behaviorWords") else ([], [])
+    beh, n3 = mi.behaviors(get_fn, act) if (seeds or {}).get("behaviorWords") else ([], [])
     notes += n2 + n3
     cands = mi.candidates(found, sugg, beh, used, avoid=(seeds or {}).get("avoid") or [], phrases_for_behaviors=(seeds or {}).get("behaviorWords") or [])
     if not cands:

@@ -6,7 +6,7 @@ holds), plus the advertiser's own audiences and lookalikes. So the question Keyw
 
     search       /search?type=adinterest&q=...                  interests whose name matches a phrase
     suggestions  /search?type=adinterestsuggestion&interest_list=...   interests that people in the given ones also have
-    behaviors    /search?type=adTargetingCategory&class=behaviors  Meta's list of behaviors (no phrase: the list is read once and filtered here)
+    behaviors    /{act}/targetingbrowse?limit_type=behaviors  Meta's list of behaviors (no phrase: the list is read once and filtered here)
 
 This module builds those requests, reads what comes back, says which of the interests an account's ad sets already name (and what they cost and brought), and checks that an
 interest somebody wrote down is one Meta has (an interest that is not in Meta's list cannot be targeted). Read only: nothing here changes an account. The network is a function
@@ -37,9 +37,9 @@ def suggest_request(names, limit=SUGGEST_LIMIT):
     return "/search", {"type": "adinterestsuggestion", "interest_list": json.dumps([str(n) for n in names][:MAX_SEEDS_FOR_SUGGESTIONS]), "limit": limit, "locale": LOCALE}
 
 
-def behaviors_request(limit=1000):
-    """(path, params) of Meta's whole list of behaviors."""
-    return "/search", {"type": "adTargetingCategory", "class": "behaviors", "limit": limit, "locale": LOCALE}
+def behaviors_request(act):
+    """(path, params) of Meta's whole list of behaviors. Meta's search no longer answers `class=behaviors` (a 400 on a real account, 2026-10-23); the account's targeting browse does."""
+    return "/%s/targetingbrowse" % act, {"limit_type": "behaviors"}
 
 
 def _int(v):
@@ -121,10 +121,12 @@ def suggestions(names, get_fn):
     return parse_options(rows), notes
 
 
-def behaviors(get_fn):
-    """([options], notes): Meta's behaviors."""
+def behaviors(get_fn, act):
+    """([options], notes): Meta's behaviors, read through an ad account (Meta lists them per account). With no account nothing is read and the note says so."""
     notes = []
-    rows = _soft(lambda: get_fn(*behaviors_request()), notes, "Meta's behaviors")
+    if not act:
+        return [], ["Meta's behaviors are read through an ad account and none was given, so no behavior is offered."]
+    rows = _soft(lambda: get_fn(*behaviors_request(act)), notes, "Meta's behaviors")
     return parse_options(rows, kind="behavior"), notes
 
 

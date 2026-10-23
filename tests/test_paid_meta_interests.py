@@ -28,7 +28,7 @@ def getter(calls=None, fail=()):
             return CATALOGUE.get(params["q"].lower(), [])
         if params.get("type") == "adinterestsuggestion":
             return [opt("5", "Continuous glucose monitor", 400_000, 500_000), opt("1", "Insulin pump")]
-        if params.get("class") == "behaviors":
+        if params.get("limit_type") == "behaviors":
             return [opt("90", "Frequent travellers", 9_000_000, 10_000_000, ("Behaviors", "Travel")), opt("91", "Diabetes care givers", 30_000, 40_000, ("Behaviors", "Health"))]
         raise AssertionError(params)
     return get
@@ -39,7 +39,8 @@ def test_the_three_requests_are_the_ones_the_graph_api_documents():
     assert path == "/search" and p["type"] == "adinterest" and p["q"] == "insulin pump" and p["limit"] == mi.SEARCH_LIMIT
     path, p = mi.suggest_request(["Insulin pump", "Diabetes"] + ["x%d" % i for i in range(20)])
     assert p["type"] == "adinterestsuggestion" and len(json.loads(p["interest_list"])) == mi.MAX_SEEDS_FOR_SUGGESTIONS and json.loads(p["interest_list"])[0] == "Insulin pump"
-    assert mi.behaviors_request()[1]["type"] == "adTargetingCategory" and mi.behaviors_request()[1]["class"] == "behaviors"
+    path, p = mi.behaviors_request("act_9")
+    assert path == "/act_9/targetingbrowse" and p == {"limit_type": "behaviors"}
 
 
 def test_options_are_read_with_their_size_range_path_and_topic_and_a_row_without_an_id_or_name_is_dropped():
@@ -81,7 +82,7 @@ def test_suggestions_and_behaviors_are_read_and_a_failure_is_said():
     got, notes = mi.suggestions(["Insulin pump"], getter())
     assert [o["id"] for o in got] == ["5", "1"] and notes == []
     assert mi.suggestions([], getter()) == ([], [])
-    beh, notes = mi.behaviors(getter())
+    beh, notes = mi.behaviors(getter(), "act_9")
     assert [o["kind"] for o in beh] == ["behavior", "behavior"]
 
     def broken(path, params):
@@ -115,7 +116,7 @@ def test_candidates_are_one_per_interest_carry_where_they_came_from_and_which_ar
     used = mi.in_use(adsets, stats)
     found, _ = mi.find(["insulin pump", "diabetes"], getter())
     sugg, _ = mi.suggestions(["Insulin pump"], getter())
-    beh, _ = mi.behaviors(getter())
+    beh, _ = mi.behaviors(getter(), "act_9")
     got = mi.candidates(found, sugg, beh, used, phrases_for_behaviors=["diabetes"])
     by = {c["id"]: c for c in got}
     assert sorted(by) == ["1", "2", "3", "4", "5", "91"] and len(got) == 6                  # id 1 came three ways and is listed once; the travel behavior has nothing to do with it
@@ -127,7 +128,7 @@ def test_candidates_leave_out_the_words_to_avoid_and_keep_no_behavior_when_none_
     found, _ = mi.find(["insulin pump", "diabetes"], getter())
     got = mi.candidates(found, [], [], {}, avoid=["diet"])
     assert "4" not in {c["id"] for c in got}
-    beh, _ = mi.behaviors(getter())
+    beh, _ = mi.behaviors(getter(), "act_9")
     assert mi.candidates({}, [], beh, {}) == []
 
 
