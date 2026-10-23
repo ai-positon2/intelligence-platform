@@ -619,6 +619,9 @@ def build(kind, raw, ctx):
 
 def ad_texts(kind, built):
     """Every piece of ad text in a build as (where, text), for the claim scan."""
+    if ps.platform_of_kind(kind) == "meta":
+        from . import paid_strategy_meta_check as mck
+        return mck.ad_texts(built)
     out = []
     if kind == "search":
         for g in built.get("adGroups") or []:
@@ -642,7 +645,10 @@ def ad_texts(kind, built):
 
 
 def shortfalls(kind, built):
-    """What a build is short of against Google's minimums, in words (an empty list when it has what it needs)."""
+    """What a build is short of against Google's minimums (or Meta's, for a Meta campaign), in words (an empty list when it has what it needs)."""
+    if ps.platform_of_kind(kind) == "meta":
+        from . import paid_strategy_meta_check as mck
+        return mck.shortfalls(built)
     out = []
     if kind == "search":
         if not built.get("adGroups"):

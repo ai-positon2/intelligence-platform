@@ -16,7 +16,8 @@ import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 
-from . import paid_strategy as ps, paid_strategy_ai as ai, paid_strategy_book as book, paid_strategy_check as ck, paid_strategy_research as rs
+from . import paid_strategy as ps, paid_strategy_ai as ai, paid_strategy_book as book, paid_strategy_check as ck, paid_strategy_meta_ai as mai, paid_strategy_meta_check as mck
+from . import paid_strategy_research as rs, paid_strategy_research_meta as mrs
 
 log = logging.getLogger(__name__)
 
@@ -181,6 +182,8 @@ class Build:
                 lanes["history"] = ex.submit(self.piece, "history", lambda: rs.read_history(
                     d["account"], search=d["search"], geo_names=d.get("geo_names"), sqr_read=d.get("sqr_read"), store=d.get("gads_store"), cached=d.get("cached"),
                     today=d.get("today")))
+            if on.get("metahistory"):
+                lanes["metahistory"] = ex.submit(self.piece, "metahistory", lambda: mrs.read_meta_history(d["meta_account"], pages_fn=d["meta_pages"], today=d.get("today")))
             if on.get("seasonality"):
                 lanes["seasonality"] = ex.submit(self.piece, "seasonality", lambda: rs.read_seasonality(d["account"], report=d["season_report"]))
             if on.get("market"):
@@ -189,6 +192,8 @@ class Build:
                 lanes["social"] = ex.submit(self.piece, "social", lambda: self.collect_social(social_run))
             for f in lanes.values():
                 f.result()
+        if on.get("metaaudience"):                           # after the lanes: its phrases come from the pages and the competitors they read
+            self.piece("metaaudience", lambda: mrs.read_meta_audience(inp, self.research, get_fn=d["meta_get"], account=d.get("meta_account"), pages_fn=d.get("meta_pages"), today=d.get("today")))
         if on.get("keywords"):
             self.piece("keywords", lambda: rs.read_keywords(
                 inp, post=d["post"], planner_account=d.get("planner_account"), website_piece=self.research.get("website"),
@@ -250,11 +255,11 @@ class Build:
             return camp
         self.step(key, "running", "", phase="Building")
         try:
-            built, drops = ai.write_build(camp, self.inputs, self.research, profile, strategy, competitive, self.call)
+            built, drops = self.write_checked(camp, profile, strategy, competitive)
             short = ck.shortfalls(camp["kind"], built)
             for _ in range(MAX_REPAIRS if short else 0):
                 try:                                        # a second try that fails must not lose the first, which is usable
-                    again, again_drops = ai.write_build(camp, self.inputs, self.research, profile, strategy, competitive, self.call, problems=short)
+                    again, again_drops = self.write_checked(camp, profile, strategy, competitive, problems=short)
                 except Exception:                           # noqa: BLE001
                     log.warning("strategy %s: the second try of %s failed; keeping the first", self.sid, camp["key"], exc_info=True)
                     break
@@ -274,6 +279,15 @@ class Build:
         self.keep(camp)
         return camp
 
+    def write_checked(self, camp, profile, strategy, competitive, problems=None):
+        """(build, drops) of one campaign. A Meta campaign's interests are looked up in Meta's list once it is written: what Meta has no such name for is dropped and counted."""
+        built, drops = ai.write_build(camp, self.inputs, self.research, profile, strategy, competitive, self.call, problems=problems)
+        if ps.platform_of_kind(camp["kind"]) == "meta":
+            built, dropped, notes = mai.verify(built, self.deps.get("meta_get"))
+            drops = built.get("drops") or drops
+            built["interestNotes"] = notes
+        return built, drops
+
     def keep(self, camp):
         """Save the campaigns written so far, so a build that is cut off keeps every campaign that was finished."""
         with self.lock:
@@ -286,6 +300,9 @@ class Build:
 
     @staticmethod
     def build_note(kind, built):
+        if ps.platform_of_kind(kind) == "meta":
+            groups = built.get("adSets") or []
+            return "%d ad sets, %d ads" % (len(groups), sum(len(g["ads"]) for g in groups))
         if kind == "search":
             groups = built.get("adGroups") or []
             return "%d ad groups, %d keywords, %d ads" % (len(groups), sum(len(g["keywords"]) for g in groups), sum(len(g["ads"]) for g in groups))
@@ -336,8 +353,14 @@ class Build:
                 drops_total[k] = drops_total.get(k, 0) + v
             removed += [dict(x, campaign=c["name"]) for x in (built.get("negatives") or {}).get("removed", [])]
             short += ["%s: %s" % (c["name"], s) for s in (built.get("shortfalls") or [])] + (["%s: %s" % (c["name"], c["buildError"])] if c.get("buildError") else [])
-        fc = ai.forecast(inputs, research)
+        google, meta = ps.platforms_of(inputs)
+        fc = ai.forecast(ai.google_inputs(inputs, strategy), research) if google else None          # Google's: the budget is the share the strategist gave Google when Meta is planned too
         cpc = ((fc or {}).get("scenarios") or [{}, {}])[1].get("cpc")
+        meta_gaps, learning_unchecked = mck.learning_gaps(campaigns, research) if meta else ([], 0)
+        short += meta_gaps
+        for want, label in ((google, "Google Ads"), (meta, "Meta")):
+            if want and not any(ps.platform_of_kind(c["kind"]) == ("meta" if label == "Meta" else "google") for c in campaigns):
+                short.append("No %s campaign was planned, though %s was asked for." % (label, label))
         for c in campaigns:
             if cpc and c["kind"] == "search" and c.get("daily") and c["daily"] / cpc < BUDGET_CLICKS_A_DAY:
                 short.append("%s gets %s a day, about %d clicks at the expected cost per click: too few for a Search campaign to learn (it wants about %d a day). "
@@ -347,7 +370,8 @@ class Build:
         plan = dict(self.plan)                              # keeps the architecture too, so a build that is resumed does not redesign the campaigns
         plan.update({"profile": profile, "competitive": competitive, "strategy": strategy, "campaigns": campaigns, "forecast": fc, "claims": claims,
                      "checks": {"dropped": drops_total, "removedNegatives": removed, "shortfalls": short,
-                                "unconfirmedFacts": sum(1 for f in profile.get("facts", []) if not f["verified"]), "missing": ai.missing(research, inputs)},
+                                "unconfirmedFacts": sum(1 for f in profile.get("facts", []) if not f["verified"]), "missing": ai.missing(research, inputs),
+                                "learningNotChecked": learning_unchecked, "interestNotes": sorted({n for c in campaigns for n in (c.get("build") or {}).get("interestNotes", [])})},
                      "generatedAt": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"), "model": ai.MODEL})
         self.plan = plan
         self.store.save_plan(self.sid, plan)

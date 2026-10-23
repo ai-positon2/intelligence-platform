@@ -86,7 +86,7 @@ def test_the_page_renders_for_staff(world):
 
 def test_options_describe_the_cards_and_say_whether_the_model_is_there(world, monkeypatch):
     j = client_as(STAFF).get(API + "/options").get_json()
-    assert [c["key"] for c in j["cards"]] == ["website", "competitors", "social", "history", "keywords", "seasonality", "market"] and j["modelReady"] is True
+    assert [c["key"] for c in j["cards"]] == ["website", "competitors", "social", "history", "metahistory", "keywords", "seasonality", "metaaudience", "market"] and j["modelReady"] is True
     assert j["goals"]["leads"] and j["kinds"]["pmax"] == "Performance Max" and j["buildsPerDay"] == 12
     monkeypatch.delenv("ANTHROPIC_API_KEY")
     assert client_as(STAFF).get(API + "/options").get_json()["modelReady"] is False
