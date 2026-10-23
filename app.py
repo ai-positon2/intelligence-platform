@@ -6482,6 +6482,18 @@ def _strat_account(account_id):
         return None
 
 
+def _strat_meta_account(act):
+    """{'id', 'name', 'currency'} for a Meta ad account the platform can read, or None."""
+    from tracker import paid_meta, paid_store
+    if not act:
+        return None
+    try:
+        a = paid_meta.account_by_id(paid_store, paid_meta.norm_id(act))
+        return {"id": a["id"], "name": a.get("name") or a["id"], "currency": a.get("currency") or "USD"} if a else None
+    except Exception:                                       # noqa: BLE001 (the account list is a convenience: a failure says the account cannot be read)
+        return None
+
+
 def _strat_deps(rec, account):
     """What a build needs from the rest of the platform, so the job itself touches nothing global."""
     from tracker import (paid_adstrength, paid_gads as base, paid_gads_segments as gads, paid_seasonality, paid_sqr_data, paid_store, paid_strategy_store, sci_pipeline, sci_store)
@@ -6492,7 +6504,10 @@ def _strat_deps(rec, account):
             planner, planner_currency = first.get("id"), first.get("currency")
         except Exception:                                   # noqa: BLE001
             planner = None
-    return {"account": account, "email": rec["created_by"], "planner_account": planner, "planner_currency": planner_currency, "model_ready": bool(os.environ.get("ANTHROPIC_API_KEY")),
+    from tracker import paid_meta
+    meta_act = ((rec.get("inputs") or {}).get("metaAccount") or "")
+    return {"account": account, "meta_account": _strat_meta_account(meta_act) if meta_act else None, "meta_pages": lambda path, params: paid_meta._pages(path, params, paid_store),
+            "email": rec["created_by"], "planner_account": planner, "planner_currency": planner_currency, "model_ready": bool(os.environ.get("ANTHROPIC_API_KEY")),
             "business_list": lambda kind="business": paid_strategy_store.list_recent(kind=kind), "business_get": paid_strategy_store.get,
             "search": lambda cid, gaql: gads.search(cid, gaql), "geo_names": gads.geo_names, "gads_store": paid_store,
             "sqr_read": lambda st, acct, start, end: paid_sqr_data.read(paid_store, acct, start, end),
@@ -6733,10 +6748,15 @@ def paid_business_start():
     account = _strat_account(inputs["account"])
     if inputs["account"] and not account:
         return jsonify(error="That Google Ads account is not one this platform can read."), 400
+    meta_account = _strat_meta_account(inputs.get("metaAccount"))
+    if inputs.get("metaAccount") and not meta_account:
+        return jsonify(error="That Meta ad account is not one this platform can read."), 400
     if account:
         inputs["currency"] = account.get("currency") or inputs["currency"]
+    elif meta_account:
+        inputs["currency"] = meta_account.get("currency") or inputs["currency"]
     try:
-        rec = store.create(by=_pm_user_email(), inputs=inputs, account_name=(account or {}).get("name") or "", steps=pb.steps_for(inputs))
+        rec = store.create(by=_pm_user_email(), inputs=inputs, account_name=(account or meta_account or {}).get("name") or "", steps=pb.steps_for(inputs))
         started, why = _strat_begin(store, rec)
         if why:
             store.archive(rec["id"])

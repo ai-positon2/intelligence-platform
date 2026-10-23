@@ -14,6 +14,7 @@ The prompts, the evidence builders and the model call are Strategy & Campaign Bo
 from __future__ import annotations
 
 from . import paid_business_check as bck, paid_business_research as brs, paid_strategy_ai as ai, paid_strategy_check as ck, paid_strategy_research as rs
+from . import paid_strategy_research_meta as mrs
 from .paid_strategy_ai import HOUSE, S, arr, obj, rowspec, strs
 
 MODEL = ai.MODEL
@@ -65,6 +66,7 @@ Now work out who buys and how they decide, from the evidence and what the first 
 IMPLICATIONS_SYSTEM = HOUSE + """
 
 Now say what the research means for paid media and for the next conversation with the client. Never promise a result; a test is a hypothesis.
+- Platforms: `client.platform` says which ad platforms the plan is for (google, meta or both). Write advertiseFirst, angles and tests for those platforms only. `metaAccount`, when given, is what the Meta ad account has already done (campaigns by objective, where the ads showed, devices, the live ads' words): use it as `account` is used for Google, and never state a Meta result it does not show. When the platform is both, say which platform should lead for what and why.
 - summary: eight bullets a busy account manager can read in a minute: who the client is, what sets it apart, who to reach, what to advertise first, what to hold back, what the site and tracking need, the biggest risk, the first move.
 - advertiseFirst: what to put paid money behind first, why (demand, margin, how clearly the site sells it, what already converted), the page to send people to, and the evidence.
 - holdBack: what not to advertise yet, and why (no page, no proof, a regulated claim, nothing known about margin).
@@ -98,8 +100,8 @@ def conversion_actions(research):
 
 
 def write_core(inputs, research, call):
-    user = ai._j({"client": ai.client_block(inputs), "website": ai.site_evidence(research), "account": ai.history_evidence(research), "reputation": reputation_evidence(research),
-                  "market": ai.market_evidence(research), "social": ai.social_evidence(research), "notAvailable": ai.missing(research, inputs)})
+    user = ai._j({"client": ai.client_block(inputs), "website": ai.site_evidence(research), "account": ai.history_evidence(research), "metaAccount": mrs.evidence(research),
+                  "reputation": reputation_evidence(research), "market": ai.market_evidence(research), "social": ai.social_evidence(research), "notAvailable": ai.missing(research, inputs)})
     return bck.core(ai._call_stage(call, "core", CORE_SYSTEM, user, CORE, 10000), ck.norm(rs.corpus(research)), ck.norm(brs.corpus(research)), research)
 
 
@@ -109,7 +111,7 @@ def _core_for_prompt(core):
 
 def write_audience(inputs, research, core, call):
     user = ai._j({"client": ai.client_block(inputs), "firstReader": _core_for_prompt(core), "website": ai.site_evidence(research, per_page=700, total=12000),
-                  "account": ai.history_evidence(research), "reputation": reputation_evidence(research), "market": ai.market_evidence(research),
+                  "account": ai.history_evidence(research), "metaAccount": mrs.evidence(research), "reputation": reputation_evidence(research), "market": ai.market_evidence(research),
                   "social": ai.social_evidence(research), "notAvailable": ai.missing(research, inputs)})
     return bck.audience(ai._call_stage(call, "audience", AUDIENCE_SYSTEM, user, AUDIENCE, 9000))
 
@@ -118,6 +120,6 @@ def write_implications(inputs, research, core, audience, call):
     rivals = ai.rival_evidence(research, per_page=500)
     user = ai._j({"client": ai.client_block(inputs), "firstReader": _core_for_prompt(core), "audience": {k: audience.get(k) for k in ("audiences", "journey", "triggers", "objections", "voice")},
                   "competitors": rivals, "reputation": reputation_evidence(research), "social": ai.social_evidence(research), "siteTracking": tech_evidence(research),
-                  "conversionActions": conversion_actions(research), "account": ai.history_evidence(research), "market": ai.market_evidence(research),
-                  "notAvailable": ai.missing(research, inputs)})
+                  "conversionActions": conversion_actions(research), "account": ai.history_evidence(research), "metaAccount": mrs.evidence(research),
+                  "market": ai.market_evidence(research), "notAvailable": ai.missing(research, inputs)})
     return bck.implications(ai._call_stage(call, "implications", IMPLICATIONS_SYSTEM, user, IMPLICATIONS, 12000), research)

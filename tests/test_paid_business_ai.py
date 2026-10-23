@@ -41,7 +41,7 @@ def test_the_first_question_is_asked_with_the_clients_evidence_and_no_money():
     (stage, user), = calls
     data = json.loads(user)
     assert stage == "core" and out["offerings"][0]["priority"] == "high"
-    assert set(data) == {"client", "website", "account", "reputation", "market", "social", "notAvailable"}
+    assert set(data) == {"client", "website", "account", "metaAccount", "reputation", "market", "social", "notAvailable"}
     assert "budget" not in data["client"] and "launch" not in data["client"] and data["client"]["name"] == "Acme Dental"
     assert data["website"]["pages"] and data["reputation"]["ratings"][0]["platform"] == "Google" and data["account"]["campaigns"] and data["market"]["adPolicy"]
     assert data["social"] is None and data["notAvailable"] == []
@@ -72,7 +72,7 @@ def test_the_second_question_is_asked_with_the_first_answer_and_the_accounts_own
     core = bai.write_core(inp, r, B.model())
     bai.write_audience(inp, r, core, B.model(calls=calls))
     data = json.loads(calls[0][1])
-    assert set(data) == {"client", "firstReader", "website", "account", "reputation", "market", "social", "notAvailable"}
+    assert set(data) == {"client", "firstReader", "website", "account", "metaAccount", "reputation", "market", "social", "notAvailable"}
     assert data["firstReader"]["usps"][0]["usp"] == "Free implant consultation" and "facts" not in data["firstReader"] and "assumptions" not in data["firstReader"]
     assert data["account"]["terms"] and data["reputation"]["questions"]
 
@@ -93,7 +93,7 @@ def test_the_third_question_sees_the_tracking_the_competitors_and_the_conversion
     aud = bai.write_audience(inp, r, core, B.model())
     out = bai.write_implications(inp, r, core, aud, B.model(calls=calls))
     data = json.loads(calls[0][1])
-    assert set(data) == {"client", "firstReader", "audience", "competitors", "reputation", "social", "siteTracking", "conversionActions", "account", "market", "notAvailable"}
+    assert set(data) == {"client", "firstReader", "audience", "competitors", "reputation", "social", "siteTracking", "conversionActions", "account", "metaAccount", "market", "notAvailable"}
     assert data["siteTracking"]["pagesRead"] >= 5 and data["siteTracking"]["toolsSeen"] == [] and any("call tracking" in g for g in data["siteTracking"]["notSeen"])
     assert data["competitors"][0]["name"] == "Smile Austin" and data["conversionActions"][0]["name"] and set(data["audience"]) == {"audiences", "journey", "triggers", "objections", "voice"}
     assert out["questions"][0]["urgency"] == "Before launch" and out["competitive"]["summary"]
