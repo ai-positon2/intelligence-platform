@@ -1,6 +1,6 @@
 /* QA Agent (Paid Marketing Agents): the Campaign Launch QC, done by the AI.
  *
- * Pick an account (the Performance Summarizer's account list), then one or more of its live
+ * Pick Google, Meta or Both and the account (a Google Ads account, a Meta ad account), then one or more of its live
  * campaigns (a multiple choice: each gets its own QC, shown as tabs). The AI reviews every check
  * on the shared checklist, reading each campaign in
  * Google Ads and its landing pages, and flags what is wrong with the fix. This page leads
@@ -36,9 +36,17 @@ var VNAME = {ready:"Ready",incomplete:"Incomplete",not_ready:"Not ready"};
 
 var root = $("#qa");
 var MAX_SEL = 10;
-var S = {list:null, items:{}, accounts:[], account:null, campaigns:[], meta:{}, sel:[], qcs:{}, campaignId:"", launchId:"", launch:null,
+var S = {list:null, lists:{}, items:{}, accounts:[], accts:[], platform:"google", account:null, campaigns:[], meta:{}, sel:[], qcs:{}, campaignId:"", launchId:"", launch:null,
          checks:{}, summary:null, needs:null, review:null, fStatus:"all", fSev:"all", closed:{}, rowMsg:{},
          inflight:{}, queued:{}, seq:0, manual:false, poll:null, startError:"", bookAll:true, bookBusy:""};
+
+/* A QC is checked against its platform's checklist (the Campaign Book checks for Google Ads, the Meta launch checklist for a Meta ad account): the ids are not the same checks. */
+function isMetaId(id){return /^act_\d+$/.test(String(id||""));}
+function useList(platform){
+  var l=S.lists[platform]||S.lists.google; if(!l) return;
+  S.list=l; S.items={}; l.items.forEach(function(it){S.items[it.id]=it;});
+}
+function pn(){return S.launch&&isMetaId(S.launch.accountId)?"Meta":"Google Ads";}
 
 /* ── Requests ─────────────────────────────────────────────── */
 function call(method, url, body){
@@ -121,45 +129,60 @@ function MultiPick(host,opts){
 }
 
 /* ── Account, then campaigns ──────────────────────────────── */
-var acctPicker = window.PMPicker($("#acctPick"),{label:"Google Ads account",search:true,onChange:function(v){pickAccount(v);}});
 var campPicker = MultiPick($("#campPick"),{label:"Live campaigns",onApply:function(ids){applySelection(ids);}});
-function setAccounts(list){
-  S.accounts=list;
-  var items=[{value:"",label:"Choose an account",sub:list.length+" accounts",avatar:"?",hue:200}];
-  list.forEach(function(a){items.push({value:a.id,label:a.name,avatar:inits(a.name),hue:hueOf(a.name),sub:dashed(a.id)+(a.currency?" · "+a.currency:"")});});
-  acctPicker.set(items,S.account?S.account.id:"");
+var scope=null, G_LIST=[], M_LIST=[];
+function acctOf(id){
+  var g=G_LIST.filter(function(x){return x.id===id;})[0]; if(g) return {id:g.id,name:g.name,platform:"google"};
+  var m=M_LIST.filter(function(x){return x.id===id;})[0]; return m?{id:m.id,name:m.name,platform:"meta"}:null;
 }
 function campaignsOff(label,sub){campPicker.off(label,sub);}
 function resetQcs(){ stopPoll(); S.sel=[]; S.qcs={}; S.campaignId=""; S.launchId=""; S.launch=null; paintTabs(); }
-function pickAccount(id){
-  var a=S.accounts.filter(function(x){return x.id===id;})[0];
-  resetQcs(); S.campaigns=[];
-  if(!a){S.account=null; campaignsOff("Choose an account first"); view("empty"); sync(); return;}
-  S.account={id:a.id,name:a.name}; try{localStorage.setItem("qa_account",a.id);}catch(e){}
+/* The platform switch and the account picker are the shared control (static/js/pm_scope.js): Google, Meta or Both (a Google Ads account and a Meta ad account, their campaigns in one list). */
+function applyScope(a,p){
+  var list=window.PMScope.partsOf(a).filter(Boolean).map(acctOf).filter(Boolean);
+  S.platform=p; resetQcs(); S.campaigns=[]; S.accts=list;
+  if(!list.length){S.account=null; campaignsOff("Choose an account first"); view("empty"); sync(); return;}
+  S.account={id:list[0].id,name:list[0].name};
+  try{localStorage.setItem("qa_account",a);}catch(e){}
   loadCampaigns();
 }
 function badgeFor(q){
   return q?'<span class="qa-dot '+q.verdict.code+'" title="'+esc(VNAME[q.verdict.code]||"")+'"></span>':"";
 }
 var CHOOSE="The AI review starts as soon as you apply your choice. Pick one campaign or several.";
+/* The live campaigns of every account chosen, in one list: each remembers its account. Resolves to {campaigns, errors}. */
+function fetchCampaigns(){
+  var accts=S.accts.length?S.accts:(S.account?[{id:S.account.id,name:S.account.name,platform:"google"}]:[]);
+  return Promise.all(accts.map(function(a){
+    return call("GET",API+"/campaigns?account="+encodeURIComponent(a.id)).then(function(r){
+      if(!r.ok) return {acct:a,error:(r.j&&r.j.error)||("HTTP "+r.status)};
+      return {acct:a,campaigns:(r.j.campaigns||[]).map(function(c){c.acct=a; return c;})};
+    }).catch(function(){return {acct:a,error:"The server could not be reached."};});
+  })).then(function(rs){
+    return {campaigns:rs.reduce(function(all,x){return all.concat(x.campaigns||[]);},[]),
+      errors:rs.filter(function(x){return x.error;}).map(function(x){return x.acct.name+": "+x.error;}), failedAll:rs.every(function(x){return x.error;})};
+  });
+}
 function loadCampaigns(keep){
   var seq=++S.seq; say(""); if(!(keep&&S.sel.length)) view("skel"); campaignsOff("Loading live campaigns…");
-  call("GET",API+"/campaigns?account="+S.account.id).then(function(r){
+  fetchCampaigns().then(function(got){
     if(seq!==S.seq) return;
-    if(!r.ok){
-      view("empty","The campaigns could not be loaded",(r.j&&r.j.error)||"Google Ads could not be read for this account.");
-      campaignsOff("Campaigns unavailable","Google Ads could not be read");
-      return say(fail(r,"The campaigns could not be loaded.")+" You can still run a QC: <a href=\"#\" id=\"goManual\">type the campaign in</a>.");
+    if(got.failedAll){
+      var why=got.errors.join(" ")||"The account could not be read.";
+      view("empty","The campaigns could not be loaded",why);
+      campaignsOff("Campaigns unavailable","The account could not be read");
+      return say(esc(why)+(S.accts.every(function(a){return a.platform==="google";})?" You can still run a QC: <a href=\"#\" id=\"goManual\">type the campaign in</a>.":""));
     }
-    S.campaigns=r.j.campaigns||[]; S.campaigns.forEach(function(c){S.meta[c.id]={name:c.name,channel:c.channel};}); paintCampaigns(); sync();
+    if(got.errors.length) say(got.errors.map(esc).join("<br>")+"<br>The campaigns of the other account are shown.","pm-note");
+    S.campaigns=got.campaigns; S.campaigns.forEach(function(c){S.meta[c.id]={name:c.name,channel:c.channel,acct:c.acct};}); paintCampaigns(); sync();
     if(keep&&S.sel.length) return;
-    if(!S.campaigns.length) return view("empty","No live campaigns","This account has no enabled campaign to QC. Enable the campaign you are launching, or pick another account.");
+    if(!S.campaigns.length) return view("empty","No live campaigns","This account has no live campaign to QC. Turn on the campaign you are launching, or pick another account.");
     view("empty","Choose campaigns",CHOOSE);
     if(S.wantCampaign){
       var want=S.wantCampaign.split(",").filter(function(id){return S.campaigns.some(function(c){return c.id===id;});}); S.wantCampaign="";
       if(want.length) applySelection(want);
     }
-  }).catch(function(){ if(seq===S.seq){view("empty");say("The server could not be reached. Try again.");} });
+  });
 }
 function paintCampaigns(){
   var items=S.campaigns.map(function(c){
@@ -169,8 +192,8 @@ function paintCampaigns(){
   campPicker.set(items,S.sel);
 }
 function startOne(id){
-  var m=S.meta[id]||{name:id,channel:""};
-  return call("POST",API+"/start",{accountId:S.account.id,accountName:S.account.name,campaignId:id,campaignName:m.name,channel:m.channel||""}).then(function(r){
+  var m=S.meta[id]||{name:id,channel:""}, a=m.acct||S.account;
+  return call("POST",API+"/start",{accountId:a.id,accountName:a.name,campaignId:id,campaignName:m.name,channel:m.channel||""}).then(function(r){
     if(!r.ok) return {error:(r.j&&r.j.error)||("HTTP "+r.status)};
     return r.j;
   }).catch(function(){return {error:"The server could not be reached."};});
@@ -257,10 +280,11 @@ function paintTabs(){
 $("#qcTabs").addEventListener("click",function(e){ var b=e.target.closest("button"); if(!b) return; if(b.dataset.c!==S.campaignId) activate(b.dataset.c); });
 function refreshCampaignList(){
   if(S.manual||!S.account) return;
-  call("GET",API+"/campaigns?account="+S.account.id).then(function(r){ if(r.ok){S.campaigns=r.j.campaigns||[];paintCampaigns();} });
+  fetchCampaigns().then(function(got){ if(!got.failedAll){S.campaigns=got.campaigns;paintCampaigns();} });
 }
 function load(j){
   var first=S.launchId!==j.launch.id;
+  useList(isMetaId(j.launch.accountId)?"meta":"google");
   S.launch=j.launch; S.launchId=j.launch.id; S.campaignId=j.launch.campaignId; S.checks=j.checks||{}; S.summary=j.summary; S.needs=j.needsClientType;
   S.review=j.launch.review||{status:""};
   if(first){ S.rowMsg={}; S.fSev="all"; S.fStatus=defaultFilter(); }
@@ -272,7 +296,7 @@ function defaultFilter(){
   return "all";
 }
 function sync(){
-  try{var q=S.account?"?account="+S.account.id+(S.sel.length?"&campaign="+S.sel.join(","):""):"";history.replaceState(null,"",location.pathname+q);}catch(e){}
+  try{var q=S.account?"?account="+S.accts.map(function(a){return a.id;}).concat(S.accts.length?[]:[S.account.id]).join("+")+(S.sel.length?"&campaign="+S.sel.join(","):""):"";history.replaceState(null,"",location.pathname+q);}catch(e){}
 }
 /* The account list is read from Google Ads, which may be rate limited or not connected. */
 function manualMode(why){
@@ -314,7 +338,7 @@ function renderReview(){
   if(running){
     var pct=r.total?Math.round(100*r.done/r.total):4;
     h='<section class="qa-review"><div class="qa-review-t"><span class="qa-spin"></span><b>The AI is doing the QC</b></div>'+
-      '<div class="qa-review-s">'+esc(r.phase||"Starting")+(r.total?" ("+r.done+" of "+r.total+" sections)":"")+'. This takes about a minute: it reads the campaign in Google Ads, opens the landing pages, then goes through the checklist.</div>'+
+      '<div class="qa-review-s">'+esc(r.phase||"Starting")+(r.total?" ("+r.done+" of "+r.total+" sections)":"")+'. This takes about a minute: it reads the campaign in '+pn()+', opens the landing pages, then goes through the checklist.</div>'+
       '<div class="qa-v-bar"><i style="width:'+pct+'%"></i></div></section>';
   }else if(r.status==="error"){
     h='<div class="pm-err">The review did not finish: '+esc(r.error||"unknown error")+' <a href="#" id="tryRead">Run it again</a>.</div>';
@@ -380,7 +404,7 @@ function tag(t,cls){return '<span class="qa-tag '+(cls||"")+'">'+esc(t)+'</span>
 function byLine(c,st){
   if(!c||!c.status) return "";
   if(c.source==="person") return (st==="fail"?"Marked wrong":st==="na"?"N/A":"Confirmed right")+" by "+esc(who(c.by))+" · "+esc(rel(c.at));
-  if(c.source==="rule") return (st==="fail"?"Flagged":"Passed")+" by an exact Google Ads rule · "+esc(rel(c.at));
+  if(c.source==="rule") return (st==="fail"?"Flagged":"Passed")+" by an exact "+pn()+" rule · "+esc(rel(c.at));
   return (st==="fail"?"Flagged":"Passed")+" by the AI · "+esc(rel(c.at));
 }
 function rowHtml(it){
@@ -396,7 +420,7 @@ function rowHtml(it){
   if(st==="todo") tags+=tag("Needs a human","need");
   var msg=S.rowMsg[id]||"", by=byLine(c,st);
   var label=st==="todo"?"Could not verify":(isFail&&!mine?"AI found":"Found");
-  if(c&&c.source==="rule") label="Google Ads";
+  if(c&&c.source==="rule") label=pn();
   return '<div class="qa-row st-'+st+'" data-id="'+esc(id)+'" id="chk-'+esc(id)+'">'+
     '<div class="qa-ctl">'+
       '<button type="button" class="qa-box" role="checkbox" aria-checked="'+pass+'" data-act="pass" title="'+(pass&&!mine?"The AI passed this. Click to confirm it yourself":pass?"Confirmed right. Click to undo":"Mark right")+'" aria-label="Right: '+esc(it.check)+'"><svg viewBox="0 0 24 24"><path d="M5 12l4 4 10-10"/></svg></button>'+
@@ -408,7 +432,7 @@ function rowHtml(it){
       (found?'<div class="qa-found'+(c.status==="fail"&&c.source!=="person"?" bad":st==="todo"?" need":"")+'"><span class="qa-found-k">'+label+'</span><span class="qa-found-v">'+esc(found)+'</span></div>':"")+
       (c&&c.fix&&(c.status==="fail")?'<div class="qa-fix"><span class="qa-found-k">Fix</span><span>'+esc(c.fix)+'</span></div>':"")+
       (c&&c.evidence&&c.source==="ai"?'<div class="qa-ev"><span class="qa-found-k">Evidence</span><span>'+esc(c.evidence)+'</span></div>':"")+
-      (c&&c.facts?'<div class="qa-ev"><span class="qa-found-k">Google Ads</span><span>'+esc(c.facts)+'</span></div>':"")+
+      (c&&c.facts?'<div class="qa-ev"><span class="qa-found-k">'+pn()+'</span><span>'+esc(c.facts)+'</span></div>':"")+
       '<p class="qa-verify">'+esc(it.verify)+'</p>'+
       '<div class="qa-foot"><span class="qa-st">'+esc(msg)+'</span>'+(by?'<span class="qa-by" title="'+esc(c&&c.by||"")+'">'+by+'</span>':"")+
         '<button type="button" class="qa-na" aria-pressed="'+na+'" data-act="na" title="Does not apply to this campaign">N/A</button></div>'+
@@ -444,7 +468,10 @@ function render(){
   paintHead(); renderBook(); renderReview();
   if(S.review&&S.review.status==="running") return;
   paintVerdict(); paintFilters(); paintSections();
-  $("#foot").innerHTML="Source: the PPC team's Campaign Book checks, reviewed by the AI. The AI answers only from what it can read in Google Ads, on the landing pages and in the campaign book you add; "+
+  $("#foot").innerHTML=isMetaId(S.launch&&S.launch.accountId)?
+    "Source: Position2's Meta launch checks, a starter written from Meta's own campaign settings (the team's own Meta checks are not written down yet), reviewed by the AI. The AI answers only from what it can read in Meta, on the landing pages and in the campaign book you add; "+
+    "Meta does not show whether the dataset received events, Conversions API, event match quality or domain verification to the API, so those stay for a person. Exact Meta rules outrank the AI, and your click outranks both.":
+    "Source: the PPC team's Campaign Book checks, reviewed by the AI. The AI answers only from what it can read in Google Ads, on the landing pages and in the campaign book you add; "+
     "Google Ads does not show some account switches to the API, so those stay for a person. Exact Google Ads rules outrank the AI, and your click outranks both. "+
     "The campaign book is for Search campaigns: a Performance Max or Demand Gen campaign is not compared with one, and the checks that would use it are judged on the spot from Google Ads.";
 }
@@ -532,7 +559,7 @@ function renderBook(){
     b?'<span class="qa-book-s ok"><b>'+esc(b.filename||"Campaign book")+'</b> · '+b.fields+' field'+(b.fields===1?"":"s")+' read'+(b.uploadedBy?' · added by '+esc(who(b.uploadedBy)):"")+(b.uploadedAt?' · '+esc(rel(b.uploadedAt)):"")+'</span>':
     '<span class="qa-book-s">Not added</span>';
   var n=S.sel.filter(takesBook).length, skipped=S.sel.length-n;
-  var all=n>1?'<label class="qa-book-all"><input type="checkbox" id="bookAll"'+(S.bookAll?" checked":"")+(busy?" disabled":"")+'> Apply to all '+n+' selected Search campaigns'+
+  var all=n>1?'<label class="qa-book-all"><input type="checkbox" id="bookAll"'+(S.bookAll?" checked":"")+(busy?" disabled":"")+'> Apply to all '+n+' selected campaigns'+
     (skipped?' ('+skipped+' other type'+(skipped===1?"":"s")+' do not use a book)':"")+'</label>':"";
   $("#bookBox").innerHTML='<section class="pm-panel qa-book"><div class="qa-book-t"><b>Campaign book</b>'+status+'</div>'+
     '<p>'+(b?'The AI compares the campaign with this book on bid strategy, devices, genders, household income, locations, age and ad schedule.':
@@ -620,27 +647,21 @@ $("#copyBtn").addEventListener("click",function(){
 
 /* ── Start ────────────────────────────────────────────────── */
 (function init(){
-  var p=new URLSearchParams(location.search), want=p.get("account")||"";
+  var p=new URLSearchParams(location.search), want=(p.get("account")||"").replace(/[^A-Za-z0-9_+]/g,"");
   S.wantCampaign=(p.get("campaign")||"").replace(/[^0-9,]/g,"");
   if(!want){try{want=localStorage.getItem("qa_account")||"";}catch(e){}}
-  view("empty"); acctPicker.set([{value:"",label:"Loading accounts…",sub:"",avatar:"…",hue:200}],"",true); campaignsOff("Choose an account first");
-  Promise.all([call("GET",API+"/checklist"),call("GET",BASE+"/api/gads/accounts")]).then(function(rs){
+  view("empty"); campaignsOff("Choose an account first");
+  Promise.all([call("GET",API+"/checklist"),call("GET",API+"/checklist?platform=meta")]).then(function(rs){
     if(!rs[0].ok){return say(fail(rs[0],"The checklist could not be loaded."));}
-    S.list=rs[0].j; S.list.items.forEach(function(it){S.items[it.id]=it;});
-    var a=rs[1];
-    if(a.ok&&a.j.accounts&&a.j.accounts.length){
-      S.accounts=a.j.accounts;
-      if(want){var hit=S.accounts.filter(function(x){return x.id===want;})[0]; if(hit){S.account={id:hit.id,name:hit.name};}}
-      setAccounts(S.accounts);
-      if(S.account) loadCampaigns();
-    }else{
-      acctPicker.set([{value:"",label:"Accounts unavailable",sub:"type it in instead",avatar:"!",hue:20}],"",true);
-      manualMode((a.j&&a.j.error)||"The account list could not be loaded from Google Ads.");
-      if(want&&/^\d{10}$/.test(want)){ $("#mId").value=want; }
-    }
+    S.lists.google=rs[0].j; if(rs[1].ok) S.lists.meta=rs[1].j; useList("google");
+    scope=window.PMScope.mount($("#acctPick"),{account:want,noGroups:true,
+      onLoaded:function(info){G_LIST=info.accounts||[]; M_LIST=info.meta||[]; S.accounts=G_LIST;},
+      onChange:function(a,pf){applyScope(a,pf);},
+      onError:function(e){
+        manualMode((e&&e.message)||"The account list could not be loaded.");
+        if(/^\d{10}$/.test(want)){ $("#mId").value=want; }
+      }});
   }).catch(function(){say("The server could not be reached. Reload to try again.");});
 })();
 
-/* A Google-only agent: the same three choices as every agent; Meta says why it has nothing here and where to look, Both keeps Google and says so. */
-if (window.PMPlatform && document.querySelector("#platSw")) window.PMPlatform.googleOnly(document.querySelector("#platSw"), {name:"QA Agent",why:"It checks a launch against the team's Campaign Book checklist, which is written for Google Ads campaigns. There is no Meta launch checklist yet.",closest:[{label:"Account Audit",href:"/p2/paid-marketing/account-audit"},{label:"Asset Coverage Audit",href:"/p2/paid-marketing/asset-coverage"},{label:"Disapproved Ads Tracker",href:"/p2/paid-marketing/disapproved-ads"}],body:"#gBody"});
 })();

@@ -6,14 +6,11 @@
     <div class="pm-hero-l">
       <span class="pm-eyebrow"><span class="d"></span>Paid Marketing · Launch QC</span>
       <h1 class="pm-title">The AI does the QC, <span class="pm-grad">you read the flags</span></h1>
-      <p class="pm-sub">Pick the account, then one or more of its live campaigns. The AI goes through the team's Campaign Book checks for you,
-        reading the campaign in Google Ads, the landing pages it sends people to, and the campaign book you add. It <b>flags what is wrong</b>,
-        says how to fix it, and lists what it cannot see for itself.</p>
+      <p class="pm-sub">Pick Google, Meta or both, then the account and one or more of its live campaigns. The AI goes through the checklist for you: <b>the team's Campaign Book checks</b> for a
+        Google Ads campaign and <b>a Meta launch checklist</b> (a starter, the team's own Meta checks are not written down yet) for a Meta campaign. It reads the campaign in Google Ads or Meta, the landing pages it
+        sends people to, and the campaign book you add. It <b>flags what is wrong</b>, says how to fix it, and lists what it cannot see for itself.</p>
     </div>
   </section>
-
-  <section class="pm-panel pd-cmd"><div id="platSw" class="pm-plat"></div></section>
-  <div id="gBody">
 
   <!-- Account, then one of its live campaigns -->
   <section class="pm-panel qa-cmd" id="cmd">
@@ -74,11 +71,11 @@
       <p class="pd-foot" id="foot"></p>
     </div>
   </div>
-  </div>
 </div>
 {% endblock %}
 {% block scripts %}
 <script src="{{ url_for('static', filename='js/pm_picker.js') }}?v=1"></script>
   <script src="{{ url_for('static', filename='js/pm_platform.js') }}?v=7"></script>
-<script src="{{ url_for('static', filename='js/qa_agent.js') }}?v=12"></script>
+  <script src="{{ url_for('static', filename='js/pm_scope.js') }}?v=2"></script>
+<script src="{{ url_for('static', filename='js/qa_agent.js') }}?v=13"></script>
 {% endblock %}

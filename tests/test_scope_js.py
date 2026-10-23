@@ -291,10 +291,9 @@ def test_every_function_a_page_calls_on_the_scope_control_is_one_it_exports():
     assert used and {n: w for n, w in used.items() if n not in exported} == {}
 
 
-def test_the_last_three_google_ads_agents_show_the_three_choices_say_why_meta_has_nothing_and_load_the_control_first():
-    for t, js, name in (("campaign_book", "campaign_book.js", "Strategy & Campaign Book"), ("qa_agent", "qa_agent.js", "QA Agent")):
-        html = open(os.path.join(ROOT, "templates", t + ".html"), encoding="utf-8").read()
-        src = open(os.path.join(JS, js), encoding="utf-8").read()
-        assert 'id="platSw"' in html and 'id="gBody"' in html and html.index("pm_platform.js") < html.index(js), t
-        assert html.index('id="platSw"') < html.index('id="gBody"') and html.count("</div>") >= html.count("<div"), t          # the wrapper opens after the control and every div is closed
-        assert "PMPlatform.googleOnly" in src and 'name:"%s"' % name in src and src.count('body:"#gBody"') == 1 and "—" not in src, t
+def test_the_qa_agent_uses_the_shared_control_for_all_three_choices_and_loads_it_first():
+    html = open(os.path.join(ROOT, "templates", "qa_agent.html"), encoding="utf-8").read()
+    src = open(os.path.join(JS, "qa_agent.js"), encoding="utf-8").read()
+    assert html.index("pm_picker.js") < html.index("pm_scope.js") < html.index("qa_agent.js") and html.count("</div>") == html.count("<div"), "qa_agent"
+    assert "PMScope.mount" in src and "noGroups:true" in src and "googleOnly" not in src and "PMPicker(" not in src and "—" not in src
+    assert 'id="platSw"' not in html and 'id="gBody"' not in html and "—" not in html
