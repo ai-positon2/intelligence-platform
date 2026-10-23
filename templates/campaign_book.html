@@ -9,15 +9,12 @@
     <div class="pm-hero-l">
       <span class="pm-eyebrow"><span class="d"></span>Paid Marketing · Strategy</span>
       <h1 class="pm-title">A full strategy and campaign book, <span class="pm-grad">built from the client's own evidence.</span></h1>
-      <p class="pm-sub">Give it a client: a website, a brief, and if there is one, the Google Ads account. It reads the client's site, the competitors' sites, what the
-        brand posts on social media, what the account has already spent, and the market, then <b>writes the strategy</b> and, for every campaign, the
-        <b>campaign book</b>: ad groups, keywords, negatives, ad copy and assets, with the settings in the layout the QA Agent checks.
-        Download it as Excel, CSV or PDF.</p>
+      <p class="pm-sub">Give it a client: a website, a brief, and if there is one, the Google Ads or Meta ad account. It reads the client's site, the competitors' sites, what the
+        brand posts on social media, what the accounts have already spent, and the market, then <b>writes the strategy</b> and, for every campaign, the
+        <b>campaign book</b>. <b>On Google</b>: ad groups, keywords, negatives, ad copy and assets. <b>On Meta</b>: an objective, ad sets aimed at interests from Meta's own list, and ads held to
+        what Meta shows. The settings are in the layout the QA Agent checks. Download it as Excel, CSV or PDF.</p>
     </div>
   </section>
-
-  <section class="pm-panel pd-cmd"><div id="platSw" class="pm-plat"></div></section>
-  <div id="gBody">
 
   <div id="msg"></div>
 
@@ -26,7 +23,7 @@
     <div class="cb-grid">
       <label class="cb-f cb-w2"><span class="pd-dd-k">Client or business name *</span><input type="text" id="fName" maxlength="120" autocomplete="off" placeholder="Acme Dental"></label>
       <label class="cb-f cb-w2"><span class="pd-dd-k">Website</span><input type="text" id="fSite" maxlength="300" autocomplete="off" placeholder="acmedental.com"></label>
-      <div class="cb-f cb-w2"><div id="acctPick"></div><span class="cb-hint" id="acctHint">Optional. With an account, the plan starts from what it has already spent and what converted.</span></div>
+      <div class="cb-f cb-w2"><div id="acctPick"></div><span class="cb-hint" id="acctHint">Optional. With an account, the plan starts from what it has already spent and what converted on that platform.</span></div>
       <label class="cb-f cb-w2"><span class="pd-dd-k">Industry</span><input type="text" id="fIndustry" maxlength="120" autocomplete="off" placeholder="Dental, SaaS, home services…"></label>
       <label class="cb-f cb-w1"><span class="pd-dd-k">Monthly budget <span id="curTag" class="cb-cur"></span></span><input type="text" inputmode="decimal" id="fBudget" maxlength="12" autocomplete="off" placeholder="6000"></label>
       <label class="cb-f cb-w1"><span class="pd-dd-k">Launch date</span><input type="date" id="fLaunch"></label>
@@ -71,12 +68,12 @@
     <div class="pm-panel-h"><span class="pm-panel-t">Saved builds</span><span class="pm-panel-s">Everyone on the team sees these. Open one to read it, download it or build it again.</span></div>
     <div id="recent"><p class="cb-fine">Loading…</p></div>
   </section>
-  <p class="pd-foot">It only recommends: nothing is changed in Google Ads. Prices, claims and facts in the ads come from the client's own pages, and anything else is listed for the client to confirm.</p>
-  </div>
+  <p class="pd-foot">It only recommends: nothing is changed in Google Ads or Meta. Prices, claims and facts in the ads come from the client's own pages, and anything else is listed for the client to confirm.</p>
 </div>
 {% endblock %}
 {% block scripts %}
   <script src="{{ url_for('static', filename='js/pm_picker.js') }}?v=1"></script>
   <script src="{{ url_for('static', filename='js/pm_platform.js') }}?v=7"></script>
-  <script src="{{ url_for('static', filename='js/campaign_book.js') }}?v=2"></script>
+  <script src="{{ url_for('static', filename='js/pm_scope.js') }}?v=2"></script>
+  <script src="{{ url_for('static', filename='js/campaign_book.js') }}?v=3"></script>
 {% endblock %}

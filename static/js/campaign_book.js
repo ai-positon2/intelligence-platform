@@ -37,8 +37,25 @@ function sendJson(url,method,body){
 function H(html){return {h:html};}
 function cell(c){return c&&typeof c==="object"&&"h" in c?c.h:esc(c);}
 
-var S = {opts:null, accounts:[], account:"", accountObj:null, goal:"leads", on:{}, kinds:[], id:"", rec:null, tab:"overview", camp:"", openC:{}, seq:0, timer:null, filter:""};
-var picker=null;
+var S = {opts:null, accounts:[], metaAccounts:[], account:"", metaAccount:"", platform:"google", accountObj:null, metaObj:null, goal:"leads", on:{}, kinds:[], id:"", rec:null, tab:"overview", camp:"", openC:{}, seq:0, timer:null, filter:""};
+var scope=null;
+
+/* The Platform switch and the account pickers are the shared control (static/js/pm_scope.js): Google plans Google Ads campaigns, Meta plans Meta campaigns (an objective each, ad sets with an
+   audience, ads), Both plans the two with a share of the budget each. S.account is the Google part, S.metaAccount the Meta part (never an MCC). */
+function applyScope(a,p){
+  var ps=window.PMScope.partsOf(a).filter(Boolean);
+  S.platform=p;
+  S.account=ps.filter(function(x){return !window.PMScope.isMeta(x);})[0]||"";
+  S.metaAccount=ps.filter(function(x){return window.PMScope.isMeta(x);})[0]||"";
+  S.accountObj=S.accounts.filter(function(x){return x.id===S.account;})[0]||null;
+  S.metaObj=S.metaAccounts.filter(function(x){return x.id===S.metaAccount;})[0]||null;
+  var first=S.accountObj||S.metaObj;
+  if(first&&!$("#fName").value.trim()) $("#fName").value=first.name;
+  if(S.opts){ S.kinds=S.kinds.filter(kindOn); paintForm(); }
+}
+function googleOn(){return S.platform!=="meta";}
+function metaOn(){return S.platform!=="google";}
+function kindOn(k){return ((S.opts&&S.opts.kindPlatforms)||{})[k]==="meta"?metaOn():googleOn();}
 
 /* ── The form ─────────────────────────────────────────────── */
 var ICON = {
@@ -46,6 +63,8 @@ var ICON = {
   competitors:'<path d="M4 20V10M10 20V4M16 20v-8M22 20H2"/>',
   social:'<circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="6" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="M8.2 10.8 15.8 7.2M8.2 13.2l7.6 3.6"/>',
   history:'<path d="M3 12a9 9 0 1 0 3-6.7M3 4v5h5M12 8v4l3 2"/>',
+  metahistory:'<path d="M3 12a9 9 0 1 0 3-6.7M3 4v5h5M12 8v4l3 2"/>',
+  metaaudience:'<circle cx="9" cy="8" r="3"/><circle cx="17" cy="9" r="2.5"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6M15 14.5c3 0 6 1.5 6 5.5"/>',
   keywords:'<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>',
   seasonality:'<path d="M3 15c3 0 3-8 6-8s3 10 6 10 3-6 6-6"/>',
   market:'<path d="M4 20V8l8-5 8 5v12zM9 20v-6h6v6"/>'
@@ -56,7 +75,11 @@ function goalsHtml(){
   }).join("");
 }
 function blocked(card){
+  var g=(S.opts.googleCards||[]).indexOf(card.key)>=0, m=(S.opts.metaCards||[]).indexOf(card.key)>=0;
+  if(g&&!googleOn()) return "Google only";
+  if(m&&!metaOn()) return "Meta only";
   if(card.needs==="account"&&!S.account) return "Needs a Google Ads account";
+  if(card.needs==="metaAccount"&&!S.metaAccount) return "Needs a Meta ad account";
   if(card.needs==="website"&&!$("#fSite").value.trim()) return "Needs a website";
   return "";
 }
@@ -73,7 +96,7 @@ function cardsHtml(){
 }
 function kindsHtml(){
   var auto=!S.kinds.length, out='<button type="button" class="pm-chip'+(auto?" on":"")+'" data-kind="" aria-pressed="'+auto+'">Let the strategist choose</button>';
-  Object.keys(S.opts.kinds).forEach(function(k){
+  Object.keys(S.opts.kinds).filter(kindOn).forEach(function(k){
     var on=S.kinds.indexOf(k)>=0;
     out+='<button type="button" class="pm-chip'+(on?" on":"")+'" data-kind="'+esc(k)+'" aria-pressed="'+on+'">'+esc(S.opts.kinds[k])+'</button>';
   });
@@ -81,7 +104,8 @@ function kindsHtml(){
 }
 function paintForm(){
   $("#goals").innerHTML=goalsHtml(); $("#cards").innerHTML=cardsHtml(); $("#kinds").innerHTML=kindsHtml();
-  $("#curTag").textContent=S.accountObj&&S.accountObj.currency?"("+S.accountObj.currency+")":"";
+  var cur=(S.accountObj||S.metaObj||{}).currency;
+  $("#curTag").textContent=cur?"("+cur+")":"";
   var warn=$("#goNote");
   if(!S.opts.modelReady) warn.innerHTML='<b>The AI is not available on this server</b> (no Anthropic key is set), so a strategy cannot be written here yet.';
 }
@@ -89,7 +113,7 @@ function setMsg(html,cls){var m=$("#msg"); m.className=cls||""; m.innerHTML=html
 
 function payload(){
   var research={}; S.opts.cards.forEach(function(c){research[c.key]=!blocked(c)&&!!S.on[c.key];});
-  return {name:$("#fName").value, website:$("#fSite").value, account:S.account, industry:$("#fIndustry").value, goal:S.goal,
+  return {name:$("#fName").value, website:$("#fSite").value, account:S.account, metaAccount:S.metaAccount, platform:S.platform, industry:$("#fIndustry").value, goal:S.goal,
     budget:$("#fBudget").value, launch:$("#fLaunch").value, locations:$("#fPlaces").value, services:$("#fServices").value, brief:$("#fBrief").value,
     avoid:$("#fAvoid").value, competitors:$("#fComp").value.split(/\n+/).map(function(s){return s.trim();}).filter(Boolean),
     campaignTypes:S.kinds.slice(), research:research};
@@ -222,6 +246,8 @@ function tabsList(){
   if(((plan.competitive||{}).competitors||[]).length||((r.competitors||{}).data||{}).competitors&&r.competitors.data.competitors.length) out.push(["competitors","Competitors"]);
   if(r.social&&(r.social.data||{}).platforms||(plan.strategy||{}).social&&(plan.strategy.social||[]).length) out.push(["social","Social media"]);
   if(r.history&&(r.history.data||{}).campaigns) out.push(["account","Google Ads account"]);
+  if(r.metahistory&&(r.metahistory.data||{}).campaigns) out.push(["maccount","Meta Ads account"]);
+  if(r.metaaudience&&(((r.metaaudience.data||{}).candidates||[]).length||((r.metaaudience.data||{}).inUse||[]).length)) out.push(["minterests","Meta interests"]);
   if(r.keywords&&((r.keywords.data||{}).ideas||[]).length) out.push(["keywords","Keywords"]);
   if(r.market&&r.market.state==="ok"||r.seasonality&&r.seasonality.state==="ok") out.push(["market","Market and season"]);
   if(plan.strategy) out.push(["strategy","Strategy"]);
@@ -233,14 +259,14 @@ function paintTabs(){
   var list=tabsList();
   if(!list.some(function(t){return t[0]===S.tab;})) S.tab="overview";
   $("#tabs").innerHTML=list.map(function(t){return '<button type="button" role="tab" class="cb-tab'+(t[0]===S.tab?" on":"")+'" data-t="'+t[0]+'" aria-selected="'+(t[0]===S.tab)+'">'+esc(t[1])+'</button>';}).join("");
-  var fn={overview:tabOverview,business:tabBusiness,competitors:tabCompetitors,social:tabSocial,account:tabAccount,keywords:tabKeywords,market:tabMarket,strategy:tabStrategy,campaigns:tabCampaigns,book:tabBook,checks:tabChecks}[S.tab];
+  var fn={overview:tabOverview,business:tabBusiness,competitors:tabCompetitors,social:tabSocial,account:tabAccount,maccount:tabMAccount,minterests:tabMInterests,keywords:tabKeywords,market:tabMarket,strategy:tabStrategy,campaigns:tabCampaigns,book:tabBook,checks:tabChecks}[S.tab];
   $("#tabBody").innerHTML=fn();
 }
 
 function tabOverview(){
   var rec=S.rec, plan=rec.plan||{}, st=plan.strategy||{}, inp=rec.inputs||{}, cur=inp.currency, fc=plan.forecast, res=rec.research||{};
   var k='<div class="cb-kpis">'+kpi("Monthly budget",inp.budget?money(inp.budget,cur):"Not given")+kpi("Campaigns",(plan.campaigns||[]).length)+
-    (fc?kpi("Expected conversions",num((fc.scenarios[1]||{}).conversions,0)+" a month","about "+money((fc.scenarios[1]||{}).cpa,cur)+" each"):kpi("Forecast","None","Needs a budget and a cost per click"))+
+    (fc?kpi("Expected conversions",num((fc.scenarios[1]||{}).conversions,0)+" a month","about "+money((fc.scenarios[1]||{}).cpa,cur)+" each"):kpi("Forecast","None",inp.platform==="meta"?"Not made for Meta":"Needs a budget and a cost per click"))+
     kpi("Claims to confirm",(plan.claims||[]).length,"with the client")+kpi("Facts on a page",((plan.profile||{}).facts||[]).filter(function(f){return f.verified;}).length+" of "+((plan.profile||{}).facts||[]).length)+'</div>';
   var out=k+sec("The plan in short",ul(st.summary));
   if(fc) out+=sec("What the budget buys",tbl(["Scenario","Cost per click","Conversion rate","Clicks","Conversions","Cost per conversion"],fc.scenarios.map(function(s){
@@ -249,7 +275,7 @@ function tabOverview(){
   var alloc=(st.budget||{}).allocation||[];
   if(alloc.length) out+=sec("Where the money goes",tbl(["Campaign","Share","A day","A month","Why"],alloc.map(function(a){return [a.campaign,num(a.share,1)+"%",money(a.daily,cur),money(a.monthly,cur),a.note];})));
   if((st.objectives||[]).length) out+=sec("Objectives",tbl(["Objective","KPI","Target","Basis"],st.objectives.map(function(o){return [o.objective,o.kpi,o.target,o.basis];})));
-  var order=["website","competitors","social","history","keywords","seasonality","market"], rows=order.filter(function(x){return res[x];}).map(function(x){
+  var order=["website","competitors","social","history","metahistory","keywords","seasonality","metaaudience","market"], rows=order.filter(function(x){return res[x];}).map(function(x){
     var p=res[x]; return [cardTitle(x),H(pill({ok:"Read",partial:"Partly",failed:"Failed",skipped:"Skipped"}[p.state]||p.state,p.state)),p.note||""];});
   out+=sec("What was read",tbl(["Research","Result","What it found"],rows),"Anything that failed is named in the strategy as missing");
   return out;
@@ -305,6 +331,25 @@ function tabAccount(){
   out+=sec("Devices",tbl(["Device","Clicks","Cost","Conv.","Per conv."],(h.devices||[]).map(function(d){return [d.device,num(d.clicks),money(d.cost),num(d.conv,1),money(d.cpa)];})));
   out+=sec("Places",tbl(["Place","Clicks","Cost","Conv.","Per conv."],(h.regions||[]).map(function(d){return [d.name,num(d.clicks),money(d.cost),num(d.conv,1),money(d.cpa)];})));
   out+=sec("The live ads",(h.ads||[]).map(function(a){return '<div class="cb-oldad"><b>'+esc(a.campaign)+'</b> · '+num(a.clicks)+' clicks, '+num(a.conv,1)+' conversions'+ul(a.headlines.slice(0,8))+'</div>';}).join(""));
+  return out;
+}
+function tabMAccount(){
+  var h=(S.rec.research.metahistory||{}).data||{}, t=h.totals||{}, cur=(h.account||{}).currency;
+  var out='<div class="cb-kpis">'+kpi("Spent",money(t.cost,cur),(h.window?h.window.start+" to "+h.window.end:""))+kpi("Results",num(t.conv,0),t.cpa?money(t.cpa,cur)+" each":"")+kpi("Conversion rate",t.cvr==null?"n/a":num(t.cvr,1)+"%")+kpi("Cost per click",money(t.cpc,cur))+kpi("Click through rate",t.ctr==null?"n/a":num(t.ctr,1)+"%")+'</div>';
+  out+=sec("Campaigns",tbl(["Campaign","Objective","Spent","Results","Per result","Conversion rate"],(h.campaigns||[]).map(function(c){return [c.name,c.type,money(c.cost),num(c.conv,1),money(c.cpa),c.cvr==null?"n/a":num(c.cvr,1)+"%"];})));
+  out+=sec("Where the ads were shown",tbl(["Placement","Share of spend","Spent","Results","Per result"],(h.placements||[]).map(function(x){return [x.name,x.share==null?"":num(x.share,1)+"%",money(x.cost),num(x.conv,1),money(x.cpa)];})));
+  out+=sec("Devices",tbl(["Device","Share of spend","Spent","Results","Per result"],(h.devices||[]).map(function(x){return [x.name,x.share==null?"":num(x.share,1)+"%",money(x.cost),num(x.conv,1),money(x.cpa)];})));
+  out+=sec("The live ads",tbl(["Ad","Campaign","Format","Headline","Text","Button"],(h.ads||[]).map(function(a){return [a.name,a.campaign,a.format,a.title,a.body,a.cta];})));
+  return out;
+}
+function tabMInterests(){
+  var d=(S.rec.research.metaaudience||{}).data||{}, q=S.filter.trim().toLowerCase();
+  var rows=(d.candidates||[]).filter(function(c){return !q||c.name.toLowerCase().indexOf(q)>=0;}).slice(0,150);
+  var out='<div class="cb-kwtools"><label><span class="pd-dd-k">Find an interest</span><input type="text" id="kwFind" value="'+esc(S.filter)+'" placeholder="Filter the interests…" autocomplete="off"></label>'+
+    '<p class="cb-fine">'+num(d.found)+' interests from Meta\'s own list for what the client sells'+((d.phrases||[]).length?" ("+esc(d.phrases.join(", "))+")":"")+'. Audience sizes are Meta\'s. The ad sets may only aim at interests from this list.</p></div>'+
+    tbl(["Interest","Audience size","Where Meta lists it","Aimed at by ad sets","Found from"],rows.map(function(c){
+      var u=c.inUse; return [c.name,c.sizeText||"n/a",(c.path||[]).join(" > "),u?num(u.adsets)+" ad sets, "+money(u.cost)+" spent, "+num(u.conv,1)+" results":"none",c.from||""];}),"cb-kwt");
+  out+=sec("Interests the ad account's ad sets aim at",tbl(["Interest","Ad sets","Spent","Results","Per result","How it is doing"],(d.inUse||[]).map(function(u){return [u.name,num(u.adsets),money(u.cost),num(u.conv,1),money(u.cpa),u.why||u.verdict];})),"Judged against the account's own cost per result");
   return out;
 }
 function tabKeywords(){
@@ -365,7 +410,34 @@ function assetsHtml(a){
   if((a.promotions||[]).length) out+='<h5 class="cb-h5">Promotions</h5>'+tbl(["Promotion","Detail"],a.promotions.map(function(p){return [p.text,p.detail];}));
   return out;
 }
+var META_SETTINGS=[["Special ad category","specialCategory"],["Budget","budgetType"],["Bid strategy","bidStrategy"],["Conversion location","conversionLocation"],["Performance goal","optimization"],["Conversion event","conversionEvent"],
+  ["Attribution","attribution"],["Locations","locations"],["Ages","ages"],["Genders","genders"],["Languages","languages"],["Placements","placements"],["Creative enhancements","creativeEnhancements"]];
+function metaAd(a,i){
+  return '<div class="cb-oldad"><b>Ad '+(i+1)+' \u00b7 '+esc(a.format)+(a.name?" \u00b7 "+esc(a.name):"")+'</b>'+
+    '<div class="cb-two"><div><h6>Primary text</h6>'+textList([a.primaryText],125)+'<h6>Headline</h6>'+textList([a.headline],40)+(a.description?'<h6>Description</h6>'+textList([a.description],30):"")+'</div>'+
+    '<div><p class="cb-fine">Button: '+esc(a.cta||"none")+'</p>'+(a.finalUrl?'<p class="cb-fine">Goes to: '+link(a.finalUrl,a.finalUrl.replace(/^https?:\/\/[^/]+/,"")||"/")+(a.landingVerified?"":' <span class="cb-flag">not seen on the site</span>')+'</p>':"")+'</div></div>'+
+    (a.concept?'<p class="cb-p"><b>Creative:</b> '+esc(a.concept)+'</p>':"")+(a.script?'<p class="cb-p"><b>Script:</b> '+esc(a.script)+'</p>':"")+'</div>';
+}
+function metaBody(c){
+  var b=c.build||{}, st=c.settings||{}, out=para(c.purpose)+(c.notes?'<p class="cb-fine">'+esc(c.notes)+'</p>':"");
+  out+='<h5 class="cb-h5">Settings</h5>'+tbl(["Setting","Value","Why"],META_SETTINGS.map(function(x){var s=st[x[1]]||{}; return [x[0],s.value||"",s.why||""];}));
+  if(!Object.keys(b).length) return out+'<div class="pm-err">This campaign could not be written: '+esc(c.buildError||"no reason was given")+'</div>';
+  (b.adSets||[]).forEach(function(g){
+    var checked=g.interestsChecked||[];
+    out+='<div class="cb-ag"><h4>'+esc(g.name)+" "+pill(g.audienceType||"interests")+" "+pill(num(g.budgetShare,0)+"% of the campaign")+'</h4>'+(g.theme?'<p class="cb-fine">'+esc(g.theme)+'</p>':"")+
+      (g.landingPage?'<p class="cb-fine">Landing page: '+link(g.landingPage,g.landingPage.replace(/^https?:\/\/[^/]+/,"")||"/")+(g.landingVerified?"":' <span class="cb-flag">not seen on the site</span>')+'</p>':"");
+    if(checked.length) out+='<h5 class="cb-h5">Interests ('+checked.length+')</h5><div class="cb-chipset">'+checked.map(function(x){return '<span class="cb-c kw" title="'+esc(x.verified?"In Meta\'s interest list":"Meta could not be asked: not checked")+'">'+esc(x.name)+(x.sizeText?" \u00b7 "+esc(x.sizeText):"")+(x.verified?"":" (not checked)")+'</span>';}).join("")+'</div>';
+    [["Behaviors",g.behaviors],["Custom audiences",g.customAudiences],["Lookalikes",g.lookalikes]].forEach(function(x){ if((x[1]||[]).length) out+='<h5 class="cb-h5">'+x[0]+'</h5>'+chips(x[1]); });
+    if((g.excludes||[]).length) out+='<h5 class="cb-h5">Excluded</h5>'+chips(g.excludes,"bad");
+    if(g.placements) out+='<p class="cb-fine">Placements: '+esc(g.placements)+'</p>';
+    out+=(g.ads||[]).map(metaAd).join("")+'</div>';
+  });
+  if((c.claims||[]).length) out+='<h5 class="cb-h5">Claims to confirm with the client</h5>'+tbl(["Where","Text","Claim"],c.claims.map(function(x){return [x.where,x.text,x.claim];}));
+  if((b.shortfalls||[]).length) out+='<div class="pm-note warn">'+esc(b.shortfalls.join(" "))+'</div>';
+  return out;
+}
 function campaignBody(c){
+  if(c.platform==="meta") return metaBody(c);
   var b=c.build||{}, st=c.settings||{}, out="";
   out+=para(c.purpose)+(c.notes?'<p class="cb-fine">'+esc(c.notes)+'</p>':"");
   out+='<h5 class="cb-h5">Settings</h5>'+tbl(["Setting","Value","Why"],[["Bid strategy","bidStrategy"],["Locations","locations"],["Devices","devices"],["Genders","genders"],["Household income","income"],["Ages","ages"],["Ad schedule","schedule"],["Language","language"]].map(function(x){
@@ -413,6 +485,7 @@ function campaignBody(c){
   return out;
 }
 function campSummary(c){
+  if(c.platform==="meta"){var sets=(c.build||{}).adSets||[]; return sets.length+" ad sets \u00b7 "+sets.reduce(function(a,x){return a+(x.ads||[]).length;},0)+" ads";}
   var b=c.build||{}, g=(b.adGroups||[]), n=g.length||(b.assetGroups||[]).length, kw=g.reduce(function(a,x){return a+(x.keywords||[]).length;},0), ads=g.reduce(function(a,x){return a+(x.ads||[]).length;},0);
   return c.kind==="pmax"?n+" asset group"+(n===1?"":"s"):c.kind==="search"?n+" ad groups · "+kw+" keywords · "+ads+" ads":n+" ad groups";
 }
@@ -445,6 +518,8 @@ function tabChecks(){
   var d=Object.keys(c.dropped||{}).map(function(k){return c.dropped[k]+" "+k+" over a limit or outside the client's site were left out";});
   out+=sec("What was held back",ul(d.concat((c.removedNegatives||[]).map(function(r){return r.campaign+": the negative "+r.negative+" ["+r.match+"] would block the keyword "+r.blocked+", so it was removed";}))));
   out+=sec("What the writing came up short on",ul(c.shortfalls));
+  out+=sec("Meta interests that could not be checked",ul(c.interestNotes),"Meta's own list is asked once more for every interest an ad set names");
+  if(c.learningNotChecked) out+=sec("Meta learning bar not checked",'<p class="cb-p">'+c.learningNotChecked+' Meta campaign'+(c.learningNotChecked===1?"":"s")+' could not be held to about 50 results a week: the account has no cost per result for the objective, or the objective has no result to count.</p>');
   out+=sec("What was not available",ul(c.missing),"The strategy says where it is working without these");
   if(c.unconfirmedFacts) out+=sec("Facts not found on a page",'<p class="cb-p">'+c.unconfirmedFacts+' fact'+(c.unconfirmedFacts===1?"":"s")+' the strategist listed could not be found word for word on the pages that were read. They are marked in The business tab.</p>');
   var cost=S.rec.cost||{};
@@ -461,8 +536,8 @@ function reuse(rec){
   set("#fPlaces",i.locations); set("#fServices",i.services); set("#fBrief",i.brief); set("#fAvoid",i.avoid);
   set("#fComp",(i.competitors||[]).map(function(c){return c.url||c.name;}).join("\n"));
   S.goal=i.goal||"leads"; S.kinds=(i.campaignTypes||[]).slice();
-  S.account=i.account||""; S.accountObj=S.accounts.filter(function(a){return a.id===S.account;})[0]||null;
-  picker.set(S.pickerItems,S.account);
+  var want=i.account&&i.metaAccount?i.account+"+"+i.metaAccount:(i.metaAccount||i.account||"");
+  if(scope&&want) scope.select(want); else applyScope("",i.platform||S.platform);
   S.opts.cards.forEach(function(c){S.on[c.key]=i.research?!!i.research[c.key]:!!c.default;});
   paintForm(); window.scrollTo&&window.scrollTo(0,0);
 }
@@ -521,7 +596,7 @@ document.addEventListener("toggle",function(e){
 document.addEventListener("input",function(e){
   if(e.target.id==="fSite") paintForm();
   if(e.target.id==="kwFind"){
-    S.filter=e.target.value; var pos=e.target.selectionStart; $("#tabBody").innerHTML=tabKeywords(); var f=$("#kwFind"); if(f){f.focus(); try{f.setSelectionRange(pos,pos);}catch(x){}}
+    S.filter=e.target.value; var pos=e.target.selectionStart; $("#tabBody").innerHTML=(S.tab==="minterests"?tabMInterests:tabKeywords)(); var f=$("#kwFind"); if(f){f.focus(); try{f.setSelectionRange(pos,pos);}catch(x){}}
   }
 });
 document.addEventListener("click",function(e){var d=document.querySelector(".cb-more[open]"); if(d&&!d.contains(e.target)) d.removeAttribute("open");});
@@ -529,28 +604,18 @@ document.addEventListener("click",function(e){var d=document.querySelector(".cb-
 /* ── Start ────────────────────────────────────────────────── */
 function dashDate(days){var d=new Date(); d.setDate(d.getDate()+days); return d.getFullYear()+"-"+("0"+(d.getMonth()+1)).slice(-2)+"-"+("0"+d.getDate()).slice(-2);}
 function init(){
-  picker=window.PMPicker($("#acctPick"),{label:"Google Ads account (optional)",search:true,onChange:function(v){
-    S.account=v; S.accountObj=S.accounts.filter(function(a){return a.id===v;})[0]||null;
-    if(S.accountObj&&!$("#fName").value.trim()) $("#fName").value=S.accountObj.name;
-    paintForm();
-  }});
-  picker.set([{value:"",label:"No account",sub:"Website and brief only",avatar:"?",hue:200}],"",true);
   $("#fLaunch").value=dashDate(14); $("#fLaunch").min=dashDate(0);
-  Promise.all([getJson(API+"/options"),getJson("/p2/paid-marketing/api/segments/accounts")]).then(function(rs){
-    var o=rs[0], a=rs[1];
+  getJson(API+"/options").then(function(o){
     if(!o.ok){setMsg(esc((o.j&&o.j.error)||"The page could not load its options."));return;}
     S.opts=o.j; S.opts.cards.forEach(function(c){S.on[c.key]=!!c.default; CARD_TITLE[c.key]=c.title;});
-    S.accounts=(a.ok&&a.j.accounts)||[];
-    var items=[{value:"",label:"No account",sub:"Website and brief only",avatar:"?",hue:200}];
-    S.accounts.forEach(function(x){items.push({value:x.id,label:x.name,avatar:inits(x.name),hue:hueOf(x.name),sub:dashed(x.id)});});
-    S.pickerItems=items; picker.set(items,"");
-    if(!a.ok) $("#acctHint").textContent="The Google Ads accounts could not be listed, so this build can use the website and the brief only.";
+    scope=window.PMScope.mount($("#acctPick"),{account:"",noGroups:true,optional:true,
+      onLoaded:function(info){S.accounts=info.accounts||[]; S.metaAccounts=info.meta||[];},
+      onChange:function(a,pf){applyScope(a,pf);},
+      onError:function(e){$("#acctHint").textContent="The accounts could not be listed ("+((e&&e.message)||"unknown")+"), so this build can use the website and the brief only.";}});
     paintForm(); loadRecent();
     var want=(location.search.match(/[?&]build=([0-9a-f]{32})/)||[])[1]; if(want) watch(want);
   }).catch(function(){setMsg("The server could not be reached. Try again.");});
 }
 if(document.readyState==="loading") document.addEventListener("DOMContentLoaded",init); else init();
 
-/* A Google-only agent: the same three choices as every agent; Meta says why it has nothing here and where to look, Both keeps Google and says so. */
-if (window.PMPlatform && document.querySelector("#platSw")) window.PMPlatform.googleOnly(document.querySelector("#platSw"), {name:"Strategy & Campaign Book",why:"It writes Google Ads campaigns: keywords and match types, ad and extension text held to Google's limits, budgets and bid strategies. A Meta plan (objectives, ad sets, audiences, placements, creative) is not written by this agent yet.",closest:[{label:"Business Research",href:"/p2/paid-marketing/business-research"},{label:"Ad Copy & Creative Generator",href:"/p2/paid-marketing/ad-copy"},{label:"Account Audit",href:"/p2/paid-marketing/account-audit"}],body:"#gBody"});
 })();

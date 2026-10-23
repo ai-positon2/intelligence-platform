@@ -95,7 +95,9 @@ function target(spec) {
 })();
 """
 
-OPTIONS = {"cards": ps.CARDS, "goals": ps.GOALS, "kinds": {k: v["label"] for k, v in ps.KINDS.items()}, "buildsPerDay": 12, "modelReady": True}
+OPTIONS = {"cards": ps.CARDS, "goals": ps.GOALS, "kinds": {k: v["label"] for k, v in ps.KINDS.items()}, "kindPlatforms": {k: ps.platform_of_kind(k) for k in ps.KINDS}, "googleCards": list(ps.GOOGLE_CARDS),
+           "metaCards": list(ps.META_CARDS), "buildsPerDay": 12, "modelReady": True}
+META_ACCOUNTS = {"accounts": [{"id": "act_1234567", "name": "Acme Dental", "currency": "USD", "platform": "meta"}, {"id": "act_7654321", "name": "Other Meta", "currency": "USD", "platform": "meta"}]}
 ACCOUNTS = {"accounts": [{"id": "1234567890", "name": "Acme Dental", "currency": "USD"}, {"id": "2345678901", "name": "Northwind <b>Dental</b>", "currency": "USD"}], "groups": []}
 
 
@@ -109,7 +111,8 @@ def plan_rec():
 
 
 def run(scenario):
-    base = {"responses": [{"match": "/strategy/options", "body": OPTIONS}, {"match": "/segments/accounts", "body": ACCOUNTS}, {"match": "/strategy/list", "body": {"builds": []}}]}
+    base = {"responses": [{"match": "/strategy/options", "body": OPTIONS}, {"match": "/segments/accounts", "body": ACCOUNTS}, {"match": "/gads/accounts", "body": META_ACCOUNTS},
+                                          {"match": "/strategy/list", "body": {"builds": []}}]}
     scenario = dict(scenario)
     scenario["responses"] = scenario.get("responses", []) + base["responses"]
     out = subprocess.run(["node", "-e", HARNESS, JS, json.dumps(scenario)], capture_output=True, text=True, timeout=60)
@@ -142,11 +145,11 @@ def test_the_form_shows_the_goals_the_cards_the_kinds_and_the_accounts():
     h = out["el"]
     assert h["#goals"]["html"].count("data-g=") == 5 and 'data-g="leads"' in h["#goals"]["html"] and 'aria-checked="true"' in h["#goals"]["html"]
     cards = h["#cards"]["html"]
-    assert cards.count('<button type="button" class="cb-card') == 7 and "Client website" in cards and "Social Media Intelligence" in cards and cards.count("Uses paid data") == 2
+    assert cards.count('<button type="button" class="cb-card') == 9 and "Client website" in cards and "Social Media Intelligence" in cards and cards.count("Uses paid data") == 2
     assert 'data-k="history"' in cards and "Needs a Google Ads account" in cards and "Needs a website" in cards                   # no account and no website yet
-    assert h["#kinds"]["html"].count("data-kind=") == 6 and "Let the strategist choose" in h["#kinds"]["html"]
-    items = out["picker"][-1][0]
-    assert [i["label"] for i in items] == ["No account", "Acme Dental", "Northwind <b>Dental</b>"] and items[1]["sub"] == "123-456-7890"
+    assert cards.count("Meta only") == 2                                                                                          # on Google the two Meta cards are for Meta only
+    assert h["#kinds"]["html"].count("data-kind=") == 6 and "Let the strategist choose" in h["#kinds"]["html"] and "Meta Leads" not in h["#kinds"]["html"]
+    assert out["scopeOpts"] == {"noGroups": True, "optional": True}                       # the shared platform and account control
 
 
 def test_a_card_that_cannot_work_cannot_be_turned_on_until_what_it_needs_is_given():
@@ -155,7 +158,7 @@ def test_a_card_that_cannot_work_cannot_be_turned_on_until_what_it_needs_is_give
     assert history.startswith(' aria-pressed="false" aria-disabled="true"') and "Needs a Google Ads account" in history          # the click changed nothing
     typed = run({"values": {"#fSite": "acme.com"}, "steps": [{"fire": ["input", {"id": "fSite"}]}]})
     assert "Needs a website" not in typed["el"]["#cards"]["html"] and typed["el"]["#cards"]["html"].count("Needs a Google Ads account") == 2
-    assert out["el"]["#cards"]["html"].count('aria-pressed="true"') == 4                  # competitors, social, keywords and market: website needs a site, history and seasonality an account
+    assert out["el"]["#cards"]["html"].count('aria-pressed="true"') == 4                  # competitors, social, keywords and market: website needs a site, history and seasonality an account, the Meta cards are for Meta
     assert typed["el"]["#cards"]["html"].count('aria-pressed="true"') == 5
 
 
@@ -179,7 +182,8 @@ def test_the_form_is_sent_as_it_was_filled_in():
     sent = next(c for c in out["calls"] if c["url"].endswith("/strategy/start"))
     b = sent["body"]
     assert b["name"] == "Acme Dental" and b["website"] == "acme.com" and b["budget"] == "6000" and b["goal"] == "leads" and b["campaignTypes"] == ["search"] and b["account"] == ""
-    assert b["competitors"] == ["smile.com", "Another"] and b["research"] == {"website": True, "competitors": True, "social": False, "history": False, "keywords": True, "seasonality": False, "market": True}
+    assert b["competitors"] == ["smile.com", "Another"] and b["research"] == {"website": True, "competitors": True, "social": False, "history": False, "metahistory": False, "keywords": True, "seasonality": False, "metaaudience": False, "market": True}
+    assert b["metaAccount"] == "" and b["platform"] == "google"
     assert out["hist"][-1] == "/p2/paid-marketing/campaign-book?build=" + "a" * 32 and out["el"]["#builder"]["hidden"] is True and out["el"]["#run"]["hidden"] is False
 
 
@@ -373,10 +377,14 @@ def test_a_finished_builds_details_can_be_put_back_in_the_form_to_be_changed(pla
     rec["inputs"].update(account="1234567890", brief="A brief", competitors=[{"name": "smile.com", "url": "https://smile.com/"}, {"name": "Another", "url": ""}], campaignTypes=["search"],
                          research={"website": True, "competitors": False, "social": True, "history": True, "keywords": True, "seasonality": False, "market": True})
     out = run(opened(rec) | {"steps": [press("reuseBtn")]})
+    sc = opened(rec)
+    again = run(dict(sc, steps=[press("reuseBtn"), press("goBtn")], responses=sc["responses"] + [{"match": "/strategy/start", "method": "POST", "status": 201, "body": {"id": "b" * 32}}, {"match": "/status", "body": {"status": "running", "progress": {"steps": []}}}]))
+    sent = next(c for c in again["calls"] if c["url"].endswith("/strategy/start"))["body"]
+    assert sent["account"] == "1234567890" and sent["platform"] == "google" and sent["metaAccount"] == ""                          # the account of the saved build is chosen again
     el = out["el"]
     assert el["#fName"]["value"] == "Acme Dental" and el["#fSite"]["value"] == "acmedental.com" and el["#fBudget"]["value"] == "6000" and el["#fLaunch"]["value"] == "2026-11-02"
     assert el["#fComp"]["value"] == "https://smile.com/\nAnother" and el["#fBrief"]["value"] == "A brief" and el["#fPlaces"]["value"] == "Austin, TX"
-    assert out["picker"][-1][1] == "1234567890" and el["#builder"]["hidden"] is False and el["#result"]["hidden"] is True
+    assert el["#builder"]["hidden"] is False and el["#result"]["hidden"] is True
     cards = el["#cards"]["html"]
     assert cards.split('data-k="competitors"')[1].split("</button>")[0].count('aria-pressed="false"') == 1 and cards.split('data-k="history"')[1].split("</button>")[0].count('aria-pressed="true"') == 1
     assert 'data-kind="search" aria-pressed="true"' in el["#kinds"]["html"]
@@ -445,3 +453,124 @@ def test_a_build_made_a_moment_ago_says_just_now(plan_rec):
     assert "by ana just now" in run(opened(rec))["el"]["#rMeta"]["html"]
     rec["createdAt"] = (datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(minutes=5)).isoformat()
     assert "by ana 5 min ago" in run(opened(rec))["el"]["#rMeta"]["html"]
+
+
+# ── Meta ────────────────────────────────────────────────────────────────────
+
+def _public(platform):
+    from tests import test_paid_strategy_meta_job as MJ
+    store, sid = MJ.start(platform=platform, **({"account": "1234567890"} if platform == "both" else {}))
+    MJ.run(store, sid)
+    return json.loads(json.dumps(ps.public(store.get(sid))))
+
+
+@pytest.fixture(scope="module")
+def mrec():
+    return _public("meta")
+
+
+@pytest.fixture(scope="module")
+def brec():
+    return _public("both")
+
+
+def _started(steps, values=None):
+    out = run({"values": values or {"#fName": "Acme", "#fSite": "acme.com"}, "steps": steps + [press("goBtn")],
+               "responses": [{"match": "/strategy/start", "method": "POST", "status": 201, "body": {"id": "a" * 32}}, {"match": "/status", "body": {"status": "running", "progress": {"steps": []}}}]})
+    return next(c for c in out["calls"] if c["url"].endswith("/strategy/start"))["body"], out
+
+
+def test_the_platform_decides_which_campaign_types_and_cards_are_offered_and_what_is_sent():
+    out = run({"steps": [{"scope": ["act_1234567", "meta"]}]})
+    kinds, cards = out["el"]["#kinds"]["html"], out["el"]["#cards"]["html"]
+    assert kinds.count("data-kind=") == 5 and "Meta Leads" in kinds and "Performance Max" not in kinds
+    assert "Google only" in cards.split('data-k="history"')[1].split("</button>")[0] and "Google only" in cards.split('data-k="keywords"')[1].split("</button>")[0]
+    assert "Needs a Meta ad account" not in cards and 'aria-pressed="true"' in cards.split('data-k="metaaudience"')[1].split("</button>")[0]
+    body, _ = _started([{"scope": ["act_1234567", "meta"]}, click({"#kinds [data-kind]": {"data-kind": "metasales"}})])
+    assert body["metaAccount"] == "act_1234567" and body["account"] == "" and body["platform"] == "meta" and body["campaignTypes"] == ["metasales"]
+    assert body["research"]["metahistory"] is True and body["research"]["metaaudience"] is True and body["research"]["history"] is False and body["research"]["keywords"] is False
+    both, _ = _started([{"scope": ["1234567890+act_1234567", "both"]}])
+    assert both["account"] == "1234567890" and both["metaAccount"] == "act_1234567" and both["platform"] == "both" and both["research"]["history"] is True and both["research"]["metahistory"] is True
+    kinds_both = run({"steps": [{"scope": ["1234567890+act_1234567", "both"]}]})["el"]["#kinds"]["html"]
+    assert kinds_both.count("data-kind=") == 10
+
+
+def test_changing_the_platform_takes_the_other_platforms_chosen_types_out_of_what_is_sent():
+    body, _ = _started([click({"#kinds [data-kind]": {"data-kind": "search"}}), {"scope": ["act_1234567", "meta"]}])
+    assert body["campaignTypes"] == [] and body["platform"] == "meta"
+
+
+def test_a_saved_meta_build_chooses_its_meta_account_again(mrec):
+    sc = opened(mrec)
+    out = run(dict(sc, steps=[press("reuseBtn"), press("goBtn")], responses=sc["responses"] + [{"match": "/strategy/start", "method": "POST", "status": 201, "body": {"id": "b" * 32}}, {"match": "/status", "body": {"status": "running", "progress": {"steps": []}}}]))
+    sent = next(c for c in out["calls"] if c["url"].endswith("/strategy/start"))["body"]
+    assert sent["metaAccount"] == "act_1234567" and sent["platform"] == "meta" and sent["account"] == ""
+
+
+def tabs_of(out):
+    return [t.split("</button>")[0].split(">")[-1] for t in out["el"]["#tabs"]["html"].split("<button")[1:]]
+
+
+def test_a_meta_plan_has_the_meta_account_and_interest_tabs_and_none_of_googles(mrec):
+    t = tabs_of(run(opened(mrec)))
+    assert "Meta Ads account" in t and "Meta interests" in t and "Campaigns (2)" in t and "Campaign Book" in t and "Google Ads account" not in t and "Keywords" not in t
+    google_and_meta = tabs_of(run(opened(_public("both"))))
+    assert "Meta Ads account" in google_and_meta and "Google Ads account" in google_and_meta and "Keywords" in google_and_meta and "Meta interests" in google_and_meta and "Campaigns (4)" in google_and_meta
+
+
+def test_a_meta_campaign_opens_into_settings_ad_sets_interests_and_ads(mrec):
+    out = run(opened(mrec) | {"steps": [tab("campaigns"), {"fire": ["toggle", {"id": "d", "classes": ["cb-camp"], "attrs": {"data-key": "metaleadsimplants"}, "open": True, "body": "m"}]}]})
+    closed = run(opened(mrec) | {"steps": [tab("campaigns")]})["el"]["#tabBody"]["html"]
+    assert closed.count("<details") == 2 and "P2_MetaLeads_Implants_20261102" in closed and "2 ad sets · 6 ads" in closed and "Meta Leads" in closed and "70%" in closed
+    m = out["bodies"]["m"]
+    assert "Special ad category" in m and "Highest volume" in m and "Performance goal" in m and "Maximize number of conversions (leads)" in m and "Creative enhancements" in m
+    assert "Missing teeth" in m and "Lookalike of leads" in m and "70% of the campaign" in m and "Interests (2)" in m and "Insulin pump" in m and "Made Up Interest" not in m and "1.0M to 1.2M" in m and "Excluded" in m and "Dental students" in m
+    assert "Primary text" in m and "Missing a tooth? Free consultation for dental implants" in m and "%d/125" % len("Missing a tooth? Free consultation for dental implants") in m and "Dental Implants In Austin" in m and "%d/40" % len("Dental Implants In Austin") in m and "Button: Book Now" in m
+    assert "Creative:" in m and "Script:" in m and "Goes to:" in m and "cb-adprev" not in m and "Negative keywords" not in m
+
+
+def test_an_interest_that_could_not_be_checked_is_marked_on_the_page(mrec):
+    r = json.loads(json.dumps(mrec))
+    first = r["plan"]["campaigns"][0]["build"]["adSets"][0]
+    first["interestsChecked"][0].update(verified=False, sizeText="")
+    out = run(opened(r) | {"steps": [tab("campaigns"), {"fire": ["toggle", {"id": "d", "classes": ["cb-camp"], "attrs": {"data-key": "metaleadsimplants"}, "open": True, "body": "m"}]}]})
+    assert "(not checked)" in out["bodies"]["m"] and "Meta could not be asked: not checked" in out["bodies"]["m"]
+
+
+def test_the_meta_account_and_interest_tabs_show_what_meta_gave(mrec):
+    h = run(opened(mrec) | {"steps": [tab("maccount")]})["el"]["#tabBody"]["html"]
+    assert "Leads &lt;b&gt;Spring&lt;/b&gt;" in h and "Facebook" in h and "77.7%" in h and "Mobile" in h and "Spring offer" in h and "901" in h and "Instagram" in h
+    i = run(opened(mrec) | {"steps": [tab("minterests")]})["el"]["#tabBody"]["html"]
+    assert "Insulin pump" in i and "1.0M to 1.2M" in i and "1 ad sets" in i and "aim at" in i and "Judged against the account" in i
+    found = run(opened(mrec) | {"steps": [tab("minterests"), {"set": ["#kwFind", "diabetes"]}, {"fire": ["input", {"id": "kwFind", "value": "diabetes"}]}]})["el"]["#tabBody"]["html"]
+    assert 'value="diabetes"' in found and "Diabetes" in found.split("Interests the ad")[0] and "Insulin</td>" not in found.split("Interests the ad")[0]
+
+
+def test_the_meta_book_is_the_meta_checklist_and_the_overview_and_checks_say_what_meta_could_not_say(mrec):
+    book = run(opened(mrec) | {"steps": [tab("book")]})["el"]["#tabBody"]["html"]
+    assert "Campaign Objective" in book and "Conversion Location" in book and "Networks" not in book and "Special Ad Categories" in book
+    ov = run(opened(mrec))["el"]["#tabBody"]["html"]
+    assert "Meta Ads history" in ov and "Meta interests and audiences" in ov and "Not made for Meta" in ov
+    r = json.loads(json.dumps(mrec))
+    r["plan"]["checks"].update(learningNotChecked=1, interestNotes=["Meta's interest list could not be asked, so no interest is checked."])
+    checks = run(opened(r) | {"steps": [tab("checks")]})["el"]["#tabBody"]["html"]
+    assert "Meta interests that could not be checked" in checks and "so no interest is checked" in checks and "Meta learning bar not checked" in checks and "1 Meta campaign could not be held" in checks
+
+
+def test_nothing_meta_or_the_model_wrote_can_run_as_html_on_the_meta_page(mrec):
+    r = json.loads(json.dumps(mrec))
+    evil = "<img src=x onerror=alert(1)>"
+    c = r["plan"]["campaigns"][0]
+    c["purpose"] = evil
+    c["settings"]["bidStrategy"]["value"] = evil
+    s = c["build"]["adSets"][0]
+    s["name"], s["theme"] = evil, evil
+    s["interestsChecked"][0]["name"] = evil
+    s["excludes"] = [evil]
+    s["ads"][0].update(primaryText=evil, headline=evil, cta=evil, concept=evil, script=evil, finalUrl="javascript:alert(1)")
+    r["research"]["metahistory"]["data"]["campaigns"][0]["name"] = evil
+    r["research"]["metaaudience"]["data"]["candidates"][0]["name"] = evil
+    out = run(opened(r) | {"steps": [tab("campaigns"), {"fire": ["toggle", {"id": "d", "classes": ["cb-camp"], "attrs": {"data-key": "metaleadsimplants"}, "open": True, "body": "m"}]}]})
+    assert "<img" not in out["bodies"]["m"] and "&lt;img" in out["bodies"]["m"] and "javascript:alert" not in out["bodies"]["m"].replace("&quot;", '"').split("href=")[-1][:20]
+    for name in ("maccount", "minterests"):
+        assert "<img" not in run(opened(r) | {"steps": [tab(name)]})["el"]["#tabBody"]["html"], name
