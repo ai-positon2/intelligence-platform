@@ -213,3 +213,29 @@ def test_the_monday_summary_covers_the_spend_alert_too():
                    "nextStep": "n", "status": "open", "firstSeen": "2026-10-19T07:00:00+00:00", "lastSeen": "2026-10-26T06:00:00+00:00", "data": {}}])
     sent = pm.send_weekly("spend", s, base_link=BASE, deliver=dv, now=MON)
     assert sent["sent"] is True and dv.emails[-1]["subject"].startswith("Spend Anomaly Alert: weekly summary, 1 open") and dv.emails[-1]["text"].endswith("/p2/paid-marketing/spend-anomaly")
+
+
+@pytest.mark.parametrize("agent", ["disapproved", "geoconf", "kpi", "copycheck"])
+def test_a_real_run_reads_meta_accounts_with_the_platforms_own_meta_reads_when_none_are_handed_in(monkeypatch, agent):
+    """The first live run failed every Meta account with "'NoneType' object is not callable": the monitors were built with no Meta reader and only the tests handed one in."""
+    from tracker import paid_meta, paid_store
+    asked = []
+    monkeypatch.setattr(paid_meta, "_pages", lambda path, params, store, **kw: asked.append((path, store is paid_store)) or [])
+    monkeypatch.setattr(paid_meta, "account_by_id", lambda store, act, **kw: {"id": act, "name": "Meta Co", "currency": "EUR"})
+    m = {"id": "act_55", "name": "Meta Co", "platform": "meta", "group": "g"}
+    spec = pm.spec_for(agent, MemStore(), today=dt.date(2026, 10, 1), search_fn=lambda *a, **k: [], list_fn=lambda: LISTED, now_fn=lambda: TUE)
+    got = spec["collect"]([m], [])
+    assert asked and all(path.startswith("/act_55") and ours for path, ours in asked)
+    assert got["unreadable"] == [] and got["okIds"] == {"act_55"}
+
+
+def test_a_meta_account_whose_details_cannot_be_read_is_still_read(monkeypatch):
+    from tracker import paid_meta
+    monkeypatch.setattr(paid_meta, "_pages", lambda path, params, store, **kw: [])
+
+    def down(store, act, **kw):
+        raise RuntimeError("Meta is down")
+    monkeypatch.setattr(paid_meta, "account_by_id", down)
+    m = {"id": "act_55", "name": "Meta Co", "platform": "meta", "group": "g"}
+    got = pm.spec_for("disapproved", MemStore(), today=dt.date(2026, 10, 1), search_fn=lambda *a, **k: [], list_fn=lambda: LISTED, now_fn=lambda: TUE)["collect"]([m], [])
+    assert got["unreadable"] == [] and got["okIds"] == {"act_55"}

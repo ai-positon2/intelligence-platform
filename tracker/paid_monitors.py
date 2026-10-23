@@ -39,8 +39,25 @@ def link_for(agent, base):
     return base.rstrip("/") + AGENTS[agent]["page"]
 
 
+def _meta_reads(pages_fn, account_fn):
+    """The Meta reads a monitor uses when none is handed in (a real run hands none in): every page of a Graph list, and the ad account's name and currency (an account whose details cannot be
+    read is read in USD under its id)."""
+    from . import paid_meta, paid_store
+    if pages_fn is None:
+        def pages_fn(path, params):
+            return paid_meta._pages(path, params, paid_store)
+    if account_fn is None:
+        def account_fn(act):
+            try:
+                return paid_meta.account_by_id(paid_store, act) or {}
+            except Exception:                                                        # noqa: BLE001 (a name and a currency are not worth skipping the account for)
+                return {}
+    return pages_fn, account_fn
+
+
 def spec_for(agent, store, *, today=None, search_fn=None, list_fn=None, meta_pages_fn=None, meta_account_fn=None, now_fn=None):
     agent_of(agent)
+    meta_pages_fn, meta_account_fn = _meta_reads(meta_pages_fn, meta_account_fn)
     day = today or (now_fn() if now_fn else dt.datetime.now(dt.timezone.utc)).date()
     if agent == "brandspend":
         from . import paid_brandspend_monitor as bm
