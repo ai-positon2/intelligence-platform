@@ -15,6 +15,7 @@ from concurrent.futures import ThreadPoolExecutor
 from . import paid_gads_segments as gads
 
 WORKERS = 4
+META_WORKERS = 4
 _LIMIT = re.compile(r"\s+LIMIT\s+\d+\s*$", re.I)
 
 
@@ -102,17 +103,19 @@ def check_google(account_id, *, search_fn=None, queries=None, workers=WORKERS):
         return list(pool.map(run, qs))
 
 
-def check_meta(act, *, pages_fn, requests=None):
-    """[{agent, label, ok, error}] for every Meta read sent to one ad account, one row each."""
-    out = []
-    for agent, label, path, params in (requests if requests is not None else meta_requests(act)):
+def check_meta(act, *, pages_fn, requests=None, workers=META_WORKERS):
+    """[{agent, label, ok, error}] for every Meta read sent to one ad account, one row each, a few at a time (they are many, and slow one by one)."""
+    reqs = list(requests if requests is not None else meta_requests(act))
+
+    def one(item):
+        agent, label, path, params = item
         if path is None:
-            out.append({"agent": agent, "label": label, "ok": False, "error": "could not be built: %s" % params.get("_build_error"), "rows": 0, "ms": 0})
-            continue
+            return {"agent": agent, "label": label, "ok": False, "error": "could not be built: %s" % params.get("_build_error"), "rows": 0, "ms": 0}
         t0 = time.monotonic()
         try:
             rows = pages_fn(path, params)
-            out.append({"agent": agent, "label": label, "ok": True, "error": "", "rows": len(rows or []), "ms": int((time.monotonic() - t0) * 1000)})
+            return {"agent": agent, "label": label, "ok": True, "error": "", "rows": len(rows or []), "ms": int((time.monotonic() - t0) * 1000)}
         except Exception as e:                                                       # noqa: BLE001
-            out.append({"agent": agent, "label": label, "ok": False, "error": str(e)[:300], "rows": 0, "ms": int((time.monotonic() - t0) * 1000)})
-    return out
+            return {"agent": agent, "label": label, "ok": False, "error": str(e)[:300], "rows": 0, "ms": int((time.monotonic() - t0) * 1000)}
+    with ThreadPoolExecutor(max_workers=max(1, workers)) as pool:
+        return list(pool.map(one, reqs))

@@ -5963,15 +5963,21 @@ def paid_query_check():
     """Send every query of the recent agents (Brand IS Monitor to Keyword Visibility) to one real account with the rows cut to one, and say which ones the platform refuses and why.
     ?account=<Google customer id> and/or ?meta=<act_ id>. Read only; a few dozen reads of the shared Google allowance, so it is an admin's check, not a page."""
     from tracker import paid_gaql_check as qc, paid_meta, paid_store
+    from concurrent.futures import ThreadPoolExecutor
     out = {}
     acct = re.sub(r"\D", "", str(request.args.get("account") or ""))
-    if acct:
-        out["google"] = {"account": acct, "results": qc.check_google(acct)}
     meta = paid_meta.norm_id(request.args.get("meta") or "")
-    if meta:
-        out["meta"] = {"account": meta, "results": qc.check_meta(meta, pages_fn=lambda path, params: paid_meta._pages(path, params, paid_store))}
-    if not out:
+    if not acct and not meta:
         return jsonify(error="Give ?account=<Google customer id> and/or ?meta=<act_ id>."), 400
+    jobs = {}
+    if acct:
+        jobs["google"] = (acct, lambda: qc.check_google(acct))
+    if meta:
+        jobs["meta"] = (meta, lambda: qc.check_meta(meta, pages_fn=lambda path, params: paid_meta._pages(path, params, paid_store)))
+    with ThreadPoolExecutor(max_workers=len(jobs)) as pool:                      # the two platforms at once: the gateway gives up on an answer after about five minutes
+        futures = {k: pool.submit(fn) for k, (_a, fn) in jobs.items()}
+        for k, (a, _fn) in jobs.items():
+            out[k] = {"account": a, "results": futures[k].result()}
     for part in out.values():
         part["failed"] = [r for r in part["results"] if not r["ok"]]
     return jsonify(out)

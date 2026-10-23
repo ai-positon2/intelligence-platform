@@ -114,3 +114,25 @@ def test_a_meta_failure_reaches_the_page_as_a_message_not_a_crash(monkeypatch):
         monkeypatch.setattr(module, "report_for", boom)
         r = client_as("ana@position2.com").get(url)
         assert r.status_code == 502 and r.get_json() == {"error": "Meta answered 400: (#100) Tried accessing nonexisting field.", "kind": "meta"}
+
+
+def test_the_meta_reads_run_a_few_at_a_time_and_keep_their_order_and_a_failure_in_one_does_not_stop_the_rest():
+    import threading
+    seen, active, peak, lock = [], [0], [0], threading.Lock()
+
+    def pages(path, params):
+        with lock:
+            active[0] += 1
+            peak[0] = max(peak[0], active[0])
+        import time
+        time.sleep(0.02)
+        with lock:
+            active[0] -= 1
+            seen.append(path)
+        if path.endswith("/bad"):
+            raise RuntimeError("Meta answered 400: bad field")
+        return [1]
+    reqs = [("a", "r%d" % i, "/act_1/%s" % ("bad" if i == 3 else "ok"), {}) for i in range(8)]
+    got = qc.check_meta("act_1", pages_fn=pages, requests=reqs)
+    assert [r["label"] for r in got] == ["r%d" % i for i in range(8)] and [r["ok"] for r in got] == [True, True, True, False, True, True, True, True]
+    assert "bad field" in got[3]["error"] and peak[0] > 1 and peak[0] <= qc.META_WORKERS
