@@ -32,6 +32,8 @@ from pathlib import Path
 from . import paid_qa_book
 
 CHECKLIST_PATH = Path(__file__).resolve().parent / "qa_checklist.json"
+META_CHECKLIST_PATH = Path(__file__).resolve().parent / "qa_checklist_meta.json"
+_PATHS = {"google": CHECKLIST_PATH, "meta": META_CHECKLIST_PATH}
 STATUSES = ("pass", "fail", "na")
 MAX_NAME = 120
 MAX_NOTE = 2000
@@ -49,23 +51,33 @@ class BadPayload(ValueError):
     """What is wrong with a request, in words the page can show."""
 
 
-@lru_cache(maxsize=1)
-def checklist():
-    with open(CHECKLIST_PATH, encoding="utf-8") as f:
+def platform_of(launch_or_account):
+    """'meta' for a Meta ad account (act_...) or a launch on one, 'google' for anything else: a launch is checked against its platform's checklist."""
+    acct = launch_or_account.get("account_id") if isinstance(launch_or_account, dict) else launch_or_account
+    return "meta" if str(acct or "").startswith("act_") else "google"
+
+
+@lru_cache(maxsize=4)
+def _load(platform):
+    with open(_PATHS[platform], encoding="utf-8") as f:
         return json.load(f)
 
 
-def items():
-    return checklist()["items"]
+def checklist(platform="google"):
+    return _load(platform if platform in _PATHS else "google")
 
 
-@lru_cache(maxsize=1)
-def _by_id():
-    return {i["id"]: i for i in items()}
+def items(platform="google"):
+    return checklist(platform)["items"]
 
 
-def item(check_id):
-    return _by_id().get(str(check_id))
+@lru_cache(maxsize=4)
+def _by_id(platform):
+    return {i["id"]: i for i in items(platform)}
+
+
+def item(check_id, platform="google"):
+    return _by_id(platform).get(str(check_id))
 
 
 # ── Which checks apply ──────────────────────────────────────────────────────
@@ -80,8 +92,8 @@ def applies(it, client_types, campaign_types):
     return camp and client
 
 
-def applicable(client_types, campaign_types):
-    return [i for i in items() if applies(i, client_types, campaign_types)]
+def applicable(client_types, campaign_types, platform="google"):
+    return [i for i in items(platform) if applies(i, client_types, campaign_types)]
 
 
 def campaign_types_for(channel, dsa=False):
@@ -158,7 +170,7 @@ def clean_check(launch, check_id, body):
     """(status, note) to store for one check, or (None, "") to clear it.
     Raises BadPayload. A Fail needs a reason: the workbook asks for the exact
     campaign or ad group and the fix needed, and a bare cross helps nobody."""
-    it = item(check_id)
+    it = item(check_id, platform_of(launch))
     if not it:
         raise BadPayload("That is not a check on this checklist")
     if not applies(it, launch["client_types"], launch["campaign_types"]):
@@ -186,8 +198,9 @@ def summarize(launch, checks):
     """Counts, progress and the verdict for one launch. `checks` is
     {check_id: {"status": ...}}. Ticks on checks that no longer apply (the
     launch's details changed) are kept in storage but do not count."""
-    cl = checklist()
-    rows = applicable(launch["client_types"], launch["campaign_types"])
+    plat = platform_of(launch)
+    cl = checklist(plat)
+    rows = applicable(launch["client_types"], launch["campaign_types"], plat)
     by_sev = {s: _blank() for s in cl["severities"]}
     by_sec = {s: _blank() for s in cl["sections"]}
     blocking = set(cl.get("blocking") or cl["severities"])
@@ -234,7 +247,7 @@ def effective(launch, people, auto, auto_at=None):
     the check to the agent's reading. The agent only ever supplies pass or fail,
     and only for the checks that apply."""
     out = {}
-    for it in applicable(launch["client_types"], launch["campaign_types"]):
+    for it in applicable(launch["client_types"], launch["campaign_types"], platform_of(launch)):
         cid = it["id"]
         mine, read = people.get(cid) or {}, (auto or {}).get(cid) or {}
         row = {"status": None, "note": "", "by": None, "at": None, "source": None, "found": read.get("found") or "",
@@ -251,8 +264,9 @@ def effective(launch, people, auto, auto_at=None):
 
 def hidden_by_client(launch):
     """The checks this campaign has that wait on a client type being chosen."""
-    shown = {i["id"] for i in applicable(launch["client_types"], launch["campaign_types"])}
-    rest = [i for i in applicable(checklist()["clientTypes"], launch["campaign_types"]) if i["id"] not in shown]
+    plat = platform_of(launch)
+    shown = {i["id"] for i in applicable(launch["client_types"], launch["campaign_types"], plat)}
+    rest = [i for i in applicable(checklist(plat)["clientTypes"], launch["campaign_types"], plat) if i["id"] not in shown]
     return {"count": len(rest), "blocking": len(rest),
             "types": sorted({t for i in rest for t in i["clientTypes"]})}
 

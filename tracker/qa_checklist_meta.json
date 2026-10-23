@@ -1,0 +1,683 @@
+{
+ "source": "Position2 Meta launch checks (a starter, written from Meta's own campaign settings and the platform's Meta audit: the team's own Meta checks are not written down yet). Edit this file to change them.",
+ "starter": true,
+ "sections": [
+  "1. Campaign Setup",
+  "2. Ad Set: audience, placements and optimisation",
+  "3. Ads",
+  "4. Tracking",
+  "5. On the spot: policy and claims"
+ ],
+ "severities": [
+  "Required"
+ ],
+ "blocking": [
+  "Required"
+ ],
+ "campaignTypes": [
+  "Meta Leads",
+  "Meta Sales",
+  "Meta Traffic",
+  "Meta Awareness"
+ ],
+ "clientTypes": [],
+ "items": [
+  {
+   "id": "1.1",
+   "section": "1. Campaign Setup",
+   "check": "Campaign Name",
+   "expected": "Should follow the format - P2_<MetaLeads, MetaSales, MetaTraffic or MetaAwareness>_<Theme>_<Launch date>",
+   "otherThingsToCheck": "One campaign per theme, named like the Google campaigns.",
+   "verify": "Expected: Should follow the format - P2_<MetaLeads, MetaSales, MetaTraffic or MetaAwareness>_<Theme>_<Launch date>. One campaign per theme, named like the Google campaigns.",
+   "fromBook": false,
+   "campaignTypes": [
+    "All"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Required",
+   "sheetRow": null
+  },
+  {
+   "id": "1.2",
+   "section": "1. Campaign Setup",
+   "check": "Campaign Objective",
+   "expected": "From the campaign book",
+   "otherThingsToCheck": "Leads, Sales, Traffic or Awareness: the objective decides which checks apply.",
+   "verify": "Expected: From the campaign book. Leads, Sales, Traffic or Awareness: the objective decides which checks apply.",
+   "fromBook": true,
+   "campaignTypes": [
+    "All"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Required",
+   "sheetRow": null,
+   "onTheSpot": "There is no plan to compare with. Judge the objective on its own: it should match the type in the campaign's name (MetaLeads is Leads, MetaSales is Sales, MetaTraffic is Traffic, MetaAwareness is Awareness) and what the ads ask people to do. Flag a mismatch and say why."
+  },
+  {
+   "id": "1.3",
+   "section": "1. Campaign Setup",
+   "check": "Special Ad Categories",
+   "expected": "From the campaign book: none, unless the ads are about credit, jobs, housing, or social issues, elections or politics",
+   "otherThingsToCheck": "Declaring a category limits age, gender and postcode targeting. Declare it when the ads are about one of these, and not otherwise.",
+   "verify": "Expected: From the campaign book: none, unless the ads are about credit, jobs, housing, or social issues, elections or politics. Declaring a category limits age, gender and postcode targeting. Declare it when the ads are about one of these, and not otherwise.",
+   "fromBook": true,
+   "campaignTypes": [
+    "All"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Required",
+   "sheetRow": null,
+   "onTheSpot": "There is no plan to compare with. Judge from the ads and the landing page whether a special ad category applies (credit, employment, housing, social issues, elections or politics). Flag a campaign that should declare one and does not, or declares one for no reason."
+  },
+  {
+   "id": "1.4",
+   "section": "1. Campaign Setup",
+   "check": "Buying Type",
+   "expected": "Auction",
+   "otherThingsToCheck": "Reach and Frequency (reservation) is a different way of buying and needs its own plan.",
+   "verify": "Expected: Auction. Reach and Frequency (reservation) is a different way of buying and needs its own plan.",
+   "fromBook": false,
+   "campaignTypes": [
+    "All"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Required",
+   "sheetRow": null
+  },
+  {
+   "id": "1.5",
+   "section": "1. Campaign Setup",
+   "check": "Budget Type and Amount",
+   "expected": "From the campaign book",
+   "otherThingsToCheck": "Campaign budget (Advantage campaign budget) or a budget on each ad set, daily or lifetime, and the amount.",
+   "verify": "Expected: From the campaign book. Campaign budget (Advantage campaign budget) or a budget on each ad set, daily or lifetime, and the amount.",
+   "fromBook": true,
+   "campaignTypes": [
+    "All"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Required",
+   "sheetRow": null,
+   "onTheSpot": "There is no plan to compare with. Judge on its own: a budget so small that an ad set cannot reach about 50 results in a week at the account's usual cost per result stays in the learning phase. Flag it, with the numbers read."
+  },
+  {
+   "id": "1.6",
+   "section": "1. Campaign Setup",
+   "check": "Campaign Bid Strategy",
+   "expected": "From the campaign book",
+   "otherThingsToCheck": "Highest volume, Cost per result goal (cost cap), ROAS goal or Bid cap. A cap that is too low stops delivery.",
+   "verify": "Expected: From the campaign book. Highest volume, Cost per result goal (cost cap), ROAS goal or Bid cap. A cap that is too low stops delivery.",
+   "fromBook": true,
+   "campaignTypes": [
+    "All"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Required",
+   "sheetRow": null,
+   "onTheSpot": "There is no plan to compare with. Judge the bid strategy on its own: highest volume is the normal start while a campaign has no history; a cost or ROAS goal needs enough results to hold. Flag a bid or cost cap with no results history behind it."
+  },
+  {
+   "id": "1.7",
+   "section": "1. Campaign Setup",
+   "check": "Start & End Date",
+   "expected": "Start date should be the date it is taken live, no end date unless the campaign book names one",
+   "otherThingsToCheck": "",
+   "verify": "Expected: Start date should be the date it is taken live, no end date unless the campaign book names one.",
+   "fromBook": false,
+   "campaignTypes": [
+    "All"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Required",
+   "sheetRow": null
+  },
+  {
+   "id": "1.8",
+   "section": "1. Campaign Setup",
+   "check": "Ad Sets and Ads",
+   "expected": "At least 1 active ad set, and at least 3 ads in each (Position2's default for Meta, as the Asset Coverage agent uses)",
+   "otherThingsToCheck": "No more than 10 ads in an ad set: Meta splits the budget and none gets enough.",
+   "verify": "Expected: At least 1 active ad set, and at least 3 ads in each (Position2's default for Meta, as the Asset Coverage agent uses). No more than 10 ads in an ad set: Meta splits the budget and none gets enough.",
+   "fromBook": false,
+   "campaignTypes": [
+    "All"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Required",
+   "sheetRow": null
+  },
+  {
+   "id": "1.9",
+   "section": "1. Campaign Setup",
+   "check": "Identity: Page and Instagram account",
+   "expected": "A Facebook Page and an Instagram account are set on every ad",
+   "otherThingsToCheck": "An ad with no Instagram account is shown on Instagram under the Page's name.",
+   "verify": "Expected: A Facebook Page and an Instagram account are set on every ad. An ad with no Instagram account is shown on Instagram under the Page's name.",
+   "fromBook": false,
+   "campaignTypes": [
+    "All"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Required",
+   "sheetRow": null
+  },
+  {
+   "id": "2.1",
+   "section": "2. Ad Set: audience, placements and optimisation",
+   "check": "Conversion Location",
+   "expected": "From the campaign book",
+   "otherThingsToCheck": "Website, Instant forms, Calls, Messaging or App: where the result happens.",
+   "verify": "Expected: From the campaign book. Website, Instant forms, Calls, Messaging or App: where the result happens.",
+   "fromBook": true,
+   "campaignTypes": [
+    "Meta Leads",
+    "Meta Sales",
+    "Meta Traffic"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Required",
+   "sheetRow": null,
+   "onTheSpot": "There is no plan to compare with. Judge on its own: the conversion location must match where the ads send people (a website address, an instant form, a phone number). Flag a mismatch."
+  },
+  {
+   "id": "2.2",
+   "section": "2. Ad Set: audience, placements and optimisation",
+   "check": "Performance Goal (optimisation)",
+   "expected": "From the campaign book",
+   "otherThingsToCheck": "For example Maximize number of leads or Maximize number of conversions. Link clicks on a campaign that is meant to bring leads is a mismatch.",
+   "verify": "Expected: From the campaign book. For example Maximize number of leads or Maximize number of conversions. Link clicks on a campaign that is meant to bring leads is a mismatch.",
+   "fromBook": true,
+   "campaignTypes": [
+    "Meta Leads",
+    "Meta Sales",
+    "Meta Traffic"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Required",
+   "sheetRow": null,
+   "onTheSpot": "There is no plan to compare with. Judge on its own: the optimisation goal must match the objective (a Leads campaign should optimise for leads or conversions, a Sales campaign for purchases). Flag clicks or impressions on a campaign meant to bring leads or sales."
+  },
+  {
+   "id": "2.3",
+   "section": "2. Ad Set: audience, placements and optimisation",
+   "check": "Dataset (pixel) and Conversion Event",
+   "expected": "A dataset is set, and the event is the one the campaign book names (for example Lead or Purchase)",
+   "otherThingsToCheck": "",
+   "verify": "Expected: A dataset is set, and the event is the one the campaign book names (for example Lead or Purchase).",
+   "fromBook": false,
+   "campaignTypes": [
+    "Meta Leads",
+    "Meta Sales"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Required",
+   "sheetRow": null
+  },
+  {
+   "id": "2.4",
+   "section": "2. Ad Set: audience, placements and optimisation",
+   "check": "Attribution Setting",
+   "expected": "From the campaign book (Meta's own default is a 7-day click and a 1-day view)",
+   "otherThingsToCheck": "",
+   "verify": "Expected: From the campaign book (Meta's own default is a 7-day click and a 1-day view).",
+   "fromBook": true,
+   "campaignTypes": [
+    "Meta Leads",
+    "Meta Sales"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Required",
+   "sheetRow": null,
+   "onTheSpot": "There is no plan to compare with. Judge on its own: 7-day click and 1-day view is Meta's default and is normal. Flag a view-only window."
+  },
+  {
+   "id": "2.5",
+   "section": "2. Ad Set: audience, placements and optimisation",
+   "check": "Locations",
+   "expected": "From the campaign book",
+   "otherThingsToCheck": "Every place the client serves is in, and nothing outside it. Check each country, state, city and radius.",
+   "verify": "Expected: From the campaign book. Every place the client serves is in, and nothing outside it. Check each country, state, city and radius.",
+   "fromBook": true,
+   "campaignTypes": [
+    "All"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Required",
+   "sheetRow": null,
+   "onTheSpot": "There is no plan to compare with. Judge on its own: the places must be where the client serves customers (from the landing page and the account's other campaigns). Flag a country or region the client does not serve."
+  },
+  {
+   "id": "2.6",
+   "section": "2. Ad Set: audience, placements and optimisation",
+   "check": "Location Type",
+   "expected": "People living in or recently in this location",
+   "otherThingsToCheck": "",
+   "verify": "Expected: People living in or recently in this location.",
+   "fromBook": false,
+   "campaignTypes": [
+    "All"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Required",
+   "sheetRow": null
+  },
+  {
+   "id": "2.7",
+   "section": "2. Ad Set: audience, placements and optimisation",
+   "check": "Age",
+   "expected": "From the campaign book",
+   "otherThingsToCheck": "Meta only lets a limit on age hold when Advantage+ audience is off.",
+   "verify": "Expected: From the campaign book. Meta only lets a limit on age hold when Advantage+ audience is off.",
+   "fromBook": true,
+   "campaignTypes": [
+    "All"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Required",
+   "sheetRow": null,
+   "onTheSpot": "There is no plan to compare with. Judge on its own: the age range must fit the offer (and any legal minimum for it). Flag a range that excludes the people the offer is for."
+  },
+  {
+   "id": "2.8",
+   "section": "2. Ad Set: audience, placements and optimisation",
+   "check": "Gender",
+   "expected": "From the campaign book",
+   "otherThingsToCheck": "",
+   "verify": "Expected: From the campaign book.",
+   "fromBook": true,
+   "campaignTypes": [
+    "All"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Required",
+   "sheetRow": null,
+   "onTheSpot": "There is no plan to compare with. Judge on its own: flag a gender that is left out when the offer is not gender specific."
+  },
+  {
+   "id": "2.9",
+   "section": "2. Ad Set: audience, placements and optimisation",
+   "check": "Languages",
+   "expected": "Left empty (all languages), unless the campaign book names one",
+   "otherThingsToCheck": "",
+   "verify": "Expected: Left empty (all languages), unless the campaign book names one.",
+   "fromBook": false,
+   "campaignTypes": [
+    "All"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Required",
+   "sheetRow": null
+  },
+  {
+   "id": "2.10",
+   "section": "2. Ad Set: audience, placements and optimisation",
+   "check": "Audience: detailed targeting and Advantage+ audience",
+   "expected": "From the campaign book",
+   "otherThingsToCheck": "The interests, lookalikes and custom audiences named in the book, and whether Advantage+ audience is on (then they are only suggestions).",
+   "verify": "Expected: From the campaign book. The interests, lookalikes and custom audiences named in the book, and whether Advantage+ audience is on (then they are only suggestions).",
+   "fromBook": true,
+   "campaignTypes": [
+    "All"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Required",
+   "sheetRow": null,
+   "onTheSpot": "There is no plan to compare with. Judge on its own: the audience must fit what the ads sell; flag an audience made only of very wide interests, and say whether Advantage+ audience is on."
+  },
+  {
+   "id": "2.11",
+   "section": "2. Ad Set: audience, placements and optimisation",
+   "check": "Audience Exclusion",
+   "expected": "From the campaign book: existing customers and current leads excluded where the client has a list",
+   "otherThingsToCheck": "",
+   "verify": "Expected: From the campaign book: existing customers and current leads excluded where the client has a list.",
+   "fromBook": true,
+   "campaignTypes": [
+    "All"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Required",
+   "sheetRow": null,
+   "onTheSpot": "There is no plan to compare with. Judge on its own: flag a retargeting or prospecting ad set that does not exclude people who have already converted, when the account has a customer or lead audience."
+  },
+  {
+   "id": "2.12",
+   "section": "2. Ad Set: audience, placements and optimisation",
+   "check": "Placements",
+   "expected": "From the campaign book (Advantage+ placements unless the book names others)",
+   "otherThingsToCheck": "A manual placement that the creative does not fit (a 1:1 image in Stories) shows badly.",
+   "verify": "Expected: From the campaign book (Advantage+ placements unless the book names others). A manual placement that the creative does not fit (a 1:1 image in Stories) shows badly.",
+   "fromBook": true,
+   "campaignTypes": [
+    "All"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Required",
+   "sheetRow": null,
+   "onTheSpot": "There is no plan to compare with. Judge on its own: Advantage+ placements is the normal setting. Flag manual placements that leave out Facebook or Instagram feeds without a reason."
+  },
+  {
+   "id": "3.1",
+   "section": "3. Ads",
+   "check": "Ad Format",
+   "expected": "From the campaign book",
+   "otherThingsToCheck": "Image, video or carousel. A campaign with more than one format gives Meta more to learn from.",
+   "verify": "Expected: From the campaign book. Image, video or carousel. A campaign with more than one format gives Meta more to learn from.",
+   "fromBook": true,
+   "campaignTypes": [
+    "All"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Required",
+   "sheetRow": null,
+   "onTheSpot": "There is no plan to compare with. Judge on its own: flag a campaign whose ads are all one format and have no video."
+  },
+  {
+   "id": "3.2",
+   "section": "3. Ads",
+   "check": "Primary Text",
+   "expected": "At most 125 characters before Meta cuts it with See more",
+   "otherThingsToCheck": "Spelling, grammar, brand spelled as the client writes it, and no claim the client has not confirmed.",
+   "verify": "Expected: At most 125 characters before Meta cuts it with See more. Spelling, grammar, brand spelled as the client writes it, and no claim the client has not confirmed.",
+   "fromBook": false,
+   "campaignTypes": [
+    "All"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Required",
+   "sheetRow": null
+  },
+  {
+   "id": "3.3",
+   "section": "3. Ads",
+   "check": "Headline",
+   "expected": "At most 40 characters (about 27 show on a phone)",
+   "otherThingsToCheck": "Spelling, grammar, brand spelled as the client writes it.",
+   "verify": "Expected: At most 40 characters (about 27 show on a phone). Spelling, grammar, brand spelled as the client writes it.",
+   "fromBook": false,
+   "campaignTypes": [
+    "All"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Required",
+   "sheetRow": null
+  },
+  {
+   "id": "3.4",
+   "section": "3. Ads",
+   "check": "Description",
+   "expected": "At most 30 characters, or empty",
+   "otherThingsToCheck": "Meta often does not show it.",
+   "verify": "Expected: At most 30 characters, or empty. Meta often does not show it.",
+   "fromBook": false,
+   "campaignTypes": [
+    "All"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Required",
+   "sheetRow": null
+  },
+  {
+   "id": "3.5",
+   "section": "3. Ads",
+   "check": "Call To Action",
+   "expected": "A button that matches the objective (Learn more, Get quote, Book now, Contact us, Call now, Sign up or Apply now)",
+   "otherThingsToCheck": "",
+   "verify": "Expected: A button that matches the objective (Learn more, Get quote, Book now, Contact us, Call now, Sign up or Apply now).",
+   "fromBook": false,
+   "campaignTypes": [
+    "All"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Required",
+   "sheetRow": null
+  },
+  {
+   "id": "3.6",
+   "section": "3. Ads",
+   "check": "Destination URL",
+   "expected": "Should be working, on the client's own site, and match the ad",
+   "otherThingsToCheck": "Open every URL: it must load without an error.",
+   "verify": "Expected: Should be working, on the client's own site, and match the ad. Open every URL: it must load without an error.",
+   "fromBook": false,
+   "campaignTypes": [
+    "All"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Required",
+   "sheetRow": null
+  },
+  {
+   "id": "3.7",
+   "section": "3. Ads",
+   "check": "URL Parameters",
+   "expected": "Tracking parameters are set on every ad (utm_source, utm_medium and utm_campaign at least)",
+   "otherThingsToCheck": "For example utm_source=meta&utm_medium=paid_social&utm_campaign={{campaign.name}}&utm_content={{ad.name}}",
+   "verify": "Expected: Tracking parameters are set on every ad (utm_source, utm_medium and utm_campaign at least). For example utm_source=meta&utm_medium=paid_social&utm_campaign={{campaign.name}}&utm_content={{ad.name}}",
+   "fromBook": false,
+   "campaignTypes": [
+    "All"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Required",
+   "sheetRow": null
+  },
+  {
+   "id": "3.8",
+   "section": "3. Ads",
+   "check": "Advantage+ creative enhancements",
+   "expected": "From the campaign book",
+   "otherThingsToCheck": "Enhancements can change the client's approved text, image or music.",
+   "verify": "Expected: From the campaign book. Enhancements can change the client's approved text, image or music.",
+   "fromBook": true,
+   "campaignTypes": [
+    "All"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Required",
+   "sheetRow": null,
+   "onTheSpot": "There is no plan to compare with. Judge on its own: flag enhancements that change the client's approved words or images when nothing says the client agreed."
+  },
+  {
+   "id": "3.9",
+   "section": "3. Ads",
+   "check": "Ad Review Status",
+   "expected": "Every ad is Active: none disapproved or with issues",
+   "otherThingsToCheck": "",
+   "verify": "Expected: Every ad is Active: none disapproved or with issues.",
+   "fromBook": false,
+   "campaignTypes": [
+    "All"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Required",
+   "sheetRow": null
+  },
+  {
+   "id": "4.1",
+   "section": "4. Tracking",
+   "check": "Dataset (pixel) receiving events",
+   "expected": "The dataset the ad sets use has received the event in the last 7 days",
+   "otherThingsToCheck": "Meta does not show this to the API: check it in Events Manager.",
+   "verify": "Expected: The dataset the ad sets use has received the event in the last 7 days. Meta does not show this to the API: check it in Events Manager.",
+   "fromBook": false,
+   "campaignTypes": [
+    "Meta Leads",
+    "Meta Sales"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Required",
+   "sheetRow": null
+  },
+  {
+   "id": "4.2",
+   "section": "4. Tracking",
+   "check": "Conversions API",
+   "expected": "Set up for the event the campaign optimises for",
+   "otherThingsToCheck": "Server events make results survive blocked cookies. Check Events Manager.",
+   "verify": "Expected: Set up for the event the campaign optimises for. Server events make results survive blocked cookies. Check Events Manager.",
+   "fromBook": false,
+   "campaignTypes": [
+    "Meta Leads",
+    "Meta Sales"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Required",
+   "sheetRow": null
+  },
+  {
+   "id": "4.3",
+   "section": "4. Tracking",
+   "check": "Event Match Quality",
+   "expected": "Rated Good or better for the event the campaign optimises for",
+   "otherThingsToCheck": "Check Events Manager.",
+   "verify": "Expected: Rated Good or better for the event the campaign optimises for. Check Events Manager.",
+   "fromBook": false,
+   "campaignTypes": [
+    "Meta Leads",
+    "Meta Sales"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Required",
+   "sheetRow": null
+  },
+  {
+   "id": "4.4",
+   "section": "4. Tracking",
+   "check": "Domain verification and event priority",
+   "expected": "The domain is verified and the event is in the aggregated event measurement list",
+   "otherThingsToCheck": "Check Business Settings and Events Manager.",
+   "verify": "Expected: The domain is verified and the event is in the aggregated event measurement list. Check Business Settings and Events Manager.",
+   "fromBook": false,
+   "campaignTypes": [
+    "Meta Leads",
+    "Meta Sales"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Required",
+   "sheetRow": null
+  },
+  {
+   "id": "5.1",
+   "section": "5. On the spot: policy and claims",
+   "check": "Personal attributes",
+   "expected": "No ad text or image says or suggests that the person seeing it has a health condition, a race, a religion, a sexuality, money trouble or another personal attribute",
+   "otherThingsToCheck": "Write about the product and the need, not about the person.",
+   "verify": "Expected: No ad text or image says or suggests that the person seeing it has a health condition, a race, a religion, a sexuality, money trouble or another personal attribute. Write about the product and the need, not about the person.",
+   "fromBook": false,
+   "campaignTypes": [
+    "All"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Required",
+   "sheetRow": null,
+   "onTheSpotOnly": true
+  },
+  {
+   "id": "5.2",
+   "section": "5. On the spot: policy and claims",
+   "check": "Claims",
+   "expected": "Nothing in the ads that the client has not confirmed: a price, a percentage, free, a guarantee, best, a cure",
+   "otherThingsToCheck": "",
+   "verify": "Expected: Nothing in the ads that the client has not confirmed: a price, a percentage, free, a guarantee, best, a cure.",
+   "fromBook": false,
+   "campaignTypes": [
+    "All"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Required",
+   "sheetRow": null,
+   "onTheSpotOnly": true
+  },
+  {
+   "id": "5.3",
+   "section": "5. On the spot: policy and claims",
+   "check": "Industry rules",
+   "expected": "The ads follow the advertising rules of the client's industry (healthcare, finance, legal, regulated devices)",
+   "otherThingsToCheck": "Use the compliance notes in the Business Research and the Campaign Book.",
+   "verify": "Expected: The ads follow the advertising rules of the client's industry (healthcare, finance, legal, regulated devices). Use the compliance notes in the Business Research and the Campaign Book.",
+   "fromBook": false,
+   "campaignTypes": [
+    "All"
+   ],
+   "clientTypes": [
+    "All"
+   ],
+   "severity": "Required",
+   "sheetRow": null,
+   "onTheSpotOnly": true
+  }
+ ]
+}
