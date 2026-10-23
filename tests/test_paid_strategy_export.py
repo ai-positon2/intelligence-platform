@@ -182,3 +182,64 @@ def test_a_cell_too_long_for_a_page_is_cut_in_the_pdf_only(rec):
     long["plan"]["strategy"]["objectives"][0]["basis"] = "Q" * 5000
     assert words(long).count("Q") - words(rec).count("Q") == export.CELL_CHARS
     assert any(r[3] == "Q" * 5000 for r in export.tables(long)["Strategy"][1])                    # every other format keeps all of it
+
+
+# ── Meta ────────────────────────────────────────────────────────────────────
+
+@pytest.fixture(scope="module")
+def mrec():
+    from tests import test_paid_strategy_meta_job as MJ
+    store, sid = MJ.start()
+    MJ.run(store, sid)
+    return store.get(sid)
+
+
+def test_a_meta_plan_has_meta_sheets_and_none_of_googles(mrec):
+    t = export.tables(mrec)
+    assert list(t) == ["Overview", "Strategy", "Business", "Competitors", "Competitive read", "Social", "Meta account history", "Meta interests", "Market", "Campaigns", "Meta ad sets", "Meta ads", "Checks"]
+    for name, (header, rows) in t.items():
+        assert rows and all(len(r) == len(header) for r in rows), name
+    ov = dict(t["Overview"][1])
+    assert ov["Meta ad account"] == "Acme Meta" and "Google Ads account" not in ov
+
+
+def test_the_meta_sheets_list_each_ad_set_with_its_interests_and_budget_and_each_ad_with_its_lengths(mrec):
+    head, rows = export.tables(mrec)["Meta ad sets"]
+    first = dict(zip(head, rows[0]))
+    assert first["Campaign"] == "P2_MetaLeads_Implants_20261102" and first["Ad set"] == "Missing teeth" and first["Audience type"] == "interests" and first["Interests"] == "Insulin pump (1.0M to 1.2M), Diabetes (20.0M to 24.0M)"
+    assert first["Excluded"] == "Dental students" and first["Share of the campaign %"] == 70.0 and first["Daily budget"] == round(mrec["plan"]["campaigns"][0]["daily"] * 0.7, 2)
+    head, rows = export.tables(mrec)["Meta ads"]
+    ad = dict(zip(head, rows[0]))
+    assert ad["Format"] == "video" and ad["Primary text"] == "Missing a tooth? Free consultation for dental implants" and ad["Characters (limit 125)"] == len(ad["Primary text"]) <= 125
+    assert ad["Characters (limit 40)"] == len(ad["Headline"]) and ad["Button"] == "Book Now" and ad["Final URL"].startswith("https://acmedental.com")
+    assert len(rows) == 12
+
+
+def test_an_interest_that_could_not_be_checked_says_so_in_the_ad_sets_sheet_and_meta_history_and_interests_are_listed():
+    from tests import test_paid_strategy_meta_job as MJ
+    store, sid = MJ.start()
+    unchecked = MJ.run(store, sid, meta_get=None)
+    head, rows = export.tables(unchecked)["Meta ad sets"]
+    assert "Made Up Interest (not checked)" in dict(zip(head, rows[0]))["Interests"]
+    t = export.tables(MJ.run(*MJ.start()))
+    h, r = t["Meta account history"]
+    assert [x[0] for x in r][:2] == ["Campaign", "Placement"] and any(x[0] == "Placement" and x[1] == "Facebook" for x in r) and any(x[0] == "Device" for x in r) and any(x[0] == "Live ad" for x in r)
+    h, r = t["Meta interests"]
+    assert r[0][0] == "Insulin pump" and r[0][4] == 1 and r[0][5] == 600.0
+
+
+def test_the_meta_checks_are_in_the_checks_sheet(mrec):
+    rec = copy.deepcopy(mrec)
+    rec["plan"]["checks"].update(learningNotChecked=2, interestNotes=["Meta's interest list could not be asked, so no interest is checked."])
+    rows = export.tables(rec)["Checks"][1]
+    assert ["Meta interests", "Meta's interest list could not be asked, so no interest is checked."] in rows and any(r[0] == "Meta learning bar not checked" and r[1].startswith("2 Meta campaigns") for r in rows)
+
+
+def test_the_files_of_a_meta_plan_open_and_the_pdf_has_the_ad_sets_and_the_meta_book(mrec):
+    wb = openpyxl.load_workbook(io.BytesIO(export.xlsx(mrec)))
+    assert "Meta ad sets" in wb.sheetnames and "Meta ads" in wb.sheetnames and any(n.startswith("Book MetaLeads") for n in wb.sheetnames)
+    z = zipfile.ZipFile(io.BytesIO(export.csv_zip(mrec)))
+    assert "meta-ad-sets.csv" in z.namelist() and "meta-ads.csv" in z.namelist()
+    with pdfplumber.open(io.BytesIO(export.pdf(mrec))) as pdf:
+        text = "\n".join(p.extract_text() or "" for p in pdf.pages)
+    assert "Missing teeth (interests, 70.0% of the campaign)" in text and "Primary text: Missing a tooth?" in text and "Campaign Objective" in text and "Meta account history" in text

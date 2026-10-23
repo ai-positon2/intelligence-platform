@@ -70,7 +70,9 @@ def tables(rec):
 
     ov = [["Client", inputs.get("name")], ["Website", inputs.get("website")], ["Industry", inputs.get("industry")], ["Goal", ps.GOALS.get(inputs.get("goal"), inputs.get("goal"))],
           ["Monthly budget", _money(inputs.get("budget"), cur)], ["Launch date", inputs.get("launch")], ["Places", inputs.get("locations")],
-          ["Google Ads account", rec.get("account_name") or rec.get("account_id")], ["Built by", rec.get("created_by")], ["Built on", (plan.get("generatedAt") or "")[:10]]]
+          ["Google Ads account", (rec.get("account_name") or rec.get("account_id")) if inputs.get("account") else ""],
+          ["Meta ad account", (((research.get("metahistory") or {}).get("data") or {}).get("account") or {}).get("name") or inputs.get("metaAccount")],
+          ["Built by", rec.get("created_by")], ["Built on", (plan.get("generatedAt") or "")[:10]]]
     ov += [["Summary", s] for s in st.get("summary") or []]
     out["Overview"] = (["Item", "Detail"], [r for r in ov if r[1]])
 
@@ -202,6 +204,19 @@ def tables(rec):
         rows += [["Place", r["name"], "", "", r["clicks"], r["cost"], r["conv"]] for r in hist.get("regions") or []]
         out["Account detail"] = (["What", "Item", "Match", "Campaign", "Clicks", "Cost", "Conversions"], rows)
 
+    mh = (research.get("metahistory") or {}).get("data") or {}
+    if mh.get("campaigns"):
+        rows = [["Campaign", c["name"], c["type"], c["cost"], c["conv"], c.get("cpa"), c["impr"], c["clicks"]] for c in mh["campaigns"]]
+        rows += [["Placement", p["name"], "", p["cost"], p["conv"], p.get("cpa"), p["impr"], p["clicks"]] for p in mh.get("placements") or []]
+        rows += [["Device", d["name"], "", d["cost"], d["conv"], d.get("cpa"), d["impr"], d["clicks"]] for d in mh.get("devices") or []]
+        rows += [["Live ad", a["name"], a.get("format") or "", "", "", "", "", ("%s | %s | %s" % (a["title"], a["body"], a["cta"])).strip(" |")] for a in mh.get("ads") or []]
+        out["Meta account history"] = (["What", "Item", "Objective or type", "Cost", "Results", "Cost per result", "Impressions", "Clicks or text"], rows)
+    ma = (research.get("metaaudience") or {}).get("data") or {}
+    if ma.get("candidates"):
+        out["Meta interests"] = (["Interest", "Audience size", "Where Meta lists it", "Found from", "Aimed at by ad sets", "Spent", "Results"],
+                                 [[c["name"], c.get("sizeText") or "", " > ".join(c.get("path") or []), c.get("from") or "", (c.get("inUse") or {}).get("adsets", ""), (c.get("inUse") or {}).get("cost", ""),
+                                   (c.get("inUse") or {}).get("conv", "")] for c in ma["candidates"]])
+
     kw = (research.get("keywords") or {}).get("data") or {}
     if kw.get("ideas"):
         out["Keyword research"] = (["Keyword", "Searches a month", "Competition", "Low bid", "High bid", "Peak month", "Lowest month", "Found from"],
@@ -220,9 +235,17 @@ def tables(rec):
         out["Campaigns"] = (["Campaign", "Type", "Share of budget %", "Daily budget", "Monthly budget", "Purpose", "Landing page", "Bid strategy", "Locations", "Audience", "Notes"],
                             [[c["name"], c["kindLabel"], c["share"], c.get("daily"), c.get("monthly"), c["purpose"], c["landingPage"], c["settings"]["bidStrategy"]["value"],
                               c["settings"]["locations"]["value"], c["audience"], c["notes"]] for c in camps])
-    ag, ng, ad, asx, theme = [], [], [], [], []
+    ag, ng, ad, asx, theme, mset, mads = [], [], [], [], [], [], []
     for c in camps:
         bld = c.get("build") or {}
+        for g in bld.get("adSets") or []:
+            checked = {x["name"]: x for x in g.get("interestsChecked") or []}
+            mset.append([c["name"], g["name"], g.get("audienceType") or "", ", ".join(("%s (%s)" % (n, checked[n]["sizeText"]) if checked.get(n, {}).get("sizeText") else n + ("" if checked.get(n, {}).get("verified", True) else " (not checked)")) for n in g.get("interests") or []),
+                         _join(g.get("behaviors")), _join(g.get("customAudiences")), _join(g.get("lookalikes")), _join(g.get("excludes")), g.get("budgetShare"),
+                         round(c["daily"] * g["budgetShare"] / 100.0, 2) if c.get("daily") else "", g.get("placements") or "", g.get("landingPage") or ""])
+            for i, a in enumerate(g.get("ads") or [], 1):
+                mads.append([c["name"], g["name"], a.get("name") or "Ad %d" % i, a["format"], a["primaryText"], len(a["primaryText"]), a["headline"], len(a["headline"]), a.get("description") or "",
+                             len(a.get("description") or ""), a.get("cta") or "", a.get("finalUrl") or "", a.get("concept") or "", a.get("script") or ""])
         for g in bld.get("adGroups") or []:
             for k in g.get("keywords") or []:
                 ag.append([c["name"], g["name"], g.get("theme") or "", g.get("intent") or "", g.get("landingPage") or "", k["text"], k["match"].title(), k.get("intent") or "", k.get("note") or ""])
@@ -287,6 +310,11 @@ def tables(rec):
         out["Negatives"] = (["Campaign", "Level", "Negative keyword", "Match type", "Reason"], ng)
     if ad:
         out["Ad copy"] = (["Campaign", "Ad group", "Ad", "Part", "No.", "Text", "Characters", "Limit", "Note"], ad)
+    if mset:
+        out["Meta ad sets"] = (["Campaign", "Ad set", "Audience type", "Interests", "Behaviors", "Custom audiences", "Lookalikes", "Excluded", "Share of the campaign %", "Daily budget", "Placements", "Landing page"], mset)
+    if mads:
+        out["Meta ads"] = (["Campaign", "Ad set", "Ad", "Format", "Primary text", "Characters (limit %d)" % 125, "Headline", "Characters (limit %d)" % 40, "Description", "Characters (limit %d)" % 30, "Button",
+                            "Final URL", "Creative concept", "Script"], mads)
     if asx:
         out["Assets"] = (["Campaign", "Group", "Asset", "Detail", "Text", "Address or note"], asx)
     if theme:
@@ -297,6 +325,9 @@ def tables(rec):
     rows = [["Dropped for being over a limit", "%s: %d" % (k, v)] for k, v in (chk.get("dropped") or {}).items()]
     rows += [["Negative removed", "%s [%s] would block the keyword '%s' (%s)" % (r["negative"], r["match"], r["blocked"], r["campaign"])] for r in chk.get("removedNegatives") or []]
     rows += [["Short", s] for s in chk.get("shortfalls") or []]
+    rows += [["Meta interests", s] for s in chk.get("interestNotes") or []]
+    if chk.get("learningNotChecked"):
+        rows.append(["Meta learning bar not checked", "%d Meta campaign%s: the account has no cost per result for the objective, or the objective has no result to count." % (chk["learningNotChecked"], "" if chk["learningNotChecked"] == 1 else "s")])
     rows += [["Not available", s] for s in chk.get("missing") or []]
     if chk.get("unconfirmedFacts"):
         rows.append(["Facts not found on a page", str(chk["unconfirmedFacts"])])
@@ -503,20 +534,20 @@ def pdf(rec):
                                                  (" | budget %s a month" % _money(inputs.get("budget"), inputs.get("currency"))) if inputs.get("budget") else ""), small), Spacer(1, 6)]
     st = plan.get("strategy") or {}
     story += bullets(st.get("summary") or [])
-    contents = ["Strategy", "Business", "Competitors", "Competitive read", "Social", "Account history", "Keyword research", "Market", "Campaigns"]
+    contents = ["Strategy", "Business", "Competitors", "Competitive read", "Social", "Account history", "Meta account history", "Keyword research", "Market", "Campaigns"]
     story += [Spacer(1, 6), P("Contents", h3), P(", ".join(n for n in contents if n in tb) + ", the Campaign Book of each campaign, and what needs confirming.", small)]
     fc = plan.get("forecast")
     if fc:
         scenes = [r for r in tb["Forecast"][1] if r[0] in ("Cautious", "Expected", "Strong")]
         story += [P("What the budget buys", h2), table(tb["Forecast"][0], scenes, [1.2, 1, 1.2, 1, 1, 1.4]),
                   P("Cost per click: %s." % fc["cpcFrom"], small), P("Conversion rate: %s." % fc["cvrFrom"], small), P(fc["note"], small)]
-    for name in ("Strategy", "Business", "Competitors", "Competitive read", "Social", "Account history", "Account detail", "Keyword research", "Market"):
+    for name in ("Strategy", "Business", "Competitors", "Competitive read", "Social", "Account history", "Account detail", "Meta account history", "Keyword research", "Market"):
         if name not in tb:
             continue
         header, rows = tb[name]
         widths = {"Strategy": [1.1, 2, 3.4, 3.4], "Business": [1.3, 2.4, 3, 3], "Competitors": [1.2, 1.3, 2.2, 1.7, 1.7, 1.2, 1.7, 1.7, 1.5], "Competitive read": [1.3, 4, 3],
                   "Social": [1.2, 1.8, 3.4, 3.4], "Account history": [3.2, 1.2, 1, 1.5, 1, 1, 1, 1, 1], "Account detail": [1.8, 3, 1, 2.6, 1, 1, 1],
-                  "Keyword research": [4, 1.5, 1.4, 1, 1, 1.2, 1.2, 1.3], "Market": [1.5, 5, 2.4]}[name]
+                  "Keyword research": [4, 1.5, 1.4, 1, 1, 1.2, 1.2, 1.3], "Market": [1.5, 5, 2.4], "Meta account history": [1.2, 2.4, 1.4, 1, 1, 1.2, 1.2, 3]}[name]
         story += [PageBreak() if name in ("Strategy", "Business") else Spacer(1, 4), P(name, h2), table(header, rows[:400], widths)]
     camps = plan.get("campaigns") or []
     if camps:
@@ -538,6 +569,13 @@ def pdf(rec):
             for a in g.get("ads") or []:
                 if isinstance(a, dict) and a.get("concept"):
                     story += bullets(["Creative: " + a["concept"]])
+        for g in bld.get("adSets") or []:
+            story += [P("%s (%s, %s%% of the campaign)" % (g["name"], g.get("audienceType") or "interests", g.get("budgetShare")), h3)]
+            aud = [x for x in (("Interests", g.get("interests")), ("Behaviors", g.get("behaviors")), ("Custom audiences", g.get("customAudiences")), ("Lookalikes", g.get("lookalikes")), ("Excluded", g.get("excludes"))) if x[1]]
+            story += bullets(["%s: %s" % (k, ", ".join(v)) for k, v in aud])
+            for i, a in enumerate(g.get("ads") or [], 1):
+                story += [P("Ad %d (%s)" % (i, a["format"]), small)] + bullets(["Primary text: " + a["primaryText"], "Headline: " + a["headline"] + ((" | Description: " + a["description"]) if a.get("description") else "") +
+                                                                           ((" | Button: " + a["cta"]) if a.get("cta") else ""), ("Creative: " + a["concept"]) if a.get("concept") else ""])
         for g in bld.get("assetGroups") or []:
             story += [P(g["name"], h3)] + bullets(["Headlines: " + " | ".join(g["headlines"]), "Long headlines: " + " | ".join(g["longHeadlines"]), "Descriptions: " + " | ".join(g["descriptions"]),
                                                   "Search themes: " + ", ".join(g["searchThemes"])])
