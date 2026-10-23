@@ -236,3 +236,90 @@ def test_the_keywords_sheet_marks_a_keyword_blocked_in_its_own_campaign(rec):
     row.update(include=False, blockedInTarget=True)
     head, rows = ex.tables(edited)["Keywords"]
     assert {r[0]: r[-1] for r in rows}[row["kw"]] == "No, the campaign it would go in already blocks it with a negative keyword"
+
+
+# ── Meta ────────────────────────────────────────────────────────────────────
+
+def _built(platform):
+    from tests import test_paid_keywords_meta_job as MJ
+    store, sid = MJ.make(platform)
+    MJ.run(store, sid)
+    return json.loads(json.dumps(store.get(sid)))
+
+
+@pytest.fixture(scope="module")
+def meta_rec():
+    return _built("meta")
+
+
+def test_a_meta_result_has_its_own_sheets_and_none_of_googles(meta_rec):
+    assert list(ex.tables(meta_rec)) == ["Overview", "Meta audiences", "Meta interests", "Meta in use", "Meta ad sets", "Meta plan", "Meta questions", "Meta checks"]
+    for name, (header, rows) in ex.tables(meta_rec).items():
+        assert rows, name
+        assert all(len(r) == len(header) for r in rows), name
+    ov = dict(ex.tables(meta_rec)["Overview"][1])
+    assert ov["Meta ad account"] == "Acme Meta" and "Google Ads account" not in ov and "Keywords judged" not in ov and ov["Meta interests judged"] == meta_rec["plan"]["meta"]["coverage"]["judged"]
+    assert ov["Ad set spend on interests judged not a fit (USD)"] == 600.0 and any(r[0] == "Meta: what the numbers say" for r in ex.tables(meta_rec)["Overview"][1])
+
+
+def test_the_meta_sheets_say_what_each_interest_cost_and_how_to_act(meta_rec):
+    head, rows = ex.tables(meta_rec)["Meta interests"]
+    by = {r[0]: dict(zip(head, r)) for r in rows}
+    assert by["Insulin pump"]["Fit"] == "yes" and by["Insulin pump"]["Audience size"] == "1.0M to 1.2M" and by["Insulin pump"]["Spent (USD)"] == 600.0 and by["Insulin pump"]["Cost per result (USD)"] == 30.0
+    assert by["Diabetes"]["Fit"] == "no" and by["Insulin"]["Aimed at by ad sets"] == "" and rows[0][2] == "yes" and rows[-1][2] in ("no", "unjudged")
+    head, plan = ex.tables(meta_rec)["Meta plan"]
+    kinds = [r[0] for r in plan]
+    assert "Quick win" in kinds and "Lookalike source" in kinds and any(k.startswith("How to: Start the audiences") for k in kinds)
+    assert "1. In Ads Manager" in [r for r in plan if r[0].startswith("How to: Start")][0][2]
+
+
+def test_a_build_for_both_has_the_google_sheets_and_then_the_meta_ones():
+    rec = _built("both")
+    names = list(ex.tables(rec))
+    assert names.index("Keywords") < names.index("Meta audiences") < names.index("Meta interests") and names.index("Meta checks") < names.index("Checks")
+    ov = dict(ex.tables(rec)["Overview"][1])
+    assert ov["Google Ads account"] and ov["Meta ad account"] == "Acme Meta" and "Keywords judged" in ov and "Meta interests judged" in ov
+
+
+def test_the_meta_files_open_and_an_interest_that_starts_like_a_formula_is_text(meta_rec):
+    rec = json.loads(json.dumps(meta_rec))
+    rec["plan"]["meta"]["interests"][0]["name"] = "=HYPERLINK(\"http://evil\")"
+    wb = openpyxl.load_workbook(io.BytesIO(ex.xlsx(rec)))
+    assert "Meta interests" in wb.sheetnames and "Meta audiences" in wb.sheetnames
+    cells = [c for ws in wb for row in ws.iter_rows() for c in row if isinstance(c.value, str) and "HYPERLINK" in c.value]
+    assert cells and all(c.data_type == "s" for c in cells)                                       # the writer marks it as text, so a spreadsheet never runs it
+    assert ex.pdf(meta_rec)[:4] == b"%PDF"
+    z = zipfile.ZipFile(io.BytesIO(ex.csv_zip(rec)))
+    csv_cells = [c for row in csv.reader(io.StringIO(z.read("meta-interests.csv").decode("utf-8"))) for c in row if "HYPERLINK" in c]
+    assert csv_cells and all(c.startswith("'=") for c in csv_cells)                              # in a CSV it gets a leading quote mark instead
+    z = zipfile.ZipFile(io.BytesIO(ex.csv_zip(meta_rec)))
+    assert "meta-audiences.csv" in z.namelist() and "google" not in " ".join(z.namelist()) and ex.csv_editor(meta_rec) is None
+
+
+def test_the_pdf_cuts_the_long_meta_lists_and_says_so(meta_rec):
+    rec = json.loads(json.dumps(meta_rec))
+    base = rec["plan"]["meta"]["interests"][0]
+    rec["plan"]["meta"]["interests"] = [dict(base, id=str(i), name="Interest %d" % i) for i in range(90)]
+    shown = {name: (rows, cut) for name, _h, rows, cut in ex.pdf_tables(rec)}
+    assert len(shown["Meta interests"][0]) == 60 and shown["Meta interests"][1] == "60 of 90 rows shown. All of them are in the Excel file."
+
+
+def test_inside_a_fit_an_interest_no_ad_set_aims_at_comes_before_one_in_use_and_the_note_for_a_cut_list_and_advantage_are_written():
+    meta = {"currency": "USD", "interests": [
+        {"id": "1", "name": "Big in use", "kind": "interest", "fit": "yes", "intent": "core", "theme": "", "size": 9_000_000, "sizeText": "9.0M", "inUse": {"adsets": 1, "cost": 10.0, "conv": 1.0, "cpa": 10.0}, "from": "", "path": [], "note": ""},
+        {"id": "2", "name": "Small new", "kind": "interest", "fit": "yes", "intent": "core", "theme": "", "size": 90_000, "sizeText": "90K", "inUse": None, "from": "", "path": [], "note": ""}],
+        "adsets": [{"name": "A", "campaign": "C", "status": "ACTIVE", "interests": [], "behaviors": [], "audiences": [], "excluded": [], "advantage": True, "cost": 1.0, "conv": 0.0, "cpa": None},
+                   {"name": "B", "campaign": "C", "status": "ACTIVE", "interests": [], "behaviors": [], "audiences": [], "excluded": [], "advantage": False, "cost": 1.0, "conv": 0.0, "cpa": None}],
+        "checks": {"cut": True, "found": 150, "advantageAdsets": 1}}
+    t = ex.meta_tables(meta)
+    assert [r[0] for r in t["Meta interests"][1]] == ["Small new", "Big in use"]
+    assert [r[7] for r in t["Meta ad sets"][1]] == ["Yes", "No"]
+    checks = dict(t["Meta checks"][1])
+    assert checks["More interests were found than were judged"] == "150 found, the first 2 judged (the ones in use first)." and "suggestions to Meta" in checks["Ad sets on Advantage+ audience"]
+
+
+def test_a_platform_that_could_not_be_written_is_named_in_the_overview(meta_rec):
+    rec = json.loads(json.dumps(meta_rec))
+    rec["plan"]["errors"] = {"Google": "Keyword Planner gave no ideas"}
+    assert ["Google part not written", "Keyword Planner gave no ideas"] in ex.tables(rec)["Overview"][1]
+    assert "Meta audiences" in ex.PDF_PAGE_BREAK

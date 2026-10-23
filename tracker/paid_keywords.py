@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import re
 
-from . import paid_strategy as ps
+from . import paid_meta, paid_strategy as ps
 
 KIND = "keywords"
 BUILDS_PER_DAY = ps.BUILDS_PER_DAY
@@ -31,6 +31,8 @@ CARDS = [
      "blurb": "Reads the home page and up to a dozen more: the services and headings the site uses become starting points for Keyword Planner."},
     {"key": "account", "title": "Account keywords and search terms", "needs": "account", "paid": False, "default": True,
      "blurb": "Every keyword the account has, its campaign-level and shared-list negative keywords (an ad group's own negatives are not read), and 90 days of search terms, so nothing is suggested that the account already bids on or blocks, and what converts is not missed."},
+    {"key": "metaaccount", "title": "Meta ad account: ad sets, interests and results", "needs": "metaAccount", "paid": False, "default": True,
+     "blurb": "Every ad set's interests, behaviors and audiences, and 90 days of what each spent and brought, so nothing is suggested that is already aimed at and the ones that do not work are named."},
     {"key": "competitors", "title": "Competitors", "needs": None, "paid": False, "default": True,
      "blurb": "Up to three competitor websites (the ones you name, or found from the web): what Keyword Planner finds each of them for."},
 ]
@@ -38,9 +40,18 @@ CARD_KEYS = [c["key"] for c in CARDS]
 
 RESEARCH_LABELS = {
     "business": "Business Research of this client", "website": "Reading the client's website", "account": "The account's keywords, negatives and search terms",
-    "competitors": "Finding and reading the competitors' websites", "planner": "Asking Google Keyword Planner",
+    "metaaccount": "The Meta ad account's ad sets, interests and results", "competitors": "Finding and reading the competitors' websites", "planner": "Asking Google Keyword Planner",
+    "interests": "Looking the phrases up in Meta's interests",
 }
 AI_STEPS = [("themes", "Grouping the market into themes"), ("classify", "Judging each keyword: fit, intent and match type"), ("plan", "The plan: quick wins, negatives, tests and questions")]
+META_AI_STEPS = [("seeds", "Choosing what to look up in Meta's interests"), ("audiences", "Judging the interests and planning the audiences")]
+PLATFORMS = ("google", "meta", "both")
+
+
+def platforms_of(inputs):
+    """(google, meta): whether the build reads Google (Keyword Planner and the account's keywords) and Meta (interests and the ad sets), from the inputs' platform."""
+    p = (inputs or {}).get("platform") or "google"
+    return p in ("google", "both"), p in ("meta", "both")
 
 
 def clean_inputs(raw):
@@ -54,9 +65,19 @@ def clean_inputs(raw):
     account = re.sub(r"\D", "", str(raw.get("account") or ""))
     if account and not ps.CUSTOMER_ID.match(account):
         raise ps.BadPayload("A Google Ads account id has ten digits.")
+    meta_account = str(raw.get("metaAccount") or "").strip()
+    if meta_account and not paid_meta.ACT_RE.match(meta_account):
+        raise ps.BadPayload("A Meta ad account id looks like act_ and digits.")
+    platform = str(raw.get("platform") or ("both" if account and meta_account else "meta" if meta_account else "google")).strip().lower()
+    if platform not in PLATFORMS:
+        raise ps.BadPayload("The platform has to be google, meta or both.")
+    if platform == "meta":                                      # the other platform's account is not read: it would only spend time and show a result nobody asked for
+        account = ""
+    elif platform == "google":
+        meta_account = ""
     services = ps._s(raw.get("services"), 800)
-    if not (services or website or account):
-        raise ps.BadPayload("Give what the client sells, a website or a Google Ads account, so Keyword Planner has something to start from.")
+    if not (services or website or account or meta_account):
+        raise ps.BadPayload("Give what the client sells, a website or an ad account, so there is something to start from.")
     goal = str(raw.get("goal") or "leads").strip().lower()
     if goal not in ps.GOALS:
         raise ps.BadPayload("The goal has to be one of: %s." % ", ".join(ps.GOALS))
@@ -85,24 +106,30 @@ def clean_inputs(raw):
     research = {}
     for card in CARDS:
         on = bool(asked.get(card["key"], card["default"]))
-        if (card["needs"] == "website" and not website) or (card["needs"] == "account" and not account):
+        if (card["needs"] == "website" and not website) or (card["needs"] == "account" and not account) or (card["needs"] == "metaAccount" and not meta_account):
             on = False
         research[card["key"]] = on
-    return {"kind": KIND, "name": name, "website": website, "account": account, "industry": ps._s(raw.get("industry"), 120), "goal": goal,
+    return {"kind": KIND, "name": name, "website": website, "account": account, "metaAccount": meta_account, "platform": platform, "industry": ps._s(raw.get("industry"), 120), "goal": goal,
             "budget": None, "currency": re.sub(r"[^A-Za-z]", "", str(raw.get("currency") or "USD")).upper()[:3] or "USD",
             "locations": ps._s(raw.get("locations"), 500), "services": services, "brief": ps._long(raw.get("brief"), 3000),
             "avoid": ps._s(raw.get("avoid"), 600), "minSearches": floor, "competitors": competitors, "campaignTypes": [], "research": research}
 
 
 def steps_for(inputs):
-    """The build's steps, in order, as the page shows them. Keyword Planner is always asked."""
+    """The build's steps, in order, as the page shows them. Keyword Planner is always asked of a Google build; a Meta build looks the phrases up in Meta's interests."""
+    google, meta = platforms_of(inputs)
     steps = []
     for key in CARD_KEYS:
         if inputs["research"].get(key):
             steps.append({"key": "r:" + key, "label": RESEARCH_LABELS[key], "state": "pending", "note": ""})
-    steps.append({"key": "r:planner", "label": RESEARCH_LABELS["planner"], "state": "pending", "note": ""})
-    for key, label in AI_STEPS:
-        steps.append({"key": "a:" + key, "label": label, "state": "pending", "note": ""})
+    if google:
+        steps.append({"key": "r:planner", "label": RESEARCH_LABELS["planner"], "state": "pending", "note": ""})
+        for key, label in AI_STEPS:
+            steps.append({"key": "a:" + key, "label": label, "state": "pending", "note": ""})
+    if meta:
+        steps.append({"key": "a:seeds", "label": META_AI_STEPS[0][1], "state": "pending", "note": ""})
+        steps.append({"key": "r:interests", "label": RESEARCH_LABELS["interests"], "state": "pending", "note": ""})
+        steps.append({"key": "a:audiences", "label": META_AI_STEPS[1][1], "state": "pending", "note": ""})
     steps.append({"key": "f:finish", "label": "Checking and putting the lists together", "state": "pending", "note": ""})
     return steps
 

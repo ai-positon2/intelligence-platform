@@ -13,7 +13,7 @@ def test_a_good_form_is_normalised_and_marked_as_this_agents():
 
 
 def test_a_name_and_one_thing_to_start_from_are_needed():
-    for body, msg in (({"website": "x.com"}, "name"), (K.inputs(name="A"), "name"), (K.inputs(website="", account="", services=""), "what the client sells, a website or a Google Ads account"),
+    for body, msg in (({"website": "x.com"}, "name"), (K.inputs(name="A"), "name"), (K.inputs(website="", account="", services=""), "what the client sells, a website or an ad account"),
                       ("nope", "form"), (None, "form")):
         with pytest.raises(ps.BadPayload) as e:
             pk.clean_inputs(body)
@@ -53,14 +53,14 @@ def test_the_free_text_is_cut_to_what_the_agent_reads():
 
 def test_a_card_that_needs_a_website_or_an_account_is_off_without_one():
     i = K.clean(website="", account="")
-    assert i["research"] == {"business": True, "website": False, "account": False, "competitors": True}
+    assert i["research"] == {"business": True, "website": False, "account": False, "metaaccount": False, "competitors": True}
     j = K.clean(research={"business": False, "competitors": False})
-    assert j["research"] == {"business": False, "website": True, "account": True, "competitors": False}
+    assert j["research"] == {"business": False, "website": True, "account": True, "metaaccount": False, "competitors": False}
 
 
 def test_the_cards_say_what_they_need_and_none_uses_paid_data():
-    assert [c["key"] for c in pk.CARDS] == pk.CARD_KEYS == ["business", "website", "account", "competitors"]
-    assert {c["key"]: c["needs"] for c in pk.CARDS} == {"business": None, "website": "website", "account": "account", "competitors": None}
+    assert [c["key"] for c in pk.CARDS] == pk.CARD_KEYS == ["business", "website", "account", "metaaccount", "competitors"]
+    assert {c["key"]: c["needs"] for c in pk.CARDS} == {"business": None, "website": "website", "account": "account", "metaaccount": "metaAccount", "competitors": None}
     assert not any(c["paid"] for c in pk.CARDS) and all(c["blurb"] and c["title"] for c in pk.CARDS) and all(c["default"] for c in pk.CARDS)
 
 
@@ -87,3 +87,35 @@ def test_the_list_row_and_the_kind_test():
 def test_it_shares_the_daily_limit_with_the_other_two_agents():
     from tracker import paid_business as pb
     assert pk.BUILDS_PER_DAY == ps.BUILDS_PER_DAY == pb.BUILDS_PER_DAY == 12 and pk.KIND == "keywords" and pk.MAX_COMPETITORS == pk.RIVALS_READ == 3
+
+
+# ── Meta ────────────────────────────────────────────────────────────────────
+
+def test_a_meta_account_is_checked_and_the_platform_follows_the_accounts_given_and_the_other_platforms_account_is_left_out():
+    with pytest.raises(ps.BadPayload) as e:
+        pk.clean_inputs(K.inputs(metaAccount="12345"))
+    assert "act_" in str(e.value)
+    with pytest.raises(ps.BadPayload) as e:
+        pk.clean_inputs(K.inputs(platform="tiktok"))
+    assert "google, meta or both" in str(e.value)
+    assert pk.clean_inputs(K.inputs(account="1234567890", metaAccount=""))["platform"] == "google"
+    i = pk.clean_inputs(K.inputs(account="1234567890", metaAccount="act_1234567"))
+    assert i["platform"] == "both" and i["account"] == "1234567890" and i["metaAccount"] == "act_1234567"
+    m = pk.clean_inputs(K.inputs(account="1234567890", metaAccount="act_1234567", platform="meta"))
+    assert m["platform"] == "meta" and m["account"] == "" and m["metaAccount"] == "act_1234567" and m["research"]["account"] is False and m["research"]["metaaccount"] is True
+    g = pk.clean_inputs(K.inputs(account="1234567890", metaAccount="act_1234567", platform="google"))
+    assert g["metaAccount"] == "" and g["research"]["metaaccount"] is False and g["research"]["account"] is True
+    assert pk.clean_inputs(K.inputs(website="", account="", services="", metaAccount="act_1234567"))["platform"] == "meta"          # an ad account alone is something to start from
+
+
+def test_the_platform_says_which_lanes_run():
+    assert pk.platforms_of({}) == (True, False) and pk.platforms_of({"platform": "meta"}) == (False, True) and pk.platforms_of({"platform": "both"}) == (True, True)
+
+
+def test_a_meta_build_has_no_keyword_planner_and_looks_up_interests_and_both_has_both_lanes():
+    keys = lambda i: [s["key"] for s in pk.steps_for(i)]
+    meta = K.clean(platform="meta", metaAccount="act_1234567", account="")
+    assert keys(meta) == ["r:business", "r:website", "r:metaaccount", "r:competitors", "a:seeds", "r:interests", "a:audiences", "f:finish"]
+    both = K.clean(platform="both", metaAccount="act_1234567", account="1234567890")
+    assert keys(both) == ["r:business", "r:website", "r:account", "r:metaaccount", "r:competitors", "r:planner", "a:themes", "a:classify", "a:plan", "a:seeds", "r:interests", "a:audiences", "f:finish"]
+    assert keys(K.clean(account="1234567890")) == ["r:business", "r:website", "r:account", "r:competitors", "r:planner", "a:themes", "a:classify", "a:plan", "f:finish"]

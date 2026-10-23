@@ -29,6 +29,7 @@ assert "navigator" in HARNESS and "copied" in HARNESS and "keyword-research" in 
 
 OPTIONS = {"cards": pk.CARDS, "goals": ps.GOALS, "minSearches": [10, 50, 100, 500], "defaultMin": 10, "buildsPerDay": 12, "modelReady": True}
 ACCOUNTS = {"accounts": [{"id": "1234567890", "name": "Acme Dental", "currency": "USD"}, {"id": "2345678901", "name": "Northwind <b>Dental</b>", "currency": "USD"}], "groups": []}
+META_ACCOUNTS = {"accounts": [{"id": "act_1234567", "name": "Acme Dental", "currency": "USD", "platform": "meta"}, {"id": "act_7654321", "name": "Other Meta", "currency": "USD", "platform": "meta"}]}
 API = "/p2/paid-marketing/api/keywords"
 
 
@@ -43,7 +44,7 @@ def rec():
 
 
 def run(scenario):
-    base = [{"match": "/keywords/options", "body": OPTIONS}, {"match": "/segments/accounts", "body": ACCOUNTS}, {"match": "/keywords/list", "body": {"builds": []}}]
+    base = [{"match": "/keywords/options", "body": OPTIONS}, {"match": "/segments/accounts", "body": ACCOUNTS}, {"match": "/gads/accounts", "body": META_ACCOUNTS}, {"match": "/keywords/list", "body": {"builds": []}}]
     scenario = dict(scenario)
     scenario["responses"] = scenario.get("responses", []) + base
     with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as f:
@@ -93,6 +94,21 @@ def table(r, steps=None, view_="add"):
     return out["el"]["#kwTable"]["html"], out["el"]["#kwCount"]["text"], out["el"]["#tabBody"]["html"]
 
 
+def _reuse_and_start(record, steps=None):
+    """Open a finished build, put its details back in the form and start again: the body that was sent."""
+    sc = opened(record)
+    sc = dict(sc, steps=[press("reuseBtn")] + (steps or []) + [press("goBtn")],
+              responses=sc["responses"] + [{"match": "/keywords/start", "method": "POST", "status": 201, "body": {"id": "b" * 32}}, {"match": "/status", "body": {"status": "running", "progress": {"steps": []}}}])
+    out = run(sc)
+    return next(c for c in out["calls"] if c["url"].endswith("/keywords/start"))["body"]
+
+
+def _started(steps, values=None):
+    out = run({"values": values or {"#fName": "Acme", "#fSite": "acme.com"}, "steps": steps + [press("goBtn")],
+               "responses": [{"match": "/keywords/start", "method": "POST", "status": 201, "body": {"id": "a" * 32}}, {"match": "/status", "body": {"status": "running", "progress": {"steps": []}}}]})
+    return next(c for c in out["calls"] if c["url"].endswith("/keywords/start"))["body"], out
+
+
 def kws(html):
     return re.findall(r'<span class="kr-kw">([^<]*)</span>', html)
 
@@ -108,10 +124,11 @@ def test_the_form_shows_the_goals_the_cards_the_floors_and_the_accounts():
     h = out["el"]
     assert h["#goals"]["html"].count("data-g=") == 5 and 'data-g="leads"' in h["#goals"]["html"] and 'aria-checked="true"' in h["#goals"]["html"]
     cards = h["#cards"]["html"]
-    assert cards.count('<button type="button" class="cb-card') == 4 and "Business Research of this client" in cards and "Account keywords and search terms" in cards and "Uses paid data" not in cards
-    assert "Needs a Google Ads account" in cards and "Needs a website" in cards
+    assert cards.count('<button type="button" class="cb-card') == 5 and "Business Research of this client" in cards and "Account keywords and search terms" in cards and "Uses paid data" not in cards
+    assert "Needs a Google Ads account" in cards and "Needs a website" in cards and "Meta only" in cards          # on Google the Meta card is for Meta only
     assert h["#fMin"]["html"].count("<option") == 4 and '<option value="10" selected>10 a month</option>' in h["#fMin"]["html"] and "500 a month" in h["#fMin"]["html"]
-    assert [i["label"] for i in out["picker"][-1][0]] == ["No account", "Acme Dental", "Northwind <b>Dental</b>"]
+    assert out["scopeOpts"] == {"noGroups": True, "optional": True}                       # the shared platform and account control: one client account per platform, either may be left out
+    assert h["#goBtn"]["text"] == "Find keywords" and h["#fMinWrap"]["hidden"] is False
 
 
 def test_a_card_that_cannot_work_cannot_be_turned_on_until_what_it_needs_is_given():
@@ -129,7 +146,8 @@ def test_the_form_is_sent_as_it_was_filled_in():
                "steps": [{"fire": ["input", {"id": "fSite"}]}, click({"#cards [data-k]": {"data-k": "business"}}), click({"#goals [data-g]": {"data-g": "calls"}}), press("goBtn")]})
     b = next(c for c in out["calls"] if c["url"].endswith("/keywords/start"))["body"]
     assert b["name"] == "Acme Dental" and b["website"] == "acme.com" and b["goal"] == "calls" and b["account"] == "" and b["locations"] == "Austin, TX" and b["services"] == "implants" and b["avoid"] == "dentures"
-    assert b["minSearches"] == 100 and b["competitors"] == ["smile.com", "Another"] and b["research"] == {"business": False, "website": True, "account": False, "competitors": True}
+    assert b["minSearches"] == 100 and b["competitors"] == ["smile.com", "Another"] and b["research"] == {"business": False, "website": True, "account": False, "metaaccount": False, "competitors": True}
+    assert b["metaAccount"] == "" and b["platform"] == "google"
     assert "budget" not in b and "campaignTypes" not in b and "launch" not in b
     assert out["hist"][-1] == "/p2/paid-marketing/keyword-research?build=" + "a" * 32 and out["el"]["#builder"]["hidden"] is True and out["el"]["#run"]["hidden"] is False
 
@@ -385,7 +403,8 @@ def test_change_the_details_puts_them_back_in_the_form(rec):
     out = run(opened(rec) | {"steps": [press("reuseBtn")]})
     e = out["el"]
     assert e["#fName"]["value"] == "Acme Dental" and e["#fSite"]["value"] == "acmedental.com" and e["#fIndustry"]["value"] == "Dental" and e["#fPlaces"]["value"] == "Austin, TX" and e["#fMin"]["value"] == "10"
-    assert e["#fComp"]["value"] == "https://smileaustin.com/" and e["#builder"]["hidden"] is False and e["#result"]["hidden"] is True and out["picker"][-1][1] == "1234567890" and 'data-g="leads" aria-checked="true"' in e["#goals"]["html"]
+    assert e["#fComp"]["value"] == "https://smileaustin.com/" and e["#builder"]["hidden"] is False and e["#result"]["hidden"] is True and 'data-g="leads" aria-checked="true"' in e["#goals"]["html"]
+    assert _reuse_and_start(rec)["account"] == "1234567890"                                      # the account of the saved build is chosen again
 
 
 def test_nothing_the_model_or_planner_or_a_website_wrote_can_run_as_html(rec):
@@ -503,3 +522,155 @@ def test_a_result_made_before_the_plans_existed_still_draws_without_them(rec):
     old["plan"].pop("plans")
     assert "kr-plan" not in page(old, "keywords") and "kr-plan" not in page(old, "negatives") and "kr-plan" not in page(old, "checks")
     assert kws(table(old)[0])                                                                                     # the keywords table is all there
+
+
+# ── Meta ────────────────────────────────────────────────────────────────────
+
+def _public(platform):
+    from tests import test_paid_keywords_meta_job as MJ
+    store, sid = MJ.make(platform)
+    MJ.run(store, sid)
+    return json.loads(json.dumps(ps.public(store.get(sid))))
+
+
+@pytest.fixture(scope="module")
+def mrec():
+    return _public("meta")
+
+
+@pytest.fixture(scope="module")
+def brec():
+    return _public("both")
+
+
+def kws_of(html):
+    return re.findall(r'<span class="kr-kw">([^<]*)</span>', html)
+
+
+def mview(name):
+    return click({".kr-views [data-mv]": {"data-mv": name}})
+
+
+def test_the_platform_is_chosen_from_the_shared_control_and_sent_with_the_accounts():
+    body, out = _started([{"scope": ["act_1234567", "meta"]}])
+    assert body["metaAccount"] == "act_1234567" and body["account"] == "" and body["platform"] == "meta" and body["research"]["metaaccount"] is True and body["research"]["account"] is False
+    assert out["el"]["#goBtn"]["text"] == "Find audiences" and out["el"]["#fMinWrap"]["hidden"] is True
+    cards = run({"steps": [{"scope": ["act_1234567", "meta"]}]})["el"]["#cards"]["html"]
+    assert "Needs a Meta ad account" not in cards and "Google only" in cards.split('data-k="account"')[1].split("</button>")[0]
+    body, out = _started([{"scope": ["1234567890+act_1234567", "both"]}])
+    assert body["account"] == "1234567890" and body["metaAccount"] == "act_1234567" and body["platform"] == "both" and out["el"]["#goBtn"]["text"] == "Find keywords and audiences" and out["el"]["#fMinWrap"]["hidden"] is False
+    body, out = _started([{"scope": ["1234567890+act_1234567", "both"]}, {"scope": ["1234567890", "google"]}])
+    assert body["metaAccount"] == "" and body["platform"] == "google" and out["el"]["#goBtn"]["text"] == "Find keywords"
+    named = run({"steps": [{"scope": ["act_1234567", "meta"]}]})
+    assert named["el"]["#fName"]["value"] == "Acme Dental"
+
+
+def test_a_saved_meta_build_chooses_its_meta_account_again(mrec):
+    assert mrec["inputs"]["platform"] == "meta"
+    sent = _reuse_and_start(mrec)
+    assert sent["metaAccount"] == "act_1234567" and sent["platform"] == "meta" and sent["account"] == ""
+
+
+def test_the_tabs_of_a_meta_result_and_of_a_result_for_both(mrec, brec):
+    assert tabs_of(run(opened(mrec))) == ["Overview", "Audiences to test (1)", "Interests (6)", "What the ad sets aim at", "Competitors", "Plan", "Questions for the client (1)", "Checks"]
+    both = tabs_of(run(opened(brec)))
+    assert both == ["Overview", "Google: Themes (6)", "Google: Keywords (23)", "Google: What the account has", "Meta: Audiences to test (1)", "Meta: Interests (6)", "Meta: What the ad sets aim at", "Competitors",
+                    "Through the year", "Google: Negatives (3)", "Google: Plan", "Meta: Plan", "Google: Questions for the client (2)", "Meta: Questions for the client (1)", "Checks"]
+
+
+def test_the_overview_of_a_meta_result_gives_the_counts_what_the_numbers_say_and_what_was_read(mrec):
+    html = page(mrec, "overview")
+    m = mrec["plan"]["meta"]
+    assert "Interests judged" in html and "Spent on interests that do not fit" in html and "Cost per result today" in html and "What the numbers say" in html
+    assert "Advantage+ audience" in html and "ad set spend names an interest judged not a fit" in html and "The list is wide." in html and "Start Pump users" in html
+    assert "Meta&#39;s interest list" in html or "Meta's interest list" in html
+    assert "What was looked up in Meta" in html and "insulin pump" in html and "Keywords judged" not in html and "What Keyword Planner was asked" not in html
+    assert "$600.00" in html                                                                      # the spend on the interest judged not a fit, in the account's currency
+
+
+def test_a_part_that_could_not_be_written_is_said_at_the_top_of_the_overview(brec):
+    r = json.loads(json.dumps(brec))
+    r["plan"]["errors"] = {"Google": "Keyword Planner gave no ideas"}
+    r["plan"].pop("keywords"); r["plan"].pop("themes"); r["plan"].pop("coverage")
+    html = page(r, "overview")
+    assert "The Google part could not be written." in html and "Keyword Planner gave no ideas" in html and "Keywords judged" not in html and "Interests judged" in html
+
+
+def test_the_audiences_tab_shows_each_audience_its_interests_with_sizes_and_the_ones_already_in_use(mrec):
+    html = page(mrec, "maud")
+    assert "Pump users" in html and "Close to the product." in html and "Cost per lead." in html and "prospecting" in html
+    assert "Insulin pump · 1.0M to 1.2M" in html and 'class="cb-c kw exact">Insulin pump' in html           # an interest an ad set already aims at is marked
+    assert "How to start these audiences in Ads Manager" in html and "Detailed targeting" in html and "Form fills" in html and "How to build the lookalikes" in html
+    assert "do not add up" in html
+
+
+def test_the_interests_tab_defaults_to_the_fits_nobody_aims_at_and_can_show_everything_and_be_searched(mrec):
+    out = run(opened(mrec) | {"steps": [tab("mint")]})
+    m = mrec["plan"]["meta"]
+    new = [r for r in m["interests"] if r["fit"] == "yes" and not r.get("inUse")]
+    assert "A fit, aimed at by no ad set (%d)" % len(new) in out["el"]["#tabBody"]["html"] and out["el"]["#miCount"]["text"] == "%d interests" % len(new) == "3 interests"
+    assert "Insulin pump" not in kws_of(out["el"]["#miTable"]["html"]) and all(n in kws_of(out["el"]["#miTable"]["html"]) for n in [r["name"] for r in new])
+    allr = run(opened(mrec) | {"steps": [tab("mint"), mview("all")]})
+    assert allr["el"]["#miCount"]["text"] == "%d interests" % len(m["interests"]) and "no ad set" in allr["el"]["#miTable"]["html"] and "1 ad set<" in allr["el"]["#miTable"]["html"]
+    assert "$600.00 spent, 20 results, $30.00 each" in allr["el"]["#miTable"]["html"]
+    found = run(opened(mrec) | {"steps": [tab("mint"), mview("all")] + typed("#miQ", "frequent")})
+    assert found["el"]["#miCount"]["text"] == "1 interest" and kws_of(found["el"]["#miTable"]["html"]) == ["Frequent travellers"] and "$400.00 spent, 0 results" in found["el"]["#miTable"]["html"]
+    none = run(opened(mrec) | {"steps": [tab("mint"), mview("all")] + typed("#miQ", "zzz")})
+    assert "No interest matches." in none["el"]["#miTable"]["html"]
+
+
+def test_the_ad_sets_tab_says_how_each_interest_in_use_is_doing_and_what_each_ad_set_aims_at(mrec):
+    html = page(mrec, "mset")
+    assert "Working" in html and "Weak" in html and "$30.00" in html and "$600.00" in html and "30 results" not in html
+    assert "Pump users" in html and "Travel" in html and "Advantage+" in html and "Site visitors" in html
+    assert "How to take out the interests that cost money and do not fit" in html and "How to give more to what works" in html
+    assert "Judged against the account" in html and "own cost per result" in html
+
+
+def test_the_plan_and_questions_tabs_and_the_copy_button(mrec):
+    plan = page(mrec, "mplan")
+    assert "Start the audiences worth testing" in plan and "Take out the interests" in plan and "Give more to what works" in plan and "Build lookalikes from the client" in plan and "Start Pump users" in plan
+    q = page(mrec, "mquestions")
+    assert "May we name the pump?" in q and "Compliance" in q and 'id="copyMQ"' in q
+    out = run(opened(mrec) | {"steps": [tab("mquestions"), press("copyMQ")]})
+    assert out["copied"] == ["Compliance\n1. May we name the pump?"]
+
+
+def test_the_checks_tab_names_what_meta_could_not_say(mrec):
+    r = json.loads(json.dumps(mrec))
+    c = r["plan"]["meta"]["checks"]
+    c.update(emptyPhrases=["type 1"], cut=True, found=150, unjudged=2, droppedAnswers=3, numbers=[{"where": "In short", "text": "About 4,242 people", "number": "4,242"}], interestNotes=["The search for \"x\" could not be read."])
+    html = page(r, "checks")
+    assert "Meta had no interest for" in html and "type 1" in html and "150 interests and behaviors were found" in html and "2 interests could not be judged" in html and "3 answers were left out" in html
+    assert "4,242" in html and "could not be read" in html and "Meta: assumptions" in html and "leads are the goal" in html
+
+
+def test_nothing_meta_or_the_model_wrote_can_run_as_html(mrec):
+    r = json.loads(json.dumps(mrec))
+    evil = "<img src=x onerror=alert(1)>"
+    m = r["plan"]["meta"]
+    m["interests"][0]["name"] = evil
+    m["interests"][0]["note"] = evil
+    m["audiences"][0]["name"] = evil
+    m["audiences"][0]["interests"][0]["name"] = evil
+    m["inUse"][0]["name"] = evil
+    m["adsets"][0]["name"] = evil
+    m["headlines"][0] = evil
+    m["plan"]["summary"][0] = evil
+    m["plan"]["questions"][0]["question"] = evil
+    for name in ("overview", "maud", "mset", "mplan", "mquestions", "checks"):
+        assert "<img" not in page(r, name), name
+    out = run(opened(r) | {"steps": [tab("mint"), mview("all")]})
+    assert "<img" not in out["el"]["#miTable"]["html"] and "&lt;img" in out["el"]["#miTable"]["html"]
+
+
+def test_each_view_of_the_interests_shows_its_own_rows_and_they_are_ordered_by_fit_then_audience_size(mrec):
+    m = mrec["plan"]["meta"]
+    order = {"yes": 0, "maybe": 1, "no": 2, "unjudged": 3}
+    want = [r["name"] for r in sorted(m["interests"], key=lambda r: (order[r["fit"]], -(r.get("size") or 0), r["name"]))]
+    allv = run(opened(mrec) | {"steps": [tab("mint"), mview("all")]})
+    assert kws_of(allv["el"]["#miTable"]["html"]) == want
+    use = run(opened(mrec) | {"steps": [tab("mint"), mview("use")]})
+    assert sorted(kws_of(use["el"]["#miTable"]["html"])) == sorted(r["name"] for r in m["interests"] if r.get("inUse")) and use["el"]["#miCount"]["text"] == "3 interests"
+    fit = run(opened(mrec) | {"steps": [tab("mint"), mview("fit")]})
+    assert sorted(kws_of(fit["el"]["#miTable"]["html"])) == sorted(r["name"] for r in m["interests"] if r["fit"] == "yes") and fit["el"]["#miCount"]["text"] == "5 interests"

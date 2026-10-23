@@ -9,16 +9,13 @@
   <section class="pm-hero">
     <div class="pm-hero-l">
       <span class="pm-eyebrow"><span class="d"></span>Paid Marketing · Research</span>
-      <h1 class="pm-title">The searches the account is not bidding on yet, <span class="pm-grad">and what each one is worth.</span></h1>
-      <p class="pm-sub">Give it a client: what it sells, a website, and if there is one, the Google Ads account. It asks <b>Google Keyword Planner</b> what people search for
-        around the client's services, its site and its competitors' sites, then <b>checks every idea against the keywords and negative keywords the account already has</b>,
-        so nothing is suggested twice. Claude groups the market into themes and judges each keyword's fit, intent and match type. Every number is Keyword Planner's.
-        Download it as Excel, CSV or PDF, or as a file for Google Ads Editor.</p>
+      <h1 class="pm-title">What people search for, and who to aim at, <span class="pm-grad">that the account is not covering yet.</span></h1>
+      <p class="pm-sub">Give it a client: what it sells, a website, and if there is one, the ad account. <b>On Google</b> it asks Google Keyword Planner what people search for
+        around the client's services, its site and its competitors' sites, then <b>checks every idea against the keywords and negative keywords the account already has</b>, so nothing is suggested twice.
+        <b>On Meta</b>, where ads are not bought on keywords, it looks the business up in Meta's own list of interests, <b>reads which interests the ad sets already aim at and how each one is doing</b>,
+        and plans the audiences to test. Claude judges what fits; every number is Google's or Meta's. Download it as Excel, CSV or PDF, or as a file for Google Ads Editor.</p>
     </div>
   </section>
-
-  <section class="pm-panel pd-cmd"><div id="platSw" class="pm-plat"></div></section>
-  <div id="gBody">
 
   <div id="msg"></div>
 
@@ -27,23 +24,23 @@
     <div class="cb-grid">
       <label class="cb-f cb-w2"><span class="pd-dd-k">Client or business name *</span><input type="text" id="fName" maxlength="120" autocomplete="off" placeholder="Acme Dental"></label>
       <label class="cb-f cb-w2"><span class="pd-dd-k">Website</span><input type="text" id="fSite" maxlength="300" autocomplete="off" placeholder="acmedental.com"></label>
-      <div class="cb-f cb-w2"><div id="acctPick"></div><span class="cb-hint" id="acctHint">Optional. With an account, nothing it already bids on or blocks is suggested, and what converted is not missed.</span></div>
+      <div class="cb-f cb-w2"><div id="acctPick"></div><span class="cb-hint" id="acctHint">Optional. On Google, nothing the account already bids on or blocks is suggested, and what converted is not missed. On Meta, the interests its ad sets already aim at are marked and judged.</span></div>
       <label class="cb-f cb-w2"><span class="pd-dd-k">Industry</span><input type="text" id="fIndustry" maxlength="120" autocomplete="off" placeholder="Dental, SaaS, home services…"></label>
       <label class="cb-f cb-w3"><span class="pd-dd-k">What it sells (separate with commas)</span><input type="text" id="fServices" maxlength="800" autocomplete="off" placeholder="dental implants, invisalign, emergency dentist"><span class="cb-hint">Each one is a separate request to Keyword Planner.</span></label>
       <label class="cb-f cb-w3"><span class="pd-dd-k">Where it serves customers</span><input type="text" id="fPlaces" maxlength="500" autocomplete="off" placeholder="Austin, TX; Round Rock, TX (separate places with a semicolon)"><span class="cb-hint">Keyword Planner counts searches there. Left empty, it counts the whole country of the account's currency, or the United States, and the result says which.</span></label>
       <div class="cb-f cb-w3"><span class="pd-dd-k">What the client wants from advertising</span><div class="pm-chips" id="goals" role="radiogroup" aria-label="Goal"></div></div>
       <label class="cb-f cb-w2"><span class="pd-dd-k">Competitors (one per line, a website or a name)</span><textarea id="fComp" rows="3" maxlength="1600" placeholder="smileaustin.com&#10;Another Dental"></textarea><span class="cb-hint">Up to three. Leave this empty and the agent finds them with a web search.</span></label>
       <label class="cb-f cb-w1"><span class="pd-dd-k">Keywords and topics to stay away from</span><textarea id="fAvoid" rows="3" maxlength="600" placeholder="cheap, dentures, a service the client does not offer"></textarea><span class="cb-hint">Separate with commas. Any idea holding all the words of one is left out.</span></label>
-      <label class="cb-f cb-w2"><span class="pd-dd-k">Smallest monthly searches worth looking at</span><select id="fMin"></select><span class="cb-hint">Ideas below it are left out, except search terms that already converted.</span></label>
+      <label class="cb-f cb-w2" id="fMinWrap"><span class="pd-dd-k">Smallest monthly searches worth looking at (Google)</span><select id="fMin"></select><span class="cb-hint">Ideas below it are left out, except search terms that already converted.</span></label>
       <label class="cb-f cb-w3"><span class="pd-dd-k">Anything else about the client (optional)</span><textarea id="fBrief" rows="3" maxlength="3000" placeholder="Offers, seasons, services to push, services to leave alone."></textarea></label>
     </div>
 
-    <div class="pm-panel-h cb-h2"><span class="pm-panel-t">2. What to read first</span><span class="pm-panel-s">Click a card to turn it on or off. Keyword Planner is always asked.</span></div>
+    <div class="pm-panel-h cb-h2"><span class="pm-panel-t">2. What to read first</span><span class="pm-panel-s">Click a card to turn it on or off. A Google build always asks Keyword Planner; a Meta build always looks the client up in Meta's interests.</span></div>
     <div class="cb-cards" id="cards"></div>
 
     <div class="cb-go">
       <button class="pm-btn" id="goBtn" type="button">Find keywords</button>
-      <p class="cb-fine" id="goNote">A build takes about 3 to 10 minutes and keeps going if you leave the page. It reads public pages, Google Ads and Keyword Planner. Nothing is changed in Google Ads.</p>
+      <p class="cb-fine" id="goNote">A build takes about 3 to 10 minutes and keeps going if you leave the page. It reads public pages, Google Ads, Keyword Planner, Meta's ad account and Meta's interest list. Nothing is changed in any account.</p>
     </div>
   </section>
 
@@ -68,12 +65,12 @@
     <div class="pm-panel-h"><span class="pm-panel-t">Saved keyword research</span><span class="pm-panel-s">Everyone on the team sees these. Open one to read it, download it or run it again.</span></div>
     <div id="recent"><p class="cb-fine">Loading…</p></div>
   </section>
-  <p class="pd-foot">It only recommends: nothing is changed in Google Ads. Searches a month, competition and bids are Google Keyword Planner's estimates for the last twelve months. A keyword the model judged is marked as its judgement; whether to bid on a competitor's name is the client's decision.</p>
-  </div>
+  <p class="pd-foot">It only recommends: nothing is changed in Google Ads or Meta. Searches a month, competition and bids are Google Keyword Planner's estimates for the last twelve months; audience sizes, spend and results are Meta's. A keyword or an interest the model judged is marked as its judgement; whether to bid on a competitor's name is the client's decision.</p>
 </div>
 {% endblock %}
 {% block scripts %}
   <script src="{{ url_for('static', filename='js/pm_picker.js') }}?v=1"></script>
   <script src="{{ url_for('static', filename='js/pm_platform.js') }}?v=7"></script>
-  <script src="{{ url_for('static', filename='js/keyword_research.js') }}?v=3"></script>
+  <script src="{{ url_for('static', filename='js/pm_scope.js') }}?v=2"></script>
+  <script src="{{ url_for('static', filename='js/keyword_research.js') }}?v=4"></script>
 {% endblock %}

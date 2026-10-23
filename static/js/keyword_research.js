@@ -37,16 +37,33 @@ function sendJson(url,method,body){
 function H(html){return {h:html};}
 function cell(c){return c&&typeof c==="object"&&"h" in c?c.h:esc(c);}
 
-var S = {opts:null, accounts:[], account:"", accountObj:null, goal:"leads", on:{}, id:"", rec:null, tab:"overview", seq:0, timer:null,
-  kw:{view:"add",q:"",theme:"",intent:"",priority:"",sort:"avg",dir:-1,shown:100}};
-var picker=null;
+var S = {opts:null, accounts:[], metaAccounts:[], account:"", metaAccount:"", platform:"google", accountObj:null, metaObj:null, goal:"leads", on:{}, id:"", rec:null, tab:"overview", seq:0, timer:null,
+  kw:{view:"add",q:"",theme:"",intent:"",priority:"",sort:"avg",dir:-1,shown:100}, mi:{view:"new",q:"",shown:100}};
+var scope=null;
 var PAGE=100;
+
+/* The Platform switch and the account pickers are the shared control (static/js/pm_scope.js): Google reads the Google Ads account's keywords and asks Keyword Planner, Meta reads the
+   Meta ad account's ad sets and looks the client up in Meta's interests, Both does the two in one build. S.account is the Google part, S.metaAccount the Meta part (never an MCC). */
+function applyScope(a,p){
+  var ps=window.PMScope.partsOf(a).filter(Boolean);
+  S.platform=p;
+  S.account=ps.filter(function(x){return !window.PMScope.isMeta(x);})[0]||"";
+  S.metaAccount=ps.filter(function(x){return window.PMScope.isMeta(x);})[0]||"";
+  S.accountObj=S.accounts.filter(function(x){return x.id===S.account;})[0]||null;
+  S.metaObj=S.metaAccounts.filter(function(x){return x.id===S.metaAccount;})[0]||null;
+  var first=S.accountObj||S.metaObj;
+  if(first&&!$("#fName").value.trim()) $("#fName").value=first.name;
+  if(S.opts) paintForm();
+}
+function googleOn(){return S.platform!=="meta";}
+function metaOn(){return S.platform!=="google";}
 
 /* ── The form ─────────────────────────────────────────────── */
 var ICON = {
   business:'<path d="M4 21V8l8-5 8 5v13"/><path d="M9 21v-6h6v6M9 11h.01M15 11h.01"/>',
   website:'<path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/><circle cx="12" cy="12" r="9"/>',
   account:'<path d="M3 12a9 9 0 1 0 3-6.7M3 4v5h5M12 8v4l3 2"/>',
+  metaaccount:'<path d="M3 12a9 9 0 1 0 3-6.7M3 4v5h5M12 8v4l3 2"/>',
   competitors:'<path d="M4 20V10M10 20V4M16 20v-8M22 20H2"/>'
 };
 function goalsHtml(){
@@ -55,7 +72,10 @@ function goalsHtml(){
   }).join("");
 }
 function blocked(card){
+  if(card.key==="account"&&!googleOn()) return "Google only";
+  if(card.key==="metaaccount"&&!metaOn()) return "Meta only";
   if(card.needs==="account"&&!S.account) return "Needs a Google Ads account";
+  if(card.needs==="metaAccount"&&!S.metaAccount) return "Needs a Meta ad account";
   if(card.needs==="website"&&!$("#fSite").value.trim()) return "Needs a website";
   return "";
 }
@@ -75,6 +95,8 @@ function minHtml(){
 }
 function paintForm(){
   $("#goals").innerHTML=goalsHtml(); $("#cards").innerHTML=cardsHtml();
+  $("#goBtn").textContent=S.platform==="meta"?"Find audiences":S.platform==="both"?"Find keywords and audiences":"Find keywords";
+  $("#fMinWrap").hidden=!googleOn();
   if(!S.minPainted){S.minPainted=true; $("#fMin").innerHTML=minHtml();}
   if(!S.opts.modelReady) $("#goNote").innerHTML='<b>The AI is not available on this server</b> (no Anthropic key is set), so the keywords cannot be judged here yet.';
 }
@@ -82,7 +104,7 @@ function setMsg(html,cls){var m=$("#msg"); m.className=cls||""; m.innerHTML=html
 
 function payload(){
   var research={}; S.opts.cards.forEach(function(c){research[c.key]=!blocked(c)&&!!S.on[c.key];});
-  return {name:$("#fName").value, website:$("#fSite").value, account:S.account, industry:$("#fIndustry").value, goal:S.goal,
+  return {name:$("#fName").value, website:$("#fSite").value, account:S.account, metaAccount:S.metaAccount, platform:S.platform, industry:$("#fIndustry").value, goal:S.goal,
     locations:$("#fPlaces").value, services:$("#fServices").value, brief:$("#fBrief").value, avoid:$("#fAvoid").value,
     minSearches:parseInt($("#fMin").value,10)||S.opts.defaultMin,
     competitors:$("#fComp").value.split(/\n+/).map(function(s){return s.trim();}).filter(Boolean), research:research};
@@ -119,7 +141,7 @@ function showRun(light){
 }
 function stopPoll(){if(S.timer){clearTimeout(S.timer);S.timer=null;}}
 function watch(id){
-  stopPoll(); S.id=id; S.rec=null; S.tab="overview"; S.kw=resetKw();
+  stopPoll(); S.id=id; S.rec=null; S.tab="overview"; S.kw=resetKw(); S.mi={view:"new",q:"",shown:PAGE};
   try{history.replaceState(null,"",location.pathname+"?build="+encodeURIComponent(id));}catch(e){}
   var seq=++S.seq;
   function tick(){
@@ -173,7 +195,7 @@ function kpi(label,value,sub){return '<div class="cb-kpi"><span>'+esc(label)+'</
 function pill(text,cls){return '<span class="cb-pill'+(cls?" "+cls:"")+'">'+esc(text)+'</span>';}
 function h5(t){return '<h5 class="cb-h5">'+esc(t)+'</h5>';}
 
-var CARD_TITLE = {planner:"Keyword Planner"};
+var CARD_TITLE = {planner:"Keyword Planner", interests:"Meta's interest list"};
 function cardTitle(k){return CARD_TITLE[k]||k;}
 function plan(){return (S.rec&&S.rec.plan)||{};}
 function wr(){return plan().plan||{};}
@@ -182,6 +204,8 @@ function cov(){return plan().coverage||{};}
 function themes(){return plan().themes||[];}
 function themeName(key){var t=themes().filter(function(x){return x.key===key;})[0]; return t?t.name:"Other";}
 function cur(){return plan().currency||"USD";}
+function mt(){return plan().meta||null;}
+function hasGoogle(){var p=plan(); return !!(p.keywords||[]).length||!!(p.themes||[]).length||!!p.coverage;}
 
 function paintResult(){
   var rec=S.rec, p=plan(), inp=rec.inputs||{};
@@ -213,15 +237,21 @@ function paintResult(){
 }
 
 function tabsList(){
-  var p=plan(), r=res(), out=[["overview","Overview"]], rivals=((r.competitors||{}).data||{}).competitors||[], seasonal=(p.seasonal||{}).rows||[];
-  if(themes().length) out.push(["themes","Themes ("+themes().length+")"]);
-  if((p.keywords||[]).length) out.push(["keywords","Keywords ("+p.keywords.length+")"]);
-  if(r.account&&(r.account.state==="ok"||r.account.state==="partial")) out.push(["account","What the account has"]);
+  var p=plan(), r=res(), out=[["overview","Overview"]], rivals=((r.competitors||{}).data||{}).competitors||[], seasonal=(p.seasonal||{}).rows||[], m=mt();
+  var both=hasGoogle()&&!!m, G=both?"Google: ":"", M=both?"Meta: ":"";
+  if(themes().length) out.push(["themes",G+"Themes ("+themes().length+")"]);
+  if((p.keywords||[]).length) out.push(["keywords",G+"Keywords ("+p.keywords.length+")"]);
+  if(r.account&&(r.account.state==="ok"||r.account.state==="partial")) out.push(["account",G+"What the account has"]);
+  if(m&&(m.audiences||[]).length) out.push(["maud",M+"Audiences to test ("+m.audiences.length+")"]);
+  if(m&&(m.interests||[]).length) out.push(["mint",M+"Interests ("+m.interests.length+")"]);
+  if(m&&((m.inUse||[]).length||(m.adsets||[]).length)) out.push(["mset",M+"What the ad sets aim at"]);
   if(rivals.some(function(c){return c.ok;})||(p.keywords||[]).some(function(k){return k.intent==="competitor";})) out.push(["compete","Competitors"]);
   if(seasonal.length) out.push(["season","Through the year"]);
-  if((wr().negatives||[]).length) out.push(["negatives","Negatives ("+wr().negatives.length+")"]);
-  if((wr().quickWins||[]).length||(wr().tests||[]).length||(wr().risks||[]).length||(wr().seasonal||[]).length) out.push(["plan","Plan"]);
-  if((wr().questions||[]).length) out.push(["questions","Questions for the client ("+wr().questions.length+")"]);
+  if((wr().negatives||[]).length) out.push(["negatives",G+"Negatives ("+wr().negatives.length+")"]);
+  if((wr().quickWins||[]).length||(wr().tests||[]).length||(wr().risks||[]).length||(wr().seasonal||[]).length) out.push(["plan",G+"Plan"]);
+  if(m&&(Object.keys(m.plans||{}).some(function(k){return m.plans[k];})||((m.plan||{}).quickWins||[]).length||((m.plan||{}).risks||[]).length)) out.push(["mplan",M+"Plan"]);
+  if((wr().questions||[]).length) out.push(["questions",G+"Questions for the client ("+wr().questions.length+")"]);
+  if(m&&((m.plan||{}).questions||[]).length) out.push(["mquestions",M+"Questions for the client ("+m.plan.questions.length+")"]);
   out.push(["checks","Checks"]);
   return out;
 }
@@ -229,9 +259,11 @@ function paintTabs(){
   var list=tabsList();
   if(!list.some(function(t){return t[0]===S.tab;})) S.tab="overview";
   $("#tabs").innerHTML=list.map(function(t){return '<button type="button" role="tab" class="cb-tab'+(t[0]===S.tab?" on":"")+'" data-t="'+t[0]+'" aria-selected="'+(t[0]===S.tab)+'">'+esc(t[1])+'</button>';}).join("");
-  var fn={overview:tabOverview,themes:tabThemes,keywords:tabKeywords,account:tabAccount,compete:tabCompete,season:tabSeason,negatives:tabNegatives,plan:tabPlan,questions:tabQuestions,checks:tabChecks}[S.tab];
+  var fn={overview:tabOverview,themes:tabThemes,keywords:tabKeywords,account:tabAccount,compete:tabCompete,season:tabSeason,negatives:tabNegatives,plan:tabPlan,questions:tabQuestions,checks:tabChecks,
+    maud:tabMAud,mint:tabMInt,mset:tabMSet,mplan:tabMPlan,mquestions:tabMQuestions}[S.tab];
   $("#tabBody").innerHTML=fn();
   if(S.tab==="keywords") paintKw();
+  if(S.tab==="mint") paintMi();
 }
 var PRI={high:"high",medium:"medium",low:"low"};
 function priPill(x){return {h:pill(x||"medium",PRI[x]||"medium"),cls:"kr-nw"};}
@@ -244,21 +276,131 @@ function statusPill(r){
 }
 function bids(r){return r.lo!=null||r.hi!=null?money(r.lo)+" to "+money(r.hi):"";}
 
+function failedParts(){
+  var e=plan().errors||{}, k=Object.keys(e);
+  return k.map(function(x){return '<div class="pm-note warn"><b>The '+esc(x)+' part could not be written.</b> '+esc(e[x])+' The other part is kept: press <b>Research again from the start</b> to try this one.</div>';}).join("");
+}
 function tabOverview(){
-  var c=cov(), p=plan(), w=wr(), r=res(), st=p.stats||{};
-  var k='<div class="cb-kpis">'+kpi("Keywords judged",num(c.judged),num(c.yes)+" a fit")+kpi("To add to the account",num(c.include),"fit, new, not a rival's name")+
-    kpi("Searches not yet covered",num(c.newSearches),"a month, of the keywords that fit")+kpi("Already covered",c.poolPct==null?"n/a":c.poolPct+"%","of the searches for ideas that share a word with what it sells")+
-    kpi("Themes",themes().length)+kpi("Negatives to add",(w.negatives||[]).length)+'</div>';
-  var out=k+sec("In short",ul(w.summary));
-  out+=sec("First moves",tbl(["What","Why"],(w.quickWins||[]).map(function(x){return [x.what,x.why];})));
-  var order=["business","website","account","competitors","planner"], rows=order.filter(function(x){return r[x];}).map(function(x){
+  var c=cov(), p=plan(), w=wr(), r=res(), st=p.stats||{}, m=mt(), out=failedParts();
+  if(hasGoogle()){
+    var k='<div class="cb-kpis">'+kpi("Keywords judged",num(c.judged),num(c.yes)+" a fit")+kpi("To add to the account",num(c.include),"fit, new, not a rival's name")+
+      kpi("Searches not yet covered",num(c.newSearches),"a month, of the keywords that fit")+kpi("Already covered",c.poolPct==null?"n/a":c.poolPct+"%","of the searches for ideas that share a word with what it sells")+
+      kpi("Themes",themes().length)+kpi("Negatives to add",(w.negatives||[]).length)+'</div>';
+    out+=(m?h5("Google"):"")+k+sec("In short",ul(w.summary));
+    out+=sec("First moves",tbl(["What","Why"],(w.quickWins||[]).map(function(x){return [x.what,x.why];})));
+  }
+  if(m){
+    var mc=m.coverage||{}, tot=m.totals||{};
+    out+=(hasGoogle()?h5("Meta"):"")+'<div class="cb-kpis">'+kpi("Interests judged",num(mc.judged),num(mc.yes)+" a fit")+kpi("Fit and aimed at by no ad set",num(mc["new"]),"worth an ad set")+
+      kpi("Interests in use",num(mc.inUse),num(m.adsetCount)+" ad sets")+kpi("Spent on interests that do not fit",mmoney(mc.misfitSpend),"in the last 90 days")+
+      kpi("Audiences to test",(m.audiences||[]).length)+kpi("Cost per result today",tot.cpa==null?"n/a":mmoney(tot.cpa),"across the ad sets")+'</div>';
+    out+=sec("What the numbers say",ul(m.headlines),"Worked out from Meta's own figures, not written by the AI")+sec("In short",ul((m.plan||{}).summary));
+    out+=sec("First moves",tbl(["What","Why"],((m.plan||{}).quickWins||[]).map(function(x){return [x.what,x.why];})));
+  }
+  var order=["business","website","account","metaaccount","competitors","planner","interests"], rows=order.filter(function(x){return r[x];}).map(function(x){
     var q=r[x]; return [cardTitle(x),H(pill({ok:"Read",partial:"Partly",failed:"Failed",skipped:"Skipped"}[q.state]||q.state,q.state)),q.note||""];});
   out+=sec("What was read",tbl(["Research","Result","What it found"],rows),"Anything that failed is named in the checks");
   var calls=(((r.planner||{}).data||{}).calls)||[];
-  out+=sec("What Keyword Planner was asked",fine(((r.planner||{}).data||{}).geoNote)+tbl(["Asked about","Ideas kept","Note"],calls.map(function(x){return [x.label,x.ideas,x.note||""];})),
+  if(calls.length) out+=sec("What Keyword Planner was asked",fine(((r.planner||{}).data||{}).geoNote)+tbl(["Asked about","Ideas kept","Note"],calls.map(function(x){return [x.label,x.ideas,x.note||""];})),
     st.considered?num(st.considered)+" different keywords came back; "+num(st.judged)+" were judged":"");
+  var seeds=((m||{}).seeds||{}).phrases||[];
+  if(seeds.length) out+=sec("What was looked up in Meta's interests",chips(seeds),"Meta keeps broad, standard names for interests: these are the phrases the AI chose to look up");
   return out;
 }
+/* ── Meta ─────────────────────────────────────────────────── */
+function mcur(){return (mt()||{}).currency||"USD";}
+var SYM={USD:"$",EUR:"€",GBP:"£"};
+function mmoney(v){return v==null||v===""||isNaN(v)?"":(SYM[mcur()]||mcur()+" ")+money(v);}
+function fitMeta(x){return fitPill(x);}
+var VERDICT={works:["Working","ok"],weak:["Weak","failed"],watch:["Watch","medium"],idle:["No spend","skipped"],unknown:["Results not read","skipped"]};
+function verdictPill(v){var p=VERDICT[v]||[v,""]; return {cls:"kr-nw",h:pill(p[0],p[1])};}
+function useCell(u){
+  if(!u) return {cls:"kr-nw",h:'<span class="kr-small">no ad set</span>'};
+  return H(esc(num(u.adsets))+" ad set"+(u.adsets===1?"":"s")+'<span class="kr-small">'+esc(mmoney(u.cost))+" spent, "+esc(num(u.conv,1))+" results"+(u.cpa!=null?", "+esc(mmoney(u.cpa))+" each":"")+'</span>');
+}
+function tabMAud(){
+  var m=mt(), aud=m.audiences||[];
+  var rows=aud.map(function(a){
+    return [{cls:"kr-c4",h:'<b>'+esc(a.name)+'</b><span class="kr-small">'+esc(a.why||"")+'</span>'},{cls:"kr-nw",h:esc(a.role)},
+      {cls:"kr-c2",h:(a.interests||[]).map(function(i){return '<span class="cb-c kw'+(i.inUse?" exact":"")+'">'+esc(i.name)+(i.sizeText?" · "+esc(i.sizeText):"")+'</span>';}).join(" ")},
+      {cls:"kr-num",h:esc(a.largest?num(a.largest):"n/a")},{cls:"kr-c3",h:esc(a.test||"")}];
+  });
+  var ex=(m.exclusions||[]).map(function(e){return [H('<span class="kr-kw">'+esc(e.name)+'</span>'),{cls:"kr-num",h:esc(e.sizeText||"")},e.why,e.inUse?"Yes":"No"];});
+  return planBox((m.plans||{}).start,"How to start these audiences in Ads Manager")+
+    sec("Audiences to test",tbl(["Audience","Role","Interests","Largest interest (people)","How to test it"],rows),"Sizes are Meta's. The interests in an audience overlap, so their sizes do not add up. A highlighted interest is one an ad set already aims at.")+
+    planBox((m.plans||{}).exclude,"How to exclude these interests")+
+    sec("Interests to exclude from every ad set",tbl(["Interest","Audience size","Why","Aimed at by an ad set now"],ex))+
+    sec("Lookalike sources",tbl(["Source","Why"],((m.plan||{}).lookalikes||[]).map(function(x){return [x.seed,x.why];})),"Built from the client's own data")+planBox((m.plans||{}).lookalike,"How to build the lookalikes");
+}
+function miViewRows(view){
+  return ((mt()||{}).interests||[]).filter(function(r){
+    if(view==="new") return r.fit==="yes"&&!r.inUse;
+    if(view==="fit") return r.fit==="yes";
+    if(view==="use") return !!r.inUse;
+    return true;
+  });
+}
+function miFiltered(){
+  var q=(S.mi.q||"").trim().toLowerCase(), order={yes:0,maybe:1,no:2,unjudged:3};
+  return miViewRows(S.mi.view).filter(function(r){return !q||r.name.toLowerCase().indexOf(q)>=0||(r.theme||"").toLowerCase().indexOf(q)>=0;}).sort(function(a,b){
+    var fa=order[a.fit]==null?4:order[a.fit], fb=order[b.fit]==null?4:order[b.fit];
+    return fa-fb||((b.size||0)-(a.size||0))||(a.name<b.name?-1:1);
+  });
+}
+function tabMInt(){
+  var views=[["new","A fit, aimed at by no ad set ("+miViewRows("new").length+")"],["fit","Everything that fits ("+miViewRows("fit").length+")"],["use","In use by an ad set ("+miViewRows("use").length+")"],["all","Everything judged ("+miViewRows("all").length+")"]];
+  return '<div class="kr-views" role="radiogroup" aria-label="Which interests">'+views.map(function(v){
+      return '<button type="button" role="radio" data-mv="'+v[0]+'" class="'+(S.mi.view===v[0]?"on":"")+'" aria-checked="'+(S.mi.view===v[0])+'">'+esc(v[1])+'</button>';}).join("")+'</div>'+
+    '<div class="kr-filters"><label><span class="pd-dd-k">Search</span><input type="text" id="miQ" value="'+esc(S.mi.q)+'" placeholder="Part of an interest or an audience" autocomplete="off"></label></div>'+
+    '<p class="cb-fine kr-count" id="miCount"></p><div id="miTable"></div>'+
+    fine("Audience sizes are Meta's (a range, for the whole of Meta). Fit, intent and the audience an interest belongs to are Claude's judgement. How an interest in use is doing is worked out from the ad sets that name it: an ad set that names several interests counts under each.");
+}
+function paintMi(){
+  var rows=miFiltered(), shown=rows.slice(0,S.mi.shown), box=$("#miTable"), count=$("#miCount");
+  if(!box) return;
+  count.textContent=num(rows.length)+" interest"+(rows.length===1?"":"s")+(rows.length>shown.length?", the first "+num(shown.length)+" shown":"");
+  if(!rows.length){box.innerHTML='<p class="cb-fine">No interest matches.</p>'; return;}
+  var body=shown.map(function(r){
+    return [{cls:"kr-c1",h:'<span class="kr-kw">'+esc(r.name)+'</span>'+(r.kind==="behavior"?'<span class="kr-small">a Meta behavior</span>':"")+(r.small?'<span class="kr-small">small: Meta cannot deliver an ad set on an audience this size reliably</span>':"")},
+      fitMeta(r.fit),{cls:"kr-nw",h:esc(r.intent||"")},{cls:"kr-c2",h:esc(r.theme||"")},{cls:"kr-num",h:esc(r.sizeText||"n/a")},useCell(r.inUse),{cls:"kr-c3",h:esc(r.note||"")},{cls:"kr-c3",h:esc(r.from||"")}];
+  });
+  box.innerHTML=tbl(["Interest","Fit","Intent","Audience","Audience size","Aimed at by","Note","Found from"],body)+
+    (rows.length>shown.length?'<p class="kr-more"><button type="button" class="pm-btn-ghost" id="miMore">Show '+Math.min(PAGE,rows.length-shown.length)+' more</button></p>':"");
+}
+function tabMSet(){
+  var m=mt(), t=m.totals||{}, cc=mcur();
+  var k='<div class="cb-kpis">'+kpi("Ad sets",num(m.adsetCount))+kpi("Interests and behaviors in use",num((m.inUse||[]).length))+kpi("Spent in 90 days",mmoney(t.cost),cc)+kpi("Results",num(t.conv,1))+
+    kpi("Cost per result",t.cpa==null?"n/a":mmoney(t.cpa),cc)+kpi("On Advantage+ audience",num(((m.checks||{}).advantageAdsets)||0),"interests are only suggestions there")+'</div>';
+  var use=(m.inUse||[]).map(function(u){return [H('<span class="kr-kw">'+esc(u.name)+'</span>'+(u.kind==="behavior"?'<span class="kr-small">a Meta behavior</span>':"")),{cls:"kr-num",h:esc(num(u.adsets))},{cls:"kr-num",h:esc(mmoney(u.cost))},{cls:"kr-num",h:esc(num(u.conv,1))},
+    {cls:"kr-num",h:esc(u.cpa==null?"":mmoney(u.cpa))},verdictPill(u.verdict),{cls:"kr-c3",h:esc(u.why)},fitMeta(u.fit)];});
+  var sets=(m.adsets||[]).map(function(a){return [{cls:"kr-c1",h:'<b>'+esc(a.name)+'</b><span class="kr-small">'+esc(a.campaign||"")+(a.status?" · "+esc(String(a.status).toLowerCase()):"")+'</span>'},
+    {cls:"kr-c3",h:esc((a.interests||[]).map(function(i){return i.name;}).concat((a.behaviors||[]).map(function(i){return i.name;})).join(", "))},{cls:"kr-c3",h:esc((a.audiences||[]).join(", "))},
+    {cls:"kr-nw",h:a.advantage?pill("Advantage+","medium"):""},{cls:"kr-num",h:esc(mmoney(a.cost))},{cls:"kr-num",h:esc(num(a.conv,1))},{cls:"kr-num",h:esc(a.cpa==null?"":mmoney(a.cpa))}];});
+  return k+planBox((m.plans||{}).remove,"How to take out the interests that cost money and do not fit")+planBox((m.plans||{}).scale,"How to give more to what works")+
+    sec("Interests and behaviors the ad sets aim at ("+cc+")",tbl(["Interest","Ad sets","Spent","Results","Cost per result","How it is doing","Why","Judged"],use),
+      "Judged against the account's own cost per result: working is at least 20 percent under it with at least 3 results; weak is spending twice the usual cost of a result with nothing to show, or costing 1.5 times as much")+
+    sec("Ad sets ("+cc+")",tbl(["Ad set","Interests and behaviors","Audiences","Setting","Spent","Results","Cost per result"],sets),m.adsetCount>(m.adsets||[]).length?"The first "+(m.adsets||[]).length+" of "+m.adsetCount:"Last 90 days");
+}
+function tabMPlan(){
+  var m=mt(), w=m.plan||{}, pl=m.plans||{};
+  return ["start","remove","scale","exclude","lookalike"].map(function(k){return planBox(pl[k],(pl[k]||{}).title||"");}).join("")+
+    sec("First moves",tbl(["What","Why"],(w.quickWins||[]).map(function(x){return [x.what,x.why];})))+sec("Risks",tbl(["Risk","What to do"],(w.risks||[]).map(function(x){return [x.risk,x.mitigation];})));
+}
+function mQuestionsByArea(){
+  var order=[], by={};
+  (((mt()||{}).plan||{}).questions||[]).forEach(function(q){ if(!by[q.area]){by[q.area]=[];order.push(q.area);} by[q.area].push(q); });
+  return order.map(function(a){return {area:a,items:by[a]};});
+}
+function mQuestionsText(){
+  return mQuestionsByArea().map(function(g){return g.area+"\n"+g.items.map(function(q,i){return (i+1)+". "+q.question;}).join("\n");}).join("\n\n");
+}
+function tabMQuestions(){
+  return '<div class="cb-go"><button type="button" class="pm-btn" id="copyMQ">Copy the questions</button></div>'+fine("Plain text, grouped by area, ready to paste into an email.")+
+    mQuestionsByArea().map(function(g){
+      return '<div class="kr-qgroup"><h4>'+esc(g.area)+'</h4>'+tbl(["Question","Why it matters","When"],g.items.map(function(q){return [q.question,q.why,H(pill(q.urgency,q.urgency==="Before launch"?"failed":q.urgency==="First month"?"medium":"low"))];}))+'</div>';
+    }).join("");
+}
+
 function tabThemes(){
   var rows=themes().map(function(t){
     return [{cls:"kr-c4",h:'<b>'+esc(t.name)+'</b><span class="kr-small">'+esc(t.why||"")+'</span>'+chips((t.top||[]).map(function(x){return x.kw+" · "+num(x.avg);}),"kw")},{h:esc(t.intent),cls:"kr-nw"},priPill(t.priority),
@@ -344,7 +486,7 @@ function tabAccount(){
 function tabCompete(){
   var read=((res().competitors||{}).data||{}).competitors||[], rows=(plan().keywords||[]).filter(function(r){return r.intent==="competitor";});
   return sec("Websites read",tbl(["Competitor","Found","Pages read","Result"],read.map(function(r){return [H(link(r.url,r.name)),r.via||"",(r.pages||[]).length,r.ok?"Read":(r.reason||"Could not be read")];})),
-    "Keyword Planner was asked what each site that was read is found for")+
+    hasGoogle()?"Keyword Planner was asked what each site that was read is found for":"The sites were read for how the client stands against them")+
     sec("Keywords that name a competitor",tbl(["Keyword","Competitor named","Searches a month","Competition"],rows.map(function(r){return [H('<span class="kr-kw">'+esc(r.kw)+'</span>'),r.rival||"",{h:esc(num(r.avg)),cls:"kr-num"},r.comp||""];})),
       "Whether to bid on a rival's name is the client's decision: these are not in the Google Ads Editor file")||'<p class="cb-fine">No competitor keywords were found.</p>';
 }
@@ -413,6 +555,17 @@ function tabChecks(){
   var left=[["Ideas below the smallest search volume",st.belowFloor],["Ideas on the avoid list",st.avoided],["Ideas blocked in every campaign by the account's negatives",st.blockedEverywhere],["Ideas merged with a close variant",st.merged]].filter(function(x){return x[1];});
   if(left.length) out+=sec("What was left out before judging",tbl(["Left out","How many"],left.map(function(x){return [x[0],{h:esc(num(x[1])),cls:"kr-num"}];})));
   out+=sec("Assumptions",ul(c.assumptions));
+  var m=mt();
+  if(m){
+    var mc=m.checks||{};
+    out+=sec("Meta: what was not available",ul((mc.missing||[]).concat(mc.accountNotes||[]).concat(mc.interestNotes||[])),"The result says where it is working without these");
+    if((mc.emptyPhrases||[]).length) out+=sec("Meta had no interest for",ul(mc.emptyPhrases),"Meta keeps broad, standard names, and none at all for some topics (health conditions among them)");
+    if(mc.cut) out+=sec("More interests than were judged",'<p class="cb-p">'+num(mc.found)+' interests and behaviors were found; the ones an ad set already aims at, then the first of the rest, were judged.</p>');
+    if(mc.unjudged) out+=sec("Meta: interests not judged",'<p class="cb-p">'+mc.unjudged+' interest'+(mc.unjudged===1?"":"s")+' could not be judged and '+(mc.unjudged===1?"is":"are")+' shown as not judged.</p>');
+    if(mc.droppedAnswers) out+=sec("Answers left out",'<p class="cb-p">'+mc.droppedAnswers+' answer'+(mc.droppedAnswers===1?" was":"s were")+' left out because '+(mc.droppedAnswers===1?"it":"they")+' named an interest that was not in the list Meta gave, or one that does not fit.</p>');
+    if((mc.numbers||[]).length) out+=sec("Meta: numbers in the write-up that are not in the research",tbl(["Where","Text","Number"],mc.numbers.map(function(x){return [x.where,x.text,x.number];})),"The AI was not asked for any number: check these before sharing the write-up");
+    out+=sec("Meta: assumptions",ul(mc.assumptions));
+  }
   var cost=S.rec.cost||{};
   if(cost.stages) out+=sec("What it cost",'<p class="cb-fine">Judging: $'+num(cost.model,2)+' in '+cost.calls+' calls. Paid research: $'+num(cost.research,2)+'. Total: $'+num(cost.usd,2)+'.</p>');
   return out||'<p class="cb-fine">Nothing to check.</p>';
@@ -426,8 +579,9 @@ function reuse(rec){
   set("#fName",i.name); set("#fSite",shortUrl(i.website)); set("#fIndustry",i.industry); set("#fPlaces",i.locations); set("#fServices",i.services); set("#fBrief",i.brief); set("#fAvoid",i.avoid);
   set("#fMin",i.minSearches||S.opts.defaultMin);
   set("#fComp",(i.competitors||[]).map(function(c){return c.url||c.name;}).join("\n"));
-  S.goal=i.goal||"leads"; S.account=i.account||""; S.accountObj=S.accounts.filter(function(a){return a.id===S.account;})[0]||null;
-  picker.set(S.pickerItems,S.account);
+  S.goal=i.goal||"leads";
+  var want=i.account&&i.metaAccount?i.account+"+"+i.metaAccount:(i.metaAccount||i.account||"");
+  if(scope&&want) scope.select(want); else applyScope("",i.platform||S.platform);
   S.opts.cards.forEach(function(c){S.on[c.key]=i.research?!!i.research[c.key]:!!c.default;});
   paintForm(); window.scrollTo&&window.scrollTo(0,0);
 }
@@ -458,8 +612,10 @@ function loadRecent(){
 
 /* ── Events ───────────────────────────────────────────────── */
 function kwChanged(fn){fn(); S.kw.shown=PAGE; paintKw();}
+function miChanged(fn){fn(); S.mi.shown=PAGE; paintMi();}
 document.addEventListener("input",function(e){
   if(e.target.id==="fSite") paintForm();
+  if(e.target.id==="miQ") miChanged(function(){S.mi.q=$("#miQ").value;});
   if(e.target.id==="kwQ") kwChanged(function(){S.kw.q=$("#kwQ").value;});
 });
 document.addEventListener("change",function(e){
@@ -477,7 +633,10 @@ document.addEventListener("click",function(e){
   var view=t.closest&&t.closest(".kr-views [data-kv]"); if(view){S.kw.view=view.getAttribute("data-kv"); S.kw.shown=PAGE; paintTabs(); return;}
   var srt=t.closest&&t.closest("#kwTable [data-sort]");
   if(srt){var key2=srt.getAttribute("data-sort"); if(S.kw.sort===key2) S.kw.dir=-S.kw.dir; else {S.kw.sort=key2; S.kw.dir=key2==="kw"?1:-1;} paintKw(); return;}
+  var mview=t.closest&&t.closest(".kr-views [data-mv]"); if(mview){S.mi.view=mview.getAttribute("data-mv"); S.mi.shown=PAGE; paintTabs(); return;}
   var op=t.closest&&t.closest(".cb-open"); if(op){watch(op.getAttribute("data-id")); return;}
+  if(t.id==="miMore"){S.mi.shown+=PAGE; paintMi(); return;}
+  if(t.id==="copyMQ"){copyText(mQuestionsText(),function(ok){t.textContent=ok?"Copied":"Could not copy: select the text and copy it";});return;}
   if(t.id==="kwMore"){S.kw.shown+=PAGE; paintKw(); return;}
   if(t.id==="goBtn"){start(); return;}
   if(t.id==="runBack"||t.id==="backBtn"){leave(); return;}
@@ -503,27 +662,17 @@ document.addEventListener("click",function(e){var d=document.querySelector(".cb-
 
 /* ── Start ────────────────────────────────────────────────── */
 function init(){
-  picker=window.PMPicker($("#acctPick"),{label:"Google Ads account (optional)",search:true,onChange:function(v){
-    S.account=v; S.accountObj=S.accounts.filter(function(a){return a.id===v;})[0]||null;
-    if(S.accountObj&&!$("#fName").value.trim()) $("#fName").value=S.accountObj.name;
-    paintForm();
-  }});
-  picker.set([{value:"",label:"No account",sub:"Website and what it sells only",avatar:"?",hue:200}],"",true);
-  Promise.all([getJson(API+"/options"),getJson("/p2/paid-marketing/api/segments/accounts")]).then(function(rs){
-    var o=rs[0], a=rs[1];
+  getJson(API+"/options").then(function(o){
     if(!o.ok){setMsg(esc((o.j&&o.j.error)||"The page could not load its options."));return;}
     S.opts=o.j; S.opts.cards.forEach(function(c){S.on[c.key]=!!c.default; CARD_TITLE[c.key]=c.title;});
-    S.accounts=(a.ok&&a.j.accounts)||[];
-    var items=[{value:"",label:"No account",sub:"Website and what it sells only",avatar:"?",hue:200}];
-    S.accounts.forEach(function(x){items.push({value:x.id,label:x.name,avatar:inits(x.name),hue:hueOf(x.name),sub:dashed(x.id)});});
-    S.pickerItems=items; picker.set(items,"");
-    if(!a.ok) $("#acctHint").textContent="The Google Ads accounts could not be listed, so this research can use the website and what the client sells only.";
+    scope=window.PMScope.mount($("#acctPick"),{account:"",noGroups:true,optional:true,
+      onLoaded:function(info){S.accounts=info.accounts||[]; S.metaAccounts=info.meta||[];},
+      onChange:function(a,pf){applyScope(a,pf);},
+      onError:function(e){$("#acctHint").textContent="The accounts could not be listed ("+((e&&e.message)||"unknown")+"), so this research can use the website and what the client sells only.";}});
     paintForm(); loadRecent();
     var want=(location.search.match(/[?&]build=([0-9a-f]{32})/)||[])[1]; if(want) watch(want);
   }).catch(function(){setMsg("The server could not be reached. Try again.");});
 }
 if(document.readyState==="loading") document.addEventListener("DOMContentLoaded",init); else init();
 
-/* A Google-only agent: the same three choices as every agent; Meta says why it has nothing here and where to look, Both keeps Google and says so. */
-if (window.PMPlatform && document.querySelector("#platSw")) window.PMPlatform.googleOnly(document.querySelector("#platSw"), {name:"Keyword Research",why:"Meta ads are not bought on keywords, so there is no search volume to research. The Meta counterpart is audience interests and behaviours, which this agent does not read yet.",closest:[{label:"Audience Segments",href:"/p2/paid-marketing/audience-segments"},{label:"Business Research",href:"/p2/paid-marketing/business-research"},{label:"Ad Copy & Creative Generator",href:"/p2/paid-marketing/ad-copy"}],body:"#gBody"});
 })();

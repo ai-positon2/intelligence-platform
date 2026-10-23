@@ -227,7 +227,9 @@ def missing(research, inputs):
         if not on and key not in (research or {}):
             if key == "metahistory" and plat not in ("meta", "both"):          # a card of the other platform is not "missing", it was never part of this build
                 continue
-            if key == "history" and plat not in ("google", "both"):
+            if key in ("history", "account") and plat not in ("google", "both"):
+                continue
+            if key == "metaaccount" and plat not in ("meta", "both"):
                 continue
             out.append("%s: not used for this build" % key)
     return out

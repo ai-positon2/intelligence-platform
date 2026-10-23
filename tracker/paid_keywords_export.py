@@ -20,7 +20,8 @@ from .paid_strategy_check import text as clean
 from .paid_strategy_export import CELL_CHARS, SHEET_NAME_BAD, _csv_text, _join, plain
 
 PDF_SKIP = {"Keywords", "Ads Editor import"}
-PDF_ROW_CAP = {"Add to account": 120, "Already in the account": 40}
+PDF_ROW_CAP = {"Add to account": 120, "Already in the account": 40, "Meta interests": 60, "Meta ad sets": 40}
+PDF_PAGE_BREAK = ("Themes", "Add to account", "Plan", "Meta audiences")
 EDITOR_HEADER = ["Campaign", "Ad group", "Keyword", "Criterion Type", "Status"]
 FIT_ORDER = {"yes": 0, "maybe": 1, "no": 2, "unjudged": 3}
 
@@ -60,6 +61,68 @@ def blocked_text(r):
     return "Blocked in some campaigns by \"%s\"" % ((n.get("by") or [{}])[0].get("kw"))
 
 
+def pk_platforms(inputs, plan):
+    """(google, meta): which platforms this saved result has something for (an older build has no platform: it is Google)."""
+    p = (inputs or {}).get("platform") or "google"
+    return p in ("google", "both"), p in ("meta", "both")
+
+
+def _money_cell(v):
+    return v if v is not None else ""
+
+
+def meta_tables(meta):
+    """The Meta sheets, each only when it has rows."""
+    out = {}
+    cur = meta.get("currency") or "USD"
+    rows = meta.get("interests") or []
+    aud = meta.get("audiences") or []
+    if aud:
+        out["Meta audiences"] = (["Audience", "Role", "Interests", "Largest interest (people)", "Why", "How to test it"],
+                                 [[a["name"], a["role"], ", ".join(("%s (%s)" % (i["name"], i["sizeText"]) if i.get("sizeText") else i["name"]) for i in a["interests"]), a.get("largest") or "", a["why"], a["test"]] for a in aud])
+    if rows:
+        order = {"yes": 0, "maybe": 1, "no": 2, "unjudged": 3}
+        ordered = sorted(rows, key=lambda r: (order.get(r["fit"], 4), 0 if not r.get("inUse") else 1, -(r.get("size") or 0), r["name"]))
+        out["Meta interests"] = (["Interest", "Type", "Fit", "Intent", "Audience", "Audience size", "Aimed at by ad sets", "Spent (%s)" % cur, "Results", "Cost per result (%s)" % cur, "Found from", "Where Meta lists it", "Note"],
+                                 [[r["name"], r["kind"], r["fit"], r["intent"], r["theme"], r.get("sizeText") or "", (r.get("inUse") or {}).get("adsets", ""), _money_cell((r.get("inUse") or {}).get("cost")),
+                                   _money_cell((r.get("inUse") or {}).get("conv")), _money_cell((r.get("inUse") or {}).get("cpa")), r.get("from") or "", " > ".join(r.get("path") or []), r["note"]] for r in ordered])
+    if meta.get("inUse"):
+        out["Meta in use"] = (["Interest", "Type", "Ad sets", "Spent (%s)" % cur, "Results", "Cost per result (%s)" % cur, "How it is doing", "Why", "Judged"],
+                              [[u["name"], u["kind"], u["adsets"], u["cost"], u["conv"], _money_cell(u.get("cpa")), u["verdict"], u["why"], u.get("fit") or ""] for u in meta["inUse"]])
+    if meta.get("adsets"):
+        out["Meta ad sets"] = (["Ad set", "Campaign", "Status", "Interests", "Behaviors", "Audiences", "Excluded", "Advantage+ audience", "Spent (%s)" % cur, "Results", "Cost per result (%s)" % cur],
+                              [[a["name"], a.get("campaign") or "", a.get("status") or "", ", ".join(i["name"] for i in a["interests"]), ", ".join(i["name"] for i in a["behaviors"]), ", ".join(a["audiences"]),
+                                ", ".join(a["excluded"]), "Yes" if a.get("advantage") else "No", a["cost"], a["conv"], _money_cell(a.get("cpa"))] for a in meta["adsets"]])
+    if meta.get("exclusions"):
+        out["Meta exclusions"] = (["Interest", "Audience size", "Why", "Aimed at by an ad set now"], [[e["name"], e.get("sizeText") or "", e["why"], "Yes" if e.get("inUse") else "No"] for e in meta["exclusions"]])
+    wr = meta.get("plan") or {}
+    prows = [["Quick win", q["what"], q["why"]] for q in wr.get("quickWins") or []] + [["Lookalike source", x["seed"], x["why"]] for x in wr.get("lookalikes") or []]
+    prows += [["Risk", r["risk"], r["mitigation"]] for r in wr.get("risks") or []]
+    for key, p in (meta.get("plans") or {}).items():
+        if p:
+            prows.append(["How to: " + p["title"], p.get("worth") or "", " ".join("%d. %s" % (i, t) for i, t in enumerate(p["steps"], 1))])
+    if prows:
+        out["Meta plan"] = (["Kind", "Item", "Detail"], prows)
+    if wr.get("questions"):
+        out["Meta questions"] = (["Area", "Question", "Why it matters", "When"], [[q["area"], q["question"], q["why"], q["urgency"]] for q in wr["questions"]])
+    chk = meta.get("checks") or {}
+    crows = [["Not available", s] for s in chk.get("missing") or []] + [["Meta ad account", w] for w in chk.get("accountNotes") or []] + [["Interest search", w] for w in chk.get("interestNotes") or []]
+    crows += [["A number in the write-up that is not in the research: check it", "%s: %s (%s)" % (n["where"], n["number"], n["text"])] for n in chk.get("numbers") or []]
+    crows += [["Meta had no interest for the phrase", p] for p in chk.get("emptyPhrases") or []]
+    if chk.get("unjudged"):
+        crows.append(["Interests the model did not judge", str(chk["unjudged"])])
+    if chk.get("droppedAnswers"):
+        crows.append(["Answers left out because they named an interest that was not in the list", str(chk["droppedAnswers"])])
+    if chk.get("cut"):
+        crows.append(["More interests were found than were judged", "%d found, the first %d judged (the ones in use first)." % (chk.get("found") or 0, len(rows))])
+    if chk.get("advantageAdsets"):
+        crows.append(["Ad sets on Advantage+ audience", "%d: the interests they name are suggestions to Meta, not limits." % chk["advantageAdsets"]])
+    crows += [["Assumption", a] for a in chk.get("assumptions") or []]
+    if crows:
+        out["Meta checks"] = (["Check", "Detail"], crows)
+    return out
+
+
 def tables(rec):
     """{sheet name: (header, rows)} in the order they are shown. Empty tables are left out. Numbers stay numbers."""
     plan = rec.get("plan") or {}
@@ -73,12 +136,27 @@ def tables(rec):
     names = {t["key"]: t["name"] for t in themes}
     out = {}
 
+    google_on, meta_on = pk_platforms(inputs, plan)
+    meta = plan.get("meta") or {}
     ov = [["Client", inputs.get("name")], ["Website", inputs.get("website")], ["Industry", inputs.get("industry")], ["Goal of the advertising", ps.GOALS.get(inputs.get("goal"), inputs.get("goal"))],
-          ["Places", inputs.get("locations")], ["Google Ads account", rec.get("account_name") or rec.get("account_id")], ["Built by", rec.get("created_by")],
-          ["Built on", (plan.get("generatedAt") or "")[:10]], ["Smallest monthly searches looked at", inputs.get("minSearches")],
-          ["Keywords judged", cov.get("judged")], ["Judged a fit", cov.get("yes")], ["Fit and new to the account", cov.get("new")], ["Monthly searches of the keywords that fit", cov.get("searches")],
-          ["Already covered by the account, of the searches for ideas that share a word with what the client sells", ("%d%%" % cov["poolPct"]) if cov.get("poolPct") is not None else ""],
-          ["Already covered by the account, of the keywords judged a fit", ("%d%%" % cov["pct"]) if cov.get("pct") is not None else ""], ["Not yet covered, monthly searches", cov.get("newSearches")]]
+          ["Places", inputs.get("locations")]]
+    if google_on:
+        ov.append(["Google Ads account", (rec.get("account_name") or rec.get("account_id")) if inputs.get("account") else ""])
+    if meta_on:
+        ov.append(["Meta ad account", (meta.get("account") or {}).get("name") or inputs.get("metaAccount")])
+    ov += [["Built by", rec.get("created_by")], ["Built on", (plan.get("generatedAt") or "")[:10]]]
+    if google_on:
+        ov += [["Smallest monthly searches looked at", inputs.get("minSearches")],
+               ["Keywords judged", cov.get("judged")], ["Judged a fit", cov.get("yes")], ["Fit and new to the account", cov.get("new")], ["Monthly searches of the keywords that fit", cov.get("searches")],
+               ["Already covered by the account, of the searches for ideas that share a word with what the client sells", ("%d%%" % cov["poolPct"]) if cov.get("poolPct") is not None else ""],
+               ["Already covered by the account, of the keywords judged a fit", ("%d%%" % cov["pct"]) if cov.get("pct") is not None else ""], ["Not yet covered, monthly searches", cov.get("newSearches")]]
+    mcov = meta.get("coverage") or {}
+    if meta_on and meta:
+        ov += [["Meta interests judged", mcov.get("judged")], ["Meta interests that fit", mcov.get("yes")], ["Fit and aimed at by no ad set", mcov.get("new")], ["Interests in use by the ad sets", mcov.get("inUse")],
+               ["Ad set spend on interests judged not a fit (%s)" % meta.get("currency"), mcov.get("misfitSpend")]]
+        ov += [["Meta: what the numbers say", h] for h in meta.get("headlines") or []] + [["Meta: in short", t] for t in (meta.get("plan") or {}).get("summary") or []]
+    for plat, why in (plan.get("errors") or {}).items():
+        ov.append(["%s part not written" % plat, why])
     ov += [["In short", s] for s in wr.get("summary") or []]
     out["Overview"] = (["Item", "Detail"], [r for r in ov if r[1] not in (None, "")])
 
@@ -136,6 +214,8 @@ def tables(rec):
     if editor:
         out["Ads Editor import"] = (EDITOR_HEADER, editor)
 
+    if meta:
+        out.update(meta_tables(meta))
     chk = plan.get("checks") or {}
     stats = plan.get("stats") or {}
     crows = [["Where searches were counted", chk["geography"]]] if chk.get("geography") else []
@@ -269,7 +349,7 @@ def pdf(rec):
     story = [P("Keyword Research", h1), P(inputs.get("name"), h2), P("%s | %s | goal of the advertising: %s" % (inputs.get("website") or "no website", inputs.get("industry") or "",
                                                                                                            ps.GOALS.get(inputs.get("goal"), "")), small), Spacer(1, 6)]
     for name, header, shown, cut in pdf_tables(rec):
-        story += [PageBreak() if name in ("Themes", "Add to account", "Plan") else Spacer(1, 4), P(name, h2), table(header, shown)]
+        story += [PageBreak() if name in PDF_PAGE_BREAK else Spacer(1, 4), P(name, h2), table(header, shown)]
         if cut:
             story.append(P(cut, small))
     story.append(P("The full keyword list, with every figure, and the file for Google Ads Editor are in the Excel and CSV downloads.", small))

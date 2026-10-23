@@ -6517,6 +6517,7 @@ def _strat_deps(rec, account):
     from tracker import paid_meta
     meta_act = ((rec.get("inputs") or {}).get("metaAccount") or "")
     return {"account": account, "meta_account": _strat_meta_account(meta_act) if meta_act else None, "meta_pages": lambda path, params: paid_meta._pages(path, params, paid_store),
+            "meta_get": lambda path, params: (paid_meta._get(path, params, paid_store) or {}).get("data") or [],          # one page: the interest search has thousands of rows behind its first 25
             "email": rec["created_by"], "planner_account": planner, "planner_currency": planner_currency, "model_ready": bool(os.environ.get("ANTHROPIC_API_KEY")),
             "business_list": lambda kind="business": paid_strategy_store.list_recent(kind=kind), "business_get": paid_strategy_store.get,
             "search": lambda cid, gaql: gads.search(cid, gaql), "geo_names": gads.geo_names, "gads_store": paid_store,
@@ -6926,10 +6927,15 @@ def paid_keywords_start():
     account = _strat_account(inputs["account"])
     if inputs["account"] and not account:
         return jsonify(error="That Google Ads account is not one this platform can read."), 400
+    meta_account = _strat_meta_account(inputs.get("metaAccount"))
+    if inputs.get("metaAccount") and not meta_account:
+        return jsonify(error="That Meta ad account is not one this platform can read."), 400
     if account:
         inputs["currency"] = account.get("currency") or inputs["currency"]
+    elif meta_account:
+        inputs["currency"] = meta_account.get("currency") or inputs["currency"]
     try:
-        rec = store.create(by=_pm_user_email(), inputs=inputs, account_name=(account or {}).get("name") or "", steps=pk.steps_for(inputs))
+        rec = store.create(by=_pm_user_email(), inputs=inputs, account_name=(account or meta_account or {}).get("name") or "", steps=pk.steps_for(inputs))
         started, why = _strat_begin(store, rec)
         if why:
             store.archive(rec["id"])
@@ -7027,7 +7033,9 @@ def paid_keywords_download(sid):
         else:
             body = export.csv_editor(rec)
             if body is None:
-                return jsonify(error="There are no keywords to add: every keyword that fits is already in the account."), 404
+                google = pk.platforms_of(rec.get("inputs") or {})[0]
+                return jsonify(error=("There are no keywords to add: every keyword that fits is already in the account." if google else
+                                      "This result is for Meta, which has no keywords: the file for Google Ads Editor is for a Google build.")), 404
             body = "\ufeff" + body
     except Exception as e:                                  # noqa: BLE001 (a file that cannot be made is said in words, not a stack trace)
         app.logger.exception("keyword research download failed")

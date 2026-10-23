@@ -91,7 +91,7 @@ def test_the_page_renders_for_staff(world):
 
 def test_options_describe_the_cards_the_floors_and_say_whether_the_model_is_there(world, monkeypatch):
     j = client_as(STAFF).get(API + "/options").get_json()
-    assert [c["key"] for c in j["cards"]] == ["business", "website", "account", "competitors"] and j["modelReady"] is True and j["minSearches"] == [10, 50, 100, 500] and j["defaultMin"] == 10
+    assert [c["key"] for c in j["cards"]] == ["business", "website", "account", "metaaccount", "competitors"] and j["modelReady"] is True and j["minSearches"] == [10, 50, 100, 500] and j["defaultMin"] == 10
     assert j["goals"]["leads"] and j["buildsPerDay"] == 12
     monkeypatch.delenv("ANTHROPIC_API_KEY")
     assert client_as(STAFF).get(API + "/options").get_json()["modelReady"] is False
@@ -350,3 +350,51 @@ def test_the_real_dependencies_look_for_business_research_among_business_builds(
     monkeypatch.setattr(gads, "list_accounts", lambda **kw: [{"id": "9999999999", "name": "First", "currency": "GBP"}])
     d = appmod._strat_deps({"created_by": STAFF}, None)
     assert d["business_list"]() == [] and d["business_list"](kind="business") == [] and asked == ["business", "business"]
+
+
+# ── Meta ────────────────────────────────────────────────────────────────────
+
+def meta_world(world, monkeypatch):
+    from tests import test_paid_keywords_meta_job as MJ
+    monkeypatch.setattr(appmod, "_strat_deps", lambda rec, account: MJ.deps(email=rec["created_by"]))
+    monkeypatch.setattr(appmod, "_strat_meta_account", lambda act: {"id": act, "name": "Acme Meta", "currency": "EUR"} if act == "act_1234567" else None)
+
+
+def test_a_meta_account_is_checked_named_and_read_into_a_keyword_research_build(world, monkeypatch):
+    meta_world(world, monkeypatch)
+    c = client_as(STAFF)
+    r = post(c, "/start", dict(FORM, account="", metaAccount="act_1234567", platform="meta"))
+    assert r.status_code == 201
+    rec = c.get(API + "/" + r.get_json()["id"]).get_json()
+    assert rec["status"] == "done" and rec["accountName"] == "Acme Meta" and rec["inputs"]["currency"] == "EUR" and rec["inputs"]["platform"] == "meta" and rec["inputs"]["metaAccount"] == "act_1234567"
+    assert rec["plan"]["meta"]["audiences"] and "keywords" not in rec["plan"] and "r:planner" not in [s["key"] for s in rec["progress"]["steps"]]
+    assert rec["research"]["metaaccount"]["state"] == "ok" and rec["research"]["interests"]["state"] == "ok"
+    bad = post(c, "/start", dict(FORM, metaAccount="act_999999"))
+    assert bad.status_code == 400 and "Meta ad account is not one this platform can read" in bad.get_json()["error"]
+    assert post(c, "/start", dict(FORM, metaAccount="nonsense")).status_code == 400
+
+
+def test_the_options_list_the_meta_card_and_a_meta_result_downloads_without_a_google_file(world, monkeypatch):
+    meta_world(world, monkeypatch)
+    c = client_as(STAFF)
+    assert [x["key"] for x in c.get(API + "/options").get_json()["cards"]] == ["business", "website", "account", "metaaccount", "competitors"]
+    sid = post(c, "/start", dict(FORM, account="", metaAccount="act_1234567", platform="meta")).get_json()["id"]
+    for kind in ("xlsx", "pdf", "zip"):
+        r = c.get(API + "/%s/download?file=%s" % (sid, kind))
+        assert r.status_code == 200 and len(r.data) > 500, kind
+    wb = openpyxl.load_workbook(io.BytesIO(c.get(API + "/%s/download?file=xlsx" % sid).data))
+    assert "Meta audiences" in wb.sheetnames and "Keywords" not in wb.sheetnames
+    r = c.get(API + "/%s/download?file=csv" % sid)
+    assert r.status_code == 404 and "Meta, which has no keywords" in r.get_json()["error"]
+
+
+def test_the_interest_search_reads_one_page_never_every_page_behind_it(monkeypatch):
+    from tracker import paid_meta
+    asked = []
+    monkeypatch.setattr(paid_meta, "_get", lambda path, params, store, **kw: asked.append((path, params)) or {"data": [{"id": "1", "name": "Insulin pump"}], "paging": {"next": "https://graph.facebook.com/next"}})
+    monkeypatch.setattr(paid_meta, "_pages", lambda *a, **k: (_ for _ in ()).throw(AssertionError("a paging reader was used")))
+    deps = appmod._strat_deps({"created_by": STAFF, "inputs": {}}, None)
+    rows = deps["meta_get"]("/search", {"type": "adinterest", "q": "x"})
+    assert rows == [{"id": "1", "name": "Insulin pump"}] and asked == [("/search", {"type": "adinterest", "q": "x"})]
+    monkeypatch.setattr(paid_meta, "_get", lambda *a, **k: {})
+    assert deps["meta_get"]("/search", {}) == []

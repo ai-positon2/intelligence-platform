@@ -292,7 +292,7 @@ def test_every_function_a_page_calls_on_the_scope_control_is_one_it_exports():
 
 
 def test_the_last_three_google_ads_agents_show_the_three_choices_say_why_meta_has_nothing_and_load_the_control_first():
-    for t, js, name in (("campaign_book", "campaign_book.js", "Strategy & Campaign Book"), ("keyword_research", "keyword_research.js", "Keyword Research"), ("qa_agent", "qa_agent.js", "QA Agent")):
+    for t, js, name in (("campaign_book", "campaign_book.js", "Strategy & Campaign Book"), ("qa_agent", "qa_agent.js", "QA Agent")):
         html = open(os.path.join(ROOT, "templates", t + ".html"), encoding="utf-8").read()
         src = open(os.path.join(JS, js), encoding="utf-8").read()
         assert 'id="platSw"' in html and 'id="gBody"' in html and html.index("pm_platform.js") < html.index(js), t
