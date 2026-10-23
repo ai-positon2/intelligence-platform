@@ -16,6 +16,8 @@ import datetime as dt
 import re
 from urllib.parse import urlsplit
 
+from . import paid_meta
+
 # ── What the page offers ────────────────────────────────────────────────────
 
 # The research cards at the top of the page. `needs` is what must be given for a card to work; `paid` says the card spends money on
@@ -29,14 +31,21 @@ CARDS = [
      "blurb": "What the brand posts on social media on its own: uses your latest finished Social Media Intelligence run for this company, or starts one."},
     {"key": "history", "title": "Google Ads history", "needs": "account", "paid": False, "default": True,
      "blurb": "What the account has already paid for: campaigns, keywords and search terms that converted, devices, places, conversion actions and live ads."},
+    {"key": "metahistory", "title": "Meta Ads history", "needs": "metaAccount", "paid": False, "default": True,
+     "blurb": "What the Meta ad account has already paid for and brought: the campaigns by objective, where the ads were shown, the devices and what the live ads say."},
     {"key": "keywords", "title": "Keyword research", "needs": None, "paid": False, "default": True,
      "blurb": "Google Keyword Planner: monthly searches, competition and bid ranges for ideas from the site and the competitors."},
     {"key": "seasonality", "title": "Seasonality", "needs": "account", "paid": False, "default": True,
      "blurb": "When the account's own demand rises and falls through the year, so the budget can follow it."},
+    {"key": "metaaudience", "title": "Meta interests and audiences", "needs": None, "paid": False, "default": True,
+     "blurb": "Looks the client up in Meta's own list of interests (with the size of each audience) and reads which interests the ad account's ad sets already aim at and how each does."},
     {"key": "market", "title": "Market, trends and ad policy", "needs": None, "paid": True, "default": True,
      "blurb": "A web search for how people choose in this market, what moves demand, and the advertising rules the industry must follow."},
 ]
 CARD_KEYS = [c["key"] for c in CARDS]
+GOOGLE_CARDS = ("history", "keywords", "seasonality")               # read from Google Ads and Keyword Planner: off when the build is for Meta only
+META_CARDS = ("metahistory", "metaaudience")                         # read from Meta: off when the build is for Google only
+PLATFORMS = ("google", "meta", "both")
 
 GOALS = {"leads": "Leads (forms and enquiries)", "calls": "Phone calls", "bookings": "Bookings and appointments",
          "sales": "Online sales", "awareness": "Awareness and reach"}
@@ -48,8 +57,34 @@ KINDS = {
     "demandgen": {"label": "Demand Gen", "qa": "Demand Gen", "code": "DemandGen"},
     "display": {"label": "Display", "qa": "Display", "code": "Display"},
     "video": {"label": "Video (YouTube)", "qa": "Video", "code": "Video"},
+    # Meta campaigns are named for their objective: `qa` is the Meta launch checklist's name for the type, `objective` the objective Meta Ads Manager calls it.
+    "metaleads": {"label": "Meta Leads", "qa": "Meta Leads", "code": "MetaLeads", "platform": "meta", "objective": "Leads"},
+    "metasales": {"label": "Meta Sales", "qa": "Meta Sales", "code": "MetaSales", "platform": "meta", "objective": "Sales"},
+    "metatraffic": {"label": "Meta Traffic", "qa": "Meta Traffic", "code": "MetaTraffic", "platform": "meta", "objective": "Traffic"},
+    "metaawareness": {"label": "Meta Awareness", "qa": "Meta Awareness", "code": "MetaAwareness", "platform": "meta", "objective": "Awareness"},
 }
 KIND_KEYS = list(KINDS)
+
+
+def platform_of_kind(kind):
+    return (KINDS.get(kind) or {}).get("platform", "google")
+
+
+GOOGLE_KINDS = [k for k in KIND_KEYS if platform_of_kind(k) == "google"]
+META_KINDS = [k for k in KIND_KEYS if platform_of_kind(k) == "meta"]
+
+
+def platforms_of(inputs):
+    """(google, meta): whether the build plans Google Ads campaigns and Meta campaigns. An older build has no platform: it is Google."""
+    p = (inputs or {}).get("platform") or "google"
+    return p in ("google", "both"), p in ("meta", "both")
+
+
+def kinds_for(inputs, platform):
+    """The campaign kinds the strategist may plan on one platform: the ones asked for (all of the platform's when none were)."""
+    mine = META_KINDS if platform == "meta" else GOOGLE_KINDS
+    asked = [k for k in (inputs or {}).get("campaignTypes") or [] if k in mine]
+    return asked or mine
 
 MAX_COMPETITORS = 8
 MAX_BRIEF = 8000
@@ -128,8 +163,18 @@ def clean_inputs(raw, *, today=None):
     account = re.sub(r"\D", "", str(raw.get("account") or ""))
     if account and not CUSTOMER_ID.match(account):
         raise BadPayload("A Google Ads account id has ten digits.")
-    if not website and not account and len(brief) < 40:
-        raise BadPayload("Give a website, a Google Ads account, or a client brief of a few sentences, so there is something to work from.")
+    meta_account = str(raw.get("metaAccount") or "").strip()
+    if meta_account and not paid_meta.ACT_RE.match(meta_account):
+        raise BadPayload("A Meta ad account id looks like act_ and digits.")
+    platform = str(raw.get("platform") or ("both" if account and meta_account else "meta" if meta_account else "google")).strip().lower()
+    if platform not in PLATFORMS:
+        raise BadPayload("The platform has to be google, meta or both.")
+    if platform == "meta":                                  # the other platform's account is not read: it would only spend time and show a result nobody asked for
+        account = ""
+    elif platform == "google":
+        meta_account = ""
+    if not website and not account and not meta_account and len(brief) < 40:
+        raise BadPayload("Give a website, a Google Ads or Meta ad account, or a client brief of a few sentences, so there is something to work from.")
     goal = str(raw.get("goal") or "leads").strip().lower()
     if goal not in GOALS:
         raise BadPayload("The goal has to be one of: %s." % ", ".join(GOALS))
@@ -171,7 +216,8 @@ def clean_inputs(raw, *, today=None):
     kinds = raw.get("campaignTypes") or []
     if not isinstance(kinds, list) or any(k not in KINDS for k in kinds):
         raise BadPayload("The campaign types have to be from: %s." % ", ".join(KIND_KEYS))
-    kinds = [k for k in KIND_KEYS if k in kinds]
+    google_on, meta_on = platform in ("google", "both"), platform in ("meta", "both")
+    kinds = [k for k in KIND_KEYS if k in kinds and (meta_on if platform_of_kind(k) == "meta" else google_on)]      # a type of the other platform is left out, not an error: the page hides them
     asked = raw.get("research")
     asked = asked if isinstance(asked, dict) else {}
     research = {}
@@ -181,8 +227,12 @@ def clean_inputs(raw, *, today=None):
             on = False
         if card["needs"] == "account" and not account:
             on = False
+        if card["needs"] == "metaAccount" and not meta_account:
+            on = False
+        if (card["key"] in GOOGLE_CARDS and not google_on) or (card["key"] in META_CARDS and not meta_on):
+            on = False
         research[card["key"]] = on
-    return {"name": name, "website": website, "account": account, "industry": _s(raw.get("industry"), 120), "goal": goal,
+    return {"name": name, "website": website, "account": account, "metaAccount": meta_account, "platform": platform, "industry": _s(raw.get("industry"), 120), "goal": goal,
             "budget": budget, "currency": currency, "launch": when.isoformat(), "locations": _s(raw.get("locations"), 500),
             "services": _s(raw.get("services"), 800), "brief": brief, "avoid": _s(raw.get("avoid"), 600),
             "competitors": competitors, "campaignTypes": kinds, "research": research}
@@ -192,7 +242,8 @@ def clean_inputs(raw, *, today=None):
 
 RESEARCH_LABELS = {
     "website": "Reading the client's website", "competitors": "Finding and reading the competitors' websites",
-    "social": "Social Media Intelligence: what the brand posts on its own", "history": "Reading the Google Ads account",
+    "social": "Social Media Intelligence: what the brand posts on its own", "history": "Reading the Google Ads account", "metahistory": "Reading the Meta ad account",
+    "metaaudience": "Meta interests and what the ad sets aim at",
     "keywords": "Keyword research in Google Keyword Planner", "seasonality": "Seasonality of the account",
     "market": "The market, its trends and its advertising rules",
 }
@@ -218,6 +269,29 @@ def with_builds(steps, campaigns):
     at = next((i for i, s in enumerate(kept) if s["key"] == "f:finish"), len(kept))
     builds = [{"key": "b:" + c["key"], "label": "Building %s" % c["name"], "state": "pending", "note": ""} for c in campaigns]
     return kept[:at] + builds + kept[at:]
+
+
+def platform_split(strategy, google, meta):
+    """(google, meta): each platform's share of the monthly budget as a fraction, 1 and 0 when only one platform is planned. For both, it is the strategist's own split (the channel shares
+    it gave for Google and for Meta), 50 and 50 when it gave none, and never less than a tenth to a platform that was asked for (a campaign with no money is no plan)."""
+    if google and not meta:
+        return 1.0, 0.0
+    if meta and not google:
+        return 0.0, 1.0
+    g = m = 0.0
+    for c in (strategy or {}).get("channels") or []:
+        share = c.get("share")
+        if share is None:
+            continue
+        name = str(c.get("channel") or "").lower()
+        if re.search(r"meta|facebook|instagram", name):
+            m += float(share)
+        elif re.search(r"google|search|pmax|performance max|youtube|demand gen|display|video", name):
+            g += float(share)
+    if g + m <= 0:
+        return 0.5, 0.5
+    gs = min(0.9, max(0.1, g / (g + m)))
+    return round(gs, 4), round(1 - gs, 4)
 
 
 # ── Names and money ─────────────────────────────────────────────────────────
