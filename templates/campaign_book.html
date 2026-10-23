@@ -16,6 +16,9 @@
     </div>
   </section>
 
+  <section class="pm-panel pd-cmd"><div id="platSw" class="pm-plat"></div></section>
+  <div id="gBody">
+
   <div id="msg"></div>
 
   <section class="pm-panel cb-builder" id="builder">
@@ -69,9 +72,11 @@
     <div id="recent"><p class="cb-fine">Loading…</p></div>
   </section>
   <p class="pd-foot">It only recommends: nothing is changed in Google Ads. Prices, claims and facts in the ads come from the client's own pages, and anything else is listed for the client to confirm.</p>
+  </div>
 </div>
 {% endblock %}
 {% block scripts %}
   <script src="{{ url_for('static', filename='js/pm_picker.js') }}?v=1"></script>
-  <script src="{{ url_for('static', filename='js/campaign_book.js') }}?v=1"></script>
+  <script src="{{ url_for('static', filename='js/pm_platform.js') }}?v=7"></script>
+  <script src="{{ url_for('static', filename='js/campaign_book.js') }}?v=2"></script>
 {% endblock %}

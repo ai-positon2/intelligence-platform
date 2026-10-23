@@ -523,4 +523,7 @@ function init(){
   }).catch(function(){setMsg("The server could not be reached. Try again.");});
 }
 if(document.readyState==="loading") document.addEventListener("DOMContentLoaded",init); else init();
+
+/* A Google-only agent: the same three choices as every agent; Meta says why it has nothing here and where to look, Both keeps Google and says so. */
+if (window.PMPlatform && document.querySelector("#platSw")) window.PMPlatform.googleOnly(document.querySelector("#platSw"), {name:"Keyword Research",why:"Meta ads are not bought on keywords, so there is no search volume to research. The Meta counterpart is audience interests and behaviours, which this agent does not read yet.",closest:[{label:"Audience Segments",href:"/p2/paid-marketing/audience-segments"},{label:"Business Research",href:"/p2/paid-marketing/business-research"},{label:"Ad Copy & Creative Generator",href:"/p2/paid-marketing/ad-copy"}],body:"#gBody"});
 })();

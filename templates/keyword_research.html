@@ -17,6 +17,9 @@
     </div>
   </section>
 
+  <section class="pm-panel pd-cmd"><div id="platSw" class="pm-plat"></div></section>
+  <div id="gBody">
+
   <div id="msg"></div>
 
   <section class="pm-panel cb-builder" id="builder">
@@ -66,9 +69,11 @@
     <div id="recent"><p class="cb-fine">Loading…</p></div>
   </section>
   <p class="pd-foot">It only recommends: nothing is changed in Google Ads. Searches a month, competition and bids are Google Keyword Planner's estimates for the last twelve months. A keyword the model judged is marked as its judgement; whether to bid on a competitor's name is the client's decision.</p>
+  </div>
 </div>
 {% endblock %}
 {% block scripts %}
   <script src="{{ url_for('static', filename='js/pm_picker.js') }}?v=1"></script>
-  <script src="{{ url_for('static', filename='js/keyword_research.js') }}?v=2"></script>
+  <script src="{{ url_for('static', filename='js/pm_platform.js') }}?v=7"></script>
+  <script src="{{ url_for('static', filename='js/keyword_research.js') }}?v=3"></script>
 {% endblock %}

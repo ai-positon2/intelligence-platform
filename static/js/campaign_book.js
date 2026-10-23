@@ -550,4 +550,7 @@ function init(){
   }).catch(function(){setMsg("The server could not be reached. Try again.");});
 }
 if(document.readyState==="loading") document.addEventListener("DOMContentLoaded",init); else init();
+
+/* A Google-only agent: the same three choices as every agent; Meta says why it has nothing here and where to look, Both keeps Google and says so. */
+if (window.PMPlatform && document.querySelector("#platSw")) window.PMPlatform.googleOnly(document.querySelector("#platSw"), {name:"Strategy & Campaign Book",why:"It writes Google Ads campaigns: keywords and match types, ad and extension text held to Google's limits, budgets and bid strategies. A Meta plan (objectives, ad sets, audiences, placements, creative) is not written by this agent yet.",closest:[{label:"Business Research",href:"/p2/paid-marketing/business-research"},{label:"Ad Copy & Creative Generator",href:"/p2/paid-marketing/ad-copy"},{label:"Account Audit",href:"/p2/paid-marketing/account-audit"}],body:"#gBody"});
 })();

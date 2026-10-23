@@ -640,4 +640,7 @@ $("#copyBtn").addEventListener("click",function(){
     }
   }).catch(function(){say("The server could not be reached. Reload to try again.");});
 })();
+
+/* A Google-only agent: the same three choices as every agent; Meta says why it has nothing here and where to look, Both keeps Google and says so. */
+if (window.PMPlatform && document.querySelector("#platSw")) window.PMPlatform.googleOnly(document.querySelector("#platSw"), {name:"QA Agent",why:"It checks a launch against the team's Campaign Book checklist, which is written for Google Ads campaigns. There is no Meta launch checklist yet.",closest:[{label:"Account Audit",href:"/p2/paid-marketing/account-audit"},{label:"Asset Coverage Audit",href:"/p2/paid-marketing/asset-coverage"},{label:"Disapproved Ads Tracker",href:"/p2/paid-marketing/disapproved-ads"}],body:"#gBody"});
 })();

@@ -12,6 +12,9 @@
     </div>
   </section>
 
+  <section class="pm-panel pd-cmd"><div id="platSw" class="pm-plat"></div></section>
+  <div id="gBody">
+
   <!-- Account, then one of its live campaigns -->
   <section class="pm-panel qa-cmd" id="cmd">
     <div class="qa-cmd-top" id="pickers">
@@ -71,9 +74,11 @@
       <p class="pd-foot" id="foot"></p>
     </div>
   </div>
+  </div>
 </div>
 {% endblock %}
 {% block scripts %}
 <script src="{{ url_for('static', filename='js/pm_picker.js') }}?v=1"></script>
-<script src="{{ url_for('static', filename='js/qa_agent.js') }}?v=11"></script>
+  <script src="{{ url_for('static', filename='js/pm_platform.js') }}?v=7"></script>
+<script src="{{ url_for('static', filename='js/qa_agent.js') }}?v=12"></script>
 {% endblock %}

@@ -43,7 +43,8 @@ function respond(url, opts) {
 }
 /* the first picker made is the page's (or the Google one of the shared scope control, tests/test_scope_js.py); a second is the Meta one. The platform switch records what it was asked. */
 const PMPicker = (host, o) => { const n = pickers.length; const p = { onChange: o.onChange, set(items, v) { (n === 0 ? picker.sets : metaSets).push([items, v]); } }; pickers.push(p); if (n === 0) picker.onChange = o.onChange; return p; };
-const PMPlatform = { saved: () => "", switcher: (host, o) => { switchers.push(o); let cur = o.value; return { set(p) { cur = p; platformsSet.push(p); }, value: () => cur, saved: () => "" }; },
+const googleOnlies = [];
+const PMPlatform = { saved: () => "", googleOnly: (host, o) => { googleOnlies.push(o); return { value: () => "google", set() {}, note: {} }; }, switcher: (host, o) => { switchers.push(o); let cur = o.value; return { set(p) { cur = p; platformsSet.push(p); }, value: () => cur, saved: () => "" }; },
   counterpart: (a, others) => { const n = x => String(x.name || "").toLowerCase().replace(/\(.*?\)/g, "").replace(/[^a-z0-9]/g, ""); const m = others.filter(o => o.currency === a.currency && n(o) === n(a)); return m.length === 1 ? m[0] : null; } };
 /* the shared scope control (static/js/pm_scope.js, tested in test_scope_js.py) as a stand-in: it lists the accounts, reports the account and platform chosen, and can be told one from outside */
 const scope = { o: null };
@@ -87,7 +88,7 @@ function target(spec) {
     if (step.platform && !scope.o) switchers[0].onChange(step.platform);
     for (let i = 0; i < 8; i++) await tick();
   }
-  const out = { calls, hist, picker: picker.sets, metaPicker: metaSets, platformsSet, switchers: switchers.length, scopeOpts: scope.opts || null, el: {}, bodies: {} };
+  const out = { calls, hist, picker: picker.sets, metaPicker: metaSets, platformsSet, switchers: switchers.length, scopeOpts: scope.opts || null, googleOnlies, el: {}, bodies: {} };
   for (const k of Object.keys(bodies)) out.bodies[k] = bodies[k].innerHTML;
   for (const k of Object.keys(els)) out.el[k] = { html: els[k].innerHTML, text: els[k].textContent, hidden: els[k].hidden, value: els[k].value, disabled: els[k].disabled };
   process.stdout.write(JSON.stringify(out));
