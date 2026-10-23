@@ -154,7 +154,8 @@ def test_the_monitor_is_known_to_the_alert_panel_and_the_agent_is_on_the_paid_ma
     css = open(os.path.join(ROOT, "static", "css", "paid_marketing.css"), encoding="utf-8").read()
     assert ".c-kv{" in css and ".pm-kp .cc-f input{" in css
     for t in ("_paid_base.html", "paid_marketing.html"):
-        assert "paid_marketing.css') }}?v=56" in open(os.path.join(ROOT, "templates", t), encoding="utf-8").read()
+        v = {re.search(r"paid_marketing\.css'\) \}\}\?v=(\d+)", open(os.path.join(ROOT, "templates", x), encoding="utf-8").read()).group(1) for x in ("_paid_base.html", "paid_marketing.html")}
+        assert len(v) == 1, v                                                                    # the stylesheet is re-versioned in the two templates that load it, together
     cards = len(re.findall(r'class="dash-card', paid))
     hub = re.sub(r"<!--.*?-->", "", hidden_paid.rendered("/p2/hub"), flags=re.S)
     assert ("<span>%d</span> dashboards" % cards) in hub and ("<span>%d</span> live" % cards) in hub and "top-spend keywords followed week by week for the top of the page, Quality Score and new competitors" in hub
