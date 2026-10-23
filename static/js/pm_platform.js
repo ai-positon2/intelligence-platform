@@ -332,6 +332,6 @@ var api = {KEY:KEY,PLATFORMS:PLATFORMS,LABEL:LABEL,validPlatform:validPlatform,i
   platformOfId:platformOfId,partsOf:partsOf,singleId:singleId,counterpart:counterpart,combine:combine,norm:norm,fmtId:fmtId,
   mergePerf:mergePerf,mergePerfResponse:mergePerfResponse,mergeExtras:mergeExtras,sumRows:sumRows,oldest:oldest,
   mergeProducts:mergeProducts,mergeProductsResponse:mergeProductsResponse,fetchJson:fetchJson,plain:plain,
-  accounts:accounts,switcher:switcher,googleOnly:googleOnly,googleOnlyCard:googleOnlyCard};
+  accounts:accounts,switcher:switcher,googleOnly:googleOnly,googleOnlyCard:googleOnlyCard,saved:saved};
 if(typeof module!=="undefined"&&module.exports) module.exports=api; else root.PMPlatform=api;
 })(typeof window!=="undefined"?window:globalThis);

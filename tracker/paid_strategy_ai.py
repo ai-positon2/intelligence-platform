@@ -222,14 +222,19 @@ def missing(research, inputs):
             out.append("%s: %s" % (key, pc.get("note") or pc["state"]))
         elif isinstance(pc, dict) and pc.get("state") == "partial":
             out.append("%s (partly): %s" % (key, pc.get("note") or ""))
+    plat = inputs.get("platform") or "google"
     for key, on in (inputs.get("research") or {}).items():
         if not on and key not in (research or {}):
+            if key == "metahistory" and plat not in ("meta", "both"):          # a card of the other platform is not "missing", it was never part of this build
+                continue
+            if key == "history" and plat not in ("google", "both"):
+                continue
             out.append("%s: not used for this build" % key)
     return out
 
 
 def client_block(inputs):
-    keys = ("name", "website", "industry", "goal", "budget", "currency", "launch", "locations", "services", "brief", "avoid", "campaignTypes")
+    keys = ("name", "website", "industry", "goal", "budget", "currency", "launch", "locations", "services", "brief", "avoid", "campaignTypes", "platform")
     return {k: inputs.get(k) for k in keys if inputs.get(k) not in (None, "", [])}
 
 

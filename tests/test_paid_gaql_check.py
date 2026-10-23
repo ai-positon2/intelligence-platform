@@ -60,7 +60,7 @@ def test_a_query_google_refuses_is_named_with_the_reason_and_the_rest_pass():
 
 def test_the_meta_reads_are_built_for_every_agent_and_cut_to_one_row():
     reqs = qc.meta_requests("act_1234567")
-    assert {a for a, _l, _p, _q in reqs} == {"geoconf", "copycheck", "kpi", "anomaly", "disapproved", "metacreative"}
+    assert {a for a, _l, _p, _q in reqs} == {"geoconf", "copycheck", "kpi", "anomaly", "disapproved", "metacreative", "metahistory"}
     for agent, label, path, params in reqs:
         assert path and path.startswith("/act_1234567/") and params["limit"] == 1, (agent, label)
     geo = [r for r in reqs if r[0] == "geoconf"][0]

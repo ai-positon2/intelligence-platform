@@ -277,3 +277,15 @@ def test_the_account_list_failing_is_reported_and_an_mcc_is_known_as_one():
     assert bad["err"] == "The account list could not be read." and bad["changes"] == []
     m = mount({}, ACCTS, METAS)
     assert m["group"]["name"] == "Group" and m["sets"][0][-1]["items"][1]["badge"].count("MCC") == 1
+
+
+def test_every_function_a_page_calls_on_the_scope_control_is_one_it_exports():
+    import glob
+    exported = set(json.loads(subprocess.run(["node", "-e", "global.window=undefined;console.log(JSON.stringify(Object.keys(require(%s))))" % json.dumps(SCOPE)], capture_output=True, text=True, timeout=30).stdout))
+    used = {}
+    for path in glob.glob(os.path.join(JS, "*.js")):
+        if os.path.basename(path) == "pm_scope.js":
+            continue
+        for n in set(re.findall(r"\b(?:window\.)?PMScope\.(\w+)", open(path, encoding="utf-8").read())):
+            used.setdefault(n, []).append(os.path.basename(path))
+    assert used and {n: w for n, w in used.items() if n not in exported} == {}

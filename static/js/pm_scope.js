@@ -7,6 +7,7 @@
  *     onLoaded: function(info){...},                // the lists arrived: info = {accounts, groups, meta, metaProblem}
  *     onError: function(err){...}
  *   });
+ *   options: noGroups (a Google account only, never an MCC), optional (the empty choice reads "No account", not "Choose an account")
  *   scope.groupOf(id)    the MCC group for an id, or null
  *   scope.select(id)     the account was changed from outside
  *
@@ -110,17 +111,17 @@ function mount(host,o){
   function metaOf(id){return st.meta.filter(function(a){return a.id===id;})[0]||null;}
   function googleOf(id){return st.google.filter(function(a){return a.id===id;})[0]||null;}
   function gItems(both){
-    var list=st.google, items=[both?NONE:{value:"",label:"Choose an account",sub:list.length+" accounts"+(st.groups.length?" · "+st.groups.length+" MCCs to check together":""),avatar:"?",hue:200}], seen={};
-    st.groups.forEach(function(g){
+    var list=st.google, groups=o.noGroups?[]:st.groups, items=[both?NONE:{value:"",label:o.optional?"No account":"Choose an account",sub:list.length+" accounts"+(groups.length?" · "+groups.length+" MCCs to check together":""),avatar:"?",hue:200}], seen={};
+    groups.forEach(function(g){
       var head=g.name+" MCC";
       items.push({value:g.id,label:"All of "+g.name,avatar:inits(g.name),hue:hueOf(g.name),group:head,badge:MCC_BADGE,sub:g.accountIds.length+" accounts checked together"});
       list.filter(function(a){return a.group===g.id;}).forEach(function(a){seen[a.id]=1; items.push({value:a.id,label:a.name,avatar:inits(a.name),hue:hueOf(a.name),group:head,sub:dashed(a.id)});});
     });
-    list.filter(function(a){return !seen[a.id];}).forEach(function(a){items.push({value:a.id,label:a.name,avatar:inits(a.name),hue:hueOf(a.name),group:st.groups.length?"Other accounts":"",sub:dashed(a.id)});});
+    list.filter(function(a){return !seen[a.id];}).forEach(function(a){items.push({value:a.id,label:a.name,avatar:inits(a.name),hue:hueOf(a.name),group:groups.length?"Other accounts":"",sub:dashed(a.id)});});
     return items;
   }
   function mItems(both){
-    var items=[both?NONE:{value:"",label:"Choose an account",sub:st.meta.length+" accounts",avatar:"?",hue:200}];
+    var items=[both?NONE:{value:"",label:o.optional?"No account":"Choose an account",sub:st.meta.length+" accounts",avatar:"?",hue:200}];
     st.meta.forEach(function(a){items.push({value:a.id,label:a.name,avatar:inits(a.name),hue:hueOf(a.name),sub:a.id+" · "+(a.currency||"")});});
     return items;
   }
@@ -151,7 +152,7 @@ function mount(host,o){
   }
   /* keep what is chosen when it still exists on the platform shown, else forget it */
   function settle(){
-    if(st.gSel&&!googleOf(st.gSel)&&!groupOf(st.gSel)) st.gSel="";
+    if(st.gSel&&!googleOf(st.gSel)&&!(groupOf(st.gSel)&&!o.noGroups)) st.gSel="";
     if(st.mSel&&!metaOf(st.mSel)) st.mSel="";
   }
   function take(id){

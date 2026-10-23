@@ -21,6 +21,7 @@ HARNESS = r"""
 const fs = require("fs"), vm = require("vm");
 const src = fs.readFileSync(process.argv[1], "utf8"), sc = JSON.parse(process.argv[2]);
 const els = {}, handlers = {}, calls = [], timers = [], hist = [], picker = { sets: [] }, bodies = {}, held = [];
+const pickers = [], metaSets = [], switchers = [], platformsSet = [];
 function el(sel) {
   if (!els[sel]) els[sel] = { sel, innerHTML: "", textContent: "", value: (sc.values || {})[sel] || "", hidden: false, disabled: false, min: "", open: false, className: "", attrs: {},
     setAttribute(k, v) { this.attrs[k] = v; }, getAttribute(k) { return this.attrs[k] == null ? null : this.attrs[k]; }, removeAttribute() {}, focus() {}, setSelectionRange() {},
@@ -40,13 +41,26 @@ function respond(url, opts) {
   if (r.hold && !r.released) return new Promise(res => held.push(() => { r.released = true; res({ status: r.status || 200, body }); }));       // an answer that comes when told to
   return { status: r.status || 200, body };
 }
-const ctx = { window: { PMPicker: (host, o) => { picker.onChange = o.onChange; return { set(items, v) { picker.sets.push([items, v]); } }; }, confirm: () => sc.confirm !== false },
+/* the first picker made is the page's (or the Google one of the shared scope control, tests/test_scope_js.py); a second is the Meta one. The platform switch records what it was asked. */
+const PMPicker = (host, o) => { const n = pickers.length; const p = { onChange: o.onChange, set(items, v) { (n === 0 ? picker.sets : metaSets).push([items, v]); } }; pickers.push(p); if (n === 0) picker.onChange = o.onChange; return p; };
+const PMPlatform = { saved: () => "", switcher: (host, o) => { switchers.push(o); let cur = o.value; return { set(p) { cur = p; platformsSet.push(p); }, value: () => cur, saved: () => "" }; },
+  counterpart: (a, others) => { const n = x => String(x.name || "").toLowerCase().replace(/\(.*?\)/g, "").replace(/[^a-z0-9]/g, ""); const m = others.filter(o => o.currency === a.currency && n(o) === n(a)); return m.length === 1 ? m[0] : null; } };
+/* the shared scope control (static/js/pm_scope.js, tested in test_scope_js.py) as a stand-in: it lists the accounts, reports the account and platform chosen, and can be told one from outside */
+const scope = { o: null };
+const PMScope = { isMeta: id => /^act_\d+$/.test(id || ""), partsOf: id => String(id || "").split("+"),
+  mount: (host, o) => { scope.o = o; scope.opts = { noGroups: !!o.noGroups, optional: !!o.optional };
+    Promise.all([ctx.fetch("/p2/paid-marketing/api/segments/accounts").then(r => r.json()), ctx.fetch("/p2/paid-marketing/api/gads/accounts?platform=meta").then(r => r.json()).catch(() => ({}))]).then(([g, m]) => {
+      o.onLoaded && o.onLoaded({ accounts: g.accounts || [], groups: g.groups || [], meta: (m.accounts || []).filter(a => a.platform === "meta") });
+      o.onChange(o.account || "", /^act_/.test(o.account || "") ? "meta" : "google"); }).catch(e => o.onError && o.onError(e));
+    return { select: id => o.onChange(id, /\+/.test(id) ? "both" : /^act_/.test(id) ? "meta" : "google"), groupOf: () => null, platform: () => "google" }; } };
+const ctx = { window: { PMPicker, PMPlatform, PMScope, confirm: () => sc.confirm !== false },
   document: doc, history: { replaceState(a, b, u) { hist.push(u); } }, location: { pathname: "/p2/paid-marketing/campaign-book", search: sc.search || "" },
   setTimeout: (fn, ms) => { timers.push(fn); return timers.length; }, clearTimeout: id => { timers[id - 1] = null; }, Intl, Date, Math, JSON, Object, Array, String, Number, Promise, RegExp, encodeURIComponent,
   console, Promise, isNaN, parseInt, parseFloat,
   fetch: (url, opts) => Promise.resolve(respond(url, opts)).then(r => ({ ok: r.status < 400, status: r.status, json: () => Promise.resolve(r.body) })) };
 ctx.window.document = doc; ctx.window.confirm = ctx.window.confirm; ctx.confirm = ctx.window.confirm;
 vm.createContext(ctx);
+for (const p of (sc.scripts || [])) vm.runInContext(fs.readFileSync(p, "utf8"), ctx);
 vm.runInContext(src, ctx);
 const tick = () => new Promise(r => setImmediate(r));
 function target(spec) {
@@ -67,10 +81,13 @@ function target(spec) {
     }
     if (step.timers) { const fns = timers.splice(0); for (const f of fns) if (f) f(); }
     if (step.release) held.splice(0).forEach(f => f());
-    if (step.pick !== undefined) picker.onChange(step.pick);
+    if (step.pick !== undefined) { if (scope.o) scope.o.onChange(step.pick, "google"); else picker.onChange(step.pick); }
+    if (step.pickMeta !== undefined) { if (scope.o) scope.o.onChange(step.pickMeta, "meta"); else pickers[1].onChange(step.pickMeta); }
+    if (step.scope) scope.o.onChange(step.scope[0], step.scope[1]);
+    if (step.platform && !scope.o) switchers[0].onChange(step.platform);
     for (let i = 0; i < 8; i++) await tick();
   }
-  const out = { calls, hist, picker: picker.sets, el: {}, bodies: {} };
+  const out = { calls, hist, picker: picker.sets, metaPicker: metaSets, platformsSet, switchers: switchers.length, scopeOpts: scope.opts || null, el: {}, bodies: {} };
   for (const k of Object.keys(bodies)) out.bodies[k] = bodies[k].innerHTML;
   for (const k of Object.keys(els)) out.el[k] = { html: els[k].innerHTML, text: els[k].textContent, hidden: els[k].hidden, value: els[k].value, disabled: els[k].disabled };
   process.stdout.write(JSON.stringify(out));

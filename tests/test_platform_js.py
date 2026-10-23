@@ -366,3 +366,22 @@ def test_the_switch_hands_back_its_element_so_a_page_can_leave_it_out_of_a_picke
     code = DOM + "const sw=P.switcher(host,{});console.log(JSON.stringify({same: sw.el===host.children[0], cls: sw.el.className}))"
     r = subprocess.run(["node", "-e", "global.window=undefined;const P=require(%s);%s" % (json.dumps(SCRIPT), code)], capture_output=True, text=True, timeout=30)
     assert json.loads(r.stdout) == {"same": True, "cls": "pm-plat-sw"}
+
+
+def test_every_function_a_page_calls_on_the_shared_platform_module_is_one_it_exports():
+    """The page tests stand the module in with a stub, so a call to something it does not export (PMPlatform.saved once was one) passes them and throws in the browser."""
+    import glob
+    import re
+    exported = set(run("Object.keys(P)"))
+    used = {}
+    for path in glob.glob(os.path.join(os.path.dirname(SCRIPT), "*.js")):
+        if os.path.basename(path) == "pm_platform.js":
+            continue
+        src = open(path, encoding="utf-8").read()
+        names = set(re.findall(r"\b(?:window\.)?PMPlatform\.(\w+)", src))
+        if re.search(r"\bPL\s*=\s*window\.PMPlatform", src):                               # a page that keeps the module under a short name
+            names |= set(re.findall(r"\bPL\.(\w+)", src))
+        for n in names:
+            used.setdefault(n, []).append(os.path.basename(path))
+    assert used, "no page uses the module?"
+    assert {n: where for n, where in used.items() if n not in exported} == {}
