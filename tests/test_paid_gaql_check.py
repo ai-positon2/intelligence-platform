@@ -151,3 +151,19 @@ def test_the_route_can_check_one_platform_or_some_agents_so_an_answer_stays_insi
     r = cl.get(base + "&agents=kpi,metacreative").get_json()
     assert seen["g"][-1] == ["kpi"] and seen["m"][-1] == ["kpi", "metacreative"] and r["meta"]["failed"][0]["agent"] == "kpi"       # an agent that reads both platforms is in both halves
     assert cl.get("/p2/paid-marketing/api/query-check?account=1234567890&only=meta").status_code == 400
+
+
+def test_the_route_reads_only_the_first_page_of_each_meta_request_and_never_follows_the_paging_links(monkeypatch):
+    """With limit 1 every row has a next link: following them reads the whole account one row at a time, which is what made the check run for minutes."""
+    from tracker import paid_meta
+    gets = []
+
+    def get(path, params, store, **k):
+        gets.append((path, params.get("limit")))
+        return {"data": [{"id": "1"}], "paging": {"next": "https://graph.example/next"}}
+    monkeypatch.setattr(paid_meta, "_get", get)
+    monkeypatch.setattr(paid_meta, "_pages", lambda *a, **k: (_ for _ in ()).throw(AssertionError("followed the paging links")))
+    monkeypatch.setattr(paid_meta, "norm_id", lambda v: v)
+    monkeypatch.setattr(qc, "meta_requests", lambda act: [("kpi", "insights", "/%s/insights" % act, {"limit": 1}), ("metacreative", "ads", "/%s/ads" % act, {"limit": 1})])
+    r = client_as(sorted(app_module.ADMIN_EMAILS)[0]).get("/p2/paid-marketing/api/query-check?meta=act_1&only=meta").get_json()
+    assert [x["ok"] for x in r["meta"]["results"]] == [True, True] and [x["rows"] for x in r["meta"]["results"]] == [1, 1] and len(gets) == 2

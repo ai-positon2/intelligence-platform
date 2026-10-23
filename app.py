@@ -5975,7 +5975,7 @@ def paid_query_check():
     if acct and only in ("", "google"):
         jobs["google"] = (acct, lambda: qc.check_google(acct, queries=[q for q in qc.google_queries() if not agents or q[0] in agents]))
     if meta and only in ("", "meta"):
-        jobs["meta"] = (meta, lambda: qc.check_meta(meta, pages_fn=lambda path, params: paid_meta._pages(path, params, paid_store), requests=[r for r in qc.meta_requests(meta) if not agents or r[0] in agents]))
+        jobs["meta"] = (meta, lambda: qc.check_meta(meta, pages_fn=lambda path, params: (paid_meta._get(path, params, paid_store).get("data") or []), requests=[r for r in qc.meta_requests(meta) if not agents or r[0] in agents]))
     if not jobs:
         return jsonify(error="Nothing to check: give ?account= or ?meta= for the platform named in ?only=."), 400
     with ThreadPoolExecutor(max_workers=len(jobs)) as pool:                      # the two platforms at once: the gateway gives up on an answer after about five minutes
