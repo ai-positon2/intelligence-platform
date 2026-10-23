@@ -44,6 +44,11 @@ function paintWhen(){
 }
 seg.addEventListener("click",function(e){var b=e.target.closest("button");if(!b)return;when=b.dataset.when;paintWhen();paintCtx();paintStarters();});
 window.addEventListener("resize",paintWhen);
+var plat="both";
+if(window.PMPlatform){
+  var sw=window.PMPlatform.switcher(document.getElementById("platSw"),{value:window.PMPlatform.saved()||"both",onChange:function(p){plat=p;paintCtx();}});
+  plat=sw.value();
+}
 
 /* ── Client picker ─────────────────────────────────────────── */
 var picker = window.PMPicker(document.getElementById("clientPick"), {label:"Asking about", search:true, onChange:function(v){
@@ -66,23 +71,28 @@ function setClients(list){
 
 
 /* ── Context chips + the line the model reads ─────────────── */
+/* Platform: Google, Meta or Both (the same switch as the other agents). One platform narrows what the model is told to look for; Both adds nothing. */
+var PLAT_TEXT={google:"Google Ads only (leave out Meta and Facebook/Instagram ads)",meta:"Meta Ads only (Facebook and Instagram ads; leave out Google Ads)"};
+var PLAT_CHIP={google:"Google Ads",meta:"Meta Ads"};
 function contextLine(){
   var parts=[];
   if(client) parts.push("client: "+client);
+  if(plat!=="both") parts.push("platform: "+PLAT_TEXT[plat]);
   if(when!=="any"){
     var end=new Date(), start=new Date(Date.now()-WHEN[when].days*86400000);
     parts.push("timeframe: "+WHEN[when].label.toLowerCase()+" ("+iso(start)+" to "+iso(end)+")");
   }
   return parts.length?"[Context for this question: "+parts.join("; ")+"]":"";
 }
-function chipsHtml(c,w){
+function chipsHtml(c,w,p){
   var out="";
+  if(p&&p!=="both"&&PLAT_CHIP[p]) out+='<span class="cf-chip">'+esc(PLAT_CHIP[p])+'</span>';
   if(c) out+='<span class="cf-chip"><span class="av" style="--h:'+hueOf(c)+'">'+esc(inits(c))+'</span>'+esc(c)+'</span>';
   if(w&&w!=="any") out+='<span class="cf-chip">◷ '+esc(WHEN[w].label)+'</span>';
   return out;
 }
 function paintCtx(){
-  var el=document.getElementById("ctx"), h=chipsHtml(client,when);
+  var el=document.getElementById("ctx"), h=chipsHtml(client,when,plat);
   el.hidden=!h;
   el.innerHTML=h?'<span class="lbl">Asking about</span>'+h+'<button type="button" class="x" title="Clear the context" aria-label="Clear the context">×</button>':"";
   input.placeholder=client?"Ask anything about "+client+"…":"Ask about a client, a meeting, a budget…";
@@ -139,10 +149,10 @@ function md(text){
 
 function scrollEnd(){ stream.scrollTop = stream.scrollHeight; }
 
-function addUser(text, c, w){
+function addUser(text, c, w, p){
   welcome.style.display="none";
   var row=document.createElement("div"); row.className="cf-msg user";
-  row.innerHTML='<div class="cf-ucol"><div class="cf-bubble"></div>'+(chipsHtml(c,w)?'<div class="cf-uctx">'+chipsHtml(c,w)+'</div>':'')+'</div>';
+  row.innerHTML='<div class="cf-ucol"><div class="cf-bubble"></div>'+(chipsHtml(c,w,p)?'<div class="cf-uctx">'+chipsHtml(c,w,p)+'</div>':'')+'</div>';
   row.querySelector(".cf-bubble").textContent=text;
   stream.appendChild(row); scrollEnd();
 }
@@ -208,7 +218,7 @@ function send(text){
   text=(text||"").trim();
   if(!text||busy) return;
   busy=true; sendBtn.disabled=true;
-  addUser(text, client, when);
+  addUser(text, client, when, plat);
   var ctx=contextLine(), message=ctx?ctx+"\n\n"+text:text;
   var history=turns.slice();
   input.value=""; grow();

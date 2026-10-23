@@ -16,6 +16,7 @@
 
   <!-- Context bar: who and when, plus where it reads from -->
   <section class="pm-panel pd-cmd cf-cmd" id="cmd">
+    <div class="pm-plat" id="platSw"></div>
     <div class="cf-cmd-grid">
       <div id="clientPick"></div>
       <div class="cf-when">
@@ -58,5 +59,6 @@
 {% endblock %}
 {% block scripts %}
 <script src="{{ url_for('static', filename='js/pm_picker.js') }}?v=1"></script>
-<script src="{{ url_for('static', filename='js/client_feedback_agent.js') }}?v=5"></script>
+<script src="{{ url_for('static', filename='js/pm_platform.js') }}?v=5"></script>
+<script src="{{ url_for('static', filename='js/client_feedback_agent.js') }}?v=6"></script>
 {% endblock %}
