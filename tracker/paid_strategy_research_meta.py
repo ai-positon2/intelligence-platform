@@ -134,3 +134,73 @@ def evidence(research):
     if not d or not (d.get("campaigns") or d.get("totals", {}).get("cost")):
         return None
     return {k: d.get(k) for k in ("account", "window", "totals", "campaigns", "placements", "devices", "ads")}
+
+
+# ── Interests and audiences ─────────────────────────────────────────────────
+
+MAX_SEED_PHRASES = 12
+MAX_AUDIENCE_CANDIDATES = 60
+
+
+def audience_phrases(inputs, research):
+    """What to look up in Meta's interest list, from what was typed and read (no model): the things the client sells, the headings of its pages, the competitors' names and the industry.
+    At most MAX_SEED_PHRASES, short ones only (Meta's interests have short, standard names)."""
+    raw = [p.strip() for p in str(inputs.get("services") or "").replace(";", ",").replace("\n", ",").split(",")]
+    for pg in ((((research or {}).get("website") or {}).get("data") or {}).get("pages") or [])[:8]:
+        raw += [h for h in (pg.get("h1") or [])[:1]]
+    raw += [c.get("name") for c in inputs.get("competitors") or []][:3]
+    raw.append(inputs.get("industry"))
+    out = []
+    for p in raw:
+        p = " ".join(str(p or "").split())
+        if p and 1 <= len(p.split()) <= 4 and len(p) <= 40 and p.lower() not in [x.lower() for x in out]:
+            out.append(p)
+    return out[:MAX_SEED_PHRASES]
+
+
+def read_meta_audience(inputs, research, *, get_fn, account=None, pages_fn=None, today=None):
+    """The interests Meta has for what the client sells, and (when there is a Meta ad account) which interests its ad sets already aim at and how each does: the evidence the Meta plan's
+    ad sets are written from. Meta's own list is the only source an interest may come from. Never raises: a piece that cannot be read says so."""
+    from . import paid_keywords_meta as km, paid_meta_interests as mi
+    started = time.monotonic()
+    phrases = audience_phrases(inputs, research)
+    notes, in_use, adset_count, totals = [], [], 0, {}
+    if account and pages_fn:
+        pc = km.read_meta_account(account, pages_fn=pages_fn, today=today)
+        d = pc.get("data") or {}
+        if pc["state"] == "failed":
+            notes.append(pc.get("note") or "The ad account's ad sets could not be read.")
+        else:
+            in_use, adset_count, totals = d.get("inUse") or [], d.get("adsetCount") or 0, d.get("totals") or {}
+            notes += d.get("notes") or []
+    used = {u["id"]: u for u in in_use}
+    if not phrases and not in_use:
+        return rs.failed("metaaudience", "There was nothing to look up in Meta's interests: no service, page heading or competitor name.", time.monotonic() - started)
+    found, n1 = mi.find(phrases, get_fn)
+    names = [u["name"] for u in in_use if u["kind"] == "interest"][:4]
+    for p in phrases[:4]:
+        top = (found.get(p) or [None])[0]
+        if top:
+            names.append(top["name"])
+    sugg, n2 = mi.suggestions(names, get_fn)
+    notes += n1 + n2
+    cands = mi.candidates(found, sugg, [], used, avoid=str(inputs.get("avoid") or "").replace(";", ",").split(","))
+    cands = [c for c in cands if c["inUse"]] + [c for c in cands if not c["inUse"]]
+    data = {"phrases": phrases, "candidates": cands[:MAX_AUDIENCE_CANDIDATES], "found": len(cands), "inUse": in_use, "adsetCount": adset_count, "totals": totals,
+            "emptyPhrases": [p for p in phrases if not found.get(p)], "notes": notes}
+    if not cands and not in_use:
+        return rs.failed("metaaudience", "Meta has no interest for these phrases (%s). Meta keeps none for some topics, health conditions among them." % ", ".join('"%s"' % p for p in phrases[:6]), time.monotonic() - started)
+    note = "%d interests from %d phrases%s." % (len(data["candidates"]), len(phrases), (", and %d interests in use by the ad sets" % len(in_use)) if in_use else "")
+    return rs.piece("metaaudience", "partial" if notes else "ok", " ".join([note] + notes), data, time.monotonic() - started)
+
+
+def audience_evidence(research):
+    """What the writing stages are shown of it: Meta's interests with their sizes and the ones in use (None when it was not asked for, failed or has nothing)."""
+    d = ((research or {}).get("metaaudience") or {}).get("data") or {}
+    if not d or not (d.get("candidates") or d.get("inUse")):
+        return None
+    return {"interestsMetaHas": ["%s | %s | %s%s" % (c["name"], c.get("sizeText") or "size not given", " > ".join(c.get("path") or []) or "no path",
+                                                    (" | in use: %d ad sets, %s spent, %s results" % (c["inUse"]["adsets"], c["inUse"]["cost"], c["inUse"]["conv"])) if c.get("inUse") else "")
+                                  for c in d.get("candidates") or []],
+            "interestsInUse": [{"name": u["name"], "adSets": u["adsets"], "spent": u["cost"], "results": u["conv"], "verdict": u["verdict"]} for u in d.get("inUse") or []],
+            "adSets": d.get("adsetCount"), "totals": d.get("totals")}

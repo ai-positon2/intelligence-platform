@@ -65,3 +65,89 @@ def test_the_writing_is_shown_nothing_for_an_unread_account_and_the_account_when
     assert set(ev) == {"account", "window", "totals", "campaigns", "placements", "devices", "ads"} and ev["totals"]["cost"] == 900.5
     assert m.evidence({}) is None and m.evidence({"metahistory": {"state": "failed", "data": None}}) is None
     assert m.evidence({"metahistory": m.read_meta_history(ACCT, pages_fn=lambda p, q: [], today=TODAY)}) is None
+
+
+# ── Interests and audiences ─────────────────────────────────────────────────
+
+from tests.test_paid_keywords_meta import ACCT as KM_ACCT, pages as km_pages          # noqa: E402
+from tests.test_paid_meta_interests import getter                                       # noqa: E402
+
+
+def test_the_phrases_to_look_up_come_from_what_it_sells_the_page_headings_the_rivals_and_the_industry_and_are_short_and_not_repeated():
+    inp = {"services": "dental implants, Invisalign; emergency dentist care for a whole family at night time", "competitors": [{"name": "Smile Austin", "url": ""}, {"name": "implants Dental", "url": ""}],
+           "industry": "Dental"}
+    research = {"website": {"data": {"pages": [{"h1": ["Family Dentist"]}, {"h1": ["Dental Implants"]}, {"h1": []}]}}}
+    got = m.audience_phrases(inp, research)
+    assert got == ["dental implants", "Invisalign", "Family Dentist", "Smile Austin", "implants Dental", "Dental"]            # the long service is left out, a repeat of "dental implants" is too
+    assert m.audience_phrases({}, {}) == [] and len(m.audience_phrases({"services": ",".join("s%d" % i for i in range(30))}, {})) == 12
+
+
+def test_the_interests_are_meta_s_own_and_those_the_ad_sets_already_aim_at_are_marked():
+    pc = m.read_meta_audience({"services": "insulin pump, diabetes"}, {}, get_fn=getter(), account=KM_ACCT, pages_fn=km_pages(), today=TODAY)
+    d = pc["data"]
+    assert pc["state"] == "ok" and d["phrases"] == ["insulin pump", "diabetes"] and d["adsetCount"] == 3 and d["totals"]["cost"] == 1100.0
+    by = {c["id"]: c for c in d["candidates"]}
+    assert sorted(by) == ["1", "2", "3", "4", "5"] and by["1"]["inUse"]["adsets"] == 1 and by["3"]["inUse"]["adsets"] == 1 and by["2"]["inUse"] is None
+    assert [c["id"] for c in d["candidates"]][:2] == ["1", "3"] and "5 interests from 2 phrases, and 3 interests in use by the ad sets." in pc["note"]
+    assert {u["id"] for u in d["inUse"]} == {"1", "3", "90"}                                    # the one no search found is in the list of what is in use, not in the interests to choose from
+
+
+def test_without_a_meta_account_the_interests_are_still_looked_up_and_nothing_is_said_to_be_in_use():
+    pc = m.read_meta_audience({"services": "insulin pump"}, {}, get_fn=getter())
+    assert pc["state"] == "ok" and pc["data"]["inUse"] == [] and pc["data"]["adsetCount"] == 0 and all(c["inUse"] is None for c in pc["data"]["candidates"])
+
+
+def test_an_ad_account_that_cannot_be_read_is_said_and_the_lookup_goes_on():
+    pc = m.read_meta_audience({"services": "insulin pump"}, {}, get_fn=getter(), account=KM_ACCT, pages_fn=km_pages(fail=("adsets",)), today=TODAY)
+    assert pc["state"] == "partial" and "ad sets of this Meta ad account could not be read" in pc["note"] and pc["data"]["candidates"] and pc["data"]["inUse"] == []
+
+
+def test_no_phrase_and_no_interest_in_use_fails_the_piece_and_so_does_a_list_with_no_interest_at_all():
+    assert m.read_meta_audience({}, {}, get_fn=getter())["state"] == "failed"
+    pc = m.read_meta_audience({"services": "type 1"}, {}, get_fn=getter())
+    assert pc["state"] == "failed" and '"type 1"' in pc["note"] and "health conditions" in pc["note"]
+
+
+def test_the_words_to_avoid_leave_an_interest_out_and_more_than_the_limit_are_cut_with_those_in_use_first():
+    pc = m.read_meta_audience({"services": "diabetes", "avoid": "diet; jobs"}, {}, get_fn=getter())
+    assert "4" not in {c["id"] for c in pc["data"]["candidates"]}
+    big = [opt_("%d" % (100 + i), "Extra %d" % i) for i in range(80)] + [opt_("1", "Insulin pump")]
+    pc = m.read_meta_audience({"services": "insulin pump"}, {}, get_fn=lambda path, params: big if params.get("type") == "adinterest" else [], account=KM_ACCT, pages_fn=km_pages(), today=TODAY)
+    assert len(pc["data"]["candidates"]) == 60 and pc["data"]["found"] == 81 and pc["data"]["candidates"][0]["id"] == "1" and pc["data"]["candidates"][0]["inUse"]
+
+
+def opt_(oid, name):
+    return {"id": oid, "name": name, "audience_size_lower_bound": 1000000, "audience_size_upper_bound": 1200000, "path": ["Interests"], "topic": "x"}
+
+
+def test_the_evidence_shows_each_interest_with_its_size_and_path_and_how_it_did_where_it_is_in_use():
+    pc = m.read_meta_audience({"services": "insulin pump"}, {}, get_fn=getter(), account=KM_ACCT, pages_fn=km_pages(), today=TODAY)
+    ev = m.audience_evidence({"metaaudience": pc})
+    assert any(x.startswith("Insulin pump | 1.0M to 1.2M | Interests > Additional interests | in use: 1 ad sets, 600.0 spent, 20.0 results") for x in ev["interestsMetaHas"])
+    assert any(x.startswith("Insulin | 5.0M to 6.0M | Interests > Additional interests") and "in use" not in x for x in ev["interestsMetaHas"])
+    assert ev["adSets"] == 3 and {u["name"] for u in ev["interestsInUse"]} == {"Insulin pump", "Diabetes", "Frequent travellers"}
+    assert m.audience_evidence({}) is None and m.audience_evidence({"metaaudience": {"data": {}}}) is None
+
+
+def test_nothing_to_look_up_is_said_in_those_words_and_the_evidence_of_an_empty_piece_is_none():
+    assert "nothing to look up" in m.read_meta_audience({}, {}, get_fn=getter())["note"]
+    assert m.audience_evidence({"metaaudience": {"data": {"phrases": ["x"], "candidates": [], "inUse": []}}}) is None
+
+
+def test_meta_is_asked_for_suggestions_from_the_interests_in_use_and_the_top_result_of_each_of_the_first_four_phrases():
+    calls = []
+    m.read_meta_audience({"services": "insulin pump, diabetes, a, b, c, d"}, {}, get_fn=getter(calls), account=KM_ACCT, pages_fn=km_pages(), today=TODAY)
+    sugg = [p for _path, p in calls if p.get("type") == "adinterestsuggestion"]
+    asked = json.loads(sugg[0]["interest_list"])
+    assert len(sugg) == 1 and asked[:2] == ["Insulin pump", "Diabetes"] and len(asked) <= 8                # the interests in use, biggest spend first, then the top result of phrases
+    calls.clear()
+    m.read_meta_audience({"services": "insulin pump, diabetes, a, b, c, d"}, {}, get_fn=getter(calls))
+    asked = json.loads([p for _path, p in calls if p.get("type") == "adinterestsuggestion"][0]["interest_list"])
+    assert asked == ["Insulin pump", "Diabetes"]                                                          # a, b, c and d found nothing; only the first four phrases are used
+
+
+def test_an_interest_in_use_is_a_seed_for_suggestions_even_when_no_phrase_found_it():
+    calls = []
+    m.read_meta_audience({"services": "insulin pump"}, {}, get_fn=getter(calls), account=KM_ACCT, pages_fn=km_pages(), today=TODAY)
+    asked = json.loads([p for _path, p in calls if p.get("type") == "adinterestsuggestion"][0]["interest_list"])
+    assert asked == ["Insulin pump", "Diabetes", "Frequent travellers"]                                    # the interests in use by ad sets, though no phrase found Diabetes or the travellers
