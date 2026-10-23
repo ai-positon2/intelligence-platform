@@ -308,3 +308,61 @@ def test_a_cooldown_answer_keeps_its_flag():
     pre = fetch_pre("mk(429,{error:'moments ago',cooldown:true,retryIn:90})")
     out = run("P.fetchJson('/x?account=%s',true,{}).then(()=>'no',e=>({c:e.cooldown,r:e.retryIn,s:e.status}))" % G, pre)
     assert out == {"c": True, "r": 90, "s": 429}
+
+
+# ── googleOnly: the switch of an agent whose subject exists only on Google ───────────────────────────────────────────────────────────────
+
+DOM = r"""
+class El { constructor(){ this.children = []; this.hidden = false; this.innerHTML = ""; this.className = ""; this.handlers = {}; this.parentNode = null; }
+  appendChild(c){ c.parentNode = this; this.children.push(c); } setAttribute(){} addEventListener(ev, fn){ this.handlers[ev] = fn; } querySelectorAll(){ return []; }
+  insertBefore(n, ref){ n.parentNode = this; const i = ref ? this.children.indexOf(ref) : -1; if (i < 0) this.children.push(n); else this.children.splice(i, 0, n); } get nextSibling(){ const p = this.parentNode; return p ? p.children[p.children.indexOf(this) + 1] || null : null; } }
+const page = new El(), section = new El(), host = new El(), body = new El();
+page.appendChild(section); section.appendChild(host); page.appendChild(body);
+host.closest = q => (q === "section" ? section : null);
+global.localStorage = { getItem: () => null, setItem(){} };
+global.document = { createElement: () => new El(), querySelector: s => (s === "#gBody" ? body : null) };
+const pick = (sw, p) => { const el = host.children[0]; el.handlers.click({ target: { closest: () => ({ dataset: { pf: p } }) } }); };
+const OPTS = { name: "Brand IS Monitor", why: "Meta has no impression share.", closest: [{ label: "Spend Anomaly Alert", href: "/p2/paid-marketing/spend-anomaly" }], body: "#gBody" };
+"""
+
+
+def _go(steps):
+    code = DOM + "const seen=[];const g=P.googleOnly(host,Object.assign({onChange:p=>seen.push(p)},OPTS));" + steps + ";console.log(JSON.stringify({seen,hidden:body.hidden,noteHidden:g.note.hidden,note:g.note.innerHTML,value:g.value(),where:page.children.indexOf(g.note)}))"
+    r = subprocess.run(["node", "-e", "global.window=undefined;const P=require(%s);%s" % (json.dumps(SCRIPT), code)], capture_output=True, text=True, timeout=30)
+    assert r.returncode == 0, r.stderr
+    return json.loads(r.stdout)
+
+
+def test_a_google_only_agent_starts_on_google_with_nothing_hidden_and_the_card_after_the_command_panel():
+    out = _go("")
+    assert out["value"] == "google" and out["hidden"] is False and out["noteHidden"] is True and out["note"] == "" and out["where"] == 1 and out["seen"] == ["google"]
+
+
+def test_meta_hides_what_is_under_the_control_and_says_why_and_where_to_look():
+    out = _go("pick(null,'meta')")
+    assert out["value"] == "meta" and out["hidden"] is True and out["noteHidden"] is False and out["seen"] == ["google", "meta"]
+    assert "Brand IS Monitor is a Google Ads agent." in out["note"] and "Meta has no impression share." in out["note"] and '<a href="/p2/paid-marketing/spend-anomaly">Spend Anomaly Alert</a>' in out["note"]
+    assert "What follows is Google Ads only" not in out["note"]
+
+
+def test_both_keeps_the_google_view_and_says_that_meta_was_not_read():
+    out = _go("pick(null,'both')")
+    assert out["hidden"] is False and out["noteHidden"] is False and "Brand IS Monitor: Meta is not read here." in out["note"] and "What follows is Google Ads only." in out["note"]
+
+
+def test_going_back_to_google_shows_the_view_again_and_clears_the_card():
+    out = _go("pick(null,'meta');pick(null,'google')")
+    assert out["hidden"] is False and out["noteHidden"] is True and out["note"] == "" and out["seen"] == ["google", "meta", "google"]
+
+
+def test_a_name_or_link_with_markup_is_text():
+    code = "const c=P.googleOnlyCard('meta',{name:'<b>x</b>',why:'a<script>',closest:[{label:'<i>',href:'/a\"b'}]});console.log(JSON.stringify(c))"
+    r = subprocess.run(["node", "-e", "global.window=undefined;const P=require(%s);%s" % (json.dumps(SCRIPT), code)], capture_output=True, text=True, timeout=30)
+    html = json.loads(r.stdout)
+    assert "&lt;b&gt;x&lt;/b&gt;" in html and "<script>" not in html and "&lt;i&gt;" in html and '/a"b' not in html
+
+
+def test_the_switch_hands_back_its_element_so_a_page_can_leave_it_out_of_a_picker_that_has_its_own():
+    code = DOM + "const sw=P.switcher(host,{});console.log(JSON.stringify({same: sw.el===host.children[0], cls: sw.el.className}))"
+    r = subprocess.run(["node", "-e", "global.window=undefined;const P=require(%s);%s" % (json.dumps(SCRIPT), code)], capture_output=True, text=True, timeout=30)
+    assert json.loads(r.stdout) == {"same": True, "cls": "pm-plat-sw"}

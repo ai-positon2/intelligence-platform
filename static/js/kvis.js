@@ -23,7 +23,7 @@ function store(k,v){try{if(v===undefined)return localStorage.getItem(k)||"";loca
 
 var S = {accounts:[], groups:[], account:"", report:null, seq:0, view:"attention", open:{}, settings:{accounts:{}}, shown:{}};
 
-if(window.PMPlatform&&$("#platSw")) window.PMPlatform.switcher($("#platSw"),{allow:["google"],value:"google"});     /* Google only: the switch says so */
+if(window.PMPlatform&&$("#platSw")) window.PMPlatform.googleOnly($("#platSw"),{name:"Keyword Visibility Tracker",why:"Meta ads are not bought on keywords, so there is no keyword position, rank loss or Quality Score to track.",closest:[{label:"Ad Strength Analysis",href:"/p2/paid-marketing/ad-strength"},{label:"Audience Segments",href:"/p2/paid-marketing/audience-segments"}],body:"#gBody"});     /* a Google-only agent: Meta says why, Both keeps Google and says so */
 var picker = window.PMPicker($("#acctPick"),{label:"Ad account",search:true,onChange:function(v){
   S.account=v; store("kv_account",v); run();
 }});

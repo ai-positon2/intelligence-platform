@@ -211,7 +211,7 @@ def test_every_element_the_script_reaches_for_is_in_the_template_and_the_scripts
         assert 'id="%s"' % sel[1:] in html, sel
     assert html.index("pm_picker.js") < html.index("monitor_panel.js") < html.index("kvis_data.js") < html.index("kvis.js")
     assert "—" not in html and "–" not in html and "—" not in js and "—" not in open(DATA, encoding="utf-8").read()
-    assert "meta" not in js.lower() and "Meta" in html                              # Google only: the page does not ask for Meta accounts (the template says why there is none)
+    assert "platform=meta" not in js and "gads/accounts" not in js and "act_" not in js and "Meta" in html      # Google only: the page never asks for Meta accounts (the card says why there is none)
 
 
 def test_the_accounts_and_what_the_team_saved_are_loaded_and_nothing_is_read_until_one_is_chosen(reports):

@@ -199,7 +199,30 @@ function switcher(host,o){
   function paint(){Array.prototype.forEach.call(el.querySelectorAll("button"),function(b){b.setAttribute("aria-checked",String(b.dataset.pf===cur));});}
   el.addEventListener("click",function(e){var b=e.target.closest("[data-pf]"); if(b&&b.dataset.pf!==cur){cur=b.dataset.pf; save(cur); paint(); o.onChange&&o.onChange(cur);}});
   paint();
-  return {set:function(p){if(allow.indexOf(p)>=0){cur=p;paint();}},value:function(){return cur;},saved:saved};
+  return {set:function(p){if(allow.indexOf(p)>=0){cur=p;paint();}},value:function(){return cur;},saved:saved,el:el};
+}
+
+/* The switch of an agent whose subject exists only on Google (impression share, search terms, keywords). It offers all three choices like every other agent. Google is the agent as it
+   is. Meta has nothing to show, so it hides `o.body` (a selector of what sits under the control) and says in a card why and which agent to use for Meta instead. Both keeps the Google
+   view and adds the same card so nobody thinks Meta was read. o: {name, why, closest: [{label, href}], body: "#selector", onChange(platform)}; returns {value(), set(p)}. */
+function googleOnlyCard(p,o){
+  var links=(o.closest||[]).map(function(c){return '<a href="'+esc(c.href)+'">'+esc(c.label)+'</a>';}).join(", ");
+  return '<div class="pm-gonly-in"><b>'+esc(o.name)+(p==="meta"?" is a Google Ads agent":": Meta is not read here")+'.</b> '+esc(o.why)+
+    (links?' For Meta use '+links+'.':"")+(p==="both"?" What follows is Google Ads only.":"")+'</div>';
+}
+function googleOnly(host,o){
+  var note=document.createElement("div"); note.className="pm-gonly"; note.hidden=true;
+  var anchor=(host.closest&&host.closest("section"))||host, cur=saved()||"google";
+  function body(){return o.body?document.querySelector(o.body):null;}
+  function apply(p){
+    cur=p; var b=body(); if(b) b.hidden=p==="meta";
+    note.hidden=p==="google"; note.innerHTML=p==="google"?"":googleOnlyCard(p,o);
+    if(o.onChange) o.onChange(p);
+  }
+  var sw=switcher(host,{value:cur,onChange:apply});
+  if(anchor.parentNode) anchor.parentNode.insertBefore(note,anchor.nextSibling);
+  apply(cur);
+  return {value:function(){return cur;},set:function(p){sw.set(p);apply(p);},note:note};
 }
 
 function accounts(host,o){
@@ -209,6 +232,7 @@ function accounts(host,o){
   var wantId=o.account||"";
   var root_=document.createElement("div"); root_.className="pm-plat";
   var swc=switcher(root_,{allow:allow,value:st.platform,onChange:function(p){setPlatform(p,true);}});
+  if(o.noSwitch) swc.el.hidden=true;
   var pickers=document.createElement("div"); pickers.className="pm-plat-pick";
   var hostG=document.createElement("div"), hostM=document.createElement("div");
   pickers.appendChild(hostG); pickers.appendChild(hostM);
@@ -308,6 +332,6 @@ var api = {KEY:KEY,PLATFORMS:PLATFORMS,LABEL:LABEL,validPlatform:validPlatform,i
   platformOfId:platformOfId,partsOf:partsOf,singleId:singleId,counterpart:counterpart,combine:combine,norm:norm,fmtId:fmtId,
   mergePerf:mergePerf,mergePerfResponse:mergePerfResponse,mergeExtras:mergeExtras,sumRows:sumRows,oldest:oldest,
   mergeProducts:mergeProducts,mergeProductsResponse:mergeProductsResponse,fetchJson:fetchJson,plain:plain,
-  accounts:accounts,switcher:switcher};
+  accounts:accounts,switcher:switcher,googleOnly:googleOnly,googleOnlyCard:googleOnlyCard};
 if(typeof module!=="undefined"&&module.exports) module.exports=api; else root.PMPlatform=api;
 })(typeof window!=="undefined"?window:globalThis);

@@ -25,7 +25,7 @@ function store(k,v){try{if(v===undefined)return localStorage.getItem(k)||"";loca
 
 var S = {accounts:[], groups:[], account:"", report:null, seq:0, view:"attention", open:{}, limit:"30", settings:null};
 
-if(window.PMPlatform&&$("#platSw")) window.PMPlatform.switcher($("#platSw"),{allow:["google"],value:"google"});     /* Google only: the switch says so */
+if(window.PMPlatform&&$("#platSw")) window.PMPlatform.googleOnly($("#platSw"),{name:"Brand Spend Alert",why:"Meta has no search terms or keywords, so a Meta campaign cannot leak onto brand searches the way a Google Search campaign does.",closest:[{label:"Spend Anomaly Alert",href:"/p2/paid-marketing/spend-anomaly"},{label:"KPI Monitoring",href:"/p2/paid-marketing/kpi-monitoring"}],body:"#gBody"});     /* a Google-only agent: Meta says why, Both keeps Google and says so */
 var picker = window.PMPicker($("#acctPick"),{label:"Google Ads account",search:true,onChange:function(v){
   S.account=v; store("bs_account",v); run();
 }});

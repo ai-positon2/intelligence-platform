@@ -188,14 +188,17 @@ def test_a_link_to_a_meta_account_or_a_both_account_opens_on_that_platform(agent
     assert asked == ["/p2/paid-marketing/api" + path + "report?account=1234567890", "/p2/paid-marketing/api" + path + "report?account=act_1234567"] and both["platformsSet"][-1] == "both"
 
 
-def test_the_pages_link_the_switch_and_the_google_only_pages_show_it_with_one_choice():
+def test_the_pages_link_the_switch_and_the_google_only_pages_show_all_three_choices_and_say_why_meta_has_nothing():
     for t in ("disapproved_ads", "ad_copy_checker", "spend_anomaly", "location_conflicts", "kpi_monitoring"):
         html = open(os.path.join(ROOT, "templates", t + ".html"), encoding="utf-8").read()
         assert html.index("pm_picker.js") < html.index("pm_platform.js") < html.index("pm_scope.js") < html.index("monitor_panel.js"), t
     for t, js in (("brand_is", "brand_is.js"), ("brand_spend", "brand_spend.js"), ("keyword_visibility", "kvis.js")):
         html = open(os.path.join(ROOT, "templates", t + ".html"), encoding="utf-8").read()
         src = open(os.path.join(JS, js), encoding="utf-8").read()
-        assert 'id="platSw"' in html and "pm_platform.js" in html and 'allow:["google"]' in src and "PMPlatform.switcher" in src, t
+        assert 'id="platSw"' in html and 'id="gBody"' in html and "pm_platform.js" in html and "PMPlatform.googleOnly" in src and 'allow:["google"]' not in src, t
+        assert "Meta" in src and src.count('body:"#gBody"') == 1, t                                                   # the card says why Meta has nothing here
+    sq, sqh = open(os.path.join(JS, "sqr_agent.js"), encoding="utf-8").read(), open(os.path.join(ROOT, "templates", "sqr_agent.html"), encoding="utf-8").read()
+    assert "PL.googleOnly" in sq and "noSwitch: true" in sq and 'id="platSw"' in sqh and 'id="gBody"' in sqh
     for js in ("disapproved", "copycheck", "anomaly", "geoconf", "kpi"):
         src = open(os.path.join(JS, js + ".js"), encoding="utf-8").read()
         assert "PMScope.mount" in src and "PMPicker" not in src and "—" not in src and '"Google + Meta":"MCC"' in src, js

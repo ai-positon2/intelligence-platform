@@ -1783,3 +1783,6 @@ tr.ud-dismissed td,tr.ud-gone td{opacity:.62}
 
 .mc-title{font:700 13px "Space Grotesk",sans-serif;letter-spacing:var(--ls-caps);text-transform:uppercase;color:var(--pm-faint);margin:26px 0 8px}
 .mc-try{display:block;margin-top:2px;font-size:12.5px;line-height:1.5;color:var(--pm-muted)}.mc-try b{color:var(--pm-ink)}
+.pm-gonly{margin:0 0 16px}
+.pm-gonly-in{font-size:13.5px;line-height:1.55;color:var(--pm-ink);padding:14px 16px;border-radius:14px;border:1px solid color-mix(in srgb,var(--pm-a) 40%,transparent);background:var(--pm-a-d)}
+.pm-gonly-in a{color:var(--pm-a);font-weight:600}

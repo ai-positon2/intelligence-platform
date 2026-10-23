@@ -24,7 +24,7 @@ function store(k,v){try{if(v===undefined)return localStorage.getItem(k)||"";loca
 
 var S = {accounts:[], groups:[], account:"", report:null, seq:0, view:"attention", open:{}, over:{}, threshold:"90", diag:{}};
 
-if(window.PMPlatform&&$("#platSw")) window.PMPlatform.switcher($("#platSw"),{allow:["google"],value:"google"});     /* Google only: the switch says so */
+if(window.PMPlatform&&$("#platSw")) window.PMPlatform.googleOnly($("#platSw"),{name:"Brand IS Monitor",why:"Impression share is a Google Search measure, and Meta ads are not bought against searches, so there is no share of brand searches to watch.",closest:[{label:"Spend Anomaly Alert",href:"/p2/paid-marketing/spend-anomaly"},{label:"KPI Monitoring",href:"/p2/paid-marketing/kpi-monitoring"}],body:"#gBody"});     /* a Google-only agent: Meta says why, Both keeps Google and says so */
 var picker = window.PMPicker($("#acctPick"),{label:"Google Ads account",search:true,onChange:function(v){
   S.account=v; store("bi_account",v); S.over=loadOver(); run();
 }});

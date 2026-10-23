@@ -166,11 +166,11 @@ function respond(url, opts) {
   if ((r.hold || (r.holdFrom && r.count >= r.holdFrom)) && !r.released) return new Promise(res => held.push(() => { r.released = true; res(answer); }));
   return answer;
 }
-let picker = null; const sets = [], setsMeta = [], pickers = [], switchers = [], platformsSet = [];
+let picker = null; const sets = [], setsMeta = [], pickers = [], switchers = [], platformsSet = [], googleOnlies = [];
 const win = { MonitorPanel: { mount: (host, o) => panels.push(o) },
   PMPicker: (host, o) => { const n = pickers.length, p = { onChange: o.onChange, set(items, v, dis) { (n === 0 ? sets : setsMeta).push({ items, v, dis }); } }; pickers.push(p); if (n === 0) picker = p; return p; },
   /* the platform switch of tracker pages: records what it was asked, and finds the same client on the other platform by name and currency */
-  PMPlatform: { switcher: (host, o) => { switchers.push(o); let cur = o.value; return { set(p) { cur = p; platformsSet.push(p); }, value: () => cur, saved: () => "" }; },
+  PMPlatform: { googleOnly: (host, o) => { googleOnlies.push(o); return { value: () => "google", set() {}, note: {} }; }, switcher: (host, o) => { switchers.push(o); let cur = o.value; return { set(p) { cur = p; platformsSet.push(p); }, value: () => cur, saved: () => "" }; },
     counterpart: (a, others) => { const n = x => String(x.name || "").toLowerCase().replace(/\(.*?\)/g, "").replace(/[^a-z0-9]/g, ""); const m = others.filter(o => o.currency === a.currency && n(o) === n(a)); return m.length === 1 ? m[0] : null; } } };
 const ctx = { window: win, document: doc, history: { replaceState(a, b, u) { hist.push(u); } }, location: { search: sc.search || "", pathname: "/p2/paid-marketing/ad-copy-checker" },
   localStorage: { getItem: k => (k in store ? store[k] : (sc.stored || {})[k] || null), setItem: (k, v) => { store[k] = v; } },
@@ -204,7 +204,7 @@ const targets = [];
     if (step.submit) { const [sel, closest] = step.submit; const t = target({ closest }); targets.push(t); el(sel).handlers.submit({ target: t, preventDefault() {} }); }
     for (let i = 0; i < 6; i++) await tick();
   }
-  const out = { calls, posts, panels, hist, store, sets, setsMeta, platformsSet, switchers: switchers.length, downloads: downloads.map(d => ({ name: d.name })), blob: downloads.blob ? downloads.blob.text : "", el: {},
+  const out = { calls, posts, panels, hist, store, sets, setsMeta, platformsSet, switchers: switchers.length, googleOnlies, downloads: downloads.map(d => ({ name: d.name })), blob: downloads.blob ? downloads.blob.text : "", el: {},
     outs: targets.map(t => Object.fromEntries(Object.entries(t.outs).map(([k, v]) => [k, v.textContent]))), disabled: targets.map(t => Object.values(t.closest ? [] : []).length) };
   for (const k of Object.keys(els)) out.el[k] = { html: els[k].innerHTML, text: els[k].textContent, hidden: els[k].hidden, value: els[k].value };
   process.stdout.write(JSON.stringify(out));

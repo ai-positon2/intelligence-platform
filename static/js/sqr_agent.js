@@ -539,7 +539,10 @@ const wantAcct = qAccount && /^\d{10}$/.test(qAccount) ? qAccount : (function(){
 paintButton(); paintWhy(); paintRanges(); computeRange(); refreshReady();
 
 let firstLoad = true;
-const accts = PL.accounts($id("acctPick"), { url: BASE + "/gads/accounts", allow: ["google"], platform: "google", account: wantAcct,
+/* A Google-only agent: the same three choices as every agent, Meta says why it has nothing here and where to look, Both keeps Google and says so. */
+if (PL && $id("platSw")) PL.googleOnly($id("platSw"), { name: "Search Query Analysis", why: "Meta has no search terms: people are reached by audience and placement, not by what they typed.",
+  closest: [{ label: "Segment Analysis", href: "/p2/paid-marketing/segment-analysis" }, { label: "Audience Segments", href: "/p2/paid-marketing/audience-segments" }], body: "#gBody" });
+const accts = PL.accounts($id("acctPick"), { url: BASE + "/gads/accounts", allow: ["google"], noSwitch: true, platform: "google", account: wantAcct,
   onChange: function(a){
     if (!a) { S.acct = null; setLive("No Google Ads account to read", true); notice("warn", "No account chosen", "There are no Google Ads accounts to show. Use the CSV exports below instead."); refreshReady(); return; }
     if (S.acct && S.acct.id === a.id && !firstLoad) return;
