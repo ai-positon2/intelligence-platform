@@ -72,6 +72,13 @@ def meta_requests(act):
         out.append(("kpi", "insights", "/%s/insights" % act, dict(paid_meta.q_insights(a, b), limit=1)))
     except Exception as e:                                                           # noqa: BLE001
         out.append(("kpi", "insights", None, {"_build_error": str(e)}))
+    from . import paid_meta_creative as mc
+    for label, fn in (("ads", lambda: mc.ads_request(act)), ("ad numbers and rankings", lambda: mc.insights_request(act, a, b))):
+        try:
+            path, params = fn()
+            out.append(("metacreative", label, path, dict(params, limit=1)))
+        except Exception as e:                                                       # noqa: BLE001
+            out.append(("metacreative", label, None, {"_build_error": str(e)}))
     return out
 
 

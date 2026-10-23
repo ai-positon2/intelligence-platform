@@ -5302,11 +5302,16 @@ def _pm_adstrength_report():
     src = request.args if request.method == "GET" else (request.get_json(silent=True) or {})
     try:
         extra = {"force": True} if str(src.get("refresh") or "") in ("1", "true") else {}      # the Refresh button
+        from tracker import paid_meta, paid_meta_creative
+        if paid_meta.is_meta(str(src.get("account") or "")):                 # a Meta ad account: Meta's rankings and frequency, not an ad strength
+            return paid_meta_creative.report_for(src.get("account"), view="quality", **extra), None
         return paid_adstrength.report_for(src.get("account"), **extra), None
     except paid_adstrength.BadRequest as e:
         return None, (jsonify(error=str(e)), 400)
     except paid_gads_base.RefreshTooSoon as e:
         return None, (jsonify(error=str(e), kind="cooldown", retryIn=e.retry_in), 429)
+    except paid_gads_base.AdsError as e:                                                   # Meta answered with an error (a Meta read raises the platform's AdsError)
+        return None, (jsonify(error=str(e), kind="meta"), 502)
     except paid_gads.GadsError as e:
         return None, _pm_gads_error(e)
 
@@ -6057,7 +6062,11 @@ def _paid_assets_answer(make):
 @position2_required
 def paid_assets_report():
     extra = {"force": True} if str(request.args.get("refresh") or "") in ("1", "true") else {}      # the Refresh button
-    return _paid_assets_answer(lambda pa: pa.report_for(request.args.get("account"), **extra))
+    from tracker import paid_meta, paid_meta_creative
+    acct = request.args.get("account")
+    if paid_meta.is_meta(str(acct or "")):                                                 # a Meta ad account: the ads per ad set, by format, and the ones Meta stopped
+        return _paid_assets_answer(lambda pa: paid_meta_creative.report_for(acct, view="coverage", **extra))
+    return _paid_assets_answer(lambda pa: pa.report_for(acct, **extra))
 
 
 # What one campaign's assets are (the pictures, the text, the dates), and every asset of one kind: read from the detail the report's
