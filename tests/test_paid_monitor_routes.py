@@ -69,6 +69,21 @@ def test_a_test_alert_goes_through_the_senders_and_names_the_monitor(world):
     assert client_as(STAFF).post(API + "/monitors/other/test-alert", json={}).status_code == 400
 
 
+def test_a_test_alert_asked_to_preview_sends_what_is_open_now_and_a_plain_one_stays_the_made_up_test(world):
+    from tracker import paid_monitor as mon
+    world.store.state_set("alerts", {"emails": [], "slackChannel": "#paid-alerts"})
+    acct = {"id": "1234567890", "name": "Acme Dental", "platform": "google"}
+    world.store.issues_put([dict(mon.make_issue("brandspend", "over:1", acct, "over", "high", "Brand spend stopped", "d", "n"), status="open", firstSeen="2026-10-01T00:00:00+00:00", lastSeen="2026-10-02T00:00:00+00:00",
+                                 alertedAt=None, alertedLevel=None, alert={}, reopened=0, resolvedAt=None)])
+    r = client_as(STAFF).post(API + "/monitors/brandspend/test-alert", json={"preview": True})
+    assert r.status_code == 200 and r.get_json()["issues"] == 1 and r.get_json()["accounts"] == 1 and r.get_json()["slack"]["status"] == "sent" and r.get_json()["email"]["status"] == "not_configured"
+    sent = world.deliver.slacks[0]
+    assert sent["channel"] == "#paid-alerts" and "Acme Dental" in sent["blocks"][3]["text"]["text"] and sent["blocks"][0]["text"]["text"].startswith("\U0001F9EA")
+    client_as(STAFF).post(API + "/monitors/brandspend/test-alert", json={})
+    assert "Test account (not real)" in world.deliver.slacks[1]["blocks"][3]["text"]["text"]
+    assert client_as(STAFF).post(API + "/monitors/other/test-alert", json={"preview": True}).status_code == 400
+
+
 def test_run_now_starts_the_monitor_in_the_background_with_who_asked_and_refuses_a_second_run(world):
     r = client_as(STAFF).post(API + "/monitors/brandspend/run", json={})
     assert r.status_code == 202 and r.get_json() == {"started": True} and len(world.spawned) == 1
@@ -141,7 +156,7 @@ def test_the_report_routes_hand_the_monitors_store_to_the_report(world, monkeypa
 
 def test_the_daily_workflow_calls_the_scheduled_address_with_the_secret_and_the_secret_is_checked_by_the_route():
     text = open(os.path.join(ROOT, ".github", "workflows", "paid-monitors.yml"), encoding="utf-8").read()
-    assert "/p2/paid-marketing/api/monitors/scheduled" in text and "X-Monitor-Secret: $SECRET" in text and "secrets.MONITOR_ALERT_SECRET" in text and "cron: '41 5 * * *'" in text
+    assert "/p2/paid-marketing/api/monitors/scheduled" in text and "X-Monitor-Secret: $SECRET" in text and "secrets.MONITOR_ALERT_SECRET" in text and "cron: '30 7 * * *'" in text
     assert "workflow_dispatch" in text and "cancel-in-progress: false" in text and "PLATFORM_BASE_URL" in text and "—" not in text and "–" not in text
     code = open(os.path.join(ROOT, "app.py"), encoding="utf-8").read()
     assert 'os.environ.get("MONITOR_ALERT_SECRET", "")' in code and 'request.headers.get("X-Monitor-Secret", "")' in code
@@ -165,9 +180,9 @@ def test_the_scheduled_address_can_be_told_which_monitors_to_run(world, monkeypa
     assert odd.status_code == 202 and len(world.spawned) == 4
 
 
-def test_the_spend_alert_has_its_own_two_hourly_workflow_that_asks_for_only_itself():
+def test_the_spend_alert_has_its_own_workflow_at_the_same_hour_that_asks_for_only_itself():
     text = open(os.path.join(ROOT, ".github", "workflows", "paid-spend-anomaly.yml"), encoding="utf-8").read()
-    assert "/p2/paid-marketing/api/monitors/scheduled" in text and "X-Monitor-Secret: $SECRET" in text and "secrets.MONITOR_ALERT_SECRET" in text and "cron: '17 */2 * * *'" in text
+    assert "/p2/paid-marketing/api/monitors/scheduled" in text and "X-Monitor-Secret: $SECRET" in text and "secrets.MONITOR_ALERT_SECRET" in text and "cron: '30 7 * * *'" in text
     assert """-d '{"agents": ["spend"]}'""" in text and "workflow_dispatch" in text and "cancel-in-progress: false" in text and "group: paid-spend-anomaly" in text and "PLATFORM_BASE_URL" in text and "—" not in text and "–" not in text
     daily = open(os.path.join(ROOT, ".github", "workflows", "paid-monitors.yml"), encoding="utf-8").read()
     assert "agents" not in daily and "group: paid-monitors" in daily

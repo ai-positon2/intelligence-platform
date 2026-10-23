@@ -226,14 +226,21 @@ def pend(n, level="medium", event="new"):
 def test_the_alert_lists_twelve_and_points_to_the_page_for_the_rest():
     m = mon.digest("Brand Spend Alert", pend(15), [], LINK)
     assert m["subject"] == "Brand Spend Alert: 15 new (1 account)" and "...and 3 more on the page." in m["text"] and m["text"].count("[NEW]") == 12 and "Open the page: " + LINK in m["text"]
-    assert m["slack_text"] == "*Brand Spend Alert: 15 new (1 account)*" and m["slack_blocks"][0]["type"] == "header" and len(m["slack_blocks"]) == 14 and "...and 3 more." in m["slack_blocks"][-1]["text"]["text"]
+    assert m["slack_text"] == "\U0001F7E0 Brand Spend Alert: 15 new in 1 account" and m["slack_blocks"][0]["type"] == "header" and m["slack_blocks"][0]["text"]["text"] == "\U0001F7E0 Brand Spend Alert"
+    kinds = [b["type"] for b in m["slack_blocks"]]
+    assert kinds == ["header", "context", "divider", "section", "actions"] and m["slack_blocks"][1]["elements"][0]["text"] == "*15 new*  \u00B7  1 account"      # short: one account, its worst three, the button
+    acct = m["slack_blocks"][3]["text"]["text"]
+    assert acct.count("\u2022") == 3 and "_+12 more_" in acct and m["slack_blocks"][-1]["elements"][0]["url"] == LINK and m["slack_blocks"][-1]["elements"][0]["text"]["text"] == "Open Brand Spend Alert"
 
 
 def test_a_high_issue_puts_high_first_in_the_subject_and_markup_in_names_is_escaped_in_the_html():
     m = mon.digest("Disapproved Ads Tracker", pend(1, "high") + pend(2, "medium", "worse"), [], LINK)
     assert m["subject"] == "HIGH: Disapproved Ads Tracker: 1 new, 2 worse (1 account)"
     assert "Acme &lt;Dental&gt;" in m["html"] and "<Dental>" not in m["html"] and "href=\"%s\"" % LINK in m["html"]
-    assert "Next: Start with" in m["text"] and "_Next: Start with" in m["slack_blocks"][1]["text"]["text"]
+    assert "Next: Start with" in m["text"]
+    lead, acct = m["slack_blocks"][1]["elements"][0]["text"], m["slack_blocks"][3]["text"]["text"]
+    assert m["slack_blocks"][0]["text"]["text"] == "\U0001F534 Disapproved Ads Tracker" and lead == "*1 new*  \u00B7  2 worse  \u00B7  1 account"
+    assert acct.startswith("\U0001F534 *Acme <Dental>*".replace("<", "&lt;").replace(">", "&gt;")) and "Next: Start" not in acct and acct.count("\u2022") == 3 and "_worse_" in acct   # Slack text is escaped and has no next step
 
 
 def test_the_alert_lists_new_before_worse_before_still_open_then_the_highest_level_then_the_account():
@@ -297,7 +304,10 @@ def test_the_weekly_summary_lists_every_open_issue_highest_first_and_what_was_fi
     assert lines[0] == "3 open, 1 of them high; 1 fixed in the last 7 days."
     assert lines[2:6] == ["Open:", "- [HIGH] Beta: Stopped (open 10 days)", "- [MEDIUM] Acme <Dental>: Over (open 10 days)", "- [LOW] Acme <Dental>: A small thing (open 10 days)"]
     assert "Fixed this week:\n- Acme <Dental>: Was over (was open 4 days)" in m["text"] and "Fixed long ago" not in m["text"] and "seven and a half days ago" not in m["text"] and m["text"].endswith("Open the page: " + LINK)
-    assert "Acme &lt;Dental&gt;" in m["html"] and "<Dental>" not in m["html"] and m["slack_text"] == "*%s*" % m["subject"] and m["slack_blocks"][0]["type"] == "header" and "*Open*" in m["slack_blocks"][1]["text"]["text"]
+    assert "Acme &lt;Dental&gt;" in m["html"] and "<Dental>" not in m["html"] and m["slack_blocks"][0]["type"] == "header" and "*Weekly summary*  \u00B7  3 open (1 high)  \u00B7  1 fixed this week" == m["slack_blocks"][1]["elements"][0]["text"]
+    texts = [b["text"]["text"] for b in m["slack_blocks"] if b["type"] == "section"]
+    assert texts[0].startswith("\U0001F534 *Beta*") and any("*Acme &lt;Dental&gt;*" in t and "open 10 days" in t for t in texts) and m["slack_blocks"][-1]["type"] == "actions"
+    assert any(b["type"] == "context" and "Fixed this week" in b["elements"][0]["text"] and "Was over" in b["elements"][0]["text"] for b in m["slack_blocks"])
 
 
 def test_the_weekly_summary_caps_its_lists_and_says_how_many_more_there_are():
@@ -365,3 +375,57 @@ def test_a_monitor_that_ran_before_the_record_existed_counts_the_accounts_with_a
     w.issues.append(issue("over:111b", A, "high", "Brand spend stopped"))
     r2 = run(s, w, dv, day(2))
     assert r2["new"] == 1 and r2["alerted"] == 1                                       # A had a saved issue, so it counted as seen
+
+
+# ── The look of an alert in Slack, and the test alert with real findings ────
+
+def stacked(n_accounts, per=2, level="medium"):
+    return [dict(issue("i:%d:%d" % (a, k), acct={"id": str(a), "name": "Acct %02d" % a, "platform": "meta" if a % 2 else "google"}, level=level, title="Issue %d" % k), event="new", ageDays=0, reopened=0)
+            for a in range(n_accounts) for k in range(per)]
+
+
+def test_a_slack_alert_stays_short_however_many_accounts_have_issues_and_the_rest_is_counted():
+    m = mon.digest("KPI Monitoring", stacked(20, per=5), [{"accountName": "Z", "title": "t", "ageDays": 2}] * 3, LINK)
+    kinds = [b["type"] for b in m["slack_blocks"]]
+    assert kinds == ["header", "context", "divider"] + ["section"] * mon.ACCOUNTS_SHOWN + ["context", "actions"] and len(m["slack_blocks"]) <= 12
+    foot = m["slack_blocks"][-2]["elements"][0]["text"]
+    assert "+14 more accounts, 70 issues" in foot and "\u2705 3 fixed since the last run" in foot
+    assert all(b["text"]["text"].count("\u2022") == 3 and "_+2 more_" in b["text"]["text"] for b in m["slack_blocks"] if b["type"] == "section")
+    assert "Meta Ads" in m["slack_blocks"][3]["text"]["text"] or "Google Ads" in m["slack_blocks"][3]["text"]["text"]
+
+
+def test_the_worst_account_is_listed_first_and_slack_markup_in_names_cannot_break_the_message():
+    items = stacked(3, per=1) + [dict(issue("h", acct={"id": "9", "name": "Evil <b>&co", "platform": "google"}, level="high", title="Stopped <!channel> & gone"), event="new", ageDays=0, reopened=0)]
+    m = mon.digest("X", items, [], LINK)
+    first = m["slack_blocks"][3]["text"]["text"]
+    assert first.startswith("\U0001F534 *Evil &lt;b&gt;&amp;co*") and "&lt;!channel&gt; &amp; gone" in first and "<!channel>" not in first
+
+
+def test_an_all_clear_slack_message_has_the_green_dot_and_says_nothing_is_open():
+    s, dv = configured(), Deliver()
+    res = mon.preview_alert(s, "brandspend", "Brand Spend Alert", LINK, dv)
+    assert res["sent"] is True and res["issues"] == 0 and res["accounts"] == 0 and dv.slacks[0]["blocks"][0]["text"]["text"] == "\U0001F9EA \U0001F7E2 Brand Spend Alert"
+    assert "nothing is open" in dv.slacks[0]["blocks"][1]["elements"][0]["text"] and dv.slacks[0]["text"].startswith("\U0001F9EA TEST: 0 issues open")
+
+
+def test_the_test_alert_shows_what_is_open_now_in_every_account_marks_it_a_test_and_marks_nothing_alerted():
+    s, dv, w = configured(), Deliver(), World()
+    w.issues = [issue(), issue("over:222", B, "high", "Brand spend stopped"), issue("low:111", A, "low", "A small thing")]
+    run(s, w, dv, day(0))                                                              # the baseline: nothing is sent
+    before = s.issues_all("brandspend")
+    res = mon.preview_alert(s, "brandspend", "Brand Spend Alert", LINK, dv)
+    assert res["sent"] is True and res["issues"] == 2 and res["accounts"] == 2                          # medium and above only, across both accounts
+    [one] = dv.slacks
+    assert one["blocks"][0]["text"]["text"] == "\U0001F9EA \U0001F534 Brand Spend Alert" and one["text"] == "\U0001F9EA TEST: 2 issues open in 2 accounts (not new)"
+    lead = one["blocks"][1]["elements"][0]["text"]
+    assert "*Test*" in lead and "not new" in lead and "2 issues in 2 accounts" in lead and "\U0001F534 1" in lead and "\U0001F7E0 1" in lead
+    texts = " ".join(b["text"]["text"] for b in one["blocks"] if b["type"] == "section")
+    assert "Beta Clinic" in texts and "Brand spend stopped" in texts and "A small thing" not in texts
+    assert s.issues_all("brandspend") == before and all(i["alert"] == {"baseline": True} for i in before)      # the baseline stays the baseline
+    assert dv.emails[0]["subject"] == "TEST: Brand Spend Alert, 2 issues open in 2 accounts"
+
+
+def test_the_test_alert_with_no_slack_channel_says_so_and_sends_nothing():
+    s, dv = MemStore(), Deliver()
+    res = mon.preview_alert(s, "brandspend", "Brand Spend Alert", LINK, dv)
+    assert res["sent"] is False and res["slack"]["status"] == "not_configured" and dv.slacks == []

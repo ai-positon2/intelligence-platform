@@ -202,6 +202,54 @@ def _age_text(p):
     return " · ".join(bits)
 
 
+DOT = {"high": "\U0001F534", "medium": "\U0001F7E0", "low": "\U0001F7E1", "info": "\u26AA"}
+ACCOUNTS_SHOWN = 6               # accounts one Slack alert lists, worst first, before it says "+N more"
+PER_ACCOUNT = 3                  # issues listed under an account in Slack
+CLEAR = "\U0001F7E2"
+
+
+def _mk(v):
+    """Slack's markup text: the three characters it reads as markup are escaped."""
+    return str(v if v is not None else "").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+
+def _section(text):
+    return {"type": "section", "text": {"type": "mrkdwn", "text": text[:2900]}}
+
+
+def _context(text):
+    return {"type": "context", "elements": [{"type": "mrkdwn", "text": text[:2900]}]}
+
+
+def _slack_message(label, items, link, *, lead, header_prefix="", fixed=0, empty="Nothing is open right now."):
+    """The Slack blocks of an alert, short: a header with the worst level's dot, one line of counts, then each account (worst first) with its worst issues as one line each, and the button to the
+    page. `items` are dicts with accountId, accountName, platform, level, title and an optional tag."""
+    top = DOT[max(items, key=lambda i: rank(i["level"]))["level"]] if items else CLEAR
+    groups = sorted(({} if not items else _group(items)).values(), key=lambda g: (-max(rank(i["level"]) for i in g), -len(g), g[0]["accountName"].lower()))
+    blocks = [{"type": "header", "text": {"type": "plain_text", "text": ("%s%s %s" % (header_prefix, top, label))[:150], "emoji": True}},
+              _context(lead if items else empty), {"type": "divider"}]
+    for g in groups[:ACCOUNTS_SHOWN]:
+        g = sorted(g, key=lambda i: (-rank(i["level"]), i["title"]))
+        lines = ["%s *%s*  \u00B7  %s" % (DOT[g[0]["level"]], _mk(g[0]["accountName"]), PLATFORM.get(g[0].get("platform") or "google", g[0].get("platform") or "google"))]
+        lines += ["\u2022  %s%s" % (_mk(i["title"]), ("  _%s_" % _mk(i["tag"])) if i.get("tag") else "") for i in g[:PER_ACCOUNT]]
+        if len(g) > PER_ACCOUNT:
+            lines.append("_+%d more_" % (len(g) - PER_ACCOUNT))
+        blocks.append(_section("\n".join(lines)))
+    rest = groups[ACCOUNTS_SHOWN:]
+    foot = (["+%d more %s, %s" % (len(rest), "account" if len(rest) == 1 else "accounts", plural(sum(len(g) for g in rest), "issue"))] if rest else []) + (["\u2705 %d fixed since the last run" % fixed] if fixed else [])
+    if foot:
+        blocks.append(_context("  \u00B7  ".join(foot)))
+    blocks.append({"type": "actions", "elements": [{"type": "button", "text": {"type": "plain_text", "text": ("Open " + label)[:70]}, "url": link, "action_id": "open_page", "style": "primary"}]})
+    return blocks
+
+
+def _group(items):
+    out = {}
+    for i in items:
+        out.setdefault(i.get("accountId") or i["accountName"], []).append(i)
+    return out
+
+
 def digest(label, pending, resolved, link):
     """{subject, text, html, slack_text, slack_blocks} for what changed. `link` is the monitor page's address."""
     counts = {e: sum(1 for p in pending if p["event"] == e) for e in EVENT_WORD}
@@ -231,15 +279,14 @@ def digest(label, pending, resolved, link):
     fixed_html = ("<p><b>Fixed since the last run</b></p><ul>%s</ul>" % "".join("<li>%s: %s</li>" % (e(r["accountName"]), e(r["title"])) for r in fixed)) if fixed else ""
     html_body = ("<div style=\"font-family:Arial,sans-serif;font-size:14px;line-height:1.5\"><p><b>%s</b></p><ul>%s</ul>%s%s<p><a href=\"%s\">Open the page</a></p></div>"
                  % (e(subject), rows, ("<p>...and %d more on the page.</p>" % more) if more else "", fixed_html, e(link)))
-    blocks = [{"type": "header", "text": {"type": "plain_text", "text": subject[:150]}}]
-    for p in shown:
-        blocks.append({"type": "section", "text": {"type": "mrkdwn", "text": "*%s* (%s) · %s\n%s\n%s%s%s" % (
-            p["accountName"], PLATFORM.get(p["platform"], p["platform"]), EVENT_WORD[p["event"]], p["title"], p["detail"][:600],
-            ("\n_Next: %s_" % p["nextStep"]) if p.get("nextStep") else "", ("\n" + _age_text(p)) if _age_text(p) else "")}})
-    if fixed:
-        blocks.append({"type": "section", "text": {"type": "mrkdwn", "text": "*Fixed since the last run:* " + "; ".join("%s: %s" % (r["accountName"], r["title"]) for r in fixed)[:600]}})
-    blocks.append({"type": "section", "text": {"type": "mrkdwn", "text": ("...and %d more. " % more if more else "") + "<%s|Open the page>" % link}})
-    return {"subject": subject, "text": text, "html": html_body, "slack_text": "*%s*" % subject, "slack_blocks": blocks[:49]}
+    tags = {"new": "", "worse": "worse", "reminder": "still open"}
+    items = [dict(p, tag=tags[p["event"]]) for p in pending]
+    lead = "  \u00B7  ".join(([ "*%d new*" % counts["new"]] if counts["new"] else []) + (["%d worse" % counts["worse"]] if counts["worse"] else []) + (["%d still open" % counts["reminder"]] if counts["reminder"] else [])
+                           + [plural(accounts, "account")])
+    blocks = _slack_message(label, items, link, lead=lead, fixed=len(resolved))
+    dot = DOT[max(pending, key=lambda p: rank(p["level"]))["level"]] if pending else CLEAR
+    slack_text = "%s %s: %s in %s" % (dot, label, ", ".join(parts) or "nothing new", plural(accounts, "account"))
+    return {"subject": subject, "text": text, "html": html_body, "slack_text": slack_text, "slack_blocks": blocks}
 
 
 def send(store, message, deliver):
@@ -259,7 +306,26 @@ def test_alert(store, label, link, deliver):
     m = digest(label, [p], [], link)
     m["subject"] = "TEST: " + m["subject"]
     m["slack_text"] = "TEST " + m["slack_text"]
+    m["slack_blocks"][0]["text"]["text"] = "\U0001F9EA Test  \u00B7  " + label
     return send(store, m, deliver)
+
+
+def preview_alert(store, agent, label, link, deliver):
+    """What is open right now, in every account the monitor has read, sent as an alert marked TEST: the real look of an alert with real findings (only what would be alerted, medium and above),
+    and it says it is not new. Marks nothing alerted. {email, slack, sent, issues, accounts}."""
+    open_rows = [i for i in store.issues_all(agent) if i["status"] == "open" and rank(i["level"]) >= rank(ALERT_FROM)]
+    accounts = len({i["accountId"] for i in open_rows})
+    by_level = "  ".join("%s %d" % (DOT[lv], n) for lv in ("high", "medium") for n in [sum(1 for i in open_rows if i["level"] == lv)] if n)
+    lead = "*Test*  \u00B7  what is open now, not new  \u00B7  %s in %s  \u00B7  %s" % (plural(len(open_rows), "issue"), plural(accounts, "account"), by_level)
+    blocks = _slack_message(label, open_rows, link, lead=lead, header_prefix="\U0001F9EA ", empty="Test  \u00B7  nothing is open right now.")
+    text = "TEST: %s open in %s (not new)" % (plural(len(open_rows), "issue"), plural(accounts, "account"))
+    msg = {"subject": "TEST: %s, %s open in %s" % (label, plural(len(open_rows), "issue"), plural(accounts, "account")),
+           "text": "\n".join(["%s: %s open now in %s (a test, not new)." % (label, len(open_rows), plural(accounts, "account")), ""]
+                            + ["- [%s] %s: %s" % (i["level"].upper(), i["accountName"], i["title"]) for i in sorted(open_rows, key=lambda i: (-rank(i["level"]), i["accountName"].lower()))[:SHOWN]]
+                            + ["", "Open the page: " + link]),
+           "html": "<p>%s</p>" % _html.escape(text), "slack_text": "\U0001F9EA " + text, "slack_blocks": blocks}
+    res = send(store, msg, deliver)
+    return dict(res, issues=len(open_rows), accounts=accounts)
 
 
 # ── A run ───────────────────────────────────────────────────────────────────
@@ -344,10 +410,9 @@ def weekly_digest(label, issues, now, link):
     html_body = ("<div style=\"font-family:Arial,sans-serif;font-size:14px;line-height:1.5\"><p><b>%s</b></p>%s%s<p><a href=\"%s\">Open the page</a></p></div>" % (
         e(subject), ("<p><b>Open</b></p><ul>%s</ul>%s" % ("".join("<li>%s</li>" % e(line(i)[2:]) for i in shown), ("<p>...and %d more on the page.</p>" % (len(opened) - len(shown))) if len(opened) > len(shown) else "")) if shown else "",
         ("<p><b>Fixed this week</b></p><ul>%s</ul>" % "".join("<li>%s</li>" % e(fixed_line(i)[2:]) for i in shown_fixed)) if shown_fixed else "", e(link)))
-    blocks = [{"type": "header", "text": {"type": "plain_text", "text": subject[:150]}}]
-    if shown:
-        blocks.append({"type": "section", "text": {"type": "mrkdwn", "text": "*Open*\n" + "\n".join(line(i) for i in shown)[:2900]}})
+    items = [dict(i, tag=("open %s" % plural(age_days(i["firstSeen"], now), "day")) if age_days(i["firstSeen"], now) else "") for i in opened]
+    lead = "*Weekly summary*  \u00B7  %s%s  \u00B7  %d fixed this week" % ("%d open" % len(opened), (" (%d high)" % high) if high else "", len(fixed))
+    blocks = _slack_message(label, items, link, lead=lead, fixed=0, empty="Weekly summary  \u00B7  nothing is open.")
     if shown_fixed:
-        blocks.append({"type": "section", "text": {"type": "mrkdwn", "text": "*Fixed this week*\n" + "\n".join(fixed_line(i) for i in shown_fixed)[:2900]}})
-    blocks.append({"type": "section", "text": {"type": "mrkdwn", "text": "<%s|Open the page>" % link}})
+        blocks.insert(-1, _context("\u2705 *Fixed this week*  \u00B7  " + "; ".join("%s: %s" % (_mk(i["accountName"]), _mk(i["title"])) for i in shown_fixed[:4]) + ("  \u00B7  +%d more" % (len(fixed) - 4) if len(fixed) > 4 else "")))
     return {"subject": subject, "text": text, "html": html_body, "slack_text": "*%s*" % subject, "slack_blocks": blocks, "open": len(opened), "fixed": len(fixed)}

@@ -10,7 +10,7 @@ name: Paid Marketing Monitors
 on:
   workflow_dispatch:
   schedule:
-    - cron: '41 5 * * *'   # 05:41 UTC every day (11:11 in India, 22:41 the evening before on the US west coast)
+    - cron: '30 7 * * *'   # 07:30 UTC every day, which is 13:00 (1 PM) in India: every alert lands in the Slack channel then (GitHub may start it a few minutes late)
 
 permissions:
   contents: read

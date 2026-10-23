@@ -5438,6 +5438,8 @@ def paid_monitor_alerts():
 def paid_monitor_test_alert(agent):
     def go(store, pm, mon):
         pm.agent_of(agent)
+        if (request.get_json(silent=True) or {}).get("preview"):
+            return jsonify(mon.preview_alert(store, agent, pm.AGENTS[agent]["label"], pm.link_for(agent, _mon_base()), _mon_deliver()))
         return jsonify(mon.test_alert(store, pm.AGENTS[agent]["label"], pm.link_for(agent, _mon_base()), _mon_deliver()))
     return _mon_run(go)
 

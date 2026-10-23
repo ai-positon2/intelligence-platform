@@ -1,19 +1,19 @@
 name: Paid Marketing Spend Anomaly Alert
 
-# Starts the Spend Anomaly Alert's run on the platform every two hours. The run itself happens on the platform (it reads every Google Ads and Meta account's spend by day and hour, holds today
+# Starts the Spend Anomaly Alert's run on the platform once a day at 13:00 India time, with the other monitors, so every alert lands in the Slack channel at the same hour. The run itself happens on the platform (it reads every Google Ads and Meta account's spend by day and hour, holds today
 # against the account's usual, and sends the email and Slack alert for what is new or worse); this only calls the secret-guarded address, which answers at once and runs in the background.
 # The first run sets the baseline and sends nothing. The other monitors have their own daily workflow (paid-monitors.yml).
 #
 # Needs the same GitHub Actions secret as that one, MONITOR_ALERT_SECRET (the value of the MONITOR_ALERT_SECRET variable on Railway). The platform's address is the repository variable
 # PLATFORM_BASE_URL (default https://intelligence.position2.com). Alert recipients and the Slack channel are set on the Spend Anomaly Alert page.
 #
-# Every two hours is twelve reads of each account a day. Google's daily read allowance is shared by every agent: if the allowance runs short, make the cron below less frequent (every 4 hours is
-# '17 */4 * * *') rather than switching the alert off.
+# It used to run every two hours ('17 */2 * * *', twelve reads of each account a day) so a spike was caught the hour it started; once a day it reports the day's spike or surge, not the hour's.
+# Put that cron back to get the hourly watch again (Google's daily read allowance is shared by every agent).
 
 on:
   workflow_dispatch:
   schedule:
-    - cron: '17 */2 * * *'   # at 17 minutes past every second hour (UTC)
+    - cron: '30 7 * * *'   # 07:30 UTC every day, which is 13:00 (1 PM) in India (GitHub may start it a few minutes late)
 
 permissions:
   contents: read
