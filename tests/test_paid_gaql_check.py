@@ -60,9 +60,9 @@ def test_a_query_google_refuses_is_named_with_the_reason_and_the_rest_pass():
 
 def test_the_meta_reads_are_built_for_every_agent_and_cut_to_one_row():
     reqs = qc.meta_requests("act_1234567")
-    assert {a for a, _l, _p, _q in reqs} == {"geoconf", "copycheck", "kpi", "anomaly", "disapproved", "metacreative", "metahistory"}
+    assert {a for a, _l, _p, _q in reqs} == {"geoconf", "copycheck", "kpi", "anomaly", "disapproved", "metacreative", "metahistory", "metainterests"}
     for agent, label, path, params in reqs:
-        assert path and path.startswith("/act_1234567/") and params["limit"] == 1, (agent, label)
+        assert path and (path.startswith("/act_1234567/") or (agent == "metainterests" and path == "/search")) and params["limit"] == 1, (agent, label)      # Meta's interest search is not under an account
     geo = [r for r in reqs if r[0] == "geoconf"][0]
     assert "location_types" not in geo[3]["fields"].replace("geo_locations", "")                # Meta keeps it inside geo_locations: asking for it beside is an error
 
@@ -74,7 +74,7 @@ def test_a_meta_read_that_fails_is_named_and_one_that_cannot_be_built_is_too():
         return [{"id": "1"}]
     got = qc.check_meta("act_1", pages_fn=pages)
     bad = [r for r in got if not r["ok"]]
-    assert {r["label"] for r in bad} == {"geoconf", "kpi adsets"} and all("nonexistent field" in r["error"] for r in bad)
+    assert {r["label"] for r in bad} == {"geoconf", "kpi adsets", "ad sets with targeting"} and all("nonexistent field" in r["error"] for r in bad)
     odd = qc.check_meta("act_1", pages_fn=lambda p, q: [], requests=[("kpi", "campaigns", None, {"_build_error": "boom"})])
     assert odd == [{"agent": "kpi", "label": "campaigns", "ok": False, "error": "could not be built: boom", "rows": 0, "ms": 0}]
 

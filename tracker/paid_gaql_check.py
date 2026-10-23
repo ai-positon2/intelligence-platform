@@ -83,6 +83,14 @@ def meta_requests(act):
             out.append(("metacreative", label, path, dict(params, limit=1)))
         except Exception as e:                                                       # noqa: BLE001
             out.append(("metacreative", label, None, {"_build_error": str(e)}))
+    from . import paid_meta_interests as mi
+    for label, fn in (("interest search", lambda: mi.search_request("insulin pump")), ("interest suggestions", lambda: mi.suggest_request(["Insulin pump"])),
+                      ("behaviors", lambda: mi.behaviors_request()), ("ad sets with targeting", lambda: mi.adsets_request(act))):
+        try:
+            path, params = fn()
+            out.append(("metainterests", label, path, dict(params, limit=1)))
+        except Exception as e:                                                       # noqa: BLE001
+            out.append(("metainterests", label, None, {"_build_error": str(e)}))
     return out
 
 
