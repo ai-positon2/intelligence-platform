@@ -316,3 +316,54 @@ def test_change_the_details_restores_which_cards_were_on():
     out = run(opened(r) | {"steps": [press("reuseBtn")]})
     cards = out["el"]["#cards"]["html"]
     assert re.search(r'data-k="website" aria-pressed="false"', cards) and re.search(r'data-k="account" aria-pressed="true"', cards)
+
+
+# ── the Platform switch ──────────────────────────────────────────────────────
+
+def _fn(src, name):
+    start = src.index("function %s(" % name)
+    depth, i = 0, src.index("{", start)
+    while True:
+        depth += {"{": 1, "}": -1}.get(src[i], 0)
+        if depth == 0:
+            return src[start:i + 1]
+        i += 1
+
+
+def plat(expr, formats, plat_="both"):
+    """The switch's own functions from the page script, executed against the real format list."""
+    src = open(JS, encoding="utf-8").read()
+    prelude = "".join(_fn(src, n) + "\n" for n in ("formatPlatform", "platFormats", "setPlatform", "platformOfFormats"))
+    setup = "var S={opts:%s,formats:%s,plat:%s};var paintForm=function(){};" % (json.dumps(OPTIONS), json.dumps(formats), json.dumps(plat_))
+    r = subprocess.run(["node", "-e", "%s%s%sconsole.log(JSON.stringify(%s))" % (setup, prelude, "", expr)], capture_output=True, text=True, timeout=30)
+    assert r.returncode == 0, r.stderr
+    return json.loads(r.stdout)
+
+
+def test_meta_offers_only_the_meta_formats_and_google_only_the_google_ones():
+    assert plat("(S.plat='meta',platFormats().map(f=>f.key))", ["google_rsa"]) == ["meta_feed", "meta_stories_reels"]
+    assert plat("(S.plat='google',platFormats().map(f=>f.key))", []) == ["google_rsa", "google_pmax", "google_demand_gen", "google_display"]
+    assert len(plat("platFormats()", [], "both")) == 6
+
+
+def test_choosing_meta_drops_the_google_formats_and_falls_back_to_the_metas_default_when_none_is_left():
+    assert plat("(setPlatform('meta'),S.formats)", ["google_rsa", "meta_stories_reels"]) == ["meta_stories_reels"]
+    assert plat("(setPlatform('meta'),S.formats)", ["google_rsa", "google_pmax"]) == ["meta_feed"]
+    assert plat("(setPlatform('google'),S.formats)", ["meta_feed"]) == ["google_rsa"]
+
+
+def test_choosing_both_makes_sure_each_platform_has_a_format_and_keeps_what_was_picked():
+    assert plat("(setPlatform('both'),S.formats)", ["google_pmax"]) == ["google_pmax", "meta_feed"]
+    assert plat("(setPlatform('both'),S.formats)", ["meta_stories_reels"]) == ["meta_stories_reels", "google_rsa"]
+    assert plat("(setPlatform('both'),S.formats)", ["google_rsa", "meta_feed"]) == ["google_rsa", "meta_feed"]
+
+
+def test_an_opened_build_puts_the_switch_where_its_formats_were():
+    assert plat("platformOfFormats(['google_rsa','google_pmax'])", []) == "google" and plat("platformOfFormats(['meta_feed'])", []) == "meta"
+    assert plat("platformOfFormats(['google_rsa','meta_feed'])", []) == "both" and plat("platformOfFormats([])", []) == "both"
+
+
+def test_the_page_has_the_switch():
+    page = open(JS, encoding="utf-8").read()
+    tpl = open(os.path.join(ROOT, "templates", "ad_copy.html"), encoding="utf-8").read()
+    assert "PMPlatform.switcher" in page and 'id="platSw"' in tpl and "pm_platform.js" in tpl and "S.platSw.set(S.plat)" in page

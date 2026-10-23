@@ -22,6 +22,7 @@
   <div id="msg"></div>
 
   <section class="pm-panel cb-builder" id="builder">
+    <div class="pm-plat" id="platSw"></div>
     <div class="pm-panel-h"><span class="pm-panel-t">1. The client and what the ads are for</span><span class="pm-panel-s" id="builderNote">Only the name and what to promote are needed.</span></div>
     <div class="cb-grid">
       <label class="cb-f cb-w2"><span class="pd-dd-k">Client or business name *</span><input type="text" id="fName" maxlength="120" autocomplete="off" placeholder="Acme Dental"></label>
@@ -89,5 +90,6 @@
 {% endblock %}
 {% block scripts %}
   <script src="{{ url_for('static', filename='js/pm_picker.js') }}?v=1"></script>
-  <script src="{{ url_for('static', filename='js/ad_copy.js') }}?v=1"></script>
+  <script src="{{ url_for('static', filename='js/pm_platform.js') }}?v=5"></script>
+  <script src="{{ url_for('static', filename='js/ad_copy.js') }}?v=2"></script>
 {% endblock %}

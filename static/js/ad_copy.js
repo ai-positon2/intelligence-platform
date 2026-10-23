@@ -34,7 +34,7 @@ function sendJson(url,method,body){
 function H(html){return {h:html};}
 function cell(c){return c&&typeof c==="object"&&"h" in c?c.h:esc(c);}
 
-var S = {opts:null, accounts:[], account:"", accountObj:null, goal:"leads", formats:[], angles:[], on:{}, id:"", rec:null, tab:"overview", seq:0, timer:null};
+var S = {opts:null, accounts:[], account:"", accountObj:null, goal:"leads", formats:[], angles:[], on:{}, id:"", rec:null, tab:"overview", seq:0, timer:null, plat:"both", platSw:null};
 var picker=null;
 
 /* ── The form ─────────────────────────────────────────────── */
@@ -55,8 +55,29 @@ function anglesHtml(){
     return '<button type="button" class="pm-chip'+(on?" on":"")+'" data-a="'+esc(k)+'" aria-pressed="'+on+'">'+esc(k.charAt(0).toUpperCase()+k.slice(1))+'<small>'+esc(S.opts.angles[k])+'</small></button>';
   }).join("");
 }
+/* The Platform switch narrows the ad formats to Google's, Meta's, or all of them. Changing it keeps the formats still on offer; if none is left it picks that
+   platform's defaults, and Both makes sure at least one format of each platform is on. */
+function formatPlatform(key){var f=S.opts.formats.filter(function(x){return x.key===key;})[0]; return f?f.platform:"";}
+function platFormats(){return S.opts.formats.filter(function(f){return S.plat==="both"||f.platform===S.plat;});}
+function setPlatform(p){
+  S.plat=p;
+  var keep=function(k){return p==="both"||formatPlatform(k)===p;};
+  S.formats=S.formats.filter(keep);
+  if(!S.formats.length) S.formats=(S.opts.defaultFormats||[]).filter(keep);
+  if(!S.formats.length){var f=platFormats()[0]; if(f) S.formats=[f.key];}
+  if(p==="both") ["google","meta"].forEach(function(pl){
+    if(S.formats.some(function(k){return formatPlatform(k)===pl;})) return;
+    var d=(S.opts.defaultFormats||[]).filter(function(k){return formatPlatform(k)===pl;})[0]||(S.opts.formats.filter(function(f){return f.platform===pl;})[0]||{}).key;
+    if(d) S.formats.push(d);
+  });
+  paintForm();
+}
+function platformOfFormats(keys){
+  var g=keys.some(function(k){return formatPlatform(k)==="google";}), m=keys.some(function(k){return formatPlatform(k)==="meta";});
+  return g&&!m?"google":m&&!g?"meta":"both";
+}
 function formatsHtml(){
-  return S.opts.formats.map(function(f){
+  return platFormats().map(function(f){
     var on=S.formats.indexOf(f.key)>=0;
     return '<button type="button" class="cb-card'+(on?" on":"")+'" data-f="'+esc(f.key)+'" aria-pressed="'+on+'">'+
       '<span class="cb-card-top"><span class="cb-card-ic"><svg viewBox="0 0 24 24" aria-hidden="true">'+(ICON[f.platform]||"")+'</svg></span><span class="cb-card-sw" aria-hidden="true"></span></span>'+
@@ -340,6 +361,7 @@ function reuse(rec){
   set("#fComp",(i.competitors||[]).map(function(c){return c.name;}).join("\n")); set("#fCampaign",i.campaignName); set("#fAdGroup",i.adGroupName);
   $("#fBriefs").checked=i.briefs!==false;
   S.goal=i.goal||"leads"; S.formats=(i.formats||[]).slice(); S.angles=(i.angles||[]).slice();
+  S.plat=platformOfFormats(S.formats); if(S.platSw) S.platSw.set(S.plat);
   S.account=i.account||""; S.accountObj=S.accounts.filter(function(a){return a.id===S.account;})[0]||null;
   picker.set(S.pickerItems,S.account);
   S.opts.cards.forEach(function(c){S.on[c.key]=i.research?!!i.research[c.key]:!!c.default;});
@@ -429,6 +451,10 @@ function init(){
     var o=rs[0], a=rs[1];
     if(!o.ok){setMsg(esc((o.j&&o.j.error)||"The page could not load its options."));return;}
     S.opts=o.j; S.formats=(S.opts.defaultFormats||[]).slice(); S.angles=(S.opts.defaultAngles||[]).slice();
+    if(window.PMPlatform){
+      S.platSw=window.PMPlatform.switcher($("#platSw"),{value:window.PMPlatform.saved()||"both",onChange:function(p){setPlatform(p);}});
+      if(S.platSw.value()!=="both") setPlatform(S.platSw.value());
+    }
     S.opts.cards.forEach(function(c){S.on[c.key]=!!c.default;});
     S.accounts=(a.ok&&a.j.accounts)||[];
     var items=[{value:"",label:"No account",sub:"Website and the facts you give only",avatar:"?",hue:200}];
