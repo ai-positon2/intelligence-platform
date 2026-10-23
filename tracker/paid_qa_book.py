@@ -44,7 +44,7 @@ TYPE_NAMES = {"PERFORMANCE_MAX": "Performance Max", "DEMAND_GEN": "Demand Gen", 
 def applies_to(channel):
     """True when the campaign book is used for a campaign of this Google Ads channel type. A campaign whose type is not known yet
     (nothing has been read) is treated as Search."""
-    return not channel or channel in BOOK_CHANNELS
+    return not channel or channel in BOOK_CHANNELS or str(channel).startswith("META_")          # a Meta campaign is checked against a Meta campaign book
 
 
 def not_used_note(channel):

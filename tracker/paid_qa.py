@@ -97,7 +97,10 @@ def applicable(client_types, campaign_types, platform="google"):
 
 
 def campaign_types_for(channel, dsa=False):
-    """The checklist's campaign types for a Google Ads channel type."""
+    """The checklist's campaign types for a Google Ads channel type, or for a Meta one (META_LEADS and so on)."""
+    meta_label = {"META_LEADS": "Meta Leads", "META_SALES": "Meta Sales", "META_TRAFFIC": "Meta Traffic", "META_AWARENESS": "Meta Awareness"}.get(channel or "")
+    if meta_label:
+        return [meta_label]
     label = {"SEARCH": "Search", "PERFORMANCE_MAX": "PMax", "SHOPPING": "Shopping", "DISPLAY": "Display",
              "DEMAND_GEN": "Demand Gen", "VIDEO": "Video", "MULTI_CHANNEL": "App"}.get(channel or "")
     if not label:
@@ -131,6 +134,15 @@ def _text(v, what, limit, required=False):
     return v
 
 
+META_ID_RE = re.compile(r"^act_\d{4,20}$")
+
+
+def account_id(value):
+    """A Google Ads customer id (10 digits, with or without dashes) or a Meta ad account id (act_ and digits)."""
+    text = str(value or "").strip()
+    return text if META_ID_RE.match(text) else customer_id(value)
+
+
 def customer_id(value):
     """A 10-digit Google Ads customer id from '123-456-7890' or '1234567890'."""
     digits = re.sub(r"\D", "", str(value or ""))
@@ -139,7 +151,8 @@ def customer_id(value):
     return digits
 
 
-CHANNELS = ("SEARCH", "PERFORMANCE_MAX", "SHOPPING", "DISPLAY", "DEMAND_GEN", "VIDEO", "MULTI_CHANNEL")
+CHANNELS = ("SEARCH", "PERFORMANCE_MAX", "SHOPPING", "DISPLAY", "DEMAND_GEN", "VIDEO", "MULTI_CHANNEL", "META_LEADS", "META_SALES", "META_TRAFFIC", "META_AWARENESS", "META_ENGAGEMENT", "META_APP",
+            "META_OTHER")
 CAMPAIGN_ID_RE = re.compile(r"^\d{1,20}$")
 
 
@@ -153,7 +166,7 @@ def clean_start(body):
     channel = body.get("channel") or ""
     if channel and channel not in CHANNELS:
         channel = ""                                    # a type this list does not map: no narrowing
-    return {"account_id": customer_id(body.get("accountId")),
+    return {"account_id": account_id(body.get("accountId")),
             "account_name": _text(body.get("accountName"), "The account name", MAX_NAME, required=True),
             "campaign_id": campaign,
             "campaign_name": _text(body.get("campaignName"), "The campaign name", MAX_NAME, required=True),

@@ -79,12 +79,52 @@ for _id, _label in AUTO_APPLY.items():
     HOW[_id] = ('Open Recommendations in the left menu, then Auto-apply (the link at the top of the Recommendations page), find "%s" in the list, and turn it off. '
                 "An auto-applied recommendation changes the account without anyone being asked.") % _label
 
+# The Meta checklist's fixes, in Meta Ads Manager's words (a campaign is edited in Ads Manager: the campaign, the ad set, the ad).
+_AM_CAMPAIGN = "In Ads Manager open the campaign and click Edit"
+_AM_ADSET = "In Ads Manager open the ad set and click Edit"
+_AM_AD = "In Ads Manager open the ad and click Edit"
+HOW_META = {
+    "1.1": _AM_CAMPAIGN + ", then rename it to the P2 format (P2_ then MetaLeads, MetaSales, MetaTraffic or MetaAwareness, the theme and the launch date as 8 digits).",
+    "1.2": "A campaign's objective cannot be changed after it is created. Create a new campaign with the right objective (Create, then pick the objective), copy the ad sets and ads across with Duplicate, and turn this one off once the new one is live.",
+    "1.3": _AM_CAMPAIGN + ", then Special ad categories: declare the category the ads are about (credit, jobs, housing, or social issues, elections or politics), or remove a category that does not apply. This cannot be changed on a live campaign: duplicate it.",
+    "1.4": "The buying type cannot be changed after it is created. Create a new campaign with the Auction buying type and move the ads over.",
+    "1.5": _AM_CAMPAIGN + ", then Budget and schedule, and set the budget type and amount the campaign book names. Change a budget in steps of about 20 percent so the ad set stays out of the learning phase.",
+    "1.6": _AM_CAMPAIGN + " (or the ad set), then the bid strategy, and choose the one the campaign book names. A cost or bid cap needs a results history behind it.",
+    "1.7": _AM_ADSET + ", then Budget and schedule, set the start date to the day the campaign goes live and remove the end date (a lifetime budget needs one: use a daily budget instead).",
+    "1.8": "In Ads Manager add ads to any ad set with fewer than 3 active ads (Duplicate an ad and change the picture or the first line), and turn off the ones beyond 10.",
+    "1.9": _AM_AD + ", then under Ad setup, Identity, choose the Facebook Page and the Instagram account the client uses.",
+    "2.1": _AM_ADSET + ", then Conversion, and choose the conversion location the campaign book names.",
+    "2.2": _AM_ADSET + ", then Conversion, then Performance goal, and choose the goal the campaign book names (for leads or sales a goal that counts conversions, not clicks or reach).",
+    "2.3": _AM_ADSET + ", then Conversion, then Dataset, and pick the client's dataset (pixel) and the conversion event the campaign book names.",
+    "2.4": _AM_ADSET + ", then Conversion, then Attribution setting, and choose the window the campaign book names (Meta's default is 7-day click and 1-day view).",
+    "2.5": _AM_ADSET + ", then Audience, then Locations, and set the places the campaign book names (and remove the others).",
+    "2.6": _AM_ADSET + ", then Audience, then Locations, then the location type, and choose People living in or recently in this location.",
+    "2.7": _AM_ADSET + ", then Audience, then Age, and set the range the campaign book names. Meta only holds a limit when Advantage+ audience is off.",
+    "2.8": _AM_ADSET + ", then Audience, then Gender, and set what the campaign book names.",
+    "2.9": _AM_ADSET + ", then Audience, then Languages, and clear it unless the campaign book names a language.",
+    "2.10": _AM_ADSET + ", then Audience, then Detailed targeting, and set the interests, custom audiences and lookalikes the campaign book names.",
+    "2.11": _AM_ADSET + ", then Audience, then Custom audiences, and exclude the client's customers and current leads.",
+    "2.12": _AM_ADSET + ", then Placements, and choose Advantage+ placements unless the campaign book names others.",
+    "3.1": "In Ads Manager add ads in the formats the campaign book names (a video or a carousel next to the images).",
+    "3.2": _AM_AD + ", then Primary text, and shorten it to 125 characters or fewer (Meta cuts it with See more after that), and fix any spelling or claim the finding names.",
+    "3.3": _AM_AD + ", then Headline, and shorten it to 40 characters or fewer.",
+    "3.4": _AM_AD + ", then Description, and shorten it to 30 characters or fewer, or clear it.",
+    "3.5": _AM_AD + ", then Call to action, and choose the button that matches the objective (Learn more, Get quote, Book now, Contact us, Call now, Sign up or Apply now).",
+    "3.6": _AM_AD + ", then Destination, and correct the website address so the page loads over https and matches the ad.",
+    "3.7": _AM_AD + ", then Tracking, then URL parameters, and add utm_source=meta&utm_medium=paid_social&utm_campaign={{campaign.name}}&utm_content={{ad.name}} (or the parameters the account uses).",
+    "3.8": _AM_AD + ", then Advantage+ creative, and turn off the enhancements the campaign book does not allow.",
+    "3.9": "Open each ad that Ads Manager marks Disapproved or With issues, read the reason under the ad's status, fix what it names (text, image or destination) and ask for a review.",
+    "5.1": "Rewrite the ad text so it talks about the product and the need, never about the person (not Are you struggling with X?), and remove any image that suggests a personal attribute.",
+    "5.2": "Remove the claim from the ad, or get the client to confirm it and show it on the landing page.",
+    "5.3": "Check the ad text against the industry's advertising rules (healthcare, finance, legal) and remove what breaks them.",
+}
+
 _VAGUE = ("depends", "from the campaign book", "check the", "none")
 
 
 def how(check_id, channel=""):
-    """The steps for a check, or "" when none are known. `channel` is the Google Ads channel type (SEARCH, PERFORMANCE_MAX...)."""
-    v = HOW.get(str(check_id))
+    """The steps for a check, or "" when none are known. `channel` is the Google Ads channel type (SEARCH, PERFORMANCE_MAX...), or META_<objective> for a Meta campaign."""
+    v = (HOW_META if str(channel or "").startswith("META_") else HOW).get(str(check_id))
     if isinstance(v, dict):
         v = v.get(channel) or v.get("*")
     return v or ""

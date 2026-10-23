@@ -15,7 +15,7 @@ from __future__ import annotations
 import datetime as dt
 import logging
 
-from . import paid_qa, paid_qa_ai, paid_qa_auto, paid_qa_book, paid_qa_fixes
+from . import paid_qa, paid_qa_ai, paid_qa_auto, paid_qa_book, paid_qa_fixes, paid_qa_meta
 
 log = logging.getLogger(__name__)
 
@@ -35,11 +35,47 @@ def _note(problems, asked_sections):
         failed, asked_sections, kinds)
 
 
-def run_review(launch_id, *, store, search, geo_fn=None, web_fn=None, call=None, today=None):
-    """Do the review and save it. Never raises: a failure is saved on the QC for the page to show."""
+def _run_meta(launch, store, meta, *, web_fn, call, today):
+    """The review of a Meta campaign: read it from Meta, run the exact rules, have the AI review the rest against the Meta launch checklist, combine, save. `meta` has `get_fn` (one object)
+    and `pages_fn` (a list)."""
+    launch_id = launch["id"]
+    store.set_progress(launch_id, "Reading the campaign from Meta", 0, 0)
+    out = paid_qa_meta.run(launch["account_id"], launch["campaign_id"], meta["get_fn"], meta["pages_fn"], web_fn=web_fn, book=launch.get("book") or None)
+    camp = out["campaign"]
+    if not camp["id"]:
+        store.fail_review(launch_id, "That campaign was not found in this ad account.")
+        return
+    rules = out["findings"]
+    types = paid_qa.campaign_types_for(camp["channel"])
+    checks = paid_qa.applicable([], types, "meta")
+    ids = [i["id"] for i in checks]
+    settled = {c for c in ids if rules.get(c) and rules[c]["result"] in ("pass", "fail")}
+    ask = [i for i in checks if i["id"] not in settled]
+    sections = len({i["section"] for i in ask})
+    ev = paid_qa_meta.evidence_bundle(out["data"])
+    info = {"name": camp["name"] or launch["campaign_name"], "type": camp["type"], "today": (today or dt.date.today()).isoformat(), "bookUsed": True, "platform": "meta"}
+    store.set_progress(launch_id, "The AI is reviewing the checklist", 0, sections)
+    ai, problems = paid_qa_ai.review(ask, ev, rules, info, call=call,
+                                     progress=lambda done, total: store.set_progress(launch_id, "The AI is reviewing the checklist", done, total))
+    combined = paid_qa_fixes.attach(paid_qa_ai.combine(rules, ai, ids), checks, camp["channel"])
+    note = _note(problems, sections).replace("Google Ads", "Meta")
+    errs = out.get("errors") or {}
+    if errs:
+        note = (note + " " if note else "") + "Meta could not be asked for: %s. Those checks need a person, or run the review again." % ", ".join(sorted(errs))
+    store.finish_review(launch_id, combined, campaign_name=camp["name"] or launch["campaign_name"], channel=camp["channel"], campaign_types=types, note=note)
+
+
+def run_review(launch_id, *, store, search, geo_fn=None, web_fn=None, call=None, today=None, meta=None):
+    """Do the review and save it. Never raises: a failure is saved on the QC for the page to show. A launch on a Meta ad account is read from Meta (`meta`) instead of Google Ads."""
     try:
         launch = store.get_launch(launch_id)
         if not launch or launch["archived"]:
+            return
+        if paid_qa.platform_of(launch) == "meta":
+            if not meta:
+                store.fail_review(launch_id, "Meta is not set up on this server, so a Meta campaign cannot be read.")
+                return
+            _run_meta(launch, store, meta, web_fn=web_fn, call=call, today=today)
             return
         store.set_progress(launch_id, "Reading the campaign from Google Ads", 0, 0)
         out = paid_qa_auto.run(launch["account_id"], launch["campaign_id"], search, geo_fn=geo_fn, web_fn=web_fn,
