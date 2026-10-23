@@ -30,31 +30,22 @@ var SEV = {high:["Fix first","high"], medium:["Add","medium"], low:["Nice to hav
 var SEV_RANK = {high:3, medium:2, low:1};
 var SOURCE = {campaign:"this campaign", account:"the account", "asset group":"the asset group", ad:"the ad"};
 var T = window.ACTiles;
-var S = {accounts:[], groups:[], account:"", currency:"USD", report:null, seq:0, sev:"high", kind:"all", filter:"", limit:25, open:{}, det:{}, openK:{}, openD:{}};
+var S = {accounts:[], groups:[], account:"", meta:"", scopeAcct:"", platform:"google", mseq:0, metaReport:null, currency:"USD", report:null, seq:0, sev:"high", kind:"all", filter:"", limit:25, open:{}, det:{}, openK:{}, openD:{}};
 var D = {on:false, mode:"", kind:"", state:"all", level:"", title:"", tab:"assets", filter:"", limit:24, data:null, loading:false, error:"", seq:0, opener:null};
 var enc = encodeURIComponent;
 
 var float_=$("#acFloat"); if(float_&&document.body&&float_.parentNode!==document.body) document.body.appendChild(float_);   // above the page's own header
-var picker = window.PMPicker($("#acctPick"),{label:"Google Ads account",search:true,onChange:function(v){
-  S.account=v; try{localStorage.setItem("ac_account",v);}catch(e){} run();
-}});
-function groupOf(id){return S.groups.filter(function(g){return g.id===id;})[0]||null;}
+/* The Platform switch and the account pickers are the shared control (static/js/pm_scope.js). Google audits Google's assets, Meta audits the ads of each ad set (Meta has no asset
+   rules), Both shows the two one under the other: S.account is the Google part (an account or an MCC), S.meta the Meta part. */
+var scope=null;
+function groupOf(id){return scope?scope.groupOf(id):null;}
 var MCC_BADGE='<span class="badge pm-pill ok">MCC</span>';
-function setAccounts(list, groups){
-  S.accounts=list; S.groups=groups||[];
-  var items=[{value:"",label:"Choose an account",sub:list.length+" accounts"+(S.groups.length?" · "+S.groups.length+" MCCs to combine":""),avatar:"?",hue:200}], seen={};
-  S.groups.forEach(function(g){
-    var head=g.name+" MCC";
-    items.push({value:g.id,label:"All of "+g.name,avatar:inits(g.name),hue:hueOf(g.name),group:head,badge:MCC_BADGE,sub:g.accountIds.length+" accounts combined"});
-    list.filter(function(a){return a.group===g.id;}).forEach(function(a){
-      seen[a.id]=1; items.push({value:a.id,label:a.name,avatar:inits(a.name),hue:hueOf(a.name),group:head,sub:dashed(a.id)});
-    });
-  });
-  list.filter(function(a){return !seen[a.id];}).forEach(function(a){
-    items.push({value:a.id,label:a.name,avatar:inits(a.name),hue:hueOf(a.name),group:S.groups.length?"Other accounts":"",sub:dashed(a.id)});
-  });
-  if(!list.some(function(a){return a.id===S.account;})&&!groupOf(S.account)) S.account="";
-  picker.set(items,S.account);
+function applyScope(a,p){
+  var ps=window.PMScope.partsOf(a).filter(Boolean);
+  S.scopeAcct=a||""; S.platform=p;
+  S.account=ps.filter(function(x){return !window.PMScope.isMeta(x);})[0]||"";
+  S.meta=ps.filter(function(x){return window.PMScope.isMeta(x);})[0]||"";
+  try{localStorage.setItem("ac_account",S.scopeAcct);}catch(e){}
 }
 
 /* ── Loading ──────────────────────────────────────────────── */
@@ -65,21 +56,47 @@ function getJson(url,opts){
   });
 }
 function show(which){$("#empty").hidden=which!=="empty"; $("#skel").hidden=which!=="skel"; $("#out").hidden=which!=="out";}
+function setMetaMsg(html,kind){$("#metaMsg").innerHTML=html?'<div class="'+(kind||"pm-err")+'">'+html+'</div>':"";}
+function hideMeta(){$("#metaOut").hidden=true; $("#metaOut").innerHTML=""; setMetaMsg("");}
+function runMeta(refresh){
+  var seq=++S.mseq;
+  setMetaMsg(""); $("#metaOut").hidden=true;
+  if(S.platform==="meta") show("skel");
+  getJson(API+"/report?account="+encodeURIComponent(S.meta)+(refresh===true?"&refresh=1":"")).then(function(r){
+    if(seq!==S.mseq) return;
+    if(S.platform==="meta") show("none");
+    if(!r.ok){
+      if(r.j&&r.j.kind==="cooldown"){setMetaMsg(esc(r.j.error),"pm-note");return;}
+      setMetaMsg('<b>Meta Ads could not be read.</b> '+esc((r.j&&r.j.error)||("The report could not be built (HTTP "+r.status+").")));
+      return;
+    }
+    S.metaReport=r.j;
+    $("#metaOut").innerHTML=(S.platform==="both"?'<h2 class="mc-title">Meta Ads</h2>':"")+window.MetaCreative.coverage(r.j);
+    $("#metaOut").hidden=false;
+  }).catch(function(){
+    if(seq!==S.mseq) return;
+    if(S.platform==="meta") show("none");
+    setMetaMsg("The server could not be reached. Try again.");
+  });
+}
 
 function run(refresh){
-  if(!S.account){show("empty");setMsg("");return;}
+  var wantG=S.platform!=="meta"&&S.account, wantM=S.platform!=="google"&&S.meta;
+  try{history.replaceState(null,"",location.pathname+"?account="+encodeURIComponent(S.scopeAcct));}catch(e){}
+  if(!wantG&&!wantM){show("empty");setMsg("");hideMeta();return;}
+  if(wantM) runMeta(refresh); else hideMeta();
+  if(!wantG){setMsg(""); S.seq++; return;}
   var seq=++S.seq, g=groupOf(S.account);
-  try{history.replaceState(null,"",location.pathname+"?account="+encodeURIComponent(S.account));}catch(e){}
   setMsg(g?"Reading all "+g.accountIds.length+" accounts of "+esc(g.name)+" together. This takes a little longer, about 15 to 30 seconds.":"",g?"pm-note":"");
-  show("skel");
+  if(S.platform!=="both"||!S.report) show("skel");
   getJson(API+"/report?account="+encodeURIComponent(S.account)+(refresh===true?"&refresh=1":"")).then(function(r){
     if(seq!==S.seq) return;
     if(g) setMsg("");
     if(!r.ok){
-      show(S.report?"out":"empty");
+      show(S.report?"out":(wantM&&S.platform==="both"?"none":"empty"));
       if(r.j&&r.j.kind==="cooldown"){setMsg(esc(r.j.error),"pm-note");return;}
       var hint=r.j&&r.j.kind==="quota"?" The platform limits how fast this app can read, so this clears on its own.":"";
-      setMsg(esc((r.j&&r.j.error)||("The report could not be built (HTTP "+r.status+")."))+hint);
+      setMsg((S.platform==="both"?"<b>Google Ads could not be read.</b> ":"")+esc((r.j&&r.j.error)||("The report could not be built (HTTP "+r.status+")."))+hint);
       return;
     }
     S.report=r.j; S.currency=r.j.account.currency||"USD"; S.open={}; S.det={}; S.openK={}; S.openD={}; S.limit=25; S.filter=""; S.kind="all"; $("#filter").value=""; closeDrawer(true);
@@ -500,17 +517,8 @@ function download(lines,stem){
 (function init(){
   var p=new URLSearchParams(location.search), saved="";
   try{saved=localStorage.getItem("ac_account")||"";}catch(e){}
-  S.account=p.get("account")||saved;
-  picker.set([{value:"",label:"Loading accounts…",sub:"",avatar:"…",hue:200}],"",true);
-  getJson("/p2/paid-marketing/api/segments/accounts").then(function(r){
-    if(!r.ok){
-      picker.set([{value:"",label:"Accounts unavailable",sub:"",avatar:"!",hue:20}],"",true);
-      setMsg(esc((r.j&&r.j.error)||"The account list could not be loaded.")); return;
-    }
-    setAccounts(r.j.accounts||[],r.j.groups||[]); run();
-  }).catch(function(){
-    picker.set([{value:"",label:"Accounts unavailable",sub:"",avatar:"!",hue:20}],"",true);
-    setMsg("The server could not be reached. Reload to try again.");
-  });
+  scope=window.PMScope.mount($("#acctPick"),{account:p.get("account")||saved,
+    onChange:function(a,pf){applyScope(a,pf); run();},
+    onError:function(e){setMsg(esc((e&&e.message)||"The account list could not be loaded."));}});
 })();
 })();

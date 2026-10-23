@@ -9,18 +9,18 @@
     <div class="pm-hero-l">
       <span class="pm-eyebrow"><span class="d"></span>Paid Marketing · Assets</span>
       <h1 class="pm-title">What every campaign is missing, <span class="pm-grad">and what to add.</span></h1>
-      <p class="pm-sub">Pick an account. The agent reads every <b>asset</b> its live campaigns carry (sitelinks, callouts, structured snippets, calls,
+      <p class="pm-sub">Pick a platform and an account. For Google the agent reads every <b>asset</b> its live campaigns carry (sitelinks, callouts, structured snippets, calls,
         images, logos, videos, headlines and more) and holds each campaign, Performance Max asset group and Display or Demand Gen ad against what its kind
         should have. You get the gaps, busiest campaign first, with exactly how many to add, plus what is disapproved, paused, past its end date or never shown,
-        and every asset itself: open one to see the picture, the text and where it is used.</p>
+        and every asset itself: open one to see the picture, the text and where it is used. For Meta it reads every live ad and holds each ad set to a team default (enough ads, more than one format, nothing stopped by Meta).</p>
     </div>
   </section>
 
   <section class="pm-panel pd-cmd ac-cmd" id="cmd">
     <div class="ac-cmd-row">
       <div id="acctPick"></div>
-      <p class="ac-scope">Google Ads only. Live, enabled campaigns. Assets can sit on an ad group, a campaign or the account, and the lowest level that has a live one is the one that serves.
-        The last 30 days decide which campaigns come first.</p>
+      <p class="ac-scope">Google audits assets: live, enabled campaigns, where assets can sit on an ad group, a campaign or the account and the lowest level with a live one serves. Meta has no asset
+        rules, so Meta audits the ads of each ad set: how many, which formats, and the ones Meta stopped. Both shows the two one under the other. The last 30 days decide what comes first.</p>
     </div>
   </section>
 
@@ -64,6 +64,8 @@
     </section>
     <p class="pd-foot" id="foot"></p>
   </div>
+  <div id="metaMsg"></div>
+  <div id="metaOut" class="mc" hidden></div>
 
   <div class="pm pm-ac" id="acFloat"><!-- moved to the end of the page by the script, so nothing around it can sit above it -->
   <div class="ac-drawer" id="acDrawer" hidden role="dialog" aria-modal="true" aria-labelledby="acdT">
@@ -90,5 +92,8 @@
 {% block scripts %}
 <script src="{{ url_for('static', filename='js/pm_picker.js') }}?v=1"></script>
 <script src="{{ url_for('static', filename='js/asset_tiles.js') }}?v=1"></script>
-<script src="{{ url_for('static', filename='js/asset_coverage.js') }}?v=6"></script>
+<script src="{{ url_for('static', filename='js/pm_platform.js') }}?v=5"></script>
+<script src="{{ url_for('static', filename='js/pm_scope.js') }}?v=1"></script>
+<script src="{{ url_for('static', filename='js/meta_creative.js') }}?v=2"></script>
+<script src="{{ url_for('static', filename='js/asset_coverage.js') }}?v=7"></script>
 {% endblock %}

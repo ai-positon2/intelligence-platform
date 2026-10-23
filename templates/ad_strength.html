@@ -5,17 +5,18 @@
   <section class="pm-hero">
     <div class="pm-hero-l">
       <span class="pm-eyebrow"><span class="d"></span>Paid Marketing · Ads</span>
-      <h1 class="pm-title">Every ad Google rates low, <span class="pm-grad">and how to lift it.</span></h1>
-      <p class="pm-sub">Pick an account. The agent reads <b>Google's ad strength rating</b> for every live Responsive Search Ad and Performance Max
-        asset group, lists the ones below Good, busiest first, and shows <b>Google's own tips</b> beside the headlines and descriptions to change.
-        Ask for suggested text on any ad.</p>
+      <h1 class="pm-title">Every ad the platform rates low, <span class="pm-grad">and how to lift it.</span></h1>
+      <p class="pm-sub">Pick a platform and an account. For Google the agent reads <b>Google's ad strength rating</b> for every live Responsive Search Ad and Performance Max
+        asset group, lists the ones below Good, busiest first, and shows <b>Google's own tips</b> beside the headlines and descriptions to change; ask for suggested text on any ad.
+        For Meta it reads <b>Meta's quality, engagement and conversion rankings</b> and how worn out each ad is, and tells you which ads to replace first.</p>
     </div>
   </section>
 
   <section class="pm-panel pd-cmd as-cmd" id="cmd">
     <div class="as-cmd-row">
       <div id="acctPick"></div>
-      <p class="as-scope">Google Ads only (Meta has no ad strength rating). Live, enabled ads. The last 30 days of impressions decide which ads come first.</p>
+      <p class="as-scope">Google shows Google's ad strength rating. Meta has no such rating, so Meta shows what it does have: its own quality, engagement and conversion rankings for every ad,
+        and how often the same people saw it. Both shows the two one under the other. Live ads only; the last 30 days decide which ads come first.</p>
     </div>
   </section>
 
@@ -49,9 +50,14 @@
     </section>
     <p class="pd-foot" id="foot"></p>
   </div>
+  <div id="metaMsg"></div>
+  <div id="metaOut" class="mc" hidden></div>
 </div>
 {% endblock %}
 {% block scripts %}
 <script src="{{ url_for('static', filename='js/pm_picker.js') }}?v=1"></script>
-<script src="{{ url_for('static', filename='js/ad_strength.js') }}?v=2"></script>
+<script src="{{ url_for('static', filename='js/pm_platform.js') }}?v=5"></script>
+<script src="{{ url_for('static', filename='js/pm_scope.js') }}?v=1"></script>
+<script src="{{ url_for('static', filename='js/meta_creative.js') }}?v=2"></script>
+<script src="{{ url_for('static', filename='js/ad_strength.js') }}?v=3"></script>
 {% endblock %}

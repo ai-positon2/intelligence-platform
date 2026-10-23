@@ -14,11 +14,12 @@ import pytest
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 JS = os.path.join(ROOT, "static", "js", "asset_coverage.js")
 TILES = os.path.join(ROOT, "static", "js", "asset_tiles.js")
+META = os.path.join(ROOT, "static", "js", "meta_creative.js")
 TEMPLATE = os.path.join(ROOT, "templates", "asset_coverage.html")
 
 HARNESS = r"""
 const fs = require("fs"), vm = require("vm");
-const pageSrc = fs.readFileSync(process.argv[1], "utf8"), tilesSrc = fs.readFileSync(process.argv[2], "utf8"), scenario = JSON.parse(process.argv[3]);
+const pageSrc = fs.readFileSync(process.argv[1], "utf8"), tilesSrc = fs.readFileSync(process.argv[2], "utf8"), scenario = JSON.parse(process.argv[3]), mcSrc = fs.readFileSync(process.argv[4], "utf8");
 const els = {}, handlers = {}, downloads = [], log = { scrolled: [], focused: [], classes: [], moved: [] };
 function el(sel){
   if (!els[sel]) els[sel] = { sel, innerHTML: "", textContent: "", hidden: ["#acDrawer", "#acZoom", "#acdMore", "#acdExport"].includes(sel), value: "", src: "", dataset: {}, parentNode: null, open: false,
@@ -31,6 +32,14 @@ const doc = { querySelector: el, createElement: () => { const e = el("created" +
   documentElement: { classList: { add(c){ log.classes.push("+" + c); }, remove(c){ log.classes.push("-" + c); } } }, activeElement: { sel: "opener", focus(){ log.focused.push("opener"); } } };
 const calls = [], held = [];
 const picker = { sets: [], set(items, v){ this.sets.push([items, v]); } };
+/* the shared scope control (static/js/pm_scope.js, tested in test_scope_js.py): it reports the account and platform chosen, and knows the MCC groups of the account list */
+const scope = { o: null };
+const PMScope = { isMeta: id => /^act_\d+$/.test(id || ""), partsOf: id => String(id || "").split("+"),
+  mount: (host, o) => { scope.o = o; const groups = (((scenario.accounts || {}).body || {}).groups) || [];
+    const acc = scenario.accounts || {};
+    if ((acc.status || 200) >= 400) Promise.resolve().then(() => o.onError(new Error((acc.body || {}).error)));
+    else Promise.resolve().then(() => o.onChange(o.account || "", /\+/.test(o.account || "") ? "both" : /^act_/.test(o.account || "") ? "meta" : "google"));
+    return { groupOf: id => groups.filter(g => g.id === id)[0] || null }; } };
 function respond(url){
   calls.push(url);
   if (scenario.hang && url.includes(scenario.hang)) return new Promise(() => {});       // an answer that never comes
@@ -42,7 +51,7 @@ function answer(url){
   if (url.includes("/segments/accounts")) return scenario.accounts;
   return scenario.reportBody;
 }
-const ctx = { window: { PMPicker: (host, o) => { picker.onChange = o.onChange; return picker; } }, document: doc, history: { replaceState(){} }, location: { pathname: "/p", search: scenario.search || "" },
+const ctx = { window: { PMPicker: (host, o) => { picker.onChange = o.onChange; return picker; }, PMScope }, document: doc, history: { replaceState(){} }, location: { pathname: "/p", search: scenario.search || "" },
   localStorage: { getItem: () => "", setItem(){} }, URLSearchParams, URL: { createObjectURL: b => { downloads.blob = b; return "blob:x"; }, revokeObjectURL(){} },
   Blob: class { constructor(parts){ this.text = parts.join(""); } }, setTimeout: fn => fn(), Intl, Date, Math, JSON, Object, Array, String, Number, Promise, RegExp, encodeURIComponent, console,
   fetch: url => (scenario.reject && url.includes(scenario.reject) ? (calls.push(url), Promise.reject(new Error("down"))) :
@@ -50,6 +59,7 @@ const ctx = { window: { PMPicker: (host, o) => { picker.onChange = o.onChange; r
 ctx.window.document = doc;
 vm.createContext(ctx);
 vm.runInContext(tilesSrc, ctx);
+vm.runInContext(mcSrc, ctx);
 vm.runInContext(pageSrc, ctx);
 const tick = () => new Promise(r => setImmediate(r));
 // a fake click target: closest(selector) answers with an element carrying that selector's dataset (or null)
@@ -61,6 +71,7 @@ function target(map){
   for (let i = 0; i < 6; i++) await tick();
   const out = {};
   for (const step of scenario.steps || []) {
+    if (step.scope) scope.o.onChange(step.scope[0], step.scope[1]);
     if (step.click) { const [sel, attr, val] = step.click; const b = { dataset: { [attr]: val }, closest: q => q === "button" ? b : null }; handlers[sel + ":click"]({ target: b }); }
     if (step.type) { el("#filter").value = step.type; handlers["#filter:input"].call(el("#filter")); }
     if (step.open) { const head = { closest: q => q === ".ac-head" ? head : q === ".ac-row" ? { dataset: { key: step.open } } : null }; handlers["#list:click"]({ target: head }); }
@@ -74,7 +85,7 @@ function target(map){
     }
     for (let i = 0; i < 6; i++) await tick();
   }
-  const keys = ["#kpis", "#cov", "#sevs", "#kinds", "#list", "#acctAssets", "#foot", "#fresh", "#msg", "#listNote", "#more"];
+  const keys = ["#metaOut", "#metaMsg", "#kpis", "#cov", "#sevs", "#kinds", "#list", "#acctAssets", "#foot", "#fresh", "#msg", "#listNote", "#more"];
   for (const k of keys) out[k] = els[k] ? els[k].innerHTML || els[k].textContent : "";
   out.hidden = { out: els["#out"] && els["#out"].hidden, empty: els["#empty"] && els["#empty"].hidden, acctCard: els["#acctCard"] && els["#acctCard"].hidden, more: els["#more"] && els["#more"].hidden };
   out.el = {}; for (const k of Object.keys(els)) out.el[k] = { html: els[k].innerHTML, text: els[k].textContent, hidden: els[k].hidden, src: els[k].src, value: els[k].value };
@@ -136,7 +147,7 @@ ACCOUNTS = {"status": 200, "body": {"accounts": [{"id": "1234567890", "name": "A
 def run(scenario):
     scenario = dict({"accounts": ACCOUNTS, "search": "?account=1234567890", "report": lambda url: {"status": 200, "body": REPORT}}, **scenario)
     scenario["reportBody"] = scenario.pop("report")("")
-    out = subprocess.run(["node", "-e", HARNESS, JS, TILES, json.dumps(scenario)], capture_output=True, text=True, timeout=60)
+    out = subprocess.run(["node", "-e", HARNESS, JS, TILES, json.dumps(scenario), META], capture_output=True, text=True, timeout=60)
     assert out.returncode == 0, out.stderr
     return json.loads(out.stdout)
 
@@ -632,3 +643,62 @@ def test_a_topic_google_gave_is_shown_as_words_and_an_odd_one_cannot_break_the_r
     evil["campaigns"][1]["groups"][0]["slots"][0]["bad"][0]["why"] = [{"t": "<b>BAD_TOPIC</b>"}]
     h = run({"report": lambda u: {"status": 200, "body": evil}, "steps": [{"click": ["#sevs", "s", "medium"]}, {"open": "1:12"}]})["#list"]
     assert "Tour (disapproved: &lt;b&gt;bad topic&lt;/b&gt;)" in h and "<b>bad" not in h
+
+
+# ── The Platform switch: Meta audits the ads of each ad set, Both shows the two ───────────────────────────────────────────────────────────
+
+def _meta_coverage():
+    from tests import test_paid_meta_creative as M
+    from tracker import paid_meta_creative_analyse as an
+    r = M.raw([M.ad("1", adset="11", name="Lone <b>ad</b>"), M.ad("2", adset="12"), M.ad("3", adset="12"), M.ad("4", adset="12"), M.ad("5", status="DISAPPROVED")], [M.ins("1", spend="400", adset="11")])
+    return json.loads(json.dumps(an.coverage(r, {"id": "act_1234567", "name": "Acme <b>Meta</b>", "currency": "USD", "platform": "meta"}, M.TODAY)))
+
+
+def _reads(out):
+    return [c for c in out["calls"] if "/assets/report" in c]
+
+
+G_STUB = {"match": "/assets/report?account=1234567890", "body": REPORT}
+M_STUB = lambda: {"match": "/assets/report?account=act_1234567", "body": _meta_coverage()}                                # noqa: E731
+
+
+def test_meta_alone_reads_only_the_meta_account_and_draws_the_creative_coverage_view():
+    out = run({"search": "?account=act_1234567", "responses": [G_STUB, M_STUB()]})
+    assert _reads(out) == ["/p2/paid-marketing/api/assets/report?account=act_1234567"]
+    html = out["#metaOut"]
+    assert out["el"]["#metaOut"]["hidden"] is False and out["hidden"]["out"] is True and out["el"]["#skel"]["hidden"] is True and "mc-title" not in html
+    assert "ad sets have 3 or more live ads" in html and "Acme &lt;b&gt;Meta&lt;/b&gt;" in html and "<b>Meta</b>" not in html and "Set 11" in html and "Disapproved by Meta" in html and "What to do:" in html
+
+
+def test_google_alone_is_unchanged_and_nothing_is_asked_of_meta():
+    out = run({"responses": [G_STUB, M_STUB()]})
+    assert _reads(out) == ["/p2/paid-marketing/api/assets/report?account=1234567890"] and out["hidden"]["out"] is False and out["el"]["#metaOut"]["hidden"] is True
+
+
+def test_both_asks_each_platform_and_draws_the_two_one_under_the_other():
+    out = run({"search": "?account=1234567890%2Bact_1234567", "responses": [G_STUB, M_STUB()]})
+    assert sorted(_reads(out)) == ["/p2/paid-marketing/api/assets/report?account=1234567890", "/p2/paid-marketing/api/assets/report?account=act_1234567"]
+    assert out["hidden"]["out"] is False and "Hudson_Broad" in out["#list"] and out["el"]["#metaOut"]["hidden"] is False and '<h2 class="mc-title">Meta Ads</h2>' in out["#metaOut"]
+
+
+def test_a_meta_failure_under_both_is_said_and_google_is_still_shown():
+    meta = {"match": "/assets/report?account=act_1234567", "status": 502, "body": {"error": "Meta is rate limiting this app right now.", "kind": "meta"}}
+    out = run({"search": "?account=1234567890%2Bact_1234567", "responses": [G_STUB, meta]})
+    assert "Hudson_Broad" in out["#list"] and out["hidden"]["out"] is False and "Meta Ads could not be read" in out["#metaMsg"] and "rate limiting" in out["#metaMsg"] and out["el"]["#metaOut"]["hidden"] is True
+
+
+def test_a_google_failure_under_both_is_said_and_meta_is_still_shown():
+    google = {"match": "/assets/report?account=1234567890", "status": 502, "body": {"error": "Google Ads answered 403"}}
+    out = run({"search": "?account=1234567890%2Bact_1234567", "responses": [google, M_STUB()]})
+    assert "Google Ads could not be read" in out["#msg"] and "403" in out["#msg"] and out["el"]["#metaOut"]["hidden"] is False and "Set 11" in out["#metaOut"]
+
+
+def test_switching_from_meta_to_google_hides_the_meta_view():
+    out = run({"search": "?account=act_1234567", "responses": [G_STUB, M_STUB()], "steps": [{"scope": ["1234567890", "google"]}]})
+    assert out["el"]["#metaOut"]["hidden"] is True and out["hidden"]["out"] is False and "Hudson_Broad" in out["#list"]
+
+
+def test_the_template_has_the_meta_panels_and_loads_the_scripts_in_order():
+    html = open(os.path.join(ROOT, "templates", "asset_coverage.html"), encoding="utf-8").read()
+    assert 'id="metaOut"' in html and 'id="metaMsg"' in html
+    assert html.index("pm_picker.js") < html.index("pm_platform.js") < html.index("pm_scope.js") < html.index("meta_creative.js") < html.index("asset_coverage.js")
