@@ -6561,8 +6561,8 @@ def paid_campaign_book():
 @position2_required
 def paid_strategy_options():
     from tracker import paid_strategy as ps
-    return jsonify(cards=ps.CARDS, goals=ps.GOALS, kinds={k: v["label"] for k, v in ps.KINDS.items()}, buildsPerDay=ps.BUILDS_PER_DAY,
-                   modelReady=bool(os.environ.get("ANTHROPIC_API_KEY")))
+    return jsonify(cards=ps.CARDS, goals=ps.GOALS, kinds={k: v["label"] for k, v in ps.KINDS.items()}, kindPlatforms={k: ps.platform_of_kind(k) for k in ps.KINDS},
+                   googleCards=list(ps.GOOGLE_CARDS), metaCards=list(ps.META_CARDS), buildsPerDay=ps.BUILDS_PER_DAY, modelReady=bool(os.environ.get("ANTHROPIC_API_KEY")))
 
 
 @app.route("/p2/paid-marketing/api/strategy/list")
@@ -6587,10 +6587,15 @@ def paid_strategy_start():
     account = _strat_account(inputs["account"])
     if inputs["account"] and not account:
         return jsonify(error="That Google Ads account is not one this platform can read."), 400
+    meta_account = _strat_meta_account(inputs.get("metaAccount"))
+    if inputs.get("metaAccount") and not meta_account:
+        return jsonify(error="That Meta ad account is not one this platform can read."), 400
     if account:
         inputs["currency"] = account.get("currency") or inputs["currency"]
+    elif meta_account:
+        inputs["currency"] = meta_account.get("currency") or inputs["currency"]
     try:
-        rec = store.create(by=_pm_user_email(), inputs=inputs, account_name=(account or {}).get("name") or "")
+        rec = store.create(by=_pm_user_email(), inputs=inputs, account_name=(account or meta_account or {}).get("name") or "")
         started, why = _strat_begin(store, rec)
         if why:
             store.archive(rec["id"])

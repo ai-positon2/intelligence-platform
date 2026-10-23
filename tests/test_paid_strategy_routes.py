@@ -314,3 +314,42 @@ def test_the_accounts_own_currency_wins_over_the_one_typed_in(world):
     c = client_as(STAFF)
     sid = built(c, currency="cad")
     assert c.get(API + "/" + sid).get_json()["inputs"]["currency"] == "USD"
+
+
+# ── Meta ────────────────────────────────────────────────────────────────────
+
+def _meta_deps(world, monkeypatch):
+    from tests import test_paid_strategy_meta_job as MJ
+    monkeypatch.setattr(appmod, "_strat_deps", lambda rec, account: F.deps(sci=world.sci, account=bool(account), email=rec["created_by"], meta_account=MJ.KM_ACCT, meta_pages=MJ.pages(), meta_get=MJ.getter()))
+    monkeypatch.setattr(appmod, "_strat_meta_account", lambda act: {"id": act, "name": "Acme Meta", "currency": "EUR"} if act == "act_1234567" else None)
+
+
+def test_the_options_say_which_platform_each_campaign_type_and_card_is_for(world):
+    j = client_as(STAFF).get(API + "/options").get_json()
+    assert j["kindPlatforms"]["search"] == "google" and j["kindPlatforms"]["metaleads"] == "meta" and j["kinds"]["metasales"] == "Meta Sales"
+    assert j["googleCards"] == ["history", "keywords", "seasonality"] and j["metaCards"] == ["metahistory", "metaaudience"]
+
+
+def test_a_meta_account_is_checked_named_and_a_meta_build_runs_and_reads_back(world, monkeypatch):
+    _meta_deps(world, monkeypatch)
+    c = client_as(STAFF)
+    body = dict(FORM, account="", metaAccount="act_1234567", platform="meta", campaignTypes=["metaleads"], services="insulin pump, diabetes")
+    r = post(c, "/start", body)
+    assert r.status_code == 201
+    rec = c.get(API + "/" + r.get_json()["id"]).get_json()
+    assert rec["status"] == "done" and rec["accountName"] == "Acme Meta" and rec["inputs"]["currency"] == "EUR" and rec["inputs"]["platform"] == "meta" and rec["inputs"]["metaAccount"] == "act_1234567"
+    assert [c["name"] for c in rec["plan"]["campaigns"]][0].startswith("P2_MetaLeads_") and rec["research"]["metaaudience"]["state"] == "ok" and rec["research"]["metahistory"]["state"] == "ok"
+    bad = post(c, "/start", dict(FORM, metaAccount="act_999999"))
+    assert bad.status_code == 400 and "Meta ad account is not one this platform can read" in bad.get_json()["error"]
+    assert post(c, "/start", dict(FORM, metaAccount="nonsense")).status_code == 400
+    assert post(c, "/start", dict(FORM, platform="tiktok")).status_code == 400
+
+
+def test_a_meta_plan_downloads_with_its_meta_sheets(world, monkeypatch):
+    _meta_deps(world, monkeypatch)
+    c = client_as(STAFF)
+    sid = post(c, "/start", dict(FORM, account="", metaAccount="act_1234567", platform="meta", services="insulin pump, diabetes")).get_json()["id"]
+    import io as _io, openpyxl as _ox
+    r = c.get(API + "/%s/download?file=xlsx" % sid)
+    assert r.status_code == 200 and "Meta ad sets" in _ox.load_workbook(_io.BytesIO(r.data)).sheetnames
+    assert c.get(API + "/%s/download?file=pdf" % sid).status_code == 200 and c.get(API + "/%s/download?file=zip" % sid).status_code == 200
