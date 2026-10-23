@@ -37,22 +37,8 @@ function sendJson(url,method,body){
 function H(html){return {h:html};}
 function cell(c){return c&&typeof c==="object"&&"h" in c?c.h:esc(c);}
 
-var S = {opts:null, accounts:[], metaAccounts:[], account:"", metaAccount:"", platform:"google", accountObj:null, metaObj:null, goal:"leads", on:{}, id:"", rec:null, tab:"overview", seq:0, timer:null};
-var scope=null;
-
-/* The Platform switch and the account pickers are the shared control (static/js/pm_scope.js): Google reads the Google Ads account's history, Meta the Meta ad account's, Both the two,
-   and either is optional. S.account is the Google part, S.metaAccount the Meta part (never an MCC: one account is the client's). */
-function applyScope(a,p){
-  var ps=window.PMScope.partsOf(a).filter(Boolean);
-  S.platform=p;
-  S.account=ps.filter(function(x){return !window.PMScope.isMeta(x);})[0]||"";
-  S.metaAccount=ps.filter(function(x){return window.PMScope.isMeta(x);})[0]||"";
-  S.accountObj=S.accounts.filter(function(x){return x.id===S.account;})[0]||null;
-  S.metaObj=S.metaAccounts.filter(function(x){return x.id===S.metaAccount;})[0]||null;
-  var first=S.accountObj||S.metaObj;
-  if(first&&!$("#fName").value.trim()) $("#fName").value=first.name;
-  if(S.opts) paintForm();
-}
+var S = {opts:null, accounts:[], account:"", accountObj:null, goal:"leads", on:{}, id:"", rec:null, tab:"overview", seq:0, timer:null};
+var picker=null;
 
 /* ── The form ─────────────────────────────────────────────── */
 var ICON = {
@@ -60,7 +46,6 @@ var ICON = {
   reputation:'<path d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z"/>',
   social:'<circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="6" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="M8.2 10.8 15.8 7.2M8.2 13.2l7.6 3.6"/>',
   history:'<path d="M3 12a9 9 0 1 0 3-6.7M3 4v5h5M12 8v4l3 2"/>',
-  metahistory:'<path d="M3 12a9 9 0 1 0 3-6.7M3 4v5h5M12 8v4l3 2"/>',
   competitors:'<path d="M4 20V10M10 20V4M16 20v-8M22 20H2"/>',
   market:'<path d="M4 20V8l8-5 8 5v12zM9 20v-6h6v6"/>'
 };
@@ -71,7 +56,6 @@ function goalsHtml(){
 }
 function blocked(card){
   if(card.needs==="account"&&!S.account) return "Needs a Google Ads account";
-  if(card.needs==="metaAccount"&&!S.metaAccount) return "Needs a Meta ad account";
   if(card.needs==="website"&&!$("#fSite").value.trim()) return "Needs a website";
   return "";
 }
@@ -94,7 +78,7 @@ function setMsg(html,cls){var m=$("#msg"); m.className=cls||""; m.innerHTML=html
 
 function payload(){
   var research={}; S.opts.cards.forEach(function(c){research[c.key]=!blocked(c)&&!!S.on[c.key];});
-  return {name:$("#fName").value, website:$("#fSite").value, account:S.account, metaAccount:S.metaAccount, platform:S.platform, industry:$("#fIndustry").value, goal:S.goal,
+  return {name:$("#fName").value, website:$("#fSite").value, account:S.account, industry:$("#fIndustry").value, goal:S.goal,
     locations:$("#fPlaces").value, services:$("#fServices").value, brief:$("#fBrief").value, avoid:$("#fAvoid").value,
     competitors:$("#fComp").value.split(/\n+/).map(function(s){return s.trim();}).filter(Boolean), research:research};
 }
@@ -250,7 +234,7 @@ function tabOverview(){
     kpi("Facts on a page",facts.filter(function(f){return f.verified;}).length+" of "+facts.length)+kpi("Claims to confirm",(p.claims||[]).length,"with the client")+kpi("Questions for the client",(i.questions||[]).length)+'</div>';
   var out=k+sec("In short",ul(i.summary));
   out+=sec("Advertise first",tbl(["What","Why","Page"],(i.advertiseFirst||[]).map(function(x){return [x.what,x.why,H(x.page?link(x.page,shortUrl(x.page)):"")];})));
-  var order=["website","reputation","social","history","metahistory","competitors","market"], rows=order.filter(function(x){return r[x];}).map(function(x){
+  var order=["website","reputation","social","history","competitors","market"], rows=order.filter(function(x){return r[x];}).map(function(x){
     var q=r[x]; return [cardTitle(x),H(pill({ok:"Read",partial:"Partly",failed:"Failed",skipped:"Skipped"}[q.state]||q.state,q.state)),q.note||""];});
   out+=sec("What was read",tbl(["Research","Result","What it found"],rows),"Anything that failed is named in the write-up as missing");
   return out;
@@ -358,9 +342,8 @@ function reuse(rec){
   var set=function(sel,v){$(sel).value=v==null?"":String(v);};
   set("#fName",i.name); set("#fSite",shortUrl(i.website)); set("#fIndustry",i.industry); set("#fPlaces",i.locations); set("#fServices",i.services); set("#fBrief",i.brief); set("#fAvoid",i.avoid);
   set("#fComp",(i.competitors||[]).map(function(c){return c.url||c.name;}).join("\n"));
-  S.goal=i.goal||"leads";
-  var want=i.account&&i.metaAccount?i.account+"+"+i.metaAccount:(i.metaAccount||i.account||"");
-  if(scope&&want) scope.select(want); else applyScope("",S.platform);
+  S.goal=i.goal||"leads"; S.account=i.account||""; S.accountObj=S.accounts.filter(function(a){return a.id===S.account;})[0]||null;
+  picker.set(S.pickerItems,S.account);
   S.opts.cards.forEach(function(c){S.on[c.key]=i.research?!!i.research[c.key]:!!c.default;});
   paintForm(); window.scrollTo&&window.scrollTo(0,0);
 }
@@ -421,13 +404,21 @@ document.addEventListener("click",function(e){var d=document.querySelector(".cb-
 
 /* ── Start ────────────────────────────────────────────────── */
 function init(){
-  getJson(API+"/options").then(function(o){
+  picker=window.PMPicker($("#acctPick"),{label:"Google Ads account (optional)",search:true,onChange:function(v){
+    S.account=v; S.accountObj=S.accounts.filter(function(a){return a.id===v;})[0]||null;
+    if(S.accountObj&&!$("#fName").value.trim()) $("#fName").value=S.accountObj.name;
+    paintForm();
+  }});
+  picker.set([{value:"",label:"No account",sub:"Website and brief only",avatar:"?",hue:200}],"",true);
+  Promise.all([getJson(API+"/options"),getJson("/p2/paid-marketing/api/segments/accounts")]).then(function(rs){
+    var o=rs[0], a=rs[1];
     if(!o.ok){setMsg(esc((o.j&&o.j.error)||"The page could not load its options."));return;}
     S.opts=o.j; S.opts.cards.forEach(function(c){S.on[c.key]=!!c.default; CARD_TITLE[c.key]=c.title;});
-    scope=window.PMScope.mount($("#acctPick"),{account:"",noGroups:true,optional:true,
-      onLoaded:function(info){S.accounts=info.accounts||[]; S.metaAccounts=info.meta||[];},
-      onChange:function(a,pf){applyScope(a,pf);},
-      onError:function(e){$("#acctHint").textContent="The accounts could not be listed ("+((e&&e.message)||"unknown")+"), so this research can use the website and the brief only.";}});
+    S.accounts=(a.ok&&a.j.accounts)||[];
+    var items=[{value:"",label:"No account",sub:"Website and brief only",avatar:"?",hue:200}];
+    S.accounts.forEach(function(x){items.push({value:x.id,label:x.name,avatar:inits(x.name),hue:hueOf(x.name),sub:dashed(x.id)});});
+    S.pickerItems=items; picker.set(items,"");
+    if(!a.ok) $("#acctHint").textContent="The Google Ads accounts could not be listed, so this research can use the website and the brief only.";
     paintForm(); loadRecent();
     var want=(location.search.match(/[?&]build=([0-9a-f]{32})/)||[])[1]; if(want) watch(want);
   }).catch(function(){setMsg("The server could not be reached. Try again.");});

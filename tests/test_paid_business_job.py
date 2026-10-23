@@ -199,36 +199,3 @@ def test_a_point_backed_only_by_the_search_is_not_counted_as_unconfirmed_and_wha
     rec = run(*start(), call=B.model({"core": answer, "implications": short}))
     assert rec["plan"]["checks"]["unconfirmedUsps"] == 0 and rec["plan"]["core"]["usps"][0]["viaSearch"] is True
     assert ("In short", "70%") in [(c["where"], c["claim"]) for c in rec["plan"]["claims"]]
-
-
-def test_a_meta_account_is_read_into_its_own_piece_and_shown_to_all_three_writing_stages():
-    calls, reads = [], []
-    store, sid = start(metaAccount="act_1234567")
-    rec = run(store, sid, call=B.model(calls=calls), meta_pages=B.meta_pages(calls=reads))
-    assert rec["status"] == "done" and rec["research"]["metahistory"]["state"] == "ok"
-    data = rec["research"]["metahistory"]["data"]
-    assert data["totals"]["cost"] == 900.5 and data["totals"]["conv"] == 30 and data["campaignCount"] == 1 and data["campaigns"][0]["objective"] == "LEADS"
-    assert [p["name"] for p in data["placements"]] == ["Facebook", "Instagram"] and [d["name"] for d in data["devices"]] == ["Mobile", "Desktop"] and data["devices"][0]["cost"] == 800
-    assert [a["title"] for a in data["ads"]] == ["Free consult"] and sorted(r[1] for r in reads) == ["ads", "campaign", "device_platform", "publisher_platform"]
-    for stage in range(3):
-        sent = json.loads(calls[stage][1])
-        assert sent["metaAccount"]["totals"]["cost"] == 900.5 and sent["client"]["platform"] == "both"
-    assert rec["inputs"]["platform"] == "both"
-
-
-def test_without_a_meta_account_nothing_is_read_from_meta_and_the_writing_is_not_shown_an_empty_one():
-    calls, reads = [], []
-    store, sid = start()
-    rec = run(store, sid, call=B.model(calls=calls), meta_pages=B.meta_pages(calls=reads))
-    assert reads == [] and "metahistory" not in rec["research"] and json.loads(calls[0][1])["metaAccount"] is None
-
-
-def test_meta_failing_to_answer_the_campaigns_fails_that_piece_only_and_a_missing_split_is_said():
-    store, sid = start(metaAccount="act_1234567")
-    rec = run(store, sid, call=B.model(), meta_pages=B.meta_pages(fail=("campaigns",)))
-    assert rec["status"] == "done" and rec["research"]["metahistory"]["state"] == "failed" and "could not be read" in rec["research"]["metahistory"]["note"]
-    assert rec["research"]["history"]["state"] == "ok" and any("metahistory" in m for m in rec["plan"]["checks"]["missing"])
-    store, sid = start(metaAccount="act_1234567")
-    rec = run(store, sid, call=B.model(), meta_pages=B.meta_pages(fail=("publisher_platform",)))
-    piece = rec["research"]["metahistory"]
-    assert piece["state"] == "partial" and "Placements could not be read (Meta answered 400: bad field)" in piece["note"] and piece["data"]["placements"] == [] and piece["data"]["totals"]["cost"] == 900.5

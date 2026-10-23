@@ -17,7 +17,6 @@ from tracker import paid_business as pb, paid_business_job as job, paid_strategy
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 JS = os.path.join(ROOT, "static", "js", "business_research.js")
-SCOPE = os.path.join(ROOT, "static", "js", "pm_scope.js")
 pytestmark = pytest.mark.skipif(not shutil.which("node"), reason="node is not installed")
 
 # the campaign book's stub page, with this page's address and a clipboard that remembers what was copied
@@ -27,8 +26,7 @@ HARNESS = (BASE_HARNESS.replace("/p2/paid-marketing/campaign-book", "/p2/paid-ma
 assert "navigator" in HARNESS and "copied" in HARNESS and "business-research" in HARNESS
 
 OPTIONS = {"cards": pb.CARDS, "goals": ps.GOALS, "buildsPerDay": 12, "modelReady": True}
-ACCOUNTS = {"accounts": [{"id": "1234567890", "name": "Acme Dental", "currency": "USD"}, {"id": "2345678901", "name": "Northwind <b>Dental</b>", "currency": "USD"}], "groups": [{"id": "mcc-1-USD", "name": "Group", "accountIds": ["1234567890"]}]}
-META_ACCOUNTS = {"accounts": [{"id": "act_1234567", "name": "Acme Dental", "currency": "USD", "platform": "meta"}, {"id": "act_7654321", "name": "Other Meta", "currency": "USD", "platform": "meta"}]}
+ACCOUNTS = {"accounts": [{"id": "1234567890", "name": "Acme Dental", "currency": "USD"}, {"id": "2345678901", "name": "Northwind <b>Dental</b>", "currency": "USD"}], "groups": []}
 
 
 @pytest.fixture(scope="module")
@@ -42,7 +40,7 @@ def rec():
 
 
 def run(scenario):
-    base = [{"match": "/business/options", "body": OPTIONS}, {"match": "/segments/accounts", "body": ACCOUNTS}, {"match": "/gads/accounts", "body": META_ACCOUNTS}, {"match": "/business/list", "body": {"builds": []}}]
+    base = [{"match": "/business/options", "body": OPTIONS}, {"match": "/segments/accounts", "body": ACCOUNTS}, {"match": "/business/list", "body": {"builds": []}}]
     scenario = dict(scenario)
     scenario["responses"] = scenario.get("responses", []) + base
     out = subprocess.run(["node", "-e", HARNESS, JS, json.dumps(scenario)], capture_output=True, text=True, timeout=60)
@@ -77,9 +75,9 @@ def test_the_form_shows_the_goals_the_cards_and_the_accounts():
     h = out["el"]
     assert h["#goals"]["html"].count("data-g=") == 5 and 'data-g="leads"' in h["#goals"]["html"] and 'aria-checked="true"' in h["#goals"]["html"]
     cards = h["#cards"]["html"]
-    assert cards.count('<button type="button" class="cb-card') == 7 and "Reviews and reputation" in cards and "Social Media Intelligence" in cards and cards.count("Uses paid data") == 3
-    assert "Needs a Google Ads account" in cards and "Needs a Meta ad account" in cards and "Needs a website" in cards and "#kinds" not in h
-    assert out["scopeOpts"] == {"noGroups": True, "optional": True}                       # the shared platform and account control: one client account per platform, either may be left out
+    assert cards.count('<button type="button" class="cb-card') == 6 and "Reviews and reputation" in cards and "Social Media Intelligence" in cards and cards.count("Uses paid data") == 3
+    assert "Needs a Google Ads account" in cards and "Needs a website" in cards and "#kinds" not in h
+    assert [i["label"] for i in out["picker"][-1][0]] == ["No account", "Acme Dental", "Northwind <b>Dental</b>"]
 
 
 def test_a_card_that_cannot_work_cannot_be_turned_on_until_what_it_needs_is_given():
@@ -97,8 +95,7 @@ def test_the_form_is_sent_as_it_was_filled_in():
                "steps": [{"fire": ["input", {"id": "fSite"}]}, click({"#cards [data-k]": {"data-k": "social"}}), click({"#goals [data-g]": {"data-g": "calls"}}), press("goBtn")]})
     b = next(c for c in out["calls"] if c["url"].endswith("/business/start"))["body"]
     assert b["name"] == "Acme Dental" and b["website"] == "acme.com" and b["goal"] == "calls" and b["account"] == "" and b["locations"] == "Austin, TX" and b["services"] == "implants"
-    assert b["competitors"] == ["smile.com", "Another"] and b["research"] == {"website": True, "reputation": True, "social": False, "history": False, "metahistory": False, "competitors": True, "market": True}
-    assert b["metaAccount"] == "" and b["platform"] == "google"
+    assert b["competitors"] == ["smile.com", "Another"] and b["research"] == {"website": True, "reputation": True, "social": False, "history": False, "competitors": True, "market": True}
     assert "budget" not in b and "campaignTypes" not in b and "launch" not in b
     assert out["hist"][-1] == "/p2/paid-marketing/business-research?build=" + "a" * 32 and out["el"]["#builder"]["hidden"] is True and out["el"]["#run"]["hidden"] is False
 
@@ -227,8 +224,7 @@ def test_change_the_details_puts_them_back_in_the_form(rec):
     out = run(opened(rec) | {"steps": [press("reuseBtn")]})
     e = out["el"]
     assert e["#fName"]["value"] == "Acme Dental" and e["#fSite"]["value"] == "acmedental.com" and e["#fIndustry"]["value"] == "Dental" and e["#fPlaces"]["value"] == "Austin, TX"
-    assert e["#builder"]["hidden"] is False and e["#result"]["hidden"] is True and 'data-g="leads" aria-checked="true"' in e["#goals"]["html"]
-    assert _reuse_and_start(rec)["account"] == "1234567890"                                      # the account of the saved build is chosen again
+    assert e["#builder"]["hidden"] is False and e["#result"]["hidden"] is True and out["picker"][-1][1] == "1234567890" and 'data-g="leads" aria-checked="true"' in e["#goals"]["html"]
 
 
 def test_nothing_the_model_or_a_website_wrote_can_run_as_html(rec):
@@ -295,54 +291,3 @@ def test_an_outside_rating_and_a_point_found_only_by_the_search_are_marked(rec):
     rep = page(r, "reputation")
     assert rep.count("no page the search read confirms this") == 1
     assert "only in what the web search found: check its source" in page(r, "business")
-
-
-# ── The Platform switch and the Meta ad account ──────────────────────────────
-
-def _reuse_and_start(record, steps=None):
-    """Open a finished build, put its details back in the form and start again: the body that was sent."""
-    sc = opened(record)
-    sc = dict(sc, steps=[press("reuseBtn")] + (steps or []) + [press("goBtn")],
-              responses=sc["responses"] + [{"match": "/business/start", "method": "POST", "status": 201, "body": {"id": "b" * 32}}, {"match": "/status", "body": {"status": "running", "progress": {"steps": []}}}])
-    out = run(sc)
-    return next(c for c in out["calls"] if c["url"].endswith("/business/start"))["body"]
-
-
-def _started(steps, values=None):
-    out = run({"values": values or {"#fName": "Acme", "#fSite": "acme.com"}, "steps": steps + [press("goBtn")],
-               "responses": [{"match": "/business/start", "method": "POST", "status": 201, "body": {"id": "a" * 32}}, {"match": "/status", "body": {"status": "running", "progress": {"steps": []}}}]})
-    return next(c for c in out["calls"] if c["url"].endswith("/business/start"))["body"], out
-
-
-def test_a_meta_account_unlocks_the_meta_history_card_and_is_sent_with_the_platform():
-    out = run({"steps": [{"scope": ["act_1234567", "meta"]}]})
-    cards = out["el"]["#cards"]["html"]
-    assert "Needs a Meta ad account" not in cards and "Needs a Google Ads account" in cards
-    meta = cards.split('data-k="metahistory"')[1].split("</button>")[0]
-    assert 'aria-pressed="true"' in meta and "Meta Ads history" in meta
-    body, _ = _started([{"scope": ["act_1234567", "meta"]}])
-    assert body["metaAccount"] == "act_1234567" and body["account"] == "" and body["platform"] == "meta" and body["research"]["metahistory"] is True and body["research"]["history"] is False
-
-
-def test_both_sends_the_google_account_and_the_meta_account_and_names_the_client_from_the_first_when_empty():
-    body, out = _started([{"scope": ["1234567890+act_1234567", "both"]}])
-    assert body["account"] == "1234567890" and body["metaAccount"] == "act_1234567" and body["platform"] == "both" and body["research"]["history"] is True and body["research"]["metahistory"] is True
-    named = run({"steps": [{"scope": ["act_1234567", "meta"]}]})
-    assert named["el"]["#fName"]["value"] == "Acme Dental"                                               # an empty name is filled from the account chosen; a typed one is kept
-    kept = run({"values": {"#fName": "Typed Name"}, "steps": [{"scope": ["act_1234567", "meta"]}]})
-    assert kept["el"]["#fName"]["value"] == "Typed Name"
-
-
-def test_going_back_to_google_takes_the_meta_account_out_of_what_is_sent():
-    body, _ = _started([{"scope": ["1234567890+act_1234567", "both"]}, {"scope": ["1234567890", "google"]}])
-    assert body["metaAccount"] == "" and body["platform"] == "google" and body["research"]["metahistory"] is False and body["research"]["history"] is True
-
-
-def test_a_saved_build_with_both_accounts_chooses_both_again_and_the_meta_card_is_in_the_report_list(rec):
-    both = json.loads(json.dumps(rec))
-    both["inputs"].update(metaAccount="act_1234567", platform="both")
-    both["research"]["metahistory"] = {"state": "ok", "note": "1 campaigns, 900 spent and 30 results in the last 90 days.", "data": {}}
-    out = run(opened(both) | {"steps": [press("reuseBtn")]})
-    assert "Meta Ads history" in out["el"]["#overview"]["html"] if "#overview" in out["el"] else True
-    sent = _reuse_and_start(both)
-    assert sent["account"] == "1234567890" and sent["metaAccount"] == "act_1234567" and sent["platform"] == "both"

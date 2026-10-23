@@ -89,7 +89,7 @@ def test_the_page_renders_for_staff(world):
 
 def test_options_describe_the_cards_and_say_whether_the_model_is_there(world, monkeypatch):
     j = client_as(STAFF).get(API + "/options").get_json()
-    assert [c["key"] for c in j["cards"]] == ["website", "reputation", "social", "history", "metahistory", "competitors", "market"] and j["modelReady"] is True
+    assert [c["key"] for c in j["cards"]] == ["website", "reputation", "social", "history", "competitors", "market"] and j["modelReady"] is True
     assert j["goals"]["leads"] and j["buildsPerDay"] == 12 and "kinds" not in j
     monkeypatch.delenv("ANTHROPIC_API_KEY")
     assert client_as(STAFF).get(API + "/options").get_json()["modelReady"] is False
@@ -311,16 +311,3 @@ def test_a_new_build_is_saved_with_this_agents_own_steps(world, monkeypatch):
     monkeypatch.setattr(store, "create", spy)
     built(client_as(STAFF))
     assert [s["key"] for s in saved[0]["steps"]][:2] == ["r:website", "r:reputation"] and saved[0]["steps"][-1]["key"] == "f:finish" and saved[0]["inputs"]["kind"] == "business"
-
-
-def test_a_meta_account_is_checked_named_and_read_into_the_build(world, monkeypatch):
-    monkeypatch.setattr(appmod, "_strat_meta_account", lambda act: {"id": act, "name": "Acme Meta", "currency": "EUR"} if act == "act_1234567" else None)
-    c = client_as(STAFF)
-    r = post(c, "/start", dict(FORM, account="", metaAccount="act_1234567"))
-    assert r.status_code == 201
-    rec = c.get(API + "/" + r.get_json()["id"]).get_json()
-    assert rec["status"] == "done" and rec["accountName"] == "Acme Meta" and rec["inputs"]["currency"] == "EUR" and rec["inputs"]["platform"] == "meta" and rec["inputs"]["metaAccount"] == "act_1234567"
-    assert rec["research"]["metahistory"]["state"] == "ok" and "r:metahistory" in [s["key"] for s in rec["progress"]["steps"]] and "r:history" not in [s["key"] for s in rec["progress"]["steps"]]
-    bad = post(c, "/start", dict(FORM, metaAccount="act_999999"))
-    assert bad.status_code == 400 and "Meta ad account is not one this platform can read" in bad.get_json()["error"]
-    assert post(c, "/start", dict(FORM, metaAccount="nonsense")).status_code == 400

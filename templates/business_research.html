@@ -22,9 +22,9 @@
   <section class="pm-panel cb-builder" id="builder">
     <div class="pm-panel-h"><span class="pm-panel-t">1. The client</span><span class="pm-panel-s" id="builderNote">Only the name and one of website, brief or account are needed. More detail makes a better picture.</span></div>
     <div class="cb-grid">
-      <div class="cb-f cb-w3"><div id="acctPick"></div><span class="cb-hint" id="acctHint">Optional. With an account, the picture includes what has already been paid for and what converted on that platform.</span></div>
       <label class="cb-f cb-w2"><span class="pd-dd-k">Client or business name *</span><input type="text" id="fName" maxlength="120" autocomplete="off" placeholder="Acme Dental"></label>
       <label class="cb-f cb-w2"><span class="pd-dd-k">Website</span><input type="text" id="fSite" maxlength="300" autocomplete="off" placeholder="acmedental.com"></label>
+      <div class="cb-f cb-w2"><div id="acctPick"></div><span class="cb-hint" id="acctHint">Optional. With an account, the picture includes what has already been paid for and what converted.</span></div>
       <label class="cb-f cb-w2"><span class="pd-dd-k">Industry</span><input type="text" id="fIndustry" maxlength="120" autocomplete="off" placeholder="Dental, SaaS, home services…"></label>
       <div class="cb-f cb-w3"><span class="pd-dd-k">What the client wants from advertising</span><div class="pm-chips" id="goals" role="radiogroup" aria-label="Goal"></div></div>
       <label class="cb-f cb-w3"><span class="pd-dd-k">Where it serves customers</span><input type="text" id="fPlaces" maxlength="500" autocomplete="off" placeholder="Austin, TX; Round Rock, TX (separate places with a semicolon)"></label>
@@ -69,7 +69,5 @@
 {% endblock %}
 {% block scripts %}
   <script src="{{ url_for('static', filename='js/pm_picker.js') }}?v=1"></script>
-  <script src="{{ url_for('static', filename='js/pm_platform.js') }}?v=7"></script>
-  <script src="{{ url_for('static', filename='js/pm_scope.js') }}?v=2"></script>
-  <script src="{{ url_for('static', filename='js/business_research.js') }}?v=2"></script>
+  <script src="{{ url_for('static', filename='js/business_research.js') }}?v=1"></script>
 {% endblock %}

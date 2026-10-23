@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import re
 
-from . import paid_meta, paid_strategy as ps
+from . import paid_strategy as ps
 
 KIND = "business"
 BUILDS_PER_DAY = ps.BUILDS_PER_DAY
@@ -30,8 +30,6 @@ CARDS = [
      "blurb": "What the brand posts on social media on its own: uses your latest finished Social Media Intelligence run for this company, or starts one."},
     {"key": "history", "title": "Google Ads history", "needs": "account", "paid": False, "default": True,
      "blurb": "What the account has already paid for and what converted, which shows what the business really sells through ads and what people ask for."},
-    {"key": "metahistory", "title": "Meta Ads history", "needs": "metaAccount", "paid": False, "default": True,
-     "blurb": "What the Meta ad account has already paid for and brought: the campaigns by objective, where the ads were shown, the devices and what the live ads say."},
     {"key": "competitors", "title": "Competitors", "needs": None, "paid": False, "default": True,
      "blurb": "Reads the sites of up to three competitors (the ones you name, or found from the web) to show where the client is the same and where it stands apart."},
     {"key": "market", "title": "Market and ad rules", "needs": None, "paid": True, "default": True,
@@ -41,7 +39,7 @@ CARD_KEYS = [c["key"] for c in CARDS]
 
 RESEARCH_LABELS = {
     "website": "Reading the client's website and what it measures", "reputation": "Reviews, press and who is behind the business",
-    "social": "Social Media Intelligence: what the brand posts on its own", "history": "Reading the Google Ads account", "metahistory": "Reading the Meta ad account",
+    "social": "Social Media Intelligence: what the brand posts on its own", "history": "Reading the Google Ads account",
     "competitors": "Finding and reading the competitors' websites", "market": "The market, its trends and its advertising rules",
 }
 AI_STEPS = [("core", "The business: what it sells, what sets it apart, what proves it"), ("audience", "Who buys, why, and how they decide"),
@@ -60,14 +58,8 @@ def clean_inputs(raw):
     account = re.sub(r"\D", "", str(raw.get("account") or ""))
     if account and not ps.CUSTOMER_ID.match(account):
         raise ps.BadPayload("A Google Ads account id has ten digits.")
-    meta_account = str(raw.get("metaAccount") or "").strip()
-    if meta_account and not paid_meta.ACT_RE.match(meta_account):
-        raise ps.BadPayload("A Meta ad account id looks like act_ and digits.")
-    if not website and not account and not meta_account and len(brief) < 40:
-        raise ps.BadPayload("Give a website, a Google Ads or Meta ad account, or a client brief of a few sentences, so there is something to work from.")
-    platform = str(raw.get("platform") or ("both" if account and meta_account else "meta" if meta_account else "google")).strip().lower()
-    if platform not in ("google", "meta", "both"):
-        raise ps.BadPayload("The platform has to be google, meta or both.")
+    if not website and not account and len(brief) < 40:
+        raise ps.BadPayload("Give a website, a Google Ads account, or a client brief of a few sentences, so there is something to work from.")
     goal = str(raw.get("goal") or "leads").strip().lower()
     if goal not in ps.GOALS:
         raise ps.BadPayload("The goal has to be one of: %s." % ", ".join(ps.GOALS))
@@ -90,10 +82,10 @@ def clean_inputs(raw):
     research = {}
     for card in CARDS:
         on = bool(asked.get(card["key"], card["default"]))
-        if (card["needs"] == "website" and not website) or (card["needs"] == "account" and not account) or (card["needs"] == "metaAccount" and not meta_account):
+        if (card["needs"] == "website" and not website) or (card["needs"] == "account" and not account):
             on = False
         research[card["key"]] = on
-    return {"kind": KIND, "name": name, "website": website, "account": account, "metaAccount": meta_account, "platform": platform, "industry": ps._s(raw.get("industry"), 120), "goal": goal,
+    return {"kind": KIND, "name": name, "website": website, "account": account, "industry": ps._s(raw.get("industry"), 120), "goal": goal,
             "budget": None, "currency": re.sub(r"[^A-Za-z]", "", str(raw.get("currency") or "USD")).upper()[:3] or "USD",
             "locations": ps._s(raw.get("locations"), 500), "services": ps._s(raw.get("services"), 800), "brief": brief,
             "avoid": ps._s(raw.get("avoid"), 600), "competitors": competitors, "campaignTypes": [], "research": research}

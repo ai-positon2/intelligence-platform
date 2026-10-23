@@ -13,7 +13,7 @@ import logging
 from concurrent.futures import ThreadPoolExecutor
 
 from . import paid_business as pb, paid_business_ai as bai, paid_business_check as bck, paid_business_research as brs, paid_strategy_ai as ai
-from . import paid_strategy_check as ck, paid_strategy_job as job, paid_strategy_research as rs, paid_strategy_research_meta as mrs
+from . import paid_strategy_check as ck, paid_strategy_job as job, paid_strategy_research as rs
 
 log = logging.getLogger(__name__)
 
@@ -49,8 +49,6 @@ class BusinessBuild(job.Build):
                 lanes["history"] = ex.submit(self.piece, "history", lambda: rs.read_history(
                     d["account"], search=d["search"], geo_names=d.get("geo_names"), sqr_read=d.get("sqr_read"), store=d.get("gads_store"), cached=d.get("cached"),
                     today=d.get("today")))
-            if on.get("metahistory"):
-                lanes["metahistory"] = ex.submit(self.piece, "metahistory", lambda: mrs.read_meta_history(d["meta_account"], pages_fn=d["meta_pages"], today=d.get("today")))
             if on.get("market"):
                 lanes["market"] = ex.submit(self.piece, "market", lambda: rs.read_market(inp, ask=d.get("ask")))
             if on.get("social"):

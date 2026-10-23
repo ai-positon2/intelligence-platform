@@ -97,38 +97,9 @@ def model(overrides=None, calls=None):
     return call
 
 
-META_ACCOUNT = {"id": "act_1234567", "name": "Acme Meta", "currency": "USD"}
-
-
-def meta_pages(calls=None, fail=()):
-    """Meta's answers to the four reads of one ad account (campaigns, placements, devices, live ads), in the shapes the Graph API documents."""
-    def split(key, rows):
-        return [dict({key: k, "spend": s, "impressions": i, "inline_link_clicks": c, "actions": [{"action_type": "lead", "value": v}]}) for k, s, i, c, v in rows]
-
-    def pages(path, params):
-        if calls is not None:
-            calls.append((path, params.get("breakdowns") or params.get("level") or "ads"))
-        kind = "ads" if path.endswith("/ads") else params.get("breakdowns") or "campaigns"
-        if kind in fail:
-            raise RuntimeError("Meta answered 400: bad field")
-        if kind == "ads":
-            return [{"id": "9", "name": "Spring offer", "campaign": {"name": "Leads"}, "creative": {"title": "Free consult", "body": "Book a free consultation this week.", "call_to_action_type": "BOOK_TRAVEL", "object_type": "SHARE"}},
-                    {"id": "10", "name": "Video only", "campaign": {"name": "Leads"}, "creative": {"object_type": "VIDEO"}}]
-        if kind == "publisher_platform":
-            return split("publisher_platform", [("facebook", "700", "40000", "420", "20"), ("instagram", "200.5", "10000", "180", "10")])
-        if kind == "device_platform":
-            return split("device_platform", [("mobile_app", "500", "30000", "300", "15"), ("mobile_web", "300", "15000", "200", "10"), ("desktop", "100.5", "5000", "100", "5")])
-        return [{"campaign_id": "1", "campaign_name": "Leads <b>Spring</b>", "objective": "OUTCOME_LEADS", "spend": "900.50", "impressions": "50000", "inline_link_clicks": "600",
-                 "actions": [{"action_type": "lead", "value": "30"}]},
-                {"campaign_id": "2", "campaign_name": "Awareness", "objective": "OUTCOME_AWARENESS", "spend": "0", "impressions": "0", "inline_link_clicks": "0"}]
-    return pages
-
-
 def deps(**kw):
     kw.setdefault("ask", ask_search())
     kw.setdefault("call", model())
-    kw.setdefault("meta_account", META_ACCOUNT)
-    kw.setdefault("meta_pages", meta_pages())
     return F.deps(**kw)
 
 
