@@ -113,11 +113,23 @@ def baseline(store, agent):
     return store.state_get("baseline:" + agent)
 
 
+def seen_accounts(store, agent, existing):
+    """The accounts this monitor has read before. Saved by every run; for a monitor that ran before the record existed it is the accounts that have a saved issue (a clean account is not known, so
+    its first issue is held back once, which is why the record is kept from now on)."""
+    saved = store.state_get("seen:" + agent)
+    if saved is not None:
+        return set(saved.get("ids") or [])
+    return {f["accountId"] for f in existing.values()}
+
+
 def track(store, agent, current, ok_ids, now):
-    """Hold today's issues against the saved ones. Returns {writes, pending, resolved, baselineSet}:
+    """Hold today's issues against the saved ones. Returns {writes, pending, resolved, baselineSet, seenIds, newAccounts}:
     writes   every row to save;
     pending  [{event: new|worse|reminder, ...the issue, ageDays, reopened}] to alert, worst first (empty on the baseline run);
-    resolved [{...the issue, ageDays (how long it was open)}] that went away since the last run."""
+    resolved [{...the issue, ageDays (how long it was open)}] that went away since the last run;
+    seenIds  every account read so far (to save);
+    newAccounts the accounts read for the first time in this run: what is wrong there already is that account's baseline, saved as seen and never alerted as news (a Meta account that could not be
+             read until now, an account added to the manager account later)."""
     first_run = baseline(store, agent) is None
     stamp = _iso(now)
     existing = {f["fingerprint"]: f for f in store.issues_all(agent)}
@@ -136,6 +148,8 @@ def track(store, agent, current, ok_ids, now):
             if old.get("alertedAt") and rank(c["level"]) > rank(old.get("alertedLevel")):
                 row["alertedAt"] = None                                           # worse than what was alerted: alert it again (alertedLevel says what it was)
         writes.append(row)
+    known = set() if first_run else seen_accounts(store, agent, existing)
+    seen_ids, new_accounts = known | set(ok_ids), (set() if first_run else set(ok_ids) - known)
     resolved = []
     for fp, old in existing.items():
         if fp not in seen and old["status"] == "open" and old["accountId"] in ok_ids:
@@ -145,7 +159,10 @@ def track(store, agent, current, ok_ids, now):
         for w in writes:
             if w["status"] == "open" and not w.get("alertedAt"):
                 w.update(alertedAt=stamp, alertedLevel=w["level"], alert={"baseline": True})
-        return {"writes": writes, "pending": [], "resolved": [], "baselineSet": True}
+        return {"writes": writes, "pending": [], "resolved": [], "baselineSet": True, "seenIds": sorted(seen_ids), "newAccounts": set()}
+    for w in writes:
+        if w["status"] == "open" and w["accountId"] in new_accounts and not w.get("alertedAt"):
+            w.update(alertedAt=stamp, alertedLevel=w["level"], alert={"baseline": True})
     pending = []
     for w in writes:
         if w["status"] != "open" or rank(w["level"]) < rank(ALERT_FROM):
@@ -158,7 +175,7 @@ def track(store, agent, current, ok_ids, now):
         p["ageDays"] = age_days(p["firstSeen"], now)
     order = {"new": 0, "worse": 1, "reminder": 2}
     pending.sort(key=lambda p: (order[p["event"]], -rank(p["level"]), p["accountName"].lower(), p["title"]))
-    return {"writes": writes, "pending": pending, "resolved": resolved, "baselineSet": False}
+    return {"writes": writes, "pending": pending, "resolved": resolved, "baselineSet": False, "seenIds": sorted(seen_ids), "newAccounts": new_accounts}
 
 
 def mark_alerted(rows, pending, result, now):
@@ -269,7 +286,7 @@ def run_monitor(store, spec, *, trigger, link, deliver, accounts, groups, proble
                "unreadable": (got.get("unreadable") or [])[:30], "unreadableCount": len(got.get("unreadable") or []), "problems": list(problems), "issues": len(got["issues"]),
                "new": sum(1 for p in tracked["pending"] if p["event"] == "new"), "worse": sum(1 for p in tracked["pending"] if p["event"] == "worse"),
                "reminders": sum(1 for p in tracked["pending"] if p["event"] == "reminder"), "resolved": len(tracked["resolved"]), "baseline": bool(tracked["baselineSet"]) or baseline(store, agent) is not None,
-               "alerted": 0, "email": None, "slack": None}
+               "alerted": 0, "email": None, "slack": None, "firstRead": len(tracked["newAccounts"])}
         writes = tracked["writes"]
         if tracked["pending"]:
             res = send(store, digest(spec["label"], tracked["pending"], tracked["resolved"], link), deliver)
@@ -278,6 +295,7 @@ def run_monitor(store, spec, *, trigger, link, deliver, accounts, groups, proble
                 writes = mark_alerted(writes, tracked["pending"], res, now_fn())
                 run["alerted"] = len(tracked["pending"])
         store.issues_put(writes)
+        store.state_set("seen:" + agent, {"ids": tracked["seenIds"]})
         if got.get("snaps"):
             store.snaps_put(agent, now.date().isoformat(), got["snaps"])
             store.snaps_prune(agent, (now.date() - timedelta(days=SNAP_DAYS)).isoformat())

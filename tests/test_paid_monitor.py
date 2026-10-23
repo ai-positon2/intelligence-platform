@@ -320,3 +320,48 @@ def test_the_weekly_summary_goes_through_the_same_senders():
     now = datetime(2026, 10, 20, 7, 0, tzinfo=timezone.utc)
     m = mon.weekly_digest("X", [stored("a")], now, LINK)
     assert mon.send(s, m, dv)["sent"] is True and dv.emails[0]["subject"] == m["subject"] and dv.slacks[0]["channel"] == "#alerts"
+
+
+# ── An account read for the first time ──────────────────────────────────────
+
+def test_an_account_that_could_not_be_read_at_the_baseline_is_silent_on_its_first_read_and_alerted_on_what_turns_up_after():
+    """Meta accounts that failed to read until a fix landed would otherwise have put everything wrong in them in the channel as news."""
+    s, dv, w = configured(), Deliver(), World()
+    w.unreadable = {B["id"]}
+    run(s, w, dv, day(0))
+    w.unreadable = set()
+    w.issues = [issue("over:222", B, "high", "Brand spend stopped"), issue("over:222b", B, "medium", "Brand spend is high")]
+    r = run(s, w, dv, day(1))
+    assert r["firstRead"] == 1 and r["new"] == 0 and r["alerted"] == 0 and r["issues"] == 2 and not dv.emails and not dv.slacks
+    rows = [x for x in s.issues_all("brandspend") if x["accountId"] == B["id"]]
+    assert len(rows) == 2 and all(x["status"] == "open" and x["alertedAt"] and x["alert"] == {"baseline": True} for x in rows)
+    assert set(s.state_get("seen:brandspend")["ids"]) == {A["id"], B["id"]}
+    w.issues.append(issue("over:222c", B, "high", "Brand spend doubled"))
+    r2 = run(s, w, dv, day(2))
+    assert r2["firstRead"] == 0 and r2["new"] == 1 and r2["alerted"] == 1 and "Brand spend doubled" in dv.emails[0]["text"] and "Brand spend stopped" not in dv.emails[0]["text"]
+
+
+def test_an_account_stays_unseen_until_it_is_read_and_a_clean_account_read_at_the_baseline_is_alerted_when_it_goes_wrong():
+    s, dv, w = configured(), Deliver(), World()
+    w.unreadable = {B["id"]}
+    run(s, w, dv, day(0))
+    assert s.state_get("seen:brandspend")["ids"] == [A["id"]]
+    run(s, w, dv, day(1))                                                              # still unreadable: still unseen
+    assert s.state_get("seen:brandspend")["ids"] == [A["id"]]
+    w.issues = [issue()]                                                               # account A was read (and clean) at the baseline, so this is news
+    r = run(s, w, dv, day(2))
+    assert r["firstRead"] == 0 and r["new"] == 1 and r["alerted"] == 1
+
+
+def test_a_monitor_that_ran_before_the_record_existed_counts_the_accounts_with_a_saved_issue_as_seen():
+    s, dv, w = configured(), Deliver(), World()
+    w.issues = [issue()]
+    run(s, w, dv, day(0))
+    s.state.pop("seen:brandspend")                                                     # what a run from before this record left behind
+    w.issues = [issue(), issue("over:222", B, "high", "Brand spend stopped")]
+    r = run(s, w, dv, day(1))
+    assert r["firstRead"] == 1 and r["alerted"] == 0 and not dv.emails                 # B had no saved issue: its first issue is held back this once
+    assert set(s.state_get("seen:brandspend")["ids"]) == {A["id"], B["id"]}
+    w.issues.append(issue("over:111b", A, "high", "Brand spend stopped"))
+    r2 = run(s, w, dv, day(2))
+    assert r2["new"] == 1 and r2["alerted"] == 1                                       # A had a saved issue, so it counted as seen
