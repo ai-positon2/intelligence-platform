@@ -99,3 +99,74 @@ def test_every_plan_fed_value_is_a_real_answer_not_a_placeholder(rec):
 def test_all_rows_is_one_flat_table():
     t = book.all_rows([{"name": "A", "book": [{"section": "s", "field": "f", "value": "v", "other": "o"}]}, {"name": "B"}])
     assert t == [["Campaign", "Section", "Field", "Value", "Other things to check"], ["A", "s", "f", "v", "o"]]
+
+
+# ── Meta ────────────────────────────────────────────────────────────────────
+
+def meta_campaign(kind="metaleads", **kw):
+    from tests.test_paid_strategy_meta_check import CTX, INPUTS as MI, adset, ad
+    from tracker import paid_strategy_meta_check as mc
+    skel = mc.architecture({"campaigns": [{"kind": kind, "theme": "Implants", "purpose": "p", "share": 1, "landingPage": "/implants", "audience": "adults", "notes": "n",
+                                           "settings": {"bidStrategy": {"value": "Highest volume", "why": "No history yet"}, "ages": {"value": "25 to 64", "why": "The offer is for adults of working age"}}}]},
+                           dict(MI, launch="2026-11-02"))["campaigns"][0]
+    built = mc.build({"adSets": [adset(interests=["Dentistry", "Teeth whitening"], excludes=["Dental school"]), adset(name="Lookalike", audienceType="lookalike", interests=[], lookalikes=["Form fills 1%"])]}, CTX, {})
+    skel["build"] = built
+    skel.update(kw)
+    return skel
+
+
+def test_a_meta_book_has_a_row_for_every_meta_check_that_applies_to_the_objective():
+    for kind, qa in (("metaleads", "Meta Leads"), ("metasales", "Meta Sales"), ("metatraffic", "Meta Traffic"), ("metaawareness", "Meta Awareness")):
+        rows = book.rows_for(meta_campaign(kind), INPUTS)
+        want = paid_qa.applicable([], [qa], "meta")
+        assert [r["id"] for r in rows] == [i["id"] for i in want] and [r["field"] for r in rows] == [i["check"] for i in want], kind
+    assert len(book.rows_for(meta_campaign("metaleads"), INPUTS)) == 37 and len(book.rows_for(meta_campaign("metaawareness"), INPUTS)) < 37
+
+
+def test_what_depends_on_the_meta_plan_comes_from_the_plan_and_the_rest_is_the_standard_answer():
+    rows = {r["id"]: r for r in book.rows_for(meta_campaign(), INPUTS)}
+    assert rows["1.1"]["value"] == "P2_MetaLeads_Implants_20261102" and rows["1.1"]["source"] == "plan" and rows["1.2"]["value"] == "Leads" and rows["1.3"]["value"] == "None"
+    assert rows["1.5"]["value"] == "Advantage campaign budget, daily, %s a day (about %s a month)" % ("{:,.2f}".format(round(3000 / 30.4, 2)), "{:,.2f}".format(round(round(3000 / 30.4, 2) * 30.4)))
+    assert rows["1.6"]["value"] == "Highest volume" and rows["1.7"]["value"] == "Start 2026-11-02, no end date" and rows["1.8"]["value"] == "Planned: 2 ad sets and 6 ads (at least 3 in each ad set)"
+    assert rows["2.2"]["value"] == "Maximize number of conversions (leads)" and rows["2.3"]["value"] == "A dataset (pixel) is set, and the event is Lead" and rows["2.4"]["value"] == "7-day click and 1-day view"
+    assert rows["2.5"]["value"] == "Austin, TX" and rows["2.7"]["value"] == "25 to 64" and rows["2.12"]["value"] == "Advantage+ placements" and rows["3.1"]["value"] == "image" and rows["3.8"]["value"] == "Off"
+    assert rows["2.10"]["value"] == "Missing teeth: interests: Dentistry, Teeth whitening; Lookalike: lookalikes: Form fills 1%" and rows["2.11"]["value"] == "Missing teeth: Dental school"
+    assert rows["3.6"]["value"] == "https://acme.com/implants" and rows["3.7"]["value"].startswith("Set on every ad: utm_source=meta&utm_medium=paid_social&utm_campaign={{campaign.name}}")
+    for cid in ("1.4", "1.9", "2.6", "3.2", "3.9", "4.1", "5.1"):
+        assert rows[cid]["source"] == "standard" and rows[cid]["value"] == paid_qa.item(cid, "meta")["expected"][:300], cid
+
+
+def test_the_reason_for_a_meta_setting_goes_in_the_last_column_as_a_sentence_before_the_checklists_note():
+    rows = {r["id"]: r for r in book.rows_for(meta_campaign(), INPUTS)}
+    assert rows["2.7"]["other"] == "The offer is for adults of working age. Meta only lets a limit on age hold when Advantage+ audience is off." and rows["1.6"]["other"].startswith("No history yet.")
+    assert rows["3.2"]["other"] == paid_qa.item("3.2", "meta")["otherThingsToCheck"]                    # a row with no reason carries the checklist's own note
+
+
+def test_a_traffic_campaign_has_no_conversion_event_row_and_a_missing_plan_falls_back_to_the_standard_answer():
+    rows = {r["id"]: r for r in book.rows_for(meta_campaign("metatraffic"), INPUTS)}
+    assert "2.3" not in rows and "2.4" not in rows and "4.1" not in rows and rows["2.2"]["value"] == "Maximize number of landing page views"
+    bare = {r["id"]: r for r in book.rows_for({"kind": "metaleads", "name": "P2_MetaLeads_X_20261102", "kindLabel": "Meta Leads", "objective": "Leads", "settings": {}, "build": {}}, INPUTS)}
+    assert bare["1.1"]["value"] == "P2_MetaLeads_X_20261102" and bare["1.5"]["source"] == "standard" and bare["1.8"]["source"] == "standard" and bare["2.10"]["source"] == "standard" and bare["3.6"]["source"] == "standard"
+
+
+def test_a_meta_book_is_the_same_layout_as_a_google_one_and_a_google_campaign_still_uses_its_own_checks(rec):
+    sheet = book.sheet_rows(book.rows_for(meta_campaign(), INPUTS))
+    assert sheet[0] == ["Field", "Value", "Other things to check"] and sheet[1][0] == "1. Campaign Setup" and any(r[0] == "Campaign Objective" and r[1] == "Leads" for r in sheet)
+    assert [r["id"] for r in camp(rec, "search")["book"]][:3] == ["1.1", "1.2", "1.3"] and camp(rec, "search")["book"][2]["field"] == "Networks (Search & Video network)"
+
+
+def test_the_audience_row_names_behaviors_and_a_broad_audience_and_the_formats_and_addresses_planned():
+    from tests.test_paid_strategy_meta_check import CTX, adset, ad
+    from tracker import paid_strategy_meta_check as mc
+    c = meta_campaign()
+    ads = [ad(name="V%d" % i, format="video" if i == 0 else "carousel" if i == 1 else "image", headline="Head %d" % i, finalUrl="/implants") for i in range(3)]
+    c["build"] = mc.build({"adSets": [adset(name="Wide", audienceType="broad", interests=[], ads=ads), adset(name="Behave", interests=["Dentistry"], behaviors=["Frequent travellers"])]}, CTX, {})
+    rows = {r["id"]: r for r in book.rows_for(c, INPUTS)}
+    assert rows["2.10"]["value"] == "Wide: a broad audience, Advantage+ audience on; Behave: interests: Dentistry; behaviors: Frequent travellers"
+    assert rows["3.1"]["value"] == "image, video, carousel"
+    many = meta_campaign()
+    many_ads = [ad(name="U%d" % i, headline="Head %d" % i, finalUrl="https://acme.com/implants") for i in range(3)]
+    many["build"] = mc.build({"adSets": [adset(ads=many_ads)]}, CTX, {})
+    many["build"]["adSets"][0]["ads"] = [dict(a, finalUrl="https://acme.com/p%d" % i) for i, a in enumerate(many["build"]["adSets"][0]["ads"] * 3)]
+    assert rows["3.6"]["value"] == "https://acme.com/implants"
+    assert book.rows_for(many, INPUTS)[[r["id"] for r in book.rows_for(many, INPUTS)].index("3.6")]["value"].count("https://") == 6               # at most six addresses are listed

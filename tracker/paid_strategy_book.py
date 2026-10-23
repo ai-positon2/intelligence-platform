@@ -49,6 +49,7 @@ OTHER = {
 
 
 URL_SUFFIX = "utm_source=google&utm_medium=cpc&utm_campaign={campaignid}&utm_content={adgroupid}&utm_term={keyword}"
+META_URL_PARAMS = "utm_source=meta&utm_medium=paid_social&utm_campaign={{campaign.name}}&utm_content={{ad.name}}&utm_term={{adset.name}}"
 
 
 def _count(items):
@@ -127,9 +128,74 @@ def _dg_audiences(build):
     return "; ".join(out) or "Every ad group targets audiences that fit the business."
 
 
+def _money(v):
+    return "{:,.2f}".format(v) if v else ""
+
+
+def _audience_line(g):
+    parts = []
+    if g.get("interests"):
+        parts.append("interests: " + ", ".join(g["interests"][:6]))
+    if g.get("behaviors"):
+        parts.append("behaviors: " + ", ".join(g["behaviors"][:3]))
+    if g.get("customAudiences"):
+        parts.append("custom audiences: " + ", ".join(g["customAudiences"][:3]))
+    if g.get("lookalikes"):
+        parts.append("lookalikes: " + ", ".join(g["lookalikes"][:3]))
+    if not parts:
+        parts.append("a broad audience, Advantage+ audience on" if g.get("audienceType") == "broad" else "to be written")
+    return "%s: %s" % (g["name"], "; ".join(parts))
+
+
+def meta_rows(campaign, inputs, strategy=None):
+    """The Campaign Book rows of a Meta campaign, from the Meta launch checklist (tracker/qa_checklist_meta.json), in the same Field | Value | Other layout."""
+    build = campaign.get("build") or {}
+    st = campaign.get("settings") or {}
+    sets = build.get("adSets") or []
+    ads = [a for g in sets for a in g.get("ads") or []]
+    formats = [f for f in ("image", "video", "carousel") if any(a["format"] == f for a in ads)]
+    urls = []
+    for a in ads:
+        if a.get("finalUrl") and a["finalUrl"] not in urls:
+            urls.append(a["finalUrl"])
+    excludes = [("%s: %s" % (g["name"], ", ".join(g["excludes"]))) for g in sets if g.get("excludes")]
+    val = lambda key: st.get(key, {}).get("value", "")                                                  # noqa: E731
+    budget = ""
+    if campaign.get("daily"):
+        budget = "%s, %s a day (about %s a month)" % (val("budgetType") or "Daily budget", _money(campaign["daily"]), _money(campaign.get("monthly")))
+    plan = {
+        "1.1": campaign["name"], "1.2": campaign.get("objective") or ps.KINDS[campaign["kind"]].get("objective", ""), "1.3": val("specialCategory"), "1.5": budget, "1.6": val("bidStrategy"),
+        "1.7": "Start %s, no end date" % (inputs.get("launch") or "on the launch date"),
+        "1.8": ("Planned: %d ad set%s and %d ad%s (at least 3 in each ad set)" % (len(sets), "" if len(sets) == 1 else "s", len(ads), "" if len(ads) == 1 else "s")) if sets else "",
+        "2.1": val("conversionLocation"), "2.2": val("optimization"), "2.4": val("attribution"), "2.5": val("locations"), "2.7": val("ages"), "2.8": val("genders"), "2.9": val("languages"),
+        "2.10": "; ".join(_audience_line(g) for g in sets), "2.11": "; ".join(excludes), "2.12": val("placements"),
+        "3.1": ", ".join(formats), "3.6": "; ".join(urls[:6]), "3.7": "Set on every ad: " + META_URL_PARAMS, "3.8": val("creativeEnhancements"),
+    }
+    event = val("conversionEvent")
+    if event:
+        plan["2.3"] = "A dataset (pixel) is set, and the event is %s" % event
+    why = {"1.3": "specialCategory", "1.5": "budgetType", "1.6": "bidStrategy", "2.1": "conversionLocation", "2.2": "optimization", "2.3": "conversionEvent", "2.4": "attribution", "2.5": "locations",
+           "2.7": "ages", "2.8": "genders", "2.9": "languages", "2.12": "placements", "3.8": "creativeEnhancements"}
+    out = []
+    for it in paid_qa.applicable([], [ps.KINDS[campaign["kind"]]["qa"]], "meta"):
+        cid = it["id"]
+        if cid in plan and plan[cid]:
+            value, source = plan[cid], "plan"
+        else:
+            value, source = text(it["expected"], 300), "standard"
+        other = it.get("otherThingsToCheck") or ""
+        if cid in why and st.get(why[cid], {}).get("why"):
+            reason = st[why[cid]]["why"].strip()
+            other = ((reason if reason[-1:] in ".!?" else reason + ".") + " " + other).strip()
+        out.append({"id": cid, "section": it["section"], "field": it["check"], "value": value, "other": other, "source": source})
+    return out
+
+
 def rows_for(campaign, inputs, strategy=None):
     """The campaign book rows for one planned campaign: [{'id', 'section', 'field', 'value', 'other', 'source'}] in the checklist's order.
-    `source` is 'plan' when the value comes from this campaign's plan and 'standard' when it is the team's standing answer."""
+    `source` is 'plan' when the value comes from this campaign's plan and 'standard' when it is the team's standing answer. A Meta campaign's book is made from the Meta checklist."""
+    if ps.platform_of_kind(campaign["kind"]) == "meta":
+        return meta_rows(campaign, inputs, strategy)
     kind = campaign["kind"]
     build = campaign.get("build") or {}
     st = campaign.get("settings") or {}
