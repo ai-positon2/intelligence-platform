@@ -18,7 +18,38 @@ var esc = function(s){return String(s==null?"":s).replace(/[&<>"']/g,function(c)
   return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];});};
 var reduceMotion = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-var S = {accounts:[], acct:null, locations:[], loc:"", src:"", preset:"last30", range:null, ov:null, an:null, anErr:null, seq:0, fetchedAt:null};
+var S = {accounts:[], acct:null, locations:[], loc:"", src:"", preset:"last30", range:null, ov:null, an:null, anErr:null, seq:0, fetchedAt:null,
+         plat:"both", platDirty:false, srcFromPlat:false};
+
+/* The Platform switch narrows the calls to one ad platform's own source. CallRail names sources, not platforms, so a platform is the largest paid
+   source whose name says it (Google Ads, Google Ads Maps and Google Ad extension for Google; Facebook, Instagram or Meta for Meta); Both is every
+   source. null when the account has no such source in the range. */
+var PLAT_SRC = {google:/\bgoogle[\s-]*ad|adwords|\bgoogle ppc/i, meta:/facebook|instagram|\bmeta\b/i};
+function platSource(plat, sources){
+  if(plat==="both") return "";
+  var hits=(sources||[]).filter(function(s){return PLAT_SRC[plat].test(String(s.key||""));});
+  hits.sort(function(a,b){return (b.paid?1:0)-(a.paid?1:0)||b.calls-a.calls;});
+  return hits.length?hits[0].key:null;
+}
+function platNote(sources){
+  var el=$("#platNote"); if(!el) return;
+  var t="";
+  if(S.plat!=="both"){
+    var re=PLAT_SRC[S.plat], rest=(sources||[]).filter(function(s){return re.test(String(s.key||""))&&s.key!==S.src;}).map(function(s){return s.key;});
+    var name=S.plat==="meta"?"Meta":"Google";
+    if(platSource(S.plat,sources)===null) t="No call source in this account says "+name+" Ads in this range, so there are no "+name+" calls to show. Pick Both to see every source.";
+    else t="Showing "+name+" Ads calls through the source \u201c"+S.src+"\u201d."+(rest.length?" Other "+name+" sources are separate: "+rest.slice(0,4).join(", ")+". Pick one in Source to see it.":"");
+  }
+  el.hidden=!t; el.textContent=t;
+}
+/* After an overview arrives: when the switch just changed, move the Source filter to the platform's source and read again. true = it did. */
+function applyPlatform(){
+  var target=platSource(S.plat,S.ov.sources);
+  if(S.plat==="both"){ if(S.srcFromPlat&&S.src){S.src=""; S.srcFromPlat=false; load(); return true;} return false; }
+  if(target===null){ if(S.srcFromPlat){S.src=""; S.srcFromPlat=false; load(); return true;} return false; }
+  if(target!==S.src){ S.src=target; S.srcFromPlat=true; load(); return true; }
+  S.srcFromPlat=true; return false;
+}
 var charts = {}, hashTimer = null;
 
 /* ── Helpers ─────────────────────────────────────────────────── */
@@ -151,12 +182,16 @@ $("#cApply").addEventListener("click",function(){
   S.preset="custom"; S.range={start:s,end:e}; paintRanges(); computeRange(); load();
 });
 $("#acctSel").addEventListener("change",function(){
-  S.acct=S.accounts.filter(function(a){return a.id===$("#acctSel").value;})[0]; S.loc=""; S.src="";
+  S.acct=S.accounts.filter(function(a){return a.id===$("#acctSel").value;})[0]; S.loc=""; S.src=""; S.srcFromPlat=false; S.platDirty=S.plat!=="both";
   try{localStorage.setItem("ca_account",S.acct.id);}catch(e){}
   loadLocations().then(load);
 });
 $("#locSel").addEventListener("change",function(){S.loc=this.value; load();});
-$("#srcSel").addEventListener("change",function(){S.src=this.value; load();});
+$("#srcSel").addEventListener("change",function(){S.src=this.value; S.srcFromPlat=false; load();});
+if(window.PMPlatform){
+  var sw=window.PMPlatform.switcher($("#platSw"),{value:window.PMPlatform.saved()||"both",onChange:function(p){S.plat=p; S.platDirty=true; if(S.acct) load();}});
+  S.plat=sw.value(); S.platDirty=S.plat!=="both";
+}
 $("#shareBtn").addEventListener("click",function(){
   writeHash();
   setTimeout(function(){
@@ -200,6 +235,8 @@ function load(){
   getJson(BASE+"/overview?"+q()).then(function(j){
     if(seq!==S.seq) return;
     S.ov=j.overview;
+    if(S.platDirty){S.platDirty=false; if(applyPlatform()) return;}
+    platNote(S.ov.sources);
     paintStale(j.stale); paintUpdated(j.fetchedAt);
     $("#live").classList.remove("off");
     $("#liveText").textContent="Live from CallRail · "+S.acct.name+(S.loc?" · one location":"")+(S.src?" · "+S.src:"");
@@ -279,7 +316,7 @@ function paintOverview(){
     {label:"Missed",data:top.map(function(s){return s.missed;}),backgroundColor:alpha(col("#fb7185"),.85),borderRadius:4,stack:"a"}]},
     options:{indexAxis:"y",responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:Object.assign(tip(),{callbacks:{label:function(i){return i.dataset.label+": "+D.num(i.parsed.x);}}})},
       scales:{x:{stacked:true,grid:{color:t.line},border:{display:false},ticks:{color:t.muted,callback:function(v){return D.num(v);}}},y:{stacked:true,grid:{display:false},ticks:{color:t.muted}}},
-      onClick:function(e,els){if(els.length){S.src=top[els[0].index].key===S.src?"":top[els[0].index].key; $("#srcSel").value=S.src; load();}}}});
+      onClick:function(e,els){if(els.length){S.src=top[els[0].index].key===S.src?"":top[els[0].index].key; S.srcFromPlat=false; $("#srcSel").value=S.src; load();}}}});
   $("#srcTable").innerHTML=table(o.sources,"Source",{click:true,sel:S.src,flags:flagsS});
   // campaigns, keywords
   $("#ckHint").textContent=S.src?"Calls CallRail finds for "+S.src+". A source whose name is part of another's brings both.":"Campaigns are the UTM campaign names CallRail captured; keywords are the Google Ads search terms.";
@@ -294,7 +331,7 @@ function paintOverview(){
     $("#locTable").innerHTML=table(o.locations,"Location",{flags:fl});
   }else sec.hidden=true;
   $$("#srcTable .ca-click").forEach(function(tr){
-    var go=function(){S.src=tr.dataset.k===S.src?"":tr.dataset.k; $("#srcSel").value=S.src; load();};
+    var go=function(){S.src=tr.dataset.k===S.src?"":tr.dataset.k; S.srcFromPlat=false; $("#srcSel").value=S.src; load();};
     tr.onclick=go; tr.onkeydown=function(e){if(e.key==="Enter"||e.key===" "){e.preventDefault();go();}};
   });
 }

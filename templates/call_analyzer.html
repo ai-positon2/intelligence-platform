@@ -17,6 +17,8 @@
   </section>
 
   <section class="pm-panel ps-cmd" id="cmd">
+    <div class="pm-plat" id="platSw"></div>
+    <p class="pm-plat-note" id="platNote" hidden></p>
     <div class="ps-cmd-grid ca-grid">
       <label class="ca-fld"><span class="pd-dd-k">CallRail account</span><select class="ps-sel" id="acctSel" aria-label="CallRail account"></select></label>
       <label class="ca-fld"><span class="pd-dd-k">Location</span><select class="ps-sel" id="locSel" aria-label="Location"><option value="">All locations</option></select></label>
@@ -80,5 +82,6 @@
 <script src="{{ url_for('static', filename='vendor/chart.umd.js') }}"></script>
 <script src="{{ url_for('static', filename='js/ps_data.js') }}?v=8"></script>
 <script src="{{ url_for('static', filename='js/cr_data.js') }}?v=3"></script>
-<script src="{{ url_for('static', filename='js/call_analyzer.js') }}?v=3"></script>
+<script src="{{ url_for('static', filename='js/pm_platform.js') }}?v=5"></script>
+<script src="{{ url_for('static', filename='js/call_analyzer.js') }}?v=4"></script>
 {% endblock %}

@@ -164,3 +164,49 @@ def test_the_missed_call_plan_and_the_what_to_do_section_are_drawn_where_they_be
     js = open(PAGE, encoding="utf-8").read()
     assert '$("#missPlan").innerHTML=S.ov.plan?' in js and 'id="missPlan"' in open(TEMPLATE, encoding="utf-8").read()
     assert "var todo=plansHtml(a);" in js and js.index("What to do about it") < js.index("Calls that looked like lost opportunities")
+
+
+def _plat(expr, **data):
+    """platSource from the page script, executed: the Platform switch picks a CallRail source for a platform."""
+    src = open(PAGE, encoding="utf-8").read()
+    start = src.index("function platSource(")
+    depth, i = 0, src.index("{", start)
+    while True:
+        depth += {"{": 1, "}": -1}.get(src[i], 0)
+        if depth == 0:
+            break
+        i += 1
+    prelude = re.search(r"var PLAT_SRC = .*?;\n", src).group(0) + src[start:i + 1] + "\n"
+    pre = "".join("const %s=%s;" % (k, json.dumps(v)) for k, v in data.items())
+    r = subprocess.run(["node", "-e", "%s%s;console.log(JSON.stringify(%s))" % (prelude, pre, expr)], capture_output=True, text=True, timeout=30)
+    assert r.returncode == 0, r.stderr
+    return json.loads(r.stdout)
+
+
+SOURCES = [{"key": "Directories", "calls": 30088, "paid": False}, {"key": "Google Ads", "calls": 4347, "paid": True}, {"key": "Google Organic", "calls": 4003, "paid": False},
+           {"key": "Google Ads Maps", "calls": 1007, "paid": True}, {"key": "Facebook Organic", "calls": 18, "paid": False}, {"key": "Facebook Ads", "calls": 9, "paid": True},
+           {"key": "Bing Ads", "calls": 116, "paid": True}, {"key": "Toilet Paper Direct", "calls": 3, "paid": False}]
+
+
+def test_google_is_the_largest_paid_google_ads_source_and_never_google_organic():
+    assert _plat("platSource('google', S)", S=SOURCES) == "Google Ads"
+    assert _plat("platSource('google', S)", S=[s for s in SOURCES if s["key"] != "Google Ads"]) == "Google Ads Maps"
+    assert _plat("platSource('google', S)", S=[{"key": "Google Organic", "calls": 9, "paid": False}, {"key": "Bing Ads", "calls": 4, "paid": True}]) is None
+
+
+def test_meta_prefers_the_paid_facebook_source_over_a_bigger_organic_one_and_ignores_words_that_only_contain_meta():
+    assert _plat("platSource('meta', S)", S=SOURCES) == "Facebook Ads"
+    assert _plat("platSource('meta', S)", S=[{"key": "Facebook Organic", "calls": 18, "paid": False}]) == "Facebook Organic"
+    assert _plat("platSource('meta', S)", S=[{"key": "Metadata Feed", "calls": 5, "paid": False}, {"key": "Google Ads", "calls": 3, "paid": True}]) is None
+
+
+def test_both_is_every_source_and_an_account_without_the_platform_gives_null_not_a_wrong_source():
+    assert _plat("platSource('both', S)", S=SOURCES) == ""
+    assert _plat("platSource('meta', [])") is None
+
+
+def test_the_page_has_the_switch_and_a_changed_platform_reads_again():
+    page, tpl = open(PAGE, encoding="utf-8").read(), open(TEMPLATE, encoding="utf-8").read()
+    assert "PMPlatform.switcher" in page and 'id="platSw"' in tpl and 'id="platNote"' in tpl and "pm_platform.js" in tpl
+    assert "if(S.platDirty){S.platDirty=false; if(applyPlatform()) return;}" in page
+    assert page.count("S.srcFromPlat=false") >= 4                  # a source the person picks (menu, chart, table) or an account change is not the switch's
