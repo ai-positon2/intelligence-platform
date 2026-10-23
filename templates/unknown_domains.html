@@ -12,6 +12,8 @@
     </div>
   </section>
 
+  <section class="pm-panel pd-cmd ud-cmd"><div class="pm-plat" id="platSw"></div><p class="pm-plat-note" id="platNote" hidden></p></section>
+
   <div id="msg"></div>
   <div id="skel" class="pd-skel-wrap"><div class="pd-skel"></div><div class="pd-skel"></div></div>
 
@@ -121,6 +123,7 @@
 </div>
 {% endblock %}
 {% block scripts %}
+<script src="{{ url_for('static', filename='js/pm_platform.js') }}?v=6"></script>
 <script src="{{ url_for('static', filename='js/url_checker.js') }}?v=2"></script>
-<script src="{{ url_for('static', filename='js/unknown_domains.js') }}?v=2"></script>
+<script src="{{ url_for('static', filename='js/unknown_domains.js') }}?v=3"></script>
 {% endblock %}

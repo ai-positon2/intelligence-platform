@@ -16,7 +16,25 @@ var STATUS = [["open","Open"],["approved","Approved"],["dismissed","Dismissed"],
 var SEVERITY = [["critical","Critical"],["high","High"],["medium","Medium"]];
 var SEV_TEXT = {critical:"Critical",high:"High",medium:"Wrong account"};
 var KIND_TEXT = {unknown:"Unknown domain", wrong_account:"Wrong account"};
-var S = {data:null, st:"open", sv:"all", q:"", limit:PAGE, dbq:"", dbLimit:PAGE, useq:"", timer:null};
+var S = {data:null, raw:null, plat:"both", st:"open", sv:"all", q:"", limit:PAGE, dbq:"", dbLimit:PAGE, useq:"", timer:null};
+
+/* The Platform switch narrows what the page lists to one platform: the findings, the links to fix and the domains each account points at, with their counts worked out again from
+   what is left. The scan, the domain database, the alert recipients and the run history are for every account of both platforms and are not narrowed. Both is the state as the server sent it. */
+function countBy(list,keys){var o={}; keys.forEach(function(k){o[k]=0;}); list.forEach(function(x){if(x.status in o) o[x.status]++;}); return o;}
+function viewOf(d,plat){
+  if(!d||plat==="both") return d;
+  var keep=function(x){return (x.platform==="meta"?"meta":"google")===plat;}, out={};
+  Object.keys(d).forEach(function(k){out[k]=d[k];});
+  out.findings=(d.findings||[]).filter(keep); out.links=(d.links||[]).filter(keep); out.inUse=(d.inUse||[]).filter(keep);
+  out.counts=countBy(out.findings,Object.keys(d.counts||{approved:0,dismissed:0,gone:0,open:0}));
+  out.linkCounts=countBy(out.links,Object.keys(d.linkCounts||{dismissed:0,fixed:0,open:0}));
+  return out;
+}
+function platNote(){
+  var el=$("#platNote"); if(!el) return;
+  el.hidden=S.plat==="both";
+  el.textContent=S.plat==="both"?"":"Showing "+(S.plat==="meta"?"Meta Ads":"Google Ads")+" only: its findings, links and the domains its accounts point at. The scan reads both platforms every 4 hours, and the domain database is shared.";
+}
 
 function dashed(id){return /^\d{10}$/.test(id)?id.slice(0,3)+"-"+id.slice(3,6)+"-"+id.slice(6):id;}
 function ago(iso){
@@ -226,13 +244,18 @@ function paintAlerts(){
 }
 
 function render(){
+  platNote();
   paintKpis();paintScan();paintBase();paintFindings();paintDb();paintAlerts();
   if(window.UDLinks) window.UDLinks.paint(S.data);
   $("#skel").hidden=true;$("#out").hidden=false;
 }
+if(window.PMPlatform&&$("#platSw")){
+  var sw=window.PMPlatform.switcher($("#platSw"),{value:window.PMPlatform.saved()||"both",onChange:function(p){S.plat=p;S.limit=PAGE;if(S.raw){S.data=viewOf(S.raw,p);render();}}});
+  S.plat=sw.value();
+}
 function load(){
   return api("GET","/state").then(function(d){
-    S.data=d;setMsg("");render();
+    S.raw=d;S.data=viewOf(d,S.plat);setMsg("");render();
     if(running()&&!S.timer) S.timer=setInterval(load,3000);
     if(!running()&&S.timer){clearInterval(S.timer);S.timer=null;}
   }).catch(function(e){
