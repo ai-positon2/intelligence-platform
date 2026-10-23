@@ -7314,8 +7314,9 @@ def paid_qa_agent():
 @app.route("/p2/paid-marketing/api/qa/checklist")
 @position2_required
 def paid_qa_checklist():
+    """?platform=meta is the Meta launch checklist; anything else the Campaign Book checks."""
     from tracker import paid_qa
-    resp = jsonify(paid_qa.checklist())
+    resp = jsonify(paid_qa.checklist("meta" if request.args.get("platform") == "meta" else "google"))
     resp.headers["Cache-Control"] = "private, max-age=3600"
     return resp
 
@@ -7347,7 +7348,7 @@ def _qc_spawn(fn):
 def _qc_start_review(store, launch):
     """Start the AI review of this QC unless one is already running. Returns
     (started, why_not): why_not is words for the page when the daily cap is hit."""
-    from tracker import paid_gads_segments as gads, paid_qa_job, paid_qa_web
+    from tracker import paid_gads_segments as gads, paid_meta, paid_qa_job, paid_qa_web, paid_store
     email, today = _pm_user_email(), datetime.now(timezone.utc).date().isoformat()
     day, used = _QC_AI_USES.get(email, (today, 0))
     if day != today:
@@ -7358,8 +7359,9 @@ def _qc_start_review(store, launch):
         return False, ""
     _QC_AI_USES[email] = (today, used + 1)
     lid = launch["id"]
+    meta_fns = {"get_fn": lambda path, params: paid_meta._get(path, params, paid_store), "pages_fn": lambda path, params: paid_meta._pages(path, params, paid_store)}
     _qc_spawn(lambda: paid_qa_job.run_review(lid, store=store, search=gads.search, geo_fn=gads.geo_names,
-                                             web_fn=paid_qa_web.audit_pages))
+                                             web_fn=paid_qa_web.audit_pages, meta=meta_fns))
     return True, ""
 
 
@@ -7368,15 +7370,20 @@ def _qc_start_review(store, launch):
 def paid_qa_campaigns():
     """GET ?account=<customer id>: the account's live campaigns, each with its
     QC (and verdict) if one has been started."""
-    from tracker import paid_gads_segments as gads, paid_qa, paid_qa_auto, paid_qa_store as store
+    from tracker import paid_gads_segments as gads, paid_meta, paid_qa, paid_qa_auto, paid_qa_meta, paid_qa_store as store, paid_store
     try:
-        account = paid_qa.customer_id(request.args.get("account"))
+        account = paid_qa.account_id(request.args.get("account"))
     except paid_qa.BadPayload as e:
         return jsonify(error=str(e)), 400
     try:
-        campaigns = paid_qa_auto.list_campaigns(account, gads.search)
+        if paid_qa.platform_of(account) == "meta":
+            campaigns = paid_qa_meta.list_campaigns(account, lambda path, params: paid_meta._pages(path, params, paid_store))
+        else:
+            campaigns = paid_qa_auto.list_campaigns(account, gads.search)
     except gads.GadsError as e:
         return _pm_gads_error(e)
+    except paid_meta.AdsError as e:
+        return jsonify(error=str(e), kind="meta"), 502
     started = {}
     try:
         launches = store.list_launches(account)
