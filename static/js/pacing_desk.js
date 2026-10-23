@@ -35,7 +35,8 @@ var PILL = {"WILL OVERSPEND":["over","Over"],"WILL UNDERSPEND":["under","Under"]
             "ON TARGET":["ok","On target"],"BUDGET UNCLEAR":["unclear","Budget unclear"]};
 var HUE = {"WILL OVERSPEND":"h-over","WILL UNDERSPEND":"h-under","ON TARGET":"h-ok","BUDGET UNCLEAR":"h-unclear"};
 
-var D = null, DERIVED = null, SOURCE = "live", LIVE_DATE = null, DATES = [], ROLLUPS = [], CURRENT_F = [];
+var D = null, D0 = null, DERIVED = null, SOURCE = "live", LIVE_DATE = null, DATES = [], ROLLUPS = [], CURRENT_F = [];
+var PLAT = "both";
 var filter = "all", pickClient = "", pickAccount = "";
 var campSort = {key:null, dir:1}, moveSort = {key:"amt", dir:-1};
 var movesApplied = {}, pollTimer = null, openKeys = {};
@@ -206,7 +207,9 @@ function countUp(el){
 }
 
 function paintTrend(){
-  var el=$("#trend"), rolls=ROLLUPS.filter(function(r){return r.asOf && r.asOf.slice(0,7)===D.asOf.slice(0,7) && r.asOf<=D.asOf});
+  var el=$("#trend");
+  if(PLAT!=="both"){el.hidden=true;return;}
+  var rolls=ROLLUPS.filter(function(r){return r.asOf && r.asOf.slice(0,7)===D.asOf.slice(0,7) && r.asOf<=D.asOf});
   if(!rolls.length){el.hidden=true;return;}
   el.hidden=false;
   var last=rolls[rolls.length-1], days=last.daysInMonth||30;
@@ -257,8 +260,12 @@ var ALL='<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#ff
 
 function buildPickers(){
   var el=$("#pickers"); el.hidden=false;
-  el.innerHTML='<div class="pd-bar-grid" id="pickGrid"></div><button class="pd-clear" id="reset" hidden title="Clear the client, account and filter">'+
+  el.innerHTML='<div class="pm-plat" id="platSw"></div><p class="pm-plat-note" id="platNote" hidden></p><div class="pd-bar-grid" id="pickGrid"></div><button class="pd-clear" id="reset" hidden title="Clear the client, account and filter">'+
     '<svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg>Clear</button>';
+  if(window.PMPlatform){
+    var sw=window.PMPlatform.switcher($("#platSw"),{value:window.PMPlatform.saved()||"both",onChange:function(p){setPlatform(p);}});
+    PLAT=sw.value(); if(D0){D=forPlatform(D0); DERIVED=computeDerived(D);}
+  }
   var g=$("#pickGrid");
   PK.client=Picker(g,{label:"Client",search:true,onChange:function(v){pickClient=v;pickAccount="";fillAccounts();paintStrip();render();flashList();}});
   PK.account=Picker(g,{label:"Account",search:true,onChange:function(v){
@@ -551,9 +558,38 @@ function paintFoot(){
     'allocations are the ones saved in Allocations. Recommendations are a draft: check before applying.';
 }
 
+/* The run as the Platform switch sees it: Meta shows the accounts paced against a Meta allocation, Google the rest, Both everything. A client with
+   nothing left is dropped, so the client list, the totals and every count are about what is in view. The portfolio trend is all channels, so it hides
+   when one is chosen. */
+function isMetaAcct(a){return a.channel==="Meta";}
+function forPlatform(nd){
+  if(PLAT==="both") return nd;
+  var keep=function(a){return PLAT==="meta"?isMetaAcct(a):!isMetaAcct(a);};
+  var out={}; Object.keys(nd).forEach(function(k){out[k]=nd[k];});
+  out.clients=nd.clients.map(function(c){var o={}; Object.keys(c).forEach(function(k){o[k]=c[k];}); o.accounts=c.accounts.filter(keep); return o;})
+    .filter(function(c){return c.accounts.length;});
+  return out;
+}
+function platformNote(){
+  var el=$("#platNote"); if(!el||!D0) return;
+  var n=D0.clients.reduce(function(t,c){return t+c.accounts.filter(isMetaAcct).length;},0), all=D0.clients.reduce(function(t,c){return t+c.accounts.length;},0);
+  var t="";
+  if(PLAT==="meta") t=n?"Showing the "+n+" account"+(n===1?"":"s")+" paced on Meta Ads. The portfolio line below is all channels, so it is hidden here.":"No account in this run is paced on Meta Ads. Add a Meta row in Allocations (Channels = Meta) and refresh.";
+  else if(PLAT==="google") t=(all-n)?"Showing the "+(all-n)+" account"+((all-n)===1?"":"s")+" paced on Google Ads"+(n?" ("+n+" on Meta left out)":"")+". The portfolio line below is all channels, so it is hidden here.":"No account in this run is paced on Google Ads.";
+  el.hidden=!t; el.textContent=t;
+}
+function setPlatform(p){
+  PLAT=p; if(!D0) return;
+  var keepClient=pickClient, keepAccount=pickAccount;
+  D=forPlatform(D0); DERIVED=computeDerived(D);
+  if(keepClient&&!D.clients.some(function(c){return c.name===keepClient;})) pickClient="";
+  if(keepAccount&&!DERIVED.A.some(function(a){return (a._client+"||"+a.name)===keepAccount;})) pickAccount="";
+  paintStrip(); paintTrend(); platformNote(); buildControls(); fillClients(); fillAccounts(); render(); flashList();
+}
+
 function setD(nd, source){
-  D=nd; DERIVED=computeDerived(D); SOURCE=source;
-  paintRing(); paintFresh(); paintStrip(); paintTrend(); paintOrphans(); paintFoot();
+  D0=nd; D=forPlatform(nd); DERIVED=computeDerived(D); SOURCE=source;
+  paintRing(); paintFresh(); paintStrip(); paintTrend(); platformNote(); paintOrphans(); paintFoot();
   buildControls(); fillClients(); fillAccounts(); fillAsOf();
   pollMoves(); render();
 }

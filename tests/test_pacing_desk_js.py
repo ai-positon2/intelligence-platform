@@ -25,7 +25,7 @@ def _function(src, name):
 
 def run(expr, **data):
     src = open(DESK, encoding="utf-8").read()
-    prelude = re.search(r"var sum = .*?;\n", src).group(0) + "".join(_function(src, n) + "\n" for n in ("cpaOf", "orphanSplit"))
+    prelude = "var PLAT='both';" + re.search(r"var sum = .*?;\n", src).group(0) + "".join(_function(src, n) + "\n" for n in ("cpaOf", "orphanSplit", "isMetaAcct", "forPlatform"))
     pre = "".join("const %s=%s;" % (k, json.dumps(v)) for k, v in data.items())
     r = subprocess.run(["node", "-e", "%s%s;console.log(JSON.stringify(%s))" % (prelude, pre, expr)], capture_output=True, text=True, timeout=30)
     assert r.returncode == 0, r.stderr
@@ -60,3 +60,36 @@ def test_the_page_says_when_a_run_was_read_from_meta_too_and_marks_a_meta_accoun
     assert "This desk paces Google Ads and Meta Ads only" in page and "This desk reads Google Ads only" not in page
     html = open(os.path.join(ROOT, "templates", "pacing_desk.html"), encoding="utf-8").read()
     assert "Google Ads and Meta Ads" in html and "straight from Google Ads and Meta Ads" in html
+
+
+RUN = {"asOf": "2026-10-20", "tolerance": 2, "clients": [
+    {"name": "Acme", "accounts": [{"name": "Acme Google", "channel": "Google", "spend": 100}, {"name": "Acme Meta", "channel": "Meta", "spend": 50}]},
+    {"name": "Bolt", "accounts": [{"name": "Bolt Google", "spend": 70}]},
+    {"name": "Cove", "accounts": [{"name": "Cove Meta", "channel": "Meta", "spend": 30}]}]}
+
+
+def _names(out):
+    return [[c["name"], [a["name"] for a in c["accounts"]]] for c in out["clients"]]
+
+
+def test_both_is_the_whole_run_untouched():
+    assert run("(PLAT='both',forPlatform(RUN))", RUN=RUN) == RUN
+
+
+def test_meta_keeps_only_the_accounts_paced_on_meta_and_drops_a_client_with_none():
+    assert _names(run("(PLAT='meta',forPlatform(RUN))", RUN=RUN)) == [["Acme", ["Acme Meta"]], ["Cove", ["Cove Meta"]]]
+
+
+def test_google_is_every_account_that_is_not_meta_including_one_with_no_channel_field():
+    assert _names(run("(PLAT='google',forPlatform(RUN))", RUN=RUN)) == [["Acme", ["Acme Google"]], ["Bolt", ["Bolt Google"]]]
+
+
+def test_a_platform_view_does_not_change_the_run_it_was_made_from():
+    assert run("(PLAT='meta',forPlatform(RUN),RUN.clients[0].accounts.length)", RUN=RUN) == 2
+
+
+def test_the_page_has_the_platform_switch_the_other_agents_have():
+    page = open(DESK, encoding="utf-8").read()
+    tpl = open(os.path.join(ROOT, "templates", "pacing_desk.html"), encoding="utf-8").read()
+    assert "PMPlatform.switcher" in page and 'id="platSw"' in page and "pm_platform.js" in tpl
+    assert "if(PLAT!==\"both\"){el.hidden=true;return;}" in page          # the portfolio line is every channel, so it hides under one
