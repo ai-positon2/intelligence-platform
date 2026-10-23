@@ -410,7 +410,7 @@ def architecture(raw, inputs):
     """The campaign skeletons. At most 8, only the kinds asked for (any kind when none were), each named the team's way, budgets split so
     they add up to the monthly budget."""
     raw = raw if isinstance(raw, dict) else {}
-    allowed = inputs.get("campaignTypes") or ps.KIND_KEYS
+    allowed = ps.kinds_for(inputs, "google")
     campaigns, keys, names = [], set(), set()
     for r in raw.get("campaigns") if isinstance(raw.get("campaigns"), list) else []:
         if not isinstance(r, dict):

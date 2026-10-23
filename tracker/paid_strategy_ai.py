@@ -20,7 +20,7 @@ import json
 import logging
 import re
 
-from . import paid_strategy as ps, paid_strategy_check as ck, paid_strategy_research as rs
+from . import paid_strategy as ps, paid_strategy_check as ck, paid_strategy_meta_check as mck, paid_strategy_research as rs
 
 log = logging.getLogger(__name__)
 
@@ -94,7 +94,13 @@ BUILD_CREATIVE = obj(
                      ads=arr(obj(format=S, headlines=strs(), longHeadline=S, descriptions=strs(), cta=S, concept=S, script=S, finalUrl=S)))),
     assets=ASSETS)
 
-BUILD_SCHEMAS = {"search": BUILD_SEARCH, "pmax": BUILD_PMAX, "demandgen": BUILD_CREATIVE, "display": BUILD_CREATIVE, "video": BUILD_CREATIVE}
+ARCHITECTURE_META = obj(campaigns=arr(obj(kind=S, theme=S, purpose=S, share=N, landingPage=S, audience=S, notes=S, settings=obj(**{k: SETTING for k in mck.SETTING_KEYS}))))
+
+BUILD_META = obj(adSets=arr(obj(name=S, theme=S, audienceType=S, interests=strs(), behaviors=strs(), customAudiences=strs(), lookalikes=strs(), excludes=strs(), budgetShare=N, placements=S,
+                                landingPage=S, ads=arr(obj(name=S, format=S, primaryText=S, headline=S, description=S, cta=S, concept=S, script=S, finalUrl=S)))))
+
+BUILD_SCHEMAS = {"search": BUILD_SEARCH, "pmax": BUILD_PMAX, "demandgen": BUILD_CREATIVE, "display": BUILD_CREATIVE, "video": BUILD_CREATIVE,
+                 "metaleads": BUILD_META, "metasales": BUILD_META, "metatraffic": BUILD_META, "metaawareness": BUILD_META}
 
 # ── The house rules every stage is told ─────────────────────────────────────
 
@@ -186,6 +192,17 @@ def history_evidence(research):
     return {k: d.get(k) for k in ("account", "window", "totals", "campaigns", "actions", "keywordsBest", "keywordsWasted", "terms", "negatives", "devices", "regions", "ads")}
 
 
+def meta_evidence(research):
+    """What the Meta ad account has done (None when there is none): the same shape as the Google account's, for the stages that write about the account."""
+    from . import paid_strategy_research_meta as mrs
+    return mrs.evidence(research)
+
+
+def meta_audience_evidence(research):
+    from . import paid_strategy_research_meta as mrs
+    return mrs.audience_evidence(research)
+
+
 def keyword_evidence(research, n=90):
     d = ((research or {}).get("keywords") or {}).get("data") or {}
     ideas = d.get("ideas") or []
@@ -225,9 +242,9 @@ def missing(research, inputs):
     plat = inputs.get("platform") or "google"
     for key, on in (inputs.get("research") or {}).items():
         if not on and key not in (research or {}):
-            if key == "metahistory" and plat not in ("meta", "both"):          # a card of the other platform is not "missing", it was never part of this build
+            if key in ("metahistory", "metaaudience", "metaaccount") and plat not in ("meta", "both"):      # a card of the other platform is not "missing", it was never part of this build
                 continue
-            if key in ("history", "account") and plat not in ("google", "both"):
+            if key in ("history", "account", "keywords", "seasonality") and plat not in ("google", "both"):
                 continue
             if key == "metaaccount" and plat not in ("meta", "both"):
                 continue
@@ -358,7 +375,7 @@ def _call_stage(call, stage, system, user, schema, max_tokens):
 
 
 def write_profile(inputs, research, call):
-    user = _j({"client": client_block(inputs), "website": site_evidence(research), "account": history_evidence(research), "market": market_evidence(research),
+    user = _j({"client": client_block(inputs), "website": site_evidence(research), "account": history_evidence(research), "metaAccount": meta_evidence(research), "market": market_evidence(research),
                "notAvailable": missing(research, inputs)})
     return ck.profile(_call_stage(call, "profile", PROFILE_SYSTEM, user, PROFILE, 8000), ck.norm(rs.corpus(research)))
 
@@ -377,28 +394,54 @@ def _facts_for_prompt(profile):
 
 
 def write_strategy(inputs, research, profile, competitive, call):
-    user = _j({"client": client_block(inputs), "profile": profile, "competitors": competitive, "account": history_evidence(research),
-               "keywordResearch": keyword_evidence(research, 40), "social": social_evidence(research), "seasonality": season_evidence(research),
-               "market": market_evidence(research), "forecast": forecast(inputs, research), "notAvailable": missing(research, inputs)})
-    return ck.strategy(_call_stage(call, "strategy", STRATEGY_SYSTEM, user, STRATEGY, 14000), inputs)
+    google, meta = ps.platforms_of(inputs)
+    system = STRATEGY_SYSTEM
+    if meta:
+        from . import paid_strategy_meta_ai as mai
+        system += mai.STRATEGY_ADDENDUM.format(also=" as well as on Google Ads" if google else "")
+    # the forecast is Google's (cost per click and Search conversion rate): given when Google is the only platform; for both, the split of the budget is the strategist's own and is not known yet
+    user = _j({"client": client_block(inputs), "profile": profile, "competitors": competitive, "account": history_evidence(research), "metaAccount": meta_evidence(research),
+               "metaAudience": meta_audience_evidence(research), "keywordResearch": keyword_evidence(research, 40), "social": social_evidence(research), "seasonality": season_evidence(research),
+               "market": market_evidence(research), "forecast": forecast(inputs, research) if google and not meta else None, "notAvailable": missing(research, inputs)})
+    return ck.strategy(_call_stage(call, "strategy", system, user, STRATEGY, 14000), inputs)
 
 
 def pages_for_prompt(research):
     return [{"url": p["url"], "title": p.get("title"), "h1": (p.get("h1") or [""])[0]} for p in (((research or {}).get("website") or {}).get("data") or {}).get("pages") or []]
 
 
+def google_inputs(inputs, strategy):
+    """The inputs a Google part is planned with: the monthly budget is the share of it the strategist gave Google when Meta is planned as well (all of it otherwise)."""
+    google, meta = ps.platforms_of(inputs)
+    share = ps.platform_split(strategy, google, meta)[0]
+    budget = inputs.get("budget")
+    return dict(inputs, budget=round(budget * share, 2) if budget else budget)
+
+
 def write_architecture(inputs, research, profile, strategy, call):
-    allowed = inputs.get("campaignTypes") or ps.KIND_KEYS
-    user = _j({"client": client_block(inputs), "allowedKinds": allowed, "profile": {k: profile.get(k) for k in ("summary", "offerings", "audiences", "compliance")},
-               "strategy": {k: strategy.get(k) for k in ("channels", "bidding", "targeting", "budget")}, "clientPages": pages_for_prompt(research),
-               "account": {k: (history_evidence(research) or {}).get(k) for k in ("campaigns", "regions", "devices", "totals")} if history_evidence(research) else None,
-               "keywordResearch": keyword_evidence(research, 25), "forecast": forecast(inputs, research)})
-    return ck.architecture(_call_stage(call, "architecture", ARCH_SYSTEM, user, ARCHITECTURE, 9000), inputs)
+    google, meta = ps.platforms_of(inputs)
+    campaigns = []
+    if google:
+        gi = google_inputs(inputs, strategy)
+        user = _j({"client": client_block(inputs), "allowedKinds": ps.kinds_for(inputs, "google"), "profile": {k: profile.get(k) for k in ("summary", "offerings", "audiences", "compliance")},
+                   "strategy": {k: strategy.get(k) for k in ("channels", "bidding", "targeting", "budget")}, "clientPages": pages_for_prompt(research),
+                   "account": {k: (history_evidence(research) or {}).get(k) for k in ("campaigns", "regions", "devices", "totals")} if history_evidence(research) else None,
+                   "keywordResearch": keyword_evidence(research, 25), "forecast": forecast(gi, research), "monthlyBudgetForGoogle": gi.get("budget") if meta else None})
+        campaigns += ck.architecture(_call_stage(call, "architecture", ARCH_SYSTEM, user, ARCHITECTURE, 9000), gi)["campaigns"]
+    if meta:
+        from . import paid_strategy_meta_ai as mai
+        share = ps.platform_split(strategy, google, meta)[1]
+        budget = inputs.get("budget")
+        campaigns += mai.write_architecture(inputs, research, profile, strategy, call, round(budget * share, 2) if budget else budget)["campaigns"]
+    return {"campaigns": campaigns}
 
 
 def write_build(campaign, inputs, research, profile, strategy, competitive, call, problems=None):
     """(build, drops) for one campaign."""
     kind = campaign["kind"]
+    if ps.platform_of_kind(kind) == "meta":
+        from . import paid_strategy_meta_ai as mai
+        return mai.write_build(campaign, inputs, research, profile, strategy, competitive, call, problems)
     ctx = {"site": inputs.get("website"), "known": ck.known_urls(research)}
     system = {"search": SEARCH_SYSTEM, "pmax": PMAX_SYSTEM}.get(kind, CREATIVE_SYSTEM)
     hist = history_evidence(research)

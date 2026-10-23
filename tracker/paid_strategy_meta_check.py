@@ -167,10 +167,10 @@ def build(raw, ctx, drops):
     return {"adSets": sets, "assets": {}}
 
 
-def verify_interests(built, answers, unanswered=False):
+def verify_interests(built, answers, unanswered=()):
     """The build with every interest checked against Meta's list: `answers` is {name: Meta's interest or None} (tracker/paid_meta_interests.validate). An interest Meta has no such name for
-    is dropped and counted; one is kept with `verified` False when `unanswered` (Meta did not answer, so nothing can be said). Each ad set gets `interestsChecked`: [{name, id, sizeText,
-    verified}]. Returns (build, dropped names)."""
+    is dropped and counted; one whose name is in `unanswered` (Meta did not answer for it, so nothing can be said) is kept with `verified` False. Each ad set gets `interestsChecked`:
+    [{name, id, sizeText, verified}]. Returns (build, dropped names)."""
     dropped = []
     for s in built.get("adSets") or []:
         checked, kept = [], []
@@ -179,7 +179,7 @@ def verify_interests(built, answers, unanswered=False):
             if hit:
                 checked.append({"name": hit["name"], "id": hit["id"], "sizeText": hit.get("sizeText") or "", "verified": True})
                 kept.append(hit["name"])
-            elif unanswered:
+            elif name in (unanswered or ()):
                 checked.append({"name": name, "id": "", "sizeText": "", "verified": False})
                 kept.append(name)
             else:

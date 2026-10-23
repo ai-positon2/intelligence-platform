@@ -232,7 +232,10 @@ def model(overrides=None, calls=None):
             return {"summary": ["Win implant patients with Search first", "Use Performance Max once conversions arrive"],
                     "objectives": [{"objective": "Implant consultations", "kpi": "Cost per lead", "target": "Under 120", "basis": "Estimate from the forecast"}],
                     "funnel": [{"stage": "Capture demand", "role": "Search", "message": "Free consultation", "channels": "Search"}],
-                    "channels": [{"channel": "Search", "why": "Intent", "share": 70, "priority": "High", "phase": "Launch"}, {"channel": "Performance Max", "why": "Reach", "share": 30, "priority": "Medium", "phase": "Month 2"}],
+                    "channels": ([{"channel": "Search", "why": "Intent", "share": 70, "priority": "High", "phase": "Launch"}, {"channel": "Performance Max", "why": "Reach", "share": 30, "priority": "Medium", "phase": "Month 2"}]
+                                 if data["client"].get("platform", "google") == "google" else
+                                 [{"channel": "Google Search", "why": "Intent", "share": 60, "priority": "High", "phase": "Launch"}, {"channel": "Meta Ads", "why": "Reach", "share": 40, "priority": "Medium", "phase": "Launch"}]
+                                 if data["client"].get("platform") == "both" else [{"channel": "Meta Ads", "why": "Reach", "share": 100, "priority": "High", "phase": "Launch"}]),
                     "budget": {"pacing": "Even across the month", "scaleRule": "Raise 20 percent when cost per lead holds for two weeks"},
                     "bidding": [{"phase": "Launch", "strategy": "Maximize conversions", "trigger": "30 conversions", "note": "Then target CPA"}],
                     "targeting": {"locations": [{"name": "Austin, Texas", "why": "Practice location"}], "devices": "All", "schedule": "All day", "demographics": "None excluded", "audiences": ["Implant researchers"]},
@@ -250,6 +253,29 @@ def model(overrides=None, calls=None):
                                    "keywordFocus": ["dental implants austin"], "audience": "Adults looking to replace teeth", "notes": "Core campaign", "settings": s},
                                   {"kind": "pmax", "theme": "Local", "purpose": "Reach more of Austin", "share": 30, "landingPage": SITE, "keywordFocus": [], "audience": "Austin adults",
                                    "notes": "Starts month 2", "settings": s}]}
+        if stage == "architecture:meta":
+            blank = {"value": "", "why": ""}
+            return {"campaigns": [{"kind": "metaleads", "theme": "Implants", "purpose": "Reach adults who may want implants", "share": 70, "landingPage": SITE + "services/dental-implants", "audience": "Adults 35 to 65 near Austin",
+                                   "notes": "Core Meta campaign", "settings": {k: blank for k in ("specialCategory", "budgetType", "conversionLocation", "optimization", "conversionEvent", "attribution", "ages", "genders",
+                                                                                                       "languages", "placements", "creativeEnhancements")} | {
+                                       "bidStrategy": {"value": "Highest volume", "why": "No Meta history yet"}, "locations": {"value": "Austin, Texas", "why": "Practice location"}}},
+                                  {"kind": "metaleads", "theme": "Retargeting", "purpose": "Bring back site visitors", "share": 30, "landingPage": SITE, "audience": "Site visitors",
+                                   "notes": "Starts once the pixel has people", "settings": {k: blank for k in ("specialCategory", "budgetType", "bidStrategy", "conversionLocation", "optimization", "conversionEvent",
+                                                                                                                 "attribution", "locations", "ages", "genders", "languages", "placements", "creativeEnhancements")}}]}
+        if stage.startswith("build:") and data["campaign"]["kind"].startswith("meta"):
+            names = [x.split(" | ")[0] for x in (data.get("interestsMetaHas") or [])[:2]]
+            texts = [("Missing a tooth? Free consultation for dental implants", "Dental Implants In Austin", "Free consult"), ("Replace missing teeth with implants from a surgeon you can ask", "Meet Your Implant Surgeon", ""),
+                     ("Book a visit and ask how implants work for you", "Book Your Implant Visit", "Book online")]
+
+            def ad_(i):
+                t, h, d = texts[i]
+                return {"name": "Ad %d" % (i + 1), "format": "video" if i == 0 else "image", "primaryText": t, "headline": h, "description": d, "cta": "Book Now" if i != 2 else "Learn More",
+                        "concept": "A patient smiling in the practice", "script": "A patient smiles at the camera" if i == 0 else "", "finalUrl": "/services/dental-implants"}
+            return {"adSets": [{"name": "Missing teeth", "theme": "Adults who may want implants", "audienceType": "interests", "interests": names + ["Made Up Interest"], "behaviors": [], "customAudiences": [],
+                                "lookalikes": [], "excludes": ["Dental students"], "budgetShare": 70, "placements": "Advantage+ placements", "landingPage": "/services/dental-implants", "ads": [ad_(0), ad_(1), ad_(2)]},
+                               {"name": "Lookalike of leads", "theme": "People like past leads", "audienceType": "lookalike", "interests": [], "behaviors": [], "customAudiences": [],
+                                "lookalikes": ["Form fills, 1 percent"], "excludes": [], "budgetShare": 30, "placements": "Advantage+ placements", "landingPage": "/services/dental-implants",
+                                "ads": [ad_(0), ad_(1), ad_(2)]}]}
         if stage.startswith("build:"):
             camp = data["campaign"]
             assets = {"sitelinks": [{"text": "Dental Implants", "desc1": "Replace missing teeth", "desc2": "Free consultation", "url": "/services/dental-implants"},

@@ -124,9 +124,15 @@ def test_interests_are_checked_against_metas_list_and_one_meta_does_not_have_is_
 
 def test_when_meta_did_not_answer_the_interests_are_kept_and_marked_unverified():
     (b, _d) = built_of(adset(interests=["Dentistry"]))
-    out, dropped = mc.verify_interests(b, {"Dentistry": None}, unanswered=True)
+    out, dropped = mc.verify_interests(b, {"Dentistry": None}, unanswered={"Dentistry"})
     assert dropped == [] and out["adSets"][0]["interests"] == ["Dentistry"] and out["adSets"][0]["interestsChecked"] == [{"name": "Dentistry", "id": "", "sizeText": "", "verified": False}]
     assert "interests" not in out.get("drops", {})
+
+
+def test_only_the_interest_meta_did_not_answer_for_is_kept_unverified_and_the_one_it_answered_no_for_is_dropped():
+    (b, _d) = built_of(adset(interests=["Dentistry", "Made up"]))
+    out, dropped = mc.verify_interests(b, {"Dentistry": None, "Made up": None}, unanswered={"Dentistry"})
+    assert dropped == ["Made up"] and out["adSets"][0]["interests"] == ["Dentistry"] and out["adSets"][0]["interestsChecked"][0]["verified"] is False
 
 
 def test_the_claim_scan_gets_every_primary_text_headline_and_description_with_where_it_is():

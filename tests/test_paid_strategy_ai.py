@@ -149,7 +149,7 @@ def test_each_stage_is_handed_its_evidence_and_the_earlier_stages():
     assert asked["profile"]["client"]["name"] == "Acme Dental" and asked["profile"]["website"]["pages"] and asked["profile"]["account"]["totals"]["cost"] == 1300.0
     assert asked["competitive"]["competitors"][0]["name"] == "smileaustin.com" and asked["competitive"]["clientProfile"]["summary"]
     assert asked["strategy"]["profile"]["summary"] and asked["strategy"]["forecast"]["scenarios"] and asked["strategy"]["social"]["platforms"]
-    assert asked["architecture"]["allowedKinds"] == list(ps.KIND_KEYS) and asked["architecture"]["clientPages"][0]["url"].startswith("https://acmedental.com")
+    assert asked["architecture"]["allowedKinds"] == ps.GOOGLE_KINDS and asked["architecture"]["clientPages"][0]["url"].startswith("https://acmedental.com")
     assert [c["name"] for c in arch["campaigns"]] == ["P2_Search_Implants_20261102", "P2_PMax_Local_20261102"]
 
 
