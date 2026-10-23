@@ -65,6 +65,14 @@ def findings(r):
                              "%s recorded %s conversions on %s of spend in this range. Under %d the cost per conversion moves a lot on one or two conversions, so it is not ranked against anything. "
                              "Choose a longer range." % (name(n), num(c["conv"]), money(c["cost"], cur), m.MIN_CONV),
                              ["%s conversions" % num(c["conv"]), "%s spend" % money(c["cost"], cur)]))
+    for n in names:
+        c = ch[n]["cur"]
+        if c["cost"] > 0 and c["conv"] >= m.MIN_CONV and not m.tracked(c["value"], c["cost"]):
+            out.append(_item("value-" + n, "low", "%s records no usable conversion value" % name(n),
+                             "%s counted %s conversions on %s of spend but recorded %s of conversion value (a return of %.2f), so no return on ad spend is shown for it and a value-based bid strategy "
+                             "(maximise conversion value, target ROAS) has nothing to learn from." % (name(n), num(c["conv"]), money(c["cost"], cur), money(c["value"], cur), (c["value"] / c["cost"]) if c["cost"] else 0),
+                             ["%s conversions" % num(c["conv"]), "%s of value for %s of spend" % (money(c["value"], cur), money(c["cost"], cur))],
+                             "If a conversion has a typical worth to the client (a lead, a booked appointment), give it that value in %s so return can be measured. If it has none, judge this platform on cost per conversion." % name(n)))
     both = [n for n in names if ch[n]["cur"]["conv"] >= m.MIN_CONV and ch[n]["cur"]["cpa"]]
     if len(both) == 2:
         a, b = sorted(both, key=lambda n: ch[n]["cur"]["cpa"])

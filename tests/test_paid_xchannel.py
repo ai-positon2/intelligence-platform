@@ -363,3 +363,17 @@ def test_a_piece_that_fails_counts_as_that_platform_failing(monkeypatch):
     monkeypatch.setattr(xc, "_shape", fake)
     r = xc.report_for(GID + "+" + ACT, store=FakeStore(), today=TODAY, now=NOW, accounts_fn=lambda: ACCTS, search_fn=lambda g: [], pages_fn=lambda p, q: [])
     assert r["platforms"] == ["google"] and any("second piece" in w for w in r["warnings"])
+
+
+def test_a_platform_with_conversions_but_no_usable_value_gets_a_finding_that_says_what_to_do():
+    from tracker import paid_xchannel_findings as f
+    def side(cost, conv, value):
+        cur = {"cost": cost, "conv": conv, "value": value, "cpa": cost / conv if conv else None, "roas": None, "impr": 1, "clicks": 1}
+        return {"cur": cur, "prev": cur, "share": 50, "types": []}
+    r = {"currency": "USD", "platforms": ["google"], "channels": {"google": side(102000.0, 1000, 1100.0)}, "blended": {"cur": side(1, 1, 1)["cur"], "prev": side(1, 1, 1)["cur"]}}
+    got = [x for x in f.findings(r) if x["id"] == "value-google"]
+    assert len(got) == 1 and got[0]["level"] == "low" and "a return of 0.01" in got[0]["text"] and "give it that value in Google Ads" in got[0]["action"]
+    ok = dict(r, channels={"google": side(1000.0, 100, 4000.0)})
+    assert not [x for x in f.findings(ok) if x["id"].startswith("value-")]
+    few = dict(r, channels={"google": side(102000.0, 3, 1100.0)})                      # too few conversions to say anything about their value
+    assert not [x for x in f.findings(few) if x["id"].startswith("value-")]

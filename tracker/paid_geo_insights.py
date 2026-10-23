@@ -62,9 +62,13 @@ MIXED_WHY = ("This account runs campaigns whose results are not the same thing (
              "across them. Pick one campaign type above.")
 
 
+MIN_TRACKED_ROAS = 0.05
+
+
 def basis_of(total):
-    """'roas' when the account tracks conversion value, 'cpa' when it only counts conversions, None when it has neither."""
-    if total.get("roas") and total.get("value", 0) > 0:
+    """'roas' when the account tracks conversion value, 'cpa' when it only counts conversions, None when it has neither. A return under MIN_TRACKED_ROAS is a value nobody set
+    (Beta Bionics counts a lead as a few cents), so it is judged on cost per conversion, not told "raise bids where the return is 0.01 against 0.01"."""
+    if total.get("roas") and total.get("value", 0) > 0 and total["roas"] >= MIN_TRACKED_ROAS:
         return "roas"
     if total.get("conversions", 0) > 0 and total.get("cpa"):
         return "cpa"

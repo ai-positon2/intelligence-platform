@@ -218,3 +218,11 @@ def test_the_briefing_is_worded_for_the_platform_that_was_read():
     assert "share of the budget" in meta and "Meta Ads terms" in meta and "bid adjustment" not in meta
     assert "higher or lower bid" in google and "Google Ads terms" in google and gs.SYSTEM == gs.system_for({})
     assert "Google Ads and Meta Ads terms" in gs.system_for({"account": {"platform": "both"}})
+
+
+def test_a_return_under_five_percent_is_judged_on_cost_per_conversion_not_told_raise_bids_where_it_is_0_01_against_0_01():
+    from tracker import paid_geo_insights as gi
+    assert gi.basis_of({"roas": 0.01, "value": 1100.0, "conversions": 3315, "cpa": 32.0}) == "cpa"
+    assert gi.basis_of({"roas": 0.05, "value": 5000.0, "conversions": 100, "cpa": 20.0}) == "roas"
+    assert gi.basis_of({"roas": 2.5, "value": 5000.0, "conversions": 100, "cpa": 20.0}) == "roas"
+    assert gi.basis_of({"roas": 0.01, "value": 1100.0, "conversions": 0, "cpa": None}) is None

@@ -47,7 +47,7 @@ function tiles(rep){
     {label: "Spend", value: money(c.cost, cur), hint: b.delta.cost == null ? rep.range.label : change(b.delta.cost) + " on the period before", tone: "neutral"},
     {label: "Conversions claimed", value: num(c.conv), hint: rep.platforms.length > 1 ? "the platforms' own claims, added" : name(rep.platforms[0]) + "'s own claim", tone: "neutral"},
     {label: "Cost per conversion", value: money(c.cpa, cur), hint: b.delta.cpa == null ? "blended" : "blended, " + change(b.delta.cpa) + " on the period before", tone: cpaTone},
-    {label: "Return on ad spend", value: c.roas == null ? "n/a" : ratio(c.roas) + "x", hint: c.roas == null ? "no conversion value tracked" : b.delta.roas == null ? "blended" : "blended, " + change(b.delta.roas) + " on the period before", tone: changeTone("roas", b.delta.roas)},
+    {label: "Return on ad spend", value: c.roas == null ? "n/a" : ratio(c.roas) + "x", hint: c.roas == null ? "no conversion value tracked, or too small to be a value" : b.delta.roas == null ? "blended" : "blended, " + change(b.delta.roas) + " on the period before", tone: changeTone("roas", b.delta.roas)},
     {label: "Findings", value: String(rep.summary.findings), hint: rep.summary.high ? rep.summary.high + " high" : "none high", tone: rep.summary.high ? "bad" : rep.summary.findings ? "warn" : "good"}
   ];
 }

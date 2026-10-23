@@ -91,7 +91,7 @@ def test_the_return_tile_says_when_no_value_is_tracked():
     rep = {"blended": {"cur": {"cost": 100, "conv": 5, "cpa": 20, "roas": None, "value": 0}, "delta": {"cost": None, "cpa": None, "roas": None}}, "account": {"currency": "USD"}, "platforms": ["meta"],
            "range": {"label": "the last 30 days"}, "summary": {"findings": 0, "high": 0}}
     t = run("X.tiles(R)", R=rep)
-    assert t[3]["value"] == "n/a" and t[3]["hint"] == "no conversion value tracked" and t[4]["tone"] == "good"
+    assert t[3]["value"] == "n/a" and t[3]["hint"] == "no conversion value tracked, or too small to be a value" and t[4]["tone"] == "good"
 
 
 def test_the_lead_line_names_the_platforms_the_spend_and_the_claim(reports):

@@ -345,3 +345,12 @@ def test_weeks_that_end_after_the_range_are_not_counted():
     d = {"days": days, "cost": [1.0] * 21, "conv": [1.0] * 21, "value": [0.0] * 21}
     assert len(m.weekly(d, days[0], days[-1])) == 3
     assert len(m.weekly(d, days[0], days[-2])) == 2                          # the range stops a day short of the third week
+
+
+def test_a_return_under_five_percent_is_a_conversion_value_nobody_set_and_shows_no_return():
+    # Beta Bionics: $106,719 spent, about $1,100 of conversion value (a lead is worth a few cents), so a return of 0.01 is not a finding
+    tiny = m.figures({"impr": 1000, "clicks": 50, "cost": 106719.0, "conv": 3315, "value": 1100.0})
+    assert tiny["roas"] is None and tiny["cpa"] == pytest.approx(106719 / 3315)
+    assert m.figures({"impr": 1000, "clicks": 50, "cost": 1000.0, "conv": 10, "value": 50.0})["roas"] == pytest.approx(0.05)           # the line itself is a return
+    assert m.figures({"impr": 1000, "clicks": 50, "cost": 1000.0, "conv": 10, "value": 49.9})["roas"] is None
+    assert m.tracked(50, 1000) and not m.tracked(49, 1000) and not m.tracked(0, 1000) and not m.tracked(50, 0)

@@ -135,13 +135,21 @@ def _ratio(a, b):
     return a / b if b and b > 0 else None
 
 
+MIN_TRACKED_ROAS = 0.05          # a return under this is a conversion value nobody set (a lead is worth a cent), not a store that loses 95% of what it spends
+
+
+def tracked(value, cost):
+    """Whether the conversion value is real enough to show a return from: some value, and at least MIN_TRACKED_ROAS of the spend."""
+    return value > 0 and cost > 0 and value / cost >= MIN_TRACKED_ROAS
+
+
 def figures(t):
     """The rates from totals: click rate (percent), cost per click, conversion rate (percent), cost per conversion, return on ad spend (None where the denominator is 0, and for return
     when no conversion value was recorded: a platform that records none has no return to show, not a return of zero)."""
     ctr, cvr = _ratio(t["clicks"], t["impr"]), _ratio(t["conv"], t["clicks"])
     return {"impr": t["impr"], "clicks": t["clicks"], "cost": t["cost"], "conv": t["conv"], "value": t["value"],
             "ctr": None if ctr is None else ctr * 100, "cpc": _ratio(t["cost"], t["clicks"]), "cvr": None if cvr is None else cvr * 100,
-            "cpa": _ratio(t["cost"], t["conv"]), "roas": _ratio(t["value"], t["cost"]) if t["value"] > 0 else None}
+            "cpa": _ratio(t["cost"], t["conv"]), "roas": _ratio(t["value"], t["cost"]) if tracked(t["value"], t["cost"]) else None}
 
 
 def add(a, b):
