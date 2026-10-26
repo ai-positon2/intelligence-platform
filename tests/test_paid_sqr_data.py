@@ -410,3 +410,56 @@ def test_a_list_that_was_cut_raises_its_flag(monkeypatch):
     monkeypatch.setattr(D, "MAX_NEGATIVE_ROWS", 0)
     out = D.read(FakeStore(), ACCT, START, END, http=google([], ANSWERS))
     assert out["negativesCut"] is True and out["keywordsCut"] is False
+
+
+# ── Every account of an MCC at once ─────────────────────────────────────────
+
+A1, A2, A3 = {"id": "1111111111", "name": "AMI"}, {"id": "2222222222", "name": "Heartland"}, {"id": "3333333333", "name": "NHI"}
+GROUP = {"id": "mcc-5717638537", "name": "OIA", "currency": "USD", "members": [A1, A2, A3]}
+
+
+def one_read(name):
+    return {"terms": [{"t": "mri near me", "s": "", "c": "Brand", "ct": "SEARCH", "g": "G1", "i": 10, "k": 2, "x": 3.0, "v": 1.0}],
+            "truncated": False, "keywords": [{"t": "mri", "m": "PHRASE", "c": "Brand", "g": "G1"}], "negatives": [{"t": "jobs", "m": "PHRASE", "c": ["Brand"]}],
+            "lists": [{"n": "Exclusions", "c": ["Brand"], "k": [["free", "BROAD"]]}], "warnings": ["Without the keyword list, a term can be suggested again."] if name == "NHI" else [],
+            "notes": D.NOTES, "keywordsFailed": name == "NHI", "negativesFailed": False, "keywordsCut": False, "negativesCut": False}
+
+
+def test_an_mcc_read_names_every_campaign_with_its_account_so_two_accounts_never_share_one():
+    out = D.read_group(None, GROUP, START, END, read_fn=lambda st, a, s, e, **k: one_read(a["name"]))
+    assert [t["c"] for t in out["terms"]] == ["AMI · Brand", "Heartland · Brand", "NHI · Brand"] and out["accounts"] == ["AMI", "Heartland", "NHI"]
+    assert out["keywords"][1]["c"] == "Heartland · Brand" and out["negatives"][2]["c"] == ["NHI · Brand"]
+    assert out["lists"][0] == {"n": "AMI · Exclusions", "c": ["AMI · Brand"], "k": [["free", "BROAD"]]}
+    assert out["warnings"] == ["NHI: Without the keyword list, a term can be suggested again."] and out["keywordsFailed"] is True
+
+
+def test_an_mcc_account_that_cannot_be_read_is_left_out_and_named_and_all_failing_is_an_error():
+    def read_fn(st, a, s, e, **k):
+        if a["name"] == "Heartland":
+            raise g.AdsError("Google Ads answered 403.")
+        return one_read(a["name"])
+    out = D.read_group(None, GROUP, START, END, read_fn=read_fn)
+    assert out["accounts"] == ["AMI", "NHI"] and out["warnings"][0] == "Heartland could not be read, so its search terms are left out: Google Ads answered 403."
+
+    def none(st, a, s, e, **k):
+        raise g.AdsError("Google Ads answered 503.")
+    with pytest.raises(g.AdsError):
+        D.read_group(None, GROUP, START, END, read_fn=none)
+
+
+def test_the_days_reads_running_out_stops_the_whole_mcc_read():
+    def read_fn(st, a, s, e, **k):
+        raise g.OverQuota("The day's Google Ads reads are used up.", until=0)
+    with pytest.raises(g.OverQuota):
+        D.read_group(None, GROUP, START, END, read_fn=read_fn)
+
+
+def test_the_data_route_reads_an_mcc_and_picks_the_rules_from_its_name(routes, monkeypatch):
+    from tracker import paid_segments
+    monkeypatch.setattr(paid_segments, "resolve_target", lambda t, **k: dict(GROUP) if t == GROUP["id"] else (_ for _ in ()).throw(paid_segments.BadRequest("That MCC is not one of Position2's Google Ads MCCs.")))
+    r = client_as(STAFF).get("/p2/paid-marketing/api/sqr/data?account=%s&start=%s&end=%s" % (GROUP["id"], START, END))
+    j = r.get_json()
+    assert r.status_code == 200 and j["account"] == {"id": "mcc-5717638537", "name": "OIA", "currency": "USD", "platform": "google", "isGroup": True, "accountCount": 3}
+    assert j["ruleset"]["id"] == "oia" and sorted(x[0] for x in routes) == ["1111111111", "2222222222", "3333333333"] and j["accounts"] == ["AMI", "Heartland", "NHI"]
+    bad = client_as(STAFF).get("/p2/paid-marketing/api/sqr/data?account=mcc-9999999999&start=%s&end=%s" % (START, END))
+    assert bad.status_code == 400 and "not one of" in bad.get_json()["error"]

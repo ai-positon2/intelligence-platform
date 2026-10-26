@@ -238,6 +238,59 @@ def read(store, account, start, end, *, force=False, notes=None, stamps=None, ht
 NOTES = ["Account-level negative keywords are not available from the Google Ads API, so a suggestion can repeat one the account has only at account level."]
 
 
+# ── Every account of an MCC at once ─────────────────────────────────────────
+
+GROUP_WORKERS = 4
+
+
+def tag(account_name, campaign):
+    """A campaign's name in an MCC read: the account's name first, so the same campaign name in two accounts is two campaigns (a keyword or a
+    negative of one never covers a term of the other)."""
+    return "%s · %s" % (account_name, campaign) if campaign else campaign
+
+
+def combine(parts):
+    """One read from the reads of an MCC's accounts: [(account, read)] in the MCC's order. Every campaign name is tagged with its account, and
+    every warning says which account it is about."""
+    out = {"terms": [], "truncated": False, "keywords": [], "negatives": [], "lists": [], "warnings": [], "notes": NOTES,
+           "keywordsFailed": False, "negativesFailed": False, "keywordsCut": False, "negativesCut": False}
+    for acct, r in parts:
+        name = acct["name"]
+        out["terms"] += [dict(t, c=tag(name, t["c"])) for t in r["terms"]]
+        out["keywords"] += [dict(k, c=tag(name, k["c"])) for k in r["keywords"]]
+        out["negatives"] += [dict(n, c=[tag(name, c) for c in n["c"]]) for n in r["negatives"]]
+        out["lists"] += [dict(l, n="%s · %s" % (name, l["n"]), c=[tag(name, c) for c in l["c"]]) for l in r.get("lists", [])]
+        out["warnings"] += ["%s: %s" % (name, w) for w in r["warnings"]]
+        for k in ("truncated", "keywordsFailed", "negativesFailed", "keywordsCut", "negativesCut"):
+            out[k] = out[k] or bool(r.get(k))
+    return out
+
+
+def read_group(store, group, start, end, *, force=False, notes=None, stamps=None, http=None, read_fn=None, workers=GROUP_WORKERS):
+    """read() for every account of an MCC ({id, name, members}), combined. An account that cannot be read is left out and named in the warnings;
+    every one failing raises the first error, and running out of the day's Google Ads reads stops the whole read (the rest would fail the same way)."""
+    from concurrent.futures import ThreadPoolExecutor
+    read_fn = read_fn or read
+    members = group.get("members") or []
+
+    def one(acct):
+        try:
+            return acct, read_fn(store, acct, start, end, force=force, notes=notes, stamps=stamps, http=http), None
+        except g.OverQuota:
+            raise
+        except g.AdsError as e:
+            return acct, None, e
+    with ThreadPoolExecutor(max_workers=max(1, min(workers, len(members) or 1))) as pool:
+        done = list(pool.map(one, members))
+    ok = [(a, r) for a, r, e in done if r is not None]
+    if not ok:
+        raise next(e for _a, _r, e in done if e) if done else ValueError("That MCC has no accounts to read.")
+    out = combine(ok)
+    out["warnings"] = ["%s could not be read, so its search terms are left out: %s" % (a["name"], e) for a, r, e in done if e] + out["warnings"]
+    out["accounts"] = [a["name"] for a, _r in ok]
+    return out
+
+
 # ── Which rules judge which account ─────────────────────────────────────────
 
 OIA_FACILITIES = {"ami", "cpic", "ft. jesse", "heartland", "holmdel-nj", "idi-fl", "nhi", "odc-al", "oic-culpeper", "smi", "ud", "wolf river"}

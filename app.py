@@ -4786,11 +4786,21 @@ def paid_gads_products():
 @position2_required
 def paid_sqr_read():
     """One Google Ads account's search terms, keywords and negative keywords for a range (what used to be three CSV exports), and which of
-    the agent's rulesets the account's name points to. Google only: Meta has no search terms."""
-    from tracker import paid_gads, paid_sqr_data, paid_store
+    the agent's rulesets the account's name points to; or, for an MCC (?account=mcc-...), every account of it at once, each campaign named
+    with its account. Google only: Meta has no search terms."""
+    from tracker import paid_gads, paid_gads_segments, paid_segments, paid_sqr_data, paid_store
 
     def run():
-        acct = _gads_account(paid_store)
+        target = request.args.get("account", "")
+        group = None
+        if paid_gads_segments.GROUP_ID_RE.match(target):                                   # an MCC: every account of it at once
+            try:
+                group = paid_segments.resolve_target(target)
+            except paid_segments.BadRequest as e:
+                raise ValueError(str(e))
+            acct = {"id": group["id"], "name": group["name"], "currency": group["currency"], "platform": "google", "isGroup": True, "accountCount": len(group["members"])}
+        else:
+            acct = _gads_account(paid_store)
         if acct.get("platform") != "google":
             raise ValueError("Search terms are read from Google Ads: pick a Google Ads account")
         start, end = paid_sqr_data.check_range(request.args.get("start", ""), request.args.get("end", ""))
@@ -4798,7 +4808,10 @@ def paid_sqr_read():
         if force:
             paid_gads.refresh_guard(paid_store, "sqr:" + acct["id"])
         notes, stamps = [], []
-        out = paid_sqr_data.read(paid_store, acct, start, end, force=force, notes=notes, stamps=stamps)
+        if group is not None:
+            out = paid_sqr_data.read_group(paid_store, group, start, end, force=force, notes=notes, stamps=stamps)
+        else:
+            out = paid_sqr_data.read(paid_store, acct, start, end, force=force, notes=notes, stamps=stamps)
         rid, why = paid_sqr_data.suggest_ruleset(acct["name"])
         return jsonify(account=acct, range=[start, end], ruleset={"id": rid, "why": why}, stale=min(notes) if notes else None,
                        fetchedAt=paid_gads.oldest(stamps), blockedUntil=_platform_blocked(acct, paid_store), **out)
