@@ -19,7 +19,7 @@ REFUSED = ["campaign.start_date,", "campaign.start_date ", "campaign.start_date 
 def test_every_query_of_the_recent_agents_builds_and_names_its_agent():
     qs = qc.google_queries()
     agents = {a for a, _l, _q in qs}
-    assert agents == {"brandis", "brandspend", "disapproved", "copycheck", "anomaly", "geoconf", "kpi", "kvis"} and len(qs) >= 40
+    assert agents == {"brandis", "brandspend", "disapproved", "copycheck", "anomaly", "geoconf", "kpi", "kvis", "track"} and len(qs) >= 40
     for agent, label, q in qs:
         assert q.startswith("SELECT ") and "%s" not in q and "%d" not in q, (agent, label)
     assert len({(a, l) for a, l, _q in qs}) == len(qs)                                       # no two queries share a name
@@ -60,7 +60,7 @@ def test_a_query_google_refuses_is_named_with_the_reason_and_the_rest_pass():
 
 def test_the_meta_reads_are_built_for_every_agent_and_cut_to_one_row():
     reqs = qc.meta_requests("act_1234567")
-    assert {a for a, _l, _p, _q in reqs} == {"geoconf", "copycheck", "kpi", "anomaly", "disapproved", "metacreative", "metahistory", "metainterests", "metaqa"}
+    assert {a for a, _l, _p, _q in reqs} == {"geoconf", "copycheck", "kpi", "anomaly", "disapproved", "metacreative", "metahistory", "metainterests", "metaqa", "track"}
     for agent, label, path, params in reqs:
         assert path and (path.startswith("/act_1234567/") or (agent == "metainterests" and path == "/search")) and params["limit"] == 1, (agent, label)      # Meta's interest search is not under an account
     geo = [r for r in reqs if r[0] == "geoconf"][0]

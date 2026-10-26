@@ -1,6 +1,6 @@
 name: Paid Marketing Monitors
 
-# Starts the daily run of the Paid Marketing monitors (the Brand Spend Alert, the Disapproved Ads Tracker, Location Conflicts, KPI Monitoring, on Mondays the Ad Copy Checker and on Tuesdays the Keyword Visibility Tracker) on the platform. The run itself happens on the platform (it reads the Google
+# Starts the daily run of the Paid Marketing monitors (the Brand Spend Alert, the Disapproved Ads Tracker, Location Conflicts, KPI Monitoring, Tracking & Data Health, on Mondays the Ad Copy Checker and on Tuesdays the Keyword Visibility Tracker) on the platform. The run itself happens on the platform (it reads the Google
 # Ads and Meta accounts, finds what is new, worse or fixed and sends the email and Slack alerts, and on Mondays the weekly summaries); this only calls its secret-guarded address, which
 # answers at once and runs in the background. The first run of a monitor sets its baseline and sends nothing.
 #

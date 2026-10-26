@@ -12,7 +12,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-tokens.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-components.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/gtm.css') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/paid_marketing.css') }}?v=60">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/paid_marketing.css') }}?v=61">
   <script src="/static/js/theme.js"></script>
   <link rel="stylesheet" href="/static/css/aurora-app.css?v=3">
   <script src="/static/js/aurora.js?v=1" defer></script>
@@ -662,6 +662,25 @@
         </div>
       </a>
 
+      <a href="/p2/paid-marketing/tracking-health" class="dash-card active c-th">
+        <div class="card-band"></div>
+        <div class="card-thumb">
+          <div class="card-thumb-icon"><svg class="au-ic" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 12h4l2-6 4 12 2-6h4"/></svg></div>
+          <div class="card-thumb-badge tb-live"><span class="tb-dot live"></span> Live</div>
+        </div>
+        <div class="card-body">
+          <div class="card-name">Tracking &amp; Data Health</div>
+          <div class="card-desc">
+            Catches conversions that stopped or dropped, a conversion action that stopped recording, audience lists that are shrinking, offline conversions that stopped arriving and a pixel that went silent, in Google Ads and Meta.
+            Says what it could not judge instead of calling it fine. Daily alerts. Read only.
+          </div>
+          <div class="card-footer">
+            <div class="card-tags"><span class="tag">Monitoring</span><span class="tag">Tracking</span></div>
+            <span class="card-arrow">→</span>
+          </div>
+        </div>
+      </a>
+
       <a href="/p2/paid-marketing/keyword-visibility" class="dash-card active c-kv">
         <div class="card-band"></div>
         <div class="card-thumb">
@@ -736,6 +755,7 @@
     {t:'Spend Anomaly Alert',d:'Is any account spending far more or less than it usually does today',u:'/p2/paid-marketing/spend-anomaly',i:'↗'},
     {t:'Location Conflicts',d:'Do the campaigns show where their names, ads and keywords say they do',u:'/p2/paid-marketing/location-conflicts',i:'↗'},
     {t:'KPI Monitoring',d:'Are the campaigns hitting their cost, return and rate targets, learning and delivering',u:'/p2/paid-marketing/kpi-monitoring',i:'◎'},
+    {t:'Tracking & Data Health',d:'Are conversions, tags, pixels and audience lists still working',u:'/p2/paid-marketing/tracking-health',i:'∿'},
     {t:'Keyword Visibility Tracker',d:'Are the highest-spend keywords still at the top of the page, and who is new in the auctions',u:'/p2/paid-marketing/keyword-visibility',i:'⌕'},
     {t:'QA Agent',d:'Campaign launch QC checklist',u:'/p2/paid-marketing/qa-agent',i:'✓'}
   ];
