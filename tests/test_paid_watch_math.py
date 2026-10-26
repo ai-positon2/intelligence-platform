@@ -96,7 +96,7 @@ def test_an_account_budget_order_nearly_used_or_about_to_end_is_flagged_and_the_
 def test_a_budget_that_moved_a_lot_is_flagged_and_a_small_move_is_not():
     r = run(g(changes=[chg(5, was=50.0, now=120.0, label="a budget raised from $50 to $120"), chg(30, was=100.0, now=105.0, label="a budget raised from $100 to $105")]))
     [f] = r["findings"]
-    assert f["rule"] == "budget_change" and f["level"] == "high" and f["title"] == "1 big budget change in the last 3 days" and f["evidence"] == ["2026-10-26 02:30 by ana@position2.com: a budget raised from $50 to $120"]
+    assert f["rule"] == "budget_change" and f["level"] == "high" and f["title"] == "Budget change: a budget raised from $50 to $120 by ana@position2.com" and f["evidence"] == ["2026-10-26 02:30 by ana@position2.com: a budget raised from $50 to $120"]
     assert run(g(changes=[chg(5, was=100.0, now=140.0)]))["findings"][0]["level"] == "medium"                                   # a 40 percent rise
     assert run(g(changes=[chg(5, was=100.0, now=25.0)]))["findings"][0]["level"] == "high"                                      # down to a quarter
     assert run(g(changes=[chg(5, was=100.0, now=110.0)]))["findings"] == []
@@ -142,7 +142,7 @@ def test_a_primary_conversion_goal_that_was_hidden_or_stopped_counting_is_high_a
     hist = [snap(1, actions=prev_actions(*before))]
     hidden = run(g(actions=[act("1", status="HIDDEN"), act("2", "Call", primary=False)]), history=hist)
     [f] = hidden["findings"]
-    assert f["rule"] == "goal_change" and f["level"] == "high" and f["evidence"] == ['"Form" went from enabled to hidden'] and f["title"] == "1 conversion goal changed since the last reading"
+    assert f["rule"] == "goal_change" and f["level"] == "high" and f["evidence"] == ['"Form" went from enabled to hidden'] and f["title"] == 'Conversion goal changed: "Form" went from enabled to hidden'
     assert run(g(actions=[act("1", include=False), act("2", "Call", primary=False)]), history=hist)["findings"][0]["level"] == "high"
     minor = run(g(actions=[act("1"), act("2", "Call", primary=True)]), history=hist)
     assert minor["findings"][0]["level"] == "medium" and minor["findings"][0]["evidence"] == ['"Call" became primary']
@@ -166,7 +166,7 @@ def test_a_new_administrator_is_high_a_new_user_or_a_removed_one_is_medium_and_n
     hist = [snap(1, users={"ana@position2.com": "ADMIN", "bo@position2.com": "STANDARD"})]
     admin = run(g(users=[{"email": "ana@position2.com", "role": "ADMIN"}, {"email": "bo@position2.com", "role": "STANDARD"}, {"email": "x@evil.com", "role": "ADMIN"}]), history=hist)
     [f] = admin["findings"]
-    assert f["rule"] == "access_change" and f["level"] == "high" and f["evidence"] == ["x@evil.com was added as admin"] and f["title"] == "Access changed: 1 change"
+    assert f["rule"] == "access_change" and f["level"] == "high" and f["evidence"] == ["x@evil.com was added as admin"] and f["title"] == "Access changed: x@evil.com was added as admin"
     std = run(g(users=[{"email": "ana@position2.com", "role": "ADMIN"}, {"email": "bo@position2.com", "role": "STANDARD"}, {"email": "c@client.com", "role": "READ_ONLY"}]), history=hist)
     assert std["findings"][0]["level"] == "medium" and std["findings"][0]["evidence"] == ["c@client.com was added as read only"]
     removed = run(g(users=[{"email": "ana@position2.com", "role": "ADMIN"}]), history=hist)
@@ -210,10 +210,10 @@ def test_meta_activity_that_touches_access_payment_or_limits_is_flagged_by_what_
 
 
 def test_meta_budget_and_bid_changes_and_outside_actors_are_flagged():
-    r = run(meta(activity=[ev(4, "update_campaign_budget", was=50.0, now=200.0, what="budget from 50 to 200"), ev(5, "update_ad_set_budget", was=100.0, now=110.0), ev(6, "update_ad_set_bid_info"),
+    r = run(meta(activity=[ev(4, "update_campaign_budget", was=50.0, now=200.0, what="update campaign budget"), ev(5, "update_ad_set_budget", was=100.0, now=110.0), ev(6, "update_ad_set_bid_info"),
                            ev(7, "update_ad_set_optimization_goal"), ev(8, "create_ad", actor="jim@client.com"), ev(9, "create_ad", actor="jim@client.com")]), platform="meta")
     got = {f["rule"]: f for f in r["findings"]}
-    assert set(got) == {"budget_change", "bid_change", "outside_editor"} and got["budget_change"]["level"] == "high" and got["budget_change"]["title"] == "1 big budget change in the last 3 days"
+    assert set(got) == {"budget_change", "bid_change", "outside_editor"} and got["budget_change"]["level"] == "high" and got["budget_change"]["title"] == "Budget change: update campaign budget from $50.00 to $200 by Ana"
     assert got["bid_change"]["title"] == "2 bid or goal changes in the last 3 days" and got["outside_editor"]["title"] == "jim@client.com outside Position2 made 2 changes"
     unknown = run(meta(activity=[ev(4, "update_campaign_budget")]), platform="meta")
     assert unknown["findings"][0]["level"] == "medium"

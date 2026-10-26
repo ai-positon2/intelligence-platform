@@ -99,10 +99,11 @@ def make_spec(*, today=None, search_fn=None, list_fn=None, mon_store=None, meta_
         if clients is not None:
             read_ids = {a["id"] for a in accounts}
             for c in clients.values():
-                if c["status"] != "ENABLED" and c["id"] not in read_ids:
-                    res = w._inactive_result(c, at0)
-                    ok.add(c["id"])
-                    issues_out += issues_of({"id": c["id"], "name": c["name"], "platform": "google"}, res)
+                if c["id"] in read_ids:
+                    continue
+                ok.add(c["id"])                                                      # listed by the manager account, so an issue about it can be resolved (an account enabled again before the platform's own list shows it)
+                if c["status"] != "ENABLED":
+                    issues_out += issues_of({"id": c["id"], "name": c["name"], "platform": "google"}, w._inactive_result(c, at0))
             snap = w.mcc_snapshot(clients, w.history_for(mon_store, "mcc", at0.date()), at0.date())
             snaps["mcc"] = snap
             for cid, name in snap["gone"].items():

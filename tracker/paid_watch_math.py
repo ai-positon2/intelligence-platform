@@ -119,6 +119,19 @@ def _line(c, cur):
     return "%s by %s: %s" % (str(c.get("at") or "")[:16].replace("T", " "), who, c.get("label") or c.get("what") or "a change")
 
 
+def _one_or(items, many, one):
+    """The title of a finding: the single change in words when there is one (an alert shows only the title), else `many` (a count)."""
+    return one(items[0]) if len(items) == 1 else many
+
+
+def _meta_what(c, cur):
+    """An activity in words: Meta's own wording of its type, with the amounts when it gave them."""
+    what = c.get("what") or str(c.get("type") or "a change").replace("_", " ")
+    if c.get("was") is not None and c.get("now") is not None:
+        what += " from %s to %s" % (money(c["was"], cur), money(c["now"], cur))
+    return what
+
+
 def _newest_key(prefix, rows):
     return "%s:%s" % (prefix, str(rows[0][1].get("at") or "")[:19].replace(" ", "T")) if rows else prefix
 
@@ -218,11 +231,13 @@ def _google_changes(a, now):
                 big.append((lvl, at, c))
     if big:
         level = "high" if any(l == "high" for l, _a, _c in big) else "medium"
-        found.append(_finding("budget_change", _newest_key("budget_change", [(b[1], b[2]) for b in big]), "%s in the last %s" % (plural(len(big), "big budget change"), plural(CHANGE_DAYS, "day")),
-                              "A budget moved by 30 percent or more (or was added or removed)." , level=level, evidence=[_line(c, cur) for _l, _a, c in big[:SHOWN]]))
+        found.append(_finding("budget_change", _newest_key("budget_change", [(b[1], b[2]) for b in big]),
+                              _one_or(big, "%s in the last %s" % (plural(len(big), "big budget change"), plural(CHANGE_DAYS, "day")), lambda b: "Budget change: %s by %s" % (b[2].get("label"), b[2].get("user") or "an unknown source")),
+                              "A budget moved by 30 percent or more (or was added or removed).", level=level, evidence=[_line(c, cur) for _l, _a, c in big[:SHOWN]]))
     bids = [(at, c) for at, c in rows if c.get("kind") == "bidding"]
     if bids:
-        found.append(_finding("bid_change", _newest_key("bid_change", bids), "%s in the last %s" % (plural(len(bids), "bidding change"), plural(CHANGE_DAYS, "day")),
+        found.append(_finding("bid_change", _newest_key("bid_change", bids), _one_or(bids, "%s in the last %s" % (plural(len(bids), "bidding change"), plural(CHANGE_DAYS, "day")),
+                                                                                 lambda b: "Bidding change: %s by %s" % (b[1].get("label"), b[1].get("user") or "an unknown source")),
                               "A campaign's bid strategy or its target was changed.", evidence=[_line(c, cur) for _a, c in bids[:SHOWN]]))
     by_user = {}
     for at, c in rows:
@@ -278,7 +293,7 @@ def _actions(a, history, today):
         if aid not in prev:
             ev.append("\"%s\" was added" % (cur.get("name") or aid))
     if ev:
-        return [_finding("goal_change", "goals:%s" % "|".join(sorted(ev))[:60].replace(" ", "_"), "%s changed since the last reading" % plural(len(ev), "conversion goal"), "What the conversion actions count is not what it was.", level=level, evidence=ev[:SHOWN])], \
+        return [_finding("goal_change", "goals:%s" % "|".join(sorted(ev))[:60].replace(" ", "_"), ("Conversion goal changed: %s" % ev[0]) if len(ev) == 1 else "%s changed since the last reading" % plural(len(ev), "conversion goal"), "What the conversion actions count is not what it was.", level=level, evidence=ev[:SHOWN])], \
             _check("goals", "Conversion goals are as they were", "problem", plural(len(ev), "change") + " since the last reading.")
     return [], _check("goals", "Conversion goals are as they were", "ok", "%s unchanged since the last reading." % plural(len(acts), "action"))
 
@@ -305,7 +320,7 @@ def _users(a, history, today):
         if email not in now:
             ev.append("%s was removed" % email)
     if ev:
-        return [_finding("access_change", "access:%s" % "|".join(ev)[:60].replace(" ", "_"), "Access changed: %s" % plural(len(ev), "change"), "Who can open the account is not who could at the last reading.", level=level, evidence=ev[:SHOWN * 2])], \
+        return [_finding("access_change", "access:%s" % "|".join(ev)[:60].replace(" ", "_"), ("Access changed: %s" % ev[0]) if len(ev) == 1 else "Access changed: %s" % plural(len(ev), "change"), "Who can open the account is not who could at the last reading.", level=level, evidence=ev[:SHOWN * 2])], \
             _check("access", "Nobody new can open the account", "problem", plural(len(ev), "change") + " since the last reading.")
     return [], _check("access", "Nobody new can open the account", "ok", "%s, the same as at the last reading." % plural(len(now), "person with access", "people with access"))
 
@@ -359,13 +374,17 @@ def _activity(a, now):
                     hits.append((lvl, at, c))
                     break
     if budgets:
-        found.append(_finding("budget_change", _newest_key("budget_change", [(b[1], b[2]) for b in budgets]), "%s in the last %s" % (plural(len(budgets), "big budget change"), plural(CHANGE_DAYS, "day")),
+        found.append(_finding("budget_change", _newest_key("budget_change", [(b[1], b[2]) for b in budgets]),
+                              _one_or(budgets, "%s in the last %s" % (plural(len(budgets), "big budget change"), plural(CHANGE_DAYS, "day")), lambda b: "Budget change: %s by %s" % (_meta_what(b[2], cur), b[2].get("actor") or "an unknown source")),
                               "A budget moved by 30 percent or more (or was added or removed).", level="high" if any(b[0] == "high" for b in budgets) else "medium", evidence=[_line(c, cur) for _l, _a, c in budgets[:SHOWN]]))
     if bids:
-        found.append(_finding("bid_change", _newest_key("bid_change", bids), "%s in the last %s" % (plural(len(bids), "bid or goal change"), plural(CHANGE_DAYS, "day")), "An ad set's bid or its optimisation goal was changed.",
-                              evidence=[_line(c, cur) for _a, c in bids[:SHOWN]]))
+        found.append(_finding("bid_change", _newest_key("bid_change", bids), _one_or(bids, "%s in the last %s" % (plural(len(bids), "bid or goal change"), plural(CHANGE_DAYS, "day")),
+                                                                                 lambda b: "Bid change: %s by %s" % (_meta_what(b[1], cur), b[1].get("actor") or "an unknown source")),
+                              "An ad set's bid or its optimisation goal was changed.", evidence=[_line(c, cur) for _a, c in bids[:SHOWN]]))
     if hits:
-        found.append(_finding("activity", _newest_key("activity", [(h[1], h[2]) for h in hits]), "%s touching payment, access or limits" % plural(len(hits), "change"), "The account's activity history shows changes that matter.",
+        found.append(_finding("activity", _newest_key("activity", [(h[1], h[2]) for h in hits]), _one_or(hits, "%s touching payment, access or limits" % plural(len(hits), "change"),
+                                                                                                    lambda h: "%s by %s" % (_meta_what(h[2], cur).capitalize(), h[2].get("actor") or "an unknown source")),
+                              "The account's activity history shows changes that matter.",
                               level="high" if any(h[0] == "high" for h in hits) else "medium", evidence=[_line(c, cur) for _l, _a, c in hits[:SHOWN]]))
     by_actor = {}
     for at, c in rows:
