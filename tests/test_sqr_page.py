@@ -209,3 +209,15 @@ def test_conversion_rate_is_conversions_per_click_and_a_dash_without_clicks():
     assert "const convRate = (conv, clicks) => clicks > 0 ? (Number(conv) / clicks * 100).toFixed(1)" in js
     assert '"Cost", "Conv Rate"], ...r.allKeywords' in js and 'k.cost.toFixed(2), convRate(k.conversions, k.clicks)])' in js   # both workbook sheets carry it
     assert js.count("convRate(k.conversions, k.clicks)") == 4                   # the two page tables and the two sheets
+
+
+def test_picking_an_mcc_says_the_pull_is_limited_with_the_real_limits():
+    """The note under the account picker quotes the limits the server and the model step actually use, so it cannot drift from them."""
+    import re as _re
+    from tracker import paid_segments, paid_sqr_data
+    html, js = read(TEMPLATE), read(PAGE)
+    core = read(os.path.join(os.path.dirname(PAGE), "sqr_core.js"))
+    assert 'id="mccNote"' in html and "hidden" in html.split('id="mccNote"')[1].split(">")[0]
+    assert "const MCC_TERM_ROWS = %d, MCC_MAX_ACCOUNTS = %d," % (paid_sqr_data.MAX_TERM_ROWS, paid_segments.MAX_MEMBERS) in js
+    assert "num(Core.MODEL_CAP)" in js and _re.search(r"MODEL_CAP = \d+", core)
+    assert "so the pull is limited" in js and "paintMccNote(a);" in js and "—" not in js

@@ -544,7 +544,24 @@ let firstLoad = true;
 if (PL && $id("platSw")) PL.googleOnly($id("platSw"), { name: "Search Query Analysis", why: "Meta has no search terms: people are reached by audience and placement, not by what they typed.",
   closest: [{ label: "Segment Analysis", href: "/p2/paid-marketing/segment-analysis" }, { label: "Audience Segments", href: "/p2/paid-marketing/audience-segments" }], body: "#gBody" });
 /* The account picker: every Google Ads account, and each MCC as "All of ..." to read all its accounts at once (the same list the other agents use). */
+/* What reading a whole MCC leaves out, said before it is read. The figures are the real limits: MAX_TERM_ROWS in tracker/paid_sqr_data.py (each account,
+   each kind), MAX_MEMBERS in tracker/paid_segments.py, and the model's cap in sqr_core.js. */
+const MCC_TERM_ROWS = 20000, MCC_MAX_ACCOUNTS = 40, MCC_READS_PER_ACCOUNT = 5;
+function mccNoteHtml(a){
+  if (!a || !a.isGroup) return "";
+  const n = a.accountCount || 0;
+  return "<b>Reading all " + num(n) + " accounts of " + esc(a.name) + " together, so the pull is limited.</b> " +
+    "Each account gives at most its " + num(MCC_TERM_ROWS) + " costliest search term rows of each kind (search and Performance Max), " +
+    "and the model reads only the " + num(Core.MODEL_CAP) + " costliest terms no rule settled across the whole MCC, so smaller accounts' terms can go unread. " +
+    "It also uses about " + num(MCC_READS_PER_ACCOUNT * n) + " of the day's shared Google Ads reads (about " + MCC_READS_PER_ACCOUNT + " an account), and an MCC of more than " + MCC_MAX_ACCOUNTS + " accounts cannot be read at once. " +
+    "For a large MCC, pick a shorter date range, or one account at a time for a full read.";
+}
+function paintMccNote(a){
+  const el = $id("mccNote"), html = mccNoteHtml(a);
+  el.innerHTML = html; el.hidden = !html;
+}
 function chooseAccount(a){
+  paintMccNote(a);
   if (!a) { S.acct = null; setLive("No Google Ads account to read", true); refreshReady(); return; }
   if (S.acct && S.acct.id === a.id && !firstLoad) return;
   firstLoad = false;
