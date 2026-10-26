@@ -40,9 +40,9 @@ The days are the point (a failure there is raised); every other read is soft (a 
 | `action_stopped` | high or medium | a conversion action with at least 5 a week usually recorded none in 7 days: high when it carried half of the account's conversions; not listed when the whole account stopped |
 | `list_lost` | high | a list is empty, or (Google) fell under the 1,000 people Search needs |
 | `list_shrunk` | medium | a list lost 30 percent against the largest reading of the last 14 days (the monitor's own daily snapshots), from 500 people or more |
-| `upload_stale` | medium | an enabled offline conversion action and no upload for 14 days, or Google's log says no recent upload or needs attention |
+| `upload_stale` | medium | an enabled offline conversion action and no upload for 14 days, or Google's log says no recent upload or needs attention (no log row at all is "not judged": a link that never worked cannot be told from an action that was never used) |
 | `pixel_unavailable` | high | Meta marks the pixel unavailable |
-| `pixel_stale` | medium (high with conversions stopped for 3 days) | the pixel has not fired for 48 hours (or never) while the account spent in the last 7 days |
+| `pixel_stale` | medium (high with conversions stopped for 3 days; low while the account still records conversions, because the pixel is then probably one it no longer uses) | the pixel has not fired for 48 hours (or never) while the account spent in the last 7 days |
 | `terms` | low (medium when the account has a customer list) | customer data terms not accepted |
 
 Enough data first: an account whose usual rate promises under 5 conversions in a window is listed as **not judged** with the number it had, never called fine. Nothing spent means nothing to judge.
@@ -58,3 +58,8 @@ channel set for the monitors, once a day with the others.
 
 Team-saved settings (thresholds are fixed and written on the page), a tag-on-site scan (fetching the account's final URLs and looking for the conversion tag), GA4 property checks and Meta CAPI health.
 Each needs access or a design this agent does not have yet.
+
+## Found by the first live read (2026-10-26)
+
+On Beta Bionics the first version flagged an upload action that had never received an upload and a pixel that last fired 133 days ago while the account recorded 703 conversions a week. Neither is
+a broken tag, so the first is now "not judged" and the second is low. Every new Google query and Meta request was accepted by the real APIs (admin live query check, `agents=track`).

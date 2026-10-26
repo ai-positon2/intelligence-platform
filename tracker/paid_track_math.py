@@ -243,15 +243,16 @@ def _uploads(a, today, now):
         t = t.replace(tzinfo=dt.timezone.utc)
     age = (now - t).days if t is not None else None
     status = str(u.get("status") or "")
-    if status in ("NO_RECENT_UPLOAD", "NEEDS_ATTENTION") or (age is not None and age >= UPLOAD_STALE_DAYS) or (t is None and not last):
-        why = "Google's log says %s" % status.replace("_", " ").lower() if status in ("NO_RECENT_UPLOAD", "NEEDS_ATTENTION") else (
-            "the last upload was %s ago" % plural(age, "day") if age is not None else "no upload is on record")
+    if t is None and not last and status not in ("NO_RECENT_UPLOAD", "NEEDS_ATTENTION"):
+        return [], _check("uploads", "Offline conversions arrive", "unknown", "An offline conversion action is set up but Google has no upload on record for it, so a broken link cannot be told from one that was never used.")
+    if status in ("NO_RECENT_UPLOAD", "NEEDS_ATTENTION") or (age is not None and age >= UPLOAD_STALE_DAYS):
+        why = "Google's log says %s" % status.replace("_", " ").lower() if status in ("NO_RECENT_UPLOAD", "NEEDS_ATTENTION") else "the last upload was %s ago" % plural(age, "day")
         return [_finding("upload_stale", "uploads", "Offline conversions are not arriving: %s" % why, "This account has an offline conversion action (a CRM or a form tool sends the sales or the calls), and %s." % why,
                          evidence=["Status: %s" % (status or "unknown"), "Last upload: %s" % (last[:10] if last else "none on record")])], _check("uploads", "Offline conversions arrive", "problem", why[0].upper() + why[1:] + ".")
     return [], _check("uploads", "Offline conversions arrive", "ok", "The last upload was %s ago." % plural(age or 0, "day"))
 
 
-def _pixels(a, now, conv_stopped):
+def _pixels(a, now, conv_stopped, conv_healthy):
     pixels = a.get("pixels")
     if pixels is None:
         return [], _check("pixels", "The pixel fires", "unknown", "The pixels could not be read.")
@@ -275,12 +276,14 @@ def _pixels(a, now, conv_stopped):
             t = t.replace(tzinfo=dt.timezone.utc)
         hours = (now - t).total_seconds() / 3600 if t is not None else None
         if t is None:
-            found.append(_finding("pixel_stale", "pixel:%s" % p["id"], "The pixel \"%s\" has never fired" % name, "Meta has no record of an event from it, and the account spent in the last 7 days.", evidence=["Pixel %s" % p["id"]]))
+            found.append(_finding("pixel_stale", "pixel:%s" % p["id"], "The pixel \"%s\" has never fired" % name, "Meta has no record of an event from it, and the account spent in the last 7 days.",
+                                  level="low" if conv_healthy else None, evidence=["Pixel %s" % p["id"]] + (["The account still records conversions, so this may be a pixel it no longer uses."] if conv_healthy else [])))
         elif hours >= PIXEL_MEDIUM_HOURS:
             days = int(hours // 24)
             found.append(_finding("pixel_stale", "pixel:%s" % p["id"], "The pixel \"%s\" last fired %s ago" % (name, plural(days, "day")),
                                   "The account spent in the last 7 days and the pixel has been silent for %s." % plural(days, "day"),
-                                  level="high" if days >= PIXEL_HIGH_DAYS and conv_stopped else None, evidence=["Last fired: %s" % fired[:16].replace("T", " "), "Pixel %s" % p["id"]]))
+                                  level="high" if days >= PIXEL_HIGH_DAYS and conv_stopped else ("low" if conv_healthy else None),
+                                  evidence=["Last fired: %s" % fired[:16].replace("T", " "), "Pixel %s" % p["id"]] + (["The account still records conversions, so this may be a pixel it no longer uses."] if conv_healthy else [])))
     if found:
         return found, _check("pixels", "The pixel fires", "problem", plural(len(found), "pixel") + " silent or unavailable.")
     if not spent:
@@ -302,7 +305,8 @@ def analyse(a, *, history=None, today=None, now=None, platform="google"):
     if platform == "google":
         parts += [_actions(a, today, stopped), _lists(a, today, history, "google"), _terms(a), _uploads(a, today, now)]
     else:
-        parts += [_pixels(a, now, stopped), _lists(a, today, history, "meta")]
+        healthy = not conv_found and conv_check["state"] == "ok"
+        parts += [_pixels(a, now, stopped, healthy), _lists(a, today, history, "meta")]
     findings = [f for fs, _c in parts for f in fs]
     findings.sort(key=lambda f: (-LEVEL_RANK[f["level"]], ORDER.index(f["rule"]), f["key"]))
     counts = {k: sum(1 for f in findings if f["level"] == k) for k in LEVEL_RANK}

@@ -142,15 +142,17 @@ def test_each_run_saves_the_lists_and_the_outcome_for_the_next_days_comparison()
     assert snap_b["status"] == "fix" and snap_b["high"] == 1 and snap_b["findings"] >= 1
 
 
-def test_a_meta_account_is_read_with_its_pixel_and_a_silent_pixel_is_alerted():
+def test_a_meta_account_is_read_with_its_pixel_a_silent_pixel_is_quiet_while_conversions_arrive_and_alerted_when_they_stop():
     s, dv, w = configured(), Deliver(), World()
     run(s, w, dv, d(0), accounts=[A, B, M])
     w.pixel_fired = "2026-10-20T06:00:00+0000"
     r = run(s, w, dv, d(1), accounts=[A, B, M])
-    assert r["read"] == 3 and r["new"] == 1 and "Meta Co" in dv.emails[0]["text"] and "The pixel \"Site\" last fired 7 days ago" in dv.emails[0]["text"]
+    assert r["read"] == 3 and r["new"] == 0 and r["alerted"] == 0 and not dv.emails                       # conversions are still arriving: the pixel is probably one the account no longer uses
+    quiet = [i for i in s.issues_all("track") if i["accountId"] == M["id"]]
+    assert [i["fingerprint"] for i in quiet] == ["track:act_1234567:small"] and "last fired 7 days ago" in quiet[0]["detail"] and quiet[0]["level"] == "low"
     w.meta_quiet = 3
     r2 = run(s, w, dv, d(2), accounts=[A, B, M])
-    assert r2["alerted"] >= 1 and "No conversions in the last 3 days" in dv.emails[-1]["text"]
+    assert r2["new"] == 2 and r2["alerted"] == 2 and "No conversions in the last 3 days" in dv.emails[-1]["text"] and "The pixel \"Site\" last fired 8 days ago" in dv.emails[-1]["text"]
 
 
 def test_a_spent_google_budget_does_not_stop_the_read_of_a_meta_account():

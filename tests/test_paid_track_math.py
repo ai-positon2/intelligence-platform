@@ -179,7 +179,9 @@ def test_offline_conversions_that_stopped_arriving_are_medium_with_the_reason_in
     flagged = run(acct(uploads={"hasUploadActions": True, "status": "NO_RECENT_UPLOAD", "lastUpload": "2026-10-19 10:00:00"}))
     assert "Google's log says no recent upload" in flagged["findings"][0]["title"]
     never = run(acct(uploads={"hasUploadActions": True, "status": "", "lastUpload": ""}))
-    assert "no upload is on record" in never["findings"][0]["title"]
+    assert never["findings"] == [] and check(never, "uploads")["state"] == "unknown" and "cannot be told from one that was never used" in check(never, "uploads")["note"]      # no log at all is not a broken link
+    broken = run(acct(uploads={"hasUploadActions": True, "status": "NEEDS_ATTENTION", "lastUpload": ""}))
+    assert broken["findings"][0]["title"] == "Offline conversions are not arriving: Google's log says needs attention"
     fine = run(acct(uploads={"hasUploadActions": True, "status": "GOOD", "lastUpload": "2026-10-18 10:00:00"}))
     assert fine["findings"] == [] and "2 days ago" in check(fine, "uploads")["note"]
     assert run(acct(uploads={"hasUploadActions": False}))["findings"] == [] and check(run(acct(uploads=None)), "uploads")["state"] == "unknown"
@@ -189,16 +191,19 @@ def px(pid, fired, unavailable=False):
     return {"id": pid, "name": "Pixel " + pid, "lastFired": fired, "unavailable": unavailable}
 
 
-def test_a_pixel_that_has_been_silent_is_medium_high_with_conversions_gone_and_an_unavailable_one_is_high():
-    two_days = run(acct(pixels=[px("1", "2026-10-17T08:00:00+0000")]), platform="meta")
-    [f] = two_days["findings"]
+def test_a_pixel_that_has_been_silent_is_medium_high_with_conversions_gone_low_when_conversions_are_fine_and_an_unavailable_one_is_high():
+    slow = acct(days=days(0.3), pixels=[px("1", "2026-10-17T08:00:00+0000")])                      # too few conversions to say they are fine
+    [f] = run(slow, platform="meta")["findings"]
     assert f["rule"] == "pixel_stale" and f["level"] == "medium" and f["title"] == "The pixel \"Pixel 1\" last fired 3 days ago"
+    healthy = run(acct(pixels=[px("1", "2026-10-17T08:00:00+0000")]), platform="meta")                # 21 conversions a week and still arriving: the pixel is probably not the one in use
+    assert healthy["findings"][0]["level"] == "low" and healthy["status"] == "check" and "may be a pixel it no longer uses" in healthy["findings"][0]["evidence"][-1]
+    assert run(acct(pixels=[px("1", "")]), platform="meta")["findings"][0]["level"] == "low"
     gone = run(acct(days=days(3, recent_conv=0, recent_days=3), pixels=[px("1", "2026-10-15T08:00:00+0000")]), platform="meta")
     assert {f["rule"]: f["level"] for f in gone["findings"]} == {"no_conv": "high", "pixel_stale": "high"}
     off = run(acct(pixels=[px("1", "2026-10-20T10:00:00+0000", unavailable=True)]), platform="meta")
     assert off["findings"][0]["rule"] == "pixel_unavailable" and off["findings"][0]["level"] == "high"
-    never = run(acct(pixels=[px("1", "")]), platform="meta")
-    assert never["findings"][0]["title"] == "The pixel \"Pixel 1\" has never fired"
+    never = run(acct(days=days(0.3), pixels=[px("1", "")]), platform="meta")
+    assert never["findings"][0]["title"] == "The pixel \"Pixel 1\" has never fired" and never["findings"][0]["level"] == "medium"
     ok = run(acct(pixels=[px("1", "2026-10-20T06:00:00+0000")]), platform="meta")
     assert ok["findings"] == [] and "fired in the last 48 hours" in check(ok, "pixels")["note"]
 
