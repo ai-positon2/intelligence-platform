@@ -74,6 +74,6 @@ def test_clients_without_a_budget_row_stay_in_the_picker_when_the_pacing_list_lo
         assert r.returncode == 0, r.stderr
         return json.loads(r.stdout)
 
-    assert names("[{name:'Riccobene'},{name:'OIA'}]") == ["Riccobene", "OIA", "Soteri Skin"]
-    assert names("[{name:'Soteri Skin'},{name:'OIA'}]") == ["Soteri Skin", "OIA"]   # never listed twice
+    assert names("[{name:'Riccobene'},{name:'OIA'}]") == ["Riccobene", "OIA", "Soteri Skin", "Tealium"]
+    assert names("[{name:'Soteri Skin'},{name:'Tealium'},{name:'OIA'}]") == ["Soteri Skin", "Tealium", "OIA"]   # never listed twice
     assert src.count("setClients(withExtraClients(") == 2   # the first paint and the pacing list

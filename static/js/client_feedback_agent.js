@@ -25,7 +25,7 @@ var FALLBACK_CLIENTS = ["BD Diesel","Beta Bionics","Brian Tooley Racing","D&J Pr
 
 // Clients the team asks about that have no Budget Tracker row, so the Pacing Desk run never lists them.
 // Without this they are missing from the picker whenever the run's own client list loads.
-var EXTRA_CLIENTS = ["Soteri Skin"];
+var EXTRA_CLIENTS = ["Soteri Skin","Tealium"];
 function withExtraClients(list){
   var out=list.slice();
   EXTRA_CLIENTS.forEach(function(n){ if(!out.some(function(c){return c.name===n})) out.push({name:n}); });
