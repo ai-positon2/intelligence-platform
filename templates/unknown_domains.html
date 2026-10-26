@@ -23,7 +23,10 @@
     <section class="pm-panel ud-scan" id="scanCard">
       <div class="ud-scan-row">
         <p class="pd-fresh" id="fresh"></p>
-        <button class="pm-btn" id="scanBtn" type="button">Scan now</button>
+        <div class="ud-scan-btns">
+          <a class="pm-btn-ghost" id="exportAll" href="/p2/paid-marketing/api/domains/export.xlsx" title="Findings of every status, the domain database, what each account uses, the broken links and the scans, as one Excel file">Download everything</a>
+          <button class="pm-btn" id="scanBtn" type="button">Scan now</button>
+        </div>
       </div>
       <div id="progress" class="ud-progress" hidden><i></i><span></span></div>
       <div id="problems"></div>

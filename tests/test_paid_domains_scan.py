@@ -357,3 +357,18 @@ def test_a_domain_added_between_scans_is_approved_not_gone():
     s.known_add("one.example", A["id"], "", "me")                           # added by a path that did not touch the findings
     run = scan(s, w, dv)
     assert run["gone"] == 0 and next(iter(s.found.values()))["status"] == "approved"
+
+
+def test_meta_is_listed_and_read_through_the_platforms_own_store(monkeypatch):
+    """paid_meta needs the platform's shared store (rate-limit block, cache), not this agent's: handing it ours made every Meta listing fail."""
+    from tracker import paid_gads_segments as g
+    from tracker import paid_meta, paid_store
+    seen = []
+    monkeypatch.setattr(g, "config_problem", lambda: "off")
+    monkeypatch.setattr(paid_meta, "config_problem", lambda: None)
+    monkeypatch.setattr(paid_meta, "list_accounts", lambda st, **kw: seen.append(st) or [{"id": "act_1", "name": "M", "status": "ACTIVE"}])
+    monkeypatch.setattr(paid_meta, "_pages", lambda path, params, st, **kw: seen.append(st) or [])
+    accounts, _groups, _problems = sc.inventory(MemStore())
+    assert [a["id"] for a in accounts] == ["act_1"]
+    sc.read_account(accounts[0], MemStore())
+    assert seen == [paid_store, paid_store]
