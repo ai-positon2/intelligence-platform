@@ -1748,6 +1748,11 @@ tr.ud-dismissed td,tr.ud-gone td{opacity:.62}
   --thumb:linear-gradient(135deg,#06241c 0%,#0b2236 100%);
   --icon-glow:rgba(52,211,153,.5);--card-border:rgba(52,211,153,.35);
   --card-glow:0 0 40px rgba(52,211,153,.10);--arrow-color:#a7f3d0}
+.c-aw{--card-accent:#fb7185;
+  --band:linear-gradient(90deg,#fb7185,#f59e0b,#fbbf24);
+  --thumb:linear-gradient(135deg,#2a0f16 0%,#2a1a06 100%);
+  --icon-glow:rgba(251,113,133,.5);--card-border:rgba(251,113,133,.35);
+  --card-glow:0 0 40px rgba(251,113,133,.10);--arrow-color:#fecdd3}
 .c-kv{--card-accent:#a78bfa;
   --band:linear-gradient(90deg,#a78bfa,#38bdf8,#22d3ee);
   --thumb:linear-gradient(135deg,#1a1236 0%,#0b2236 100%);
