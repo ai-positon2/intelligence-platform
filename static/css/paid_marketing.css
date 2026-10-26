@@ -1743,6 +1743,16 @@ tr.ud-dismissed td,tr.ud-gone td{opacity:.62}
   --thumb:linear-gradient(135deg,#2a1a06 0%,#2a0f1a 100%);
   --icon-glow:rgba(245,158,11,.5);--card-border:rgba(245,158,11,.35);
   --card-glow:0 0 40px rgba(245,158,11,.10);--arrow-color:#fde68a}
+.c-th{--card-accent:#34d399;
+  --band:linear-gradient(90deg,#34d399,#22d3ee,#38bdf8);
+  --thumb:linear-gradient(135deg,#06241c 0%,#0b2236 100%);
+  --icon-glow:rgba(52,211,153,.5);--card-border:rgba(52,211,153,.35);
+  --card-glow:0 0 40px rgba(52,211,153,.10);--arrow-color:#a7f3d0}
+.c-aw{--card-accent:#fb7185;
+  --band:linear-gradient(90deg,#fb7185,#f59e0b,#fbbf24);
+  --thumb:linear-gradient(135deg,#2a0f16 0%,#2a1a06 100%);
+  --icon-glow:rgba(251,113,133,.5);--card-border:rgba(251,113,133,.35);
+  --card-glow:0 0 40px rgba(251,113,133,.10);--arrow-color:#fecdd3}
 .c-kv{--card-accent:#a78bfa;
   --band:linear-gradient(90deg,#a78bfa,#38bdf8,#22d3ee);
   --thumb:linear-gradient(135deg,#1a1236 0%,#0b2236 100%);
@@ -1790,3 +1800,13 @@ tr.ud-dismissed td,tr.ud-gone td{opacity:.62}
 .pm-gonly{margin:0 0 16px}
 .pm-gonly-in{font-size:13.5px;line-height:1.55;color:var(--pm-ink);padding:14px 16px;border-radius:14px;border:1px solid color-mix(in srgb,var(--pm-a) 40%,transparent);background:var(--pm-a-d)}
 .pm-gonly-in a{color:var(--pm-a);font-weight:600}
+
+/* Tracking & Data Health (static/js/tracking_health.js) */
+.pm-th .bi-tbl .bi-sub,.pm-th .th-finds .bi-sub{white-space:normal;overflow:visible;text-overflow:clip}
+.pm-th .gc-finds{grid-template-columns:minmax(0,1fr)}
+.th-head{margin:0 0 10px;font-size:14px}
+.th-finds>li{padding:10px 0;border-top:1px solid var(--pm-line,rgba(255,255,255,.1))}
+.th-finds>li:first-child{border-top:0}
+.th-fix{margin:6px 0 0;font-size:13px;opacity:.92;overflow-wrap:anywhere}
+.th-blind{margin-top:14px}
+.th-blind-l{margin:6px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px;opacity:.9}
