@@ -226,3 +226,42 @@ def test_the_url_checker_state_dismiss_reopen_and_the_sheet(world, monkeypatch):
     assert r.status_code == 200 and "spreadsheetml" in r.mimetype and r.data[:2] == b"PK" and "broken-links.xlsx" in r.headers["Content-Disposition"]
     assert client_as(None).get(API + "/links.xlsx").status_code == 302
     assert post("/links/%s/dismiss" % broken["fingerprint"], headers={"Origin": "https://evil.example"}).status_code == 403
+
+
+def test_the_download_is_the_whole_record_as_one_workbook(world, monkeypatch):
+    """Every finding of every status, the domain database, what each account uses, the broken links and the scans, whatever the page is showing."""
+    import io
+    from openpyxl import load_workbook
+    monkeypatch.setattr(pl, "default_fetch", lambda: Site({"https://strange.example/": 404}))
+    monkeypatch.setattr(pl.time, "sleep", lambda s: None)
+    post("/scan")
+    fps = [f["fingerprint"] for f in world.store.found.values()]
+    post("/findings/%s/dismiss" % fps[0])
+    world.store.found[fps[1]]["status"] = "gone"
+    post("/known", {"domain": "acme-garden.com", "scope": "mcc-1", "note": "main site"})
+    assert client_as(None).get(API + "/export.xlsx").status_code == 302
+    r = client_as(STAFF).get(API + "/export.xlsx")
+    assert r.status_code == 200 and "spreadsheetml" in r.mimetype and "unknown-domains-export.xlsx" in r.headers["Content-Disposition"]
+    wb = load_workbook(io.BytesIO(r.data))
+    assert wb.sheetnames == ["Findings", "Domain database", "In use today", "Links to fix", "Scans"]
+    findings = [[c.value for c in row] for row in wb["Findings"].iter_rows()]
+    assert findings[0][:4] == ["Status", "Severity", "Kind", "Account"] 
+    assert {"Dismissed", "Gone"} <= {row[0] for row in findings[1:]}                              # the dump holds what the page's default filter hides
+    db = [[c.value for c in row] for row in wb["Domain database"].iter_rows()]
+    assert db[1][:2] == ["acme-garden.com", "Acme"] and db[1][3] == "main site"
+    use = [[c.value for c in row] for row in wb["In use today"].iter_rows()]
+    assert use[0][3] == "Domain its ads point at" and {row[3] for row in use[1:]} >= {"acme-garden.com", "strange.example"}
+    assert dict((row[3], row[5]) for row in use[1:])["acme-garden.com"] == "Yes" and dict((row[3], row[5]) for row in use[1:])["strange.example"] == "No"
+    links = [[c.value for c in row] for row in wb["Links to fix"].iter_rows()]
+    assert links[1][1] == "Broken" and links[1][8] == "https://strange.example/"
+    scans = [[c.value for c in row] for row in wb["Scans"].iter_rows()]
+    assert scans[0][1] == "Started by" and scans[1][1] == STAFF
+    assert client_as(STAFF).get(API + "/export.xlsx").status_code == 200
+
+
+def test_the_download_of_an_empty_record_is_a_workbook_with_headings(monkeypatch):
+    import io
+    from openpyxl import load_workbook
+    from tracker import paid_domains_export
+    wb = load_workbook(io.BytesIO(paid_domains_export.workbook(MemStore(), [A], GROUPS)))
+    assert wb.sheetnames == ["Findings", "Domain database", "In use today", "Links to fix", "Scans"] and all(ws.max_row == 1 for ws in wb)
