@@ -23,6 +23,15 @@ var turns = [], busy = false, client = "", when = "any";
 var FALLBACK_CLIENTS = ["BD Diesel","Beta Bionics","Brian Tooley Racing","D&J Precision Machine","Eventgroove",
   "GD & Affiliates","Inspire Aesthetics","McHale Landscaping","Monster Transmission","OIA","Phoenix","Riccobene"];
 
+// Clients the team asks about that have no Budget Tracker row, so the Pacing Desk run never lists them.
+// Without this they are missing from the picker whenever the run's own client list loads.
+var EXTRA_CLIENTS = ["Soteri Skin"];
+function withExtraClients(list){
+  var out=list.slice();
+  EXTRA_CLIENTS.forEach(function(n){ if(!out.some(function(c){return c.name===n})) out.push({name:n}); });
+  return out;
+}
+
 function esc(s){return String(s==null?"":s).replace(/[&<>"']/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]})}
 function hueOf(name){var h=0;for(var i=0;i<name.length;i++)h=(h*31+name.charCodeAt(i))%360;return h;}
 function inits(name){return name.replace(/\(.*?\)/g,"").split(/[\s&.,-]+/).filter(function(w){return /^[A-Za-z0-9]/.test(w)}).slice(0,2).map(function(w){return w[0]}).join("").toUpperCase()||"·";}
@@ -324,9 +333,9 @@ if(qClient){
   // A client the built-in list doesn't have still gets a row, so a link never loses its aim.
   if(FALLBACK_CLIENTS.indexOf(qClient)<0) FALLBACK_CLIENTS.push(qClient);
 }
-setClients(FALLBACK_CLIENTS.map(function(n){return {name:n}}));
+setClients(withExtraClients(FALLBACK_CLIENTS.map(function(n){return {name:n}})));
 fetch("/p2/paid-marketing/api/pacing/clients",{credentials:"same-origin"}).then(function(r){return r.ok?r.json():null})
-  .then(function(j){ if(j&&j.clients&&j.clients.length){ var l=j.clients; if(qClient&&!l.some(function(c){return c.name===qClient})) l=l.concat([{name:qClient}]); setClients(l); } }).catch(function(){});
+  .then(function(j){ if(j&&j.clients&&j.clients.length){ var l=j.clients; if(qClient&&!l.some(function(c){return c.name===qClient})) l=l.concat([{name:qClient}]); setClients(withExtraClients(l)); } }).catch(function(){});
 paintWhen();
 if(location.search) history.replaceState(null,"",location.pathname);
 })();

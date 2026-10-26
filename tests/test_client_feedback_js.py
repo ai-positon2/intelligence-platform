@@ -61,3 +61,19 @@ def test_the_page_has_the_switch_and_declares_the_platform_before_the_switch_rea
     assert "PMPlatform.switcher" in page and 'id="platSw"' in tpl and "pm_platform.js" in tpl
     assert page.index('var plat="both";') < page.index("PMPlatform.switcher")      # declared after the switch ran it would reset the saved choice
     assert "addUser(text, client, when, plat)" in page
+
+
+def test_clients_without_a_budget_row_stay_in_the_picker_when_the_pacing_list_loads():
+    src = open(PAGE, encoding="utf-8").read()
+    extra = re.search(r"var EXTRA_CLIENTS *=.*?;\n", src, re.S).group(0)
+    prelude = extra + _function(src, "withExtraClients") + "\n"
+
+    def names(list_json):
+        r = subprocess.run(["node", "-e", "%sconsole.log(JSON.stringify(withExtraClients(%s).map(function(c){return c.name})))" % (prelude, list_json)],
+                           capture_output=True, text=True, timeout=30)
+        assert r.returncode == 0, r.stderr
+        return json.loads(r.stdout)
+
+    assert names("[{name:'Riccobene'},{name:'OIA'}]") == ["Riccobene", "OIA", "Soteri Skin"]
+    assert names("[{name:'Soteri Skin'},{name:'OIA'}]") == ["Soteri Skin", "OIA"]   # never listed twice
+    assert src.count("setClients(withExtraClients(") == 2   # the first paint and the pacing list
