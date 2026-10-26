@@ -535,26 +535,58 @@ $id("dlBtn").addEventListener("click", () => {
 const qAccount = new URLSearchParams(location.search).get("account");
 if (qAccount && RULESETS[qAccount]) { current = qAccount; S.rulesManual = true; }
 // (the old page kept a rules id under the same key, so only a 10-digit Google Ads id is taken from storage)
-const wantAcct = qAccount && /^\d{10}$/.test(qAccount) ? qAccount : (function(){ try { const v = localStorage.getItem("sqr_account") || ""; return /^\d{10}$/.test(v) ? v : ""; } catch (e) { return ""; } })();
+const ACCT_RE = /^(\d{10}|mcc-\d{10}(-[A-Z]{3})?)$/;                  // a Google Ads account or an MCC ("All of ...")
+const wantAcct = qAccount && ACCT_RE.test(qAccount) ? qAccount : (function(){ try { const v = localStorage.getItem("sqr_account") || ""; return ACCT_RE.test(v) ? v : ""; } catch (e) { return ""; } })();
 paintButton(); paintWhy(); paintRanges(); computeRange(); refreshReady();
 
 let firstLoad = true;
 /* A Google-only agent: the same three choices as every agent, Meta says why it has nothing here and where to look, Both keeps Google and says so. */
 if (PL && $id("platSw")) PL.googleOnly($id("platSw"), { name: "Search Query Analysis", why: "Meta has no search terms: people are reached by audience and placement, not by what they typed.",
   closest: [{ label: "Segment Analysis", href: "/p2/paid-marketing/segment-analysis" }, { label: "Audience Segments", href: "/p2/paid-marketing/audience-segments" }], body: "#gBody" });
-const accts = PL.accounts($id("acctPick"), { url: BASE + "/gads/accounts", allow: ["google"], noSwitch: true, platform: "google", account: wantAcct,
-  onChange: function(a){
-    if (!a) { S.acct = null; setLive("No Google Ads account to read", true); notice("warn", "No account chosen", "There are no Google Ads accounts to show. Use the CSV exports below instead."); refreshReady(); return; }
-    if (S.acct && S.acct.id === a.id && !firstLoad) return;
-    firstLoad = false;
-    S.acct = a; S.rulesManual = qAccount && RULESETS[qAccount] ? true : false; S.data = null;
-    try { localStorage.setItem("sqr_account", a.id); } catch (e) {}
-    load(false);
-  },
-  onError: function(err){
+/* The account picker: every Google Ads account, and each MCC as "All of ..." to read all its accounts at once (the same list the other agents use). */
+function chooseAccount(a){
+  if (!a) { S.acct = null; setLive("No Google Ads account to read", true); refreshReady(); return; }
+  if (S.acct && S.acct.id === a.id && !firstLoad) return;
+  firstLoad = false;
+  S.acct = a; S.rulesManual = qAccount && RULESETS[qAccount] ? true : false; S.data = null;
+  try { localStorage.setItem("sqr_account", a.id); } catch (e) {}
+  load(false);
+}
+const pickList = { accounts: [], groups: [] };
+function hueOf(n){ let h = 0; for (let i = 0; i < n.length; i++) h = (h * 31 + n.charCodeAt(i)) % 360; return h; }
+function inits(n){ return n.replace(/\(.*?\)/g, "").split(/[\s&.,-]+/).filter(w => /^[A-Za-z0-9]/.test(w)).slice(0, 2).map(w => w[0]).join("").toUpperCase() || "·"; }
+function dashed(id){ return id.length === 10 ? id.slice(0, 3) + "-" + id.slice(3, 6) + "-" + id.slice(6) : id; }
+function accountOf(id){
+  const g = pickList.groups.find(x => x.id === id);
+  if (g) return { id: g.id, name: g.name, currency: g.currency, isGroup: true, accountCount: g.accountIds.length };
+  return pickList.accounts.find(x => x.id === id) || null;
+}
+const picker = window.PMPicker($id("acctPick"), { label: "Ad account", search: true, onChange: v => chooseAccount(accountOf(v)) });
+function pickItems(list, groups){
+  const items = [{ value: "", label: "Choose an account", sub: list.length + " accounts" + (groups.length ? " · " + groups.length + " MCCs to read together" : ""), avatar: "?", hue: 200 }], seen = {};
+  groups.forEach(g => {
+    const head = g.name + " MCC";
+    items.push({ value: g.id, label: "All of " + g.name, avatar: inits(g.name), hue: hueOf(g.name), group: head, badge: '<span class="badge pm-pill ok">MCC</span>', sub: g.accountIds.length + " accounts read together" });
+    list.filter(a => a.group === g.id).forEach(a => { seen[a.id] = 1; items.push({ value: a.id, label: a.name, avatar: inits(a.name), hue: hueOf(a.name), group: head, sub: dashed(a.id) }); });
+  });
+  list.filter(a => !seen[a.id]).forEach(a => items.push({ value: a.id, label: a.name, avatar: inits(a.name), hue: hueOf(a.name), group: groups.length ? "Other accounts" : "", sub: dashed(a.id) }));
+  return items;
+}
+picker.set([{ value: "", label: "Loading accounts…", sub: "", avatar: "…", hue: 200 }], "", true);
+fetch(BASE + "/segments/accounts", { credentials: "same-origin" }).then(r => r.json().catch(() => ({})).then(j => ({ ok: r.ok, status: r.status, j }))).then(r => {
+  if (!r.ok) {
+    picker.set([{ value: "", label: "Accounts unavailable", sub: "", avatar: "!", hue: 0 }], "", true);
     setLive("Google Ads is not reachable", true);
-    if (err.status === 409) notice("setup", "Google Ads is not connected yet", esc(err.message) + " The CSV exports below still work.");
-    else notice("bad", "Could not load the Google Ads accounts", esc(err.message) + " The CSV exports below still work.");
+    const msg = (r.j && r.j.error) || "The account list could not be read.";
+    if (r.status === 409) notice("setup", "Google Ads is not connected yet", esc(msg) + " The CSV exports below still work.");
+    else notice("bad", "Could not load the Google Ads accounts", esc(msg) + " The CSV exports below still work.");
     $id("csvFallback").open = true;
-  } });
+    return;
+  }
+  pickList.accounts = r.j.accounts || []; pickList.groups = r.j.groups || [];
+  if (!pickList.accounts.length) { notice("warn", "No account chosen", "There are no Google Ads accounts to show. Use the CSV exports below instead."); }
+  const want = accountOf(wantAcct) ? wantAcct : "";
+  picker.set(pickItems(pickList.accounts, pickList.groups), want);
+  if (want) chooseAccount(accountOf(want));
+}).catch(() => { setLive("Google Ads is not reachable", true); notice("bad", "Could not load the Google Ads accounts", "The server could not be reached. The CSV exports below still work."); $id("csvFallback").open = true; });
 })();

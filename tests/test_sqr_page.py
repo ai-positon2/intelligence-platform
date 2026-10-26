@@ -54,7 +54,8 @@ def test_the_scripts_load_in_the_order_they_depend_on():
 
 def test_the_page_reads_google_ads_and_keeps_the_csv_as_a_fallback():
     html, js = read(TEMPLATE), read(PAGE)
-    assert 'id="acctPick"' in html and "/sqr/data?account=" in js and 'allow: ["google"]' in js
+    assert 'id="acctPick"' in html and "/sqr/data?account=" in js and "PL.googleOnly(" in js
+    assert 'BASE + "/segments/accounts"' in js and '"All of " + g.name' in js          # Google Ads accounts only, and each MCC to read all its accounts at once
     assert 'id="csvFallback"' in html and "Can't read Google Ads?" in html
     assert 'class="req">Required</span>' in html          # the search terms CSV is required only inside the fallback
     assert ".get(\"account\")" in js                        # an old link names a ruleset, a new one a Google Ads account
