@@ -1379,6 +1379,9 @@ details.sq-fallback .sq-drops{margin-top:10px}
 .ud-scan-row{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
 .ud-scan-row .pd-fresh{margin:0}
 .ud-scan-btns{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+/* The platform switch and its note: the top bar is a flex row that does not wrap, so the note (a full-width item) sat on top of the switch and squeezed it to nothing. */
+.pd-cmd.ud-cmd{position:relative;top:auto;flex-wrap:wrap}
+.ud-cmd .pm-plat{flex:1 1 100%}
 .ud-progress{position:relative;height:26px;border-radius:12px;background:var(--pm-line);overflow:hidden;margin-top:14px}
 .ud-progress i{position:absolute;inset:0 auto 0 0;width:4%;background:linear-gradient(90deg,var(--pm-a),var(--pm-a2));opacity:.55;transition:width .6s ease}
 .ud-progress span{position:relative;display:block;line-height:26px;padding:0 12px;font-size:12px;font-weight:600;color:var(--pm-ink)}
