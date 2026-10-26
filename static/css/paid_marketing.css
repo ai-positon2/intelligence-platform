@@ -1790,3 +1790,19 @@ tr.ud-dismissed td,tr.ud-gone td{opacity:.62}
 .pm-gonly{margin:0 0 16px}
 .pm-gonly-in{font-size:13.5px;line-height:1.55;color:var(--pm-ink);padding:14px 16px;border-radius:14px;border:1px solid color-mix(in srgb,var(--pm-a) 40%,transparent);background:var(--pm-a-d)}
 .pm-gonly-in a{color:var(--pm-a);font-weight:600}
+
+/* Tracking Data Health (templates/tracking_health.html) */
+.pm.pm-th{--pm-a:#2dd4bf;--pm-a2:#60a5fa}
+.c-th{--card-accent:#2dd4bf;
+  --band:linear-gradient(90deg,#2dd4bf,#60a5fa,#f472b6);
+  --thumb:linear-gradient(135deg,#06261f 0%,#0b1d36 100%);
+  --icon-glow:rgba(45,212,191,.5);--card-border:rgba(45,212,191,.35);
+  --card-glow:0 0 40px rgba(45,212,191,.10);--arrow-color:#99f6e4}
+.th-chart{display:block;width:100%;height:120px;margin:6px 0 10px}
+.th-bar{fill:color-mix(in srgb,var(--pm-a2) 38%,transparent)}
+.th-bar.exp{fill:color-mix(in srgb,var(--pm-muted) 30%,transparent)}
+.th-dot{fill:var(--pm-a)}
+.th-dot.zero{fill:#f87171}
+.th-score.ok .bi-n{color:#34d399}.th-score.warn .bi-n{color:#fbbf24}.th-score.bad .bi-n{color:#f87171}
+.th-tag{margin:4px 0 0;font-size:12.5px;color:var(--pm-muted);font-style:italic}
+.pm-th .cc-f input[type=date]{color-scheme:dark}

@@ -11,7 +11,8 @@ a title, the figures behind it and one next step. This engine keeps them and say
 Rules it keeps:
   * nothing is alerted until a monitor has run once: the first run sets the baseline, marks what it found as already seen and sends nothing, so the first alert is about what turns up
     after it (a team does not want fifty emails on day one);
-  * only medium and high issues are alerted (low ones are on the page and in the weekly digest);
+  * only medium, high and critical issues are alerted (low ones are on the page and in the weekly digest); critical is the Tracking Data Health monitor's, for tracking that stopped,
+    and puts CRITICAL in the subject;
   * an issue is marked alerted only when a channel took the alert, so a digest that went nowhere (no recipient set, Slack refused) is tried again at the next run;
   * two runs of one monitor never run at once (a lock in the store that expires, so a run that died does not block the next);
   * an account that cannot be read is named on the run and never counted as clean.
@@ -24,7 +25,7 @@ import html as _html
 import re
 from datetime import datetime, timedelta, timezone
 
-LEVEL_RANK = {"info": 0, "low": 1, "medium": 2, "high": 3}
+LEVEL_RANK = {"info": 0, "low": 1, "medium": 2, "high": 3, "critical": 4}   # critical: only the Tracking Data Health monitor raises it (conversions or a pixel stopped)
 ALERT_FROM = "medium"            # the lowest level that is alerted
 REMIND_DAYS = 7                  # a high issue still open this long after its alert is alerted again
 LOCK_TTL_S = 30 * 60
@@ -169,7 +170,7 @@ def track(store, agent, current, ok_ids, now):
             continue
         if not w.get("alertedAt"):
             pending.append(dict(w, event="worse" if w.get("alertedLevel") else "new"))
-        elif w["level"] == "high" and (age_days(w["alertedAt"], now) or 0) >= REMIND_DAYS:
+        elif rank(w["level"]) >= rank("high") and (age_days(w["alertedAt"], now) or 0) >= REMIND_DAYS:
             pending.append(dict(w, event="reminder"))
     for p in pending:
         p["ageDays"] = age_days(p["firstSeen"], now)
@@ -202,7 +203,7 @@ def _age_text(p):
     return " · ".join(bits)
 
 
-DOT = {"high": "\U0001F534", "medium": "\U0001F7E0", "low": "\U0001F7E1", "info": "\u26AA"}
+DOT = {"critical": "\U0001F6A8", "high": "\U0001F534", "medium": "\U0001F7E0", "low": "\U0001F7E1", "info": "\u26AA"}
 ACCOUNTS_SHOWN = 6               # accounts one Slack alert lists, worst first, before it says "+N more"
 PER_ACCOUNT = 3                  # issues listed under an account in Slack
 CLEAR = "\U0001F7E2"
@@ -257,7 +258,7 @@ def digest(label, pending, resolved, link):
     parts = ["%d new" % counts["new"]] if counts["new"] else []
     parts += ["%d worse" % counts["worse"]] if counts["worse"] else []
     parts += ["%d still open" % counts["reminder"]] if counts["reminder"] else []
-    top = "HIGH: " if any(p["level"] == "high" for p in pending) else ""
+    top = "CRITICAL: " if any(p["level"] == "critical" for p in pending) else "HIGH: " if any(p["level"] == "high" for p in pending) else ""
     subject = "%s%s: %s (%s)" % (top, label, ", ".join(parts) or "nothing new", plural(accounts, "account"))
     shown = pending[:SHOWN]
     more = len(pending) - len(shown)
@@ -274,7 +275,7 @@ def digest(label, pending, resolved, link):
                      + ["", "Open the page: " + link])
     e = _html.escape
     rows = "".join("<li><b>%s</b> (%s) <span style=\"color:%s\">%s</span><br>%s<br>%s%s%s</li>" % (
-        e(p["accountName"]), e(PLATFORM.get(p["platform"], p["platform"])), "#b91c1c" if p["level"] == "high" else "#b45309", e(EVENT_WORD[p["event"]]), e(p["title"]), e(p["detail"]),
+        e(p["accountName"]), e(PLATFORM.get(p["platform"], p["platform"])), "#b91c1c" if rank(p["level"]) >= rank("high") else "#b45309", e(EVENT_WORD[p["event"]]), e(p["title"]), e(p["detail"]),
         ("<br><i>Next: %s</i>" % e(p["nextStep"])) if p.get("nextStep") else "", ("<br><small>%s</small>" % e(_age_text(p))) if _age_text(p) else "") for p in shown)
     fixed_html = ("<p><b>Fixed since the last run</b></p><ul>%s</ul>" % "".join("<li>%s: %s</li>" % (e(r["accountName"]), e(r["title"])) for r in fixed)) if fixed else ""
     html_body = ("<div style=\"font-family:Arial,sans-serif;font-size:14px;line-height:1.5\"><p><b>%s</b></p><ul>%s</ul>%s%s<p><a href=\"%s\">Open the page</a></p></div>"
@@ -315,7 +316,7 @@ def preview_alert(store, agent, label, link, deliver):
     and it says it is not new. Marks nothing alerted. {email, slack, sent, issues, accounts}."""
     open_rows = [i for i in store.issues_all(agent) if i["status"] == "open" and rank(i["level"]) >= rank(ALERT_FROM)]
     accounts = len({i["accountId"] for i in open_rows})
-    by_level = "  ".join("%s %d" % (DOT[lv], n) for lv in ("high", "medium") for n in [sum(1 for i in open_rows if i["level"] == lv)] if n)
+    by_level = "  ".join("%s %d" % (DOT[lv], n) for lv in ("critical", "high", "medium") for n in [sum(1 for i in open_rows if i["level"] == lv)] if n)
     lead = "*Test*  \u00B7  what is open now, not new  \u00B7  %s in %s  \u00B7  %s" % (plural(len(open_rows), "issue"), plural(accounts, "account"), by_level)
     blocks = _slack_message(label, open_rows, link, lead=lead, header_prefix="\U0001F9EA ", empty="Test  \u00B7  nothing is open right now.")
     text = "TEST: %s open in %s (not new)" % (plural(len(open_rows), "issue"), plural(accounts, "account"))
@@ -392,7 +393,7 @@ def weekly_digest(label, issues, now, link):
     fixed = sorted([i for i in issues if i["status"] == "resolved" and (_parse(i.get("resolvedAt")) or cut) > cut], key=lambda i: (i["accountName"].lower(), i["title"]))
     if not opened and not fixed:
         return None
-    high = sum(1 for i in opened if i["level"] == "high")
+    high = sum(1 for i in opened if rank(i["level"]) >= rank("high"))                   # a critical issue counts as high here
     subject = "%s: weekly summary, %d open%s, %d fixed this week" % (label, len(opened), (" (%d high)" % high) if high else "", len(fixed))
     shown, shown_fixed = opened[:DIGEST_OPEN], fixed[:DIGEST_FIXED]
 

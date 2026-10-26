@@ -1,4 +1,4 @@
-"""Paid Marketing Agents: the monitors together (the Brand Spend Alert, the Disapproved Ads Tracker, the Ad Copy Checker, Location Conflicts, KPI Monitoring, the Keyword Visibility Tracker and the Spend Anomaly Alert), what the routes and the scheduled run use (no network of its own).
+"""Paid Marketing Agents: the monitors together (the Brand Spend Alert, the Disapproved Ads Tracker, the Ad Copy Checker, Location Conflicts, KPI Monitoring, the Keyword Visibility Tracker, the Spend Anomaly Alert and Tracking Data Health), what the routes and the scheduled run use (no network of its own).
 
   spec_for      the spec the engine (tracker/paid_monitor.py) runs for one monitor, built with what the team saved
   run_agent     one monitor over the accounts it is given
@@ -20,6 +20,7 @@ AGENTS = {
     "kpi": {"label": "KPI Monitoring", "page": "/p2/paid-marketing/kpi-monitoring"},
     "kvis": {"label": "Keyword Visibility Tracker", "page": "/p2/paid-marketing/keyword-visibility", "weekdays": (1,)},       # Tuesdays: whole weeks end on Sunday, and Google's last hours of it are in by then
     "spend": {"label": "Spend Anomaly Alert", "page": "/p2/paid-marketing/spend-anomaly", "frequent": True},               # its own run every two hours: a spike is worth an alert the hour it starts
+    "tracking": {"label": "Tracking Data Health", "page": "/p2/paid-marketing/tracking-health"},
 }
 SHOWN_OPEN = 40
 SHOWN_FIXED = 10
@@ -78,6 +79,9 @@ def spec_for(agent, store, *, today=None, search_fn=None, list_fn=None, meta_pag
     if agent == "spend":
         from . import paid_anomaly_monitor as am
         return am.make_spec(today=day, search_fn=search_fn, list_fn=list_fn, mon_store=store, meta_pages_fn=meta_pages_fn, meta_account_fn=meta_account_fn, now_fn=now_fn)
+    if agent == "tracking":
+        from . import paid_tracking_monitor as tm
+        return tm.make_spec(today=day, search_fn=search_fn, list_fn=list_fn, mon_store=store, meta_pages_fn=meta_pages_fn, meta_account_fn=meta_account_fn, now_fn=now_fn)
     from . import paid_disapproved_monitor as dm
     return dm.make_spec(today=day, search_fn=search_fn, list_fn=list_fn, mon_store=store, meta_pages_fn=meta_pages_fn, meta_account_fn=meta_account_fn, now_fn=now_fn)
 
@@ -139,5 +143,6 @@ def state_for(store, agent, deliver, now=None):
                 "alertedAt": i.get("alertedAt"), "resolvedAt": i.get("resolvedAt")}
     return {"agent": agent, "label": AGENTS[agent]["label"], "alerts": mon.alert_settings(store), "senders": deliver.ready(), "baseline": mon.baseline(store, agent),
             "runs": (store.state_get("runs:" + agent) or [])[:10], "counts": {lv: sum(1 for i in opened if i["level"] == lv) for lv in ("high", "medium", "low")},
+            "critical": sum(1 for i in opened if i["level"] == "critical"),                                                # its own key: the counts above keep their three levels
             "open": [row(i) for i in opened[:SHOWN_OPEN]], "openTotal": len(opened), "fixed": [row(i) for i in fixed[:SHOWN_FIXED]],
             "digest": (store.state_get("digest:" + agent) or {}).get("day"), "running": bool((store.state_get("lock:" + agent) or {}).get("locked"))}

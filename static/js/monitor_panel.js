@@ -9,7 +9,7 @@
 (function(root){
 "use strict";
 
-var LEVEL = {high: {label: "High", tone: "bad"}, medium: {label: "Medium", tone: "warn"}, low: {label: "Low", tone: "wait"}, info: {label: "Info", tone: "unk"}};
+var LEVEL = {critical: {label: "Critical", tone: "bad"}, high: {label: "High", tone: "bad"}, medium: {label: "Medium", tone: "warn"}, low: {label: "Low", tone: "wait"}, info: {label: "Info", tone: "unk"}};
 function levelInfo(l){ return LEVEL[l] || {label: String(l), tone: "unk"}; }
 function plural(n, one, many){ return n + " " + (n === 1 ? one : (many || one + "s")); }
 function day(iso){ return iso ? String(iso).slice(0, 10) : ""; }
@@ -37,7 +37,8 @@ function standing(state){
   if (b) bits.push("Baseline set " + day(b.at));
   if (last) bits.push(last.status === "failed" ? "the last run (" + when(last.finishedAt) + ") failed" : "last run " + when(last.finishedAt) + " (" + String(last.trigger || "").replace(/^page by .*/, "from the page") + ")");
   var c = state.counts || {};
-  bits.push(plural(state.openTotal || 0, "issue") + " open" + ((c.high) ? " (" + c.high + " high)" : "") + ", " + plural((state.fixed || []).length, "fixed lately", "fixed lately"));
+  var crit = state.critical || 0, hi = [crit ? crit + " critical" : "", c.high ? c.high + " high" : ""].filter(Boolean).join(", ");
+  bits.push(plural(state.openTotal || 0, "issue") + " open" + (hi ? " (" + hi + ")" : "") + ", " + plural((state.fixed || []).length, "fixed lately", "fixed lately"));
   return bits.join(" · ") + ".";
 }
 

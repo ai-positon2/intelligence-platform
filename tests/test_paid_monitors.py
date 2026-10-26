@@ -45,6 +45,8 @@ class Search:
         self.rows, self.ads = {A["id"]: TB.weeks_of(weekly=TB.USUAL + [203])}, {A["id"]: []}
 
     def __call__(self, cid, q):
+        if "FROM conversion_action" in q or "FROM user_list" in q or "auto_tagging_enabled" in q or "segments.conversion_action" in q:
+            return []                                                                    # Tracking Data Health: no action, no list and no setting read
         if "FROM customer" in q:
             return TA.hourly_rows()
         if "FROM keyword_view" in q or "auction_insight_domain" in q:
@@ -73,7 +75,7 @@ def sched(store, dv, search, now):
 
 
 def test_only_the_four_monitors_are_known_and_each_has_its_page_link():
-    assert sorted(pm.AGENTS) == ["brandspend", "copycheck", "disapproved", "geoconf", "kpi", "kvis", "spend"] and pm.agent_of("brandspend") == "brandspend"
+    assert sorted(pm.AGENTS) == ["brandspend", "copycheck", "disapproved", "geoconf", "kpi", "kvis", "spend", "tracking"] and pm.agent_of("brandspend") == "brandspend"
     with pytest.raises(pm.BadRequest, match="must be one of: brandspend, copycheck, disapproved, geoconf, kpi, kvis, spend"):
         pm.agent_of("other")
     assert pm.link_for("copycheck", BASE) == BASE + "/p2/paid-marketing/ad-copy-checker" and pm.AGENTS["copycheck"]["weekdays"] == (0,) and "weekdays" not in pm.AGENTS["brandspend"]
@@ -85,7 +87,7 @@ def test_the_scheduled_run_runs_every_monitor_once_and_the_first_run_of_each_is_
     s, dv, se = configured(), Deliver(), Search()
     se.ads[A["id"]] = [TD.api()]
     out = sched(s, dv, se, TUE)
-    assert sorted(out) == ["brandspend", "disapproved", "geoconf", "kpi", "kvis"] and "copycheck" not in out and out["brandspend"]["baseline"] and out["disapproved"]["baseline"] and not dv.emails
+    assert sorted(out) == ["brandspend", "disapproved", "geoconf", "kpi", "kvis", "tracking"] and "copycheck" not in out and out["brandspend"]["baseline"] and out["disapproved"]["baseline"] and not dv.emails
     assert s.issues_all("disapproved")[0]["kind"] == "stopped" and s.state_get("baseline:brandspend") and s.state_get("baseline:disapproved")
 
 
@@ -93,8 +95,8 @@ def test_the_ad_copy_checker_runs_on_mondays_only_and_its_first_run_is_a_baselin
     s, dv, se = configured(), Deliver(), Search()
     assert "copycheck" not in sched(s, dv, se, TUE) and "kvis" not in sched(configured(), dv, se, MON)
     out = sched(s, dv, se, MON)
-    assert sorted(k for k in out if k != "weekly") == ["brandspend", "copycheck", "disapproved", "geoconf", "kpi"] and out["copycheck"]["baseline"] is True and s.state_get("baseline:copycheck")
-    assert sorted(out["weekly"]) == ["brandspend", "copycheck", "disapproved", "geoconf", "kpi", "kvis", "spend"]
+    assert sorted(k for k in out if k != "weekly") == ["brandspend", "copycheck", "disapproved", "geoconf", "kpi", "tracking"] and out["tracking"]["status"] == "done" and out["copycheck"]["baseline"] is True and s.state_get("baseline:copycheck")
+    assert sorted(out["weekly"]) == ["brandspend", "copycheck", "disapproved", "geoconf", "kpi", "kvis", "spend", "tracking"]
 
 
 def test_a_problem_after_the_baseline_is_alerted_by_the_monitor_it_belongs_to_with_its_own_link():
@@ -182,7 +184,7 @@ NOON = dt.datetime(2026, 10, 22, 19, 0, tzinfo=dt.timezone.utc)                #
 def test_the_daily_run_leaves_the_frequent_monitor_to_its_own_run():
     s, dv, se = configured(), Deliver(), Search()
     out = sched(s, dv, se, NOON)
-    assert sorted(out) == ["brandspend", "disapproved", "geoconf", "kpi"] and not s.state_get("baseline:spend")
+    assert sorted(out) == ["brandspend", "disapproved", "geoconf", "kpi", "tracking"] and not s.state_get("baseline:spend")
 
 
 def test_a_run_for_named_monitors_runs_only_those_and_sends_no_weekly_summary_even_on_a_monday():
@@ -203,7 +205,7 @@ def test_named_monitors_run_whatever_the_weekday_and_an_unknown_name_is_refused(
 def test_an_empty_list_is_the_daily_run():
     s, dv, se = configured(), Deliver(), Search()
     out = pm.run_scheduled(s, base_link=BASE, deliver=dv, inventory_fn=inventory, now_fn=lambda: NOON, search_fn=se, list_fn=lambda: LISTED, only=[])
-    assert sorted(out) == ["brandspend", "disapproved", "geoconf", "kpi"]
+    assert sorted(out) == ["brandspend", "disapproved", "geoconf", "kpi", "tracking"]
 
 
 def test_the_monday_summary_covers_the_spend_alert_too():

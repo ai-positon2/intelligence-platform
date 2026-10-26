@@ -5897,6 +5897,101 @@ def paid_kpi_settings_unmute():
     return _kp_save(lambda st, store, body: {"account": st.unmute(store, body.get("account"), body.get("campaign"), _pm_user_email())})
 
 
+# ── Tracking Data Health (2026-10-26) ──────────────────────────────────────────────────────────────────────────────────────
+# Can each account's conversion numbers be trusted: conversions that stopped or dropped while clicks held, a conversion rate that fell, a primary conversion action or a Meta pixel gone
+# quiet, auto-tagging off and remarketing lists shrinking under what Google needs. The rules are tracker/paid_tracking_math.py, the read and report paid_tracking.py, what the team saved
+# paid_tracking_settings.py and the daily run paid_tracking_monitor.py. Google Ads and Meta. Read only: nothing is changed in an ad account.
+
+@app.route("/p2/paid-marketing/tracking-health")
+@position2_required
+def paid_tracking_health():
+    return render_template("tracking_health.html", user=_get_user())
+
+
+def _th_report(src):
+    from tracker import paid_tracking
+    extra = {"force": True} if str(src.get("refresh") or "") in ("1", "true") else {}      # the Refresh button
+    return paid_tracking.report_for(src.get("account"), mon=_mon_store(), **extra)
+
+
+def _th_answer(fn):
+    from tracker import paid_gads as paid_gads_base, paid_gads_segments as paid_gads, paid_tracking
+    try:
+        return fn()
+    except paid_tracking.BadRequest as e:
+        return jsonify(error=str(e)), 400
+    except paid_gads_base.RefreshTooSoon as e:
+        return jsonify(error=str(e), kind="cooldown", retryIn=e.retry_in), 429
+    except paid_gads_base.AdsError as e:                                                   # Meta answered with an error
+        return jsonify(error=str(e), kind="meta"), 502
+    except paid_gads.GadsError as e:
+        return _pm_gads_error(e)
+
+
+@app.route("/p2/paid-marketing/api/tracking/report")
+@position2_required
+def paid_tracking_report():
+    return _th_answer(lambda: jsonify(_th_report(request.args)))
+
+
+@app.route("/p2/paid-marketing/api/tracking/export")
+@position2_required
+def paid_tracking_export():
+    """The whole report of an account as a JSON file (Download JSON on the page)."""
+    import json as _json
+
+    def go():
+        rep = _th_report(request.args)
+        name = re.sub(r"[^A-Za-z0-9]+", "-", rep["account"]["name"]).strip("-") or "account"
+        body = _json.dumps(dict(rep, exportedAt=datetime.now(timezone.utc).isoformat(timespec="seconds"), exportedBy=_pm_user_email()), indent=2, ensure_ascii=False)
+        resp = make_response(body)
+        resp.headers["Content-Type"] = "application/json; charset=utf-8"
+        resp.headers["Content-Disposition"] = 'attachment; filename="tracking-health-%s-%s.json"' % (name, rep["generatedAt"][:10])
+        return resp
+    return _th_answer(go)
+
+
+@app.route("/p2/paid-marketing/api/tracking/settings")
+@position2_required
+def paid_tracking_settings():
+    from tracker import paid_tracking_settings as st
+    store = _mon_store()
+    try:
+        return jsonify(st.view(store))
+    except store.StoreUnavailable as e:
+        return _pm_store_error(e)
+
+
+def _th_save(fn):
+    from tracker import paid_tracking_settings as st
+    store = _mon_store()
+    try:
+        return jsonify(account=fn(st, store, request.get_json(silent=True) or {}, _pm_user_email()))
+    except st.BadRequest as e:
+        return jsonify(error=str(e)), 400
+    except store.StoreUnavailable as e:
+        return _pm_store_error(e)
+
+
+_TH_ACTIONS = {
+    "owner": lambda st, s, b, who: st.save_owner(s, b.get("account"), b.get("name"), b.get("owner"), who),
+    "window": lambda st, s, b, who: st.add_window(s, b.get("account"), b.get("name"), b.get("from"), b.get("to"), b.get("why"), who),
+    "window-remove": lambda st, s, b, who: st.remove_window(s, b.get("account"), b.get("from"), b.get("to"), who),
+    "mute": lambda st, s, b, who: st.mute(s, b.get("account"), b.get("key"), b.get("itemName"), b.get("why"), who),
+    "unmute": lambda st, s, b, who: st.unmute(s, b.get("account"), b.get("key"), who),
+    "ack": lambda st, s, b, who: st.acknowledge(s, b.get("account"), b.get("key"), b.get("note"), who),
+    "unack": lambda st, s, b, who: st.unacknowledge(s, b.get("account"), b.get("key"), who),
+}
+
+
+@app.route("/p2/paid-marketing/api/tracking/settings/<action>", methods=["POST"])
+@position2_required
+def paid_tracking_settings_save(action):
+    if action not in _TH_ACTIONS:
+        return jsonify(error="Unknown setting."), 404
+    return _th_save(_TH_ACTIONS[action])
+
+
 # ── Keyword Visibility Tracker (sheet item #35, 2026-10-22) ───────────────────────────────────────────────────────────────
 # The highest-spend Search keywords (top-of-page share, share lost to rank, Quality Score) and the auction insights, the last whole week against the four before. The rules are
 # tracker/paid_kvis_math.py, the read and report paid_kvis.py, the fix plan paid_kvis_plan.py, what the team saved paid_kvis_settings.py and the weekly run paid_kvis_monitor.py. Google Ads only. Read only.
@@ -21705,7 +21800,7 @@ def _cap_rows(lines: list, key: str) -> tuple:
 # it. Unlisted, not gone: the pages, APIs and saved results keep working.
 PAID_HIDDEN_AGENTS = {}
 PAID_HIDDEN_SLUGS = frozenset(PAID_HIDDEN_AGENTS)
-PAID_AGENT_TOTAL = 22  # Paid Marketing agents built, hidden ones included
+PAID_AGENT_TOTAL = 23  # Paid Marketing agents built, hidden ones included
 
 
 def _without_hidden_paid(text):
@@ -21815,6 +21910,7 @@ Spend Anomaly Alert (/p2/paid-marketing/spend-anomaly): is an account spending f
 Location Conflicts (/p2/paid-marketing/location-conflicts): do the campaigns show where their names, ads and keywords say they do. Pick a Google Ads account, an MCC to check every account in one go, or a Meta ad account, and it reads, read only, where each live campaign is set to show (the locations and radiuses it targets or excludes with the place names Google gives them, its location option, its ad schedule and device adjustments), the ad group names, the responsive Search ads and the keywords; for Meta, the ad sets' locations and ads. A place is a name the account itself uses: the places its campaigns target or exclude with their state and country, the places the team saved, the places saved for other accounts in the Ad Copy Checker, and the fifty states. It finds a place both targeted and excluded or inside an excluded place (high, the exclusion wins so it never shows), an ad group and its ad that name different places (high), a campaign or ad group named for a place it does not target (high when another campaign targets it), an ad or keywords naming a place outside the campaign's locations (high when excluded), a campaign with no location (it shows in every country), the location option Presence or interest (people only interested in the place see the ads too; low when the campaign targets a whole country or the team accepted it), two Search campaigns on one place, and a schedule or device adjustment that differs from what most campaigns of that type in the account run (an excluded device is medium). A campaign called after a city that no campaign targets and nobody saved is not seen. The team saves, per account, places its copy may name, words that look like a place and are not (a button on a finding adds one), and whether Presence or interest is wanted. Each account shows what was found, a fix plan, the campaigns with what they show in and to, and a CSV. A monitor reads every account daily and alerts by email and Slack to the recipients saved on the page's Alerts and history panel (the first run sets a baseline and sends nothing; only medium and high are alerted). It changes nothing in any ad account.
 
 KPI Monitoring (/p2/paid-marketing/kpi-monitoring): are the campaigns hitting their targets. Pick a Google Ads account, an MCC to check every account in one go, or a Meta ad account, and it reads, read only, each live campaign's last two weeks (cost, clicks, impressions, conversions and their value by day), its delivery status, its bid strategy status and the strategy's own target, and holds the last 7 whole days against the campaign's target and against the 7 days before. A target is the one the team saved for the campaign, then the one saved for the account (cost per conversion or lead, return on ad spend, lowest conversion rate and click-through rate, with a tolerance of 20 percent unless saved), then, for cost and return on Google, the campaign's own bid strategy target. It flags a cost or return off target (high at twice the target, or half again two weeks running), a campaign that stopped converting or spent twice its target cost with no conversion, a campaign that is not delivering (not eligible, misconfigured, ended or no impressions), a misconfigured or CPC-limited bid strategy, a campaign stuck in learning (14 days, counted from the day the daily check first saw it) or limited by data, a campaign limited by budget (medium when it is on target, so there is room to grow) and a conversion or click-through rate under the lowest wanted. A figure with too little behind it (under 5 conversions, 100 clicks or 1,000 impressions in the week) is never judged and the page says so. The team can leave a campaign out with a reason. A monitor reads every account daily and alerts by email and Slack to the recipients saved on the page's Alerts and history panel (the first run sets a baseline and sends nothing; only medium and high are alerted). It changes nothing in any ad account.
+Tracking Data Health (/p2/paid-marketing/tracking-health): can an account's conversion numbers be trusted. Pick a Google Ads account, an MCC to check every account in one go, or a Meta ad account, and it reads, read only, the last five weeks of clicks, cost and conversions by day, and what the conversions depend on (Google: each conversion action's conversions by day and whether it is primary, auto-tagging, and the open remarketing lists' sizes for Search; Meta: the campaigns' results by day, the ad account's pixels and when each last fired, and its custom audiences). Yesterday is held against the 28 days before (from the account's first day with clicks, leaving out the days the team expected a drop; under 7 such days nothing is judged). It flags conversions at zero while clicks held (critical when the account usually has at least 2 a day; under that, medium after 3 days at zero), conversions down 60 percent or more while clicks held (high), the conversion rate of the last 3 days down 40 percent with at least 10 conversions expected (medium), a primary Google conversion action that converted in the baseline and has none for 3 days (high, or evidence of the account-wide finding when conversions stopped with it), auto-tagging off (high), a Meta pixel that was firing and has not fired for 24 hours while the account spends (critical, or high when another pixel still fires), a remarketing list that held Google's 1,000 for Search and fell under it (medium) and a list down 25 percent in 14 days (low). Each account gets a health score out of 100 (critical costs 40, high 25, medium 10, low 3), a 35-day chart of clicks against conversions, and its actions, lists and pixels. The team saves, per account, who looks after its tracking, windows when a drop is expected (at most 92 days, with why), a conversion action, list or pixel to leave out with why, and an acknowledgement on a finding (known, being fixed: kept open, not alerted or reminded for 14 days). Download JSON gives the whole report. A monitor reads every account daily with the other monitors and alerts by email and Slack to the recipients saved on the page's Alerts and history panel (the first run sets a baseline and sends nothing; medium, high and critical are alerted, critical with CRITICAL in the subject). List trends start once the daily check has kept the lists' sizes for a few days. It changes nothing in any ad account.
 
 Keyword Visibility Tracker (/p2/paid-marketing/keyword-visibility): are the highest-spend keywords still winning the page. Pick a Google Ads account or an MCC to check every account in one go. It reads, read only, the highest-spend Search keywords of the last 28 days (the top 25 unless the team saves another number, 5 to 100), each one's last five whole weeks (the share of eligible searches at the top of the page, the share lost to rank, the Quality Score Google kept for each week) and the auction insights of the live Search campaigns by week, and holds the last whole week against the average of the four before. Google no longer reports a true average position and gives no keyword-level share lost to budget, so it uses the top-of-page share and the share lost to rank. It flags a keyword at the top of the page less than the lowest wanted share (50 percent unless saved; medium when 20 points under), a fall of 15 points in that share (30 is high), a keyword losing 40 percent of its eligible searches to rank (60 is medium), a Quality Score of 4 or less or a fall of 2 points in four weeks, and in the auctions a competitor that is new (10 percent overlap, under 2 percent before), one overlapping 15 points more, and on a brand campaign a possible brand hijack (high when new). A keyword is judged only with 100 searches it was eligible for in the week, and the page says which were not judged. Google currently refuses this app's developer access the auction insight metrics (a 403), so the competitor checks are off until that access is granted and the page says so. The team saves, per account, the lowest top-of-page share, the lowest Quality Score, how many keywords to track and competitor domains to ignore (a button on a finding adds one). A monitor reads every account once a week, on Tuesdays, and alerts by email and Slack to the recipients saved on the page's Alerts and history panel (the first run sets a baseline and sends nothing; only medium and high are alerted). It changes nothing in any ad account.
 
