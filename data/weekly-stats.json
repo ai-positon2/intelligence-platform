@@ -1,10 +1,10 @@
 {
   "counts": {
-    "C-Suite Join": 901,
-    "C-Suite Exit": 122
+    "C-Suite Join": 947,
+    "C-Suite Exit": 120
   },
-  "total": 1023,
+  "total": 1067,
   "companies": 1251,
-  "generated_at": "2026-10-19T15:50:04.441552+00:00",
-  "cutoff": "2026-10-12T15:50:04.439639+00:00"
+  "generated_at": "2026-10-26T15:24:30.292842+00:00",
+  "cutoff": "2026-10-19T15:24:30.290936+00:00"
 }
