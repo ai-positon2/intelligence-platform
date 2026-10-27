@@ -22,7 +22,7 @@ class World:
     """What a monitor finds today: set `issues` and `unreadable` before each run."""
 
     def __init__(self):
-        self.issues, self.unreadable, self.snaps, self.boom = [], set(), {}, False
+        self.issues, self.unreadable, self.snaps, self.boom, self.hold = [], set(), {}, False, {}
 
     def spec(self):
         def collect(accounts, groups):
@@ -30,7 +30,7 @@ class World:
                 raise RuntimeError("Google is down")
             ok = {a["id"] for a in accounts if a["id"] not in self.unreadable}
             return {"issues": [i for i in self.issues if i["accountId"] in ok], "snaps": self.snaps, "okIds": ok,
-                    "unreadable": [{"accountId": a["id"], "name": a["name"], "error": "no"} for a in accounts if a["id"] in self.unreadable]}
+                    "unreadable": [{"accountId": a["id"], "name": a["name"], "error": "no"} for a in accounts if a["id"] in self.unreadable], "hold": self.hold}
         return {"agent": "brandspend", "label": "Brand Spend Alert", "collect": collect}
 
 
@@ -140,6 +140,29 @@ def test_an_account_that_could_not_be_read_never_resolves_its_issues_and_is_name
     assert s.issues_all("brandspend")[0]["status"] == "open"
     w.unreadable = set()
     assert run(s, w, dv, day(3))["resolved"] == 1                                         # read again and gone: now it is resolved
+
+
+def test_an_issue_of_a_kind_whose_read_failed_stays_open_while_the_accounts_other_issues_are_judged():
+    s, dv, w = configured(), Deliver(), World()
+    run(s, w, dv, day(0))
+    w.issues = [issue("a:1", title="First", kind="weak"), issue("b:1", title="Second", kind="tired")]
+    run(s, w, dv, day(1))
+    w.issues, w.hold = [], {A["id"]: {"weak"}}                    # today neither is seen, but the read of the weak kind failed
+    r = run(s, w, dv, day(2))
+    states = {x["fingerprint"]: x["status"] for x in s.issues_all("brandspend")}
+    assert states == {"a:1": "open", "b:1": "resolved"} and r["resolved"] == 1 and r["held"] == 1
+    w.hold = {}
+    assert run(s, w, dv, day(3))["resolved"] == 1                  # read properly and gone: now it is resolved
+
+
+def test_a_held_kind_of_one_account_does_not_hold_another_account():
+    s, dv, w = configured(), Deliver(), World()
+    run(s, w, dv, day(0))
+    w.issues = [issue("a:1", kind="weak"), issue("b:1", B, kind="weak")]
+    run(s, w, dv, day(1))
+    w.issues, w.hold = [], {A["id"]: {"weak"}}
+    run(s, w, dv, day(2))
+    assert {x["fingerprint"]: x["status"] for x in s.issues_all("brandspend")} == {"a:1": "open", "b:1": "resolved"}
 
 
 def test_a_problem_that_comes_back_is_new_again_counts_from_the_day_it_came_back_and_says_how_often():

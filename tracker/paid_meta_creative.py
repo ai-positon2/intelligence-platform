@@ -141,10 +141,9 @@ def raw_read(act, *, pages_fn, today=None):
             "insightsRead": not any("could not be read" in w for w in warnings)}
 
 
-def report_for(account_id, *, store=None, force=False, now=None, today=None, pages_fn=None, account_fn=None, view="quality"):
-    """The Meta view ("quality" for Ad Strength, "coverage" for Asset Coverage) of one Meta ad account (act_...). `force` (Refresh) skips the saved read, at most once per
-    paid_gads.REFRESH_COOLDOWN_S for the account."""
-    from . import paid_meta_creative_analyse as an
+def raw_for(account_id, *, store=None, force=False, now=None, today=None, pages_fn=None, account_fn=None):
+    """(raw, stale, account): the saved read of one Meta ad account (act_...), read from Meta when there is none or when `force`. Ad Strength, Asset Coverage and Creative & Asset Health
+    share it, so opening a second page costs no Meta read."""
     from . import paid_store
     store = store or paid_store
     if not meta.is_meta(str(account_id or "")):
@@ -155,6 +154,15 @@ def report_for(account_id, *, store=None, force=False, now=None, today=None, pag
     acct = (account_fn or (lambda a: meta.account_by_id(store, a) or {}))(act) or {}
     account = {"id": act, "name": acct.get("name") or act, "currency": acct.get("currency") or "USD", "platform": "meta", "isGroup": False, "accountCount": 1}
     raw, stale = geo._cached("metacreative", act, "ads", day, day, lambda: raw_read(act, pages_fn=pages, today=day), force=force, store=store, now=now)
+    return raw, stale, account
+
+
+def report_for(account_id, *, store=None, force=False, now=None, today=None, pages_fn=None, account_fn=None, view="quality"):
+    """The Meta view ("quality" for Ad Strength, "coverage" for Asset Coverage) of one Meta ad account (act_...). `force` (Refresh) skips the saved read, at most once per
+    paid_gads.REFRESH_COOLDOWN_S for the account."""
+    from . import paid_meta_creative_analyse as an
+    day = today or dt.date.today()
+    raw, stale, account = raw_for(account_id, store=store, force=force, now=now, today=day, pages_fn=pages_fn, account_fn=account_fn)
     report = (an.coverage if view == "coverage" else an.quality)(raw, account, day)
     if raw.get("readAt"):
         report["readAt"] = raw["readAt"]

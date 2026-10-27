@@ -122,8 +122,9 @@ def seen_accounts(store, agent, existing):
     return {f["accountId"] for f in existing.values()}
 
 
-def track(store, agent, current, ok_ids, now):
-    """Hold today's issues against the saved ones. Returns {writes, pending, resolved, baselineSet, seenIds, newAccounts}:
+def track(store, agent, current, ok_ids, now, hold=None):
+    """Hold today's issues against the saved ones. `hold` is {account id: {kind, ...}}: the kinds of issue whose part of the read failed for that account in this run. An open issue of a held
+    kind is left open (the run could not see whether it is still there), while the account's other issues are judged as usual. Returns {writes, pending, resolved, baselineSet, seenIds, newAccounts}:
     writes   every row to save;
     pending  [{event: new|worse|reminder, ...the issue, ageDays, reopened}] to alert, worst first (empty on the baseline run);
     resolved [{...the issue, ageDays (how long it was open)}] that went away since the last run;
@@ -152,7 +153,7 @@ def track(store, agent, current, ok_ids, now):
     seen_ids, new_accounts = known | set(ok_ids), (set() if first_run else set(ok_ids) - known)
     resolved = []
     for fp, old in existing.items():
-        if fp not in seen and old["status"] == "open" and old["accountId"] in ok_ids:
+        if fp not in seen and old["status"] == "open" and old["accountId"] in ok_ids and old.get("kind") not in (hold or {}).get(old["accountId"], ()):
             writes.append(dict(old, status="resolved", resolvedAt=stamp))
             resolved.append(dict(old, status="resolved", resolvedAt=stamp, ageDays=age_days(old["firstSeen"], now)))
     if first_run:
@@ -337,7 +338,7 @@ def _keep_run(store, agent, run):
 
 def run_monitor(store, spec, *, trigger, link, deliver, accounts, groups, problems=(), now_fn=None):
     """One run of a monitor. `spec` is {agent, label, collect}; collect(accounts, groups) returns
-    {issues: [make_issue...], snaps: {account id: {...}}, okIds: set of the accounts that were read, unreadable: [{accountId, name, error}]}.
+    {issues: [make_issue...], snaps: {account id: {...}}, okIds: set of the accounts that were read, unreadable: [{accountId, name, error}], hold: {account id: {issue kinds}} (optional, see track)}.
     Returns the run record ({status: "busy"} when another run of the monitor is going)."""
     now_fn = now_fn or (lambda: datetime.now(timezone.utc))
     agent = spec["agent"]
@@ -347,9 +348,10 @@ def run_monitor(store, spec, *, trigger, link, deliver, accounts, groups, proble
     try:
         got = spec["collect"](accounts, groups)
         now = now_fn()
-        tracked = track(store, agent, got["issues"], set(got["okIds"]), now)
+        tracked = track(store, agent, got["issues"], set(got["okIds"]), now, got.get("hold"))
         run = {"status": "done", "trigger": trigger, "startedAt": _iso(started), "finishedAt": _iso(now), "accounts": len(accounts), "read": len(got["okIds"]),
                "unreadable": (got.get("unreadable") or [])[:30], "unreadableCount": len(got.get("unreadable") or []), "problems": list(problems), "issues": len(got["issues"]),
+               "held": sum(len(v) for v in (got.get("hold") or {}).values()),
                "new": sum(1 for p in tracked["pending"] if p["event"] == "new"), "worse": sum(1 for p in tracked["pending"] if p["event"] == "worse"),
                "reminders": sum(1 for p in tracked["pending"] if p["event"] == "reminder"), "resolved": len(tracked["resolved"]), "baseline": bool(tracked["baselineSet"]) or baseline(store, agent) is not None,
                "alerted": 0, "email": None, "slack": None, "firstRead": len(tracked["newAccounts"])}
