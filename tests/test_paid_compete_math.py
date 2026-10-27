@@ -330,3 +330,31 @@ def test_an_ad_with_no_known_run_is_not_listed_among_the_longest_and_ideas_are_s
     ads = [ad("A", "$0 Insulin Pump Delivered", "Plain %d" % i, id="a%d" % i, days=300 if i == 0 else 5) for i in range(2)] + [ad("B", "Word %d" % i, "Text %d" % i, id="b%d" % i, days=5) for i in range(5)]
     rep = cm.analyse({"meta": own_without_price()}, [entry("A", ads[:2]), entry("B", ads[2:])], now=NOW)
     assert [(i["id"], i["level"]) for i in rep["ideas"]] == [("meta:winners", "medium"), ("meta:offers", "low")]
+
+
+# ── a read that hit its limit or stopped early is said, never passed off as everything ──────
+
+def test_a_competitor_read_to_its_limit_or_stopped_early_is_said_in_its_figures_and_in_the_caveats():
+    ads = pool_with_price(who=("A",))
+    capped = dict(entry("A", ads), limit=150, capped=True)
+    stopped = dict(entry("B", pool_with_price(who=("B",))), limit=150, partial="The Meta read stopped before it finished (out of time), so only part of the ads were read.")
+    rep = cm.analyse({"meta": own_without_price()}, [capped, stopped], now=NOW)
+    a, b = rep["platforms"]["meta"]["competitors"]
+    assert a["capped"] is True and a["limit"] == 150 and a["read"] == 4 and a["partial"] == "" and b["capped"] is False and "stopped before it finished" in b["partial"]
+    assert "A on Meta: the limit of 150 ads was reached, so they run more ads than were read. Their longest-running and newest ads may be missing." in rep["caveats"]
+    assert "B on Meta: The Meta read stopped before it finished (out of time), so only part of the ads were read." in rep["caveats"]
+
+
+def test_a_complete_read_has_no_limit_caveat_and_a_failed_one_has_only_its_error():
+    rep = cm.analyse({"meta": own_without_price()}, [dict(entry("A", pool_with_price(who=("A",))), limit=150), dict(entry("B", [], error="x"), capped=True, limit=150)], now=NOW)
+    assert [c for c in rep["caveats"] if "limit" in c] == [] and "B on Meta: x" in rep["caveats"]
+    a = rep["platforms"]["meta"]["competitors"][0]
+    assert a["capped"] is False and a["partial"] == ""
+
+
+def test_ads_with_no_text_are_counted_so_a_picture_or_video_only_read_is_not_taken_for_a_small_advertiser():
+    ads = pool_with_price(who=("A",))
+    rep = cm.analyse({"meta": own_without_price()}, [dict(entry("A", ads), items=13), dict(entry("B", ads), items=4), dict(entry("C", ads))], now=NOW)
+    a, b, c = rep["platforms"]["meta"]["competitors"]
+    assert (a["noText"], b["noText"], c["noText"]) == (9, 0, 0) and a["read"] == 4
+    assert cm.competitor_stats("X", [], fetched_at="", now=NOW, items=5)["noText"] == 5 and cm.competitor_stats("X", [], fetched_at="", now=NOW)["noText"] == 0

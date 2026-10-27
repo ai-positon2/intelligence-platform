@@ -294,7 +294,8 @@ def _brief(a):
             "url": a["url"], "copies": a["copies"]}
 
 
-def competitor_stats(name, ads, *, fetched_at, now, error=None, skipped=None):
+def competitor_stats(name, ads, *, fetched_at, now, error=None, skipped=None, limit=None, capped=False, partial="", items=0):
+    read = len(ads)
     ads = dedupe(ads)
     day0 = now.date()
     cut = day0 - timedelta(days=NEW_DAYS)
@@ -310,11 +311,11 @@ def competitor_stats(name, ads, *, fetched_at, now, error=None, skipped=None):
         p = path_of(a["url"])
         if p:
             paths[p] = paths.get(p, 0) + 1
-    read = to_date(fetched_at)
-    return {"name": name, "count": len(ads), "active": sum(1 for a in ads if a.get("active")), "new": len(new), "medianDays": _median(days), "maxDays": max(days) if days else None, "formats": formats,
+    fetched = to_date(fetched_at)
+    return {"name": name, "count": len(ads), "read": read, "noText": max(0, (items or 0) - read), "limit": limit, "capped": bool(capped), "partial": partial or "", "active": sum(1 for a in ads if a.get("active")), "new": len(new), "medianDays": _median(days), "maxDays": max(days) if days else None, "formats": formats,
             "ctas": dict(sorted(ctas.items(), key=lambda kv: (-kv[1], kv[0]))[:TOP_N]), "landing": [{"path": p, "ads": n} for p, n in sorted(paths.items(), key=lambda kv: (-kv[1], kv[0]))[:TOP_N]],
             "longest": [_brief(a) for a in sorted(ads, key=lambda a: -(a.get("days") or 0))[:3]], "newest": [_brief(a) for a in sorted(new, key=lambda a: a["firstShown"], reverse=True)[:3]],
-            "fetchedAt": fetched_at or "", "ageDays": _days_between(read, day0) if read else None, "error": error or "", "skipped": skipped or ""}
+            "fetchedAt": fetched_at or "", "ageDays": _days_between(fetched, day0) if fetched else None, "error": error or "", "skipped": skipped or ""}
 
 
 # ── Comparing ───────────────────────────────────────────────────────────────
@@ -386,20 +387,27 @@ def analyse(own, competitors, *, now, region="US"):
     platforms, caveats = {}, []
     for p, own_ads in own.items():
         entries = [c for c in competitors if c["platform"] == p]
-        stats = [competitor_stats(c["name"], c.get("ads") or [], fetched_at=c.get("fetchedAt"), now=now, error=c.get("error"), skipped=c.get("skipped")) for c in entries]
+        stats = [competitor_stats(c["name"], c.get("ads") or [], fetched_at=c.get("fetchedAt"), now=now, error=c.get("error"), skipped=c.get("skipped"),
+                                  limit=c.get("limit"), capped=c.get("capped"), partial=c.get("partial"), items=c.get("items")) for c in entries]
         with_data = [c for c in entries if c.get("ads")]
         cmp_, pool, theirs, ours = compare(own_ads, [a for c in with_data for a in c["ads"]], n_competitors=len(with_data))
         platforms[p] = {"own": {"ads": len(own_ads), "lines": ours["lines"], "themes": {k: v["share"] for k, v in ours["themes"].items()}}, "competitors": stats, "compare": cmp_,
                         "pool": {"ads": len(pool), "lines": theirs["lines"], "themes": {k: dict(v) for k, v in theirs["themes"].items()}}, "offers": offers_of(pool),
                         "winners": [_brief(a) for a in sorted(pool, key=lambda a: -(a.get("days") or 0))[:TOP_N] if (a.get("days") or 0) > 0],
                         "examples": {g["theme"]: example_for(g["theme"], pool) for g in cmp_["gaps"]}}
+        where = "Google" if p == "google" else "Meta"
         for s in stats:
             if s["error"]:
-                caveats.append("%s on %s: %s" % (s["name"], "Google" if p == "google" else "Meta", s["error"]))
+                caveats.append("%s on %s: %s" % (s["name"], where, s["error"]))
             elif s["skipped"]:
-                caveats.append("%s on %s: %s" % (s["name"], "Google" if p == "google" else "Meta", s["skipped"]))
-            elif s["ageDays"] is not None and s["ageDays"] > STALE_DAYS:
-                caveats.append("%s on %s was last read %s ago." % (s["name"], "Google" if p == "google" else "Meta", plural(s["ageDays"], "day")))
+                caveats.append("%s on %s: %s" % (s["name"], where, s["skipped"]))
+            else:
+                if s["capped"]:
+                    caveats.append("%s on %s: the limit of %d ads was reached, so they run more ads than were read. Their longest-running and newest ads may be missing." % (s["name"], where, s["limit"] or s["read"]))
+                if s["partial"]:
+                    caveats.append("%s on %s: %s" % (s["name"], where, s["partial"]))
+                if s["ageDays"] is not None and s["ageDays"] > STALE_DAYS:
+                    caveats.append("%s on %s was last read %s ago." % (s["name"], where, plural(s["ageDays"], "day")))
         if p == "google" and any(c.get("ads") for c in entries):
             caveats.append(OCR_NOTE)
         if not cmp_["judged"] and cmp_["why"]:

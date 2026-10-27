@@ -8,13 +8,18 @@ One Google Ads account and/or one Meta ad account at a time: a manager account w
 """
 from __future__ import annotations
 
+import contextlib
 import datetime as dt
+import time
 
 from . import paid_gads as gb
 from . import paid_gads_segments as gs
 from . import paid_compete_fetch as cf
 from . import paid_compete_math as cm
+from . import paid_compete_search as se
 from . import paid_compete_settings as cs
+
+SETTINGS_LOCK = "lock:compete:settings"
 
 
 class BadRequest(ValueError):
@@ -53,6 +58,55 @@ def competitors_of(settings, accounts):
         if region is None and (settings.get("accounts") or {}).get(str(aid), {}).get("region"):
             region = a["region"]
     return out, region or cs.REGION_DEFAULT
+
+
+@contextlib.contextmanager
+def _settings_lock(mon, wait_s=5.0):
+    """Two people changing competitors at the same moment must not lose each other's change: a change reads the list, alters it and saves it whole, so it holds this short lock (it waits a few seconds for
+    another change to finish, then says so)."""
+    waited = 0.0
+    while not mon.claim(SETTINGS_LOCK, 30):
+        if waited >= wait_s:
+            raise BadRequest("The competitors are being changed by someone else. Try again in a moment.")
+        time.sleep(0.25)                                                             # looked up here, so a test can replace it
+        waited += 0.25
+    try:
+        yield
+    finally:
+        mon.release(SETTINGS_LOCK)
+
+
+def change(mon, accounts, names, op, who, competitor=None, region=None, now=None):
+    """One change (add, remove, update, region) to the competitors of each ad account of the page's scope, each on its own list: {platform: the account's competitors as saved}. With two accounts
+    (a Google Ads account and a Meta account of one client) a change that does not apply to one of them (it already has the competitor, or never had it) is passed over; it is refused only when it
+    applies to none."""
+    done, errors = {}, []
+    with _settings_lock(mon):
+        for p, aid in accounts.items():
+            try:
+                done[p] = cs.change_account(mon, aid, (names or {}).get(aid) or "", op, who, competitor, region, now)
+            except cs.BadRequest as e:
+                errors.append(str(e))
+    if not done:
+        raise BadRequest(errors[0])
+    return done
+
+
+def find_facebook(mon, accounts, names, name, who, *, ask_fn=None, force=False, now=None):
+    """Look for the Facebook page of one of the account's competitors (by its name and website) and keep it when the answer is sure of it. A page already set is left alone unless `force`. Returns
+    the answer {facebook, confidence, reasoning, pageName, error, kept}."""
+    competitors, _region = competitors_of(cs.load_for_read(mon), accounts)
+    comp = next((c for c in competitors if c["name"].lower() == str(name or "").strip().lower()), None)
+    if comp is None:
+        raise BadRequest("%s is not one of this account's competitors." % (str(name or "That competitor")[:60]))
+    if comp.get("facebook") and not force:
+        return {"facebook": comp["facebook"], "confidence": "", "reasoning": "A Facebook page is already set.", "pageName": "", "error": "", "kept": False}
+    got = se.find_facebook(comp["name"], comp.get("domain") or "", ask_fn=ask_fn)
+    got["kept"] = False
+    if got["facebook"]:
+        change(mon, accounts, names, "update", who, dict(comp, facebook=got["facebook"], fbSource="search"), now=now)
+        got["kept"] = True
+    return got
 
 
 def own_ads(platform, account_id, *, accounts_fn=None, groups_fn=None, search_fn=None, now=None, force=False, store=None, today=None, meta_pages_fn=None, meta_account_fn=None):

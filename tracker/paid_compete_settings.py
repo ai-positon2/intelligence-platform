@@ -7,6 +7,8 @@ Who an account's competitors are cannot be read from an ad account, so the team 
   domain            its website: Google's Ads Transparency Center is searched by it (every ad that sends people to it)
   facebook          its Facebook page (an address, a page id or the name in the address): Meta's Ad Library is searched by it
   googleAdvertiser  optional, the advertiser id (AR...) from its Transparency Center page, for a competitor whose ads are not found by its domain
+  logo, industry    only for showing the competitor on the page (what the company search answered)
+  fbSource          where the Facebook page came from: "search" (found by name and website), "apollo" (the company's own record), "manual" (typed by the team) or "" (none yet)
   region            the country whose ads are read, for the whole account (two letters, US unless set)
 
 A competitor with none of the three is refused: nothing could be looked up. The Master Agent can hold the same list for a client (tracker/paid_master.py); an account's own saved list wins.
@@ -104,7 +106,10 @@ def clean_competitor(c):
         raise BadRequest("%s is not an advertiser id (it starts with AR, from the competitor's Ads Transparency Center address)." % ar[:40])
     if not (domain or fb or ar):
         raise BadRequest("%s needs a website, a Facebook page or an advertiser id, or there is nowhere to look." % name)
-    return {"name": name, "domain": domain, "facebook": fb, "googleAdvertiser": ar}
+    logo = str(c.get("logo") or "").strip()
+    src = str(c.get("fbSource") or "").strip().lower()
+    return {"name": name, "domain": domain, "facebook": fb, "googleAdvertiser": ar, "logo": logo[:300] if re.match(r"^https://", logo) else "", "industry": " ".join(str(c.get("industry") or "").split())[:80],
+            "fbSource": src if fb and src in ("search", "apollo", "manual") else ("manual" if fb else "")}
 
 
 def identity(c):
@@ -154,10 +159,15 @@ def lines_of(competitors):
 
 # ── Saving ──────────────────────────────────────────────────────────────────
 
-def save_account(store, account_id, name, data, who, now=None):
+def _scope_ok(account_id):
     account_id = str(account_id or "").strip()
     if not re.fullmatch(r"\d{10}|act_\d{4,20}", account_id):
         raise BadRequest("Pick one account to save its competitors: they are not saved for an MCC as a whole.")
+    return account_id
+
+
+def save_account(store, account_id, name, data, who, now=None):
+    account_id = _scope_ok(account_id)
     data = data if isinstance(data, dict) else {}
     clean = {"competitors": clean_competitors(data.get("competitors")), "region": clean_region(data.get("region")), "name": str(name or "")[:120]}
     s = load(store)
@@ -168,6 +178,32 @@ def save_account(store, account_id, name, data, who, now=None):
     _note(s, who, "saved the competitors of account %s (%d)" % (account_id, len(clean["competitors"])), now)
     store.state_set(KEY, s)
     return account_of(s, account_id)
+
+
+def change_account(store, account_id, name, op, who, competitor=None, region=None, now=None):
+    """One change to the competitors of one ad account, made on the list the page shows (this account's own, or the Master Agent's for an account that has none saved) and saved as the account's own:
+    op "add" (a competitor not yet listed, by its website, else its Facebook page), "remove" (by name), "update" (the competitor with the same name or website: its Facebook page, advertiser id...) or
+    "region". Returns the account's competitors as saved. Each ad account keeps its own list."""
+    account_id = _scope_ok(account_id)
+    cur = account_of(load_for_read(store), account_id)
+    comps, reg = cur["competitors"], cur["region"]
+    comp = competitor if isinstance(competitor, dict) else {}
+    if op == "region":
+        reg = clean_region(region)
+    elif op == "add":
+        new = clean_competitor(comp)
+        if any(identity(c) == identity(new) or c["name"].lower() == new["name"].lower() for c in comps):
+            raise BadRequest("%s is already in this account's competitors." % new["name"])
+        comps = comps + [new]
+    elif op in ("remove", "update"):
+        key, name_l = identity(clean_competitor(comp)) if op == "update" else "", str(comp.get("name") or "").strip().lower()
+        hit = [i for i, c in enumerate(comps) if (c["name"].lower() == name_l if op == "remove" else identity(c) == key or c["name"].lower() == name_l)]
+        if not hit:
+            raise BadRequest("%s is not one of this account's competitors." % (str(comp.get("name") or "That competitor")[:60]))
+        comps = [c for i, c in enumerate(comps) if i not in hit] if op == "remove" else [dict(c, **clean_competitor(dict(c, **comp))) if i in hit else c for i, c in enumerate(comps)]
+    else:
+        raise BadRequest("Unknown change.")
+    return save_account(store, account_id, name, {"competitors": comps, "region": reg}, who, now)
 
 
 def view(store):

@@ -33,7 +33,9 @@ NOW = dt.datetime(2026, 10, 27, 12, 0, tzinfo=dt.timezone.utc)
 G = "1234567890"
 ACCTS = {"accounts": [{"id": G, "name": "Acme <b>Dental</b>", "currency": "USD", "group": None}], "groups": []}
 HARNESS_PAGE = (HARNESS.replace("/p2/paid-marketing/ad-copy-checker", "/p2/paid-marketing/competitor-analysis")
-                .replace("hidden: els[k].hidden, value:", "hidden: els[k].hidden, disabled: els[k].disabled, title: els[k].title || \"\", value:"))
+                .replace("hidden: els[k].hidden, value:", "hidden: els[k].hidden, disabled: els[k].disabled, title: els[k].title || \"\", value:")
+                .replace("const make = s => ({ dataset: s.dataset || {},", "const make = s => ({ value: s.value, dataset: s.dataset || {},")
+                .replace("    for (let i = 0; i < 6; i++) await tick();\n  }\n  const out", "    if (step.change) { const [sel, closest] = step.change; const t = target({ closest }); targets.push(t); el(sel).handlers.change({ target: t }); }\n    for (let i = 0; i < 6; i++) await tick();\n  }\n  const out"))
 MA = "act_1234567"
 
 
@@ -95,9 +97,13 @@ def test_the_tiles_count_competitors_ads_gaps_ideas_and_how_old_the_read_is(repo
     assert clean[2][1:] == ["0", "no clear gap against our ads", "good"] and clean[3][2] == "none yet" and clean[4][1] == "today"
 
 
+SLOW = "(Google shows each text ad as a picture, so those reads are slow)"
+
+
 def test_the_cost_of_a_refresh_is_said_before_it_is_paid():
-    assert run("X.estimateText(E, 7)", E={"reads": 4, "ads": 120, "usd": 0.45}) == "A refresh reads 4 competitor pages, up to 120 ads, about $0.45 at most. Reads newer than 7 days are not paid for again."
-    assert run("X.estimateText(E, 1)", E={"reads": 1, "ads": 30, "usd": 0.05}) == "A refresh reads 1 competitor page, up to 30 ads, about $0.05 at most. Reads newer than 1 day are not paid for again."
+    assert run("X.estimateText(E, 7)", E={"reads": 4, "ads": 120, "usd": 0.45}) == "A refresh reads 4 competitor pages, up to 120 ads, about $0.45 at most and a few minutes %s. Reads newer than 7 days are not paid for again." % SLOW
+    assert run("X.estimateText(E, 1)", E={"reads": 1, "ads": 100, "usd": 0.16, "minutes": 15}) == "A refresh reads 1 competitor page, up to 100 ads, about $0.16 at most and up to about 15 minutes %s. Reads newer than 1 day are not paid for again." % SLOW
+    assert "up to about 1 minute " in run("X.estimateText(E, 7)", E={"reads": 1, "ads": 10, "usd": 0.05, "minutes": 1})
     assert run("X.estimateText({}, 7)") == "Nothing can be read yet: a competitor needs a website or a Facebook page." and run("X.estimateText(null, 7)").startswith("Nothing can be read")
     assert run("X.money(1.005)") in ("$1.00", "$1.01") and run("X.money(0.3)") == "$0.30"
 
@@ -113,6 +119,8 @@ def test_a_refresh_is_worded_while_it_runs_when_it_fails_and_when_it_is_done():
     assert run("X.jobText(J)", J={"status": "done", "steps": [], "skippedFresh": 0}).endswith("again.") and run("X.jobText(null)") == ""
     assert run("X.stepLine(S)", S=done[0]) == {"text": "A on Meta: 3 ads", "tone": "ok"} and run("X.stepLine(S)", S=done[1]) == {"text": "B on Google: x", "tone": "bad"}
     assert run("X.stepLine(S)", S=steps[1]) == {"text": "B on Google: reading", "tone": "wait"} and run("X.stepLine(S)", S=steps[2])["text"] == "C on Meta: waiting"
+    assert run("X.stepLine(S)", S=dict(done[0], ads=150, capped=True, limit=150)) == {"text": "A on Meta: 150 ads (limit of 150 reached, they run more)", "tone": "warn"}
+    assert run("X.stepLine(S)", S=dict(done[0], ads=40, partial="x")) == {"text": "A on Meta: 40 ads (stopped early, only part was read)", "tone": "warn"}
 
 
 def test_the_competitors_are_a_table_per_platform_with_what_failed_or_was_skipped_in_words(report):
@@ -157,11 +165,59 @@ def test_offers_the_longest_runners_and_the_newest_ads_are_rows(report):
     assert run("X.offerRows(R, 'x')", R=report) == [] and run("X.winnerRows(R, 'x')", R=report) == [] and run("X.newestRows(R, 'x')", R=report) == []
 
 
-def test_what_the_page_sends_to_save_and_the_line_that_says_where_it_stands(report, empty_report):
-    assert run("X.saveBody('1234567890', 'A | a.com', ' de ', N)", N={G: "Acme"}) == {"account": G, "competitors": "A | a.com", "region": "DE", "names": {G: "Acme"}}
-    assert run("X.saveBody('1', 'x', '', null)") == {"account": "1", "competitors": "x", "region": "US", "names": {}}
+def test_what_the_page_sends_for_each_change_and_the_line_that_says_where_it_stands(report, empty_report):
+    co = {"name": "Tandem", "domain": "tandemdiabetes.com", "facebook": "", "fbSource": "", "logo": "https://l.example/t.png", "industry": "devices"}
+    assert run("X.addBody('1234567890', C, N)", C=co, N={G: "Acme"}) == {"account": G, "op": "add", "competitor": co, "names": {G: "Acme"}} and run("X.addBody('1', C, null)", C=co)["names"] == {}
+    assert run("X.removeBody('1234567890', 'Tandem', N)", N={G: "Acme"}) == {"account": G, "op": "remove", "competitor": {"name": "Tandem"}, "names": {G: "Acme"}}
+    assert run("X.pageBody('1234567890', C, '  TandemDiabetes ', N)", C=dict(co, googleAdvertiser="AR1"), N={}) == {"account": G, "op": "update", "names": {}, "competitor": {"name": "Tandem", "domain": "tandemdiabetes.com", "googleAdvertiser": "AR1",
+                                                                                                                                                      "logo": "https://l.example/t.png", "industry": "devices", "facebook": "TandemDiabetes", "fbSource": "manual"}}
+    assert run("X.regionBody('1234567890', ' de ', N)", N={G: "Acme"}) == {"account": G, "op": "region", "region": "DE", "names": {G: "Acme"}} and run("X.regionBody('1', '', null)")["region"] == "US"
+    assert run("X.findBody('1', 'Tandem', N, true)", N={"1": "A"}) == {"account": "1", "name": "Tandem", "names": {"1": "A"}, "force": True} and run("X.findBody('1', 'T', null)") == {"account": "1", "name": "T", "names": {}, "force": False}
     assert run("X.standing(R)", R=empty_report).startswith("No competitors are saved for this account yet.") and run("X.standing({status: 'no_competitor_data'})").startswith("The competitors are saved, but none of their ads")
     assert run("X.standing(R)", R=report) == report["headline"]
+
+
+def test_the_company_search_is_cards_with_what_tells_the_companies_apart_and_a_note_that_says_what_was_found():
+    res = {"companies": [{"name": "Tandem Diabetes Care", "domain": "tandemdiabetes.com", "website": "https://tandemdiabetes.com", "facebook": "https://www.facebook.com/TandemDiabetes", "fbSource": "apollo", "logo": "https://l.example/t.png",
+                          "industry": "medical devices", "location": "San Diego, California, United States", "description": "Insulin pumps.", "added": False},
+                         {"name": "Tandem Bank", "domain": "tandem.co.uk", "website": "https://tandem.co.uk", "facebook": "", "fbSource": "", "logo": "", "industry": "", "location": "", "description": "A bank.", "added": True}], "error": None}
+    cards = run("X.resultCards(R)", R=res)
+    assert cards[0] == {"name": "Tandem Diabetes Care", "domain": "tandemdiabetes.com", "website": "https://tandemdiabetes.com", "logo": "https://l.example/t.png", "sub": "medical devices \u00b7 San Diego, California, United States", "description": "Insulin pumps.",
+                        "added": False, "hasFacebook": True, "company": {"name": "Tandem Diabetes Care", "domain": "tandemdiabetes.com", "facebook": "https://www.facebook.com/TandemDiabetes", "fbSource": "apollo", "logo": "https://l.example/t.png", "industry": "medical devices"}}
+    assert cards[1]["sub"] == "" and cards[1]["added"] is True and cards[1]["hasFacebook"] is False and cards[1]["company"]["facebook"] == "" and run("X.resultCards(null)") == []
+    assert run("X.searchNote(R, 'tandem')", R=res) == "2 companies found. Pick the ones that are competitors."
+    assert run("X.searchNote(R, 'zzz')", R={"companies": [], "error": None}) == "No company matched \"zzz\". Try a shorter name, or type its website address."
+    assert run("X.searchNote(R, 'x')", R={"companies": [], "error": {"message": "Apollo is rate-limiting us. Try again in a minute."}}) == "Apollo is rate-limiting us. Try again in a minute."
+    assert run("X.searchNote(R, 'x')", R={"companies": [{"name": "A"}], "error": {"message": "Apollo did not respond."}}) == "Apollo did not respond. 1 company found. Pick the ones that are competitors." and run("X.searchNote(null, 'x')") == ""
+
+
+def test_each_competitor_says_whether_its_meta_ads_can_be_read_and_where_the_page_came_from():
+    rep = {"competitors": [{"name": "A", "domain": "a.com", "facebook": "https://www.facebook.com/AAA", "fbSource": "search", "logo": "", "industry": "devices"}, {"name": "B", "domain": "b.com", "facebook": "https://www.facebook.com/BBB", "fbSource": "apollo"},
+                           {"name": "C", "domain": "c.com", "facebook": "https://www.facebook.com/CCC", "fbSource": "manual"}, {"name": "D", "domain": "d.com", "facebook": "", "googleAdvertiser": "AR1"}]}
+    cards = run("X.competitorCards(R, F)", R=rep, F={"D": True})
+    assert [c["fbText"] for c in cards] == ["Facebook page, found by searching for the company", "Facebook page, from the company's own record", "Facebook page, typed by the team", "Looking for its Facebook page\u2026"]
+    assert [c["fbTone"] for c in cards] == ["ok", "ok", "ok", "wait"] and [c["canFind"] for c in cards] == [False, False, False, False] and cards[3]["finding"] is True and cards[3]["advertiser"] == "AR1"
+    idle = run("X.competitorCards(R)", R=rep)[3]
+    assert idle["fbText"] == "No Facebook page yet, so its Meta ads cannot be read." and idle["fbTone"] == "warn" and idle["canFind"] is True and idle["finding"] is False
+    assert run("X.facebookText({facebook: 'https://www.facebook.com/X'}, false)") == {"text": "Facebook page", "tone": "ok"} and run("X.competitorCards({})") == []
+    assert run("X.forText(R)", R={"names": {"google": "Acme <b>Dental</b>", "meta": "Acme Meta"}}) == "These competitors are saved for Acme <b>Dental</b> + Acme Meta only. Each ad account has its own list." and run("X.forText({})").startswith("These competitors are saved for this ad account only")
+
+
+def test_a_competitor_read_to_its_limit_or_stopped_early_is_flagged_in_the_table_and_the_csv():
+    rep = {"platforms": ["meta"], "ideas": [], "analysis": {"meta": {"compare": {"gaps": []}, "offers": [], "winners": [], "competitors": [
+        stats_of("A", [], age=0, count=150, active=150, capped=True, limit=150, read=150, partial=""), stats_of("B", [], age=0, count=40, active=40, capped=False, limit=150, read=40, partial="The Meta read stopped before it finished (x), so only part of the ads were read."),
+        stats_of("C", [], age=0, count=5, active=5, capped=False, limit=150, read=5, partial="")]}}}
+    rows = {r["name"]: r for r in run("X.competitorRows(R, 'meta')", R=rep)}
+    assert rows["A"]["capped"] is True and rows["A"]["flag"] == "Limit of 150 ads reached: they run more than were read." and rows["B"]["partial"] is True and rows["B"]["flag"] == "Stopped early: only part of their ads were read."
+    assert rows["C"]["flag"] == "" and rows["C"]["capped"] is False and rows["C"]["noText"] == ""
+    nt = run("X.competitorRows(R, 'meta')", R={"analysis": {"meta": {"competitors": [stats_of("N", [], count=3, noText=9), stats_of("O", [], count=3, noText=1), stats_of("P", [], error="boom", noText=4)]}}})
+    assert [r["noText"] for r in nt] == ["9 ads have no text to read (a picture or a video only).", "1 ad has no text to read (a picture or a video only).", ""]
+    csv = {r[2]: r for r in run("X.csvRows(R)", R=dict(rep, platforms=["meta"])) if r and r[0] == "Competitor"}
+    assert csv["A"][4].endswith(". Limit of 150 ads reached: they run more than were read") and csv["B"][4].endswith(". Stopped early: only part was read") and "Limit" not in csv["C"][4]
+    withtext = run("X.csvRows(R)", R={"platforms": ["meta"], "ideas": [], "analysis": {"meta": {"compare": {"gaps": []}, "offers": [], "winners": [], "competitors": [stats_of("N", [], count=3, active=3, noText=2)]}}})
+    assert [r for r in withtext if r and r[0] == "Competitor"][0][4].endswith(". 2 ads without text (picture or video only) not counted")
+    bad = run("X.competitorRows(R, 'meta')", R={"analysis": {"meta": {"competitors": [stats_of("X", [], error="boom", capped=True, limit=150, count=0)]}}})
+    assert bad[0]["flag"] == ""                                                                      # a failed read says its error, not that it hit a limit
 
 
 def test_the_csv_has_the_ideas_the_gaps_the_competitors_the_offers_and_the_longest_runners(report):
@@ -215,7 +271,8 @@ def test_the_report_is_drawn_with_the_tiles_the_competitors_the_ideas_the_gaps_a
     el = out["el"]
     assert "Competitor ads read" in el["#kpis"]["html"] and "Message gaps" in el["#kpis"]["html"] and report["headline"] == el["#standing"]["text"]
     assert "Acme &lt;b&gt;Dental&lt;/b&gt;" in el["#fresh"]["html"] and "Google Ads" in el["#fresh"]["html"] and "<b>Dental</b>" not in el["#fresh"]["html"]
-    assert el["#fComp"]["value"] == report["competitorsText"] and el["#fRegion"]["value"] == "US" and el["#compNote"]["text"] == "3 competitors" and "A refresh reads 4 competitor pages" in el["#estimate"]["text"]
+    assert "fComp" not in el and el["#fRegion"]["value"] == "US" and el["#compNote"]["text"] == "3 competitors" and "A refresh reads 4 competitor pages" in el["#estimate"]["text"]
+    assert el["#compFor"]["text"] == "These competitors are saved for Acme <b>Dental</b> + Acme <b>Dental</b> only. Each ad account has its own list."
     comp = el["#compTables"]["html"]
     assert "<h4>Google Ads</h4>" in comp and "<h4>Meta Ads</h4>" in comp and "Tandem" in comp and "Cheap Co" in comp and "Median days running" in comp and "No Facebook page is set" in comp
     assert el["#ideasCard"]["hidden"] is False and "Try this:" in el["#ideas"]["html"] and 'class="bi-lv bad">High' in el["#ideas"]["html"] and "Example from them:" in el["#ideas"]["html"]
@@ -243,19 +300,154 @@ def test_a_server_without_an_apify_token_cannot_refresh_and_says_why(report):
     assert ok["el"]["#refreshBtn"]["disabled"] is False and ok["el"]["#refreshBtn"]["title"] == ""
 
 
-def test_saving_posts_the_box_the_country_and_the_account_names_and_reads_the_report_again(report):
-    steps = [{"set": ["#fComp", "A | a.com | AFacebook"]}, {"set": ["#fRegion", "gb"]}, {"click": "#saveBtn"}]
-    out = opened(report, steps, more=[{"match": "/compete/settings", "method": "POST", "body": {"saved": {}}}])
+TANDEM_CO = {"name": "Tandem Diabetes Care", "domain": "tandemdiabetes.com", "website": "https://tandemdiabetes.com", "facebook": "https://www.facebook.com/TandemDiabetes", "fbSource": "apollo", "logo": "https://l.example/t.png",
+             "industry": "medical devices", "location": "San Diego, California, United States", "description": "Insulin pumps.", "added": False}
+INSULET_CO = {"name": "Insulet", "domain": "insulet.com", "website": "https://insulet.com", "facebook": "", "fbSource": "", "logo": "", "industry": "medical devices", "location": "", "description": "", "added": False}
+SEARCH = {"companies": [TANDEM_CO, INSULET_CO], "error": None}
+NAMES = {G: "Acme <b>Dental</b>", MA: "Acme <b>Dental</b>"}
+
+
+def picking(report, steps, more=(), search=SEARCH, query="tandem", **kw):
+    """The account is chosen, a name typed and searched, then `steps`."""
+    return opened(report, [{"set": ["#caQ", query]}, {"submit": ["#caForm", {}]}] + steps, more=[{"match": "/compete/search", "body": search}] + list(more), **kw)
+
+
+def change_ok(competitors, region="US"):
+    return {"match": "/compete/competitors", "method": "POST", "body": {"competitors": competitors, "region": region}}
+
+
+ADD_FIRST = {"fire": ["#caResults", {"[data-add]": {"dataset": {"add": "0"}}}]}
+ADD_SECOND = {"fire": ["#caResults", {"[data-add]": {"dataset": {"add": "1"}}}]}
+
+
+def test_a_name_is_searched_for_the_account_and_the_companies_found_are_shown_to_pick_from(report):
+    out = picking(report, [])
+    assert [c for c in out["calls"] if "/compete/search" in c] == ["/p2/paid-marketing/api/compete/search?account=1234567890&q=tandem"]
+    html = out["el"]["#caResults"]["html"]
+    assert "2 companies found. Pick the ones that are competitors." in html and html.count("Add as competitor") == 2 and 'data-add="0"' in html and 'data-add="1"' in html
+    assert "<b>Tandem Diabetes Care</b>" in html and "medical devices \u00b7 San Diego, California, United States" in html and "tandemdiabetes.com \u00b7 Facebook page known" in html and 'src="https://l.example/t.png"' in html
+    assert '<span class="ca-logo ca-logo-x">I</span>' in html and out["el"]["#caSearch"]["disabled"] is False                  # a company without a logo shows its first letter
+
+
+def test_what_the_search_returns_is_escaped_and_a_company_already_added_is_marked(report):
+    evil = dict(TANDEM_CO, name="<img src=x onerror=alert(1)>", logo="https://l.example/\"><script>", added=True)
+    out = picking(report, [], search={"companies": [evil, INSULET_CO], "error": None})
+    html = out["el"]["#caResults"]["html"]
+    assert "<img src=x" not in html and "&lt;img src=x onerror=alert(1)&gt;" in html and "<script>" not in html and '<span class="ca-added">Added</span>' in html and html.count("Add as competitor") == 1
+
+
+def test_a_search_that_found_nothing_or_failed_says_so_in_words(report):
+    none = picking(report, [], search={"companies": [], "error": None}, query="zzzz")
+    assert 'No company matched &quot;zzzz&quot;.' in none["el"]["#caResults"]["html"]
+    down = picking(report, [], search={"companies": [], "error": {"kind": "not_configured", "message": "Company search is not configured on this deployment: APOLLO_API_KEY is missing. Type a website to add a competitor.", "retryable": False}})
+    assert "APOLLO_API_KEY is missing" in down["el"]["#caResults"]["html"] and "No company matched" not in down["el"]["#caResults"]["html"]
+    refused = picking(report, [], more=[], search={"companies": []})
+    refused2 = opened(report, [{"set": ["#caQ", "tandem"]}, {"submit": ["#caForm", {}]}], more=[{"match": "/compete/search", "status": 400, "body": {"error": "Pick one Google Ads account."}}])
+    assert "Pick one Google Ads account." in refused2["el"]["#msg"]["html"] and refused2["el"]["#caResults"]["html"] == "" and refused2["el"]["#caSearch"]["disabled"] is False
+    down2 = opened(report, [{"set": ["#caQ", "tandem"]}, {"submit": ["#caForm", {}]}], reject="/compete/search")
+    assert "The server could not be reached. Try again." in down2["el"]["#msg"]["html"] and down2["el"]["#caSearch"]["disabled"] is False and refused["el"]["#caResults"]["html"]
+
+
+def test_a_name_too_short_or_no_account_chosen_searches_nothing_and_says_why(report):
+    short = picking(report, [], query="t")
+    assert not any("/compete/search" in c for c in short["calls"]) and "Type at least two letters" in short["el"]["#msg"]["html"]
+    none = page({"responses": [{"match": "/segments/accounts", "body": ACCTS}], "steps": [{"set": ["#caQ", "tandem"]}, {"submit": ["#caForm", {}]}]})
+    assert not any("/compete/search" in c for c in none["calls"]) and "Pick an ad account first" in none["el"]["#msg"]["html"]
+
+
+def test_picking_a_company_adds_it_to_this_account_with_its_page_and_marks_it_added(report):
+    both = report["competitors"] + [{"name": "Tandem Diabetes Care", "domain": "tandemdiabetes.com", "facebook": "https://www.facebook.com/TandemDiabetes", "fbSource": "apollo", "logo": "https://l.example/t.png", "industry": "medical devices", "googleAdvertiser": ""}]
+    out = picking(report, [ADD_FIRST], more=[change_ok(both)])
     [post] = out["posts"]
-    assert post["url"] == "/p2/paid-marketing/api/compete/settings" and post["body"] == {"account": G, "competitors": "A | a.com | AFacebook", "region": "GB", "names": {G: "Acme <b>Dental</b>", MA: "Acme <b>Dental</b>"}}
-    assert len([c for c in out["calls"] if "/compete/report" in c]) == 2 and "Saved. Press Refresh competitor ads" in out["el"]["#msg"]["html"] and "pm-note" in out["el"]["#msg"]["html"]
+    assert post["url"] == "/p2/paid-marketing/api/compete/competitors" and post["body"] == {"account": G, "op": "add", "names": NAMES, "competitor": {"name": "Tandem Diabetes Care", "domain": "tandemdiabetes.com",
+            "facebook": "https://www.facebook.com/TandemDiabetes", "fbSource": "apollo", "logo": "https://l.example/t.png", "industry": "medical devices"}}
+    assert not any("/find-facebook" in c for c in out["calls"]) and len([c for c in out["calls"] if "/compete/report" in c]) == 2           # the page was known: nothing to look for; the report is read again
+    assert '<span class="ca-added">Added</span>' in out["el"]["#caResults"]["html"] and out["el"]["#caResults"]["html"].count("Add as competitor") == 1
 
 
-def test_a_refused_save_says_why_and_an_unreachable_server_says_nothing_was_saved(report):
-    bad = opened(report, [{"set": ["#fComp", "A"]}, {"click": "#saveBtn"}], more=[{"match": "/compete/settings", "method": "POST", "status": 400, "body": {"error": "A needs a website, a Facebook page or an advertiser id, or there is nowhere to look."}}])
-    assert "nowhere to look" in bad["el"]["#msg"]["html"] and len([c for c in bad["calls"] if "/compete/report" in c]) == 1
-    down = opened(report, [{"click": "#saveBtn"}], reject="/compete/settings")
-    assert "Nothing was saved." in down["el"]["#msg"]["html"] and down["el"]["#saveOut"]["text"] == ""
+def test_a_company_with_no_known_facebook_page_has_it_looked_for_by_name_and_website_once_added(report):
+    both = report["competitors"] + [{"name": "Insulet", "domain": "insulet.com", "facebook": "", "fbSource": "", "logo": "", "industry": "medical devices", "googleAdvertiser": ""}]
+    found = [dict(c) for c in both[:-1]] + [dict(both[-1], facebook="https://www.facebook.com/InsuletCorp", fbSource="search")]
+    more = [change_ok(both), {"match": "/compete/find-facebook", "method": "POST", "body": {"kept": True, "facebook": "https://www.facebook.com/InsuletCorp", "confidence": "high", "reasoning": "r", "competitors": found, "region": "US"}}]
+    out = picking(report, [ADD_SECOND], more=more)
+    assert [p["url"].rsplit("/", 1)[1] for p in out["posts"]] == ["competitors", "find-facebook"] and out["posts"][1]["body"] == {"account": G, "name": "Insulet", "names": NAMES, "force": False}
+    assert len([c for c in out["calls"] if "/compete/report" in c]) == 3 and "Paste its page address" not in out["el"]["#msg"]["html"]
+
+
+def test_a_page_that_could_not_be_checked_is_said_and_the_team_is_told_to_paste_it(report):
+    both = report["competitors"] + [{"name": "Insulet", "domain": "insulet.com", "facebook": "", "fbSource": "", "logo": "", "industry": "", "googleAdvertiser": ""}]
+    more = [change_ok(both), {"match": "/compete/find-facebook", "method": "POST", "body": {"kept": False, "facebook": "", "confidence": "low", "reasoning": "only a fan page was found", "error": "", "competitors": both, "region": "US"}}]
+    msg = picking(report, [ADD_SECOND], more=more)["el"]["#msg"]["html"]
+    assert "Insulet: only a fan page was found" in msg and "Paste its page address in the box if you know it, or Meta ads cannot be read for it." in msg and "pm-note" in msg
+    err = [change_ok(both), {"match": "/compete/find-facebook", "method": "POST", "body": {"kept": False, "facebook": "", "error": "ANTHROPIC_API_KEY is not configured on this deployment.", "competitors": both, "region": "US"}}]
+    assert "ANTHROPIC_API_KEY is not configured" in picking(report, [ADD_SECOND], more=err)["el"]["#msg"]["html"]
+    refused = [change_ok(both), {"match": "/compete/find-facebook", "method": "POST", "status": 400, "body": {"error": "Insulet is not one of this account's competitors."}}]
+    assert "not one of this account" in picking(report, [ADD_SECOND], more=refused)["el"]["#msg"]["html"]
+    down = picking(report, [ADD_SECOND], more=[change_ok(both)], reject="/find-facebook")
+    assert "The Facebook page was not looked for." in down["el"]["#msg"]["html"]
+
+
+def test_while_the_page_is_looked_for_the_card_says_so_and_its_box_is_locked_and_it_is_freed_after(report):
+    hold = {"match": "/compete/find-facebook", "method": "POST", "hold": True, "body": {"kept": False, "facebook": "", "reasoning": "x", "competitors": report["competitors"], "region": "US"}}
+    find = {"fire": ["#caList", {"[data-find]": {"dataset": {"find": "1"}}}]}
+    waiting = opened(report, [find], more=[hold])
+    html = waiting["el"]["#caList"]["html"]
+    assert html.count("Looking for its Facebook page\u2026") == 1 and html.count(" disabled") == 1 and html.count("Find its Facebook page") == 1                   # only the competitor being looked for is locked, and it has no find button
+    freed = opened(report, [find, {"release": True}], more=[hold])
+    assert "Looking for its Facebook page" not in freed["el"]["#caList"]["html"] and freed["el"]["#caList"]["html"].count("Find its Facebook page") == 2
+    twice = opened(report, [find, find], more=[hold])
+    assert len([p for p in twice["posts"] if p["url"].endswith("/find-facebook")]) == 1                                                       # a second click while it is looked for starts nothing
+
+
+def test_a_company_that_cannot_be_added_says_why_and_can_be_tried_again(report):
+    out = picking(report, [ADD_FIRST], more=[{"match": "/compete/competitors", "method": "POST", "status": 400, "body": {"error": "Tandem Diabetes Care is already in this account's competitors."}}])
+    assert "already in this account" in out["el"]["#msg"]["html"] and out["targets"][0]["disabled"] is False if "targets" in out else "already in this account" in out["el"]["#msg"]["html"]
+    assert len([c for c in out["calls"] if "/compete/report" in c]) == 1 and '<span class="ca-added">Added</span>' not in out["el"]["#caResults"]["html"]
+    down = picking(report, [ADD_FIRST], reject="/compete/competitors")
+    assert "Nothing was saved." in down["el"]["#msg"]["html"]
+
+
+def test_the_competitors_of_the_account_are_cards_with_their_page_a_box_to_correct_it_and_a_remove_button(report):
+    html = opened(report)["el"]["#caList"]["html"]
+    assert "<h4>This account's competitors</h4>" in html and html.count("data-rm=") == 3 and html.count("Remove") >= 3 and 'data-rm="0"' in html and 'data-rm="2"' in html
+    assert 'value="https://www.facebook.com/TandemDiabetes"' in html and html.count("Find its Facebook page") == 2 and "No Facebook page yet, so its Meta ads cannot be read." in html
+    assert "Facebook page, typed by the team" in html and 'data-fb="0"' in html and 'data-find="1"' in html and 'data-find="0"' not in html
+    empty = opened(dict(report, competitors=[]))["el"]["#caList"]["html"]
+    assert "No competitors yet for this account." in empty and "data-rm" not in empty
+
+
+def test_removing_a_competitor_posts_its_name_and_reads_the_report_again(report):
+    left = [c for c in report["competitors"] if c["name"] != "Cheap Co"]
+    out = opened(report, [{"fire": ["#caList", {"[data-rm]": {"dataset": {"rm": "1"}}}]}], more=[change_ok(left)])
+    assert out["posts"] == [{"url": "/p2/paid-marketing/api/compete/competitors", "body": {"account": G, "op": "remove", "competitor": {"name": "Cheap Co"}, "names": NAMES}}]
+    assert len([c for c in out["calls"] if "/compete/report" in c]) == 2
+    refused = opened(report, [{"fire": ["#caList", {"[data-rm]": {"dataset": {"rm": "1"}}}]}], more=[{"match": "/compete/competitors", "method": "POST", "status": 400, "body": {"error": "Cheap Co is not one of this account's competitors."}}])
+    assert "not one of this account" in refused["el"]["#msg"]["html"] and len([c for c in refused["calls"] if "/compete/report" in c]) == 1
+
+
+def test_a_page_typed_in_the_box_is_saved_as_typed_for_that_competitor(report):
+    typed = [dict(c) for c in report["competitors"]]
+    typed[1]["facebook"] = "https://www.facebook.com/CheapCo"
+    out = opened(report, [{"change": ["#caList", {"[data-fb]": {"dataset": {"fb": "1"}, "value": "cheapco"}}]}], more=[change_ok(typed)])
+    [post] = out["posts"]
+    assert post["body"] == {"account": G, "op": "update", "names": NAMES, "competitor": {"name": "Cheap Co", "domain": "cheap.example", "googleAdvertiser": "", "logo": "", "industry": "", "facebook": "cheapco", "fbSource": "manual"}}
+    assert len([c for c in out["calls"] if "/compete/report" in c]) == 2
+    bad = opened(report, [{"change": ["#caList", {"[data-fb]": {"dataset": {"fb": "1"}, "value": "https://example.com/x"}}]}], more=[{"match": "/compete/competitors", "method": "POST", "status": 400, "body": {"error": "https://example.com/x is not a Facebook page address."}}])
+    assert "not a Facebook page address" in bad["el"]["#msg"]["html"]
+
+
+def test_the_find_button_looks_for_that_competitors_page(report):
+    cheap = dict(report["competitors"][1], facebook="https://www.facebook.com/CheapCo", fbSource="search")
+    comps = [report["competitors"][0], cheap, report["competitors"][2]]
+    out = opened(report, [{"fire": ["#caList", {"[data-find]": {"dataset": {"find": "1"}}}]}], more=[{"match": "/compete/find-facebook", "method": "POST", "body": {"kept": True, "facebook": cheap["facebook"], "competitors": comps, "region": "US"}}])
+    assert out["posts"] == [{"url": "/p2/paid-marketing/api/compete/find-facebook", "body": {"account": G, "name": "Cheap Co", "names": NAMES, "force": False}}]
+
+
+def test_the_country_is_saved_for_the_account_when_it_is_changed(report):
+    out = opened(report, [{"set": ["#fRegion", " gb "]}, {"change": ["#fRegion", {}]}], more=[change_ok(report["competitors"], "GB")])
+    assert out["posts"] == [{"url": "/p2/paid-marketing/api/compete/competitors", "body": {"account": G, "op": "region", "region": "GB", "names": NAMES}}] and len([c for c in out["calls"] if "/compete/report" in c]) == 2
+    bad = opened(report, [{"set": ["#fRegion", "USA"]}, {"change": ["#fRegion", {}]}], more=[{"match": "/compete/competitors", "method": "POST", "status": 400, "body": {"error": "The country is two letters, like US."}}])
+    assert "two letters" in bad["el"]["#msg"]["html"]
 
 
 def test_refresh_starts_the_read_polls_the_job_and_reads_the_report_when_it_is_done(report):
@@ -289,7 +481,7 @@ def test_a_refresh_already_running_when_the_page_opens_is_followed_until_it_is_d
 def test_the_page_stops_following_a_job_that_never_finishes(report):
     running = dict(report, job={"status": "running", "steps": [], "total": 1})
     out = page({"responses": [{"match": "/segments/accounts", "body": ACCTS}, {"match": "/compete/report", "body": running}, {"match": "/compete/job", "body": {"job": running["job"]}}], "steps": [{"pick": G}]})
-    assert len([c for c in out["calls"] if "/compete/job" in c]) == 90 and len([c for c in out["calls"] if "/compete/report" in c]) == 1 and out["el"]["#refreshBtn"]["disabled"] is True
+    assert len([c for c in out["calls"] if "/compete/job" in c]) == 600 and len([c for c in out["calls"] if "/compete/report" in c]) == 1 and out["el"]["#refreshBtn"]["disabled"] is True
 
 
 def test_a_report_that_cannot_be_built_is_said_in_words(report):
@@ -323,5 +515,5 @@ def test_a_competitor_read_today_says_so_and_the_newest_ads_are_the_latest_first
 
 
 def test_the_line_that_says_where_it_stands_is_exact_for_each_state(empty_report):
-    assert run("X.standing(R)", R=empty_report) == "No competitors are saved for this account yet. Write them below, then press Refresh competitor ads."
+    assert run("X.standing(R)", R=empty_report) == "No competitors are saved for this account yet. Type a company name below and pick the ones that are competitors, then press Refresh competitor ads."
     assert run("X.standing(R)", R={"status": "no_competitor_data"}) == "The competitors are saved, but none of their ads has been read yet. Press Refresh competitor ads."

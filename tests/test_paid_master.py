@@ -44,8 +44,8 @@ def test_a_client_is_cleaned_into_the_shapes_the_agents_read():
     assert sh["phones"] == ["617-555-0100", "617-555-0111"] and sh["locations"] == ["Quincy, MA", "Boston, MA"] and sh["areas"] == ["Greater Boston"]
     assert sh["brandTerms"] == ["acme dental", "acme"] and sh["writtenAs"] == ["AcmeDental"] and sh["allowWords"] == ["invisalign"] and sh["domains"] == ["acmedental.com", "acmedental.net"]
     assert sh["offers"] == [{"text": "Free whitening with a new patient exam", "ends": "2026-12-31"}] and sh["notes"] == "Closed on Sundays."
-    assert sh["competitors"] == [{"name": "Aspen Dental", "domain": "aspendental.com", "facebook": "https://www.facebook.com/AspenDental", "googleAdvertiser": ""},
-                                 {"name": "Bright Smiles", "domain": "brightsmiles.example", "facebook": "", "googleAdvertiser": ""}]
+    assert sh["competitors"] == [{"name": "Aspen Dental", "domain": "aspendental.com", "facebook": "https://www.facebook.com/AspenDental", "googleAdvertiser": "", "logo": "", "industry": "", "fbSource": "manual"},
+                                 {"name": "Bright Smiles", "domain": "brightsmiles.example", "facebook": "", "googleAdvertiser": "", "logo": "", "industry": "", "fbSource": ""}]
 
 
 @pytest.mark.parametrize("change, message", [

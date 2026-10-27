@@ -43,8 +43,8 @@ def test_each_platform_is_asked_with_the_address_and_limits_the_actors_were_trie
     assert cf.start_url("google", TANDEM, "US") == "https://adstransparency.google.com/?region=US&domain=tandemdiabetes.com"
     assert cf.start_url("google", OMNI, "DE") == "https://adstransparency.google.com/advertiser/AR111111111111?region=DE"          # the advertiser id wins over the website
     assert cf.start_url("google", BARE, "US") is None
-    assert cf.actor_input("meta", "u") == {"startUrls": [{"url": "u"}], "resultsLimit": 30, "activeStatus": "active"}
-    assert cf.actor_input("google", "u") == {"startUrls": [{"url": "u"}], "resultsLimit": 30, "ocr": True}
+    assert cf.actor_input("meta", "u") == {"startUrls": [{"url": "u"}], "resultsLimit": 150, "activeStatus": "active"}
+    assert cf.actor_input("google", "u") == {"startUrls": [{"url": "u"}], "resultsLimit": 150, "ocr": True}
 
 
 def test_the_actors_are_the_ones_tried_and_an_environment_setting_replaces_them(monkeypatch):
@@ -65,8 +65,8 @@ def test_the_cache_keys_keep_platforms_countries_and_competitors_apart():
 
 
 def test_the_cost_of_a_refresh_counts_only_what_can_be_looked_up():
-    assert cf.estimate([TANDEM, OMNI, BARE], ["meta", "google"], "US") == {"reads": 4, "ads": 120, "usd": round(2 * 30 * 0.005 + 2 * 30 * 0.0016, 2)}
-    assert cf.estimate([TANDEM], ["google"], "US") == {"reads": 1, "ads": 30, "usd": 0.05} and cf.estimate([], ["meta"], "US") == {"reads": 0, "ads": 0, "usd": 0.0}
+    assert cf.estimate([TANDEM, OMNI, BARE], ["meta", "google"], "US") == {"reads": 4, "ads": 600, "usd": round(2 * 150 * 0.005 + 2 * 150 * 0.0016, 2), "minutes": 28}
+    assert cf.estimate([TANDEM], ["google"], "US") == {"reads": 1, "ads": 150, "usd": 0.24, "minutes": 28} and cf.estimate([], ["meta"], "US") == {"reads": 0, "ads": 0, "usd": 0.0, "minutes": 0}
 
 
 # ── one read ────────────────────────────────────────────────────────────────
@@ -74,7 +74,7 @@ def test_the_cost_of_a_refresh_counts_only_what_can_be_looked_up():
 def test_a_read_asks_the_actor_and_turns_its_rows_into_ads():
     r = Runner()
     res = cf.read_one("meta", TANDEM, "US", run_fn=r, token="tok", now=NOW)
-    assert r.calls == [{"actor": "apify/facebook-ads-scraper", "input": cf.actor_input("meta", "https://www.facebook.com/TandemDiabetes"), "token": "tok", "timeout": cf.TIMEOUT_S}]
+    assert r.calls == [{"actor": "apify/facebook-ads-scraper", "input": cf.actor_input("meta", "https://www.facebook.com/TandemDiabetes"), "token": "tok", "timeout": cf.timeout_for("meta")}]
     assert res["error"] == "" and res["skipped"] == "" and res["items"] == 1 and res["fetchedAt"] == "2026-10-27T12:00:00+00:00" and res["ads"][0]["who"] == "Tandem Diabetes Care" and res["ads"][0]["days"] == 34
     g = cf.read_one("google", TANDEM, "US", run_fn=r, token="tok", now=NOW)
     assert r.calls[1]["actor"] == "silva95gustavo/google-ads-scraper" and g["ads"][0]["id"] == "google:CR03842488522816618497"
@@ -97,6 +97,75 @@ def test_a_competitor_with_nothing_to_look_up_is_not_asked():
     r = Runner()
     res = cf.read_one("meta", OMNI, "US", run_fn=r, token="t", now=NOW)
     assert r.calls == [] and res["ads"] == [] and "No Facebook page" in res["skipped"] and res["error"] == ""
+
+
+def test_the_limits_are_far_above_what_a_large_advertiser_runs_and_the_time_allowed_covers_the_slow_google_read():
+    """Measured 2026-10-27 on a real advertiser: Meta showed 94 active ads (read in 96 s), Google 126 creatives (23 minutes, because the text of each is read from its picture)."""
+    assert cf.LIMIT["meta"] >= 94 and cf.LIMIT["google"] >= 126
+    assert cf.LIMIT["google"] * cf.SECONDS_PER_AD["google"] <= cf.timeout_for("google") and cf.LIMIT["meta"] * cf.SECONDS_PER_AD["meta"] <= cf.timeout_for("meta")
+    assert cf.LOCK_TTL_S > cf.timeout_for("google")                                                          # a lock must outlive the longest read
+
+
+def collected(items, status="SUCCEEDED", error=None):
+    def run(actor, run_input, token, timeout):
+        return {"items": items, "status": status, "error": error}
+    return run
+
+
+def test_a_read_that_reaches_its_limit_says_the_competitor_has_more_ads():
+    rows = [META_REAL] * cf.LIMIT["meta"]
+    res = cf.read_one("meta", TANDEM, "US", run_fn=collected(rows), token="t", now=NOW)
+    assert res["capped"] is True and res["items"] == cf.LIMIT["meta"] and res["limit"] == 150 and res["partial"] == ""
+    one_short = cf.read_one("meta", TANDEM, "US", run_fn=collected(rows[:-1]), token="t", now=NOW)
+    assert one_short["capped"] is False
+    assert cf.read_one("meta", TANDEM, "US", run_fn=Runner(meta=rows), token="t", now=NOW)["capped"] is True      # a plain list of rows is judged the same way
+
+
+def test_a_run_stopped_before_it_finished_keeps_the_ads_it_saved_as_a_partial_read():
+    res = cf.read_one("google", TANDEM, "US", run_fn=collected([GOOGLE_REAL], status="ABORTED", error="Apify run r1 did not finish within 1500s"), token="t", now=NOW)
+    assert len(res["ads"]) == 1 and res["error"] == "" and "stopped before it finished" in res["partial"] and "did not finish within 1500s" in res["partial"] and res["capped"] is False
+    assert not cf.fresh(dict(res, fetchedAt="2026-10-27T11:00:00+00:00"), NOW)                              # read again at the next refresh
+
+
+def test_a_run_that_failed_with_nothing_saved_is_a_failed_read_and_one_that_found_nothing_is_empty():
+    res = cf.read_one("google", TANDEM, "US", run_fn=collected([], status="FAILED"), token="t", now=NOW)
+    assert res["ads"] == [] and res["error"] == "The Google read failed: the run ended with status FAILED"
+    res = cf.read_one("google", TANDEM, "US", run_fn=collected([], status=None, error="start failed: 402"), token="t", now=NOW)
+    assert res["error"] == "The Google read failed: start failed: 402"
+    res = cf.read_one("google", TANDEM, "US", run_fn=collected([]), token="t", now=NOW)
+    assert res["error"] == "" and res["partial"] == "" and res["ads"] == [] and res["items"] == 0
+
+
+def test_a_partial_read_does_not_replace_a_fuller_one_but_replaces_a_poorer_one():
+    s = MemStore()
+    rows = [dict(GOOGLE_REAL, creativeId="CR%d" % i) for i in range(3)]
+    refresh(s, runner=lambda *a: collected(rows)(*a), platforms=("google",), competitors=(TANDEM,))
+    good = s.state_get(cf.cache_key("google", TANDEM, "US"))
+    assert len(good["ads"]) == 3
+    refresh(s, runner=lambda *a: collected(rows[:1], status="ABORTED", error="out of time")(*a), platforms=("google",), competitors=(TANDEM,), force=True)
+    assert s.state_get(cf.cache_key("google", TANDEM, "US")) == good
+    s2 = MemStore()
+    refresh(s2, runner=lambda *a: collected(rows[:1], status="ABORTED", error="out of time")(*a), platforms=("google",), competitors=(TANDEM,))
+    kept = s2.state_get(cf.cache_key("google", TANDEM, "US"))
+    assert len(kept["ads"]) == 1 and kept["partial"]
+    job, _ = refresh(s2, runner=lambda *a: collected(rows)(*a), platforms=("google",), competitors=(TANDEM,))
+    assert job["steps"][0]["ads"] == 3 and len(s2.state_get(cf.cache_key("google", TANDEM, "US"))["ads"]) == 3        # a partial read is read again, and a fuller one replaces it
+
+
+def test_the_job_steps_say_when_a_read_hit_its_limit_or_stopped_early():
+    s = MemStore()
+    job, _ = refresh(s, runner=Runner(meta=[META_REAL] * 150), platforms=("meta",), competitors=(TANDEM,))
+    assert job["steps"][0]["capped"] is True and job["steps"][0]["limit"] == 150 and job["steps"][0]["partial"] == ""
+
+
+def test_the_entries_for_the_analysis_carry_the_limit_and_the_partial_note():
+    s = MemStore()
+    refresh(s, runner=Runner(meta=[META_REAL] * 150), platforms=("meta",), competitors=(TANDEM,))
+    e = cf.entries_for(s, [TANDEM, OMNI], ["meta"], "US")
+    assert e[0]["capped"] is True and e[0]["items"] == 150 and e[0]["limit"] == 150 and e[0]["partial"] == ""
+    assert e[1]["capped"] is False and e[1]["limit"] == 150 and e[1]["items"] == 0
+    s.state_set(cf.cache_key("meta", TANDEM, "US"), dict(s.state_get(cf.cache_key("meta", TANDEM, "US")), partial="The Meta read stopped before it finished (x), so only part of the ads were read."))
+    assert cf.entries_for(s, [TANDEM], ["meta"], "US")[0]["partial"].startswith("The Meta read stopped before it finished")
 
 
 # ── a refresh ───────────────────────────────────────────────────────────────
@@ -235,8 +304,8 @@ def test_the_report_compares_the_cached_competitor_ads_with_ours_and_gives_ideas
     for who, fb in (("A", "https://www.facebook.com/AFacebook"), ("B", "https://www.facebook.com/BFacebook")):
         s.state_set(cf.cache_key("meta", {"facebook": fb}, "US"), {"ads": pool_with_price(who=(who,)), "error": "", "skipped": "", "fetchedAt": "2026-10-26T00:00:00+00:00", "items": 4})
     rep = pc.report_for("", MA, mon=s, now=NOW)
-    assert rep["status"] == "ok" and rep["counts"]["gaps"] >= 1 and rep["ideas"][0]["platform"] == "meta" and rep["analysis"]["meta"]["pool"]["ads"] == 8 and rep["estimate"] == {"reads": 2, "ads": 60, "usd": 0.3}
-    assert rep["region"] == "US" and [c["name"] for c in rep["competitors"]] == ["A", "B"] and rep["limits"] == {"competitors": 8, "ads": {"meta": 30, "google": 30}} and rep["cacheDays"] == 7
+    assert rep["status"] == "ok" and rep["counts"]["gaps"] >= 1 and rep["ideas"][0]["platform"] == "meta" and rep["analysis"]["meta"]["pool"]["ads"] == 8 and rep["estimate"] == {"reads": 2, "ads": 300, "usd": 1.5, "minutes": 3}
+    assert rep["region"] == "US" and [c["name"] for c in rep["competitors"]] == ["A", "B"] and rep["limits"] == {"competitors": 8, "ads": {"meta": 150, "google": 150}} and rep["cacheDays"] == 7
 
 
 def test_the_report_carries_the_refresh_in_progress(own):

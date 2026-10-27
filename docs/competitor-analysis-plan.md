@@ -26,10 +26,16 @@ same shape.
 
 ## What it does
 
-1. **The competitors** are written down per account (`tracker/paid_compete_settings.py`, the monitors' store, `settings:compete`): a name, a website, a Facebook page and optionally a Google advertiser
-   id. Up to eight. The Master Agent can hold the same list for a client (`shared.competitors`); an account's own saved list wins, whole.
-2. **Refresh** reads each competitor on each platform that has something to look up (`tracker/paid_compete_fetch.py`): a background job, three reads at a time, 30 ads per read, progress kept in the store and
-   followed by the page. It is never automatic because it costs money (about $1 for five competitors on both platforms, and the page says the most a refresh can cost before it is pressed). What was
+1. **The competitors** are added by company name only, as in Social Media Intelligence (2026-10-27 rework). The page searches the name (`tracker/paid_compete_search.py`, the same Apollo company search),
+   lists the companies with a similar name, and the team picks the ones it means, one at a time, up to eight. A website typed instead of a name is offered as a company of its own. A pick is saved at once for
+   that ad account only (`tracker/paid_compete_settings.py` `change_account`, the monitors' store, `settings:compete`; a client with a Google and a Meta account gets the change on both, each on its own
+   list). The website comes from the company record (Google is searched by it); the Facebook page (Meta is searched by it) comes from the record when it has one, else one Claude web search finds the
+   company's official page and it is kept only when the answer is sure (high or medium); otherwise the card says so and the team pastes the page (typed pages are never searched over). The Master Agent can
+   hold the same list for a client (`shared.competitors`); an account's own saved list wins, whole, and the first change starts from the master's list so nothing is lost.
+2. **Refresh** reads each competitor on each platform that has something to look up (`tracker/paid_compete_fetch.py`): a background job, three reads at a time, up to 150 ads per Meta read and 100 per Google
+   read (measured 2026-10-27 on a real advertiser: Meta showed 94 active ads, read in 96 seconds; Google showed over 120 creatives and took about 17 minutes, because the text of each is read from its picture,
+   so the limit was 30 before and hid two thirds of them). A read that reaches its limit is marked capped ("they run more than were read") and a run stopped at its time limit keeps the ads it saved as a partial
+   read, read again at the next refresh and never replacing a fuller read. Progress is kept in the store and followed by the page for about 40 minutes. It is never automatic because it costs money (about $1 for five competitors on both platforms, and the page says the most a refresh can cost before it is pressed). What was
    read is kept per competitor for seven days, shared by every account that names the same competitor, and a read newer than that is not paid for again. A failed read never replaces the last good one.
 3. **Our own ads** are the Ad Copy Checker's saved read (`paid_copycheck.load_raw`): the text of the ads running now, so a report costs nothing in the ad account when that read is fresh. One Google account
    and/or one Meta account at a time; a group of accounts is refused because each client has its own competitors.

@@ -32,8 +32,8 @@ def test_something_that_is_not_a_facebook_page_is_refused(raw):
 
 def test_a_competitor_is_cleaned_and_needs_somewhere_to_look():
     c = cs.clean_competitor({"name": "  Tandem   Diabetes ", "domain": "https://www.TandemDiabetes.com/pumps", "facebook": "TandemDiabetes", "googleAdvertiser": "ar17804925876349960193"})
-    assert c == {"name": "Tandem Diabetes", "domain": "tandemdiabetes.com", "facebook": "https://www.facebook.com/TandemDiabetes", "googleAdvertiser": "AR17804925876349960193"}
-    assert cs.clean_competitor({"name": "A", "domain": "a.com"}) == {"name": "A", "domain": "a.com", "facebook": "", "googleAdvertiser": ""}
+    assert c == {"name": "Tandem Diabetes", "domain": "tandemdiabetes.com", "facebook": "https://www.facebook.com/TandemDiabetes", "googleAdvertiser": "AR17804925876349960193", "logo": "", "industry": "", "fbSource": "manual"}
+    assert cs.clean_competitor({"name": "A", "domain": "a.com"}) == {"name": "A", "domain": "a.com", "facebook": "", "googleAdvertiser": "", "logo": "", "industry": "", "fbSource": ""}
     for bad, msg in (({"domain": "a.com"}, "Give each competitor a name"), ({"name": "A"}, "nowhere to look"), ({"name": "A", "domain": "not a domain"}, "not a website"), ({"name": "x" * 81, "domain": "a.com"}, "at most 80"),
                      ({"name": "A", "googleAdvertiser": "XX123"}, "not an advertiser id")):
         with pytest.raises(cs.BadRequest, match=msg):
@@ -94,3 +94,101 @@ def test_the_agent_reads_its_own_saved_list_and_a_master_that_cannot_be_read_cha
     monkeypatch.setattr(paid_master, "load", boom)
     assert cs.account_of(cs.load_for_read(s), G)["competitors"][0]["name"] == "A"
     assert cs.account_of({}, "999") == {"competitors": [], "region": "US", "name": ""}
+
+
+# ── the picker's changes: one competitor at a time, kept for each ad account ────────────────────────────
+
+G1, G2, MA1 = "1234567890", "2345678901", "act_1234567"
+
+
+def test_a_competitor_keeps_what_the_search_showed_and_where_its_facebook_page_came_from():
+    c = cs.clean_competitor({"name": "Tandem", "domain": "tandemdiabetes.com", "facebook": "TandemDiabetes", "fbSource": "SEARCH", "logo": "https://cdn.example/t.png", "industry": "  medical   devices "})
+    assert c["fbSource"] == "search" and c["logo"] == "https://cdn.example/t.png" and c["industry"] == "medical devices"
+    assert cs.clean_competitor({"name": "A", "domain": "a.com", "fbSource": "search"})["fbSource"] == ""                    # no page, so no source
+    assert cs.clean_competitor({"name": "A", "domain": "a.com", "facebook": "AFacebook", "fbSource": "made up"})["fbSource"] == "manual"
+    assert cs.clean_competitor({"name": "A", "domain": "a.com", "logo": "http://insecure.example/x.png"})["logo"] == "" and cs.clean_competitor({"name": "A", "domain": "a.com", "logo": "javascript:alert(1)"})["logo"] == ""
+
+
+def test_adding_competitors_one_at_a_time_builds_the_list_of_one_ad_account():
+    s = MemStore()
+    cs.change_account(s, G1, "Acme", "add", "ana", {"name": "Tandem", "domain": "tandemdiabetes.com"}, now=NOW)
+    out = cs.change_account(s, G1, "Acme", "add", "ana", {"name": "Insulet", "domain": "omnipod.com"}, now=NOW)
+    assert [c["name"] for c in out["competitors"]] == ["Tandem", "Insulet"] and out["region"] == "US"
+    assert [c["name"] for c in cs.account_of(cs.load(s), G1)["competitors"]] == ["Tandem", "Insulet"]
+    assert "saved the competitors of account %s (2)" % G1 in cs.load(s)["changes"][0]["what"] and cs.load(s)["changes"][0]["by"] == "ana"
+
+
+def test_each_ad_account_keeps_its_own_competitors():
+    s = MemStore()
+    cs.change_account(s, G1, "", "add", "ana", {"name": "Tandem", "domain": "tandemdiabetes.com"}, now=NOW)
+    cs.change_account(s, MA1, "", "add", "ana", {"name": "Medtronic", "domain": "medtronicdiabetes.com"}, now=NOW)
+    cs.change_account(s, MA1, "", "add", "ana", {"name": "Tandem", "domain": "tandemdiabetes.com"}, now=NOW)
+    assert [c["name"] for c in cs.account_of(cs.load(s), G1)["competitors"]] == ["Tandem"]
+    assert [c["name"] for c in cs.account_of(cs.load(s), MA1)["competitors"]] == ["Medtronic", "Tandem"]
+    assert cs.account_of(cs.load(s), G2)["competitors"] == []
+    cs.change_account(s, MA1, "", "remove", "ana", {"name": "Tandem"}, now=NOW)
+    assert [c["name"] for c in cs.account_of(cs.load(s), G1)["competitors"]] == ["Tandem"]                  # removing from one account leaves the other's list alone
+
+
+def test_the_same_competitor_cannot_be_added_twice_and_there_is_a_limit():
+    s = MemStore()
+    cs.change_account(s, G1, "", "add", "ana", {"name": "Tandem", "domain": "tandemdiabetes.com"}, now=NOW)
+    for dup in ({"name": "Tandem", "domain": "other.com"}, {"name": "Tandem Diabetes", "domain": "www.TandemDiabetes.com"}):
+        with pytest.raises(cs.BadRequest, match="already in this account"):
+            cs.change_account(s, G1, "", "add", "ana", dup, now=NOW)
+    for i in range(7):
+        cs.change_account(s, G1, "", "add", "ana", {"name": "C%d" % i, "domain": "c%d.com" % i}, now=NOW)
+    with pytest.raises(cs.BadRequest, match="At most 8"):
+        cs.change_account(s, G1, "", "add", "ana", {"name": "Nine", "domain": "nine.com"}, now=NOW)
+    assert len(cs.account_of(cs.load(s), G1)["competitors"]) == 8
+
+
+def test_removing_the_last_competitor_clears_the_account_and_an_unknown_one_is_refused():
+    s = MemStore()
+    cs.change_account(s, G1, "", "add", "ana", {"name": "Tandem", "domain": "tandemdiabetes.com"}, now=NOW)
+    with pytest.raises(cs.BadRequest, match="not one of this account's competitors"):
+        cs.change_account(s, G1, "", "remove", "ana", {"name": "Nobody"}, now=NOW)
+    out = cs.change_account(s, G1, "", "remove", "ana", {"name": "tandem"}, now=NOW)
+    assert out["competitors"] == [] and G1 not in cs.load(s)["accounts"]
+
+
+def test_an_update_changes_one_competitors_facebook_page_and_nothing_else():
+    s = MemStore()
+    cs.change_account(s, G1, "", "add", "ana", {"name": "Tandem", "domain": "tandemdiabetes.com", "logo": "https://cdn.example/t.png"}, now=NOW)
+    cs.change_account(s, G1, "", "add", "ana", {"name": "Insulet", "domain": "omnipod.com"}, now=NOW)
+    out = cs.change_account(s, G1, "", "update", "ana", {"name": "Tandem", "domain": "tandemdiabetes.com", "facebook": "TandemDiabetes", "fbSource": "search"}, now=NOW)
+    t, i = out["competitors"]
+    assert t["facebook"] == "https://www.facebook.com/TandemDiabetes" and t["fbSource"] == "search" and t["logo"] == "https://cdn.example/t.png" and t["domain"] == "tandemdiabetes.com"
+    assert i["facebook"] == "" and i["name"] == "Insulet"
+    out = cs.change_account(s, G1, "", "update", "ana", {"name": "Tandem", "domain": "tandemdiabetes.com", "facebook": ""}, now=NOW)
+    assert out["competitors"][0]["facebook"] == "" and out["competitors"][0]["fbSource"] == ""                 # clearing the page clears where it came from
+    with pytest.raises(cs.BadRequest, match="not one of this account's competitors"):
+        cs.change_account(s, G1, "", "update", "ana", {"name": "Ghost", "domain": "ghost.com"}, now=NOW)
+
+
+def test_the_country_is_kept_with_the_account_and_a_bad_one_is_refused():
+    s = MemStore()
+    cs.change_account(s, G1, "", "add", "ana", {"name": "Tandem", "domain": "tandemdiabetes.com"}, now=NOW)
+    out = cs.change_account(s, G1, "", "region", "ana", region="gb", now=NOW)
+    assert out["region"] == "GB" and [c["name"] for c in out["competitors"]] == ["Tandem"]
+    out = cs.change_account(s, G1, "", "add", "ana", {"name": "Insulet", "domain": "omnipod.com"}, now=NOW)
+    assert out["region"] == "GB"
+    with pytest.raises(cs.BadRequest, match="two letters"):
+        cs.change_account(s, G1, "", "region", "ana", region="USA", now=NOW)
+
+
+def test_the_first_change_starts_from_the_master_agents_list_so_nothing_is_lost():
+    from tracker import paid_master
+    s = MemStore()
+    s.state_set(paid_master.KEY, {"clients": {"c1": {"name": "Acme", "accounts": [G1], "shared": {"competitors": [{"name": "Aspen", "domain": "aspendental.com"}]}}}})
+    assert [c["name"] for c in cs.account_of(cs.load_for_read(s), G1)["competitors"]] == ["Aspen"]
+    out = cs.change_account(s, G1, "", "add", "ana", {"name": "Tandem", "domain": "tandemdiabetes.com"}, now=NOW)
+    assert [c["name"] for c in out["competitors"]] == ["Aspen", "Tandem"]
+
+
+def test_an_unknown_change_and_a_group_of_accounts_are_refused():
+    s = MemStore()
+    with pytest.raises(cs.BadRequest, match="Unknown change"):
+        cs.change_account(s, G1, "", "explode", "ana", {"name": "A", "domain": "a.com"}, now=NOW)
+    with pytest.raises(cs.BadRequest, match="Pick one account"):
+        cs.change_account(s, "all", "", "add", "ana", {"name": "A", "domain": "a.com"}, now=NOW)

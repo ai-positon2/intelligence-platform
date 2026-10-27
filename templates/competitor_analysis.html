@@ -6,7 +6,7 @@
     <div class="pm-hero-l">
       <span class="pm-eyebrow"><span class="d"></span>Paid Marketing · Competitors</span>
       <h1 class="pm-title">What are the competitors saying, <span class="pm-grad">and what should we say back?</span></h1>
-      <p class="pm-sub">Write down an account's competitors. The agent reads their ads from <b>Meta's Ad Library</b> and <b>Google's Ads Transparency Center</b>, sets them against the <b>ads running in our account</b>, message by message
+      <p class="pm-sub">Type a competitor's company name and pick it from the companies with a similar name, as many as you like for each ad account. The agent reads their ads from <b>Meta's Ad Library</b> and <b>Google's Ads Transparency Center</b>, sets them against the <b>ads running in our account</b>, message by message
         (a price, free, urgency, proof, a guarantee, insurance, local), and gives you <b>ideas to test</b>: what they say that we do not, the offers they run and the ads that have run longest.</p>
     </div>
   </section>
@@ -23,7 +23,7 @@
   <div id="empty" class="pm-panel sg-empty">
     <div class="sg-empty-ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 18V9M10 18V5M16 18v-6M22 18H2"/></svg></div>
     <h2>Choose an account to begin</h2>
-    <p>You will write its competitors down once. Their ads are read when you press Refresh, and kept for a week.</p>
+    <p>You will add its competitors once, by company name. Their ads are read when you press Refresh, and kept for a week.</p>
   </div>
   <div id="skel" hidden><div class="pd-skel"></div><div class="pd-skel"></div><div class="pd-skel"></div></div>
 
@@ -38,10 +38,14 @@
 
     <section class="pm-panel" id="compCard">
       <div class="pm-panel-h"><span class="pm-panel-t">Competitors</span><span class="pm-panel-s" id="compNote"></span></div>
-      <label class="cc-f"><span>One per line: name | website | Facebook page | Google advertiser id <em class="dim">(the last two are optional)</em></span>
-        <textarea id="fComp" rows="5" spellcheck="false" placeholder="Tandem Diabetes | tandemdiabetes.com | TandemDiabetes"></textarea></label>
+      <p class="bi-sub" id="compFor"></p>
+      <form class="ca-add" id="caForm" autocomplete="off">
+        <label class="cc-f"><span>Add a competitor: type its company name <em class="dim">(or its website address)</em></span>
+          <span class="ca-add-row"><input type="text" id="caQ" maxlength="80" placeholder="For example: Tandem Diabetes" spellcheck="false"><button class="pm-btn" id="caSearch" type="submit">Find companies</button></span></label>
+      </form>
+      <div id="caResults"></div>
+      <div id="caList"></div>
       <label class="cc-f ca-region"><span>Country of the Google ads</span><input type="text" id="fRegion" maxlength="2" value="US" spellcheck="false" autocomplete="off"></label>
-      <div class="cc-set-b"><button class="pm-btn" id="saveBtn" type="button">Save the competitors</button><span class="bi-sub" id="saveOut"></span></div>
       <p class="mp-note" id="estimate"></p>
       <div id="jobBox"></div>
       <div id="compTables"></div>
@@ -74,6 +78,6 @@
 <script src="{{ url_for('static', filename='js/pm_picker.js') }}?v=1"></script>
 <script src="{{ url_for('static', filename='js/pm_platform.js') }}?v=7"></script>
 <script src="{{ url_for('static', filename='js/pm_scope.js') }}?v=2"></script>
-<script src="{{ url_for('static', filename='js/competitor_analysis_data.js') }}?v=1"></script>
-<script src="{{ url_for('static', filename='js/competitor_analysis.js') }}?v=1"></script>
+<script src="{{ url_for('static', filename='js/competitor_analysis_data.js') }}?v=2"></script>
+<script src="{{ url_for('static', filename='js/competitor_analysis.js') }}?v=2"></script>
 {% endblock %}

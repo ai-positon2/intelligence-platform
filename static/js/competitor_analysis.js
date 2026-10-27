@@ -1,12 +1,13 @@
 /* Competitor Analysis (Paid Marketing Agents).
  *
- * Pick a Google Ads account and/or a Meta ad account, write its competitors down, press Refresh to read their ads, and read how they differ from ours and what to try. The server decides
+ * Pick a Google Ads account and/or a Meta ad account, type a competitor's company name and pick it from the companies with a similar name (as many as you like; they are kept for that ad account),
+ * press Refresh to read their ads, and read how they differ from ours and what to try. The server decides
  * (tracker/paid_compete*.py); this page draws it. The wording and the shapes are competitor_analysis_data.js. It reads and changes nothing in an ad account.
  */
 (function(){
 "use strict";
 
-var D = window.CAData, API = "/p2/paid-marketing/api/compete", MAX_POLLS = 90;
+var D = window.CAData, API = "/p2/paid-marketing/api/compete", MAX_POLLS = 600;      /* a Google read of a big advertiser takes a quarter of an hour, so the page keeps looking for about 40 minutes */
 var $ = function(s){return document.querySelector(s)};
 var esc = function(s){return String(s==null?"":s).replace(/[&<>"']/g,function(c){
   return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]})};
@@ -18,7 +19,7 @@ function ago(iso){
   return t.toLocaleDateString("en-US",{month:"short",day:"numeric"})+" ("+rel+")";
 }
 
-var S = {account:"", report:null, seq:0, polls:0};
+var S = {account:"", report:null, seq:0, polls:0, results:null, finding:{}, query:""};
 var scope = null;
 
 function setMsg(html,kind){$("#msg").innerHTML=html?'<div class="'+(kind||"pm-err")+'">'+html+'</div>':"";}
@@ -75,8 +76,10 @@ function render(){
 }
 function paintCompetitors(){
   var rep=S.report;
-  $("#fComp").value=rep.competitorsText||""; $("#fRegion").value=rep.region||"US";
+  $("#fRegion").value=rep.region||"US";
   $("#compNote").textContent=rep.competitors.length?D.plural(rep.competitors.length,"competitor"):"none yet";
+  $("#compFor").textContent=D.forText(rep);
+  paintList(); paintResults();
   $("#estimate").textContent=D.estimateText(rep.estimate,rep.cacheDays);
   $("#refreshBtn").disabled=!rep.competitors.length||!(rep.senders&&rep.senders.apify)||!!(rep.job&&rep.job.status==="running");
   $("#refreshBtn").title=rep.senders&&rep.senders.apify?"":"APIFY_API_TOKEN is not set on this server";
@@ -86,8 +89,8 @@ function paintCompetitors(){
     if(!rows.length) return "";
     return '<h4>'+esc(D.PLAT[p])+'</h4><div class="bi-tbl"><table><thead><tr><th>Competitor</th><th>Ads</th><th>Active</th><th>New in 30 days</th><th>Median days running</th><th>Longest</th><th>Formats</th><th>Calls to action</th><th>Landing pages</th></tr></thead><tbody>'+rows.map(function(r){
       var bad=r.status==="failed"||r.status==="skipped";
-      return '<tr><td><b>'+esc(r.name)+'</b><div class="bi-sub'+(r.status==="failed"?" ca-bad":"")+'">'+esc(r.note)+'</div></td>'+(bad?'<td colspan="8"></td>':
-        '<td>'+r.ads+'</td><td>'+r.active+'</td><td>'+r.newest+'</td><td>'+esc(r.median)+'</td><td>'+(r.longest==null?"":esc(r.longest+" days"))+'</td><td>'+esc(r.formats)+'</td><td>'+esc(r.ctas)+'</td><td>'+esc(r.landing)+'</td>')+'</tr>';
+      return '<tr><td><b>'+esc(r.name)+'</b><div class="bi-sub'+(r.status==="failed"?" ca-bad":"")+'">'+esc(r.note)+'</div>'+(r.flag?'<div class="bi-sub ca-warn">'+esc(r.flag)+'</div>':"")+(r.noText?'<div class="bi-sub">'+esc(r.noText)+'</div>':"")+'</td>'+(bad?'<td colspan="8"></td>':
+        '<td>'+r.ads+(r.capped?'+':"")+'</td><td>'+r.active+'</td><td>'+r.newest+'</td><td>'+esc(r.median)+'</td><td>'+(r.longest==null?"":esc(r.longest+" days"))+'</td><td>'+esc(r.formats)+'</td><td>'+esc(r.ctas)+'</td><td>'+esc(r.landing)+'</td>')+'</tr>';
     }).join("")+'</tbody></table></div>';
   }).join("");
 }
@@ -140,17 +143,106 @@ function paintBlind(){
   $("#blind").innerHTML=(rep.caveats||[]).map(function(c){return '<li><b>This time:</b> '+esc(c)+'</li>';}).join("")+(rep.notMeasured||[]).map(function(c){return '<li>'+esc(c)+'</li>';}).join("");
 }
 
-/* ── Saving, refreshing, polling ──────────────────────── */
-$("#saveBtn").addEventListener("click",function(){
-  if(!S.report) return;
-  $("#saveOut").textContent="Saving…"; setMsg("");
-  postJson(API+"/settings",D.saveBody(S.account,$("#fComp").value,$("#fRegion").value,S.report.names&&flip(S.report))).then(function(r){
-    $("#saveOut").textContent="";
-    if(!r.ok){setMsg(esc((r.j&&r.j.error)||("The competitors could not be saved (HTTP "+r.status+").")));return;}
-    return run(true).then(function(){setMsg("Saved. Press Refresh competitor ads to read what they are running.","pm-note");});
-  }).catch(function(){$("#saveOut").textContent=""; setMsg("The server could not be reached. Nothing was saved.");});
-});
+/* ── Finding and keeping competitors ──────────────────────── */
+function names(){return S.report&&S.report.names?flip(S.report):{};}
 function flip(rep){var o={}; Object.keys(rep.names||{}).forEach(function(p){o[rep.accounts[p]]=rep.names[p];}); return o;}
+function reasonOf(r,fallback){return esc((r.j&&r.j.error)||(fallback+" (HTTP "+r.status+")."));}
+
+function paintResults(){
+  var res=S.results, box=$("#caResults");
+  if(!res){box.innerHTML="";return;}
+  var cards=D.resultCards(res);
+  box.innerHTML='<p class="bi-sub">'+esc(D.searchNote(res,S.query))+'</p>'+cards.map(function(c,i){
+    return '<div class="ca-co'+(c.added?" added":"")+'">'+(c.logo?'<img class="ca-logo" src="'+esc(c.logo)+'" alt="" loading="lazy" referrerpolicy="no-referrer">':'<span class="ca-logo ca-logo-x">'+esc(c.name.charAt(0).toUpperCase())+'</span>')+
+      '<div class="ca-co-t"><b>'+esc(c.name)+'</b><div class="bi-sub">'+esc(c.sub||c.description)+'</div><div class="bi-sub">'+(c.website?esc(c.domain):'<em>no website known</em>')+(c.hasFacebook?' \u00b7 Facebook page known':"")+'</div></div>'+
+      (c.added?'<span class="ca-added">Added</span>':'<button class="pm-btn-ghost" type="button" data-add="'+i+'">Add as competitor</button>')+'</div>';
+  }).join("");
+}
+function paintList(){
+  var rep=S.report, cards=D.competitorCards(rep,S.finding), box=$("#caList");
+  box.innerHTML=cards.length?'<h4>This account\'s competitors</h4>'+cards.map(function(c,i){
+    return '<div class="ca-co">'+(c.logo?'<img class="ca-logo" src="'+esc(c.logo)+'" alt="" loading="lazy" referrerpolicy="no-referrer">':'<span class="ca-logo ca-logo-x">'+esc(c.name.charAt(0).toUpperCase())+'</span>')+
+      '<div class="ca-co-t"><b>'+esc(c.name)+'</b><div class="bi-sub">'+esc([c.industry,c.domain].filter(Boolean).join(" \u00b7 "))+'</div>'+
+      '<div class="bi-sub ca-fb '+esc(c.fbTone)+'">'+esc(c.fbText)+'</div>'+
+      '<label class="ca-fb-in"><span class="dim">Facebook page</span><input type="text" data-fb="'+i+'" value="'+esc(c.facebook)+'" placeholder="paste the page address if it is not found" spellcheck="false" autocomplete="off"'+(c.finding?" disabled":"")+'></label></div>'+
+      '<div class="ca-co-b">'+(c.canFind?'<button class="pm-btn-ghost" type="button" data-find="'+i+'">Find its Facebook page</button>':"")+'<button class="pm-btn-ghost" type="button" data-rm="'+i+'" aria-label="Remove '+esc(c.name)+'">Remove</button></div></div>';
+  }).join(""):'<p class="pm-empty">No competitors yet for this account. Type a company name above.</p>';
+}
+function applyChange(r){
+  if(!r.ok){setMsg(reasonOf(r,"The change could not be saved"));return false;}
+  S.report.competitors=r.j.competitors; S.report.region=r.j.region; return true;
+}
+function afterChange(){paintList(); paintResults(); $("#compNote").textContent=S.report.competitors.length?D.plural(S.report.competitors.length,"competitor"):"none yet"; return run(true);}
+
+function findFacebook(name,force){
+  if(S.finding[name]) return Promise.resolve();
+  S.finding[name]=true; paintList(); var acct=S.account;
+  return postJson(API+"/find-facebook",D.findBody(S.account,name,names(),force)).then(function(r){
+    delete S.finding[name];
+    if(acct!==S.account) return;
+    if(!r.ok){paintList(); setMsg(reasonOf(r,"The Facebook page could not be looked for"));return;}
+    S.report.competitors=r.j.competitors;
+    var found=r.j.kept||r.j.facebook;
+    return afterChange().then(function(){        /* the report is drawn again first, which clears the message line */
+      setMsg(found?"":esc(name)+": "+esc(r.j.error||r.j.reasoning||"No Facebook page could be checked.")+" Paste its page address in the box if you know it, or Meta ads cannot be read for it.","pm-note");
+    });
+  }).catch(function(){delete S.finding[name]; paintList(); setMsg("The server could not be reached. The Facebook page was not looked for.");});
+}
+$("#caForm").addEventListener("submit",function(e){
+  e.preventDefault();
+  var q=$("#caQ").value.trim();
+  if(!S.account||q.length<2){setMsg(S.account?"Type at least two letters of the company name.":"Pick an ad account first: competitors are saved for each ad account.");return;}
+  setMsg(""); S.query=q; $("#caSearch").disabled=true; $("#caResults").innerHTML='<p class="bi-sub">Searching\u2026</p>';
+  getJson(API+"/search?account="+encodeURIComponent(S.account)+"&q="+encodeURIComponent(q)).then(function(r){
+    $("#caSearch").disabled=false;
+    if(!r.ok){S.results=null; paintResults(); setMsg(reasonOf(r,"The search could not be made"));return;}
+    S.results=r.j; paintResults();
+  }).catch(function(){$("#caSearch").disabled=false; S.results=null; paintResults(); setMsg("The server could not be reached. Try again.");});
+});
+$("#caResults").addEventListener("click",function(e){
+  var b=e.target.closest("[data-add]"); if(!b||!S.results) return;
+  var card=D.resultCards(S.results)[+b.dataset.add]; if(!card) return;
+  b.disabled=true; setMsg("");
+  postJson(API+"/competitors",D.addBody(S.account,card.company,names())).then(function(r){
+    if(!applyChange(r)){b.disabled=false;return;}
+    (S.results.companies||[]).forEach(function(c){ if(c.name===card.name) c.added=true; });
+    var need=!card.company.facebook;
+    return afterChange().then(function(){ if(need) return findFacebook(card.name,false); });
+  }).catch(function(){b.disabled=false; setMsg("The server could not be reached. Nothing was saved.");});
+});
+$("#caList").addEventListener("click",function(e){
+  var rm=e.target.closest("[data-rm]"), fd=e.target.closest("[data-find]");
+  var cards=D.competitorCards(S.report,S.finding);
+  if(rm){
+    var c=cards[+rm.dataset.rm]; if(!c) return;
+    rm.disabled=true; setMsg("");
+    postJson(API+"/competitors",D.removeBody(S.account,c.name,names())).then(function(r){
+      if(!applyChange(r)){rm.disabled=false;return;}
+      if(S.results) (S.results.companies||[]).forEach(function(x){ if(x.name===c.name) x.added=false; });
+      return afterChange();
+    }).catch(function(){rm.disabled=false; setMsg("The server could not be reached. Nothing was changed.");});
+  }else if(fd){
+    var f=cards[+fd.dataset.find]; if(f) findFacebook(f.name,false);
+  }
+});
+$("#caList").addEventListener("change",function(e){
+  var inp=e.target.closest("[data-fb]"); if(!inp) return;
+  var c=S.report.competitors[+inp.dataset.fb]; if(!c) return;
+  setMsg("");
+  postJson(API+"/competitors",D.pageBody(S.account,c,inp.value,names())).then(function(r){
+    if(!applyChange(r)){paintList();return;}
+    return afterChange();
+  }).catch(function(){setMsg("The server could not be reached. Nothing was saved.");});
+});
+$("#fRegion").addEventListener("change",function(){
+  if(!S.report) return; setMsg("");
+  postJson(API+"/competitors",D.regionBody(S.account,$("#fRegion").value,names())).then(function(r){
+    if(!applyChange(r)){$("#fRegion").value=S.report.region||"US";return;}
+    return afterChange();
+  }).catch(function(){setMsg("The server could not be reached. Nothing was saved.");});
+});
+
+/* ── Refreshing and polling ───────────────────────────────── */
 $("#refreshBtn").addEventListener("click",function(){
   if(!S.report) return;
   setMsg("");
@@ -183,7 +275,7 @@ $("#exportBtn").addEventListener("click",function(){
 /* ── Start ────────────────────────────────────────────────── */
 (function(){
   var want=(new URLSearchParams(location.search).get("account"))||store("ca_account")||"";
-  scope=window.PMScope.mount($("#acctPick"),{account:want,noGroups:true,onChange:function(a){S.account=a; store("ca_account",a); run();},
+  scope=window.PMScope.mount($("#acctPick"),{account:want,noGroups:true,onChange:function(a){S.account=a; S.results=null; S.finding={}; store("ca_account",a); run();},
     onError:function(e){setMsg(esc((e&&e.message)||"The account list could not be read."));}});
 })();
 })();
