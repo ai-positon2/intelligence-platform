@@ -14,7 +14,7 @@ import datetime as dt
 
 from . import paid_meta_creative as read
 
-MIN_RANKED_IMPRESSIONS = 500          # Meta's own bar for ranking an ad
+MIN_RANKED_IMPRESSIONS = read.RANK_MIN_IMPRESSIONS          # Meta's own bar for ranking an ad
 FATIGUE_MEDIUM, FATIGUE_HIGH = 4.0, 6.0   # 30-day frequency: how many times the same person saw the ad
 MIN_FATIGUE_IMPRESSIONS = 1000
 MIN_SPEND_NO_RESULT = 50.0
@@ -100,17 +100,22 @@ def quality(raw, account, today=None):
         counts[k] = c
     flagged = sorted([i for i in delivered if i["flags"]], key=lambda i: (-SEV[i["severity"]], -i["spend"]))
     spend_below = sum(i["spend"] for i in below)
+    rankable = sum(1 for i in delivered if i["impressions"] >= MIN_RANKED_IMPRESSIONS)
+    small = sum(1 for i in delivered if i["impressions"] < MIN_RANKED_IMPRESSIONS)
     out = _base(raw, account, today, "quality")
     out["summary"] = {"ads": len(live), "delivered": len(delivered), "idle": len(live) - len(delivered), "ranked": len(ranked), "notRanked": len(delivered) - len(ranked),
+                      "underMin": small, "unrankedBig": rankable - len(ranked),
                       "belowAverage": len(below), "spend": round(total_spend, 2), "spendBelow": round(spend_below, 2), "shareBelow": round(_share(spend_below, total_spend), 4),
                       "fatigued": sum(1 for i in delivered if any(f["code"] == "fatigue" for f in i["flags"])),
                       "noResults": sum(1 for i in delivered if any(f["code"] == "no_results" for f in i["flags"])), "counts": counts, "flagged": len(flagged)}
     out["items"] = sorted(items, key=lambda i: (-SEV.get(i["severity"], 0), -i["spend"], i["name"].lower()))
     out["fixFirst"] = flagged[:12]
-    out["headline"] = _quality_headline(out["summary"], out["insightsRead"])
+    out["headline"] = _quality_headline(dict(out["summary"], rankable=rankable), out["insightsRead"])
     out["notes"] = ["Meta ranks an ad only after %d impressions, and ranks it against the ads competing for the same audience, so a ranking says how the ad compares, not how it performs." % MIN_RANKED_IMPRESSIONS,
                     "Frequency is the average number of times a person saw the ad in the last %d days. A retargeting ad is meant to be seen more often than a cold one, so judge it against its job." % read.WINDOW_DAYS,
                     "Results are what each campaign's objective counts (purchases, leads, installs). A campaign aimed at traffic or reach has no result to judge."]
+    if ranked:                                              # Meta sends each ranking separately; one it sent for no ad is said, not shown as a column of "Not ranked"
+        out["notes"] += ["Meta sent no %s ranking for any of the %d delivering ads in this read, so only the other rankings are used." % (DIM[k], len(delivered)) for k in DIM if counts[k]["unknown"] == len(delivered)]
     return out
 
 
@@ -121,6 +126,9 @@ def _quality_headline(s, insights_read):
         return "No ad in this account is live."
     if not s["delivered"]:
         return "%d ads are live but none delivered in the last %d days." % (s["ads"], read.WINDOW_DAYS)
+    if not s["ranked"] and s["rankable"]:
+        return "Meta sent no ranking for any of the %d delivering ads, although %d of them have %d or more impressions. It does this at times: use Refresh in a few minutes." % (
+            s["delivered"], s["rankable"], MIN_RANKED_IMPRESSIONS)
     if not s["ranked"]:
         return "None of the %d delivering ads has had the %d impressions Meta needs to rank it yet." % (s["delivered"], MIN_RANKED_IMPRESSIONS)
     if not s["belowAverage"]:

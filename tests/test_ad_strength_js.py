@@ -146,3 +146,12 @@ def test_markup_in_an_ad_or_campaign_name_is_text():
     r = json.loads(json.dumps(an.quality(M.raw([M.ad("1", name="<script>x</script>")], [M.ins("1", q="BELOW_AVERAGE_10")]), M.ACCT, M.TODAY)))
     html = render("X.quality(R)", R=r)
     assert "&lt;script&gt;" in html and "<script>" not in html
+
+
+def test_the_ranked_tile_does_not_call_a_big_unranked_ad_under_500_impressions():
+    r = json.loads(json.dumps(an.quality(M.raw([M.ad("1"), M.ad("2"), M.ad("3")], [M.ins("1", imp="400000", q="AVERAGE"), M.ins("2", imp="300000"), M.ins("3", imp="90")]), M.ACCT, M.TODAY)))
+    html = render("X.quality(R)", R=r)
+    assert "1 under 500 impressions" in html and "1 with 500 or more that Meta did not rank" in html and "2 under 500 impressions" not in html
+    only_big = json.loads(json.dumps(an.quality(M.raw([M.ad("1")], [M.ins("1", imp="400000")]), M.ACCT, M.TODAY)))
+    h = render("X.quality(R)", R=only_big)
+    assert "1 with 500 or more that Meta did not rank" in h and "under 500 impressions" not in h

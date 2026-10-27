@@ -276,3 +276,66 @@ def test_rankings_probe_counts_each_word_and_a_missing_field_per_request_shape()
     assert [o for o in out if "error" in o][0]["variant"].endswith("last_7d")
     assert any(p.get("time_increment") == 1 for p in seen) and any(p.get("date_preset") == "maximum" for p in seen)
     assert all(p["level"] == "ad" for p in seen)
+
+
+# ── Meta sends no ranking at all at times (Beta Bionics, 2026-10-27) ────────
+
+def _pages_answering(*answers):
+    """pages_fn: the ads read, then each insights read in turn (the last answer repeats); `calls` counts the insights reads."""
+    seq, calls = list(answers), []
+
+    def pages(path, params):
+        if not path.endswith("/insights"):
+            return [ad("1"), ad("2")]
+        calls.append(1)
+        return seq[min(len(calls), len(seq)) - 1]
+    return pages, calls
+
+
+def test_an_answer_with_no_ranking_for_ads_that_have_the_impressions_is_asked_again_and_the_second_answer_is_used():
+    pages, calls = _pages_answering([ins("1", imp="9000"), ins("2", imp="4000")], [ins("1", imp="9000", q="AVERAGE"), ins("2", imp="4000")])
+    r = c.raw_read("act_1", pages_fn=pages, today=TODAY)
+    assert len(calls) == 2 and r["insights"]["1"]["rank"]["quality"] == "AVERAGE" and r["warnings"] == [] and r["insightsRead"] is True
+
+
+def test_two_answers_with_no_ranking_are_said_in_a_warning_that_also_keeps_the_read_from_being_saved():
+    pages, calls = _pages_answering([ins("1", imp="9000"), ins("2", imp="400")])
+    r = c.raw_read("act_1", pages_fn=pages, today=TODAY)
+    assert len(calls) == 2 and r["insightsRead"] is True and len(r["warnings"]) == 1
+    assert "no quality, engagement or conversion ranking for any of the 1 ads that have 500 or more impressions" in r["warnings"][0] and "Refresh" in r["warnings"][0]
+    saved = []
+
+    class Store(FakeStore):
+        def put_gads_cache(self, key, value, *a, **k):
+            saved.append(key)
+            return super().put_gads_cache(key, value, *a, **k)
+    st = Store()
+    got, _stale, _acct = c.raw_for("act_1234567", store=st, today=TODAY, pages_fn=pages, account_fn=lambda a: {"name": "Acme"}, force=True, now=1000.0)
+    assert got["warnings"] and not [k for k in saved if ":ads:" in k]                     # a read with a warning is shown, not kept for hours
+
+
+def test_no_second_ask_when_no_ad_has_the_impressions_to_be_ranked_or_when_any_ad_was_ranked():
+    for rows in ([ins("1", imp="300"), ins("2", imp="40")], [ins("1", imp="9000", q="ABOVE_AVERAGE"), ins("2", imp="9000")]):
+        pages, calls = _pages_answering(rows)
+        r = c.raw_read("act_1", pages_fn=pages, today=TODAY)
+        assert len(calls) == 1 and r["warnings"] == []
+
+
+def test_ads_with_the_impressions_but_no_ranking_are_not_called_too_new():
+    q = an.quality(raw([ad("1"), ad("2")], [ins("1", imp="400000"), ins("2", imp="200")]), ACCT, TODAY)
+    s = q["summary"]
+    assert s["ranked"] == 0 and s["unrankedBig"] == 1 and s["underMin"] == 1
+    assert "too new" not in q["headline"] and "yet" not in q["headline"]
+    assert q["headline"] == "Meta sent no ranking for any of the 2 delivering ads, although 1 of them have 500 or more impressions. It does this at times: use Refresh in a few minutes."
+
+
+def test_a_ranking_meta_sent_for_no_ad_is_said_in_a_note_when_the_others_are_used():
+    q = an.quality(raw([ad("1"), ad("2")], [ins("1", q="AVERAGE"), ins("2", q="BELOW_AVERAGE_20")]), ACCT, TODAY)
+    assert q["summary"]["ranked"] == 2
+    assert any("no expected engagement rate ranking for any of the 2 delivering ads" in n for n in q["notes"])
+    assert any("no expected conversion rate ranking" in n for n in q["notes"]) and not any("no quality ranking" in n for n in q["notes"])
+
+
+def test_no_note_about_a_ranking_never_sent_when_not_one_ad_was_ranked():
+    q = an.quality(raw([ad("1")], [ins("1", imp="400000")]), ACCT, TODAY)
+    assert q["summary"]["ranked"] == 0 and not any("Meta sent no" in n for n in q["notes"])

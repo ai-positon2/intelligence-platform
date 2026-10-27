@@ -63,7 +63,7 @@ function quality(r){
   var out=head(r,"ad quality")+'<p class="mc-headline">'+esc(r.headline||"")+'</p>';
   out+='<div class="pd-strip mc-kpis">'+
     kpi("Live ads",int(s.ads),s.idle?int(s.idle)+" with no delivery":"all delivering")+
-    kpi("Ranked by Meta",int(s.ranked),s.notRanked?int(s.notRanked)+" under 500 impressions":"")+
+    kpi("Ranked by Meta",int(s.ranked),(s.underMin?int(s.underMin)+" under 500 impressions":"")+(s.unrankedBig?(s.underMin?", ":"")+int(s.unrankedBig)+" with 500 or more that Meta did not rank":""))+
     kpi("Below average",int(s.belowAverage),s.ranked?pct(s.shareBelow)+" of the spend":"",s.belowAverage?"warn":"good")+
     kpi("Worn out",int(s.fatigued),"seen 4 or more times by the same people",s.fatigued?"warn":"good")+
     kpi("Spent, no result",int(s.noResults),"in "+((r.window||{}).days||30)+" days",s.noResults?"warn":"good")+'</div>';

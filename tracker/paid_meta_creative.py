@@ -21,6 +21,7 @@ from . import paid_geo as geo
 from . import paid_meta as meta
 
 WINDOW_DAYS = 30
+RANK_MIN_IMPRESSIONS = 500       # Meta's own bar for ranking an ad
 MAX_ADS = 5000
 PAGE = 100
 
@@ -121,6 +122,15 @@ def read_insights(rows):
     return out
 
 
+def rankings_missing(insights):
+    """How many ads have the impressions Meta ranks on, when not one ad in the read has any ranking. Meta answers UNKNOWN for every ad at times (live on Beta Bionics: the same
+    30 days came back with no ranking at 09:29 UTC and with 39 of 92 ads ranked an hour later), so an answer with none is not taken as the truth about the ads."""
+    rows = list((insights or {}).values())
+    if any(v for r in rows for v in (r.get("rank") or {}).values()):
+        return 0
+    return sum(1 for r in rows if r.get("impressions", 0) >= RANK_MIN_IMPRESSIONS)
+
+
 def raw_read(act, *, pages_fn, today=None):
     """The raw read of one Meta ad account. The ads are the read (a failure there is the error); the numbers are a soft part: without them the coverage view is
     complete and the quality view says it could not rank anything."""
@@ -135,6 +145,12 @@ def raw_read(act, *, pages_fn, today=None):
     try:
         path, params = insights_request(act, start.isoformat(), end.isoformat())
         insights = read_insights(pages_fn(path, params))
+        if rankings_missing(insights):                      # Meta sometimes sends no ranking at all: ask once more before saying so
+            insights = read_insights(pages_fn(path, params))
+        n = rankings_missing(insights)
+        if n:                                               # a warning keeps this read from being saved for hours (tracker/paid_geo.py _cached), so the next ask reads again
+            warnings.append("Meta sent no quality, engagement or conversion ranking for any of the %d ads that have %d or more impressions, although it normally ranks them. "
+                            "It does this at times, so this read is not kept: use Refresh again in a few minutes." % (n, RANK_MIN_IMPRESSIONS))
     except meta.AdsError as e:
         warnings.append("Meta's numbers and quality rankings for the last %d days could not be read (%s), so only what the ads are made of is shown." % (WINDOW_DAYS, e))
     return {"ads": ads, "insights": insights, "warnings": warnings, "window": {"from": start.isoformat(), "to": end.isoformat(), "days": WINDOW_DAYS},

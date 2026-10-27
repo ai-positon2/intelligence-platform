@@ -271,3 +271,9 @@ def test_only_the_base_weeks_just_before_count_as_the_usual_rate():
 def test_a_rest_of_the_account_with_almost_no_delivery_is_not_a_yardstick():
     tiny_rest = cr("a2", w=[wk(100, 0.05)] * 3 + [wk(100, 0.01)] * 2)
     assert [f["key"] for f in run(acct([cr(w=weeks(0.05, 0.028)), tiny_rest]))["findings"]] == ["tired:a1"]
+
+
+def test_a_meta_ad_without_a_ranking_is_not_called_too_new_to_rank():
+    r = run(acct([cr("m1", rank=ranked("AVERAGE", None, None)), cr("m2", rank=ranked(None, None, None))], platform="meta"))
+    note = check(r, "ratings")["note"]
+    assert "1 ad ranked" in note and "1 not ranked by Meta" in note and "too new" not in note

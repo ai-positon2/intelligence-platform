@@ -272,7 +272,7 @@ def _ratings(a, platform):
     if not ranked:
         return [], {"key": "ratings", "label": label, "state": "unknown", "note": "Meta gave no ranking for any of the %s. It ranks an ad only after 500 impressions, and for some accounts it returns none at all." % plural(unranked, "ad")}
     return found, {"key": "ratings", "label": label, "state": "problem" if found else "ok",
-                   "note": "%s ranked%s." % (plural(ranked, "ad"), ("; %d too new to rank" % unranked) if unranked else "")}
+                   "note": "%s ranked%s." % (plural(ranked, "ad"), ("; %d not ranked by Meta" % unranked) if unranked else "")}
 
 
 def _gaps(a):
