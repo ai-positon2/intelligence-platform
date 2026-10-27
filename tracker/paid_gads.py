@@ -12,9 +12,9 @@ Environment (Railway):
   GOOGLE_ADS_REFRESH_TOKEN                          one sign-in that can see the MCC
   GOOGLE_ADS_LOGIN_CUSTOMER_ID                      the manager account (default below)
 
-The developer token has Explorer access, a small daily allowance that Google
-counts in its own way (the 429 says "Number of operations for explorer
-access"). What keeps a busy team inside it:
+The developer token began with Explorer access, a small daily allowance (about 2,880
+operations) that Google counts in its own way (the 429 said "Number of operations for explorer
+access"); Basic access (15,000 a day) was granted on 2026-10-27. What keeps a busy team inside it:
 
   * campaign numbers are stored one day at a time in Postgres (pm_gads_days),
     so a range is built from days already read and only the days never read,
@@ -56,7 +56,7 @@ API_VERSION = "v24"
 API = "https://googleads.googleapis.com/" + API_VERSION
 TOKEN_URL = "https://oauth2.googleapis.com/token"
 DEFAULT_LOGIN = "9923720096"
-DAILY_LIMIT = 2400            # our own ceiling, below what we believe Google allows
+DAILY_LIMIT = 12000           # our own ceiling, 80% of the 15,000 a day Basic access allows (Explorer was about 2,880)
 MAX_RANGE_DAYS = 800
 MAX_ROWS = 250_000
 TTL_OPEN = 3600               # a range that includes today or yesterday
