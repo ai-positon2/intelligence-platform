@@ -1,0 +1,64 @@
+{% extends "_paid_base.html" %}
+{% block title %}Master Agent{% endblock %}
+{% block content %}
+<div class="pm pm-gc pm-th pm-qa" id="ma">
+  <section class="pm-hero">
+    <div class="pm-hero-l">
+      <span class="pm-eyebrow"><span class="d"></span>Paid Marketing · Client master</span>
+      <h1 class="pm-title">Write the client down once, <span class="pm-grad">every agent reads it.</span></h1>
+      <p class="pm-sub">One record per client: the accounts it owns, each account's <b>budget and KPI targets</b>, and the client's <b>phone numbers, locations, brand terms, allowed domains and offers</b>. Brand Spend Alert, KPI Monitoring,
+        the Ad Copy Checker, Location Conflicts and Unknown Domains read it wherever an agent has nothing saved of its own, and a figure saved on an agent's own page still wins. This page lists every place the two disagree.</p>
+    </div>
+  </section>
+
+  <div id="msg"></div>
+  <div id="skel" hidden><div class="pd-skel"></div><div class="pd-skel"></div><div class="pd-skel"></div></div>
+
+  <div id="out" hidden>
+    <div class="sg-head">
+      <p class="pd-fresh" id="fresh"></p>
+      <button class="pm-btn" id="addBtn" type="button">Add a client</button>
+      <button class="pm-btn-ghost" id="exportBtn" type="button"><svg viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>Export CSV</button>
+    </div>
+    <div class="pd-strip" id="kpis"></div>
+
+    <section class="pm-panel" id="editor" hidden>
+      <div class="pm-panel-h"><span class="pm-panel-t" id="edTitle">Client</span><span class="pm-panel-s" id="edSub"></span></div>
+      <div id="edMsg"></div>
+      <label class="cc-f"><span>Client name</span><input type="text" id="fName" maxlength="80" placeholder="Acme Dental" spellcheck="false"></label>
+      <h4>Accounts it owns <span class="dim" id="acctNote"></span></h4>
+      <div class="bi-tools"><input type="text" id="acctFilter" placeholder="Find an account" spellcheck="false"></div>
+      <div id="acctList" class="ma-accts"></div>
+      <div id="acctBlocks"></div>
+      <h4>For the whole client</h4>
+      <div class="ma-grid" id="shared"></div>
+      <label class="cc-f"><span>Offers, one per line, with the day each ends after a bar <em class="dim">(Not read by an agent yet)</em></span><textarea id="fOffers" rows="3" spellcheck="false" placeholder="Free whitening with a new patient exam | 2026-12-31"></textarea></label>
+      <label class="cc-f"><span>Notes <em class="dim">(Not read by an agent yet)</em></span><textarea id="fNotes" rows="2" spellcheck="false" placeholder="Closed on Sundays."></textarea></label>
+      <div class="cc-set-b"><button class="pm-btn" id="saveBtn" type="button">Save the client</button><button class="pm-btn-ghost" id="cancelBtn" type="button">Cancel</button>
+        <button class="pm-btn-ghost" id="removeBtn" type="button" hidden>Remove the client</button><span class="bi-sub" id="edOut"></span></div>
+    </section>
+
+    <section class="pm-panel" id="listCard">
+      <div class="pm-panel-h"><span class="pm-panel-t">Clients</span><span class="pm-panel-s" id="listNote"></span></div>
+      <div id="list"></div>
+    </section>
+    <section class="pm-panel" id="driftCard" hidden>
+      <div class="pm-panel-h"><span class="pm-panel-t">Where an agent's own value is not the master's</span><span class="pm-panel-s">the agent's own wins until one of them is changed</span></div>
+      <div id="drift"></div>
+    </section>
+    <section class="pm-panel" id="freeCard" hidden>
+      <div class="pm-panel-h"><span class="pm-panel-t">Accounts with no client</span><span class="pm-panel-s" id="freeNote"></span></div>
+      <p class="bi-sub" id="free"></p>
+    </section>
+    <section class="pm-panel" id="changesCard" hidden>
+      <div class="pm-panel-h"><span class="pm-panel-t">Latest changes</span></div>
+      <ul class="th-blind-l" id="changes"></ul>
+    </section>
+    <p class="pd-foot" id="foot"></p>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/master_agent_data.js') }}?v=1"></script>
+<script src="{{ url_for('static', filename='js/master_agent.js') }}?v=1"></script>
+{% endblock %}

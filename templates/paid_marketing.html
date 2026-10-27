@@ -12,7 +12,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-tokens.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-components.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/gtm.css') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/paid_marketing.css') }}?v=63">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/paid_marketing.css') }}?v=64">
   <script src="/static/js/theme.js"></script>
   <link rel="stylesheet" href="/static/css/aurora-app.css?v=3">
   <script src="/static/js/aurora.js?v=1" defer></script>
@@ -681,6 +681,25 @@
         </div>
       </a>
 
+      <a href="/p2/paid-marketing/master-agent" class="dash-card active c-ma">
+        <div class="card-band"></div>
+        <div class="card-thumb">
+          <div class="card-thumb-icon"><svg class="au-ic" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h10"/><circle cx="19" cy="17" r="2"/></svg></div>
+          <div class="card-thumb-badge tb-live"><span class="tb-dot live"></span> Live</div>
+        </div>
+        <div class="card-body">
+          <div class="card-name">Master Agent</div>
+          <div class="card-desc">
+            Write each client down once: the accounts it owns, budgets and KPI targets, phone numbers, locations, brand terms, allowed domains and offers. Brand Spend, KPI Monitoring, the Ad Copy Checker,
+            Location Conflicts and Unknown Domains read it, and the page shows where an agent's own setting differs.
+          </div>
+          <div class="card-footer">
+            <div class="card-tags"><span class="tag">Client master</span><span class="tag">Settings</span></div>
+            <span class="card-arrow">→</span>
+          </div>
+        </div>
+      </a>
+
       <a href="/p2/paid-marketing/creative-health" class="dash-card active c-ch">
         <div class="card-band"></div>
         <div class="card-thumb">
@@ -795,6 +814,7 @@
     {t:'KPI Monitoring',d:'Are the campaigns hitting their cost, return and rate targets, learning and delivering',u:'/p2/paid-marketing/kpi-monitoring',i:'◎'},
     {t:'Account Watch',d:'Did anything happen to the account that nobody meant: suspensions, limits, changes, access',u:'/p2/paid-marketing/account-watch',i:'◈'},
     {t:'Creative & Asset Health',d:'Which ads are wearing out and which sitelinks, callouts and images are missing',u:'/p2/paid-marketing/creative-health',i:'◐'},
+    {t:'Master Agent',d:'The client written down once: accounts, budgets, targets, phones, places, brand terms, domains, offers',u:'/p2/paid-marketing/master-agent',i:'◎'},
     {t:'Tracking & Data Health',d:'Are conversions, tags, pixels and audience lists still working',u:'/p2/paid-marketing/tracking-health',i:'∿'},
     {t:'Keyword Visibility Tracker',d:'Are the highest-spend keywords still at the top of the page, and who is new in the auctions',u:'/p2/paid-marketing/keyword-visibility',i:'⌕'},
     {t:'QA Agent',d:'Campaign launch QC checklist',u:'/p2/paid-marketing/qa-agent',i:'✓'}
