@@ -9,6 +9,9 @@ a person can open and fix:
   * the manager account's own list is read once: an account that is suspended, canceled or closed is an issue even though the platform's account list leaves it out, and an account that was in the
     list at an earlier reading and is not any more is an issue until it is listed again.
 
+A part of the read that failed for an account (its budget orders, change history, conversion actions, users, or on Meta its status, Pages and activity log) is handed to the engine as a hold: the
+issues of the rules that part feeds stay open instead of being resolved by a read that could not see them, and are not alerted as new the next day.
+
 Each run saves, per account, who can open it, its conversion actions and its Pages (what a later day is held against), and the manager account's list under the key "mcc". An account that cannot be
 read is listed as unreadable so nothing open is resolved by a read that could not see.
 """
@@ -31,6 +34,26 @@ MAX_PER_ACCOUNT = 100
 
 def fingerprint(account_id, key):
     return "watch:%s:%s" % (account_id, key)
+
+
+# What each soft part of the read feeds: the rules (issue kinds) that cannot be judged while it is unread. A part is unread when it is None (for Google's status too: the manager account's list
+# could not be read); a Meta status without a code is unread as well. The platform that never reads a part does not hold it.
+PART_RULES = {
+    "google": {"status": ("account_status",), "orders": ("spend_limit",), "changes": ("budget_change", "bid_change", "outside_editor"), "actions": ("goal_change",), "users": ("access_change",)},
+    "meta": {"status": ("account_status", "spend_limit"), "pages": ("page_lost",), "activity": ("budget_change", "bid_change", "activity", "outside_editor")},
+}
+
+
+def unread_rules(raw_account, platform):
+    """The issue kinds that cannot be judged because their part of the read failed for this account (a set; empty when everything was read). The quiet `small` issue and the counted `more` issue
+    may hold findings of any rule, so they are held with any of them."""
+    parts = PART_RULES["meta" if platform == "meta" else "google"]
+    held = set()
+    for part, rules in parts.items():
+        v = raw_account.get(part)
+        if v is None or (part == "status" and platform == "meta" and v.get("code") is None):
+            held |= set(rules)
+    return held | {"small", "more"} if held else set()
 
 
 def issues_of(account, analysed):
@@ -87,13 +110,16 @@ def make_spec(*, today=None, search_fn=None, list_fn=None, mon_store=None, meta_
                 return a, None, None, str(e)[:240] or type(e).__name__
             except Exception as e:                                                   # noqa: BLE001 (Meta has its own errors; one account failing never stops the rest)
                 return a, None, None, ("%s: %s" % (type(e).__name__, e))[:240]
-        issues_out, snaps, ok, unreadable = [], {}, set(), []
+        issues_out, snaps, ok, unreadable, hold = [], {}, set(), [], {}
         with ThreadPoolExecutor(max_workers=max(1, workers)) as pool:
             for a, res, raw_acct, err in pool.map(one, accounts):
                 if res is None:
                     unreadable.append({"accountId": a["id"], "name": a["name"], "platform": a.get("platform") or "google", "error": err})
                     continue
                 ok.add(a["id"])
+                held = unread_rules(raw_acct, a.get("platform") or "google")
+                if held:
+                    hold[a["id"]] = held
                 issues_out += issues_of({"id": a["id"], "name": a["name"], "platform": a.get("platform") or "google"}, res)
                 snaps[a["id"]] = w.snapshot_of(raw_acct, res)
         if clients is not None:
@@ -110,5 +136,5 @@ def make_spec(*, today=None, search_fn=None, list_fn=None, mon_store=None, meta_
                 issues_out += issues_of({"id": cid, "name": name, "platform": "google"}, w._gone_result(cid, name, at0))
         elif problem and any(a.get("platform") != "meta" for a in accounts):
             unreadable.append({"accountId": "mcc", "name": "The manager account's list", "platform": "google", "error": problem})
-        return {"issues": issues_out, "snaps": snaps, "okIds": ok, "unreadable": unreadable}
+        return {"issues": issues_out, "snaps": snaps, "okIds": ok, "unreadable": unreadable, "hold": hold}
     return {"agent": AGENT, "label": LABEL, "collect": collect}

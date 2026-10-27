@@ -36,6 +36,7 @@ class World:
         self.changes = {A["id"]: [], B["id"]: []}
         self.fail = set()
         self.quota = False
+        self.fail_kinds, self.clients_fail, self.meta_fail = (), False, ()                          # the parts of the read that are refused while the account itself reads
         self.meta_status = {"account_status": 1, "disable_reason": 0, "spend_cap": "0", "amount_spent": "9900", "currency": "USD"}
         self.pages = [{"id": "10", "name": "Acme", "is_published": True}]
         self.activities = []
@@ -47,22 +48,34 @@ class World:
         if self.quota:
             raise gads.GadsError("quota", "The daily limit is used up.")
         if "FROM customer_client" in q:
+            if self.clients_fail:
+                raise gads.GadsError("api", "no manager list")
             return self.clients()
-        return T.searcher(clients=[], users=self.users.get(cid, []), changes=self.changes.get(cid, []), fail=self.fail)(cid, q)
+        return T.searcher(clients=[], users=self.users.get(cid, []), changes=self.changes.get(cid, []), fail=self.fail, fail_kinds=self.fail_kinds)(cid, q)
 
     def get(self, path, params):
+        if "status" in self.meta_fail:
+            raise RuntimeError("Meta says no")
         return self.meta_status
 
     def pages_fn(self, path, params):
         if path.endswith("/promote_pages"):
+            if "pages" in self.meta_fail:
+                raise RuntimeError("Meta says no")
             return self.pages
+        if "activity" in self.meta_fail:
+            raise RuntimeError("Meta says no")
         return self.activities
 
 
-def run(store, world, deliver, day=DAY, accounts=(A, B), hour=7, workers=4):
+def spec_of(store, world, day=DAY, hour=7, workers=4):
     now = lambda: dt.datetime.combine(day, dt.time(hour), tzinfo=dt.timezone.utc)                    # noqa: E731
-    spec = wm.make_spec(today=day, search_fn=world.search, list_fn=lambda: LISTED, mon_store=store, meta_pages_fn=world.pages_fn, meta_account_fn=lambda act: {"name": "Meta Co", "currency": "USD"},
-                        meta_get_fn=world.get, now_fn=now, workers=workers)
+    return wm.make_spec(today=day, search_fn=world.search, list_fn=lambda: LISTED, mon_store=store, meta_pages_fn=world.pages_fn, meta_account_fn=lambda act: {"name": "Meta Co", "currency": "USD"},
+                        meta_get_fn=world.get, now_fn=now, workers=workers), now
+
+
+def run(store, world, deliver, day=DAY, accounts=(A, B), hour=7, workers=4):
+    spec, now = spec_of(store, world, day, hour, workers)
     return mon.run_monitor(store, spec, trigger="test", link=LINK, deliver=deliver, accounts=list(accounts), groups=[], now_fn=now)
 
 
@@ -186,6 +199,82 @@ def test_an_account_new_to_the_manager_account_is_quiet_on_its_first_read_and_on
     w.status[B["id"]] = "SUSPENDED"
     r2 = run(s, w, dv, d(2), accounts=[A, B])
     assert r2["new"] == 1 and "Beta Clinic" in dv.emails[0]["text"] and "Gamma" not in dv.emails[0]["text"]
+
+
+# ── A part of the read that failed ──────────────────────────────────────────
+
+GOOGLE_READ = {"status": "ENABLED", "orders": [], "changes": [], "actions": [], "users": []}
+META_READ = {"status": {"code": 1, "spendCap": 0.0, "spent": 0.0}, "pages": [], "activity": [], "orders": None, "changes": None, "actions": None, "users": None}
+QUIET = {"small", "more"}
+GOOGLE_PARTS = {"status": {"account_status"}, "orders": {"spend_limit"}, "changes": {"budget_change", "bid_change", "outside_editor"}, "actions": {"goal_change"}, "users": {"access_change"}}
+META_PARTS = {"status": {"account_status", "spend_limit"}, "pages": {"page_lost"}, "activity": {"budget_change", "bid_change", "activity", "outside_editor"}}
+
+
+def test_every_rule_but_the_one_of_the_manager_accounts_list_belongs_to_a_part_of_the_read():
+    held = set().union(*(set(r) for p in wm.PART_RULES.values() for r in p.values()))
+    assert held == set(math.RULES) - {"account_gone"}                                                # an account that left the list is read from the list itself, never from the account
+
+
+def test_the_rules_of_a_part_that_failed_to_read_are_held_with_the_quiet_and_the_counted_issues():
+    assert wm.unread_rules(GOOGLE_READ, "google") == set() and wm.unread_rules(META_READ, "meta") == set()
+    for part, rules in GOOGLE_PARTS.items():
+        assert wm.unread_rules(dict(GOOGLE_READ, **{part: None}), "google") == rules | QUIET, part
+    for part, rules in META_PARTS.items():
+        assert wm.unread_rules(dict(META_READ, **{part: None}), "meta") == rules | QUIET, part
+    assert wm.unread_rules(dict(META_READ, status={"code": None}), "meta") == META_PARTS["status"] | QUIET                 # a status without a code says nothing
+    assert wm.unread_rules(dict(GOOGLE_READ, orders=None, users=None), "google") == {"spend_limit", "access_change"} | QUIET
+
+
+def test_a_part_the_platform_never_reads_is_not_held_so_a_fully_read_account_holds_nothing():
+    s, w = configured(), World()
+    got = spec_of(s, w)[0]["collect"]([A, B, M], [])
+    assert got["okIds"] >= {A["id"], B["id"], M["id"]} and got["hold"] == {}
+    w.fail_kinds, w.meta_fail = ("orders", "actions"), ("pages",)
+    held = spec_of(s, w)[0]["collect"]([A, B, M], [])["hold"]
+    assert held == {A["id"]: {"spend_limit", "goal_change"} | QUIET, B["id"]: {"spend_limit", "goal_change"} | QUIET, M["id"]: {"page_lost"} | QUIET}
+
+
+def test_an_issue_about_the_status_stays_open_while_the_manager_accounts_list_cannot_be_read():
+    s, dv, w = configured(), Deliver(), World()
+    run(s, w, dv, d(0))
+    w.status[B["id"]] = "SUSPENDED"
+    assert run(s, w, dv, d(1))["alerted"] == 1
+    w.clients_fail = True
+    r2 = run(s, w, dv, d(2))
+    assert r2["resolved"] == 0 and r2["new"] == 0 and [i["status"] for i in s.issues_all("watch") if i["kind"] == "account_status"] == ["open"]
+    w.clients_fail = False
+    r3 = run(s, w, dv, d(3))
+    assert r3["new"] == 0 and r3["alerted"] == 0 and r3["resolved"] == 0 and len(dv.emails) == 1
+    [row] = [i for i in s.issues_all("watch") if i["kind"] == "account_status"]
+    assert row["status"] == "open" and row["reopened"] == 0
+
+
+def test_an_outside_editors_issue_stays_open_while_the_change_history_cannot_be_read_and_the_other_issues_are_judged_as_usual():
+    s, dv, w = configured(), Deliver(), World()
+    run(s, w, dv, d(0))
+    at = (dt.datetime.combine(d(1), dt.time(7), tzinfo=dt.timezone.utc) - dt.timedelta(hours=5)).strftime("%Y-%m-%d %H:%M:%S")
+    w.changes[B["id"]] = [T.change_row(at=at, user="x@evil.com", old="50000000", new="150000000")]
+    w.status[B["id"]] = "SUSPENDED"
+    assert run(s, w, dv, d(1))["alerted"] == 3                                                        # the budget change, the outside editor and the status
+    w.fail_kinds, w.status[B["id"]] = ("changes",), "ENABLED"
+    r2 = run(s, w, dv, d(2))
+    assert {i["kind"]: i["status"] for i in s.issues_all("watch")} == {"outside_editor": "open", "budget_change": "open", "account_status": "resolved"} and r2["resolved"] == 1
+    w.fail_kinds = ()
+    r3 = run(s, w, dv, d(3))
+    assert r3["new"] == 0 and r3["alerted"] == 0 and r3["resolved"] == 0 and {i["status"] for i in s.issues_all("watch") if i["kind"] != "account_status"} == {"open"}
+
+
+def test_a_meta_status_issue_stays_open_while_the_ad_accounts_status_cannot_be_read():
+    s, dv, w = configured(), Deliver(), World()
+    run(s, w, dv, d(0), accounts=[A, B, M])
+    w.meta_status = {"account_status": 3, "disable_reason": 0, "spend_cap": "0", "amount_spent": "9900", "currency": "USD"}
+    assert run(s, w, dv, d(1), accounts=[A, B, M])["alerted"] == 1
+    w.meta_fail = ("status",)
+    r2 = run(s, w, dv, d(2), accounts=[A, B, M])
+    assert r2["resolved"] == 0 and [i["status"] for i in s.issues_all("watch") if i["kind"] == "account_status"] == ["open"]
+    w.meta_fail = ()
+    r3 = run(s, w, dv, d(3), accounts=[A, B, M])
+    assert r3["new"] == 0 and r3["alerted"] == 0 and r3["resolved"] == 0
 
 
 def test_the_spec_names_the_monitor_and_its_page():
