@@ -218,6 +218,7 @@ def meta_raw_read(statuses=("ACTIVE", "ACTIVE", "DISAPPROVED"), insights_read=Tr
 
 def test_only_active_ads_are_creatives_and_meta_rankings_ride_along():
     got = c.meta_creatives(meta_raw_read(), {"a1": c._empty_weeks()})
+    assert [x["name"] for x in got] == ["Hero video (Prospecting)", "Static (Prospecting)"]                # ads share names across ad sets: the ad set tells them apart
     assert [x["id"] for x in got] == ["a1", "a2"] and got[0]["kind"] == "Video ad" and got[0]["rank"]["quality"] == "BELOW_AVERAGE_20" and got[1]["rank"] is None
     assert got[0]["group"] == "Prospecting" and got[0]["campaign"] == "Leads"
 

@@ -253,7 +253,7 @@ def meta_creatives(raw, weeks):
         if ad.get("status") != "ACTIVE":
             continue
         rank = ((raw.get("insights") or {}).get(ad["id"]) or {}).get("rank")
-        out.append({"id": ad["id"], "name": ad["name"], "kind": FORMAT_LABEL.get(ad.get("format"), "Ad"), "campaign": ad.get("campaign") or "", "campaignId": ad.get("campaignId") or "",
+        out.append({"id": ad["id"], "name": "%s (%s)" % (ad["name"], ad["adset"]) if ad.get("adset") else ad["name"], "kind": FORMAT_LABEL.get(ad.get("format"), "Ad"), "campaign": ad.get("campaign") or "", "campaignId": ad.get("campaignId") or "",
                     "group": ad.get("adset") or "", "weeks": weeks.get(ad["id"]) or _empty_weeks(), "rank": rank})
     return out
 

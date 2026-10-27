@@ -270,7 +270,7 @@ def _ratings(a, platform):
                               "Meta ranks this ad below the ads competing for the same people on %s." % plural(len(low), "of its three rankings", "of its three rankings"),
                               level=level, evidence=["%s ranking: %s" % (k.capitalize(), r[k].replace("_", " ").lower()) for k in low], fix=FIX_META_RATING, where=_where(c)))
     if not ranked:
-        return [], {"key": "ratings", "label": label, "state": "unknown", "note": "Meta has ranked none of the %s yet (it needs 500 impressions)." % plural(unranked, "ad")}
+        return [], {"key": "ratings", "label": label, "state": "unknown", "note": "Meta gave no ranking for any of the %s. It ranks an ad only after 500 impressions, and for some accounts it returns none at all." % plural(unranked, "ad")}
     return found, {"key": "ratings", "label": label, "state": "problem" if found else "ok",
                    "note": "%s ranked%s." % (plural(ranked, "ad"), ("; %d too new to rank" % unranked) if unranked else "")}
 

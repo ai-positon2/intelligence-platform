@@ -180,7 +180,7 @@ def test_two_bottom_ten_rankings_are_high():
 def test_meta_with_no_ranked_ad_says_unknown():
     r = run(acct([cr("m1"), cr("m2", rank=ranked(None, None, None))], platform="meta"))
     c = check(r, "ratings")
-    assert c["state"] == "unknown" and "500 impressions" in c["note"]
+    assert c["state"] == "unknown" and "gave no ranking for any of the 2 ads" in c["note"] and "500 impressions" in c["note"]
 
 
 # ── Missing assets ──────────────────────────────────────────────────────────
