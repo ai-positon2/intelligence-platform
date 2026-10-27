@@ -21,6 +21,7 @@ AGENTS = {
     "kvis": {"label": "Keyword Visibility Tracker", "page": "/p2/paid-marketing/keyword-visibility", "weekdays": (1,)},       # Tuesdays: whole weeks end on Sunday, and Google's last hours of it are in by then
     "track": {"label": "Tracking & Data Health", "page": "/p2/paid-marketing/tracking-health"},
     "watch": {"label": "Account Watch", "page": "/p2/paid-marketing/account-watch"},
+    "creative": {"label": "Creative & Asset Health", "page": "/p2/paid-marketing/creative-health"},
     "spend": {"label": "Spend Anomaly Alert", "page": "/p2/paid-marketing/spend-anomaly", "frequent": True},               # its own run every two hours: a spike is worth an alert the hour it starts
 }
 SHOWN_OPEN = 40
@@ -80,6 +81,9 @@ def spec_for(agent, store, *, today=None, search_fn=None, list_fn=None, meta_pag
     if agent == "watch":
         from . import paid_watch_monitor as wm
         return wm.make_spec(today=day, search_fn=search_fn, list_fn=list_fn, mon_store=store, meta_pages_fn=meta_pages_fn, meta_account_fn=meta_account_fn, now_fn=now_fn)
+    if agent == "creative":
+        from . import paid_creative_monitor as xm
+        return xm.make_spec(today=day, search_fn=search_fn, list_fn=list_fn, mon_store=store, meta_pages_fn=meta_pages_fn, meta_account_fn=meta_account_fn, now_fn=now_fn)
     if agent == "track":
         from . import paid_track_monitor as tm
         return tm.make_spec(today=day, search_fn=search_fn, list_fn=list_fn, mon_store=store, meta_pages_fn=meta_pages_fn, meta_account_fn=meta_account_fn, now_fn=now_fn)

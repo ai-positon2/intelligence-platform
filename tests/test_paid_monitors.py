@@ -13,6 +13,7 @@ from monitor_fakes import Deliver, MemStore  # noqa: E402
 from tests import test_paid_brandspend as TB  # noqa: E402
 from tests import test_paid_anomaly as TA  # noqa: E402
 from tests import test_paid_disapproved as TD  # noqa: E402
+from tracker import paid_assets as assets  # noqa: E402
 from tracker import paid_brandspend_settings as st  # noqa: E402
 from tracker import paid_gads as base  # noqa: E402
 from tracker import paid_monitors as pm  # noqa: E402
@@ -38,6 +39,10 @@ def cache(monkeypatch):
     base.forget("")
 
 
+ASSET_ONLY_QUERIES = {assets.CAMPAIGNS_GAQL, assets.CAMPAIGN_METRICS_GAQL, assets.CAMPAIGN_ASSETS_GAQL, assets.CAMPAIGN_ASSETS_SHOWN_GAQL, assets.CUSTOMER_ASSETS_GAQL, assets.AD_GROUP_ASSETS_GAQL,
+                      assets.AD_GROUP_COUNT_GAQL, assets.CAMPAIGN_SETS_GAQL, assets.CUSTOMER_SETS_GAQL}      # the ones only Asset Coverage asks (its group queries are also the Disapproved Ads Tracker's)
+
+
 class Search:
     """One stand-in for Google Ads that answers both monitors: the brand spend rows and the flagged ads."""
 
@@ -45,6 +50,10 @@ class Search:
         self.rows, self.ads = {A["id"]: TB.weeks_of(weekly=TB.USUAL + [203])}, {A["id"]: []}
 
     def __call__(self, cid, q):
+        if (q.startswith(("SELECT ad_group_ad.ad.id, ad_group_ad.ad.responsive_search_ad.headlines", "SELECT campaign.id, campaign.name, ad_group.id, ad_group.name, ad_group_ad.ad.id, ad_group_ad.ad.type, ad_group_ad.ad.name, segments.week",
+                          "SELECT campaign.id, campaign.name, asset_group.id, asset_group.name, segments.week", "SELECT campaign.id, campaign.name, ad_group.name, ad_group_ad.ad.id, ad_group_ad.ad.type, ad_group_ad_asset_view",
+                          "SELECT campaign.id, campaign.name, asset_group.id, asset_group.name, asset_group_asset.field_type, asset_group_asset.performance_label")) or q in ASSET_ONLY_QUERIES):
+            return []                                                                    # Creative & Asset Health (and the asset coverage it reads): an account with no live ad has nothing to judge
         if ("FROM conversion_action" in q or "segments.conversion_action" in q or "FROM user_list" in q or "accepted_customer_data_terms" in q or "offline_conversion_upload" in q
                 or q.startswith("SELECT customer.time_zone, segments.date, metrics.cost_micros") or "FROM customer_client" in q or "FROM account_budget" in q or "FROM change_event" in q
                 or "FROM customer_user_access" in q):
@@ -77,11 +86,11 @@ def sched(store, dv, search, now):
 
 
 def test_only_the_four_monitors_are_known_and_each_has_its_page_link():
-    assert sorted(pm.AGENTS) == ["brandspend", "copycheck", "disapproved", "geoconf", "kpi", "kvis", "spend", "track", "watch"] and pm.agent_of("brandspend") == "brandspend"
-    with pytest.raises(pm.BadRequest, match="must be one of: brandspend, copycheck, disapproved, geoconf, kpi, kvis, spend, track, watch"):
+    assert sorted(pm.AGENTS) == ["brandspend", "copycheck", "creative", "disapproved", "geoconf", "kpi", "kvis", "spend", "track", "watch"] and pm.agent_of("brandspend") == "brandspend"
+    with pytest.raises(pm.BadRequest, match="must be one of: brandspend, copycheck, creative, disapproved, geoconf, kpi, kvis, spend, track, watch"):
         pm.agent_of("other")
     assert pm.link_for("copycheck", BASE) == BASE + "/p2/paid-marketing/ad-copy-checker" and pm.AGENTS["copycheck"]["weekdays"] == (0,) and "weekdays" not in pm.AGENTS["brandspend"]
-    assert pm.AGENTS["spend"]["frequent"] is True and not [a for a in ("brandspend", "copycheck", "disapproved", "geoconf", "kpi", "kvis", "track", "watch") if pm.AGENTS[a].get("frequent")] and pm.link_for("spend", BASE) == BASE + "/p2/paid-marketing/spend-anomaly"
+    assert pm.AGENTS["spend"]["frequent"] is True and not [a for a in ("brandspend", "copycheck", "creative", "disapproved", "geoconf", "kpi", "kvis", "track", "watch") if pm.AGENTS[a].get("frequent")] and pm.link_for("spend", BASE) == BASE + "/p2/paid-marketing/spend-anomaly"
     assert pm.link_for("brandspend", "https://p.example/") == "https://p.example/p2/paid-marketing/brand-spend" and pm.link_for("disapproved", BASE) == BASE + "/p2/paid-marketing/disapproved-ads"
 
 
@@ -89,7 +98,7 @@ def test_the_scheduled_run_runs_every_monitor_once_and_the_first_run_of_each_is_
     s, dv, se = configured(), Deliver(), Search()
     se.ads[A["id"]] = [TD.api()]
     out = sched(s, dv, se, TUE)
-    assert sorted(out) == ["brandspend", "disapproved", "geoconf", "kpi", "kvis", "track", "watch"] and "copycheck" not in out and out["brandspend"]["baseline"] and out["disapproved"]["baseline"] and not dv.emails
+    assert sorted(out) == ["brandspend", "creative", "disapproved", "geoconf", "kpi", "kvis", "track", "watch"] and "copycheck" not in out and out["brandspend"]["baseline"] and out["disapproved"]["baseline"] and not dv.emails
     assert s.issues_all("disapproved")[0]["kind"] == "stopped" and s.state_get("baseline:brandspend") and s.state_get("baseline:disapproved")
 
 
@@ -97,8 +106,8 @@ def test_the_ad_copy_checker_runs_on_mondays_only_and_its_first_run_is_a_baselin
     s, dv, se = configured(), Deliver(), Search()
     assert "copycheck" not in sched(s, dv, se, TUE) and "kvis" not in sched(configured(), dv, se, MON)
     out = sched(s, dv, se, MON)
-    assert sorted(k for k in out if k != "weekly") == ["brandspend", "copycheck", "disapproved", "geoconf", "kpi", "track", "watch"] and out["copycheck"]["baseline"] is True and s.state_get("baseline:copycheck")
-    assert sorted(out["weekly"]) == ["brandspend", "copycheck", "disapproved", "geoconf", "kpi", "kvis", "spend", "track", "watch"]
+    assert sorted(k for k in out if k != "weekly") == ["brandspend", "copycheck", "creative", "disapproved", "geoconf", "kpi", "track", "watch"] and out["copycheck"]["baseline"] is True and s.state_get("baseline:copycheck")
+    assert sorted(out["weekly"]) == ["brandspend", "copycheck", "creative", "disapproved", "geoconf", "kpi", "kvis", "spend", "track", "watch"]
 
 
 def test_a_problem_after_the_baseline_is_alerted_by_the_monitor_it_belongs_to_with_its_own_link():
@@ -186,7 +195,7 @@ NOON = dt.datetime(2026, 10, 22, 19, 0, tzinfo=dt.timezone.utc)                #
 def test_the_daily_run_leaves_the_frequent_monitor_to_its_own_run():
     s, dv, se = configured(), Deliver(), Search()
     out = sched(s, dv, se, NOON)
-    assert sorted(out) == ["brandspend", "disapproved", "geoconf", "kpi", "track", "watch"] and not s.state_get("baseline:spend")
+    assert sorted(out) == ["brandspend", "creative", "disapproved", "geoconf", "kpi", "track", "watch"] and not s.state_get("baseline:spend")
 
 
 def test_a_run_for_named_monitors_runs_only_those_and_sends_no_weekly_summary_even_on_a_monday():
@@ -207,7 +216,7 @@ def test_named_monitors_run_whatever_the_weekday_and_an_unknown_name_is_refused(
 def test_an_empty_list_is_the_daily_run():
     s, dv, se = configured(), Deliver(), Search()
     out = pm.run_scheduled(s, base_link=BASE, deliver=dv, inventory_fn=inventory, now_fn=lambda: NOON, search_fn=se, list_fn=lambda: LISTED, only=[])
-    assert sorted(out) == ["brandspend", "disapproved", "geoconf", "kpi", "track", "watch"]
+    assert sorted(out) == ["brandspend", "creative", "disapproved", "geoconf", "kpi", "track", "watch"]
 
 
 def test_the_monday_summary_covers_the_spend_alert_too():
@@ -219,18 +228,18 @@ def test_the_monday_summary_covers_the_spend_alert_too():
     assert sent["sent"] is True and dv.emails[-1]["subject"].startswith("Spend Anomaly Alert: weekly summary, 1 open") and dv.emails[-1]["text"].endswith("/p2/paid-marketing/spend-anomaly")
 
 
-@pytest.mark.parametrize("agent", ["disapproved", "geoconf", "kpi", "copycheck", "track", "watch"])
+@pytest.mark.parametrize("agent", ["disapproved", "geoconf", "kpi", "copycheck", "track", "watch", "creative"])
 def test_a_real_run_reads_meta_accounts_with_the_platforms_own_meta_reads_when_none_are_handed_in(monkeypatch, agent):
     """The first live run failed every Meta account with "'NoneType' object is not callable": the monitors were built with no Meta reader and only the tests handed one in."""
     from tracker import paid_meta, paid_store
     asked = []
     monkeypatch.setattr(paid_meta, "_pages", lambda path, params, store, **kw: asked.append((path, store is paid_store)) or [])
     monkeypatch.setattr(paid_meta, "account_by_id", lambda store, act, **kw: {"id": act, "name": "Meta Co", "currency": "EUR"})
-    m = {"id": "act_55", "name": "Meta Co", "platform": "meta", "group": "g"}
+    m = {"id": "act_5555", "name": "Meta Co", "platform": "meta", "group": "g"}
     spec = pm.spec_for(agent, MemStore(), today=dt.date(2026, 10, 1), search_fn=lambda *a, **k: [], list_fn=lambda: LISTED, now_fn=lambda: TUE)
     got = spec["collect"]([m], [])
-    assert asked and all(path.startswith("/act_55") and ours for path, ours in asked)
-    assert got["unreadable"] == [] and got["okIds"] == {"act_55"}
+    assert asked and all(path.startswith("/act_5555") and ours for path, ours in asked)
+    assert got["unreadable"] == [] and got["okIds"] == {"act_5555"}
 
 
 def test_a_meta_account_whose_details_cannot_be_read_is_still_read(monkeypatch):
@@ -240,6 +249,6 @@ def test_a_meta_account_whose_details_cannot_be_read_is_still_read(monkeypatch):
     def down(store, act, **kw):
         raise RuntimeError("Meta is down")
     monkeypatch.setattr(paid_meta, "account_by_id", down)
-    m = {"id": "act_55", "name": "Meta Co", "platform": "meta", "group": "g"}
+    m = {"id": "act_5555", "name": "Meta Co", "platform": "meta", "group": "g"}
     got = pm.spec_for("disapproved", MemStore(), today=dt.date(2026, 10, 1), search_fn=lambda *a, **k: [], list_fn=lambda: LISTED, now_fn=lambda: TUE)["collect"]([m], [])
-    assert got["unreadable"] == [] and got["okIds"] == {"act_55"}
+    assert got["unreadable"] == [] and got["okIds"] == {"act_5555"}
