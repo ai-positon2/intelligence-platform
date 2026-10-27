@@ -1769,6 +1769,16 @@ tr.ud-dismissed td,tr.ud-gone td{opacity:.62}
 .ma-acctblock{margin:10px 0;padding:12px 14px;border:1px solid var(--pm-line2);border-radius:14px;display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,190px),1fr));gap:10px}
 .ma-acctblock legend{padding:0 8px;font-weight:600}
 .ma-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,320px),1fr));gap:12px}
+.c-ah{--card-accent:#fb7185;
+  --band:linear-gradient(90deg,#fb7185,#f59e0b,#38bdf8);
+  --thumb:linear-gradient(135deg,#34101a 0%,#2a2210 100%);
+  --icon-glow:rgba(251,113,133,.5);--card-border:rgba(251,113,133,.35);
+  --card-glow:0 0 40px rgba(251,113,133,.10);--arrow-color:#fecdd3}
+.ah-filters{display:flex;flex-wrap:wrap;gap:8px}
+.ah-filters select{min-width:0;max-width:100%}
+.ah-act{white-space:nowrap}
+.ah-held{opacity:.62}
+#destClients input,#destClients select{width:100%;min-width:0}
 .c-kv{--card-accent:#a78bfa;
   --band:linear-gradient(90deg,#a78bfa,#38bdf8,#22d3ee);
   --thumb:linear-gradient(135deg,#1a1236 0%,#0b2236 100%);

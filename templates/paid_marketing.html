@@ -12,7 +12,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-tokens.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-components.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/gtm.css') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/paid_marketing.css') }}?v=64">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/paid_marketing.css') }}?v=65">
   <script src="/static/js/theme.js"></script>
   <link rel="stylesheet" href="/static/css/aurora-app.css?v=3">
   <script src="/static/js/aurora.js?v=1" defer></script>
@@ -700,6 +700,25 @@
         </div>
       </a>
 
+      <a href="/p2/paid-marketing/alert-hub" class="dash-card active c-ah">
+        <div class="card-band"></div>
+        <div class="card-thumb">
+          <div class="card-thumb-icon"><svg class="au-ic" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 17V11a6 6 0 0 1 12 0v6l1.5 2h-15z"/><path d="M10 21a2 2 0 0 0 4 0"/></svg></div>
+          <div class="card-thumb-badge tb-live"><span class="tb-dot live"></span> Live</div>
+        </div>
+        <div class="card-body">
+          <div class="card-name">Alert Hub</div>
+          <div class="card-desc">
+            The one alert layer every monitor goes through: each issue is P1, P2 or P3, an issue another monitor already says is held back instead of sent twice, and each client can have a Slack channel of its own.
+            Lists everything open across the monitors and what was sent where.
+          </div>
+          <div class="card-footer">
+            <div class="card-tags"><span class="tag">Alerts</span><span class="tag">Slack</span></div>
+            <span class="card-arrow">→</span>
+          </div>
+        </div>
+      </a>
+
       <a href="/p2/paid-marketing/creative-health" class="dash-card active c-ch">
         <div class="card-band"></div>
         <div class="card-thumb">
@@ -815,6 +834,7 @@
     {t:'Account Watch',d:'Did anything happen to the account that nobody meant: suspensions, limits, changes, access',u:'/p2/paid-marketing/account-watch',i:'◈'},
     {t:'Creative & Asset Health',d:'Which ads are wearing out and which sitelinks, callouts and images are missing',u:'/p2/paid-marketing/creative-health',i:'◐'},
     {t:'Master Agent',d:'The client written down once: accounts, budgets, targets, phones, places, brand terms, domains, offers',u:'/p2/paid-marketing/master-agent',i:'◎'},
+    {t:'Alert Hub',d:'One alert layer: P1/P2/P3, held back when another monitor says it, a Slack channel per client',u:'/p2/paid-marketing/alert-hub',i:'⚑'},
     {t:'Tracking & Data Health',d:'Are conversions, tags, pixels and audience lists still working',u:'/p2/paid-marketing/tracking-health',i:'∿'},
     {t:'Keyword Visibility Tracker',d:'Are the highest-spend keywords still at the top of the page, and who is new in the auctions',u:'/p2/paid-marketing/keyword-visibility',i:'⌕'},
     {t:'QA Agent',d:'Campaign launch QC checklist',u:'/p2/paid-marketing/qa-agent',i:'✓'}

@@ -226,6 +226,29 @@ def _destination(route):
     return {"emails": route["emails"], "slackChannel": route["slack"]}
 
 
+def client_names(store):
+    """{client id: name} of the Master Agent's clients (the destinations a route can be given to)."""
+    return {cid: c["name"] for cid, c in (_master(store).get("clients") or {}).items()}
+
+
+def destination_of(store, key):
+    """The destination of the default (key "default") or of a client, as {key, name, slack, emails, floor}, or BadRequest for a client that does not exist."""
+    default, master, saved = mon.alert_settings(store), _master(store), load(store)["routes"]
+    if key == DEFAULT:
+        return {"key": DEFAULT, "name": "", "slack": default["slackChannel"], "emails": list(default["emails"]), "floor": "P2"}
+    c = (master.get("clients") or {}).get(str(key))
+    if c is None:
+        raise BadRequest("That client does not exist.")
+    r = saved.get(key) or {}
+    return {"key": key, "name": c["name"], "slack": r.get("slackChannel") or default["slackChannel"], "emails": list(r.get("emails") or default["emails"]), "floor": r.get("floor") or "P2"}
+
+
+def send_test(store, key, base_link, deliver):
+    """A test alert to the destination of `key` (see destination_of): {email, slack, sent, route, name}."""
+    d = destination_of(store, key)
+    return dict(test_route(d, d["name"], base_link.rstrip("/") + PAGE, deliver), route=key, name=d["name"])
+
+
 def test_route(route, name, link, deliver):
     """A made-up P1 through the real senders to one destination, to prove the wiring."""
     item = {"p": "P1", "agentLabel": "Alert Hub", "event": "new", "level": "high", "accountId": "0", "accountName": "Test account (not real)", "platform": "google", "title": "This is a test alert",

@@ -5966,6 +5966,53 @@ def paid_master_client_delete():
     return _ma_save(lambda pm, store, body: {"removed": pm.delete_client(store, body.get("id"), _pm_user_email())})
 
 
+# ── Alert Hub (sheet item #38, 2026-10-27) ────────────────────────────────────────────────────────────────────────────────
+# The one layer every monitor's alert goes through (tracker/paid_alerthub.py): P1/P2/P3 severity, an issue held back while another monitor's issue covers it, one message per destination
+# (the default channel, or a Master Agent client's own), one weekly summary. The page shows the destinations, every open issue of every monitor, and the last sends. The default destination is
+# saved by the same address every monitor page uses (/api/monitors/alerts). Reads and changes nothing in an ad account.
+
+@app.route("/p2/paid-marketing/alert-hub")
+@position2_required
+def paid_alert_hub():
+    return render_template("alert_hub.html", user=_get_user())
+
+
+def _ah_run(fn):
+    from tracker import paid_alerthub, paid_monitors
+    store = _mon_store()
+    try:
+        return fn(paid_alerthub, paid_monitors, store)
+    except paid_alerthub.BadRequest as e:
+        return jsonify(error=str(e)), 400
+    except store.StoreUnavailable as e:
+        return _pm_store_error(e)
+
+
+@app.route("/p2/paid-marketing/api/alerthub/state")
+@position2_required
+def paid_alerthub_state():
+    import datetime as _dt
+    return _ah_run(lambda ah, pm, store: jsonify(ah.view(store, _mon_deliver(), _dt.datetime.now(_dt.timezone.utc), pm.AGENTS)))
+
+
+@app.route("/p2/paid-marketing/api/alerthub/route", methods=["POST"])
+@position2_required
+def paid_alerthub_route():
+    import datetime as _dt
+
+    def save(ah, pm, store):
+        body = request.get_json(silent=True) or {}
+        route = ah.save_route(store, body.get("clientId"), body, _pm_user_email(), _dt.datetime.now(_dt.timezone.utc), ah.client_names(store))
+        return jsonify(route=route)
+    return _ah_run(save)
+
+
+@app.route("/p2/paid-marketing/api/alerthub/test", methods=["POST"])
+@position2_required
+def paid_alerthub_test():
+    return _ah_run(lambda ah, pm, store: jsonify(ah.send_test(store, str((request.get_json(silent=True) or {}).get("route") or ""), _mon_base(), _mon_deliver())))
+
+
 # ── Tracking & Data Health (sheet item #33, 2026-10-26) ──────────────────────────────────────────────────────────────────
 # Whether an account's measurement still works: conversions that stopped or dropped, a conversion action that stopped recording, audience lists that shrink, offline uploads that stopped, a silent
 # pixel. The rules are tracker/paid_track_math.py, the read and report paid_track.py and the daily run paid_track_monitor.py. Google Ads and Meta. Read only: nothing is changed in an ad account.
@@ -21972,6 +22019,8 @@ Location Conflicts (/p2/paid-marketing/location-conflicts): do the campaigns sho
 KPI Monitoring (/p2/paid-marketing/kpi-monitoring): are the campaigns hitting their targets. Pick a Google Ads account, an MCC to check every account in one go, or a Meta ad account, and it reads, read only, each live campaign's last two weeks (cost, clicks, impressions, conversions and their value by day), its delivery status, its bid strategy status and the strategy's own target, and holds the last 7 whole days against the campaign's target and against the 7 days before. A target is the one the team saved for the campaign, then the one saved for the account (cost per conversion or lead, return on ad spend, lowest conversion rate and click-through rate, with a tolerance of 20 percent unless saved), then, for cost and return on Google, the campaign's own bid strategy target. It flags a cost or return off target (high at twice the target, or half again two weeks running), a campaign that stopped converting or spent twice its target cost with no conversion, a campaign that is not delivering (not eligible, misconfigured, ended or no impressions), a misconfigured or CPC-limited bid strategy, a campaign stuck in learning (14 days, counted from the day the daily check first saw it) or limited by data, a campaign limited by budget (medium when it is on target, so there is room to grow) and a conversion or click-through rate under the lowest wanted. A figure with too little behind it (under 5 conversions, 100 clicks or 1,000 impressions in the week) is never judged and the page says so. The team can leave a campaign out with a reason. A monitor reads every account daily and alerts by email and Slack to the recipients saved on the page's Alerts and history panel (the first run sets a baseline and sends nothing; only medium and high are alerted). It changes nothing in any ad account.
 
 Master Agent (/p2/paid-marketing/master-agent): the one place a client is written down. The team creates a client, picks the Google Ads and Meta accounts it owns (an account is in one client only) and saves, per account, the monthly budget and the weekly floor and ceiling, the KPI targets (cost per conversion, return on ad spend, lowest conversion rate and click-through rate) and the tolerance; and for the whole client the phone numbers, the places it serves, regions people say, the brand terms, the way the name is written, words that are right, the domains its ads may send people to, and offers with the day each ends. The other agents read it: Brand Spend Alert takes the budget and brand terms, KPI Monitoring the targets and tolerance, the Ad Copy Checker the phone numbers, places, written name and allowed words, Location Conflicts the regions, and Unknown Domains counts the allowed domains as known for the client's accounts. The master only fills what an agent has not saved for itself: a figure saved on an agent's own page still wins, and the page lists every place that differs so the team can settle it. Offers and notes are kept but no agent reads them yet. Each change says who made it and when. It reads and changes nothing in an ad account.
+
+Alert Hub (/p2/paid-marketing/alert-hub): the one layer every monitor's alert goes through. Each issue a monitor raises is P1 (high), P2 (medium) or P3 (low). P1 and P2 are alerted; P3 stays on its page and in the Monday summary. A scheduled run sends one message per destination for all the monitors together, not one per monitor, and Mondays one summary of every monitor. The default destination is the email list and Slack channel every monitor page shows; a client written down in the Master Agent can have a Slack channel, emails and a floor (P1 only, or P1 and P2) of its own, and its accounts' alerts go there. An issue is held back, not sent and not marked as alerted, while another monitor's issue of the same or a higher level on the same account already says it: when an account itself is not serving (Account Watch), what follows from it (KPI Monitoring, Keyword Visibility, Creative and Asset Health, a spend drop, conversions that stopped or dropped, an ad group that cannot show) is held back, and two monitors saying the same thing (a stopped ad group, a campaign not delivering and a spend drop; or conversions that stopped in Tracking and in KPI Monitoring) are said once by the one that names the cause. When the issue that covers it is fixed, the held one is alerted at the next run. The page lists the destinations, every open issue of every monitor with its level, client and what covers it (filters and CSV), the last sends and the rules. It does not snooze, throttle an issue that keeps coming back or page a person. It reads and changes nothing in an ad account.
 
 Creative & Asset Health (/p2/paid-marketing/creative-health): which ads are tired and what is missing. Pick a Google Ads account, an MCC to check every account in one go, or a Meta ad account, and it reads, read only, for Google every live ad's and Performance Max asset group's clicks and impressions by whole week (the last 5), the assets Google itself rates Low (an ad's and an asset group's) and the asset coverage Asset Coverage reads (sitelinks, callouts, images and the rest, held to Google's minimums and the team's targets); for Meta the live ads' spend, impressions, reach and link clicks by 7-day bucket, Meta's quality, engagement and conversion rankings and how many live ads each ad set holds. A creative is judged on its last 2 whole weeks against the 3 before, and only with at least 1,000 impressions in the last weeks and 2,000 before; one with less is counted as not judged, never as fine. A click-through rate that fell by 25 percent (40 is high), is unlikely to be chance and fell clearly more than the rest of the account did (a quiet season hits every ad, so a shared fall is not blamed on one creative) is a signal. On Meta a frequency of 3 or more in the last week that is rising (or 4 or more), and a cost per 1,000 views up 25 percent more than the account's, are signals too; Google does not report frequency for Search or Performance Max, so Google ads are judged on click-through rate and Google's own ratings. Two signals make a creative high. Assets Google rates Low are one finding per ad or asset group naming each (medium when the ad is seen, low when nobody sees it); on Meta two or more below-average rankings are medium and three, or two in the bottom 10 percent, high. Missing assets keep Asset Coverage's own severity, and Meta ad sets with a single live ad are flagged. The page also says what it cannot see: how old a creative is, Google frequency, Meta frequency over an ad's whole life, Performance Max assets' own weekly numbers, and ads Meta has not ranked yet. A daily monitor alerts once on each new problem, and the first read of an account is its quiet baseline; a part of the read that failed never marks its problems as fixed. Nothing is changed in an ad account.
 

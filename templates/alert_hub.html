@@ -1,0 +1,68 @@
+{% extends "_paid_base.html" %}
+{% block title %}Alert Hub{% endblock %}
+{% block content %}
+<div class="pm pm-gc pm-th pm-qa" id="ah">
+  <section class="pm-hero">
+    <div class="pm-hero-l">
+      <span class="pm-eyebrow"><span class="d"></span>Paid Marketing · Alerts</span>
+      <h1 class="pm-title">One alert layer, <span class="pm-grad">one message per client.</span></h1>
+      <p class="pm-sub">Every monitor's alert goes through here. Each issue is <b>P1, P2 or P3</b>; an issue another monitor already says is <b>held back</b> instead of sent twice; and a client can have <b>a Slack channel of its own</b>,
+        with the rest going to the default. A scheduled run sends one message per destination, and Mondays one summary of every monitor.</p>
+    </div>
+  </section>
+
+  <div id="msg"></div>
+  <div id="skel" hidden><div class="pd-skel"></div><div class="pd-skel"></div><div class="pd-skel"></div></div>
+
+  <div id="out" hidden>
+    <div class="sg-head">
+      <p class="pd-fresh" id="fresh"></p>
+      <button class="pm-btn-ghost" id="exportBtn" type="button"><svg viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>Export CSV</button>
+    </div>
+    <div class="pd-strip" id="kpis"></div>
+
+    <section class="pm-panel" id="destCard">
+      <div class="pm-panel-h"><span class="pm-panel-t">Where alerts go</span><span class="pm-panel-s" id="destNote"></span></div>
+      <h4>Default destination</h4>
+      <div class="mp-form">
+        <label class="cc-f"><span>Email addresses</span><input type="text" id="dEmails" placeholder="name@position2.com, other@position2.com" autocomplete="off" spellcheck="false"></label>
+        <label class="cc-f"><span>Slack channel</span><input type="text" id="dSlack" placeholder="#paid-alerts" autocomplete="off" spellcheck="false"></label>
+        <div class="mp-btns"><button type="button" class="pm-btn" id="dSave">Save</button><button type="button" class="pm-btn-ghost" id="dTest">Send a test</button></div>
+      </div>
+      <h4>Clients with a channel of their own</h4>
+      <div id="destClients"></div>
+    </section>
+
+    <section class="pm-panel" id="openCard">
+      <div class="pm-panel-h"><span class="pm-panel-t">Open across every monitor</span><span class="pm-panel-s" id="openNote"></span></div>
+      <div class="bi-tools ah-filters">
+        <select id="fP" aria-label="Level"><option value="all">All levels</option><option value="P1">P1</option><option value="P2">P2</option><option value="P3">P3</option></select>
+        <select id="fClient" aria-label="Client"></select>
+        <select id="fAgent" aria-label="Monitor"></select>
+        <select id="fHeld" aria-label="Held back"><option value="show">Show held back</option><option value="hide">Hide held back</option></select>
+      </div>
+      <div id="open"></div>
+    </section>
+
+    <section class="pm-panel" id="logCard">
+      <div class="pm-panel-h"><span class="pm-panel-t">What was sent</span><span class="pm-panel-s">the last sends, newest first</span></div>
+      <div id="log"></div>
+    </section>
+
+    <section class="pm-panel" id="rulesCard">
+      <div class="pm-panel-h"><span class="pm-panel-t">How it decides</span></div>
+      <div id="rules"></div>
+    </section>
+
+    <section class="pm-panel" id="changesCard" hidden>
+      <div class="pm-panel-h"><span class="pm-panel-t">Latest changes</span></div>
+      <ul class="th-blind-l" id="changes"></ul>
+    </section>
+    <p class="pd-foot" id="foot"></p>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/alert_hub_data.js') }}?v=1"></script>
+<script src="{{ url_for('static', filename='js/alert_hub.js') }}?v=1"></script>
+{% endblock %}
