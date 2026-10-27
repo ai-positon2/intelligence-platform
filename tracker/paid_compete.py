@@ -112,7 +112,8 @@ def find_facebook(mon, accounts, names, name, who, *, ask_fn=None, force=False, 
 def own_ads(platform, account_id, *, accounts_fn=None, groups_fn=None, search_fn=None, now=None, force=False, store=None, today=None, meta_pages_fn=None, meta_account_fn=None):
     """([own_ad], warnings, name) for one account: the text of its running ads."""
     from . import paid_copycheck
-    raw, _stale, account = paid_copycheck.load_raw(account_id, accounts_fn=accounts_fn, groups_fn=groups_fn, search_fn=search_fn, now=now, force=force, store=store, today=today,
+    clock = now.timestamp() if isinstance(now, dt.datetime) else now                 # the saved read counts in epoch seconds, the report's clock is a datetime
+    raw, _stale, account = paid_copycheck.load_raw(account_id, accounts_fn=accounts_fn, groups_fn=groups_fn, search_fn=search_fn, now=clock, force=force, store=store, today=today,
                                                    meta_pages_fn=meta_pages_fn, meta_account_fn=meta_account_fn)
     if account.get("members"):
         raise BadRequest("%s is a group of accounts. Pick one account: each client has its own competitors." % (account.get("name") or account_id))

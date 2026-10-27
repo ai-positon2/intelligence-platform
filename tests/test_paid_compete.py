@@ -342,6 +342,19 @@ def test_our_ads_that_cannot_be_read_stop_the_report_in_words(monkeypatch):
         pc.report_for(G, "", mon=MemStore(), now=NOW)
 
 
+def test_our_ads_read_twice_through_the_real_saved_read_with_a_datetime_clock(monkeypatch):
+    """The report's own clock is a datetime but the saved read counts in epoch seconds: the second ask of an account used to subtract one datetime from another and fail on a timedelta."""
+    from gads_fakes import FakeStore
+    from tracker import paid_geo
+    paid_geo.clear_cache()
+    reads = dict(store=FakeStore(), today=NOW.date(), meta_pages_fn=lambda path, params: [], meta_account_fn=lambda act: {"name": "Meta Co"})
+    first = pc.own_ads("meta", MA, now=NOW, **reads)
+    second = pc.own_ads("meta", MA, now=NOW, **reads)
+    third = pc.own_ads("meta", MA, now=NOW, force=False, **reads)
+    paid_geo.clear_cache()
+    assert first == second == third == ([], [], "Meta Co")
+
+
 def test_only_the_ads_of_the_platform_asked_for_are_ours_and_assets_are_left_out(monkeypatch):
     from tracker import paid_copycheck
     mixed = own_raw_ads("google") + [{"id": "a1", "platform": "google", "kind": "assets", "texts": [{"slot": "headline", "text": "Sitelink"}]}, dict(own_raw_ads("meta")[0], id="m")]
