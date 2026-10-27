@@ -257,3 +257,22 @@ def test_a_meta_error_is_a_502_with_meta_named_and_never_a_500(monkeypatch, path
     monkeypatch.setattr(c, "report_for", boom)
     r = _routes().get(path)
     assert r.status_code == 502 and r.get_json()["kind"] == "meta" and "rate limiting" in r.get_json()["error"]
+
+
+def test_rankings_probe_counts_each_word_and_a_missing_field_per_request_shape():
+    seen = []
+
+    def get(path, params):
+        seen.append(params)
+        if params.get("date_preset") == "last_7d":
+            raise c.meta.AdsError("nope")
+        return {"data": [{"ad_id": "1", "impressions": "900", "quality_ranking": "UNKNOWN", "engagement_rate_ranking": "AVERAGE"},
+                         {"ad_id": "2", "impressions": "9", "quality_ranking": "ABOVE_AVERAGE", "engagement_rate_ranking": "AVERAGE", "conversion_rate_ranking": "UNKNOWN"}]}
+    out = c.rankings_probe("act_9", get_fn=get, today=dt.date(2026, 10, 27))
+    assert len(out) == len(seen) == len(c.rankings_variants("act_9", dt.date(2026, 10, 27)))
+    ok = out[0]
+    assert ok["rows"] == 2 and ok["counts"]["quality_ranking"] == {"UNKNOWN": 1, "ABOVE_AVERAGE": 1}
+    assert ok["counts"]["conversion_rate_ranking"] == {"(field missing)": 1, "UNKNOWN": 1}
+    assert [o for o in out if "error" in o][0]["variant"].endswith("last_7d")
+    assert any(p.get("time_increment") == 1 for p in seen) and any(p.get("date_preset") == "maximum" for p in seen)
+    assert all(p["level"] == "ad" for p in seen)

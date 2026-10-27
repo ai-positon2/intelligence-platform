@@ -141,6 +141,50 @@ def raw_read(act, *, pages_fn, today=None):
             "insightsRead": not any("could not be read" in w for w in warnings)}
 
 
+RANK_FIELDS = "ad_id,impressions,quality_ranking,engagement_rate_ranking,conversion_rate_ranking"
+
+
+def rankings_variants(act, today=None):
+    """[(name, params)]: the same ad-level ranking read sent several ways, for the admin check (which shape of request does Meta rank an ad for?). One page each, read only."""
+    start, end = window(today)
+    d = today or dt.date.today()
+    rng = lambda days: json.dumps({"since": (d - dt.timedelta(days=days)).isoformat(), "until": (d - dt.timedelta(days=1)).isoformat()})
+    base = {"level": "ad", "limit": 100}
+    return [("as read (30 days, all fields)", dict(base, time_range=json.dumps({"since": start.isoformat(), "until": end.isoformat()}), fields=INSIGHT_FIELDS)),
+            ("rankings only, 30 days", dict(base, time_range=json.dumps({"since": start.isoformat(), "until": end.isoformat()}), fields=RANK_FIELDS)),
+            ("rankings only, last 7 days", dict(base, time_range=rng(7), fields=RANK_FIELDS)),
+            ("rankings only, last 3 days", dict(base, time_range=rng(3), fields=RANK_FIELDS)),
+            ("rankings only, date_preset last_30d", dict(base, date_preset="last_30d", fields=RANK_FIELDS)),
+            ("rankings only, date_preset last_7d", dict(base, date_preset="last_7d", fields=RANK_FIELDS)),
+            ("rankings only, date_preset maximum", dict(base, date_preset="maximum", fields=RANK_FIELDS)),
+            ("rankings only, 30 days, daily", dict(base, time_range=json.dumps({"since": start.isoformat(), "until": end.isoformat()}), time_increment=1, fields=RANK_FIELDS))]
+
+
+def rankings_probe(act, *, get_fn, today=None):
+    """What Meta really sends for the three rankings, one entry per request shape: how many rows, how often each ranking word (or none) came back per field, and two raw rows.
+    `get_fn(path, params)` is one Graph GET returning the decoded body."""
+    out = []
+    for name, params in rankings_variants(act, today):
+        item = {"variant": name, "params": {k: v for k, v in params.items() if k != "fields"}}
+        try:
+            rows = (get_fn("/%s/insights" % act, params) or {}).get("data") or []
+        except meta.AdsError as e:
+            item["error"] = str(e)[:300]
+            out.append(item)
+            continue
+        counts = {}
+        for field in ("quality_ranking", "engagement_rate_ranking", "conversion_rate_ranking"):
+            c = {}
+            for r in rows:
+                w = str(r[field]) if field in r else "(field missing)"
+                c[w] = c.get(w, 0) + 1
+            counts[field] = c
+        item["rows"], item["counts"] = len(rows), counts
+        item["sample"] = [{k: v for k, v in r.items() if k in ("ad_id", "impressions", "quality_ranking", "engagement_rate_ranking", "conversion_rate_ranking", "date_start", "date_stop")} for r in rows[:2]]
+        out.append(item)
+    return out
+
+
 def raw_for(account_id, *, store=None, force=False, now=None, today=None, pages_fn=None, account_fn=None):
     """(raw, stale, account): the saved read of one Meta ad account (act_...), read from Meta when there is none or when `force`. Ad Strength, Asset Coverage and Creative & Asset Health
     share it, so opening a second page costs no Meta read."""

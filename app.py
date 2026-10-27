@@ -4732,6 +4732,12 @@ def paid_meta_status():
         return jsonify(error="Only an admin can run the Meta connection check."), 403
     from tracker import paid_meta, paid_store
     try:
+        if request.args.get("probe") and request.args.get("rankings"):        # what Meta sends for the three ad rankings, one entry per request shape
+            from tracker import paid_meta_creative as mc
+            act = paid_meta.norm_id(request.args.get("probe"))
+            if not paid_meta.is_meta(act):
+                return jsonify(error="probe should be a Meta ad account (act_...)."), 400
+            return jsonify(account=act, variants=mc.rankings_probe(act, get_fn=lambda path, params: paid_meta._get(path, params, paid_store)))
         if request.args.get("probe"):
             return jsonify(paid_meta.probe(paid_store, request.args.get("probe"), days=min(max(int(request.args.get("days", "30") or 30), 1), 90),
                                                 breakdown=request.args.get("breakdown", "")))
