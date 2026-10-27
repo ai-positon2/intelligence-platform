@@ -2,7 +2,7 @@
 
 The agents' tests run on fakes written from what their authors believed Google and Meta answer, so a field name that does not exist passes every test and fails on the first real read (the
 first KPI Monitoring read failed on `campaign.start_date`). This sends each query of the Brand IS Monitor, the Brand Spend Alert, the Disapproved Ads Tracker, the Ad Copy Checker, the Spend
-Anomaly Alert, Location Conflicts, KPI Monitoring, the Keyword Visibility Tracker, Tracking & Data Health and Account Watch to one real account with its rows cut to one, and says which ones Google refuses and why; the Meta reads
+Anomaly Alert, Location Conflicts, KPI Monitoring, the Keyword Visibility Tracker, Tracking & Data Health, Account Watch and Creative & Asset Health to one real account with its rows cut to one, and says which ones Google refuses and why; the Meta reads
 are asked for one row of one account in the same way. It is the check to run after adding or changing any query, and what an admin runs from /p2/paid-marketing/api/query-check.
 """
 from __future__ import annotations
@@ -26,7 +26,7 @@ def _one_row(q):
 def google_queries(today=None):
     """[(agent, label, gaql)]: every Google query the recent agents send, built with sample dates and ids (the ids need not exist: a query is valid or not by its fields)."""
     from . import paid_anomaly as an, paid_brandis as bis, paid_brandis_diag as diag, paid_brandspend as bs, paid_copycheck as cc, paid_disapproved as dis, paid_disapproved_extra as dx
-    from . import paid_geoconf as gc, paid_kpi as kp, paid_kvis as kv, paid_track as tr, paid_watch as wt
+    from . import paid_creative as cr, paid_geoconf as gc, paid_kpi as kp, paid_kvis as kv, paid_track as tr, paid_watch as wt
     today = today or dt.date.today()
     a, b = (today - dt.timedelta(days=28)).isoformat(), (today - dt.timedelta(days=1)).isoformat()
     ts = ((today - dt.timedelta(days=3)).strftime("%Y-%m-%d %H:%M:%S"), today.strftime("%Y-%m-%d %H:%M:%S"))
@@ -51,6 +51,8 @@ def google_queries(today=None):
         ("track", "customer data terms", tr.GAQL_TERMS), ("track", "offline upload log", tr.GAQL_UPLOADS),
         ("watch", "manager account clients", wt.GAQL_CLIENTS), ("watch", "account budget orders", wt.GAQL_ORDERS), ("watch", "change history", wt.GAQL_CHANGES % (ts[0], ts[1])),
         ("watch", "conversion actions", wt.GAQL_ACTIONS), ("watch", "who can open the account", wt.GAQL_USERS),
+        ("creative", "ads by week", cr.GAQL_ADS % (a, b)), ("creative", "asset groups by week", cr.GAQL_GROUPS % (a, b)), ("creative", "ad headlines", cr.GAQL_HEADLINES),
+        ("creative", "assets of ads rated low", cr.GAQL_WEAK_ADS), ("creative", "assets of asset groups rated low", cr.GAQL_WEAK_GROUPS),
     ]
     return qs
 
@@ -110,6 +112,12 @@ def meta_requests(act):
             out.append(("watch", label, path, dict(params, limit=1)))
         except Exception as e:                                                       # noqa: BLE001
             out.append(("watch", label, None, {"_build_error": str(e)}))
+    from . import paid_creative as cr
+    try:
+        path, params = cr.meta_weeks_request(act, dt.date.today())
+        out.append(("creative", "ads by week", path, dict(params, limit=1)))
+    except Exception as e:                                                           # noqa: BLE001
+        out.append(("creative", "ads by week", None, {"_build_error": str(e)}))
     from . import paid_qa_meta as qm
     for label, edge, fields in (("campaigns", "campaigns", qm.CAMPAIGN_FIELDS), ("ad sets", "adsets", qm.ADSET_FIELDS), ("ads", "ads", qm.AD_FIELDS)):
         out.append(("metaqa", label, "/%s/%s" % (act, edge), {"fields": fields, "limit": 1}))

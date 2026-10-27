@@ -1753,6 +1753,11 @@ tr.ud-dismissed td,tr.ud-gone td{opacity:.62}
   --thumb:linear-gradient(135deg,#2a0f16 0%,#2a1a06 100%);
   --icon-glow:rgba(251,113,133,.5);--card-border:rgba(251,113,133,.35);
   --card-glow:0 0 40px rgba(251,113,133,.10);--arrow-color:#fecdd3}
+.c-ch{--card-accent:#e879f9;
+  --band:linear-gradient(90deg,#e879f9,#818cf8,#38bdf8);
+  --thumb:linear-gradient(135deg,#2a1034 0%,#141a3a 100%);
+  --icon-glow:rgba(232,121,249,.5);--card-border:rgba(232,121,249,.35);
+  --card-glow:0 0 40px rgba(232,121,249,.10);--arrow-color:#f5d0fe}
 .c-kv{--card-accent:#a78bfa;
   --band:linear-gradient(90deg,#a78bfa,#38bdf8,#22d3ee);
   --thumb:linear-gradient(135deg,#1a1236 0%,#0b2236 100%);

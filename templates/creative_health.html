@@ -1,0 +1,57 @@
+{% extends "_paid_base.html" %}
+{% block title %}Creative &amp; Asset Health{% endblock %}
+{% block content %}
+<div class="pm pm-gc pm-th" id="ch">
+  <section class="pm-hero">
+    <div class="pm-hero-l">
+      <span class="pm-eyebrow"><span class="d"></span>Paid Marketing · Monitoring</span>
+      <h1 class="pm-title">Which ads are tired, and <span class="pm-grad">what is missing?</span></h1>
+      <p class="pm-sub">Pick an account, or an MCC to check every account in one go. The agent spots <b>creatives that are wearing out</b> (a click-through rate that keeps falling, a frequency that keeps rising, a cost per 1,000 views that keeps climbing),
+        <b>assets the platform rates Low</b> and <b>assets a campaign is missing</b> such as sitelinks, callouts and images, and tells you what to put in their place.</p>
+    </div>
+  </section>
+
+  <section class="pm-panel pd-cmd bi-cmd" id="cmd">
+    <div class="bi-cmd-row da-cmd-row">
+      <div id="acctPick"></div>
+      <p class="bi-scope">Google Ads (every live ad and Performance Max asset group by week, Google's own asset ratings, the asset coverage) and Meta (the live ads by week, Meta's quality rankings, ads per ad set). Nothing is changed in an account.</p>
+    </div>
+  </section>
+
+  <div id="msg"></div>
+
+  <div id="empty" class="pm-panel sg-empty">
+    <div class="sg-empty-ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 17l5-6 4 4 7-9"/></svg></div>
+    <h2>Choose an account to begin</h2>
+    <p>The figures come straight from Google Ads or Meta. Nothing is changed there: the agent only reports.</p>
+  </div>
+  <div id="skel" hidden><div class="pd-skel"></div><div class="pd-skel"></div><div class="pd-skel"></div></div>
+
+  <div id="out" hidden>
+    <div class="sg-head">
+      <p class="pd-fresh" id="fresh"></p>
+      <button class="pm-btn-ghost" id="refreshBtn" type="button" title="Read the figures again"><svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.3-5.6M20 4v5h-5"/></svg>Refresh</button>
+      <button class="pm-btn-ghost" id="exportBtn" type="button"><svg viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>Export CSV</button>
+    </div>
+    <div class="pd-strip" id="kpis"></div>
+    <div id="insights"></div>
+
+    <section class="pm-panel" id="listCard">
+      <div class="pm-panel-h"><span class="pm-panel-t">Accounts</span><span class="pm-panel-s" id="listNote"></span></div>
+      <div class="bi-tools"><div class="pm-chips" id="views" role="radiogroup" aria-label="Which accounts"></div></div>
+      <div id="list"></div>
+    </section>
+    <section class="pm-panel th-blind" id="blind"></section>
+    <p class="pd-foot" id="foot"></p>
+  </div>
+  <div id="monPanel"></div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/pm_picker.js') }}?v=1"></script>
+<script src="{{ url_for('static', filename='js/pm_platform.js') }}?v=7"></script>
+<script src="{{ url_for('static', filename='js/pm_scope.js') }}?v=2"></script>
+<script src="{{ url_for('static', filename='js/monitor_panel.js') }}?v=1"></script>
+<script src="{{ url_for('static', filename='js/creative_health_data.js') }}?v=1"></script>
+<script src="{{ url_for('static', filename='js/creative_health.js') }}?v=1"></script>
+{% endblock %}

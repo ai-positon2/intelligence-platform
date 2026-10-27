@@ -137,7 +137,7 @@ def test_when_one_platform_cannot_be_read_the_other_is_shown_and_the_page_says_w
 PAGES = [("kpi", "kpi-monitoring", "kpi_data.js", "kpi.js", "/kpi/"), ("geoconf", "location-conflicts", "geoconf_data.js", "geoconf.js", "/geoconf/"),
          ("copycheck", "ad-copy-checker", "copycheck_data.js", "copycheck.js", "/copycheck/"), ("anomaly", "spend-anomaly", "anomaly_data.js", "anomaly.js", "/anomaly/"),
          ("disapproved", "disapproved-ads", "disapproved_data.js", "disapproved.js", "/disapproved/"), ("track", "tracking-health", "tracking_health_data.js", "tracking_health.js", "/track/"),
-         ("watch", "account-watch", "account_watch_data.js", "account_watch.js", "/watch/")]
+         ("watch", "account-watch", "account_watch_data.js", "account_watch.js", "/watch/"), ("creative", "creative-health", "creative_health_data.js", "creative_health.js", "/creative/")]
 GROUP = "mcc-9923720096-USD"
 ACCTS = {"accounts": [{"id": "1234567890", "name": "Acme Dental", "currency": "USD", "group": GROUP}, {"id": "2222222222", "name": "Beta Clinic", "currency": "USD", "group": GROUP}],
          "groups": [{"id": GROUP, "name": "Group", "accountIds": ["1234567890", "2222222222"]}]}
@@ -190,7 +190,7 @@ def test_a_link_to_a_meta_account_or_a_both_account_opens_on_that_platform(agent
 
 
 def test_the_pages_link_the_switch_and_the_google_only_pages_show_all_three_choices_and_say_why_meta_has_nothing():
-    for t in ("disapproved_ads", "ad_copy_checker", "spend_anomaly", "location_conflicts", "kpi_monitoring", "tracking_health", "account_watch"):
+    for t in ("disapproved_ads", "ad_copy_checker", "spend_anomaly", "location_conflicts", "kpi_monitoring", "tracking_health", "account_watch", "creative_health"):
         html = open(os.path.join(ROOT, "templates", t + ".html"), encoding="utf-8").read()
         assert html.index("pm_picker.js") < html.index("pm_platform.js") < html.index("pm_scope.js") < html.index("monitor_panel.js"), t
     for t, js in (("brand_is", "brand_is.js"), ("brand_spend", "brand_spend.js"), ("keyword_visibility", "kvis.js")):
@@ -201,7 +201,7 @@ def test_the_pages_link_the_switch_and_the_google_only_pages_show_all_three_choi
     sq, sqh = open(os.path.join(JS, "sqr_agent.js"), encoding="utf-8").read(), open(os.path.join(ROOT, "templates", "sqr_agent.html"), encoding="utf-8").read()
     assert "PL.googleOnly" in sq and 'id="platSw"' in sqh and 'id="gBody"' in sqh                                      # Google only: Meta says why it has nothing here
     assert "window.PMPicker(" in sq and 'BASE + "/segments/accounts"' in sq and "PL.accounts(" not in sq                    # the grouped list, with each MCC as "All of ..."
-    for js in ("disapproved", "copycheck", "anomaly", "geoconf", "kpi", "tracking_health", "account_watch"):
+    for js in ("disapproved", "copycheck", "anomaly", "geoconf", "kpi", "tracking_health", "account_watch", "creative_health"):
         src = open(os.path.join(JS, js + ".js"), encoding="utf-8").read()
         assert "PMScope.mount" in src and "PMPicker" not in src and "—" not in src and '"Google + Meta":"MCC"' in src, js
     assert "—" not in open(SCOPE, encoding="utf-8").read() and "–" not in open(SCOPE, encoding="utf-8").read()

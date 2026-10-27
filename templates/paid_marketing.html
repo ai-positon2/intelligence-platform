@@ -12,7 +12,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-tokens.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-components.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/gtm.css') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/paid_marketing.css') }}?v=62">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/paid_marketing.css') }}?v=63">
   <script src="/static/js/theme.js"></script>
   <link rel="stylesheet" href="/static/css/aurora-app.css?v=3">
   <script src="/static/js/aurora.js?v=1" defer></script>
@@ -681,6 +681,25 @@
         </div>
       </a>
 
+      <a href="/p2/paid-marketing/creative-health" class="dash-card active c-ch">
+        <div class="card-band"></div>
+        <div class="card-thumb">
+          <div class="card-thumb-icon"><svg class="au-ic" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 17l5-6 4 4 7-9"/><path d="M15 6h5v5"/></svg></div>
+          <div class="card-thumb-badge tb-live"><span class="tb-dot live"></span> Live</div>
+        </div>
+        <div class="card-body">
+          <div class="card-name">Creative &amp; Asset Health</div>
+          <div class="card-desc">
+            Spots tired creatives: a click-through rate that keeps falling, a frequency that keeps rising, a cost per 1,000 views that keeps climbing, and the assets Google or Meta rate low. Lists the sitelinks, callouts and
+            images each campaign is missing. Daily alerts. Read only.
+          </div>
+          <div class="card-footer">
+            <div class="card-tags"><span class="tag">Monitoring</span><span class="tag">Creative</span></div>
+            <span class="card-arrow">→</span>
+          </div>
+        </div>
+      </a>
+
       <a href="/p2/paid-marketing/tracking-health" class="dash-card active c-th">
         <div class="card-band"></div>
         <div class="card-thumb">
@@ -775,6 +794,7 @@
     {t:'Location Conflicts',d:'Do the campaigns show where their names, ads and keywords say they do',u:'/p2/paid-marketing/location-conflicts',i:'↗'},
     {t:'KPI Monitoring',d:'Are the campaigns hitting their cost, return and rate targets, learning and delivering',u:'/p2/paid-marketing/kpi-monitoring',i:'◎'},
     {t:'Account Watch',d:'Did anything happen to the account that nobody meant: suspensions, limits, changes, access',u:'/p2/paid-marketing/account-watch',i:'◈'},
+    {t:'Creative & Asset Health',d:'Which ads are wearing out and which sitelinks, callouts and images are missing',u:'/p2/paid-marketing/creative-health',i:'◐'},
     {t:'Tracking & Data Health',d:'Are conversions, tags, pixels and audience lists still working',u:'/p2/paid-marketing/tracking-health',i:'∿'},
     {t:'Keyword Visibility Tracker',d:'Are the highest-spend keywords still at the top of the page, and who is new in the auctions',u:'/p2/paid-marketing/keyword-visibility',i:'⌕'},
     {t:'QA Agent',d:'Campaign launch QC checklist',u:'/p2/paid-marketing/qa-agent',i:'✓'}
