@@ -139,10 +139,19 @@ def baseline(store):
     return store.state_get("baseline")
 
 
-def in_use(store):
+def master_domain_entries():
+    """The allowed domains the Master Agent holds (tracker/paid_master.py), as entries for each account of its client; none when it cannot be read, so the domain database is still used."""
+    try:
+        from . import paid_master, paid_monitor_store
+        return paid_master.domain_entries(paid_master.load(paid_monitor_store))
+    except Exception:                                                                # noqa: BLE001 (a master that cannot be read must not stop the scan)
+        return []
+
+
+def in_use(store, master_fn=None):
     """The domains each account points at as of the last scan: [{accountId, name, platform, domains: [{domain, ads, known}]}], for the baseline view."""
     snap = (store.state_get("inuse") or {}).get("accounts") or {}
-    entries = store.known_list()
+    entries = store.known_list() + (master_fn or master_domain_entries)()
     out = []
     for aid, a in snap.items():
         acct = {"id": aid, "platform": a["platform"], "group": a.get("group") or ""}
@@ -332,8 +341,8 @@ def _keep_run(store, run):
     store.state_set("runs", runs[:RUNS_KEPT])
 
 
-def run_scan(store, *, trigger, link, deliver, inventory_fn=None, read_fn=None, now_fn=None, workers=WORKERS, fetch_fn=None, sleep_fn=None, check_links=True):
-    """One scan. Returns the run record ({status: "busy"} when another is going)."""
+def run_scan(store, *, trigger, link, deliver, inventory_fn=None, read_fn=None, now_fn=None, workers=WORKERS, fetch_fn=None, sleep_fn=None, check_links=True, master_fn=None):
+    """One scan. `master_fn()` gives the Master Agent's allowed domains as entries (they count as known, like the domain database's). Returns the run record ({status: "busy"} when another is going)."""
     now_fn = now_fn or (lambda: datetime.now(timezone.utc))
     if not store.claim(LOCK, LOCK_TTL_S):
         return {"status": "busy"}
@@ -370,7 +379,7 @@ def run_scan(store, *, trigger, link, deliver, inventory_fn=None, read_fn=None, 
                 if done[0] % 5 == 0 or done[0] == len(accounts):
                     _progress(store, running=True, startedAt=_iso(started), done=done[0], total=len(accounts))
 
-        entries = store.known_list()
+        entries = store.known_list() + (master_fn or master_domain_entries)()
         by_id = {a["id"]: a for a in accounts}
         found = dom.assess(sightings, entries, [a for a in accounts if a["id"] in ok_ids], groups)
         stamp = _iso(now_fn())

@@ -50,9 +50,9 @@ def strange(store):
     return next(f for f in store.found.values() if f["host"] == "strange.example")
 
 
-def scan(store, world, deliver, trigger="test", site=None):
+def scan(store, world, deliver, trigger="test", site=None, master=None):
     return sc.run_scan(store, trigger=trigger, link=LINK, deliver=deliver, inventory_fn=world.inventory, read_fn=world.read, workers=2,
-                       fetch_fn=site or Site(), sleep_fn=lambda s: None)
+                       fetch_fn=site or Site(), sleep_fn=lambda s: None, master_fn=(lambda: master or []))
 
 
 def configured():
@@ -372,3 +372,26 @@ def test_meta_is_listed_and_read_through_the_platforms_own_store(monkeypatch):
     assert [a["id"] for a in accounts] == ["act_1"]
     sc.read_account(accounts[0], MemStore())
     assert seen == [paid_store, paid_store]
+
+
+def test_a_domain_the_master_agent_allows_for_an_account_is_known_to_the_scan_and_for_that_account_only():
+    from tracker import paid_master
+    from monitor_fakes import MemStore as MonStore
+    mon = MonStore()
+    paid_master.save_client(mon, "", {"name": "Acme", "accounts": [{"id": A["id"]}], "shared": {"domains": "strange.example"}}, "ana@position2.com")
+    master = paid_master.domain_entries(paid_master.load(mon))
+    s, dv = configured(), Deliver()
+    w = World(**{A["id"]: ["https://acme-garden.com/"], B["id"]: ["https://bolt-dental.com/"]})
+    scan(s, w, dv)
+    sc.set_baseline(s, "me", [A, B], trust="all")
+    w.ads[A["id"]].append("https://strange.example/")
+    w.ads[B["id"]].append("https://strange.example/")
+    run = scan(s, w, dv, master=master)
+    assert run["new"] == 1 and [f["accountId"] for f in s.found.values() if f["host"] == "strange.example"] == [B["id"]]      # Acme's client allowed it; Bolt's did not
+    assert sc.in_use(s, master_fn=lambda: master) and next(x for x in sc.in_use(s, master_fn=lambda: master) if x["accountId"] == A["id"])["domains"][0]["known"] is True
+
+
+def test_a_master_that_cannot_be_read_leaves_the_domain_database_in_charge(monkeypatch):
+    from tracker import paid_master
+    monkeypatch.setattr(paid_master, "load", lambda store: (_ for _ in ()).throw(RuntimeError("store down")))
+    assert sc.master_domain_entries() == []
