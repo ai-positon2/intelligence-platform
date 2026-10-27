@@ -200,8 +200,10 @@ def test_failed_discovery_keeps_spend_and_failed_status(monkeypatch):
 
 def test_same_series_can_have_two_editions_in_one_year():
     from tracker.event_intel_discover import merge
-    first = event('Regional Forum', starts_on='2026-10-01')
-    second = event('Regional Forum', starts_on='2026-12-01')
+    # Both ends are stated: the helper's default end is today + 32 days, which made the first edition
+    # stretch toward the second as the calendar moved on, and two editions that overlap are one.
+    first = event('Regional Forum', starts_on='2026-10-01', ends_on='2026-10-03')
+    second = event('Regional Forum', starts_on='2026-12-01', ends_on='2026-12-03')
     assert event_key(first) != event_key(second)
     assert len(merge({'vertical_summit': [first, second, dict(first)]})) == 2
 
