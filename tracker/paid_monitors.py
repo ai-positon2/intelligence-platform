@@ -65,7 +65,7 @@ def spec_for(agent, store, *, today=None, search_fn=None, list_fn=None, meta_pag
     if agent == "brandspend":
         from . import paid_brandspend_monitor as bm
         from . import paid_brandspend_settings as st
-        return bm.make_spec(today=day, search_fn=search_fn, list_fn=list_fn, settings=st.load(store), mon_store=store)
+        return bm.make_spec(today=day, search_fn=search_fn, list_fn=list_fn, settings=st.load_for_read(store), mon_store=store)
     if agent == "copycheck":
         from . import paid_copycheck_monitor as cm
         return cm.make_spec(today=day, search_fn=search_fn, list_fn=list_fn, mon_store=store, meta_pages_fn=meta_pages_fn, meta_account_fn=meta_account_fn, now_fn=now_fn)

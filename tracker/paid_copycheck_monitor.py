@@ -88,8 +88,8 @@ def make_spec(*, today, search_fn=None, list_fn=None, mon_store=None, meta_pages
     def collect(accounts, groups):
         listed = {a["id"]: a for a in (list_fn or gads.list_accounts)()}
         try:
-            settings = st.load(mon_store) if mon_store is not None else st.empty()
-            brand_terms = {aid: (a.get("brandTerms") or []) for aid, a in ((bs.load(mon_store).get("accounts") or {}) if mon_store is not None else {}).items()}
+            settings = st.load_for_read(mon_store) if mon_store is not None else st.empty()
+            brand_terms = {aid: (a.get("brandTerms") or []) for aid, a in ((bs.load_for_read(mon_store).get("accounts") or {}) if mon_store is not None else {}).items()}
         except Exception:                                                            # noqa: BLE001 (no saved lists is not a reason to skip the run: only the checks that need them are skipped)
             settings, brand_terms = st.empty(), {}
         quota = {"hit": False}

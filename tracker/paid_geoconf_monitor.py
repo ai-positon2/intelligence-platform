@@ -70,8 +70,8 @@ def make_spec(*, today, search_fn=None, list_fn=None, mon_store=None, meta_pages
     def collect(accounts, groups):
         listed = {a["id"]: a for a in (list_fn or gads.list_accounts)()}
         try:
-            settings = st.load(mon_store) if mon_store is not None else st.empty()
-            copy_settings = copy_st.load(mon_store) if mon_store is not None else copy_st.empty()
+            settings = st.load_for_read(mon_store) if mon_store is not None else st.empty()
+            copy_settings = copy_st.load_for_read(mon_store) if mon_store is not None else copy_st.empty()
         except Exception:                                                            # noqa: BLE001 (no saved lists is not a reason to skip the run: only the checks that need them are skipped)
             settings, copy_settings = st.empty(), copy_st.empty()
         quota = {"hit": False}

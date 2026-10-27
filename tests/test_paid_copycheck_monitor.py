@@ -186,3 +186,13 @@ def test_the_brand_words_the_brand_spend_alert_saved_are_read_as_the_accounts_br
     run(s, World(a=ads), dv, accounts=(A,))
     snap = s.snaps_get("copycheck", A["id"], "2026-10-01")[0]
     assert snap["low"] == 1 and snap["findings"] == 1 and [i["kind"] for i in s.issues_all("copycheck")] == ["small"]            # one place writes the brand the other way; without the brand known every SmileCo would be an odd capital
+
+
+def test_phone_numbers_in_the_master_agent_are_used_by_the_checker():
+    from tracker import paid_master
+    s, dv, w = configured(), Deliver(), World()
+    run(s, w, dv)
+    paid_master.save_client(s, "", {"name": "Acme", "accounts": [{"id": A["id"]}], "shared": {"phones": "617-555-0100"}}, "a@b.co")
+    w.search_rows[A["id"]] = [GOOD, T.rsa(ad="6", heads=("Quality Dental Care", "Book Today"), descs=("Call 617-555-0199 today.",))]
+    r = run(s, w, dv, d(7))
+    assert r["new"] == 1 and dv.emails[0]["subject"].startswith("HIGH: Ad Copy Checker") and "617-555-0199 is not one of the numbers saved" in dv.emails[0]["text"]

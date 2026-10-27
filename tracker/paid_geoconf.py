@@ -349,8 +349,8 @@ def report_for(account_id, *, accounts_fn=None, groups_fn=None, search_fn=None, 
     warnings, settings, copy_settings = [], None, None
     if mon is not None:
         try:
-            settings = st.load(mon)
-            copy_settings = copy_st.load(mon)
+            settings = st.load_for_read(mon)
+            copy_settings = copy_st.load_for_read(mon)
         except Exception as e:                                                       # noqa: BLE001
             warnings.append("What the team saved (areas, words to ignore) could not be read (%s), so it was not applied." % e)
     raw, stale, account = load_raw(account_id, accounts_fn=accounts_fn, groups_fn=groups_fn, search_fn=search_fn, now=now, force=force, store=store, today=today,

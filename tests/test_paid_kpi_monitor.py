@@ -242,3 +242,16 @@ def test_the_monitor_is_registered_for_the_daily_run_and_its_page():
     from tracker import paid_monitors as pm
     assert pm.AGENTS["kpi"] == {"label": "KPI Monitoring", "page": "/p2/paid-marketing/kpi-monitoring"} and pm.link_for("kpi", "https://p.example/") == LINK
     assert km.MAX_PER_ACCOUNT == 200                                                    # the page lists every finding; the alerts follow the worst 200 of an account
+
+
+def test_a_target_in_the_master_agent_is_used_and_an_agents_own_target_wins():
+    from tracker import paid_master
+    s, dv, w = configured(), Deliver(), World()
+    w.camps[A["id"]] = [T.camp_row()]
+    run(s, w, dv)
+    paid_master.save_client(s, "", {"name": "Acme", "accounts": [{"id": A["id"], "targets": {"cpa": 20}}]}, "a@b.co")
+    r = run(s, w, dv, d(1))
+    assert r["new"] == 1 and [i["kind"] for i in s.issues_all("kpi")] == ["cpa"]
+    st.save_account(s, A["id"], A["name"], {"targets": {"cpa": 100000}}, "a@b.co")             # the team set this agent's own target on purpose: it wins
+    r = run(s, w, dv, d(2))
+    assert r["resolved"] == 1 and [i["status"] for i in s.issues_all("kpi")] == ["resolved"]

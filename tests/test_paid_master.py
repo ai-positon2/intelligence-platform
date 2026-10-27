@@ -196,3 +196,54 @@ def test_every_field_names_the_agents_that_read_it_and_nothing_uses_an_em_dash()
     assert set(m.USED_BY) >= {"budget.monthly", "targets", "phones", "locations", "areas", "brandTerms", "writtenAs", "allowWords", "domains", "offers", "notes"}
     assert m.USED_BY["domains"] == ["Unknown Domains"] and m.USED_BY["offers"] == []
     assert "—" not in open(os.path.join(ROOT, "tracker", "paid_master.py"), encoding="utf-8").read()
+
+
+# ── The agents read it, and only through load_for_read ──────────────────────
+
+def test_each_agent_reads_its_own_settings_with_the_master_filled_in_and_the_settings_pages_do_not():
+    from tracker import paid_brandspend_settings as bs, paid_copycheck_settings as cs, paid_geoconf_settings as gs, paid_kpi_settings as ks
+    s = saved()
+    assert bs.load_for_read(s)["accounts"][G]["monthlyBudget"] == 12000.0 and bs.load(s)["accounts"] == {}
+    assert ks.load_for_read(s)["accounts"][G]["targets"]["cpa"] == 85.0 and ks.load(s)["accounts"] == {}
+    assert cs.load_for_read(s)["accounts"][G]["phones"] == ["617-555-0100", "617-555-0111"] and cs.load(s)["accounts"] == {}
+    assert gs.load_for_read(s)["accounts"][G]["areas"] == ["Greater Boston"] and gs.load(s)["accounts"] == {}
+
+
+def test_an_agents_own_saved_value_wins_over_the_master():
+    from tracker import paid_kpi_settings as ks
+    s = saved()
+    ks.save_account(s, G, "Acme", {"targets": {"cpa": 20}}, "a@b.co")
+    t = ks.load_for_read(s)["accounts"][G]["targets"]
+    assert t["cpa"] == 20.0 and t["cvr"] == 4.0
+
+
+def test_a_master_that_cannot_be_read_never_stops_an_agent():
+    from tracker import paid_brandspend_settings as bs, paid_kpi_settings as ks
+
+    class Broken(MemStore):
+        def state_get(self, key):
+            if key == m.KEY:
+                raise RuntimeError("store down")
+            return super().state_get(key)
+    s = Broken()
+    ks.save_account(s, G, "Acme", {"targets": {"cpa": 20}}, "a@b.co")
+    assert ks.load_for_read(s)["accounts"][G]["targets"]["cpa"] == 20.0 and bs.load_for_read(s)["accounts"] == {}
+
+
+def test_the_scheduled_brand_spend_monitor_is_given_the_overlaid_settings(monkeypatch):
+    from tracker import paid_brandspend_monitor as bm, paid_monitors as pm
+    seen = {}
+    monkeypatch.setattr(bm, "make_spec", lambda **kw: seen.update(kw) or {"agent": "brandspend", "label": "x", "collect": None})
+    pm.spec_for("brandspend", saved(), today=dt.date(2026, 10, 27), search_fn=lambda *a, **k: [], list_fn=lambda: [])
+    assert seen["settings"]["accounts"][G]["brandTerms"] == ["acme dental", "acme"]
+
+
+def test_every_place_an_agent_reads_what_the_team_saved_goes_through_the_master():
+    """The reports and monitors are tested on their own fakes, so a read site left on plain load would silently ignore the master: scan them."""
+    import re
+    sites = ["paid_brandspend.py", "paid_copycheck.py", "paid_copycheck_monitor.py", "paid_geoconf.py", "paid_geoconf_monitor.py", "paid_kpi.py", "paid_kpi_monitor.py", "paid_monitors.py"]
+    for f in sites:
+        src = open(os.path.join(ROOT, "tracker", f), encoding="utf-8").read()
+        plain = re.findall(r"\b(?:st|bs|copy_st)\.load\(", src)
+        assert not plain, (f, plain)
+        assert "load_for_read(" in src, f

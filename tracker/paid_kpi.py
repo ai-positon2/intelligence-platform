@@ -289,7 +289,7 @@ def report_for(account_id, *, accounts_fn=None, groups_fn=None, search_fn=None, 
     warnings, settings, issues = [], None, None
     if mon is not None:
         try:
-            settings = st.load(mon)
+            settings = st.load_for_read(mon)
         except Exception as e:                                                       # noqa: BLE001
             warnings.append("What the team saved (targets, muted campaigns) could not be read (%s), so it was not applied." % e)
         try:

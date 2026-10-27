@@ -72,7 +72,7 @@ def make_spec(*, today=None, search_fn=None, list_fn=None, mon_store=None, meta_
     def collect(accounts, groups):
         listed = {a["id"]: a for a in (list_fn or gads.list_accounts)()}
         try:
-            settings = st.load(mon_store) if mon_store is not None else st.empty()
+            settings = st.load_for_read(mon_store) if mon_store is not None else st.empty()
         except Exception:                                                            # noqa: BLE001 (no saved targets is not a reason to skip the run: only the checks that need them are skipped)
             settings = st.empty()
         try:

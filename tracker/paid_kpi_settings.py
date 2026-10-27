@@ -37,6 +37,17 @@ def load(store):
     return {"accounts": dict(s.get("accounts") or {}), "changes": list(s.get("changes") or [])}
 
 
+def load_for_read(store):
+    """What the agent reads: its own saved settings with the Master Agent's figures filled in where it has none (tracker/paid_master.py). Never saved back; the settings pages and every
+    save use load. If the master cannot be read the agent's own settings are used as they are."""
+    s = load(store)
+    try:
+        from . import paid_master
+        return paid_master.overlay_kpi(s, paid_master.load(store))
+    except Exception:                                                                # noqa: BLE001 (a master that cannot be read must not stop an agent)
+        return s
+
+
 def account_of(settings, account_id):
     """One account's saved figures in the shape the rules read: {targets, tolerance, campaigns: {id: {cpa, roas, cvr, ctr}}, muted: {id: why}, names: {id: name}, name}."""
     a = (settings.get("accounts") or {}).get(str(account_id)) or {}

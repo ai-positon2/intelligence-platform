@@ -235,7 +235,7 @@ def report_for(account_id, *, limit=None, overrides=None, accounts_fn=None, grou
         settings = {}
         if mon is not None:
             try:
-                settings = st.load(mon)
+                settings = st.load_for_read(mon)
             except Exception as e:                                                       # noqa: BLE001
                 warnings.append("The team's saved settings could not be read (%s), so the defaults were used." % e)
     lim = limit if isinstance(limit, float) else parse_limit(limit) if limit not in (None, "") else (settings.get("limit") or m.DEFAULT_LIMIT)

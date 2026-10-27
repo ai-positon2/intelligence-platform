@@ -327,10 +327,10 @@ def report_for(account_id, *, accounts_fn=None, groups_fn=None, search_fn=None, 
     warnings, settings, issues, brand_terms = [], None, None, {}
     if mon is not None:
         try:
-            settings = st.load(mon)
+            settings = st.load_for_read(mon)
             issues = mon.issues_all("copycheck")
             from . import paid_brandspend_settings as bs
-            brand_terms = {aid: (a.get("brandTerms") or []) for aid, a in (bs.load(mon).get("accounts") or {}).items()}
+            brand_terms = {aid: (a.get("brandTerms") or []) for aid, a in (bs.load_for_read(mon).get("accounts") or {}).items()}
         except Exception as e:                                                       # noqa: BLE001
             warnings.append("What the team saved (phone numbers, places, brand spellings) and the history could not be read (%s), so those checks were skipped." % e)
     raw, stale, account = load_raw(account_id, accounts_fn=accounts_fn, groups_fn=groups_fn, search_fn=search_fn, now=now, force=force, store=store, today=today,
