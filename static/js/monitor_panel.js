@@ -51,6 +51,8 @@ function runLine(r){
   if (r.reminders) parts.push(plural(r.reminders, "reminder"));
   if (r.resolved) parts.push(r.resolved + " fixed");
   parts.push(r.alerted ? plural(r.alerted, "issue") + " alerted" : "none alerted");
+  if (r.heldBack) parts.push(r.heldBack + " held back (another issue covers it)");
+  if (r.belowFloor) parts.push(r.belowFloor + " under a client's floor");
   if (r.unreadableCount) parts.push(r.unreadableCount + " not read");
   var bad = r.unreadableCount || (r.email && r.email.status === "failed") || (r.slack && r.slack.status === "failed");
   return {when: when(r.finishedAt), tone: bad ? "warn" : "ok", text: parts.join(" · ")};
@@ -88,7 +90,7 @@ api.mount = function(host, opts){
       '<label>Slack channel<input type="text" id="mpSlack" value="' + esc(a.slackChannel || "") + '" placeholder="#ppc-alerts" autocomplete="off"></label>' +
       '<div class="mp-btns"><button type="button" class="pm-btn" id="mpSave"' + (S.busy ? " disabled" : "") + '>Save</button><button type="button" class="pm-btn-ghost" id="mpTest"' + (S.busy ? " disabled" : "") + '>Send a test alert</button>' +
       '<button type="button" class="pm-btn-ghost" id="mpRun"' + (S.busy || st.running ? " disabled" : "") + '>' + (st.running ? "Running…" : "Run now") + '</button></div></div>' +
-      '<p class="mp-note">' + esc(recipientsText(a)) + ' ' + esc(sendersText(st.senders)) + '. A summary of everything open goes out on Mondays' + (st.digest ? " (last " + esc(st.digest) + ")" : "") + '.' + '</p>' +
+      '<p class="mp-note">' + esc(recipientsText(a)) + ' ' + esc(sendersText(st.senders)) + '. This is the default destination: every monitor\'s alerts go out together through the <a href="/p2/paid-marketing/alert-hub">Alert Hub</a>, which can give a client a channel of its own. A summary of everything open goes out on Mondays' + (st.digest ? " (last " + esc(st.digest) + ")" : "") + '.' + '</p>' +
       (S.note ? '<p class="mp-msg">' + esc(S.note) + '</p>' : "") + issuesHtml(st) + runsHtml(st) + '</section>';
   }
   function issuesHtml(st){

@@ -2,8 +2,9 @@
 
   spec_for      the spec the engine (tracker/paid_monitor.py) runs for one monitor, built with what the team saved
   run_agent     one monitor over the accounts it is given
-  run_scheduled the daily run: every monitor except the "frequent" ones (the Ad Copy Checker on Mondays only, the Keyword Visibility Tracker on Tuesdays only), then on Mondays each one's weekly summary (once a day at most, and only when a
-                a channel took it); or, when `only` names monitors, just those and no summaries (the Spend Anomaly Alert has its own run every two hours)
+  run_scheduled the daily run: every monitor except the "frequent" ones (the Ad Copy Checker on Mondays only, the Keyword Visibility Tracker on Tuesdays only), then on Mondays the weekly summary (one per
+                destination, once a day at most, and only when a channel took it); or, when `only` names monitors, just those and no summaries (the Spend Anomaly Alert has its own run every two hours).
+                Every alert goes through the Alert Hub (tracker/paid_alerthub.py): severity, de-duplication across monitors and one message per client channel
   state_for     what an alert panel on a monitor's page shows: the recipients, the senders that are set up, the baseline, the last runs, the open issues and the ones fixed lately
 """
 from __future__ import annotations
@@ -94,34 +95,28 @@ def spec_for(agent, store, *, today=None, search_fn=None, list_fn=None, meta_pag
     return dm.make_spec(today=day, search_fn=search_fn, list_fn=list_fn, mon_store=store, meta_pages_fn=meta_pages_fn, meta_account_fn=meta_account_fn, now_fn=now_fn)
 
 
-def run_agent(agent, store, *, trigger, base_link, deliver, accounts, groups, problems=(), now_fn=None, **inject):
-    """One run of one monitor. `inject` hands the reads (search_fn, list_fn, meta_pages_fn, meta_account_fn) in for tests."""
+def run_agent(agent, store, *, trigger, base_link, deliver, accounts, groups, problems=(), now_fn=None, outbox=None, **inject):
+    """One run of one monitor. `inject` hands the reads (search_fn, list_fn, meta_pages_fn, meta_account_fn) in for tests. What is to be alerted goes through the Alert Hub
+    (tracker/paid_alerthub.py): into `outbox` when one is handed in (the caller flushes it), else it is flushed here, so a monitor run by hand sends its own message."""
+    from . import paid_alerthub as hub
+    now_fn = now_fn or (lambda: dt.datetime.now(dt.timezone.utc))
     spec = spec_for(agent, store, now_fn=now_fn, **inject)
-    return mon.run_monitor(store, spec, trigger=trigger, link=link_for(agent, base_link), deliver=deliver, accounts=accounts, groups=groups, problems=problems, now_fn=now_fn)
-
-
-def send_weekly(agent, store, *, base_link, deliver, now):
-    """Send one monitor's weekly summary, once a day at most; {sent, why}."""
-    key = "digest:" + agent
-    last = (store.state_get(key) or {}).get("day")
-    if last == now.date().isoformat():
-        return {"sent": False, "why": "already sent today"}
-    msg = mon.weekly_digest(AGENTS[agent]["label"], store.issues_all(agent), now, link_for(agent, base_link))
-    if msg is None:
-        return {"sent": False, "why": "nothing to say"}
-    res = mon.send(store, msg, deliver)
-    if res["sent"]:
-        store.state_set(key, {"day": now.date().isoformat()})
-    return {"sent": res["sent"], "why": "" if res["sent"] else "no channel took it", "email": res["email"], "slack": res["slack"]}
+    box = [] if outbox is None else outbox
+    run = mon.run_monitor(store, spec, trigger=trigger, link=link_for(agent, base_link), deliver=deliver, accounts=accounts, groups=groups, problems=problems, now_fn=now_fn, outbox=box)
+    if outbox is None:
+        hub.flush(store, box, base_link=base_link, deliver=deliver, now=now_fn(), trigger=trigger, agents=AGENTS)
+    return run
 
 
 def run_scheduled(store, *, base_link, deliver, inventory_fn, now_fn=None, only=None, **inject):
-    """The monitors over every account. With no `only` (the daily run) every monitor that is not "frequent" runs, and on a Monday each one's weekly summary (the frequent ones' too);
-    with `only` (a list of monitor names) just those run and no summary is sent. {agent: run record, "weekly": {agent: {...}}}."""
+    """The monitors over every account. With no `only` (the daily run) every monitor that is not "frequent" runs, and on a Monday the one weekly summary per destination;
+    with `only` (a list of monitor names) just those run and no summary is sent. The alerts of all the monitors in the run go through the Alert Hub together: one message per destination.
+    {agent: run record, "hub": what was sent, "weekly": {destination: {...}}}."""
+    from . import paid_alerthub as hub
     now_fn = now_fn or (lambda: dt.datetime.now(dt.timezone.utc))
     names = [agent_of(a) for a in only] if only else None
     accounts, groups, problems = inventory_fn()
-    out = {}
+    out, box = {}, []
     for agent in AGENTS:
         if names is not None and agent not in names:
             continue
@@ -130,9 +125,13 @@ def run_scheduled(store, *, base_link, deliver, inventory_fn, now_fn=None, only=
         days = AGENTS[agent].get("weekdays")
         if names is None and days and now_fn().weekday() not in days:
             continue
-        out[agent] = run_agent(agent, store, trigger="schedule", base_link=base_link, deliver=deliver, accounts=accounts, groups=groups, problems=problems, now_fn=now_fn, **inject)
+        out[agent] = run_agent(agent, store, trigger="schedule", base_link=base_link, deliver=deliver, accounts=accounts, groups=groups, problems=problems, now_fn=now_fn, outbox=box, **inject)
+    try:
+        out["hub"] = hub.flush(store, box, base_link=base_link, deliver=deliver, now=now_fn(), trigger="schedule", agents=AGENTS)
+    except Exception as e:                                                          # noqa: BLE001 (the issues stay unmarked, so the next run alerts them; the weekly summary still goes)
+        out["hub"] = {"error": ("%s: %s" % (type(e).__name__, e))[:300]}
     if names is None and now_fn().weekday() == 0:
-        out["weekly"] = {agent: send_weekly(agent, store, base_link=base_link, deliver=deliver, now=now_fn()) for agent in AGENTS}
+        out["weekly"] = hub.weekly(store, base_link=base_link, deliver=deliver, now=now_fn(), agents=AGENTS)
     return out
 
 
@@ -152,4 +151,4 @@ def state_for(store, agent, deliver, now=None):
     return {"agent": agent, "label": AGENTS[agent]["label"], "alerts": mon.alert_settings(store), "senders": deliver.ready(), "baseline": mon.baseline(store, agent),
             "runs": (store.state_get("runs:" + agent) or [])[:10], "counts": {lv: sum(1 for i in opened if i["level"] == lv) for lv in ("high", "medium", "low")},
             "open": [row(i) for i in opened[:SHOWN_OPEN]], "openTotal": len(opened), "fixed": [row(i) for i in fixed[:SHOWN_FIXED]],
-            "digest": (store.state_get("digest:" + agent) or {}).get("day"), "running": bool((store.state_get("lock:" + agent) or {}).get("locked"))}
+            "digest": (store.state_get("digest:hub") or {}).get("day"), "running": bool((store.state_get("lock:" + agent) or {}).get("locked"))}

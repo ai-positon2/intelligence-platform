@@ -290,14 +290,18 @@ def digest(label, pending, resolved, link):
     return {"subject": subject, "text": text, "html": html_body, "slack_text": slack_text, "slack_blocks": blocks}
 
 
-def send(store, message, deliver):
-    """Send an alert message to the saved recipients and channel: {email: {status, error?}, slack: {...}, sent}; `sent` is True when at least one channel took it."""
-    s = alert_settings(store)
-    email = (deliver.attempt(lambda: deliver.send_email(message["subject"], message["text"], message["html"], s["emails"]))
-             if s["emails"] else {"status": "not_configured", "error": "No email address is set."})
-    slack = (deliver.attempt(lambda: deliver.send_slack(s["slackChannel"], message["slack_text"], message["slack_blocks"]))
-             if s["slackChannel"] else {"status": "not_configured", "error": "No Slack channel is set."})
+def send_to(settings, message, deliver):
+    """Send an alert message to the emails and Slack channel in `settings` ({emails, slackChannel}): {email: {status, error?}, slack: {...}, sent}; `sent` is True when at least one channel took it."""
+    email = (deliver.attempt(lambda: deliver.send_email(message["subject"], message["text"], message["html"], settings["emails"]))
+             if settings["emails"] else {"status": "not_configured", "error": "No email address is set."})
+    slack = (deliver.attempt(lambda: deliver.send_slack(settings["slackChannel"], message["slack_text"], message["slack_blocks"]))
+             if settings["slackChannel"] else {"status": "not_configured", "error": "No Slack channel is set."})
     return {"email": email, "slack": slack, "sent": "sent" in (email["status"], slack["status"])}
+
+
+def send(store, message, deliver):
+    """Send an alert message to the saved recipients and channel (see send_to)."""
+    return send_to(alert_settings(store), message, deliver)
 
 
 def test_alert(store, label, link, deliver):
@@ -336,10 +340,11 @@ def _keep_run(store, agent, run):
     store.state_set("runs:" + agent, [run] + runs[:RUNS_KEPT - 1])
 
 
-def run_monitor(store, spec, *, trigger, link, deliver, accounts, groups, problems=(), now_fn=None):
+def run_monitor(store, spec, *, trigger, link, deliver, accounts, groups, problems=(), now_fn=None, outbox=None):
     """One run of a monitor. `spec` is {agent, label, collect}; collect(accounts, groups) returns
     {issues: [make_issue...], snaps: {account id: {...}}, okIds: set of the accounts that were read, unreadable: [{accountId, name, error}], hold: {account id: {issue kinds}} (optional, see track)}.
-    Returns the run record ({status: "busy"} when another run of the monitor is going)."""
+    With `outbox` (a list) nothing is sent: what would have been is appended to it as {agent, label, link, pending, resolved, run} for the Alert Hub (tracker/paid_alerthub.py) to decide and send,
+    and the issues are saved not yet marked as alerted. Returns the run record ({status: "busy"} when another run of the monitor is going)."""
     now_fn = now_fn or (lambda: datetime.now(timezone.utc))
     agent = spec["agent"]
     if not store.claim("lock:" + agent, LOCK_TTL_S):
@@ -356,13 +361,15 @@ def run_monitor(store, spec, *, trigger, link, deliver, accounts, groups, proble
                "reminders": sum(1 for p in tracked["pending"] if p["event"] == "reminder"), "resolved": len(tracked["resolved"]), "baseline": bool(tracked["baselineSet"]) or baseline(store, agent) is not None,
                "alerted": 0, "email": None, "slack": None, "firstRead": len(tracked["newAccounts"])}
         writes = tracked["writes"]
-        if tracked["pending"]:
+        if outbox is None and tracked["pending"]:
             res = send(store, digest(spec["label"], tracked["pending"], tracked["resolved"], link), deliver)
             run.update(email=res["email"], slack=res["slack"])
             if res["sent"]:
                 writes = mark_alerted(writes, tracked["pending"], res, now_fn())
                 run["alerted"] = len(tracked["pending"])
         store.issues_put(writes)
+        if outbox is not None and (tracked["pending"] or tracked["resolved"]):
+            outbox.append({"agent": agent, "label": spec["label"], "link": link, "pending": tracked["pending"], "resolved": tracked["resolved"], "run": run})
         store.state_set("seen:" + agent, {"ids": tracked["seenIds"]})
         if got.get("snaps"):
             store.snaps_put(agent, now.date().isoformat(), got["snaps"])

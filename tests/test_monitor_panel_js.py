@@ -48,6 +48,10 @@ def test_a_run_is_a_line_with_what_it_found_and_what_went_wrong():
     assert "nothing new" not in run("X.runLine(R)", R=dict(base, worse=1, alerted=1))["text"] and "nothing new" not in run("X.runLine(R)", R=dict(base, reminders=1, alerted=1))["text"] and "nothing new" not in run("X.runLine(R)", R=dict(base, reminders=1))["text"]
     assert "nothing new" not in run("X.runLine(R)", R=dict(base, alerted=1))["text"] and "nothing new" not in run("X.runLine(R)", R=dict(base, baseline=False))["text"]
     assert run("X.runLine(R)", R=dict(base, new=1, alerted=1))["text"] == "read 12 of 12 accounts · 1 new · 1 issue alerted"
+    held = run("X.runLine(R)", R=dict(base, new=2, alerted=1, heldBack=1, belowFloor=0))["text"]
+    assert held == "read 12 of 12 accounts · 2 new · 1 issue alerted · 1 held back (another issue covers it)"
+    assert run("X.runLine(R)", R=dict(base, new=1, alerted=0, heldBack=0, belowFloor=1))["text"] == "read 12 of 12 accounts · 1 new · none alerted · 1 under a client's floor"
+    assert "held back" not in run("X.runLine(R)", R=dict(base, new=1, alerted=1, heldBack=0, belowFloor=0))["text"]
     assert run("X.runLine(R)", R={"status": "failed", "finishedAt": "2026-10-21T07:01:12+00:00", "error": "RuntimeError: x"}) == {"when": "2026-10-21 07:01 UTC", "tone": "bad", "text": "Failed: RuntimeError: x"}
     assert run("X.runLine(R)", R={"status": "failed", "finishedAt": ""})["text"] == "Failed: no reason given"
 
