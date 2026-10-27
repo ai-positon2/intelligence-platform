@@ -10,6 +10,8 @@ from __future__ import annotations
 
 import datetime as dt
 
+from . import paid_gads as gb
+from . import paid_gads_segments as gs
 from . import paid_compete_fetch as cf
 from . import paid_compete_math as cm
 from . import paid_compete_settings as cs
@@ -76,7 +78,7 @@ def report_for(google, meta, *, mon, now=None, **reads):
     for p in platforms:
         try:
             own[p], w, names[p] = own_ads(p, accounts[p], now=now, **reads)
-        except BadRequest:
+        except (BadRequest, gs.GadsError, gb.AdsError, gb.RefreshTooSoon):            # the platform's own errors are answered by the route as every other page does
             raise
         except Exception as e:                                                       # noqa: BLE001 (our ads could not be read: say so, do not compare against nothing)
             raise BadRequest("The ads of %s could not be read (%s)." % (accounts[p], str(e)[:160]))

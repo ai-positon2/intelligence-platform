@@ -6013,6 +6013,104 @@ def paid_alerthub_test():
     return _ah_run(lambda ah, pm, store: jsonify(ah.send_test(store, str((request.get_json(silent=True) or {}).get("route") or ""), _mon_base(), _mon_deliver())))
 
 
+# ── Competitor Analysis (sheet item #39, 2026-10-27) ──────────────────────────────────────────────────────────────────────
+# What the competitors' ads say on Meta (the Ad Library) and Google (the Ads Transparency Center) against what ours say, and ideas to improve ours. The competitors are written down per account
+# (tracker/paid_compete_settings.py, or by the Master Agent); their ads are read by Apify actors only when the team presses Refresh and kept for a week (tracker/paid_compete_fetch.py); our own
+# ads are the Ad Copy Checker's read. The arithmetic is tracker/paid_compete_math.py. Reads and changes nothing in an ad account.
+
+@app.route("/p2/paid-marketing/competitor-analysis")
+@position2_required
+def paid_competitor_analysis():
+    return render_template("competitor_analysis.html", user=_get_user())
+
+
+def _ca_scope(account):
+    """(google id, meta id) from the page's account: a Google id, an act_ id, or "<google>+<act_>" for both (tracker/paid_compete.py scope_of says whether they are accounts)."""
+    parts = [x for x in str(account or "").split("+") if x]
+    return next((x for x in parts if not x.startswith("act_")), ""), next((x for x in parts if x.startswith("act_")), "")
+
+
+def _ca_run(fn):
+    from tracker import paid_compete, paid_compete_settings
+    from tracker import paid_gads as paid_gads_base, paid_gads_segments as paid_gads
+    store = _mon_store()
+    try:
+        return fn(paid_compete, paid_compete_settings, store)
+    except (paid_compete.BadRequest, paid_compete_settings.BadRequest) as e:
+        return jsonify(error=str(e)), 400
+    except paid_gads_base.RefreshTooSoon as e:
+        return jsonify(error=str(e), kind="cooldown", retryIn=e.retry_in), 429
+    except paid_gads_base.AdsError as e:
+        return jsonify(error=str(e), kind="meta"), 502
+    except paid_gads.GadsError as e:
+        return _pm_gads_error(e)
+    except store.StoreUnavailable as e:
+        return _pm_store_error(e)
+
+
+@app.route("/p2/paid-marketing/api/compete/report")
+@position2_required
+def paid_compete_report():
+    def go(pc, cs, store):
+        google, meta = _ca_scope(request.args.get("account"))
+        extra = {"force": True} if str(request.args.get("refresh") or "") in ("1", "true") else {}
+        rep = pc.report_for(google, meta, mon=store, **extra)
+        rep["competitorsText"] = cs.lines_of(rep["competitors"])
+        rep["senders"] = {"apify": bool(os.environ.get("APIFY_API_TOKEN"))}
+        return jsonify(rep)
+    return _ca_run(go)
+
+
+@app.route("/p2/paid-marketing/api/compete/job")
+@position2_required
+def paid_compete_job():
+    def go(pc, cs, store):
+        google, meta = _ca_scope(request.args.get("account"))
+        from tracker import paid_compete_fetch
+        return jsonify(job=paid_compete_fetch.job_of(store, pc.scope_of(google, meta)[1]))
+    return _ca_run(go)
+
+
+@app.route("/p2/paid-marketing/api/compete/settings", methods=["POST"])
+@position2_required
+def paid_compete_settings_save():
+    def go(pc, cs, store):
+        body = request.get_json(silent=True) or {}
+        google, meta = _ca_scope(body.get("account"))
+        accounts, _key = pc.scope_of(google, meta)
+        names = body.get("names") if isinstance(body.get("names"), dict) else {}
+        saved = {p: cs.save_account(store, aid, str(names.get(aid) or "")[:120], body, _pm_user_email()) for p, aid in accounts.items()}
+        return jsonify(saved=saved)
+    return _ca_run(go)
+
+
+@app.route("/p2/paid-marketing/api/compete/refresh", methods=["POST"])
+@position2_required
+def paid_compete_refresh():
+    def go(pc, cs, store):
+        from tracker import apify_transport, paid_compete_fetch as cf
+        body = request.get_json(silent=True) or {}
+        google, meta = _ca_scope(body.get("account"))
+        accounts, key = pc.scope_of(google, meta)
+        token = os.environ.get("APIFY_API_TOKEN", "")
+        if not token:
+            return jsonify(error="APIFY_API_TOKEN is not set on this server, so competitor ads cannot be read."), 400
+        competitors, region = pc.competitors_of(cs.load_for_read(store), accounts)
+        if not competitors:
+            return jsonify(error="Save at least one competitor first."), 400
+        if (store.state_get("lock:compete:" + key) or {}).get("locked"):
+            return jsonify(error="A refresh is already running for this account."), 409
+        only = body.get("only") if isinstance(body.get("only"), list) else None
+        who = _pm_user_email()
+
+        def runner(actor, run_input, tok, timeout):
+            return apify_transport.run_actor_and_wait(actor, run_input, tok, timeout=timeout, strict=True)
+        platforms = sorted(accounts, key=lambda p: ("meta", "google").index(p))
+        _mon_spawn(lambda: cf.refresh(store, key, competitors, platforms, region, run_fn=runner, token=token, who=who, force=bool(body.get("force")), only=only))
+        return jsonify(started=True, estimate=cf.estimate([c for c in competitors if not only or c["name"] in only], platforms, region)), 202
+    return _ca_run(go)
+
+
 # ── Tracking & Data Health (sheet item #33, 2026-10-26) ──────────────────────────────────────────────────────────────────
 # Whether an account's measurement still works: conversions that stopped or dropped, a conversion action that stopped recording, audience lists that shrink, offline uploads that stopped, a silent
 # pixel. The rules are tracker/paid_track_math.py, the read and report paid_track.py and the daily run paid_track_monitor.py. Google Ads and Meta. Read only: nothing is changed in an ad account.
@@ -22021,6 +22119,8 @@ KPI Monitoring (/p2/paid-marketing/kpi-monitoring): are the campaigns hitting th
 Master Agent (/p2/paid-marketing/master-agent): the one place a client is written down. The team creates a client, picks the Google Ads and Meta accounts it owns (an account is in one client only) and saves, per account, the monthly budget and the weekly floor and ceiling, the KPI targets (cost per conversion, return on ad spend, lowest conversion rate and click-through rate) and the tolerance; and for the whole client the phone numbers, the places it serves, regions people say, the brand terms, the way the name is written, words that are right, the domains its ads may send people to, and offers with the day each ends. The other agents read it: Brand Spend Alert takes the budget and brand terms, KPI Monitoring the targets and tolerance, the Ad Copy Checker the phone numbers, places, written name and allowed words, Location Conflicts the regions, and Unknown Domains counts the allowed domains as known for the client's accounts. The master only fills what an agent has not saved for itself: a figure saved on an agent's own page still wins, and the page lists every place that differs so the team can settle it. Offers and notes are kept but no agent reads them yet. Each change says who made it and when. It reads and changes nothing in an ad account.
 
 Alert Hub (/p2/paid-marketing/alert-hub): the one layer every monitor's alert goes through. Each issue a monitor raises is P1 (high), P2 (medium) or P3 (low). P1 and P2 are alerted; P3 stays on its page and in the Monday summary. A scheduled run sends one message per destination for all the monitors together, not one per monitor, and Mondays one summary of every monitor. The default destination is the email list and Slack channel every monitor page shows; a client written down in the Master Agent can have a Slack channel, emails and a floor (P1 only, or P1 and P2) of its own, and its accounts' alerts go there. An issue is held back, not sent and not marked as alerted, while another monitor's issue of the same or a higher level on the same account already says it: when an account itself is not serving (Account Watch), what follows from it (KPI Monitoring, Keyword Visibility, Creative and Asset Health, a spend drop, conversions that stopped or dropped, an ad group that cannot show) is held back, and two monitors saying the same thing (a stopped ad group, a campaign not delivering and a spend drop; or conversions that stopped in Tracking and in KPI Monitoring) are said once by the one that names the cause. When the issue that covers it is fixed, the held one is alerted at the next run. The page lists the destinations, every open issue of every monitor with its level, client and what covers it (filters and CSV), the last sends and the rules. It does not snooze, throttle an issue that keeps coming back or page a person. It reads and changes nothing in an ad account.
+
+Competitor Analysis (/p2/paid-marketing/competitor-analysis): what the competitors' ads say against what ours say, and ideas to improve ours. Pick a Google Ads account, a Meta ad account or both of a client, write its competitors down (a name, a website, a Facebook page, optionally a Google advertiser id; up to eight, and the Master Agent can hold the same list for a client), and press Refresh competitor ads: the ads are read from Meta's Ad Library (the page's active ads) and Google's Ads Transparency Center (for one country, with the text of text ads read from the picture, so descriptions can have mistakes) by scrapers that cost about half a cent an ad on Meta and two tenths of a cent on Google, so a refresh is never automatic and a read is kept for seven days. Our own ads are the Ad Copy Checker's read of the text of the ads running now. The comparison is by line of copy, not by ad, over thirteen messages found by plain rules (a price, free, urgency, proof, credentials, a guarantee, convenience, insurance, local, a question, something new, a figure, a comparison): a message is a gap only when the competitors use it clearly more than we do, in at least three of their ads and, when two competitors were read, in two of them; short of enough copy on either side it says it could not judge. It lists the offers they state, the ads that have run longest (the best public sign that an ad works) and the newest, and gives ideas, each with its evidence and an example. It cannot see how their ads perform, our own formats and calls to action, ads that have stopped, the keywords they bid on, or LinkedIn, TikTok and Microsoft. It reads and changes nothing in an ad account.
 
 Creative & Asset Health (/p2/paid-marketing/creative-health): which ads are tired and what is missing. Pick a Google Ads account, an MCC to check every account in one go, or a Meta ad account, and it reads, read only, for Google every live ad's and Performance Max asset group's clicks and impressions by whole week (the last 5), the assets Google itself rates Low (an ad's and an asset group's) and the asset coverage Asset Coverage reads (sitelinks, callouts, images and the rest, held to Google's minimums and the team's targets); for Meta the live ads' spend, impressions, reach and link clicks by 7-day bucket, Meta's quality, engagement and conversion rankings and how many live ads each ad set holds. A creative is judged on its last 2 whole weeks against the 3 before, and only with at least 1,000 impressions in the last weeks and 2,000 before; one with less is counted as not judged, never as fine. A click-through rate that fell by 25 percent (40 is high), is unlikely to be chance and fell clearly more than the rest of the account did (a quiet season hits every ad, so a shared fall is not blamed on one creative) is a signal. On Meta a frequency of 3 or more in the last week that is rising (or 4 or more), and a cost per 1,000 views up 25 percent more than the account's, are signals too; Google does not report frequency for Search or Performance Max, so Google ads are judged on click-through rate and Google's own ratings. Two signals make a creative high. Assets Google rates Low are one finding per ad or asset group naming each (medium when the ad is seen, low when nobody sees it); on Meta two or more below-average rankings are medium and three, or two in the bottom 10 percent, high. Missing assets keep Asset Coverage's own severity, and Meta ad sets with a single live ad are flagged. The page also says what it cannot see: how old a creative is, Google frequency, Meta frequency over an ad's whole life, Performance Max assets' own weekly numbers, and ads Meta has not ranked yet. A daily monitor alerts once on each new problem, and the first read of an account is its quiet baseline; a part of the read that failed never marks its problems as fixed. Nothing is changed in an ad account.
 

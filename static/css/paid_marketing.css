@@ -1779,6 +1779,22 @@ tr.ud-dismissed td,tr.ud-gone td{opacity:.62}
 .ah-act{white-space:nowrap}
 .ah-held{opacity:.62}
 #destClients input,#destClients select{width:100%;min-width:0}
+.c-ca{--card-accent:#f97316;
+  --band:linear-gradient(90deg,#f97316,#fb7185,#a78bfa);
+  --thumb:linear-gradient(135deg,#34190a 0%,#2a1030 100%);
+  --icon-glow:rgba(249,115,22,.5);--card-border:rgba(249,115,22,.35);
+  --card-glow:0 0 40px rgba(249,115,22,.10);--arrow-color:#fed7aa}
+.ca-region input{max-width:90px;text-transform:uppercase}
+.ca-bad{color:var(--bad)}
+.ca-idea{padding:12px 14px;margin:10px 0;border:1px solid var(--pm-line2);border-radius:14px;background:var(--pm-panel2)}
+.ca-idea p{margin:6px 0 0;font-size:13px;line-height:1.55}
+.ca-idea-h{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.ca-bar{display:grid;grid-template-columns:minmax(0,220px) minmax(0,1fr) minmax(0,1fr) 84px;align-items:center;gap:8px;margin:8px 0 2px;font-size:12.5px}
+.ca-bar-t{display:block;height:8px;border-radius:6px;background:var(--pm-line2);overflow:hidden}
+.ca-bar-t i{display:block;height:100%;border-radius:6px}
+.ca-bar-t i.their{background:var(--over)}
+.ca-bar-t i.own{background:var(--under)}
+.ca-bar-n{text-align:right;font-variant-numeric:tabular-nums;color:var(--pm-muted)}
 .c-kv{--card-accent:#a78bfa;
   --band:linear-gradient(90deg,#a78bfa,#38bdf8,#22d3ee);
   --thumb:linear-gradient(135deg,#1a1236 0%,#0b2236 100%);

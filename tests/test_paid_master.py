@@ -20,7 +20,8 @@ def data(name="Acme Dental", **kw):
     d = {"name": name, "accounts": [{"id": G, "budget": {"monthly": "12,000", "weeklyMin": 2000, "weeklyMax": "3500"}, "targets": {"cpa": "85", "roas": "", "cvr": "4", "ctr": "3.5"}, "tolerance": "25"},
                                     {"id": MA, "targets": {"cpa": "120"}}],
          "shared": {"phones": "(617) 555-0100; 617-555-0111", "locations": "Quincy, MA\nBoston, MA", "areas": "Greater Boston", "brandTerms": "Acme Dental, acme",
-                    "writtenAs": "AcmeDental", "allowWords": "invisalign", "domains": "https://www.acmedental.com/book, acmedental.net", "offers": [{"text": "Free whitening with a new patient exam", "ends": "2026-12-31"}],
+                    "writtenAs": "AcmeDental", "allowWords": "invisalign", "domains": "https://www.acmedental.com/book, acmedental.net",
+                    "competitors": "Aspen Dental | aspendental.com | AspenDental\nBright Smiles | brightsmiles.example", "offers": [{"text": "Free whitening with a new patient exam", "ends": "2026-12-31"}],
                     "notes": "Closed on Sundays."}}
     d.update(kw)
     return d
@@ -43,6 +44,8 @@ def test_a_client_is_cleaned_into_the_shapes_the_agents_read():
     assert sh["phones"] == ["617-555-0100", "617-555-0111"] and sh["locations"] == ["Quincy, MA", "Boston, MA"] and sh["areas"] == ["Greater Boston"]
     assert sh["brandTerms"] == ["acme dental", "acme"] and sh["writtenAs"] == ["AcmeDental"] and sh["allowWords"] == ["invisalign"] and sh["domains"] == ["acmedental.com", "acmedental.net"]
     assert sh["offers"] == [{"text": "Free whitening with a new patient exam", "ends": "2026-12-31"}] and sh["notes"] == "Closed on Sundays."
+    assert sh["competitors"] == [{"name": "Aspen Dental", "domain": "aspendental.com", "facebook": "https://www.facebook.com/AspenDental", "googleAdvertiser": ""},
+                                 {"name": "Bright Smiles", "domain": "brightsmiles.example", "facebook": "", "googleAdvertiser": ""}]
 
 
 @pytest.mark.parametrize("change, message", [
@@ -175,6 +178,27 @@ def test_location_conflicts_gets_the_areas_where_it_has_none():
     assert m.overlay_geoconf({"accounts": {G: {"areas": ["Mine"]}}}, master)["accounts"][G]["areas"] == ["Mine"]
 
 
+def test_competitor_analysis_gets_the_clients_competitors_where_an_account_has_none_saved_and_its_own_list_wins_whole():
+    master = m.load(saved())
+    out = m.overlay_compete({"accounts": {G: {"competitors": [], "region": "GB", "name": "Acme"}}}, master)
+    got = out["accounts"][G]
+    assert [c["name"] for c in got["competitors"]] == ["Aspen Dental", "Bright Smiles"] and got["region"] == "GB" and got["name"] == "Acme" and got["fromMaster"] is True
+    assert [c["name"] for c in out["accounts"][MA]["competitors"]] == ["Aspen Dental", "Bright Smiles"]            # an account of the client with nothing saved at all gets it too
+    mine = {"accounts": {G: {"competitors": [{"name": "Mine", "domain": "mine.com", "facebook": "", "googleAdvertiser": ""}], "region": "US"}}}
+    kept = m.overlay_compete(mine, master)["accounts"][G]
+    assert [c["name"] for c in kept["competitors"]] == ["Mine"] and "fromMaster" not in kept
+    assert m.overlay_compete({"accounts": {}}, {"clients": {}}) == {"accounts": {}}
+    from tracker import paid_compete_settings as cs
+    assert [c["name"] for c in cs.account_of(cs.load_for_read(saved()), G)["competitors"]] == ["Aspen Dental", "Bright Smiles"]
+
+
+def test_a_competitor_the_agent_would_refuse_is_refused_by_the_master_in_the_same_words():
+    with pytest.raises(m.BadRequest, match="nowhere to look"):
+        m.clean_client(data(shared={"competitors": "Nobody"}))
+    with pytest.raises(m.BadRequest, match="not a Facebook page"):
+        m.clean_client(data(shared={"competitors": "A | a.com | https://example.com/x"}))
+
+
 def test_the_allowed_domains_become_one_entry_per_account_of_the_client():
     entries = m.domain_entries(m.load(saved()))
     assert sorted((e["domain"], e["scope"]) for e in entries) == [("acmedental.com", G), ("acmedental.com", MA), ("acmedental.net", G), ("acmedental.net", MA)]
@@ -193,8 +217,8 @@ def test_where_an_agents_own_value_is_not_the_masters_is_listed_and_agreement_is
 
 
 def test_every_field_names_the_agents_that_read_it_and_nothing_uses_an_em_dash():
-    assert set(m.USED_BY) >= {"budget.monthly", "targets", "phones", "locations", "areas", "brandTerms", "writtenAs", "allowWords", "domains", "offers", "notes"}
-    assert m.USED_BY["domains"] == ["Unknown Domains"] and m.USED_BY["offers"] == []
+    assert set(m.USED_BY) >= {"budget.monthly", "targets", "phones", "locations", "areas", "brandTerms", "writtenAs", "allowWords", "domains", "competitors", "offers", "notes"}
+    assert m.USED_BY["domains"] == ["Unknown Domains"] and m.USED_BY["competitors"] == ["Competitor Analysis"] and m.USED_BY["offers"] == []
     assert "—" not in open(os.path.join(ROOT, "tracker", "paid_master.py"), encoding="utf-8").read()
 
 

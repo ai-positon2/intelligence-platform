@@ -1,0 +1,79 @@
+{% extends "_paid_base.html" %}
+{% block title %}Competitor Analysis{% endblock %}
+{% block content %}
+<div class="pm pm-gc pm-th pm-qa" id="ca">
+  <section class="pm-hero">
+    <div class="pm-hero-l">
+      <span class="pm-eyebrow"><span class="d"></span>Paid Marketing · Competitors</span>
+      <h1 class="pm-title">What are the competitors saying, <span class="pm-grad">and what should we say back?</span></h1>
+      <p class="pm-sub">Write down an account's competitors. The agent reads their ads from <b>Meta's Ad Library</b> and <b>Google's Ads Transparency Center</b>, sets them against the <b>ads running in our account</b>, message by message
+        (a price, free, urgency, proof, a guarantee, insurance, local), and gives you <b>ideas to test</b>: what they say that we do not, the offers they run and the ads that have run longest.</p>
+    </div>
+  </section>
+
+  <section class="pm-panel pd-cmd bi-cmd" id="cmd">
+    <div class="bi-cmd-row da-cmd-row">
+      <div id="acctPick"></div>
+      <p class="bi-scope">Pick one Google Ads account, one Meta ad account, or both of a client. Our ads are the ones the Ad Copy Checker reads. Nothing is changed in an account.</p>
+    </div>
+  </section>
+
+  <div id="msg"></div>
+
+  <div id="empty" class="pm-panel sg-empty">
+    <div class="sg-empty-ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 18V9M10 18V5M16 18v-6M22 18H2"/></svg></div>
+    <h2>Choose an account to begin</h2>
+    <p>You will write its competitors down once. Their ads are read when you press Refresh, and kept for a week.</p>
+  </div>
+  <div id="skel" hidden><div class="pd-skel"></div><div class="pd-skel"></div><div class="pd-skel"></div></div>
+
+  <div id="out" hidden>
+    <div class="sg-head">
+      <p class="pd-fresh" id="fresh"></p>
+      <button class="pm-btn" id="refreshBtn" type="button">Refresh competitor ads</button>
+      <button class="pm-btn-ghost" id="exportBtn" type="button"><svg viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>Export CSV</button>
+    </div>
+    <div class="pd-strip" id="kpis"></div>
+    <p class="bi-sub" id="standing"></p>
+
+    <section class="pm-panel" id="compCard">
+      <div class="pm-panel-h"><span class="pm-panel-t">Competitors</span><span class="pm-panel-s" id="compNote"></span></div>
+      <label class="cc-f"><span>One per line: name | website | Facebook page | Google advertiser id <em class="dim">(the last two are optional)</em></span>
+        <textarea id="fComp" rows="5" spellcheck="false" placeholder="Tandem Diabetes | tandemdiabetes.com | TandemDiabetes"></textarea></label>
+      <label class="cc-f ca-region"><span>Country of the Google ads</span><input type="text" id="fRegion" maxlength="2" value="US" spellcheck="false" autocomplete="off"></label>
+      <div class="cc-set-b"><button class="pm-btn" id="saveBtn" type="button">Save the competitors</button><span class="bi-sub" id="saveOut"></span></div>
+      <p class="mp-note" id="estimate"></p>
+      <div id="jobBox"></div>
+      <div id="compTables"></div>
+    </section>
+
+    <section class="pm-panel" id="ideasCard" hidden>
+      <div class="pm-panel-h"><span class="pm-panel-t">Ideas to improve our ads</span><span class="pm-panel-s" id="ideasNote"></span></div>
+      <div id="ideas"></div>
+    </section>
+
+    <section class="pm-panel" id="gapsCard" hidden>
+      <div class="pm-panel-h"><span class="pm-panel-t">What they say, and what we say</span><span class="pm-panel-s">share of the lines of copy that carry each message</span></div>
+      <div id="gaps"></div>
+    </section>
+
+    <section class="pm-panel" id="adsCard" hidden>
+      <div class="pm-panel-h"><span class="pm-panel-t">Their offers and their longest-running ads</span><span class="pm-panel-s">a long run is the best public sign that an ad works</span></div>
+      <div id="ads"></div>
+    </section>
+
+    <section class="pm-panel" id="blindCard">
+      <div class="pm-panel-h"><span class="pm-panel-t">What this could not measure</span></div>
+      <ul class="th-blind-l" id="blind"></ul>
+    </section>
+    <p class="pd-foot" id="foot"></p>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/pm_picker.js') }}?v=1"></script>
+<script src="{{ url_for('static', filename='js/pm_platform.js') }}?v=7"></script>
+<script src="{{ url_for('static', filename='js/pm_scope.js') }}?v=2"></script>
+<script src="{{ url_for('static', filename='js/competitor_analysis_data.js') }}?v=1"></script>
+<script src="{{ url_for('static', filename='js/competitor_analysis.js') }}?v=1"></script>
+{% endblock %}

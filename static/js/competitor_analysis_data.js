@@ -1,0 +1,151 @@
+/* Competitor Analysis: the wording and the shapes the page draws, as plain functions (so tests/test_competitor_analysis_js.py runs them in Node).
+ *
+ * The server decides everything (tracker/paid_compete*.py): which messages the competitors use more than we do, the ideas, what was read and what could not be. This file only words it, lays it
+ * out in tables and turns the report into a CSV. It never judges an ad.
+ */
+(function(root){
+"use strict";
+
+var PLAT = {google: "Google Ads", meta: "Meta Ads"};
+var LEVEL = {high: {label: "High", tone: "bad"}, medium: {label: "Medium", tone: "warn"}, low: {label: "Low", tone: "wait"}};
+
+function int(v){ return v == null ? "n/a" : Math.round(v).toLocaleString("en-US"); }
+function plural(n, one, many){ return int(n) + " " + (n === 1 ? one : (many || one + "s")); }
+function day(iso){ return iso ? String(iso).slice(0, 10) : ""; }
+function levelInfo(l){ return LEVEL[l] || {label: String(l), tone: "unk"}; }
+function money(v){ return "$" + (Math.round(v * 100) / 100).toFixed(2); }
+
+/* a read, how old it is */
+function ageText(d){
+  if (d == null) return "not read yet";
+  return d < 1 ? "read today" : "read " + plural(d, "day") + " ago";
+}
+
+/* the tiles above the page */
+function tiles(rep){
+  var c = rep.counts || {}, comps = rep.competitors || [], ages = [];
+  Object.keys(rep.analysis || {}).forEach(function(p){ (rep.analysis[p].competitors || []).forEach(function(s){ if (s.ageDays != null) ages.push(s.ageDays); }); });
+  var oldest = ages.length ? Math.max.apply(null, ages) : null;
+  return [
+    ["Competitors", int(comps.length), comps.length ? "saved for this account" : "none saved yet: add the first", comps.length ? "" : "warn"],
+    ["Competitor ads read", int(c.competitorAds || 0), c.reads ? "from " + plural(c.reads, "read") : "press Refresh to read them", c.reads ? "" : "warn"],
+    ["Message gaps", int(c.gaps || 0), c.gaps ? "things they say more than we do" : (c.reads ? "no clear gap against our ads" : "needs their ads first"), c.gaps ? "warn" : (c.reads ? "good" : "")],
+    ["Ideas", int(c.ideas || 0), c.ideas ? "to test in our ads" : "none yet", ""],
+    ["Last read", ages.length ? (oldest < 1 ? "today" : plural(oldest, "day") + " ago") : "never", ages.length ? "the oldest of the competitors' reads" : "no competitor has been read", ""]
+  ];
+}
+
+/* what a refresh would cost, in words */
+function estimateText(est, cacheDays){
+  est = est || {};
+  if (!est.reads) return "Nothing can be read yet: a competitor needs a website or a Facebook page.";
+  return "A refresh reads " + plural(est.reads, "competitor page") + ", up to " + plural(est.ads, "ad") + ", about " + money(est.usd) + " at most. Reads newer than " + plural(cacheDays || 7, "day") + " are not paid for again.";
+}
+
+/* the refresh in progress or last done, in words */
+function jobText(job){
+  if (!job) return "";
+  var steps = job.steps || [], done = steps.filter(function(s){ return s.status === "done" || s.status === "failed"; }).length, failed = steps.filter(function(s){ return s.status === "failed"; }).length;
+  if (job.status === "running") return "Reading competitor ads: " + done + " of " + steps.length + " done. This takes a minute or two.";
+  if (job.status === "failed") return "The refresh failed: " + (job.error || "no reason given") + ".";
+  if (!steps.length) return "Every competitor was read within the last week, so nothing was read again" + (job.skippedFresh ? " (" + plural(job.skippedFresh, "read") + " kept)." : ".");
+  return "Last refresh " + day(job.finishedAt || job.startedAt) + " by " + (job.by || "someone") + ": " + plural(steps.length - failed, "read") + " done" + (failed ? ", " + failed + " failed" : "") + ".";
+}
+function stepLine(s){
+  var what = s.name + " on " + (s.platform === "google" ? "Google" : "Meta");
+  if (s.status === "done") return {text: what + ": " + plural(s.ads, "ad"), tone: "ok"};
+  if (s.status === "failed") return {text: what + ": " + s.error, tone: "bad"};
+  return {text: what + ": " + (s.status === "reading" ? "reading" : "waiting"), tone: "wait"};
+}
+
+/* the competitors of one platform as table rows */
+function competitorRows(rep, platform){
+  var a = (rep.analysis || {})[platform];
+  if (!a) return [];
+  return (a.competitors || []).map(function(s){
+    var longest = (s.longest || [])[0];
+    var formats = Object.keys(s.formats || {}).map(function(k){ return s.formats[k] + " " + k; }).join(", ");
+    return {name: s.name, status: s.error ? "failed" : (s.skipped ? "skipped" : (s.count ? "read" : "empty")), note: s.error || s.skipped || (s.count ? ageText(s.ageDays) : "read, no ads found"),
+      ads: s.count, active: s.active, newest: s.new, median: s.medianDays == null ? "" : Math.round(s.medianDays), longest: longest ? longest.days : null, formats: formats,
+      ctas: Object.keys(s.ctas || {}).map(function(k){ return k + " (" + s.ctas[k] + ")"; }).join(", "), landing: (s.landing || []).slice(0, 2).map(function(l){ return l.path + " (" + l.ads + ")"; }).join(", ")};
+  });
+}
+
+/* the messages as bars: what they say, what we say */
+function gapRows(rep, platform){
+  var a = (rep.analysis || {})[platform];
+  if (!a) return {judged: false, why: "", gaps: [], edges: []};
+  var c = a.compare || {};
+  return {judged: !!c.judged, why: c.why || "", gaps: (c.gaps || []).map(function(g){ return {label: g.label, their: g.theirShare, own: g.ownShare, points: g.points, level: g.level, ads: g.ads, who: g.who,
+    example: (a.examples || {})[g.theme] || null}; }), edges: (c.edges || []).map(function(g){ return {label: g.label, their: g.theirShare, own: g.ownShare, points: g.points}; })};
+}
+function gapText(g){
+  return Math.round(g.their) + "% of their lines, " + Math.round(g.own) + "% of ours (" + plural(g.ads, "ad") + " from " + plural(g.who, "competitor") + ")";
+}
+
+function exampleText(e){
+  return e ? "\"" + e.line + "\" (" + e.who + (e.days ? ", running " + plural(e.days, "day") : "") + ")" : "";
+}
+
+/* the ideas as cards */
+function ideaCards(rep){
+  return (rep.ideas || []).map(function(i){
+    var l = levelInfo(i.level);
+    return {id: i.id, tone: l.tone, level: l.label, platform: PLAT[i.platform] || i.platform, title: i.title, why: i.why, tryThis: i.tryThis, example: exampleText(i.example)};
+  });
+}
+
+/* what one platform's ads of the competitors say about the offer and what has run longest */
+function offerRows(rep, platform){
+  var a = (rep.analysis || {})[platform];
+  return a ? (a.offers || []).map(function(o){ return {text: o.text, lines: o.n, who: (o.who || []).join(", "), days: o.maxDays || 0}; }) : [];
+}
+function adRows(list){
+  return (list || []).map(function(x){ return {who: x.who, headline: x.headline, body: x.body, format: x.format, cta: x.cta, days: x.days, since: x.firstShown, url: x.url, copies: x.copies}; });
+}
+function winnerRows(rep, platform){
+  var a = (rep.analysis || {})[platform];
+  return a ? adRows(a.winners) : [];
+}
+function newestRows(rep, platform){
+  var a = (rep.analysis || {})[platform], out = [];
+  if (!a) return out;
+  (a.competitors || []).forEach(function(s){ (s.newest || []).forEach(function(x){ out.push(x); }); });
+  out.sort(function(x, y){ return String(y.firstShown).localeCompare(String(x.firstShown)); });
+  return adRows(out.slice(0, 6));
+}
+
+/* the competitors as the box on the page holds them, and what the page sends */
+function saveBody(account, text, region, names){
+  return {account: account, competitors: text, region: String(region || "").trim().toUpperCase() || "US", names: names || {}};
+}
+
+/* one line that says where the report stands */
+function standing(rep){
+  if (rep.status === "no_competitors") return "No competitors are saved for this account yet. Write them below, then press Refresh competitor ads.";
+  if (rep.status === "no_competitor_data") return "The competitors are saved, but none of their ads has been read yet. Press Refresh competitor ads.";
+  return rep.headline;
+}
+
+/* ── CSV ───────────────────────────────────────────────────────────────── */
+
+var HEAD = ["Section", "Platform", "Competitor", "Item", "Detail", "Figure"];
+function csvRows(rep){
+  var rows = [["Competitor Analysis"], [], HEAD];
+  (rep.ideas || []).forEach(function(i){ rows.push(["Idea", PLAT[i.platform] || i.platform, "", i.title, i.why + " Try: " + i.tryThis + (i.example ? " Example: " + exampleText(i.example) : ""), levelInfo(i.level).label]); });
+  (rep.platforms || []).forEach(function(p){
+    var a = (rep.analysis || {})[p];
+    if (!a) return;
+    (a.compare.gaps || []).forEach(function(g){ rows.push(["Gap", PLAT[p], "", g.label, gapText({their: g.theirShare, own: g.ownShare, ads: g.ads, who: g.who}), g.points]); });
+    (a.competitors || []).forEach(function(s){ rows.push(["Competitor", PLAT[p], s.name, s.error || s.skipped || "ads", s.error || s.skipped ? "" : s.active + " active, " + s.new + " new in 30 days, median " + (s.medianDays == null ? "n/a" : Math.round(s.medianDays)) + " days running", s.count]); });
+    (a.offers || []).forEach(function(o){ rows.push(["Offer", PLAT[p], (o.who || []).join(", "), o.text, "in " + plural(o.n, "line"), o.maxDays || 0]); });
+    (a.winners || []).forEach(function(w){ rows.push(["Longest running", PLAT[p], w.who, w.headline, w.body, w.days == null ? "" : w.days]); });
+  });
+  return rows;
+}
+
+var api = {PLAT: PLAT, HEAD: HEAD, int: int, plural: plural, day: day, levelInfo: levelInfo, money: money, ageText: ageText, tiles: tiles, estimateText: estimateText, jobText: jobText, stepLine: stepLine,
+  competitorRows: competitorRows, gapRows: gapRows, gapText: gapText, exampleText: exampleText, ideaCards: ideaCards, offerRows: offerRows, winnerRows: winnerRows, newestRows: newestRows, saveBody: saveBody,
+  standing: standing, csvRows: csvRows};
+if (typeof module !== "undefined" && module.exports) module.exports = api; else root.CAData = api;
+})(typeof window !== "undefined" ? window : globalThis);

@@ -13,13 +13,14 @@ var SHARED = [
   {key: "brandTerms", label: "Brand terms (words searches for the brand contain)", hint: "acme dental, acme", kind: "csv"},
   {key: "writtenAs", label: "How the name is written in copy", hint: "AcmeDental, one per line", kind: "lines"},
   {key: "allowWords", label: "Words that are right (the dictionary does not know them)", hint: "invisalign, zoomwhitening", kind: "csv"},
-  {key: "domains", label: "Domains its ads may send people to", hint: "acmedental.com, one per line", kind: "lines"}
+  {key: "domains", label: "Domains its ads may send people to", hint: "acmedental.com, one per line", kind: "lines"},
+  {key: "competitors", label: "Competitors (name | website | Facebook page | Google advertiser id, one per line)", hint: "Tandem Diabetes | tandemdiabetes.com | TandemDiabetes", kind: "competitors"}
 ];
 var TARGETS = [["cpa", "Cost per conversion"], ["roas", "Return on ad spend (4 is 400%)"], ["cvr", "Lowest conversion rate (%)"], ["ctr", "Lowest click-through rate (%)"]];
 var BUDGETS = [["monthly", "Monthly budget"], ["weeklyMin", "Weekly minimum"], ["weeklyMax", "Weekly maximum"]];
 var LABEL = {"budget.monthly": "Monthly budget", "budget.weeklyMin": "Weekly minimum", "budget.weeklyMax": "Weekly maximum", "targets.cpa": "Cost per conversion", "targets.roas": "Return on ad spend",
   "targets.cvr": "Lowest conversion rate", "targets.ctr": "Lowest click-through rate", tolerance: "Tolerance", phones: "Phone numbers", locations: "Places", areas: "Regions", brandTerms: "Brand terms",
-  writtenAs: "Written name", allowWords: "Allowed words", domains: "Domains", offers: "Offers", notes: "Notes"};
+  writtenAs: "Written name", allowWords: "Allowed words", domains: "Domains", competitors: "Competitors", offers: "Offers", notes: "Notes"};
 
 function int(v){ return v == null ? "n/a" : Math.round(v).toLocaleString("en-US"); }
 function plural(n, one, many){ return int(n) + " " + (n === 1 ? one : (many || one + "s")); }
@@ -40,7 +41,7 @@ function valueText(v){
 
 /* a number as it is typed into a box or written in a CSV: no thousands separator (the server reads "12,000" too, but a spreadsheet does not) */
 function plain(v){
-  if (Array.isArray(v)) return v.join(", ");
+  if (Array.isArray(v)) return v.map(function(x){ return x && typeof x === "object" ? x.name : x; }).join(", ");
   return v == null ? "" : String(v);
 }
 
@@ -89,9 +90,14 @@ function formOf(c){
     f.accounts[id] = {monthly: plain(b.monthly), weeklyMin: plain(b.weeklyMin), weeklyMax: plain(b.weeklyMax), cpa: plain(t.cpa), roas: plain(t.roas), cvr: plain(t.cvr),
       ctr: plain(t.ctr), tolerance: plain(a.tolerance)};
   });
-  SHARED.forEach(function(s){ f.shared[s.key] = (sh[s.key] || []).join(s.kind === "csv" ? ", " : "\n"); });
+  SHARED.forEach(function(s){ f.shared[s.key] = s.kind === "competitors" ? competitorLines(sh[s.key]) : (sh[s.key] || []).join(s.kind === "csv" ? ", " : "\n"); });
   f.offers = (sh.offers || []).map(function(o){ return o.text + (o.ends ? " | " + o.ends : ""); }).join("\n");
   return f;
+}
+
+/* the competitors as the box holds them: "Name | website | Facebook page | advertiser id" per line (the last three left off when empty) */
+function competitorLines(list){
+  return (list || []).map(function(c){ return [c.name, c.domain || "", c.facebook || "", c.googleAdvertiser || ""].join(" | ").replace(/( \| )+$/, ""); }).join("\n");
 }
 
 /* "Free whitening | 2026-12-31" per line into [{text, ends}] */
@@ -141,7 +147,7 @@ function csvRows(state, nameOf){
   return rows;
 }
 
-var api = {SHARED: SHARED, TARGETS: TARGETS, BUDGETS: BUDGETS, HEAD: HEAD, int: int, plural: plural, fieldLabel: fieldLabel, usedBy: usedBy, valueText: valueText, filled: filled, clientSummary: clientSummary,
+var api = {SHARED: SHARED, TARGETS: TARGETS, BUDGETS: BUDGETS, HEAD: HEAD, int: int, plural: plural, fieldLabel: fieldLabel, usedBy: usedBy, valueText: valueText, competitorLines: competitorLines, filled: filled, clientSummary: clientSummary,
   ownersOf: ownersOf, unassigned: unassigned, tiles: tiles, formOf: formOf, offersOf: offersOf, payload: payload, driftText: driftText, driftRows: driftRows, csvRows: csvRows};
 if (typeof module !== "undefined" && module.exports) module.exports = api; else root.MAData = api;
 })(typeof window !== "undefined" ? window : globalThis);

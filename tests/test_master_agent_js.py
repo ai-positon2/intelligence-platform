@@ -25,7 +25,7 @@ pytestmark = pytest.mark.skipif(not shutil.which("node"), reason="node is not in
 G, G2, MA = "1234567890", "2222222222", "act_1234567"
 CLIENT = {"name": "Acme <b>Dental</b>", "accounts": [{"id": G, "budget": {"monthly": "12,000", "weeklyMin": 2000, "weeklyMax": "3500"}, "targets": {"cpa": "85", "cvr": "4"}, "tolerance": "25"}, {"id": MA}],
           "shared": {"phones": "617-555-0100\n617-555-0111", "locations": "Quincy, MA", "areas": "Greater Boston", "brandTerms": "acme dental, acme", "writtenAs": "AcmeDental", "allowWords": "invisalign, zoomwhitening",
-                     "domains": "acmedental.com\nacmedental.net", "offers": [{"text": "Free whitening | exam", "ends": "2026-12-31"}, {"text": "Spring special", "ends": ""}], "notes": "Closed Sundays."}}
+                     "domains": "acmedental.com\nacmedental.net", "competitors": "Tandem Diabetes | tandemdiabetes.com | TandemDiabetes\nInsulet | omnipod.com | | AR111111111111", "offers": [{"text": "Free whitening | exam", "ends": "2026-12-31"}, {"text": "Spring special", "ends": ""}], "notes": "Closed Sundays."}}
 ACCOUNTS = [{"id": G, "name": "Acme Dental", "platform": "google"}, {"id": G2, "name": "Beta Clinic", "platform": "google"}, {"id": MA, "name": "Acme Meta", "platform": "meta"}]
 
 
@@ -60,9 +60,9 @@ def test_a_field_says_which_agents_read_it_and_one_nobody_reads_says_so():
 
 
 def test_a_client_reads_in_one_line(client):
-    assert run("X.clientSummary(C)", C=client) == "2 accounts, 9 of 9 shared fields filled"
-    assert run("X.clientSummary(C)", C={"accounts": {G: {}}, "shared": {"phones": ["617-555-0100"]}}) == "1 account, 1 of 9 shared fields filled"
-    assert run("X.filled(C)", C={}) == [0, 9]
+    assert run("X.clientSummary(C)", C=client) == "2 accounts, 10 of 10 shared fields filled"
+    assert run("X.clientSummary(C)", C={"accounts": {G: {}}, "shared": {"phones": ["617-555-0100"]}}) == "1 account, 1 of 10 shared fields filled"
+    assert run("X.filled(C)", C={}) == [0, 10]
 
 
 def test_the_accounts_no_client_owns_are_listed_google_first_by_name(client):
@@ -88,11 +88,12 @@ def test_what_the_form_turns_into_is_what_the_server_saved_so_nothing_is_lost_on
     form = run("X.formOf(C)", C=client)
     assert form["name"] == "Acme <b>Dental</b>" and form["accounts"][G]["monthly"] == "12000" and form["accounts"][G]["tolerance"] == "25" and form["accounts"][MA]["monthly"] == ""
     assert form["shared"]["phones"] == "617-555-0100\n617-555-0111" and form["shared"]["brandTerms"] == "acme dental, acme" and form["offers"] == "Free whitening | exam | 2026-12-31\nSpring special"
+    assert form["shared"]["competitors"] == "Tandem Diabetes | tandemdiabetes.com | https://www.facebook.com/TandemDiabetes\nInsulet | omnipod.com |  | AR111111111111"
     sent = run("X.payload(F, [%s, %s])" % (json.dumps(G), json.dumps(MA)), F=form)
     back = m.clean_client(sent)
     assert back == {k: client[k] for k in ("name", "accounts", "shared")}                         # the form read back is the client saved
     assert run("X.payload(X.formOf(null), [])") == {"name": "", "accounts": [], "shared": {"phones": "", "locations": "", "areas": "", "brandTerms": "", "writtenAs": "", "allowWords": "", "domains": "",
-                                                                                       "offers": [], "notes": ""}}
+                                                                                       "competitors": "", "offers": [], "notes": ""}}
 
 
 def test_an_offer_line_splits_at_the_last_bar():
@@ -112,6 +113,7 @@ def test_the_csv_has_one_line_per_figure_and_per_shared_list(client):
     body = rows[3:]
     assert ["Acme <b>Dental</b>", "Acme Dental", "Google Ads", "Monthly budget", "12000"] in body and ["Acme <b>Dental</b>", "Acme Dental", "Google Ads", "Tolerance", "25"] in body
     assert ["Acme <b>Dental</b>", "(whole client)", "", "Phone numbers", "617-555-0100, 617-555-0111"] in body and ["Acme <b>Dental</b>", "(whole client)", "", "Offer", "Free whitening | exam (ends 2026-12-31)"] in body
+    assert ["Acme <b>Dental</b>", "(whole client)", "", "Competitors", "Tandem Diabetes, Insulet"] in body
     assert not [r for r in body if r[1] == "Acme Meta"]
 
 
@@ -186,7 +188,7 @@ def test_the_clients_are_listed_with_the_tiles_and_nothing_is_escaped_wrongly(cl
     out = page({"responses": stubs(client)}, tmp_path)
     lst, kp = out["el"]["#list"]["html"], out["el"]["#kpis"]["html"]
     assert [c for c in out["calls"]] == ["GET /p2/paid-marketing/api/master/state", "GET /p2/paid-marketing/api/segments/accounts", "GET /p2/paid-marketing/api/gads/accounts?platform=meta"]
-    assert "Acme &lt;b&gt;Dental&lt;/b&gt;" in lst and "<b>Dental</b>" not in lst and "2 accounts, 9 of 9 shared fields filled" in lst and "Acme Dental, Acme Meta" in lst and 'class="pm-btn-ghost ma-edit" data-id="%s"' % client["id"] in lst
+    assert "Acme &lt;b&gt;Dental&lt;/b&gt;" in lst and "<b>Dental</b>" not in lst and "2 accounts, 10 of 10 shared fields filled" in lst and "Acme Dental, Acme Meta" in lst and 'class="pm-btn-ghost ma-edit" data-id="%s"' % client["id"] in lst
     assert "Clients" in kp and "Accounts covered" in kp and "Without a client" in kp and "Settings that differ" in kp
     assert out["el"]["#out"]["hidden"] is False and out["el"]["#skel"]["hidden"] is True and "1 client" in out["el"]["#fresh"]["html"] and "last change" in out["el"]["#fresh"]["html"]
     assert "Beta Clinic" in out["el"]["#free"]["text"] and out["el"]["#freeCard"]["hidden"] is False and out["el"]["#driftCard"]["hidden"] is True and "ana@position2.com saved the client" in out["el"]["#changes"]["html"]

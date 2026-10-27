@@ -7,7 +7,8 @@ monitors' store (tracker/paid_monitor_store.py, the value "settings:master"):
   client     a name and the accounts it owns (Google customer ids and Meta ad accounts; an account is in one client only)
   per account  budget {monthly, weeklyMin, weeklyMax}, targets {cpa, roas, cvr, ctr}, tolerance: what differs between a client's own accounts
   shared     phones, locations (where the client's patients or customers are), areas (regions people say), brandTerms (the words searches for the brand contain), writtenAs (how the name is
-             written in copy), allowWords (words the dictionary does not know that are right), domains (the addresses its ads may send people to), offers (text and the day it ends), notes
+             written in copy), allowWords (words the dictionary does not know that are right), domains (the addresses its ads may send people to), competitors (name, website, Facebook page,
+             Google advertiser id: Competitor Analysis reads them), offers (text and the day it ends), notes
 
 How the agents read it: the master FILLS what an agent has not saved for itself, and what an agent saved for itself still wins (the team set it there on purpose); the page shows every place
 the two disagree. The overlay_* functions return a copy of an agent's settings with the master's figures filled in; nothing is written to the agent's own saved settings.
@@ -21,6 +22,7 @@ from datetime import date, datetime, timezone
 
 from . import paid_brandspend_insight as ins
 from . import paid_brandspend_settings as bs
+from . import paid_compete_settings as ccs
 from . import paid_copycheck_settings as cs
 from . import paid_domains as dom
 from . import paid_geoconf_settings as gs
@@ -36,7 +38,7 @@ USED_BY = {
     "budget.monthly": ["Brand Spend Alert"], "budget.weeklyMin": ["Brand Spend Alert"], "budget.weeklyMax": ["Brand Spend Alert"],
     "targets": ["KPI Monitoring"], "tolerance": ["KPI Monitoring"],
     "phones": ["Ad Copy Checker"], "locations": ["Ad Copy Checker"], "areas": ["Location Conflicts"], "brandTerms": ["Brand Spend Alert"],
-    "writtenAs": ["Ad Copy Checker"], "allowWords": ["Ad Copy Checker"], "domains": ["Unknown Domains"], "offers": [], "notes": [],
+    "writtenAs": ["Ad Copy Checker"], "allowWords": ["Ad Copy Checker"], "domains": ["Unknown Domains"], "competitors": ["Competitor Analysis"], "offers": [], "notes": [],
 }
 
 
@@ -126,7 +128,7 @@ def _shared(v):
     brand = v.get("brandTerms")
     return {"phones": cs.clean_phones(v.get("phones")), "locations": cs.clean_places(v.get("locations")), "areas": gs._clean(v.get("areas"), "a place name", MAX_AREAS),
             "brandTerms": ins.terms_of(",".join(brand) if isinstance(brand, list) else brand), "writtenAs": cs.clean_brand(v.get("writtenAs")), "allowWords": cs.clean_words(v.get("allowWords")),
-            "domains": _domains(v.get("domains")), "offers": _offers(v.get("offers")), "notes": str(v.get("notes") or "").strip()[:MAX_NOTES]}
+            "domains": _domains(v.get("domains")), "competitors": ccs.clean_competitors(v.get("competitors")), "offers": _offers(v.get("offers")), "notes": str(v.get("notes") or "").strip()[:MAX_NOTES]}
 
 
 def clean_client(data):
@@ -134,7 +136,7 @@ def clean_client(data):
     BadRequest; it is said the same way, as this module's)."""
     try:
         return _clean_client(data)
-    except (bs.BadRequest, cs.BadRequest, ks.BadRequest, gs.BadRequest) as e:
+    except (bs.BadRequest, cs.BadRequest, ks.BadRequest, gs.BadRequest, ccs.BadRequest) as e:
         raise BadRequest(str(e)) from e
 
 
@@ -221,7 +223,7 @@ def effective(master, account):
     return {"client": {"id": c["id"], "name": c["name"]}, "budget": dict(a.get("budget") or {}), "targets": dict(a.get("targets") or {}), "tolerance": a.get("tolerance"),
             "phones": list(sh.get("phones") or []), "locations": list(sh.get("locations") or []), "areas": list(sh.get("areas") or []), "brandTerms": list(sh.get("brandTerms") or []),
             "writtenAs": list(sh.get("writtenAs") or []), "allowWords": list(sh.get("allowWords") or []), "domains": list(sh.get("domains") or []),
-            "offers": [dict(o) for o in sh.get("offers") or []], "notes": sh.get("notes") or ""}
+            "competitors": [dict(c) for c in sh.get("competitors") or []], "offers": [dict(o) for o in sh.get("offers") or []], "notes": sh.get("notes") or ""}
 
 
 def active_offers(offers, today):
@@ -300,6 +302,18 @@ def overlay_geoconf(settings, master):
             have = out["accounts"].get(aid) or {}
             if e["areas"] and not have.get("areas"):
                 out["accounts"][aid] = dict(have, areas=list(e["areas"]))
+    return out
+
+
+def overlay_compete(settings, master):
+    """A copy of Competitor Analysis's settings with the client's competitors filled in for an account that has none saved (the account's own list wins, whole: lists are not merged)."""
+    out = _accounts_copy(settings)
+    for cid, c in (master.get("clients") or {}).items():
+        mine = [dict(x) for x in (c.get("shared") or {}).get("competitors") or []]
+        for aid in c.get("accounts") or {}:
+            have = out["accounts"].get(aid) or {}
+            if mine and not have.get("competitors"):
+                out["accounts"][aid] = dict(have, competitors=[dict(x) for x in mine], fromMaster=True)
     return out
 
 
