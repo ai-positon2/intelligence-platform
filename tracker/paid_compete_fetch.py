@@ -22,9 +22,9 @@ from . import paid_compete_math as cm
 from . import paid_compete_settings as cs
 
 ACTORS = {"meta": ("CA_APIFY_META_ACTOR_ID", "apify/facebook-ads-scraper"), "google": ("CA_APIFY_GOOGLE_ACTOR_ID", "silva95gustavo/google-ads-scraper")}
-LIMIT = {"meta": 150, "google": 150}                  # ads read per competitor and platform (a competitor with more says so: a read that reaches its limit is marked capped)
+LIMIT = {"meta": 400, "google": 150}                  # ads read per competitor and platform (a competitor with more says so: a read that reaches its limit is marked capped)
 USD_PER_AD = {"meta": 0.005, "google": 0.0016}        # what the actors charge at the time of writing (Apify's own tier, shown to the team as "about")
-SECONDS_PER_AD = {"meta": 1.2, "google": 11.0}        # measured 2026-10-27: Meta read 94 ads in 96 s, Google (reading the text from each picture) 126 creatives in 23 minutes
+SECONDS_PER_AD = {"meta": 1.2, "google": 11.0}        # measured 2026-10-27: Meta read 94 ads in 96 s and 307 in 193 s, Google (reading the text from each picture) 126 creatives in 23 minutes
 TIMEOUT = {"meta": 900, "google": 2100}               # a read still going then is stopped and what it had saved is kept as a partial read
 CACHE_DAYS = 7
 WORKERS = 3
@@ -117,6 +117,11 @@ def cached(store, platform, comp, region):
     return store.state_get(cache_key(platform, comp, region))
 
 
+def outgrown(entry, platform):
+    """A read that stopped at a limit lower than today's is not the whole of what the competitor runs: it is read again (a read at today's limit is not)."""
+    return bool(entry) and bool(entry.get("capped")) and (entry.get("limit") or 0) < LIMIT[platform]
+
+
 def fresh(entry, now):
     try:
         return bool(entry) and not entry.get("error") and not entry.get("partial") and datetime.fromisoformat(entry["fetchedAt"]) > now - timedelta(days=CACHE_DAYS)
@@ -154,7 +159,7 @@ def refresh(store, account_key, competitors, platforms, region, *, run_fn, token
         return {"status": "busy"}
     started = now_fn()
     pairs = [(p, c) for c in competitors if not only or c["name"] in only for p in platforms if start_url(p, c, region)]          # a competitor with nothing to look up on a platform is not a read
-    todo = [(p, c) for p, c in pairs if force or not fresh(cached(store, p, c, region), started)]
+    todo = [(p, c) for p, c in pairs if force or not fresh(cached(store, p, c, region), started) or outgrown(cached(store, p, c, region), p)]
     job = {"status": "running", "startedAt": started.isoformat(timespec="seconds"), "by": who, "total": len(todo), "skippedFresh": len(pairs) - len(todo),
            "steps": [{"name": c["name"], "platform": p, "status": "waiting", "ads": 0, "error": ""} for p, c in todo]}
     store.state_set("compete:job:" + account_key, job)
