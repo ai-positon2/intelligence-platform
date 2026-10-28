@@ -19,7 +19,8 @@ function ago(iso){
   return t.toLocaleDateString("en-US",{month:"short",day:"numeric"})+" ("+rel+")";
 }
 
-var S = {account:"", report:null, seq:0, polls:0, results:null, finding:{}, query:""};
+var S = {account:"", report:null, seq:0, polls:0, results:null, finding:{}, query:"", filters:{platform:"",competitor:"",format:"",sort:"longest",q:""}, cards:[], adsRes:null, adsSeq:0, adsBusy:false, adsErr:"", toolsKey:""};
+var PAGE_ADS = 24;
 var scope = null;
 
 function setMsg(html,kind){$("#msg").innerHTML=html?'<div class="'+(kind||"pm-err")+'">'+html+'</div>':"";}
@@ -70,8 +71,9 @@ function render(){
     return '<div class="pd-kpi '+cls+'"><div class="k">'+esc(c[0])+'</div><div class="v">'+esc(c[1])+'</div><div class="s">'+esc(c[2])+'</div></div>';
   }).join("");
   $("#standing").textContent=D.standing(rep);
-  paintCompetitors(); paintIdeas(); paintGaps(); paintAds(); paintBlind();
+  paintCompetitors(); paintIdeas(); paintGaps(); paintAds(); paintBlind(); paintGallery(); loadAds(true);
   $("#foot").innerHTML="Competitor ads are read from Meta's Ad Library (the page's active ads) and Google's Ads Transparency Center by scrapers, only when you press Refresh, and kept for "+rep.cacheDays+" days. "+
+    "Pictures and videos are loaded from the platforms' own servers, and Meta removes those links after a few days: a picture that no longer loads can still be seen in the Ad Library. "+
     "Our ads are the Ad Copy Checker's read of the text of the ads running now. A message is a gap only when the competitors use it clearly more than we do, in at least three of their ads and, when two were read, in two competitors. Nothing is changed in an ad account.";
 }
 function paintCompetitors(){
@@ -142,6 +144,89 @@ function paintBlind(){
   var rep=S.report;
   $("#blind").innerHTML=(rep.caveats||[]).map(function(c){return '<li><b>This time:</b> '+esc(c)+'</li>';}).join("")+(rep.notMeasured||[]).map(function(c){return '<li>'+esc(c)+'</li>';}).join("");
 }
+
+/* ── The ads themselves ───────────────────────────────────── */
+function resetGallery(){S.filters={platform:"",competitor:"",format:"",sort:"longest",q:""}; S.cards=[]; S.adsRes=null; S.adsErr=""; S.toolsKey=""; S.adsSeq++;}
+function loadAds(reset){
+  if(!S.report||!S.report.competitors.length){S.cards=[]; S.adsRes=null; S.adsErr=""; paintGallery(); return Promise.resolve();}
+  var seq=++S.adsSeq, acct=S.account, offset=reset?0:S.cards.length;
+  S.adsBusy=true; paintGallery();
+  return getJson(API+"/ads"+D.adsQuery(acct,S.filters,offset,PAGE_ADS)).then(function(r){
+    if(seq!==S.adsSeq||acct!==S.account) return;
+    S.adsBusy=false;
+    if(!r.ok){S.adsErr=(r.j&&r.j.error)||("The ads could not be listed (HTTP "+r.status+")."); paintGallery(); return;}
+    var cards=(r.j.ads||[]).map(D.adCard);
+    S.adsErr=""; S.adsRes=r.j; S.cards=reset?cards:S.cards.concat(cards); paintGallery();
+  }).catch(function(){
+    if(seq!==S.adsSeq) return;
+    S.adsBusy=false; S.adsErr="The server could not be reached. The ads were not listed."; paintGallery();
+  });
+}
+function paintGallery(){
+  var rep=S.report, show=!!(rep&&rep.competitors&&rep.competitors.length), res=S.adsRes;
+  $("#galCard").hidden=!show;
+  if(!show) return;
+  $("#galNote").textContent=res&&!S.adsErr?D.pageText(res):(S.adsBusy?"Loading the ads\u2026":"");
+  var note=res&&!S.adsErr?D.creativeNote(res):"";
+  $("#galMsg").innerHTML=S.adsErr?'<div class="pm-err">'+esc(S.adsErr)+'</div>':(note?'<p class="mp-note">'+esc(note)+'</p>':"");
+  var key=S.account+"|"+(res?JSON.stringify(res.facets):"");
+  if(res&&!S.adsErr&&key!==S.toolsKey){S.toolsKey=key; paintTools(res);}
+  paintGrid();
+  $("#galMore").hidden=!(res&&!S.adsErr&&S.cards.length<res.total);
+  $("#galMore").disabled=S.adsBusy;
+}
+function paintTools(res){
+  var o=D.filterOptions(res), f=S.filters;
+  function sel(key,label,opts){
+    return '<label class="cc-f ca-gal-f"><span>'+esc(label)+'</span><select data-f="'+key+'">'+opts.map(function(x){return '<option value="'+esc(x[0])+'"'+(f[key]===x[0]?" selected":"")+'>'+esc(x[1])+'</option>';}).join("")+'</select></label>';
+  }
+  $("#galTools").innerHTML=(o.platforms?sel("platform","Platform",o.platforms):"")+sel("competitor","Competitor",o.competitors)+sel("format","Format",o.formats)+sel("sort","Sort by",D.SORTS)+
+    '<label class="cc-f ca-gal-f"><span>Search the ads</span><input type="text" data-f="q" value="'+esc(f.q)+'" maxlength="80" placeholder="A word, an offer, a page" spellcheck="false" autocomplete="off"></label>';
+}
+function mediaHtml(m,alt){
+  if(!m) return '<div class="ca-ad-nomedia">No picture or video was kept for this ad.</div>';
+  if(m.kind==="video") return '<video class="ca-ad-m" controls preload="none" playsinline'+(m.poster?' poster="'+esc(m.poster)+'"':"")+' src="'+esc(m.url)+'"></video>';
+  return '<img class="ca-ad-m" src="'+esc(m.url)+'" alt="'+esc(alt)+'" loading="lazy" referrerpolicy="no-referrer">';
+}
+function thumbHtml(t,j,on){
+  var inner=t.poster||t.kind!=="video"?'<img src="'+esc(t.poster||t.url)+'" alt="" loading="lazy" referrerpolicy="no-referrer">':'<span class="ca-ad-play">\u25B6</span>';
+  return '<button type="button" class="ca-ad-thumb'+(on?" on":"")+'" data-m="'+j+'" aria-label="Show variant '+(j+1)+'">'+inner+'</button>';
+}
+function cardHtml(c,i){
+  var sel=Math.min(c.sel||0,Math.max(0,c.media.length-1)), m=c.media[sel], alt=c.title||c.advertiser;
+  var thumbs=c.media.length>1||c.extra?'<div class="ca-ad-thumbs">'+(c.media.length>1?c.media.map(function(t,j){return thumbHtml(t,j,j===sel);}).join(""):"")+(c.extra?'<span class="bi-sub">+'+c.extra+' more variants</span>':"")+'</div>':"";
+  var google=c.platform==="google"&&c.media.length>0;          /* a Google ad's picture is the ad as it reads, so the words come from the variant shown and are not listed a second time */
+  var variant=m&&(m.title||m.body||m.cta)&&(c.media.length>1||google)?'<p class="ca-ad-var">'+(m.title?'<b>'+esc(m.title)+'</b> ':"")+esc(m.body)+(m.cta?' <span class="bi-sub">Button: '+esc(m.cta)+'</span>':"")+'</p>':"";
+  var heads=c.title?'<h4 class="ca-ad-t">'+esc(c.title)+'</h4>'+(google?[]:c.moreHeads.slice(0,3)).map(function(h){return '<p class="ca-ad-h">'+esc(h)+'</p>';}).join(""):'<h4 class="ca-ad-t ca-ad-t0">Picture or video only</h4>';
+  var more=c.text&&c.text!==(c.lines[0]||"")?'<details class="ca-ad-more"><summary>Full text</summary><p class="ca-ad-full">'+esc(c.text)+'</p></details>':"";
+  var lib=c.libraryUrl?'<a href="'+esc(c.libraryUrl)+'" target="_blank" rel="noopener noreferrer">Open in the '+(c.platform==="google"?"Ads Transparency Center":"Meta Ad Library")+'</a>':"";
+  var page=c.link?'<a href="'+esc(c.link)+'" target="_blank" rel="noopener noreferrer">'+esc(c.landing||c.link)+'</a>':(c.caption?'<span class="bi-sub">'+esc(c.caption)+'</span>':"");
+  return '<article class="ca-ad" data-i="'+i+'"><div class="ca-ad-media">'+mediaHtml(m,alt)+'</div>'+thumbs+'<div class="ca-ad-b">'+
+    '<div class="ca-ad-chips"><span class="ca-chip">'+esc(c.platformLabel)+'</span>'+(c.format?'<span class="ca-chip">'+esc(c.format)+'</span>':"")+(c.status?'<span class="ca-chip '+(c.status==="Active"?"on":"")+'">'+esc(c.status)+'</span>':"")+'</div>'+
+    heads+variant+(google?[]:c.lines.slice(0,3)).map(function(l){return '<p>'+esc(l)+'</p>';}).join("")+more+
+    '<div class="ca-ad-act">'+(c.cta?'<span class="ca-cta">'+esc(c.cta)+'</span>':"")+page+'</div>'+
+    '<div class="bi-sub ca-ad-who">'+esc(c.advertiser)+(c.competitor&&c.competitor!==c.advertiser?" ("+esc(c.competitor)+")":"")+(c.running?" \u00b7 "+esc(c.running):"")+(c.copies?" \u00b7 "+esc(c.copies):"")+'</div>'+
+    (lib?'<div class="ca-ad-links">'+lib+'</div>':"")+'</div></article>';
+}
+function paintGrid(){
+  var res=S.adsRes;
+  $("#galGrid").innerHTML=S.cards.length?S.cards.map(cardHtml).join(""):(res&&!S.adsErr?'<p class="pm-empty">'+esc(D.emptyText(res))+'</p>':"");
+}
+$("#galTools").addEventListener("change",function(e){
+  var t=e.target.closest("[data-f]"); if(!t) return;
+  S.filters[t.dataset.f]=String(t.value||""); loadAds(true);
+});
+$("#galMore").addEventListener("click",function(){loadAds(false);});
+$("#galGrid").addEventListener("click",function(e){
+  var b=e.target.closest("[data-m]"), card=e.target.closest("[data-i]");
+  if(!b||!card) return;
+  var c=S.cards[+card.dataset.i]; if(!c) return;
+  c.sel=+b.dataset.m; paintGrid();
+});
+$("#galGrid").addEventListener("error",function(e){            /* an image or a video that no longer loads (a platform's picture links expire): say so, and point at the ad's own page */
+  var t=e.target, host=t&&t.classList&&t.classList.contains("ca-ad-m")?t.parentNode:null;
+  if(host) host.innerHTML='<div class="ca-ad-nomedia">This picture can no longer be loaded: the platforms remove their picture links after a few days. Open the ad in its library to see it.</div>';
+},true);
 
 /* ── Finding and keeping competitors ──────────────────────── */
 function names(){return S.report&&S.report.names?flip(S.report):{};}
@@ -275,7 +360,7 @@ $("#exportBtn").addEventListener("click",function(){
 /* ── Start ────────────────────────────────────────────────── */
 (function(){
   var want=(new URLSearchParams(location.search).get("account"))||store("ca_account")||"";
-  scope=window.PMScope.mount($("#acctPick"),{account:want,noGroups:true,onChange:function(a){S.account=a; S.results=null; S.finding={}; store("ca_account",a); run();},
+  scope=window.PMScope.mount($("#acctPick"),{account:want,noGroups:true,onChange:function(a){S.account=a; S.results=null; S.finding={}; resetGallery(); store("ca_account",a); run();},
     onError:function(e){setMsg(esc((e&&e.message)||"The account list could not be read."));}});
 })();
 })();

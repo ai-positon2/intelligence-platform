@@ -581,3 +581,101 @@ def test_the_gallery_says_what_is_missing_why_it_is_empty_and_how_much_is_shown(
     assert run("X.emptyText({reads: [], facets: {platforms: {}}})") == "No competitors are saved for this account yet."
     assert run("X.emptyText({reads: [{}], facets: {platforms: {}}})") == "No competitor ads have been read yet. Press Refresh competitor ads to read them."
     assert run("X.emptyText({reads: [{}], facets: {platforms: {meta: 4}}})") == "No ad matches these filters."
+
+
+# ── the gallery on the page ─────────────────────────────────────────────────
+
+def with_ads(rep, ads_res, steps=None, **kw):
+    return opened(rep, steps, more=[{"match": "/compete/ads", "body": ads_res}], **kw)
+
+
+def ads_calls(out):
+    return [c for c in out["calls"] if "/compete/ads" in c]
+
+
+def test_the_gallery_is_drawn_from_the_ads_the_server_lists_with_pictures_words_buttons_and_links(report):
+    out = with_ads(report, gallery_res())
+    assert ads_calls(out) == ["/p2/paid-marketing/api/compete/ads?account=1234567890&sort=longest&limit=24"] and out["el"]["#galCard"]["hidden"] is False
+    grid = out["el"]["#galGrid"]["html"]
+    assert grid.count('<article class="ca-ad"') == 2 and "Pump delivered" in grid and 'src="https://scontent-hou1-1.xx.fbcdn.net/' in grid and 'referrerpolicy="no-referrer"' in grid and "See details" in grid
+    assert 'href="https://www.tandemdiabetes.com/landing-pages/tandem-pump-rx" target="_blank" rel="noopener noreferrer"' in grid and "https://www.facebook.com/ads/library/?id=1" in grid
+    assert grid.count('target="_blank"') >= 3 and grid.count('target="_blank"') == grid.count('target="_blank" rel="noopener noreferrer"')            # every link that opens a new tab keeps the page it came from out of reach
+    assert "Picture or video only" in grid and "34 days running, since 2026-09-23" in grid and "Active" in grid and "Important Safety Information" in grid
+    assert out["el"]["#galNote"]["text"] == "Showing 2 of 2 ads" and out["el"]["#galMore"]["hidden"] is True and out["el"]["#galMsg"]["html"] == ""
+    tools = out["el"]["#galTools"]["html"]
+    assert 'data-f="competitor"' in tools and "All competitors (2)" in tools and 'data-f="format"' in tools and 'data-f="sort"' in tools and 'data-f="q"' in tools and 'data-f="platform"' not in tools
+
+
+def test_what_an_ad_says_is_never_drawn_as_markup(report):
+    res = gallery_res()
+    res["ads"][0].update(headlines=["<img src=x onerror=alert(1)>"], bodies=['"><script>alert(2)</script>'], text="a <b>bold</b> claim", who="<i>Evil</i>", competitor="<u>C</u>", cta="<b>Buy</b>")
+    res["ads"][0]["media"][0].update(title="<svg onload=alert(3)>")
+    grid = with_ads(report, res)["el"]["#galGrid"]["html"]
+    for raw in ("<img src=x", "<script>", "<b>bold</b>", "<i>Evil</i>", "<u>C</u>", "<b>Buy</b>", "<svg onload"):
+        assert raw not in grid, raw
+    assert "&lt;img src=x onerror=alert(1)&gt;" in grid and "&lt;i&gt;Evil&lt;/i&gt;" in grid
+
+
+def test_show_more_asks_for_the_next_page_and_adds_its_ads_below(report):
+    first = dict(gallery_res(), total=3)
+    nxt = dict(gallery_res(), total=3, offset=2, ads=[dict(gallery_res()["ads"][0], id="meta:9", headlines=["Third ad"])])
+    out = opened(report, [{"click": "#galMore"}], more=[{"match": "/compete/ads", "sequence": [first, nxt]}])
+    assert ads_calls(out)[1].endswith("&sort=longest&offset=2&limit=24")
+    grid = out["el"]["#galGrid"]["html"]
+    assert grid.count('<article class="ca-ad"') == 3 and "Third ad" in grid and out["el"]["#galNote"]["text"] == "Showing 3 of 3 ads" and out["el"]["#galMore"]["hidden"] is True
+    assert with_ads(report, first)["el"]["#galMore"]["hidden"] is False
+
+
+def test_a_filter_asks_again_from_the_first_page_with_the_choice_in_the_request(report):
+    res = gallery_res()
+    pick = {"[data-f]": {"dataset": {"f": "competitor"}, "value": "Tandem"}}
+    out = with_ads(report, res, [{"change": ["#galTools", pick]}])
+    assert ads_calls(out)[1] == "/p2/paid-marketing/api/compete/ads?account=1234567890&competitor=Tandem&sort=longest&limit=24"
+    out = with_ads(report, res, [{"change": ["#galTools", {"[data-f]": {"dataset": {"f": "q"}, "value": "t:slim"}}]}, {"change": ["#galTools", {"[data-f]": {"dataset": {"f": "sort"}, "value": "newest"}}]}])
+    assert ads_calls(out)[-1] == "/p2/paid-marketing/api/compete/ads?account=1234567890&sort=newest&q=t%3Aslim&limit=24"
+
+
+def test_a_thumbnail_shows_that_picture_of_a_dynamic_ad_and_says_how_many_more_there_are(report):
+    res = gallery_res()
+    res["ads"][0].update(media=[{"kind": "image", "url": "https://a.example/%d.jpg" % i, "title": "V%d" % i, "cta": "Go %d" % i} for i in range(1, 4)], mediaCount=9)
+    grid = with_ads(report, res)["el"]["#galGrid"]["html"]
+    assert grid.count("ca-ad-thumb") >= 3 and "+6 more variants" in grid and 'src="https://a.example/1.jpg"' in grid
+    out = with_ads(report, res, [{"fire": ["#galGrid", {"[data-m]": {"dataset": {"m": "2"}}, "[data-i]": {"dataset": {"i": "0"}}}]}])
+    grid = out["el"]["#galGrid"]["html"]
+    assert 'class="ca-ad-m" src="https://a.example/3.jpg"' in grid and 'class="ca-ad-m" src="https://a.example/1.jpg"' not in grid and "V3" in grid
+
+
+def test_a_video_is_a_player_that_loads_nothing_until_played_and_an_ad_with_no_picture_says_so(report):
+    res = gallery_res()
+    res["ads"][0]["media"] = [{"kind": "video", "url": "https://video.example/a.mp4", "poster": "https://video.example/p.jpg"}]
+    res["ads"][1]["media"] = []
+    grid = with_ads(report, res)["el"]["#galGrid"]["html"]
+    assert '<video class="ca-ad-m" controls preload="none" playsinline poster="https://video.example/p.jpg" src="https://video.example/a.mp4"></video>' in grid and "No picture or video was kept for this ad." in grid
+
+
+def test_the_gallery_says_when_ads_were_read_before_pictures_were_kept_and_when_it_could_not_be_listed(report):
+    res = dict(gallery_res(), creativeMissing=2)
+    assert "2 ads were read before pictures and links were kept" in with_ads(report, res)["el"]["#galMsg"]["html"]
+    out = opened(report, more=[{"match": "/compete/ads", "status": 400, "body": {"error": "Pick one Google Ads account."}}])
+    assert "Pick one Google Ads account." in out["el"]["#galMsg"]["html"] and out["el"]["#galGrid"]["html"] == ""
+    out = opened(report, more=[{"match": "/compete/ads", "body": {"ads": [], "total": 0, "offset": 0, "limit": 24, "reads": [], "facets": {"platforms": {}, "competitors": {}, "formats": {}}, "creativeMissing": 0}}])
+    assert "No competitors are saved for this account yet." in out["el"]["#galGrid"]["html"] and out["el"]["#galMore"]["hidden"] is True
+
+
+def test_an_account_with_no_competitor_has_no_gallery(empty_report):
+    out = opened(empty_report)
+    assert out["el"]["#galCard"]["hidden"] is True and ads_calls(out) == []
+
+
+def test_a_google_card_shows_the_picture_and_the_words_of_the_variant_shown_not_the_same_words_again(report):
+    res = gallery_res()
+    g = dict(res["ads"][0], platform="google", id="google:1", headlines=["Head one", "Head two"], bodies=["Description read from the picture"], text="", url="https://tandemdiabetes.com", landing="tandemdiabetes.com",
+             adUrl="https://adstransparency.google.com/advertiser/AR1/creative/CR1", cta="", ctaType="", format="text",
+             media=[{"kind": "image", "url": "https://tpc.googlesyndication.com/archive/simgad/%d" % i, "title": "Head %d" % i, "body": "Words %d" % i, "link": "https://tandemdiabetes.com"} for i in (1, 2)], mediaCount=2)
+    res["ads"] = [g]
+    grid = with_ads(report, res)["el"]["#galGrid"]["html"]
+    assert "Head one" in grid and "<b>Head 1</b> Words 1" in grid and "Description read from the picture" not in grid and "Head two" not in grid and "Open in the Ads Transparency Center" in grid
+    grid = with_ads(report, res, [{"fire": ["#galGrid", {"[data-m]": {"dataset": {"m": "1"}}, "[data-i]": {"dataset": {"i": "0"}}}]}])["el"]["#galGrid"]["html"]
+    assert "<b>Head 2</b> Words 2" in grid and 'class="ca-ad-m" src="https://tpc.googlesyndication.com/archive/simgad/2"' in grid
+    one = dict(g, media=g["media"][:1], mediaCount=1)
+    assert "<b>Head 1</b> Words 1" in with_ads(report, dict(res, ads=[one]))["el"]["#galGrid"]["html"]                    # one picture still shows its words

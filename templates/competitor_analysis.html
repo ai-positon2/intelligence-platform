@@ -51,6 +51,15 @@
       <div id="compTables"></div>
     </section>
 
+    <section class="pm-panel" id="galCard" hidden>
+      <div class="pm-panel-h"><span class="pm-panel-t">The ads they are running</span><span class="pm-panel-s" id="galNote"></span></div>
+      <p class="bi-sub ca-gal-sub">The ads as the platforms show them: the picture or video, the words, the button and the page it opens. The longest-running ads come first.</p>
+      <div class="ca-gal-tools" id="galTools"></div>
+      <div id="galMsg"></div>
+      <div class="ca-gal" id="galGrid"></div>
+      <div class="ca-gal-more"><button class="pm-btn-ghost" id="galMore" type="button" hidden>Show more ads</button></div>
+    </section>
+
     <section class="pm-panel" id="ideasCard" hidden>
       <div class="pm-panel-h"><span class="pm-panel-t">Ideas to improve our ads</span><span class="pm-panel-s" id="ideasNote"></span></div>
       <div id="ideas"></div>
@@ -78,6 +87,6 @@
 <script src="{{ url_for('static', filename='js/pm_picker.js') }}?v=1"></script>
 <script src="{{ url_for('static', filename='js/pm_platform.js') }}?v=7"></script>
 <script src="{{ url_for('static', filename='js/pm_scope.js') }}?v=2"></script>
-<script src="{{ url_for('static', filename='js/competitor_analysis_data.js') }}?v=2"></script>
-<script src="{{ url_for('static', filename='js/competitor_analysis.js') }}?v=2"></script>
+<script src="{{ url_for('static', filename='js/competitor_analysis_data.js') }}?v=3"></script>
+<script src="{{ url_for('static', filename='js/competitor_analysis.js') }}?v=3"></script>
 {% endblock %}

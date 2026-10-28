@@ -164,6 +164,7 @@ function findBody(account, name, names, force){ return {account: account, name: 
 
 /* ── The ads themselves ────────────────────────────────────────────────── */
 
+var SORTS = [["longest", "Running longest"], ["newest", "Newest first"]];
 var FORMAT = {image: "Image", video: "Video", carousel: "Carousel", dynamic: "Dynamic", catalog: "Catalog", text: "Text ad"};
 function formatLabel(f){ f = String(f || ""); return FORMAT[f] || (f ? f.charAt(0).toUpperCase() + f.slice(1) : ""); }
 function ctaLabel(ad){
@@ -256,6 +257,6 @@ function csvRows(rep){
 var api = {PLAT: PLAT, HEAD: HEAD, int: int, plural: plural, day: day, levelInfo: levelInfo, money: money, ageText: ageText, tiles: tiles, estimateText: estimateText, jobText: jobText, stepLine: stepLine,
   competitorRows: competitorRows, gapRows: gapRows, gapText: gapText, exampleText: exampleText, ideaCards: ideaCards, offerRows: offerRows, winnerRows: winnerRows, newestRows: newestRows,
   resultCards: resultCards, searchNote: searchNote, facebookText: facebookText, competitorCards: competitorCards, forText: forText, addBody: addBody, removeBody: removeBody, pageBody: pageBody, regionBody: regionBody, findBody: findBody,
-  standing: standing, csvRows: csvRows, formatLabel: formatLabel, ctaLabel: ctaLabel, safeUrl: safeUrl, adsQuery: adsQuery, adCard: adCard, filterOptions: filterOptions, pageText: pageText, creativeNote: creativeNote, emptyText: emptyText};
+  standing: standing, csvRows: csvRows, SORTS: SORTS, formatLabel: formatLabel, ctaLabel: ctaLabel, safeUrl: safeUrl, adsQuery: adsQuery, adCard: adCard, filterOptions: filterOptions, pageText: pageText, creativeNote: creativeNote, emptyText: emptyText};
 if (typeof module !== "undefined" && module.exports) module.exports = api; else root.CAData = api;
 })(typeof window !== "undefined" ? window : globalThis);

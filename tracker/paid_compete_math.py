@@ -253,9 +253,9 @@ def meta_ad(item, *, asof, textless=False):
 
 def google_ad(item, *, asof, textless=False):
     """One creative of Google's Ads Transparency Center as the shape above, or None for a row with no text in any variation (with `textless`, one that has a picture is kept). The descriptions were
-    read from the picture of the ad; the picture of each variation is kept, with the words read from it and the link it opens."""
+    read from the picture of the ad; the picture of each variation is kept, with the words read from it and the link it opens. A video creative's file is not given, only its picture, so
+    its media stay pictures and the format says "video"."""
     heads, bodies, url, media = [], [], "", []
-    video = str(item.get("format") or "").upper() == "VIDEO"
     for v in item.get("variations") or []:
         if not isinstance(v, dict):
             continue
@@ -265,10 +265,10 @@ def google_ad(item, *, asof, textless=False):
         url = url or web(v.get("clickUrl"))
         pic = https(v.get("imageUrl"))
         if pic:
-            media.append({"kind": "video" if video else "image", "url": pic, "title": _clean_line(v.get("headline")), "body": desc, "link": web(v.get("clickUrl"))})
+            media.append({"kind": "image", "url": pic, "title": _clean_line(v.get("headline")), "body": desc, "link": web(v.get("clickUrl"))})
     if not media and https(item.get("previewUrl")):
         first = next((v for v in item.get("variations") or [] if isinstance(v, dict)), {})
-        media.append({"kind": "video" if video else "image", "url": https(item.get("previewUrl")), "title": _clean_line(first.get("headline")), "body": clean_ocr(first.get("description")), "link": web(first.get("clickUrl"))})
+        media.append({"kind": "image", "url": https(item.get("previewUrl")), "title": _clean_line(first.get("headline")), "body": clean_ocr(first.get("description")), "link": web(first.get("clickUrl"))})
     heads, bodies = _uniq(heads), _uniq(bodies)
     if not heads and not bodies and not (textless and media):
         return None

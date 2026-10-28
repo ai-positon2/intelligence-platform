@@ -151,6 +151,8 @@ def test_a_google_creative_keeps_one_picture_per_variation_with_its_words_and_it
     assert a["media"][0] == {"kind": "image", "url": "https://tpc.googlesyndication.com/archive/simgad/1", "title": "Connected with Dexcom - Get Started Today",
                              "body": "Say goodbye to fingersticks when you use t:slim X2 insulin pump with Dexcom G6 or G7 CGM.", "link": "https://tandemdiabetes.com"}
     assert a["media"][2]["body"] == "" and cm.google_ad(dict(item, adLibraryUrl="https://evil.example/creative/1"), asof=ASOF)["adUrl"] == ""
+    vid = cm.google_ad(dict(item, format="VIDEO"), asof=ASOF)
+    assert vid["format"] == "video" and {m["kind"] for m in vid["media"]} == {"image"}                                  # Google gives the picture of a video creative, not the file: it must not be played
     nopic = cm.google_ad(dict(item, variations=[{"headline": "H", "description": "", "clickUrl": ""}]), asof=ASOF)
     assert nopic["media"] == [{"kind": "image", "url": "https://tpc.googlesyndication.com/archive/simgad/1", "title": "H", "body": "", "link": ""}]         # the creative's own preview stands in
 
