@@ -1818,6 +1818,8 @@ video.ca-ad-m{background:#000}
 .ca-ad-thumb.on{border-color:var(--pm-a)}
 .ca-ad-thumb:focus-visible{outline:2px solid var(--pm-a);outline-offset:1px}
 .ca-ad-play{font-size:14px}
+.ca-ad-watch{position:relative;display:block;width:100%}
+.ca-ad-wl{position:absolute;left:8px;bottom:8px;padding:4px 11px;border-radius:999px;background:rgba(0,0,0,.74);color:#fff;font-size:12px;font-weight:700}
 .ca-ad-b{padding:10px 14px 14px;min-width:0;overflow-wrap:anywhere}
 .ca-ad-b p{margin:5px 0 0;font-size:12.5px;line-height:1.5}
 .ca-ad-chips{display:flex;flex-wrap:wrap;gap:6px}

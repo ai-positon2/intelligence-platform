@@ -186,7 +186,8 @@ function paintTools(res){
 function mediaHtml(m,alt){
   if(!m) return '<div class="ca-ad-nomedia">No picture or video was kept for this ad.</div>';
   if(m.kind==="video") return '<video class="ca-ad-m" controls preload="none" playsinline'+(m.poster?' poster="'+esc(m.poster)+'"':"")+' src="'+esc(m.url)+'"></video>';
-  return '<img class="ca-ad-m" src="'+esc(m.url)+'" alt="'+esc(alt)+'" loading="lazy" referrerpolicy="no-referrer">';
+  var img='<img class="ca-ad-m" src="'+esc(m.url)+'" alt="'+esc(alt)+'" loading="lazy" referrerpolicy="no-referrer">';
+  return m.watch?'<a class="ca-ad-watch" href="'+esc(m.watch)+'" target="_blank" rel="noopener noreferrer">'+img+'<span class="ca-ad-wl"><span class="ca-ad-play">\u25B6</span> Watch on YouTube</span></a>':img;
 }
 function thumbHtml(t,j,on){
   var inner=t.poster||t.kind!=="video"?'<img src="'+esc(t.poster||t.url)+'" alt="" loading="lazy" referrerpolicy="no-referrer">':'<span class="ca-ad-play">\u25B6</span>';

@@ -179,9 +179,14 @@ function safeUrl(u, secure){
   return (secure ? /^https:\/\//i : /^https?:\/\//i).test(u) ? u : "";
 }
 function str(v){ return v == null ? "" : String(v); }
+/* Google gives the picture of a video creative as its YouTube thumbnail, which carries the video's id: the link that plays it (only for that exact host and an id of the right shape) */
+function youtube(url){
+  var m = /^https:\/\/i\.ytimg\.com\/vi\/([A-Za-z0-9_-]{11})\//.exec(url || "");
+  return m ? "https://www.youtube.com/watch?v=" + m[1] : "";
+}
 function mediaItems(list){
   return (list || []).map(function(m){
-    return {kind: m && m.kind === "video" ? "video" : "image", url: safeUrl(m && m.url, true), poster: safeUrl(m && m.poster, true), title: str(m && m.title), body: str(m && m.body), cta: str(m && m.cta), link: safeUrl(m && m.link)};
+    return {kind: m && m.kind === "video" ? "video" : "image", url: safeUrl(m && m.url, true), watch: youtube(safeUrl(m && m.url, true)), poster: safeUrl(m && m.poster, true), title: str(m && m.title), body: str(m && m.body), cta: str(m && m.cta), link: safeUrl(m && m.link)};
   }).filter(function(m){ return m.url; });
 }
 function adsQuery(account, f, offset, limit){

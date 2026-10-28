@@ -679,3 +679,23 @@ def test_a_google_card_shows_the_picture_and_the_words_of_the_variant_shown_not_
     assert "<b>Head 2</b> Words 2" in grid and 'class="ca-ad-m" src="https://tpc.googlesyndication.com/archive/simgad/2"' in grid
     one = dict(g, media=g["media"][:1], mediaCount=1)
     assert "<b>Head 1</b> Words 1" in with_ads(report, dict(res, ads=[one]))["el"]["#galGrid"]["html"]                    # one picture still shows its words
+
+
+YT = "https://i.ytimg.com/vi/T84TitSO-qg/hqdefault.jpg"
+
+
+def test_a_picture_that_is_a_youtube_thumbnail_gets_the_link_to_the_video_and_nothing_else_does():
+    item = lambda url: run("X.adCard(A).media[0]", A={"headlines": ["H"], "bodies": [], "media": [{"kind": "image", "url": url}]})
+    assert item(YT)["watch"] == "https://www.youtube.com/watch?v=T84TitSO-qg" and item("https://i.ytimg.com/vi/T84TitSO-qg/maxresdefault.jpg")["watch"] == "https://www.youtube.com/watch?v=T84TitSO-qg"
+    for other in ("https://tpc.googlesyndication.com/archive/simgad/1", "https://i.ytimg.com/vi/short/hqdefault.jpg", "https://evil.example/i.ytimg.com/vi/T84TitSO-qg/hqdefault.jpg", "https://i.ytimg.com.evil.example/vi/T84TitSO-qg/hqdefault.jpg",
+                  "https://i.ytimg.com/vi/T84TitSO-qg%22%3E/hqdefault.jpg", "https://evil.example/?next=https://i.ytimg.com/vi/T84TitSO-qg/hqdefault.jpg", "https://i.ytimg.com/vi/T84TitSO/hqdefault.jpg",
+                  "https://i.ytimg.com/vi/T84TitSO-qgXY/hqdefault.jpg"):
+        assert item(other)["watch"] == "", other
+
+
+def test_a_video_creative_is_drawn_as_its_thumbnail_with_a_link_that_plays_it_on_youtube(report):
+    res = gallery_res()
+    res["ads"][0].update(platform="google", format="video", media=[{"kind": "image", "url": YT, "title": "Automatically Adjusts Insulin", "body": "", "link": "https://www.omnipod.com/simplify/omnipod-5"}], mediaCount=1)
+    grid = with_ads(report, res)["el"]["#galGrid"]["html"]
+    assert '<a class="ca-ad-watch" href="https://www.youtube.com/watch?v=T84TitSO-qg" target="_blank" rel="noopener noreferrer">' in grid and 'class="ca-ad-m" src="%s"' % YT in grid and "Watch on YouTube" in grid
+    assert grid.count('target="_blank"') == grid.count('target="_blank" rel="noopener noreferrer"')
