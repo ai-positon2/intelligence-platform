@@ -162,6 +162,73 @@ function pageBody(account, comp, facebook, names){
 function regionBody(account, region, names){ return {account: account, op: "region", region: String(region || "").trim().toUpperCase() || "US", names: names || {}}; }
 function findBody(account, name, names, force){ return {account: account, name: name, names: names || {}, force: !!force}; }
 
+/* ── The ads themselves ────────────────────────────────────────────────── */
+
+var FORMAT = {image: "Image", video: "Video", carousel: "Carousel", dynamic: "Dynamic", catalog: "Catalog", text: "Text ad"};
+function formatLabel(f){ f = String(f || ""); return FORMAT[f] || (f ? f.charAt(0).toUpperCase() + f.slice(1) : ""); }
+function ctaLabel(ad){
+  if (ad.cta) return String(ad.cta);
+  var t = String(ad.ctaType || "").toLowerCase().replace(/_/g, " ");
+  return t ? t.charAt(0).toUpperCase() + t.slice(1) : "";
+}
+/* an address that goes into a link or a picture: only https for what is drawn, http or https for a landing page, nothing with a space in it, whatever the server let through */
+function safeUrl(u, secure){
+  u = typeof u === "string" ? u.trim() : "";
+  if (!u || /\s/.test(u)) return "";
+  return (secure ? /^https:\/\//i : /^https?:\/\//i).test(u) ? u : "";
+}
+function str(v){ return v == null ? "" : String(v); }
+function mediaItems(list){
+  return (list || []).map(function(m){
+    return {kind: m && m.kind === "video" ? "video" : "image", url: safeUrl(m && m.url, true), poster: safeUrl(m && m.poster, true), title: str(m && m.title), body: str(m && m.body), cta: str(m && m.cta), link: safeUrl(m && m.link)};
+  }).filter(function(m){ return m.url; });
+}
+function adsQuery(account, f, offset, limit){
+  f = f || {};
+  var p = ["account=" + encodeURIComponent(account || "")];
+  ["platform", "competitor", "format", "sort", "q"].forEach(function(k){ var v = str(f[k]).trim(); if (v) p.push(k + "=" + encodeURIComponent(v)); });
+  if (offset) p.push("offset=" + offset);
+  if (limit) p.push("limit=" + limit);
+  return "?" + p.join("&");
+}
+/* one ad of the gallery as what a card shows */
+function adCard(ad){
+  var heads = ad.headlines || [], lines = ad.bodies || [], media = mediaItems(ad.media), shown = ad.mediaCount == null ? media.length : ad.mediaCount;
+  return {id: ad.id, platform: ad.platform, platformLabel: PLAT[ad.platform] || str(ad.platform), competitor: str(ad.competitor), advertiser: str(ad.who), format: formatLabel(ad.format),
+    title: str(heads[0]), moreHeads: heads.slice(1), lines: lines, text: str(ad.text), cta: ctaLabel(ad), caption: str(ad.caption), link: safeUrl(ad.url), landing: str(ad.landing), libraryUrl: safeUrl(ad.adUrl, true),
+    media: media, extra: Math.max(0, shown - media.length), pictureOnly: !heads.length && !lines.length && !str(ad.text),
+    status: ad.active === true ? "Active" : (ad.active === false ? "Stopped" : ""),
+    running: ad.days == null ? "" : plural(ad.days, "day") + " running" + (ad.firstShown ? ", since " + day(ad.firstShown) : ""),
+    copies: ad.copies > 1 ? "Shown " + ad.copies + " times" : "", networks: (ad.networks || []).join(", ")};
+}
+function countOptions(counts, label){
+  var keys = Object.keys(counts || {}).sort(function(a, b){ return counts[b] - counts[a] || a.localeCompare(b); });
+  return keys.map(function(k){ return [k, label(k) + " (" + counts[k] + ")"]; });
+}
+function filterOptions(res){
+  var f = (res && res.facets) || {}, total = function(o){ return Object.keys(o || {}).reduce(function(n, k){ return n + o[k]; }, 0); };
+  return {
+    competitors: [["", "All competitors (" + total(f.competitors) + ")"]].concat(countOptions(f.competitors, function(k){ return k; })),
+    formats: [["", "All formats"]].concat(countOptions(f.formats, formatLabel)),
+    platforms: Object.keys(f.platforms || {}).length > 1 ? [["", "Google and Meta"]].concat(countOptions(f.platforms, function(k){ return PLAT[k] || k; })) : null
+  };
+}
+function pageText(res){
+  res = res || {};
+  var shown = Math.min((res.offset || 0) + (res.ads || []).length, res.total || 0);
+  return res.total ? "Showing " + int(shown) + " of " + plural(res.total, "ad") : "";
+}
+function creativeNote(res){
+  var n = (res && res.creativeMissing) || 0;
+  return n ? plural(n, "ad") + (n === 1 ? " was" : " were") + " read before pictures and links were kept, so " + (n === 1 ? "it shows" : "they show") + " words only. Press Refresh competitor ads to read " + (n === 1 ? "it" : "them") + " again." : "";
+}
+function emptyText(res){
+  var f = (res && res.facets) || {}, pool = Object.keys(f.platforms || {}).reduce(function(n, k){ return n + f.platforms[k]; }, 0);
+  if (!((res && res.reads) || []).length) return "No competitors are saved for this account yet.";
+  if (!pool) return "No competitor ads have been read yet. Press Refresh competitor ads to read them.";
+  return "No ad matches these filters.";
+}
+
 /* one line that says where the report stands */
 function standing(rep){
   if (rep.status === "no_competitors") return "No competitors are saved for this account yet. Type a company name below and pick the ones that are competitors, then press Refresh competitor ads.";
@@ -189,6 +256,6 @@ function csvRows(rep){
 var api = {PLAT: PLAT, HEAD: HEAD, int: int, plural: plural, day: day, levelInfo: levelInfo, money: money, ageText: ageText, tiles: tiles, estimateText: estimateText, jobText: jobText, stepLine: stepLine,
   competitorRows: competitorRows, gapRows: gapRows, gapText: gapText, exampleText: exampleText, ideaCards: ideaCards, offerRows: offerRows, winnerRows: winnerRows, newestRows: newestRows,
   resultCards: resultCards, searchNote: searchNote, facebookText: facebookText, competitorCards: competitorCards, forText: forText, addBody: addBody, removeBody: removeBody, pageBody: pageBody, regionBody: regionBody, findBody: findBody,
-  standing: standing, csvRows: csvRows};
+  standing: standing, csvRows: csvRows, formatLabel: formatLabel, ctaLabel: ctaLabel, safeUrl: safeUrl, adsQuery: adsQuery, adCard: adCard, filterOptions: filterOptions, pageText: pageText, creativeNote: creativeNote, emptyText: emptyText};
 if (typeof module !== "undefined" && module.exports) module.exports = api; else root.CAData = api;
 })(typeof window !== "undefined" ? window : globalThis);

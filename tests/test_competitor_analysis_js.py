@@ -16,7 +16,7 @@ import pytest
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from monitor_fakes import MemStore  # noqa: E402
-from test_paid_compete import own_raw_ads, raw_of  # noqa: E402
+from test_paid_compete import keep, mad, own_raw_ads, picture_only, raw_of  # noqa: E402
 from test_paid_compete_math import GOOGLE_REAL, META_REAL, ad, pool_with_price  # noqa: E402
 from tests.test_copycheck_js import HARNESS  # noqa: E402
 from tracker import paid_compete as pc  # noqa: E402
@@ -517,3 +517,67 @@ def test_a_competitor_read_today_says_so_and_the_newest_ads_are_the_latest_first
 def test_the_line_that_says_where_it_stands_is_exact_for_each_state(empty_report):
     assert run("X.standing(R)", R=empty_report) == "No competitors are saved for this account yet. Type a company name below and pick the ones that are competitors, then press Refresh competitor ads."
     assert run("X.standing(R)", R={"status": "no_competitor_data"}) == "The competitors are saved, but none of their ads has been read yet. Press Refresh competitor ads."
+
+
+# ── the ads themselves ──────────────────────────────────────────────────────
+
+def gallery_res(**kw):
+    """The page of ads the server builds for a Meta account with Tandem read: one ad with words and a picture, one that is only a picture."""
+    s = MemStore()
+    cs.save_account(s, MA, "Acme", {"competitors": "Tandem | tandemdiabetes.com | TandemDiabetes"}, "ana@position2.com", NOW)
+    keep(s, MA, "Tandem", "meta", [mad(1, "Tandem Diabetes Care", "Pump delivered", "2026-09-23")], pictures=[picture_only(2, "Tandem Diabetes Care", "2026-10-20")])
+    return json.loads(json.dumps(pc.ads_for("", MA, mon=s, **kw)))
+
+
+def test_the_query_of_the_gallery_carries_the_account_encoded_and_only_the_choices_made():
+    assert run("X.adsQuery('1234567890+act_1', {}, 0)") == "?account=1234567890%2Bact_1"
+    assert run("X.adsQuery('a', {platform: 'meta', competitor: 'Tandem Diabetes', format: 'video', sort: 'newest', q: ' t:slim  '}, 24, 24)") == "?account=a&platform=meta&competitor=Tandem%20Diabetes&format=video&sort=newest&q=t%3Aslim&offset=24&limit=24"
+    assert run("X.adsQuery('a', {platform: '', q: '   '}, 0)") == "?account=a"
+
+
+def test_a_card_has_the_words_the_picture_the_button_the_link_and_how_long_it_has_run():
+    ad = gallery_res()["ads"]
+    card = run("X.adCard(A)", A=[a for a in ad if a["id"] == "meta:1"][0])
+    assert card["title"] == "Pump delivered" and card["competitor"] == "Tandem" and card["advertiser"] == "Tandem Diabetes Care" and card["platformLabel"] == "Meta Ads" and card["format"] == "Image"
+    assert card["cta"] == "See details" and card["link"].startswith("https://www.tandemdiabetes.com/") and card["landing"] == "tandemdiabetes.com/landing-pages/tandem-pump-rx" and card["libraryUrl"].endswith("ads/library/?id=1")
+    assert card["status"] == "Active" and card["running"] == "34 days running, since 2026-09-23" and card["pictureOnly"] is False and card["extra"] == 0
+    assert card["media"][0]["kind"] == "image" and card["media"][0]["url"].startswith("https://scontent") and card["lines"][0].startswith("With a sleek touchscreen") and "Important Safety Information" in card["text"]
+
+
+def test_a_card_for_an_ad_that_is_only_a_picture_says_so_and_a_dynamic_ad_says_how_many_more_variants_it_has():
+    ad = gallery_res()["ads"]
+    pic = run("X.adCard(A)", A=[a for a in ad if a["id"] == "meta:2"][0])
+    assert pic["pictureOnly"] is True and pic["title"] == "" and pic["lines"] == [] and pic["media"][0]["kind"] == "image"
+    many = run("X.adCard(A)", A={"id": "x", "platform": "meta", "media": [{"kind": "image", "url": "https://a.example/1.jpg"}] * 6, "mediaCount": 14, "headlines": ["H"], "bodies": [], "format": "dynamic", "active": False, "days": 1, "copies": 3})
+    assert many["extra"] == 8 and many["format"] == "Dynamic" and many["status"] == "Stopped" and many["running"] == "1 day running" and many["copies"] == "Shown 3 times"
+
+
+def test_the_button_is_the_text_the_ad_gives_or_the_kind_of_button_in_words():
+    assert run("X.adCard({headlines: [], bodies: [], media: [], cta: '', ctaType: 'LEARN_MORE'}).cta") == "Learn more"
+    assert run("X.adCard({headlines: [], bodies: [], media: [], cta: 'Shop now', ctaType: 'LEARN_MORE'}).cta") == "Shop now"
+    assert run("X.adCard({headlines: [], bodies: [], media: []}).cta") == ""
+
+
+@pytest.mark.parametrize("bad", ["javascript:alert(1)", "http://insecure.example/a.jpg", "data:image/png;base64,AAAA", "//x.example/a.jpg", "https://has space.example/a b.jpg", "", None, 5])
+def test_a_picture_or_a_link_that_is_not_safe_is_not_drawn_even_if_the_server_let_it_through(bad):
+    card = run("X.adCard(A)", A={"headlines": ["H"], "bodies": [], "url": bad, "adUrl": bad, "media": [{"kind": "image", "url": bad, "poster": bad, "link": bad}, {"kind": "video", "url": "https://v.example/a.mp4", "poster": bad, "link": bad}]})
+    plain = bad if str(bad).startswith("http://insecure") else ""                                                                        # a plain http landing page is still a page
+    assert [m["url"] for m in card["media"]] == ["https://v.example/a.mp4"] and card["media"][0]["poster"] == "" and card["media"][0]["link"] == plain and card["libraryUrl"] == "" and card["link"] == plain
+
+
+def test_the_choices_count_what_each_competitor_and_format_has_and_a_platform_is_offered_only_when_there_are_two():
+    res = {"facets": {"platforms": {"meta": 3}, "competitors": {"Tandem": 2, "Insulet": 5}, "formats": {"image": 6, "video": 1}}}
+    o = run("X.filterOptions(R)", R=res)
+    assert o["competitors"] == [["", "All competitors (7)"], ["Insulet", "Insulet (5)"], ["Tandem", "Tandem (2)"]] and o["formats"] == [["", "All formats"], ["image", "Image (6)"], ["video", "Video (1)"]] and o["platforms"] is None
+    two = run("X.filterOptions(R)", R={"facets": {"platforms": {"google": 4, "meta": 3}, "competitors": {}, "formats": {}}})
+    assert two["platforms"] == [["", "Google and Meta"], ["google", "Google Ads (4)"], ["meta", "Meta Ads (3)"]]
+
+
+def test_the_gallery_says_what_is_missing_why_it_is_empty_and_how_much_is_shown(own):
+    res = gallery_res()
+    assert run("X.pageText(R)", R=res) == "Showing 2 of 2 ads" and run("X.pageText({total: 0, ads: [], offset: 0})") == "" and run("X.pageText({total: 50, ads: new Array(24), offset: 24})") == "Showing 48 of 50 ads"
+    assert run("X.creativeNote(R)", R=res) == "" and run("X.creativeNote({creativeMissing: 1})").startswith("1 ad was read before pictures and links were kept, so it shows words only. Press Refresh")
+    assert run("X.creativeNote({creativeMissing: 3})").startswith("3 ads were read before pictures and links were kept, so they show words only.")
+    assert run("X.emptyText({reads: [], facets: {platforms: {}}})") == "No competitors are saved for this account yet."
+    assert run("X.emptyText({reads: [{}], facets: {platforms: {}}})") == "No competitor ads have been read yet. Press Refresh competitor ads to read them."
+    assert run("X.emptyText({reads: [{}], facets: {platforms: {meta: 4}}})") == "No ad matches these filters."
