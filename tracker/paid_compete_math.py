@@ -33,6 +33,8 @@ NEW_DAYS = 30
 STALE_DAYS = 14                   # a read older than this is said to be old
 TOP_N = 5
 MAX_LINE = 300
+MAX_MEDIA = 6                     # pictures and videos kept per ad (a dynamic ad can carry dozens of variants); the ad says how many there were
+MAX_COPY = 900                    # the full text of an ad, kept for the gallery
 
 THEMES = {
     "price": {"label": "A price or a saving", "rx": r"\$\s?\d|\d+\s?%\s?off|\bsave\b|\bsavings?\b|\bdiscounts?\b|starting (at|from)|\baffordable\b|\blow[- ]cost\b|\bprices?\b|\bpricing\b|\bcheap",
@@ -172,43 +174,111 @@ def path_of(url):
 FORMATS = {"IMAGE": "image", "VIDEO": "video", "CAROUSEL": "carousel", "DCO": "dynamic", "DPA": "catalog", "TEXT": "text", "MULTI_IMAGES": "carousel", "MULTI_VIDEOS": "carousel", "DAI": "dynamic"}
 
 
-def meta_ad(item, *, asof):
-    """One ad of the Meta Ad Library as the shape above, or None for a row that has no ad text. `asof` is the day it was read."""
+def https(url):
+    """The address when it is an https one with no spaces, else '': a picture or a file a scraper hands over is never trusted further than that (it is drawn on our page)."""
+    u = url.strip() if isinstance(url, str) else ""
+    return u if u.startswith("https://") and " " not in u and len(u) <= 1500 else ""
+
+
+def web(url):
+    """A landing page address: http or https, else ''."""
+    u = url.strip() if isinstance(url, str) else ""
+    return u if (u[:8].lower() == "https://" or u[:7].lower() == "http://") and " " not in u and len(u) <= 1500 else ""
+
+
+def _copy(text):
+    """The full text of an ad, paragraph by paragraph with the whitespace tidied; '' for a catalog template."""
+    t = str(text or "")
+    if "{{" in t:
+        return ""
+    return "\n".join(p for p in (" ".join(x.split()) for x in re.split(r"\n\s*\n", t.strip())) if p)[:MAX_COPY]
+
+
+def _meta_piece(kind, url, poster="", **text):
+    out = {"kind": kind, "url": url}
+    if poster:
+        out["poster"] = poster
+    out.update({k: v for k, v in text.items() if v})
+    return out
+
+
+def _meta_media(snap, cards):
+    """The pictures and videos of a Meta ad, as [{kind, url, poster?, title?, body?, cta?, link?}] in the order the ad shows them: its videos, its pictures, then each card (a card is one
+    variant of a carousel or a dynamic ad, with its own words and link). A picture is the 600 pixel one when there is one."""
+    out = []
+    for v in snap.get("videos") or []:
+        if isinstance(v, dict):
+            file, poster = https(v.get("videoHdUrl")) or https(v.get("videoSdUrl")), https(v.get("videoPreviewImageUrl"))
+            if file or poster:
+                out.append(_meta_piece("video", file or poster, poster if file else ""))
+    for i in snap.get("images") or []:
+        url = https(i.get("resizedImageUrl")) or https(i.get("originalImageUrl")) if isinstance(i, dict) else ""
+        if url:
+            out.append(_meta_piece("image", url))
+    for c in cards:
+        file, poster = https(c.get("videoHdUrl")) or https(c.get("videoSdUrl")), https(c.get("videoPreviewImageUrl"))
+        pic = https(c.get("resizedImageUrl")) or https(c.get("originalImageUrl"))
+        words = {"title": _clean_line(c.get("title")), "body": _first_paragraph(c.get("body")) if "{{" not in str(c.get("body") or "") else "", "cta": str(c.get("ctaText") or ""), "link": web(c.get("linkUrl"))}
+        if file:
+            out.append(_meta_piece("video", file, poster or pic, **words))
+        elif pic or poster:
+            out.append(_meta_piece("image", pic or poster, **words))
+    return out
+
+
+def meta_ad(item, *, asof, textless=False):
+    """One ad of the Meta Ad Library as the shape above, or None for a row that has no ad text. `asof` is the day it was read. With `textless` an ad that is only a picture or a video is returned too
+    (no lines of copy, its media kept): the gallery shows it, the analysis, which counts words, does not take it."""
     snap = item.get("snapshot") or {}
     cards = [c for c in snap.get("cards") or [] if isinstance(c, dict)]
     body = snap.get("body")
     body = body.get("text") if isinstance(body, dict) else body
     headlines = _uniq([snap.get("title")] + [c.get("title") for c in cards])
     bodies = _uniq([_first_paragraph(body)] + [_first_paragraph(c.get("body")) for c in cards] + [snap.get("linkDescription")] + [c.get("linkDescription") for c in cards])
-    if not headlines and not bodies:
+    media = _meta_media(snap, cards)
+    if not headlines and not bodies and not (textless and media):
         return None
     start, end = to_date(item.get("startDateFormatted") or item.get("startDate")), to_date(item.get("endDateFormatted") or item.get("endDate"))
     active = item.get("isActive")
     last = asof if active else (end or asof)
     cta = snap.get("ctaText") or (cards[0].get("ctaText") if cards else "") or ""
-    return {"id": "meta:" + str(item.get("adArchiveID") or item.get("adArchiveId") or ""), "platform": "meta", "who": snap.get("pageName") or item.get("pageName") or "", "format": FORMATS.get(str(snap.get("displayFormat") or "").upper(), str(snap.get("displayFormat") or "other").lower()),
-            "headlines": headlines, "bodies": bodies, "cta": str(cta), "url": snap.get("linkUrl") or (cards[0].get("linkUrl") if cards else "") or "", "firstShown": _day(start), "lastShown": _day(last),
+    ident = str(item.get("adArchiveID") or item.get("adArchiveId") or "")
+    return {"id": "meta:" + ident, "platform": "meta", "who": snap.get("pageName") or item.get("pageName") or "", "format": FORMATS.get(str(snap.get("displayFormat") or "").upper(), str(snap.get("displayFormat") or "other").lower()),
+            "headlines": headlines, "bodies": bodies, "cta": str(cta), "url": web(snap.get("linkUrl")) or (web(cards[0].get("linkUrl")) if cards else ""), "firstShown": _day(start), "lastShown": _day(last),
             "days": _days_between(start, last), "active": bool(active) if active is not None else None, "copies": max(1, int(item.get("collationCount") or 1)),
-            "networks": [str(p).lower() for p in item.get("publisherPlatform") or []]}
+            "networks": [str(p).lower() for p in item.get("publisherPlatform") or []],
+            "text": _copy(body), "caption": str(snap.get("caption") or "")[:120], "ctaType": str(snap.get("ctaType") or ""), "media": media[:MAX_MEDIA], "mediaCount": len(media),
+            "adUrl": ("https://www.facebook.com/ads/library/?id=" + ident) if ident.isdigit() else ""}
 
 
-def google_ad(item, *, asof):
-    """One creative of Google's Ads Transparency Center as the shape above, or None for a row with no text in any variation. The descriptions were read from the picture of the ad."""
-    heads, bodies, url = [], [], ""
+def google_ad(item, *, asof, textless=False):
+    """One creative of Google's Ads Transparency Center as the shape above, or None for a row with no text in any variation (with `textless`, one that has a picture is kept). The descriptions were
+    read from the picture of the ad; the picture of each variation is kept, with the words read from it and the link it opens."""
+    heads, bodies, url, media = [], [], "", []
+    video = str(item.get("format") or "").upper() == "VIDEO"
     for v in item.get("variations") or []:
         if not isinstance(v, dict):
             continue
         heads.append(v.get("headline"))
-        bodies.append(clean_ocr(v.get("description")))
-        url = url or v.get("clickUrl") or ""
+        desc = clean_ocr(v.get("description"))
+        bodies.append(desc)
+        url = url or web(v.get("clickUrl"))
+        pic = https(v.get("imageUrl"))
+        if pic:
+            media.append({"kind": "video" if video else "image", "url": pic, "title": _clean_line(v.get("headline")), "body": desc, "link": web(v.get("clickUrl"))})
+    if not media and https(item.get("previewUrl")):
+        first = next((v for v in item.get("variations") or [] if isinstance(v, dict)), {})
+        media.append({"kind": "video" if video else "image", "url": https(item.get("previewUrl")), "title": _clean_line(first.get("headline")), "body": clean_ocr(first.get("description")), "link": web(first.get("clickUrl"))})
     heads, bodies = _uniq(heads), _uniq(bodies)
-    if not heads and not bodies:
+    if not heads and not bodies and not (textless and media):
         return None
     first, last = to_date(item.get("firstShown")), to_date(item.get("lastShown"))
     served = item.get("numServedDays")
+    lib = https(item.get("adLibraryUrl"))
     return {"id": "google:" + str(item.get("creativeId") or ""), "platform": "google", "who": item.get("advertiserName") or "", "format": FORMATS.get(str(item.get("format") or "").upper(), str(item.get("format") or "other").lower()),
             "headlines": heads, "bodies": bodies, "cta": "", "url": url, "firstShown": _day(first), "lastShown": _day(last), "days": int(served) if isinstance(served, (int, float)) else _days_between(first, last),
-            "active": (_days_between(last, asof) or 0) <= 3 if last else None, "copies": 1, "networks": [], "creativeId": str(item.get("creativeId") or "")}
+            "active": (_days_between(last, asof) or 0) <= 3 if last else None, "copies": 1, "networks": [], "creativeId": str(item.get("creativeId") or ""),
+            "text": "", "caption": "", "ctaType": "", "media": media[:MAX_MEDIA], "mediaCount": len(media), "adUrl": lib if urlsplit(lib).hostname == "adstransparency.google.com" else ""}
 
 
 _OWN_HEAD = {"headline", "longheadline", "title"}

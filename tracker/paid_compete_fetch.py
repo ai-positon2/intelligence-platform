@@ -27,6 +27,7 @@ USD_PER_AD = {"meta": 0.005, "google": 0.0016}        # what the actors charge a
 SECONDS_PER_AD = {"meta": 1.2, "google": 11.0}        # measured 2026-10-27: Meta read 94 ads in 96 s and 307 in 193 s, Google (reading the text from each picture) 126 creatives in 23 minutes
 TIMEOUT = {"meta": 900, "google": 2100}               # a read still going then is stopped and what it had saved is kept as a partial read
 CACHE_DAYS = 7
+READ_V = 2                                           # 2: a read keeps each ad's pictures, videos, full text and library page; a read saved before has none, so it is not fresh and a refresh reads it again
 WORKERS = 3
 JOB_KEEP = 8
 LOCK_TTL_S = 90 * 60
@@ -91,7 +92,7 @@ def read_one(platform, comp, region, *, run_fn, token, now):
     returns {items, status, error} (tracker/apify_transport.py run_actor_collect) when what a run saved before it was stopped is worth keeping: rows with a run that did not finish are a partial read, no rows
     with a run that did not finish a failed one. `capped` says the limit was reached, so the competitor has more ads than were read."""
     stamp = now.isoformat(timespec="seconds")
-    out = {"ads": [], "error": "", "skipped": "", "fetchedAt": stamp, "items": 0, "limit": LIMIT[platform], "capped": False, "partial": ""}
+    out = {"ads": [], "pictures": [], "error": "", "skipped": "", "fetchedAt": stamp, "items": 0, "limit": LIMIT[platform], "capped": False, "partial": "", "v": READ_V}
     why = skipped_reason(platform, comp, region)
     if why:
         return dict(out, skipped=why)
@@ -109,8 +110,10 @@ def read_one(platform, comp, region, *, run_fn, token, now):
             partial = "The %s read stopped before it finished (%s), so only part of the ads were read." % (PLATFORM_NAME[platform], reason)
     rows = rows or []
     norm = cm.meta_ad if platform == "meta" else cm.google_ad
-    ads = [a for a in (norm(r, asof=now.date()) for r in rows if isinstance(r, dict)) if a]
-    return dict(out, ads=ads, items=len(rows), capped=len(rows) >= LIMIT[platform], partial=partial)
+    seen = [a for a in (norm(r, asof=now.date(), textless=True) for r in rows if isinstance(r, dict)) if a]
+    ads = [a for a in seen if a["headlines"] or a["bodies"]]
+    pictures = [a for a in seen if not (a["headlines"] or a["bodies"])]              # only a picture or a video: shown in the gallery, not counted as words
+    return dict(out, ads=ads, pictures=pictures, items=len(rows), capped=len(rows) >= LIMIT[platform], partial=partial)
 
 
 def cached(store, platform, comp, region):
@@ -124,7 +127,7 @@ def outgrown(entry, platform):
 
 def fresh(entry, now):
     try:
-        return bool(entry) and not entry.get("error") and not entry.get("partial") and datetime.fromisoformat(entry["fetchedAt"]) > now - timedelta(days=CACHE_DAYS)
+        return bool(entry) and not entry.get("error") and not entry.get("partial") and (entry.get("v") or 1) >= READ_V and datetime.fromisoformat(entry["fetchedAt"]) > now - timedelta(days=CACHE_DAYS)
     except (KeyError, ValueError):
         return False
 
@@ -137,9 +140,9 @@ def entries_for(store, competitors, platforms, region):
             e = cached(store, p, c, region)
             if e is None:
                 why = skipped_reason(p, c, region)
-                out.append({"name": c["name"], "platform": p, "ads": [], "fetchedAt": "", "error": "", "skipped": why or "Not read yet: press Refresh competitor ads.", "items": 0, "limit": LIMIT[p], "capped": False, "partial": ""})
+                out.append({"name": c["name"], "platform": p, "ads": [], "pictures": [], "fetchedAt": "", "error": "", "skipped": why or "Not read yet: press Refresh competitor ads.", "items": 0, "limit": LIMIT[p], "capped": False, "partial": ""})
             else:
-                out.append({"name": c["name"], "platform": p, "ads": e.get("ads") or [], "fetchedAt": e.get("fetchedAt") or "", "error": e.get("error") or "", "skipped": e.get("skipped") or "",
+                out.append({"name": c["name"], "platform": p, "ads": e.get("ads") or [], "pictures": e.get("pictures") or [], "fetchedAt": e.get("fetchedAt") or "", "error": e.get("error") or "", "skipped": e.get("skipped") or "",
                         "items": e.get("items") or 0, "limit": e.get("limit") or LIMIT[p], "capped": bool(e.get("capped")), "partial": e.get("partial") or ""})
     return out
 

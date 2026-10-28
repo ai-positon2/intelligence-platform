@@ -97,6 +97,74 @@ def test_a_real_google_creative_becomes_one_shape():
     assert cm.google_ad({"creativeId": "1", "format": "IMAGE", "variations": [{"imageUrl": "x"}]}, asof=ASOF) is None
 
 
+# Shapes of the rows the two actors returned on 2026-10-28 (urls shortened): a Meta IMAGE ad has snapshot.images, a DCO ad has one card per variant, a Google TEXT creative has one picture of the ad per
+# variation. A Meta video's fields (snapshot.videos, a card's videoHdUrl / videoSdUrl / videoPreviewImageUrl) are the ones the actor lists for its cards; no video row was in the sample.
+FB = "https://scontent-hou1-1.xx.fbcdn.net/v/t39.35426-6/"
+META_IMAGE = {"adArchiveID": "1646739963541817", "pageName": "Tandem Diabetes Care", "isActive": True, "startDateFormatted": "2026-09-24T07:00:00.000Z", "publisherPlatform": ["FACEBOOK"],
+              "snapshot": {"displayFormat": "IMAGE", "title": "The All-In-One t:slim X2 Pump", "caption": "tandemdiabetes.com", "ctaText": "See details", "ctaType": "SEE_DETAILS", "linkDescription": "Let us check your benefits today.",
+                           "linkUrl": "https://www.tandemdiabetes.com/landing-pages/tandem-pump-rx", "cards": [], "videos": [],
+                           "body": {"text": "With a sleek touchscreen, the t:slim X2 is designed to match your lifestyle.  \n\n$0 pump claim based on evaluation of pharmacy coverage.  \n\nImportant Safety Information: RX ONLY."},
+                           "images": [{"originalImageUrl": FB + "orig1_n.jpg?oe=1", "resizedImageUrl": FB + "small1_n.jpg?stp=s600x600&oe=1", "watermarkedResizedImageUrl": ""}]}}
+
+
+def card(n, **kw):
+    return dict({"title": "Variant %d" % n, "body": "Body of variant %d.\n\nMore." % n, "ctaText": "See Details", "linkUrl": "https://www.tandemdiabetes.com/landing-pages/v%d" % n, "linkDescription": "", "caption": "",
+                 "originalImageUrl": FB + "c%d_orig.jpg" % n, "resizedImageUrl": FB + "c%d_small.jpg" % n, "videoHdUrl": None, "videoSdUrl": None, "videoPreviewImageUrl": None}, **kw)
+
+
+def test_a_meta_image_ad_keeps_its_picture_its_full_text_its_library_page_and_its_display_address():
+    a = cm.meta_ad(META_IMAGE, asof=ASOF)
+    assert a["media"] == [{"kind": "image", "url": FB + "small1_n.jpg?stp=s600x600&oe=1"}] and a["mediaCount"] == 1                    # the 600 pixel picture, not the original
+    assert a["adUrl"] == "https://www.facebook.com/ads/library/?id=1646739963541817" and a["caption"] == "tandemdiabetes.com" and a["ctaType"] == "SEE_DETAILS"
+    assert a["text"].startswith("With a sleek touchscreen") and "Important Safety Information" in a["text"] and a["text"].count("\n") == 2         # every paragraph, whitespace tidied
+    assert cm.meta_ad(dict(META_IMAGE, snapshot=dict(META_IMAGE["snapshot"], images=[{"originalImageUrl": FB + "o.jpg", "resizedImageUrl": ""}])), asof=ASOF)["media"][0]["url"] == FB + "o.jpg"
+
+
+def test_a_dynamic_meta_ad_keeps_each_cards_picture_and_words_up_to_a_limit_and_says_how_many_there_were():
+    snap = dict(META_IMAGE["snapshot"], displayFormat="DCO", images=[], cards=[card(i) for i in range(1, 9)])
+    a = cm.meta_ad(dict(META_IMAGE, snapshot=snap), asof=ASOF)
+    assert a["mediaCount"] == 8 and len(a["media"]) == cm.MAX_MEDIA == 6
+    assert a["media"][0] == {"kind": "image", "url": FB + "c1_small.jpg", "title": "Variant 1", "body": "Body of variant 1.", "cta": "See Details", "link": "https://www.tandemdiabetes.com/landing-pages/v1"}
+
+
+def test_a_meta_video_keeps_its_file_and_its_poster_and_the_sd_file_when_there_is_no_hd_one():
+    vids = [{"videoHdUrl": "https://video.xx.fbcdn.net/hd.mp4", "videoSdUrl": "https://video.xx.fbcdn.net/sd.mp4", "videoPreviewImageUrl": FB + "poster.jpg"}]
+    a = cm.meta_ad(dict(META_IMAGE, snapshot=dict(META_IMAGE["snapshot"], displayFormat="VIDEO", images=[], videos=vids)), asof=ASOF)
+    assert a["media"] == [{"kind": "video", "url": "https://video.xx.fbcdn.net/hd.mp4", "poster": FB + "poster.jpg"}] and a["format"] == "video"
+    sd = cm.meta_ad(dict(META_IMAGE, snapshot=dict(META_IMAGE["snapshot"], images=[], videos=[dict(vids[0], videoHdUrl=None)])), asof=ASOF)
+    assert sd["media"][0]["url"] == "https://video.xx.fbcdn.net/sd.mp4"
+    in_card = cm.meta_ad(dict(META_IMAGE, snapshot=dict(META_IMAGE["snapshot"], images=[], cards=[card(1, videoHdUrl="https://video.xx.fbcdn.net/c.mp4", videoPreviewImageUrl=FB + "cp.jpg")])), asof=ASOF)
+    assert in_card["media"][0]["kind"] == "video" and in_card["media"][0]["url"] == "https://video.xx.fbcdn.net/c.mp4" and in_card["media"][0]["poster"] == FB + "cp.jpg" and in_card["media"][0]["title"] == "Variant 1"
+
+
+@pytest.mark.parametrize("bad", ["javascript:alert(1)", "http://insecure.example/a.jpg", "data:image/png;base64,AAAA", "//x.example/a.jpg", "https://has space.example/a b.jpg", "", None, 5])
+def test_only_https_pictures_and_files_are_kept(bad):
+    a = cm.meta_ad(dict(META_IMAGE, snapshot=dict(META_IMAGE["snapshot"], images=[{"originalImageUrl": bad, "resizedImageUrl": bad}], linkUrl=bad)), asof=ASOF)
+    assert a["media"] == [] and a["mediaCount"] == 0 and a["url"] == (bad if str(bad).startswith("http://insecure") else "")                 # a plain http landing page is still a page
+
+
+def test_a_google_creative_keeps_one_picture_per_variation_with_its_words_and_its_transparency_page():
+    item = dict(GOOGLE_REAL, adLibraryUrl="https://adstransparency.google.com/advertiser/AR1/creative/CR03842488522816618497", previewUrl="https://tpc.googlesyndication.com/archive/simgad/1")
+    item["variations"] = [dict(v, imageUrl="https://tpc.googlesyndication.com/archive/simgad/%d" % i) for i, v in enumerate(GOOGLE_REAL["variations"], 1)]
+    a = cm.google_ad(item, asof=ASOF)
+    assert a["adUrl"] == "https://adstransparency.google.com/advertiser/AR1/creative/CR03842488522816618497" and a["mediaCount"] == 3
+    assert a["media"][0] == {"kind": "image", "url": "https://tpc.googlesyndication.com/archive/simgad/1", "title": "Connected with Dexcom - Get Started Today",
+                             "body": "Say goodbye to fingersticks when you use t:slim X2 insulin pump with Dexcom G6 or G7 CGM.", "link": "https://tandemdiabetes.com"}
+    assert a["media"][2]["body"] == "" and cm.google_ad(dict(item, adLibraryUrl="https://evil.example/creative/1"), asof=ASOF)["adUrl"] == ""
+    nopic = cm.google_ad(dict(item, variations=[{"headline": "H", "description": "", "clickUrl": ""}]), asof=ASOF)
+    assert nopic["media"] == [{"kind": "image", "url": "https://tpc.googlesyndication.com/archive/simgad/1", "title": "H", "body": "", "link": ""}]         # the creative's own preview stands in
+
+
+def test_an_ad_that_is_only_a_picture_is_kept_for_the_gallery_when_asked_and_is_not_text_for_the_analysis():
+    pic = dict(META_IMAGE, snapshot=dict(META_IMAGE["snapshot"], title=None, body=None, linkDescription=None))
+    assert cm.meta_ad(pic, asof=ASOF) is None
+    kept = cm.meta_ad(pic, asof=ASOF, textless=True)
+    assert kept["headlines"] == [] and kept["bodies"] == [] and kept["mediaCount"] == 1 and kept["adUrl"].endswith("1646739963541817")
+    assert cm.meta_ad({"adArchiveID": "1", "snapshot": {"title": None, "body": None, "cards": []}}, asof=ASOF, textless=True) is None            # no text and no picture: nothing to show
+    g = {"creativeId": "CR1", "advertiserName": "A", "format": "IMAGE", "firstShown": "2026-10-01T00:00:00Z", "lastShown": "2026-10-27T00:00:00Z", "variations": [{"imageUrl": "https://tpc.googlesyndication.com/archive/simgad/9"}]}
+    assert cm.google_ad(g, asof=ASOF) is None and cm.google_ad(g, asof=ASOF, textless=True)["media"][0]["url"].endswith("/9")
+
+
 def test_our_own_ads_become_the_same_shape_without_their_paths_and_assets():
     own = {"id": "9", "platform": "google", "kind": "rsa", "campaign": "Brand", "url": "https://acme.com", "texts": [{"slot": "headline", "text": "Acme Dental"}, {"slot": "headline", "text": "Acme Dental"},
                                                                                                                         {"slot": "description", "text": "Call us today"}, {"slot": "path", "text": "dental"}]}

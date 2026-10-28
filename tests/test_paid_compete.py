@@ -99,6 +99,24 @@ def test_a_competitor_with_nothing_to_look_up_is_not_asked():
     assert r.calls == [] and res["ads"] == [] and "No Facebook page" in res["skipped"] and res["error"] == ""
 
 
+def test_a_read_keeps_the_ads_that_are_only_a_picture_apart_from_the_ads_with_words():
+    pic = dict(META_REAL, adArchiveID="777", snapshot=dict(META_REAL["snapshot"], title=None, body=None, linkDescription=None, cards=[], images=[{"resizedImageUrl": "https://scontent.xx.fbcdn.net/p.jpg"}]))
+    res = cf.read_one("meta", TANDEM, "US", run_fn=Runner(meta=[META_REAL, pic]), token="t", now=NOW)
+    assert [a["id"] for a in res["ads"]] == ["meta:1746216413314264"] and [a["id"] for a in res["pictures"]] == ["meta:777"] and res["items"] == 2 and res["v"] == cf.READ_V
+    assert res["pictures"][0]["media"][0]["url"] == "https://scontent.xx.fbcdn.net/p.jpg" and res["ads"][0]["adUrl"].endswith("1746216413314264")
+
+
+def test_a_read_saved_before_pictures_were_kept_is_not_fresh_and_a_refresh_reads_it_again():
+    old = {"fetchedAt": "2026-10-25T00:00:00+00:00", "error": "", "ads": [], "items": 1}
+    assert not cf.fresh(old, NOW) and cf.fresh(dict(old, v=cf.READ_V), NOW) and not cf.fresh(dict(old, v=cf.READ_V - 1), NOW)
+    s = MemStore()
+    s.state_set(cf.cache_key("meta", TANDEM, "US"), dict(old, limit=400, name="Tandem"))
+    job, r = refresh(s, platforms=("meta",), competitors=(TANDEM,))
+    assert len(r.calls) == 1 and job["skippedFresh"] == 0 and s.state_get(cf.cache_key("meta", TANDEM, "US"))["v"] == cf.READ_V
+    job, r = refresh(s, platforms=("meta",), competitors=(TANDEM,))
+    assert r.calls == [] and job["skippedFresh"] == 1                                                         # the new read is kept for the week
+
+
 def test_the_limits_are_far_above_what_a_large_advertiser_runs_and_the_time_allowed_covers_the_slow_google_read():
     """Measured 2026-10-27 on a real advertiser: Meta showed 94 active ads (read in 96 s), Google 126 creatives (23 minutes, because the text of each is read from its picture)."""
     assert cf.LIMIT["meta"] >= 307 and cf.LIMIT["google"] >= 126                                              # Meta: a second advertiser showed 307
@@ -254,13 +272,14 @@ def test_the_entries_for_the_analysis_say_what_was_read_failed_skipped_or_not_re
     e = {(x["name"], x["platform"]): x for x in cf.entries_for(s, [TANDEM, OMNI, BARE], ["meta", "google"], "US")}
     assert len(e[("Tandem", "meta")]["ads"]) == 1 and e[("Tandem", "meta")]["error"] == "" and e[("Tandem", "meta")]["fetchedAt"].startswith("2026-10-27")
     assert e[("Tandem", "google")]["error"] == "The Google read failed: x" and e[("Tandem", "google")]["ads"] == []
+    assert e[("Tandem", "meta")]["pictures"] == [] and e[("Tandem", "google")]["pictures"] == [] and e[("Insulet", "google")]["pictures"] == []
     assert "No Facebook page" in e[("Insulet", "meta")]["skipped"] and e[("Insulet", "google")]["skipped"] == "Not read yet: press Refresh competitor ads."
     assert e[("Bare", "meta")]["skipped"] == "Not read yet: press Refresh competitor ads." and "No website or advertiser id" in e[("Bare", "google")]["skipped"]
 
 
 def test_a_read_is_fresh_for_a_week_unless_it_failed():
-    ok = {"fetchedAt": "2026-10-25T00:00:00+00:00", "error": ""}
-    assert cf.fresh(ok, NOW) and not cf.fresh(dict(ok, error="x"), NOW) and not cf.fresh(None, NOW) and not cf.fresh({"fetchedAt": "2026-10-01T00:00:00+00:00"}, NOW) and not cf.fresh({"fetchedAt": "nope"}, NOW) and not cf.fresh({}, NOW)
+    ok = {"fetchedAt": "2026-10-25T00:00:00+00:00", "error": "", "v": cf.READ_V}
+    assert cf.fresh(ok, NOW) and not cf.fresh(dict(ok, error="x"), NOW) and not cf.fresh(None, NOW) and not cf.fresh({"fetchedAt": "2026-10-01T00:00:00+00:00", "v": cf.READ_V}, NOW) and not cf.fresh({"fetchedAt": "nope"}, NOW) and not cf.fresh({}, NOW)
 
 
 # ── the report ──────────────────────────────────────────────────────────────
