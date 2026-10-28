@@ -69,7 +69,8 @@ _OFFER = re.compile(r"(\$\s?\d[\d,.]*\s?(off|per|a|/)?[^.!?\n]{0,40}|\d+\s?%\s?o
 
 NOT_MEASURED = [
     "How the competitors' ads perform. Clicks, conversions and spend are not public; only how long an ad has run is, and a long run is the best sign that it works.",
-    "Our own ad formats (image, video, carousel) and calls to action: only the text of our ads is read, so those are shown for the competitors and not compared.",
+    "How fresh our own Google ads are: Google gives no start day for an ad, so only our Meta ads' start days are compared.",
+    "What is in the pictures and videos: the rules count formats, buttons and placements. Only the written ideas look at their pictures, and those are a model's reading.",
     "Competitors' ads that have stopped. Meta's Ad Library lists the ads running now, and Google's Transparency Center the ads it still shows.",
     "Which searches a competitor's Google ads answer. The Transparency Center names the advertiser and the creative, not the keywords.",
     "LinkedIn, TikTok and Microsoft ads of the competitors: only Google and Meta are read.",
@@ -415,6 +416,41 @@ def compare(own_ads, comp_ads, *, n_competitors):
     return out, pool, theirs, ours
 
 
+def thin_reason(entries, platform, lines):
+    """Why the competitors' copy on a platform was too thin to compare, competitor by competitor: no page or website to look up, not read yet, a failed read, ads with no words, or no ads at all."""
+    where, what = ("Meta", "Facebook page") if platform == "meta" else ("Google", "website")
+    groups = {"unset": [], "unread": [], "failed": [], "pictures": [], "empty": []}
+    pics = 0
+    for c in entries:
+        if c.get("ads"):
+            continue
+        if c.get("error"):
+            groups["failed"].append(c["name"])
+        elif str(c.get("skipped") or "").startswith("Not read yet"):
+            groups["unread"].append(c["name"])
+        elif c.get("skipped"):
+            groups["unset"].append(c["name"])
+        elif c.get("pictures"):
+            groups["pictures"].append(c["name"])
+            pics += len(c["pictures"])
+        else:
+            groups["empty"].append(c["name"])
+    names = lambda xs: xs[0] if len(xs) == 1 else ", ".join(xs[:-1]) + " and " + xs[-1]    # noqa: E731
+    parts = []
+    if groups["unset"]:
+        parts.append("%s %s no %s set, so %s was not searched for %s" % (names(groups["unset"]), "has" if len(groups["unset"]) == 1 else "have", what, where, "it" if len(groups["unset"]) == 1 else "them"))
+    if groups["unread"]:
+        parts.append("%s %s not been read yet (press Refresh competitor ads)" % (names(groups["unread"]), "has" if len(groups["unread"]) == 1 else "have"))
+    if groups["failed"]:
+        parts.append("the %s read of %s failed" % (where, names(groups["failed"])))
+    if groups["pictures"]:
+        parts.append("the %s read of %s %s only pictures or videos with no words (their formats are compared below)" % (plural(pics, "ad"), names(groups["pictures"]), "is" if pics == 1 else "are"))
+    if groups["empty"]:
+        parts.append("%s %s no active ads on %s" % (names(groups["empty"]), "shows" if len(groups["empty"]) == 1 else "show", where))
+    head = ("No line of the competitors' copy was read" if not lines else "Only %s of the competitors' copy were read" % plural(lines, "line")) + ", too few to say what they have in common (at least %d are needed)" % MIN_POOL
+    return head + (": " + "; ".join(parts) + "." if parts else ".")
+
+
 def example_for(theme, pool):
     """A competitor line that carries the theme: the one from the ad that has run longest."""
     best = None
@@ -461,6 +497,8 @@ def analyse(own, competitors, *, now, region="US"):
                                   limit=c.get("limit"), capped=c.get("capped"), partial=c.get("partial"), items=c.get("items")) for c in entries]
         with_data = [c for c in entries if c.get("ads")]
         cmp_, pool, theirs, ours = compare(own_ads, [a for c in with_data for a in c["ads"]], n_competitors=len(with_data))
+        if not cmp_["judged"] and theirs["lines"] < MIN_POOL:
+            cmp_["why"] = thin_reason(entries, p, theirs["lines"])
         platforms[p] = {"own": {"ads": len(own_ads), "lines": ours["lines"], "themes": {k: v["share"] for k, v in ours["themes"].items()}}, "competitors": stats, "compare": cmp_,
                         "pool": {"ads": len(pool), "lines": theirs["lines"], "themes": {k: dict(v) for k, v in theirs["themes"].items()}}, "offers": offers_of(pool),
                         "winners": [_brief(a) for a in sorted(pool, key=lambda a: -(a.get("days") or 0))[:TOP_N] if (a.get("days") or 0) > 0],

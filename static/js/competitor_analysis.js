@@ -71,10 +71,10 @@ function render(){
     return '<div class="pd-kpi '+cls+'"><div class="k">'+esc(c[0])+'</div><div class="v">'+esc(c[1])+'</div><div class="s">'+esc(c[2])+'</div></div>';
   }).join("");
   $("#standing").textContent=D.standing(rep);
-  paintCompetitors(); paintIdeas(); paintGaps(); paintAds(); paintBlind(); paintGallery(); loadAds(true);
+  paintCompetitors(); paintIdeas(); paintGaps(); paintMix(); paintAds(); paintBlind(); paintGallery(); loadAds(true); loadBrief();
   $("#foot").innerHTML="Competitor ads are read from Meta's Ad Library (the page's active ads) and Google's Ads Transparency Center by scrapers, only when you press Refresh, and kept for "+rep.cacheDays+" days. "+
     "Pictures and videos are loaded from the platforms' own servers, and Meta removes those links after a few days: a picture that no longer loads can still be seen in the Ad Library. "+
-    "Our ads are the Ad Copy Checker's read of the text of the ads running now. A message is a gap only when the competitors use it clearly more than we do, in at least three of their ads and, when two were read, in two competitors. Nothing is changed in an ad account.";
+    "Our ads are the Ad Copy Checker's read of the text of the ads running now, and a daily read of their formats, buttons and placements. A message is a gap only when the competitors use it clearly more than we do, in at least three of their ads and, when two were read, in two competitors. Nothing is changed in an ad account.";
 }
 function paintCompetitors(){
   var rep=S.report;
@@ -124,6 +124,59 @@ function paintGaps(){
   $("#gapsCard").hidden=!html;
   $("#gaps").innerHTML=html;
 }
+function paintMix(){
+  var rep=S.report, html=rep.platforms.map(function(p){
+    var m=D.mixRows(rep,p);
+    if(!m) return "";
+    var out='<h4>'+esc(D.PLAT[p])+'</h4>';
+    if(m.ownError) out+='<p class="pm-empty">'+esc("Our own ads could not be read for this: "+m.ownError)+'</p>';
+    m.kinds.forEach(function(k){
+      out+='<h5>'+esc(k.title)+'</h5>';
+      if(!k.judged){out+='<p class="pm-empty">'+esc(k.why||"Nothing to compare yet.")+'</p>';return;}
+      out+=k.rows.map(function(r){return '<div class="ca-mix'+(r.gap?" gap":"")+'">'+bar(r.label,r.their,r.own)+'<p class="bi-sub">'+(r.gap?'<span class="bi-lv '+D.levelInfo(r.gap).tone+'">Gap</span> ':(r.edge?'<span class="bi-lv wait">Ours</span> ':""))+esc(r.text)+'</p></div>';}).join("");
+    });
+    if(m.durability.length) out+='<h5>Which of their formats run longest</h5><div class="bi-tbl"><table><thead><tr><th>Format</th><th>Their ads</th><th>Median days running</th><th>Longest</th></tr></thead><tbody>'+m.durability.map(function(d){return '<tr><td>'+esc(d.label)+'</td><td>'+d.ads+'</td><td>'+esc(d.median)+'</td><td>'+esc(d.longest==null?"":d.longest+" days")+'</td></tr>';}).join("")+'</tbody></table></div>';
+    if(m.fresh) out+='<p class="bi-sub"><b>How fresh:</b> '+esc(m.fresh)+'</p>';
+    out+=m.notes.map(function(n){return '<p class="bi-sub">'+esc(n)+'</p>';}).join("");
+    return out;
+  }).join("");
+  $("#mixCard").hidden=!html;
+  $("#mix").innerHTML=html;
+}
+
+/* ── Ideas written by Claude ──────────────────────────────── */
+function paintBrief(){
+  var b=S.brief, cards=D.briefCards(b);
+  $("#briefNote").textContent=D.briefNote(b);
+  $("#briefBtn").textContent=b&&b.status!=="none"?"Write them again":"Write creative ideas";
+  $("#briefBtn").disabled=!!S.briefBusy||!(S.report&&S.report.counts&&S.report.counts.competitorAds);
+  $("#brief").innerHTML=cards.map(function(c){
+    return '<article class="ca-idea ca-brief"><div class="ca-idea-h"><span class="bi-lv wait">'+esc(c.platform)+'</span><b>'+esc(c.title)+'</b></div>'+
+      '<p><b>Format:</b> '+esc(c.format)+' · <b>Placement:</b> '+esc(c.placement)+'</p><p><b>Hook:</b> '+esc(c.hook)+'</p><p><b>First line:</b> '+esc(c.firstLine)+'</p><p><b>Why:</b> '+esc(c.why)+'</p>'+
+      (c.ads.length?'<p class="bi-sub">Learned from: '+c.ads.map(function(a){return a.url?'<a href="'+esc(a.url)+'" target="_blank" rel="noopener noreferrer">'+esc(a.label)+'</a>':esc(a.label);}).join(" · ")+'</p>':"")+'</article>';
+  }).join("");
+}
+function loadBrief(){
+  var acct=S.account;
+  return getJson(API+"/brief"+q()).then(function(r){
+    if(acct!==S.account) return;
+    S.brief=r.ok?r.j:null; paintBrief();
+  }).catch(function(){S.brief=null; paintBrief();});
+}
+function writeBrief(){
+  if(!S.report||S.briefBusy) return;
+  var acct=S.account;
+  S.briefBusy=true; paintBrief(); $("#briefMsg").innerHTML='<p class="mp-note">Claude is reading their ads and pictures and writing ideas. This takes up to a minute.</p>';
+  return postJson(API+"/brief",{account:acct}).then(function(r){
+    S.briefBusy=false;
+    if(acct!==S.account) return;
+    var err=!r.ok?((r.j&&r.j.error)||("The ideas could not be written (HTTP "+r.status+").")):(r.j.error||"");
+    $("#briefMsg").innerHTML=err?'<div class="pm-err">'+esc(err)+'</div>':"";
+    if(r.ok&&r.j.status==="ready") S.brief=r.j;
+    paintBrief();
+  }).catch(function(){S.briefBusy=false; $("#briefMsg").innerHTML='<div class="pm-err">The server could not be reached. Try again.</div>'; paintBrief();});
+}
+
 function adTable(rows){
   return '<div class="bi-tbl"><table><thead><tr><th>Competitor</th><th>Headline</th><th>Text</th><th>Format</th><th>Running</th></tr></thead><tbody>'+rows.map(function(r){
     return '<tr><td>'+esc(r.who)+'</td><td>'+esc(r.headline)+'</td><td>'+esc(r.body)+'</td><td>'+esc(r.format)+(r.cta?' · '+esc(r.cta):"")+'</td><td>'+(r.days==null?"":esc(D.plural(r.days,"day")))+(r.since?'<div class="bi-sub">since '+esc(r.since)+'</div>':"")+'</td></tr>';
@@ -327,6 +380,8 @@ $("#fRegion").addEventListener("change",function(){
     return afterChange();
   }).catch(function(){setMsg("The server could not be reached. Nothing was saved.");});
 });
+
+$("#briefBtn").addEventListener("click",writeBrief);
 
 /* ── Refreshing and polling ───────────────────────────────── */
 $("#refreshBtn").addEventListener("click",function(){

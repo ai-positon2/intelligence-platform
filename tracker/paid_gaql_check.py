@@ -27,6 +27,7 @@ def google_queries(today=None):
     """[(agent, label, gaql)]: every Google query the recent agents send, built with sample dates and ids (the ids need not exist: a query is valid or not by its fields)."""
     from . import paid_anomaly as an, paid_brandis as bis, paid_brandis_diag as diag, paid_brandspend as bs, paid_copycheck as cc, paid_disapproved as dis, paid_disapproved_extra as dx
     from . import paid_creative as cr, paid_geoconf as gc, paid_kpi as kp, paid_kvis as kv, paid_track as tr, paid_watch as wt
+    from . import paid_compete_own as co
     today = today or dt.date.today()
     a, b = (today - dt.timedelta(days=28)).isoformat(), (today - dt.timedelta(days=1)).isoformat()
     ts = ((today - dt.timedelta(days=3)).strftime("%Y-%m-%d %H:%M:%S"), today.strftime("%Y-%m-%d %H:%M:%S"))
@@ -53,6 +54,7 @@ def google_queries(today=None):
         ("watch", "conversion actions", wt.GAQL_ACTIONS), ("watch", "who can open the account", wt.GAQL_USERS),
         ("creative", "ads by week", cr.GAQL_ADS % (a, b)), ("creative", "asset groups by week", cr.GAQL_GROUPS % (a, b)), ("creative", "ad headlines", cr.GAQL_HEADLINES),
         ("creative", "assets of ads rated low", cr.GAQL_WEAK_ADS), ("creative", "assets of asset groups rated low", cr.GAQL_WEAK_GROUPS),
+        ("compete", "our ad types", co.GAQL_AD_TYPES), ("compete", "our asset group pictures and videos", co.GAQL_PMAX_MEDIA),
     ]
     return qs
 
@@ -118,6 +120,12 @@ def meta_requests(act):
         out.append(("creative", "ads by week", path, dict(params, limit=1)))
     except Exception as e:                                                           # noqa: BLE001
         out.append(("creative", "ads by week", None, {"_build_error": str(e)}))
+    from . import paid_compete_own as co
+    try:
+        path, params = co.meta_request(act)
+        out.append(("compete", "our ads' formats, buttons and placements", path, dict(params, limit=1)))
+    except Exception as e:                                                           # noqa: BLE001
+        out.append(("compete", "our ads' formats, buttons and placements", None, {"_build_error": str(e)}))
     from . import paid_qa_meta as qm
     for label, edge, fields in (("campaigns", "campaigns", qm.CAMPAIGN_FIELDS), ("ad sets", "adsets", qm.ADSET_FIELDS), ("ads", "ads", qm.AD_FIELDS)):
         out.append(("metaqa", label, "/%s/%s" % (act, edge), {"fields": fields, "limit": 1}))

@@ -65,9 +65,23 @@
       <div id="ideas"></div>
     </section>
 
+    <section class="pm-panel" id="briefCard">
+      <div class="pm-panel-h"><span class="pm-panel-t">Creative ideas from their best ads</span><span class="pm-panel-s">written by Claude</span></div>
+      <p class="bi-sub" id="briefNote"></p>
+      <div class="ca-brief-tools"><button class="pm-btn" id="briefBtn" type="button" disabled>Write creative ideas</button></div>
+      <div id="briefMsg"></div>
+      <div id="brief"></div>
+    </section>
+
     <section class="pm-panel" id="gapsCard" hidden>
       <div class="pm-panel-h"><span class="pm-panel-t">What they say, and what we say</span><span class="pm-panel-s">share of the lines of copy that carry each message</span></div>
       <div id="gaps"></div>
+    </section>
+
+    <section class="pm-panel" id="mixCard" hidden>
+      <div class="pm-panel-h"><span class="pm-panel-t">What kinds of ads they run, and what we run</span><span class="pm-panel-s">share of the ads in each format, button and placement</span></div>
+      <p class="bi-sub">Bars: them, then us. Their ads with no words (a picture or a video only) count here.</p>
+      <div id="mix"></div>
     </section>
 
     <section class="pm-panel" id="adsCard" hidden>
@@ -87,6 +101,6 @@
 <script src="{{ url_for('static', filename='js/pm_picker.js') }}?v=1"></script>
 <script src="{{ url_for('static', filename='js/pm_platform.js') }}?v=7"></script>
 <script src="{{ url_for('static', filename='js/pm_scope.js') }}?v=2"></script>
-<script src="{{ url_for('static', filename='js/competitor_analysis_data.js') }}?v=4"></script>
-<script src="{{ url_for('static', filename='js/competitor_analysis.js') }}?v=4"></script>
+<script src="{{ url_for('static', filename='js/competitor_analysis_data.js') }}?v=5"></script>
+<script src="{{ url_for('static', filename='js/competitor_analysis.js') }}?v=5"></script>
 {% endblock %}
