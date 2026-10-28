@@ -255,13 +255,64 @@ function csvRows(rep){
     (a.competitors || []).forEach(function(s){ rows.push(["Competitor", PLAT[p], s.name, s.error || s.skipped || "ads", s.error || s.skipped ? "" : s.active + " active, " + s.new + " new in 30 days, median " + (s.medianDays == null ? "n/a" : Math.round(s.medianDays)) + " days running" + (s.capped ? ". Limit of " + int(s.limit) + " ads reached: they run more than were read" : "") + (s.partial ? ". Stopped early: only part was read" : "") + (s.noText ? ". " + plural(s.noText, "ad") + " without text (picture or video only) not counted" : ""), s.count]); });
     (a.offers || []).forEach(function(o){ rows.push(["Offer", PLAT[p], (o.who || []).join(", "), o.text, "in " + plural(o.n, "line"), o.maxDays || 0]); });
     (a.winners || []).forEach(function(w){ rows.push(["Longest running", PLAT[p], w.who, w.headline, w.body, w.days == null ? "" : w.days]); });
+    var m = mixRows(rep, p);
+    (m ? m.kinds : []).forEach(function(k){ k.rows.forEach(function(r){ rows.push(["Kind of ad", PLAT[p], "", k.title + ": " + r.label, Math.round(r.their) + "% of theirs, " + Math.round(r.own) + "% of ours" + (r.gap ? " (gap)" : ""), r.their]); }); });
   });
   return rows;
+}
+
+/* ── What kinds of ads: formats, buttons, placements, how fresh ────────── */
+
+var KIND_TITLE = {format: "Formats", cta: "Buttons (calls to action)", network: "Placements"};
+function freshText(f, platform){
+  if (!f || f.their == null) return "";
+  var t = Math.round(f.their) + "% of their ads started in the last 30 days (" + plural(f.theirNew, "ad") + ")";
+  if (f.own != null) return t + ", " + Math.round(f.own) + "% of ours.";
+  return t + (platform === "google" ? ". Google gives no start day for our ads, so ours are not compared." : ".");
+}
+function mixNotes(m, platform){
+  var n = [];
+  if (platform === "google") {
+    n.push("A Performance Max asset group counts once for each of text, image and video it carries, so our shares can add up to more than 100%.");
+    if (m.pmaxNoVideo) n.push(plural(m.pmaxNoVideo, "Performance Max asset group") + (m.pmaxNoVideo === 1 ? " has" : " have") + " no video of our own, so Google makes one from the pictures.");
+  } else if (m.automatic) {
+    n.push(plural(m.automatic, "of our ads", "of our ads") + (m.automatic === 1 ? " uses" : " use") + " automatic placements, so it can show on Facebook, Instagram, Messenger and Audience Network.");
+  }
+  return n;
+}
+function mixRows(rep, platform){
+  var m = (rep.mix || {})[platform];
+  if (!m) return null;
+  var kinds = ["format", "cta", "network"].filter(function(k){ return m.kinds && m.kinds[k]; }).map(function(k){
+    var c = m.kinds[k], gap = {}, edge = {};
+    (c.gaps || []).forEach(function(g){ gap[g.value] = g.level; });
+    (c.edges || []).forEach(function(g){ edge[g.value] = true; });
+    return {kind: k, title: KIND_TITLE[k], judged: !!c.judged, why: c.why || "", rows: (c.rows || []).slice(0, 8).map(function(r){
+      return {label: r.label, their: r.their, own: r.own, gap: gap[r.value] || "", edge: !!edge[r.value], text: plural(r.ads, "of their ads", "of their ads") + " from " + plural(r.who, "competitor") + ", " + plural(r.ownN, "of ours", "of ours")};
+    })};
+  });
+  return {kinds: kinds, ownError: m.ownError || "", fresh: freshText(m.fresh, platform), notes: mixNotes(m, platform),
+    durability: (m.durability || []).map(function(d){ return {label: d.label, ads: d.ads, median: d.median == null ? "" : Math.round(d.median), longest: d.longest}; })};
+}
+
+/* ── The ideas Claude wrote ────────────────────────────────────────────── */
+
+function briefCards(brief){
+  return ((brief && brief.ideas) || []).map(function(i){
+    return {title: i.title, platform: PLAT[i.platform] || i.platform, format: i.format, placement: i.placement, hook: i.hook, firstLine: i.firstLine, why: i.why,
+      ads: (i.ads || []).map(function(a){ return {label: (a.who || "A competitor") + " · " + formatLabel(a.format) + (a.days != null ? " · " + plural(a.days, "day") : "") + (a.headline ? " · “" + a.headline + "”" : ""), url: safeUrl(a.adUrl, true)}; })};
+  });
+}
+function briefNote(brief){
+  if (!brief || brief.status === "none") return "Claude reads their longest-running ads, with the pictures, and our own ads, and writes ideas for new ads to test. Each one names the competitor ads it learned from. It costs a few cents, so it runs only when you press the button.";
+  var when = "Written by Claude on " + day(brief.at) + " from " + plural(brief.shown || 0, "of their ads", "of their ads") + " and " + plural(brief.images || 0, "picture") + ". These are a model's ideas: check each one before you brief it.";
+  return brief.status === "old" ? "The competitors or our ads were read again since these were written. Write them again to use the latest ads. " + when : when;
 }
 
 var api = {PLAT: PLAT, HEAD: HEAD, int: int, plural: plural, day: day, levelInfo: levelInfo, money: money, ageText: ageText, tiles: tiles, estimateText: estimateText, jobText: jobText, stepLine: stepLine,
   competitorRows: competitorRows, gapRows: gapRows, gapText: gapText, exampleText: exampleText, ideaCards: ideaCards, offerRows: offerRows, winnerRows: winnerRows, newestRows: newestRows,
   resultCards: resultCards, searchNote: searchNote, facebookText: facebookText, competitorCards: competitorCards, forText: forText, addBody: addBody, removeBody: removeBody, pageBody: pageBody, regionBody: regionBody, findBody: findBody,
-  standing: standing, csvRows: csvRows, SORTS: SORTS, formatLabel: formatLabel, ctaLabel: ctaLabel, safeUrl: safeUrl, adsQuery: adsQuery, adCard: adCard, filterOptions: filterOptions, pageText: pageText, creativeNote: creativeNote, emptyText: emptyText};
+  standing: standing, csvRows: csvRows, SORTS: SORTS, formatLabel: formatLabel, ctaLabel: ctaLabel, safeUrl: safeUrl, adsQuery: adsQuery, adCard: adCard, filterOptions: filterOptions, pageText: pageText, creativeNote: creativeNote, emptyText: emptyText,
+  mixRows: mixRows, freshText: freshText, briefCards: briefCards, briefNote: briefNote};
 if (typeof module !== "undefined" && module.exports) module.exports = api; else root.CAData = api;
 })(typeof window !== "undefined" ? window : globalThis);

@@ -48,6 +48,25 @@ same shape.
    * The same ad of one competitor (Meta repeats it per placement) is counted once.
 5. **Ideas** come from the gaps (each with its evidence, a thing to test and a real example line), the offers and the longest runners, worst first.
 
+## The kinds of ads, and ideas written by Claude (2026-10-28)
+
+Asked by Divith: "can we get better suggestions, from seeing the different types of ads they are running vs what we are running". Spec approved the same day.
+
+* **Why Meta said "Only 0 lines"**: the words of a platform cannot be compared when no competitor ad with words was read there. The page now says why, competitor by competitor (`paid_compete_math.py`
+  `thin_reason`): no Facebook page or website set, not read yet, a failed read, ads that are only pictures or videos, or no active ads.
+* **Our own kinds of ads** (`tracker/paid_compete_own.py`), read in small reads of their own and kept for the day (`paid_geo._cached`, kind `compete-own`), because the Ad Copy Checker's read keeps
+  text only. Google: each enabled ad's type (`ad_group_ad.ad.type`, text, image or video) and each enabled Performance Max asset group's pictures and videos (`asset_group_asset.field_type`; an
+  asset group counts for every format it carries). Meta: each active ad's creative (format: dynamic, catalog, carousel, video or image; its button), its ad set's placements (none chosen means
+  automatic placements, which count everywhere) and the day it was made. Both Google queries were run against two real accounts on 2026-10-28 (18 and 37 ads, 164 and 75 asset rows). The Meta
+  fields were not run from here (no Meta token on this machine): they are in the admin live query check (`agents=compete`).
+* **The comparison** (`tracker/paid_compete_mix.py`): format on both platforms, button and placement on Meta, over every ad read of theirs (pictures and videos with no words included). A gap is
+  as strict as a gap in the words: their share 25 points above ours, in 3 of their ads, in two competitors when two were read, from 8 of their ads and 3 of ours. Also: which of their formats
+  run longest (median days), and how fresh each side is (share started in the last 30 days; ours on Meta only, Google gives no start day). Gaps become ideas with a thing to try.
+* **Ideas written by Claude** (`tracker/paid_compete_brief.py`, `/api/compete/brief`): on a button press (a few cents, never automatic), Claude Opus 5.5 is shown the gaps, a sample of our copy
+  and their 10 longest-running ads (the 2 longest of each format first) with the pictures of up to 8, and writes 3 to 6 ideas (format, placement, hook, first line, why). Each must name the
+  competitor ads it learned from; one that names none it was shown is dropped. It is told not to invent facts about the client (placeholders such as [your offer]). The answer is kept per
+  account until the competitors or our ads are read again (then it is marked old). One ask at a time per account. A refusal is retried on a fallback model by the API.
+
 ## What it says it could not measure
 
 How the competitors' ads perform; our own formats and calls to action (only text is read); competitors' ads that have stopped; the keywords they bid on; LinkedIn, TikTok and Microsoft. A competitor with no
@@ -58,4 +77,4 @@ Facebook page, a read that failed, and a read that is old are named in the repor
 * **A model's written creative brief.** The ideas are rules with evidence; a model could turn them into copy, but nothing here could verify its claims.
 * **New competitor ad alerts** through the Alert Hub: possible later, since each read has the ads' first-shown days.
 * **Spend and reach of competitors:** Meta publishes them for the EU only and Google for the EU only.
-* **Our own ad formats and calls to action** in the comparison: the Ad Copy Checker's read has text only.
+* **How fresh our own Google ads are**: Google gives no start day for an ad.

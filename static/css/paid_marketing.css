@@ -1848,6 +1848,10 @@ video.ca-ad-m{background:#000}
 .ca-bar-t i.their{background:var(--over)}
 .ca-bar-t i.own{background:var(--under)}
 .ca-bar-n{text-align:right;font-variant-numeric:tabular-nums;color:var(--pm-muted)}
+.ca-mix{margin:2px 0 6px}
+.ca-mix.gap .ca-bar-l{font-weight:600}
+.ca-brief-tools{margin:10px 0}
+.ca-brief p b{color:var(--pm-ink)}
 .c-kv{--card-accent:#a78bfa;
   --band:linear-gradient(90deg,#a78bfa,#38bdf8,#22d3ee);
   --thumb:linear-gradient(135deg,#1a1236 0%,#0b2236 100%);

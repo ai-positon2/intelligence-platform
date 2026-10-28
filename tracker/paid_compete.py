@@ -16,6 +16,8 @@ from . import paid_gads as gb
 from . import paid_gads_segments as gs
 from . import paid_compete_fetch as cf
 from . import paid_compete_math as cm
+from . import paid_compete_mix as mx
+from . import paid_compete_own as co
 from . import paid_compete_search as se
 from . import paid_compete_settings as cs
 
@@ -124,6 +126,35 @@ def own_ads(platform, account_id, *, accounts_fn=None, groups_fn=None, search_fn
     return [x for x in (cm.own_ad(a) for a in ads) if x], list(raw.get("warnings") or []), account.get("name") or account_id
 
 
+def their_ads(entries):
+    """Every ad read of the competitors on one platform, each once: the ones with words (an ad Meta repeats per placement counted once) and the ones that are only a picture or a video."""
+    seen, out = set(), []
+    for e in entries:
+        for a in cm.dedupe(list(e.get("ads") or [])) + list(e.get("pictures") or []):
+            if a["id"] not in seen:
+                seen.add(a["id"])
+                out.append(a)
+    return out
+
+
+def own_kinds(platform, account_id, *, now, search_fn=None, meta_pages_fn=None, store=None, today=None, force=False, **_reads):
+    """{units, error}: the kinds of ads we run on one account (tracker/paid_compete_own.py). Never raises: a read that failed is said on the page and the mix is not judged."""
+    clock = now.timestamp() if isinstance(now, dt.datetime) else now
+    try:
+        return co.load(platform, account_id, search_fn=search_fn, meta_pages_fn=meta_pages_fn, store=store, now=clock, force=force, today=today)
+    except Exception as e:                                                           # noqa: BLE001
+        return {"units": [], "error": str(e)[:200]}
+
+
+def mixes_of(own_units, entries, platforms, *, now):
+    out = {}
+    for p in platforms:
+        es = [e for e in entries if e["platform"] == p]
+        u = own_units.get(p) or {"units": [], "error": ""}
+        out[p] = mx.analyse(p, u["units"], their_ads(es), n_competitors=sum(1 for e in es if e.get("ads") or e.get("pictures")), today=now.date(), own_error=u["error"])
+    return out
+
+
 def report_for(google, meta, *, mon, now=None, **reads):
     """The Competitor Analysis report for a Google Ads account and/or a Meta ad account. `mon` is the monitors' store (the competitors, what was read of them and the refresh). `reads` hands
     the reads of our own ads in (accounts_fn, groups_fn, search_fn, meta_pages_fn, meta_account_fn, store, today, force) for tests."""
@@ -147,8 +178,12 @@ def report_for(google, meta, *, mon, now=None, **reads):
     if not competitors:
         return dict(base, status="no_competitors", headline="No competitors are saved for this account yet.", ideas=[], notMeasured=list(cm.NOT_MEASURED), caveats=[],
                     counts={"competitorAds": 0, "reads": 0, "gaps": 0, "ideas": 0}, analysis={}, own=own_counts)
-    a = cm.analyse(own, cf.entries_for(mon, competitors, platforms, region), now=now, region=region)
-    return dict(base, status=a["status"], headline=a["headline"], ideas=a["ideas"], notMeasured=a["notMeasured"], caveats=a["caveats"], counts=a["counts"], analysis=a["platforms"], own=own_counts)
+    entries = cf.entries_for(mon, competitors, platforms, region)
+    a = cm.analyse(own, entries, now=now, region=region)
+    mixes = mixes_of({p: own_kinds(p, accounts[p], now=now, **reads) for p in platforms}, entries, platforms, now=now)
+    ideas = sorted(a["ideas"] + mx.ideas_of(mixes), key=lambda i: mx.ORDER[i["level"]])          # stable: within a level the words come first, then the kinds of ads
+    counts = dict(a["counts"], ideas=len(ideas), kindGaps=sum(len(k["gaps"]) for m in mixes.values() for k in m["kinds"].values()))
+    return dict(base, status=a["status"], headline=a["headline"], ideas=ideas, notMeasured=a["notMeasured"], caveats=a["caveats"], counts=counts, analysis=a["platforms"], mix=mixes, own=own_counts)
 
 
 # ── The ads themselves ──────────────────────────────────────────────────────
@@ -197,3 +232,27 @@ def ads_for(google, meta, *, mon, platform="", competitor="", fmt="", q="", sort
         shown.sort(key=lambda a: (-(a["days"] if a["days"] is not None else -1), a["id"]))
     return {"ads": shown[offset:offset + limit], "total": len(shown), "offset": offset, "limit": limit, "reads": reads, "creativeMissing": missing,
             "facets": {"platforms": _count(a["platform"] for a in pool), "competitors": _count(a["competitor"] for a in pool), "formats": _count(a["format"] for a in pool if a["format"])}}
+
+
+# ── Ideas written by Claude ─────────────────────────────────────────────────
+
+def brief_for(google, meta, *, mon, now=None, write=False, ask_fn=None, fetch_fn=None, **reads):
+    """The ideas Claude wrote for this scope (tracker/paid_compete_brief.py): the saved ones ({status: ready, old or none}), or, with `write`, new ones (a few cents, never automatic)."""
+    from . import paid_compete_brief as cb
+    now = now or dt.datetime.now(dt.timezone.utc)
+    rep = report_for(google, meta, mon=mon, now=now, **reads)
+    entries = cf.entries_for(mon, rep["competitors"], rep["platforms"], rep["region"])
+    sig = cb.signature(rep, entries)
+    if not write:
+        return cb.saved(mon, rep["key"], sig)
+    if not rep["competitors"]:
+        raise BadRequest("Add the competitors first: the ideas are learned from their ads.")
+    own_lines = {p: [l for a in own_ads(p, rep["accounts"][p], now=now, **reads)[0] for l in cm.lines_of(a)] for p in rep["platforms"]}
+    theirs = {p: their_ads([e for e in entries if e["platform"] == p]) for p in rep["platforms"]}
+    lock = "lock:compete:brief:" + rep["key"]
+    if not mon.claim(lock, 180):                                                     # one ask at a time per account: a second press waits for the first answer
+        raise BadRequest("Claude is already writing ideas for this account. They will show here in a minute.")
+    try:
+        return cb.write(mon, rep["key"], sig, rep, theirs, own_lines, ask_fn=ask_fn, fetch_fn=fetch_fn, now=now)
+    finally:
+        mon.release(lock)

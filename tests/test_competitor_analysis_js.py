@@ -699,3 +699,60 @@ def test_a_video_creative_is_drawn_as_its_thumbnail_with_a_link_that_plays_it_on
     grid = with_ads(report, res)["el"]["#galGrid"]["html"]
     assert '<a class="ca-ad-watch" href="https://www.youtube.com/watch?v=T84TitSO-qg" target="_blank" rel="noopener noreferrer">' in grid and 'class="ca-ad-m" src="%s"' % YT in grid and "Watch on YouTube" in grid
     assert grid.count('target="_blank"') == grid.count('target="_blank" rel="noopener noreferrer"')
+
+
+# ── the kinds of ads and the ideas Claude writes ────────────────────────────
+
+MIX = {"meta": {"platform": "meta", "ownError": "", "ownUnits": 4, "theirAds": 10, "automatic": 2, "pmaxNoVideo": 0,
+                "kinds": {"format": {"kind": "format", "judged": True, "why": "", "rows": [{"value": "video", "label": "Video", "their": 60.0, "own": 0.0, "ads": 6, "who": 2, "ownN": 0},
+                                                                                        {"value": "image", "label": "Single <b>image</b>", "their": 40.0, "own": 100.0, "ads": 4, "who": 2, "ownN": 4}],
+                                     "gaps": [{"value": "video", "level": "high"}], "edges": [{"value": "image"}]},
+                          "cta": {"kind": "cta", "judged": False, "why": "Only 2 ads of theirs say it, too few to compare (at least 8 are needed).", "rows": [], "gaps": [], "edges": []}},
+                "durability": [{"format": "video", "label": "Video", "ads": 6, "median": 120.4, "longest": 300}], "fresh": {"their": 60.0, "theirNew": 6, "own": 0.0, "ownNew": 0, "gap": "high"}},
+       "google": {"platform": "google", "ownError": "", "automatic": 0, "pmaxNoVideo": 1, "kinds": {"format": {"judged": True, "why": "", "rows": [], "gaps": [], "edges": []}},
+                  "durability": [], "fresh": {"their": 10.0, "theirNew": 1, "own": None, "ownNew": None, "gap": None}}}
+BRIEF = {"status": "ready", "at": "2026-10-27T12:00:00+00:00", "model": "claude-opus-5-5", "images": 3, "shown": 8,
+         "ideas": [{"title": "A <script>video</script>", "platform": "meta", "format": "Video", "placement": "Reels", "hook": "A parent at breakfast", "firstLine": "[your offer] today", "why": "Their videos run longest.",
+                    "basedOn": ["meta:1"], "ads": [{"id": "meta:1", "who": "Tandem", "format": "video", "days": 120, "adUrl": "https://www.facebook.com/ads/library/?id=1", "headline": "Pump delivered"},
+                                                   {"id": "meta:2", "who": "Evil", "format": "image", "days": 3, "adUrl": "javascript:alert(1)", "headline": ""}]}]}
+
+
+def test_the_kinds_of_ads_are_rows_with_the_gaps_marked_the_freshness_and_the_notes_in_words():
+    m = run("X.mixRows(R, 'meta')", R={"mix": MIX})
+    assert [k["kind"] for k in m["kinds"]] == ["format", "cta"] and m["kinds"][0]["title"] == "Formats" and m["kinds"][1]["why"].startswith("Only 2 ads")
+    assert m["kinds"][0]["rows"][0] == {"label": "Video", "their": 60.0, "own": 0.0, "gap": "high", "edge": False, "text": "6 of their ads from 2 competitors, 0 of ours"}
+    assert m["kinds"][0]["rows"][1]["edge"] is True and m["durability"] == [{"label": "Video", "ads": 6, "median": 120, "longest": 300}]
+    assert m["fresh"] == "60% of their ads started in the last 30 days (6 ads), 0% of ours." and m["notes"] == ["2 of our ads use automatic placements, so it can show on Facebook, Instagram, Messenger and Audience Network."]
+    g = run("X.mixRows(R, 'google')", R={"mix": MIX})
+    assert g["fresh"].endswith("Google gives no start day for our ads, so ours are not compared.") and "1 Performance Max asset group has no video of our own" in g["notes"][1]
+    assert run("X.mixRows({}, 'meta')") is None
+
+
+def test_claudes_ideas_are_cards_that_link_only_safe_library_pages_and_the_note_says_they_are_a_models():
+    c = run("X.briefCards(B)", B=BRIEF)
+    assert c[0]["platform"] == "Meta Ads" and c[0]["ads"][0] == {"label": "Tandem · Video · 120 days · “Pump delivered”", "url": "https://www.facebook.com/ads/library/?id=1"} and c[0]["ads"][1]["url"] == ""
+    assert run("X.briefCards(null)") == [] and "only when you press the button" in run("X.briefNote(null)")
+    assert run("X.briefNote(B)", B=BRIEF) == "Written by Claude on 2026-10-27 from 8 of their ads and 3 pictures. These are a model's ideas: check each one before you brief it."
+    assert run("X.briefNote(B)", B=dict(BRIEF, status="old")).startswith("The competitors or our ads were read again since these were written.")
+
+
+def test_the_kinds_of_ads_panel_is_drawn_with_bars_and_escaped_labels(report):
+    out = opened(dict(report, mix=MIX))
+    el = out["el"]
+    assert el["#mixCard"]["hidden"] is False and "<h5>Formats</h5>" in el["#mix"]["html"] and 'class="ca-mix gap"' in el["#mix"]["html"] and ">Gap</span>" in el["#mix"]["html"]
+    assert "Single &lt;b&gt;image&lt;/b&gt;" in el["#mix"]["html"] and ">Ours</span>" in el["#mix"]["html"] and "Which of their formats run longest" in el["#mix"]["html"] and "Only 2 ads of theirs" in el["#mix"]["html"]
+
+
+def test_saved_ideas_are_drawn_and_the_button_writes_new_ones(report):
+    out = opened(report, [{"click": "#briefBtn"}], more=[{"match": "/compete/brief", "body": BRIEF}, {"match": "/compete/brief", "method": "POST", "body": dict(BRIEF, ideas=[dict(BRIEF["ideas"][0], title="Fresh idea")])}])
+    el = out["el"]
+    assert "/p2/paid-marketing/api/compete/brief?account=1234567890" in out["calls"] and out["posts"] == [{"url": "/p2/paid-marketing/api/compete/brief", "body": {"account": G}}]
+    assert "Fresh idea" in el["#brief"]["html"] and "<script>" not in el["#brief"]["html"] and "javascript:" not in el["#brief"]["html"] and 'rel="noopener noreferrer"' in el["#brief"]["html"]
+    assert el["#briefBtn"]["text"] == "Write them again" and el["#briefMsg"]["html"] == "" and "Written by Claude on 2026-10-27" in el["#briefNote"]["text"]
+
+
+def test_a_failed_ask_for_ideas_is_said_and_no_saved_ideas_means_the_button_explains_the_cost(report):
+    out = opened(report, [{"click": "#briefBtn"}], more=[{"match": "/compete/brief", "body": {"status": "none"}}, {"match": "/compete/brief", "method": "POST", "body": {"status": "failed", "error": "Claude could not be asked (overloaded)."}}])
+    assert "Claude could not be asked (overloaded)." in out["el"]["#briefMsg"]["html"] and out["el"]["#brief"]["html"] == "" and "costs a few cents" in out["el"]["#briefNote"]["text"]
+    busy = opened(report, [{"click": "#briefBtn"}], more=[{"match": "/compete/brief", "method": "POST", "status": 400, "body": {"error": "Claude is already writing ideas for this account."}}])
+    assert "already writing" in busy["el"]["#briefMsg"]["html"]
