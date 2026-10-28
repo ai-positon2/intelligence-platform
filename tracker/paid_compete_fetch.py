@@ -140,9 +140,9 @@ def entries_for(store, competitors, platforms, region):
             e = cached(store, p, c, region)
             if e is None:
                 why = skipped_reason(p, c, region)
-                out.append({"name": c["name"], "platform": p, "ads": [], "pictures": [], "fetchedAt": "", "error": "", "skipped": why or "Not read yet: press Refresh competitor ads.", "items": 0, "limit": LIMIT[p], "capped": False, "partial": ""})
+                out.append({"name": c["name"], "platform": p, "ads": [], "pictures": [], "fetchedAt": "", "error": "", "skipped": why or "Not read yet: press Refresh competitor ads.", "items": 0, "limit": LIMIT[p], "capped": False, "partial": "", "v": 0})
             else:
-                out.append({"name": c["name"], "platform": p, "ads": e.get("ads") or [], "pictures": e.get("pictures") or [], "fetchedAt": e.get("fetchedAt") or "", "error": e.get("error") or "", "skipped": e.get("skipped") or "",
+                out.append({"name": c["name"], "platform": p, "ads": e.get("ads") or [], "pictures": e.get("pictures") or [], "v": e.get("v") or 1, "fetchedAt": e.get("fetchedAt") or "", "error": e.get("error") or "", "skipped": e.get("skipped") or "",
                         "items": e.get("items") or 0, "limit": e.get("limit") or LIMIT[p], "capped": bool(e.get("capped")), "partial": e.get("partial") or ""})
     return out
 

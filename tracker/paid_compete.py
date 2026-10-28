@@ -20,6 +20,9 @@ from . import paid_compete_search as se
 from . import paid_compete_settings as cs
 
 SETTINGS_LOCK = "lock:compete:settings"
+GALLERY_PAGE = 24                 # ads per page of the gallery, and the most one request may ask for
+GALLERY_MAX = 48
+SORTS = ("longest", "newest")
 
 
 class BadRequest(ValueError):
@@ -146,3 +149,51 @@ def report_for(google, meta, *, mon, now=None, **reads):
                     counts={"competitorAds": 0, "reads": 0, "gaps": 0, "ideas": 0}, analysis={}, own=own_counts)
     a = cm.analyse(own, cf.entries_for(mon, competitors, platforms, region), now=now, region=region)
     return dict(base, status=a["status"], headline=a["headline"], ideas=a["ideas"], notMeasured=a["notMeasured"], caveats=a["caveats"], counts=a["counts"], analysis=a["platforms"], own=own_counts)
+
+
+# ── The ads themselves ──────────────────────────────────────────────────────
+
+def _view(a, competitor):
+    media = a.get("media") or []
+    return {"id": a["id"], "platform": a["platform"], "competitor": competitor, "who": a["who"], "format": a["format"], "headlines": a["headlines"], "bodies": a["bodies"], "text": a.get("text") or "", "cta": a["cta"],
+            "ctaType": a.get("ctaType") or "", "caption": a.get("caption") or "", "url": a["url"], "landing": cm.path_of(a["url"]), "adUrl": a.get("adUrl") or "", "media": media, "mediaCount": a.get("mediaCount") or len(media),
+            "firstShown": a["firstShown"], "lastShown": a["lastShown"], "days": a["days"], "active": a["active"], "copies": a["copies"], "networks": a["networks"]}
+
+
+def _count(items):
+    out = {}
+    for k in items:
+        out[k] = out.get(k, 0) + 1
+    return out
+
+
+def ads_for(google, meta, *, mon, platform="", competitor="", fmt="", q="", sort="longest", offset=0, limit=GALLERY_PAGE):
+    """One page of the competitors' ads as cards: {ads, total, offset, limit, facets, reads, creativeMissing}. The ads are the ones read (Refresh), with their pictures, videos, words, link and call to
+    action; the same ad shown in many places is one card (with its copies), and an ad that is only a picture or a video is a card too. `platform`, `competitor`, `fmt` and `q` (words in the ad, its
+    advertiser or its landing page) narrow it; `sort` is the longest-running ad first (the best public sign that an ad works) or the newest. `facets` count the whole set, so the page can offer the choices."""
+    accounts, _key = scope_of(google, meta)
+    competitors, region = competitors_of(cs.load_for_read(mon), accounts)
+    platforms = sorted(accounts, key=lambda p: ("meta", "google").index(p))
+    pool, reads, missing = [], [], 0
+    for e in cf.entries_for(mon, competitors, platforms, region):
+        seen, ads = set(), cm.dedupe(list(e["ads"]))
+        ads += [a for a in e["pictures"] if not (a["id"] in seen or seen.add(a["id"]))]
+        old = bool(ads) and e["v"] < cf.READ_V                                                              # read before the pictures were kept
+        missing += len(ads) if old else 0
+        reads.append({"name": e["name"], "platform": e["platform"], "fetchedAt": e["fetchedAt"], "ads": len(ads), "hasCreative": not old,
+                      "note": e["error"] or e["skipped"] or ("The read stopped early." if e["partial"] else "")})
+        pool += [_view(a, e["name"]) for a in ads]
+    try:
+        offset, limit = max(0, int(offset)), int(limit)
+    except (TypeError, ValueError):
+        offset, limit = 0, GALLERY_PAGE
+    limit = GALLERY_PAGE if limit < 1 else min(limit, GALLERY_MAX)
+    words = " ".join(str(q or "").lower().split())
+    shown = [a for a in pool if (not platform or a["platform"] == platform) and (not competitor or a["competitor"] == competitor) and (not fmt or a["format"] == fmt)
+             and (not words or words in " ".join(a["headlines"] + a["bodies"] + [a["text"], a["cta"], a["url"], a["who"], a["caption"]]).lower())]
+    if sort == "newest":
+        shown.sort(key=lambda a: (a["firstShown"] or "", a["id"]), reverse=True)
+    else:
+        shown.sort(key=lambda a: (-(a["days"] if a["days"] is not None else -1), a["id"]))
+    return {"ads": shown[offset:offset + limit], "total": len(shown), "offset": offset, "limit": limit, "reads": reads, "creativeMissing": missing,
+            "facets": {"platforms": _count(a["platform"] for a in pool), "competitors": _count(a["competitor"] for a in pool), "formats": _count(a["format"] for a in pool if a["format"])}}

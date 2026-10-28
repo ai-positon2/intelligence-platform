@@ -60,7 +60,7 @@ def save(c, account=G, text="Tandem | tandemdiabetes.com | TandemDiabetes", **kw
 def test_the_page_is_for_signed_in_staff_only():
     html = client_as(STAFF).get(PAGE).get_data(as_text=True)
     assert "Competitor Analysis" in html and 'id="caQ"' in html and 'id="caSearch"' in html and 'id="refreshBtn"' in html and 'id="fComp"' not in html and "js/competitor_analysis_data.js" in html and "js/competitor_analysis.js" in html
-    for url in (PAGE, API + "/report?account=" + G, API + "/job?account=" + G):
+    for url in (PAGE, API + "/report?account=" + G, API + "/job?account=" + G, API + "/ads?account=" + G):
         assert client_as(None).get(url).status_code == 302 and client_as("someone@gmail.com").get(url).status_code == 302, url
     for url in ("/settings", "/refresh"):
         assert client_as(None).post(API + url, json={}).status_code == 302 and client_as("someone@gmail.com").post(API + url, json={}).status_code == 302, url
@@ -352,3 +352,28 @@ def test_a_refresh_keeps_what_a_stopped_run_saved_and_says_so(store, monkeypatch
     assert job["steps"][0]["ads"] == 1 and "stopped before it finished" in job["steps"][0]["partial"]
     j = c.get(API + "/report?account=" + G).get_json()
     assert j["analysis"]["google"]["competitors"][0]["partial"] and any("stopped before it finished" in x for x in j["caveats"])
+
+
+def test_the_ads_read_come_back_as_cards_with_their_pictures_and_the_filters_apply(store, monkeypatch):
+    from tracker import apify_transport
+    from test_paid_compete_math import META_IMAGE, GOOGLE_REAL
+    google = dict(GOOGLE_REAL, adLibraryUrl="https://adstransparency.google.com/advertiser/AR1/creative/CR1", variations=[dict(v, imageUrl="https://tpc.googlesyndication.com/archive/simgad/%d" % i) for i, v in enumerate(GOOGLE_REAL["variations"], 1)])
+    runner = Runner(meta=[META_IMAGE], google=[google])
+    monkeypatch.setenv("APIFY_API_TOKEN", "tok")
+    monkeypatch.setattr(apify_transport, "run_actor_collect", collect(runner))
+    c = client_as(STAFF)
+    both = G + "+" + MA
+    save(c, account=both, text="Tandem | tandemdiabetes.com | TandemDiabetes")
+    assert c.post(API + "/refresh", json={"account": both}).status_code == 202
+    q = "account=" + both.replace("+", "%2B")                                                      # the page sends the plus sign encoded
+    j = c.get(API + "/ads?" + q).get_json()
+    assert j["total"] == 2 and j["facets"]["platforms"] == {"google": 1, "meta": 1} and j["creativeMissing"] == 0 and {r["platform"] for r in j["reads"]} == {"google", "meta"}
+    g = [a for a in j["ads"] if a["platform"] == "google"][0]
+    assert g["mediaCount"] == 3 and g["media"][0]["url"].startswith("https://tpc.googlesyndication.com/") and g["adUrl"].startswith("https://adstransparency.google.com/") and g["competitor"] == "Tandem"
+    m = [a for a in j["ads"] if a["platform"] == "meta"][0]
+    assert m["media"][0]["kind"] == "image" and m["cta"] == "See details" and m["url"].startswith("https://www.tandemdiabetes.com/") and m["adUrl"].endswith("1646739963541817")
+    only = c.get(API + "/ads?" + q + "&platform=meta&limit=1&offset=0&sort=newest&q=t:slim").get_json()
+    assert only["total"] == 1 and only["ads"][0]["platform"] == "meta"
+    assert c.get(API + "/ads?account=" + G + "&offset=abc&limit=xyz").get_json()["limit"] == 24                                   # a bad number is the default, not an error
+    bad = c.get(API + "/ads?account=abc")
+    assert bad.status_code == 400 and "Pick one Google Ads account" in bad.get_json()["error"]

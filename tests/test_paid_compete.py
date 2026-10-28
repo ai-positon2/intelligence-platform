@@ -10,7 +10,7 @@ sys.path.insert(0, ROOT)
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from monitor_fakes import MemStore  # noqa: E402
-from test_paid_compete_math import GOOGLE_REAL, META_REAL, own_without_price, pool_with_price  # noqa: E402
+from test_paid_compete_math import GOOGLE_REAL, META_IMAGE, META_REAL, own_without_price, pool_with_price  # noqa: E402
 from tracker import paid_compete as pc  # noqa: E402
 from tracker import paid_compete_fetch as cf  # noqa: E402
 from tracker import paid_compete_math as cm  # noqa: E402
@@ -380,3 +380,83 @@ def test_only_the_ads_of_the_platform_asked_for_are_ours_and_assets_are_left_out
     monkeypatch.setattr(paid_copycheck, "load_raw", lambda account_id, **kw: (raw_of("google", mixed), False, {"id": account_id, "name": "Acme"}))
     ads, warnings, name = pc.own_ads("google", G, now=NOW)
     assert len(ads) == 4 and warnings == [] and name == "Acme" and all(a["platform"] == "google" for a in ads)
+
+
+# ── the ads themselves ──────────────────────────────────────────────────────
+
+def mad(i, who, title, start, fmt="IMAGE", pictures=True):
+    snap = dict(META_IMAGE["snapshot"], displayFormat=fmt, title=title, images=META_IMAGE["snapshot"]["images"] if pictures else [])
+    return cm.meta_ad(dict(META_IMAGE, adArchiveID=str(i), pageName=who, startDateFormatted=start + "T07:00:00.000Z", snapshot=snap), asof=NOW.date())
+
+
+def picture_only(i, who, start):
+    snap = dict(META_IMAGE["snapshot"], title=None, body=None, linkDescription=None)
+    return cm.meta_ad(dict(META_IMAGE, adArchiveID=str(i), pageName=who, startDateFormatted=start + "T07:00:00.000Z", snapshot=snap), asof=NOW.date(), textless=True)
+
+
+def keep(s, account, competitor, platform, ads, pictures=(), v=None, **kw):
+    comps, region = pc.competitors_of(cs.load_for_read(s), {("meta" if account.startswith("act_") else "google"): account})
+    comp = next(c for c in comps if c["name"] == competitor)
+    s.state_set(cf.cache_key(platform, comp, region), dict({"ads": list(ads), "pictures": list(pictures), "error": "", "skipped": "", "fetchedAt": "2026-10-26T00:00:00+00:00", "items": len(ads) + len(pictures), "v": v or cf.READ_V}, **kw))
+
+
+@pytest.fixture
+def gallery():
+    s = MemStore()
+    cs.save_account(s, MA, "Acme", {"competitors": "Tandem | tandemdiabetes.com | TandemDiabetes\nInsulet | omnipod.com | myomnipod"}, "ana", NOW)
+    keep(s, MA, "Tandem", "meta", [mad(1, "Tandem Diabetes Care", "Pump delivered", "2026-09-01"), mad(2, "Tandem Diabetes Care", "Pump delivered", "2026-09-01"), mad(3, "Tandem Diabetes Care", "Newest pump", "2026-10-20", fmt="VIDEO")],
+         pictures=[picture_only(4, "Tandem Diabetes Care", "2026-10-01")])
+    keep(s, MA, "Insulet", "meta", [mad(5, "Insulet Corporation", "Tubeless pump", "2026-01-05")])
+    return s
+
+
+def test_the_gallery_lists_every_ad_read_with_its_creative_longest_running_first(gallery):
+    g = pc.ads_for("", MA, mon=gallery)
+    assert g["total"] == 4 and [a["id"] for a in g["ads"]] == ["meta:5", "meta:1", "meta:4", "meta:3"]                 # 295, 56, 26 and 7 days
+    first = g["ads"][0]
+    assert first["competitor"] == "Insulet" and first["who"] == "Insulet Corporation" and first["headlines"] == ["Tubeless pump"] and first["media"][0]["kind"] == "image" and first["mediaCount"] == 1
+    assert first["cta"] == "See details" and first["landing"] == "tandemdiabetes.com/landing-pages/tandem-pump-rx" and first["adUrl"].endswith("ads/library/?id=5") and first["days"] == 295 and first["active"] is True
+    assert "Important Safety Information" in first["text"] and set(first) >= {"id", "platform", "format", "bodies", "url", "caption", "ctaType", "firstShown", "lastShown", "copies", "networks", "competitor"}
+    assert g["creativeMissing"] == 0 and g["facets"]["competitors"] == {"Insulet": 1, "Tandem": 3} and g["facets"]["platforms"] == {"meta": 4} and g["facets"]["formats"] == {"image": 3, "video": 1}
+
+
+def test_the_same_ad_shown_in_many_places_is_one_card_and_a_picture_only_ad_is_still_listed(gallery):
+    g = pc.ads_for("", MA, mon=gallery, competitor="Tandem")
+    ids = [a["id"] for a in g["ads"]]
+    assert ids.count("meta:1") + ids.count("meta:2") == 1 and "meta:4" in ids and [a for a in g["ads"] if a["id"] == "meta:4"][0]["headlines"] == []
+    kept = [a for a in g["ads"] if a["id"] in ("meta:1", "meta:2")][0]
+    assert kept["copies"] == 2
+
+
+def test_the_gallery_filters_by_competitor_format_and_words_and_sorts_by_newest(gallery):
+    assert [a["id"] for a in pc.ads_for("", MA, mon=gallery, competitor="Insulet")["ads"]] == ["meta:5"]
+    assert [a["id"] for a in pc.ads_for("", MA, mon=gallery, fmt="video")["ads"]] == ["meta:3"]
+    assert [a["id"] for a in pc.ads_for("", MA, mon=gallery, q="TUBELESS")["ads"]] == ["meta:5"] and pc.ads_for("", MA, mon=gallery, q="no such words")["total"] == 0
+    assert pc.ads_for("", MA, mon=gallery, q="tandemdiabetes.com")["total"] == 4                          # the landing page is searched too
+    newest = pc.ads_for("", MA, mon=gallery, sort="newest")["ads"]
+    assert [a["id"] for a in newest] == ["meta:3", "meta:4", "meta:1", "meta:5"]
+    assert pc.ads_for("", MA, mon=gallery, sort="nonsense")["ads"][0]["id"] == "meta:5"                    # an unknown sort is the default one
+    assert pc.ads_for("", MA, mon=gallery, platform="google")["total"] == 0
+
+
+def test_the_gallery_pages_and_never_hands_out_more_than_a_page_limit(gallery):
+    first = pc.ads_for("", MA, mon=gallery, limit=2)
+    assert len(first["ads"]) == 2 and first["total"] == 4 and first["offset"] == 0 and first["limit"] == 2
+    second = pc.ads_for("", MA, mon=gallery, limit=2, offset=2)
+    assert len(second["ads"]) == 2 and not {a["id"] for a in first["ads"]} & {a["id"] for a in second["ads"]}
+    assert pc.ads_for("", MA, mon=gallery, offset=99)["ads"] == [] and pc.ads_for("", MA, mon=gallery, limit=0)["limit"] == pc.GALLERY_PAGE and pc.ads_for("", MA, mon=gallery, limit=10 ** 6)["limit"] == pc.GALLERY_MAX
+    assert pc.ads_for("", MA, mon=gallery, offset=-5)["offset"] == 0
+
+
+def test_a_read_saved_before_pictures_were_kept_is_listed_and_says_it_has_no_creative(gallery):
+    keep(gallery, MA, "Insulet", "meta", [dict(mad(5, "Insulet Corporation", "Tubeless pump", "2026-01-05"), media=[], mediaCount=0, adUrl="", text="")], v=1)
+    g = pc.ads_for("", MA, mon=gallery)
+    assert g["creativeMissing"] == 1 and [r for r in g["reads"] if r["name"] == "Insulet"][0]["hasCreative"] is False and [r for r in g["reads"] if r["name"] == "Tandem"][0]["hasCreative"] is True
+
+
+def test_a_competitor_never_read_has_no_cards_and_the_reads_say_why(gallery):
+    cs.save_account(gallery, G, "Acme G", {"competitors": "Bare | bare.com"}, "ana", NOW)
+    g = pc.ads_for(G, "", mon=gallery)
+    assert g["total"] == 0 and g["ads"] == [] and g["reads"][0]["note"] == "Not read yet: press Refresh competitor ads."
+    with pytest.raises(pc.BadRequest):
+        pc.ads_for("", "", mon=gallery)

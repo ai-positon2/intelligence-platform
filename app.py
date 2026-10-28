@@ -6071,6 +6071,17 @@ def paid_compete_job():
     return _ca_run(go)
 
 
+@app.route("/p2/paid-marketing/api/compete/ads")
+@position2_required
+def paid_compete_ads():
+    def go(pc, cs, store):
+        google, meta = _ca_scope(request.args.get("account"))
+        a = request.args
+        return jsonify(pc.ads_for(google, meta, mon=store, platform=a.get("platform", ""), competitor=a.get("competitor", ""), fmt=a.get("format", ""), q=a.get("q", ""), sort=a.get("sort", "longest"),
+                                  offset=a.get("offset", 0), limit=a.get("limit", pc.GALLERY_PAGE)))
+    return _ca_run(go)
+
+
 @app.route("/p2/paid-marketing/api/compete/settings", methods=["POST"])
 @position2_required
 def paid_compete_settings_save():
