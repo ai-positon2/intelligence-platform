@@ -32,9 +32,10 @@ import app as appmod  # noqa: E402
 # stays a fact this file checks rather than a line someone edited once and
 # nothing ever confirmed. sangeeta@ was the first; pushpendra.k@ and
 # nikhil.ashok@ were confirmed/granted together on 2026-09-07; sajjan@ was
-# granted on 2026-09-25.
+# granted on 2026-09-25; akshay.poojary@ was granted on 2026-10-29.
 _GRANTED_ADMINS = ("sangeeta@position2.com", "pushpendra.k@position2.com",
-                   "nikhil.ashok@position2.com", "sajjan@position2.com", "divith.k@position2.com")
+                   "nikhil.ashok@position2.com", "sajjan@position2.com", "divith.k@position2.com",
+                   "akshay.poojary@position2.com")
 _STAFF = "not-an-admin@position2.com"          # real Position2 login, no admin rights
 _EXTERNAL = "someone@example.com"              # a public /app member
 _APP_PY = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "app.py")
