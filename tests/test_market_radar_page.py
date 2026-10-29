@@ -277,10 +277,10 @@ def test_a_collection_starts_once_and_its_moves_are_read_back(client_with_readin
     assert _client(OWNER).get(BASE + "/api/clients/999999/moves").status_code == 404
 
 
-def test_the_page_renders_with_its_script_and_menu_entry():
+def test_the_page_renders_with_its_script_and_no_menu_entry():
     html = _client(ADMIN).get(BASE).get_data(as_text=True)
     assert "js/market_radar.js" in html and "css/market_radar.css" in html
-    assert 'href="/p2/admin/market-radar"' in html
+    assert 'href="/p2/admin/market-radar"' not in html                # hidden from the admin dropdown on purpose
 
 
 def test_routes_edit_flow(client_with_reading, monkeypatch):
