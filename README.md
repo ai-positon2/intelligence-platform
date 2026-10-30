@@ -183,10 +183,19 @@ person-level store (`data/identity_graph.db`) holds real visitor PII and is giti
 never committed.
 
 #### Vimi (GTM assistant)
-`/api/ppc-chat`, `/api/vimi-chat/<account_id>`
+`/api/vimi/ask`, `/api/vimi/jobs/<id>` · `tracker/vimi_agent.py`, `vimi_tools.py`, `vimi_catalog.py`, `vimi_data.py` · older routes `/api/ppc-chat`, `/api/vimi-chat/<account_id>`
 
-An embedded AI assistant (public-facing label **GTM**) that helps reps act on signal data without
-leaving the page. Two backends so account data never crosses a boundary it shouldn't.
+The assistant on every internal page (public-facing label **GTM**), rebuilt 2026-10-30 as an analyst: Claude (`VIMI_MODEL`,
+default `claude-opus-5-5`, falling back down a chain) with five tools. It finds the account a question names, reads the
+agents' own read-only endpoints in-process **as the signed-in person** (so an admin-only page still refuses a non-admin),
+drills into big results with sums and rankings computed in code, and answers from what it read, saying what it could not.
+A question is a background job (`pm_vimi_jobs`) whose steps the widget polls and shows live; Stop cancels it.
+
+`tracker/vimi_catalog.py` lists every agent with what it holds and the reads it offers: that list is the allowlist, there is
+no `refresh` and no read that spends a model. A test fails when an agent page is added without a catalog entry. Where the
+analyst is not configured (no `ANTHROPIC_API_KEY` or database) the widget falls back to `/api/ppc-chat`, which also tries the
+analyst inline first (so the Ad Intelligence page's own widget copy gets it) and otherwise answers the old way (OpenAI, three
+sources pasted into the prompt). `/api/vimi-chat/<account_id>` (per-account signal chat) is unchanged.
 
 ---
 

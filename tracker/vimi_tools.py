@@ -24,7 +24,7 @@ from urllib.parse import quote
 from . import vimi_catalog as cat
 from . import vimi_data as vd
 
-ACCOUNT_RE = re.compile(r"^(\d{10}|act_\d{4,20})(\+act_\d{4,20})?$")
+ACCOUNT_RE = re.compile(r"^((\d{10}|act_\d{4,20})(\+act_\d{4,20})?|mcc-\d{10}(-[A-Z]{3})?)$")      # an account, both platforms, or a whole MCC
 FRESHNESS = ("fetchedAt", "stale", "blockedUntil", "warnings", "warning", "error", "googleProblem", "metaProblem", "configProblem", "kind")
 MAX_VALUE = 300
 
@@ -63,14 +63,14 @@ class Tools:
     def label_for(self, account):
         """A readable name for an account string ("Beta Bionics (1234567890)"), or the string itself."""
         data = self._load_accounts()
-        names = {a["id"]: a.get("name") for a in (data.get("google") or []) + (data.get("meta") or [])}
+        names = {a["id"]: a.get("name") for a in (data.get("google") or []) + (data.get("meta") or []) + (data.get("groups") or [])}
         parts = [p for p in str(account or "").split("+") if p]
         return " + ".join("%s (%s)" % (names[p], p) if names.get(p) else p for p in parts) or str(account or "")
 
     def find_account(self, inp):
         data = self._load_accounts()
         q = str(inp.get("query") or "").strip()
-        google, meta, clients = data.get("google") or [], data.get("meta") or [], data.get("clients") or []
+        google, meta, clients, groups = data.get("google") or [], data.get("meta") or [], data.get("clients") or [], data.get("groups") or []
         notes = [n for n in (data.get("googleProblem"), data.get("metaProblem"), data.get("error")) if n]
         lines = []
         if q:
@@ -84,6 +84,9 @@ class Tools:
             scored.sort(key=lambda t: (-t[0], str(t[2].get("name")).lower()))
             for _s, platform, a in scored[:12]:
                 lines.append("%s | %s | %s | %s" % (platform, a["id"], a.get("name"), a.get("currency") or ""))
+            for g in groups:
+                if any(t in _tokens(g.get("name")) or any(t in h for h in _tokens(g.get("name"))) for t in want if len(t) > 2):
+                    lines.append("mcc | %s | %s | %s | %s accounts" % (g["id"], g.get("name"), g.get("currency") or "", g.get("accounts", "")))
             hits = []
             for c in clients:
                 hay = _tokens(c.get("name"))
@@ -94,12 +97,15 @@ class Tools:
                     hits.append("client '%s' (Master Agent) owns: %s%s" % (c.get("name"), ", ".join(self.label_for(i) for i in ids) or "no accounts yet",
                                                                           ("  -> both platforms: account=%s" % ("+".join(g[:1] + m[:1]))) if g and m else ""))
             body = "\n".join(lines) if lines else "No account name contains '%s'." % q
+            if any(l.startswith("mcc |") for l in lines):
+                body += "\n(An mcc is a whole MCC: every account of a client together. Only agents that say so take one, e.g. Segment Analysis and Search Query Analysis.)"
             if hits:
                 body += "\n\nCLIENTS\n" + "\n".join(hits)
             if not lines and not hits:
                 body += " Try one distinctive word of the name, or call find_account with no query to list every account."
         else:
-            lines = ["google | %s | %s | %s" % (a["id"], a.get("name"), a.get("currency") or "") for a in google] + ["meta | %s | %s | %s" % (a["id"], a.get("name"), a.get("currency") or "") for a in meta]
+            lines = (["google | %s | %s | %s" % (a["id"], a.get("name"), a.get("currency") or "") for a in google] + ["meta | %s | %s | %s" % (a["id"], a.get("name"), a.get("currency") or "") for a in meta]
+                     + ["mcc | %s | %s | %s | %s accounts (a whole MCC)" % (g["id"], g.get("name"), g.get("currency") or "", g.get("accounts", "")) for g in groups])
             body = "%d accounts (platform | account id | name | currency):\n%s" % (len(lines), "\n".join(lines))
             if clients:
                 body += "\n\nCLIENTS (Master Agent)\n" + "\n".join("- %s: %s" % (c.get("name"), ", ".join((c.get("accounts") or {}).keys())) for c in clients)

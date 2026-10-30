@@ -22126,7 +22126,7 @@ DATA section below when available — use those numbers, never a memorised figur
 AD INTELLIGENCE (/p2/strategic-agents/ad-intelligence): tracks competitors' running ads (headline, CTA, format,
 keywords, messaging angle, first/last seen) pulled from a shared Google Sheet.
 
-PAID MARKETING AGENTS (/p2/paid-marketing): the PPC team's five agents (three came from Agent Holmes).
+PAID MARKETING AGENTS (/p2/paid-marketing): the PPC team's agents over live Google Ads and Meta Ads data (the first three came from Agent Holmes).
 Pacing Desk (/p2/paid-marketing/pacing-desk): reads every Google Ads account live each day, and the Meta ad accounts the month's Meta allocations name (an allocation row has a channel, Google or Meta; a Meta row is matched to a Meta ad account by name, and a Meta campaign's daily budget is its own, else its running ad sets', a lifetime budget spread over its flight, or unknown and said so), and measures each against the
 month's allocations (kept on the page, not in a sheet), projects every account to month end from actual spend per active day (never from the daily cap), labels it
 over/under/on target against ideal pacing ((today-1)/days in month, +2pp tolerance), and recommends budget
@@ -22450,7 +22450,13 @@ def _build_ppc_context() -> str:
 @app.route("/api/ppc-chat", methods=["POST"])
 @position2_required
 def ppc_chat():
-    """PPC AI assistant — context injection."""
+    """PPC AI assistant. The analyst (tracker/vimi_agent.py) answers when it can; this route's own context-injection answer (the older GPT path below) is the fallback and
+    still does the reformat-my-last-answer exports."""
+    raw = request.get_json(silent=True) or {}
+    if not (raw.get("export_format") and raw.get("source_text")):
+        inline = _vimi_inline(raw)
+        if inline:
+            return jsonify(inline)
     from openai import OpenAI
     api_key = os.environ.get("OPENAI_API_KEY", "")
     if not api_key:
@@ -22686,6 +22692,10 @@ def _vimi_accounts(call):
         out["googleProblem"], out["metaProblem"] = body.get("googleProblem"), body.get("metaProblem")
         if status >= 400 and body.get("error") and not (out["google"] or out["meta"]):
             out["error"] = body["error"]
+    out["groups"] = []
+    gstatus, ginv = call(_PM_PREFIX + "/api/segments/accounts", {})            # the MCCs (whole clients), as Segment Analysis lists them
+    if gstatus == 200 and isinstance(ginv, dict):
+        out["groups"] = [{"id": g.get("id"), "name": g.get("name"), "currency": g.get("currency"), "accounts": len(g.get("accountIds") or [])} for g in ginv.get("groups") or [] if g.get("id")]
     _s, master = call(_PM_PREFIX + "/api/master/state", {})
     if isinstance(master, dict):
         out["clients"] = [c for c in master.get("clients") or [] if isinstance(c, dict)]
@@ -22708,8 +22718,21 @@ def _vimi_int(v, default, top):
         return default
 
 
-def _vimi_locals():
-    """The sources that live in sheets and databases, not behind an endpoint."""
+def _vimi_thin(row):
+    """A saved run as one line of facts: its plain fields, long text cut, and none of the big result blobs (those are read one run at a time)."""
+    out = {}
+    for k, v in (row or {}).items():
+        if k in ("email", "company_logo"):
+            continue
+        if isinstance(v, (int, float, bool)) or v is None:
+            out[k] = v
+        elif isinstance(v, str):
+            out[k] = v[:200]
+    return out
+
+
+def _vimi_locals(email=""):
+    """The sources that live in sheets and databases, not behind an endpoint. The saved runs are the person's own (the stores are per person)."""
     def visitors(p):
         return _chatbot_get_anonymous_visitors(date_from=p.get("date_from"), date_to=p.get("date_to"), company=p.get("company"), seniority=p.get("seniority"),
                                                industry=p.get("industry"), limit=_vimi_int(p.get("limit"), 50, 300))
@@ -22724,7 +22747,25 @@ def _vimi_locals():
     def ads(p):
         return get_ad_intelligence_data(competitor=p.get("competitor"), ad_format=p.get("ad_format"), status=p.get("status"), keyword=p.get("keyword"),
                                         limit=_vimi_int(p.get("limit"), 50, 300))
-    return {"visitors": visitors, "signals": signals, "ads": ads}
+
+    def runs(lister, default):
+        def read(p):
+            rows = lister(email, _vimi_int(p.get("limit"), default, 100)) if email else []
+            return {"runs": [_vimi_thin(r) for r in rows], "note": "Your own saved runs, newest first. Read one by its id with the run view." if rows else "No saved runs found for you."}
+        return read
+
+    def sci_runs(email_, limit):
+        from tracker import sci_store
+        return sci_store.list_runs(email_, limit)
+
+    def event_runs(email_, limit):
+        from tracker import event_intel_store
+        return event_intel_store.list_runs(email_, limit)
+
+    def tlpr_runs(email_, limit):
+        from tracker import thought_leader_pr
+        return thought_leader_pr.list_runs(email_, limit)
+    return {"visitors": visitors, "signals": signals, "ads": ads, "sci_runs": runs(sci_runs, 30), "event_runs": runs(event_runs, 30), "tlpr_runs": runs(tlpr_runs, 25)}
 
 
 def _vimi_jobs():
@@ -22748,37 +22789,16 @@ def _vimi_jobs():
     return Jobs()
 
 
-@app.route("/api/vimi/ask", methods=["POST"])
-@position2_required
-def vimi_ask():
-    """Start a question: 202 {job_id} to poll, or a 503 {fallback: true} the widget answers by the older route."""
-    from tracker import paid_store, vimi_agent, vimi_catalog, vimi_tools
-    refused = _pm_refuse_cross_site()                       # a question spends a model: same-origin JSON only
-    if refused:
-        return refused
-    body = request.get_json(silent=True) or {}
+def _vimi_prepare(body, email):
+    """Everything the analyst needs from a widget request body: (message, user turn, ctx for the prompt, tools factory), or (None, ...) when there is nothing to ask."""
+    from tracker import vimi_agent, vimi_tools
     message = str(body.get("message") or "").strip()
     has_image = bool(body.get("file_is_image") and body.get("file_base64"))
     if not message and not (body.get("file_content") or has_image):
-        return jsonify(error="Ask a question first."), 400
-    if len(message) > vimi_agent.MAX_QUESTION_CHARS:
-        return jsonify(error="That question is over %d characters." % vimi_agent.MAX_QUESTION_CHARS), 400
-    if not os.environ.get("ANTHROPIC_API_KEY"):
-        return jsonify(error="The analyst is not configured on this server.", fallback=True), 503
-    user = dict(_get_user() or {})
-    email = _pm_user_email()
-    try:
-        running, today = paid_store.vimi_job_counts(email, vimi_agent.JOB_STALE_S)
-    except paid_store.StoreUnavailable as e:
-        return jsonify(error="The analyst's store is unavailable: %s" % e, fallback=True), 503
-    if running:
-        return jsonify(error="Your previous question is still being answered."), 429
-    if today >= VIMI_DAILY_CAP:
-        return jsonify(error="That is %d questions in a day, the most this allows." % today), 429
+        return None
     if not message:
         message = "Please analyse the attached file '%s' and summarise the key information." % (str(body.get("file_name") or "file")[:120])
-    export = ""
-    export_text = ""
+    export, export_text = "", ""
     for name, pattern, how in _VIMI_FORMATS:
         if re.search(pattern, message, re.I):
             export, export_text = name, how
@@ -22793,20 +22813,89 @@ def vimi_ask():
     acct_view = acct_view if acct_view in ("healthcare", "csg") else ""
     hidden = set(PAID_HIDDEN_SLUGS)
     admin = email in ADMIN_EMAILS
+    user = dict(_get_user() or {})
 
     def tools_factory():
         call = _vimi_route_caller(user)
-        return vimi_tools.Tools(route=call, accounts=lambda: _vimi_accounts(call), web=_vimi_web, local=_vimi_locals(), is_admin=admin, hidden=hidden, knowledge=_vimi_knowledge())
+        return vimi_tools.Tools(route=call, accounts=lambda: _vimi_accounts(call), web=_vimi_web, local=_vimi_locals(email), is_admin=admin, hidden=hidden, knowledge=_vimi_knowledge())
 
+    user_msg = vimi_agent.user_turn(message, file_name=str(body.get("file_name") or "")[:120], file_content=str(body.get("file_content") or "") if not image else "",
+                                    file_truncated=bool(body.get("file_truncated")), image=image)
+    ctx = dict(page=page, account_view=acct_view, memories=memories, export_format=export_text, is_admin=admin, email=email)
+    return {"message": message, "user_msg": user_msg, "ctx": ctx, "tools_factory": tools_factory, "hidden": hidden, "export": export}
+
+
+@app.route("/api/vimi/ask", methods=["POST"])
+@position2_required
+def vimi_ask():
+    """Start a question: 202 {job_id} to poll, or a 503 {fallback: true} the widget answers by the older route."""
+    from tracker import paid_store, vimi_agent, vimi_catalog
+    refused = _pm_refuse_cross_site()                       # a question spends a model: same-origin JSON only
+    if refused:
+        return refused
+    body = request.get_json(silent=True) or {}
+    if len(str(body.get("message") or "").strip()) > vimi_agent.MAX_QUESTION_CHARS:
+        return jsonify(error="That question is over %d characters." % vimi_agent.MAX_QUESTION_CHARS), 400
+    email = _pm_user_email()
+    prep = _vimi_prepare(body, email)
+    if prep is None:
+        return jsonify(error="Ask a question first."), 400
+    if not os.environ.get("ANTHROPIC_API_KEY"):
+        return jsonify(error="The analyst is not configured on this server.", fallback=True), 503
     try:
-        job_id = vimi_agent.start(
-            message, body.get("history"), email, jobs=_vimi_jobs(), tools_factory=tools_factory, roster=vimi_catalog.roster(hidden),
-            user_msg=vimi_agent.user_turn(message, file_name=str(body.get("file_name") or "")[:120], file_content=str(body.get("file_content") or "") if not image else "",
-                                          file_truncated=bool(body.get("file_truncated")), image=image),
-            page=page, account_view=acct_view, memories=memories, export_format=export_text, is_admin=admin, email=email)
+        running, today = paid_store.vimi_job_counts(email, vimi_agent.JOB_STALE_S)
     except paid_store.StoreUnavailable as e:
         return jsonify(error="The analyst's store is unavailable: %s" % e, fallback=True), 503
-    return jsonify(job_id=job_id, detected_format=export, is_export=bool(export), is_csv=export in ("csv", "excel")), 202
+    if running:
+        return jsonify(error="Your previous question is still being answered."), 429
+    if today >= VIMI_DAILY_CAP:
+        return jsonify(error="That is %d questions in a day, the most this allows." % today), 429
+    try:
+        job_id = vimi_agent.start(prep["message"], body.get("history"), email, jobs=_vimi_jobs(), tools_factory=prep["tools_factory"], roster=vimi_catalog.roster(prep["hidden"]),
+                                  user_msg=prep["user_msg"], **prep["ctx"])
+    except paid_store.StoreUnavailable as e:
+        return jsonify(error="The analyst's store is unavailable: %s" % e, fallback=True), 503
+    return jsonify(job_id=job_id, detected_format=prep["export"], is_export=bool(prep["export"]), is_csv=prep["export"] in ("csv", "excel")), 202
+
+
+_VIMI_INLINE = {"running": set(), "used": {}}
+_VIMI_INLINE_LOCK = threading.Lock()
+VIMI_INLINE_WALL_S = 85                                      # an answer in the request itself must come back before a proxy gives up
+
+
+def _vimi_inline(body):
+    """The analyst's answer inside one request, for the pages whose widget only knows /api/ppc-chat (Ad Intelligence's own copy, and the fallback). Returns the answer's
+    JSON in the older route's shape, or None when the analyst cannot answer (not configured, one already running for this person, over the day's cap, or it failed),
+    so the older route answers instead. No live steps here: the new widget shows those."""
+    from tracker import vimi_agent, vimi_catalog
+    if not os.environ.get("ANTHROPIC_API_KEY"):
+        return None
+    email = _pm_user_email()
+    prep = _vimi_prepare(body, email)
+    if prep is None:
+        return None
+    day = datetime.now(IST).strftime("%Y-%m-%d")
+    with _VIMI_INLINE_LOCK:
+        if email in _VIMI_INLINE["running"] or _VIMI_INLINE["used"].get((email, day), 0) >= VIMI_DAILY_CAP:
+            return None
+        _VIMI_INLINE["running"].add(email)
+        _VIMI_INLINE["used"][(email, day)] = _VIMI_INLINE["used"].get((email, day), 0) + 1
+    try:
+        tools = prep["tools_factory"]()
+        messages = vimi_agent.clean_history(body.get("history")) + [prep["user_msg"]]
+        system = vimi_agent.instructions(roster=vimi_catalog.roster(prep["hidden"]), **prep["ctx"])
+        answer = vimi_agent.run_loop(messages, client=vimi_agent.default_client(), tools=tools, system=system, wall_s=VIMI_INLINE_WALL_S)
+    except Exception as e:                                   # noqa: BLE001 (the older route answers instead; the reason is logged)
+        app.logger.warning("vimi inline answer failed, using the older route: %s: %s", type(e).__name__, e)
+        return None
+    finally:
+        with _VIMI_INLINE_LOCK:
+            _VIMI_INLINE["running"].discard(email)
+    if not answer:
+        return None
+    export = prep["export"]
+    return {"answer": answer, "detected_format": export, "is_export": bool(export), "is_csv": export in ("csv", "excel"), "web_search_used": any(s.get("agent") == "Web search" for s in tools.sources),
+            "sources": vimi_agent._dedupe_sources(tools.sources)}
 
 
 @app.route("/api/vimi/jobs/<job_id>")

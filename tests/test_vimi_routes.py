@@ -310,3 +310,83 @@ def test_stop_needs_same_origin_json_and_a_real_id(world):
     c = client_for()
     assert c.post("/api/vimi/jobs/%s/cancel" % ("0" * 32)).status_code == 415
     assert c.post("/api/vimi/jobs/x/cancel", json={}, headers={"Origin": "http://localhost"}).status_code == 404
+
+
+# ── the older route: pages whose widget only knows /api/ppc-chat get the same analyst ──
+
+def chat(c, **body):
+    return c.post("/api/ppc-chat", json=body, headers={"Origin": "http://localhost"})
+
+
+@pytest.fixture()
+def inline(monkeypatch):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test")
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    appmod._VIMI_INLINE["running"].clear()
+    appmod._VIMI_INLINE["used"].clear()
+    monkeypatch.setattr(appmod, "_vimi_accounts", lambda call: {"google": [], "meta": [], "clients": []})
+    vimi_agent._DEAD.clear()
+    vimi_agent._NO_THINKING[0] = False
+    yield
+    appmod._VIMI_INLINE["running"].clear()
+    appmod._VIMI_INLINE["used"].clear()
+
+
+def test_the_older_route_answers_through_the_analyst_in_its_own_shape(inline, monkeypatch):
+    cl = model(monkeypatch, R("tool_use", B("tool_use", id="a", name="agent_info", input={})), R("end_turn", B("text", text="Here is the roster — all of it.")))
+    r = chat(client_for(), message="what agents are there?", page="/p2/strategic-agents/ad-intelligence")
+    d = r.get_json()
+    assert r.status_code == 200 and d["answer"] == "Here is the roster, all of it." and d["is_export"] is False and d["web_search_used"] is False
+    assert d["sources"] == []
+    assert "- kpi-monitoring |" in [m for m in cl.requests[1]["messages"] if m["role"] == "user"][-1]["content"][0]["content"]
+
+
+def test_a_format_request_through_the_older_route_is_flagged(inline, monkeypatch):
+    model(monkeypatch, R("end_turn", B("text", text="a,b\n1,2")))
+    d = chat(client_for(), message="the visitors as a csv").get_json()
+    assert d["detected_format"] == "csv" and d["is_csv"] is True and d["is_export"] is True
+
+
+def test_when_the_analyst_fails_the_older_answer_takes_over_and_the_person_is_not_left_marked_busy(inline, monkeypatch):
+    class Down(Client):
+        def create(self, **kw):
+            raise RuntimeError("upstream down")
+    monkeypatch.setattr(vimi_agent, "default_client", lambda: Down())
+    d = chat(client_for(), message="hi").get_json()
+    assert "OPENAI_API_KEY" in d["answer"] and appmod._VIMI_INLINE["running"] == set()
+
+
+def test_without_a_model_key_the_older_route_is_untouched(inline, monkeypatch):
+    monkeypatch.delenv("ANTHROPIC_API_KEY")
+    assert "OPENAI_API_KEY" in chat(client_for(), message="hi").get_json()["answer"]
+
+
+def test_a_reformat_of_the_last_answer_never_goes_to_the_analyst(inline, monkeypatch):
+    cl = model(monkeypatch, R("end_turn", B("text", text="should not be asked")))
+    from tracker import vimi_agent as va
+
+    monkeypatch.setattr(appmod, "_vimi_inline", lambda body: pytest.fail("the analyst was asked to reformat"))
+    d = chat(client_for(), message="as csv", export_format="csv", source_text="a b c").get_json()
+    assert "OPENAI_API_KEY" in d["answer"] and cl.requests == [] and va
+
+
+def test_one_inline_question_at_a_time_per_person_and_a_daily_cap(inline, monkeypatch):
+    model(monkeypatch, R("end_turn", B("text", text="x")))
+    appmod._VIMI_INLINE["running"].add(ANA)
+    assert "OPENAI_API_KEY" in chat(client_for(), message="hi").get_json()["answer"]
+    appmod._VIMI_INLINE["running"].clear()
+    monkeypatch.setattr(appmod, "VIMI_DAILY_CAP", 0)
+    assert "OPENAI_API_KEY" in chat(client_for(), message="hi").get_json()["answer"]
+
+
+def test_the_inline_answer_stops_reading_by_the_wall_it_is_given(inline, monkeypatch):
+    seen = {}
+    real = vimi_agent.run_loop
+
+    def spy(messages, **kw):
+        seen["wall"] = kw.get("wall_s")
+        return real(messages, **kw)
+    monkeypatch.setattr(vimi_agent, "run_loop", spy)
+    model(monkeypatch, R("end_turn", B("text", text="ok")))
+    chat(client_for(), message="hi")
+    assert seen["wall"] == appmod.VIMI_INLINE_WALL_S and appmod.VIMI_INLINE_WALL_S <= 100

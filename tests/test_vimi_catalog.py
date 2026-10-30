@@ -99,7 +99,8 @@ def _pages():
 
 def test_every_agent_page_is_listed_or_ignored_with_a_reason():
     known = {a["page"] for a in cat.AGENTS} | set(cat.IGNORED)
-    missing = sorted(p for p in _pages() if p not in known and p + "/" not in known)
+    retired = {"/p2/strategic-agents/" + slug for slug in appmod._LEGACY_AGENT_SLUGS}        # an old name the app still answers: not an agent of its own
+    missing = sorted(p for p in _pages() if p not in known and p + "/" not in known and p not in retired)
     assert not missing, "agent pages Vimi does not know about: %s (add an agent to tracker/vimi_catalog.py or name it in IGNORED)" % missing
 
 
