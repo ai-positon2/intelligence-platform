@@ -586,8 +586,15 @@ def add_vimi_step(job_id, step):
 def finish_vimi_job(job_id, *, answer=None, sources=None, error=None):
     status = "failed" if error else "done"
     with _tx() as cur:
-        cur.execute("UPDATE pm_vimi_jobs SET status = %s, answer = %s, sources = %s, error = %s, finished_at = now() WHERE id = %s",
+        cur.execute("UPDATE pm_vimi_jobs SET status = %s, answer = %s, sources = %s, error = %s, finished_at = now() WHERE id = %s AND status = 'running'",
                     (status, answer, json.dumps(sources or [], default=str), error, job_id))
+
+
+def cancel_vimi_job(job_id):
+    """Stop a running question (the person pressed Stop): it counts as finished at once, and the worker's own finish no longer changes it. True if it was running."""
+    with _tx() as cur:
+        cur.execute("UPDATE pm_vimi_jobs SET status = 'failed', error = 'Stopped.', finished_at = now() WHERE id = %s AND status = 'running'", (job_id,))
+        return cur.rowcount > 0
 
 
 def vimi_job_counts(by, stale_s):

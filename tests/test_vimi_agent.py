@@ -259,6 +259,12 @@ class MemJobs(va.Jobs):
     def get(self, jid):
         return self.rows.get(jid)
 
+    def cancel(self, jid):
+        if self.rows[jid]["status"] != "running":
+            return False
+        self.rows[jid].update(status="failed", error="Stopped.")
+        return True
+
 
 def test_a_question_runs_as_a_job_with_its_steps_answer_and_sources():
     jobs = MemJobs()
@@ -296,3 +302,21 @@ def test_a_job_whose_worker_died_is_reported_failed_after_the_limit():
     gone = va.read_job(jobs, jid, now=late)
     assert gone["status"] == "failed" and "restarted" in gone["error"] and jobs.rows[jid]["status"] == "running"
     assert va.read_job(jobs, "nope") is None
+
+
+def test_stop_ends_the_loop_before_the_next_round_and_calls_no_model():
+    client = Client(say("never"))
+    msgs = [{"role": "user", "content": "q"}]
+    assert va.run_loop(msgs, client=client, tools=FakeTools(), system="S", stop=lambda: True) is None and client.requests == []
+
+
+def test_a_job_the_person_stopped_is_not_overwritten_by_the_worker_finishing():
+    jobs = MemJobs()
+    tools = FakeTools(find_account="x")
+
+    def factory():
+        jobs.cancel("j1")                                          # Stop pressed while the worker is starting
+        return tools
+    client = Client(say("late answer"))
+    jid = va.start("q", [], "ana@position2.com", jobs=jobs, tools_factory=factory, roster="r", client_factory=lambda: client, spawn=False)
+    assert jobs.rows[jid]["status"] == "failed" and jobs.rows[jid]["error"] == "Stopped." and jobs.rows[jid]["answer"] is None and client.requests == []

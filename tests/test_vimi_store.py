@@ -57,3 +57,20 @@ def test_an_unknown_job_is_none(store):
 def test_a_long_question_is_cut_not_refused(store):
     jid = store.create_vimi_job("x" * 20000, "a@position2.com")
     assert len(store.get_vimi_job(jid)["question"]) == 6000
+
+
+def test_stop_closes_a_running_job_at_once_and_the_worker_finishing_later_changes_nothing(store):
+    jid = store.create_vimi_job("q", "a@position2.com")
+    assert store.cancel_vimi_job(jid) is True and store.cancel_vimi_job(jid) is False
+    store.finish_vimi_job(jid, answer="too late", sources=[])
+    job = store.get_vimi_job(jid)
+    assert job["status"] == "failed" and job["error"] == "Stopped." and job["answer"] is None
+    assert store.vimi_job_counts("a@position2.com", 600) == (0, 1)
+
+
+def test_a_finished_job_cannot_be_stopped_or_rewritten(store):
+    jid = store.create_vimi_job("q", "a@position2.com")
+    store.finish_vimi_job(jid, answer="done")
+    assert store.cancel_vimi_job(jid) is False
+    store.finish_vimi_job(jid, error="later failure")
+    assert store.get_vimi_job(jid)["status"] == "done"

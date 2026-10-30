@@ -50,6 +50,12 @@ class MemStore:
     def get_vimi_job(self, jid):
         return self.rows.get(jid)
 
+    def cancel_vimi_job(self, jid):
+        if self.rows[jid]["status"] != "running":
+            return False
+        self.rows[jid].update(status="failed", error="Stopped.")
+        return True
+
     def vimi_job_counts(self, by, stale):
         mine = [r for r in self.rows.values() if r["createdBy"] == by]
         return sum(1 for r in mine if r["status"] == "running"), len(mine)
@@ -58,7 +64,7 @@ class MemStore:
 @pytest.fixture()
 def world(monkeypatch):
     store = MemStore()
-    for name in ("create_vimi_job", "add_vimi_step", "finish_vimi_job", "get_vimi_job", "vimi_job_counts"):
+    for name in ("create_vimi_job", "add_vimi_step", "finish_vimi_job", "get_vimi_job", "vimi_job_counts", "cancel_vimi_job"):
         monkeypatch.setattr(paid_store, name, getattr(store, name))
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test")
     monkeypatch.setattr(appmod, "_vimi_accounts", lambda call: {"google": [{"id": "1234567890", "name": "Beta Bionics", "currency": "USD"}], "meta": [], "clients": []})
@@ -287,3 +293,20 @@ def test_a_non_admin_asking_for_an_admin_read_is_refused_before_any_page_is_call
     job = wait_done(c, ask(c, message="how many people used the platform?").get_json()["job_id"])
     sent = [m for m in cl.requests[1]["messages"] if m["role"] == "user" and isinstance(m["content"], list)][-1]["content"][0]["content"]
     assert job["status"] == "done" and "you are not signed in as one" in sent          # the tool refused it itself, before the page's own admin gate was asked
+
+
+def test_stop_closes_the_question_so_the_next_can_start_and_only_its_owner_can_stop_it(world, monkeypatch):
+    jid = world.store.create_vimi_job("long one", ANA)
+    c = client_for()
+    assert client_for("bob@position2.com").post("/api/vimi/jobs/%s/cancel" % jid, json={}, headers={"Origin": "http://localhost"}).status_code == 404
+    r = c.post("/api/vimi/jobs/%s/cancel" % jid, json={}, headers={"Origin": "http://localhost"})
+    assert r.status_code == 200 and r.get_json() == {"stopped": True} and world.store.rows[jid]["status"] == "failed"
+    assert c.post("/api/vimi/jobs/%s/cancel" % jid, json={}, headers={"Origin": "http://localhost"}).get_json() == {"stopped": False}
+    model(monkeypatch, R("end_turn", B("text", text="Hi.")))
+    assert ask(c, message="next").status_code == 202                 # not 429: the stopped one no longer counts as running
+
+
+def test_stop_needs_same_origin_json_and_a_real_id(world):
+    c = client_for()
+    assert c.post("/api/vimi/jobs/%s/cancel" % ("0" * 32)).status_code == 415
+    assert c.post("/api/vimi/jobs/x/cancel", json={}, headers={"Origin": "http://localhost"}).status_code == 404

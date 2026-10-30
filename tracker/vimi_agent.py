@@ -190,10 +190,12 @@ def _text(resp):
     return no_dash("".join(getattr(b, "text", "") for b in resp.content if getattr(b, "type", None) == "text").strip())
 
 
-def run_loop(messages, *, client, tools, system, on_step=lambda s: None, now=time.monotonic, wall_s=WALL_S, max_rounds=MAX_ROUNDS):
-    """The tool loop. Returns the answer text; `tools` (vimi_tools.Tools) keeps what was read."""
+def run_loop(messages, *, client, tools, system, on_step=lambda s: None, now=time.monotonic, wall_s=WALL_S, max_rounds=MAX_ROUNDS, stop=lambda: False):
+    """The tool loop. Returns the answer text, or None when `stop()` says the person pressed Stop; `tools` (vimi_tools.Tools) keeps what was read."""
     started = now()
     for _round in range(max_rounds):
+        if stop():
+            return None
         if now() - started > wall_s:
             break
         resp = _create(client, system=system, messages=messages, tools=vt.TOOL_SPECS)
@@ -262,6 +264,9 @@ class Jobs:
     def get(self, job_id):
         raise NotImplementedError
 
+    def cancel(self, job_id):
+        raise NotImplementedError
+
 
 def default_client():
     from anthropic import Anthropic
@@ -288,8 +293,10 @@ def start(question, history, by, *, jobs, tools_factory, roster, client_factory=
             tools = tools_factory()
             system = instructions(roster=roster, **ctx)
             answer = run_loop(messages, client=(client_factory or default_client)(), tools=tools, system=system,
-                              on_step=lambda s: jobs.step(job_id, dict(s, t=time.time())))
-            jobs.finish(job_id, answer=answer, sources=_dedupe_sources(tools.sources))
+                              on_step=lambda s: jobs.step(job_id, dict(s, t=time.time())),
+                              stop=lambda: (jobs.get(job_id) or {}).get("status") != "running")
+            if answer is not None:                                       # None: the person pressed Stop and the job is already closed
+                jobs.finish(job_id, answer=answer, sources=_dedupe_sources(tools.sources))
         except Exception as e:                                           # noqa: BLE001 (any failure ends the job in words, so the page never polls forever)
             log.exception("vimi: job %s failed", job_id)
             jobs.finish(job_id, error="%s: %s" % (type(e).__name__, str(e)[:400]))

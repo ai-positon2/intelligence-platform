@@ -22742,6 +22742,9 @@ def _vimi_jobs():
 
         def get(self, job_id):
             return paid_store.get_vimi_job(job_id)
+
+        def cancel(self, job_id):
+            return paid_store.cancel_vimi_job(job_id)
     return Jobs()
 
 
@@ -22819,6 +22822,26 @@ def vimi_job(job_id):
     if not job or (job["createdBy"] != _pm_user_email() and not _pm_is_admin()):
         abort(404)
     return jsonify({k: job.get(k) for k in ("id", "status", "steps", "answer", "sources", "error")})
+
+
+@app.route("/api/vimi/jobs/<job_id>/cancel", methods=["POST"])
+@position2_required
+def vimi_job_cancel(job_id):
+    """The Stop button: the question closes at once (so the next one can start) and its worker stops reading at the next round."""
+    from tracker import paid_store, vimi_agent
+    refused = _pm_refuse_cross_site()
+    if refused:
+        return refused
+    if not re.fullmatch(r"[0-9a-f]{32}", job_id or ""):
+        abort(404)
+    jobs = _vimi_jobs()
+    try:
+        job = vimi_agent.read_job(jobs, job_id)
+        if not job or (job["createdBy"] != _pm_user_email() and not _pm_is_admin()):
+            abort(404)
+        return jsonify(stopped=bool(jobs.cancel(job_id)))
+    except paid_store.StoreUnavailable as e:
+        return _pm_store_error(e)
 
 
 # ── File extraction helpers ───────────────────────────────────────────────────
