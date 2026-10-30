@@ -215,6 +215,33 @@
 .k-tb.on-up{ color:var(--pos); border-color:rgba(52,211,153,.45); background:rgba(52,211,153,.12); }
 .k-tb.on-down{ color:var(--danger); border-color:rgba(255,107,107,.45); background:rgba(255,107,107,.12); }
 
+
+/* live steps while Vimi reads the platform */
+.k-steps{ margin-top:6px; padding:8px 12px; border-left:2px solid var(--st1); display:flex; flex-direction:column; gap:3px; }
+.k-step{ font-size:11.5px; color:var(--t3); display:flex; align-items:center; gap:7px; }
+.k-step.now{ color:var(--t1); }
+.k-step.warn{ color:var(--warn); }
+.k-step-dot{ width:6px; height:6px; border-radius:50%; background:var(--st2); flex:none; }
+.k-step.now .k-step-dot{ background:var(--brand2); animation:k-bounce 1.1s var(--easeio) infinite; }
+/* what an answer was built from */
+.k-srcs{ display:flex; flex-wrap:wrap; gap:5px; margin-top:7px; align-items:center; }
+.k-srcs-t{ font-size:10px; font-weight:700; color:var(--t3); text-transform:uppercase; letter-spacing:.06em; margin-right:2px; }
+.k-src{ font-size:10.5px; padding:2px 8px; border-radius: var(--radius-pill); background:var(--s1); border:1px solid var(--st1); color:var(--t2); cursor:help; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.k-src.failed{ border-color:rgba(255,180,92,.5); color:var(--warn); }
+/* markdown in an answer */
+.k-bub h4.k-h{ margin:10px 0 4px; font-size:12.5px; font-weight:700; color:var(--t1); }
+.k-bub h4.k-h:first-child{ margin-top:0; }
+.k-bub ol{ margin:6px 0 2px; padding-left:20px; }
+.k-bub hr.k-hr{ border:0; border-top:1px solid var(--st1); margin:8px 0; }
+.k-bub code{ font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:11.5px; padding:1px 5px; border-radius: var(--radius-xs); background:var(--s3); }
+.k-bub pre.k-code{ margin:8px 0; padding:9px 11px; border-radius: var(--radius-sm); background:var(--s3); font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:11.5px; overflow:auto; white-space:pre; }
+.k-bub a{ color:var(--brand2); text-decoration:underline; text-underline-offset:2px; }
+.k-md-tbl{ margin:8px 0; overflow:auto; max-width:100%; border:1px solid var(--st1); border-radius: var(--radius-sm); }
+.k-md-tbl table{ border-collapse:collapse; width:100%; font-size:11.5px; }
+.k-md-tbl th{ text-align:left; padding:7px 10px; background:var(--s3); color:var(--t1); font-weight:700; white-space:nowrap; }
+.k-md-tbl td{ padding:6px 10px; border-top:1px solid var(--st1); color:var(--t2); }
+.k-md-tbl tr:nth-child(even) td{ background:rgba(127,127,127,.04); }
+
 /* typing */
 .k-typing{ display:flex; gap:5px; align-items:center; padding:14px 16px; }
 .k-typing span{ width:7px; height:7px; border-radius:50%; background:var(--brand2); animation:k-bounce 1.1s var(--easeio) infinite; }
@@ -713,44 +740,93 @@ table.k-table{ border-collapse:collapse; width:100%; font-size:11.5px; }
   };
 
   function runChat(msg){
-    var payload={message:msg||'', history:_hist.slice(-12), memories:memList(), account:_acct};
+    var payload={message:msg||'', history:_hist.slice(-12), memories:memList(), account:_acct, page:location.pathname};
     var fmtReq=detectExport(msg);
     if(fmtReq && !_file){ payload.export_format=fmtReq; }
     if(_file){ payload.file_name=_file.name; payload.file_is_image=_file.is_image; payload.file_truncated=_file.truncated||false;
       if(_file.is_image){ payload.file_mime=_file.mime; payload.file_base64=_file.base64; } else { payload.file_content=_file.content; }
       kRemoveFile();
     }
-    var load=loader(); setBusy(true); _abort=false;
-    fetch('/api/ppc-chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})
-      .then(function(r){ return r.json(); })
-      .then(function(d){ load.remove(); var ans=d.answer||'No response received.'; streamIn(ans); })
+    var load=loader(); setBusy(true); _abort=false; _jobId='';
+    askVimi(payload, load)
+      .then(function(d){ load.remove(); if(d.stopped){ return; } var ans=d.answer||'No response received.'; streamIn(ans, d.sources); })
       .catch(function(){ load.remove(); retryRow(msg); })
       .finally(function(){ setBusy(false); });
   }
 
-  function streamIn(text){
+  /* A question is a job on the server (Vimi reads the platform's agents before it answers, which can take a minute): start it, then poll its
+     steps and show each one live. Where the analyst is not configured the older route answers, so the chat never goes blank. */
+  var _jobId='';
+  function askVimi(payload, load){
+    return fetch('/api/vimi/ask',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})
+      .then(function(r){ return r.json().then(function(d){ return {status:r.status,d:d||{}}; }, function(){ return {status:r.status,d:{}}; }); })
+      .then(function(x){
+        if(x.status===202 && x.d.job_id){ _jobId=x.d.job_id; return pollJob(x.d.job_id, load); }
+        if(x.d.fallback || x.status>=500 || x.status===404){ return legacyChat(payload); }
+        return {answer:'⚠️ '+(x.d.error||'Something went wrong.')};
+      });
+  }
+  function legacyChat(payload){
+    return fetch('/api/ppc-chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}).then(function(r){ return r.json(); });
+  }
+  function pollJob(id, load){
+    return new Promise(function(resolve, reject){
+      var fails=0, began=Date.now();
+      (function tick(){
+        if(_abort){ resolve({stopped:true}); return; }
+        if(Date.now()-began>11*60*1000){ resolve({answer:'⚠️ That is taking too long. Ask again, or narrow the question.'}); return; }
+        fetch('/api/vimi/jobs/'+id).then(function(r){ if(!r.ok){ throw new Error('poll'); } return r.json(); }).then(function(j){
+          fails=0; paintSteps(load, j.steps||[]);
+          if(j.status==='done'){ resolve({answer:j.answer, sources:j.sources}); }
+          else if(j.status==='failed'){ resolve(j.error==='Stopped.' ? {stopped:true} : {answer:'⚠️ '+(j.error||'Something went wrong.')}); }
+          else { setTimeout(tick, 1100); }
+        }).catch(function(){ if(++fails>6){ reject(new Error('poll')); } else { setTimeout(tick, 2000); } });
+      })();
+    });
+  }
+  function paintSteps(row, steps){
+    var col=row.querySelector('.k-bcol'), box=row.querySelector('.k-steps');
+    if(!steps.length){ return; }
+    if(!box){ box=document.createElement('div'); box.className='k-steps'; col.appendChild(box); }
+    box.innerHTML=steps.slice(-9).map(function(s,i,a){ var now=i===a.length-1; return '<div class="k-step'+(now?' now':'')+(s.kind==='warn'?' warn':'')+'"><span class="k-step-dot"></span>'+esc(s.label||'')+'</div>'; }).join('');
+    scroll();
+  }
+  function sourceRow(sources){
+    if(!sources || !sources.length){ return null; }
+    var d=document.createElement('div'); d.className='k-srcs';
+    d.innerHTML='<span class="k-srcs-t">Read</span>'+sources.slice(0,14).map(function(s){
+      var t=(s.agent||'')+(s.account?' · '+s.account:'');
+      var tip=[s.view, s.fetchedAt?('read '+s.fetchedAt):'', s.stale?('saved copy from '+s.stale):'', s.failed?('could not be read'+(s.error?': '+s.error:'')):''].filter(Boolean).join(' · ');
+      return '<span class="k-src'+(s.failed?' failed':'')+'" title="'+esc(tip)+'">'+esc(t)+'</span>';
+    }).join('');
+    return d;
+  }
+
+  function streamIn(text, sources){
     beep('recv');
     var m=addMsg('assistant','',{streaming:true});
     var tokens=text.split(/(\s+)/); var i=0; var acc='';
     (function step(){
-      if(_abort){ finishStream(m,acc||text); return; }
-      if(i>=tokens.length){ finishStream(m,text); return; }
+      if(_abort){ finishStream(m,acc||text,sources); return; }
+      if(i>=tokens.length){ finishStream(m,text,sources); return; }
       acc+=tokens[i]; i++;
       m.bub.innerHTML=fmt(citeify(esc(acc)))+'<span class="k-cursor"></span>';
       scroll();
       setTimeout(step, 14);
     })();
   }
-  function finishStream(m,text){
+  function finishStream(m,text,sources){
     m.bub.innerHTML=fmt(citeify(esc(text)));
     decorate(m.row,m.bub,'assistant',text);
+    var sr=sourceRow(sources); if(sr){ m.bub.insertAdjacentElement('afterend', sr); }
     _hist.push({role:'assistant',content:text.length>1200?text.slice(0,1200)+'…':text});
     persistSession();
     if(_settings.voiceReply){ speak(stripHtml(m.bub)); }
     scroll();
   }
 
-  window.kStop = function(){ _abort=true; setBusy(false); };
+  window.kStop = function(){ _abort=true; setBusy(false);
+    if(_jobId){ try{ fetch('/api/vimi/jobs/'+_jobId+'/cancel',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'}); }catch(e){} } };
 
   function regen(row){ /* find preceding user msg */ var rows=[].slice.call(body.querySelectorAll('.k-row')); var idx=rows.indexOf(row); for(var i=idx-1;i>=0;i--){ if(rows[i].classList.contains('user')){ var t=rows[i].querySelector('.k-bub'); var q=stripHtml(t); /* remove this assistant row */ row.remove(); runChat(q); return; } } }
 
@@ -766,7 +842,7 @@ table.k-table{ border-collapse:collapse; width:100%; font-size:11.5px; }
     var lines=text.trim().split('\n').filter(function(l){return l.trim();});
     var pipe=lines.filter(function(l){return l.indexOf('|')>=0;});
     var rows=null;
-    if(pipe.length>=2){ rows=pipe.map(function(l){ return l.replace(/^\||\|$/g,'').split('|').map(function(c){return c.trim();}); }).filter(function(r){ return !/^[-: ]+$/.test(r.join('')); }); }
+    if(pipe.length>=2 && pipe.length===lines.length){ rows=pipe.map(function(l){ return l.replace(/^\||\|$/g,'').split('|').map(function(c){return c.trim();}); }).filter(function(r){ return !/^[-: ]+$/.test(r.join('')); }); }
     else { var csv=lines.filter(function(l){return (l.match(/,/g)||[]).length>=1;}); if(csv.length>=2 && csv.length===lines.length){ rows=csv.map(function(l){return l.split(',').map(function(c){return c.trim();});}); } }
     if(!rows || rows.length<2 || rows[0].length<2){ return; }
     bub.innerHTML='';
@@ -994,15 +1070,46 @@ table.k-table{ border-collapse:collapse; width:100%; font-size:11.5px; }
   function stripText(t){ return (''+t).replace(/```vimi-card[\s\S]*?```/g,'').replace(/[*_`#>]/g,'').trim(); }
   function detectExport(m){ m=(m||'').toLowerCase(); if(/excel|xlsx/.test(m)){return 'excel';} if(/\bcsv\b/.test(m)){return 'csv';} if(/\bjson\b/.test(m)){return 'json';} if(/\btable\b|spreadsheet/.test(m)){return 'table';} return null; }
   function citeify(t){ return t.replace(/\[(ABM Signal Tracker|Signal Tracker|Visitors|Ad Intelligence|HubSpot|Apollo|Insights|Funding|Search Console)\]/g, function(_,s){ return '<span class="k-cite" title="Source: '+s+'">◆ '+s+'</span>'; }); }
-  function fmt(t){ if(/```vimi-card/.test(t)){ /* handled after insert */ }
+  function fmt(t){
     t=t.replace(/```vimi-card[\s\S]*?```/g,'');
-    t=t.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>');
-    var lines=t.split('\n'),out=[],list=false;
-    for(var i=0;i<lines.length;i++){ var l=lines[i],bul=/^[\-\*•]\s+/.test(l.trim());
-      if(/<span class="k-cite"|<span class="k-cursor"/.test(l)){ out.push('<p>'+l+'</p>'); continue; }
-      if(bul){ if(!list){out.push('<ul>');list=true;} out.push('<li>'+l.trim().replace(/^[\-\*•]\s+/,'')+'</li>'); }
-      else { if(list){out.push('</ul>');list=false;} if(l.trim()){ out.push('<p>'+l+'</p>'); } } }
-    if(list){out.push('</ul>');} return out.join(''); }
+    var parts=t.split(/```/), res=[];
+    for(var p=0;p<parts.length;p++){
+      if(p%2===1){ res.push('<pre class="k-code">'+parts[p].replace(/^[a-z]*\n/,'')+'</pre>'); }
+      else { res.push(mdBlock(parts[p])); }
+    }
+    return res.join('');
+  }
+  function mdInline(s){
+    s=s.replace(/`([^`]+)`/g,'<code>$1</code>');
+    s=s.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>');
+    s=s.replace(/(^|[\s(])\*([^*\s][^*]*?)\*(?=[\s).,;:!?]|$)/g,'$1<em>$2</em>');
+    s=s.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+|\/p2\/[^\s)]*)\)/g,function(_,a,u){ return '<a href="'+u+'" target="_blank" rel="noopener">'+a+'</a>'; });
+    return s;
+  }
+  function mdCells(l){ return l.trim().replace(/^\|/,'').replace(/\|$/,'').split('|').map(function(c){ return mdInline(c.trim()); }); }
+  function mdBlock(t){
+    var lines=t.split('\n'), out=[], list='', i=0;
+    function close(){ if(list){ out.push('</'+list+'>'); list=''; } }
+    while(i<lines.length){
+      var l=lines[i], tr=l.trim();
+      if(!tr){ close(); i++; continue; }
+      if(/<span class="k-cite"|<span class="k-cursor"/.test(l)){ close(); out.push('<p>'+l+'</p>'); i++; continue; }
+      if(/^\|.*\|$/.test(tr) && i+1<lines.length && /^\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|?$/.test(lines[i+1].trim())){
+        close(); var head=mdCells(tr); i+=2; var rows=[];
+        while(i<lines.length && /^\|.*\|$/.test(lines[i].trim())){ rows.push(mdCells(lines[i])); i++; }
+        out.push('<div class="k-md-tbl"><table><thead><tr>'+head.map(function(c){ return '<th>'+c+'</th>'; }).join('')+'</tr></thead><tbody>'+
+          rows.map(function(r){ return '<tr>'+head.map(function(_,k){ return '<td>'+(r[k]==null?'':r[k])+'</td>'; }).join('')+'</tr>'; }).join('')+'</tbody></table></div>');
+        continue;
+      }
+      var h=tr.match(/^(#{1,4})\s+(.*)$/);
+      if(h){ close(); out.push('<h4 class="k-h">'+mdInline(h[2])+'</h4>'); i++; continue; }
+      if(/^(-{3,}|\*{3,})$/.test(tr)){ close(); out.push('<hr class="k-hr">'); i++; continue; }
+      var b=tr.match(/^[\-\*•]\s+(.*)$/), n=tr.match(/^\d+[.)]\s+(.*)$/);
+      if(b||n){ var kind=b?'ul':'ol'; if(list!==kind){ close(); out.push('<'+kind+'>'); list=kind; } out.push('<li>'+mdInline((b||n)[1])+'</li>'); i++; continue; }
+      close(); out.push('<p>'+mdInline(l)+'</p>'); i++;
+    }
+    close(); return out.join('');
+  }
 
   /* dossier post-process hook: after finishStream we already called decorate; render cards */
   var _origDecorate=decorate;
