@@ -26,6 +26,9 @@ pm_ prefix so they never collide with that service's own tables.
                         developer token's daily allowance
   pm_feedback_jobs      one Client Feedback Agent question: its live tool
                         steps while it runs, then its answer
+  pm_vimi_jobs          one question put to Vimi, the assistant on every
+                        internal page: its live steps, then its answer and
+                        the agents it read
 """
 from __future__ import annotations
 
@@ -111,6 +114,19 @@ CREATE TABLE IF NOT EXISTS pm_feedback_jobs (
     error        TEXT,
     finished_at  TIMESTAMPTZ
 );
+CREATE TABLE IF NOT EXISTS pm_vimi_jobs (
+    id           TEXT PRIMARY KEY,
+    created_by   TEXT,
+    created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+    status       TEXT NOT NULL,
+    question     TEXT,
+    steps        JSONB NOT NULL DEFAULT '[]'::jsonb,
+    answer       TEXT,
+    sources      JSONB NOT NULL DEFAULT '[]'::jsonb,
+    error        TEXT,
+    finished_at  TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS pm_vimi_jobs_by ON pm_vimi_jobs (created_by, created_at);
 """
 
 JOB_STATUSES = ("running", "done", "failed")
@@ -548,3 +564,47 @@ def get_job(job_id):
             "status": r[3], "question": r[4], "steps": r[5] or [], "answer": r[6],
             "tools": r[7] or [], "error": r[8],
             "finishedAt": r[9].isoformat() if r[9] else None}
+
+
+# ── Vimi ────────────────────────────────────────────────────────────────────
+# The same shape as the Client Feedback Agent's jobs above (a question outlasts a web request and the
+# platform runs more than one worker), with the agents the answer was built from kept beside it.
+
+def create_vimi_job(question, by):
+    job_id = uuid.uuid4().hex
+    with _tx() as cur:
+        cur.execute("INSERT INTO pm_vimi_jobs (id, created_by, status, question) VALUES (%s, %s, 'running', %s)",
+                    (job_id, by, question[:6000]))
+    return job_id
+
+
+def add_vimi_step(job_id, step):
+    with _tx() as cur:
+        cur.execute("UPDATE pm_vimi_jobs SET steps = steps || %s::jsonb WHERE id = %s", (json.dumps([step]), job_id))
+
+
+def finish_vimi_job(job_id, *, answer=None, sources=None, error=None):
+    status = "failed" if error else "done"
+    with _tx() as cur:
+        cur.execute("UPDATE pm_vimi_jobs SET status = %s, answer = %s, sources = %s, error = %s, finished_at = now() WHERE id = %s",
+                    (status, answer, json.dumps(sources or [], default=str), error, job_id))
+
+
+def vimi_job_counts(by, stale_s):
+    """(questions still running, questions asked in the last 24 hours) for one person; a job older than stale_s is not running: its worker is gone."""
+    with _tx() as cur:
+        cur.execute(
+            "SELECT count(*) FILTER (WHERE status = 'running' AND created_at > now() - %s * interval '1 second'), "
+            "count(*) FILTER (WHERE created_at > now() - interval '1 day') FROM pm_vimi_jobs WHERE created_by = %s", (stale_s, by))
+        running, today = cur.fetchone()
+    return int(running or 0), int(today or 0)
+
+
+def get_vimi_job(job_id):
+    with _tx() as cur:
+        cur.execute("SELECT id, created_by, created_at, status, question, steps, answer, sources, error, finished_at FROM pm_vimi_jobs WHERE id = %s", (job_id,))
+        r = cur.fetchone()
+    if not r:
+        return None
+    return {"id": r[0], "createdBy": r[1], "createdAt": r[2].isoformat() if r[2] else None, "status": r[3], "question": r[4], "steps": r[5] or [],
+            "answer": r[6], "sources": r[7] or [], "error": r[8], "finishedAt": r[9].isoformat() if r[9] else None}
