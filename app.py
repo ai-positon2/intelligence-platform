@@ -22636,6 +22636,191 @@ CSV/EXCEL EXPORT RULES:
         return jsonify({"answer": f"Something went wrong: {str(e)}"}), 200
 
 
+# ── Vimi, the analyst (tracker/vimi_agent.py, vimi_tools.py, vimi_catalog.py, vimi_data.py) ────────────────────────────────
+# The widget used to be handed three sources pasted into its prompt and could not see a paid-marketing number. This one is Claude with tools: it finds
+# the account a question names, reads the agents' own pages' read-only endpoints in-process as the person who asked (so an admin-only read still
+# refuses a non-admin), drills into big results with the sums computed in code, and answers from what it read. A question is a background job whose
+# steps the widget polls and shows live (the same shape as the Client Feedback Agent). /api/ppc-chat stays: the widget falls back to it when this is
+# not configured (no ANTHROPIC_API_KEY, no database), and it still does the reformat-my-last-answer exports.
+
+VIMI_DAILY_CAP = 200
+_VIMI_KNOW = {}
+_VIMI_FORMATS = (("excel", r"\bexcel\b|\bxlsx\b", "CSV (Excel-compatible) with a header row, only the rows, no prose and no code fence"),
+                 ("csv", r"\bcsv\b", "CSV with a header row, only the rows, no prose and no code fence"),
+                 ("json", r"\bjson\b", "a valid JSON array of objects, nothing else"),
+                 ("table", r"\btable format\b|\bin a table\b|\bspreadsheet\b", "a clean markdown table with headers, nothing else"))
+_VIMI_IMAGE_MIMES = ("image/png", "image/jpeg", "image/gif", "image/webp")
+
+
+def _vimi_knowledge():
+    """{agent id: what the platform knowledge says of it}, built once from the knowledge text."""
+    from tracker import vimi_catalog
+    if _VIMI_KNOW.get("src") is not _VIMI_PLATFORM_KNOWLEDGE:
+        _VIMI_KNOW.update(src=_VIMI_PLATFORM_KNOWLEDGE, know=vimi_catalog.knowledge_for(_VIMI_PLATFORM_KNOWLEDGE))
+    return _VIMI_KNOW["know"]
+
+
+def _vimi_route_caller(user):
+    """call(path, params) -> (status, body): one of the pages' own GET endpoints, in-process, as `user`. Only GET: no read Vimi has can change anything."""
+    def call(path, params):
+        c = app.test_client()
+        with c.session_transaction() as sess:
+            sess["google_user"] = dict(user)
+        resp = c.get(path, query_string={k: v for k, v in (params or {}).items()})
+        raw = resp.get_data(as_text=True)
+        try:
+            body = json.loads(raw)
+        except ValueError:
+            body = raw[:400]
+        return resp.status_code, body
+    return call
+
+
+def _vimi_accounts(call):
+    """The Google Ads and Meta accounts the pages can read, and the Master Agent's clients, as the account lists the pages themselves use."""
+    out = {"google": [], "meta": [], "clients": []}
+    status, body = call(_PM_PREFIX + "/api/gads/accounts", {"platform": "both"})
+    if isinstance(body, dict):
+        for a in body.get("accounts") or []:
+            (out["meta"] if a.get("platform") == "meta" else out["google"]).append({"id": a.get("id"), "name": a.get("name"), "currency": a.get("currency")})
+        out["googleProblem"], out["metaProblem"] = body.get("googleProblem"), body.get("metaProblem")
+        if status >= 400 and body.get("error") and not (out["google"] or out["meta"]):
+            out["error"] = body["error"]
+    _s, master = call(_PM_PREFIX + "/api/master/state", {})
+    if isinstance(master, dict):
+        out["clients"] = [c for c in master.get("clients") or [] if isinstance(c, dict)]
+    return out
+
+
+def _vimi_web(question):
+    from tracker import claude_websearch as cw
+    res = cw.ask("You answer one research question from the public web. Be exact and brief, give dates, say plainly when sources disagree or nothing was found, and never use an em dash.",
+                 question, max_uses=4, max_tokens=2500, timeout=90.0)
+    if res.get("error") and not res.get("text"):
+        raise RuntimeError((res["error"] or {}).get("detail") or "the web search failed")
+    return res.get("text") or ""
+
+
+def _vimi_int(v, default, top):
+    try:
+        return max(1, min(int(v), top))
+    except (TypeError, ValueError):
+        return default
+
+
+def _vimi_locals():
+    """The sources that live in sheets and databases, not behind an endpoint."""
+    def visitors(p):
+        return _chatbot_get_anonymous_visitors(date_from=p.get("date_from"), date_to=p.get("date_to"), company=p.get("company"), seniority=p.get("seniority"),
+                                               industry=p.get("industry"), limit=_vimi_int(p.get("limit"), 50, 300))
+
+    def signals(p):
+        acct = str(p.get("account") or "healthcare").lower()
+        if acct not in ("healthcare", "csg"):
+            return {"error": "account should be healthcare or csg"}
+        return _chatbot_get_signal_tracker(account=acct, signal_type=p.get("signal_type"), company=p.get("company"), severity=p.get("severity"),
+                                           limit=_vimi_int(p.get("limit"), 50, 300))
+
+    def ads(p):
+        return get_ad_intelligence_data(competitor=p.get("competitor"), ad_format=p.get("ad_format"), status=p.get("status"), keyword=p.get("keyword"),
+                                        limit=_vimi_int(p.get("limit"), 50, 300))
+    return {"visitors": visitors, "signals": signals, "ads": ads}
+
+
+def _vimi_jobs():
+    from tracker import paid_store, vimi_agent
+
+    class Jobs(vimi_agent.Jobs):
+        def create(self, question, by):
+            return paid_store.create_vimi_job(question, by)
+
+        def step(self, job_id, step):
+            paid_store.add_vimi_step(job_id, step)
+
+        def finish(self, job_id, *, answer=None, sources=None, error=None):
+            paid_store.finish_vimi_job(job_id, answer=answer, sources=sources, error=error)
+
+        def get(self, job_id):
+            return paid_store.get_vimi_job(job_id)
+    return Jobs()
+
+
+@app.route("/api/vimi/ask", methods=["POST"])
+@position2_required
+def vimi_ask():
+    """Start a question: 202 {job_id} to poll, or a 503 {fallback: true} the widget answers by the older route."""
+    from tracker import paid_store, vimi_agent, vimi_catalog, vimi_tools
+    refused = _pm_refuse_cross_site()                       # a question spends a model: same-origin JSON only
+    if refused:
+        return refused
+    body = request.get_json(silent=True) or {}
+    message = str(body.get("message") or "").strip()
+    has_image = bool(body.get("file_is_image") and body.get("file_base64"))
+    if not message and not (body.get("file_content") or has_image):
+        return jsonify(error="Ask a question first."), 400
+    if len(message) > vimi_agent.MAX_QUESTION_CHARS:
+        return jsonify(error="That question is over %d characters." % vimi_agent.MAX_QUESTION_CHARS), 400
+    if not os.environ.get("ANTHROPIC_API_KEY"):
+        return jsonify(error="The analyst is not configured on this server.", fallback=True), 503
+    user = dict(_get_user() or {})
+    email = _pm_user_email()
+    try:
+        running, today = paid_store.vimi_job_counts(email, vimi_agent.JOB_STALE_S)
+    except paid_store.StoreUnavailable as e:
+        return jsonify(error="The analyst's store is unavailable: %s" % e, fallback=True), 503
+    if running:
+        return jsonify(error="Your previous question is still being answered."), 429
+    if today >= VIMI_DAILY_CAP:
+        return jsonify(error="That is %d questions in a day, the most this allows." % today), 429
+    if not message:
+        message = "Please analyse the attached file '%s' and summarise the key information." % (str(body.get("file_name") or "file")[:120])
+    export = ""
+    export_text = ""
+    for name, pattern, how in _VIMI_FORMATS:
+        if re.search(pattern, message, re.I):
+            export, export_text = name, how
+            break
+    image = None
+    if has_image and str(body.get("file_mime") or "") in _VIMI_IMAGE_MIMES and len(str(body.get("file_base64"))) <= 9_000_000:
+        image = {"base64": str(body["file_base64"]), "mime": str(body["file_mime"])}
+    page = str(body.get("page") or "")
+    page = page if re.fullmatch(r"/[A-Za-z0-9_\-./]{0,200}", page) else ""
+    memories = [str(m)[:300] for m in (body.get("memories") or [])[:30] if isinstance(m, str) and m.strip()]
+    acct_view = str(body.get("account") or "")
+    acct_view = acct_view if acct_view in ("healthcare", "csg") else ""
+    hidden = set(PAID_HIDDEN_SLUGS)
+    admin = email in ADMIN_EMAILS
+
+    def tools_factory():
+        call = _vimi_route_caller(user)
+        return vimi_tools.Tools(route=call, accounts=lambda: _vimi_accounts(call), web=_vimi_web, local=_vimi_locals(), is_admin=admin, hidden=hidden, knowledge=_vimi_knowledge())
+
+    try:
+        job_id = vimi_agent.start(
+            message, body.get("history"), email, jobs=_vimi_jobs(), tools_factory=tools_factory, roster=vimi_catalog.roster(hidden),
+            user_msg=vimi_agent.user_turn(message, file_name=str(body.get("file_name") or "")[:120], file_content=str(body.get("file_content") or "") if not image else "",
+                                          file_truncated=bool(body.get("file_truncated")), image=image),
+            page=page, account_view=acct_view, memories=memories, export_format=export_text, is_admin=admin, email=email)
+    except paid_store.StoreUnavailable as e:
+        return jsonify(error="The analyst's store is unavailable: %s" % e, fallback=True), 503
+    return jsonify(job_id=job_id, detected_format=export, is_export=bool(export), is_csv=export in ("csv", "excel")), 202
+
+
+@app.route("/api/vimi/jobs/<job_id>")
+@position2_required
+def vimi_job(job_id):
+    from tracker import paid_store, vimi_agent
+    if not re.fullmatch(r"[0-9a-f]{32}", job_id or ""):
+        abort(404)
+    try:
+        job = vimi_agent.read_job(_vimi_jobs(), job_id)
+    except paid_store.StoreUnavailable as e:
+        return _pm_store_error(e)
+    if not job or (job["createdBy"] != _pm_user_email() and not _pm_is_admin()):
+        abort(404)
+    return jsonify({k: job.get(k) for k in ("id", "status", "steps", "answer", "sources", "error")})
+
+
 # ── File extraction helpers ───────────────────────────────────────────────────
 
 def _extract_pdf(data: bytes) -> str:

@@ -278,7 +278,7 @@ def _dedupe_sources(sources):
     return out
 
 
-def start(question, history, by, *, jobs, tools_factory, roster, client_factory=default_client, user_msg=None, spawn=True, **ctx):
+def start(question, history, by, *, jobs, tools_factory, roster, client_factory=None, user_msg=None, spawn=True, **ctx):
     """Create the job and run it in a thread. Returns the job id. `ctx` is what instructions() takes (page, account_view, memories, export_format, is_admin, email)."""
     job_id = jobs.create(question, by)
     messages = clean_history(history) + [user_msg or {"role": "user", "content": question}]
@@ -287,7 +287,7 @@ def start(question, history, by, *, jobs, tools_factory, roster, client_factory=
         try:
             tools = tools_factory()
             system = instructions(roster=roster, **ctx)
-            answer = run_loop(messages, client=client_factory(), tools=tools, system=system,
+            answer = run_loop(messages, client=(client_factory or default_client)(), tools=tools, system=system,
                               on_step=lambda s: jobs.step(job_id, dict(s, t=time.time())))
             jobs.finish(job_id, answer=answer, sources=_dedupe_sources(tools.sources))
         except Exception as e:                                           # noqa: BLE001 (any failure ends the job in words, so the page never polls forever)

@@ -137,9 +137,38 @@ def test_search_ranks_by_title_then_description():
 
 
 def test_the_knowledge_text_is_cut_into_one_entry_per_agent():
-    titles = {a["id"]: a["title"] for a in cat.AGENTS}
-    know = cat.split_knowledge(appmod._VIMI_PLATFORM_KNOWLEDGE, titles)
+    agents = {a["id"]: (a["title"], a["page"]) for a in cat.AGENTS}
+    know = cat.split_knowledge(appmod._VIMI_PLATFORM_KNOWLEDGE, agents)
     paid_missing = [a["id"] for a in cat.PAID_AGENTS if a["id"] not in know]
     assert not paid_missing, "no knowledge text found for: %s" % paid_missing
     assert "impression share" in know["brand-is"].lower() and "Brand Spend" not in know["brand-is"][:60]
     assert len(know["cross-channel"]) > 1500 and "SEO STUDIO" not in know["cross-channel"] and "ADMIN DASHBOARDS" not in know["cross-channel"]
+
+
+def test_every_agent_has_something_to_say_about_how_it_works():
+    know = cat.knowledge_for(appmod._VIMI_PLATFORM_KNOWLEDGE)
+    missing = [a["id"] for a in cat.AGENTS if a["reads"] and a["id"] not in know]
+    assert not missing, "no description for: %s" % missing
+    assert "de-anonymisation" in know["anonymous-visitors"] or "business" in know["anonymous-visitors"]
+    assert "severity" in know["abm-signal-tracker"] and "headline" in know["ad-intelligence"]
+    assert "ADMIN DASHBOARDS" not in know["ad-intelligence"] and "PAID MARKETING" not in know["ad-intelligence"] and "ANONYMOUS" not in know["abm-signal-tracker"]
+    assert "Apollo" in know["contact-finder"]
+
+
+def test_the_knowledge_and_notes_hold_no_dash():
+    know = cat.knowledge_for(appmod._VIMI_PLATFORM_KNOWLEDGE)
+    for aid, text in cat.NOTES.items():
+        assert "—" not in text and "–" not in text, aid
+
+
+def test_a_title_that_ends_another_title_does_not_cut_it_short():
+    text = "Audience Segment Analysis (/p2/paid-marketing/audience-segments): how audiences do. Segment Analysis (/p2/paid-marketing/segment-analysis): day and hour cuts."
+    got = cat.split_knowledge(text, {"audience-segments": ("Audience Segment Analysis", "/p2/paid-marketing/audience-segments"), "segment-analysis": ("Segment Analysis", "/p2/paid-marketing/segment-analysis")})
+    assert got["audience-segments"].endswith("how audiences do.") and got["segment-analysis"].endswith("day and hour cuts.")
+    assert got["segment-analysis"].startswith("Segment Analysis (")
+
+
+def test_every_paid_agent_entry_is_a_real_description_not_a_stub():
+    know = cat.knowledge_for(appmod._VIMI_PLATFORM_KNOWLEDGE)
+    short = {a["id"]: len(know[a["id"]]) for a in cat.PAID_AGENTS if len(know.get(a["id"], "")) < 150}
+    assert not short, short

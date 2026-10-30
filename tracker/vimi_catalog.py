@@ -325,16 +325,15 @@ def roster(hidden_ids=()):
     return "\n".join(lines)
 
 
-_ENTRY = re.compile(r"\(/p2/(?:paid-marketing|strategic-agents|abm-signal-tracker|seo-aeo|admin)(?:/[a-z0-9\-/<>_]*)?\):")
-
-
-def split_knowledge(text, titles):
-    """{agent id: the knowledge text of that agent} from the platform knowledge, found by "Title (/p2/...):" and cut at the next agent's title.
-    `titles` is {id: title}; an agent the text does not mention is left out."""
+def split_knowledge(text, agents):
+    """{agent id: the knowledge text of that agent}, found by "Title (page):" and cut where the next agent's entry begins.
+    `agents` is {id: (title, page)}; the page is part of the match so a title that ends another agent's title ("Segment Analysis" inside
+    "Audience Segment Analysis") cannot cut it short. An agent the text does not mention is left out."""
     text = str(text or "")
     marks = []
-    for aid, title in titles.items():
-        for m in re.finditer(r"(?<![A-Za-z&])%s\s+\(/p2/[a-z0-9\-/<>_]*\):" % re.escape(title).replace(r"\ ", r"\s+"), text):
+    for aid, (title, page) in agents.items():
+        pattern = r"(?<![A-Za-z&])%s\s+\(%s\):" % (re.escape(title).replace(r"\ ", r"\s+"), re.escape(page))
+        for m in re.finditer(pattern, text):
             marks.append((m.start(), aid))
     marks.sort()
     out = {}
@@ -343,4 +342,36 @@ def split_knowledge(text, titles):
         chunk = text[pos:end]
         cut = re.search(r"\n(?:PLATFORM CHOICE|SEO STUDIO|ADMIN DASHBOARDS|Auth:|Ground rule:)", chunk)      # the paragraphs that follow the last agent are not its own
         out.setdefault(aid, " ".join((chunk[:cut.start()] if cut else chunk).split()))
+    return out
+
+
+# ── what the platform knowledge text does not say ─────────────────────────────
+# The knowledge text in app.py describes the visitor, ABM, Ad Intelligence and Paid Marketing agents. These are the others, condensed from the README's agent catalog.
+
+NOTES = {
+    "job-change-alert": "Tracks two things: newly detected job changes at people the team watches, and the full tracked people and company roster. Sourced entirely from Apollo's native Slack notification workflow, parsed out of one channel, not from a scraper. A real, permanent limit: Apollo's notification only carries a person's NEW role, never the prior employer.",
+    "42-north-dental-slot-checker": "A read and visualise layer over a weekly scrape of a multi-brand dental chain's real booking widgets (82 locations): what a new patient would be offered if they tried to book now, at every location. The source is a Google Sheet with a committed JSON fallback. The dashboard was renamed from Gentle Dental, but Gentle Dental is still a real brand in the data and must never be renamed.",
+    "linkedin-intelligence": "Position2's own LinkedIn engagement data (people by post engagement) read from a Google Sheet. It is the team's own engagement, not a competitive read: not to be confused with LinkedIn Strategy Researcher.",
+    "linkedin-strategy-researcher": "Search any company's LinkedIn page, then run a five-part competitive strategy analysis on the brand or a competitor: company profile, posts, strategy (personas, hooks, calls to action, audience), content and creative, messaging, and a competitive scorecard, plus an engagement tab and an on-demand Claude synthesis. Backed by the Arena vendor; results persist in Postgres so a playbook can be generated from any saved run. A recurring 'No companies found' in its search is the Arena workspace's LinkedIn connection lapsing.",
+    "contact-finder": "Finds people and companies through Apollo: describe a company and it finds the person, or ask for a list by title, seniority or industry. Apollo's search is free; enrichment (emails, phones, company details) spends credits from one shared agency pool, so every credit-spending action is an explicit action on the page, never something Vimi does. Saved searches and the working list are per person.",
+    "event-conference-intelligence": "Three modes over one store: recommend (score a client's whole event calendar against its ideal customer profile, 0 to 110 on relevance, decision-maker access and engagement, with a ranked shortlist and a worth-a-look second tier, nothing padded in), lookup (name an event, get the participants it publishes) and workroom (post-event follow-up: who to talk to and what to say, refusing to invent a conversation nobody recorded). Events sell attendee lists, they do not publish them, so what is collected is exhibitors, sponsors, speakers and partners, each labelled with the role its own source page gave it.",
+    "social-media-intelligence": "Given a company name or URL, resolves its handles on Instagram, LinkedIn, X, TikTok, YouTube and Facebook, reads Reddit brand conversation as a seventh surface, pulls recent organic posts, runs every image and video through Claude vision (plus transcription of spoken video), and writes a cited per-platform and cross-platform report on content patterns and what correlates with engagement. It looks at the actual pixels of a competitor's creative, not only engagement numbers.",
+    "thought-leader-pr": "Given a person's name, resolves to one confirmed public figure before any research starts (it refuses at low confidence), then runs separate billed phases: their own posts on LinkedIn, X and YouTube; how people react plus what Reddit says; real press coverage via GDELT and SerpAPI; and a final synthesis of the three into one reputation verdict.",
+    "market-radar": "A URL-only radar for a company: the industry, its competitors and the local market, with weekly updates on what competitors did. Admin only. Costs per run are small and tracked.",
+    "admin-analytics": "The admin dashboards: Internal Usage, External Usage (sign-ins from outside Position2), Client Usage, Agent Feedback (thumbs up and down on agent output), Market Radar, Anonymous Traffic, Public Page Analytics, Public Agent Usage and Access Requests. Admin only.",
+}
+
+# the three sections of the knowledge text that are headed in capitals, not "Title (/page):"
+SECTION_HEADS = {"anonymous-visitors": "ANONYMOUS VISITORS", "abm-signal-tracker": "ABM SIGNAL TRACKER", "ad-intelligence": "AD INTELLIGENCE"}
+
+
+def knowledge_for(text):
+    """{agent id: what the platform knowledge text (or NOTES) says of it}, for every agent that has anything."""
+    out = split_knowledge(text, {a["id"]: (a["title"], a["page"]) for a in AGENTS})
+    for aid, head in SECTION_HEADS.items():
+        m = re.search(r"^%s \(.*?(?=\n\n|\n[A-Z][A-Z &]{5,} \()" % re.escape(head), str(text or ""), re.S | re.M)
+        if m:
+            out[aid] = " ".join(m.group(0).split())
+    for aid, note in NOTES.items():
+        out.setdefault(aid, note)
     return out
