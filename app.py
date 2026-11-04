@@ -11720,6 +11720,179 @@ def admin_agent_runs_data():
     """JSON data endpoint called by the admin agent-usage shell page."""
     return jsonify(_fetch_agent_run_stats())
 
+
+# ── Agent Usage: who used which agent, how often and for how long ────────────
+# Time comes from the 'Page Views' tab (page_track.js reports the seconds an
+# agent's page was visible), runs from the 'Agent Runs' tab, and what each run
+# was (a keyword, an article) from agent_run_history. Only pages where the agent
+# is actually used count: /app/<slug>/use, a client portal's agent pages, and
+# the internal tool pages -- not the /app/<slug> page that just describes it.
+_AU_INTERNAL_PREFIXES = ("/p2/strategic-agents/", "/p2/seo-aeo/", "/p2/seo-aeo-aeo/", "/p2/paid-marketing/",
+                         "/ppc/", "/seo/", "/gtm/")
+_AU_SIGNAL_TRACKER = ("/p2/abm-signal-tracker", "/p2/accounts", "/accounts")
+_AU_TITLE_TAIL = re.compile(r"\s*[·|\-–]\s*(Intelligence|arena) by Position\s*(2|²).*$", re.I)
+
+
+def _agent_usage_page(path: str):
+    """(agent slug, where) for a page where an agent is used, else None."""
+    p = (path or "").split("?")[0].split("#")[0].rstrip("/")
+    parts = [x for x in p.split("/") if x]
+    if len(parts) == 3 and parts[0] == "app" and parts[2] == "use":
+        return _canonical_agent_slug(parts[1]), "Public app"
+    if len(parts) >= 3 and parts[1] == "agents" and parts[0] in CLIENTS:
+        return _canonical_agent_slug(parts[2]), CLIENTS[parts[0]].get("name", parts[0])
+    if any(p == s or p.startswith(s + "/") for s in _AU_SIGNAL_TRACKER):
+        return "abm-signal-tracker", "Internal"
+    for pre in _AU_INTERNAL_PREFIXES:
+        if p.startswith(pre):
+            slug = p[len(pre):].split("/")[0]
+            if slug:
+                return _canonical_agent_slug(slug), "Internal"
+    return None
+
+
+def _agent_usage_from_rows(page_rows, run_rows, run_titles, names=None, people=None) -> dict:
+    """The Agent Usage dashboard from raw rows: Page Views (latest snapshot per
+    page view, header included), Agent Runs (header included) and
+    _list_agent_run_titles(). `names` maps slug -> display name, `people`
+    email -> person's name (from the sign-in logs; Page Views has no name)."""
+    from collections import Counter
+    names = dict(names or {})
+    people = people or {}
+    PV = {n: i for i, n in enumerate(_PV_HEADER)}
+    AR = {n: i for i, n in enumerate(_AR_HEADER)}
+    def g(r, i):
+        return r[i] if 0 <= i < len(r) else ""
+
+    users, agents, titles_seen = {}, {}, {}
+    def user(email, name=""):
+        u = users.setdefault(email, {"email": email, "name": "", "staff": email.endswith("@position2.com"),
+                                     "secs": 0, "views": 0, "runs": 0, "last": "", "agents": {}})
+        if name and not u["name"]:
+            u["name"] = name
+        return u
+    def use(u, slug):
+        a = u["agents"].setdefault(slug, {"slug": slug, "secs": 0, "views": 0, "runs": 0, "last": "", "where": set(), "ran": []})
+        t = agents.setdefault(slug, {"slug": slug, "secs": 0, "views": 0, "runs": 0, "users": set(), "where": set(), "last": ""})
+        t["users"].add(u["email"])
+        return a, t
+    def seen(*objs, ts=""):
+        for o in objs:
+            if ts > o["last"]:
+                o["last"] = ts
+
+    for r in (page_rows or [])[1:]:
+        hit = _agent_usage_page(g(r, PV["Page URL"]))
+        email = (g(r, PV["Email"]) or "").strip().lower()
+        if not hit or not email:
+            continue
+        slug, where = hit
+        secs = int(g(r, PV["Seconds"])) if str(g(r, PV["Seconds"])).isdigit() else 0
+        ts = (g(r, PV["Timestamp (IST)"]) or "")[:19]
+        u = user(email)
+        a, t = use(u, slug)
+        for o in (u, a, t):
+            o["secs"] += secs
+            o["views"] += 1
+        a["where"].add(where); t["where"].add(where)
+        seen(u, a, t, ts=ts)
+        title = _AU_TITLE_TAIL.sub("", g(r, PV["Page Title"]) or "").strip()
+        if title and slug not in names:
+            titles_seen.setdefault(slug, Counter())[title] += 1
+
+    # What each run was: pair a user's runs of an agent with their saved titles, in order.
+    queue = {}
+    for h in run_titles or []:
+        if h.get("title"):
+            queue.setdefault(((h.get("email") or "").lower(), _canonical_agent_slug(h.get("slug") or "")), []).append(h)
+    for r in (run_rows or [])[1:]:
+        email = (g(r, AR["Email"]) or "").strip().lower()
+        slug = _canonical_agent_slug(g(r, AR["Agent Slug"]) or "")
+        if not email or not slug:
+            continue
+        ts = (g(r, AR["Timestamp (IST)"]) or "")[:19]
+        u = user(email, g(r, AR["Name"]))
+        a, t = use(u, slug)
+        for o in (u, a, t):
+            o["runs"] += 1
+        seen(u, a, t, ts=ts)
+        if g(r, AR["Agent Name"]) and slug not in names:
+            names[slug] = g(r, AR["Agent Name"])
+    for (email, slug), hs in queue.items():
+        a = (users.get(email) or {}).get("agents", {}).get(slug)
+        if a is not None:
+            a["ran"] = [{"title": h["title"], "at": h.get("at", "")} for h in reversed(hs)][:50]   # newest first
+
+    def name(slug):
+        if slug in names:
+            return names[slug]
+        if titles_seen.get(slug):
+            return titles_seen[slug].most_common(1)[0][0]
+        return slug.replace("-", " ").title()
+
+    users_out = []
+    for u in users.values():
+        al = sorted(u["agents"].values(), key=lambda a: (-a["secs"], -a["runs"]))
+        users_out.append({"email": u["email"], "name": people.get(u["email"]) or u["name"] or u["email"], "staff": u["staff"],
+                          "secs": u["secs"], "time": _fmt_secs(u["secs"]), "views": u["views"], "runs": u["runs"], "last": u["last"],
+                          "agents": [{"slug": a["slug"], "name": name(a["slug"]), "secs": a["secs"], "time": _fmt_secs(a["secs"]),
+                                      "views": a["views"], "runs": a["runs"], "last": a["last"],
+                                      "where": sorted(a["where"]), "ran": a["ran"]} for a in al]})
+    users_out.sort(key=lambda u: u["last"], reverse=True)
+    agents_out = sorted(({"slug": t["slug"], "name": name(t["slug"]), "secs": t["secs"], "time": _fmt_secs(t["secs"]),
+                          "views": t["views"], "runs": t["runs"], "users": len(t["users"]),
+                          "staff_users": sum(1 for e in t["users"] if e.endswith("@position2.com")),
+                          "where": sorted(t["where"]), "last": t["last"]} for t in agents.values()),
+                        key=lambda t: (-t["secs"], -t["runs"]))
+    return {"users": users_out, "agents": agents_out}
+
+
+_AGENT_USAGE_CACHE = {"data": None, "ts": 0.0}
+_AGENT_USAGE_TTL = 120
+
+
+def _fetch_agent_usage(force: bool = False) -> dict:
+    """Agent Usage dashboard data (cached two minutes; ?fresh=1 rereads)."""
+    now = time.time()
+    if not force and _AGENT_USAGE_CACHE["data"] is not None and now - _AGENT_USAGE_CACHE["ts"] < _AGENT_USAGE_TTL:
+        return _AGENT_USAGE_CACHE["data"]
+    svc = _va_sheets_service_st()
+    def read(rng):
+        if not svc:
+            return []
+        try:
+            return _strip_repeated_headers(svc.spreadsheets().values().get(
+                spreadsheetId=LOGIN_LOG_SHEET_ID, range=rng).execute().get("values", []))
+        except Exception as e:
+            log.warning("agent usage read of %s failed: %s", rng, e)
+            return []
+    page_rows = _pv_latest_snapshots(read("Page Views!A:P"))
+    people = {}
+    # Staff sign in to the Login Log (email F, name G), everyone else to Member Signins (email C, name D).
+    for rows, ei, ni in ((read("A:G"), 5, 6), (read("%s!A:D" % _MEMBER_TAB), 2, 3)):
+        for r in rows[1:]:
+            if len(r) > ni and r[ei] and r[ni]:
+                people[r[ei].strip().lower()] = r[ni]
+    names = {a["slug"]: a["name"] for a in APP_AGENTS}
+    names.update({t.get("slug"): t.get("name") for t in _SEO_TOOLS_FALLBACK if t.get("slug") and t.get("name")})
+    data = _agent_usage_from_rows(page_rows, _agent_run_rows(force=force), _list_agent_run_titles(), names, people)
+    data.update(configured=bool(svc), built=datetime.now(IST).strftime("%Y-%m-%d %H:%M"))
+    _AGENT_USAGE_CACHE.update(data=data, ts=now)
+    return data
+
+
+@app.route("/p2/admin/agent-usage")
+@admin_required
+def admin_agent_usage():
+    """Shell page -- JS fetches /p2/admin/agent-usage/data."""
+    return render_template("admin_agent_usage.html", user=_get_user())
+
+
+@app.route("/p2/admin/agent-usage/data")
+@admin_required
+def admin_agent_usage_data():
+    return jsonify(_fetch_agent_usage(force=request.args.get("fresh") in ("1", "true", "yes")))
+
 # ── Legacy admin URLs (pre-rename) ───────────────────────────────────────────
 # These pages' URLs originally didn't match their display names (e.g. "Public
 # Page Analytics" lived at /p2/admin/members). Renamed the routes above to
