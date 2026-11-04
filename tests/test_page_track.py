@@ -209,7 +209,7 @@ def test_usage_counts_one_page_view_per_id_with_its_final_time(monkeypatch):
 def test_every_page_views_reader_keeps_one_row_per_page_view():
     src = open(os.path.join(_ROOT, "app.py"), encoding="utf-8").read()
     reads = [m.start() for m in re.finditer(r'"Page Views!A:P"', src)]
-    assert len(reads) == 5
+    assert len(reads) == 6   # the 6th is Agent Usage (_fetch_agent_usage)
     for pos in reads:
         assert "_pv_latest_snapshots(" in src[pos - 120:pos + 900], src[pos - 200:pos + 400]
     assert not re.search(r'"Page Views!A:[A-O]"', src)
