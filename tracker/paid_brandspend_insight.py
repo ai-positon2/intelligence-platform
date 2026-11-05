@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import calendar
 import datetime as dt
+import re
 
 from . import paid_brandis_math as bis
 from . import paid_brandspend_math as m
@@ -197,12 +198,14 @@ def leak(rows, terms, brand_ids, brand_cpc, brand_cost):
     rows are {campaignId, campaign, term, cost, clicks, conversions} of the last LEAK_DAYS days; overpay is the clicks times what each cost over the brand campaign's own price."""
     if not terms:
         return None
+    # a brand word counts where a word starts: "ilet" is in "ilet pump" and "ilets", never inside "toilet", "islet" or "filet"
+    has = re.compile("|".join(r"(?<![a-z0-9])" + re.escape(w) for w in terms))
     by = {}
     for r in rows:
         if str(r["campaignId"]) in brand_ids:
             continue
         t = str(r["term"]).lower()
-        if not any(w in t for w in terms) or m._f(r["cost"]) <= 0:
+        if not has.search(t) or m._f(r["cost"]) <= 0:
             continue
         c = by.setdefault(str(r["campaignId"]), {"id": str(r["campaignId"]), "name": r["campaign"], "cost": 0.0, "clicks": 0.0, "conversions": 0.0, "top": {}})
         c["cost"] += m._f(r["cost"])

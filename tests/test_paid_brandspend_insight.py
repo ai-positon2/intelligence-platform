@@ -188,6 +188,13 @@ def test_no_brand_word_or_no_match_is_no_leak_and_an_unknown_brand_price_gives_n
     assert ins.leak(LEAK, ["northwind"], {"11"}, 9.0, 400.0)["overpay"] == 0.0                         # the brand campaign costs more per click: nothing is overpaid
 
 
+def test_a_brand_word_counts_only_where_a_word_starts():
+    rows = [{"campaignId": "21", "campaign": "NonBrand", "term": term, "cost": 10.0, "clicks": 2, "conversions": 0}
+            for term in ("ilet pump", "the ilets", "i-let review", "toilet pump", "islet cell transplant", "beef filet")]
+    v = ins.leak(rows, ["ilet", "i-let"], set(), 1.0, 100.0)
+    assert v["cost"] == 30.0 and v["campaigns"][0]["top"] == ["i-let review", "ilet pump", "the ilets"]
+
+
 def test_a_campaign_marked_brand_is_not_a_leak():
     assert ins.leak(LEAK, ["northwind"], {"11", "12", "13"}, 1.5, 400.0) is None
 
