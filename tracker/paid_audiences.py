@@ -355,6 +355,8 @@ def assemble(raw, account, start, end):
         "kinds": [{"key": k, "label": l, "count": sum(1 for r in views[ALL]["rows"] if r["kind"] == k)} for k, l in KINDS],
         "kindTotals": insights.kind_totals(views[ALL]),
         "types": types, "views": views, "lists": lists, "exclusions": raw["exclusions"], "warnings": raw.get("warnings") or [],
+        "attached": len(raw["audiences"]),                                   # audiences any campaign or ad group uses, with results in the range or not
+        "hasPmax": "Performance Max" in totals,                              # Performance Max spent in the range: its audience signals are what the table cannot show
         "generatedAt": raw.get("readAt") or dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"),         # when the numbers were read, not when this page was built
     }
     report["views"][ALL]["insights"] = insights.report_insights(report, views[ALL])

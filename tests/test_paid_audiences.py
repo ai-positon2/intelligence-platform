@@ -336,7 +336,16 @@ def test_a_closed_list_is_flagged_and_the_exclusions_and_the_pmax_note_are_in(ca
     rep = report(searcher(ag=AG, settings=SETTINGS, lists=[list_row("10", "CRM list", "CRM_BASED", status="CLOSED")], interests=INTERESTS, totals=TOTALS, excl_ag=excl))
     assert any("closed" in p for p in rep["lists"][0]["problems"]) and len(rep["exclusions"]) == 1
     kinds = {i["kind"] for i in rep["views"]["All"]["insights"]}
-    assert {"exclusions", "pmax"} <= kinds
+    assert "exclusions" in kinds and "pmax" not in kinds                  # no Performance Max spend in TOTALS: the note would be about nothing
+    with_pmax = report(searcher(ag=AG, settings=SETTINGS, lists=LISTS, interests=INTERESTS, totals=TOTALS + [total_row("PMax", "PERFORMANCE_MAX", cost=300, conv=5, val=900, clk=100, imp=4000)]), force=True)
+    assert with_pmax["hasPmax"] and "pmax" in {i["kind"] for i in with_pmax["views"]["All"]["insights"]}
+
+
+def test_an_account_with_no_audience_attached_is_told_so_not_shown_an_empty_table(cache):
+    rep = report(searcher(ag=[], settings=SETTINGS, lists=LISTS, interests=INTERESTS, totals=TOTALS))
+    ins = {i["kind"]: i for i in rep["views"]["All"]["insights"]}
+    assert rep["attached"] == 0 and ins["none"]["severity"] == "action" and ins["none"]["headline"] == "No audience is attached to any campaign or ad group"
+    assert "Observation" in ins["none"]["action"] and "audience list" in ins["none"]["evidence"]
 
 
 def test_no_text_the_page_shows_has_an_em_dash(cache):

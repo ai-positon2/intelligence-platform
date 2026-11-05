@@ -259,7 +259,7 @@ def test_a_google_and_a_meta_account_are_one_report_with_each_audience_on_its_ow
     assert rep["account"]["platform"] == "both" and {r["platform"] for r in rows} == {"google", "meta"}
     assert any(r["label"] == "Site visitors 30d" for r in rows) and any(r["label"] == "CRM list" for r in rows)
     kinds = [i["kind"] for i in rep["views"]["All"]["insights"]]
-    assert "meta" in kinds and "pmax" in kinds                                              # both notes: each platform's own caveat
+    assert "meta" in kinds and "pmax" not in kinds          # Meta's own caveat; the Performance Max one only where Performance Max spent (none in this account)
     google_row = next(r for r in rows if r["platform"] == "google" and r["adjustable"])
     assert "bid adjustment" in google_row["action"]["text"]                                  # Google's advice is still Google's
 

@@ -292,7 +292,18 @@ def report_insights(report, view):
              "%s." % _names([{"label": "%s (%s)" % (e["label"], e["adGroup"] or e["campaign"])} for e in report["exclusions"]], 4),
              "These are listed below. An excluded audience is never recommended above.", "high")
     platform = report["account"].get("platform") or "google"
-    if platform != "meta":
+    if not report.get("attached", 1) and platform != "meta":             # an empty table must not read like a quiet date range
+        add_("none", "action", "No audience is attached to any campaign or ad group",
+             "Nothing in this account observes or targets an audience, so there are no audience results to compare%s." % (
+                 (": it has %s audience list%s ready" % (num(len(report["lists"])), "" if len(report["lists"]) == 1 else "s")) if report.get("lists") else ""),
+             "Add the account's remarketing lists and the in-market and affinity audiences that fit the offer as Observation on the campaigns (observation does not "
+             "narrow who sees the ads), then read this page again after a few weeks to see which of them convert better.", "high")
+    elif report.get("attached") and not view["rows"]:
+        add_("none", "info", "The attached audiences had no results in this range",
+             "%s audience%s %s attached, but none had an impression in the range." % (num(report["attached"]), "" if report["attached"] == 1 else "s",
+                                                                                    "is" if report["attached"] == 1 else "are"),
+             "Pick a longer range, or check that the campaigns they are on were running.", "high")
+    if platform != "meta" and report.get("hasPmax", True):
         out.append({"kind": "pmax", "severity": "info", "headline": "Performance Max audiences are not in this table",
                     "evidence": "Google reports no results for the audience signals of a Performance Max campaign.",
                     "action": "Judge Performance Max by its asset groups and its campaign totals instead.", "confidence": "high", "keys": []})
