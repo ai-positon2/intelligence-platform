@@ -68,7 +68,7 @@
       </div>
     </div>
     <div class="row"><span class="rl">Signed in with</span><span class="rv">Google</span></div>
-    <div class="row"><span class="rl">Access level</span><span class="rv">{{ 'Position2 team' if user.email and user.email.endswith('@position2.com') else 'Public member' }}</span></div>
+    <div class="row"><span class="rl">Access level</span><span class="rv">{{ 'Position2 team' if is_staff else 'Public member' }}</span></div>
     <div style="margin-top:18px">
       <a class="signout-btn" href="/logout">
         <svg viewBox="0 0 24 24" fill="none" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M15 17l5-5-5-5M20 12H9M13 21H6a2 2 0 01-2-2V5a2 2 0 012-2h7"/></svg>

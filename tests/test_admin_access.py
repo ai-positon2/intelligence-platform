@@ -32,10 +32,11 @@ import app as appmod  # noqa: E402
 # stays a fact this file checks rather than a line someone edited once and
 # nothing ever confirmed. sangeeta@ was the first; pushpendra.k@ and
 # nikhil.ashok@ were confirmed/granted together on 2026-09-07; sajjan@ was
-# granted on 2026-09-25; akshay.poojary@ was granted on 2026-10-29.
+# granted on 2026-09-25; akshay.poojary@ was granted on 2026-10-29; ladhakrishna2022@gmail.com
+# (the only staff login outside @position2.com, STAFF_EXTRA_EMAILS) was granted on 2026-11-05.
 _GRANTED_ADMINS = ("sangeeta@position2.com", "pushpendra.k@position2.com",
                    "nikhil.ashok@position2.com", "sajjan@position2.com", "divith.k@position2.com",
-                   "akshay.poojary@position2.com")
+                   "akshay.poojary@position2.com", "ladhakrishna2022@gmail.com")
 _STAFF = "not-an-admin@position2.com"          # real Position2 login, no admin rights
 _EXTERNAL = "someone@example.com"              # a public /app member
 _APP_PY = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "app.py")
@@ -96,12 +97,13 @@ def test_each_granted_admin_is_on_the_roster(email):
         "%s was granted admin access but is not in ADMIN_EMAILS" % email)
 
 
-def test_the_roster_is_all_lowercase_position2_addresses():
+def test_the_roster_is_all_lowercase_staff_addresses():
     """Every gate lowercases the session email before the membership test, so
     an entry carrying a capital letter would be an admin who is never an
-    admin -- silently, and only for that one person."""
+    admin -- silently, and only for that one person. And every admin must be
+    staff: admin_required turns anyone else away before it reads the roster."""
     assert all(e == e.lower() for e in appmod.ADMIN_EMAILS), sorted(appmod.ADMIN_EMAILS)
-    assert all(e.endswith("@position2.com") for e in appmod.ADMIN_EMAILS)
+    assert all(appmod._is_staff_email(e) for e in appmod.ADMIN_EMAILS)
 
 
 # ── The gate itself ────────────────────────────────────────────────────────

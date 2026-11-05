@@ -1297,7 +1297,16 @@ ACCOUNTS = {
 }
 
 # ── Auth helpers ────────────────────────────────────────────────────────────────
-ADMIN_EMAILS = {"krishna.ladha@position2.com", "sudheer.d@position2.com", "reporting@position2.com", "sparikh@position2.com", "abhilash.dg@position2.com", "pushpendra.k@position2.com", "sangeeta@position2.com", "nikhil.ashok@position2.com", "sajjan@position2.com", "divith.k@position2.com", "akshay.poojary@position2.com"}
+ADMIN_EMAILS = {"krishna.ladha@position2.com", "sudheer.d@position2.com", "reporting@position2.com", "sparikh@position2.com", "abhilash.dg@position2.com", "pushpendra.k@position2.com", "sangeeta@position2.com", "nikhil.ashok@position2.com", "sajjan@position2.com", "divith.k@position2.com", "akshay.poojary@position2.com", "ladhakrishna2022@gmail.com"}
+# Google accounts outside @position2.com that are staff all the same: they reach the internal /p2 pages and count as Position2 everywhere a
+# @position2.com account does. Nobody else outside the domain gets in. (Admin rights are still only ADMIN_EMAILS.)
+STAFF_EXTRA_EMAILS = {"ladhakrishna2022@gmail.com"}
+
+
+def _is_staff_email(email):
+    """Position2 staff: an @position2.com Google account, or one of STAFF_EXTRA_EMAILS. The one test behind every staff-only door."""
+    e = str(email or "").strip().lower()
+    return e.endswith("@position2.com") or e in STAFF_EXTRA_EMAILS
 
 def _get_user():
     """Return current user dict or None."""
@@ -1338,7 +1347,7 @@ def admin_required(f):
         if not user:
             return _login_redirect()
         email = user.get("email", "").lower()
-        if not email.endswith("@position2.com"):
+        if not _is_staff_email(email):
             return redirect("/app")          # external users never see internal /p2
         if email not in ADMIN_EMAILS:
             abort(403)                        # Position2 non-admins: forbidden
@@ -1354,7 +1363,7 @@ def position2_required(f):
         user = _get_user()
         if not user:
             return _login_redirect()
-        if not user.get("email", "").lower().endswith("@position2.com"):
+        if not _is_staff_email(user.get("email")):
             return redirect("/app")
         return f(*args, **kwargs)
     return decorated
@@ -1402,11 +1411,11 @@ def auth_google():
         # No deep link: @position2.com staff land on the internal hub (/p2/hub);
         # everyone else lands on the public signed-in home (/app). An explicit
         # next_url (e.g. a shared /p2/admin/... link) still takes precedence.
-        nxt = "/p2/hub" if email.lower().endswith("@position2.com") else "/app"
+        nxt = "/p2/hub" if _is_staff_email(email) else "/app"
     # Route sign-in logging: @position2.com -> always Internal Usage,
     # PLUS Public Page Analytics too when landing on the public /app surface (not
     # deep-linking straight into /p2). Everyone else -> Public Page Analytics only.
-    if email.lower().endswith("@position2.com"):
+    if _is_staff_email(email):
         _log_login_to_sheet(session["google_user"])   # fire-and-forget, fails silently
         if not nxt.startswith("/p2"):
             _log_member_signin(session["google_user"])
@@ -1441,7 +1450,7 @@ def index():
     u = _get_user()
     if u:
         # Staff go straight to the internal hub; everyone else to the public home.
-        return redirect("/p2/hub" if u.get("email", "").lower().endswith("@position2.com") else "/app")
+        return redirect("/p2/hub" if _is_staff_email(u.get("email")) else "/app")
     return render_template("agents.html", page="home", agents=AGENTS, agent=None,
                            related=[], signals_list=SIGNALS)
 
@@ -1807,7 +1816,7 @@ AGENT_RUN_CAP_INTERNAL = 100  # @position2.com staff get a higher ceiling than
 
 def _agent_run_cap(email: str) -> int:
     """Per-agent run cap for one user, by email domain."""
-    return AGENT_RUN_CAP_INTERNAL if (email or "").lower().endswith("@position2.com") else AGENT_RUN_CAP
+    return AGENT_RUN_CAP_INTERNAL if _is_staff_email(email) else AGENT_RUN_CAP
 
 _AR_TAB = "Agent Runs"
 _AR_HEADER = ["Timestamp (IST)", "Date", "Email", "Name", "Agent Slug", "Agent Name"]
@@ -1961,7 +1970,7 @@ def _fetch_agent_run_stats() -> dict:
                                "cap": AGENT_RUN_CAP, "ac": meta.get("ac", "#8b5cf6"),
                                "ac2": meta.get("ac2", "#22d3ee"), "icon": meta.get("icon", "")})
     users_at_cap = sum(1 for u in users_out if any(a["at_cap"] for a in u["agents"]))
-    staff = [u for u in users_out if u["email"].endswith("@position2.com")]
+    staff = [u for u in users_out if _is_staff_email(u["email"])]
 
     return {
         "configured": bool(svc),
@@ -3191,7 +3200,7 @@ def _inject_app_agents():
     _u = _get_user() or {}
     _is_admin = (_u.get("email", "").lower() in ADMIN_EMAILS)
     return {"app_agents": _visible_app_agents(), "google_client_id": GOOGLE_CLIENT_ID,
-            "is_admin": _is_admin, "paid_hidden": PAID_HIDDEN_SLUGS}
+            "is_admin": _is_admin, "is_staff": _is_staff_email(_u.get("email")), "paid_hidden": PAID_HIDDEN_SLUGS}
 
 @app.route("/app")
 @login_required
@@ -3618,7 +3627,7 @@ def _client_allowed(client, email):
     if client.get("open_to_all"):
         return True
     email = (email or "").lower()
-    if email.endswith("@position2.com"):
+    if _is_staff_email(email):
         return True
     return any(email.endswith("@" + d.lower()) for d in client.get("domains", []))
 
@@ -4302,7 +4311,7 @@ def _pm_state_change_guard():
     if request.path.startswith(_PM_PREFIX + "/api/feedback/disconnect/"):
         return None
     user = _get_user() or {}
-    if not (user.get("email") or "").lower().endswith("@position2.com"):
+    if not _is_staff_email(user.get("email")):
         return None
     return _pm_refuse_cross_site()
 
@@ -9291,7 +9300,7 @@ def _login_events_by_vid(ms_rows=None, login_rows=None) -> dict:
 
     for entry in out.values():
         entry["events"].sort(key=lambda e: e["ts"] or "")
-        entry["type"] = "staff" if (entry["email"] or "").lower().endswith("@position2.com") else "member"
+        entry["type"] = "staff" if _is_staff_email(entry["email"]) else "member"
         entry["first_ts"] = entry["events"][0]["ts"] if entry["events"] else ""
         entry["last_ts"] = entry["events"][-1]["ts"] if entry["events"] else ""
         entry["count"] = len(entry["events"])
@@ -10098,7 +10107,7 @@ def _fetch_member_analytics_uncached() -> dict:
     for r in pv:
         e = (pc(r, 4) or "").lower()
         path = pc(r, 6) or ""
-        if e and (not e.endswith("@position2.com") or path.startswith("/app")):
+        if e and (not _is_staff_email(e) or path.startswith("/app")):
             pv_by_email[e].append(r)
 
     members = {}
@@ -10254,7 +10263,7 @@ def _fetch_member_analytics_uncached() -> dict:
     # staff never arrive as anonymous visitors, so they're excluded from this ratio
     # (they still count toward the "Members" KPI above, which intentionally covers
     # all /app usage per the two-tier design).
-    external_out = [x for x in out_members if not x["email"].lower().endswith("@position2.com")]
+    external_out = [x for x in out_members if not _is_staff_email(x["email"])]
     external_members = len(external_out)
     external_returning = sum(1 for x in external_out if x["status"] == "returning")
 
@@ -10406,7 +10415,7 @@ def _fetch_usage_data(internal: bool = True) -> dict:
 
     # Internal Usage keeps @position2.com only; External Usage keeps everyone
     # else (any real non-P2 email). One predicate, inverted by mode.
-    def _is_p2(e): return (e or "").lower().endswith("@position2.com")
+    def _is_p2(e): return _is_staff_email(e)
     def keep(e):
         e = (e or "").strip()
         if not e:
@@ -11549,12 +11558,11 @@ def _fetch_client_usage(slug, force=False):
     def col(r, i, d=""):
         return r[i] if len(r) > i else d
 
-    p2_dom = "@position2.com"
     cli_doms = ["@" + d.lower() for d in client.get("domains", [])]
 
     def seg_of(email):
         e = (email or "").lower()
-        if e.endswith(p2_dom):
+        if _is_staff_email(e):
             return "p2"
         if any(e.endswith(d) for d in cli_doms):
             return "client"
@@ -11914,7 +11922,7 @@ def _agent_usage_from_rows(page_rows, run_rows, run_titles, names=None, people=N
 
     users, agents, titles_seen = {}, {}, {}
     def user(email, name=""):
-        u = users.setdefault(email, {"email": email, "name": "", "staff": email.endswith("@position2.com"),
+        u = users.setdefault(email, {"email": email, "name": "", "staff": _is_staff_email(email),
                                      "secs": 0, "views": 0, "runs": 0, "last": "", "agents": {}})
         if name and not u["name"]:
             u["name"] = name
@@ -11989,7 +11997,7 @@ def _agent_usage_from_rows(page_rows, run_rows, run_titles, names=None, people=N
     users_out.sort(key=lambda u: u["last"], reverse=True)
     agents_out = sorted(({"slug": t["slug"], "name": name(t["slug"]), "secs": t["secs"], "time": _fmt_secs(t["secs"]),
                           "views": t["views"], "runs": t["runs"], "users": len(t["users"]),
-                          "staff_users": sum(1 for e in t["users"] if e.endswith("@position2.com")),
+                          "staff_users": sum(1 for e in t["users"] if _is_staff_email(e)),
                           "where": sorted(t["where"]), "last": t["last"]} for t in agents.values()),
                         key=lambda t: (-t["secs"], -t["runs"]))
     return {"users": users_out, "agents": agents_out}
@@ -14215,7 +14223,7 @@ def _evi_state_change_guard():
             request.path == _EVI_PREFIX or request.path.startswith(_EVI_PREFIX + "/")):
         return None
     user = _get_user() or {}
-    if not (user.get("email") or "").lower().endswith("@position2.com"):
+    if not _is_staff_email(user.get("email")):
         return None
     if not _evi_same_origin():
         app.logger.warning("event conference intelligence: refused cross-site POST to %s "
@@ -22421,7 +22429,7 @@ content, brand & website, RevOps). The platform surfaces buying signals, de-anon
 tracks competitor ads and AI-answer-engine brand visibility, and runs a suite of SEO/GEO tools.
 
 THREE SURFACES: (1) public marketing site, logged out; (2) /app member workspace, any signed-in Google
-account, curated SEO/GEO agents + saved run history; (3) /p2/* internal staff app, @position2.com only
+account, curated SEO/GEO agents + saved run history; (3) /p2/* internal staff app, @position2.com plus the addresses in STAFF_EXTRA_EMAILS only
 (this chat lives here) — Hub, GTM tools, SEO Studio, Accounts/ABM Signal Tracker, Admin dashboards.
 
 ANONYMOUS VISITORS (de-anonymisation engine, /p2/admin/anonymous-traffic, /p2/strategic-agents/anonymous-visitors):
@@ -22527,7 +22535,7 @@ Some are fully live and connected; others are request-access only.
 ADMIN DASHBOARDS (/p2/admin/*, admin-only): Internal Usage, Anonymous Traffic (the visitor de-anon
 dashboard above), Public Page Analytics, Public Agent Usage, Agent Runs, Access Requests.
 
-Auth: Google Sign-In is open to any Google account; only @position2.com reaches /p2/* internal pages; a
+Auth: Google Sign-In is open to any Google account; only @position2.com (plus the addresses in STAFF_EXTRA_EMAILS) reaches /p2/* internal pages; a
 small admin allowlist reaches /p2/admin/*.
 
 Ground rule: answer questions about how a platform feature/number/term works from the facts above, precisely
