@@ -64,7 +64,7 @@ RULESETS = {
         "Beta Bionics makes the iLet Bionic Pancreas: a prescription automated insulin delivery (AID) system for TYPE 1 diabetes, ages 6 and up, "
         "sold in the United States only. The account's brand, named competitors, jobs, investor, DIY, freebie, informational, age, type 2, Medicaid, "
         "insurance, trial, country and CGM-only rules have already been applied; what reaches you is what none of them settled. Relevant: a clear "
-        "intent about insulin pumps, automated insulin delivery, closed loop or artificial pancreas systems, switching pumps, avoiding carb "
+        "intent about insulin pumps, automated insulin delivery, closed loop, artificial pancreas or bionic pancreas systems ('bionic pancreas' is a generic term here, not the brand), switching pumps, avoiding carb "
         "counting, or what pumps cost or cover. Medicare IS covered, so a Medicare question is never Not Relevant, and cost, price and copay "
         "research is the buying funnel, never price-seeking. A CGM brand (Dexcom, Libre) next to a pump or compatibility is Relevant. Competitor: "
         "another named insulin pump, AID system or smart insulin pen company that is not listed above. Not Relevant: other medical topics, general "

@@ -421,7 +421,9 @@ BB_VERDICTS = [
     ("ilet pump", "Relevant", "Brand"), ("islet cell transplant", "Not Relevant", "Different medical topic"), ("toilet pump", None, None),
     ("beta bionics careers", "Not Relevant", "Jobs/Recruitment"), ("bbnx stock price", "Not Relevant", "Investor intent"), ("bbnx", "Not Relevant", "Investor intent"),
     ("ilet vs omnipod", "Relevant", "Brand: comparison"), ("switching from tandem to ilet", "Relevant", "Brand: comparison"),
-    ("ilet not charging", "Relevant", "Brand: support intent"), ("bionic pancreas", "Relevant", "Brand"),
+    ("ilet not charging", "Relevant", "Brand: support intent"),
+    # "bionic pancreas" is a generic, unbranded category term on this account (the team's call, Nov 2026): never brand, never a routing negative
+    ("bionic pancreas", "Relevant", "Core product intent"), ("bionic pancreas insulin pump", "Relevant", "Core product intent"), ("ilet bionic pancreas", "Relevant", "Brand"),
     # a competitor with no brand word, and the partners that are not competitors (checklist 3)
     ("omnipod 5 review", "Competitor", "Named insulin delivery competitor"), ("medtronic 780g", "Competitor", "Named insulin delivery competitor"),
     ("freestyle libre 3 plus", "Not Relevant", "Partner product only"), ("dexcom g7 price", "Not Relevant", "Partner product only"),
