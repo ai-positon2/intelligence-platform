@@ -483,3 +483,13 @@ def test_a_saved_read_is_dated_when_it_was_read_not_when_it_was_shown_again(monk
     paid_geo.clear_cache()
     base.forget("")                                           # the minute in memory is gone; the read saved in the store is what answers
     assert report(store=store)["generatedAt"] == "2026-06-30T10:00:00+00:00"
+
+
+def test_attached_audiences_with_no_results_are_named_with_where_they_are(cache):
+    quiet = [dict(r, metrics={"impressions": "0", "clicks": "0", "costMicros": "0", "conversions": 0, "conversionsValue": 0}) for r in AG]
+    rep = report(searcher(ag=quiet, settings=SETTINGS, lists=LISTS, interests=INTERESTS, totals=TOTALS))
+    ins = {i["kind"]: i for i in rep["views"]["All"]["insights"]}
+    assert rep["attached"] == len(rep["idle"]) > 0 and not rep["views"]["All"]["rows"]
+    first = rep["idle"][0]
+    assert first["where"] and " on " in ins["none"]["evidence"] and first["label"] in ins["none"]["evidence"]
+    assert "paused" in ins["none"]["action"]

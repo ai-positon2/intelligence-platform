@@ -299,10 +299,13 @@ def report_insights(report, view):
              "Add the account's remarketing lists and the in-market and affinity audiences that fit the offer as Observation on the campaigns (observation does not "
              "narrow who sees the ads), then read this page again after a few weeks to see which of them convert better.", "high")
     elif report.get("attached") and not view["rows"]:
-        add_("none", "info", "The attached audiences had no results in this range",
-             "%s audience%s %s attached, but none had an impression in the range." % (num(report["attached"]), "" if report["attached"] == 1 else "s",
-                                                                                    "is" if report["attached"] == 1 else "are"),
-             "Pick a longer range, or check that the campaigns they are on were running.", "high")
+        idle = report.get("idle") or []
+        where = "; ".join("%s on %s" % (i["label"], ", ".join(i["where"][:2])) for i in idle[:4])
+        add_("none", "watch", "The attached audiences had no results in this range",
+             "%s audience%s %s attached, but none had an impression in the range%s." % (num(report["attached"]), "" if report["attached"] == 1 else "s",
+                                                                                      "is" if report["attached"] == 1 else "are", (": " + where) if where else ""),
+             "Check that the campaigns and ad groups they are on were running in the range; an audience on a paused ad group or a campaign that did not spend "
+             "shows nothing here. Then pick a longer range if they were.", "high")
     if platform != "meta" and report.get("hasPmax", True):
         out.append({"kind": "pmax", "severity": "info", "headline": "Performance Max audiences are not in this table",
                     "evidence": "Google reports no results for the audience signals of a Performance Max campaign.",

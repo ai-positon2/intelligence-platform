@@ -356,6 +356,9 @@ def assemble(raw, account, start, end):
         "kindTotals": insights.kind_totals(views[ALL]),
         "types": types, "views": views, "lists": lists, "exclusions": raw["exclusions"], "warnings": raw.get("warnings") or [],
         "attached": len(raw["audiences"]),                                   # audiences any campaign or ad group uses, with results in the range or not
+        "idle": [{"label": a["label"], "kind": a["kind"], "account": a["account"],
+                  "where": sorted({"%s%s (%s)" % (u["campaign"], (" / " + u["adGroup"]) if u.get("adGroup") else "", u["mode"]) for u in a["uses"]})[:4]}
+                 for a in sorted(raw["audiences"].values(), key=lambda a: a["label"].lower()) if is_empty(a["all"])][:40],     # attached, nothing in the range: where they are
         "hasPmax": "Performance Max" in totals,                              # Performance Max spent in the range: its audience signals are what the table cannot show
         "generatedAt": raw.get("readAt") or dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"),         # when the numbers were read, not when this page was built
     }
