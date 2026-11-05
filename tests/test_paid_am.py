@@ -134,3 +134,23 @@ def test_the_budget_trackers_dpr_tab_gives_the_newest_month_of_each_account():
         paid_am.sheet_id("not a link")
     with pytest.raises(paid_am.BadRequest):
         paid_am.parse_dpr([["Client", "Budget"]])
+
+
+def test_pasted_dpr_rows_are_kept_and_used_until_cleared(monkeypatch):
+    from monitor_fakes import MemStore
+    a = _app()
+    s = MemStore()
+    s.StoreUnavailable = type("StoreUnavailable", (Exception,), {})
+    monkeypatch.setattr(a, "_mon_store", lambda: s)
+    monkeypatch.setattr(a, "_AM_CACHE", {"own": None, "ts": 0.0})
+    c = a.app.test_client()
+    with c.session_transaction() as sess:
+        sess["google_user"] = {"email": "ana@position2.com", "name": "T"}
+    paste = "\r\n".join("\t".join(r) for r in [["Client", "Account", "Allocated Budget", "Date", "AM", "Channels"], ["Acme Dental", "Acme Dental", "100", "2026-10-01", "Asha", "Google"], ["Glow Skin", "Glow Skin Facebook", "50", "2026-10-01", "Mia", "Meta"]])
+    got = c.post("/p2/paid-marketing/api/alerthub/ams", json={"paste": paste}).get_json()
+    assert got["pasted"] == 2 and got["accounts"] == 2 and [p["name"] for p in got["people"]] == ["Asha", "Mia"] and got["source"].startswith("the DPR rows pasted")
+    got = c.post("/p2/paid-marketing/api/alerthub/ams", json={"people": [{"name": "Asha", "slack": "U0123ABCD"}]}).get_json()
+    assert got["pasted"] == 2 and s.state_get(paid_am.KEY)["people"] == {"Asha": "U0123ABCD"}          # saving the ids keeps the rows
+    assert c.post("/p2/paid-marketing/api/alerthub/ams", json={"paste": "just words"}).status_code == 400
+    got = c.post("/p2/paid-marketing/api/alerthub/ams", json={"clearRows": True}).get_json()
+    assert got["pasted"] == 0 and s.state_get(paid_am.KEY)["people"] == {"Asha": "U0123ABCD"}

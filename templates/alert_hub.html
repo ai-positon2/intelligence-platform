@@ -37,6 +37,9 @@
       <div class="pm-panel-h"><span class="pm-panel-t">Account managers tagged on Slack</span><span class="pm-panel-s" id="amNote"></span></div>
       <p class="pm-panel-s" style="margin:0 0 10px">Every alert on Slack ends with a line naming the account manager of each account in it, so they are notified. Who manages an account is the AM column of the Budget Tracker's DPR tab (or, without it, the Pacing Desk's allocations). Give each manager's Slack member id (their Slack profile, the three dots, Copy member ID) or their email.</p>
       <div class="mp-form"><label class="cc-f"><span>Budget Tracker link</span><input type="text" id="amSheet" placeholder="https://docs.google.com/spreadsheets/d/..." autocomplete="off" spellcheck="false"></label></div>
+      <div class="mp-form"><label class="cc-f"><span>Or paste the DPR tab's rows (select the cells with the header row, copy, paste here; used instead of the link)</span>
+        <textarea id="amPaste" rows="3" placeholder="Client&#9;Account&#9;...&#9;AM&#9;Channels" spellcheck="false"></textarea></label></div>
+      <p class="pm-panel-s" id="amPasted" hidden></p>
       <div id="amRows"></div>
       <div class="mp-btns"><button type="button" class="pm-btn" id="amSave">Save</button></div>
       <div id="amMsg"></div>

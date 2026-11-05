@@ -5440,8 +5440,11 @@ def _am_rows():
     """(rows, source, problem): who manages each account. The Budget Tracker's DPR tab when its link is saved on the Alert Hub and the platform's
     Google service account can read it; else the Pacing Desk's allocations, the newest month with rows."""
     from tracker import paid_am, paid_pacing_budget_store as pbs
-    link = (_mon_store().state_get(paid_am.KEY) or {}).get("sheet") or ""
+    saved = _mon_store().state_get(paid_am.KEY) or {}
+    link = saved.get("sheet") or ""
     problem = ""
+    if saved.get("rows"):                                                           # pasted from the DPR tab on the Alert Hub
+        return saved["rows"], "the DPR rows pasted %s" % (saved.get("rowsAt") or "")[:10], ""
     if link:
         try:
             svc = _va_sheets_service_st()
@@ -5451,8 +5454,12 @@ def _am_rows():
             return paid_am.parse_dpr(values), "the Budget Tracker's DPR tab", ""
         except Exception as e:                                                      # noqa: BLE001 (fall back to the allocations, and say why)
             problem = "The Budget Tracker could not be read (%s). Share it with %s (Viewer)." % (str(e)[:160], _sa_email() or "the platform's service account")
-    months = pbs.months()
-    rows = pbs.list_month(months[-1]) if months else []
+    try:
+        months = pbs.months()
+        rows = pbs.list_month(months[-1]) if months else []
+    except Exception as e:                                                          # noqa: BLE001 (no allocations is the same as none saved)
+        log.warning("account managers: the allocations could not be read: %s", e)
+        months, rows = [], []
     return rows, ("the Pacing Desk's %s allocations" % months[-1]) if months else "nothing yet", problem
 
 
@@ -6123,18 +6130,31 @@ def paid_alerthub_ams():
     try:
         if request.method == "POST":
             body = request.get_json(silent=True) or {}
-            people = paid_am.clean_people(body)
-            sheet = str(body.get("sheet") or "").strip()
-            if sheet:
-                paid_am.sheet_id(sheet)
-            for name, v in list(people.items()):
-                if "@" in v:
-                    people[name] = _slack_member_by_email(v)
-            store.state_set(paid_am.KEY, {"people": people, "sheet": sheet, "by": _pm_user_email(), "at": _dt.datetime.now(_dt.timezone.utc).isoformat()})
+            old = store.state_get(paid_am.KEY) or {}
+            now = _dt.datetime.now(_dt.timezone.utc).isoformat()
+            new = {"people": old.get("people") or {}, "sheet": old.get("sheet") or "", "rows": old.get("rows") or [], "rowsAt": old.get("rowsAt") or "",
+                   "by": _pm_user_email(), "at": now}
+            if "people" in body:
+                people = paid_am.clean_people(body)
+                for name, v in list(people.items()):
+                    if "@" in v:
+                        people[name] = _slack_member_by_email(v)
+                new["people"] = people
+            if "sheet" in body:
+                sheet = str(body.get("sheet") or "").strip()
+                if sheet:
+                    paid_am.sheet_id(sheet)
+                new["sheet"] = sheet
+            if str(body.get("paste") or "").strip():
+                new["rows"], new["rowsAt"] = paid_am.parse_paste(body["paste"]), now
+            elif body.get("clearRows"):
+                new["rows"], new["rowsAt"] = [], ""
+            store.state_set(paid_am.KEY, new)
         info = _am_owners(force=True)
         saved = store.state_get(paid_am.KEY) or {}
         return jsonify(people=paid_am.people_list(saved.get("people") or {}, info.get("names") or []), source=info.get("source") or "", problem=info.get("problem") or "",
-                       sheet=saved.get("sheet") or "", accounts=len(info["own"]["accounts"]), savedBy=saved.get("by") or "", savedAt=saved.get("at") or "")
+                       sheet=saved.get("sheet") or "", pasted=len(saved.get("rows") or []), accounts=len(info["own"]["accounts"]),
+                       savedBy=saved.get("by") or "", savedAt=saved.get("at") or "")
     except (paid_am.BadRequest, ValueError) as e:
         return jsonify(error=str(e)), 400
     except store.StoreUnavailable as e:

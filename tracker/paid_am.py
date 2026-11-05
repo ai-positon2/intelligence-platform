@@ -55,6 +55,20 @@ def parse_dpr(values):
     return sorted((r for r in rows if r["account"] and r["am"]), key=lambda r: r["date"], reverse=True)
 
 
+MAX_PASTED = 2000
+
+
+def parse_paste(text):
+    """Rows {client, account, am} from cells copied out of the DPR tab (tab-separated, the header row included), or BadRequest."""
+    lines = [l for l in str(text or "").replace("\r\n", "\n").split("\n") if l.strip()]
+    if len(lines) > MAX_PASTED:
+        raise BadRequest("At most %d rows can be pasted." % MAX_PASTED)
+    rows = parse_dpr([l.split("\t") for l in lines])
+    if not rows:
+        raise BadRequest("No row with both an Account and an AM was found. Copy the DPR tab's cells with the header row.")
+    return [{"client": r["client"], "account": r["account"], "am": r["am"], "date": r["date"]} for r in rows]
+
+
 def owners(rows):
     """{normalised account name: AM} and {normalised client name: AM when the client has one AM} from allocation rows."""
     acc, by_client = {}, {}
