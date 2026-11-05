@@ -130,7 +130,7 @@ def read(search=None, report=None, member=ACCT):
 def test_an_account_is_read_into_its_creatives_ratings_and_gaps():
     a = read(searcher(groups=[group_row()], weak_ads=[weak_ad_row()], weak_groups=[weak_group_row()]),
              coverage_report([{"key": "SITELINK", "scope": "Campaign", "label": "Sitelinks", "severity": "high", "have": 0, "target": 4, "add": 4, "message": "None."}]))
-    assert [x["id"] for x in a["creatives"]] == ["11", "g31"] and len(a["weak"]) == 2 and len(a["gaps"]) == 1 and a["weeksRead"] is True and a["today"] == "2026-10-22"
+    assert [x["id"] for x in a["creatives"]] == ["11", "g31"] and [w["creativeId"] for w in a["weak"]] == ["11"] and len(a["gaps"]) == 1 and a["weeksRead"] is True and a["today"] == "2026-10-22"
     assert a["unread"] == [] and a["warnings"] == []
 
 
@@ -162,9 +162,20 @@ def test_a_part_that_fails_is_soft_says_so_and_is_named_unread():
     assert [x["id"] for x in d["creatives"]] == ["11"] and len(d["warnings"]) == 2 and d["unread"] == []
 
 
-def test_the_ratings_are_unread_if_either_half_fails_so_nothing_is_half_judged():
-    assert read(searcher(fail=("weak_groups",), weak_ads=[weak_ad_row()]))["weak"] is None
-    assert read(searcher(fail=("weak_ads",), weak_groups=[weak_group_row()]))["weak"] is None
+def test_the_ads_ratings_count_on_their_own_because_google_no_longer_rates_performance_max_assets():
+    # The asset group half used to be required too, and since Google dropped asset_group_asset.performance_label it failed on every account, which threw
+    # the ads' own Low ratings away: the check never ran anywhere. No asset group query is sent now.
+    a = read(searcher(weak_ads=[weak_ad_row()]))
+    assert a["weak"] and a["weak"][0]["creativeId"] == "11" and "low_rating" not in a["unread"] and a["warnings"] == []
+    assert read(searcher(fail=("weak_ads",)))["weak"] is None
+
+
+def test_no_query_asks_for_a_field_google_no_longer_has():
+    queries = [v for k, v in vars(c).items() if k.startswith("GAQL_") and isinstance(v, str)]
+    assert queries and not any("asset_group_asset.performance_label" in q for q in queries)
+    seen = []
+    read(lambda cid, gaql: seen.append(gaql) or [])
+    assert seen and not any("FROM asset_group_asset" in q for q in seen)
 
 
 def test_the_headline_names_the_ad_and_a_missing_headline_read_still_gives_a_readable_name():

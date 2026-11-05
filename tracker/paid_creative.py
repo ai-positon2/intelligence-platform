@@ -37,9 +37,9 @@ GAQL_HEADLINES = ("SELECT ad_group_ad.ad.id, ad_group_ad.ad.responsive_search_ad
 GAQL_WEAK_ADS = ("SELECT campaign.id, campaign.name, ad_group.name, ad_group_ad.ad.id, ad_group_ad.ad.type, ad_group_ad_asset_view.field_type, ad_group_ad_asset_view.performance_label, "
                  "asset.type, asset.name, asset.text_asset.text FROM ad_group_ad_asset_view WHERE ad_group_ad_asset_view.performance_label = LOW AND ad_group_ad_asset_view.enabled = TRUE AND "
                  + _LIVE)
-GAQL_WEAK_GROUPS = ("SELECT campaign.id, campaign.name, asset_group.id, asset_group.name, asset_group_asset.field_type, asset_group_asset.performance_label, asset.type, asset.name, "
-                    "asset.text_asset.text FROM asset_group_asset WHERE asset_group_asset.performance_label = LOW AND asset_group_asset.status = ENABLED AND asset_group.status = ENABLED "
-                    "AND campaign.status = ENABLED")
+# Performance Max assets are not rated: Google's API (v24) no longer has asset_group_asset.performance_label ("Unrecognized field in the query", seen live on
+# 2026-11-05 through the admin query check). Asking for it failed every read and, because the ratings were only used when both halves were read, it also
+# threw away the ads' own Low ratings, so the check never ran on any account. Only the ads' assets are rated now; NOT_MEASURED says the rest.
 
 META_WEEK_FIELDS = "ad_id,ad_name,adset_id,adset_name,campaign_id,campaign_name,spend,impressions,reach,inline_link_clicks"
 
@@ -151,7 +151,8 @@ def _asset_text(r):
 
 
 def read_weak(ad_rows, group_rows, headlines):
-    """[{creativeId, name, campaign, group, field, text, label, kind}]: the assets Google rates Low, an ad's and an asset group's."""
+    """[{creativeId, name, campaign, group, field, text, label, kind}]: the assets Google rates Low. `group_rows` takes asset group assets in the same shape, should Google
+    rate them again; the read passes none (see the note under GAQL_WEAK_ADS)."""
     out = []
     for r in ad_rows:
         ad = _get(r, "adGroupAd", "ad", default={})
@@ -203,8 +204,7 @@ def read_account(member, search, *, today, report_fn):
     headlines = headlines_of(head_rows or [])
     creatives = read_ads(ad_rows, starts, headlines) + (read_groups(group_rows, starts) if group_rows else [])
     weak_ads = _soft(warnings, "Google's ratings of the ads' assets", lambda: search(cid, GAQL_WEAK_ADS), None)
-    weak_groups = _soft(warnings, "Google's ratings of the asset groups' assets", lambda: search(cid, GAQL_WEAK_GROUPS), None)
-    weak = read_weak(weak_ads, weak_groups or [], headlines) if weak_ads is not None and weak_groups is not None else None
+    weak = read_weak(weak_ads, [], headlines) if weak_ads is not None else None
     if weak is None:
         unread.append("low_rating")
     gaps = _soft(warnings, "The asset coverage", lambda: gaps_of_google(report_fn(member)), None)

@@ -68,7 +68,7 @@ function render(){
     (rep.stale?' <span class="sg-mcc">The platform is not answering, so this is the copy saved '+esc(ago(rep.stale))+'</span>':"");
   paintKpis(); paintInsights(); paintViews(); paintList(); paintBlind();
   var t=rep.thresholds||{};
-  $("#foot").innerHTML="Source: Google Ads (every live ad's and Performance Max asset group's clicks and impressions by whole week, the assets Google itself rates Low, and the asset coverage Asset Coverage reads) and Meta (the live ads' numbers by week, Meta's quality rankings and how many ads each ad set holds), saved so the same report opens instantly. "+
+  $("#foot").innerHTML="Source: Google Ads (every live ad's and Performance Max asset group's clicks and impressions by whole week, the assets Google itself rates Low (an ad's: Google no longer rates Performance Max assets), and the asset coverage Asset Coverage reads) and Meta (the live ads' numbers by week, Meta's quality rankings and how many ads each ad set holds), saved so the same report opens instantly. "+
     "A creative is judged on its last "+(t.recentWeeks||2)+" whole weeks against the "+(t.baseWeeks||3)+" before, and only with at least "+D.int(t.minRecentImpressions||1000)+" impressions in the last weeks and "+D.int(t.minBaseImpressions||2000)+" before. A click-through rate that fell by "+(t.ctrFallPercent||25)+" percent ("+(t.ctrFallHighPercent||40)+" is high), unlikely to be chance and clearly more than the rest of the account fell, is a signal; on Meta so is a frequency of "+(t.frequency||3)+" or more that is rising and a cost per 1,000 views up "+(t.cpmRisePercent||25)+" percent more than the account's. Two signals make a creative high. "+
     "Nothing is changed in an ad account.";
 }

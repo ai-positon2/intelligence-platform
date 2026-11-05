@@ -53,7 +53,7 @@ def google_queries(today=None):
         ("watch", "manager account clients", wt.GAQL_CLIENTS), ("watch", "account budget orders", wt.GAQL_ORDERS), ("watch", "change history", wt.GAQL_CHANGES % (ts[0], ts[1])),
         ("watch", "conversion actions", wt.GAQL_ACTIONS), ("watch", "who can open the account", wt.GAQL_USERS),
         ("creative", "ads by week", cr.GAQL_ADS % (a, b)), ("creative", "asset groups by week", cr.GAQL_GROUPS % (a, b)), ("creative", "ad headlines", cr.GAQL_HEADLINES),
-        ("creative", "assets of ads rated low", cr.GAQL_WEAK_ADS), ("creative", "assets of asset groups rated low", cr.GAQL_WEAK_GROUPS),
+        ("creative", "assets of ads rated low", cr.GAQL_WEAK_ADS),
         ("compete", "our ad types", co.GAQL_AD_TYPES), ("compete", "our asset group pictures and videos", co.GAQL_PMAX_MEDIA),
     ]
     return qs

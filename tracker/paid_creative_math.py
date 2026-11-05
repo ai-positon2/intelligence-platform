@@ -52,7 +52,7 @@ NOT_MEASURED = [
     "How old a creative is, or when it was last changed: Google's API does not carry it, so a creative is judged on its last weeks, not its age.",
     "Frequency on Google: Google does not report how often one person saw a Search or Performance Max ad, so Google ads are judged on click-through rate and the platform's own asset ratings.",
     "Frequency on Meta is for the week, not for the ad's whole life, so a person reached many times over months is not seen.",
-    "Performance Max assets have no weekly numbers of their own: the asset group is judged, and Google's Low ratings name the weak assets inside it.",
+    "Performance Max assets have no weekly numbers of their own and Google's API no longer rates them Low: the asset group is judged on its numbers and its asset coverage.",
     "Meta ranks an ad only after 500 impressions; a newer ad is left out of the ratings.",
 ]
 
