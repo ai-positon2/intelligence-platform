@@ -23,19 +23,19 @@ const fmtConv = Core.fmtConv;
 const CLASSIFY_URL = BASE + "/sqr/classify";
 const BATCH = 40, PARALLEL = 3;
 
-async function classifyBatch(rulesetId, account, batch, profile){
+async function classifyBatch(rulesetId, account, batch, profile, site){
   const ctl = new AbortController();
   const t = setTimeout(() => ctl.abort(), 90000);
   try {
     const res = await fetch(CLASSIFY_URL, { method: "POST", credentials: "same-origin", signal: ctl.signal,
-      headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ruleset: rulesetId, account: account, terms: batch, profile: profile || undefined }) });
+      headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ruleset: rulesetId, account: account, terms: batch, profile: profile || undefined, site: site ? site(batch) : undefined }) });
     const j = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(j.error || ("classify answered " + res.status));
     return j.results || {};
   } finally { clearTimeout(t); }
 }
 
-async function classifyPending(ruleset, account, terms, progress, profile){
+async function classifyPending(ruleset, account, terms, progress, profile, site){
   const out = {}, failures = [];
   const batches = [];
   for (let i = 0; i < terms.length; i += BATCH) batches.push(terms.slice(i, i + BATCH));
@@ -43,7 +43,7 @@ async function classifyPending(ruleset, account, terms, progress, profile){
   async function worker(){
     while (next < batches.length){
       const b = batches[next++];
-      try { Object.assign(out, await classifyBatch(ruleset.id, account, b, profile)); }
+      try { Object.assign(out, await classifyBatch(ruleset.id, account, b, profile, site)); }
       catch (e) { failures.push(e.message || String(e)); }
       done += b.length;
       progress(done, terms.length);
@@ -61,7 +61,7 @@ async function classifyPending(ruleset, account, terms, progress, profile){
 // =====================================================================
 // State
 // =====================================================================
-const S = { acct: null, preset: "last30", range: P.presetRange("last30"), data: null, loading: 0, rulesManual: false, currency: "USD", ran: null };
+const S = { acct: null, preset: "last30", range: P.presetRange("last30"), data: null, loading: 0, rulesManual: false, currency: "USD", ran: null, site: null, siteWait: null };
 let current = "generic", orb = null, lastResult = null;
 const files = { terms: null, keywords: null, negs: null }, meta = { terms: null, keywords: null, negs: null };
 const PRESETS = [{id:"last7",label:"Last 7 days"},{id:"last14",label:"Last 14 days"},{id:"last30",label:"Last 30 days"},{id:"last90",label:"Last 90 days"}];
@@ -230,6 +230,7 @@ async function load(force){
   if (!S.acct) return;
   const seq = ++loadSeq, acct = S.acct; S.loading++; S.data = null; lastResult = null;
   $id("dlBtn").disabled = true; $id("results").innerHTML = ""; $id("dataLine").innerHTML = ""; $id("staleBar").hidden = true; clearNotice();
+  S.site = null; S.siteWait = null; paintSite();
   setLive("Reading " + acct.name + " from Google Ads…"); refreshReady();
   const url = BASE + "/sqr/data?account=" + encodeURIComponent(acct.id) + "&start=" + S.range.start + "&end=" + S.range.end + (force ? "&refresh=1" : "");
   try {
@@ -240,6 +241,7 @@ async function load(force){
     S.data = j; S.currency = acct.currency || "USD";
     if (!S.rulesManual && j.ruleset) setRules(j.ruleset.id, false); else { paintButton(); paintWhy(); }
     $id("upd").textContent = j.fetchedAt ? "· read " + ago(j.fetchedAt) : "";
+    loadSite(acct, force, seq);
     setLive("Live from Google Ads · " + acct.name);
     if (j.stale) { $id("staleBar").hidden = false; $id("staleBar").innerHTML = "<b>Showing the copy saved " + esc(new Date(j.stale).toLocaleString([], { weekday: "short", hour: "numeric", minute: "2-digit" })) + ".</b> Google Ads did not answer, so fresh numbers will come back when it does."; }
   } catch (err) {
@@ -253,6 +255,32 @@ async function load(force){
     if (seq === loadSeq) S.loading--; else S.loading = Math.max(0, S.loading - 1);
     refreshReady();
   }
+}
+// The account's own website (tracker/paid_sqr_site.py), read beside the Google Ads data: a site takes longer to read than the data, so the
+// page does not wait for it until the analysis runs.
+function loadSite(acct, force, seq){
+  if (acct.isGroup) { S.site = { status: "none", why: "a whole MCC covers many websites: pick one account to compare its searches with its own site" }; paintSite(); return; }
+  const url = BASE + "/sqr/site?account=" + encodeURIComponent(acct.id) + "&start=" + S.range.start + "&end=" + S.range.end + (force ? "&refresh=1" : "");
+  S.site = { status: "reading" }; paintSite();
+  S.siteWait = fetch(url, { credentials: "same-origin" }).then(r => r.json().catch(() => ({})).then(j => r.ok ? j : { status: "failed", notes: [j.error || ("the server answered " + r.status)] }))
+    .catch(() => ({ status: "failed", notes: ["the server could not be reached"] }))
+    .then(j => { if (seq === loadSeq) { S.site = j; paintSite(); } return j; });
+}
+function paintSite(){
+  const el = $id("siteLine"), w = S.site;
+  if (!w) { el.hidden = true; el.innerHTML = ""; return; }
+  el.hidden = false;
+  const warn = (w.warnings || []).map(x => '<small class="sq-ex">' + esc(x) + '</small>').join("");
+  if (w.status === "reading") { el.innerHTML = '<div class="sq-data-in"><b>Website:</b> reading the account\'s own site, to compare the searches with what it offers…</div>'; return; }
+  if (w.status === "none") { el.innerHTML = '<div class="sq-data-in"><b>Website:</b> none read, because ' + esc(w.why || "no site was found") + '. The analysis runs without it.' + warn + '</div>'; return; }
+  const pages = (w.pages || []), ok = pages.filter(p => p.status === "ok"), bad = pages.filter(p => p.status !== "ok");
+  if (w.status !== "ok") { el.innerHTML = '<div class="sq-data-in"><b>Website:</b> ' + esc(w.domain || "") + ' could not be read (' + esc((w.notes || []).join("; ") || "no answer") + '). The analysis runs without it.' + warn + '</div>'; return; }
+  const kinds = k => ok.filter(p => p.kind === k).length;
+  el.innerHTML = '<div class="sq-data-in"><b>Website:</b> <b>' + esc(w.domain) + '</b>, ' + esc(w.why || "") + '. Read ' + plural(ok.length, "page") + ' (the homepage, ' +
+    plural(kinds("menu"), "page") + ' its menu links to, ' + plural(kinds("landing"), "landing page") + ' the ads paid most for): ' + num(w.wordCount || Object.keys(w.words || {}).length) +
+    ' different words. Each search is checked for words the site never uses, the model is told them, and a negative that would block something the site names is held back.' +
+    (bad.length ? ' <small class="sq-ex">' + plural(bad.length, "page") + ' could not be read: ' + esc(bad.slice(0, 3).map(p => p.url + " (" + (p.note || p.status) + ")").join("; ")) + (bad.length > 3 ? "…" : "") + '</small>' : '') +
+    warn + '</div>';
 }
 function ago(iso){
   const s = Math.max(0, (Date.now() - Date.parse(iso)) / 1000);
@@ -358,20 +386,38 @@ function accountProfile(inp){
   const seen = new Set(), kws = [];
   inp.keywords.forEach(k => { const t = Core.keyText(k.text); if (t && !seen.has(t)) { seen.add(t); kws.push(t); } });
   kws.sort((a, b) => (cost.get(b) || 0) - (cost.get(a) || 0));
+  const site = inp.site;
   return {
     campaigns: Array.from(camp.entries()).sort((a, b) => b[1] - a[1]).slice(0, 25).map(e => e[0]),
     keywords: kws.slice(0, 40),
     converting: Array.from(conv.values()).sort((a, b) => (b.conversions - a.conversions) || (b.cost - a.cost)).slice(0, 30).map(e => e.term),
+    siteNames: site ? (site.headings || []).slice(0, 60) : undefined,
+    sitePhrases: site ? (site.phrases || []).slice(0, 60).map(p => p[0]) : undefined,
   };
+}
+// The website, once read: the analysis waits for it (up to a limit) rather than run without it.
+async function siteForRun(){
+  if (files.terms || !S.siteWait) return null;
+  if (S.site && S.site.status === "reading") {
+    setStatus("Reading the account's website…", 0.02);
+    const late = new Promise(res => setTimeout(() => res(null), 100000));
+    await Promise.race([S.siteWait, late]);
+  }
+  return S.site && S.site.status === "ok" ? S.site : null;
 }
 async function runAnalysis(){
   const inp = inputs();
+  inp.site = await siteForRun();
   const auto = current === "generic";
   const profile = accountProfile(inp);
+  const ix = Core.siteIndex(inp.site);
+  // per batch, the words of each term the website never uses
+  const siteOf = ix ? batch => { const missing = {}; batch.forEach(t => { const m = Core.siteCheck(ix, t).missing; if (m.length) missing[t] = m.slice(0, 6); }); return { domain: ix.domain, missing }; } : null;
   const ruleset = auto ? Core.autoRuleset({ name: inp.account, keywords: inp.keywords }) : RULESETS[current];
-  S.ran = { from: inp.from, account: inp.account, range: files.terms ? null : S.data.range, warnings: files.terms ? [] : (S.data.warnings || []), notes: files.terms ? [] : (S.data.notes || []) };
-  const classify = terms => classifyPending(ruleset, inp.account, terms, (d, n) => setStatus("Model: " + d.toLocaleString() + " / " + n.toLocaleString() + " terms the rules couldn't settle", 0.32 + 0.6 * d / n), profile);
-  return Core.analyze(ruleset, inp.rows, { keywords: inp.keywords, negatives: inp.negatives, accountName: inp.account, classify, status: setStatus });
+  S.ran = { from: inp.from, account: inp.account, range: files.terms ? null : S.data.range, warnings: files.terms ? [] : (S.data.warnings || []), notes: files.terms ? [] : (S.data.notes || []),
+    site: inp.site ? { domain: inp.site.domain, pages: (inp.site.pages || []).filter(p => p.status === "ok").length } : null };
+  const classify = terms => classifyPending(ruleset, inp.account, terms, (d, n) => setStatus("Model: " + d.toLocaleString() + " / " + n.toLocaleString() + " terms the rules couldn't settle", 0.32 + 0.6 * d / n), profile, siteOf);
+  return Core.analyze(ruleset, inp.rows, { keywords: inp.keywords, negatives: inp.negatives, accountName: inp.account, site: inp.site, classify, status: setStatus });
 }
 document.addEventListener("keydown", e => {
   if ((e.metaKey || e.ctrlKey) && e.key === "Enter" && !$id("runBtn").disabled && $id("overlay").hidden) { e.preventDefault(); $id("runBtn").click(); }
@@ -441,7 +487,7 @@ function renderResults(r){
     '<div class="sq-kpis">' + kpi(num(s.uniqueTerms), "distinct terms (" + num(N) + " rows)") + kpi(money(s.totalSpend), "spend") + kpi(fmtConv(s.totalConv).toLocaleString(), "conversions") +
       kpi(money(s.wastedSpend), "spent on not-relevant terms that never converted") + kpi(s.relevantSpendPct == null ? "–" : s.relevantSpendPct + "%", "of spend on relevant terms") +
       kpi(r.priorityNegatives.length, r.priorityNegatives.length === 1 ? "priority negative" : "priority negatives") + kpi(reviewCount, reviewCount === 1 ? "negative to check first" : "negatives to check first") + kpi(r.priorityKeywords.length, r.priorityKeywords.length === 1 ? "priority keyword" : "priority keywords") + '</div>' +
-    (skippedBits.length ? hint("Left out: " + skippedBits.join("; ") + ".") : "") +
+    (skippedBits.length ? hint("Left out: " + skippedBits.join("; ") + ".") : "") + siteHtml(r) +
     '<div class="sq-tabs">' + tab("negs", "Priority negatives", r.priorityNegatives.length) + tab("check", "Check before blocking", reviewCount) + tab("kws", "Priority keywords", r.priorityKeywords.length) +
       tab("review", "Client review", r.clientReview.reduce((a, c) => a + c.count, 0)) + tab("all", "Every term", N) + '</div>' +
     '<div id="panes">' + paneNegs(r) + paneCheck(r) + paneKws(r) + paneReview(r) + paneAll(r) + '</div>' + howRanked() + '</div>';
@@ -450,11 +496,23 @@ function renderResults(r){
   tabs.forEach(t => t.addEventListener("click", () => show(t.dataset.k)));
   show("negs");
 }
+// What people searched for that the account's own website never mentions, by spend.
+function siteHtml(r){
+  const w = r.summary.site;
+  if (!w) return "";
+  const held = r.reviewNegatives.filter(n => n.siteName).length;
+  const top = w.top.slice(0, 12).map(e => '<tr><td class="sq-term">' + esc(e.word) + '</td><td class="r num">' + num(e.terms) + '</td><td class="r num">' + money(e.cost, false) + '</td><td class="r num">' + num(e.clicks) + '</td><td class="r num">' + fmtConv(e.conversions) + '</td></tr>').join("");
+  return '<details class="sq-ref"><summary>Compared with the website (' + esc(w.domain) + ', ' + plural(w.pagesRead, "page") + ' read): ' + money(w.missingSpend) + ' went on ' + plural(w.missingTerms, "search", "searches") +
+    ' using words the site never uses' + (held ? '; ' + plural(held, "negative") + ' held back because the site names what it would block' : '') + '</summary>' +
+    hint("The words searchers used that appear nowhere on " + esc(w.domain) + ", by what those searches cost. A product or service here that the business does not offer is a negative to consider; one it does offer is missing from its website. Place names, misspellings and everyday words show up too and mean little on their own. The model was told each term's missing words.") +
+    (top ? tbl([["Word not on the website"], ["Searches", 1], ["Cost", 1], ["Clicks", 1], ["Conv", 1]], top) : none("Every search used only words the website uses.")) + '</details>';
+}
 function howRanked(){
   return '<details class="sq-ref"><summary>How these are decided and ranked</summary><ul class="sq-how">' +
     '<li><b>Every term</b> goes through the account\'s own rules first. Words are matched as whole words, so "student" is not "dent". A term the rules cannot settle is read by Claude only if it was clicked, costliest first, up to ' + Core.MODEL_CAP.toLocaleString() + ' terms a run. A service word does not settle a term that also hints at jobs, schools, DIY, price shopping, a general question, pets, products or charity: those go to Claude too.</li>' +
     '<li><b>Priority negatives</b> are ranked by the money spent on those terms that never converted. A competitor or not-relevant term that did convert, a negative that would also stop a term judged relevant, one that would stop a keyword the account bids on, one that names a competitor the account bids on, and an account-wide competitor negative in an account that runs a competitor campaign are held back under Check before blocking. Only a negative with money actually wasted is a priority. A negative the account already has (at account level, in that campaign, or in a list attached to it) is not suggested again. A not-relevant term with no rule-given negative gets an exact negative in its campaign only if it spent at least 1 and never converted.</li>' +
     '<li><b>Priority keywords</b> are relevant terms the account does not bid on, in campaigns that take keywords. The rows of a term in several ad groups are added together, and it is suggested for the ad group where it converted most. Tier 1 is at least one whole conversion; tier 2 is a partial conversion, or at least 3 clicks at a click rate of 5% or more. Ranked by tier, conversions, then clicks. Terms Google already marks as added or excluded are left out.</li>' +
+    '<li><b>The website</b>: the account\'s own site (its Master Agent domain, else the site its ads paid most to reach) is read: the homepage, the pages its menu links to and the costliest landing pages, not careers, legal or log-in pages. Each search is marked with its words the site never uses, Claude is told those words and the names the site gives its pages, and a negative that would block something the site names as its own (a page, a menu item, a common phrase) is held under Check before blocking.</li>' +
     '<li><b>Client review</b> items are ordered by the money they cost.</li></ul></details>';
 }
 function negRow(n){
@@ -473,8 +531,9 @@ function paneCheck(r){
   const rows = r.reviewNegatives.map(n => '<tr><td class="sq-term">' + esc(n.text) + '</td><td>' + esc(n.matchType) + '</td><td>' + esc(where(n)) + '</td><td>' + esc(n.reason || "") +
     '</td><td>' + n.risks.map(x => '<span class="pm-pill unclear">' + esc(x) + '</span>').join(" ") +
     (n.collateral.n ? '<small class="sq-ex">would also stop ' + esc(n.collateral.ex.join(", ")) + (n.collateral.n > n.collateral.ex.length ? " and " + (n.collateral.n - n.collateral.ex.length) + " more" : "") + '</small>' : '') +
-    (n.conflicts.length ? '<small class="sq-ex">stops keyword ' + esc(n.conflicts.join(", ")) + '</small>' : '') + '</td><td class="r num">' + money(n.cost, false) + '</td><td class="r num">' + fmtConv(n.conversions) + '</td></tr>').join("");
-  return '<div class="pane" id="pane-check" hidden>' + planHtml(Plan.checkPlan(r)) + hint("These look like negatives, but a person should look first: the terms converted, or the negative would also stop terms judged relevant or a keyword the account bids on.") +
+    (n.conflicts.length ? '<small class="sq-ex">stops keyword ' + esc(n.conflicts.join(", ")) + '</small>' : '') +
+    (n.siteName ? '<small class="sq-ex">the website says \u201c' + esc(n.siteName) + '\u201d</small>' : '') + '</td><td class="r num">' + money(n.cost, false) + '</td><td class="r num">' + fmtConv(n.conversions) + '</td></tr>').join("");
+  return '<div class="pane" id="pane-check" hidden>' + planHtml(Plan.checkPlan(r)) + hint("These look like negatives, but a person should look first: the terms converted, the negative would also stop terms judged relevant or a keyword the account bids on, or the account\'s website names what it would block.") +
     (rows ? tbl([["Negative"], ["Match"], ["Where"], ["Why"], ["Check"], ["Cost", 1], ["Conv", 1]], rows) : none()) + '</div>';
 }
 function paneKws(r){
@@ -491,9 +550,11 @@ function paneReview(r){
 }
 function paneAll(r){
   const sorted = r.rows.slice().sort((a, b) => b.cost - a.cost || b.clicks - a.clicks);
+  const site = !!r.summary.site;
   const rows = sorted.slice(0, 500).map(x => '<tr class="' + rowClass(x._det.status) + '"><td class="sq-term">' + esc(x.term) + '</td><td>' + esc(x.campaign) + '</td><td class="r num">' + money(x.cost, false) + '</td><td class="r num">' + fmtConv(x.conversions) +
-    '</td><td><span class="pm-pill ' + pillClass(x._det.status) + '">' + esc(x._det.status) + '</span></td><td>' + esc(x._det.subtype || "") + '<span class="sq-by">' + esc(BY[x._det.by] || x._det.by || "") + '</span></td></tr>').join("");
-  return '<div class="pane" id="pane-all" hidden>' + tbl([["Term"], ["Campaign"], ["Cost", 1], ["Conv", 1], ["Status"], ["Why"]], rows) +
+    '</td><td><span class="pm-pill ' + pillClass(x._det.status) + '">' + esc(x._det.status) + '</span></td><td>' + esc(x._det.subtype || "") + '<span class="sq-by">' + esc(BY[x._det.by] || x._det.by || "") + '</span></td>' +
+    (site ? '<td>' + esc(x.site && x.site.missing.length ? x.site.missing.join(", ") : "") + '</td>' : '') + '</tr>').join("");
+  return '<div class="pane" id="pane-all" hidden>' + tbl([["Term"], ["Campaign"], ["Cost", 1], ["Conv", 1], ["Status"], ["Why"]].concat(site ? [["Not on the website"]] : []), rows) +
     (r.rows.length > 500 ? '<p class="pm-panel-s" style="margin-top:10px">Showing the 500 that cost the most of ' + r.rows.length.toLocaleString() + ' term rows. The workbook has every one.</p>' : "") + '</div>';
 }
 
@@ -502,22 +563,25 @@ $id("dlBtn").addEventListener("click", () => {
   const r = lastResult, ran = S.ran || {}, wb = XLSX.utils.book_new();
   const add = (name, aoa) => XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), name);
   const w = n => n.campaign ? n.campaign : "";
-  add("SQR Analysis", [["Search Term", "Campaign", "Ad Group", "Clicks", "Impr.", "Cost", "Conversions", "Classification", "Subtype", "Decided by"],
-    ...r.rows.map(x => [x.term, x.campaign, x.adGroup, x.clicks, x.impressions, x.cost, fmtConv(x.conversions), x._det.status, x._det.subtype || "", BY[x._det.by] || x._det.by || ""])]);
+  const sw = r.summary.site, notOn = x => x.site ? x.site.missing.join(", ") : "";
+  add("SQR Analysis", [["Search Term", "Campaign", "Ad Group", "Clicks", "Impr.", "Cost", "Conversions", "Classification", "Subtype", "Decided by", ...(sw ? ["Words Not On The Website"] : [])],
+    ...r.rows.map(x => [x.term, x.campaign, x.adGroup, x.clicks, x.impressions, x.cost, fmtConv(x.conversions), x._det.status, x._det.subtype || "", BY[x._det.by] || x._det.by || "", ...(sw ? [notOn(x)] : [])])]);
   add("Summary", [["Metric", "Value"], ["Account", ran.account || ""], ["Range", ran.range ? ran.range[0] + " to " + ran.range[1] : ""], ["Data from", ran.from || ""], ["Currency", S.currency], ["Not compared", (ran.notes || []).join(" ")],
     ["Account ruleset", r.ruleset.label], ["Term rows", r.summary.totalRows], ["Distinct terms", r.summary.uniqueTerms], ["Total spend", r.summary.totalSpend.toFixed(2)],
     ["Total conversions", fmtConv(r.summary.totalConv)], ["Spend on not-relevant terms with no conversions", r.summary.wastedSpend.toFixed(2)], ["Spend on competitor terms", r.summary.competitorSpend.toFixed(2)],
     ["Share of spend on relevant terms %", r.summary.relevantSpendPct == null ? "" : r.summary.relevantSpendPct], ["Relevant rows %", r.summary.relevantPct],
     ["Rows settled by rules", r.summary.byRule], ["Rows settled by the model", r.summary.byModel], ["Rows the model failed on (fallback)", r.summary.fallback],
-    ["Rows not read (no clicks, or over the review limit)", r.summary.skipped], ...(Plan.saving(r, ran.range, v => money(v)) ? [["What the priority negatives are worth", Plan.saving(r, ran.range, v => money(v))]] : []), ...Object.entries(r.summary.byStatus)]);
+    ["Rows not read (no clicks, or over the review limit)", r.summary.skipped],
+    ["Website compared", sw ? sw.domain + " (" + sw.pagesRead + " pages read)" : "none"], ...(sw ? [["Spend on searches using words the website never uses", sw.missingSpend.toFixed(2)]] : []), ...(Plan.saving(r, ran.range, v => money(v)) ? [["What the priority negatives are worth", Plan.saving(r, ran.range, v => money(v))]] : []), ...Object.entries(r.summary.byStatus)]);
   const negHead = ["Negative Text", "Match Type", "Level", "Campaign", "Reason", "Decided by", "Wasted Spend", "Total Cost", "Clicks", "Conversions", "Distinct Terms"];
   const negRowX = n => [n.text, n.matchType, n.level, w(n), n.reason, source(n), n.wasted.toFixed(2), n.cost.toFixed(2), n.clicks, fmtConv(n.conversions), n.terms];
   add("Negatives to Add (Priority)", [negHead, ...r.priorityNegatives.map(negRowX)]);
-  add("Negatives to Check First", [[...negHead, "Why check", "Would also stop", "Stops keyword"], ...r.reviewNegatives.map(n => [...negRowX(n), n.risks.join("; "), n.collateral.ex.join("; "), n.conflicts.join("; ")])]);
+  add("Negatives to Check First", [[...negHead, "Why check", "Would also stop", "Stops keyword", "What The Website Says"], ...r.reviewNegatives.map(n => [...negRowX(n), n.risks.join("; "), n.collateral.ex.join("; "), n.conflicts.join("; "), n.siteName || ""])]);
   add("New Keywords to Add (Priority)", [["Term", "Asset Type", "Suggested Match Type", "Add To Level", "Where To Add", "Tier", "Conversions", "Cost / Conv", "CTR", "Clicks", "Cost", "Conv Rate"],
     ...r.priorityKeywords.map(k => [k.term, k.assetType, k.matchType, k.addLevel, k.whereToAdd, k.tier, fmtConv(k.conversions), k.cpa == null ? "" : k.cpa.toFixed(2), (k.ctr * 100).toFixed(2) + "%", k.clicks, k.cost.toFixed(2), convRate(k.conversions, k.clicks)])]);
   add("Client Review Required", [["Issue Type", "Rows", "Cost", "Conversions", "Costliest Example Terms"], ...r.clientReview.map(c => [c.subtype, c.count, c.cost.toFixed(2), fmtConv(c.conversions), c.examples.join("; ")])]);
   add("All Negatives (Reference)", [[...negHead, "Check"], ...r.allNegatives.map(n => [...negRowX(n), n.risks.join("; ")])]);
+  if (sw) add("Words Not On The Website", [["Word", "Searches", "Cost", "Clicks", "Conversions"], ...sw.top.map(e => [e.word, e.terms, e.cost.toFixed(2), e.clicks, fmtConv(e.conversions)])]);
   add("All Keywords (Reference)", [["Term", "Asset Type", "Match Type", "Where To Add", "Tier", "Conversions", "CTR", "Clicks", "Cost", "Conv Rate"], ...r.allKeywords.map(k => [k.term, k.assetType, k.matchType, k.whereToAdd, k.tier, fmtConv(k.conversions), (k.ctr * 100).toFixed(2) + "%", k.clicks, k.cost.toFixed(2), convRate(k.conversions, k.clicks)])]);
   const blob = new Blob([XLSX.write(wb, { bookType: "xlsx", type: "array" })], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
   const slug = String(ran.account || r.ruleset.id).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40);

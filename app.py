@@ -4824,6 +4824,24 @@ def paid_sqr_read():
     return _gads_guard(run)
 
 
+@app.route("/p2/paid-marketing/api/sqr/site")
+@position2_required
+def paid_sqr_site_read():
+    """The words on one Google Ads account's own website (tracker/paid_sqr_site.py): the Master Agent's domain for its client, else the site its
+    ads paid most to reach, read with its menu pages and costliest landing pages. An MCC covers many sites, so it is not read for one."""
+    from tracker import paid_gads, paid_gads_segments, paid_master, paid_sqr_data, paid_sqr_site, paid_store
+
+    def run():
+        if paid_gads_segments.GROUP_ID_RE.match(request.args.get("account", "")):
+            return jsonify(status="none", why="a whole MCC covers many websites: pick one account to compare its searches with its own site")
+        acct = _gads_account(paid_store)
+        if acct.get("platform") != "google":
+            raise ValueError("Search terms are read from Google Ads: pick a Google Ads account")
+        start, end = paid_sqr_data.check_range(request.args.get("start", ""), request.args.get("end", ""))
+        return jsonify(**paid_sqr_site.read(paid_store, acct, start, end, master=paid_master.load(_mon_store()), force=request.args.get("refresh") == "1"))
+    return _gads_guard(run)
+
+
 @app.route("/p2/paid-marketing/api/sqr/classify", methods=["POST"])
 @position2_required
 def paid_sqr_classify():
@@ -4831,7 +4849,7 @@ def paid_sqr_classify():
     from tracker.market_radar_llm import ModelError
     body = request.get_json(silent=True) or {}
     try:
-        results = paid_sqr.classify(body.get("ruleset"), body.get("terms"), account=body.get("account") or "", profile=body.get("profile"))
+        results = paid_sqr.classify(body.get("ruleset"), body.get("terms"), account=body.get("account") or "", profile=body.get("profile"), site=body.get("site"))
     except paid_sqr.BadRequest as e:
         return jsonify(error=str(e)), 400
     except ModelError as e:

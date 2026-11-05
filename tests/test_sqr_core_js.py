@@ -616,3 +616,72 @@ def test_terms_a_failed_model_batch_never_judged_are_not_counted_as_wasted_spend
     s = out["s"]
     assert s["fallback"] == 2 and s["notJudgedSpend"] == 500
     assert s["wastedSpend"] == 40                                   # only the term a rule judged ("faraway") is waste
+
+
+# ── The account's own website ───────────────────────────────────────────────
+
+SITE = {"status": "ok", "domain": "smile.com", "pagesRead": 3,
+        "words": {"dental": 3, "implants": 2, "crown": 1, "batteries": 1, "brushes": 1, "pediatric": 1, "dentistry": 2, "richmond": 1, "school": 1, "berry": 1, "box": 1},
+        "phrases": [["dental implants", 2], ["same day crowns", 1]],
+        "headings": ["Pediatric Dentistry", "Richmond Office", "School of Dentistry Partners", "Type 1 Diabetes", "Free Consultation",
+                     "We do not offer orthodontics or veneers at any of our offices today"]}
+
+
+def test_a_search_is_marked_with_the_words_the_website_never_uses():
+    out = js("const ix = C.siteIndex(%s); return ['Dental Implant cost near me', 'veneers 2024 in Richmond', 'crowns', 'battery brush', 'smile.com’s veneers', 'berries boxes', 'boxs'].map(t => C.siteCheck(ix, t).missing);" % json.dumps(SITE))
+    assert out == [[], ["veneers"], [], [], ["veneers"], [], []]       # plurals both ways, filler words and numbers are not looked for
+
+
+def test_no_website_read_means_no_index():
+    assert js("return [C.siteIndex(null), C.siteIndex({status: 'failed'}), C.siteIndex({status: 'ok', words: {}})];") == [None, None, None]
+
+
+def test_what_the_website_names_is_found_in_its_page_names_and_phrases():
+    out = js("const ix = C.siteIndex(%s); return ['pediatric', 'pediatric dentist', 'richmond', 'school dentistry', 'dental implants', 'implants dental', 'type 2', 'free', 'near me', 'crown', 'orthodontics', '1'].map(t => C.siteNamed(ix, t));" % json.dumps(SITE))
+    assert out == ["Pediatric Dentistry", "", "Richmond Office", "School of Dentistry Partners", "dental implants", "", "", "", "", "", "", ""]   # a sentence or a bare number names nothing
+
+
+def test_a_negative_that_blocks_what_the_website_names_is_held_back():
+    out = js("""
+      const rows = [R("pediatric dentist jobs", {cost: 40, clicks: 4}), R("veneers in faraway", {cost: 20, clicks: 2}), R("veneers in faraway", {cost: 10, clicks: 1, campaign: "C2"})];
+      const RS = Object.assign({}, STUB, {classifyDeterministic(t){
+        if (t.includes("pediatric")) return {status: "Not Relevant", subtype: "Kids", negMatchType: "Phrase", negText: "pediatric", negLevel: "Account"};
+        return STUB.classifyDeterministic(t); }});
+      const r = await C.analyze(RS, rows, {site: %s});
+      const pick = n => [n.text, n.risks, n.siteName];
+      return {priority: r.priorityNegatives.map(pick), review: r.reviewNegatives.map(pick), site: r.summary.site, rows: r.rows.map(x => x.site.missing)};
+    """ % json.dumps(SITE))
+    assert out["review"] == [["pediatric", ["the website names it"], "Pediatric Dentistry"]]
+    assert [n[0] for n in out["priority"]] == ["veneers in faraway", "veneers in faraway"]          # one per campaign
+    assert out["rows"] == [["dentist", "jobs"], ["veneers", "faraway"], ["veneers", "faraway"]]           # "dentistry" on the site is not "dentist"
+    s = out["site"]
+    assert s["domain"] == "smile.com" and s["pagesRead"] == 3 and s["missingSpend"] == 70 and s["missingTerms"] == 2
+    assert [(e["word"], e["cost"], e["terms"]) for e in s["top"]] == [("dentist", 40, 1), ("jobs", 40, 1), ("faraway", 30, 1), ("veneers", 30, 1)]
+
+
+def test_without_a_website_nothing_changes():
+    out = js("""
+      const RS = Object.assign({}, STUB, {classifyDeterministic(t){
+        if (t.includes("pediatric")) return {status: "Not Relevant", subtype: "Kids", negMatchType: "Phrase", negText: "pediatric", negLevel: "Account"};
+        return STUB.classifyDeterministic(t); }});
+      const r = await C.analyze(RS, [R("pediatric dentist jobs", {cost: 40, clicks: 4})], {});
+      return [r.summary.site, r.priorityNegatives.map(n => [n.text, n.risks, n.siteName]), r.rows[0].site || null];
+    """)
+    assert out == [None, [["pediatric", [], ""]], None]
+
+
+def test_a_routing_negative_is_never_held_for_the_website():
+    out = js("""
+      const RS = Object.assign({}, STUB, {routeCampaignRe: /nonbrand/i, classifyDeterministic(t){ return {status: "Relevant", subtype: "Brand", routeNeg: "pediatric"}; }});
+      const r = await C.analyze(RS, [R("pediatric dentistry", {cost: 9, clicks: 2, campaign: "NonBrand"})], {site: %s});
+      return r.allNegatives.map(n => [n.text, n.routing, n.risks, n.siteName]);
+    """ % json.dumps(SITE))
+    assert out == [["pediatric", True, [], ""]]
+
+
+def test_a_suggested_keyword_carries_its_words_the_website_never_uses():
+    out = js("""
+      const r = await C.analyze(STUB, [R("core veneers", {cost: 9, clicks: 4, conversions: 1}), R("core implants", {cost: 9, clicks: 4, conversions: 1})], {site: %s});
+      return r.allKeywords.map(k => [k.term, k.siteMissing]);
+    """ % json.dumps(SITE))
+    assert sorted(out) == [["core implants", ["core"]], ["core veneers", ["core", "veneers"]]]

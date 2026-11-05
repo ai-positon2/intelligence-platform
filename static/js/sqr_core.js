@@ -635,6 +635,65 @@ function autoRuleset(profile){
   });
 }
 
+// =====================================================================
+// The account's own website (read by tracker/paid_sqr_site.py): what the business says it sells. A search whose words the site never uses is
+// marked with them (the model is told them too), and a negative that would block something the site names as its own is held back for a person.
+// =====================================================================
+// Words that say nothing about what is sold: they are not looked for on the site, and a negative made only of them is never "named by the site".
+const SITE_FILLER = new Set(("a an and or the of for to in on at by with from is are be do does did can i me my you your our we us it its this that " +
+  "near nearby around close closest best top good great cheap cheapest cheaper affordable free cost costs price prices pricing much many how what who " +
+  "where when why which vs versus open now today hours online local area company companies service services home about contact blog news reviews " +
+  "review testimonials faq faqs gallery menu more learn read view see page team staff meet locations location directions get").split(" "));
+function siteWords(s){
+  return (String(s == null ? "" : s).toLowerCase().replace(/’/g, "'").match(/[a-z0-9]+(?:'[a-z]+)?/g) || []).map(w => /'s$/.test(w) ? w.slice(0, -2) : w);
+}
+function siteIndex(site){
+  if (!site || site.status !== "ok" || !site.words || !Object.keys(site.words).length) return null;
+  // the site's own address is its words too ("smile.com's veneers")
+  return { domain: site.domain || "", pagesRead: site.pagesRead || 0, words: new Set(Object.keys(site.words).concat(siteWords(String(site.domain || "").replace(/[^a-z0-9]+/gi, " ")))),
+    phrases: new Set((site.phrases || []).map(p => Array.isArray(p) ? p[0] : p)),
+    // a name is short: a page title or a menu label names what is sold, a sentence (a page's description) only mentions it
+    names: (site.headings || []).map(h => ({ text: h, key: " " + siteWords(h).join(" ") + " " })).filter(n => n.key.trim().split(" ").length <= 8) };
+}
+// a word and its plural or singular ("implant", "implants"; "battery", "batteries"; "brush", "brushes")
+function wordForms(w){
+  const f = new Set([w, w + "s"]);
+  if (w.length > 3 && /s$/.test(w) && !/ss$/.test(w)) f.add(w.slice(0, -1));
+  if (/ies$/.test(w)) f.add(w.slice(0, -3) + "y");
+  if (/(ch|sh|ss|x)es$/.test(w)) f.add(w.slice(0, -2));
+  if (/[^aeiou]y$/.test(w)) f.add(w.slice(0, -1) + "ies");
+  if (/(ch|sh|ss|x)$/.test(w)) f.add(w + "es");
+  return Array.from(f);
+}
+function onSite(ix, w){ return wordForms(w).some(f => ix.words.has(f)); }
+// The words of a search that the site never uses. Numbers are not looked for (a house number or a model number is not vocabulary).
+function siteCheck(ix, term){
+  const content = Array.from(new Set(siteWords(term).filter(w => w.length >= 2 && !/^\d+$/.test(w) && !SITE_FILLER.has(w))));
+  return { content, missing: content.filter(w => !onSite(ix, w)) };
+}
+// What the site calls one of its own pages or menu items that holds these words in this order (one other word may sit between two of them), or,
+// for two words or more, one of its common phrases: "" when there is none. A negative that blocks it would block what the business sells.
+function siteNamed(ix, text){
+  const c = siteWords(text).filter(w => !SITE_FILLER.has(w));
+  if (!c.length || c.every(w => /^\d+$/.test(w))) return "";
+  const re = new RegExp(" " + c.map(w => "(?:" + wordForms(w).map(reEsc).join("|") + ")").join(" (?:\\S+ )?") + " ");
+  const hit = ix.names.find(n => re.test(n.key));
+  if (hit) return hit.text;
+  return ix.phrases.has(c.join(" ")) ? c.join(" ") : "";              // the phrases are two and three words long
+}
+// The site's words the searches used most, by spend: what people searched for that the business never mentions.
+function siteSummary(ix, rows){
+  const by = new Map(); let spend = 0, n = 0; const seen = new Set();
+  rows.forEach(r => {
+    if (!r.site || !r.site.missing.length) return;
+    spend += r.cost; if (!seen.has(r.key)) { seen.add(r.key); n++; }
+    r.site.missing.forEach(w => { const e = by.get(w) || { word: w, cost: 0, clicks: 0, conversions: 0, terms: new Set() }; e.cost += r.cost; e.clicks += r.clicks; e.conversions += r.conversions; e.terms.add(r.key); by.set(w, e); });
+  });
+  const top = Array.from(by.values()).sort((a, b) => (b.cost - a.cost) || (b.clicks - a.clicks) || (a.word < b.word ? -1 : 1)).slice(0, 25)
+    .map(e => ({ word: e.word, cost: e.cost, clicks: e.clicks, conversions: e.conversions, terms: e.terms.size }));
+  return { domain: ix.domain, pagesRead: ix.pagesRead, words: ix.words.size, missingSpend: spend, missingTerms: n, top };
+}
+
 const RULESETS = { generic: GENERIC, riccobene: RICCOBENE, oia: OIA, eventgroove: EVENTGROOVE, gentledental_42north: GENTLEDENTAL_42NORTH, mchale: MCHALE, beta_bionics: BETA_BIONICS };
 
 // Place names that are also ordinary words or surnames (Normal, Apex, Independence, Cary) count as ANOTHER campaign's city only when the
@@ -801,9 +860,11 @@ async function analyze(ruleset, rawRows, ctx){
   });
 
   status("Building negatives, keywords and the summary…", 0.95);
+  const ix = siteIndex(ctx.site), checked = new Map();
+  if (ix) rows.forEach(r => { let c = checked.get(r.key); if (!c) { c = siteCheck(ix, r.term); checked.set(r.key, c); } r.site = c; });
   const cover = buildCover(ctx.negatives);
   const kwSet = new Set((ctx.keywords || []).map(k => keyText(k.text)).filter(Boolean));
-  const out = { negatives: buildNegatives(rows, cover, ctx.keywords || [], ruleset), keywords: buildKeywords(rows, kwSet, cover) };
+  const out = { negatives: buildNegatives(rows, cover, ctx.keywords || [], ruleset, ix), keywords: buildKeywords(rows, kwSet, cover) };
   const review = {};
   rows.filter(r => r._det.status === "Client Review").forEach(r => {
     const k = r._det.subtype; const e = review[k] || (review[k] = { subtype: k, count: 0, cost: 0, conversions: 0, ex: [] });
@@ -827,6 +888,7 @@ async function analyze(ruleset, rawRows, ctx){
       wastedSpend: sum(r => r.cost, r => r._det.status === "Not Relevant" && r.conversions === 0 && r._det.by !== "fallback"),
       notJudgedSpend: sum(r => r.cost, r => r._det.by === "fallback"),       // a batch the model failed on is not "not relevant": nobody read those terms
       competitorSpend: sum(r => r.cost, r => r._det.status === "Competitor"),
+      site: ix ? siteSummary(ix, rows) : null,                       // what the searches used that the account's website never does
       relevantPct: Math.round(100 * (byStatus["Relevant"] || 0) / rows.length), relevantSpendPct: totalSpend > 0 ? Math.round(100 * relevantSpend / totalSpend) : null },
   };
 }
@@ -855,7 +917,7 @@ function negativeSpec(r, ruleset){
   return { text, match, level, explicit };
 }
 
-function buildNegatives(rows, cover, keywords, ruleset){
+function buildNegatives(rows, cover, keywords, ruleset, ix){
   const groups = new Map(); let skipped = 0;
   rows.forEach(r => {
     const s = negativeSpec(r, ruleset); if (!s) return;
@@ -915,10 +977,13 @@ function buildNegatives(rows, cover, keywords, ruleset){
     else if (g.rival && conquests && g.level.indexOf("Account") === 0) risks.push("the account runs a competitor campaign");
     if (!g.routing && (hit.clicks > 0 || hit.conversions > 0)) risks.push("blocks relevant terms");
     if (!g.routing && conflicts.length) risks.push("blocks a keyword you bid on");
+    // what the business names as its own on its website (a page, a menu item): blocking it would block what it sells, or a place it serves
+    const siteName = ix && !g.routing ? siteNamed(ix, g.text) : "";
+    if (siteName) risks.push("the website names it");
     const examples = Array.from(new Map(g.ex.sort((a, b) => b.cost - a.cost).map(r => [r.key, r.term])).values()).slice(0, 3);
     all.push({ text: g.text, matchType: g.matchType, level: g.level, campaign: g.campaign, reason: g.reason, by: g.by.size > 1 ? "mixed" : Array.from(g.by)[0] || "rule",
       implied: g.implied, routing: g.routing, cost: g.cost, wasted: g.routing ? g.cost : g.wasted, impact: g.routing ? g.cost : g.wasted, conversions: g.conversions, clicks: g.clicks, impressions: g.impressions, terms: g.terms.size,
-      examples, risks, collateral: hit, conflicts });
+      examples, risks, collateral: hit, conflicts, siteName });
   });
   // Ranked by the money wasted on terms that never converted. A negative whose terms did convert, or that would also stop relevant terms or
   // a keyword the account bids on, is held back for a person to look at: it is never in the priority list.
@@ -933,7 +998,7 @@ function buildKeywords(rows, kwSet, cover){
     const pm = isPmax(r.campaignType);
     const k = r.key + "|" + r.campaign;
     let g = groups.get(k);
-    if (!g) { g = { key: r.key, term: r.term, campaign: r.campaign, campaignType: r.campaignType, pmax: pm, status: new Set(), ad: new Map(), clicks: 0, impressions: 0, cost: 0, conversions: 0 }; groups.set(k, g); }
+    if (!g) { g = { key: r.key, term: r.term, campaign: r.campaign, campaignType: r.campaignType, pmax: pm, site: r.site || null, status: new Set(), ad: new Map(), clicks: 0, impressions: 0, cost: 0, conversions: 0 }; groups.set(k, g); }
     g.status.add(r.status); g.clicks += r.clicks; g.impressions += r.impressions; g.cost += r.cost; g.conversions += r.conversions;
     const a = g.ad.get(r.adGroup) || { conversions: 0, clicks: 0 }; a.conversions += r.conversions; a.clicks += r.clicks; g.ad.set(r.adGroup, a);
   });
@@ -949,7 +1014,7 @@ function buildKeywords(rows, kwSet, cover){
     const wordCount = g.term.trim().split(/\s+/).length;
     list.push({ term: g.term, assetType: g.pmax ? "Search Theme" : "Keyword", matchType: g.pmax ? "Search Theme" : (wordCount >= 3 && (g.conversions > 0 || ctr >= 0.05)) ? "Exact Match" : "Phrase Match",
       addLevel: g.pmax ? "Asset Group" : "Ad Group", whereToAdd: g.campaign + (g.pmax || !best || !best[0] ? "" : " / " + best[0]), tier, conversions: g.conversions, ctr,
-      clicks: g.clicks, impressions: g.impressions, cost: g.cost, cpa: g.conversions > 0 ? g.cost / g.conversions : null });
+      clicks: g.clicks, impressions: g.impressions, cost: g.cost, cpa: g.conversions > 0 ? g.cost / g.conversions : null, siteMissing: g.site ? g.site.missing : null });
   });
   list.sort((a, b) => (a.tier - b.tier) || (b.conversions - a.conversions) || (b.ctr - a.ctr) || (b.clicks - a.clicks) || (a.term < b.term ? -1 : 1));
   return { all: list, skipped };
@@ -980,7 +1045,7 @@ function negativesFromCsv(text){
   }).filter(k => k.text);
 }
 
-const api = { autoRuleset, brandPhrases, brandKeywords, parseCSV, pick, num, fmtConv, normText, keyText, matchOf, blocks, buildCover, isCovered, isBlockedHere, phraseRe, signalRe, has, core, individual, isAddress, competitorName,
+const api = { siteIndex, siteCheck, siteNamed, siteWords, wordForms, autoRuleset, brandPhrases, brandKeywords, parseCSV, pick, num, fmtConv, normText, keyText, matchOf, blocks, buildCover, isCovered, isBlockedHere, phraseRe, signalRe, has, core, individual, isAddress, competitorName,
   campaignServesCity, prepareRows, analyze, rowsFromCsv, keywordsFromCsv, negativesFromCsv, RULESETS, PRIORITY, MODEL_CAP, STATUS_ORDER };
 root.SQRCore = api;
 if (typeof module !== "undefined" && module.exports) module.exports = api;

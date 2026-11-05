@@ -61,9 +61,18 @@ def test_the_page_reads_google_ads_and_keeps_the_csv_as_a_fallback():
     assert ".get(\"account\")" in js                        # an old link names a ruleset, a new one a Google Ads account
 
 
-def test_the_page_never_asks_the_model_anything_but_the_ruleset_account_profile_and_terms():
+def test_the_page_never_asks_the_model_anything_but_the_ruleset_account_profile_terms_and_website_words():
     js = read(PAGE)
-    assert "JSON.stringify({ ruleset: rulesetId, account: account, terms: batch, profile: profile || undefined })" in js
+    assert "JSON.stringify({ ruleset: rulesetId, account: account, terms: batch, profile: profile || undefined, site: site ? site(batch) : undefined })" in js
+    # per batch, only each term's words the website never uses, a few of them
+    assert "Core.siteCheck(ix, t).missing; if (m.length) missing[t] = m.slice(0, 6);" in js
+
+
+def test_the_website_is_read_beside_the_data_and_the_run_waits_for_it():
+    js = read(PAGE)
+    assert 'BASE + "/sqr/site?account="' in js and "loadSite(acct, force, seq);" in js
+    assert "inp.site = await siteForRun();" in js and "site: inp.site, classify" in js
+    assert "if (acct.isGroup)" in js                                   # an MCC covers many sites: none is read
 
 
 def test_the_page_opens_for_staff_and_the_scripts_are_served():
@@ -105,7 +114,7 @@ def test_the_rules_list_says_it_is_not_a_list_of_accounts_and_nothing_is_called_
 def test_automatic_sends_the_account_profile_and_an_empty_range_offers_a_longer_one():
     js = read(PAGE)
     assert "Core.autoRuleset({ name: inp.account, keywords: inp.keywords })" in js and "const profile = accountProfile(inp);" in js
-    assert "0.32 + 0.6 * d / n), profile);" in js                          # and it is what the batches are sent with
+    assert "0.32 + 0.6 * d / n), profile, siteOf);" in js                  # and it is what the batches are sent with
     assert 'id="tryLonger"' in js and 'S.preset = "last90"' in js
 
 
@@ -221,3 +230,33 @@ def test_picking_an_mcc_says_the_pull_is_limited_with_the_real_limits():
     assert "const MCC_TERM_ROWS = %d, MCC_MAX_ACCOUNTS = %d," % (paid_sqr_data.MAX_TERM_ROWS, paid_segments.MAX_MEMBERS) in js
     assert "num(Core.MODEL_CAP)" in js and _re.search(r"MODEL_CAP = \d+", core)
     assert "so the pull is limited" in js and "paintMccNote(a);" in js and "—" not in js
+
+
+@pytest.mark.skipif(not shutil.which("node"), reason="node is not installed")
+def test_the_website_comparison_is_drawn_where_a_site_was_read_and_nowhere_else():
+    """Run the page's own drawing code: the website panel, the held negative's reason and the Every term column, with a site and without."""
+    js = read(PAGE)
+
+    def grab(name):
+        m = re.search(r"^(?:function " + name + r"\b[^\n]*\}$|function " + name + r"\b.*?^\}|const " + name + r" = [^\n]*;$)", js, re.S | re.M)
+        assert m, name + " not found in the page script"
+        return m.group(0)
+
+    src = "\n".join(grab(n) for n in ("esc", "money", "num", "plural", "none", "hint", "tbl", "planHtml", "where", "pillClass", "rowClass", "siteHtml", "paneCheck", "paneAll"))
+    harness = (
+        "const Plan = require(" + json.dumps(os.path.join(JS, "sqr_plan.js")) + "); const S = { currency: 'USD' }; const fmtConv = v => String(v);"
+        "const BY = { rule: 'rule', model: 'model' };\n" + src + "\n"
+        "const held = { text: 'pediatric', matchType: 'Phrase', level: 'Account', reason: 'Kids', risks: ['the website names it'], siteName: 'Pediatric <Dentistry>', collateral: { n: 0, ex: [] }, conflicts: [], cost: 40, conversions: 0 };\n"
+        "const row = { term: 'veneers in faraway', campaign: 'C1', cost: 30, conversions: 0, _det: { status: 'Not Relevant', subtype: 'x', by: 'model' }, site: { missing: ['veneers', 'faraway'] } };\n"
+        "const site = { domain: 'smile.com', pagesRead: 3, words: 9, missingSpend: 70, missingTerms: 2, top: [{ word: 'veneers', terms: 1, cost: 30, clicks: 3, conversions: 0 }] };\n"
+        "const r = { reviewNegatives: [held], rows: [row], summary: { site } }, bare = { reviewNegatives: [], rows: [Object.assign({}, row, { site: undefined })], summary: { site: null } };\n"
+        "process.stdout.write(JSON.stringify([siteHtml(r), paneCheck(r), paneAll(r), siteHtml(bare), paneAll(bare)]));"
+    )
+    out = subprocess.run(["node", "-e", harness], capture_output=True, text=True, timeout=30)
+    assert out.returncode == 0, out.stderr
+    panel, check, every, bare_panel, bare_every = json.loads(out.stdout)
+    assert "smile.com" in panel and "3 pages read" in panel and "$70" in panel and "2 searches" in panel and "1 negative held back" in panel
+    assert re.findall(r"<td[^>]*>(.*?)</td>", panel)[:3] == ["veneers", "1", "$30.00"]
+    assert "the website says “Pediatric &lt;Dentistry&gt;”" in check and "the website names it" in check
+    assert "<th>Not on the website</th>" in every and "<td>veneers, faraway</td>" in every
+    assert bare_panel == "" and "Not on the website" not in bare_every
