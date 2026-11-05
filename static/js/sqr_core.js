@@ -977,8 +977,9 @@ function buildNegatives(rows, cover, keywords, ruleset, ix){
     else if (g.rival && conquests && g.level.indexOf("Account") === 0) risks.push("the account runs a competitor campaign");
     if (!g.routing && (hit.clicks > 0 || hit.conversions > 0)) risks.push("blocks relevant terms");
     if (!g.routing && conflicts.length) risks.push("blocks a keyword you bid on");
-    // what the business names as its own on its website (a page, a menu item): blocking it would block what it sells, or a place it serves
-    const siteName = ix && !g.routing ? siteNamed(ix, g.text) : "";
+    // what the business names as its own on its website (a page, a menu item): blocking it would block what it sells, or a place it serves.
+    // Not a competitor: a site names its rivals to compare itself with them (Beta Bionics names Omnipod 5), which does not make them its own.
+    const siteName = ix && !g.routing && !g.rival ? siteNamed(ix, g.text) : "";
     if (siteName) risks.push("the website names it");
     const examples = Array.from(new Map(g.ex.sort((a, b) => b.cost - a.cost).map(r => [r.key, r.term])).values()).slice(0, 3);
     all.push({ text: g.text, matchType: g.matchType, level: g.level, campaign: g.campaign, reason: g.reason, by: g.by.size > 1 ? "mixed" : Array.from(g.by)[0] || "rule",

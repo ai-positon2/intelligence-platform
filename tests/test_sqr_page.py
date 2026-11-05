@@ -248,14 +248,14 @@ def test_the_website_comparison_is_drawn_where_a_site_was_read_and_nowhere_else(
         "const BY = { rule: 'rule', model: 'model' };\n" + src + "\n"
         "const held = { text: 'pediatric', matchType: 'Phrase', level: 'Account', reason: 'Kids', risks: ['the website names it'], siteName: 'Pediatric <Dentistry>', collateral: { n: 0, ex: [] }, conflicts: [], cost: 40, conversions: 0 };\n"
         "const row = { term: 'veneers in faraway', campaign: 'C1', cost: 30, conversions: 0, _det: { status: 'Not Relevant', subtype: 'x', by: 'model' }, site: { missing: ['veneers', 'faraway'] } };\n"
-        "const site = { domain: 'smile.com', pagesRead: 3, words: 9, missingSpend: 70, missingTerms: 2, top: [{ word: 'veneers', terms: 1, cost: 30, clicks: 3, conversions: 0 }] };\n"
+        "const site = { domain: 'smile.com', pagesRead: 3, words: 9, missingSpend: 70, missingTerms: 1067, top: [{ word: 'veneers', terms: 1, cost: 30, clicks: 3, conversions: 0 }] };\n"
         "const r = { reviewNegatives: [held], rows: [row], summary: { site } }, bare = { reviewNegatives: [], rows: [Object.assign({}, row, { site: undefined })], summary: { site: null } };\n"
         "process.stdout.write(JSON.stringify([siteHtml(r), paneCheck(r), paneAll(r), siteHtml(bare), paneAll(bare)]));"
     )
     out = subprocess.run(["node", "-e", harness], capture_output=True, text=True, timeout=30)
     assert out.returncode == 0, out.stderr
     panel, check, every, bare_panel, bare_every = json.loads(out.stdout)
-    assert "smile.com" in panel and "3 pages read" in panel and "$70" in panel and "2 searches" in panel and "1 negative held back" in panel
+    assert "smile.com" in panel and "3 pages read" in panel and "$70" in panel and "1,067 searches" in panel and "1 negative held back" in panel
     assert re.findall(r"<td[^>]*>(.*?)</td>", panel)[:3] == ["veneers", "1", "$30.00"]
     assert "the website says “Pediatric &lt;Dentistry&gt;”" in check and "the website names it" in check
     assert "<th>Not on the website</th>" in every and "<td>veneers, faraway</td>" in every

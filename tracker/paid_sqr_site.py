@@ -71,7 +71,8 @@ def parse_landing(rows):
         url = str(((r.get("landingPageView") or {}).get("unexpandedFinalUrl")) or "").strip()
         if not url.lower().startswith(("http://", "https://")):
             continue
-        url = url.split("#", 1)[0].split("?", 1)[0]
+        # a Google Ads placeholder in the address ("/landing/{ignore}") is not part of the page: cut there, or every such address is a 404
+        url = re.split(r"\{|%7b", url.split("#", 1)[0].split("?", 1)[0], maxsplit=1, flags=re.I)[0]
         cost[url] += int((r.get("metrics") or {}).get("costMicros") or 0) / 1e6
     return sorted(cost.items(), key=lambda kv: (-kv[1], kv[0]))
 

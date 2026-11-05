@@ -502,7 +502,7 @@ function siteHtml(r){
   if (!w) return "";
   const held = r.reviewNegatives.filter(n => n.siteName).length;
   const top = w.top.slice(0, 12).map(e => '<tr><td class="sq-term">' + esc(e.word) + '</td><td class="r num">' + num(e.terms) + '</td><td class="r num">' + money(e.cost, false) + '</td><td class="r num">' + num(e.clicks) + '</td><td class="r num">' + fmtConv(e.conversions) + '</td></tr>').join("");
-  return '<details class="sq-ref"><summary>Compared with the website (' + esc(w.domain) + ', ' + plural(w.pagesRead, "page") + ' read): ' + money(w.missingSpend) + ' went on ' + plural(w.missingTerms, "search", "searches") +
+  return '<details class="sq-ref"><summary>Compared with the website (' + esc(w.domain) + ', ' + plural(w.pagesRead, "page") + ' read): ' + money(w.missingSpend) + ' went on ' + num(w.missingTerms) + (w.missingTerms === 1 ? " search" : " searches") +
     ' using words the site never uses' + (held ? '; ' + plural(held, "negative") + ' held back because the site names what it would block' : '') + '</summary>' +
     hint("The words searchers used that appear nowhere on " + esc(w.domain) + ", by what those searches cost. A product or service here that the business does not offer is a negative to consider; one it does offer is missing from its website. Place names, misspellings and everyday words show up too and mean little on their own. The model was told each term's missing words.") +
     (top ? tbl([["Word not on the website"], ["Searches", 1], ["Cost", 1], ["Clicks", 1], ["Conv", 1]], top) : none("Every search used only words the website uses.")) + '</details>';

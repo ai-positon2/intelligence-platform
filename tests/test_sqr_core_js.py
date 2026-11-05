@@ -670,6 +670,16 @@ def test_without_a_website_nothing_changes():
     assert out == [None, [["pediatric", [], ""]], None]
 
 
+def test_a_competitor_the_website_names_is_still_blocked():
+    """A site names its rivals to compare itself with them: that does not make them its own (Beta Bionics' site names Omnipod 5)."""
+    site = dict(SITE, headings=SITE["headings"] + ["iLet vs Rival"])
+    out = js("""
+      const r = await C.analyze(STUB, [R("rival", {cost: 12, clicks: 2})], {site: %s});
+      return [r.priorityNegatives.map(n => [n.text, n.risks, n.siteName]), r.reviewNegatives.length];
+    """ % json.dumps(site))
+    assert out == [[["rival", [], ""]], 0]
+
+
 def test_a_routing_negative_is_never_held_for_the_website():
     out = js("""
       const RS = Object.assign({}, STUB, {routeCampaignRe: /nonbrand/i, classifyDeterministic(t){ return {status: "Relevant", subtype: "Brand", routeNeg: "pediatric"}; }});

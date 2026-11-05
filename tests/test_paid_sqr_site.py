@@ -60,8 +60,11 @@ def test_landing_pages_are_summed_by_address_costliest_first():
     rows = [{"landingPageView": {"unexpandedFinalUrl": "https://a.com/x?gclid=1"}, "metrics": {"costMicros": "2000000"}},
             {"landingPageView": {"unexpandedFinalUrl": "https://a.com/x#top"}, "metrics": {"costMicros": "1000000"}},
             {"landingPageView": {"unexpandedFinalUrl": "https://b.com/"}, "metrics": {"costMicros": "5000000"}},
-            {"landingPageView": {"unexpandedFinalUrl": "{lpurl}"}, "metrics": {"costMicros": "9000000"}}]
-    assert W.parse_landing(rows) == [("https://b.com/", 5.0), ("https://a.com/x", 3.0)]
+            {"landingPageView": {"unexpandedFinalUrl": "{lpurl}"}, "metrics": {"costMicros": "9000000"}},
+            {"landingPageView": {"unexpandedFinalUrl": "https://a.com/x/%7Bignore"}, "metrics": {"costMicros": "1000000"}},
+            {"landingPageView": {"unexpandedFinalUrl": "https://a.com/y/{ignore}"}, "metrics": {"costMicros": "1000000"}}]
+    # a Google Ads placeholder ("{ignore", "%7Bignore") is cut off, so the address is the page itself and not a 404
+    assert W.parse_landing(rows) == [("https://b.com/", 5.0), ("https://a.com/x", 3.0), ("https://a.com/x/", 1.0), ("https://a.com/y/", 1.0)]
 
 
 def test_the_master_domain_the_ads_paid_most_to_reach_is_read():
