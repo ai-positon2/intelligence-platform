@@ -111,6 +111,15 @@ def test_a_brand_from_the_brand_spend_alert_written_two_ways_names_the_less_used
     assert {f["rule"] for i in unknown["items"] for f in i["findings"]} == {"odd_caps"} and unknown["brandsRead"] == []
 
 
+def test_a_brand_in_a_display_path_or_a_handle_is_not_held_to_the_way_it_is_written():
+    ads = [ad(1, ("headline", "Soteri Skin Relief"), ("path", "soteriskin"), ("description", "Loved it! @soteriskin #soteriskin")),
+           ad(2, ("headline", "Try soteri skin"), ("description", "Soteri Skin works."))]
+    for kw in ({"config": {"brand": ["Soteri Skin"]}}, {"brand_terms": ["soteriskin"]}):
+        r = run(ads, **kw)
+        got = [(i["id"], f["excerpt"]) for i in r["items"] for f in i["findings"] if f["rule"] == "brand"]
+        assert got == [("2", "soteri skin")], kw
+
+
 def test_brand_forms_are_found_by_joining_up_to_three_words_without_case_or_separators():
     ads = [ad(1, ("headline", "Smile Co Dental"), ("description", "S-m-i-l-e C-o"), ("path", "smileco"))]
     f = an.brand_forms(ads, ["SmileCo", ""])

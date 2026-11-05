@@ -81,6 +81,8 @@ def _brand_findings(forms, saved):
     """{ad id: [finding]} for the brand written in a way the team did not save, or (with nothing saved) written two ways in one account."""
     out = defaultdict(list)
     by = defaultdict(Counter)
+    # a display path is written in small letters by convention, and "@soteriskin" or "#tealium" is a handle or a tag spelt the way the platform needs it: neither is the brand misspelt
+    forms = [f for f in forms if f["slot"] != "path" and not (f["start"] and f["text"][f["start"] - 1] in "@#")]
     for f in forms:
         by[f["brand"]][f["surface"]] += 1
     for f in forms:
