@@ -69,6 +69,9 @@ def brand_forms(ads, brands):
                 for n in (1, 2, 3):
                     if i + n > len(ws):
                         break
+                    # the words must sit next to each other: "Monster 6L80E Transmission" names a product of Monster Transmission, it does not misspell it
+                    if any(not re.fullmatch(r"[\s-]*", t["text"][ws[k][2]:ws[k + 1][1]]) for k in range(i, i + n - 1)):
+                        break
                     joined = "".join(w for w, _a, _b in ws[i:i + n]).lower()
                     for b, key in keyed:
                         if joined == key:
@@ -77,12 +80,20 @@ def brand_forms(ads, brands):
     return out
 
 
-def _brand_findings(forms, saved):
+def _plain_phrase(surface, speller):
+    """True when a brand is written as two or more words the dictionary knows ("Ticket Printing", "Perforated Paper"): that is the everyday phrase as often as the brand."""
+    ws = [w.lower() for w, _a, _b in rules.words_of(surface)]
+    return len(ws) >= 2 and bool(speller) and speller.ready and not speller.unknown(ws)
+
+
+def _brand_findings(forms, saved, speller=None):
     """{ad id: [finding]} for the brand written in a way the team did not save, or (with nothing saved) written two ways in one account."""
     out = defaultdict(list)
     by = defaultdict(Counter)
     # a display path is written in small letters by convention, and "@soteriskin" or "#tealium" is a handle or a tag spelt the way the platform needs it: neither is the brand misspelt
     forms = [f for f in forms if f["slot"] != "path" and not (f["start"] and f["text"][f["start"] - 1] in "@#")]
+    # with no spelling saved, a brand written as everyday words cannot be told from the phrase: "TicketPrinting - Official" is the brand, "ticket printing" in 177 other places is not
+    forms = [f for f in forms if f["brand"] in saved or not _plain_phrase(f["surface"], speller)]
     for f in forms:
         by[f["brand"]][f["surface"]] += 1
     for f in forms:
@@ -124,15 +135,17 @@ def analyse(ads, *, account, config=None, brand_terms=(), speller=None, ages=Non
     config = config or {}
     truncated = len(ads) > MAX_ADS
     ads = ads[:MAX_ADS]
-    brands = list(dict.fromkeys([b for b in (config.get("brand") or []) if str(b).strip()] + [b for b in brand_terms if str(b).strip()]))
     saved_brands = set(config.get("brand") or [])
+    # a Brand Spend word that is a saved spelling in other letters ("eventgroove" and "Eventgroove") is that brand already: kept, it would say the same thing twice about each place
+    saved_keys = {rules.norm_key(b) for b in saved_brands}
+    brands = list(dict.fromkeys([b for b in (config.get("brand") or []) if str(b).strip()] + [b for b in brand_terms if str(b).strip() and rules.norm_key(b) not in saved_keys]))
     urls = [ad.get("url") for ad in ads if ad.get("url")]
     account_words = {w.lower() for w in re.findall(r"[A-Za-z']{3,}", str(account.get("name") or ""))} | domain_words(urls)
     ctx = rules.context(allowed=list(config.get("allow") or []) + list(allowed_extra), brands=brands, phones=config.get("phones") or [], places=config.get("places") or [],
                         other_places=other_places, speller=speller, own=_own_words(ads), account_words=account_words)
     per_ad = {ad["id"]: rules.check_ad(ad, ctx) for ad in ads}
     forms = brand_forms(ads, brands)
-    for ad_id, fs in _brand_findings(forms, saved_brands).items():
+    for ad_id, fs in _brand_findings(forms, saved_brands, speller).items():
         per_ad[ad_id] = per_ad[ad_id] + fs
     # a word the dictionary does not know that the account spells the same way in many ads is its own word: say so quietly instead of calling it a typo
     spread = defaultdict(set)

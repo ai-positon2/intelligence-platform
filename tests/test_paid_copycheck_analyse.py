@@ -126,6 +126,28 @@ def test_brand_forms_are_found_by_joining_up_to_three_words_without_case_or_sepa
     assert [(x["surface"], x["slot"]) for x in f] == [("Smile Co", "headline"), ("smileco", "path")] and an.brand_forms(ads, []) == []
 
 
+def test_a_brand_is_only_found_in_words_that_sit_next_to_each_other():
+    ads = [ad(1, ("headline", "Smile 4L60E Co Implants"), ("description", "Smile, Co and you."), ("long", "Smile - Co Care"))]
+    assert [x["surface"] for x in an.brand_forms(ads, ["SmileCo"])] == ["Smile - Co"]
+    r = run([ad(1, ("headline", "SmileCo 4L60E"), ("description", "Smile 4L60E Co Dental care."))], config={"brand": ["SmileCo"]})
+    assert [f["rule"] for i in r["items"] for f in i["findings"] if f["rule"] == "brand"] == []
+
+
+def test_a_brand_spend_word_that_is_a_saved_spelling_in_other_letters_gives_one_finding_not_two():
+    ads = [ad(1, ("headline", "SmileCo Dental"), ("description", "Use code smileco today.")), ad(2, ("headline", "SmileCo Care"), ("description", "Visit SmileCo today."))]
+    r = run(ads, config={"brand": ["SmileCo"]}, brand_terms=["smileco"])
+    got = [(i["id"], f["excerpt"], f["level"]) for i in r["items"] for f in i["findings"] if f["rule"] == "brand"]
+    assert got == [("1", "smileco", "medium")] and [b["brand"] for b in r["brandsRead"]] == ["SmileCo"]
+
+
+def test_a_brand_of_everyday_words_with_no_saved_spelling_is_not_judged_against_the_everyday_phrase():
+    ads = [ad(1, ("headline", "SmileCare - Official"), ("description", "Smile care for the family.")), ad(2, ("headline", "Smile Care Today"), ("description", "Book smile care now."))]
+    r = run(ads, brand_terms=["smilecare"])
+    assert [f for i in r["items"] for f in i["findings"] if f["rule"] == "brand"] == []
+    r = run(ads, config={"brand": ["SmileCare"]})                                                                   # a saved spelling is still held to
+    assert {f["excerpt"] for i in r["items"] for f in i["findings"] if f["rule"] == "brand"} == {"Smile care", "Smile Care", "smile care"}
+
+
 def test_a_place_saved_for_another_account_is_a_medium_finding_in_this_one():
     ads = [ad(1, ("headline", "Dentist in Dover"), ("description", "We offer implants."))]
     r = run(ads, config={"places": ["Quincy, MA"]}, other_places={"Dover, NH": "Dover Dental"})
