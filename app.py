@@ -23473,6 +23473,40 @@ def _strip_revenue_fields(obj):
         return [_strip_revenue_fields(x) for x in obj]
     return obj
 
+_VIMI_SIGNAL_DBS = {"healthcare": Path(__file__).parent / "data" / "tracker.db", "csg": Path(__file__).parent / "data" / "tracker_csg_v2.db"}
+
+
+@app.route("/api/vimi/companies/<account_id>")
+@position2_required
+def vimi_companies(account_id):
+    """What the Vimi widget offers as @-mentions and Dossier buttons (the account's companies with signals, the most HIGH signals first) and its badge
+    (how many companies had a HIGH signal recorded in the last 7 days), straight from the account's signal database: no model.
+
+    The widget used to ask /api/insights/<account> for this on every page view, twice (the list, then the badge 1.5 seconds later). That route writes
+    an OpenAI analysis, uncached, which held a request slot for a minute or more each time, and its answer never had the fields the widget read, so the
+    list stayed the hard-coded fallback and the badge never showed. Four pages opened together filled every slot and stopped the site answering
+    (2026-11-05)."""
+    import sqlite3
+    db_path = _VIMI_SIGNAL_DBS.get(account_id)
+    if not db_path or not db_path.exists():
+        return jsonify({"error": "Unknown account"}), 404
+    since = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()
+    try:
+        conn = sqlite3.connect(str(db_path))
+        try:
+            names = [r[0] for r in conn.execute(
+                "SELECT c.name FROM alerts_sent a JOIN companies c ON a.apollo_id = c.apollo_id WHERE a.dry_run = 0 AND c.name IS NOT NULL AND c.name != '' "
+                "GROUP BY c.apollo_id ORDER BY SUM(CASE WHEN a.severity = 'HIGH' THEN 1 ELSE 0 END) DESC, MAX(a.sent_at) DESC LIMIT 60")]
+            fresh = conn.execute("SELECT COUNT(DISTINCT apollo_id) FROM alerts_sent WHERE dry_run = 0 AND severity = 'HIGH' AND sent_at >= ?", (since,)).fetchone()[0]
+        finally:
+            conn.close()
+    except sqlite3.Error as e:
+        return jsonify({"error": "The signal database could not be read: %s" % e}), 500
+    resp = jsonify({"companies": names, "fresh": int(fresh or 0)})
+    resp.headers["Cache-Control"] = "private, max-age=300"
+    return resp
+
+
 @app.route("/api/insights-meta/<account_id>")
 @position2_required
 def insights_meta(account_id):

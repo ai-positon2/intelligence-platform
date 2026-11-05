@@ -922,7 +922,11 @@ table.k-table{ border-collapse:collapse; width:100%; font-size:11.5px; }
   function hidePops(){ hide('k-slashpop'); hide('k-mentionpop'); document.getElementById('k-emoji').classList.remove('on'); }
 
   /* ---------- companies (for @ + detection) ---------- */
-  function loadCompanies(){ var acct=_acct==='all'?'healthcare':_acct; try{ fetch('/api/insights/'+acct).then(function(r){return r.json();}).then(function(d){ var list=[]; if(d){ if(Array.isArray(d.companies)){ list=d.companies.map(function(c){return c.name||c.company||c;}); } else if(Array.isArray(d)){ list=d.map(function(c){return c.name||c.company||c;}); } else if(d.ranked){ list=d.ranked.map(function(c){return c.name||c.company;}); } } if(list && list.length){ _companies=list.filter(Boolean).slice(0,60); } }).catch(function(){}); }catch(e){} }
+  /* The account's companies and its badge count come from /api/vimi/companies (the signal database, no model). Never /api/insights: that writes an
+     OpenAI analysis on every call, and asking it on every page view filled the server's request slots. */
+  var _coCache={};
+  function companiesOf(acct){ if(!_coCache[acct]){ _coCache[acct]=fetch('/api/vimi/companies/'+acct).then(function(r){return r.json();}).catch(function(){ delete _coCache[acct]; return {}; }); } return _coCache[acct]; }
+  function loadCompanies(){ var acct=_acct==='all'?'healthcare':_acct; try{ companiesOf(acct).then(function(d){ var list=(d&&Array.isArray(d.companies))?d.companies:[]; if(list.length){ _companies=list.filter(function(n){return typeof n==='string'&&n;}).slice(0,60); } }); }catch(e){} }
   /* fallback seed */
   _companies=['Veradigm','Tebra','Commure','Memora Health','Athenahealth','NextGen','eClinicalWorks'];
 
@@ -1048,7 +1052,7 @@ table.k-table{ border-collapse:collapse; width:100%; font-size:11.5px; }
   /* ---------- proactive nudges ---------- */
   function clearNudge(){ document.getElementById('k-badge').classList.remove('show'); }
   function checkNudge(){ try{ var seen=load(LS.nud,{day:''}); var today=new Date().toDateString(); var acct=_acct==='all'?'healthcare':_acct;
-    fetch('/api/insights/'+acct).then(function(r){return r.json();}).then(function(d){ var n=0; if(d){ if(Array.isArray(d.companies)){n=d.companies.length;} else if(Array.isArray(d)){n=d.length;} else if(d.count){n=d.count;} }
+    companiesOf(acct).then(function(d){ var n=(d&&typeof d.fresh==='number')?d.fresh:0;
       if(n && seen.day!==today){ var fab=document.getElementById('k-badge'); fab.textContent=n>9?'9+':n; fab.classList.add('show'); save(LS.nud,{day:today,n:n}); } }).catch(function(){});
   }catch(e){} }
 
