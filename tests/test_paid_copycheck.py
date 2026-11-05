@@ -312,3 +312,12 @@ def test_a_spent_quota_with_nothing_saved_is_raised_and_an_account_that_is_not_p
 def test_other_places_are_the_places_saved_for_the_other_accounts():
     s = {"accounts": {"1": {"name": "Quincy Smiles", "places": ["Quincy, MA"]}, "2": {"name": "Dover Dental", "places": ["Dover, NH", "Quincy, MA"]}, "3": {"places": ["Salem, MA"]}}}
     assert cc.other_places(s, "2") == {"Quincy, MA": "Quincy Smiles", "Salem, MA": "3"} and cc.other_places(s, "9") == {"Quincy, MA": "Quincy Smiles", "Dover, NH": "Dover Dental", "Salem, MA": "3"}
+
+
+def test_a_long_text_is_cut_where_a_word_ends_so_no_half_word_is_read_as_a_misspelling():
+    texts = []
+    cc._add(texts, "primary", "x" * (cc.MAX_TEXT - 10) + " formulas designed for skin")
+    assert texts[0]["text"].endswith(" formulas") and len(texts[0]["text"]) <= cc.MAX_TEXT
+    exact = []
+    cc._add(exact, "primary", "y" * cc.MAX_TEXT + " more")
+    assert exact[0]["text"] == "y" * cc.MAX_TEXT

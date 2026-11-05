@@ -63,7 +63,10 @@ def _get(row, *path, default=None):
 
 
 def _add(texts, slot, value):
-    t = " ".join(str(value or "").split())[:MAX_TEXT] if value else ""
+    t = " ".join(str(value or "").split()) if value else ""
+    if len(t) > MAX_TEXT:
+        # cut where a word ends: a half word left at the cut ("desig" of "designed") would be read as a misspelling
+        t = t[:MAX_TEXT] if t[MAX_TEXT] == " " else t[:MAX_TEXT].rsplit(" ", 1)[0]
     if t and not any(x["slot"] == slot and x["text"] == t for x in texts):
         texts.append({"slot": slot, "text": t})
 
