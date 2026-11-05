@@ -5425,7 +5425,88 @@ def _mon_store():
 
 def _mon_deliver():
     from tracker import market_radar_deliver
-    return market_radar_deliver
+    return _AmTaggingDeliver(market_radar_deliver)
+
+
+# ── Account managers tagged in the Slack alerts (tracker/paid_am.py) ─────────────────────────────────────────────────────
+# Every paid alert (the Alert Hub's, Unknown Domains', the URL Checker's) goes to Slack through _AmTaggingDeliver, which adds one line naming the
+# account managers of the accounts in the message, as Slack mentions. Who manages an account is the Pacing Desk's allocations (the Budget Tracker's
+# AM column), the newest month with rows; who that is on Slack is saved per AM name on the Alert Hub page. A failure here never stops an alert.
+_AM_CACHE = {"own": None, "ts": 0.0}
+_AM_TTL = 300
+
+
+def _am_rows():
+    """(rows, source, problem): who manages each account. The Budget Tracker's DPR tab when its link is saved on the Alert Hub and the platform's
+    Google service account can read it; else the Pacing Desk's allocations, the newest month with rows."""
+    from tracker import paid_am, paid_pacing_budget_store as pbs
+    link = (_mon_store().state_get(paid_am.KEY) or {}).get("sheet") or ""
+    problem = ""
+    if link:
+        try:
+            svc = _va_sheets_service_st()
+            if not svc:
+                raise ValueError("GOOGLE_SA_JSON is not set on the platform")
+            values = svc.spreadsheets().values().get(spreadsheetId=paid_am.sheet_id(link), range="DPR!A:T").execute().get("values", [])
+            return paid_am.parse_dpr(values), "the Budget Tracker's DPR tab", ""
+        except Exception as e:                                                      # noqa: BLE001 (fall back to the allocations, and say why)
+            problem = "The Budget Tracker could not be read (%s). Share it with %s (Viewer)." % (str(e)[:160], _sa_email() or "the platform's service account")
+    months = pbs.months()
+    rows = pbs.list_month(months[-1]) if months else []
+    return rows, ("the Pacing Desk's %s allocations" % months[-1]) if months else "nothing yet", problem
+
+
+def _sa_email():
+    try:
+        return json.loads(os.environ.get("GOOGLE_SA_JSON", "") or "{}").get("client_email", "")
+    except ValueError:
+        return ""
+
+
+def _am_owners(force=False):
+    from tracker import paid_am
+    now = time.time()
+    if force or _AM_CACHE["own"] is None or now - _AM_CACHE["ts"] > _AM_TTL:
+        rows, source, problem = _am_rows()
+        _AM_CACHE.update(own=paid_am.owners(rows), ts=now, source=source, problem=problem,
+                         names=sorted({" ".join(str(r.get("am") or "").split()) for r in rows} - {""}))
+    return _AM_CACHE
+
+
+def _am_people():
+    from tracker import paid_am
+    return dict((_mon_store().state_get(paid_am.KEY) or {}).get("people") or {})
+
+
+class _AmTaggingDeliver:
+    """A deliver module (send_slack, send_email, attempt, ready, NotConfigured) whose Slack messages get the account managers' line."""
+
+    def __init__(self, inner):
+        self._inner = inner
+
+    def __getattr__(self, name):
+        return getattr(self._inner, name)
+
+    def send_slack(self, channel, text, blocks):
+        try:
+            from tracker import paid_am
+            text, blocks = paid_am.tag(text, blocks, _am_owners()["own"], _am_people())
+        except Exception as e:                                                      # noqa: BLE001 (the alert goes out untagged)
+            log.warning("account manager tagging skipped: %s", e)
+        return self._inner.send_slack(channel, text, blocks)
+
+
+def _slack_member_by_email(email):
+    """A Slack member id for an email (users.lookupByEmail; the bot needs users:read.email), or raise saying why not."""
+    token = os.environ.get("SLACK_BOT_TOKEN", "")
+    if not token:
+        raise ValueError("SLACK_BOT_TOKEN is not set, so emails cannot be looked up. Give the Slack member id instead.")
+    r = requests.get("https://slack.com/api/users.lookupByEmail", params={"email": email}, headers={"Authorization": "Bearer " + token}, timeout=10)
+    body = r.json() if r.headers.get("content-type", "").startswith("application/json") else {}
+    if body.get("ok") and (body.get("user") or {}).get("id"):
+        return body["user"]["id"]
+    why = {"users_not_found": "nobody on Slack has that email", "missing_scope": "the Slack app is missing the users:read.email permission"}.get(body.get("error"), body.get("error") or "HTTP %s" % r.status_code)
+    raise ValueError("%s could not be looked up on Slack (%s). Give the Slack member id instead." % (email, why))
 
 
 def _mon_spawn(fn):
@@ -6029,6 +6110,35 @@ def paid_alerthub_route():
 @position2_required
 def paid_alerthub_test():
     return _ah_run(lambda ah, pm, store: jsonify(ah.send_test(store, str((request.get_json(silent=True) or {}).get("route") or ""), _mon_base(), _mon_deliver())))
+
+
+@app.route("/p2/paid-marketing/api/alerthub/ams", methods=["GET", "POST"])
+@position2_required
+def paid_alerthub_ams():
+    """The account managers named in the Pacing Desk's allocations and who each is on Slack. POST {people: [{name, slack}]} saves the table; an email is
+    turned into the Slack member id when saved."""
+    import datetime as _dt
+    from tracker import paid_am
+    store = _mon_store()
+    try:
+        if request.method == "POST":
+            body = request.get_json(silent=True) or {}
+            people = paid_am.clean_people(body)
+            sheet = str(body.get("sheet") or "").strip()
+            if sheet:
+                paid_am.sheet_id(sheet)
+            for name, v in list(people.items()):
+                if "@" in v:
+                    people[name] = _slack_member_by_email(v)
+            store.state_set(paid_am.KEY, {"people": people, "sheet": sheet, "by": _pm_user_email(), "at": _dt.datetime.now(_dt.timezone.utc).isoformat()})
+        info = _am_owners(force=True)
+        saved = store.state_get(paid_am.KEY) or {}
+        return jsonify(people=paid_am.people_list(saved.get("people") or {}, info.get("names") or []), source=info.get("source") or "", problem=info.get("problem") or "",
+                       sheet=saved.get("sheet") or "", accounts=len(info["own"]["accounts"]), savedBy=saved.get("by") or "", savedAt=saved.get("at") or "")
+    except (paid_am.BadRequest, ValueError) as e:
+        return jsonify(error=str(e)), 400
+    except store.StoreUnavailable as e:
+        return _pm_store_error(e)
 
 
 # ── Competitor Analysis (sheet item #39, 2026-10-27) ──────────────────────────────────────────────────────────────────────
@@ -7939,7 +8049,7 @@ def _dom_store():
 
 def _dom_deliver():
     from tracker import market_radar_deliver
-    return market_radar_deliver
+    return _AmTaggingDeliver(market_radar_deliver)
 
 
 def _dom_inventory(store):
