@@ -117,8 +117,18 @@ def _status(s):
     return meta.STATUS.get(str(s or ""), "ENABLED")
 
 
-def campaign_row(camp, budget):
-    return {"id": str(camp.get("id") or ""), "name": str(camp.get("name") or "").strip(), "status": _status(camp.get("effective_status")),
+def _campaign_status(camp, now=None):
+    """The campaign's status, "ENDED" for one switched on whose stop time has passed (Meta still calls it ACTIVE)."""
+    st, stop = _status(camp.get("effective_status")), _time(camp.get("stop_time"))
+    if stop is not None and stop.tzinfo is None:
+        stop = stop.replace(tzinfo=dt.timezone.utc)
+    if st == "ENABLED" and stop is not None and stop <= (now or dt.datetime.now(dt.timezone.utc)):
+        return "ENDED"
+    return st
+
+
+def campaign_row(camp, budget, now=None):
+    return {"id": str(camp.get("id") or ""), "name": str(camp.get("name") or "").strip(), "status": _campaign_status(camp, now),
             "type": mseg.campaign_type(camp.get("objective")),
             "bid": BIDS.get(str(camp.get("bid_strategy") or ""), str(camp.get("bid_strategy") or "Lowest cost").replace("_", " ").capitalize()),
             "budget": budget, "pool": ""}

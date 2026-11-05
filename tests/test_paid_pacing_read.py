@@ -257,3 +257,11 @@ def test_the_rows_are_laid_out_like_the_google_ads_export_the_engine_reads():
     assert first[h["Search impr. share"]] == " --" and second[h["Search impr. share"]] == 0.4
     assert second[h["Budget name"]] == "--" and second[h["Campaign type"]] == "Search" and second[h["Cost"]] == 12.5
     assert second[h["Conv. value"]] == 300.5 and second[h["Account"]] == "Acme"
+
+
+def test_a_campaign_past_its_end_date_reads_as_ended_and_holds_no_budget():
+    row = lambda serving: {"campaign": {"id": "1", "name": "Spring", "status": "ENABLED", "servingStatus": serving, "advertisingChannelType": "SEARCH"},  # noqa: E731
+                           "campaignBudget": {"amountMicros": "30000000"}}
+    assert rd.parse_enabled([row("ENDED")]) == [] and [c["id"] for c in rd.parse_enabled([row("SERVING")])] == ["1"]
+    assert rd._campaign(row("ENDED"))["status"] == "ENDED" and rd._status("ENDED") == "Ended"
+    assert "campaign.serving_status" in rd.q_enabled() and "campaign.serving_status" in rd.q_days("2026-11-01", "2026-11-04")

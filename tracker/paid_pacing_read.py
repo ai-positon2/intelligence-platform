@@ -83,7 +83,7 @@ def plan_window(accounts, now=None):
 
 # ── Queries and parsing ─────────────────────────────────────────────────────
 
-CAMPAIGN_FIELDS = ("campaign.id, campaign.name, campaign.status, campaign.advertising_channel_type, campaign.bidding_strategy_type, "
+CAMPAIGN_FIELDS = ("campaign.id, campaign.name, campaign.status, campaign.serving_status, campaign.advertising_channel_type, campaign.bidding_strategy_type, "
                    "campaign_budget.id, campaign_budget.name, campaign_budget.amount_micros, campaign_budget.explicitly_shared")
 
 
@@ -128,7 +128,7 @@ def _campaign(row):
     c, b = row.get("campaign") or {}, row.get("campaignBudget") or {}
     shared = bool(b.get("explicitlyShared"))
     return {"id": str(c.get("id") or ""), "name": str(c.get("name") or "").strip(),
-            "status": str(c.get("status") or ""), "type": TYPES.get(str(c.get("advertisingChannelType") or ""), "Other"),
+            "status": "ENDED" if str(c.get("servingStatus") or "") == "ENDED" else str(c.get("status") or ""), "type": TYPES.get(str(c.get("advertisingChannelType") or ""), "Other"),
             "bid": BIDS.get(str(c.get("biddingStrategyType") or ""), str(c.get("biddingStrategyType") or "").replace("_", " ").capitalize()),
             "budget": round(_f(b.get("amountMicros")) / 1e6, 2), "pool": str(b.get("name") or "").strip() if shared else ""}
 
@@ -149,7 +149,8 @@ def parse_days(rows):
 
 
 def parse_enabled(rows):
-    return [c for c in (_campaign(r) for r in rows) if c["id"]]
+    """The campaigns that are on and still within their dates (one past its end date is "ENDED" and holds no budget)."""
+    return [c for c in (_campaign(r) for r in rows) if c["id"] and c["status"] == "ENABLED"]
 
 
 def add_idle(days, enabled, end):
@@ -223,7 +224,7 @@ def too_many_unread(accounts, unread):
 # ── The engine's input ──────────────────────────────────────────────────────
 
 def _status(s):
-    return {"ENABLED": "Enabled", "PAUSED": "Paused"}.get(s, s.capitalize())
+    return {"ENABLED": "Enabled", "PAUSED": "Paused", "ENDED": "Ended"}.get(s, s.capitalize())
 
 
 def export_rows(rows):
