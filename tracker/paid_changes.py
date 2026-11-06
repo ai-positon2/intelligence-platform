@@ -11,6 +11,9 @@ person in a single Slack message: "jane@agency.com (Google Ads Editor): paused 3
   new_since      which changes were not seen at the last run, and what to remember now
   run            one run over every Google account (the reads and the sender are handed in)
 
+Google's change history has no rows for users given or losing access, manager (MCC) links or conversion actions, so each run also reads those
+as they are now and flags what differs from the last run's snapshot (access_changes); Google does not say who made those changes.
+
 Rules it keeps:
   * the first run sets the baseline: what it finds is marked seen and nothing is sent, and the same for an account read for the first time;
   * what was seen is remembered only once Slack took the message, so a message Slack refused is sent again at the next run;
@@ -32,6 +35,7 @@ SEEN_KEY = "changes:seen"
 RECENT_KEY = "changes:recent"
 RUNS_KEY = "runs:changes"
 LOCK_KEY = "lock:changes"
+ACCESS_KEY = "changes:access"      # the last snapshot of each account's access, manager links and conversion actions
 DEFAULT_CHANNEL = "C0B322RN6SG"      # #adcopyqc
 READ_DAYS = 2                        # more than the time between two runs, and Google's time zones either way
 LAG_HOURS = 6                        # Google can list a change a little after its time: a change this much older than the newest one seen is still looked at
@@ -56,7 +60,8 @@ GAQL_PLAIN = ("SELECT " + _FIELDS + " FROM change_event WHERE change_event.chang
 CLIENTS = {"GOOGLE_ADS_WEB_CLIENT": "Google Ads", "GOOGLE_ADS_AUTOMATED_RULE": "an automated rule", "GOOGLE_ADS_SCRIPTS": "a script", "GOOGLE_ADS_BULK_UPLOAD": "a bulk upload",
            "GOOGLE_ADS_EDITOR": "Google Ads Editor", "GOOGLE_ADS_MOBILE_APP": "the Google Ads app", "GOOGLE_ADS_RECOMMENDATIONS": "a recommendation applied",
            "GOOGLE_ADS_API": "the API", "GOOGLE_ADS_RECOMMENDATIONS_SUBSCRIPTION": "a recommendation Google applied automatically", "SEARCH_ADS_360_SYNC": "Search Ads 360",
-           "SEARCH_ADS_360_POST": "Search Ads 360", "INTERNAL_TOOL": "a Google tool", "OTHER": "another tool"}
+           "SEARCH_ADS_360_POST": "Search Ads 360", "INTERNAL_TOOL": "a Google tool", "OTHER": "another tool",
+           "SNAPSHOT": "someone (Google does not say who)"}
 
 # Google's resource type -> (one, many, the key of the resource in old_resource / new_resource)
 NOUNS = {"AD": ("ad", "ads", "ad"), "AD_GROUP_AD": ("ad", "ads", "adGroupAd"), "AD_GROUP": ("ad group", "ad groups", "adGroup"),
@@ -192,7 +197,7 @@ def who(change):
 
 def via(change):
     """The tool a person used, when it says something ("" for the Google Ads website)."""
-    if not change["user"] or change["client"] in ("GOOGLE_ADS_WEB_CLIENT", ""):
+    if not change["user"] or change["client"] in ("GOOGLE_ADS_WEB_CLIENT", "SNAPSHOT", ""):
         return ""
     return CLIENTS.get(change["client"], "")
 
@@ -255,6 +260,10 @@ def summarize(changes, currency="USD", money=None):
     money = money or _plain_money
     counts, order, extra, camps = {}, [], [], []
     for c in sorted(changes, key=lambda c: c["at"]):
+        if c.get("phrase"):
+            if c["phrase"] not in extra:
+                extra.append(c["phrase"])
+            continue
         if c["campaign"] and c["campaign"] not in camps:
             camps.append(c["campaign"])
         if c["type"] == "CAMPAIGN_BUDGET":
@@ -365,6 +374,128 @@ def messages(found, link, now):
     return out
 
 
+# ── What change history leaves out: access, manager links, conversion actions ──
+# Google's change_event has no row for a user given or losing access, a manager (MCC) account linked or unlinked, or a conversion action
+# added or edited. Each run reads these as they are now and compares them with the last run's snapshot; what differs is a change. Google does
+# not say who made it (except the inviter of a new user), so it is flagged unless the inviter is on the allowed list.
+
+GAQL_MANAGERS = "SELECT customer_manager_link.manager_customer, customer_manager_link.status FROM customer_manager_link"
+GAQL_USERS = ("SELECT customer_user_access.email_address, customer_user_access.access_role, customer_user_access.inviter_user_email_address "
+              "FROM customer_user_access")
+GAQL_CONVERSIONS = ("SELECT conversion_action.id, conversion_action.name, conversion_action.status, conversion_action.primary_for_goal, "
+                    "conversion_action.counting_type FROM conversion_action")
+_LINK_WORD = {"ACTIVE": "linked", "PENDING": "invited", "INACTIVE": "unlinked", "REFUSED": "refused", "CANCELED": "canceled"}
+_ROLE_WORD = {"ADMIN": "admin", "STANDARD": "standard", "READ_ONLY": "read-only", "EMAIL_ONLY": "email-only"}
+_COUNT_WORD = {"ONE_PER_CLICK": "one per click", "MANY_PER_CLICK": "every conversion"}
+_CONV_STATUS = {"ENABLED": "enabled it", "HIDDEN": "hid it"}
+
+
+def _cid(resource):
+    d = re.sub(r"\D", "", str(resource or "").rsplit("/", 1)[-1])
+    return "%s-%s-%s" % (d[:3], d[3:6], d[6:]) if len(d) == 10 else d
+
+
+def _word(table, v):
+    return table.get(v) or str(v or "").lower().replace("_", " ")
+
+
+def read_access(account_id, search):
+    """{managers: {id: status}, users: {email: {role, inviter}}, conversions: {id: {name, status, primary, counting}}} as they are now. A part
+    Google refuses (no permission, say) is None and is not compared; a quota refusal stops the read."""
+    def part(query, fn):
+        try:
+            return fn(search(account_id, query) or [])
+        except Exception as e:                                                      # noqa: BLE001
+            if getattr(e, "kind", "") == "quota":
+                raise
+            return None
+
+    def managers(rows):
+        return {_cid(_get(r, "customerManagerLink", "managerCustomer")): str(_get(r, "customerManagerLink", "status", default=""))
+                for r in rows if _get(r, "customerManagerLink", "managerCustomer")}
+
+    def users(rows):
+        return {str(_get(r, "customerUserAccess", "emailAddress")).strip().lower(): {
+            "role": str(_get(r, "customerUserAccess", "accessRole", default="")),
+            "inviter": str(_get(r, "customerUserAccess", "inviterUserEmailAddress", default="")).strip().lower()}
+            for r in rows if _get(r, "customerUserAccess", "emailAddress")}
+
+    def conversions(rows):
+        return {str(_get(r, "conversionAction", "id")): {
+            "name": str(_get(r, "conversionAction", "name", default="")), "status": str(_get(r, "conversionAction", "status", default="")),
+            "primary": bool(_get(r, "conversionAction", "primaryForGoal", default=False)),
+            "counting": str(_get(r, "conversionAction", "countingType", default=""))}
+            for r in rows if _get(r, "conversionAction", "id")}
+    return {"managers": part(GAQL_MANAGERS, managers), "users": part(GAQL_USERS, users), "conversions": part(GAQL_CONVERSIONS, conversions)}
+
+
+def _snap_change(at, key, phrase, user=""):
+    return {"id": "snapshot:" + key, "at": at, "user": user, "client": "SNAPSHOT", "type": "SNAPSHOT", "op": "", "fields": [], "campaign": "", "adGroup": "",
+            "old": {}, "new": {}, "phrase": phrase}
+
+
+def access_changes(old, new, at):
+    """[change] for what differs between two snapshots (read_access). A part missing from either one is not compared."""
+    old, new, out = old or {}, new or {}, []
+    a, b = old.get("managers"), new.get("managers")
+    if a is not None and b is not None:
+        for m in sorted(set(a) | set(b)):
+            was, now = a.get(m), b.get(m)
+            if was == now:
+                continue
+            if was is None:
+                p = "%s the manager account %s" % ({"PENDING": "invited", "ACTIVE": "linked"}[now], m) if now in ("PENDING", "ACTIVE") \
+                    else "added a link to the manager account %s (%s)" % (m, _word(_LINK_WORD, now))
+            elif now is None:
+                p = "removed the link to the manager account %s" % m
+            else:
+                p = "changed the link to the manager account %s from %s to %s" % (m, _word(_LINK_WORD, was), _word(_LINK_WORD, now))
+            out.append(_snap_change(at, "manager:%s:%s:%s" % (m, was, now), p))
+    a, b = old.get("users"), new.get("users")
+    if a is not None and b is not None:
+        for e in sorted(set(a) | set(b)):
+            was, now = a.get(e), b.get(e)
+            if was is None:
+                out.append(_snap_change(at, "user:%s:+%s" % (e, now["role"]), "gave %s %s access" % (e, _word(_ROLE_WORD, now["role"])), now.get("inviter", "")))
+            elif now is None:
+                out.append(_snap_change(at, "user:%s:-" % e, "removed %s's access" % e))
+            elif was["role"] != now["role"]:
+                out.append(_snap_change(at, "user:%s:%s>%s" % (e, was["role"], now["role"]), "changed %s's access from %s to %s" % (
+                    e, _word(_ROLE_WORD, was["role"]), _word(_ROLE_WORD, now["role"]))))
+    a, b = old.get("conversions"), new.get("conversions")
+    if a is not None and b is not None:
+        for cid in sorted(set(a) | set(b)):
+            was, now = a.get(cid), b.get(cid)
+            if was == now:
+                continue
+            name = '"%s"' % (now or was)["name"]
+            if was is None:
+                p = "added the conversion action %s" % name
+            elif now is None or (now["status"] == "REMOVED" and was["status"] != "REMOVED"):
+                p = "removed the conversion action %s" % name
+            else:
+                bits = []
+                if was["name"] != now["name"]:
+                    bits.append('renamed it from "%s"' % was["name"])
+                if was["status"] != now["status"]:
+                    bits.append(_CONV_STATUS.get(now["status"], "set its status to " + _word({}, now["status"])))
+                if was["primary"] != now["primary"]:
+                    bits.append("made it %s" % ("primary" if now["primary"] else "secondary"))
+                if was["counting"] != now["counting"]:
+                    bits.append("set it to count %s" % _word(_COUNT_WORD, now["counting"]))
+                if not bits:
+                    continue
+                p = "changed the conversion action %s (%s)" % (name, ", ".join(bits))
+            out.append(_snap_change(at, "conversion:%s:%s" % (cid, p), p))
+    return out
+
+
+def _merge_access(old, new):
+    """The snapshot to keep: each part as read now, or as it was when it could not be read."""
+    old, new = old or {}, new or {}
+    return {k: (new.get(k) if new.get(k) is not None else old.get(k)) for k in ("managers", "users", "conversions")}
+
+
 # ── One run ──────────────────────────────────────────────────────────────────
 
 def read_account(account_id, search, now):
@@ -384,23 +515,29 @@ def run(store, *, accounts, deliver, search_fn, link, trigger, now=None, currenc
     now = now or dt.datetime.now(dt.timezone.utc)
     conf = settings(store)
     seen_all = store.state_get(SEEN_KEY) or {}
+    access_all = store.state_get(ACCESS_KEY) or {}
     baseline = not seen_all
     google = [a for a in accounts if (a.get("platform") or "google") == "google"]
     currency_of = currency_of or (lambda aid: "USD")
 
     def one(a):
         try:
-            return a, read_account(a["id"], search_fn, now), None
+            return a, read_account(a["id"], search_fn, now), read_access(a["id"], search_fn), None
         except Exception as e:                                                      # noqa: BLE001 (one account failing never stops the rest)
-            return a, None, ("%s" % e)[:240] or type(e).__name__
-    unread, found, keep = [], [], {}
+            return a, None, None, ("%s" % e)[:240] or type(e).__name__
+    unread, found, keep, access_keep = [], [], {}, {}
+    at = now.strftime("%Y-%m-%d %H:%M:%S")
     with ThreadPoolExecutor(max_workers=max(1, workers)) as pool:
         done = list(pool.map(one, google))
-    for a, changes, err in done:
+    for a, changes, access, err in done:
         if changes is None:
             unread.append({"accountId": a["id"], "name": a["name"], "error": err})
             continue
         fresh, keep[a["id"]] = new_since(changes, None if baseline else seen_all.get(a["id"]))
+        before = access_all.get(a["id"])
+        if before is not None and not baseline:                                     # an account's first snapshot is its baseline
+            fresh = fresh + access_changes(before, access, at)
+        access_keep[a["id"]] = _merge_access(before, access)
         bad = flagged(fresh, conf["allow"])
         if bad:
             found.append({"account": a, "lines": lines_for(a, bad, currency_of(a["id"]), money)})
@@ -426,6 +563,9 @@ def run(store, *, accounts, deliver, search_fn, link, trigger, now=None, currenc
         merged = dict(seen_all)
         merged.update(keep)
         store.state_set(SEEN_KEY, merged)
+        snaps = dict(access_all)
+        snaps.update(access_keep)
+        store.state_set(ACCESS_KEY, snaps)
         if found and not baseline:
             recent = [dict(x, at=now.isoformat()) for f in found for x in f["lines"]] + list(store.state_get(RECENT_KEY) or [])
             store.state_set(RECENT_KEY, recent[:RECENT_KEPT])
