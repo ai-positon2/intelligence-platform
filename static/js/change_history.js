@@ -66,5 +66,40 @@
       return call("run", {}).then(function () { setTimeout(function () { follow(before, 0); }, 2000); });
     }).catch(function (e) { say(esc(e.message)); $("runNow").disabled = false; $("runNow").textContent = "Run now"; });
   });
+
+  // ── Look at a day (nothing is sent) ──
+  function iso(d) { return d.getFullYear() + "-" + ("0" + (d.getMonth() + 1)).slice(-2) + "-" + ("0" + d.getDate()).slice(-2); }
+  var today = new Date(), oldest = new Date(); oldest.setDate(today.getDate() - 29);
+  var yest = new Date(); yest.setDate(today.getDate() - 1);
+  $("dayDate").max = iso(today); $("dayDate").min = iso(oldest); $("dayDate").value = iso(yest);
+  call("accounts").then(function (d) {
+    $("dayAcct").innerHTML = '<option value="">All Google Ads accounts</option>' + (d.accounts || []).map(function (a) {
+      return '<option value="' + esc(a.id) + '">' + esc(a.name) + " (" + esc(a.id) + ")</option>";
+    }).join("");
+  }).catch(function () {});
+  function dayPaint(d) {
+    var head = "<p class=\"pm-panel-s\">" + esc(d.date) + ": read " + d.read + " of " + d.of + " account" + (d.of === 1 ? "" : "s") + ", " +
+      (d.flagged ? d.flagged + " change" + (d.flagged === 1 ? "" : "s") + " by someone not on the allowed list." : "no change by anyone not on the allowed list.") +
+      (d.noAllowList ? " No allowed addresses are saved, so every change counts as flagged." : "") + "</p>";
+    var rows = [];
+    (d.accounts || []).forEach(function (a) {
+      if (!a.lines.length) { rows.push("<tr><td>" + esc(a.name) + "</td><td colspan=\"2\">No changes that day.</td><td>" + a.total + "</td></tr>"); return; }
+      a.lines.forEach(function (x, i) {
+        rows.push("<tr><td>" + (i ? "" : esc(a.name)) + "</td><td>" + esc(x.who) + (x.via ? " (" + esc(x.via) + ")" : "") + (x.allowed ? " <span class=\"pm-panel-s\">allowed</span>" : "") +
+          "</td><td>" + esc(x.line) + "</td><td>" + (i ? "" : a.flagged + " of " + a.total) + "</td></tr>");
+      });
+    });
+    var un = (d.unread || []).map(function (u) { return esc(u.name) + ": " + esc(u.error); }).join("; ");
+    $("dayOut").innerHTML = head + (rows.length ? table(["Account", "Who", "What was done", "Flagged"], rows) : "") + (un ? '<p class="pm-err">Not read: ' + un + "</p>" : "");
+  }
+  $("dayGo").addEventListener("click", function () {
+    var btn = $("dayGo");
+    btn.disabled = true; btn.textContent = "Reading...";
+    $("dayOut").innerHTML = '<p class="pm-panel-s">Reading the change history' + ($("dayAcct").value ? "" : " of every account; this takes up to a minute") + ".</p>";
+    call("day", { date: $("dayDate").value, account: $("dayAcct").value, everyone: $("dayAll").checked })
+      .then(dayPaint)
+      .catch(function (e) { $("dayOut").innerHTML = '<div class="pm-err">' + esc(e.message) + "</div>"; })
+      .then(function () { btn.disabled = false; btn.textContent = "Show changes"; });
+  });
   load();
 })();
