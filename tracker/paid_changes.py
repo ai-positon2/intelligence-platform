@@ -646,3 +646,37 @@ def state_for(store):
     """What the page shows: the settings, the last runs and the changes flagged lately."""
     return {"settings": settings(store), "runs": (store.state_get(RUNS_KEY) or [])[:10], "recent": (store.state_get(RECENT_KEY) or [])[:100],
             "baseline": bool(store.state_get(SEEN_KEY)), "running": bool((store.state_get(LOCK_KEY) or {}).get("locked")), "channel": DEFAULT_CHANNEL}
+
+
+def raw_check(account_id, search, day):
+    """An admin's look at what Google answers for one account and day, read a few ways, counts only (no change is sent or remembered):
+    the run's query, the same without ORDER BY, a window a day wider each side, and change_status (what changed, without who)."""
+    d0, d1 = "%s 00:00:00" % day.isoformat(), "%s 23:59:59" % day.isoformat()
+    w0 = "%s 00:00:00" % (day - dt.timedelta(days=1)).isoformat()
+    w1 = "%s 23:59:59" % (day + dt.timedelta(days=1)).isoformat()
+    plain = "SELECT " + _FIELDS + " FROM change_event WHERE change_event.change_date_time >= '%s' AND change_event.change_date_time <= '%s' LIMIT " + str(LIMIT)
+    variants = [("run", GAQL % (d0, d1)), ("noOrder", plain % (d0, d1)), ("wide", GAQL % (w0, w1))]
+    out = {"date": day.isoformat()}
+    for name, q in variants:
+        try:
+            cs = read_changes(search(account_id, q) or [])
+        except Exception as e:                                                      # noqa: BLE001
+            out[name] = {"error": ("%s" % e)[:400]}
+            continue
+        groups = {}
+        for c in cs:
+            k = "%s | %s | %s | %s" % (c["at"][:10], c["user"] or "-", c["client"] or "-", c["type"] or "-")
+            groups[k] = groups.get(k, 0) + 1
+        out[name] = {"rows": len(cs), "first": min((c["at"] for c in cs), default=""), "last": max((c["at"] for c in cs), default=""),
+                     "groups": dict(sorted(groups.items()))}
+    try:
+        rows = search(account_id, "SELECT change_status.resource_type, change_status.last_change_date_time, change_status.resource_status FROM change_status "
+                                  "WHERE change_status.last_change_date_time >= '%s' AND change_status.last_change_date_time <= '%s' LIMIT 10000" % (d0, d1)) or []
+        groups = {}
+        for r in rows:
+            k = "%s | %s" % (_get(r, "changeStatus", "resourceType", default="-"), _get(r, "changeStatus", "resourceStatus", default="-"))
+            groups[k] = groups.get(k, 0) + 1
+        out["changeStatus"] = {"rows": len(rows), "groups": dict(sorted(groups.items()))}
+    except Exception as e:                                                          # noqa: BLE001
+        out["changeStatus"] = {"error": ("%s" % e)[:400]}
+    return out

@@ -5702,6 +5702,20 @@ def paid_changes_day():
     return _ch(go)
 
 
+@app.route("/p2/paid-marketing/api/changes/raw")
+@admin_required
+def paid_changes_raw():
+    """Admin check: what Google answers for one account and day, read a few ways, counts only. ?account=<Google customer id>&date=YYYY-MM-DD."""
+    def go(pc, store):
+        from tracker import paid_gads_segments as g
+        day = pc.clean_day(request.args.get("date"), datetime.now(timezone.utc).date())
+        acct = re.sub(r"\D", "", str(request.args.get("account") or ""))
+        if len(acct) != 10:
+            return jsonify(error="Give ?account=<10-digit Google customer id>."), 400
+        return jsonify(pc.raw_check(acct, g.search, day))
+    return _ch(go)
+
+
 @app.route("/p2/paid-marketing/api/changes/run", methods=["POST"])
 @position2_required
 def paid_changes_run():
