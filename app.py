@@ -5622,6 +5622,85 @@ def paid_monitor_scheduled():
     return _mon_run(go)
 
 
+# ── Change History: a Slack line for every Google Ads change made by someone not on the allowed list (tracker/paid_changes.py) ──────────
+# Every two hours (.github/workflows/paid-change-history.yml calls the secret-guarded address below) each Google Ads account's change history of the
+# last two days is read and what was not seen before is judged: a change by an allowed address (the account managers, saved on the page) is left
+# alone, any other goes to the Slack channel saved on the page (#adcopyqc unless changed), one line per person per account. Read only.
+
+def _ch_run(trigger, base):
+    """One Change History run (in the background). Two never run at once."""
+    from tracker import paid_changes as pc, paid_gads_segments as g, paid_brandspend_math as bm
+    store = _mon_store()
+    if not store.claim(pc.LOCK_KEY, 30 * 60):
+        return
+    try:
+        accounts, _groups, _problems = _mon_inventory()
+        try:
+            cur = {a["id"]: a.get("currency") or "USD" for a in g.list_accounts()}
+        except Exception:                                                           # noqa: BLE001 (amounts are then written in dollars)
+            cur = {}
+        pc.run(store, accounts=accounts, deliver=_mon_deliver(), search_fn=g.search, link=base.rstrip("/") + pc.PAGE, trigger=trigger,
+               currency_of=lambda aid: cur.get(aid, "USD"), money=bm.money)
+    except Exception as e:                                                          # noqa: BLE001
+        log.warning("change history run failed: %s", e)
+    finally:
+        store.release(pc.LOCK_KEY)
+
+
+def _ch(fn):
+    from tracker import paid_changes as pc
+    store = _mon_store()
+    try:
+        return fn(pc, store)
+    except pc.BadRequest as e:
+        return jsonify(error=str(e)), 400
+    except store.StoreUnavailable as e:
+        return _pm_store_error(e)
+
+
+@app.route("/p2/paid-marketing/change-history")
+@position2_required
+def paid_change_history():
+    return render_template("change_history.html", user=_get_user())
+
+
+@app.route("/p2/paid-marketing/api/changes/state")
+@position2_required
+def paid_changes_state():
+    return _ch(lambda pc, store: jsonify(pc.state_for(store)))
+
+
+@app.route("/p2/paid-marketing/api/changes/settings", methods=["POST"])
+@position2_required
+def paid_changes_settings():
+    return _ch(lambda pc, store: jsonify(settings=pc.save_settings(store, request.get_json(silent=True) or {}, _pm_user_email())))
+
+
+@app.route("/p2/paid-marketing/api/changes/run", methods=["POST"])
+@position2_required
+def paid_changes_run():
+    def go(pc, store):
+        if (store.state_get(pc.LOCK_KEY) or {}).get("locked"):
+            return jsonify(error="A run is already going."), 409
+        base, who = _mon_base(), _pm_user_email()
+        _mon_spawn(lambda: _ch_run("page by " + who, base))
+        return jsonify(started=True), 202
+    return _ch(go)
+
+
+@app.route("/p2/paid-marketing/api/changes/scheduled", methods=["POST"])
+def paid_changes_scheduled():
+    """The run every two hours. No session: the monitors' shared secret in X-Monitor-Secret, and with MONITOR_ALERT_SECRET unset every call is refused."""
+    import hmac
+    secret = os.environ.get("MONITOR_ALERT_SECRET", "")
+    given = request.headers.get("X-Monitor-Secret", "")
+    if not secret or not hmac.compare_digest(given.encode("utf-8"), secret.encode("utf-8")):
+        return jsonify(error="Forbidden."), 403
+    base = _mon_base()
+    _mon_spawn(lambda: _ch_run("schedule", base))
+    return jsonify(started=True), 202
+
+
 # ── Brand Spend Alert: what the team saved ──────────────────────────────────────────────────────────────────────────────
 
 @app.route("/p2/paid-marketing/api/brandspend/settings")
@@ -22399,7 +22478,7 @@ def _cap_rows(lines: list, key: str) -> tuple:
 # it. Unlisted, not gone: the pages, APIs and saved results keep working.
 PAID_HIDDEN_AGENTS = {}
 PAID_HIDDEN_SLUGS = frozenset(PAID_HIDDEN_AGENTS)
-PAID_AGENT_TOTAL = 22  # Paid Marketing agents built, hidden ones included
+PAID_AGENT_TOTAL = 23  # Paid Marketing agents built, hidden ones included
 
 
 def _without_hidden_paid(text):
@@ -22519,6 +22598,8 @@ Competitor Analysis (/p2/paid-marketing/competitor-analysis): what the competito
 Creative & Asset Health (/p2/paid-marketing/creative-health): which ads are tired and what is missing. Pick a Google Ads account, an MCC to check every account in one go, or a Meta ad account, and it reads, read only, for Google every live ad's and Performance Max asset group's clicks and impressions by whole week (the last 5), the assets Google itself rates Low (an ad's: Google's API no longer rates Performance Max assets) and the asset coverage Asset Coverage reads (sitelinks, callouts, images and the rest, held to Google's minimums and the team's targets); for Meta the live ads' spend, impressions, reach and link clicks by 7-day bucket, Meta's quality, engagement and conversion rankings and how many live ads each ad set holds. A creative is judged on its last 2 whole weeks against the 3 before, and only with at least 1,000 impressions in the last weeks and 2,000 before; one with less is counted as not judged, never as fine. A click-through rate that fell by 25 percent (40 is high), is unlikely to be chance and fell clearly more than the rest of the account did (a quiet season hits every ad, so a shared fall is not blamed on one creative) is a signal. On Meta a frequency of 3 or more in the last week that is rising (or 4 or more), and a cost per 1,000 views up 25 percent more than the account's, are signals too; Google does not report frequency for Search or Performance Max, so Google ads are judged on click-through rate and Google's own ratings. Two signals make a creative high. Assets Google rates Low are one finding per ad naming each (medium when the ad is seen, low when nobody sees it); on Meta two or more below-average rankings are medium and three, or two in the bottom 10 percent, high. Missing assets keep Asset Coverage's own severity, and Meta ad sets with a single live ad are flagged. The page also says what it cannot see: how old a creative is, Google frequency, Meta frequency over an ad's whole life, Performance Max assets' own weekly numbers, and ads Meta has not ranked yet. A daily monitor alerts once on each new problem, and the first read of an account is its quiet baseline; a part of the read that failed never marks its problems as fixed. Nothing is changed in an ad account.
 
 Account Watch (/p2/paid-marketing/account-watch): did anything happen to the account that nobody meant. Pick a Google Ads account, an MCC to check every account in one go, or a Meta ad account, and it reads, read only, for Google the manager account's list of every client with its status (the platform's own account list leaves out suspended, canceled and closed accounts, so a suspension would otherwise just look like a missing account), each account's account budget orders, its change history of the last 3 days (budgets with their old and new amounts, bid strategy changes and who made each change), its conversion actions and who can open it; for Meta the ad account's status and spend cap, the Pages it can promote and its activity history of the last 3 days. A suspended, canceled, closed, disabled, unsettled (a failed payment), in-grace-period or risk-review account is high; so is an account that was in the manager account at an earlier reading and is not now. An account budget order or Meta spend cap 85 to 90 percent used is medium and 95 to 98 percent high. A budget that moved by 30 percent or more is medium, and high when it doubled or fell to under a third; a bid strategy change and a changed conversion goal are medium (a primary goal that was hidden, removed or stopped counting is high). Who can open the account, the conversion goals and the Pages are held against the monitor's own earlier daily readings, so they are judged from the second day: a new administrator is high, a new user or a removed one medium, a Page that is gone or unpublished high. Someone whose address is not on position2.com who changed the account is named with what they did. The page also says what it cannot see: a declined card (a failed payment shows as a status that is not active), changes older than 3 days and edits the platforms make on their own. A daily monitor alerts once on each new problem and the first read of an account is its quiet baseline. Nothing is changed in an ad account.
+
+Change History (/p2/paid-marketing/change-history): who changed the Google Ads accounts, when they are not the account managers. Every two hours it reads, read only, each Google Ads account's change history of the last two days (Google's own record of every change: who made it, when, through which tool, and what changed) and keeps what it has not seen before. A change made by an address on the allowed list saved on the page (the account managers, and a whole domain can be allowed as @domain.com) is left alone. Any other change is flagged: a person not on the list, a script or automated rule run by someone else, a recommendation Google applied on its own, or a change with no address. Each account with flagged changes gets one line per person in one Slack message (the channel saved on the page, #adcopyqc unless changed), saying what was done in counts and names, for example a budget raised from one amount to another, keywords paused, negative keywords added or an ad edited, and the account manager of the account is tagged. The first run only sets the baseline and sends nothing, and so does the first read of an account. What was seen is remembered only once Slack took the message, so a message Slack refused goes again at the next run. The page lists the allowed addresses, the channel, the changes flagged lately and the last runs, and has Run now. Meta is not read yet. Nothing is changed in an ad account.
 
 Tracking & Data Health (/p2/paid-marketing/tracking-health): is the tracking still working. Pick a Google Ads account, an MCC to check every account in one go, or a Meta ad account, and it reads, read only, the account's cost and conversions by day (Google: the customer's totals and each conversion action's conversions by day, the audience lists with their sizes, whether the customer data terms are accepted and the offline conversion upload log; Meta: insights by day, the pixels with when each last fired and the custom audiences' sizes) and holds the last whole days against the 21 days before them. Conversions that stopped is high: the account spent and recorded none in the last 3 days (or 7 for a slower account) though its usual rate promised at least 5 in that window; a drop to a fifth of a usual week with the spend going on is medium. A conversion action that carried much of the conversions and recorded none in 7 days is high or medium by its share; if the whole account stopped the actions are not listed one by one. An audience list that lost 30 percent of its people since the monitor's own earlier daily readings is medium, one that is empty or fell under Google's 1,000 for Search is high; lists are judged from the second day. Offline conversions with no upload for 14 days (or Google's log saying so) are medium, a Meta pixel silent for 48 hours while the account spent is medium (high when conversions stopped too, and an unavailable pixel is high). Customer data terms not accepted are low. A figure with too little behind it (an account under about 5 conversions a week, nothing spent) is listed as not judged, never as fine. The page also says what it cannot see: whether the tag is on the site, Google Analytics 4 itself, Meta's Conversions API and pixel event counts, dashboards. A daily monitor alerts once on each new problem and the first read of an account is its quiet baseline. Nothing is changed in an ad account.
 
