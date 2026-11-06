@@ -8925,6 +8925,30 @@ def _compress_response(resp):
     return resp
 
 
+# A dropdown's open list is drawn by the browser, and on the dark pages its
+# options came out light text on a white list, so they could not be read. One
+# rule, put in every HTML page's <head>, makes every option black on white.
+# Flask runs after_request hooks last-registered first, so this one (below
+# _compress_response) runs before the page is gzipped.
+_OPTION_STYLE = (b'<style id="p2-option-colors">select option,select optgroup'
+                 b'{color:#111 !important;background-color:#fff !important}</style>')
+
+@app.after_request
+def _readable_options(resp):
+    try:
+        if (resp.mimetype != "text/html" or resp.direct_passthrough or resp.is_streamed
+                or "Content-Encoding" in resp.headers):
+            return resp
+        data = resp.get_data()
+        i = data.find(b"</head>")
+        if i < 0 or b'id="p2-option-colors"' in data:
+            return resp
+        resp.set_data(data[:i] + _OPTION_STYLE + data[i:])
+    except Exception:
+        pass
+    return resp
+
+
 @app.route("/dashboard/<account_id>")
 @app.route("/dashboard/<account_id>/<section>")
 @position2_required
