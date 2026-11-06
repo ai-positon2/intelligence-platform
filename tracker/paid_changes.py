@@ -51,11 +51,12 @@ _CHANNEL = re.compile(r"^[#@]?[A-Za-z0-9._-]{1,80}$")
 _DOMAIN = re.compile(r"^@[^@\s,;<>]+\.[^@\s,;<>]+$")
 
 _FIELDS = ("change_event.resource_name, change_event.change_date_time, change_event.user_email, change_event.client_type, change_event.change_resource_type, "
-           "change_event.resource_change_operation, change_event.changed_fields, change_event.old_resource, change_event.new_resource")
-GAQL = ("SELECT " + _FIELDS + ", campaign.name, ad_group.name FROM change_event WHERE change_event.change_date_time >= '%s' AND change_event.change_date_time <= '%s' "
+           "change_event.resource_change_operation, change_event.changed_fields, change_event.old_resource, change_event.new_resource, change_event.campaign")
+# Only change_event's own fields: selecting campaign.name or ad_group.name joins on them, and Google then leaves out every change that has no
+# campaign or no ad group (campaign settings, asset groups, account assets...). The campaigns' names are read apart (campaign_names).
+GAQL = ("SELECT " + _FIELDS + " FROM change_event WHERE change_event.change_date_time >= '%s' AND change_event.change_date_time <= '%s' "
         "ORDER BY change_event.change_date_time DESC LIMIT " + str(LIMIT))
-GAQL_PLAIN = ("SELECT " + _FIELDS + " FROM change_event WHERE change_event.change_date_time >= '%s' AND change_event.change_date_time <= '%s' "
-              "ORDER BY change_event.change_date_time DESC LIMIT " + str(LIMIT))
+GAQL_CAMPAIGNS = "SELECT campaign.resource_name, campaign.name FROM campaign WHERE campaign.resource_name IN (%s)"
 
 CLIENTS = {"GOOGLE_ADS_WEB_CLIENT": "Google Ads", "GOOGLE_ADS_AUTOMATED_RULE": "an automated rule", "GOOGLE_ADS_SCRIPTS": "a script", "GOOGLE_ADS_BULK_UPLOAD": "a bulk upload",
            "GOOGLE_ADS_EDITOR": "Google Ads Editor", "GOOGLE_ADS_MOBILE_APP": "the Google Ads app", "GOOGLE_ADS_RECOMMENDATIONS": "a recommendation applied",
@@ -174,7 +175,7 @@ def allowed(email, allow):
 
 # ── Google's rows ────────────────────────────────────────────────────────────
 
-def read_changes(rows):
+def read_changes(rows, names=None):
     """[{id, at, user, client, type, op, fields, campaign, adGroup, old, new}] from Google's change_event rows (newest first, as Google gives them)."""
     out = []
     for r in rows or []:
@@ -185,7 +186,7 @@ def read_changes(rows):
             continue
         out.append({"id": rid or at, "at": at, "user": str(e.get("userEmail") or "").strip().lower(), "client": str(e.get("clientType") or ""),
                     "type": str(e.get("changeResourceType") or ""), "op": str(e.get("resourceChangeOperation") or ""), "fields": sorted(_fields(e.get("changedFields"))),
-                    "campaign": str(_get(r, "campaign", "name", default="") or ""), "adGroup": str(_get(r, "adGroup", "name", default="") or ""),
+                    "campaign": str((names or {}).get(e.get("campaign")) or _get(r, "campaign", "name", default="") or ""), "adGroup": str(_get(r, "adGroup", "name", default="") or ""),
                     "old": e.get("oldResource") or {}, "new": e.get("newResource") or {}})
     return out
 
@@ -498,16 +499,35 @@ def _merge_access(old, new):
 
 # ── One run ──────────────────────────────────────────────────────────────────
 
+def campaign_names(account_id, search, rows):
+    """{campaign resource name: name} for the campaigns Google's rows name; {} when Google refuses (the lines then go without them)."""
+    ids = sorted({str(_get(r, "changeEvent", "campaign", default="")) for r in rows or []} - {""})
+    out = {}
+    for k in range(0, len(ids), 200):
+        try:
+            got = search(account_id, GAQL_CAMPAIGNS % ", ".join("'%s'" % x for x in ids[k:k + 200] if "'" not in x))
+        except Exception as e:                                                      # noqa: BLE001
+            if getattr(e, "kind", "") == "quota":
+                raise
+            return out
+        for r in got or []:
+            c = r.get("campaign") or {}
+            if c.get("resourceName"):
+                out[c["resourceName"]] = str(c.get("name") or "")
+    return out
+
+
+def read_between(account_id, search, since, until):
+    """[change] of one account between two times (the account's time zone, 'YYYY-MM-DD HH:MM:SS'), with the campaigns named."""
+    rows = search(account_id, GAQL % (since, until)) or []
+    return read_changes(rows, campaign_names(account_id, search, rows))
+
+
 def read_account(account_id, search, now):
-    """[change] of one account for the last READ_DAYS days. When Google refuses the campaign and ad group names, it is read without them."""
+    """[change] of one account for the last READ_DAYS days."""
     since = (now - dt.timedelta(days=READ_DAYS)).strftime("%Y-%m-%d %H:%M:%S")
     until = (now + dt.timedelta(days=1)).strftime("%Y-%m-%d %H:%M:%S")
-    try:
-        return read_changes(search(account_id, GAQL % (since, until)))
-    except Exception as e:                                                          # noqa: BLE001 (a refusal of the names; the plain read raises a real failure)
-        if getattr(e, "kind", "") == "quota":
-            raise
-        return read_changes(search(account_id, GAQL_PLAIN % (since, until)))
+    return read_between(account_id, search, since, until)
 
 
 def run(store, *, accounts, deliver, search_fn, link, trigger, now=None, currency_of=None, money=None, workers=WORKERS):
@@ -600,13 +620,7 @@ def day_report(store, *, accounts, search_fn, day, account=None, everyone=False,
 
     def one(a):
         try:
-            try:
-                rows = search_fn(a["id"], GAQL % (since, until))
-            except Exception as e:                                                  # noqa: BLE001 (read again without the names, as a run does)
-                if getattr(e, "kind", "") == "quota":
-                    raise
-                rows = search_fn(a["id"], GAQL_PLAIN % (since, until))
-            return a, read_changes(rows), None
+            return a, read_between(a["id"], search_fn, since, until), None
         except Exception as e:                                                      # noqa: BLE001
             return a, None, ("%s" % e)[:240] or type(e).__name__
     with ThreadPoolExecutor(max_workers=max(1, workers)) as pool:

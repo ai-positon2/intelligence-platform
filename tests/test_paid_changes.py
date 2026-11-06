@@ -173,16 +173,27 @@ def test_an_account_that_cannot_be_read_is_named_and_nothing_is_sent_without_an_
     assert rec["error"].startswith("No allowed addresses") and d.sent == [] and s.state_get(pc.SEEN_KEY)["1111111111"]["last"] == "2026-11-05 00:00:00"
 
 
-def test_names_refused_by_google_are_read_without_them():
+def test_the_read_joins_nothing_and_the_campaigns_are_named_apart():
     calls = []
+    rows = [{"changeEvent": dict(ROWS[0]["changeEvent"], campaign="customers/1/campaigns/5")},
+            ev("x2", "2026-11-06 10:05:00", "tom@agency.com", "CAMPAIGN", "UPDATE", "targetCpa")]   # a campaign setting: no ad group
 
-    def search(cid, gaql):
+    def search(cid, gaql, refuse=False):
         calls.append(gaql)
-        if "campaign.name" in gaql:
-            raise RuntimeError("UNRECOGNIZED_FIELD")
-        return ROWS[:1]
+        if "FROM change_event" in gaql:
+            assert "campaign.name" not in gaql and "ad_group.name" not in gaql   # a joined name leaves out every change without one
+            return rows
+        assert "'customers/1/campaigns/5'" in gaql
+        return [{"campaign": {"resourceName": "customers/1/campaigns/5", "name": "P2_Generic"}}]
     got = pc.read_account("1111111111", search, NOW)
-    assert len(calls) == 2 and "campaign.name" not in calls[1] and got[0]["id"] == "c1"
+    assert len(calls) == 2 and [c["id"] for c in got] == ["c1", "x2"] and got[0]["campaign"] == "P2_Generic"
+
+    def refusing(cid, gaql):
+        if "FROM campaign " in gaql:
+            raise RuntimeError("PERMISSION_DENIED")
+        return rows
+    got = pc.read_account("1111111111", refusing, NOW)
+    assert [c["id"] for c in got] == ["c1", "x2"] and got[0]["campaign"] == ""
 
 
 def test_many_accounts_are_split_over_several_messages():
