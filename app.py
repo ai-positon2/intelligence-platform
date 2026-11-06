@@ -5676,6 +5676,32 @@ def paid_changes_settings():
     return _ch(lambda pc, store: jsonify(settings=pc.save_settings(store, request.get_json(silent=True) or {}, _pm_user_email())))
 
 
+@app.route("/p2/paid-marketing/api/changes/accounts")
+@position2_required
+def paid_changes_accounts():
+    """The Google Ads accounts the run reads, for the page's account filter."""
+    accounts, _groups, problems = _mon_inventory()
+    return jsonify(accounts=sorted(({"id": a["id"], "name": a["name"]} for a in accounts if a.get("platform") == "google"), key=lambda a: a["name"].lower()), problems=problems)
+
+
+@app.route("/p2/paid-marketing/api/changes/day", methods=["POST"])
+@position2_required
+def paid_changes_day():
+    """What a run would flag on one day (shown on the page only: nothing is sent or remembered). Body {date, account?, everyone?}."""
+    def go(pc, store):
+        from tracker import paid_gads_segments as g, paid_brandspend_math as bm
+        body = request.get_json(silent=True) or {}
+        day = pc.clean_day(body.get("date"), datetime.now(timezone.utc).date())
+        accounts, _groups, _problems = _mon_inventory()
+        try:
+            cur = {a["id"]: a.get("currency") or "USD" for a in g.list_accounts()}
+        except Exception:                                                           # noqa: BLE001
+            cur = {}
+        return jsonify(pc.day_report(store, accounts=accounts, search_fn=g.search, day=day, account=str(body.get("account") or "").strip() or None,
+                                     everyone=bool(body.get("everyone")), currency_of=lambda aid: cur.get(aid, "USD"), money=bm.money))
+    return _ch(go)
+
+
 @app.route("/p2/paid-marketing/api/changes/run", methods=["POST"])
 @position2_required
 def paid_changes_run():

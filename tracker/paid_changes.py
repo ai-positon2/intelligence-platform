@@ -434,6 +434,60 @@ def run(store, *, accounts, deliver, search_fn, link, trigger, now=None, currenc
     return record
 
 
+HISTORY_DAYS = 29                    # Google keeps 30 days of change history
+
+
+def clean_day(day, today):
+    """The date asked for (a date), or BadRequest: one of the last HISTORY_DAYS days, today included."""
+    try:
+        d = dt.date.fromisoformat(str(day or "").strip())
+    except ValueError:
+        raise BadRequest("Pick a date (YYYY-MM-DD).")
+    if d > today or d < today - dt.timedelta(days=HISTORY_DAYS):
+        raise BadRequest("Pick a date in the last %d days: Google keeps 30 days of change history." % (HISTORY_DAYS + 1))
+    return d
+
+
+def day_report(store, *, accounts, search_fn, day, account=None, everyone=False, currency_of=None, money=None, workers=WORKERS):
+    """What a run would flag for one day ({date, accounts: [{id, name, total, allowed, lines}], unread, read}), read for the page only: nothing is sent,
+    nothing is remembered. `account` keeps one account id; `everyone` lists the allowed people's changes too (each line says whether it is allowed)."""
+    allow = settings(store)["allow"]
+    currency_of = currency_of or (lambda aid: "USD")
+    google = [a for a in accounts if (a.get("platform") or "google") == "google" and (not account or a["id"] == account)]
+    if account and not google:
+        raise BadRequest("That is not one of the Google Ads accounts the platform reads.")
+    since, until = "%s 00:00:00" % day.isoformat(), "%s 23:59:59" % day.isoformat()
+
+    def one(a):
+        try:
+            try:
+                rows = search_fn(a["id"], GAQL % (since, until))
+            except Exception as e:                                                  # noqa: BLE001 (read again without the names, as a run does)
+                if getattr(e, "kind", "") == "quota":
+                    raise
+                rows = search_fn(a["id"], GAQL_PLAIN % (since, until))
+            return a, read_changes(rows), None
+        except Exception as e:                                                      # noqa: BLE001
+            return a, None, ("%s" % e)[:240] or type(e).__name__
+    with ThreadPoolExecutor(max_workers=max(1, workers)) as pool:
+        done = list(pool.map(one, google))
+    out, unread = [], []
+    for a, changes, err in done:
+        if changes is None:
+            unread.append({"accountId": a["id"], "name": a["name"], "error": err})
+            continue
+        bad = flagged(changes, allow)
+        shown = changes if everyone else bad
+        lines = lines_for(a, shown, currency_of(a["id"]), money)
+        for x in lines:
+            x["allowed"] = allowed(x["who"], allow)
+        if lines or account:
+            out.append({"id": a["id"], "name": a["name"], "total": len(changes), "allowed": len(changes) - len(bad), "flagged": len(bad), "lines": lines})
+    out.sort(key=lambda r: (-r["flagged"], r["name"].lower()))
+    return {"date": day.isoformat(), "accounts": out, "unread": unread, "read": len(google) - len(unread), "of": len(google), "noAllowList": not allow,
+            "flagged": sum(r["flagged"] for r in out)}
+
+
 def state_for(store):
     """What the page shows: the settings, the last runs and the changes flagged lately."""
     return {"settings": settings(store), "runs": (store.state_get(RUNS_KEY) or [])[:10], "recent": (store.state_get(RECENT_KEY) or [])[:100],

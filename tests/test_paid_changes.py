@@ -152,6 +152,33 @@ def test_many_accounts_are_split_over_several_messages():
     assert len(msgs) == 2 and msgs[0][1][0]["text"]["text"] == "Change History (1 of 2)" and len(msgs[1][1]) == 2 + 5 + 1
 
 
+def test_a_day_is_read_whole_for_the_page_and_nothing_is_sent_or_remembered():
+    s = Store()
+    s.state_set(pc.KEY, {"allow": ALLOW})
+    asked = []
+
+    def search(cid, gaql):
+        asked.append((cid, gaql))
+        return ROWS if cid == "1111111111" else []
+    day = dt.date(2026, 11, 5)
+    got = pc.day_report(s, accounts=ACCOUNTS, search_fn=search, day=day)
+    assert "'2026-11-05 00:00:00'" in asked[0][1] and "'2026-11-05 23:59:59'" in asked[0][1] and {a for a, _ in asked} == {"1111111111", "2222222222"}
+    assert got["read"] == 2 and got["flagged"] == 5 and [a["name"] for a in got["accounts"]] == ["Acme Dental"]          # Bolt Parts had nothing flagged
+    acme = got["accounts"][0]
+    assert acme["total"] == 6 and acme["allowed"] == 1 and [x["allowed"] for x in acme["lines"]] == [False, False]
+    every = pc.day_report(s, accounts=ACCOUNTS, search_fn=search, day=day, everyone=True)["accounts"][0]["lines"]
+    assert [(x["who"], x["allowed"]) for x in every][-1] == ("asha@example.com", True)
+    one = pc.day_report(s, accounts=ACCOUNTS, search_fn=search, day=day, account="2222222222")
+    assert one["accounts"] == [{"id": "2222222222", "name": "Bolt Parts", "total": 0, "allowed": 0, "flagged": 0, "lines": []}]
+    assert pc.SEEN_KEY not in s.d and pc.RUNS_KEY not in s.d
+    with pytest.raises(pc.BadRequest):
+        pc.day_report(s, accounts=ACCOUNTS, search_fn=search, day=day, account="act_1")
+    assert pc.clean_day("2026-10-08", dt.date(2026, 11, 6)) == dt.date(2026, 10, 8)
+    for bad in ("2026-10-07", "2026-11-07", "yesterday", ""):
+        with pytest.raises(pc.BadRequest):
+            pc.clean_day(bad, dt.date(2026, 11, 6))
+
+
 # ── app.py ───────────────────────────────────────────────────────────────────
 
 def _app():
@@ -184,3 +211,24 @@ def test_the_page_saves_the_allowed_list_and_the_scheduled_address_needs_the_sec
     anon = a.app.test_client()
     assert anon.post("/p2/paid-marketing/api/changes/scheduled", headers={"X-Monitor-Secret": "wrong"}, json={}).status_code == 403
     assert anon.post("/p2/paid-marketing/api/changes/scheduled", headers={"X-Monitor-Secret": "shh"}, json={}).status_code == 202 and len(started) == 2
+
+
+def test_the_day_and_accounts_routes(monkeypatch):
+    from monitor_fakes import MemStore
+    from tracker import paid_gads_segments as g
+    a = _app()
+    s = MemStore()
+    s.StoreUnavailable = type("StoreUnavailable", (Exception,), {})
+    monkeypatch.setattr(a, "_mon_store", lambda: s)
+    monkeypatch.setattr(a, "_mon_inventory", lambda: (ACCOUNTS, [], []))
+    monkeypatch.setattr(g, "list_accounts", lambda: [{"id": "1111111111", "currency": "USD"}])
+    monkeypatch.setattr(g, "search", lambda cid, gaql: ROWS if cid == "1111111111" else [])
+    c = a.app.test_client()
+    with c.session_transaction() as sess:
+        sess["google_user"] = {"email": "ana@position2.com", "name": "T"}
+    assert c.get("/p2/paid-marketing/api/changes/accounts").get_json()["accounts"] == [{"id": "1111111111", "name": "Acme Dental"}, {"id": "2222222222", "name": "Bolt Parts"}]
+    yesterday = (dt.datetime.now(dt.timezone.utc).date() - dt.timedelta(days=1)).isoformat()
+    got = c.post("/p2/paid-marketing/api/changes/day", json={"date": yesterday, "account": "1111111111"}).get_json()
+    assert got["date"] == yesterday and got["of"] == 1 and got["noAllowList"] is True and got["flagged"] == 6
+    assert c.post("/p2/paid-marketing/api/changes/day", json={"date": "2020-01-01"}).status_code == 400
+    assert 'id="dayCard"' in c.get("/p2/paid-marketing/change-history").get_data(as_text=True)

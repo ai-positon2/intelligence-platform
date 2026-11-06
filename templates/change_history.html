@@ -24,6 +24,18 @@
     </div>
   </section>
 
+  <section class="pm-panel" id="dayCard">
+    <div class="pm-panel-h"><span class="pm-panel-t">Look at a day</span><span class="pm-panel-s">shown here only: nothing is sent to Slack</span></div>
+    <p class="pm-panel-s" style="margin:0 0 10px">Pick a day in the last 30 days (Google keeps 30 days of change history) and, if you like, one account, to see what a run would flag for it.</p>
+    <div class="mp-form">
+      <label class="cc-f"><span>Date</span><input type="date" id="dayDate"></label>
+      <label class="cc-f"><span>Account</span><select id="dayAcct"><option value="">All Google Ads accounts</option></select></label>
+      <label class="cc-f"><span><input type="checkbox" id="dayAll"> Also list the allowed people's changes</span></label>
+      <div class="mp-btns"><button type="button" class="pm-btn" id="dayGo">Show changes</button></div>
+    </div>
+    <div id="dayOut"></div>
+  </section>
+
   <section class="pm-panel" id="recentCard">
     <div class="pm-panel-h"><span class="pm-panel-t">Flagged lately</span><span class="pm-panel-s">newest first</span></div>
     <div id="recent"></div>
@@ -36,5 +48,5 @@
 </div>
 {% endblock %}
 {% block scripts %}
-<script src="{{ url_for('static', filename='js/change_history.js') }}?v=2"></script>
+<script src="{{ url_for('static', filename='js/change_history.js') }}?v=3"></script>
 {% endblock %}
