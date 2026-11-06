@@ -43,10 +43,28 @@
       .catch(function (e) { say(esc(e.message)); })
       .then(function () { $("save").disabled = false; });
   });
+  function result(r) {
+    if (!r) return "Done.";
+    if (r.error) return "Done, with a problem: " + esc(r.error);
+    var un = (r.unread || []).length ? " " + r.unread.length + " could not be read." : "";
+    if (r.baseline) return "Done. Read " + r.read + " of " + r.accounts + " accounts and set the baseline; nothing is sent on a first run." + un;
+    return "Done. Read " + r.read + " of " + r.accounts + " accounts: " + (r.flagged ? r.flagged + " changes by someone not on the list, sent to Slack in " + r.sent + " message" + (r.sent === 1 ? "" : "s") + "." : "no new changes by anyone not on the list, so nothing was sent.") + un;
+  }
+  function follow(before, tries) {
+    call("state").then(function (d) {
+      var top = (d.runs || [])[0];
+      if (!d.running && top && top.at !== before) { paint(d); say(result(top), top.error ? "pm-err" : "pm-note"); return; }
+      if (tries > 120) { paint(d); say("Still running. Reload the page in a minute to see the result.", "pm-note"); return; }
+      $("runNow").disabled = true; $("runNow").textContent = "Running...";
+      setTimeout(function () { follow(before, tries + 1); }, 3000);
+    }).catch(function (e) { say(esc(e.message)); $("runNow").disabled = false; });
+  }
   $("runNow").addEventListener("click", function () {
-    $("runNow").disabled = true; say("");
-    call("run", {}).then(function () { say("Started. It takes a few minutes; this page refreshes the list.", "pm-note"); setTimeout(load, 60000); })
-      .catch(function (e) { say(esc(e.message)); $("runNow").disabled = false; });
+    $("runNow").disabled = true; $("runNow").textContent = "Running..."; say("Running. This takes a minute or less.", "pm-note");
+    call("state").then(function (d) {
+      var before = ((d.runs || [])[0] || {}).at || "";
+      return call("run", {}).then(function () { setTimeout(function () { follow(before, 0); }, 2000); });
+    }).catch(function (e) { say(esc(e.message)); $("runNow").disabled = false; $("runNow").textContent = "Run now"; });
   });
   load();
 })();
