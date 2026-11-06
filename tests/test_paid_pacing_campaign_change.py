@@ -20,12 +20,22 @@ def test_no_campaign_reads_a_recommended_budget_of_zero_and_each_follows_its_cat
     assert implants["newDaily"] == round(implants["budget"] * cats["Search"]["newDaily"] / cats["Search"]["budget"], 2)
 
 
-def test_a_campaign_that_is_not_delivering_keeps_its_budget():
-    old = [dict(r, id="9", name="P2_Old", status="PAUSED", cost=0.0, conv=0.0, impr=0.0, clicks=0.0, budget=30.0) for r in spend("Acme Dental", 30.0)]
+def test_a_campaign_that_is_on_but_not_delivering_keeps_its_budget():
+    old = [dict(r, id="9", name="P2_Stuck", status="ENABLED", cost=0.0, conv=0.0, impr=0.0, clicks=0.0, budget=30.0) for r in spend("Acme Dental", 30.0)]
     a = run(old)
     camps = {c["name"]: c for c in a["campaigns"]}
-    assert "P2_Old" in camps and camps["P2_Old"]["active"] is False
-    assert camps["P2_Old"]["newDaily"] == camps["P2_Old"]["budget"] == 30.0
+    assert "P2_Stuck" in camps and camps["P2_Stuck"]["active"] is False
+    assert camps["P2_Stuck"]["newDaily"] == camps["P2_Stuck"]["budget"] == 30.0
+
+
+def test_paused_and_ended_campaigns_are_left_out_but_their_spend_still_counts():
+    base = run()
+    paused = [dict(r, id="9", name="P2_Paused", status="PAUSED", cost=r["cost"] * 0.2, budget=30.0) for r in spend("Acme Dental", 30.0)]
+    ended = [dict(r, id="8", name="P2_Ended", status="ENDED", cost=r["cost"] * 0.1, budget=20.0) for r in spend("Acme Dental", 20.0)]
+    a = run(paused + ended)
+    names = {c["name"] for c in a["campaigns"]}
+    assert names == {"P2_Brand", "P2_Implants"}
+    assert a["spend"] > base["spend"]                                                   # what they spent this month is still in the account's spend
 
 
 def test_a_move_carries_the_steps_to_make_it_with_each_campaigns_budget_before_and_after():

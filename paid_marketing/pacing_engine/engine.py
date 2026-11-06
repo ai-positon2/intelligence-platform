@@ -382,6 +382,11 @@ def analyse_account(client: str, account: str, alloc: float,
             active=(status.lower() != "paused") and c_spend > 0,
         ))
 
+    # Paused, ended and removed campaigns are left out of the campaign view, the scores and the
+    # moves: there is nothing to pace or shift in them. Their spend this month stays in
+    # the account's totals above, because it counts against the allocation.
+    rows = [r for r in rows if r.status.strip().lower() not in ("paused", "ended", "removed")]
+
     # campaign-level pacing: its MTD spend vs its pro-rata slice of the account
     for r in rows:
         implied_alloc = alloc * r.share if spend else 0.0

@@ -175,3 +175,11 @@ def test_the_rows_go_to_the_engine_in_the_layout_it_reads():
     sheet = reader.export_rows(out["rows"])
     assert sheet[0] == reader.HEADER and sheet[1][:3] == ["2026-10-01", "Enabled", "Leads Oct"] and sheet[1][6:9] == ["Acme Social", "Meta Leads", "Lowest cost"]
     assert sheet[1][10] == " --" and sheet[1][11] == 90.0 and sheet[1][12] == 3.0
+
+
+def test_a_meta_campaign_past_its_stop_time_is_ended():
+    now = dt.datetime(2026, 11, 5, tzinfo=dt.timezone.utc)
+    st = lambda **c: pm.campaign_row(dict({"id": "1", "name": "C", "effective_status": "ACTIVE"}, **c), 10.0, now)["status"]  # noqa: E731
+    assert st(stop_time="2026-11-01T00:00:00+0000") == "ENDED"
+    assert st(stop_time="2026-12-01T00:00:00+0000") == "ENABLED" and st() == "ENABLED"
+    assert st(effective_status="PAUSED", stop_time="2026-11-01T00:00:00+0000") == "PAUSED"
