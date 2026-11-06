@@ -282,3 +282,17 @@ def test_the_day_and_accounts_routes(monkeypatch):
     assert got["date"] == yesterday and got["of"] == 1 and got["noAllowList"] is True and got["flagged"] == 6
     assert c.post("/p2/paid-marketing/api/changes/day", json={"date": "2020-01-01"}).status_code == 400
     assert 'id="dayCard"' in c.get("/p2/paid-marketing/change-history").get_data(as_text=True)
+
+
+def test_the_raw_check_reads_a_day_several_ways_and_counts_only():
+    asked = []
+
+    def search(cid, gaql):
+        asked.append(gaql)
+        if "FROM change_status" in gaql:
+            return [{"changeStatus": {"resourceType": "AD_GROUP", "resourceStatus": "ENABLED"}}] * 2
+        return ROWS[:3]
+    out = pc.raw_check("1111111111", search, dt.date(2026, 11, 6))
+    assert out["run"]["rows"] == 3 and out["noOrder"]["rows"] == 3 and "ORDER BY" not in asked[1] and "2026-11-05 00:00:00" in asked[2]
+    assert out["run"]["groups"] == {"2026-11-06 | jane@agency.com | GOOGLE_ADS_EDITOR | AD_GROUP_CRITERION": 2, "2026-11-06 | jane@agency.com | GOOGLE_ADS_EDITOR | CAMPAIGN_BUDGET": 1}
+    assert out["changeStatus"] == {"rows": 2, "groups": {"AD_GROUP | ENABLED": 2}}
