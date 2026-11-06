@@ -8,6 +8,8 @@
       <h1 class="pm-title">Every Google Ads change, <span class="pm-grad">unless an account manager made it.</span></h1>
       <p class="pm-sub">Every two hours each Google Ads account's change history is read. A change made by an address on the allowed list is left alone; any other change
         (someone else, a script or rule run by someone else, a recommendation Google applied on its own) goes to Slack, with <b>one line per person per account</b> saying what was done.
+        Google's change history leaves out who can use an account, so each run also compares the account's users, manager (MCC) links and conversion actions
+        with the last run and flags what changed; Google does not say who made those changes, except who invited a new user.
         The first run only sets the baseline. Read only: nothing is changed in an account.</p>
     </div>
   </section>
@@ -26,7 +28,7 @@
 
   <section class="pm-panel" id="dayCard">
     <div class="pm-panel-h"><span class="pm-panel-t">Look at a day</span><span class="pm-panel-s">shown here only: nothing is sent to Slack</span></div>
-    <p class="pm-panel-s" style="margin:0 0 10px">Pick a day in the last 30 days (Google keeps 30 days of change history) and, if you like, one account, to see what a run would flag for it.</p>
+    <p class="pm-panel-s" style="margin:0 0 10px">Pick a day in the last 30 days (Google keeps 30 days of change history) and, if you like, one account, to see what a run would flag for it. This reads Google's change history only: access, manager links and conversion actions are compared run to run, so they are not shown for a past day.</p>
     <div class="mp-form">
       <label class="cc-f"><span>Date</span><input type="date" id="dayDate"></label>
       <label class="cc-f"><span>Account</span><select id="dayAcct"><option value="">All Google Ads accounts</option></select></label>

@@ -96,10 +96,12 @@ ACCOUNTS = [{"id": "1111111111", "name": "Acme Dental", "platform": "google"}, {
             {"id": "act_1", "name": "Glow Skin", "platform": "meta"}]
 
 
-def _search(rows_by_account, fail=()):
+def _search(rows_by_account, fail=(), access=None):
     def search(cid, gaql):
         if cid in fail:
             raise RuntimeError("PERMISSION_DENIED")
+        if "FROM change_event" not in gaql:
+            return ((access or {}).get(cid) or {}).get(gaql.rsplit(" ", 1)[-1], [])
         assert "FROM change_event" in gaql and gaql.endswith("LIMIT %d" % pc.LIMIT)
         return rows_by_account.get(cid, [])
     return search
@@ -124,6 +126,43 @@ def test_a_run_sets_the_baseline_then_sends_one_message_and_remembers_only_once_
     assert s.state_get(pc.RECENT_KEY)[0]["accountName"] == "Acme Dental"
     rec = pc.run(s, accounts=ACCOUNTS, deliver=d, search_fn=_search(rows), link="https://p.example/x", trigger="schedule", now=NOW)
     assert rec["flagged"] == 0 and len(d.sent) == 1                                                  # nothing is sent twice
+
+
+def _access(managers=(), users=(), conversions=()):
+    return {"customer_manager_link": [{"customerManagerLink": {"managerCustomer": "customers/" + m, "status": st}} for m, st in managers],
+            "customer_user_access": [{"customerUserAccess": {"emailAddress": e, "accessRole": r, "inviterUserEmailAddress": i}} for e, r, i in users],
+            "conversion_action": [{"conversionAction": {"id": c, "name": n, "status": st, "primaryForGoal": pr, "countingType": ct}} for c, n, st, pr, ct in conversions]}
+
+
+def test_access_manager_links_and_conversion_actions_are_compared_with_the_last_run():
+    s, d = Store(), Deliver()
+    s.state_set(pc.KEY, {"allow": ALLOW, "channel": "C0TEST"})
+    before = {"1111111111": _access(managers=[("1234567890", "ACTIVE")], users=[("asha@example.com", "ADMIN", "")],
+                                    conversions=[("7", "Lead form", "ENABLED", True, "ONE_PER_CLICK")])}
+    run = lambda acc: pc.run(s, accounts=ACCOUNTS, deliver=d, search_fn=_search({}, access=acc), link="https://p.example/x", trigger="schedule", now=NOW)
+    assert run(before)["baseline"] and d.sent == []
+    assert run(before)["flagged"] == 0 and d.sent == []                                             # nothing changed
+    after = {"1111111111": _access(managers=[("1234567890", "INACTIVE"), ("9998887776", "PENDING")],
+                                   users=[("asha@example.com", "STANDARD", ""), ("new@agency.com", "ADMIN", "jane@agency.com"), ("ok@example.com", "READ_ONLY", "ravi@example.com")],
+                                   conversions=[("7", "Lead form", "ENABLED", False, "ONE_PER_CLICK"), ("8", "Calls", "ENABLED", True, "MANY_PER_CLICK")])}
+    rec = run(after)
+    assert rec["flagged"] == 6 and len(d.sent) == 1                                                   # ok@ was added by ravi, who is allowed
+    text = d.sent[0][2][2]["text"]["text"]
+    assert "•  jane@agency.com: Gave new@agency.com admin access. 1 change." in text
+    line = next(r for r in text.splitlines() if r.startswith("•  someone (Google does not say who):"))
+    for bit in ("changed the link to the manager account 123-456-7890 from linked to unlinked", "invited the manager account 999-888-7776",
+                "changed asha@example.com's access from admin to standard", 'changed the conversion action "Lead form" (made it secondary)',
+                'added the conversion action "Calls"'):
+        assert bit in line.lower() or bit in line, bit
+    assert run(after)["flagged"] == 0                                                                # remembered once Slack took it
+
+
+def test_a_part_google_refuses_is_kept_as_it_was_and_not_compared():
+    old = {"managers": {"123-456-7890": "ACTIVE"}, "users": {"a@example.com": {"role": "ADMIN", "inviter": ""}}, "conversions": {}}
+    new = {"managers": None, "users": {}, "conversions": None}
+    out = pc.access_changes(old, new, "2026-11-06 12:00:00")
+    assert [c["phrase"] for c in out] == ["removed a@example.com's access"]
+    assert pc._merge_access(old, new)["managers"] == {"123-456-7890": "ACTIVE"}
 
 
 def test_an_account_that_cannot_be_read_is_named_and_nothing_is_sent_without_an_allowed_list():
