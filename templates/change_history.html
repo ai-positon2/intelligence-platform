@@ -1,0 +1,40 @@
+{% extends "_paid_base.html" %}
+{% block title %}Change History{% endblock %}
+{% block content %}
+<div class="pm pm-gc pm-th pm-qa" id="ch">
+  <section class="pm-hero">
+    <div class="pm-hero-l">
+      <span class="pm-eyebrow"><span class="d"></span>Paid Marketing · Monitoring</span>
+      <h1 class="pm-title">Every Google Ads change, <span class="pm-grad">unless an account manager made it.</span></h1>
+      <p class="pm-sub">Every two hours each Google Ads account's change history is read. A change made by an address on the allowed list is left alone; any other change
+        (someone else, a script or rule run by someone else, a recommendation Google applied on its own) goes to Slack, with <b>one line per person per account</b> saying what was done.
+        The first run only sets the baseline. Read only: nothing is changed in an account.</p>
+    </div>
+  </section>
+
+  <div id="msg"></div>
+
+  <section class="pm-panel" id="setCard">
+    <div class="pm-panel-h"><span class="pm-panel-t">Who is allowed, and where alerts go</span><span class="pm-panel-s" id="setNote"></span></div>
+    <div class="mp-form">
+      <label class="cc-f"><span>Allowed addresses (one per line, or a whole domain as @domain.com)</span>
+        <textarea id="allow" rows="8" placeholder="name@position2.com" spellcheck="false"></textarea></label>
+      <label class="cc-f"><span>Slack channel (an id like C0..., or #name)</span><input type="text" id="channel" autocomplete="off" spellcheck="false"></label>
+      <div class="mp-btns"><button type="button" class="pm-btn" id="save">Save</button><button type="button" class="pm-btn-ghost" id="runNow">Run now</button></div>
+    </div>
+  </section>
+
+  <section class="pm-panel" id="recentCard">
+    <div class="pm-panel-h"><span class="pm-panel-t">Flagged lately</span><span class="pm-panel-s">newest first</span></div>
+    <div id="recent"></div>
+  </section>
+
+  <section class="pm-panel" id="runsCard">
+    <div class="pm-panel-h"><span class="pm-panel-t">Last runs</span></div>
+    <div id="runs"></div>
+  </section>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/change_history.js') }}?v=1"></script>
+{% endblock %}
