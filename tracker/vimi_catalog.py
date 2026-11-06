@@ -69,7 +69,7 @@ PAID_AGENTS = [
           [read("search_terms", API + "/sqr/data", "Search terms with clicks, cost and conversions, the keywords and the negative keywords of the account (Google only). Another call tells which terms to negate: reason it from the rows.",
                 _rng(), account=True)]),
     agent("client-feedback-agent", "Client Feedback Agent", "paid", PAID + "/client-feedback-agent",
-          "A chat over Slack, Gmail, meeting transcripts and the Pacing Desk allocations. Vimi does not read Slack or email: send the person to this page for client conversations.", []),
+          "A chat over Slack, Gmail, meeting transcripts and the Pacing Desk allocations. Admins ask anything; other users get answers about the client accounts only, never about the team's people (who is leaving, someone's performance, HR). Vimi does not read Slack or email: send the person to this page for client conversations.", []),
     agent("segment-analysis", "Segment Analysis", "paid", PAID + "/segment-analysis",
           "Day of week, hour, age, gender, city, device and network cuts with the segments worth pushing or cutting, for one account or a whole MCC.",
           [read("report", API + "/segments/report", "Every segment table (each cut by campaign type), the rule-based insights with evidence and confidence, and coverage caveats.",

@@ -4900,7 +4900,10 @@ def paid_feedback_chat():
             return jsonify(error="Your previous question is still being answered."), 429
         if today >= FEEDBACK_DAILY_CAP:
             return jsonify(error="That is %d questions in a day, the most this allows." % today), 429
-        job_id = paid_feedback.start(question.strip(), body.get("history"), email)
+        # Admins ask anything; everyone else gets answers about the client
+        # accounts only (paid_feedback screens out questions about the team's people).
+        job_id = paid_feedback.start(question.strip(), body.get("history"), email,
+                                     restricted=not _pm_is_admin())
     except paid_store.StoreUnavailable as e:
         return _pm_store_error(e)
     return jsonify(job_id=job_id), 202
@@ -22619,7 +22622,7 @@ converted or would block relevant terms or a keyword the account bids on are hel
 (never one already bid on or already blocked), client-review items and a workbook. Client
 Feedback Agent (/p2/paid-marketing/client-feedback-agent): a chat that answers from live Slack, Gmail, meeting
 transcripts (Zoom first when configured, else the Meeting Notes Drive folder) and the Pacing Desk's allocations, through
-one shared Slack and Google account an admin connects. Segment Analysis (/p2/paid-marketing/segment-analysis):
+one shared Slack and Google account an admin connects. Admins can ask anything; everyone else gets answers about the client accounts only, and questions about the team's people (who is leaving, who is unhappy, someone's performance, HR matters) are refused. Segment Analysis (/p2/paid-marketing/segment-analysis):
 pick a Google Ads account, or a whole MCC (OIA, Eventgroove, Tealium, Workato: all of its accounts together), and
 a date range and it reads Google Ads live to build the PPC team's segment report: day of the week, hour of the
 day, age, gender, city, device and network, each with impressions, clicks, cost, % cost, CTR, CPC, conversions and

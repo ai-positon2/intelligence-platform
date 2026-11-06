@@ -542,6 +542,7 @@ details.sq-ref>summary{cursor:pointer;font-size:12.5px;font-weight:600;color:var
 .cf-banner{border-radius:14px;padding:11px 14px;font-size:13px;margin-bottom:14px;line-height:1.5}
 .cf-banner.ok{background:var(--ok-d);border:1px solid var(--ok-l);color:var(--pm-ink)}
 .cf-banner.bad{background:var(--over-d);border:1px solid var(--over-l);color:var(--pm-ink)}
+.cf-banner.info{background:var(--pm-panel2);border:1px solid var(--pm-line);color:var(--pm-ink2)}
 
 @media (prefers-reduced-motion:reduce){
   .pm *{animation:none!important;transition:none!important}
