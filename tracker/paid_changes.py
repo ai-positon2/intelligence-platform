@@ -38,6 +38,7 @@ LOCK_KEY = "lock:changes"
 ACCESS_KEY = "changes:access"      # the last snapshot of each account's access, manager links and conversion actions
 DEFAULT_CHANNEL = "C0B322RN6SG"      # #adcopyqc
 READ_DAYS = 2                        # more than the time between two runs, and Google's time zones either way
+STATUS_WAIT_MINUTES = 30            # see read_account
 LAG_HOURS = 6                        # Google can list a change a little after its time: a change this much older than the newest one seen is still looked at
 LIMIT = 1000
 RECENT_KEPT = 300
@@ -51,7 +52,8 @@ _CHANNEL = re.compile(r"^[#@]?[A-Za-z0-9._-]{1,80}$")
 _DOMAIN = re.compile(r"^@[^@\s,;<>]+\.[^@\s,;<>]+$")
 
 _FIELDS = ("change_event.resource_name, change_event.change_date_time, change_event.user_email, change_event.client_type, change_event.change_resource_type, "
-           "change_event.resource_change_operation, change_event.changed_fields, change_event.old_resource, change_event.new_resource, change_event.campaign")
+           "change_event.resource_change_operation, change_event.changed_fields, change_event.old_resource, change_event.new_resource, change_event.campaign, "
+           "change_event.change_resource_name")
 # Only change_event's own fields: selecting campaign.name or ad_group.name joins on them, and Google then leaves out every change that has no
 # campaign or no ad group (campaign settings, asset groups, account assets...). The campaigns' names are read apart (campaign_names).
 GAQL = ("SELECT " + _FIELDS + " FROM change_event WHERE change_event.change_date_time >= '%s' AND change_event.change_date_time <= '%s' "
@@ -62,7 +64,7 @@ CLIENTS = {"GOOGLE_ADS_WEB_CLIENT": "Google Ads", "GOOGLE_ADS_AUTOMATED_RULE": "
            "GOOGLE_ADS_EDITOR": "Google Ads Editor", "GOOGLE_ADS_MOBILE_APP": "the Google Ads app", "GOOGLE_ADS_RECOMMENDATIONS": "a recommendation applied",
            "GOOGLE_ADS_API": "the API", "GOOGLE_ADS_RECOMMENDATIONS_SUBSCRIPTION": "a recommendation Google applied automatically", "SEARCH_ADS_360_SYNC": "Search Ads 360",
            "SEARCH_ADS_360_POST": "Search Ads 360", "INTERNAL_TOOL": "a Google tool", "OTHER": "another tool",
-           "SNAPSHOT": "someone (Google does not say who)"}
+           "SNAPSHOT": "someone (Google does not say who)", "STATUS": "someone (Google does not say who)"}
 
 # Google's resource type -> (one, many, the key of the resource in old_resource / new_resource)
 NOUNS = {"AD": ("ad", "ads", "ad"), "AD_GROUP_AD": ("ad", "ads", "adGroupAd"), "AD_GROUP": ("ad group", "ad groups", "adGroup"),
@@ -79,6 +81,18 @@ _CRIT_NOUNS = {"KEYWORD": ("keyword", "keywords"), "LOCATION": ("location", "loc
                "AGE_RANGE": ("age range", "age ranges"), "GENDER": ("gender", "genders"), "USER_LIST": ("audience", "audiences"), "PLACEMENT": ("placement", "placements"),
                "KEYWORD_THEME": ("keyword theme", "keyword themes"), "WEBPAGE": ("page target", "page targets"), "USER_INTEREST": ("audience", "audiences"),
                "AUDIENCE": ("audience", "audiences"), "TOPIC": ("topic", "topics"), "INCOME_RANGE": ("income range", "income ranges"), "PARENTAL_STATUS": ("parental status", "parental statuses")}
+# change_status types (what changed, without who) -> (one, many, the change_status field holding the resource's name)
+STATUS_TYPES = {"AD_GROUP": ("ad group", "ad groups", "adGroup"), "AD_GROUP_AD": ("ad", "ads", "adGroupAd"),
+                "AD_GROUP_CRITERION": ("ad group keyword or targeting item", "ad group keywords or targeting items", "adGroupCriterion"),
+                "CAMPAIGN": ("campaign setting", "campaign settings", "campaign"),
+                "CAMPAIGN_CRITERION": ("campaign targeting item", "campaign targeting items", "campaignCriterion"),
+                "AD_GROUP_BID_MODIFIER": ("bid adjustment", "bid adjustments", "adGroupBidModifier"), "ASSET": ("asset", "assets", "asset"),
+                "CUSTOMER_ASSET": ("account asset", "account assets", "customerAsset"), "CAMPAIGN_ASSET": ("campaign asset", "campaign assets", "campaignAsset"),
+                "AD_GROUP_ASSET": ("ad group asset", "ad group assets", "adGroupAsset"), "ASSET_GROUP": ("asset group", "asset groups", "assetGroup"),
+                "SHARED_SET": ("shared list", "shared lists", "sharedSet"), "CAMPAIGN_SHARED_SET": ("campaign shared list", "campaign shared lists", "campaignSharedSet"),
+                "FEED": ("feed", "feeds", "feed"), "FEED_ITEM": ("feed item", "feed items", "feedItem"),
+                "COMBINED_AUDIENCE": ("audience", "audiences", "combinedAudience"), "UNKNOWN": ("item of another kind", "items of other kinds", "")}
+_STATUS_OP = {"ADDED": "CREATE", "REMOVED": "REMOVE", "CHANGED": "UPDATE"}
 _STATUS_VERB = {"ENABLED": "enabled", "PAUSED": "paused", "REMOVED": "removed"}
 _BID_FIELDS = {"bidding_strategy_type", "target_cpa", "target_roas", "maximize_conversions", "maximize_conversion_value", "manual_cpc", "target_spend", "bidding_strategy",
                "target_impression_share", "manual_cpm", "percent_cpc"}
@@ -204,6 +218,9 @@ def via(change):
 
 
 def _noun(change):
+    if change["client"] == "STATUS":
+        one, many, _k = STATUS_TYPES.get(change["type"], (change["type"].lower().replace("_", " ") or "item", (change["type"].lower().replace("_", " ") or "item") + "s", ""))
+        return one, many, {}
     one, many, key = NOUNS.get(change["type"], (change["type"].lower().replace("_", " ") or "setting", (change["type"].lower().replace("_", " ") or "setting") + "s", ""))
     res = _get(change["new"], key) or _get(change["old"], key) or {}
     if change["type"] in ("AD_GROUP_CRITERION", "CAMPAIGN_CRITERION"):
@@ -499,9 +516,9 @@ def _merge_access(old, new):
 
 # ── One run ──────────────────────────────────────────────────────────────────
 
-def campaign_names(account_id, search, rows):
-    """{campaign resource name: name} for the campaigns Google's rows name; {} when Google refuses (the lines then go without them)."""
-    ids = sorted({str(_get(r, "changeEvent", "campaign", default="")) for r in rows or []} - {""})
+def campaign_names(account_id, search, ids):
+    """{campaign resource name: name} for these campaigns; {} when Google refuses (the lines then go without them)."""
+    ids = sorted(set(ids) - {""})
     out = {}
     for k in range(0, len(ids), 200):
         try:
@@ -517,17 +534,80 @@ def campaign_names(account_id, search, rows):
     return out
 
 
+# change_status: Google's list of what changed (one row per item, its last change), without who. change_event leaves some changes out
+# (a big Google Ads Editor upload, for one), so an item change_status lists that no change_event row explains is a change too, by someone
+# Google does not name.
+_STATUS_FIELDS = ["change_status.resource_name", "change_status.resource_type", "change_status.resource_status", "change_status.last_change_date_time",
+                  "change_status.campaign"]
+_STATUS_KEYS = ["change_status.ad_group", "change_status.ad_group_ad", "change_status.ad_group_criterion", "change_status.campaign_criterion",
+                "change_status.ad_group_bid_modifier", "change_status.asset", "change_status.customer_asset", "change_status.campaign_asset",
+                "change_status.ad_group_asset", "change_status.asset_group", "change_status.shared_set", "change_status.campaign_shared_set",
+                "change_status.feed", "change_status.feed_item", "change_status.combined_audience"]
+GAQL_STATUS = ("SELECT %s FROM change_status WHERE change_status.last_change_date_time >= '%s' AND change_status.last_change_date_time <= '%s' "
+               "ORDER BY change_status.last_change_date_time DESC LIMIT 10000")
+
+
+def _ad_id(resource):
+    """The ad's id in customers/1/ads/9 or customers/1/adGroupAds/5~9, so an AD change_event row explains an AD_GROUP_AD change_status row."""
+    tail = str(resource or "").rsplit("/", 1)[-1]
+    return tail.rsplit("~", 1)[-1] if ("/ads/" in str(resource) or "/adGroupAds/" in str(resource)) else ""
+
+
+def status_changes(account_id, search, since, until, explained):
+    """[change] for the items change_status lists between two times that no change_event row explains (`explained`: the resource names
+    change_event named). None when Google refuses change_status."""
+    rows = None
+    for fields in (_STATUS_FIELDS + _STATUS_KEYS, _STATUS_FIELDS):
+        try:
+            rows = search(account_id, GAQL_STATUS % (", ".join(fields), since, until)) or []
+            break
+        except Exception as e:                                                      # noqa: BLE001 (read again with fewer fields)
+            if getattr(e, "kind", "") == "quota":
+                raise
+    if rows is None:
+        return None
+    ads = {_ad_id(x) for x in explained} - {""}
+    out = []
+    for r in rows:
+        st = r.get("changeStatus") or {}
+        rtype = str(st.get("resourceType") or "UNKNOWN")
+        key = STATUS_TYPES.get(rtype, ("", "", ""))[2]
+        res = str(st.get(key) or "") if key else ""
+        at = str(st.get("lastChangeDateTime") or "")[:26]
+        if not at or (res and (res in explained or (rtype == "AD_GROUP_AD" and _ad_id(res) in ads))):
+            continue
+        rid = res or str(st.get("resourceName") or "")
+        out.append({"id": "status:%s@%s" % (rid, at), "at": at, "user": "", "client": "STATUS", "type": rtype,
+                    "op": _STATUS_OP.get(str(st.get("resourceStatus") or ""), "UPDATE"), "fields": [], "campaign": str(st.get("campaign") or ""),
+                    "adGroup": "", "old": {}, "new": {}})
+    return out
+
+
 def read_between(account_id, search, since, until):
-    """[change] of one account between two times (the account's time zone, 'YYYY-MM-DD HH:MM:SS'), with the campaigns named."""
+    """[change] of one account between two times (the account's time zone, 'YYYY-MM-DD HH:MM:SS'), with the campaigns named: what
+    change_event says, and what change_status lists that change_event does not explain."""
     rows = search(account_id, GAQL % (since, until)) or []
-    return read_changes(rows, campaign_names(account_id, search, rows))
+    explained = {str(_get(r, "changeEvent", "changeResourceName", default="")) for r in rows} - {""}
+    extra = status_changes(account_id, search, since, until, explained) or []
+    names = campaign_names(account_id, search, [str(_get(r, "changeEvent", "campaign", default="")) for r in rows] + [c["campaign"] for c in extra])
+    out = read_changes(rows, names)
+    for c in extra:
+        c["campaign"] = names.get(c["campaign"], "")
+    return out + extra
 
 
 def read_account(account_id, search, now):
     """[change] of one account for the last READ_DAYS days."""
     since = (now - dt.timedelta(days=READ_DAYS)).strftime("%Y-%m-%d %H:%M:%S")
     until = (now + dt.timedelta(days=1)).strftime("%Y-%m-%d %H:%M:%S")
-    return read_between(account_id, search, since, until)
+    got = read_between(account_id, search, since, until)
+    # change_event can list a change a few minutes after change_status does: an unexplained item changed in the last STATUS_WAIT_MINUTES is
+    # left for the next run (it is still inside LAG_HOURS then), so a change an account manager made is not flagged as "Google does not say who".
+    newest = _time(max((c["at"] for c in got), default=""))
+    if newest:
+        wait = (newest - dt.timedelta(minutes=STATUS_WAIT_MINUTES)).isoformat(sep=" ")
+        got = [c for c in got if c["client"] != "STATUS" or c["at"] < wait]
+    return got
 
 
 def run(store, *, accounts, deliver, search_fn, link, trigger, now=None, currency_of=None, money=None, workers=WORKERS):

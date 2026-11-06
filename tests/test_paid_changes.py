@@ -183,10 +183,12 @@ def test_the_read_joins_nothing_and_the_campaigns_are_named_apart():
         if "FROM change_event" in gaql:
             assert "campaign.name" not in gaql and "ad_group.name" not in gaql   # a joined name leaves out every change without one
             return rows
+        if "FROM change_status" in gaql:
+            return []
         assert "'customers/1/campaigns/5'" in gaql
         return [{"campaign": {"resourceName": "customers/1/campaigns/5", "name": "P2_Generic"}}]
     got = pc.read_account("1111111111", search, NOW)
-    assert len(calls) == 2 and [c["id"] for c in got] == ["c1", "x2"] and got[0]["campaign"] == "P2_Generic"
+    assert len(calls) == 3 and [c["id"] for c in got] == ["c1", "x2"] and got[0]["campaign"] == "P2_Generic"
 
     def refusing(cid, gaql):
         if "FROM campaign " in gaql:
@@ -296,3 +298,33 @@ def test_the_raw_check_reads_a_day_several_ways_and_counts_only():
     assert out["run"]["rows"] == 3 and out["noOrder"]["rows"] == 3 and "ORDER BY" not in asked[1] and "2026-11-05 00:00:00" in asked[2]
     assert out["run"]["groups"] == {"2026-11-06 | jane@agency.com | GOOGLE_ADS_EDITOR | AD_GROUP_CRITERION": 2, "2026-11-06 | jane@agency.com | GOOGLE_ADS_EDITOR | CAMPAIGN_BUDGET": 1}
     assert out["changeStatus"] == {"rows": 2, "groups": {"AD_GROUP | ENABLED": 2}}
+
+
+def test_what_change_status_lists_and_change_event_does_not_explain_is_flagged_without_a_name():
+    events = [{"changeEvent": dict(ROWS[0]["changeEvent"], changeResourceName="customers/1/ads/77", changeResourceType="AD", campaign="customers/1/campaigns/5")}]
+    status = [{"changeStatus": {"resourceType": "AD_GROUP_AD", "resourceStatus": "CHANGED", "lastChangeDateTime": "2026-11-06 10:00:01.5",
+                                "adGroupAd": "customers/1/adGroupAds/3~77", "campaign": "customers/1/campaigns/5"}}]                # explained by the AD row
+    status += [{"changeStatus": {"resourceType": "AD_GROUP_AD", "resourceStatus": st, "lastChangeDateTime": "2026-11-06 11:%02d:00" % n,
+                                 "adGroupAd": "customers/1/adGroupAds/3~%d" % (100 + n), "campaign": "customers/1/campaigns/5"}}
+               for n, st in enumerate(["CHANGED", "CHANGED", "REMOVED"])]
+    status += [{"changeStatus": {"resourceType": "ASSET_GROUP", "resourceStatus": "CHANGED", "lastChangeDateTime": "2026-11-06 11:30:00",
+                                 "assetGroup": "customers/1/assetGroups/9", "campaign": "customers/1/campaigns/6"}},
+               {"changeStatus": {"resourceType": "UNKNOWN", "resourceStatus": "CHANGED", "lastChangeDateTime": "2026-11-06 11:40:00",
+                                 "resourceName": "customers/1/changeStatus/x1"}}]
+
+    def search(cid, gaql):
+        if "FROM change_event" in gaql:
+            return events
+        if "FROM change_status" in gaql:
+            return status
+        return [{"campaign": {"resourceName": "customers/1/campaigns/5", "name": "P2_Generic"}}, {"campaign": {"resourceName": "customers/1/campaigns/6", "name": "P2_PMax"}}]
+    got = pc.read_account("1111111111", search, NOW)
+    assert [c["at"][11:16] for c in got if c["client"] == "STATUS"] == ["11:00", "11:01", "11:02"]   # the newest 30 minutes wait for the next run
+    got = pc.read_between("1111111111", search, "2026-11-06 00:00:00", "2026-11-06 23:59:59")         # the day view reads them all
+    extra = [c for c in got if c["client"] == "STATUS"]
+    assert len(got) == 6 and len(extra) == 5
+    lines = pc.lines_for({"id": "1", "name": "Acme Dental"}, extra)
+    assert [x["who"] for x in lines] == ["someone (Google does not say who)"]
+    assert lines[0]["line"] == "Edited 2 ads, removed an ad, edited an asset group, edited an item of another kind (in P2_Generic, P2_PMax). 5 changes."
+    seen = pc.new_since(got, None)[1]
+    assert pc.new_since(got, seen)[0] == []                                                         # the same items are not flagged twice
