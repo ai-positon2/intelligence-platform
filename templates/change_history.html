@@ -8,8 +8,8 @@
       <h1 class="pm-title">Every Google Ads change, <span class="pm-grad">unless an account manager made it.</span></h1>
       <p class="pm-sub">Every two hours each Google Ads account's change history is read. A change made by an address on the allowed list is left alone; any other change
         (someone else, a script or rule run by someone else, a recommendation Google applied on its own) goes to Slack, with <b>one line per person per account</b> saying what was done.
-        Google's change history can leave changes out (a big Google Ads Editor upload, for one), so Google's list of changed items is read too, and an item
-        it lists that the change history does not explain is flagged as a change Google does not say who made.
+        Google's change history can leave changes out (a big Google Ads Editor upload, for one); "Look at a day" also shows Google's list of changed items,
+        which does not say who and counts Google's own automatic updates, so it is never flagged or sent.
         Google's change history also leaves out who can use an account, so each run also compares the account's users, manager (MCC) links and conversion actions
         with the last run and flags what changed; Google does not say who made those changes, except who invited a new user.
         The first run only sets the baseline. Read only: nothing is changed in an account.</p>
@@ -52,5 +52,5 @@
 </div>
 {% endblock %}
 {% block scripts %}
-<script src="{{ url_for('static', filename='js/change_history.js') }}?v=3"></script>
+<script src="{{ url_for('static', filename='js/change_history.js') }}?v=4"></script>
 {% endblock %}

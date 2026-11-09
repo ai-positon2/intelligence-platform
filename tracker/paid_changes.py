@@ -38,7 +38,6 @@ LOCK_KEY = "lock:changes"
 ACCESS_KEY = "changes:access"      # the last snapshot of each account's access, manager links and conversion actions
 DEFAULT_CHANNEL = "C0B322RN6SG"      # #adcopyqc
 READ_DAYS = 2                        # more than the time between two runs, and Google's time zones either way
-STATUS_WAIT_MINUTES = 30            # see read_account
 LAG_HOURS = 6                        # Google can list a change a little after its time: a change this much older than the newest one seen is still looked at
 LIMIT = 1000
 RECENT_KEPT = 300
@@ -583,12 +582,14 @@ def status_changes(account_id, search, since, until, explained):
     return out
 
 
-def read_between(account_id, search, since, until):
+def read_between(account_id, search, since, until, with_status=False):
     """[change] of one account between two times (the account's time zone, 'YYYY-MM-DD HH:MM:SS'), with the campaigns named: what
-    change_event says, and what change_status lists that change_event does not explain."""
+    change_event says, and with `with_status` also what change_status lists that change_event does not explain. change_status counts
+    Google's own automatic updates too (policy reviews, asset ratings...), a hundred or more a day in a quiet account, so it is shown on the
+    page as activity Google does not name, never flagged or sent."""
     rows = search(account_id, GAQL % (since, until)) or []
     explained = {str(_get(r, "changeEvent", "changeResourceName", default="")) for r in rows} - {""}
-    extra = status_changes(account_id, search, since, until, explained) or []
+    extra = (status_changes(account_id, search, since, until, explained) or []) if with_status else []
     names = campaign_names(account_id, search, [str(_get(r, "changeEvent", "campaign", default="")) for r in rows] + [c["campaign"] for c in extra])
     out = read_changes(rows, names)
     for c in extra:
@@ -600,14 +601,7 @@ def read_account(account_id, search, now):
     """[change] of one account for the last READ_DAYS days."""
     since = (now - dt.timedelta(days=READ_DAYS)).strftime("%Y-%m-%d %H:%M:%S")
     until = (now + dt.timedelta(days=1)).strftime("%Y-%m-%d %H:%M:%S")
-    got = read_between(account_id, search, since, until)
-    # change_event can list a change a few minutes after change_status does: an unexplained item changed in the last STATUS_WAIT_MINUTES is
-    # left for the next run (it is still inside LAG_HOURS then), so a change an account manager made is not flagged as "Google does not say who".
-    newest = _time(max((c["at"] for c in got), default=""))
-    if newest:
-        wait = (newest - dt.timedelta(minutes=STATUS_WAIT_MINUTES)).isoformat(sep=" ")
-        got = [c for c in got if c["client"] != "STATUS" or c["at"] < wait]
-    return got
+    return read_between(account_id, search, since, until)
 
 
 def run(store, *, accounts, deliver, search_fn, link, trigger, now=None, currency_of=None, money=None, workers=WORKERS):
@@ -700,7 +694,7 @@ def day_report(store, *, accounts, search_fn, day, account=None, everyone=False,
 
     def one(a):
         try:
-            return a, read_between(a["id"], search_fn, since, until), None
+            return a, read_between(a["id"], search_fn, since, until, with_status=True), None
         except Exception as e:                                                      # noqa: BLE001
             return a, None, ("%s" % e)[:240] or type(e).__name__
     with ThreadPoolExecutor(max_workers=max(1, workers)) as pool:
@@ -710,13 +704,20 @@ def day_report(store, *, accounts, search_fn, day, account=None, everyone=False,
         if changes is None:
             unread.append({"accountId": a["id"], "name": a["name"], "error": err})
             continue
+        unnamed = [c for c in changes if c["client"] == "STATUS"]
+        changes = [c for c in changes if c["client"] != "STATUS"]
+        other = None
+        if unnamed:
+            x = lines_for(a, unnamed, currency_of(a["id"]), money)[0]
+            other = {"count": len(unnamed), "line": x["line"], "first": x["first"], "last": x["last"]}
         bad = flagged(changes, allow)
         shown = changes if everyone else bad
         lines = lines_for(a, shown, currency_of(a["id"]), money)
         for x in lines:
             x["allowed"] = allowed(x["who"], allow)
-        if lines or account:
-            out.append({"id": a["id"], "name": a["name"], "total": len(changes), "allowed": len(changes) - len(bad), "flagged": len(bad), "lines": lines})
+        if lines or account or other:
+            out.append({"id": a["id"], "name": a["name"], "total": len(changes), "allowed": len(changes) - len(bad), "flagged": len(bad), "lines": lines,
+                        "unnamed": other})
     out.sort(key=lambda r: (-r["flagged"], r["name"].lower()))
     return {"date": day.isoformat(), "accounts": out, "unread": unread, "read": len(google) - len(unread), "of": len(google), "noAllowList": not allow,
             "flagged": sum(r["flagged"] for r in out)}
@@ -724,7 +725,7 @@ def day_report(store, *, accounts, search_fn, day, account=None, everyone=False,
 
 def state_for(store):
     """What the page shows: the settings, the last runs and the changes flagged lately."""
-    return {"settings": settings(store), "runs": (store.state_get(RUNS_KEY) or [])[:10], "recent": (store.state_get(RECENT_KEY) or [])[:100],
+    return {"settings": settings(store), "runs": (store.state_get(RUNS_KEY) or [])[:10], "recent": (store.state_get(RECENT_KEY) or [])[:RECENT_KEPT],
             "baseline": bool(store.state_get(SEEN_KEY)), "running": bool((store.state_get(LOCK_KEY) or {}).get("locked")), "channel": DEFAULT_CHANNEL}
 
 

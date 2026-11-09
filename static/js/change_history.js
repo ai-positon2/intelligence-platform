@@ -23,8 +23,9 @@
     $("channel").value = s.channel || d.channel || "";
     $("setNote").textContent = (s.allow || []).length + " allowed" + (s.savedBy ? ", saved by " + s.savedBy : "");
     var rec = d.recent || [];
-    $("recent").innerHTML = rec.length ? table(["Sent", "Account", "Who", "What was done"], rec.map(function (x) {
-      return "<tr><td>" + when(x.at) + "</td><td>" + esc(x.accountName) + "</td><td>" + esc(x.who) + (x.via ? " (" + esc(x.via) + ")" : "") + "</td><td>" + esc(x.line) + "</td></tr>";
+    $("recent").innerHTML = rec.length ? table(["Changed (account's time)", "Account", "Who", "What was done", "Sent"], rec.map(function (x) {
+      var span = esc(x.first || "") + (x.last && x.last !== x.first ? " to " + esc(x.last.slice(x.last.slice(0, 10) === (x.first || "").slice(0, 10) ? 11 : 0)) : "");
+      return "<tr><td>" + span + "</td><td>" + esc(x.accountName) + "</td><td>" + esc(x.who) + (x.via ? " (" + esc(x.via) + ")" : "") + "</td><td>" + esc(x.line) + "</td><td>" + when(x.at) + "</td></tr>";
     })) : '<p class="pm-panel-s">Nothing flagged yet.' + (d.baseline ? "" : " The first run sets the baseline and sends nothing.") + "</p>";
     var runs = d.runs || [];
     $("runs").innerHTML = runs.length ? table(["When", "How", "Accounts read", "Flagged", "Messages", "Problem"], runs.map(function (r) {
@@ -83,14 +84,20 @@
       (d.noAllowList ? " No allowed addresses are saved, so every change counts as flagged." : "") + "</p>";
     var rows = [];
     (d.accounts || []).forEach(function (a) {
+      if (!a.lines.length && a.unnamed && d.accounts.length > 1) return;
       if (!a.lines.length) { rows.push("<tr><td>" + esc(a.name) + "</td><td colspan=\"2\">No changes that day.</td><td>" + a.total + "</td></tr>"); return; }
       a.lines.forEach(function (x, i) {
         rows.push("<tr><td>" + (i ? "" : esc(a.name)) + "</td><td>" + esc(x.who) + (x.via ? " (" + esc(x.via) + ")" : "") + (x.allowed ? " <span class=\"pm-panel-s\">allowed</span>" : "") +
           "</td><td>" + esc(x.line) + "</td><td>" + (i ? "" : a.flagged + " of " + a.total) + "</td></tr>");
       });
     });
+    var other = (d.accounts || []).filter(function (a) { return a.unnamed; });
+    var otherHtml = other.length ? '<p class="pm-panel-s" style="margin-top:14px">Also changed that day, in Google\'s list of changed items, which does not say who and counts Google\'s own automatic updates too (policy reviews, asset ratings). Shown here only, never flagged or sent.</p>' +
+      table(["Account", "What changed", "When"], other.map(function (a) {
+        return "<tr><td>" + esc(a.name) + "</td><td>" + esc(a.unnamed.line) + "</td><td>" + esc(a.unnamed.first.slice(11)) + " to " + esc(a.unnamed.last.slice(11)) + "</td></tr>";
+      })) : "";
     var un = (d.unread || []).map(function (u) { return esc(u.name) + ": " + esc(u.error); }).join("; ");
-    $("dayOut").innerHTML = head + (rows.length ? table(["Account", "Who", "What was done", "Flagged"], rows) : "") + (un ? '<p class="pm-err">Not read: ' + un + "</p>" : "");
+    $("dayOut").innerHTML = head + (rows.length ? table(["Account", "Who", "What was done", "Flagged"], rows) : "") + otherHtml + (un ? '<p class="pm-err">Not read: ' + un + "</p>" : "");
   }
   $("dayGo").addEventListener("click", function () {
     var btn = $("dayGo");
