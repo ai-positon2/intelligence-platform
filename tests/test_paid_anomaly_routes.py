@@ -86,6 +86,9 @@ def test_a_bad_account_is_refused_by_the_real_report(monkeypatch, store):
 def test_the_real_report_is_built_from_the_read_and_what_the_team_saved(monkeypatch, store):
     monkeypatch.setattr(gads, "list_accounts", lambda: [TA.ACCT])
     monkeypatch.setattr(gads, "search", TA.searcher(), raising=True)
+    # The read is dated around TA.NOW, so the report runs at TA.NOW: on the real clock the read ages out of its window.
+    real = an.report_for
+    monkeypatch.setattr(an, "report_for", lambda *a, **k: real(*a, **dict(k, now_utc=TA.NOW)))
     an.clear_cache()
     base.reset_state()
     r = client_as(STAFF).get(API + "/report?account=1234567890")

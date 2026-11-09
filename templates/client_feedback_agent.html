@@ -13,6 +13,10 @@
 
   {% if connected %}<div class="cf-banner ok">{{ connected|title }} is connected. Everyone's questions now read through it.</div>{% endif %}
   {% if connect_error %}<div class="cf-banner bad">{{ connect_error }}</div>{% endif %}
+  {% if not is_admin %}<div class="cf-banner info" id="scopeNote"><b>What you can ask:</b> anything about the client
+    accounts: what a client said or asked for, meeting summaries, budgets, pacing and how an account is performing.
+    Questions about people or the team (who is leaving, who is unhappy, someone's performance, HR matters) are for
+    admins only and will not be answered.</div>{% endif %}
 
   <!-- Context bar: who and when, plus where it reads from -->
   <section class="pm-panel pd-cmd cf-cmd" id="cmd">
