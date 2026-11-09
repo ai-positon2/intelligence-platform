@@ -188,7 +188,7 @@ def test_the_read_joins_nothing_and_the_campaigns_are_named_apart():
         assert "'customers/1/campaigns/5'" in gaql
         return [{"campaign": {"resourceName": "customers/1/campaigns/5", "name": "P2_Generic"}}]
     got = pc.read_account("1111111111", search, NOW)
-    assert len(calls) == 3 and [c["id"] for c in got] == ["c1", "x2"] and got[0]["campaign"] == "P2_Generic"
+    assert len(calls) == 2 and [c["id"] for c in got] == ["c1", "x2"] and got[0]["campaign"] == "P2_Generic"
 
     def refusing(cid, gaql):
         if "FROM campaign " in gaql:
@@ -221,7 +221,7 @@ def test_a_day_is_read_whole_for_the_page_and_nothing_is_sent_or_remembered():
     every = pc.day_report(s, accounts=ACCOUNTS, search_fn=search, day=day, everyone=True)["accounts"][0]["lines"]
     assert [(x["who"], x["allowed"]) for x in every][-1] == ("asha@example.com", True)
     one = pc.day_report(s, accounts=ACCOUNTS, search_fn=search, day=day, account="2222222222")
-    assert one["accounts"] == [{"id": "2222222222", "name": "Bolt Parts", "total": 0, "allowed": 0, "flagged": 0, "lines": []}]
+    assert one["accounts"] == [{"id": "2222222222", "name": "Bolt Parts", "total": 0, "allowed": 0, "flagged": 0, "lines": [], "unnamed": None}]
     assert pc.SEEN_KEY not in s.d and pc.RUNS_KEY not in s.d
     with pytest.raises(pc.BadRequest):
         pc.day_report(s, accounts=ACCOUNTS, search_fn=search, day=day, account="act_1")
@@ -319,12 +319,16 @@ def test_what_change_status_lists_and_change_event_does_not_explain_is_flagged_w
             return status
         return [{"campaign": {"resourceName": "customers/1/campaigns/5", "name": "P2_Generic"}}, {"campaign": {"resourceName": "customers/1/campaigns/6", "name": "P2_PMax"}}]
     got = pc.read_account("1111111111", search, NOW)
-    assert [c["at"][11:16] for c in got if c["client"] == "STATUS"] == ["11:00", "11:01", "11:02"]   # the newest 30 minutes wait for the next run
-    got = pc.read_between("1111111111", search, "2026-11-06 00:00:00", "2026-11-06 23:59:59")         # the day view reads them all
+    assert [c for c in got if c["client"] == "STATUS"] == []      # a run never takes change_status: it counts Google's own automatic updates too
+    got = pc.read_between("1111111111", search, "2026-11-06 00:00:00", "2026-11-06 23:59:59", with_status=True)
     extra = [c for c in got if c["client"] == "STATUS"]
     assert len(got) == 6 and len(extra) == 5
     lines = pc.lines_for({"id": "1", "name": "Acme Dental"}, extra)
     assert [x["who"] for x in lines] == ["someone (Google does not say who)"]
     assert lines[0]["line"] == "Edited 2 ads, removed an ad, edited an asset group, edited an item of another kind (in P2_Generic, P2_PMax). 5 changes."
-    seen = pc.new_since(got, None)[1]
-    assert pc.new_since(got, seen)[0] == []                                                         # the same items are not flagged twice
+    s = Store()
+    s.state_set(pc.KEY, {"allow": ALLOW})
+    day = pc.day_report(s, accounts=ACCOUNTS[:1], search_fn=search, day=dt.date(2026, 11, 6), everyone=True)
+    acme = day["accounts"][0]
+    assert day["flagged"] == 1 and acme["total"] == 1 and acme["flagged"] == 1                     # only the change Google names a person for
+    assert acme["unnamed"]["count"] == 5 and acme["unnamed"]["line"].startswith("Edited 2 ads, removed an ad")
