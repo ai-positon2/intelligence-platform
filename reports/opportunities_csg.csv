@@ -1,34 +1,35 @@
 rank,company,domain,industry,total_score,signal_types,top_signal,top_signal_date
-1,Fujitsu,fujitsu.com,Technology,90.0,Partnership + Product Launch,Fujitsu launches technology - first Uvance Wayfinders consulting practice to challenge traditional consulting models in ,2026-08-10
-2,Apple Inc.,apple.com,Technology,63.6,News Mention + Product Launch,Apple foldable iPhone Duo launches in China with delivery stretching into 2027,2026-10-23
-3,Lava International,lavamobiles.com,Technology,63.0,Product Launch,"Lava Smart 4 with 6 . 56 ″ display , 5000mAh battery launched",2026-08-10
-4,Sony Group Corporation,sony.com,Technology,53.5,Partnership + Product Launch,Sony Introduces True RGB Technology Backed by RGB Backlight Master Drive Pro in India with Launch of BRAVIA 9II and BRAV,2026-10-19
-5,"Samsung Electronics Co., Ltd.",samsung.com,Technology,52.5,Product Launch,Samsung introduces Galaxy Tab S12 series with AI features,2026-10-16
-6,HP Inc,hp.com,Technology,43.5,Partnership + Product Launch,HP introduces ZBook Ultra G3a in India ! – Chennaionline,2026-10-15
-7,Realme,realme.com,Technology,30.0,Partnership + Product Launch,"Realme 16 Pro Harry Potter Edition launches in Malaysia for RM2 , 699",2026-09-24
-8,Foxconn,foxconn.com,Technology,23.5,Partnership + Product Launch,"Mitsubishi Electric , Foxconn Enter Strategic Alliance for Automotive Equipment Business",2026-10-19
-9,Compal Electronics,compal.com,Technology,23.5,Partnership + Product Launch,Compal and Verda expand AI cloud infrastructure partnership,2026-10-23
-10,Corsair,corsair.com,Technology,21.0,Product Launch,"Corsair Gaming ( NASDAQ : CRSR ) Releases Quarterly Earnings Results , Beats Expectations By $0 . 16 EPS",2026-08-08
+1,Fujitsu,fujitsu.com,Technology,80.0,Partnership + Product Launch,Fujitsu & DigiCert team up on certificate management,2026-08-18
+2,Sony Electronics,sony.com,Technology,60.0,Partnership + Product Launch,Sony Unveils Fourth Generation Of DWX Wireless Mics,2026-09-09
+3,Lava International,lavamobiles.com,Technology,56.0,Product Launch,"Lava launches Virat Curve 5G at ₹23 , 999 , launch price ₹19 , 999",2026-09-21
+4,Apple Inc.,apple.com,Technology,54.0,News Mention + Product Launch,Apple foldable iPhone Duo launches in China with delivery stretching into 2027,2026-10-23
+5,Sony Group Corporation,sony.com,Technology,53.5,Partnership + Product Launch,Sony Introduces True RGB Technology Backed by RGB Backlight Master Drive Pro in India with Launch of BRAVIA 9II and BRAV,2026-10-19
+6,"Samsung Electronics Co., Ltd.",samsung.com,Technology,52.5,Product Launch,Samsung introduces Galaxy Tab S12 series with AI features,2026-10-16
+7,Razer,razer.com,Technology,44.0,Partnership + Product Launch,Razer Unveils The Hammerhead V3 Chroma,2026-11-06
+8,HP Inc,hp.com,Technology,43.5,Partnership + Product Launch,HP introduces ZBook Ultra G3a in India ! – Chennaionline,2026-10-15
+9,Realme,realme.com,Technology,30.0,Partnership + Product Launch,"Realme 16 Pro Harry Potter Edition launches in Malaysia for RM2 , 699",2026-09-24
+10,Compal Electronics,compal.com,Technology,23.5,Partnership + Product Launch,Compal and Verda expand AI cloud infrastructure partnership,2026-10-23
 11,Acer Inc.,acer.com,Technology,21.0,Product Launch,"Acer Unveils New Vero 16 Laptop - Designed Around Repairability , AI - powered Performance , and a Commitment to Reducin",2026-09-02
-12,"LG Electronics, Inc.",lge.com,Technology,20.0,Partnership + Product Launch,LG ELECTRONICS ACCELERATES ROBOTICS COLLABORATION WITH NVIDIA,2026-08-18
-13,Logitech,logitech.com,Technology,14.0,Product Launch,Logitech G unveils new Pro X3 Superstrike mouse and more,2026-09-24
-14,Samsung Electronics,samsung.com,Technology,14.0,Product Launch,Samsung Galaxy S26 FE Launch : The  Fan Edition  – Capital FM Kenya,2026-09-28
-15,Emdoor,emdoor.com,Technology,10.5,Product Launch,"Emdoor Information International Co ., Limited : ONERugged Launches V82T and M10A - VDS Rugged Devices for Fleet Managem",2026-10-16
-16,"Casio Computer Co.,Ltd.",casio.com,Technology,10.5,Product Launch,"Casio G - Shock GMC - 2500 price , features and India availability : 5 new watches unveiled",2026-10-24
-17,CyberPowerPC,cyberpowerpc.com,Technology,7.0,Partnership,CyberPowerPC to power Fnatic events and bootcamps throughout 2026,2026-09-04
-18,Hamilton Beach Brands Holding Company,hamiltonbeach.com,Technology,7.0,Product Launch,"Hamilton Beach Brands ( NYSE : HBB ) Releases Earnings Results , Beats Estimates By $2 . 33 EPS",2026-08-06
-19,ASRock,asrock.com,Technology,7.0,Product Launch,ASRock Continues Expanding AM4 Lineup By Launching Budget B550M Pro - A WiFi 6E Motherboard,2026-08-30
-20,Grundig,grundig.com,Technology,7.0,Partnership,"Grundig Unveils New Product Lineup at IFA 2026 , Marking a New Phase in Strategic Partnership",2026-09-04
-21,Durabook,durabook.com,Technology,7.0,Product Launch,Durabook launches a workstation laptop with three real screens - Z14I - DX3 is a rugged mobile device featuring a trio o,2026-09-25
-22,Gradiente,gradiente.com.br,Technology,7.0,Product Launch,"Major Push for the Orange Economy : Gradiente Infotainment Unveils ₹5 , 000 Crore Mega Investment Roadmap",2026-08-05
-23,Hyundai Technology,hyundaitechnology.com,Technology,7.0,Partnership,Hyundai Rotem partnership drives rail upgrade,2026-08-29
-24,Samsung,samsung.com,Technology,7.0,Product Launch,Samsung Galaxy S26 FE Launch : The  Fan Edition  – Capital FM Kenya,2026-09-28
-25,Bang & Olufsen A-S,bang-olufsen.com,Technology,7.0,Partnership,Motorola and Bang & Olufsen announce multi - year partnership to co - create premium audio experiences,2026-09-21
-26,Huawei,huawei.com,Technology,7.0,Product Launch,Huawei Mate 90 debut bawa baterai 6 . 600 mAh dan tiga kamera belakang,2026-10-02
-27,Koss Corporation,koss.com,Technology,7.0,Product Launch,Koss Corporation Releases Fourth Quarter and Full Year Results,2026-08-27
-28,Vuzix Corporation,vuzix.com,Technology,7.0,Product Launch,Vuzix Introduces Shrike Defense Display Platform and Ships Initial Evaluation Units,2026-09-29
-29,Dell Technologies,dell.com,Technology,3.6,News Mention,Huddle Workspaces Upgrade With New Dell 43 - Inch 4K Monitor,2026-08-10
+12,Getac,getac.com,Technology,21.0,Product Launch,Getac Next Generation B360X and B360X Pro Fully Rugged Notebooks Bring the Power of Edge AI to Frontline Professionals,2026-10-23
+13,"LG Electronics, Inc.",lge.com,Technology,20.0,Partnership + Product Launch,LG ELECTRONICS ACCELERATES ROBOTICS COLLABORATION WITH NVIDIA,2026-08-18
+14,Corsair,corsair.com,Technology,14.0,Product Launch,Corsair Launches TC80 Gaming Chair for $199 . 99 After Passing Over 30 Durability Tests,2026-09-09
+15,Logitech,logitech.com,Technology,14.0,Product Launch,Logitech G unveils new Pro X3 Superstrike mouse and more,2026-09-24
+16,Samsung Electronics,samsung.com,Technology,14.0,Product Launch,Samsung Galaxy S26 FE Launch : The  Fan Edition  – Capital FM Kenya,2026-09-28
+17,Emdoor,emdoor.com,Technology,10.5,Product Launch,"Emdoor Information International Co ., Limited : ONERugged Launches V82T and M10A - VDS Rugged Devices for Fleet Managem",2026-10-16
+18,Foxconn,foxconn.com,Technology,10.5,Partnership,"Mitsubishi Electric , Foxconn Enter Strategic Alliance for Automotive Equipment Business",2026-10-19
+19,"Casio Computer Co.,Ltd.",casio.com,Technology,10.5,Product Launch,"Casio G - Shock GMC - 2500 price , features and India availability : 5 new watches unveiled",2026-10-24
+20,CyberPowerPC,cyberpowerpc.com,Technology,7.0,Partnership,CyberPowerPC to power Fnatic events and bootcamps throughout 2026,2026-09-04
+21,ASRock,asrock.com,Technology,7.0,Product Launch,ASRock Continues Expanding AM4 Lineup By Launching Budget B550M Pro - A WiFi 6E Motherboard,2026-08-30
+22,Grundig,grundig.com,Technology,7.0,Partnership,"Grundig Unveils New Product Lineup at IFA 2026 , Marking a New Phase in Strategic Partnership",2026-09-04
+23,Durabook,durabook.com,Technology,7.0,Product Launch,Durabook launches a workstation laptop with three real screens - Z14I - DX3 is a rugged mobile device featuring a trio o,2026-09-25
+24,Hyundai Technology,hyundaitechnology.com,Technology,7.0,Partnership,Hyundai Rotem partnership drives rail upgrade,2026-08-29
+25,Samsung,samsung.com,Technology,7.0,Product Launch,Samsung Galaxy S26 FE Launch : The  Fan Edition  – Capital FM Kenya,2026-09-28
+26,Bang & Olufsen A-S,bang-olufsen.com,Technology,7.0,Partnership,Motorola and Bang & Olufsen announce multi - year partnership to co - create premium audio experiences,2026-09-21
+27,Huawei,huawei.com,Technology,7.0,Product Launch,Huawei Mate 90 debut bawa baterai 6 . 600 mAh dan tiga kamera belakang,2026-10-02
+28,Koss Corporation,koss.com,Technology,7.0,Product Launch,Koss Corporation Releases Fourth Quarter and Full Year Results,2026-08-27
+29,Vuzix Corporation,vuzix.com,Technology,7.0,Product Launch,Vuzix Introduces Shrike Defense Display Platform and Ships Initial Evaluation Units,2026-09-29
 30,Clevo,clevo.com.tw,Technology,1.8,News Mention,Clevo Books to Rebrand as a Maker Marketplace,2026-08-20
 31,Quanta Computer,quantatw.com,Technology,1.8,News Mention,Quanta raises 2026 capex to NT$40B as AI visibility runs to 2028,2026-08-13
 32,Supermicro,supermicro.com,Technology,1.8,News Mention,"Fortune Tech : Anthropic IPO , Trump digs data centers , SuperMicro investigation",2026-08-21
-33,Optima,optima.es,Technology,1.8,News Mention,Greece Optima Bank plans capital raise following regulator pressure,2026-09-25
+33,Dell Technologies,dell.com,Technology,1.8,News Mention,Dell enters the S & P 100 index after monstrous three - year rally,2026-09-12
+34,Optima,optima.es,Technology,1.8,News Mention,Greece Optima Bank plans capital raise following regulator pressure,2026-09-25
