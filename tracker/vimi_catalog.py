@@ -284,6 +284,7 @@ IGNORED = {
     "/p2/strategic-agents/linkedin-scraper": "listed under LinkedIn Intelligence",
     "/p2/strategic-agents": "the section's index page",
     "/p2/paid-marketing": "the section's index page",
+    "/p2/paid-marketing/capacity-demo": "an anonymized, frozen demo copy of the 42 North Dental Slot Checker; its numbers are that agent's",
 }
 
 

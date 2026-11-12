@@ -4355,6 +4355,34 @@ def paid_client_feedback():
                            connect_error=request.args.get("error", "")[:300])
 
 
+# Dental Capacity Demo (2026-11-12): an anonymized, frozen copy of the 42 North
+# Dental Slot Checker (Aug 12 to 25 snapshot) for showing the dashboard without
+# naming the client. Every practice, brand, city, office number and booking URL
+# is a placeholder ("Dental Group", "Practice A", "Location 1"); the numbers are
+# the real ones. Static files in data/capacity_demo/, never the live sheet, so
+# nothing new can leak in. AI Insights is off on purpose: its text names
+# practices. Behind the Position2 login like every other Paid Marketing page.
+_CAPACITY_DEMO_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "capacity_demo")
+
+
+@app.route("/p2/paid-marketing/capacity-demo")
+@position2_required
+def paid_capacity_demo():
+    return send_from_directory(_CAPACITY_DEMO_DIR, "index.html", mimetype="text/html", max_age=0)
+
+
+@app.route("/p2/paid-marketing/capacity-demo/data")
+@position2_required
+def paid_capacity_demo_data():
+    return send_from_directory(_CAPACITY_DEMO_DIR, "data.json", mimetype="application/json", max_age=0)
+
+
+@app.route("/p2/paid-marketing/capacity-demo/insights")
+@position2_required
+def paid_capacity_demo_insights():
+    return send_from_directory(_CAPACITY_DEMO_DIR, "insights.json", mimetype="application/json", max_age=0)
+
+
 # Pacing Desk data ------------------------------------------------------------
 
 @app.route("/p2/paid-marketing/api/pacing/snapshots")
