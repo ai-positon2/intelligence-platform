@@ -48,6 +48,14 @@ def test_a_position2_user_gets_the_page_and_its_data():
     assert c.get(_PATHS[2]).get_json() == {"configured": False}
 
 
+def test_dropdown_options_are_black_on_white():
+    """The page is sent as a file, which skips the after_request hook that adds
+    this rule to every other page, so the page must carry the rule itself."""
+    body = _client("reporting@position2.com").get(_PATHS[0]).get_data(as_text=True)
+    head = body.split("</head>", 1)[0]
+    assert 'id="p2-option-colors"' in head and "color:#111 !important" in head
+
+
 def _real_names():
     with open(os.path.join(_ROOT, "data", "slot_checker_snapshot.json"), encoding="utf-8") as fh:
         snap = json.load(fh)
