@@ -21,6 +21,7 @@
     var s = d.settings || {};
     $("allow").value = (s.allow || []).join("\n");
     $("channel").value = s.channel || d.channel || "";
+    $("canvas").value = Object.keys(s.canvas || {}).map(function (name) { return name + " -> " + s.canvas[name]; }).join("\n");
     $("setNote").textContent = (s.allow || []).length + " allowed" + (s.savedBy ? ", saved by " + s.savedBy : "");
     var rec = d.recent || [];
     $("recent").innerHTML = rec.length ? table(["Changed (account's time)", "Account", "Who", "What was done", "Sent"], rec.map(function (x) {
@@ -39,7 +40,7 @@
   function load() { return call("state").then(function (d) { paint(d); }).catch(function (e) { say(esc(e.message)); }); }
   $("save").addEventListener("click", function () {
     $("save").disabled = true; say("");
-    call("settings", { allow: $("allow").value, channel: $("channel").value.trim() })
+    call("settings", { allow: $("allow").value, channel: $("channel").value.trim(), canvas: $("canvas").value })
       .then(function () { say("Saved.", "pm-note"); return load(); })
       .catch(function (e) { say(esc(e.message)); })
       .then(function () { $("save").disabled = false; });

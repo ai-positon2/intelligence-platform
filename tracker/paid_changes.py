@@ -19,6 +19,10 @@ Rules it keeps:
   * what was seen is remembered only once Slack took the message, so a message Slack refused is sent again at the next run;
   * an account that could not be read is named on the run and remembered as it was.
 
+An account named in the saved settings' canvas mapping (saved on the page, never in this repository, like the allowed addresses) never goes
+in the shared message: its flagged changes are appended instead to that account's own Slack Canvas (titled CANVAS_TITLE) in its own channel,
+created the first time there is something to write. The canvas id is remembered under CANVAS_KEY so later runs append to the same one.
+
 Read only: nothing is changed in an ad account.
 """
 from __future__ import annotations
@@ -36,7 +40,9 @@ RECENT_KEY = "changes:recent"
 RUNS_KEY = "runs:changes"
 LOCK_KEY = "lock:changes"
 ACCESS_KEY = "changes:access"      # the last snapshot of each account's access, manager links and conversion actions
+CANVAS_KEY = "changes:canvas"      # {account name: canvas id}, the per-account canvases settings()["canvas"] writes to instead of the shared channel
 DEFAULT_CHANNEL = "C0B322RN6SG"      # #adcopyqc
+CANVAS_TITLE = "Change History"
 READ_DAYS = 2                        # more than the time between two runs, and Google's time zones either way
 LAG_HOURS = 6                        # Google can list a change a little after its time: a change this much older than the newest one seen is still looked at
 LIMIT = 1000
@@ -143,8 +149,12 @@ def _time(v):
 
 # ── Settings (who is allowed, where it goes) ─────────────────────────────────
 
+_CANVAS_LINE = re.compile(r"^(.+?)\s*(?:->|=>|=|:)\s*([#@]?[A-Za-z0-9._-]{1,80})$")
+MAX_CANVAS = 20
+
+
 def clean_settings(data):
-    """{allow: [email or @domain], channel} from what the page sent, or BadRequest."""
+    """{allow: [email or @domain], channel, canvas: {account name: channel}} from what the page sent, or BadRequest."""
     if not isinstance(data, dict):
         raise BadRequest("Send the allowed addresses and the channel.")
     raw = data.get("allow")
@@ -164,12 +174,45 @@ def clean_settings(data):
     channel = str(data.get("channel") or "").strip() or DEFAULT_CHANNEL
     if not _CHANNEL.match(channel):
         raise BadRequest("The Slack channel must be a channel id (C0...) or a #name.")
-    return {"allow": allow, "channel": channel}
+    return {"allow": allow, "channel": channel, "canvas": _clean_canvas(data.get("canvas"))}
+
+
+def _clean_canvas(raw):
+    """{account name: channel}: the accounts whose flagged changes go only to their own Slack Canvas (CANVAS_TITLE) in that channel, never to
+    the shared one. Saved on the page like the allowed addresses, never written to this repository. Takes a dict, or textarea lines written
+    "Account name -> channel"."""
+    if raw is None:
+        return {}
+    if isinstance(raw, str):
+        pairs = {}
+        for line in raw.splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            m = _CANVAS_LINE.match(line)
+            if not m:
+                raise BadRequest('"%s" should be written "Account name -> Slack channel".' % line[:80])
+            pairs[m.group(1).strip()] = m.group(2)
+        raw = pairs
+    if not isinstance(raw, dict):
+        raise BadRequest("The canvas accounts must be an account name and a Slack channel, one per line.")
+    out = {}
+    for name, channel in raw.items():
+        name, channel = str(name or "").strip(), str(channel or "").strip()
+        if not name or not channel:
+            continue
+        if not _CHANNEL.match(channel):
+            raise BadRequest("The Slack channel for %s must be a channel id (C0...) or a #name." % name[:80])
+        out[name] = channel
+    if len(out) > MAX_CANVAS:
+        raise BadRequest("At most %d canvas accounts." % MAX_CANVAS)
+    return out
 
 
 def settings(store):
     saved = store.state_get(KEY) or {}
-    return {"allow": list(saved.get("allow") or []), "channel": saved.get("channel") or DEFAULT_CHANNEL, "savedBy": saved.get("savedBy") or "", "savedAt": saved.get("savedAt") or ""}
+    return {"allow": list(saved.get("allow") or []), "channel": saved.get("channel") or DEFAULT_CHANNEL, "canvas": dict(saved.get("canvas") or {}),
+            "savedBy": saved.get("savedBy") or "", "savedAt": saved.get("savedAt") or ""}
 
 
 def save_settings(store, data, who, now=None):
@@ -389,6 +432,25 @@ def messages(found, link, now):
             total, "" if total == 1 else "s", ", ".join(f["account"]["name"] for f in chunk[:5]) + (" +%d" % (len(chunk) - 5) if len(chunk) > 5 else ""))
         out.append((text, blocks))
     return out
+
+
+# ── An account's own canvas (settings()["canvas"]): a running log in its own channel instead of the shared message ──────────
+
+def canvas_entry(item, now):
+    """The markdown appended to an account's canvas for one run's flagged lines ([{who, via, line, count}])."""
+    rows = "\n".join("- **%s**%s: %s" % (x["who"], " (%s)" % x["via"] if x["via"] else "", x["line"]) for x in item["lines"])
+    return "## %s UTC\n%s\n" % (now.strftime("%d %b %Y, %H:%M"), rows)
+
+
+def canvas_id_for(store, deliver, name, channel):
+    """The canvas id this account writes to, creating it (named CANVAS_TITLE, in `channel`) the first time."""
+    ids = store.state_get(CANVAS_KEY) or {}
+    cid = ids.get(name)
+    if cid:
+        return cid
+    cid = deliver.canvas_create(CANVAS_TITLE, channel, "# %s\nGoogle Ads changes by someone other than the account managers, oldest first.\n" % CANVAS_TITLE)
+    store.state_set(CANVAS_KEY, dict(ids, **{name: cid}))
+    return cid
 
 
 # ── What change history leaves out: access, manager links, conversion actions ──
@@ -636,6 +698,9 @@ def run(store, *, accounts, deliver, search_fn, link, trigger, now=None, currenc
         if bad:
             found.append({"account": a, "lines": lines_for(a, bad, currency_of(a["id"]), money)})
     found.sort(key=lambda f: f["account"]["name"].lower())
+    canvas_of = conf["canvas"]
+    chat_found = [f for f in found if f["account"]["name"] not in canvas_of]       # a canvas account goes only to its own canvas, never here too
+    canvas_found = [f for f in found if f["account"]["name"] in canvas_of]
     record = {"at": now.isoformat(), "trigger": trigger, "accounts": len(google), "read": len(google) - len(unread), "unread": unread[:30], "baseline": baseline,
               "flagged": sum(x["count"] for f in found for x in f["lines"]), "accountsFlagged": len(found), "sent": 0, "error": ""}
     remember = True
@@ -644,15 +709,27 @@ def run(store, *, accounts, deliver, search_fn, link, trigger, now=None, currenc
     elif found and not conf["allow"]:
         record["error"] = "No allowed addresses are saved yet, so nothing was sent (every change would be flagged). Save the account managers' addresses first."
         remember = False                                                            # kept unseen, so they are judged once the list is saved
-    elif found:
-        for text, blocks in messages(found, link, now):
-            try:
-                deliver.send_slack(conf["channel"], text, blocks)
-                record["sent"] += 1
-            except Exception as e:                                                  # noqa: BLE001 (nothing is remembered, so the next run sends it again)
-                remember = False
-                record["error"] = ("Slack: %s" % e)[:300]
-                break
+    else:
+        if chat_found:
+            for text, blocks in messages(chat_found, link, now):
+                try:
+                    deliver.send_slack(conf["channel"], text, blocks)
+                    record["sent"] += 1
+                except Exception as e:                                              # noqa: BLE001 (nothing is remembered, so the next run sends it again)
+                    remember = False
+                    record["error"] = ("Slack: %s" % e)[:300]
+                    break
+        if remember:
+            for f in canvas_found:
+                name = f["account"]["name"]
+                try:
+                    cid = canvas_id_for(store, deliver, name, canvas_of[name])
+                    deliver.canvas_append(cid, canvas_entry(f, now))
+                    record["sent"] += 1
+                except Exception as e:                                              # noqa: BLE001 (nothing is remembered, so the next run sends it again)
+                    remember = False
+                    record["error"] = ("Slack canvas (%s): %s" % (name, e))[:300]
+                    break
     if remember:
         merged = dict(seen_all)
         merged.update(keep)
