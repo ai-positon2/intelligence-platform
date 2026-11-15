@@ -5,7 +5,9 @@ Email goes through the Gmail API with the platform's service account
 platform's access-request emails use: Railway blocks outbound SMTP, which
 is the fallback only where SMTP_HOST/USER/PASS are set. Slack goes through
 the platform's bot (SLACK_BOT_TOKEN, chat.postMessage); the bot has to be
-a member of the channel.
+a member of the channel. The same bot can also keep a channel's own Slack
+Canvas up to date (canvases.create, canvases.edit) instead of posting a
+message each time; the bot token needs the canvases:write scope for that.
 
 Each send returns nothing or raises. attempt() turns that into the record
 stored with the update: sent, not_configured (a variable is unset), or
@@ -151,3 +153,25 @@ def send_slack(channel, text, blocks):
     if not r.ok or not body.get("ok"):
         # "not_in_channel": the bot has to be invited to the channel first.
         raise RuntimeError("Slack refused: %s" % (body.get("error") or "HTTP %s" % r.status_code))
+
+
+def _slack_post(method, payload):
+    token = os.environ.get("SLACK_BOT_TOKEN", "")
+    if not token:
+        raise NotConfigured("SLACK_BOT_TOKEN is not set")
+    r = requests.post("https://slack.com/api/" + method, headers={"Authorization": "Bearer " + token}, json=payload, timeout=15)
+    body = r.json() if r.headers.get("content-type", "").startswith("application/json") else {}
+    if not r.ok or not body.get("ok"):
+        # "not_in_channel": the bot has to be invited to the channel first; "missing_scope": the bot token needs canvases:write.
+        raise RuntimeError("Slack refused: %s" % (body.get("error") or "HTTP %s" % r.status_code))
+    return body
+
+
+def canvas_create(title, channel, markdown):
+    """A new standalone canvas titled `title`, added as a tab on `channel`. Returns its id."""
+    return _slack_post("canvases.create", {"title": title, "channel_id": channel, "document_content": {"type": "markdown", "markdown": markdown}})["canvas_id"]
+
+
+def canvas_append(canvas_id, markdown):
+    """Adds markdown to the end of an existing canvas."""
+    _slack_post("canvases.edit", {"canvas_id": canvas_id, "changes": [{"operation": "insert_at_end", "document_content": {"type": "markdown", "markdown": markdown}}]})

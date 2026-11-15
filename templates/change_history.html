@@ -24,6 +24,10 @@
       <label class="cc-f"><span>Allowed addresses (one per line, or a whole domain as @domain.com)</span>
         <textarea id="allow" rows="8" placeholder="name@position2.com" spellcheck="false"></textarea></label>
       <label class="cc-f"><span>Slack channel (an id like C0..., or #name)</span><input type="text" id="channel" autocomplete="off" spellcheck="false"></label>
+      <label class="cc-f"><span>Accounts with their own channel (one per line: Account name -&gt; channel)</span>
+        <textarea id="canvas" rows="3" placeholder="Acme Dental -> C0123456789" spellcheck="false"></textarea></label>
+      <p class="pm-panel-s" style="margin:4px 0 0">An account listed here never goes in the shared message above: its flagged changes go only to a Slack Canvas named
+        "Change History" in its own channel (the bot creates it the first time there is something to write, and keeps adding to the same one).</p>
       <div class="mp-btns"><button type="button" class="pm-btn" id="save">Save</button><button type="button" class="pm-btn-ghost" id="runNow">Run now</button></div>
     </div>
   </section>

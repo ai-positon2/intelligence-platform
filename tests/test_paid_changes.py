@@ -46,7 +46,7 @@ def test_the_allowed_list_takes_addresses_and_whole_domains():
     assert pc.allowed("Asha@Example.com", ALLOW) and not pc.allowed("", ALLOW) and not pc.allowed("mia@example.com", ALLOW)
     assert pc.allowed("mia@example.com", ["@example.com"]) and not pc.allowed("mia@notexample.org", ["@example.com"])
     got = pc.clean_settings({"allow": "Asha@Example.com\nravi@example.com, asha@example.com\n@example.org", "channel": ""})
-    assert got == {"allow": ["asha@example.com", "ravi@example.com", "@example.org"], "channel": pc.DEFAULT_CHANNEL}
+    assert got == {"allow": ["asha@example.com", "ravi@example.com", "@example.org"], "channel": pc.DEFAULT_CHANNEL, "canvas": {}}
     with pytest.raises(pc.BadRequest):
         pc.clean_settings({"allow": "not an address"})
     with pytest.raises(pc.BadRequest):
@@ -83,13 +83,27 @@ class Store:
 
 
 class Deliver:
-    def __init__(self, fail=False):
-        self.sent, self.fail = [], fail
+    def __init__(self, fail=False, fail_canvas=False):
+        self.sent, self.fail, self.fail_canvas = [], fail, fail_canvas
+        self.canvases, self._next_canvas = {}, 0
 
     def send_slack(self, channel, text, blocks):
         if self.fail:
             raise RuntimeError("not_in_channel")
         self.sent.append((channel, text, blocks))
+
+    def canvas_create(self, title, channel, markdown):
+        if self.fail_canvas:
+            raise RuntimeError("missing_scope")
+        self._next_canvas += 1
+        cid = "F%d" % self._next_canvas
+        self.canvases[cid] = {"title": title, "channel": channel, "markdown": [markdown]}
+        return cid
+
+    def canvas_append(self, canvas_id, markdown):
+        if self.fail_canvas:
+            raise RuntimeError("missing_scope")
+        self.canvases[canvas_id]["markdown"].append(markdown)
 
 
 ACCOUNTS = [{"id": "1111111111", "name": "Acme Dental", "platform": "google"}, {"id": "2222222222", "name": "Bolt Parts", "platform": "google"},
@@ -105,6 +119,43 @@ def _search(rows_by_account, fail=(), access=None):
         assert "FROM change_event" in gaql and gaql.endswith("LIMIT %d" % pc.LIMIT)
         return rows_by_account.get(cid, [])
     return search
+
+
+def test_the_canvas_accounts_setting_takes_a_dict_or_textarea_lines():
+    assert pc.clean_settings({"allow": "", "channel": "", "canvas": {"Glow Skin": "C0TEST1"}})["canvas"] == {"Glow Skin": "C0TEST1"}
+    assert pc.clean_settings({"allow": "", "channel": "", "canvas": "Glow Skin -> C0TEST1\n\nBolt Parts : #bolt-internal\n"})["canvas"] == \
+        {"Glow Skin": "C0TEST1", "Bolt Parts": "#bolt-internal"}
+    assert pc.clean_settings({"allow": "", "channel": ""})["canvas"] == {}
+    with pytest.raises(pc.BadRequest):
+        pc.clean_settings({"allow": "", "channel": "", "canvas": "not a pair"})
+    with pytest.raises(pc.BadRequest):
+        pc.clean_settings({"allow": "", "channel": "", "canvas": {"Glow Skin": "bad channel!"}})
+
+
+def test_a_canvas_account_goes_only_to_its_own_canvas_never_the_shared_channel():
+    s, d = Store(), Deliver()
+    accounts = ACCOUNTS       # "Glow Skin" is already one of them (a Meta account here, but the setting only looks at the name)
+    s.state_set(pc.KEY, {"allow": ALLOW, "channel": "C0TEST", "canvas": {"Bolt Parts": "C0BOLTINTERNAL"}})
+    pc.run(s, accounts=accounts, deliver=d, search_fn=_search({}), link="https://p.example/x", trigger="schedule", now=NOW)   # baseline
+    bolt1 = ev("b1", "2026-11-06 09:00:00", "ravi@agency.com", "CAMPAIGN", "UPDATE", "status", new={"campaign": {"status": "PAUSED"}}, campaign="P2-PMax")
+    rows = {"1111111111": ROWS[:1], "2222222222": [bolt1]}
+    rec = pc.run(s, accounts=accounts, deliver=d, search_fn=_search(rows), link="https://p.example/x", trigger="schedule", now=NOW)
+    assert rec["sent"] == 2 and rec["accountsFlagged"] == 2                                       # one chat message (Acme), one canvas append (Bolt Parts)
+    assert len(d.sent) == 1 and "Acme Dental" in d.sent[0][1] and "Bolt Parts" not in d.sent[0][1] and "Bolt Parts" not in d.sent[0][2][2]["text"]["text"]
+    cid = s.state_get(pc.CANVAS_KEY)["Bolt Parts"]
+    assert d.canvases[cid]["title"] == pc.CANVAS_TITLE and d.canvases[cid]["channel"] == "C0BOLTINTERNAL" and len(d.canvases) == 1
+    assert "ravi@agency.com" in d.canvases[cid]["markdown"][1] and "Paused the campaign P2-PMax" in d.canvases[cid]["markdown"][1]
+    # a second run with another Bolt Parts change appends to the same canvas rather than creating a new one
+    bolt2 = ev("b2", "2026-11-06 10:00:00", "ravi@agency.com", "CAMPAIGN_BUDGET", "UPDATE", "amountMicros",
+               old={"campaignBudget": {"amountMicros": "50000000"}}, new={"campaignBudget": {"amountMicros": "70000000"}}, campaign="P2-PMax")
+    pc.run(s, accounts=accounts, deliver=d, search_fn=_search({"2222222222": [bolt1, bolt2]}), link="https://p.example/x", trigger="schedule", now=NOW)
+    assert len(d.canvases) == 1 and len(d.canvases[cid]["markdown"]) == 3 and "70" in d.canvases[cid]["markdown"][2]
+    # a canvas failure is not remembered, so it is sent again, and never falls back to the shared channel
+    s2, failing = Store(), Deliver(fail_canvas=True)
+    s2.state_set(pc.KEY, {"allow": ALLOW, "channel": "C0TEST", "canvas": {"Bolt Parts": "C0BOLTINTERNAL"}})
+    pc.run(s2, accounts=accounts, deliver=failing, search_fn=_search({}), link="https://p.example/x", trigger="schedule", now=NOW)   # baseline
+    rec = pc.run(s2, accounts=accounts, deliver=failing, search_fn=_search({"2222222222": [bolt1]}), link="https://p.example/x", trigger="schedule", now=NOW)
+    assert rec["error"].startswith("Slack canvas (Bolt Parts): missing_scope") and failing.sent == [] and failing.canvases == {}
 
 
 def test_a_run_sets_the_baseline_then_sends_one_message_and_remembers_only_once_slack_took_it():
