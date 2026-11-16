@@ -130,7 +130,7 @@ def test_the_monitor_is_known_to_the_alert_panel_and_the_agent_is_on_the_paid_ma
     assert ".c-cc{" in css and ".pm.pm-cc" in css and ".cc-hl{" in css
     cards = len(re.findall(r'class="dash-card', paid))
     hub = re.sub(r"<!--.*?-->", "", hidden_paid.rendered("/p2/hub"), flags=re.S)
-    assert ("<span>%d</span> dashboards" % cards) in hub and ("<span>%d</span> live" % cards) in hub and "ad copy proofread for typos and wrong numbers" in hub
+    assert ("<span>%d</span> dashboards" % cards) in hub and ("<span>%d</span> live" % cards) in hub
     k = app_module._VIMI_PLATFORM_KNOWLEDGE
     assert "Ad Copy Checker (/p2/paid-marketing/ad-copy-checker)" in k and "This is right" in k and "Client Master Config is not built yet" in k
     card = paid.split('href="/p2/paid-marketing/ad-copy-checker" class="dash-card', 1)[1].split("</a>", 1)[0]

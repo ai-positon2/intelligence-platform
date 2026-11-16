@@ -58,7 +58,7 @@ def test_nothing_is_hidden_now_and_every_card_is_listed():
         assert "u:'/p2/paid-marketing/%s'" % slug in page, slug
     hub = re.sub(r"<!--.*?-->", "", H.rendered("/p2/hub"), flags=re.S)
     assert "<span>%d</span> dashboards" % TOTAL in hub and 'data-lxn="%d"' % BAND in hub
-    assert "ad copy checked against" in hub and "Google and Meta compared side by side" in hub
+    assert "ad copy checks" in hub and "Google-Meta comparisons" in hub
     for slug, title in PLAIN.items():
         assert "%s (/p2/paid-marketing/%s)" % (title, slug) in appmod._VIMI_PLATFORM_KNOWLEDGE, slug
 
@@ -85,7 +85,7 @@ def test_the_hub_counts_and_text_follow_the_switch(hide):
     hub = re.sub(r"<!--.*?-->", "", H.rendered("/p2/hub"), flags=re.S)
     assert "<span>%d</span> dashboards" % (TOTAL - 5) in hub and "<span>%d</span> live" % (TOTAL - 5) in hub
     assert 'data-lxn="%d"' % (BAND - 5) in hub
-    assert "ad copy checked against" not in hub and "compared side by side" not in hub
+    assert "ad copy checks" not in hub and "Google-Meta comparisons" not in hub
 
 
 def test_the_assistant_no_longer_describes_them_and_still_describes_the_rest(hide):

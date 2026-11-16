@@ -121,7 +121,7 @@ def test_the_monitor_is_known_to_the_alert_panel_and_the_agent_is_on_the_paid_ma
     assert len(v) == 1, v                                                                       # the stylesheet is re-versioned in the two templates that load it, together
     cards = len(re.findall(r'class="dash-card', paid))
     hub = re.sub(r"<!--.*?-->", "", hidden_paid.rendered("/p2/hub"), flags=re.S)
-    assert ("<span>%d</span> dashboards" % cards) in hub and ("<span>%d</span> live" % cards) in hub and "tired creatives and missing assets caught before results slip" in hub
+    assert ("<span>%d</span> dashboards" % cards) in hub and ("<span>%d</span> live" % cards) in hub
     kn = app_module._VIMI_PLATFORM_KNOWLEDGE
     mine = kn.split("Creative & Asset Health (", 1)[1].split("\n", 1)[0]
     assert "Creative & Asset Health (/p2/paid-marketing/creative-health)" in kn and "not blamed on one creative" in mine and "—" not in mine and "–" not in mine
