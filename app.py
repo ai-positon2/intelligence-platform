@@ -5707,6 +5707,13 @@ def paid_changes_settings():
     return _ch(lambda pc, store: jsonify(settings=pc.save_settings(store, request.get_json(silent=True) or {}, _pm_user_email())))
 
 
+@app.route("/p2/paid-marketing/api/changes/test-canvas", methods=["POST"])
+@position2_required
+def paid_changes_test_canvas():
+    """A made-up entry through every saved canvas account's own Slack Canvas, to prove the wiring without waiting for a real flagged change."""
+    return _ch(lambda pc, store: jsonify(pc.test_canvas(store, _mon_deliver())))
+
+
 @app.route("/p2/paid-marketing/api/changes/accounts")
 @position2_required
 def paid_changes_accounts():

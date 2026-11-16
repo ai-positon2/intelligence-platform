@@ -69,6 +69,18 @@
       return call("run", {}).then(function () { setTimeout(function () { follow(before, 0); }, 2000); });
     }).catch(function (e) { say(esc(e.message)); $("runNow").disabled = false; $("runNow").textContent = "Run now"; });
   });
+  $("testCanvas").addEventListener("click", function () {
+    $("testCanvas").disabled = true; say("");
+    call("test-canvas", {}).then(function (r) {
+      var names = Object.keys(r.results || {});
+      if (!names.length) { say("No accounts have a canvas channel saved. Add one above and save first.", "pm-err"); return; }
+      var ok = names.filter(function (n) { return r.results[n].ok; });
+      var bad = names.filter(function (n) { return !r.results[n].ok; });
+      var msg = (ok.length ? "Sent a test entry to " + ok.map(esc).join(", ") + "." : "") +
+        (bad.length ? " " + bad.map(function (n) { return esc(n) + ": " + esc(r.results[n].error); }).join("; ") : "");
+      say(msg, bad.length ? "pm-err" : "pm-note");
+    }).catch(function (e) { say(esc(e.message)); }).then(function () { $("testCanvas").disabled = false; });
+  });
 
   // ── Look at a day (nothing is sent) ──
   function iso(d) { return d.getFullYear() + "-" + ("0" + (d.getMonth() + 1)).slice(-2) + "-" + ("0" + d.getDate()).slice(-2); }

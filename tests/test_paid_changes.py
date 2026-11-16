@@ -132,6 +132,23 @@ def test_the_canvas_accounts_setting_takes_a_dict_or_textarea_lines():
         pc.clean_settings({"allow": "", "channel": "", "canvas": {"Glow Skin": "bad channel!"}})
 
 
+def test_sending_a_test_touches_every_saved_canvas_account_and_keeps_going_after_one_fails():
+    s, d = Store(), Deliver()
+    s.state_set(pc.KEY, {"allow": ALLOW, "channel": "C0TEST", "canvas": {}})
+    assert pc.test_canvas(s, d) == {"results": {}}
+    s.state_set(pc.KEY, {"allow": ALLOW, "channel": "C0TEST", "canvas": {"Glow Skin": "C0GLOW", "Bolt Parts": "C0BOLT"}})
+    out = pc.test_canvas(s, d)
+    assert out == {"results": {"Glow Skin": {"ok": True, "error": ""}, "Bolt Parts": {"ok": True, "error": ""}}}
+    assert len(d.canvases) == 2 and all("Test" in v["markdown"][-1] for v in d.canvases.values())
+    # calling it again appends to the same two canvases, it does not create new ones
+    pc.test_canvas(s, d)
+    assert len(d.canvases) == 2 and all(len(v["markdown"]) == 3 for v in d.canvases.values())
+    failing = Deliver(fail_canvas=True)
+    s2 = Store()
+    s2.state_set(pc.KEY, {"allow": ALLOW, "channel": "C0TEST", "canvas": {"Glow Skin": "C0GLOW"}})
+    assert pc.test_canvas(s2, failing) == {"results": {"Glow Skin": {"ok": False, "error": "missing_scope"}}}
+
+
 def test_a_canvas_account_goes_only_to_its_own_canvas_never_the_shared_channel():
     s, d = Store(), Deliver()
     accounts = ACCOUNTS       # "Glow Skin" is already one of them (a Meta account here, but the setting only looks at the name)
@@ -340,6 +357,11 @@ def test_the_page_saves_the_allowed_list_and_the_scheduled_address_needs_the_sec
     anon = a.app.test_client()
     assert anon.post("/p2/paid-marketing/api/changes/scheduled", headers={"X-Monitor-Secret": "wrong"}, json={}).status_code == 403
     assert anon.post("/p2/paid-marketing/api/changes/scheduled", headers={"X-Monitor-Secret": "shh"}, json={}).status_code == 202 and len(started) == 2
+    fake_deliver = Deliver()
+    monkeypatch.setattr(a, "_mon_deliver", lambda: fake_deliver)
+    c.post("/p2/paid-marketing/api/changes/settings", json={"allow": "asha@example.com", "channel": "C0TEST", "canvas": "Acme Dental -> C0ACME"})
+    r = c.post("/p2/paid-marketing/api/changes/test-canvas", json={})
+    assert r.status_code == 200 and r.get_json()["results"] == {"Acme Dental": {"ok": True, "error": ""}} and len(fake_deliver.canvases) == 1
 
 
 def test_the_day_and_accounts_routes(monkeypatch):
