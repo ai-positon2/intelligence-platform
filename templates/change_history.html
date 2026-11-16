@@ -20,7 +20,7 @@
 
   <section class="pm-panel" id="setCard">
     <div class="pm-panel-h"><span class="pm-panel-t">Who is allowed, and where alerts go</span><span class="pm-panel-s" id="setNote"></span></div>
-    <div class="mp-form">
+    <div class="mp-form" style="grid-template-columns:minmax(0,1fr)">
       <label class="cc-f"><span>Allowed addresses (one per line, or a whole domain as @domain.com)</span>
         <textarea id="allow" rows="8" placeholder="name@position2.com" spellcheck="false"></textarea></label>
       <label class="cc-f"><span>Slack channel (an id like C0..., or #name)</span><input type="text" id="channel" autocomplete="off" spellcheck="false"></label>
@@ -29,6 +29,10 @@
       <p class="pm-panel-s" style="margin:4px 0 0">An account listed here never goes in the shared message above: its flagged changes go only to a Slack Canvas named
         "Change History" in its own channel (the bot creates it the first time there is something to write, and keeps adding to the same one). "Send a test" adds a made-up
         entry to each saved account's canvas (using what was last saved, not an unsaved edit above) so you can check the canvas without waiting for a real flagged change.</p>
+      <label class="cc-f"><span>Also flag an account manager for just one account (one per line: Account name -&gt; email, email)</span>
+        <textarea id="watch" rows="3" placeholder="Acme Dental -> jane@agency.com" spellcheck="false"></textarea></label>
+      <p class="pm-panel-s" style="margin:4px 0 0">An address listed here is still on the allowed list everywhere else; only for the account named does its changes get
+        flagged and sent (or added to that account's canvas, if it has one above) like anyone not on the list.</p>
       <div class="mp-btns"><button type="button" class="pm-btn" id="save">Save</button><button type="button" class="pm-btn-ghost" id="runNow">Run now</button>
         <button type="button" class="pm-btn-ghost" id="testCanvas">Send a test</button></div>
     </div>
@@ -58,5 +62,5 @@
 </div>
 {% endblock %}
 {% block scripts %}
-<script src="{{ url_for('static', filename='js/change_history.js') }}?v=4"></script>
+<script src="{{ url_for('static', filename='js/change_history.js') }}?v=6"></script>
 {% endblock %}

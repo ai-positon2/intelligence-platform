@@ -23,6 +23,9 @@ An account named in the saved settings' canvas mapping (saved on the page, never
 in the shared message: its flagged changes are appended instead to that account's own Slack Canvas (titled CANVAS_TITLE) in its own channel,
 created the first time there is something to write. The canvas id is remembered under CANVAS_KEY so later runs append to the same one.
 
+An account named in the saved settings' watch mapping (same place, same privacy) also flags changes by the addresses listed for it, even
+though those addresses are on the allowed list for every other account: an account manager watched for just that one account.
+
 Read only: nothing is changed in an ad account.
 """
 from __future__ import annotations
@@ -150,11 +153,14 @@ def _time(v):
 # ── Settings (who is allowed, where it goes) ─────────────────────────────────
 
 _CANVAS_LINE = re.compile(r"^(.+?)\s*(?:->|=>|=|:)\s*([#@]?[A-Za-z0-9._-]{1,80})$")
+_WATCH_LINE = re.compile(r"^(.+?)\s*(?:->|=>|=|:)\s*(.+)$")
 MAX_CANVAS = 20
+MAX_WATCH = 20
 
 
 def clean_settings(data):
-    """{allow: [email or @domain], channel, canvas: {account name: channel}} from what the page sent, or BadRequest."""
+    """{allow: [email or @domain], channel, canvas: {account name: channel}, watch: {account name: [email]}} from what the page sent, or
+    BadRequest."""
     if not isinstance(data, dict):
         raise BadRequest("Send the allowed addresses and the channel.")
     raw = data.get("allow")
@@ -174,7 +180,7 @@ def clean_settings(data):
     channel = str(data.get("channel") or "").strip() or DEFAULT_CHANNEL
     if not _CHANNEL.match(channel):
         raise BadRequest("The Slack channel must be a channel id (C0...) or a #name.")
-    return {"allow": allow, "channel": channel, "canvas": _clean_canvas(data.get("canvas"))}
+    return {"allow": allow, "channel": channel, "canvas": _clean_canvas(data.get("canvas")), "watch": _clean_watch(data.get("watch"))}
 
 
 def _clean_canvas(raw):
@@ -209,10 +215,52 @@ def _clean_canvas(raw):
     return out
 
 
+def _clean_watch(raw):
+    """{account name: [email]}: for that account only, flag changes by these addresses too, even though they are on the allowed list
+    (an account manager who should be watched for just one account). Saved on the page like the allowed addresses, never written to this
+    repository. Takes a dict, or textarea lines written "Account name -> email, email"."""
+    if raw is None:
+        return {}
+    if isinstance(raw, str):
+        pairs = {}
+        for line in raw.splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            m = _WATCH_LINE.match(line)
+            if not m:
+                raise BadRequest('"%s" should be written "Account name -> email address".' % line[:80])
+            pairs[m.group(1).strip()] = m.group(2)
+        raw = pairs
+    if not isinstance(raw, dict):
+        raise BadRequest("The watched addresses must be an account name and email addresses, one per line.")
+    out = {}
+    for name, emails in raw.items():
+        name = str(name or "").strip()
+        if not name:
+            continue
+        if isinstance(emails, str):
+            emails = re.split(r"[,;\s]+", emails)
+        clean = []
+        for e in emails or []:
+            e = str(e).strip().lower()
+            if not e:
+                continue
+            if not _EMAIL.match(e):
+                raise BadRequest("%s is not an email address." % e[:80])
+            if e not in clean:
+                clean.append(e)
+        if clean:
+            out[name] = clean
+    if len(out) > MAX_WATCH:
+        raise BadRequest("At most %d accounts with watched addresses." % MAX_WATCH)
+    return out
+
+
 def settings(store):
     saved = store.state_get(KEY) or {}
     return {"allow": list(saved.get("allow") or []), "channel": saved.get("channel") or DEFAULT_CHANNEL, "canvas": dict(saved.get("canvas") or {}),
-            "savedBy": saved.get("savedBy") or "", "savedAt": saved.get("savedAt") or ""}
+            "watch": {k: list(v) for k, v in (saved.get("watch") or {}).items()}, "savedBy": saved.get("savedBy") or "", "savedAt": saved.get("savedAt") or ""}
 
 
 def save_settings(store, data, who, now=None):
@@ -383,8 +431,11 @@ def new_since(changes, seen):
     return fresh, keep
 
 
-def flagged(changes, allow):
-    return [c for c in changes if not allowed(c["user"], allow)]
+def flagged(changes, allow, watch=None):
+    """The changes to flag: anyone not on the allowed list, plus anyone in `watch` (addresses watched for this one account even though
+    they are on the allowed list elsewhere)."""
+    watch = watch or ()
+    return [c for c in changes if c["user"] in watch or not allowed(c["user"], allow)]
 
 
 def by_person(changes):
@@ -708,7 +759,7 @@ def run(store, *, accounts, deliver, search_fn, link, trigger, now=None, currenc
         if before is not None and not baseline:                                     # an account's first snapshot is its baseline
             fresh = fresh + access_changes(before, access, at)
         access_keep[a["id"]] = _merge_access(before, access)
-        bad = flagged(fresh, conf["allow"])
+        bad = flagged(fresh, conf["allow"], conf["watch"].get(a["name"]))
         if bad:
             found.append({"account": a, "lines": lines_for(a, bad, currency_of(a["id"]), money)})
     found.sort(key=lambda f: f["account"]["name"].lower())
@@ -776,7 +827,8 @@ def clean_day(day, today):
 def day_report(store, *, accounts, search_fn, day, account=None, everyone=False, currency_of=None, money=None, workers=WORKERS):
     """What a run would flag for one day ({date, accounts: [{id, name, total, allowed, lines}], unread, read}), read for the page only: nothing is sent,
     nothing is remembered. `account` keeps one account id; `everyone` lists the allowed people's changes too (each line says whether it is allowed)."""
-    allow = settings(store)["allow"]
+    conf = settings(store)
+    allow, watch_of = conf["allow"], conf["watch"]
     currency_of = currency_of or (lambda aid: "USD")
     google = [a for a in accounts if (a.get("platform") or "google") == "google" and (not account or a["id"] == account)]
     if account and not google:
@@ -801,11 +853,12 @@ def day_report(store, *, accounts, search_fn, day, account=None, everyone=False,
         if unnamed:
             x = lines_for(a, unnamed, currency_of(a["id"]), money)[0]
             other = {"count": len(unnamed), "line": x["line"], "first": x["first"], "last": x["last"]}
-        bad = flagged(changes, allow)
+        watch = watch_of.get(a["name"])
+        bad = flagged(changes, allow, watch)
         shown = changes if everyone else bad
         lines = lines_for(a, shown, currency_of(a["id"]), money)
         for x in lines:
-            x["allowed"] = allowed(x["who"], allow)
+            x["allowed"] = allowed(x["who"], allow) and x["who"] not in (watch or ())
         if lines or account or other:
             out.append({"id": a["id"], "name": a["name"], "total": len(changes), "allowed": len(changes) - len(bad), "flagged": len(bad), "lines": lines,
                         "unnamed": other})

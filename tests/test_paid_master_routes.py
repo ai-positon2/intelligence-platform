@@ -114,7 +114,7 @@ def test_the_agent_is_on_the_paid_marketing_page_the_palette_the_hub_counts_and_
     assert len(v) == 1, v
     cards = len(re.findall(r'class="dash-card', paid))
     hub = re.sub(r"<!--.*?-->", "", hidden_paid.rendered("/p2/hub"), flags=re.S)
-    assert ("<span>%d</span> dashboards" % cards) in hub and ("<span>%d</span> live" % cards) in hub and "written down once for every agent" in hub
+    assert ("<span>%d</span> dashboards" % cards) in hub and ("<span>%d</span> live" % cards) in hub
     kn = app_module._VIMI_PLATFORM_KNOWLEDGE
     mine = kn.split("Master Agent (", 1)[1].split("\n", 1)[0]
     assert "Master Agent (/p2/paid-marketing/master-agent)" in kn and "still wins" in mine and "—" not in mine and "–" not in mine

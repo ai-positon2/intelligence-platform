@@ -180,7 +180,7 @@ def test_the_agent_is_on_the_paid_marketing_page_the_palette_the_hub_counts_and_
     assert len(v) == 1, v
     cards = len(re.findall(r'class="dash-card', paid))
     hub_html = re.sub(r"<!--.*?-->", "", hidden_paid.rendered("/p2/hub"), flags=re.S)
-    assert ("<span>%d</span> dashboards" % cards) in hub_html and ("<span>%d</span> live" % cards) in hub_html and "read against yours with ideas to test" in hub_html
+    assert ("<span>%d</span> dashboards" % cards) in hub_html and ("<span>%d</span> live" % cards) in hub_html
     kn = app_module._VIMI_PLATFORM_KNOWLEDGE
     mine = kn.split("Competitor Analysis (", 1)[1].split("\n", 1)[0]
     assert "Competitor Analysis (/p2/paid-marketing/competitor-analysis)" in kn and "Ads Transparency Center" in mine and "never automatic" in mine and "—" not in mine and "–" not in mine

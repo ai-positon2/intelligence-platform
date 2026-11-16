@@ -46,7 +46,7 @@ def test_the_allowed_list_takes_addresses_and_whole_domains():
     assert pc.allowed("Asha@Example.com", ALLOW) and not pc.allowed("", ALLOW) and not pc.allowed("mia@example.com", ALLOW)
     assert pc.allowed("mia@example.com", ["@example.com"]) and not pc.allowed("mia@notexample.org", ["@example.com"])
     got = pc.clean_settings({"allow": "Asha@Example.com\nravi@example.com, asha@example.com\n@example.org", "channel": ""})
-    assert got == {"allow": ["asha@example.com", "ravi@example.com", "@example.org"], "channel": pc.DEFAULT_CHANNEL, "canvas": {}}
+    assert got == {"allow": ["asha@example.com", "ravi@example.com", "@example.org"], "channel": pc.DEFAULT_CHANNEL, "canvas": {}, "watch": {}}
     with pytest.raises(pc.BadRequest):
         pc.clean_settings({"allow": "not an address"})
     with pytest.raises(pc.BadRequest):
@@ -173,6 +173,32 @@ def test_a_canvas_account_goes_only_to_its_own_canvas_never_the_shared_channel()
     pc.run(s2, accounts=accounts, deliver=failing, search_fn=_search({}), link="https://p.example/x", trigger="schedule", now=NOW)   # baseline
     rec = pc.run(s2, accounts=accounts, deliver=failing, search_fn=_search({"2222222222": [bolt1]}), link="https://p.example/x", trigger="schedule", now=NOW)
     assert rec["error"].startswith("Slack canvas (Bolt Parts): missing_scope") and failing.sent == [] and failing.canvases == {}
+
+
+def test_the_watch_setting_takes_a_dict_or_textarea_lines():
+    assert pc.clean_settings({"allow": "", "channel": "", "watch": {"Glow Skin": ["jane@agency.com"]}})["watch"] == {"Glow Skin": ["jane@agency.com"]}
+    assert pc.clean_settings({"allow": "", "channel": "", "watch": "Glow Skin -> jane@agency.com, Mo@Agency.com\n\n"})["watch"] == \
+        {"Glow Skin": ["jane@agency.com", "mo@agency.com"]}
+    assert pc.clean_settings({"allow": "", "channel": ""})["watch"] == {}
+    with pytest.raises(pc.BadRequest):
+        pc.clean_settings({"allow": "", "channel": "", "watch": "not a pair"})
+    with pytest.raises(pc.BadRequest):
+        pc.clean_settings({"allow": "", "channel": "", "watch": {"Glow Skin": ["not an address"]}})
+
+
+def test_a_watched_address_is_flagged_only_for_the_account_it_is_watched_on():
+    assert pc.flagged(pc.read_changes(ROWS), ALLOW, ["asha@example.com"])[-1]["user"] == "asha@example.com"   # watched: flagged despite being allowed
+    assert pc.flagged(pc.read_changes(ROWS), ALLOW)[-1]["user"] != "asha@example.com"                          # not watched: left alone, as usual
+    s, d = Store(), Deliver()
+    accounts = ACCOUNTS   # ravi@agency.com is on the allowed list, as an account manager would be
+    s.state_set(pc.KEY, {"allow": ALLOW + ["ravi@agency.com"], "channel": "C0TEST", "canvas": {}, "watch": {"Bolt Parts": ["ravi@agency.com"]}})
+    pc.run(s, accounts=accounts, deliver=d, search_fn=_search({}), link="https://p.example/x", trigger="schedule", now=NOW)   # baseline
+    bolt = ev("b1", "2026-11-06 09:00:00", "ravi@agency.com", "CAMPAIGN", "UPDATE", "status", new={"campaign": {"status": "PAUSED"}}, campaign="P2-PMax")
+    acme = ev("a1", "2026-11-06 09:00:00", "ravi@agency.com", "CAMPAIGN", "UPDATE", "status", new={"campaign": {"status": "PAUSED"}}, campaign="P2_Brand")
+    rec = pc.run(s, accounts=accounts, deliver=d, search_fn=_search({"1111111111": [acme], "2222222222": [bolt]}), link="https://p.example/x",
+                 trigger="schedule", now=NOW)
+    # ravi@agency.com is allowed everywhere, but still flagged for Bolt Parts (watched there) and not for Acme Dental (not watched there)
+    assert rec["accountsFlagged"] == 1 and "Bolt Parts" in d.sent[0][1] and "Acme Dental" not in d.sent[0][1]
 
 
 def test_a_run_sets_the_baseline_then_sends_one_message_and_remembers_only_once_slack_took_it():
