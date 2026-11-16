@@ -453,6 +453,20 @@ def canvas_id_for(store, deliver, name, channel):
     return cid
 
 
+def test_canvas(store, deliver):
+    """A made-up entry through the real canvas of every saved canvas account, to prove the wiring. {results: {account name: {ok, error}}}."""
+    now = dt.datetime.now(dt.timezone.utc)
+    out = {}
+    for name, channel in settings(store)["canvas"].items():
+        try:
+            cid = canvas_id_for(store, deliver, name, channel)
+            deliver.canvas_append(cid, "## %s UTC\n- **Test**: this entry only proves the canvas wiring works; it is not a real change.\n" % now.strftime("%d %b %Y, %H:%M"))
+            out[name] = {"ok": True, "error": ""}
+        except Exception as e:                                                      # noqa: BLE001 (one account's failure never stops the rest)
+            out[name] = {"ok": False, "error": ("%s" % e)[:300]}
+    return {"results": out}
+
+
 # ── What change history leaves out: access, manager links, conversion actions ──
 # Google's change_event has no row for a user given or losing access, a manager (MCC) account linked or unlinked, or a conversion action
 # added or edited. Each run reads these as they are now and compares them with the last run's snapshot; what differs is a change. Google does

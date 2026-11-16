@@ -27,8 +27,10 @@
       <label class="cc-f"><span>Accounts with their own channel (one per line: Account name -&gt; channel)</span>
         <textarea id="canvas" rows="3" placeholder="Acme Dental -> C0123456789" spellcheck="false"></textarea></label>
       <p class="pm-panel-s" style="margin:4px 0 0">An account listed here never goes in the shared message above: its flagged changes go only to a Slack Canvas named
-        "Change History" in its own channel (the bot creates it the first time there is something to write, and keeps adding to the same one).</p>
-      <div class="mp-btns"><button type="button" class="pm-btn" id="save">Save</button><button type="button" class="pm-btn-ghost" id="runNow">Run now</button></div>
+        "Change History" in its own channel (the bot creates it the first time there is something to write, and keeps adding to the same one). "Send a test" adds a made-up
+        entry to each saved account's canvas (using what was last saved, not an unsaved edit above) so you can check the canvas without waiting for a real flagged change.</p>
+      <div class="mp-btns"><button type="button" class="pm-btn" id="save">Save</button><button type="button" class="pm-btn-ghost" id="runNow">Run now</button>
+        <button type="button" class="pm-btn-ghost" id="testCanvas">Send a test</button></div>
     </div>
   </section>
 
