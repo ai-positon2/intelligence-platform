@@ -28,6 +28,10 @@
         <textarea id="canvas" rows="3" placeholder="Acme Dental -> C0123456789" spellcheck="false"></textarea></label>
       <p class="pm-panel-s" style="margin:4px 0 0">An account listed here never goes in the shared message above: its flagged changes go only to a Slack Canvas named
         "Change History" in its own channel (the bot creates it the first time there is something to write, and keeps adding to the same one).</p>
+      <label class="cc-f"><span>Also flag an account manager for just one account (one per line: Account name -&gt; email, email)</span>
+        <textarea id="watch" rows="3" placeholder="Acme Dental -> jane@agency.com" spellcheck="false"></textarea></label>
+      <p class="pm-panel-s" style="margin:4px 0 0">An address listed here is still on the allowed list everywhere else; only for the account named does its changes get
+        flagged and sent (or added to that account's canvas, if it has one above) like anyone not on the list.</p>
       <div class="mp-btns"><button type="button" class="pm-btn" id="save">Save</button><button type="button" class="pm-btn-ghost" id="runNow">Run now</button></div>
     </div>
   </section>
