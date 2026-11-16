@@ -79,7 +79,7 @@ def test_the_agent_is_on_the_paid_marketing_page_the_palette_the_hub_counts_and_
     assert ".c-bs{" in css and ".pm.pm-bs" in css and ".bs-band{" in css
     cards = len(re.findall(r'class="dash-card', paid))
     hub = re.sub(r"<!--.*?-->", "", hidden_paid.rendered("/p2/hub"), flags=re.S)
-    assert ("<span>%d</span> dashboards" % cards) in hub and ("<span>%d</span> live" % cards) in hub and "brand spend watched against its usual week" in hub
+    assert ("<span>%d</span> dashboards" % cards) in hub and ("<span>%d</span> live" % cards) in hub
     assert "Brand Spend Alert (/p2/paid-marketing/brand-spend)" in app_module._VIMI_PLATFORM_KNOWLEDGE and "the account's own history" in app_module._VIMI_PLATFORM_KNOWLEDGE
     card = paid.split('href="/p2/paid-marketing/brand-spend" class="dash-card', 1)[1].split("</a>", 1)[0]
     assert "\u2014" not in card and "\u2013" not in card

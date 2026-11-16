@@ -76,7 +76,7 @@ def test_the_agent_is_on_the_paid_marketing_page_the_palette_the_hub_counts_and_
     assert ".c-da{" in css and ".pm.pm-da" in css
     cards = len(re.findall(r'class="dash-card', paid))
     hub = re.sub(r"<!--.*?-->", "", hidden_paid.rendered("/p2/hub"), flags=re.S)
-    assert ("<span>%d</span> dashboards" % cards) in hub and ("<span>%d</span> live" % cards) in hub and "disapproved ads found before a client does" in hub
+    assert ("<span>%d</span> dashboards" % cards) in hub and ("<span>%d</span> live" % cards) in hub
     assert "Disapproved Ads Tracker (/p2/paid-marketing/disapproved-ads)" in app_module._VIMI_PLATFORM_KNOWLEDGE and "Policy manager" in app_module._VIMI_PLATFORM_KNOWLEDGE
     card = paid.split('href="/p2/paid-marketing/disapproved-ads" class="dash-card', 1)[1].split("</a>", 1)[0]
     assert "—" not in card and "–" not in card

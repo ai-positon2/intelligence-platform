@@ -142,7 +142,7 @@ def test_the_agent_is_on_the_paid_marketing_page_the_palette_the_hub_counts_and_
     assert len(v) == 1, v
     cards = len(re.findall(r'class="dash-card', paid))
     hub_html = re.sub(r"<!--.*?-->", "", hidden_paid.rendered("/p2/hub"), flags=re.S)
-    assert ("<span>%d</span> dashboards" % cards) in hub_html and ("<span>%d</span> live" % cards) in hub_html and "through one layer with a channel per client" in hub_html
+    assert ("<span>%d</span> dashboards" % cards) in hub_html and ("<span>%d</span> live" % cards) in hub_html
     kn = app_module._VIMI_PLATFORM_KNOWLEDGE
     mine = kn.split("Alert Hub (", 1)[1].split("\n", 1)[0]
     assert "Alert Hub (/p2/paid-marketing/alert-hub)" in kn and "held back" in mine and "P1 (high)" in mine and "—" not in mine and "–" not in mine

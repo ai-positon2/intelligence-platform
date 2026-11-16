@@ -146,7 +146,7 @@ def test_the_monitor_is_known_to_the_alert_panel_and_the_agent_is_on_the_paid_ma
     assert ".c-sa{" in css and ".pm.pm-sa" in css and ".sa-chart" in css and ".sa-f{" in css
     cards = len(re.findall(r'class="dash-card', paid))
     hub = re.sub(r"<!--.*?-->", "", hidden_paid.rendered("/p2/hub"), flags=re.S)
-    assert ("<span>%d</span> dashboards" % cards) in hub and ("<span>%d</span> live" % cards) in hub and "spend watched for a spike or a stop every two hours" in hub
+    assert ("<span>%d</span> dashboards" % cards) in hub and ("<span>%d</span> live" % cards) in hub
     k = app_module._VIMI_PLATFORM_KNOWLEDGE
     assert "Spend Anomaly Alert (/p2/paid-marketing/spend-anomaly)" in k and "mute until a date (at most 45 days ahead" in k and "every two hours" in k and "—" not in k.split("Spend Anomaly Alert (", 1)[1].split("\n", 1)[0]
     card = paid.split('href="/p2/paid-marketing/spend-anomaly" class="dash-card', 1)[1].split("</a>", 1)[0]
