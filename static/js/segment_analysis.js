@@ -392,15 +392,24 @@ function csv(v){if(v==null)v="";var num=typeof v==="number";v=String(v);if(!num&
 $("#refreshBtn").addEventListener("click",function(){run(true);});
 $("#exportBtn").addEventListener("click",function(){
   var rep=S.report; if(!rep) return;
+  function row(label,r){return [label,r.impressions,r.clicks,r.cost.toFixed(2),r.pctCost==null?"":(r.pctCost*100).toFixed(2)+"%",
+    r.ctr==null?"":(r.ctr*100).toFixed(2)+"%",r.cpc==null?"":r.cpc.toFixed(2),r.conversions,r.cpl==null?"Na":r.cpl.toFixed(2)];}
+  function section(lines,type){
+    rep.segments.forEach(function(seg){
+      var v=seg.views&&seg.views[type]; if(!v) return;
+      lines.push([seg.label,"Impressions","Clicks","Cost","% Cost","CTR","CPC","Conversions","CPL"]);
+      v.rows.forEach(function(r){lines.push(row(r.label,r));});
+      lines.push(row("Grand Total",v.total)); lines.push([]);
+    });
+  }
   var lines=[["Account",rep.account.name],["Date range",rep.range.from+" to "+rep.range.to],["Campaign type",S.type],[]];
-  rep.segments.forEach(function(seg){
-    var v=seg.views&&seg.views[S.type]; if(!v) return;
-    lines.push([seg.label,"Impressions","Clicks","Cost","% Cost","CTR","CPC","Conversions","CPL"]);
-    function row(label,r){return [label,r.impressions,r.clicks,r.cost.toFixed(2),r.pctCost==null?"":(r.pctCost*100).toFixed(2)+"%",
-      r.ctr==null?"":(r.ctr*100).toFixed(2)+"%",r.cpc==null?"":r.cpc.toFixed(2),r.conversions,r.cpl==null?"Na":r.cpl.toFixed(2)];}
-    v.rows.forEach(function(r){lines.push(row(r.label,r));});
-    lines.push(row("Grand Total",v.total)); lines.push([]);
-  });
+  section(lines,S.type);
+  if(S.type==="All"){
+    rep.types.forEach(function(t){
+      lines.push(["Campaign type",t],[]);
+      section(lines,t);
+    });
+  }
   var blob=new Blob(["﻿"+lines.map(function(l){return l.map(csv).join(",");}).join("\r\n")],{type:"text/csv;charset=utf-8"});
   var a=document.createElement("a"); a.href=URL.createObjectURL(blob);
   a.download="segments-"+rep.account.name.replace(/[^A-Za-z0-9]+/g,"-").replace(/^-|-$/g,"")+"-"+rep.range.from+"-"+rep.range.to+".csv";
