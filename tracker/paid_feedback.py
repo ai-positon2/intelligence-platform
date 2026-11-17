@@ -73,6 +73,10 @@ PROVIDERS = ("slack", "google")
 
 SCREEN_MODEL = os.environ.get("FEEDBACK_SCREEN_MODEL", "claude-haiku-5-5")
 
+# The people guardrail below is switched off for now: everyone gets the admin
+# experience. Set FEEDBACK_GUARDRAIL=1 to bring it back; the code is intact.
+GUARDRAIL = os.environ.get("FEEDBACK_GUARDRAIL", "").strip().lower() in ("1", "true", "yes", "on")
+
 RESTRICTED_REPLY = (
     "Sorry, I can't help with that one. With your access I can answer questions about client "
     "accounts: what a client said, meeting summaries, budgets, pacing and how an account is "
@@ -808,6 +812,7 @@ def start(question, history, by, *, restricted=False, client_factory=default_cli
     """Create the job and run it in a thread. Returns the job id. A
     `restricted` (non-admin) question about the team's people is answered with
     RESTRICTED_REPLY and no source is read."""
+    restricted = bool(restricted and GUARDRAIL)
     job_id = store.create_job(question, by)
     messages = clean_history(history) + [{"role": "user", "content": question}]
     step = lambda s: store.add_step(job_id, dict(s, t=time.time()))

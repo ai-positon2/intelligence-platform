@@ -68,6 +68,11 @@ def test_account_questions_pass_the_keyword_screen(q):
     assert not fb.people_question(q)
 
 
+@pytest.fixture(autouse=True)
+def guardrail_on(monkeypatch):
+    monkeypatch.setattr(fb, "GUARDRAIL", True)
+
+
 # ── start(): the job ─────────────────────────────────────────────────────────
 
 class FakeClient:
@@ -216,3 +221,11 @@ def test_a_task_update_question_is_answered_for_a_restricted_user(jobs):
     client = FakeClient([([text("ALLOW")], "end_turn"), ([text("Acme: send the report.")], "end_turn")])
     fb.start(TASKS, [], STAFF, restricted=True, client_factory=lambda: client, spawn=False)
     assert jobs["done"]["answer"] == "Acme: send the report."
+
+
+def test_with_the_guardrail_off_a_restricted_user_is_answered_like_an_admin(jobs, monkeypatch):
+    monkeypatch.setattr(fb, "GUARDRAIL", False)
+    client = FakeClient([([text("Here you go.")], "end_turn")])
+    fb.start("Who is leaving the team?", [], STAFF, restricted=True, client_factory=lambda: client, spawn=False)
+    assert jobs["done"]["answer"] == "Here you go." and len(client.calls) == 1
+    assert client.calls[0]["model"] != fb.SCREEN_MODEL and "ACCESS LEVEL" not in str(client.calls[0].get("system"))
