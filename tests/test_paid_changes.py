@@ -100,7 +100,7 @@ class Deliver:
         self.canvases[cid] = {"title": title, "channel": channel, "markdown": [markdown]}
         return cid
 
-    def canvas_append(self, canvas_id, markdown):
+    def canvas_replace(self, canvas_id, markdown):
         if self.fail_canvas:
             raise RuntimeError("missing_scope")
         self.canvases[canvas_id]["markdown"].append(markdown)
@@ -140,7 +140,8 @@ def test_sending_a_test_touches_every_saved_canvas_account_and_keeps_going_after
     out = pc.test_canvas(s, d)
     assert out == {"results": {"Glow Skin": {"ok": True, "error": ""}, "Bolt Parts": {"ok": True, "error": ""}}}
     assert len(d.canvases) == 2 and all("Test" in v["markdown"][-1] for v in d.canvases.values())
-    # calling it again appends to the same two canvases, it does not create new ones
+    # the test row is shown but not remembered, so a real run clears it; calling it again reuses the same two canvases
+    assert s.state_get(pc.CANVAS_ROWS_KEY) is None
     pc.test_canvas(s, d)
     assert len(d.canvases) == 2 and all(len(v["markdown"]) == 3 for v in d.canvases.values())
     failing = Deliver(fail_canvas=True)
@@ -167,6 +168,11 @@ def test_a_canvas_account_goes_only_to_its_own_canvas_never_the_shared_channel()
                old={"campaignBudget": {"amountMicros": "50000000"}}, new={"campaignBudget": {"amountMicros": "70000000"}}, campaign="P2-PMax")
     pc.run(s, accounts=accounts, deliver=d, search_fn=_search({"2222222222": [bolt1, bolt2]}), link="https://p.example/x", trigger="schedule", now=NOW)
     assert len(d.canvases) == 1 and len(d.canvases[cid]["markdown"]) == 3 and "70" in d.canvases[cid]["markdown"][2]
+    # the canvas is a table of every flagged change, newest first, rewritten whole each time (the first change stays below the second)
+    doc = d.canvases[cid]["markdown"][2]
+    assert doc.startswith("# Bolt Parts AD Copy Changes") and "|Read (UTC)|Who|What changed|Changes|" in doc
+    table = [x for x in doc.splitlines() if x.startswith("|") and "ravi@agency.com" in x]
+    assert len(table) == 2 and "70" in table[0] and "Paused the campaign" in table[1]
     # a canvas failure is not remembered, so it is sent again, and never falls back to the shared channel
     s2, failing = Store(), Deliver(fail_canvas=True)
     s2.state_set(pc.KEY, {"allow": ALLOW, "channel": "C0TEST", "canvas": {"Bolt Parts": "C0BOLTINTERNAL"}})

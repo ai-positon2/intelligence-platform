@@ -172,6 +172,11 @@ def canvas_create(title, channel, markdown):
     return _slack_post("canvases.create", {"title": title, "channel_id": channel, "document_content": {"type": "markdown", "markdown": markdown}})["canvas_id"]
 
 
+def canvas_replace(canvas_id, markdown):
+    """Replaces the whole content of an existing canvas with `markdown`."""
+    _slack_post("canvases.edit", {"canvas_id": canvas_id, "changes": [{"operation": "replace", "document_content": {"type": "markdown", "markdown": markdown}}]})
+
+
 def canvas_append(canvas_id, markdown):
     """Adds markdown to the end of an existing canvas."""
     _slack_post("canvases.edit", {"canvas_id": canvas_id, "changes": [{"operation": "insert_at_end", "document_content": {"type": "markdown", "markdown": markdown}}]})
