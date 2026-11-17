@@ -487,21 +487,48 @@ def messages(found, link, now):
 
 # ── An account's own canvas (settings()["canvas"]): a running log in its own channel instead of the shared message ──────────
 
-def canvas_entry(item, now):
-    """The markdown appended to an account's canvas for one run's flagged lines ([{who, via, line, count}])."""
-    rows = "\n".join("- **%s**%s: %s" % (x["who"], " (%s)" % x["via"] if x["via"] else "", x["line"]) for x in item["lines"])
-    return "## %s UTC\n%s\n" % (now.strftime("%d %b %Y, %H:%M"), rows)
+CANVAS_ROWS_KEY = "changes:canvas_rows"   # {account name: [row, newest first]}, what each account's canvas table shows (the canvas is rewritten from it)
+MAX_CANVAS_ROWS = 200
 
 
-def canvas_id_for(store, deliver, name, channel):
+def _cell(v):
+    return re.sub(r"\s+", " ", str(v or "")).replace("|", "/").strip()
+
+
+def canvas_rows(item, now):
+    """The table rows one run adds to an account's canvas ([{who, via, line, count}] -> [{at, who, line, count}]), read time in UTC."""
+    return [{"at": now.strftime("%d %b %H:%M"), "who": x["who"] + (" (%s)" % x["via"] if x["via"] else ""), "line": x["line"], "count": x["count"]} for x in item["lines"]]
+
+
+def canvas_doc(name, rows, now):
+    """The whole canvas for one account: heading, a note, then a table of the flagged changes, newest first."""
+    nl = chr(10)
+    table = "".join("|%s|%s|%s|%s|" % (_cell(r["at"]), _cell(r["who"]), _cell(r["line"]), _cell(r["count"])) + nl for r in rows)
+    note = ("Every change the Change History alert has flagged for %s: it tracks all account changes made by someone other than the account managers, "
+            "not only ad copy edits. Newest first." % name)
+    head = nl.join(["# %s AD Copy Changes" % name, "", "::: {.callout}", note, ":::", "", "|Read (UTC)|Who|What changed|Changes|", "|  ---  |  ---  |  ---  |  ---  |"])
+    return head + nl + table + nl + "*Source: the Change History alert, last read %s UTC.*" % now.strftime("%Y-%m-%d %H:%M") + nl
+
+
+def canvas_id_for(store, deliver, name, channel, now=None):
     """The canvas id this account writes to, creating it (named CANVAS_TITLE, in `channel`) the first time."""
     ids = store.state_get(CANVAS_KEY) or {}
     cid = ids.get(name)
     if cid:
         return cid
-    cid = deliver.canvas_create(CANVAS_TITLE, channel, "# %s\nGoogle Ads changes by someone other than the account managers, oldest first.\n" % CANVAS_TITLE)
+    cid = deliver.canvas_create(CANVAS_TITLE, channel, canvas_doc(name, [], now or dt.datetime.now(dt.timezone.utc)))
     store.state_set(CANVAS_KEY, dict(ids, **{name: cid}))
     return cid
+
+
+def canvas_write(store, deliver, name, channel, new_rows, now, keep=True):
+    """Puts `new_rows` at the top of the account's canvas table and rewrites the canvas. With keep=False (a test) they are shown but not remembered."""
+    cid = canvas_id_for(store, deliver, name, channel, now)
+    saved = (store.state_get(CANVAS_ROWS_KEY) or {}).get(name) or []
+    rows = (list(new_rows) + list(saved))[:MAX_CANVAS_ROWS]
+    deliver.canvas_replace(cid, canvas_doc(name, rows, now))
+    if keep:
+        store.state_set(CANVAS_ROWS_KEY, dict(store.state_get(CANVAS_ROWS_KEY) or {}, **{name: rows}))
 
 
 def test_canvas(store, deliver):
@@ -510,8 +537,8 @@ def test_canvas(store, deliver):
     out = {}
     for name, channel in settings(store)["canvas"].items():
         try:
-            cid = canvas_id_for(store, deliver, name, channel)
-            deliver.canvas_append(cid, "## %s UTC\n- **Test**: this entry only proves the canvas wiring works; it is not a real change.\n" % now.strftime("%d %b %Y, %H:%M"))
+            row = {"at": now.strftime("%d %b %H:%M"), "who": "Test", "line": "This row only proves the canvas wiring works; it is not a real change and goes at the next run.", "count": 0}
+            canvas_write(store, deliver, name, channel, [row], now, keep=False)
             out[name] = {"ok": True, "error": ""}
         except Exception as e:                                                      # noqa: BLE001 (one account's failure never stops the rest)
             out[name] = {"ok": False, "error": ("%s" % e)[:300]}
@@ -788,8 +815,7 @@ def run(store, *, accounts, deliver, search_fn, link, trigger, now=None, currenc
             for f in canvas_found:
                 name = f["account"]["name"]
                 try:
-                    cid = canvas_id_for(store, deliver, name, canvas_of[name])
-                    deliver.canvas_append(cid, canvas_entry(f, now))
+                    canvas_write(store, deliver, name, canvas_of[name], canvas_rows(f, now), now)
                     record["sent"] += 1
                 except Exception as e:                                              # noqa: BLE001 (nothing is remembered, so the next run sends it again)
                     remember = False
