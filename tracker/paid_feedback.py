@@ -76,7 +76,7 @@ SCREEN_MODEL = os.environ.get("FEEDBACK_SCREEN_MODEL", "claude-haiku-5-5")
 RESTRICTED_REPLY = (
     "Sorry, I can't help with that one. With your access I can answer questions about client "
     "accounts: what a client said, meeting summaries, budgets, pacing and how an account is "
-    "performing. Questions about people or the team (who is leaving, who is unhappy, someone's "
+    "performing, plus the tasks, open items and next steps from client calls. Questions about people or the team (who is leaving, who is unhappy, someone's "
     "performance, HR or personnel matters) are for admins only.")
 
 _TEAM = (r"(?:employees?|colleagues?|co-?workers?|team ?members?|teammates?|staff|account managers?|"
@@ -114,8 +114,11 @@ def _screen_instructions():
     return (
         "You screen questions sent to an internal tool that answers from a marketing agency's Slack, "
         "email and meeting notes. The person asking may only get answers about CLIENT ACCOUNTS: what a "
-        "client said or asked for, client meetings, budgets, pacing, campaigns and how an account is "
-        "performing, including whether a client is happy with the agency. They may NOT ask about the "
+        "client said or asked for, client meetings and calls, the tasks, action items, open items, "
+        "follow-ups and next steps from them (and who they are assigned to), budgets, pacing, campaigns "
+        "and how an account is performing, including whether a client is happy with the agency. A request "
+        "for the tasks or status of a client's account or calls is ALWAYS an account question, even "
+        "when it names several clients, a time window or asks for every detail. They may NOT ask about the "
         "agency's own people: who is leaving, quitting or being let go, who is unhappy, attrition, any "
         "employee's performance, pay, promotion or behaviour, HR or personnel matters, or what "
         "colleagues said about each other or about their managers. Read the conversation and judge "
@@ -710,7 +713,8 @@ def restricted_instructions():
     """Added to the prompt when a non-admin asks."""
     return (
         "\n\nACCESS LEVEL: the person asking is a standard user, not an admin. Answer only about the "
-        "client accounts: what a client said or asked for, client meetings, budgets, pacing, campaigns "
+        "client accounts: what a client said or asked for, client meetings and calls, the tasks, action "
+        "items, open items and next steps from them and who owns them, budgets, pacing, campaigns "
         "and account performance. Never report anything about Position2's own people, even when a "
         "tool result contains it: who is leaving, joining, quitting or being let go, who is unhappy, "
         "attrition, any employee's performance, pay, promotion or behaviour, HR or personnel matters, "

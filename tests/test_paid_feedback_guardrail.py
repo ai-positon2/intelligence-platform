@@ -198,3 +198,21 @@ def test_the_page_tells_a_standard_user_what_they_can_ask():
     admin = client_as(ADMIN).get("/p2/paid-marketing/client-feedback-agent").get_data(as_text=True)
     assert 'id="scopeNote"' in staff and "admins only" in staff
     assert 'id="scopeNote"' not in admin
+
+TASKS = "Tell me about Acme and Wingtip calls that happened in the last 20 days. Give me all the tasks, open items, details etc"
+
+
+def test_a_task_update_question_passes_the_keyword_screen():
+    assert not fb.people_question(TASKS)
+
+
+def test_the_screen_and_the_prompt_say_tasks_and_open_items_from_client_calls_are_allowed():
+    for words in (fb._screen_instructions(), fb.restricted_instructions(), fb.RESTRICTED_REPLY):
+        assert "open items" in words
+    assert "ALWAYS an account question" in fb._screen_instructions()
+
+
+def test_a_task_update_question_is_answered_for_a_restricted_user(jobs):
+    client = FakeClient([([text("ALLOW")], "end_turn"), ([text("Acme: send the report.")], "end_turn")])
+    fb.start(TASKS, [], STAFF, restricted=True, client_factory=lambda: client, spawn=False)
+    assert jobs["done"]["answer"] == "Acme: send the report."
