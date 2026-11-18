@@ -270,10 +270,21 @@ def save_settings(store, data, who, now=None):
     return settings(store)
 
 
+def _name_is(name, email):
+    """Whether a person's name as Meta writes it ("Ebin V Edison") is the owner of an address (ebin.edison@...): every word before the @ is in the name."""
+    words = {w for w in re.split(r"[^a-z]+", str(name or "").lower()) if w}
+    mine = [w for w in re.split(r"[^a-z]+", str(email or "").split("@")[0].lower()) if w]
+    return bool(mine) and all(w in words for w in mine)
+
+
 def allowed(email, allow):
+    """Whether an address is on the allowed list. Meta gives a name, not an address, so a name (no @) is allowed when it is the owner of an allowed
+    address (_name_is)."""
     e = str(email or "").strip().lower()
     if not e:
         return False
+    if "@" not in e:
+        return any(not a.startswith("@") and _name_is(e, a) for a in allow)
     return any(e == a or (a.startswith("@") and e.endswith(a)) for a in allow)
 
 
@@ -435,7 +446,7 @@ def flagged(changes, allow, watch=None):
     """The changes to flag: anyone not on the allowed list, plus anyone in `watch` (addresses watched for this one account even though
     they are on the allowed list elsewhere)."""
     watch = watch or ()
-    return [c for c in changes if c["user"] in watch or not allowed(c["user"], allow)]
+    return [c for c in changes if c["user"] in watch or (c.get("meta") and any(_name_is(c["user"], w) for w in watch)) or not allowed(c["user"], allow)]
 
 
 def by_person(changes):
@@ -461,7 +472,7 @@ def lines_for(account, changes, currency="USD", money=None):
     out = []
     for name, tool, cs in by_person(changes):
         out.append({"who": name, "via": tool, "line": summarize(cs, currency, money), "count": len(cs), "first": cs[0]["at"][:16], "last": cs[-1]["at"][:16],
-                    "accountId": account["id"], "accountName": account["name"]})
+                    "accountId": account["id"], "accountName": account["name"], "platform": account.get("platform") or "google"})
     return out
 
 
@@ -477,7 +488,8 @@ def messages(found, link, now):
                       total, len(found), "" if len(found) == 1 else "s", now.strftime("%d %b %H:%M"))}]}]
         for f in chunk:
             rows = ["•  %s%s: %s" % (_mk(x["who"]), (" (%s)" % _mk(x["via"])) if x["via"] else "", _mk(x["line"])) for x in f["lines"]]
-            blocks.append({"type": "section", "text": {"type": "mrkdwn", "text": ("*%s*\n" % _mk(f["account"]["name"]) + "\n".join(rows))[:2900]}})
+            label = f["account"]["name"] + (" (Meta)" if f["account"].get("platform") == "meta" else "")
+            blocks.append({"type": "section", "text": {"type": "mrkdwn", "text": ("*%s*\n" % _mk(label) + "\n".join(rows))[:2900]}})
         blocks.append({"type": "actions", "elements": [{"type": "button", "text": {"type": "plain_text", "text": "Open Change History"}, "url": link}]})
         text = "Change History: %d change%s by someone other than the account managers in %s" % (
             total, "" if total == 1 else "s", ", ".join(f["account"]["name"] for f in chunk[:5]) + (" +%d" % (len(chunk) - 5) if len(chunk) > 5 else ""))
@@ -497,7 +509,8 @@ def _cell(v):
 
 def canvas_rows(item, now):
     """The table rows one run adds to an account's canvas ([{who, via, line, count}] -> [{at, who, line, count}]), read time in UTC."""
-    return [{"at": now.strftime("%d %b %H:%M"), "who": x["who"] + (" (%s)" % x["via"] if x["via"] else ""), "line": x["line"], "count": x["count"]} for x in item["lines"]]
+    return [{"at": now.strftime("%d %b %H:%M"), "who": x["who"] + (" (%s)" % x["via"] if x["via"] else "") + (" · Meta" if x.get("platform") == "meta" else ""),
+             "line": x["line"], "count": x["count"]} for x in item["lines"]]
 
 
 def canvas_doc(name, rows, now):
@@ -751,6 +764,72 @@ def read_between(account_id, search, since, until, with_status=False):
     return out + extra
 
 
+# ── Meta's activity log (the ad account's "activities": who changed what, by name) ───────────────────────────────────────────
+META_FIELDS = "event_time,event_type,translated_event_type,actor_id,actor_name,object_id,object_name,object_type,extra_data"
+META_LIMIT = 500
+
+
+def _meta_at(v):
+    """Meta's time ("2026-11-17T08:27:10+0000") as a UTC "YYYY-MM-DD HH:MM:SS"."""
+    try:
+        t = dt.datetime.fromisoformat(re.sub(r"([+-]\d\d)(\d\d)$", r"\1:\2", str(v)))
+    except ValueError:
+        return ""
+    return (t.astimezone(dt.timezone.utc) if t.tzinfo else t).strftime("%Y-%m-%d %H:%M:%S")
+
+
+def _meta_phrase(row):
+    """What one Meta activity says: 'Ad set budget updated "Retargeting" (50.00 to 35.00)'."""
+    import json
+    kind = re.sub(r"\s+", " ", str(row.get("translated_event_type") or str(row.get("event_type") or "changed").replace("_", " "))).strip()
+    name = str(row.get("object_name") or "").strip()
+    extra = row.get("extra_data")
+    try:
+        extra = json.loads(extra) if isinstance(extra, str) else (extra or {})
+    except ValueError:
+        extra = {}
+    old, new = (extra.get("old_value"), extra.get("new_value")) if isinstance(extra, dict) else (None, None)
+    if "budget" in str(row.get("event_type") or "") and old is not None and new is not None:
+        try:
+            old, new = "%.2f" % (float(old) / 100), "%.2f" % (float(new) / 100)      # Meta writes a budget in the currency's smallest unit
+        except (TypeError, ValueError):
+            pass
+    both = old not in (None, "") and new not in (None, "") and len(str(old)) < 60 and len(str(new)) < 60
+    shown = (" (%s to %s)" % (old, new)) if both else ""
+    return (kind[:1].upper() + kind[1:]) + (' "%s"' % name[:80] if name else "") + shown
+
+
+def read_meta_changes(rows):
+    """[change] from Meta's activity rows, shaped like Google's (user is the person's name) with the sentence in `phrase`."""
+    out = []
+    for r in rows or []:
+        at = _meta_at(r.get("event_time"))
+        if not at:
+            continue
+        name = str(r.get("actor_name") or "").strip()
+        out.append({"id": "meta:%s:%s:%s:%s" % (r.get("object_id") or "", r.get("event_type") or "", r.get("event_time") or "", r.get("actor_id") or ""), "at": at,
+                    "user": name, "client": "META" if name else "", "type": str(r.get("object_type") or ""), "op": "UPDATE", "fields": [], "campaign": "",
+                    "adGroup": "", "old": {}, "new": {}, "phrase": _meta_phrase(r), "meta": True})
+    return sorted(out, key=lambda c: c["at"], reverse=True)
+
+
+def read_meta_account(account_id, pages, now):
+    """[change] of one Meta ad account for the last READ_DAYS days. `pages(path, params)` returns every row of a Graph list."""
+    since = int((now - dt.timedelta(days=READ_DAYS)).timestamp())
+    until = int((now + dt.timedelta(days=1)).timestamp())
+    return read_meta_changes(pages("%s/activities" % account_id, {"fields": META_FIELDS, "since": since, "until": until, "limit": META_LIMIT}))
+
+
+def canvas_key(name, canvas_of):
+    """The saved canvas account a name belongs to: the same name, or a Meta account written "<name> Facebook" and the like, else ''."""
+    n = re.sub(r"[^a-z0-9]+", "", str(name or "").lower())
+    for k in canvas_of:
+        kn = re.sub(r"[^a-z0-9]+", "", k.lower())
+        if kn and (n == kn or n.startswith(kn)):
+            return k
+    return ""
+
+
 def read_account(account_id, search, now):
     """[change] of one account for the last READ_DAYS days."""
     since = (now - dt.timedelta(days=READ_DAYS)).strftime("%Y-%m-%d %H:%M:%S")
@@ -758,18 +837,21 @@ def read_account(account_id, search, now):
     return read_between(account_id, search, since, until)
 
 
-def run(store, *, accounts, deliver, search_fn, link, trigger, now=None, currency_of=None, money=None, workers=WORKERS):
-    """One run over the Google accounts in `accounts` ([{id, name, platform}]). Returns the run record (kept under RUNS_KEY)."""
+def run(store, *, accounts, deliver, search_fn, link, trigger, now=None, currency_of=None, money=None, workers=WORKERS, meta_pages=None):
+    """One run over the Google accounts in `accounts` ([{id, name, platform}]), and the Meta ones too when `meta_pages` (a Graph list reader) is given.
+    Returns the run record (kept under RUNS_KEY)."""
     now = now or dt.datetime.now(dt.timezone.utc)
     conf = settings(store)
     seen_all = store.state_get(SEEN_KEY) or {}
     access_all = store.state_get(ACCESS_KEY) or {}
     baseline = not seen_all
-    google = [a for a in accounts if (a.get("platform") or "google") == "google"]
+    google = [a for a in accounts if (a.get("platform") or "google") == "google" or (meta_pages and a.get("platform") == "meta")]
     currency_of = currency_of or (lambda aid: "USD")
 
     def one(a):
         try:
+            if a.get("platform") == "meta":
+                return a, read_meta_account(a["id"], meta_pages, now), None, None
             return a, read_account(a["id"], search_fn, now), read_access(a["id"], search_fn), None
         except Exception as e:                                                      # noqa: BLE001 (one account failing never stops the rest)
             return a, None, None, ("%s" % e)[:240] or type(e).__name__
@@ -782,17 +864,18 @@ def run(store, *, accounts, deliver, search_fn, link, trigger, now=None, currenc
             unread.append({"accountId": a["id"], "name": a["name"], "error": err})
             continue
         fresh, keep[a["id"]] = new_since(changes, None if baseline else seen_all.get(a["id"]))
-        before = access_all.get(a["id"])
-        if before is not None and not baseline:                                     # an account's first snapshot is its baseline
-            fresh = fresh + access_changes(before, access, at)
-        access_keep[a["id"]] = _merge_access(before, access)
+        if access is not None:                                                      # Meta has no access snapshot
+            before = access_all.get(a["id"])
+            if before is not None and not baseline:                                 # an account's first snapshot is its baseline
+                fresh = fresh + access_changes(before, access, at)
+            access_keep[a["id"]] = _merge_access(before, access)
         bad = flagged(fresh, conf["allow"], conf["watch"].get(a["name"]))
         if bad:
             found.append({"account": a, "lines": lines_for(a, bad, currency_of(a["id"]), money)})
     found.sort(key=lambda f: f["account"]["name"].lower())
     canvas_of = conf["canvas"]
-    chat_found = [f for f in found if f["account"]["name"] not in canvas_of]       # a canvas account goes only to its own canvas, never here too
-    canvas_found = [f for f in found if f["account"]["name"] in canvas_of]
+    chat_found = [f for f in found if not canvas_key(f["account"]["name"], canvas_of)]       # a canvas account goes only to its own canvas, never here too
+    canvas_found = [f for f in found if canvas_key(f["account"]["name"], canvas_of)]
     record = {"at": now.isoformat(), "trigger": trigger, "accounts": len(google), "read": len(google) - len(unread), "unread": unread[:30], "baseline": baseline,
               "flagged": sum(x["count"] for f in found for x in f["lines"]), "accountsFlagged": len(found), "sent": 0, "error": ""}
     remember = True
@@ -813,7 +896,7 @@ def run(store, *, accounts, deliver, search_fn, link, trigger, now=None, currenc
                     break
         if remember:
             for f in canvas_found:
-                name = f["account"]["name"]
+                name = canvas_key(f["account"]["name"], canvas_of)
                 try:
                     canvas_write(store, deliver, name, canvas_of[name], canvas_rows(f, now), now)
                     record["sent"] += 1
