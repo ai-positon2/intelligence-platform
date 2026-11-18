@@ -5779,6 +5779,60 @@ def paid_changes_scheduled():
     return jsonify(started=True), 202
 
 
+# ── Daily to-do list for the account managers (tracker/paid_dailytodo.py) ───────────────────────────────────────────────
+# Every weekday morning the Client Feedback Agent lists what each account manager has to do today; one Slack message with a check box per item.
+# A ticked item is never listed again. Slack sends each tick to /api/dailytodo/slack (the Slack app's Interactivity request URL), signed with
+# SLACK_SIGNING_SECRET. The channel is FEEDBACK_TODO_CHANNEL (C05SWCJHMDF unless set).
+
+def _todo_run(trigger):
+    from tracker import paid_dailytodo as dtd, paid_feedback, market_radar_deliver
+    store = _mon_store()
+    if not store.claim("dailytodo:lock", 20 * 60):
+        return
+    try:
+        rows, _source, _problem = _am_rows()
+        client = paid_feedback.default_client()
+
+        def ask(am, accounts, done):
+            answer, _used = paid_feedback.run_loop([{"role": "user", "content": dtd.prompt_for(am, accounts, done, datetime.now(timezone.utc).date().isoformat())}], client=client)
+            return answer
+        dtd.run(store, market_radar_deliver, groups=dtd.groups_from_rows(rows), people=_am_people(), ask=ask,
+                channel=os.environ.get("FEEDBACK_TODO_CHANNEL", "").strip() or dtd.DEFAULT_CHANNEL)
+    except Exception as e:                                                          # noqa: BLE001
+        log.warning("daily to-do run failed: %s", e)
+    finally:
+        store.release("dailytodo:lock")
+
+
+@app.route("/p2/paid-marketing/api/dailytodo/scheduled", methods=["POST"])
+def paid_dailytodo_scheduled():
+    """The weekday run. No session: the monitors' shared secret in X-Monitor-Secret, and with MONITOR_ALERT_SECRET unset every call is refused."""
+    import hmac
+    secret = os.environ.get("MONITOR_ALERT_SECRET", "")
+    given = request.headers.get("X-Monitor-Secret", "")
+    if not secret or not hmac.compare_digest(given.encode("utf-8"), secret.encode("utf-8")):
+        return jsonify(error="Forbidden."), 403
+    _mon_spawn(lambda: _todo_run("schedule"))
+    return jsonify(started=True), 202
+
+
+@app.route("/p2/paid-marketing/api/dailytodo/slack", methods=["POST"])
+def paid_dailytodo_slack():
+    """Slack's Interactivity request URL: a tick or untick on a to-do check box. Signed by Slack, no session."""
+    from tracker import paid_dailytodo as dtd, market_radar_deliver
+    try:
+        dtd.verify_signature(os.environ.get("SLACK_SIGNING_SECRET", ""), request.headers.get("X-Slack-Request-Timestamp", ""), request.get_data(),
+                             request.headers.get("X-Slack-Signature", ""))
+    except dtd.BadSignature as e:
+        return jsonify(error=str(e)), 403
+    try:
+        payload = json.loads(request.form.get("payload") or "{}")
+        dtd.handle_action(_mon_store(), market_radar_deliver, payload, _am_people())
+    except Exception as e:                                                          # noqa: BLE001 (Slack only needs a quick 200)
+        log.warning("daily to-do tick failed: %s", e)
+    return "", 200
+
+
 # ── Brand Spend Alert: what the team saved ──────────────────────────────────────────────────────────────────────────────
 
 @app.route("/p2/paid-marketing/api/brandspend/settings")

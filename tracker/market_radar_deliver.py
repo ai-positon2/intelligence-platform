@@ -167,6 +167,16 @@ def _slack_post(method, payload):
     return body
 
 
+def post_message(channel, text, blocks):
+    """Posts a message and returns its timestamp (the id later edits use)."""
+    return _slack_post("chat.postMessage", {"channel": channel, "text": text, "blocks": blocks, "unfurl_links": False})["ts"]
+
+
+def update_message(channel, ts, text, blocks):
+    """Replaces the text and blocks of a message the bot posted."""
+    _slack_post("chat.update", {"channel": channel, "ts": ts, "text": text, "blocks": blocks})
+
+
 def canvas_create(title, channel, markdown):
     """A new standalone canvas titled `title`, added as a tab on `channel`. Returns its id."""
     return _slack_post("canvases.create", {"title": title, "channel_id": channel, "document_content": {"type": "markdown", "markdown": markdown}})["canvas_id"]
