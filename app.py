@@ -5669,7 +5669,7 @@ def _ch_run(trigger, base):
     """One Change History run (in the background). Two never run at once."""
     from tracker import paid_changes as pc, paid_gads_segments as g, paid_brandspend_math as bm
     store = _mon_store()
-    if not store.claim(pc.LOCK_KEY, 30 * 60):
+    if not store.claim(pc.LOCK_KEY, 12 * 60):                                        # a run takes a couple of minutes: a lock left by a restart ends quickly
         return
     try:
         accounts, _groups, _problems = _mon_inventory()
@@ -5782,9 +5782,43 @@ def paid_changes_scheduled():
     given = request.headers.get("X-Monitor-Secret", "")
     if not secret or not hmac.compare_digest(given.encode("utf-8"), secret.encode("utf-8")):
         return jsonify(error="Forbidden."), 403
+    from tracker import paid_changes as pc
+    if not pc.due(_mon_store(), datetime.now(timezone.utc), _ch_every_min() // 2):                # the platform's own timer has run it lately: GitHub is only the back-up
+        return jsonify(started=False, reason="A run was made recently."), 200
     base = _mon_base()
     _mon_spawn(lambda: _ch_run("schedule", base))
     return jsonify(started=True), 202
+
+
+# The platform keeps its own time for Change History. GitHub's scheduled workflow (paid-change-history.yml) is only a back-up: GitHub starts a scheduled
+# workflow late or skips it, and the runs were seen eight to eleven hours apart instead of two. Every web worker checks once a minute whether a run is
+# due (the last run, whatever started it, is older than the interval) and runs it; two workers never run at once (the run claims a lock, and a run that is
+# going shows as the newest run only once it is recorded). Set CHANGE_HISTORY_EVERY_MIN (15 to 240, default 60) to change the interval, and
+# PLATFORM_SCHEDULER=0 to switch the timers off (tests do).
+
+def _ch_every_min():
+    try:
+        return min(240, max(15, int(os.environ.get("CHANGE_HISTORY_EVERY_MIN", "") or 60)))
+    except ValueError:
+        return 60
+
+
+def _ch_timer():
+    from tracker import paid_changes as pc
+    time.sleep(20)
+    while True:
+        try:
+            if pc.due(_mon_store(), datetime.now(timezone.utc), _ch_every_min()):
+                _ch_run("platform timer", os.environ.get("PLATFORM_BASE_URL", "").strip() or "https://intelligence.position2.com")
+        except Exception as e:                                                      # noqa: BLE001 (the timer never stops)
+            log.warning("change history timer: %s", e)
+        time.sleep(60)
+
+
+def _start_timers():
+    if "pytest" in __import__("sys").modules or os.environ.get("PLATFORM_SCHEDULER", "1") == "0":
+        return
+    threading.Thread(target=_ch_timer, daemon=True, name="change-history-timer").start()
 
 
 # ── Daily to-do list for the account managers (tracker/paid_dailytodo.py) ───────────────────────────────────────────────
@@ -25029,6 +25063,8 @@ def refresh_status():
     except Exception as e:
         return jsonify({"error": str(e)})
 
+
+_start_timers()
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8080))

@@ -1,6 +1,6 @@
 name: Paid Marketing Change History
 
-# Starts the Change History run on the platform every two hours. The run itself happens on the platform (it reads each Google Ads account's change history and sends a Slack
+# The back-up for Change History's own timer: the platform runs it itself every hour (see _ch_timer in app.py); this only nudges it every half hour, and the platform ignores the nudge when a run was made in the last half hour. GitHub starts a scheduled workflow late or skips it, which is why it is not the main clock. It starts the run on the platform. The run itself happens on the platform (it reads each Google Ads account's change history and sends a Slack
 # line for every change made by someone not on the allowed list saved on the Change History page); this only calls the secret-guarded address, which answers at once and
 # runs in the background. The first run sets the baseline and sends nothing.
 #
@@ -10,7 +10,7 @@ name: Paid Marketing Change History
 on:
   workflow_dispatch:
   schedule:
-    - cron: '20 */2 * * *'   # every two hours at :20 UTC (GitHub may start it a few minutes late)
+    - cron: '10,40 * * * *'   # twice an hour (GitHub may start it late, or skip it)
 
 permissions:
   contents: read
