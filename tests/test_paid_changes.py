@@ -466,3 +466,32 @@ def test_meta_changes_are_read_by_name_flagged_unless_the_person_owns_an_allowed
     doc = d.canvases[s.state_get(pc.CANVAS_KEY)["Glow Skin"]]["markdown"][-1]
     assert "Zed Agency · Meta" in doc and "Retargeting" in doc and "Asha" not in doc
     assert pc.run(s, accounts=meta, deliver=d, search_fn=_search({}), link="https://p.example/x", trigger="schedule", now=NOW)["read"] == 0    # without a Meta reader, Meta is skipped
+
+
+def test_a_run_is_due_once_the_interval_has_passed_and_the_github_back_up_skips_one_made_lately(monkeypatch):
+    from monitor_fakes import MemStore
+    s = Store()
+    assert pc.due(s, NOW, 60)                                                                        # never run: due
+    s.state_set(pc.RUNS_KEY, [{"at": (NOW - dt.timedelta(minutes=59)).isoformat()}])
+    assert not pc.due(s, NOW, 60) and pc.due(s, NOW, 30) and pc.due(s, NOW + dt.timedelta(minutes=2), 60)
+    a = _app()
+    m = MemStore()
+    m.StoreUnavailable = type("StoreUnavailable", (Exception,), {})
+    monkeypatch.setattr(a, "_mon_store", lambda: m)
+    started = []
+    monkeypatch.setattr(a, "_mon_spawn", lambda fn: started.append(fn))
+    monkeypatch.setenv("MONITOR_ALERT_SECRET", "shh")
+    monkeypatch.delenv("CHANGE_HISTORY_EVERY_MIN", raising=False)
+    anon = a.app.test_client()
+    hdr = {"X-Monitor-Secret": "shh"}
+    assert anon.post("/p2/paid-marketing/api/changes/scheduled", headers=hdr, json={}).status_code == 202 and len(started) == 1        # no run yet
+    m.state_set(pc.RUNS_KEY, [{"at": (dt.datetime.now(dt.timezone.utc) - dt.timedelta(minutes=10)).isoformat()}])
+    r = anon.post("/p2/paid-marketing/api/changes/scheduled", headers=hdr, json={})
+    assert r.status_code == 200 and r.get_json()["started"] is False and len(started) == 1                                              # the timer ran it 10 minutes ago
+    m.state_set(pc.RUNS_KEY, [{"at": (dt.datetime.now(dt.timezone.utc) - dt.timedelta(minutes=40)).isoformat()}])
+    assert anon.post("/p2/paid-marketing/api/changes/scheduled", headers=hdr, json={}).status_code == 202 and len(started) == 2        # 40 min: the back-up goes
+    assert a._ch_every_min() == 60
+    monkeypatch.setenv("CHANGE_HISTORY_EVERY_MIN", "5")
+    assert a._ch_every_min() == 15
+    monkeypatch.setenv("CHANGE_HISTORY_EVERY_MIN", "x")
+    assert a._ch_every_min() == 60

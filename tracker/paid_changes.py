@@ -919,6 +919,13 @@ def run(store, *, accounts, deliver, search_fn, link, trigger, now=None, currenc
     return record
 
 
+def due(store, now, every_min):
+    """Whether the last run (any trigger) started at least `every_min` minutes ago, or there has been none. `now` is a UTC datetime."""
+    runs = store.state_get(RUNS_KEY) or []
+    last = _time(runs[0].get("at")) if runs else None
+    return last is None or (now.replace(tzinfo=None) - last).total_seconds() >= every_min * 60
+
+
 HISTORY_DAYS = 29                    # Google keeps 30 days of change history
 
 
