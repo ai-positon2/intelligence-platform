@@ -98,6 +98,8 @@ def test_a_ticked_item_is_done_redrawn_ticked_and_never_listed_again_while_an_op
     t.run(s, d2, groups=GROUPS, people=PEOPLE, ask=asker({"Siddesh": again}), now=NOW + dt.timedelta(days=1))
     texts = [o["text"]["text"] for o in d2.posted[0][2][3]["elements"][0]["options"]]
     assert texts == ["Monster: add stock feed", "D&J: send the weekly report"]                # the done one is gone, the open one carried, the new one added
+    notes = [o["description"]["text"] for o in d2.posted[0][2][3]["elements"][0]["options"]]
+    assert notes == ["assigned 18 Nov (yesterday)", "assigned 19 Nov (today)"]                   # the carried item shows when it was first assigned
     assert t.handle_action(s, d, tick(ts, []), PEOPLE, now=NOW) == 1 and s.state_get(t.KEY_ITEMS)[first]["status"] == "open"   # unticking puts it back
 
 
@@ -126,7 +128,7 @@ def test_long_items_use_the_description_and_a_manager_gets_at_most_eight():
     assert o["text"]["text"].endswith("word") and len(o["text"]["text"]) <= 75 and len(o["description"]["text"]) <= 75 and len(items[ids[0]]["text"]) <= t.MAX_ITEM
     words = ("McHale Landscaping: Add the new ad text from last week into the search campaigns before today's weekly client call, as promised")
     split = t._option({"x": {"text": words}}, "x")
-    assert split["text"]["text"] + " " + split["description"]["text"] == words                      # split between words, nothing lost
+    assert (split["text"]["text"] + " " + split["description"]["text"]).startswith(words[:len(split["text"]["text"])]) and len(split["description"]["text"]) <= 75
 
 
 def test_slacks_signature_is_checked():

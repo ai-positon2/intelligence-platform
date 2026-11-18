@@ -111,17 +111,36 @@ def plan(items, am, fresh, today):
 
 # ── The message ─────────────────────────────────────────────────────────────
 
-def _option(items, k):
-    """A check box option: the item's words on the first line, the rest of a long item on the second, split between words (never inside one)."""
+def _assigned(first_on, today):
+    """"assigned 17 Nov" with how long ago it was ("today", "yesterday", "3 days ago"), so an overdue item can be spotted."""
+    try:
+        d = dt.date.fromisoformat(first_on)
+        n = (dt.date.fromisoformat(today) - d).days if today else 0
+    except ValueError:
+        return ""
+    ago = "today" if n <= 0 else "yesterday" if n == 1 else "%d days ago" % n
+    return "assigned %d %s (%s)" % (d.day, d.strftime("%b"), ago)
+
+
+def _option(items, k, today=None):
+    """A check box option: the item's words on the first line, and on the second the rest of a long item (split between words, never inside one)
+    and the date it was first assigned."""
     t = items[k]["text"]
+    stamp = _assigned(items[k].get("firstOn", ""), today)
     if len(t) <= 75:
-        return {"text": {"type": "mrkdwn", "text": t}, "value": k}
-    cut = t.rfind(" ", 0, 76)
-    cut = cut if cut > 30 else 75
-    head, rest = t[:cut].rstrip(), t[cut:].strip()
-    if len(rest) > 75:
-        rest = rest[:74].rsplit(" ", 1)[0].rstrip(" ,;:") + "…"
-    return {"text": {"type": "mrkdwn", "text": head}, "value": k, "description": {"type": "mrkdwn", "text": rest}}
+        head, rest = t, ""
+    else:
+        cut = t.rfind(" ", 0, 76)
+        cut = cut if cut > 30 else 75
+        head, rest = t[:cut].rstrip(), t[cut:].strip()
+    room = 75 - (len(stamp) + 3 if stamp else 0)
+    if len(rest) > room:
+        rest = rest[:max(room - 1, 1)].rsplit(" ", 1)[0].rstrip(" ,;:") + "…"
+    line = " · ".join(x for x in (rest, stamp) if x)
+    o = {"text": {"type": "mrkdwn", "text": head}, "value": k}
+    if line:
+        o["description"] = {"type": "mrkdwn", "text": line}
+    return o
 
 
 def _mention(am, people):
@@ -129,7 +148,7 @@ def _mention(am, people):
     return "<@%s>" % sid if sid and re.match(r"^[UW][A-Z0-9]{6,20}$", sid) else "*%s*" % am
 
 
-def build_blocks(sections, items, people, date_label):
+def build_blocks(sections, items, people, date_label, today=None):
     """Slack blocks for a message's sections ([{am, ids}]): a header, then per manager a name line and a check box group (done items ticked)."""
     n = sum(len(s["ids"]) for s in sections)
     blocks = [{"type": "header", "text": {"type": "plain_text", "text": "Today's to-do list"}},
@@ -140,8 +159,8 @@ def build_blocks(sections, items, people, date_label):
         if not ids:
             continue
         blocks.append({"type": "section", "text": {"type": "mrkdwn", "text": _mention(s["am"], people)}})
-        box = {"type": "checkboxes", "action_id": "todo_check", "options": [_option(items, k) for k in ids]}
-        ticked = [_option(items, k) for k in ids if items[k]["status"] == "done"]
+        box = {"type": "checkboxes", "action_id": "todo_check", "options": [_option(items, k, today) for k in ids]}
+        ticked = [_option(items, k, today) for k in ids if items[k]["status"] == "done"]
         if ticked:
             box["initial_options"] = ticked
         blocks.append({"type": "actions", "block_id": "todo_%d" % i, "elements": [box]})
@@ -179,7 +198,7 @@ def run(store, deliver, *, groups, people, ask, channel=DEFAULT_CHANNEL, now=Non
     if sections:
         label = now.strftime("%a %d %b %Y")
         try:
-            ts = deliver.post_message(channel, summary_text(sections), build_blocks(sections, items, people, label))
+            ts = deliver.post_message(channel, summary_text(sections), build_blocks(sections, items, people, label, today))
         except Exception as e:                                                      # noqa: BLE001 (nothing is remembered, so the next run lists them again)
             record["errors"].append("Slack: %s" % str(e)[:200])
         else:
@@ -241,5 +260,5 @@ def handle_action(store, deliver, payload, people, now=None):
             changed += 1
     if changed:
         store.state_set(KEY_ITEMS, items)
-        deliver.update_message(msg["channel"], ts, summary_text(msg["sections"]), build_blocks(msg["sections"], items, people, msg["label"]))
+        deliver.update_message(msg["channel"], ts, summary_text(msg["sections"]), build_blocks(msg["sections"], items, people, msg["label"], msg.get("date")))
     return changed
