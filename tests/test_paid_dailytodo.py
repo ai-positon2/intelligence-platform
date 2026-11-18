@@ -123,7 +123,10 @@ def test_long_items_use_the_description_and_a_manager_gets_at_most_eight():
     items = {}
     ids = t.plan(items, "Divith", [t.clean_item(long)], "2026-11-18")
     o = t._option(items, ids[0])
-    assert len(o["text"]["text"]) == 75 and "description" in o and len(items[ids[0]]["text"]) <= t.MAX_ITEM
+    assert o["text"]["text"].endswith("word") and len(o["text"]["text"]) <= 75 and len(o["description"]["text"]) <= 75 and len(items[ids[0]]["text"]) <= t.MAX_ITEM
+    words = ("McHale Landscaping: Add the new ad text from last week into the search campaigns before today's weekly client call, as promised")
+    split = t._option({"x": {"text": words}}, "x")
+    assert split["text"]["text"] + " " + split["description"]["text"] == words                      # split between words, nothing lost
 
 
 def test_slacks_signature_is_checked():
@@ -167,3 +170,12 @@ def test_the_scheduled_address_needs_the_monitors_secret(monkeypatch, store):
     c = app_module.app.test_client()
     assert c.post("/p2/paid-marketing/api/dailytodo/scheduled").status_code == 403 and ran == []
     assert c.post("/p2/paid-marketing/api/dailytodo/scheduled", headers={"X-Monitor-Secret": "shh"}).status_code == 202 and len(ran) == 1
+
+
+def test_accounts_no_longer_managed_are_dropped_and_two_clients_go_to_ebin():
+    from tracker import paid_am
+    rows = [{"account": "Riccobene", "client": "Riccobene", "am": "Divith"}, {"account": "Great Lakes Dental", "client": "x", "am": "A"},
+            {"account": "Daniel I. Shapiro, M.D.", "client": "y", "am": "A"}, {"account": "Dental Care Associates", "client": "z", "am": "A"},
+            {"account": "Eventgroove 1", "client": "Eventgroove", "am": "Siddesh"}, {"account": "Burn Out Brands", "client": "Burn Out", "am": "Siddesh"},
+            {"account": "OIA", "client": "OIA", "am": "Divith"}]
+    assert t.groups_from_rows(paid_am.adjust(rows)) == {"Divith": ["OIA"], "Ebin V Edison": ["Burn Out Brands", "Eventgroove 1"]}

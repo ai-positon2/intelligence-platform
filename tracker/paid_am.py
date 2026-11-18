@@ -69,6 +69,24 @@ def parse_paste(text):
     return [{"client": r["client"], "account": r["account"], "am": r["am"], "date": r["date"]} for r in rows]
 
 
+# Accounts the team no longer manages (their rows are dropped, so no to-do list or alert tag names them) and accounts whose manager is fixed here
+# whatever the sheet says. A match is on the account or client name with spaces and punctuation ignored, and the name only has to contain the words.
+NOT_MANAGED = ("riccobene", "danielishapiro", "shapiro", "greatlakes", "dentalcareassociates")
+MANAGER_OVERRIDES = (("eventgroove", "Ebin V Edison"), ("burnout", "Ebin V Edison"))
+
+
+def adjust(rows):
+    """The allocation rows without the accounts that are not managed any more, and with the managers that are fixed in MANAGER_OVERRIDES."""
+    out = []
+    for r in rows or []:
+        names = norm(r.get("account")) + "|" + norm(r.get("client"))
+        if any(k in names for k in NOT_MANAGED):
+            continue
+        am = next((who for k, who in MANAGER_OVERRIDES if k in names), None)
+        out.append(dict(r, am=am) if am else r)
+    return out
+
+
 def owners(rows):
     """{normalised account name: AM} and {normalised client name: AM when the client has one AM} from allocation rows."""
     acc, by_client = {}, {}

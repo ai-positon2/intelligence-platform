@@ -79,7 +79,8 @@ def prompt_for(am, accounts, done_texts, today):
         "on those accounts: follow-ups promised on calls, client requests waiting for an answer, changes agreed but not made yet, budget or pacing "
         "problems that need action. Only include something a source actually says; never invent or pad. Fewer than %d items is fine, and an empty "
         "list is right when nothing needs doing.\n\n"
-        "Each item is one short sentence that starts with the account name and says what to do. Reply with ONLY this JSON and nothing else: "
+        "Each item is ONE short sentence of at most 110 characters that starts with the account name, then a colon, and says what to do; "
+        "leave out the dates, amounts and background unless they are the point, and never end a sentence with an ellipsis. Reply with ONLY this JSON and nothing else: "
         '{"items": ["...", "..."]}%s' % (today, am, "; ".join(accounts), MAX_PER_AM + 1, done)
     )
 
@@ -111,11 +112,16 @@ def plan(items, am, fresh, today):
 # ── The message ─────────────────────────────────────────────────────────────
 
 def _option(items, k):
+    """A check box option: the item's words on the first line, the rest of a long item on the second, split between words (never inside one)."""
     t = items[k]["text"]
-    o = {"text": {"type": "mrkdwn", "text": t[:75]}, "value": k}
-    if len(t) > 75:
-        o["description"] = {"type": "mrkdwn", "text": t[75:150]}
-    return o
+    if len(t) <= 75:
+        return {"text": {"type": "mrkdwn", "text": t}, "value": k}
+    cut = t.rfind(" ", 0, 76)
+    cut = cut if cut > 30 else 75
+    head, rest = t[:cut].rstrip(), t[cut:].strip()
+    if len(rest) > 75:
+        rest = rest[:74].rsplit(" ", 1)[0].rstrip(" ,;:") + "…"
+    return {"text": {"type": "mrkdwn", "text": head}, "value": k, "description": {"type": "mrkdwn", "text": rest}}
 
 
 def _mention(am, people):
