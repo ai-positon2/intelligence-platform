@@ -5677,8 +5677,9 @@ def _ch_run(trigger, base):
             cur = {a["id"]: a.get("currency") or "USD" for a in g.list_accounts()}
         except Exception:                                                           # noqa: BLE001 (amounts are then written in dollars)
             cur = {}
+        from tracker import paid_meta, paid_store
         pc.run(store, accounts=accounts, deliver=_mon_deliver(), search_fn=g.search, link=base.rstrip("/") + pc.PAGE, trigger=trigger,
-               currency_of=lambda aid: cur.get(aid, "USD"), money=bm.money)
+               currency_of=lambda aid: cur.get(aid, "USD"), money=bm.money, meta_pages=lambda path, params: paid_meta._pages(path, params, paid_store))
     except Exception as e:                                                          # noqa: BLE001
         log.warning("change history run failed: %s", e)
     finally:

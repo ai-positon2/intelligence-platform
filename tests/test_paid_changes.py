@@ -437,3 +437,32 @@ def test_what_change_status_lists_and_change_event_does_not_explain_is_flagged_w
     acme = day["accounts"][0]
     assert day["flagged"] == 1 and acme["total"] == 1 and acme["flagged"] == 1                     # only the change Google names a person for
     assert acme["unnamed"]["count"] == 5 and acme["unnamed"]["line"].startswith("Edited 2 ads, removed an ad")
+
+
+def test_meta_changes_are_read_by_name_flagged_unless_the_person_owns_an_allowed_address_and_go_to_the_same_canvas():
+    assert pc.allowed("Ebin V Edison", ["ebin.edison@example.com"]) and not pc.allowed("Ebin Smith", ["ebin.edison@example.com"]) and not pc.allowed("Zed", ALLOW)
+    assert pc.canvas_key("Glow Skin Facebook", {"Glow Skin": "C1"}) == "Glow Skin" and pc.canvas_key("Other", {"Glow Skin": "C1"}) == ""
+
+    def row(t, who, kind, name, extra=None):
+        return {"event_time": t, "event_type": kind, "translated_event_type": kind.replace("_", " ").capitalize(), "actor_id": "1", "actor_name": who,
+                "object_id": "9", "object_name": name, "object_type": "AD_SET", "extra_data": extra or ""}
+    first = row("2026-11-06T09:00:00+0000", "Zed Agency", "update_ad_set_budget", "Retargeting", '{"old_value": 5000, "new_value": 3500}')
+    mine = row("2026-11-06T09:30:00+0000", "Asha", "update_ad_run_status", "Prospecting")
+    ids = [c["id"] for c in pc.read_meta_changes([first, mine])]
+    assert len(ids) == 2 and pc.read_meta_changes([first])[0]["phrase"] == 'Update ad set budget "Retargeting" (50.00 to 35.00)'
+    s, d = Store(), Deliver()
+    s.state_set(pc.KEY, {"allow": ["asha@example.com"], "channel": "C0TEST", "canvas": {"Glow Skin": "C0GLOW"}})
+    meta = [{"id": "act_1", "name": "Glow Skin", "platform": "meta"}]
+    seen = []
+
+    def pages(path, params):
+        seen.append(path)
+        return pages.rows
+    pages.rows = []
+    pc.run(s, accounts=meta, deliver=d, search_fn=_search({}), link="https://p.example/x", trigger="schedule", now=NOW, meta_pages=pages)   # baseline
+    pages.rows = [first, mine]
+    rec = pc.run(s, accounts=meta, deliver=d, search_fn=_search({}), link="https://p.example/x", trigger="schedule", now=NOW, meta_pages=pages)
+    assert seen == ["act_1/activities"] * 2 and rec["accountsFlagged"] == 1 and rec["flagged"] == 1 and d.sent == []
+    doc = d.canvases[s.state_get(pc.CANVAS_KEY)["Glow Skin"]]["markdown"][-1]
+    assert "Zed Agency · Meta" in doc and "Retargeting" in doc and "Asha" not in doc
+    assert pc.run(s, accounts=meta, deliver=d, search_fn=_search({}), link="https://p.example/x", trigger="schedule", now=NOW)["read"] == 0    # without a Meta reader, Meta is skipped
