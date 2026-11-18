@@ -173,6 +173,18 @@ def summary_text(sections):
 
 # ── The daily run ───────────────────────────────────────────────────────────
 
+SEND_FROM = (3, 30)                # 03:30 UTC = 09:00 IST
+SEND_UNTIL_HOUR = 12               # a list that could not go out by 12:00 UTC (17:30 IST) waits for the next weekday
+
+
+def due(store, now):
+    """Whether today's list should go out now: a weekday, from 09:00 IST to 12:00 UTC, and no run recorded yet today. `now` is a UTC datetime."""
+    if now.weekday() > 4 or (now.hour, now.minute) < SEND_FROM or now.hour >= SEND_UNTIL_HOUR:
+        return False
+    today = now.date().isoformat()
+    return not any(str(r.get("at") or "")[:10] == today for r in (store.state_get(KEY_RUNS) or []))
+
+
 def run(store, deliver, *, groups, people, ask, channel=DEFAULT_CHANNEL, now=None):
     """Ask for each manager's items, post one message. `ask(am, accounts, done_texts)` returns the agent's answer text. Returns the run record."""
     now = now or dt.datetime.now(dt.timezone.utc)
