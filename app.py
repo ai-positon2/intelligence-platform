@@ -5477,7 +5477,14 @@ _AM_TTL = 300
 
 
 def _am_rows():
-    """(rows, source, problem): who manages each account. The Budget Tracker's DPR tab when its link is saved on the Alert Hub and the platform's
+    """(rows, source, problem): who manages each account, without the accounts the team no longer manages and with the fixed managers (paid_am.adjust)."""
+    from tracker import paid_am
+    rows, source, problem = _am_rows_raw()
+    return paid_am.adjust(rows), source, problem
+
+
+def _am_rows_raw():
+    """The Budget Tracker's DPR tab when its link is saved on the Alert Hub and the platform's
     Google service account can read it; else the Pacing Desk's allocations, the newest month with rows."""
     from tracker import paid_am, paid_pacing_budget_store as pbs
     saved = _mon_store().state_get(paid_am.KEY) or {}
