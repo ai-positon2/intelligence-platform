@@ -174,6 +174,29 @@ def test_the_scheduled_address_needs_the_monitors_secret(monkeypatch, store):
     assert c.post("/p2/paid-marketing/api/dailytodo/scheduled", headers={"X-Monitor-Secret": "shh"}).status_code == 202 and len(ran) == 1
 
 
+def test_the_list_is_due_on_weekdays_from_nine_ist_until_noon_utc_and_only_once_a_day():
+    s = Store()
+    at = lambda d, h, m: dt.datetime(2026, 11, d, h, m, tzinfo=dt.timezone.utc)      # noqa: E731 (18 Nov 2026 is a Wednesday)
+    assert t.due(s, at(18, 3, 30)) and t.due(s, at(18, 11, 59))
+    assert not t.due(s, at(18, 3, 29)) and not t.due(s, at(18, 12, 0))               # too early, too late
+    assert not t.due(s, at(21, 5, 0)) and not t.due(s, at(22, 5, 0))                 # Saturday, Sunday
+    s.state_set(t.KEY_RUNS, [{"at": at(18, 3, 31).isoformat()}])
+    assert not t.due(s, at(18, 5, 0)) and t.due(s, at(19, 3, 30))                    # sent today, due again tomorrow
+
+
+def test_a_run_started_twice_in_a_day_sends_once_unless_forced(monkeypatch, store):
+    ran = []
+    monkeypatch.setattr(t, "due", lambda s, now: not ran)
+    monkeypatch.setattr(app_module, "_am_rows", lambda: ([], "", ""))
+    monkeypatch.setattr(t, "run", lambda *a, **k: ran.append(1))
+    monkeypatch.setattr("tracker.paid_feedback.default_client", lambda: None)
+    app_module._todo_run("platform timer")
+    app_module._todo_run("platform timer")
+    assert len(ran) == 1
+    app_module._todo_run("schedule", True)
+    assert len(ran) == 2
+
+
 def test_accounts_no_longer_managed_are_dropped_and_two_clients_go_to_ebin():
     from tracker import paid_am
     rows = [{"account": "Riccobene", "client": "Riccobene", "am": "Divith"}, {"account": "Great Lakes Dental", "client": "x", "am": "A"},

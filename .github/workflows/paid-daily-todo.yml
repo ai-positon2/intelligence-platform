@@ -8,7 +8,7 @@ name: Paid Marketing Daily To-do
 on:
   workflow_dispatch:
   schedule:
-    - cron: '30 3 * * 1-5'   # 03:30 UTC = 09:00 IST, Monday to Friday (GitHub may start it a few minutes late)
+    - cron: '30 3,5,7 * * 1-5'   # back-up only: the platform's own timer sends the list at 09:00 IST; the platform ignores this call once today's list is out
 
 permissions:
   contents: read

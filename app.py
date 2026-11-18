@@ -5819,6 +5819,7 @@ def _start_timers():
     if "pytest" in __import__("sys").modules or os.environ.get("PLATFORM_SCHEDULER", "1") == "0":
         return
     threading.Thread(target=_ch_timer, daemon=True, name="change-history-timer").start()
+    threading.Thread(target=_todo_timer, daemon=True, name="daily-todo-timer").start()
 
 
 # ── Daily to-do list for the account managers (tracker/paid_dailytodo.py) ───────────────────────────────────────────────
@@ -5826,12 +5827,14 @@ def _start_timers():
 # A ticked item is never listed again. Slack sends each tick to /api/dailytodo/slack (the Slack app's Interactivity request URL), signed with
 # SLACK_SIGNING_SECRET. The channel is FEEDBACK_TODO_CHANNEL (C05SWCJHMDF unless set).
 
-def _todo_run(trigger):
+def _todo_run(trigger, force=False):
     from tracker import paid_dailytodo as dtd, paid_feedback, market_radar_deliver
     store = _mon_store()
     if not store.claim("dailytodo:lock", 20 * 60):
         return
     try:
+        if not force and not dtd.due(store, datetime.now(timezone.utc)):                # another worker or GitHub already sent today's list
+            return
         rows, _source, _problem = _am_rows()
         client = paid_feedback.default_client()
 
@@ -5854,8 +5857,21 @@ def paid_dailytodo_scheduled():
     given = request.headers.get("X-Monitor-Secret", "")
     if not secret or not hmac.compare_digest(given.encode("utf-8"), secret.encode("utf-8")):
         return jsonify(error="Forbidden."), 403
-    _mon_spawn(lambda: _todo_run("schedule"))
+    force = bool((request.get_json(silent=True) or {}).get("force"))                 # a manual run from GitHub with {"force": true} sends again today
+    _mon_spawn(lambda: _todo_run("schedule", force))
     return jsonify(started=True), 202
+
+
+def _todo_timer():
+    from tracker import paid_dailytodo as dtd
+    time.sleep(30)
+    while True:
+        try:
+            if dtd.due(_mon_store(), datetime.now(timezone.utc)):
+                _todo_run("platform timer")
+        except Exception as e:                                                      # noqa: BLE001 (the timer never stops)
+            log.warning("daily to-do timer: %s", e)
+        time.sleep(60)
 
 
 @app.route("/p2/paid-marketing/api/dailytodo/slack", methods=["POST"])
