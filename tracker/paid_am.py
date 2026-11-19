@@ -95,6 +95,12 @@ def mentions_dropped(text, extra=()):
     return any((" " + re.sub(r"[^a-z0-9]+", " ", n.lower().replace("&", " and ")).strip() + " ") in t for n in list(NOT_MANAGED_TEXT) + list(extra) if len(n.strip()) >= 4)
 
 
+def owner_of(text):
+    """The manager fixed in MANAGER_OVERRIDES for the account a to-do item names ("Eventgroove: ..." -> Ebin V Edison), or None."""
+    n = norm(text)
+    return next((who for k, who in MANAGER_OVERRIDES if k in n), None)
+
+
 def adjust(rows):
     """The allocation rows without the accounts that are not managed any more, and with the managers that are fixed in MANAGER_OVERRIDES."""
     out = []
