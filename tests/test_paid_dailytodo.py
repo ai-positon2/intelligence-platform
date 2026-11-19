@@ -233,3 +233,18 @@ def test_reviews_are_told_apart_and_listed_after_the_tasks():
     ids = t.plan(items, "Siddesh", ["D&J: Review: Todd changed the budget", "D&J: reply to the invoice"], "2026-11-18")
     items[ids[0]]["firstOn"] = "2026-11-10"                                          # even an older review comes after a newer task
     assert [items[k]["text"] for k in t.plan(items, "Siddesh", [], "2026-11-19")][0] == "D&J: reply to the invoice"
+
+
+def test_eventgroove_and_burn_out_items_go_to_ebin_even_when_they_were_open_under_siddesh_or_found_for_him():
+    from tracker import paid_am
+    s, d = Store(), Deliver()
+    old = "Eventgroove: Review pacing on the US account"
+    s.state_set(t.KEY_ITEMS, {t.item_id("Siddesh", old): {"am": "Siddesh", "text": old, "status": "open", "firstOn": "2026-11-18", "doneBy": "", "doneAt": ""}})
+    ans = '{"items": ["D&J: reply to the invoice", "Burn Out: send the new creative", "Monster: add stock feed"]}'
+    t.run(s, d, groups={"Siddesh": ["D&J"], "Ebin V Edison": ["Eventgroove"]}, people=PEOPLE, ask=asker({"Siddesh": ans}), now=NOW, owner=paid_am.owner_of)
+    items = s.state_get(t.KEY_ITEMS)
+    mine = {v["text"]: v["am"] for v in items.values()}
+    assert mine[old] == "Ebin V Edison" and mine["Burn Out: send the new creative"] == "Ebin V Edison"
+    assert mine["D&J: reply to the invoice"] == "Siddesh" and mine["Monster: add stock feed"] == "Siddesh"
+    assert old in json.dumps(d.posted[0][2]) and items[t.item_id("Ebin V Edison", old)]["firstOn"] == "2026-11-18"   # keeps the day it was first assigned
+    assert paid_am.owner_of("Monster Transmission: x") is None and paid_am.owner_of("Burnout: x") == "Ebin V Edison"

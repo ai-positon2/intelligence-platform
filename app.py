@@ -5862,7 +5862,7 @@ def _todo_run(trigger, force=False):
             answer, _used = paid_feedback.run_loop([{"role": "user", "content": dtd.prompt_for(am, accounts, done, datetime.now(timezone.utc).date().isoformat())}], client=client)
             return answer
         dtd.run(store, market_radar_deliver, groups=dtd.groups_from_rows(rows), people=_am_people(), ask=ask,
-                channel=os.environ.get("FEEDBACK_TODO_CHANNEL", "").strip() or dtd.DEFAULT_CHANNEL, skip=lambda text: paid_am.mentions_dropped(text, extra))
+                channel=os.environ.get("FEEDBACK_TODO_CHANNEL", "").strip() or dtd.DEFAULT_CHANNEL, skip=lambda text: paid_am.mentions_dropped(text, extra), owner=paid_am.owner_of)
     except Exception as e:                                                          # noqa: BLE001
         log.warning("daily to-do run failed: %s", e)
     finally:

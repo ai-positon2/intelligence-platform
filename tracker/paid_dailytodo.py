@@ -195,9 +195,11 @@ def due(store, now):
     return not any(str(r.get("at") or "")[:10] == today for r in (store.state_get(KEY_RUNS) or []))
 
 
-def run(store, deliver, *, groups, people, ask, channel=DEFAULT_CHANNEL, now=None, skip=None):
+def run(store, deliver, *, groups, people, ask, channel=DEFAULT_CHANNEL, now=None, skip=None, owner=None):
     """Ask for each manager's items, post one message. `ask(am, accounts, done_texts)` returns the agent's answer text. `skip(text)` says an item is about
-    an account that is not managed any more: such an item is never listed, and one still open from an earlier day is retired. Returns the run record."""
+    an account that is not managed any more: such an item is never listed, and one still open from an earlier day is retired. `owner(text)` names the manager
+    an item belongs to when its account is fixed to one (or None): the item goes to that manager's list, and one still open under someone else moves to them.
+    Returns the run record."""
     now = now or dt.datetime.now(dt.timezone.utc)
     today = now.date().isoformat()
     items = _items(store)
@@ -205,7 +207,15 @@ def run(store, deliver, *, groups, people, ask, channel=DEFAULT_CHANNEL, now=Non
     retired = [v for v in items.values() if v["status"] == "open" and skip(v["text"])]
     for v in retired:
         v["status"] = "removed"
-    if retired:
+    owner = owner or (lambda text: None)
+    moved = False
+    for k, v in list(items.items()):                                                # an open item moves to the manager its account belongs to
+        who = owner(v["text"]) if v["status"] == "open" else None
+        if who and who != v["am"]:
+            del items[k]
+            items.setdefault(item_id(who, v["text"]), dict(v, am=who))
+            moved = True
+    if retired or moved:
         store.state_set(KEY_ITEMS, items)
     record = {"at": now.isoformat(), "managers": len(groups), "items": 0, "posted": False, "errors": []}
 
@@ -217,9 +227,16 @@ def run(store, deliver, *, groups, people, ask, channel=DEFAULT_CHANNEL, now=Non
     with ThreadPoolExecutor(max_workers=WORKERS) as ex:
         answers = list(ex.map(one, list(groups)))
     sections = []
+    fresh_by = {am: [] for am in groups}
     for am, fresh, err in answers:
         if err:
             record["errors"].append(err)
+        for text in fresh:
+            fresh_by.setdefault(owner(text) or am, []).append(text)                 # an item about an account that is someone else's goes to them
+    for v in items.values():
+        if v["status"] == "open":
+            fresh_by.setdefault(v["am"], [])                                        # a manager with only carried-over items still gets a list
+    for am, fresh in fresh_by.items():
         ids = plan(items, am, fresh, today)
         if ids:
             sections.append({"am": am, "ids": ids})
