@@ -79,9 +79,14 @@ def prompt_for(am, accounts, done_texts, today):
         "on those accounts: follow-ups promised on calls, client requests waiting for an answer, changes agreed but not made yet, budget or pacing "
         "problems that need action. Only include something a source actually says; never invent or pad. Fewer than %d items is fine, and an empty "
         "list is right when nothing needs doing.\n\n"
+        "A task goes in the list only when it is directed at %s: they were asked to do it, promised it, or it is theirs because they manage the account. "
+        "Do not list work that someone else (a teammate, the client, a vendor) has to do. When a teammate or anyone else changed or did something on "
+        "these accounts that %s should know about, list it as a review instead, starting the sentence after the account name with \"Review:\" and "
+        "naming who did it, for example \"Monster Transmission: Review: Todd changed the daily budget, please check it\". "
+        "Put the tasks first and the reviews after them, and never use a review for work this person must do themselves.\n\n"
         "Each item is ONE short sentence of at most 110 characters that starts with the account name, then a colon, and says what to do; "
         "leave out the dates, amounts and background unless they are the point, and never end a sentence with an ellipsis. Reply with ONLY this JSON and nothing else: "
-        '{"items": ["...", "..."]}%s' % (today, am, "; ".join(accounts), MAX_PER_AM + 1, done)
+        '{"items": ["...", "..."]}%s' % (today, am, "; ".join(accounts), MAX_PER_AM + 1, am, am, done)
     )
 
 
@@ -95,6 +100,11 @@ def done_texts(items, am):
     return [v["text"] for v in items.values() if v["am"] == am and v["status"] == "done"][-40:]
 
 
+def is_review(text):
+    """Whether an item is a review ("Account: Review: Todd changed the budget, please check it") and not a task."""
+    return bool(re.match(r"^[^:]{1,80}:\s*review\s*:", str(text or ""), re.I))
+
+
 def plan(items, am, fresh, today):
     """The ids that go in `am`'s list today: items still open (oldest first), then the new ones that were never done or listed. Adds the new ones
     to `items`. Returns the ids, at most MAX_PER_AM."""
@@ -105,7 +115,7 @@ def plan(items, am, fresh, today):
             continue                                                                # done already, or already open (and in `keep`)
         items[k] = {"am": am, "text": text, "status": "open", "firstOn": today, "doneBy": "", "doneAt": ""}
         keep.append(k)
-    keep.sort(key=lambda k: items[k]["firstOn"])
+    keep.sort(key=lambda k: (is_review(items[k]["text"]), items[k]["firstOn"]))                  # the tasks first, the reviews after them
     return keep[:MAX_PER_AM]
 
 
