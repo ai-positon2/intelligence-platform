@@ -96,6 +96,7 @@
         <button class="cap-tab" id="tab-heat" onclick="switchTab('heat')">Calendar</button>
         <button class="cap-tab" id="tab-alerts" onclick="switchTab('alerts')">Needs Attention<span class="cap-tab-count" id="cntAlerts"></span></button>
         <button class="cap-tab" id="tab-services" onclick="switchTab('services')">Services<span class="cap-tab-count" id="cntServices"></span></button>
+        <button class="cap-tab" id="tab-shifts" onclick="switchTab('shifts')">Budget Shifts<span class="cap-tab-count" id="cntShifts"></span></button>
       </div>
 
       <div class="cap-toolbar" id="toolbar">
@@ -144,6 +145,9 @@
       </div>
       <div id="pane-services" class="cap-pane">
         <div id="servicesBody"><div class="cap-loading" data-orb-state="listening" data-orb-size="64">Loading…</div></div>
+      </div>
+      <div id="pane-shifts" class="cap-pane">
+        <div id="shiftsBody"><div class="cap-loading" data-orb-state="listening" data-orb-size="64">Loading…</div></div>
       </div>
     </div>
 
@@ -241,12 +245,12 @@
           DATA = d;
           if(!d.practices || !d.practices.length){ renderNoData(d); return; }
           renderHeader(); renderStats(); renderDays(); renderStates(); renderBrands();
-          buildFilters(); onFilter(); renderAlerts(); renderServices();
+          buildFilters(); onFilter(); renderAlerts(); renderServices(); renderShifts();
           reveal();
         })
         .catch(function(e){
           document.getElementById('windowText').textContent = 'Unavailable';
-          ['practicesBody','heatBody','alertsBody','servicesBody'].forEach(function(id){
+          ['practicesBody','heatBody','alertsBody','servicesBody','shiftsBody'].forEach(function(id){
             document.getElementById(id).innerHTML='<div class="cap-empty"><b>Couldn\'t load availability</b>'+
               'The dashboard reads a saved snapshot of the capacity data. '+
               'If this persists the snapshot is missing from the deploy.</div>';
@@ -261,7 +265,7 @@
       var msg='<div class="cap-empty"><b>No availability data in this snapshot</b>'+
         'The snapshot parsed cleanly but contained no locations. Re-run '+
         'a fresh data export.</div>';
-      ['practicesBody','heatBody','alertsBody','servicesBody'].forEach(function(id){
+      ['practicesBody','heatBody','alertsBody','servicesBody','shiftsBody'].forEach(function(id){
         document.getElementById(id).innerHTML=msg; });
       ['daysBody','statesBody'].forEach(function(id){ document.getElementById(id).innerHTML=''; });
       reveal();
@@ -1033,10 +1037,107 @@
     }
 
     
+    // ── Budget Shifts ───────────────────────────────────────────────────────
+    // A location with no openings is flagged, and its budget is suggested to move to nearby locations that still have openings. Same rules as the team's
+    // budget shift tracker: SHIFT = no openings in the next 10 days (the campaign keeps a floor, the rest moves, with client approval); WATCH = none in the
+    // next 5 days (budget steps down, the money is held, not moved); only a backup with openings within 5 days can receive; the freed money is split by
+    // the backups' open slots; a backup's daily budget rises by at most the cap. Nearness here is the same city first, then the same state: this demo has
+    // no street addresses, so the nearest three locations are picked from those.
+    var SHIFT_CFG={daily:80,floor:20,watch:50,cap:30,days:10};
+    function shSum(p,n){ var t=0,c=p.counts||[]; for(var i=0;i<n&&i<c.length;i++) t+=c[i]||0; return t; }
+    function shFlag(p){ return shSum(p,10)===0?'SHIFT':(shSum(p,5)===0?'WATCH':'OK'); }
+    function shNear(p){
+      return DATA.practices.filter(function(q){ return q.office!==p.office && q.state===p.state && q.status!=='no-data'; })
+        .sort(function(a,b){
+          var ca=a.city===p.city?0:1, cb=b.city===p.city?0:1;
+          return ca-cb || Math.abs(+a.office-+p.office)-Math.abs(+b.office-+p.office);
+        }).slice(0,3);
+    }
+    function shPlan(){
+      var c=SHIFT_CFG, incoming={}, out={shift:[],watch:[],freed:0,absorbed:0,held:0};
+      DATA.practices.forEach(function(p){
+        if(p.status==='no-data') return;
+        var f=shFlag(p); if(f==='OK') return;
+        var row={p:p,s5:shSum(p,5),s10:shSum(p,10)};
+        if(f==='WATCH'){
+          row.keep=c.daily*c.watch/100; row.held=c.daily-row.keep; out.watch.push(row); return;
+        }
+        row.keep=c.daily*c.floor/100; row.freed=c.daily-row.keep;
+        var near=shNear(p).map(function(q){ return {q:q,flag:shFlag(q),open:q.total||0}; });
+        var elig=near.filter(function(x){ return x.flag==='OK'; });
+        var pool=elig.reduce(function(a,x){ return a+x.open; },0);
+        row.near=near; row.moves=[]; row.absorbed=0;
+        elig.forEach(function(x){
+          var share=pool?row.freed*x.open/pool:0;
+          var room=Math.max(0,c.daily*c.cap/100-(incoming[x.q.office]||0));
+          var give=Math.min(share,room);
+          incoming[x.q.office]=(incoming[x.q.office]||0)+give;
+          row.absorbed+=give; row.moves.push({q:x.q,give:give,open:x.open});
+        });
+        row.held=row.freed-row.absorbed;
+        out.freed+=row.freed; out.absorbed+=row.absorbed; out.held+=row.held;
+        out.shift.push(row);
+      });
+      out.watch.forEach(function(r){ out.held+=r.held; });
+      return out;
+    }
+    function shMoney(v){ return '$'+Math.round(v).toLocaleString('en-US'); }
+    function shSet(k,v){ v=parseFloat(v); if(isNaN(v)||v<0) return; SHIFT_CFG[k]=v; renderShifts(); }
+    function shField(k,label,suffix){
+      return '<label class="sh-field"><span>'+label+'</span><span class="sh-in"><input type="number" min="0" step="'+(k==='days'?1:5)+'" value="'+SHIFT_CFG[k]+
+        '" onchange="shSet(\''+k+'\',this.value)" id="sh-'+k+'">'+(suffix?'<i>'+suffix+'</i>':'')+'</span></label>';
+    }
+    function shLink(p){ return '<a href="#" onclick="openDrawer(\''+esc(p.office)+'\');return false">'+esc(p.name)+'</a>'; }
+    function renderShifts(){
+      var plan=shPlan(), c=SHIFT_CFG, h='';
+      document.getElementById('cntShifts').textContent=' '+plan.shift.length;
+      h+='<div class="sh-wrap"><div class="sh-intro">Locations with no openings are flagged and their budget is suggested to move to nearby locations that still have openings. '+
+         'Nothing changes in the ad account until the client approves. Budgets below are a sample daily amount, change them to see the effect.</div>';
+      h+='<div class="sh-settings">'+shField('daily','Daily budget per location','$')+shField('floor','Flagged location keeps','%')+
+         shField('watch','Watch runs at','%')+shField('cap','Backup can rise by at most','%')+shField('days','Days of budget to move','')+'</div>';
+      h+='<div class="sh-tiles">'+
+         '<div class="sh-tile"><b>'+plan.shift.length+'</b><span>Move budget (no openings in 10 days)</span></div>'+
+         '<div class="sh-tile"><b>'+plan.watch.length+'</b><span>Watch (no openings in 5 days)</span></div>'+
+         '<div class="sh-tile"><b>'+shMoney(plan.freed)+'</b><span>Freed per day</span></div>'+
+         '<div class="sh-tile"><b>'+shMoney(plan.absorbed)+'</b><span>Moved to nearby locations per day</span></div>'+
+         '<div class="sh-tile"><b>'+shMoney(plan.held)+'</b><span>Held, not spent, per day</span></div></div>';
+      if(!plan.shift.length&&!plan.watch.length){
+        h+='<div class="cap-empty"><b>No budget needs to move</b>Every location has openings in the next 5 days.</div>';
+      }
+      if(plan.shift.length){
+        h+='<div class="sh-title">Suggested moves <span class="card-meta">'+plan.shift.length+'</span></div><div class="cap-tbl-wrap"><table class="cap-tbl sh-tbl"><thead><tr>'+
+           '<th>Location</th><th class="num">Openings, next 5 days</th><th class="num">Openings, next 10 days</th><th class="num">Daily budget</th><th>Suggestion</th><th class="num">Held per day</th><th class="num">Moved over '+c.days+' days</th></tr></thead><tbody>';
+        plan.shift.forEach(function(r){
+          var moves=r.moves.length?r.moves.map(function(m){
+            return '<div>Move <b>'+shMoney(m.give)+'/day</b> to '+shLink(m.q)+' <span class="st">'+
+              (m.q.city===r.p.city?'same city':'same state')+' · '+m.open+' openings in 14 days</span></div>';
+          }).join(''):'<div class="sh-none">No nearby location has openings, so nothing can move. Hold the budget.</div>';
+          var skipped=r.near.filter(function(x){ return x.flag!=='OK'; }).map(function(x){ return esc(x.q.name); });
+          h+='<tr><td><b>'+shLink(r.p)+'</b><div class="st">'+esc(r.p.state)+' · '+esc(r.p.city)+'</div></td>'+
+             '<td class="num">'+r.s5+'</td><td class="num">'+r.s10+'</td><td class="num">'+shMoney(c.daily)+' → '+shMoney(r.keep)+'</td>'+
+             '<td>'+moves+(skipped.length?'<div class="st">Not used, no openings soon: '+skipped.join(', ')+'</div>':'')+'</td>'+
+             '<td class="num">'+shMoney(r.held)+'</td><td class="num">'+shMoney(r.absorbed*c.days)+'</td></tr>';
+        });
+        h+='</tbody></table></div>';
+      }
+      if(plan.watch.length){
+        h+='<div class="sh-title">Watch <span class="card-meta">'+plan.watch.length+'</span></div><div class="sh-note">Openings are missing in the next 5 days but come back by day 10. The daily budget steps down and the money is held, not moved.</div>'+
+           '<div class="cap-tbl-wrap"><table class="cap-tbl sh-tbl"><thead><tr><th>Location</th><th class="num">Openings, next 5 days</th><th class="num">Openings, next 10 days</th><th class="num">Daily budget</th><th class="num">Held per day</th></tr></thead><tbody>';
+        plan.watch.forEach(function(r){
+          h+='<tr><td><b>'+shLink(r.p)+'</b><div class="st">'+esc(r.p.state)+' · '+esc(r.p.city)+'</div></td>'+
+             '<td class="num">'+r.s5+'</td><td class="num">'+r.s10+'</td><td class="num">'+shMoney(c.daily)+' → '+shMoney(r.keep)+'</td><td class="num">'+shMoney(r.held)+'</td></tr>';
+        });
+        h+='</tbody></table></div>';
+      }
+      h+='<div class="sh-foot">Campaigns are never paused: a flagged location keeps a floor so bidding data keeps flowing and it can ramp back fast. When its openings return, its budget is restored and the extra is taken back off the backups. '+
+         'Nearby means the same city first, then the same state, and only locations with openings in the next 5 days can receive budget. In the live tracker the backups come from a reviewed location map.</div></div>';
+      document.getElementById('shiftsBody').innerHTML=h;
+    }
+
     function switchTab(t){
       TAB=t;
       document.getElementById('gdTabs').className='cap-tabs at-'+t;
-      ['practices','heat','alerts','services'].forEach(function(k){
+      ['practices','heat','alerts','services','shifts'].forEach(function(k){
         document.getElementById('tab-'+k).classList.toggle('active',k===t);
         document.getElementById('pane-'+k).classList.toggle('active',k===t);
       });
