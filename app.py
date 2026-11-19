@@ -4775,6 +4775,24 @@ def paid_meta_status():
             if not paid_meta.is_meta(act):
                 return jsonify(error="probe should be a Meta ad account (act_...)."), 400
             return jsonify(account=act, variants=mc.rankings_probe(act, get_fn=lambda path, params: paid_meta._get(path, params, paid_store)))
+        if request.args.get("related"):                                       # does Meta's API show "Related media" (and the other automatic creative settings)?
+            act = paid_meta.norm_id(request.args.get("related"))
+            if not paid_meta.is_meta(act):
+                return jsonify(error="related should be a Meta ad account (act_...)."), 400
+            get = lambda path, params: paid_meta._get(path, params, paid_store)        # noqa: E731
+            ads = (get("/%s/ads" % act, {"fields": "id,name,effective_status,creative{id}", "effective_status": json.dumps(["ACTIVE"]), "limit": 3}).get("data") or [])
+            out = []
+            for ad in ads:
+                cid = ((ad.get("creative") or {}).get("id")) or ""
+                fields = {}
+                for f in ("degrees_of_freedom_spec", "creative_sourcing_spec", "contextual_multi_ads", "related_media", "asset_feed_spec", "image_url", "thumbnail_url",
+                          "object_story_spec", "platform_customizations", "object_type", "video_id", "effective_object_story_id"):
+                    try:
+                        fields[f] = get("/%s" % cid, {"fields": f}).get(f, "(not set)")
+                    except paid_meta.AdsError as e:                           # an unknown field is itself the answer
+                        fields[f] = "ERROR: %s" % str(e)[:200]
+                out.append({"ad": ad.get("name"), "id": ad.get("id"), "creative": cid, "fields": fields})
+            return jsonify(account=act, ads=out)
         if request.args.get("probe"):
             return jsonify(paid_meta.probe(paid_store, request.args.get("probe"), days=min(max(int(request.args.get("days", "30") or 30), 1), 90),
                                                 breakdown=request.args.get("breakdown", "")))
