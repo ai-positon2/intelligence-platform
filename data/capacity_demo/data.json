@@ -213,7 +213,13 @@
    "first_open_index": 1,
    "lead_days": 1,
    "runs": 2,
-   "status": "open"
+   "status": "open",
+   "daily_budget": 110,
+   "backups": [
+    "050",
+    "052",
+    "049"
+   ]
   },
   {
    "office": "021",
@@ -321,7 +327,13 @@
    "first_open_index": 0,
    "lead_days": 0,
    "runs": 2,
-   "status": "open"
+   "status": "open",
+   "daily_budget": 120,
+   "backups": [
+    "020",
+    "022",
+    "019"
+   ]
   },
   {
    "office": "027",
@@ -429,7 +441,13 @@
    "first_open_index": 0,
    "lead_days": 0,
    "runs": 1,
-   "status": "open"
+   "status": "open",
+   "daily_budget": 140,
+   "backups": [
+    "026",
+    "028",
+    "025"
+   ]
   },
   {
    "office": "019",
@@ -537,7 +555,13 @@
    "first_open_index": 0,
    "lead_days": 0,
    "runs": 1,
-   "status": "open"
+   "status": "open",
+   "daily_budget": 150,
+   "backups": [
+    "018",
+    "020",
+    "017"
+   ]
   },
   {
    "office": "029",
@@ -668,7 +692,13 @@
    "first_open_index": 0,
    "lead_days": 0,
    "runs": 3,
-   "status": "open"
+   "status": "open",
+   "daily_budget": 110,
+   "backups": [
+    "028",
+    "030",
+    "027"
+   ]
   },
   {
    "office": "072",
@@ -799,7 +829,13 @@
    "first_open_index": 1,
    "lead_days": 1,
    "runs": 2,
-   "status": "open"
+   "status": "open",
+   "daily_budget": 70,
+   "backups": [
+    "071",
+    "073",
+    "070"
+   ]
   },
   {
    "office": "017",
@@ -907,7 +943,13 @@
    "first_open_index": 0,
    "lead_days": 0,
    "runs": 1,
-   "status": "open"
+   "status": "open",
+   "daily_budget": 70,
+   "backups": [
+    "016",
+    "018",
+    "019"
+   ]
   },
   {
    "office": "002",
@@ -1015,7 +1057,13 @@
    "first_open_index": 1,
    "lead_days": 1,
    "runs": 1,
-   "status": "open"
+   "status": "open",
+   "daily_budget": 130,
+   "backups": [
+    "001",
+    "003",
+    "004"
+   ]
   },
   {
    "office": "047",
@@ -1100,7 +1148,13 @@
    "first_open_index": 1,
    "lead_days": 1,
    "runs": 1,
-   "status": "open"
+   "status": "open",
+   "daily_budget": 60,
+   "backups": [
+    "046",
+    "048",
+    "045"
+   ]
   },
   {
    "office": "061",
@@ -1185,7 +1239,13 @@
    "first_open_index": 0,
    "lead_days": 0,
    "runs": 2,
-   "status": "open"
+   "status": "open",
+   "daily_budget": 70,
+   "backups": [
+    "060",
+    "062",
+    "059"
+   ]
   },
   {
    "office": "070",
@@ -1270,7 +1330,13 @@
    "first_open_index": 0,
    "lead_days": 0,
    "runs": 3,
-   "status": "open"
+   "status": "open",
+   "daily_budget": 100,
+   "backups": [
+    "069",
+    "071",
+    "068"
+   ]
   },
   {
    "office": "001",
@@ -1378,7 +1444,13 @@
    "first_open_index": 1,
    "lead_days": 1,
    "runs": 2,
-   "status": "open"
+   "status": "open",
+   "daily_budget": 90,
+   "backups": [
+    "002",
+    "003",
+    "004"
+   ]
   },
   {
    "office": "076",
@@ -1486,7 +1558,13 @@
    "first_open_index": 0,
    "lead_days": 0,
    "runs": 2,
-   "status": "open"
+   "status": "open",
+   "daily_budget": 120,
+   "backups": [
+    "075",
+    "074",
+    "073"
+   ]
   },
   {
    "office": "068",
@@ -1571,7 +1649,13 @@
    "first_open_index": 0,
    "lead_days": 0,
    "runs": 1,
-   "status": "open"
+   "status": "open",
+   "daily_budget": 130,
+   "backups": [
+    "067",
+    "069",
+    "066"
+   ]
   },
   {
    "office": "036",
@@ -1679,7 +1763,13 @@
    "first_open_index": 0,
    "lead_days": 0,
    "runs": 1,
-   "status": "open"
+   "status": "open",
+   "daily_budget": 60,
+   "backups": [
+    "035",
+    "037",
+    "034"
+   ]
   },
   {
    "office": "050",
@@ -1787,7 +1877,13 @@
    "first_open_index": 0,
    "lead_days": 0,
    "runs": 2,
-   "status": "open"
+   "status": "open",
+   "daily_budget": 70,
+   "backups": [
+    "049",
+    "051",
+    "048"
+   ]
   },
   {
    "office": "059",
@@ -1895,7 +1991,13 @@
    "first_open_index": 1,
    "lead_days": 1,
    "runs": 1,
-   "status": "open"
+   "status": "open",
+   "daily_budget": 100,
+   "backups": [
+    "058",
+    "060",
+    "057"
+   ]
   },
   {
    "office": "060",
@@ -1980,7 +2082,13 @@
    "first_open_index": 1,
    "lead_days": 1,
    "runs": 1,
-   "status": "open"
+   "status": "open",
+   "daily_budget": 140,
+   "backups": [
+    "059",
+    "061",
+    "058"
+   ]
   },
   {
    "office": "006",
@@ -2088,7 +2196,13 @@
    "first_open_index": 1,
    "lead_days": 1,
    "runs": 1,
-   "status": "open"
+   "status": "open",
+   "daily_budget": 70,
+   "backups": [
+    "005",
+    "007",
+    "004"
+   ]
   },
   {
    "office": "037",
@@ -2196,7 +2310,13 @@
    "first_open_index": 0,
    "lead_days": 0,
    "runs": 1,
-   "status": "open"
+   "status": "open",
+   "daily_budget": 100,
+   "backups": [
+    "036",
+    "038",
+    "035"
+   ]
   },
   {
    "office": "040",
@@ -2304,7 +2424,13 @@
    "first_open_index": 1,
    "lead_days": 1,
    "runs": 3,
-   "status": "open"
+   "status": "open",
+   "daily_budget": 110,
+   "backups": [
+    "039",
+    "041",
+    "038"
+   ]
   },
   {
    "office": "049",
@@ -2412,7 +2538,13 @@
    "first_open_index": 0,
    "lead_days": 0,
    "runs": 2,
-   "status": "open"
+   "status": "open",
+   "daily_budget": 140,
+   "backups": [
+    "050",
+    "048",
+    "047"
+   ]
   },
   {
    "office": "013",
@@ -2543,7 +2675,13 @@
    "first_open_index": 1,
    "lead_days": 1,
    "runs": 1,
-   "status": "open"
+   "status": "open",
+   "daily_budget": 130,
+   "backups": [
+    "012",
+    "014",
+    "011"
+   ]
   },
   {
    "office": "026",
@@ -2651,7 +2789,13 @@
    "first_open_index": 0,
    "lead_days": 0,
    "runs": 2,
-   "status": "open"
+   "status": "open",
+   "daily_budget": 100,
+   "backups": [
+    "025",
+    "027",
+    "024"
+   ]
   },
   {
    "office": "023",
@@ -2759,7 +2903,13 @@
    "first_open_index": 1,
    "lead_days": 1,
    "runs": 3,
-   "status": "open"
+   "status": "open",
+   "daily_budget": 90,
+   "backups": [
+    "022",
+    "024",
+    "021"
+   ]
   },
   {
    "office": "056",
@@ -2844,7 +2994,13 @@
    "first_open_index": 0,
    "lead_days": 0,
    "runs": 3,
-   "status": "open"
+   "status": "open",
+   "daily_budget": 90,
+   "backups": [
+    "055",
+    "057",
+    "054"
+   ]
   },
   {
    "office": "014",
@@ -2952,7 +3108,13 @@
    "first_open_index": 1,
    "lead_days": 1,
    "runs": 1,
-   "status": "open"
+   "status": "open",
+   "daily_budget": 60,
+   "backups": [
+    "013",
+    "015",
+    "012"
+   ]
   },
   {
    "office": "057",
@@ -3060,7 +3222,13 @@
    "first_open_index": 0,
    "lead_days": 0,
    "runs": 1,
-   "status": "open"
+   "status": "open",
+   "daily_budget": 130,
+   "backups": [
+    "056",
+    "058",
+    "055"
+   ]
   },
   {
    "office": "008",
@@ -3168,7 +3336,13 @@
    "first_open_index": 1,
    "lead_days": 1,
    "runs": 1,
-   "status": "open"
+   "status": "open",
+   "daily_budget": 150,
+   "backups": [
+    "007",
+    "009",
+    "006"
+   ]
   },
   {
    "office": "025",
@@ -3276,7 +3450,13 @@
    "first_open_index": 1,
    "lead_days": 1,
    "runs": 1,
-   "status": "open"
+   "status": "open",
+   "daily_budget": 60,
+   "backups": [
+    "024",
+    "026",
+    "023"
+   ]
   },
   {
    "office": "067",
@@ -3384,7 +3564,13 @@
    "first_open_index": 0,
    "lead_days": 0,
    "runs": 3,
-   "status": "open"
+   "status": "open",
+   "daily_budget": 90,
+   "backups": [
+    "066",
+    "068",
+    "069"
+   ]
   },
   {
    "office": "042",
@@ -3492,7 +3678,13 @@
    "first_open_index": 1,
    "lead_days": 1,
    "runs": 2,
-   "status": "open"
+   "status": "open",
+   "daily_budget": 80,
+   "backups": [
+    "041",
+    "043",
+    "040"
+   ]
   },
   {
    "office": "024",
@@ -3623,7 +3815,13 @@
    "first_open_index": 1,
    "lead_days": 1,
    "runs": 3,
-   "status": "open"
+   "status": "open",
+   "daily_budget": 130,
+   "backups": [
+    "023",
+    "025",
+    "022"
+   ]
   },
   {
    "office": "004",
@@ -3708,7 +3906,13 @@
    "first_open_index": 6,
    "lead_days": 6,
    "runs": 1,
-   "status": "open"
+   "status": "open",
+   "daily_budget": 100,
+   "backups": [
+    "003",
+    "005",
+    "002"
+   ]
   },
   {
    "office": "031",
@@ -3793,7 +3997,13 @@
    "first_open_index": 1,
    "lead_days": 1,
    "runs": 2,
-   "status": "open"
+   "status": "open",
+   "daily_budget": 80,
+   "backups": [
+    "032",
+    "030",
+    "029"
+   ]
   },
   {
    "office": "032",
@@ -3924,7 +4134,13 @@
    "first_open_index": 1,
    "lead_days": 1,
    "runs": 2,
-   "status": "open"
+   "status": "open",
+   "daily_budget": 120,
+   "backups": [
+    "031",
+    "033",
+    "030"
+   ]
   },
   {
    "office": "010",
@@ -4032,7 +4248,13 @@
    "first_open_index": 1,
    "lead_days": 1,
    "runs": 1,
-   "status": "open"
+   "status": "open",
+   "daily_budget": 120,
+   "backups": [
+    "009",
+    "011",
+    "008"
+   ]
   },
   {
    "office": "045",
@@ -4117,7 +4339,13 @@
    "first_open_index": 1,
    "lead_days": 1,
    "runs": 2,
-   "status": "open"
+   "status": "open",
+   "daily_budget": 90,
+   "backups": [
+    "044",
+    "046",
+    "043"
+   ]
   },
   {
    "office": "052",
@@ -4225,7 +4453,13 @@
    "first_open_index": 0,
    "lead_days": 0,
    "runs": 1,
-   "status": "open"
+   "status": "open",
+   "daily_budget": 150,
+   "backups": [
+    "051",
+    "053",
+    "050"
+   ]
   },
   {
    "office": "046",
@@ -4356,7 +4590,13 @@
    "first_open_index": 0,
    "lead_days": 0,
    "runs": 2,
-   "status": "open"
+   "status": "open",
+   "daily_budget": 130,
+   "backups": [
+    "045",
+    "047",
+    "044"
+   ]
   },
   {
    "office": "048",
@@ -4464,7 +4704,13 @@
    "first_open_index": 1,
    "lead_days": 1,
    "runs": 1,
-   "status": "open"
+   "status": "open",
+   "daily_budget": 100,
+   "backups": [
+    "047",
+    "049",
+    "046"
+   ]
   },
   {
    "office": "015",
@@ -4572,7 +4818,13 @@
    "first_open_index": 1,
    "lead_days": 1,
    "runs": 1,
-   "status": "open"
+   "status": "open",
+   "daily_budget": 100,
+   "backups": [
+    "014",
+    "013",
+    "012"
+   ]
   },
   {
    "office": "063",
@@ -4657,7 +4909,13 @@
    "first_open_index": 2,
    "lead_days": 2,
    "runs": 2,
-   "status": "open"
+   "status": "open",
+   "daily_budget": 150,
+   "backups": [
+    "062",
+    "061",
+    "060"
+   ]
   },
   {
    "office": "039",
@@ -4788,7 +5046,13 @@
    "first_open_index": 1,
    "lead_days": 1,
    "runs": 1,
-   "status": "open"
+   "status": "open",
+   "daily_budget": 70,
+   "backups": [
+    "038",
+    "040",
+    "037"
+   ]
   },
   {
    "office": "075",
@@ -4896,7 +5160,13 @@
    "first_open_index": 0,
    "lead_days": 0,
    "runs": 1,
-   "status": "open"
+   "status": "open",
+   "daily_budget": 80,
+   "backups": [
+    "074",
+    "076",
+    "073"
+   ]
   },
   {
    "office": "011",
@@ -5004,7 +5274,13 @@
    "first_open_index": 1,
    "lead_days": 1,
    "runs": 2,
-   "status": "open"
+   "status": "open",
+   "daily_budget": 50,
+   "backups": [
+    "010",
+    "012",
+    "009"
+   ]
   },
   {
    "office": "044",
@@ -5089,7 +5365,13 @@
    "first_open_index": 1,
    "lead_days": 1,
    "runs": 2,
-   "status": "open"
+   "status": "open",
+   "daily_budget": 50,
+   "backups": [
+    "043",
+    "045",
+    "042"
+   ]
   },
   {
    "office": "022",
@@ -5197,7 +5479,13 @@
    "first_open_index": 5,
    "lead_days": 5,
    "runs": 3,
-   "status": "open"
+   "status": "open",
+   "daily_budget": 50,
+   "backups": [
+    "021",
+    "023",
+    "020"
+   ]
   },
   {
    "office": "034",
@@ -5282,7 +5570,13 @@
    "first_open_index": 5,
    "lead_days": 5,
    "runs": 3,
-   "status": "open"
+   "status": "open",
+   "daily_budget": 90,
+   "backups": [
+    "033",
+    "035",
+    "032"
+   ]
   },
   {
    "office": "074",
@@ -5390,7 +5684,13 @@
    "first_open_index": 0,
    "lead_days": 0,
    "runs": 2,
-   "status": "open"
+   "status": "open",
+   "daily_budget": 150,
+   "backups": [
+    "073",
+    "075",
+    "072"
+   ]
   },
   {
    "office": "018",
@@ -5498,7 +5798,13 @@
    "first_open_index": 1,
    "lead_days": 1,
    "runs": 2,
-   "status": "open"
+   "status": "open",
+   "daily_budget": 110,
+   "backups": [
+    "017",
+    "019",
+    "016"
+   ]
   },
   {
    "office": "020",
@@ -5606,7 +5912,13 @@
    "first_open_index": 0,
    "lead_days": 0,
    "runs": 2,
-   "status": "open"
+   "status": "open",
+   "daily_budget": 80,
+   "backups": [
+    "019",
+    "021",
+    "018"
+   ]
   },
   {
    "office": "078",
@@ -5691,7 +6003,9 @@
    "first_open_index": 5,
    "lead_days": 5,
    "runs": 2,
-   "status": "open"
+   "status": "open",
+   "daily_budget": 90,
+   "backups": []
   },
   {
    "office": "028",
@@ -5822,7 +6136,13 @@
    "first_open_index": 2,
    "lead_days": 2,
    "runs": 1,
-   "status": "open"
+   "status": "open",
+   "daily_budget": 70,
+   "backups": [
+    "027",
+    "029",
+    "026"
+   ]
   },
   {
    "office": "003",
@@ -5930,7 +6250,13 @@
    "first_open_index": 1,
    "lead_days": 1,
    "runs": 1,
-   "status": "open"
+   "status": "open",
+   "daily_budget": 60,
+   "backups": [
+    "002",
+    "004",
+    "001"
+   ]
   },
   {
    "office": "030",
@@ -6015,7 +6341,13 @@
    "first_open_index": 2,
    "lead_days": 2,
    "runs": 1,
-   "status": "open"
+   "status": "open",
+   "daily_budget": 150,
+   "backups": [
+    "029",
+    "031",
+    "028"
+   ]
   },
   {
    "office": "005",
@@ -6123,7 +6455,13 @@
    "first_open_index": 3,
    "lead_days": 3,
    "runs": 1,
-   "status": "open"
+   "status": "open",
+   "daily_budget": 140,
+   "backups": [
+    "004",
+    "006",
+    "003"
+   ]
   },
   {
    "office": "033",
@@ -6231,7 +6569,13 @@
    "first_open_index": 6,
    "lead_days": 6,
    "runs": 1,
-   "status": "open"
+   "status": "open",
+   "daily_budget": 50,
+   "backups": [
+    "032",
+    "034",
+    "031"
+   ]
   },
   {
    "office": "043",
@@ -6316,7 +6660,13 @@
    "first_open_index": 3,
    "lead_days": 3,
    "runs": 1,
-   "status": "open"
+   "status": "open",
+   "daily_budget": 120,
+   "backups": [
+    "042",
+    "044",
+    "041"
+   ]
   },
   {
    "office": "054",
@@ -6424,7 +6774,13 @@
    "first_open_index": 1,
    "lead_days": 1,
    "runs": 1,
-   "status": "open"
+   "status": "open",
+   "daily_budget": 120,
+   "backups": [
+    "055",
+    "053",
+    "052"
+   ]
   },
   {
    "office": "016",
@@ -6509,7 +6865,13 @@
    "first_open_index": 6,
    "lead_days": 6,
    "runs": 2,
-   "status": "open"
+   "status": "open",
+   "daily_budget": 140,
+   "backups": [
+    "017",
+    "018",
+    "019"
+   ]
   },
   {
    "office": "035",
@@ -6594,7 +6956,13 @@
    "first_open_index": 5,
    "lead_days": 5,
    "runs": 4,
-   "status": "open"
+   "status": "open",
+   "daily_budget": 130,
+   "backups": [
+    "034",
+    "036",
+    "033"
+   ]
   },
   {
    "office": "077",
@@ -6702,7 +7070,9 @@
    "first_open_index": 2,
    "lead_days": 2,
    "runs": 1,
-   "status": "open"
+   "status": "open",
+   "daily_budget": 50,
+   "backups": []
   },
   {
    "office": "058",
@@ -6833,7 +7203,13 @@
    "first_open_index": 6,
    "lead_days": 6,
    "runs": 2,
-   "status": "thin"
+   "status": "thin",
+   "daily_budget": 60,
+   "backups": [
+    "057",
+    "059",
+    "056"
+   ]
   },
   {
    "office": "066",
@@ -6941,7 +7317,13 @@
    "first_open_index": 8,
    "lead_days": 8,
    "runs": 3,
-   "status": "thin"
+   "status": "thin",
+   "daily_budget": 50,
+   "backups": [
+    "067",
+    "068",
+    "069"
+   ]
   },
   {
    "office": "041",
@@ -7026,7 +7408,13 @@
    "first_open_index": 1,
    "lead_days": 1,
    "runs": 3,
-   "status": "thin"
+   "status": "thin",
+   "daily_budget": 150,
+   "backups": [
+    "040",
+    "042",
+    "039"
+   ]
   },
   {
    "office": "038",
@@ -7134,7 +7522,13 @@
    "first_open_index": 1,
    "lead_days": 1,
    "runs": 1,
-   "status": "thin"
+   "status": "thin",
+   "daily_budget": 140,
+   "backups": [
+    "037",
+    "039",
+    "036"
+   ]
   },
   {
    "office": "071",
@@ -7219,7 +7613,13 @@
    "first_open_index": 2,
    "lead_days": 2,
    "runs": 1,
-   "status": "thin"
+   "status": "thin",
+   "daily_budget": 140,
+   "backups": [
+    "070",
+    "072",
+    "069"
+   ]
   },
   {
    "office": "079",
@@ -7327,7 +7727,13 @@
    "first_open_index": 0,
    "lead_days": 0,
    "runs": 1,
-   "status": "thin"
+   "status": "thin",
+   "daily_budget": 130,
+   "backups": [
+    "080",
+    "081",
+    "082"
+   ]
   },
   {
    "office": "009",
@@ -7435,7 +7841,13 @@
    "first_open_index": 4,
    "lead_days": 4,
    "runs": 1,
-   "status": "thin"
+   "status": "thin",
+   "daily_budget": 80,
+   "backups": [
+    "008",
+    "010",
+    "007"
+   ]
   },
   {
    "office": "073",
@@ -7543,7 +7955,13 @@
    "first_open_index": 1,
    "lead_days": 1,
    "runs": 3,
-   "status": "thin"
+   "status": "thin",
+   "daily_budget": 110,
+   "backups": [
+    "072",
+    "074",
+    "071"
+   ]
   },
   {
    "office": "080",
@@ -7651,7 +8069,13 @@
    "first_open_index": 7,
    "lead_days": 7,
    "runs": 1,
-   "status": "thin"
+   "status": "thin",
+   "daily_budget": 60,
+   "backups": [
+    "079",
+    "081",
+    "082"
+   ]
   },
   {
    "office": "053",
@@ -7736,7 +8160,13 @@
    "first_open_index": 6,
    "lead_days": 6,
    "runs": 2,
-   "status": "thin"
+   "status": "thin",
+   "daily_budget": 80,
+   "backups": [
+    "052",
+    "054",
+    "051"
+   ]
   },
   {
    "office": "055",
@@ -7821,7 +8251,13 @@
    "first_open_index": 12,
    "lead_days": 12,
    "runs": 2,
-   "status": "thin"
+   "status": "thin",
+   "daily_budget": 50,
+   "backups": [
+    "054",
+    "056",
+    "053"
+   ]
   },
   {
    "office": "064",
@@ -7906,7 +8342,11 @@
    "first_open_index": 1,
    "lead_days": 1,
    "runs": 1,
-   "status": "thin"
+   "status": "thin",
+   "daily_budget": 80,
+   "backups": [
+    "065"
+   ]
   },
   {
    "office": "065",
@@ -7991,7 +8431,11 @@
    "first_open_index": 2,
    "lead_days": 2,
    "runs": 1,
-   "status": "thin"
+   "status": "thin",
+   "daily_budget": 120,
+   "backups": [
+    "064"
+   ]
   },
   {
    "office": "007",
@@ -8099,7 +8543,13 @@
    "first_open_index": 7,
    "lead_days": 7,
    "runs": 1,
-   "status": "thin"
+   "status": "thin",
+   "daily_budget": 110,
+   "backups": [
+    "006",
+    "008",
+    "005"
+   ]
   },
   {
    "office": "081",
@@ -8207,7 +8657,13 @@
    "first_open_index": 0,
    "lead_days": 0,
    "runs": 2,
-   "status": "thin"
+   "status": "thin",
+   "daily_budget": 100,
+   "backups": [
+    "080",
+    "082",
+    "079"
+   ]
   },
   {
    "office": "082",
@@ -8269,7 +8725,13 @@
    "first_open_index": 1,
    "lead_days": 1,
    "runs": 1,
-   "status": "thin"
+   "status": "thin",
+   "daily_budget": 140,
+   "backups": [
+    "081",
+    "080",
+    "079"
+   ]
   },
   {
    "office": "012",
@@ -8307,7 +8769,13 @@
    "first_open_index": null,
    "lead_days": null,
    "runs": 0,
-   "status": "no-data"
+   "status": "no-data",
+   "daily_budget": 90,
+   "backups": [
+    "011",
+    "013",
+    "010"
+   ]
   },
   {
    "office": "062",
@@ -8392,7 +8860,13 @@
    "first_open_index": null,
    "lead_days": null,
    "runs": 2,
-   "status": "none"
+   "status": "none",
+   "daily_budget": 110,
+   "backups": [
+    "061",
+    "063",
+    "060"
+   ]
   },
   {
    "office": "069",
@@ -8500,7 +8974,13 @@
    "first_open_index": null,
    "lead_days": null,
    "runs": 1,
-   "status": "none"
+   "status": "none",
+   "daily_budget": 60,
+   "backups": [
+    "068",
+    "070",
+    "067"
+   ]
   }
  ],
  "totals": {
