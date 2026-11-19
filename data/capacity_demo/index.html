@@ -1103,20 +1103,24 @@
         h+='<div class="cap-empty"><b>No budget needs to move</b>Every location has openings in the next 5 days.</div>';
       }
       if(plan.shift.length){
-        h+='<div class="sh-title">Suggested moves <span class="card-meta">'+plan.shift.length+'</span></div><div class="cap-tbl-wrap"><table class="cap-tbl sh-tbl"><thead><tr>'+
-           '<th>Location</th><th class="num">Openings, next 5 days</th><th class="num">Openings, next 10 days</th><th class="num">Daily budget</th><th>Suggestion</th><th class="num">Held per day</th><th class="num">Moved over '+c.days+' days</th></tr></thead><tbody>';
+        h+='<div class="sh-title">Suggested moves <span class="card-meta">'+plan.shift.length+'</span></div><div class="sh-cards">';
         plan.shift.forEach(function(r){
-          var moves=r.moves.length?r.moves.map(function(m){
-            return '<div>Move <b>'+shMoney(m.give)+'/day</b> to '+shLink(m.q)+' <span class="st">'+
-              (m.q.city===r.p.city?'same city':'same state')+' · '+m.open+' openings in 14 days</span></div>';
-          }).join(''):'<div class="sh-none">No nearby location has openings, so nothing can move. Hold the budget.</div>';
-          var skipped=r.near.filter(function(x){ return x.flag!=='OK'; }).map(function(x){ return esc(x.q.name); });
-          h+='<tr><td><b>'+shLink(r.p)+'</b><div class="st">'+esc(r.p.state)+' · '+esc(r.p.city)+'</div></td>'+
-             '<td class="num">'+r.s5+'</td><td class="num">'+r.s10+'</td><td class="num">'+shMoney(shDaily(r.p))+' → '+shMoney(r.keep)+'</td>'+
-             '<td>'+moves+(skipped.length?'<div class="st">Not used, no openings soon: '+skipped.join(', ')+'</div>':'')+'</td>'+
-             '<td class="num">'+shMoney(r.held)+'</td><td class="num">'+shMoney(r.absorbed*c.days)+'</td></tr>';
+          var moved=r.absorbed, skipped=r.near.filter(function(x){ return x.flag!=='OK'; }).map(function(x){ return esc(x.q.name); });
+          var lead=esc(r.p.name)+' has no openings in the next 10 days. '+(r.moves.length
+            ? 'Suggest keeping '+shMoney(r.keep)+' a day running and moving '+shMoney(moved)+' a day to nearby locations that have openings.'
+            : 'No nearby location has openings, so nothing can move: hold the budget.');
+          var moves=r.moves.map(function(m){
+            return '<div class="sh-move"><span class="sh-amt">'+shMoney(m.give)+' a day</span><span class="sh-arrow">to</span>'+shLink(m.q)+
+              '<span class="sh-why">'+(m.q.city===r.p.city?'same city':'same state')+', '+m.open+' openings in the next 14 days</span></div>';
+          }).join('');
+          h+='<div class="sh-card"><div class="sh-card-head"><div class="sh-loc"><b>'+shLink(r.p)+'</b><span>'+esc(r.p.state)+' · '+esc(r.p.city)+'</span></div>'+
+             '<div class="sh-chips"><span class="sh-chip bad">'+r.s5+' openings, next 5 days</span><span class="sh-chip bad">'+r.s10+' openings, next 10 days</span>'+
+             '<span class="sh-chip">Daily budget '+shMoney(shDaily(r.p))+' → '+shMoney(r.keep)+'</span></div></div>'+
+             '<div class="sh-lead">'+lead+'</div>'+(moves?'<div class="sh-moves">'+moves+'</div>':'')+
+             '<div class="sh-card-foot"><span>Held, not spent: <b>'+shMoney(r.held)+' a day</b></span><span>Moved over '+c.days+' days: <b>'+shMoney(moved*c.days)+'</b></span>'+
+             (skipped.length?'<span>Not used, no openings soon: '+skipped.join(', ')+'</span>':'')+'</div></div>';
         });
-        h+='</tbody></table></div>';
+        h+='</div>';
       }
       if(plan.watch.length){
         h+='<div class="sh-title">Watch <span class="card-meta">'+plan.watch.length+'</span></div><div class="sh-note">Openings are missing in the next 5 days but come back by day 10. The daily budget steps down and the money is held, not moved.</div>'+
