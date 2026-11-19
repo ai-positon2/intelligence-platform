@@ -76,3 +76,9 @@ def test_no_real_name_appears_in_anything_the_page_serves():
                    if re.search(r"(?<![A-Za-z])" + re.escape(n) + r"(?![A-Za-z])", blob,
                                 0 if n.isupper() else re.I))
     assert not found, "real names in the demo: %s" % found
+
+
+def test_the_budget_shifts_tab_is_on_the_page_and_uses_only_the_demos_own_data():
+    body = _client("reporting@position2.com").get(_PATHS[0]).get_data(as_text=True)
+    assert 'id="tab-shifts"' in body and 'id="pane-shifts"' in body and "function renderShifts" in body
+    assert "fetch(" in body and body.count("fetch('/p2/paid-marketing/capacity-demo/") == 2        # no new data source: the same data and insights files
