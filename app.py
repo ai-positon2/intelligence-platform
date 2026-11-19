@@ -5835,14 +5835,16 @@ def _todo_run(trigger, force=False):
     try:
         if not force and not dtd.due(store, datetime.now(timezone.utc)):                # another worker or GitHub already sent today's list
             return
+        from tracker import paid_am
         rows, _source, _problem = _am_rows()
+        extra = paid_am.dropped_names(_am_rows_raw()[0])                            # the accounts the team no longer manages, by the names the sheet uses
         client = paid_feedback.default_client()
 
         def ask(am, accounts, done):
             answer, _used = paid_feedback.run_loop([{"role": "user", "content": dtd.prompt_for(am, accounts, done, datetime.now(timezone.utc).date().isoformat())}], client=client)
             return answer
         dtd.run(store, market_radar_deliver, groups=dtd.groups_from_rows(rows), people=_am_people(), ask=ask,
-                channel=os.environ.get("FEEDBACK_TODO_CHANNEL", "").strip() or dtd.DEFAULT_CHANNEL)
+                channel=os.environ.get("FEEDBACK_TODO_CHANNEL", "").strip() or dtd.DEFAULT_CHANNEL, skip=lambda text: paid_am.mentions_dropped(text, extra))
     except Exception as e:                                                          # noqa: BLE001
         log.warning("daily to-do run failed: %s", e)
     finally:

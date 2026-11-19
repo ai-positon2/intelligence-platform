@@ -75,6 +75,26 @@ NOT_MANAGED = ("riccobene", "danielishapiro", "shapiro", "greatlakes", "dentalca
 MANAGER_OVERRIDES = (("eventgroove", "Ebin V Edison"), ("burnout", "Ebin V Edison"))
 
 
+# Names that must not appear in a to-do item at all: the agent finds these in Slack, meetings and the budget snapshot whoever the item is for.
+# Riccobene's locations are budgeted one by one, so the ones seen are listed too; the names of every dropped allocation row are added (dropped_names).
+NOT_MANAGED_TEXT = ("riccobene", "brush and floss", "commonwealth dentistry", "myrtle beach", "daniel i shapiro", "great lakes", "dental care associates")
+
+
+def dropped_names(rows):
+    """The account and client names of the allocation rows that adjust() drops."""
+    out = []
+    for r in rows or []:
+        if any(k in norm(r.get("account")) + "|" + norm(r.get("client")) for k in NOT_MANAGED):
+            out += [str(r.get("account") or "").strip(), str(r.get("client") or "").strip()]
+    return [n for n in dict.fromkeys(out) if len(norm(n)) >= 4]
+
+
+def mentions_dropped(text, extra=()):
+    """Whether a to-do item names an account that is not managed any more."""
+    t = " " + re.sub(r"[^a-z0-9]+", " ", html.unescape(str(text or "")).lower().replace("&", " and ")).strip() + " "
+    return any((" " + re.sub(r"[^a-z0-9]+", " ", n.lower().replace("&", " and ")).strip() + " ") in t for n in list(NOT_MANAGED_TEXT) + list(extra) if len(n.strip()) >= 4)
+
+
 def adjust(rows):
     """The allocation rows without the accounts that are not managed any more, and with the managers that are fixed in MANAGER_OVERRIDES."""
     out = []
