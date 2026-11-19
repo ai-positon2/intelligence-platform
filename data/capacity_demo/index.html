@@ -1041,17 +1041,15 @@
     // A location with no openings is flagged, and its budget is suggested to move to nearby locations that still have openings. Same rules as the team's
     // budget shift tracker: SHIFT = no openings in the next 10 days (the campaign keeps a floor, the rest moves, with client approval); WATCH = none in the
     // next 5 days (budget steps down, the money is held, not moved); only a backup with openings within 5 days can receive; the freed money is split by
-    // the backups' open slots; a backup's daily budget rises by at most the cap. Nearness here is the same city first, then the same state: this demo has
-    // no street addresses, so the nearest three locations are picked from those.
-    var SHIFT_CFG={daily:80,floor:20,watch:50,cap:30,days:10};
+    // the backups' open slots; a backup's daily budget rises by at most the cap. The backups (practice.backups) and the daily budgets (practice.daily_budget)
+    // are samples made up for this demo, saved in data.json.
+    var SHIFT_CFG={floor:20,watch:50,cap:30,days:10};
     function shSum(p,n){ var t=0,c=p.counts||[]; for(var i=0;i<n&&i<c.length;i++) t+=c[i]||0; return t; }
     function shFlag(p){ return shSum(p,10)===0?'SHIFT':(shSum(p,5)===0?'WATCH':'OK'); }
+    function shDaily(p){ return p.daily_budget||80; }
     function shNear(p){
-      return DATA.practices.filter(function(q){ return q.office!==p.office && q.state===p.state && q.status!=='no-data'; })
-        .sort(function(a,b){
-          var ca=a.city===p.city?0:1, cb=b.city===p.city?0:1;
-          return ca-cb || Math.abs(+a.office-+p.office)-Math.abs(+b.office-+p.office);
-        }).slice(0,3);
+      var by={}; DATA.practices.forEach(function(q){ by[q.office]=q; });
+      return (p.backups||[]).map(function(o){ return by[o]; }).filter(Boolean);
     }
     function shPlan(){
       var c=SHIFT_CFG, incoming={}, out={shift:[],watch:[],freed:0,absorbed:0,held:0};
@@ -1060,16 +1058,16 @@
         var f=shFlag(p); if(f==='OK') return;
         var row={p:p,s5:shSum(p,5),s10:shSum(p,10)};
         if(f==='WATCH'){
-          row.keep=c.daily*c.watch/100; row.held=c.daily-row.keep; out.watch.push(row); return;
+          row.keep=shDaily(p)*c.watch/100; row.held=shDaily(p)-row.keep; out.watch.push(row); return;
         }
-        row.keep=c.daily*c.floor/100; row.freed=c.daily-row.keep;
+        row.keep=shDaily(p)*c.floor/100; row.freed=shDaily(p)-row.keep;
         var near=shNear(p).map(function(q){ return {q:q,flag:shFlag(q),open:q.total||0}; });
         var elig=near.filter(function(x){ return x.flag==='OK'; });
         var pool=elig.reduce(function(a,x){ return a+x.open; },0);
         row.near=near; row.moves=[]; row.absorbed=0;
         elig.forEach(function(x){
           var share=pool?row.freed*x.open/pool:0;
-          var room=Math.max(0,c.daily*c.cap/100-(incoming[x.q.office]||0));
+          var room=Math.max(0,shDaily(x.q)*c.cap/100-(incoming[x.q.office]||0));
           var give=Math.min(share,room);
           incoming[x.q.office]=(incoming[x.q.office]||0)+give;
           row.absorbed+=give; row.moves.push({q:x.q,give:give,open:x.open});
@@ -1092,8 +1090,8 @@
       var plan=shPlan(), c=SHIFT_CFG, h='';
       document.getElementById('cntShifts').textContent=' '+plan.shift.length;
       h+='<div class="sh-wrap"><div class="sh-intro">Locations with no openings are flagged and their budget is suggested to move to nearby locations that still have openings. '+
-         'Nothing changes in the ad account until the client approves. Budgets below are a sample daily amount, change them to see the effect.</div>';
-      h+='<div class="sh-settings">'+shField('daily','Daily budget per location','$')+shField('floor','Flagged location keeps','%')+
+         'Nothing changes in the ad account until the client approves. The daily budgets and the list of nearby locations are samples made up for this demo; change the rules below to see the effect.</div>';
+      h+='<div class="sh-settings">'+shField('floor','Flagged location keeps','%')+
          shField('watch','Watch runs at','%')+shField('cap','Backup can rise by at most','%')+shField('days','Days of budget to move','')+'</div>';
       h+='<div class="sh-tiles">'+
          '<div class="sh-tile"><b>'+plan.shift.length+'</b><span>Move budget (no openings in 10 days)</span></div>'+
@@ -1114,7 +1112,7 @@
           }).join(''):'<div class="sh-none">No nearby location has openings, so nothing can move. Hold the budget.</div>';
           var skipped=r.near.filter(function(x){ return x.flag!=='OK'; }).map(function(x){ return esc(x.q.name); });
           h+='<tr><td><b>'+shLink(r.p)+'</b><div class="st">'+esc(r.p.state)+' · '+esc(r.p.city)+'</div></td>'+
-             '<td class="num">'+r.s5+'</td><td class="num">'+r.s10+'</td><td class="num">'+shMoney(c.daily)+' → '+shMoney(r.keep)+'</td>'+
+             '<td class="num">'+r.s5+'</td><td class="num">'+r.s10+'</td><td class="num">'+shMoney(shDaily(r.p))+' → '+shMoney(r.keep)+'</td>'+
              '<td>'+moves+(skipped.length?'<div class="st">Not used, no openings soon: '+skipped.join(', ')+'</div>':'')+'</td>'+
              '<td class="num">'+shMoney(r.held)+'</td><td class="num">'+shMoney(r.absorbed*c.days)+'</td></tr>';
         });
@@ -1125,12 +1123,12 @@
            '<div class="cap-tbl-wrap"><table class="cap-tbl sh-tbl"><thead><tr><th>Location</th><th class="num">Openings, next 5 days</th><th class="num">Openings, next 10 days</th><th class="num">Daily budget</th><th class="num">Held per day</th></tr></thead><tbody>';
         plan.watch.forEach(function(r){
           h+='<tr><td><b>'+shLink(r.p)+'</b><div class="st">'+esc(r.p.state)+' · '+esc(r.p.city)+'</div></td>'+
-             '<td class="num">'+r.s5+'</td><td class="num">'+r.s10+'</td><td class="num">'+shMoney(c.daily)+' → '+shMoney(r.keep)+'</td><td class="num">'+shMoney(r.held)+'</td></tr>';
+             '<td class="num">'+r.s5+'</td><td class="num">'+r.s10+'</td><td class="num">'+shMoney(shDaily(r.p))+' → '+shMoney(r.keep)+'</td><td class="num">'+shMoney(r.held)+'</td></tr>';
         });
         h+='</tbody></table></div>';
       }
       h+='<div class="sh-foot">Campaigns are never paused: a flagged location keeps a floor so bidding data keeps flowing and it can ramp back fast. When its openings return, its budget is restored and the extra is taken back off the backups. '+
-         'Nearby means the same city first, then the same state, and only locations with openings in the next 5 days can receive budget. In the live tracker the backups come from a reviewed location map.</div></div>';
+         'Each location has up to 3 nearby backups, and only a backup with openings in the next 5 days can receive budget. The backups and budgets in this demo are samples; the live tracker uses a reviewed location map and the real budgets.</div></div>';
       document.getElementById('shiftsBody').innerHTML=h;
     }
 
