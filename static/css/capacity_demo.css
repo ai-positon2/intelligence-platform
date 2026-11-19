@@ -733,3 +733,8 @@ html:root[data-theme="light"]::-webkit-scrollbar-thumb:hover { background-color:
 :root[data-theme="light"] .sh-tile, :root[data-theme="light"] .sh-in { background: rgba(18,26,54,.035); border-color: rgba(18,26,54,.1); }
 :root[data-theme="light"] .sh-intro, :root[data-theme="light"] .sh-note, :root[data-theme="light"] .sh-foot, :root[data-theme="light"] .sh-tile span, :root[data-theme="light"] .sh-tbl .st { color: #5b6a85; }
 :root[data-theme="light"] .sh-tbl a { color: #0f766e; }
+.sh-tbl { min-width: 880px; }
+.sh-tbl th { white-space: normal; }
+.sh-tbl td:nth-child(5), .sh-tbl th:nth-child(5) { min-width: 270px; }
+.sh-tbl td:first-child { min-width: 110px; }
+.sh-tbl td, .sh-tbl th { padding-left: 10px; padding-right: 10px; }
