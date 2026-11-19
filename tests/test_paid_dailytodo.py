@@ -218,3 +218,18 @@ def test_accounts_no_longer_managed_are_dropped_and_two_clients_go_to_ebin():
             {"account": "Eventgroove 1", "client": "Eventgroove", "am": "Siddesh"}, {"account": "Burn Out Brands", "client": "Burn Out", "am": "Siddesh"},
             {"account": "OIA", "client": "OIA", "am": "Divith"}]
     assert t.groups_from_rows(paid_am.adjust(rows)) == {"Divith": ["OIA"], "Ebin V Edison": ["Burn Out Brands", "Eventgroove 1"]}
+
+
+def test_the_prompt_asks_for_tasks_directed_at_the_manager_and_other_peoples_work_as_reviews():
+    text = t.prompt_for("Siddesh", ["D&J"], [], "2026-11-19")
+    assert "directed at Siddesh" in text and "Review:" in text and "Todd changed" in text
+    assert "%s" not in text and "%d" not in text
+
+
+def test_reviews_are_told_apart_and_listed_after_the_tasks():
+    assert t.is_review("D&J: Review: Todd changed the budget, please check it") and t.is_review("D&J: review : x")
+    assert not t.is_review("D&J: reply to the invoice") and not t.is_review("D&J: Check the review of the ads")
+    items = {}
+    ids = t.plan(items, "Siddesh", ["D&J: Review: Todd changed the budget", "D&J: reply to the invoice"], "2026-11-18")
+    items[ids[0]]["firstOn"] = "2026-11-10"                                          # even an older review comes after a newer task
+    assert [items[k]["text"] for k in t.plan(items, "Siddesh", [], "2026-11-19")][0] == "D&J: reply to the invoice"
