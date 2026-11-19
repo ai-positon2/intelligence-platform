@@ -197,6 +197,20 @@ def test_a_run_started_twice_in_a_day_sends_once_unless_forced(monkeypatch, stor
     assert len(ran) == 2
 
 
+def test_nothing_about_riccobene_is_listed_and_an_open_item_from_before_is_retired():
+    from tracker import paid_am
+    s, d = Store(), Deliver()
+    old = "Myrtle Beach (de novo): Check pacing"
+    s.state_set(t.KEY_ITEMS, {t.item_id("Siddesh", old): {"am": "Siddesh", "text": old, "status": "open", "firstOn": "2026-11-18", "doneBy": "", "doneAt": ""}})
+    skip = lambda x: paid_am.mentions_dropped(x, ["Benson Dental"])                  # noqa: E731
+    ans = '{"items": ["D&J: reply to the invoice", "Riccobene: fix the budget", "Benson Dental: call", "Monster Transmission: add the feed"]}'
+    t.run(s, d, groups=GROUPS, people=PEOPLE, ask=asker({"Siddesh": ans}), now=NOW, skip=skip)
+    text = json.dumps(d.posted[0][2])
+    assert "Myrtle" not in text and "Riccobene" not in text and "Benson" not in text and "D&amp;J" in text or "D&J" in text
+    assert s.state_get(t.KEY_ITEMS)[t.item_id("Siddesh", old)]["status"] == "removed"
+    assert paid_am.dropped_names([{"account": "Hampstead", "client": "Riccobene"}, {"account": "OIA", "client": "OIA"}]) == ["Hampstead", "Riccobene"]
+
+
 def test_accounts_no_longer_managed_are_dropped_and_two_clients_go_to_ebin():
     from tracker import paid_am
     rows = [{"account": "Riccobene", "client": "Riccobene", "am": "Divith"}, {"account": "Great Lakes Dental", "client": "x", "am": "A"},

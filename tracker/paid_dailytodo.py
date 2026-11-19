@@ -185,16 +185,23 @@ def due(store, now):
     return not any(str(r.get("at") or "")[:10] == today for r in (store.state_get(KEY_RUNS) or []))
 
 
-def run(store, deliver, *, groups, people, ask, channel=DEFAULT_CHANNEL, now=None):
-    """Ask for each manager's items, post one message. `ask(am, accounts, done_texts)` returns the agent's answer text. Returns the run record."""
+def run(store, deliver, *, groups, people, ask, channel=DEFAULT_CHANNEL, now=None, skip=None):
+    """Ask for each manager's items, post one message. `ask(am, accounts, done_texts)` returns the agent's answer text. `skip(text)` says an item is about
+    an account that is not managed any more: such an item is never listed, and one still open from an earlier day is retired. Returns the run record."""
     now = now or dt.datetime.now(dt.timezone.utc)
     today = now.date().isoformat()
     items = _items(store)
+    skip = skip or (lambda text: False)
+    retired = [v for v in items.values() if v["status"] == "open" and skip(v["text"])]
+    for v in retired:
+        v["status"] = "removed"
+    if retired:
+        store.state_set(KEY_ITEMS, items)
     record = {"at": now.isoformat(), "managers": len(groups), "items": 0, "posted": False, "errors": []}
 
     def one(am):
         try:
-            return am, parse_items(ask(am, groups[am], done_texts(items, am))), None
+            return am, [t for t in parse_items(ask(am, groups[am], done_texts(items, am))) if not skip(t)], None
         except Exception as e:                                                      # noqa: BLE001 (one manager's failure never stops the rest)
             return am, [], "%s: %s" % (am, str(e)[:160])
     with ThreadPoolExecutor(max_workers=WORKERS) as ex:
