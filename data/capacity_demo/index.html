@@ -95,9 +95,7 @@
         <button class="cap-tab active" id="tab-practices" onclick="switchTab('practices')">Locations<span class="cap-tab-count" id="cntPractices"></span></button>
         <button class="cap-tab" id="tab-heat" onclick="switchTab('heat')">Calendar</button>
         <button class="cap-tab" id="tab-alerts" onclick="switchTab('alerts')">Needs Attention<span class="cap-tab-count" id="cntAlerts"></span></button>
-        <button class="cap-tab" id="tab-services" onclick="switchTab('services')">Services<span class="cap-tab-count" id="cntServices"></span></button>
-        <button class="cap-tab" id="tab-shifts" onclick="switchTab('shifts')">Budget Shifts<span class="cap-tab-count" id="cntShifts"></span></button>
-      </div>
+        <button class="cap-tab" id="tab-services" onclick="switchTab('services')">Services<span class="cap-tab-count" id="cntServices"></span></button>      </div>
 
       <div class="cap-toolbar" id="toolbar">
         <div class="cap-toolbar-row cap-toolbar-filters">
@@ -142,12 +140,10 @@
       </div>
       <div id="pane-alerts" class="cap-pane">
         <div id="alertsBody"><div class="cap-loading" data-orb-state="listening" data-orb-size="64">Loading…</div></div>
+        <div id="shiftsBody"></div>
       </div>
       <div id="pane-services" class="cap-pane">
         <div id="servicesBody"><div class="cap-loading" data-orb-state="listening" data-orb-size="64">Loading…</div></div>
-      </div>
-      <div id="pane-shifts" class="cap-pane">
-        <div id="shiftsBody"><div class="cap-loading" data-orb-state="listening" data-orb-size="64">Loading…</div></div>
       </div>
     </div>
 
@@ -1088,8 +1084,7 @@
     function shLink(p){ return '<a href="#" onclick="openDrawer(\''+esc(p.office)+'\');return false">'+esc(p.name)+'</a>'; }
     function renderShifts(){
       var plan=shPlan(), c=SHIFT_CFG, h='';
-      document.getElementById('cntShifts').textContent=' '+plan.shift.length;
-      h+='<div class="sh-wrap"><div class="sh-intro">Locations with no openings are flagged and their budget is suggested to move to nearby locations that still have openings. '+
+      h+='<div class="sh-wrap"><div class="sh-heading">Budget shifts</div><div class="sh-intro">Locations with no openings are flagged and their budget is suggested to move to nearby locations that still have openings. '+
          'Nothing changes in the ad account until the client approves. The daily budgets and the list of nearby locations are samples made up for this demo; change the rules below to see the effect.</div>';
       h+='<div class="sh-settings">'+shField('floor','Flagged location keeps','%')+
          shField('watch','Watch runs at','%')+shField('cap','Backup can rise by at most','%')+shField('days','Days of budget to move','')+'</div>';
@@ -1139,7 +1134,7 @@
     function switchTab(t){
       TAB=t;
       document.getElementById('gdTabs').className='cap-tabs at-'+t;
-      ['practices','heat','alerts','services','shifts'].forEach(function(k){
+      ['practices','heat','alerts','services'].forEach(function(k){
         document.getElementById('tab-'+k).classList.toggle('active',k===t);
         document.getElementById('pane-'+k).classList.toggle('active',k===t);
       });

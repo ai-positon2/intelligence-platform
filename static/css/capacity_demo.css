@@ -217,11 +217,10 @@ html::-webkit-scrollbar-thumb:hover { background-color: rgba(74,222,128,.55); ba
 
 
 .cap-tabs { display: flex; position: relative; background: rgba(255,255,255,.025); border-bottom: 1px solid rgba(255,255,255,.07); padding: 7px; }
-.cap-tab-ind { position: absolute; top: 7px; bottom: 7px; left: 7px; width: calc((100% - 14px) / 5); background: linear-gradient(95deg,rgba(74,222,128,.24),rgba(20,184,166,.16)); border: 1px solid rgba(74,222,128,.4); border-radius: var(--radius-sm); box-shadow: 0 3px 14px rgba(74,222,128,.16), inset 0 1px 0 rgba(255,255,255,.07); transition: transform .28s cubic-bezier(.22,1,.36,1); pointer-events: none; }
+.cap-tab-ind { position: absolute; top: 7px; bottom: 7px; left: 7px; width: calc((100% - 14px) / 4); background: linear-gradient(95deg,rgba(74,222,128,.24),rgba(20,184,166,.16)); border: 1px solid rgba(74,222,128,.4); border-radius: var(--radius-sm); box-shadow: 0 3px 14px rgba(74,222,128,.16), inset 0 1px 0 rgba(255,255,255,.07); transition: transform .28s cubic-bezier(.22,1,.36,1); pointer-events: none; }
 .cap-tabs.at-heat  .cap-tab-ind { transform: translateX(100%); }
 .cap-tabs.at-alerts .cap-tab-ind { transform: translateX(200%); }
 .cap-tabs.at-services .cap-tab-ind { transform: translateX(300%); }
-.cap-tabs.at-shifts .cap-tab-ind { transform: translateX(400%); }
 .cap-tab { flex: 1; position: relative; z-index: 1; background: none; border: none; border-radius: var(--radius-sm); font-family: inherit; font-size: 13px; font-weight: 700; letter-spacing: .01em; color: #82978f; padding: 11px 10px; cursor: pointer; transition: color .2s, background .2s; white-space: nowrap; }
 .cap-tab.active { color: #eafff4; text-shadow: 0 0 18px rgba(74,222,128,.35); }
 .cap-tab:hover:not(.active) { color: #c3ded4; background: rgba(255,255,255,.035); }
@@ -761,3 +760,7 @@ html:root[data-theme="light"]::-webkit-scrollbar-thumb:hover { background-color:
 :root[data-theme="light"] .sh-amt { color: #0f766e; }
 :root[data-theme="light"] .sh-move a { color: #0f766e; }
 :root[data-theme="light"] .sh-why, :root[data-theme="light"] .sh-card-foot, :root[data-theme="light"] .sh-loc span { color: #5b6a85; }
+
+#shiftsBody:not(:empty) { border-top: 1px solid rgba(255,255,255,.07); }
+.sh-heading { font-size: 16px; font-weight: 800; margin-bottom: 6px; }
+:root[data-theme="light"] #shiftsBody:not(:empty) { border-top-color: rgba(18,26,54,.1); }
