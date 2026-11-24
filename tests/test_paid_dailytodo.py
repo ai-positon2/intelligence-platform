@@ -245,6 +245,19 @@ def test_eventgroove_and_burn_out_items_go_to_ebin_even_when_they_were_open_unde
     items = s.state_get(t.KEY_ITEMS)
     mine = {v["text"]: v["am"] for v in items.values()}
     assert mine[old] == "Ebin V Edison" and mine["Burn Out: send the new creative"] == "Ebin V Edison"
-    assert mine["D&J: reply to the invoice"] == "Siddesh" and mine["Monster: add stock feed"] == "Siddesh"
+    assert mine["D&J: reply to the invoice"] == "Ebin V Edison" and mine["Monster: add stock feed"] == "Ebin V Edison"   # everything under Siddesh is Ebin's
+    assert not any(v["am"] == "Siddesh" and v["status"] == "open" for v in items.values())
     assert old in json.dumps(d.posted[0][2]) and items[t.item_id("Ebin V Edison", old)]["firstOn"] == "2026-11-18"   # keeps the day it was first assigned
-    assert paid_am.owner_of("Monster Transmission: x") is None and paid_am.owner_of("Burnout: x") == "Ebin V Edison"
+    assert paid_am.owner_of("Monster Transmission: x") is None and paid_am.owner_of("Monster Transmission: x", "Siddesh SB") == "Ebin V Edison" and paid_am.owner_of("Burnout: x") == "Ebin V Edison"
+
+
+def test_siddesh_accounts_and_open_items_all_move_to_ebin():
+    from tracker import paid_am
+    rows = [{"account": "D&J", "client": "BD", "am": "Siddesh SB"}, {"account": "OIA", "am": "Divith"}]
+    assert t.groups_from_rows(paid_am.adjust(rows)) == {"Ebin V Edison": ["D&J"], "Divith": ["OIA"]}
+    s, d = Store(), Deliver()
+    old = "BD Diesel: Take the already-built YouTube remarketing campaign live."
+    s.state_set(t.KEY_ITEMS, {t.item_id("Siddesh SB", old): {"am": "Siddesh SB", "text": old, "status": "open", "firstOn": "2026-11-18", "doneBy": "", "doneAt": ""}})
+    t.run(s, d, groups={"Ebin V Edison": ["D&J"]}, people=PEOPLE, ask=asker({"Ebin V Edison": '{"items": []}'}), now=NOW, owner=paid_am.owner_of)
+    items = s.state_get(t.KEY_ITEMS)
+    assert items[t.item_id("Ebin V Edison", old)]["am"] == "Ebin V Edison" and t.item_id("Siddesh SB", old) not in items

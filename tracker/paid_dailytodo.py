@@ -207,10 +207,10 @@ def run(store, deliver, *, groups, people, ask, channel=DEFAULT_CHANNEL, now=Non
     retired = [v for v in items.values() if v["status"] == "open" and skip(v["text"])]
     for v in retired:
         v["status"] = "removed"
-    owner = owner or (lambda text: None)
+    owner = owner or (lambda text, am=None: None)
     moved = False
     for k, v in list(items.items()):                                                # an open item moves to the manager its account belongs to
-        who = owner(v["text"]) if v["status"] == "open" else None
+        who = owner(v["text"], v["am"]) if v["status"] == "open" else None
         if who and who != v["am"]:
             del items[k]
             items.setdefault(item_id(who, v["text"]), dict(v, am=who))
@@ -232,7 +232,7 @@ def run(store, deliver, *, groups, people, ask, channel=DEFAULT_CHANNEL, now=Non
         if err:
             record["errors"].append(err)
         for text in fresh:
-            fresh_by.setdefault(owner(text) or am, []).append(text)                 # an item about an account that is someone else's goes to them
+            fresh_by.setdefault(owner(text, am) or am, []).append(text)                 # an item about an account that is someone else's goes to them
     for v in items.values():
         if v["status"] == "open":
             fresh_by.setdefault(v["am"], [])                                        # a manager with only carried-over items still gets a list

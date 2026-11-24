@@ -73,6 +73,14 @@ def parse_paste(text):
 # whatever the sheet says. A match is on the account or client name with spaces and punctuation ignored, and the name only has to contain the words.
 NOT_MANAGED = ("riccobene", "danielishapiro", "shapiro", "greatlakes", "dentalcareassociates")
 MANAGER_OVERRIDES = (("eventgroove", "Ebin V Edison"), ("burnout", "Ebin V Edison"))
+# Everything one manager has goes to another (matched on the name with spaces and punctuation ignored, containing the words): Siddesh's accounts and to-do items are Ebin's.
+MANAGER_REDIRECTS = (("siddesh", "Ebin V Edison"),)
+
+
+def redirect(am):
+    """The manager who has taken over everything of `am` (Siddesh -> Ebin V Edison), or None."""
+    n = norm(am)
+    return next((who for k, who in MANAGER_REDIRECTS if k in n), None)
 
 
 # Names that must not appear in a to-do item at all: the agent finds these in Slack, meetings and the budget snapshot whoever the item is for.
@@ -95,10 +103,11 @@ def mentions_dropped(text, extra=()):
     return any((" " + re.sub(r"[^a-z0-9]+", " ", n.lower().replace("&", " and ")).strip() + " ") in t for n in list(NOT_MANAGED_TEXT) + list(extra) if len(n.strip()) >= 4)
 
 
-def owner_of(text):
-    """The manager fixed in MANAGER_OVERRIDES for the account a to-do item names ("Eventgroove: ..." -> Ebin V Edison), or None."""
+def owner_of(text, am=None):
+    """The manager a to-do item belongs to: the one fixed in MANAGER_OVERRIDES for the account it names ("Eventgroove: ..." -> Ebin V Edison), else the one
+    who took over from `am` (MANAGER_REDIRECTS), or None."""
     n = norm(text)
-    return next((who for k, who in MANAGER_OVERRIDES if k in n), None)
+    return next((who for k, who in MANAGER_OVERRIDES if k in n), None) or redirect(am)
 
 
 def adjust(rows):
@@ -108,7 +117,7 @@ def adjust(rows):
         names = norm(r.get("account")) + "|" + norm(r.get("client"))
         if any(k in names for k in NOT_MANAGED):
             continue
-        am = next((who for k, who in MANAGER_OVERRIDES if k in names), None)
+        am = next((who for k, who in MANAGER_OVERRIDES if k in names), None) or redirect(r.get("am"))
         out.append(dict(r, am=am) if am else r)
     return out
 
