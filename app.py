@@ -6708,6 +6708,36 @@ def paid_creative_report():
         return _pm_gads_error(e)
 
 
+# ── Meta Creative Analysis (2026-11-25) ───────────────────────────────────────────────────────────────────────────────────
+# Which Meta creatives to scale, keep running or cut against the account's average return (ROAS, or cost per lead for an account that sells nothing online), and which
+# hooks, formats, partnership ads and call-to-action buttons work. Built first as Soteri Skin's own dashboard (ai-positon2/soteri-creative-analysis). The read is
+# tracker/paid_creative_roas.py (90 days of daily ad rows and each ad's creative); the page judges them for the dates and filters picked (static/js/creative_analysis*.js).
+# Meta only. Read only: nothing is changed in an ad account.
+
+@app.route("/p2/paid-marketing/creative-analysis")
+@position2_required
+def paid_creative_analysis():
+    return render_template("creative_analysis.html", user=_get_user())
+
+
+@app.route("/p2/paid-marketing/api/creative-analysis/data")
+@position2_required
+def paid_creative_analysis_data():
+    from tracker import paid_gads as paid_gads_base, paid_gads_segments as paid_gads, paid_creative_roas
+    src = request.args
+    try:
+        extra = {"force": True} if str(src.get("refresh") or "") in ("1", "true") else {}      # the Refresh button
+        return jsonify(paid_creative_roas.report_for(src.get("account"), **extra))
+    except paid_creative_roas.BadRequest as e:
+        return jsonify(error=str(e)), 400
+    except paid_gads_base.RefreshTooSoon as e:
+        return jsonify(error=str(e), kind="cooldown", retryIn=e.retry_in), 429
+    except paid_gads_base.AdsError as e:                                                   # Meta answered with an error (a Meta read raises the platform's AdsError)
+        return jsonify(error=str(e), kind="meta"), 502
+    except paid_gads.GadsError as e:
+        return _pm_gads_error(e)
+
+
 # ── Keyword Visibility Tracker (sheet item #35, 2026-10-22) ───────────────────────────────────────────────────────────────
 # The highest-spend Search keywords (top-of-page share, share lost to rank, Quality Score) and the auction insights, the last whole week against the four before. The rules are
 # tracker/paid_kvis_math.py, the read and report paid_kvis.py, the fix plan paid_kvis_plan.py, what the team saved paid_kvis_settings.py and the weekly run paid_kvis_monitor.py. Google Ads only. Read only.
