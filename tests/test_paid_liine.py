@@ -477,6 +477,31 @@ def test_load_is_cached_for_ten_minutes_and_force_reads_again(monkeypatch):
     assert fd.calls == 3
 
 
+def test_why_gives_googles_own_words_without_a_url():
+    class Resp:
+        status = 403
+
+    class Err(Exception):
+        resp = Resp()
+        content = b'{"error": {"message": "Google Drive API has not been used in project 1 before or it is disabled. Enable it by visiting https://console.developers.google.com/apis/api/drive.googleapis.com/overview?project=1 then retry."}}'
+    out = L.why(Err())
+    assert out.startswith("403 Google Drive API has not been used") and "http" not in out and "console" not in out
+    assert L.why(RuntimeError("500 boom")) == "500 boom"
+    assert len(L.why(RuntimeError("x" * 900))) <= 260
+
+
+def test_a_drive_failure_carries_googles_reason():
+    class Boom(Exception):
+        content = b'{"error": {"message": "Drive API disabled"}}'
+    fd = FakeDrive([], fail=True)
+    fd.fail = False
+    fd.execute = lambda: (_ for _ in ()).throw(Boom("x"))
+    fs = FakeSheets({})
+    with pytest.raises(L.LiineError) as e:
+        L.load(services=lambda: (_Drive(fd), fs))
+    assert "Drive API disabled" in str(e.value)
+
+
 def test_services_without_a_key_say_so(monkeypatch):
     monkeypatch.delenv("GOOGLE_SA_JSON", raising=False)
     with pytest.raises(L.LiineError) as e:

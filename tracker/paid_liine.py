@@ -35,6 +35,19 @@ class LiineError(Exception):
     """Something the page can show the user as it is."""
 
 
+def why(e):
+    """What Google said, in a few plain words: its own message when it sent one (no URL, no query string)."""
+    status = getattr(getattr(e, "resp", None), "status", None)
+    msg = ""
+    try:
+        msg = json.loads(e.content.decode("utf-8"))["error"]["message"]
+    except Exception:  # noqa: BLE001
+        msg = str(e)
+    msg = re.sub(r"https?://\S+", "", msg)
+    msg = re.sub(r"\s+", " ", msg).strip()[:260]
+    return ("%s " % status if status else "") + msg
+
+
 def _services():
     """(drive, sheets) for the service account, read-only. Module level so a test can replace it."""
     from google.oauth2 import service_account
@@ -82,7 +95,7 @@ def _read_run(sheets, parts):
         try:
             got = sheets.spreadsheets().values().get(spreadsheetId=fid, range="A:K").execute()
         except Exception as e:  # noqa: BLE001
-            raise LiineError("Could not read %s: %s" % (title, str(e)[:160]))
+            raise LiineError("Could not read %s: %s" % (title, why(e)))
         rows.extend(rows_of(got.get("values", [])))
     return rows
 
@@ -99,7 +112,7 @@ def load(force=False, services=None):
             q="'%s' in parents and trashed = false" % FOLDER_ID, orderBy="createdTime desc", pageSize=200,
             fields="files(id,name,mimeType,createdTime)").execute()
     except Exception as e:  # noqa: BLE001
-        raise LiineError("Could not list the Liine folder. Is it still shared with the platform? (%s)" % str(e)[:160])
+        raise LiineError("Could not list the Liine folder. Is it still shared with the platform? (%s)" % why(e))
     found = runs(listing.get("files", []))
     if not found:
         raise LiineError("There is no Liine data in the folder yet. Ask Claude to pull the Liine data (see 'How the data gets here').")
