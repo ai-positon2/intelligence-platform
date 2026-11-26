@@ -1,7 +1,8 @@
-"""Paid Marketing Agents: Meta Creative Analysis, the reading.
+"""Paid Marketing Agents: Creative Analysis, the reading (Meta here, Google Ads in paid_creative_roas_google.py).
 
-Which Meta creatives to scale, keep running or cut, judged against the account's own average return, and which hooks, formats, partnership ads and call-to-action buttons
-work. Built first as a stand-alone dashboard for Soteri Skin (ai-positon2/soteri-creative-analysis); here it reads any Meta ad account the shared token can open.
+Which creatives to scale, keep running or cut, judged against the account's own average return, and which hooks, formats, partnership ads and call-to-action buttons
+work. Built first as a stand-alone dashboard for Soteri Skin (ai-positon2/soteri-creative-analysis); here it reads any Meta ad account the shared token can open and any
+Google Ads account under Position2's manager account.
 
 What is read, read only, for the last LOOKBACK_DAYS days:
   * /insights at ad level, one row per ad per day, every ad that spent: spend, impressions, link clicks, purchases and purchase value (the platform's own purchase reading,
@@ -21,7 +22,7 @@ from __future__ import annotations
 import datetime as dt
 import json
 import re
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeout
 
 from . import paid_meta as meta
 from . import paid_segments as seg
@@ -246,7 +247,7 @@ def read_account(act, *, pages, get, today, workers=WORKERS):
 
 ROW_FIELDS = ["date", "ad", "spend", "impr", "clicks", "purch", "rev", "atc", "v3", "thru", "leads"]
 AD_KEYS = ["id", "name", "status", "campaign", "adset", "campaign_status", "adset_status", "format", "cta", "partnership", "partnership_ids", "hook", "body", "headline",
-           "thumb", "video_id", "creative_id", "post_url", "created"]
+           "thumb", "video_id", "creative_id", "post_url", "created", "landing"]
 
 
 def compact(raw):
@@ -256,32 +257,91 @@ def compact(raw):
         if r["ad_id"] not in ads:
             ads[r["ad_id"]] = {"id": r["ad_id"], "name": r["ad_name"], "status": "DELETED", "campaign": r["campaign"], "adset": r["adset"], "format": "Unknown",
                                "cta": "Not known", "partnership": None}
-    ids = sorted(ads)
+    ids = sorted(ads, key=str)
     idx = {k: i for i, k in enumerate(ids)}
     rows = sorted([r["date"], idx[r["ad_id"]], round(r["spend"], 2), r["impr"], r["clicks"], round(r["purch"], 2), round(r["rev"], 2), round(r["atc"], 2),
                    round(r["v3"], 2), round(r["thru"], 2), round(r["leads"], 2)] for r in raw.get("rows") or [])
     return {"ads": [{k: ads[i].get(k, "" if k != "partnership" else None) for k in AD_KEYS} for i in ids], "rows": rows, "rowFields": ROW_FIELDS}
 
 
-def report_for(account_id, *, force=False, store=None, today=None, now=None, pages_fn=None, get_fn=None, account_fn=None):
-    """The data of the Meta Creative Analysis page for one Meta ad account (act_...). `force` (Refresh) reads Meta again, at most once per paid_gads.REFRESH_COOLDOWN_S."""
+def local_today(tz):
+    """Today in the account's own time zone (Ads Manager and Google Ads count days there), else on the server's clock."""
+    try:
+        from zoneinfo import ZoneInfo
+        return dt.datetime.now(ZoneInfo(tz)).date() if tz else dt.date.today()
+    except Exception:
+        return dt.date.today()
+
+
+def report_for(account_id, *, force=False, store=None, today=None, now=None, pages_fn=None, get_fn=None, account_fn=None, google_accounts_fn=None, search_fn=None,
+               search_pruned_fn=None):
+    """The data of the Creative Analysis page for one Meta ad account (act_...) or one Google Ads account (10 digits). `force` (Refresh) reads the platform again, at most
+    once per paid_gads.REFRESH_COOLDOWN_S."""
     from . import paid_geo, paid_store
     store = store or paid_store
-    act = meta.norm_id(account_id)
-    if not act:
-        raise BadRequest("Pick a Meta ad account: this agent reads Meta only.")
-    problem = meta.config_problem()
-    if problem and not pages_fn:
-        raise BadRequest(problem)
-    day = today or dt.date.today()
-    pages = pages_fn or (lambda path, params: meta._pages(path, params, store))
-    get = get_fn or (lambda path, params: meta._get(path, params, store))
-    acct = (account_fn or (lambda a: meta.account_by_id(store, a) or {}))(act) or {}
+    target = str(account_id or "").strip()
+    if not target:
+        raise BadRequest("Pick a Google Ads or Meta ad account.")
+    if meta.is_meta(target):
+        act = meta.norm_id(target)
+        problem = meta.config_problem()
+        if problem and not pages_fn:
+            raise BadRequest(problem)
+        pages = pages_fn or (lambda path, params: meta._pages(path, params, store))
+        get = get_fn or (lambda path, params: meta._get(path, params, store))
+        acct = (account_fn or (lambda a: meta.account_by_id(store, a) or {}))(act) or {}
+        account = {"id": act, "name": acct.get("name") or act, "currency": acct.get("currency") or "USD", "tz": acct.get("tz") or "", "platform": "meta"}
+        day = today or local_today(account["tz"])
+        build = lambda: read_account(act, pages=pages, get=get, today=day)
+    else:
+        from . import paid_creative_roas_google as goog
+        if seg.gads.GROUP_ID_RE.match(target):
+            raise BadRequest("Pick one Google Ads account: this agent reads one account at a time, not a whole MCC.")
+        acct = seg.resolve_target(target, accounts_fn=google_accounts_fn)
+        account = {"id": acct["id"], "name": acct.get("name") or acct["id"], "currency": acct.get("currency") or "USD", "tz": acct.get("tz") or "", "platform": "google"}
+        day = today or local_today(account["tz"])
+        since0, until0 = window(day)
+        build = lambda: goog.read_account(account["id"], since0, until0, store=store, search_fn=search_fn, search_pruned_fn=search_pruned_fn)
     since, until = window(day)
-    raw, stale = paid_geo._cached("creative-analysis", act, "days", since, until, lambda: read_account(act, pages=pages, get=get, today=day), force=force, store=store, now=now)
-    out = dict(compact(raw), account={"id": act, "name": acct.get("name") or act, "currency": acct.get("currency") or "USD", "tz": acct.get("tz") or ""},
-               since=raw.get("since") or since.isoformat(), until=raw.get("until") or until.isoformat(), lookbackDays=LOOKBACK_DAYS, warnings=list(raw.get("warnings") or []),
-               extrasRead=raw.get("extrasRead", 0), extrasCapped=bool(raw.get("extrasCapped")), extrasMax=EXTRAS_MAX, readAt=raw.get("readAt") or "")
+    try:
+        raw, stale = paid_geo._cached(AGENT + "-" + account["platform"], account["id"], "days", since, until, build, force=force, store=store, now=now)
+    except seg.base.RefreshTooSoon:
+        raise
+    except seg.base.AdsError as e:               # a Google read: said as the platform's Google error (a Meta one stays an AdsError, which the page calls Meta's)
+        if account["platform"] == "google":
+            raise seg.gads.translate(e) from e
+        raise
+    out = dict(compact(raw), account=account, platform=account["platform"], since=raw.get("since") or since.isoformat(), until=raw.get("until") or until.isoformat(),
+               today=day.isoformat(), lookbackDays=LOOKBACK_DAYS, warnings=list(raw.get("warnings") or []), extrasRead=raw.get("extrasRead", 0),
+               extrasCapped=bool(raw.get("extrasCapped")), extrasMax=EXTRAS_MAX, readAt=raw.get("readAt") or "")
     if stale:
         out["stale"] = stale
     return out
+
+
+# ── A read that outlasts one request ────────────────────────────────────────
+# The first 90-day read of a large Meta account can take longer than the web server lets a request run (gunicorn --timeout 120). The page's request starts the read in the
+# background and waits WAIT_S for it; if it is not done the page is told {loading: true} and asks again, and the finished read is answered from the saved copy.
+
+WAIT_S = 25
+_POOL = ThreadPoolExecutor(max_workers=4, thread_name_prefix="creative-analysis")
+_JOBS = {}
+_JOBS_LOCK = __import__("threading").Lock()
+
+
+def report_or_loading(account_id, *, force=False, wait=WAIT_S, **kw):
+    """report_for, or {loading, started, name} while the read is still running in the background. An error the read ends with is raised to the request that sees it end."""
+    key = str(account_id or "").strip()
+    with _JOBS_LOCK:
+        job = _JOBS.get(key)
+        if job is None:
+            job = _JOBS[key] = {"future": _POOL.submit(report_for, key, force=force, **kw), "started": dt.datetime.now(dt.timezone.utc).isoformat()}
+    try:
+        return job["future"].result(timeout=wait)
+    except FutureTimeout:
+        return {"loading": True, "started": job["started"], "account": key}
+    finally:
+        if job["future"].done():
+            with _JOBS_LOCK:
+                if _JOBS.get(key) is job:
+                    _JOBS.pop(key, None)

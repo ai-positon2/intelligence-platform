@@ -1,17 +1,18 @@
-/* Meta Creative Analysis: the judging, as plain functions (so tests/test_creative_analysis_js.py runs them in Node).
+/* Creative Analysis: the judging, as plain functions (so tests/test_creative_analysis_js.py runs them in Node).
  *
- * The server sends 90 days of daily ad rows and each ad's creative (tracker/paid_creative_roas.py). Everything here works on that one payload for whatever dates,
- * campaign and ad filters the reader picks:
+ * The server sends 90 days of daily rows and each creative of one Meta or Google Ads account (tracker/paid_creative_roas*.py). Everything here works on that one
+ * payload for whatever dates, campaign and ad filters the reader picks:
  *
- *   Goal        Purchases (ROAS) when the account has purchase value, else Leads (cost per lead). The reader can switch.
- *   Totals      everything the active campaigns spent in the range, ads paused since included, which is what Ads Manager shows for those campaigns.
+ *   Dates       "Last N days" ends on the last whole day in the account's own time zone, as in Ads Manager and Google Ads.
+ *   Goal        Purchases (ROAS) when the account has purchase value, else Leads (cost per lead; on Google, cost per conversion). The reader can switch.
+ *   Totals      everything the account spent in the range, paused campaigns and ads included, which is the account total in Ads Manager and Google Ads.
  *   Benchmark   the average of all those ads: ROAS, or leads per unit spent (shown as cost per lead). The Ads filter narrows the totals and the creatives, never the
  *               benchmark, so a filtered creative is still judged against the whole account, not against its own kind.
  *   Judged      only ads running now (the ad, its ad set and its campaign all on).
  *   Verdict     Scale   at least scaleX times the average and at least minRes results
  *               Keep    at least keepX times the average
  *               Cut     below that
- *               Too early  less than minSpend spent (by default one average cost per result)
+ *               Too early  less than minSpend spent (by default 1.5 times the average cost per result)
  */
 (function(root){
 "use strict";
@@ -42,7 +43,19 @@ function finish(t, goal){
   return t;
 }
 
-/* A campaign is on when Meta says so; an ad read without its campaign's status counts its campaign on when any ad of it is running. */
+/* the last whole day in the account's time zone (today - 1), never past the data's last day nor before its first */
+function lastDay(D, nowDate){
+  var today = D.today || "";
+  if (!today){
+    var tz = (D.account || {}).tz;
+    try { today = (nowDate || new Date()).toLocaleDateString("en-CA", tz ? {timeZone: tz} : {}); } catch (e) { today = (nowDate || new Date()).toISOString().slice(0,10); }
+  }
+  var y = shift(today, -1);
+  return y < D.until ? (y < D.since ? D.since : y) : D.until;
+}
+function presetRange(D, days){ var end = lastDay(D); return [shift(end, -(days - 1)), end]; }
+
+/* A campaign is on when the platform says so; an ad read without its campaign's status counts its campaign on when any ad of it is running. */
 function campaignActive(D, a){
   if (a.campaign_status) return a.campaign_status === "ACTIVE";
   if (!D._liveCamps){ D._liveCamps = {}; D.ads.forEach(function(x){ if (x.status === "ACTIVE") D._liveCamps[x.campaign] = 1; }); }
@@ -50,11 +63,11 @@ function campaignActive(D, a){
 }
 
 /* broad format for the Ads filter: single and flexible images together, single and flexible videos together */
-function kindOf(a){ var f = String(a.format || ""); return /video/i.test(f) ? "Video" : /image/i.test(f) ? "Image" : (f || "Other"); }
+function kindOf(a, google){ var f = String(a.format || ""); return google ? (f || "Other") : /video/i.test(f) ? "Video" : /image/i.test(f) ? "Image" : (f || "Other"); }
 function partLabel(a){ return a.partnership === true ? "Partnership ad" : a.partnership === false ? "Brand ad" : "Not known"; }
-function adFilter(kind, partner){
+function adFilter(kind, partner, google){
   if (!kind && !partner) return null;
-  return function(a){ return (!kind || kindOf(a) === kind) && (!partner || (partner === "1" ? a.partnership === true : a.partnership === false)); };
+  return function(a){ return (!kind || kindOf(a, google) === kind) && (!partner || (partner === "1" ? a.partnership === true : a.partnership === false)); };
 }
 
 /* Purchases when the account has any purchase value in the payload, else leads when it has leads, else purchases. */
@@ -64,13 +77,13 @@ function defaultGoal(D){
   return rev > 0 ? "roas" : leads > 0 ? "cpl" : "roas";
 }
 
-/* o: {since, until, campaign, kind, partner, goal, scaleX, keepX, minRes, minSpend (null = one average cost per result)} */
+/* o: {since, until, campaign, kind, partner, goal, scaleX, keepX, minRes, minSpend (null = 1.5 average costs per result)} */
 function compute(D, o){
-  var keep = adFilter(o.kind, o.partner), perAd = {}, order = [], total = blank(), paused = blank(), all = blank();
+  var keep = adFilter(o.kind, o.partner, D.platform === "google"), perAd = {}, order = [], total = blank(), paused = blank(), all = blank();
   D.rows.forEach(function(r){
     if (r[F.date] < o.since || r[F.date] > o.until) return;
     var ad = D.ads[r[F.ad]];
-    if (!ad || (o.campaign && ad.campaign !== o.campaign) || !campaignActive(D, ad)) return;
+    if (!ad || (o.campaign && ad.campaign !== o.campaign)) return;     // paused campaigns count in the totals, like the account total
     add(all, r);
     if (keep && !keep(ad)) return;
     add(total, r);
@@ -81,7 +94,7 @@ function compute(D, o){
   });
   finish(total, o.goal); finish(all, o.goal); finish(paused, o.goal);
   total.paused = paused; total.all = all; total.filtered = !!keep;
-  var autoMin = all.cpr ? Math.round(all.cpr) : 50;
+  var autoMin = all.cpr ? Math.round(all.cpr * 1.5) : 75;          // 1.5 × the account's cost per result before an ad is judged
   var rules = {goal:o.goal, avg:all.score, scaleX:+o.scaleX || 1.2, keepX:+o.keepX || 0.8, minRes:+o.minRes || 0,
                minSpend:o.minSpend == null || o.minSpend === "" ? autoMin : +o.minSpend || 0, autoMin:autoMin};
   return {since:o.since, until:o.until, perAd:order.map(function(k){ return finish(perAd[k], o.goal); }), total:total, rules:rules};
@@ -138,7 +151,7 @@ function nameDelim(names){
 /* a text cell must never run as a formula in Excel; a number is left alone */
 function csvCell(v){ if (v == null) v = ""; var num = typeof v === "number"; v = String(v); if (!num && /^[=+\-@\t\r]/.test(v)) v = "'" + v; return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; }
 
-var api = {VERDICTS:VERDICTS, VLABEL:VLABEL, F:F, TAGS:TAGS, shift:shift, daysBetween:daysBetween, blank:blank, finish:finish, campaignActive:campaignActive, kindOf:kindOf,
+var api = {VERDICTS:VERDICTS, VLABEL:VLABEL, F:F, TAGS:TAGS, shift:shift, daysBetween:daysBetween, blank:blank, finish:finish, campaignActive:campaignActive, lastDay:lastDay, presetRange:presetRange, kindOf:kindOf,
   partLabel:partLabel, adFilter:adFilter, defaultGoal:defaultGoal, compute:compute, judge:judge, metricName:metricName, metricText:metricText, groupBy:groupBy,
   creatives:creatives, tagsOf:tagsOf, isUgc:isUgc, nameDelim:nameDelim, csvCell:csvCell};
 if (typeof module !== "undefined" && module.exports) module.exports = api; else root.CAData = api;

@@ -1,0 +1,76 @@
+{% extends "_paid_base.html" %}
+{% block title %}Creative Analysis{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='css/creative_analysis.css') }}?v=1">{% endblock %}
+{% block content %}
+<div class="pm ca" id="ca">
+  <section class="pm-hero">
+    <div class="pm-hero-l">
+      <span class="pm-eyebrow"><span class="d"></span>Paid Marketing · Creative</span>
+      <h1 class="pm-title">Which creatives to <span class="pm-grad">scale, keep or cut?</span></h1>
+      <p class="pm-sub">Pick a Google Ads or Meta account. Every ad (and on Google every Performance Max asset group) is judged against the account's own average return:
+        <b>scale</b> what beats it, <b>keep</b> what is close, <b>cut</b> what is well below, and wait on what has not spent enough to tell. Then see which
+        <b>hooks</b>, <b>headlines</b>, <b>formats</b> and <b>angles</b> make money.</p>
+    </div>
+  </section>
+
+  <section class="pm-panel pd-cmd bi-cmd" id="cmd">
+    <div class="bi-cmd-row da-cmd-row">
+      <div id="acctPick"></div>
+      <p class="bi-scope">The last 90 days, by day: Google Ads (every ad and Performance Max asset group, Conversions and Conv. value) and Meta (every ad, purchases and purchase value, or leads). Nothing is changed in an account.</p>
+    </div>
+  </section>
+
+  <div id="banners"></div>
+
+  <div id="empty" class="pm-panel sg-empty">
+    <div class="sg-empty-ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 17l5-6 4 4 7-9"/></svg></div>
+    <h2>Choose an account to begin</h2>
+    <p>The figures come straight from Google Ads or Meta. Nothing is changed there: the agent only reports.</p>
+  </div>
+  <div id="skel" hidden><p class="ca-loading" id="loadingNote"></p><div class="pd-skel"></div><div class="pd-skel"></div><div class="pd-skel"></div></div>
+
+  <main id="app" hidden>
+    <div class="sg-head">
+      <p class="pd-fresh" id="meta"></p>
+      <button class="pm-btn-ghost" id="refresh" type="button" title="Read the account again"><svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.3-5.6M20 4v5h-5"/></svg><span>Refresh</span></button>
+      <button class="pm-btn-ghost" id="csv" type="button"><svg viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>Export CSV</button>
+    </div>
+    <div class="bar">
+      <label>Dates <select id="range">
+        <option value="7">Last 7 days</option><option value="14">Last 14 days</option><option value="30" selected>Last 30 days</option>
+        <option value="60">Last 60 days</option><option value="90">Last 90 days</option><option value="custom">Custom…</option></select></label>
+      <span id="customDates" style="display:none"><input type="date" id="since"> – <input type="date" id="until"></span>
+      <label>Campaign <select id="campaign"><option value="">All campaigns</option></select></label>
+      <label>Ads <select id="kind"><option value="">All formats</option></select>
+        <select id="partner"><option value="">Partnership + brand</option><option value="1">Partnership ads</option><option value="0">Brand ads</option></select></label>
+      <label>Judge by <select id="group">
+        <option value="ad">Each ad</option><option value="name">Ad name (same creative across ad sets)</option></select></label>
+      <label id="goalWrap" style="display:none">Goal <select id="goal"><option value="roas">Purchases (ROAS)</option><option value="cpl">Leads (cost per lead)</option></select></label>
+      <span class="badge" id="scopeBadge" title="Totals and the average count everything the account spent in the range, paused campaigns and ads included, matching the account total in Ads Manager and Google Ads. Only ads running now are judged.">All campaigns · running ads judged</span>
+    </div>
+    <div class="bar rules">
+      <span><b>Scale</b> when <span class="mWord">ROAS</span> ≥ <input type="number" id="scaleX" step="0.05" value="1.2">× average and ≥ <input type="number" id="minPurch" step="1" value="2"> <span id="purchWord">purchases</span></span>
+      <span><b>Keep</b> when <span class="mWord">ROAS</span> ≥ <input type="number" id="keepX" step="0.05" value="0.8">× average</span>
+      <span><b>Cut</b> below that</span>
+      <span><b>Too early</b> until spend ≥ <input type="number" id="minSpend" step="5"> <span id="minSpendNote"></span></span>
+    </div>
+    <div class="kpis" id="kpis"></div>
+    <div class="tabs" id="tabs">
+      <button type="button" data-tab="creatives" class="on">Creatives: scale / keep / cut</button>
+      <button type="button" data-tab="hooks">Hooks</button>
+      <button type="button" data-tab="formats">Formats &amp; angles</button>
+    </div>
+    <section id="tab-creatives"></section>
+    <section id="tab-hooks" style="display:none"></section>
+    <section id="tab-formats" style="display:none"></section>
+    <p class="pd-foot" id="foot"></p>
+  </main>
+  <div class="ca-tip" id="tip"></div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/pm_picker.js') }}?v=1"></script>
+<script src="{{ url_for('static', filename='js/pm_platform.js') }}?v=7"></script>
+<script src="{{ url_for('static', filename='js/creative_analysis_data.js') }}?v=1"></script>
+<script src="{{ url_for('static', filename='js/creative_analysis.js') }}?v=1"></script>
+{% endblock %}
