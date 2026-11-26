@@ -12,7 +12,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-tokens.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-components.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/gtm.css') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/paid_marketing.css') }}?v=71">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/paid_marketing.css') }}?v=72">
   <script src="/static/js/theme.js"></script>
   <link rel="stylesheet" href="/static/css/aurora-app.css?v=3">
   <script src="/static/js/aurora.js?v=1" defer></script>
@@ -273,6 +273,25 @@
           </div>
           <div class="card-footer">
             <div class="card-tags"><span class="tag">CallRail</span><span class="tag">Lead quality</span></div>
+            <span class="card-arrow">→</span>
+          </div>
+        </div>
+      </a>
+
+      <a href="/p2/paid-marketing/liine-lead-analysis" class="dash-card active c-liine">
+        <div class="card-band"></div>
+        <div class="card-thumb">
+          <div class="card-thumb-icon"><svg class="au-ic" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 18V8"/><path d="M9 18V4"/><path d="M14 18v-7"/><path d="M19 18v-4"/><path d="M3 21h18"/></svg></div>
+          <div class="card-thumb-badge tb-live"><span class="tb-dot live"></span> Live</div>
+        </div>
+        <div class="card-body">
+          <div class="card-name">Liine Lead Analysis</div>
+          <div class="card-desc">
+            What happens to the new patient leads Liine tracks: how many booked, which were never called, where calls go to voicemail and which paid
+            campaigns brought leads that did not book. Counts only, no patient details.
+          </div>
+          <div class="card-footer">
+            <div class="card-tags"><span class="tag">Liine</span><span class="tag">Lead follow-up</span></div>
             <span class="card-arrow">→</span>
           </div>
         </div>
@@ -870,6 +889,7 @@
     {t:'Geo Performance',d:'Performance by location, with geo bid adjustments',u:'/p2/paid-marketing/geo-performance',i:'◍'},
     {t:'Seasonality Analysis',d:'The shape of the year, and the next three months',u:'/p2/paid-marketing/seasonality-analysis',i:'∿'},
     {t:'Call Transcript Analyzer',d:'What ad calls were about, from CallRail',u:'/p2/paid-marketing/call-transcript-analyzer',i:'☎'},
+    {t:'Liine Lead Analysis',d:'What happens to the leads Liine tracks: never called, missed calls, paid campaigns that booked nobody',u:'/p2/paid-marketing/liine-lead-analysis',i:'☎'},
     {t:'Ad Strength Analysis',d:'Google ad strength, and the text changes to lift it',u:'/p2/paid-marketing/ad-strength',i:'▲'},
     {t:'Audience Segment Analysis',d:'Which audiences earn their bids',u:'/p2/paid-marketing/audience-segments',i:'◉'},
     {t:'Asset Coverage Audit',d:'What every campaign is missing, and what to add',u:'/p2/paid-marketing/asset-coverage',i:'▦'},

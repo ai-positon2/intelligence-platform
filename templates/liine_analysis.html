@@ -1,0 +1,58 @@
+{% extends "_paid_base.html" %}
+{% block title %}Liine Lead Analysis{% endblock %}
+{% block head %}
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/performance_summarizer.css') }}?v=10">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/liine.css') }}?v=1">
+{% endblock %}
+{% block content %}
+<div class="pm pm-ps pm-ln" id="ln">
+  <section class="pm-hero">
+    <div class="pm-hero-l">
+      <span class="pm-eyebrow"><span class="d"></span>Paid Marketing · Leads</span>
+      <h1 class="pm-title">What happens to your leads <span class="pm-grad">after the click.</span></h1>
+      <p class="pm-sub">Every new patient lead Liine tracked for the Inspire Aesthetics practices: how many booked, how many were never called back,
+        where the calls went unanswered, and which paid campaigns brought leads that did not book. Plain counts from Liine, no patient details.</p>
+    </div>
+    <div class="ps-live" id="live" aria-live="polite"><span class="ps-live-dot"></span><span id="liveText">Reading the Liine data…</span></div>
+  </section>
+
+  <section class="pm-panel ln-cmd">
+    <label class="ln-fld"><span class="pd-dd-k">Practice</span>
+      <select class="ps-sel" id="pracSel" aria-label="Practice"><option value="">All practices</option></select></label>
+    <button type="button" class="pm-btn-ghost" id="refreshBtn" title="Read the Liine folder again. It holds whatever Claude last pulled.">
+      <svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.3-5.6M20 4v5h-5"/></svg><span>Read again</span></button>
+    <p class="ps-range-note" id="rangeNote"></p>
+  </section>
+
+  <div id="notice"></div>
+
+  <div id="dash" hidden>
+    <div class="ps-sec-h"><div><h2>Key numbers</h2><span class="ps-hint ps-hint-b" id="kpiHint"></span></div></div>
+    <section class="ps-kpis" id="kpis" style="--cols:4"></section>
+
+    <div class="ps-sec-h"><div><h2>What needs attention</h2><span class="ps-hint ps-hint-b" id="findHint"></span></div></div>
+    <div id="findings"></div>
+
+    <div class="ps-sec-h"><div><h2>The practices</h2><span class="ps-hint ps-hint-b">Last 90 days, against the 90 days before. Click a practice to look at it alone.</span></div></div>
+    <section class="pm-panel ps-card ps-tablecard" id="pracTable"></section>
+
+    <div class="ps-sec-h"><div><h2>Leads and bookings by month</h2><span class="ps-hint ps-hint-b" id="monthHint"></span></div></div>
+    <section class="pm-panel ps-card" id="months"></section>
+
+    <div class="ps-sec-h"><div><h2>Why leads did not book</h2><span class="ps-hint ps-hint-b" id="reasonHint"></span></div></div>
+    <section class="pm-panel ps-card" id="reasons"></section>
+
+    <div class="ps-sec-h"><div><h2>Where the leads come from</h2><span class="ps-hint ps-hint-b" id="chanHint"></span></div></div>
+    <section class="pm-panel ps-card ps-tablecard" id="chanTable"></section>
+
+    <div class="ps-sec-h"><div><h2>Paid campaigns</h2><span class="ps-hint ps-hint-b" id="campHint"></span></div></div>
+    <section class="pm-panel ps-card ps-tablecard" id="campTable"></section>
+
+    <div class="ps-sec-h"><div><h2>How this data gets here</h2></div></div>
+    <section class="pm-panel ps-card ln-how" id="how"></section>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/liine.js') }}?v=1"></script>
+{% endblock %}

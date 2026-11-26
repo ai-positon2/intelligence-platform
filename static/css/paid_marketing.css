@@ -1097,6 +1097,13 @@ details.sq-ref>summary{cursor:pointer;font-size:12.5px;font-weight:600;color:var
   --icon-glow:rgba(20,184,166,.5);--card-border:rgba(20,184,166,.35);
   --card-glow:0 0 40px rgba(20,184,166,.10);--arrow-color:#99f6e4}
 
+/* Liine Lead Analysis (2026-11-26): the hub card */
+.c-liine{--card-accent:#f472b6;
+  --band:linear-gradient(90deg,#f472b6,#818cf8,#38bdf8);
+  --thumb:linear-gradient(135deg,#240a1c 0%,#0a1230 100%);
+  --icon-glow:rgba(244,114,182,.5);--card-border:rgba(244,114,182,.35);
+  --card-glow:0 0 40px rgba(244,114,182,.10);--arrow-color:#fbcfe8}
+
 /* Search Query Analysis: reading Google Ads */
 .pm-sqr .sq-kpis{grid-template-columns:repeat(4,minmax(0,1fr))}
 @media (max-width:900px){.pm-sqr .sq-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}

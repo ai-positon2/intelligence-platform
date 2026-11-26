@@ -1,0 +1,33 @@
+/* Liine Lead Analysis (Paid Marketing Agents). Loaded after performance_summarizer.css; reuses its tokens and cards. */
+.pm-ln .ln-cmd{display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap;padding:16px 20px}
+.pm-ln .ln-fld{display:flex;flex-direction:column;gap:6px;min-width:240px}
+.pm-ln .ln-sev{display:inline-block;padding:3px 10px;border-radius:999px;font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase}
+.pm-ln .ln-sev.high{background:rgba(239,68,68,.16);color:#f87171}
+.pm-ln .ln-sev.medium{background:rgba(245,158,11,.16);color:#fbbf24}
+.pm-ln .ln-find{padding:18px 20px;margin-bottom:14px;border-radius:20px;min-width:0}
+.pm-ln .ln-find h3{margin:8px 0 6px;font-size:17px;font-weight:700;color:var(--pm-ink)}
+.pm-ln .ln-find p{margin:0 0 8px;color:var(--pm-mute,#94a3b8);font-size:13.5px;line-height:1.5}
+.pm-ln .ln-find ul{margin:0 0 10px 18px;padding:0;font-size:13.5px;line-height:1.55;color:var(--pm-ink)}
+.pm-ln .ln-act{font-size:13.5px;line-height:1.5;color:var(--pm-ink)}
+.pm-ln .ln-act b{color:var(--pm-a)}
+.pm-ln .ln-none{padding:18px 20px;border-radius:20px;color:var(--pm-mute,#94a3b8)}
+.pm-ln .ln-pill{cursor:pointer}
+.pm-ln tr.ln-row{cursor:pointer}
+.pm-ln tr.ln-row:hover td{background:rgba(129,140,248,.08)}
+.pm-ln .ln-bad{color:#f87171}.pm-ln .ln-good{color:#34d399}
+.pm-ln .ln-bars{display:flex;align-items:flex-end;gap:10px;height:200px;padding:10px 4px 0;overflow-x:auto}
+.pm-ln .ln-bar{flex:1 0 46px;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;min-width:46px}
+.pm-ln .ln-bar i{display:block;width:60%;min-height:2px;border-radius:6px 6px 0 0;background:linear-gradient(180deg,#818cf8,#6366f1)}
+.pm-ln .ln-bar.partial i{opacity:.45}
+.pm-ln .ln-bar .r{font-size:11.5px;font-weight:700;margin-bottom:4px;color:var(--pm-ink)}
+.pm-ln .ln-bar .m{font-size:11px;margin-top:6px;color:var(--pm-mute,#94a3b8);white-space:nowrap}
+.pm-ln .ln-bar .n{font-size:10.5px;color:var(--pm-mute,#94a3b8)}
+.pm-ln .ln-rs{display:grid;grid-template-columns:minmax(0,260px) minmax(0,1fr) 70px 70px;gap:8px 14px;align-items:center;font-size:13px}
+.pm-ln .ln-rs .t{height:10px;border-radius:6px;background:rgba(148,163,184,.15);overflow:hidden}
+.pm-ln .ln-rs .t i{display:block;height:100%;border-radius:6px}
+.pm-ln .g-not_called i{background:#ef4444}.pm-ln .g-handling i{background:#f59e0b}.pm-ln .g-fit i{background:#38bdf8}
+.pm-ln .g-nurture i{background:#a78bfa}.pm-ln .g-other i{background:#94a3b8}.pm-ln .g-booked i{background:#34d399}
+.pm-ln .ln-legend{display:flex;gap:16px;flex-wrap:wrap;margin:0 0 12px;font-size:12.5px;color:var(--pm-mute,#94a3b8)}
+.pm-ln .ln-how p{margin:0 0 10px;font-size:13.5px;line-height:1.6;color:var(--pm-ink)}
+.pm-ln .ln-how code{padding:2px 6px;border-radius:6px;background:rgba(148,163,184,.16);font-size:12.5px}
+@media (max-width:720px){.pm-ln .ln-rs{grid-template-columns:minmax(0,1fr) 60px 60px}.pm-ln .ln-rs .t{display:none}}
