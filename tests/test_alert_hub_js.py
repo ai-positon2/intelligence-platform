@@ -16,7 +16,7 @@ import pytest
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from monitor_fakes import Deliver, MemStore  # noqa: E402
-from test_master_agent_js import HARNESS  # noqa: E402
+from js_harness import HARNESS  # noqa: E402
 from tracker import paid_alerthub as hub  # noqa: E402
 from tracker import paid_master as m  # noqa: E402
 from tracker import paid_monitor as mon  # noqa: E402
@@ -227,9 +227,9 @@ def test_the_filter_menus_list_the_clients_and_monitors_with_counts(tmp_path):
     assert "All monitors" in out["el"]["#fAgent"]["html"] and "KPI Monitoring (1)" in out["el"]["#fAgent"]["html"]
 
 
-def test_with_no_client_the_page_points_to_the_master_agent_and_with_nothing_open_it_says_so(tmp_path):
+def test_with_no_client_the_page_says_so_and_with_nothing_open_it_says_so(tmp_path):
     out = page({"responses": stubs(real_state(clients=False, log=False))}, tmp_path)
-    assert "Master Agent" in out["el"]["#destClients"]["html"] and "No client in the Master Agent yet" in out["el"]["#destNote"]["text"] and "Nothing has been sent through the hub yet" in out["el"]["#log"]["html"]
+    assert "No client is saved" in out["el"]["#destClients"]["html"] and "master-agent" not in out["el"]["#destClients"]["html"] and "No client is saved" in out["el"]["#destNote"]["text"] and "Nothing has been sent through the hub yet" in out["el"]["#log"]["html"]
     s = MemStore()
     empty = json.loads(json.dumps(hub.view(s, Deliver(), NOW, pm.AGENTS)))
     out = page({"responses": stubs(empty)}, tmp_path)

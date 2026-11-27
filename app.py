@@ -6353,14 +6353,16 @@ def paid_kpi_settings_unmute():
 @app.route("/p2/paid-marketing/master-agent")
 @position2_required
 def paid_master_agent():
-    """The Master Agent: a chat that answers anything about the paid accounts (tracker/master_chat.py). The client set-up is its Clients tab."""
+    """The Master Agent: a chat that answers anything about the paid accounts (tracker/master_chat.py), and nothing else."""
     return render_template("master_agent.html", user=_get_user())
 
 
 @app.route("/p2/paid-marketing/master-agent/clients")
 @position2_required
 def paid_master_clients():
-    return render_template("master_clients.html", user=_get_user())
+    """The Clients page was taken off on 2026-11-27 (the Master Agent only answers questions now). Old links land on the chat. The clients already saved are kept
+    and the other agents still read them (the /api/master routes below stay for that)."""
+    return redirect("/p2/paid-marketing/master-agent")
 
 
 @app.route("/p2/paid-marketing/api/master/state")
@@ -6428,11 +6430,12 @@ def _master_convo_or_404(cid):
 def _master_turn_view(t):
     from tracker import master_chat
     t = master_chat.read_turn(t)
-    keep = ("id", "convoId", "createdAt", "finishedAt", "status", "question", "filesIn", "steps", "answer", "filesOut", "sources", "error", "draft")
+    keep = ("id", "convoId", "createdAt", "finishedAt", "status", "question", "filesIn", "answer", "filesOut", "sources", "error", "draft")
     out = {k: t.get(k) for k in keep}
     out["cost"] = (t.get("usage") or {}).get("cost_usd")
-    if _pm_is_admin():
+    if _pm_is_admin():                                   # the working steps (queries, code, output) are for admins checking a turn; the page never shows them
         out["usage"] = t.get("usage") or {}
+        out["steps"] = t.get("steps") or []
     return out
 
 
@@ -23117,7 +23120,7 @@ Location Conflicts (/p2/paid-marketing/location-conflicts): do the campaigns sho
 
 KPI Monitoring (/p2/paid-marketing/kpi-monitoring): are the campaigns hitting their targets. Pick a Google Ads account, an MCC to check every account in one go, or a Meta ad account, and it reads, read only, each live campaign's last two weeks (cost, clicks, impressions, conversions and their value by day), its delivery status, its bid strategy status and the strategy's own target, and holds the last 7 whole days against the campaign's target and against the 7 days before. A target is the one the team saved for the campaign, then the one saved for the account (cost per conversion or lead, return on ad spend, lowest conversion rate and click-through rate, with a tolerance of 20 percent unless saved), then, for cost and return on Google, the campaign's own bid strategy target. It flags a cost or return off target (high at twice the target, or half again two weeks running), a campaign that stopped converting or spent twice its target cost with no conversion, a campaign that is not delivering (not eligible, misconfigured, ended or no impressions), a misconfigured or CPC-limited bid strategy, a campaign stuck in learning (14 days, counted from the day the daily check first saw it) or limited by data, a campaign limited by budget (medium when it is on target, so there is room to grow) and a conversion or click-through rate under the lowest wanted. A figure with too little behind it (under 5 conversions, 100 clicks or 1,000 impressions in the week) is never judged and the page says so. The team can leave a campaign out with a reason. A monitor reads every account daily and alerts by email and Slack to the recipients saved on the page's Alerts and history panel (the first run sets a baseline and sends nothing; only medium and high are alerted). It changes nothing in any ad account.
 
-Master Agent (/p2/paid-marketing/master-agent): a chat that answers anything about the paid accounts in plain English. It reads every Paid Marketing agent as the person asking, runs read-only Google Ads (GAQL) and Meta (Graph API) queries for anything no agent shows, reads files people attach (CSV, Excel, JSON, XML, text, PDF, Word, PowerPoint, images, or a zip or folder of them), does every sum in Python in a code sandbox, and answers with the evidence and sources, or hands back Excel, CSV, Word, PDF, PowerPoint or charts. Conversations are kept per person; the sandbox keeps files and variables for the whole conversation. It only reads: it changes nothing in an ad account. Its Clients tab (/p2/paid-marketing/master-agent/clients) is the one place a client is written down. The team creates a client, picks the Google Ads and Meta accounts it owns (an account is in one client only) and saves, per account, the monthly budget and the weekly floor and ceiling, the KPI targets (cost per conversion, return on ad spend, lowest conversion rate and click-through rate) and the tolerance; and for the whole client the phone numbers, the places it serves, regions people say, the brand terms, the way the name is written, words that are right, the domains its ads may send people to, and offers with the day each ends. The other agents read it: Brand Spend Alert takes the budget and brand terms, KPI Monitoring the targets and tolerance, the Ad Copy Checker the phone numbers, places, written name and allowed words, Location Conflicts the regions, and Unknown Domains counts the allowed domains as known for the client's accounts. The master only fills what an agent has not saved for itself: a figure saved on an agent's own page still wins, and the page lists every place that differs so the team can settle it. Offers and notes are kept but no agent reads them yet. Each change says who made it and when. It reads and changes nothing in an ad account.
+Master Agent (/p2/paid-marketing/master-agent): a chat that answers anything about the paid accounts in plain English. It reads every Paid Marketing agent as the person asking, runs read-only Google Ads (GAQL) and Meta (Graph API) queries for anything no agent shows, reads files people attach (CSV, Excel, JSON, XML, text, PDF, Word, PowerPoint, images, or a zip or folder of them), does every sum in Python in a code sandbox, and answers with the evidence and sources, or hands back Excel, CSV, Word, PDF, PowerPoint or charts. Conversations are kept per person; the sandbox keeps files and variables for the whole conversation. It only reads: it changes nothing in an ad account. It only answers questions: the Clients page it used to have was taken off on 2026-11-27. The clients the team saved there earlier (each client's accounts, budgets, KPI targets, phone numbers, places, brand terms and domains) are still kept, and Brand Spend Alert, KPI Monitoring, the Ad Copy Checker, Location Conflicts and Unknown Domains still read them where they have nothing saved of their own, but they can no longer be changed from a page. It reads and changes nothing in an ad account.
 
 Alert Hub (/p2/paid-marketing/alert-hub): the one layer every monitor's alert goes through. Each issue a monitor raises is P1 (high), P2 (medium) or P3 (low). P1 and P2 are alerted; P3 stays on its page and in the Monday summary. A scheduled run sends one message per destination for all the monitors together, not one per monitor, and Mondays one summary of every monitor. The default destination is the email list and Slack channel every monitor page shows; a client written down in the Master Agent can have a Slack channel, emails and a floor (P1 only, or P1 and P2) of its own, and its accounts' alerts go there. An issue is held back, not sent and not marked as alerted, while another monitor's issue of the same or a higher level on the same account already says it: when an account itself is not serving (Account Watch), what follows from it (KPI Monitoring, Keyword Visibility, Creative and Asset Health, a spend drop, conversions that stopped or dropped, an ad group that cannot show) is held back, and two monitors saying the same thing (a stopped ad group, a campaign not delivering and a spend drop; or conversions that stopped in Tracking and in KPI Monitoring) are said once by the one that names the cause. When the issue that covers it is fixed, the held one is alerted at the next run. The page lists the destinations, every open issue of every monitor with its level, client and what covers it (filters and CSV), the last sends and the rules. It does not snooze, throttle an issue that keeps coming back or page a person. It reads and changes nothing in an ad account.
 

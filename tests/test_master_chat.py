@@ -749,7 +749,7 @@ API = "/p2/paid-marketing/api/master/chat"
 
 
 def test_the_pages_and_the_api_are_for_staff_only(rs):
-    for url in ("/p2/paid-marketing/master-agent", "/p2/paid-marketing/master-agent/clients", API + "/convos"):
+    for url in ("/p2/paid-marketing/master-agent", API + "/convos"):
         assert client_as(None).get(url).status_code == 302 and client_as("x@gmail.com").get(url).status_code == 302, url
         assert client_as(STAFF).get(url).status_code == 200, url
 
@@ -876,6 +876,27 @@ def test_a_running_turn_shows_the_answer_being_written():
     assert "Final" in done and "mx-draft" not in done
 
 
+def test_the_working_steps_are_never_shown_only_a_thinking_line():
+    steps = [{"kind": "tool", "label": "Querying Google Ads (campaign) for Acme (from code)"}, {"kind": "code", "label": "Running Python", "code": "print(1)"}]
+    busy = node_turn({"id": "t", "status": "running", "question": "q", "steps": steps, "createdAt": "2026-11-27T10:00:00+00:00"})
+    assert "Thinking" in busy and "mx-think" in busy and "busy" in busy
+    for t in (busy, node_turn({"id": "t", "status": "done", "question": "q", "answer": "A", "steps": steps})):
+        assert "Querying" not in t and "Running Python" not in t and "print(1)" not in t and "mx-step" not in t and "mx-work" not in t
+    page = read("templates/master_agent.html")
+    assert "Reads only" not in page and "Enter to send" not in page and 'id="foot"' not in page
+
+
+def test_only_an_admin_gets_the_steps_from_the_api(monkeypatch):
+    from tracker import master_chat
+    monkeypatch.setattr(master_chat, "read_turn", lambda t: t)
+    t = {"id": "t", "status": "done", "steps": [{"kind": "tool", "label": "x"}], "usage": {"cost_usd": 0.1}}
+    with appmod.app.test_request_context():
+        monkeypatch.setattr(appmod, "_pm_is_admin", lambda: False)
+        assert "steps" not in appmod._master_turn_view(dict(t)) and "usage" not in appmod._master_turn_view(dict(t))
+        monkeypatch.setattr(appmod, "_pm_is_admin", lambda: True)
+        assert appmod._master_turn_view(dict(t))["steps"] == t["steps"]
+
+
 def test_every_element_the_script_uses_is_on_the_page_and_nothing_has_a_dash():
     html, js, css = read("templates/master_agent.html"), read("static/js/master_chat.js"), read("static/css/master_chat.css")
     for sel in sorted(set(re.findall(r'\$\("#([A-Za-z]+)"\)', js))):
@@ -885,14 +906,14 @@ def test_every_element_the_script_uses_is_on_the_page_and_nothing_has_a_dash():
         assert "—" not in read(path) and "–" not in read(path), path
     assert "js/master_chat.js" in html and "css/master_chat.css" in html
     for sel in re.findall(r"^\.(mx-[\w-]+)", css, re.M):
-        assert sel not in read("static/css/paid_marketing.css").replace(".mx-tabs", ""), sel
+        assert sel not in read("static/css/paid_marketing.css"), sel
 
 
-def test_the_hub_the_palette_and_vimi_know_the_new_master_agent():
+def test_the_hub_the_palette_and_vimi_know_the_master_agent_only_answers():
     paid = read("templates/paid_marketing.html")
     card = paid.split('href="/p2/paid-marketing/master-agent" class="dash-card', 1)[1].split("</a>", 1)[0]
-    assert "Ask anything" in card and "Clients tab" in card
-    for p in ("templates/paid_marketing.html", "templates/_paid_kpal.html"):
-        assert "u:'/p2/paid-marketing/master-agent/clients'" in read(p)
+    assert "Ask anything" in card and "Clients" not in card and "Client master" not in card
+    for p in ("templates/paid_marketing.html", "templates/_paid_kpal.html", "templates/master_agent.html"):
+        assert "master-agent/clients" not in read(p) and "mx-tabs" not in read(p), p
     kn = appmod._VIMI_PLATFORM_KNOWLEDGE
-    assert "Master Agent (/p2/paid-marketing/master-agent): a chat" in kn and "/p2/paid-marketing/master-agent/clients" in kn and "still wins" in kn
+    assert "Master Agent (/p2/paid-marketing/master-agent): a chat" in kn and "taken off on 2026-11-27" in kn and "Its Clients tab" not in kn

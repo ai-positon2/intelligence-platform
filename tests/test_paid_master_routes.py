@@ -1,4 +1,4 @@
-"""The Master Agent: the routes and the page (app.py, templates/master_clients.html). No network."""
+"""The Master Agent client store: its routes (app.py). The Clients page itself was taken off on 2026-11-27. No network."""
 import os
 import re
 import sys
@@ -16,7 +16,7 @@ from tracker import paid_master as m  # noqa: E402
 
 STAFF = "ana@position2.com"
 API = "/p2/paid-marketing/api/master"
-PAGE = "/p2/paid-marketing/master-agent/clients"          # the client set-up moved to its own tab when the Master Agent became a chat (2026-11-27)
+PAGE = "/p2/paid-marketing/master-agent/clients"          # the old Clients page: now a redirect to the chat
 G, MA = "1234567890", "act_1234567"
 
 
@@ -42,10 +42,10 @@ def body(**kw):
     return d
 
 
-def test_the_page_is_for_signed_in_staff_only():
-    html = client_as(STAFF).get(PAGE).get_data(as_text=True)
-    assert "Master Agent" in html and 'id="editor"' in html and 'id="saveBtn"' in html and "js/master_agent_data.js" in html and "js/master_agent.js" in html
-    assert html.index("master_agent_data.js") < html.index("master_agent.js")
+def test_the_clients_page_is_gone_and_its_old_link_lands_on_the_chat_but_the_api_stays_for_staff_only():
+    r = client_as(STAFF).get(PAGE)
+    assert r.status_code == 302 and r.headers["Location"].endswith("/p2/paid-marketing/master-agent")
+    assert not os.path.exists(os.path.join(ROOT, "templates", "master_clients.html")) and not os.path.exists(os.path.join(ROOT, "static", "js", "master_agent.js"))
     for url in (PAGE, API + "/state"):
         assert client_as(None).get(url).status_code == 302 and client_as("someone@gmail.com").get(url).status_code == 302, url
     for url in ("/client", "/client/delete"):
@@ -117,6 +117,6 @@ def test_the_agent_is_on_the_paid_marketing_page_the_palette_the_hub_counts_and_
     assert ("<span>%d</span> dashboards" % cards) in hub and ("<span>%d</span> live" % cards) in hub
     kn = app_module._VIMI_PLATFORM_KNOWLEDGE
     mine = kn.split("Master Agent (", 1)[1].split("\n", 1)[0]
-    assert "Master Agent (/p2/paid-marketing/master-agent)" in kn and "still wins" in mine and "—" not in mine and "–" not in mine
+    assert "Master Agent (/p2/paid-marketing/master-agent)" in kn and "still read them" in mine and "—" not in mine and "–" not in mine
     card = paid.split('href="/p2/paid-marketing/master-agent" class="dash-card', 1)[1].split("</a>", 1)[0]
     assert "—" not in card and "–" not in card

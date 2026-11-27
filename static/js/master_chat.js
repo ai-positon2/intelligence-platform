@@ -1,7 +1,7 @@
 /* Master Agent chat (Paid Marketing Agents).
  *
  * Ask anything about the paid accounts, with files, and get an answer or a file back. The server runs each question as a background turn
- * (tracker/master_chat.py) and this page polls it, showing the steps live. Every text from the server or the model is escaped before it is drawn;
+ * (tracker/master_chat.py) and this page polls it, showing a quiet "Thinking" line and then the answer as it is written (the working steps are never shown). Every text from the server or the model is escaped before it is drawn;
  * the answer's markdown is rendered by a small, safe renderer here (no HTML from the model is ever inserted).
  */
 (function(){
@@ -18,9 +18,7 @@ var SUGGESTIONS = [
   "Which Google Ads campaigns wasted the most spend last month, across all clients?",
   "Compare Google and Meta cost per lead for one client over the last 90 days, month by month.",
   "Make an Excel of every search term that spent over $50 with no conversion in the last 30 days for one account.",
-  "Why did conversions drop last week? Check spend, impression share, changes and tracking.",
-  "Here is a lead export from the client: match it against the Google Ads conversions.",
-  "Build a one-page PDF performance summary for a client for last month."
+  "Why did conversions drop last week? Check spend, impression share, changes and tracking."
 ];
 
 /* ── a small, safe markdown renderer ───────────────────────────────────── */
@@ -103,7 +101,7 @@ function drawConvos(){
   var box = $("#convos");
   if (!S.convos.length){ box.innerHTML = '<p class="mx-none">No conversations yet.</p>'; return; }
   box.innerHTML = S.convos.map(function(c){
-    return '<div class="mx-ci' + (c.id === S.cid ? " on" : "") + '" role="listitem"><button type="button" class="mx-cbtn" data-id="' + esc(c.id) + '"><span class="t">' + esc(c.title || "New conversation") +
+    return '<div class="mx-ci' + (c.id === S.cid ? " on" : "") + '" role="listitem"><button type="button" class="mx-cbtn" data-id="' + esc(c.id) + '"><span class="t">' + esc(c.title || "New chat") +
       '</span><span class="w">' + esc(ago(c.updatedAt)) + '</span></button><button type="button" class="mx-del" data-del="' + esc(c.id) + '" title="Delete this conversation" aria-label="Delete">&times;</button></div>';
   }).join("");
 }
@@ -121,7 +119,7 @@ function openConvo(cid){
   drawConvos();
   if (!cid){ drawThread(); return Promise.resolve(); }
   return api("/convos/" + cid).then(function(j){
-    S.turns = j.turns || []; $("#title").textContent = (j.convo && j.convo.title) || "New conversation"; $("#renameBtn").hidden = false;
+    S.turns = j.turns || []; $("#title").textContent = (j.convo && j.convo.title) || "New chat"; $("#renameBtn").hidden = false;
     drawThread();
     var live = S.turns.filter(function(t){ return t.status === "running"; })[0];
     if (live) poll(live.id);
@@ -129,14 +127,6 @@ function openConvo(cid){
 }
 
 /* ── the thread ────────────────────────────────────────────────────────── */
-function stepHtml(s){
-  var cls = "mx-step k-" + esc(s.kind || "tool");
-  var body = "";
-  if (s.code) body += '<pre class="mx-code"><code>' + esc(s.code) + "</code></pre>";
-  if (s.output) body += '<pre class="mx-out"><code>' + esc(s.output) + "</code></pre>";
-  if (body) return '<details class="' + cls + '"><summary>' + esc(s.label) + "</summary>" + body + "</details>";
-  return '<div class="' + cls + '">' + esc(s.label) + "</div>";
-}
 function filesHtml(files, out){
   if (!files || !files.length) return "";
   return '<div class="mx-files">' + files.map(function(f){
@@ -146,43 +136,35 @@ function filesHtml(files, out){
       esc(f.name) + ' <span class="s">' + esc(size(f.size || 0)) + "</span></a>";
   }).join("") + "</div>";
 }
+function secs(t){ return Math.max(0, Math.round((Date.now() - Date.parse(t.createdAt || "")) / 1000)) || 0; }
 function turnHtml(t){
   var u = '<div class="mx-u"><div class="mx-bub">' + (t.question ? md(t.question) : '<p class="dim">(files only)</p>') + filesHtml(t.filesIn, false) + "</div></div>";
-  var steps = t.steps || [];
-  var work = "";
-  if (steps.length){
-    var open = t.status === "running" ? " open" : "";
-    var tools = steps.filter(function(s){ return s.kind === "tool"; }).length, code = steps.filter(function(s){ return s.kind === "code"; }).length;
-    var sum = t.status === "running" ? (steps[steps.length - 1].label || "Working") : ("Read " + tools + (tools === 1 ? " source" : " sources") + (code ? ", ran code " + code + (code === 1 ? " time" : " times") : ""));
-    work = '<details class="mx-work"' + open + "><summary>" + (t.status === "running" ? '<span class="mx-spin"></span>' : "") + esc(sum) + "</summary>" + steps.map(stepHtml).join("") + "</details>";
-  } else if (t.status === "running"){
-    work = '<div class="mx-work"><span class="mx-spin"></span>Reading the question</div>';
-  }
-  var body = "";
+  var running = t.status === "running", body = "";
   if (t.status === "done") body = '<div class="mx-ans">' + md(t.answer || "") + "</div>" + filesHtml(t.filesOut, true);
-  else if (t.status === "running" && t.draft) body = '<div class="mx-ans mx-draft">' + md(t.draft) + '<span class="mx-caret" aria-hidden="true"></span></div>';
+  else if (running && t.draft) body = '<div class="mx-ans mx-draft">' + md(t.draft) + '<span class="mx-caret" aria-hidden="true"></span></div>';
+  else if (running) body = '<div class="mx-think" role="status"><span class="mx-shim">Thinking</span><span class="sec" data-since="' + esc(t.createdAt || "") + '">' + secs(t) + " s</span></div>";
   else if (t.status === "failed") body = '<div class="mx-err">' + esc(t.error === "Stopped." ? "Stopped." : ("This did not finish: " + (t.error || "an error"))) + "</div>";
-  var src = "";
-  if (t.status === "done" && t.sources && t.sources.length){
-    src = '<details class="mx-src"><summary>' + t.sources.length + " sources</summary><ul>" + t.sources.map(function(s){
+  var meta = "";
+  if (t.status === "done"){
+    var src = (t.sources && t.sources.length) ? '<details class="mx-src"><summary>' + t.sources.length + (t.sources.length === 1 ? " source" : " sources") + "</summary><ul>" + t.sources.map(function(s){
       return "<li>" + esc(s.agent) + (s.view ? " / " + esc(s.view) : "") + (s.account ? " for " + esc(s.account) : "") + (s.failed ? ' <b class="bad">could not be read</b>' : "") + "</li>";
-    }).join("") + "</ul></details>";
+    }).join("") + "</ul></details>" : "";
+    meta = '<div class="mx-meta"><button type="button" class="mx-copy" data-copy="' + esc(t.id) + '">Copy</button>' + src +
+      (t.finishedAt && t.createdAt ? "<span>" + Math.max(1, Math.round((Date.parse(t.finishedAt) - Date.parse(t.createdAt)) / 1000)) + " s</span>" : "") + "</div>";
   }
-  var meta = t.status === "done" ? '<div class="mx-meta"><button type="button" class="mx-copy" data-copy="' + esc(t.id) + '">Copy</button>' +
-    (t.finishedAt && t.createdAt ? "<span>" + Math.max(1, Math.round((Date.parse(t.finishedAt) - Date.parse(t.createdAt)) / 1000)) + " s</span>" : "") + "</div>" : "";
-  return u + '<div class="mx-a" id="t-' + esc(t.id) + '">' + work + body + src + meta + "</div>";
+  return u + '<div class="mx-a' + (running ? " busy" : "") + '" id="t-' + esc(t.id) + '"><span class="mx-mark" aria-hidden="true"></span><div class="mx-body">' + body + meta + "</div></div>";
 }
 function drawThread(){
   var th = $("#thread");
   if (!S.turns.length){
     th.innerHTML = EMPTY; drawSugs();
-    $("#title").textContent = S.cid ? "New conversation" : "Master Agent"; $("#renameBtn").hidden = !S.cid;
+    $("#title").textContent = "New chat"; $("#renameBtn").hidden = !S.cid;
   } else {
     th.innerHTML = S.turns.map(turnHtml).join("");
   }
   th.scrollTop = th.scrollHeight;
   var running = S.turns.some(function(t){ return t.status === "running"; });
-  $("#stopBtn").hidden = !running; $("#sendBtn").disabled = running || S.sending;
+  $("#stopBtn").hidden = !running; $("#sendBtn").hidden = running; $("#sendBtn").disabled = S.sending;
 }
 var EMPTY = "";
 function drawSugs(){
@@ -223,7 +205,7 @@ function ask(){
   var q = $("#q").value.trim();
   if (S.sending || (!q && !S.files.length)) return;
   if (S.turns.some(function(t){ return t.status === "running"; })){ toast("Wait for the answer, or press Stop."); return; }
-  S.sending = true; $("#sendBtn").disabled = true; $("#foot").textContent = S.files.length ? "Sending the files..." : "Sending...";
+  S.sending = true; $("#sendBtn").disabled = true;
   var files = S.files.slice();
   Promise.all(files.map(readFile)).then(function(payload){
     return ensureConvo().then(function(cid){ return api("/convos/" + cid + "/ask", {method: "POST", body: {question: q, files: payload}}); });
@@ -231,7 +213,7 @@ function ask(){
     $("#q").value = ""; S.files = []; drawChips(); autosize();
     S.turns.push(j.turn); drawThread(); poll(j.turn.id); loadConvos();
   }).catch(function(e){ toast(e.message); })
-    .then(function(){ S.sending = false; $("#sendBtn").disabled = S.turns.some(function(t){ return t.status === "running"; }); $("#foot").textContent = "Reads only: it never changes an ad account. Enter to send, Shift+Enter for a new line."; });
+    .then(function(){ S.sending = false; $("#sendBtn").disabled = false; });
 }
 function stopPolling(){ if (S.polling){ clearTimeout(S.polling); S.polling = null; } S.running = null; }
 function poll(tid){
@@ -244,7 +226,7 @@ function poll(tid){
       if (at >= 0){
         var old = S.turns[at]; S.turns[at] = t;
         var node = document.getElementById("t-" + tid);
-        if (node && old.status === t.status && (old.steps || []).length === (t.steps || []).length && (old.draft || "") === (t.draft || "")) { /* nothing new */ }
+        if (node && old.status === t.status && (old.draft || "") === (t.draft || "")) { /* nothing new to show */ }
         else if (node){ var wrap = document.createElement("div"); wrap.innerHTML = turnHtml(t); node.replaceWith(wrap.lastChild); $("#thread").scrollTop = $("#thread").scrollHeight; }
         else drawThread();
       }
@@ -262,7 +244,22 @@ function stop(){
 function autosize(){ var t = $("#q"); t.style.height = "auto"; t.style.height = Math.min(220, t.scrollHeight) + "px"; }
 
 /* ── wiring ────────────────────────────────────────────────────────────── */
+/* the page fills the window under the top bar and never scrolls itself: only the thread and the list do */
+function fit(){
+  var m = document.querySelector(".main"); if (!m) return;
+  m.style.height = Math.max(420, window.innerHeight - m.getBoundingClientRect().top) + "px";
+}
+function tickSeconds(){
+  var els = document.querySelectorAll(".mx-think .sec[data-since]");
+  for (var k = 0; k < els.length; k++){ var since = Date.parse(els[k].getAttribute("data-since")); if (since) els[k].textContent = Math.max(0, Math.round((Date.now() - since) / 1000)) + " s"; }
+}
+if (document.documentElement) document.documentElement.classList.add("mx-page");
+if (document.body) document.body.classList.add("mx-page");
+
 document.addEventListener("DOMContentLoaded", function(){
+  document.body.classList.add("mx-page"); fit();
+  window.addEventListener("resize", fit);
+  setInterval(tickSeconds, 1000);
   EMPTY = $("#empty").outerHTML;
   drawSugs();
   $("#composer").addEventListener("submit", function(e){ e.preventDefault(); ask(); });

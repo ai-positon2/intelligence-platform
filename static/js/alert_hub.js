@@ -62,14 +62,14 @@ function paintKpis(){
 function paintDest(){
   var st=S.state, rows=D.destinations(st), d=rows[0];
   $("#dEmails").value=D.emailsText(d.emails); $("#dSlack").value=d.slack;
-  $("#destNote").textContent=st.hasClients?"A client with no channel of its own uses the default":"No client in the Master Agent yet, so every account uses the default";
+  $("#destNote").textContent=st.hasClients?"A client with no channel of its own uses the default":"No client is saved, so every account uses the default";
   $("#destClients").innerHTML=st.hasClients?'<div class="bi-tbl"><table><thead><tr><th>Client</th><th>Slack channel</th><th>Emails</th><th>Alerts from</th><th></th></tr></thead><tbody>'+rows.slice(1).map(function(r){
     return '<tr><td><b>'+esc(r.name)+'</b><span class="bi-sub"> '+D.plural(r.accounts,"account")+'</span><div class="bi-sub">'+esc(D.destText(r,st.default))+'</div></td>'+
       '<td><input type="text" id="rs-'+esc(r.key)+'" value="'+esc(r.slack)+'" placeholder="default channel" spellcheck="false" autocomplete="off"></td>'+
       '<td><input type="text" id="re-'+esc(r.key)+'" value="'+esc(D.emailsText(r.emails))+'" placeholder="default emails" spellcheck="false" autocomplete="off"></td>'+
       '<td><select id="rf-'+esc(r.key)+'"><option value="P2"'+(r.floor==="P2"?" selected":"")+'>P1 and P2</option><option value="P1"'+(r.floor==="P1"?" selected":"")+'>P1 only</option></select></td>'+
       '<td class="ah-act"><button type="button" class="pm-btn ah-save" data-id="'+esc(r.key)+'">Save</button> <button type="button" class="pm-btn-ghost ah-test" data-id="'+esc(r.key)+'">Send a test</button></td></tr>';
-  }).join("")+'</tbody></table></div>':'<p class="pm-empty">Clients are written down in the <a href="/p2/paid-marketing/master-agent">Master Agent</a>. Each one can then have a Slack channel of its own here.</p>';
+  }).join("")+'</tbody></table></div>':'<p class="pm-empty">No client is saved, so there is nothing to give a channel of its own. Every account goes to the default destination.</p>';
 }
 function paintFilters(){
   var fc=D.facets(S.state.open), f=S.f;
