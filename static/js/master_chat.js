@@ -149,8 +149,11 @@ function turnHtml(t){
     var src = (t.sources && t.sources.length) ? '<details class="mx-src"><summary>' + t.sources.length + (t.sources.length === 1 ? " source" : " sources") + "</summary><ul>" + t.sources.map(function(s){
       return "<li>" + esc(s.agent) + (s.view ? " / " + esc(s.view) : "") + (s.account ? " for " + esc(s.account) : "") + (s.failed ? ' <b class="bad">could not be read</b>' : "") + "</li>";
     }).join("") + "</ul></details>" : "";
-    meta = '<div class="mx-meta"><button type="button" class="mx-copy" data-copy="' + esc(t.id) + '">Copy</button>' + src +
-      (t.finishedAt && t.createdAt ? "<span>" + Math.max(1, Math.round((Date.parse(t.finishedAt) - Date.parse(t.createdAt)) / 1000)) + " s</span>" : "") + "</div>";
+    var thumb = function(v, path){ return '<button type="button" class="mx-thumb' + (t.rating === v ? " on" : "") + '" data-rate="' + v + '" data-tid="' + esc(t.id) + '" title="' + (v === "up" ? "Good answer" : "Not right") + '" aria-label="' + (v === "up" ? "Good answer" : "Not right") + '" aria-pressed="' + (t.rating === v) + '"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="' + path + '"/></svg></button>'; };
+    var why = t.rating === "down" && !t.ratingNote && !t.whyDone ? '<div class="mx-why"><input type="text" maxlength="500" placeholder="What was wrong? (optional)" data-why="' + esc(t.id) + '"><button type="button" data-whysend="' + esc(t.id) + '">Send</button></div>' : "";
+    meta = '<div class="mx-meta"><button type="button" class="mx-copy" data-copy="' + esc(t.id) + '">Copy</button>' +
+      thumb("up", "M7 11v9H4v-9zM7 11l4-7c1.5 0 2.5 1 2.5 2.5V9H19a2 2 0 0 1 2 2.3l-1 6A2 2 0 0 1 18 19H7") + thumb("down", "M7 13V4H4v9zM7 13l4 7c1.5 0 2.5-1 2.5-2.5V15H19a2 2 0 0 0 2-2.3l-1-6A2 2 0 0 0 18 5H7") + src +
+      (t.finishedAt && t.createdAt ? "<span>" + Math.max(1, Math.round((Date.parse(t.finishedAt) - Date.parse(t.createdAt)) / 1000)) + " s</span>" : "") + "</div>" + why;
   }
   return u + '<div class="mx-a' + (running && !t.draft ? " busy" : "") + '" id="t-' + esc(t.id) + '"><span class="mx-mark" aria-hidden="true"></span><div class="mx-body">' + body + meta + "</div></div>";
 }
@@ -231,6 +234,19 @@ function ask(){
   }).catch(function(e){ toast(e.message); })
     .then(function(){ S.sending = false; $("#sendBtn").disabled = false; });
 }
+function markRated(tid, value, note, whyDone){
+  S.turns.forEach(function(x, k){
+    if (x.id !== tid) return;
+    x.rating = value || null; if (note) x.ratingNote = note; if (whyDone) x.whyDone = true;
+    var node = document.getElementById("t-" + tid);
+    if (node){ var wrap = document.createElement("div"); wrap.innerHTML = turnHtml(x); var fresh = wrap.lastChild; node.replaceWith(fresh); }
+  });
+}
+function rate(tid, value){
+  var t = S.turns.filter(function(x){ return x.id === tid; })[0]; if (!t) return;
+  var next = t.rating === value ? "" : value;                          // pressing the same thumb again takes it back
+  api("/turns/" + tid + "/rating", {method: "POST", body: {value: next}}).then(function(){ markRated(tid, next, "", false); }).catch(function(er){ toast(er.message); });
+}
 function stopPolling(){ if (S.polling){ clearTimeout(S.polling); S.polling = null; } S.running = null; }
 function poll(tid){
   stopPolling(); S.running = tid;
@@ -307,6 +323,15 @@ document.addEventListener("DOMContentLoaded", function(){
   $("#thread").addEventListener("click", function(e){
     var sug = e.target.closest(".mx-sug");
     if (sug){ $("#q").value = sug.textContent; autosize(); $("#q").focus(); return; }
+    var th = e.target.closest("[data-rate]");
+    if (th){ rate(th.getAttribute("data-tid"), th.getAttribute("data-rate")); return; }
+    var ws = e.target.closest("[data-whysend]");
+    if (ws){
+      var tid = ws.getAttribute("data-whysend"), inp = $('[data-why="' + tid + '"]');
+      var note = inp ? inp.value.trim() : "";
+      api("/turns/" + tid + "/rating", {method: "POST", body: {value: "down", note: note}}).then(function(){ markRated(tid, "down", note, true); }).catch(function(er){ toast(er.message); });
+      return;
+    }
     var cp = e.target.closest("[data-copy]");
     if (cp){
       var t = S.turns.filter(function(x){ return x.id === cp.getAttribute("data-copy"); })[0];

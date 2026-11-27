@@ -46,6 +46,17 @@ CREATE TABLE IF NOT EXISTS pm_master_turns (
 );
 ALTER TABLE pm_master_turns ADD COLUMN IF NOT EXISTS draft TEXT;
 ALTER TABLE pm_master_turns ADD COLUMN IF NOT EXISTS beat_at TIMESTAMPTZ;
+ALTER TABLE pm_master_turns ADD COLUMN IF NOT EXISTS attempts INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE pm_master_turns ADD COLUMN IF NOT EXISTS rating TEXT;
+ALTER TABLE pm_master_turns ADD COLUMN IF NOT EXISTS rating_note TEXT;
+CREATE TABLE IF NOT EXISTS pm_master_notes (
+    id            TEXT PRIMARY KEY,
+    created_by    TEXT NOT NULL,
+    created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+    client        TEXT NOT NULL DEFAULT '',
+    note          TEXT NOT NULL,
+    archived      BOOLEAN NOT NULL DEFAULT false
+);
 CREATE INDEX IF NOT EXISTS pm_master_turns_convo ON pm_master_turns (convo_id, created_at);
 CREATE INDEX IF NOT EXISTS pm_master_turns_by ON pm_master_turns (created_by, created_at);
 CREATE TABLE IF NOT EXISTS pm_master_files (
@@ -142,13 +153,14 @@ def touch_convo(cid):
 
 # ── turns ──────────────────────────────────────────────────────────────────
 
-TURN_COLS = "id, convo_id, created_by, created_at, finished_at, status, question, files_in, steps, answer, files_out, sources, usage, error, draft, beat_at"
+TURN_COLS = "id, convo_id, created_by, created_at, finished_at, status, question, files_in, steps, answer, files_out, sources, usage, error, draft, beat_at, rating, rating_note"
 
 
 def _turn_row(r):
     return {"id": r[0], "convoId": r[1], "createdBy": r[2], "createdAt": _iso(r[3]), "finishedAt": _iso(r[4]), "status": r[5], "question": r[6],
             "filesIn": r[7] or [], "steps": r[8] or [], "answer": r[9], "filesOut": r[10] or [], "sources": r[11] or [], "usage": r[12] or {}, "error": r[13],
-            "draft": r[14] if len(r) > 14 else None, "beatAt": _iso(r[15]) if len(r) > 15 else None}
+            "draft": r[14] if len(r) > 14 else None, "beatAt": _iso(r[15]) if len(r) > 15 else None,
+            "rating": r[16] if len(r) > 16 else None, "ratingNote": r[17] if len(r) > 17 else None}
 
 
 def create_turn(cid, by, question, files_in):
@@ -177,12 +189,62 @@ def beat(tid):
         cur.execute("UPDATE pm_master_turns SET beat_at = now() WHERE id = %s AND status = 'running'", (tid,))
 
 
+def claim_dead(tid, stale_s):
+    """Take over one turn whose worker is gone (no beat for stale_s seconds), once: it goes back to the start with a fresh beat. Returns the turn, or None when
+    it is not dead, was already taken (another worker was quicker) or has been taken before. Safe to call from every worker at once."""
+    with _tx() as cur:
+        cur.execute("UPDATE pm_master_turns SET beat_at = now(), attempts = attempts + 1, steps = '[]'::jsonb, draft = NULL "
+                    "WHERE id = %s AND status = 'running' AND attempts < 1 AND created_at > now() - interval '2 hours' AND coalesce(beat_at, created_at) < now() - %s * interval '1 second'", (tid, stale_s))
+        got = cur.rowcount > 0
+    return get_turn(tid) if got else None
+
+
+def dead_turn_ids(stale_s, limit=20):
+    with _tx() as cur:
+        cur.execute("SELECT id FROM pm_master_turns WHERE status = 'running' AND attempts < 1 AND coalesce(beat_at, created_at) < now() - %s * interval '1 second' "
+                    "AND created_at > now() - interval '2 hours' ORDER BY created_at LIMIT %s", (stale_s, int(limit)))
+        return [r[0] for r in cur.fetchall()]
+
+
+def set_rating(tid, rating, note=None):
+    with _tx() as cur:
+        if note is None:
+            cur.execute("UPDATE pm_master_turns SET rating = %s WHERE id = %s", (rating, tid))
+        else:
+            cur.execute("UPDATE pm_master_turns SET rating = coalesce(%s, rating), rating_note = %s WHERE id = %s", (rating, (note or "")[:600], tid))
+
+
+# ── what the team has told the agent to remember ───────────────────────────
+
+MAX_NOTES = 80
+
+
+def list_notes(limit=MAX_NOTES):
+    with _tx() as cur:
+        cur.execute("SELECT id, created_by, created_at, client, note FROM pm_master_notes WHERE NOT archived ORDER BY created_at DESC LIMIT %s", (int(limit),))
+        return [{"id": r[0], "by": r[1], "at": _iso(r[2]), "client": r[3], "note": r[4]} for r in cur.fetchall()]
+
+
+def add_note(by, note, client=""):
+    nid = uuid.uuid4().hex[:8]
+    with _tx() as cur:
+        cur.execute("INSERT INTO pm_master_notes (id, created_by, client, note) VALUES (%s, %s, %s, %s)", (nid, by, (client or "")[:120], (note or "")[:600]))
+    return nid
+
+
+def archive_note(nid):
+    with _tx() as cur:
+        cur.execute("UPDATE pm_master_notes SET archived = true WHERE id = %s AND NOT archived", (nid,))
+        return cur.rowcount > 0
+
+
 def recent_turns(limit=60):
     """The latest turns of everyone, for an admin looking for what is failing (question cut short, no answer text)."""
     with _tx() as cur:
-        cur.execute("SELECT id, created_by, created_at, finished_at, status, left(question, 160), error, usage FROM pm_master_turns ORDER BY created_at DESC LIMIT %s", (int(limit),))
+        cur.execute("SELECT id, created_by, created_at, finished_at, status, left(question, 160), error, usage, rating, rating_note FROM pm_master_turns ORDER BY created_at DESC LIMIT %s", (int(limit),))
         return [{"id": r[0], "by": r[1], "at": _iso(r[2]), "finishedAt": _iso(r[3]), "status": r[4], "question": r[5], "error": r[6],
-                 "seconds": round((r[3] - r[2]).total_seconds()) if r[3] and r[2] else None, "cost": (r[7] or {}).get("cost_usd")} for r in cur.fetchall()]
+                 "seconds": round((r[3] - r[2]).total_seconds()) if r[3] and r[2] else None, "cost": (r[7] or {}).get("cost_usd"),
+                 "flagged": ((r[7] or {}).get("verify") or {}).get("flagged"), "rating": r[8], "ratingNote": r[9]} for r in cur.fetchall()]
 
 
 def finish_turn(tid, *, answer=None, files_out=None, sources=None, usage=None, error=None):

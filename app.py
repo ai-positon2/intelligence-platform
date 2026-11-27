@@ -6430,7 +6430,7 @@ def _master_convo_or_404(cid):
 def _master_turn_view(t):
     from tracker import master_chat
     t = master_chat.read_turn(t)
-    keep = ("id", "convoId", "createdAt", "finishedAt", "status", "question", "filesIn", "answer", "filesOut", "sources", "error", "draft")
+    keep = ("id", "convoId", "createdAt", "finishedAt", "status", "question", "filesIn", "answer", "filesOut", "sources", "error", "draft", "rating", "ratingNote")
     out = {k: t.get(k) for k in keep}
     out["cost"] = (t.get("usage") or {}).get("cost_usd")
     if _pm_is_admin():                                   # the working steps (queries, code, output) are for admins checking a turn; the page never shows them
@@ -6453,23 +6453,75 @@ class _MasterAds:
         return paid_meta._get(path, params, paid_store)
 
 
-def _master_tools_factory(email):
+class _MasterNotes:
+    """What the team asked the agent to remember (tracker/master_store.py), as the tools use it."""
+    def __init__(self, email):
+        from tracker import master_store
+        self.s, self.email, self.max = master_store, email, master_store.MAX_NOTES
+
+    def list(self):
+        return self.s.list_notes()
+
+    def add(self, note, client):
+        return self.s.add_note(self.email, note, client)
+
+    def archive(self, nid):
+        return self.s.archive_note(nid)
+
+
+def _master_tools_factory(email, user=None):
+    """(make, hidden, admin, user). `user` is who the reads are made as: the person asking, or, when a turn is started again after a deploy, its owner."""
     from tracker import master_tools
     hidden = set(PAID_HIDDEN_SLUGS)
     admin = email in ADMIN_EMAILS
-    user = dict(_get_user() or {})
+    user = dict(user if user is not None else (_get_user() or {}))
+    knowledge = _vimi_knowledge()
 
     def make():
         call = _vimi_route_caller(user)
         return master_tools.Tools(route=call, accounts=lambda: _vimi_accounts(call), web=_vimi_web, local=_vimi_locals(email), is_admin=admin,
-                                  hidden=hidden, knowledge=_vimi_knowledge(), ads=_MasterAds())
+                                  hidden=hidden, knowledge=knowledge, ads=_MasterAds(), scope=email, notes=_MasterNotes(email))
     return make, hidden, admin, user
+
+
+def _master_resume(turn):
+    """A turn whose worker is gone (a deploy or restart: no beat for a while) is started again, once, as its owner. Any worker may try: only one wins."""
+    from tracker import master_chat, master_store, vimi_catalog
+    if not turn or turn.get("status") != "running":
+        return False
+    row = master_store.claim_dead(turn["id"], master_chat.RESUME_AFTER_S)
+    if not row:
+        return False
+    email = row["createdBy"]
+    make, hidden, admin, user = _master_tools_factory(email, {"email": email, "name": ""})
+    master_chat.resume(store=master_store, turn=row, tools_factory=make, roster=vimi_catalog.roster(hidden), is_admin=admin, email=email, name="")
+    return True
+
+
+_MASTER_SCANNED = {"done": False}
+
+
+def _master_scan_once():
+    """After a restart, the first visit to the Master Agent starts again every turn the restart cut off (their askers need not be on the page)."""
+    if _MASTER_SCANNED["done"]:
+        return
+    _MASTER_SCANNED["done"] = True
+
+    def scan():
+        from tracker import master_chat, master_store
+        try:
+            for tid in master_store.dead_turn_ids(master_chat.RESUME_AFTER_S):
+                _master_resume(master_store.get_turn(tid))
+        except Exception:                                                    # noqa: BLE001 (the poll of each turn tries again)
+            app.logger.exception("master: the restart scan failed")
+    threading.Thread(target=scan, name="master-scan", daemon=True).start()
 
 
 @app.route("/p2/paid-marketing/api/master/chat/convos")
 @position2_required
 def master_chat_convos():
     from tracker import master_store
+    _master_scan_once()
     try:
         return jsonify(convos=master_store.list_convos(_pm_user_email()))
     except master_store.StoreUnavailable as e:
@@ -6608,7 +6660,35 @@ def master_chat_turn(tid):
         return _pm_store_error(e)
     if not _master_owner_ok(t):
         abort(404)
+    if t.get("status") == "running":
+        try:
+            if _master_resume(t):
+                t = master_store.get_turn(tid) or t
+        except Exception:                                                    # noqa: BLE001 (a failed restart is shown as the turn's own failure after a while)
+            app.logger.exception("master: could not start turn %s again", tid)
     return jsonify(turn=_master_turn_view(t))
+
+
+@app.route("/p2/paid-marketing/api/master/chat/turns/<tid>/rating", methods=["POST"])
+@position2_required
+def master_chat_rating(tid):
+    """A thumb up or down on an answer, and for a thumb down what was wrong. Admins read them on the recent-questions list."""
+    from tracker import master_store
+    if not MASTER_ID.match(tid or ""):
+        abort(404)
+    body = request.get_json(silent=True) or {}
+    try:
+        t = master_store.get_turn(tid)
+        if not _master_owner_ok(t) or t.get("status") != "done":
+            abort(404)
+        value = str(body.get("value") or "")
+        if value not in ("up", "down", ""):
+            return jsonify(error="value is up or down."), 400
+        note = body.get("note")
+        master_store.set_rating(tid, value or None, str(note)[:600] if isinstance(note, str) else None)
+    except master_store.StoreUnavailable as e:
+        return _pm_store_error(e)
+    return jsonify(ok=True)
 
 
 @app.route("/p2/paid-marketing/api/master/chat/turns/<tid>/cancel", methods=["POST"])

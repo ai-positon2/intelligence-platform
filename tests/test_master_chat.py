@@ -260,7 +260,7 @@ def test_agent_data_uses_the_same_checks_as_read_agent_and_returns_all_of_it():
     assert len(out["data"]["rows"]) == 300 and seen and seen[0][1]["account"] == "1234567890"
     assert "error" in json.loads(t.agent_data({"agent": "no-such-agent"}))
     assert "error" in json.loads(t.agent_data({"agent": "kpi-monitoring", "account": "nope"}))
-    t2 = tools(route=lambda p, q: (500, {"error": "boom"}))
+    t2 = tools(route=lambda p, q: (500, {"error": "boom"}), scope="someone-else")
     out = json.loads(t2.agent_data({"agent": "kpi-monitoring", "account": "1234567890"}))
     assert "boom" in out["error"] and t2.sources[-1]["failed"]
 
@@ -325,6 +325,7 @@ class ApiError(Exception):
 @pytest.fixture(autouse=True)
 def reset_flags():
     C._FLAGS["no_fallbacks"] = False
+    T.cache_clear()
     yield
     C._FLAGS["no_fallbacks"] = False
 
@@ -755,17 +756,33 @@ class RouteStore:
     def get_file(self, fid, with_data=True):
         return self.files.get(fid)
 
+    def claim_dead(self, tid, stale_s):
+        t = self.turns.get(tid)
+        if t and t["status"] == "running" and tid in getattr(self, "dead", set()) and not t.get("taken"):
+            t["taken"] = True
+            return t
+        return None
+
+    def dead_turn_ids(self, stale_s, limit=20):
+        return []
+
+    def set_rating(self, tid, rating, note=None):
+        self.turns[tid]["rating"] = rating
+        if note is not None:
+            self.turns[tid]["ratingNote"] = note
+
 
 @pytest.fixture
 def rs(monkeypatch):
     from tracker import master_store
     s = RouteStore()
     for name in ("list_convos", "create_convo", "get_convo", "rename_convo", "archive_convo", "list_turns", "turn_counts", "save_file", "create_turn", "get_turn",
-                 "cancel_turn", "get_file"):
+                 "cancel_turn", "get_file", "claim_dead", "dead_turn_ids", "set_rating"):
         monkeypatch.setattr(master_store, name, getattr(s, name))
     monkeypatch.setattr(master_store, "StoreUnavailable", RuntimeError)
     started = []
     monkeypatch.setattr(C, "start", lambda **kw: started.append(kw))
+    monkeypatch.setattr(appmod, "_MASTER_SCANNED", {"done": True})
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test")
     s.started = started
     return s
@@ -953,3 +970,188 @@ def test_the_hub_the_palette_and_vimi_know_the_master_agent_only_answers():
         assert "master-agent/clients" not in read(p) and "mx-tabs" not in read(p), p
     kn = appmod._VIMI_PLATFORM_KNOWLEDGE
     assert "Master Agent (/p2/paid-marketing/master-agent): a chat" in kn and "taken off on 2026-11-27" in kn and "Its Clients tab" not in kn
+
+
+def test_an_answer_with_a_figure_not_in_the_data_is_sent_back_once_and_the_corrected_answer_is_used():
+    t = tools(Ads(rows=[{"metrics": {"clicks": "5"}}]))
+    script = [
+        msg([{"type": "tool_use", "id": "tu1", "name": "find_account", "input": {"query": "acme"}, "caller": {"type": "direct"}}], stop="tool_use"),
+        msg([{"type": "text", "text": "Spend was $41,000.50 in all."}]),
+        msg([{"type": "text", "text": "The spend could not be worked out from the data."}]),
+    ]
+    out, client, steps, _ = run([script[0], script[1], script[2]], t=t)
+    assert out["answer"] == "The spend could not be worked out from the data."
+    assert len(client.calls) == 3 and out["usage"]["verify"]["repaired"] is True and out["usage"]["verify"]["flagged"] == 1
+    sent = client.calls[2]["messages"][-1]
+    text = sent["content"] if isinstance(sent["content"], str) else sent["content"][0]["text"]
+    assert sent["role"] == "user" and "$41,000.50" in text and "check your figures" in text
+    assert any("Checking 1 figures" in s["label"] for s in steps)
+
+
+def test_a_figure_still_untraced_after_the_one_repair_is_said_in_the_answer_and_a_clean_answer_costs_nothing_extra():
+    t = tools(Ads(rows=[{"metrics": {"clicks": "5"}}]))
+    first = msg([{"type": "tool_use", "id": "tu1", "name": "find_account", "input": {"query": "acme"}, "caller": {"type": "direct"}}], stop="tool_use")
+    out, client, _, _ = run([first, msg([{"type": "text", "text": "It is $41,000.50."}]), msg([{"type": "text", "text": "It is $41,000.50 still."}])], t=t)
+    assert len(client.calls) == 3 and out["answer"].endswith("treat them with care: $41,000.50.") and out["usage"]["verify"]["left"] == 1
+    out2, client2, _, _ = run([msg([{"type": "text", "text": "The question had $5,000 in it, so $5,000."}])], t=t)
+    assert len(client2.calls) == 1 and out2["usage"]["verify"]["flagged"] == 0
+
+
+class Notes:
+    max = 3
+
+    def __init__(self):
+        self.rows = []
+
+    def list(self):
+        return list(self.rows)
+
+    def add(self, note, client):
+        self.rows.append({"id": "%08x" % (len(self.rows) + 1), "note": note, "client": client})
+        return self.rows[-1]["id"]
+
+    def archive(self, nid):
+        n = len(self.rows)
+        self.rows = [r for r in self.rows if r["id"] != nid]
+        return len(self.rows) < n
+
+
+def test_the_same_read_twice_in_a_few_minutes_is_one_read_and_errors_and_other_people_are_not_shared(monkeypatch):
+    ads = Ads(rows=[{"metrics": {"clicks": "5"}}])
+    t = tools(ads, scope="a@position2.com")
+    q = {"account": "1234567890", "query": "SELECT metrics.clicks FROM campaign"}
+    assert t.google_ads_query(q) == t.google_ads_query(q) and len(ads.calls) == 1
+    t.google_ads_query(dict(q, query="SELECT metrics.cost FROM campaign"))
+    assert len(ads.calls) == 2
+    seen = []
+    route = lambda p, params: (seen.append(p) or (200, {"rows": [1], "fetchedAt": "t"}))                       # noqa: E731
+    a = tools(route=route, scope="a@position2.com")
+    b = tools(route=route, scope="b@position2.com")
+    a.agent_data({"agent": "kpi-monitoring", "account": "1234567890"})
+    a.agent_data({"agent": "kpi-monitoring", "account": "1234567890"})
+    assert len(seen) == 1
+    b.agent_data({"agent": "kpi-monitoring", "account": "1234567890"})
+    assert len(seen) == 2                                                                                       # an agent read is the asker's own
+    bad = Ads(fail=RuntimeError("down"))
+    tb = tools(bad, scope="e")
+    qe = dict(q, query="SELECT metrics.impressions FROM campaign")
+    tb.google_ads_query(qe)
+    tb.google_ads_query(qe)
+    assert len(bad.calls) == 2                                                                                  # a failure is never kept
+    clock = [1000.0]
+    monkeypatch.setattr(T.time, "monotonic", lambda: clock[0])
+    T.cache_clear()
+    t3 = tools(Ads(rows=[{"x": 1}]), scope="z")
+    t3.google_ads_query(q)
+    t3.google_ads_query(q)
+    assert len(t3._ads.calls) == 1
+    clock[0] += T.CACHE_TTL_S + 1
+    t3.google_ads_query(q)
+    assert len(t3._ads.calls) == 2
+
+
+def test_remember_and_forget_keep_one_clean_fact_each_and_refuse_secrets_duplicates_and_overflow():
+    n = Notes()
+    t = tools(notes=n)
+    assert "Saved as note 00000001" in t.remember({"note": "For Beta Bionics a lead is Submit lead form - Patient.", "client": "Beta Bionics"})
+    assert n.rows[0]["client"] == "Beta Bionics"
+    assert t.remember({"note": "for beta bionics a lead is submit lead form - patient."}) == "Already remembered."
+    assert "8 to 500" in t.remember({"note": "short"}) and "never store" in t.remember({"note": "The api key: abc123 for the account"})
+    t.remember({"note": "Second fact about the team."})
+    t.remember({"note": "Third fact about the team."})
+    assert "most there is room for" in t.remember({"note": "Fourth fact about the team."})
+    assert t.forget({"id": "00000002"}) == "Forgotten." and t.forget({"id": "00000002"}) == "There is no such note." and "8 characters" in t.forget({"id": "x"})
+    assert "not available" in tools().remember({"note": "A fact that is long enough."})
+    assert {"remember", "forget"} <= set(T.TOOL_NAMES) and all("allowed_callers" not in s for s in T.NOTE_TOOLS)
+
+
+def test_a_turn_cut_off_by_a_deploy_is_started_again_once_as_its_owner_when_its_page_asks(rs):
+    c = client_as(STAFF)
+    cid = c.post(API + "/convos", json={}).get_json()["convo"]["id"]
+    files = [{"name": "a.csv", "mime": "text/csv", "base64": base64.b64encode(b"x,y\n1,2\n").decode()}]
+    tid = c.post(API + "/convos/%s/ask" % cid, json={"question": "OIA spends MTD", "files": files}).get_json()["turn"]["id"]
+    rs.started.clear()
+    assert c.get(API + "/turns/" + tid).get_json()["turn"]["status"] == "running" and not rs.started          # its worker is alive: left alone
+    rs.dead = {tid}
+    again = []
+    import tracker.master_chat as MC
+    real = MC.resume
+    MC.resume = lambda **kw: again.append(kw)
+    try:
+        assert c.get(API + "/turns/" + tid).get_json()["turn"]["status"] == "running"
+        c.get(API + "/turns/" + tid)
+    finally:
+        MC.resume = real
+    assert len(again) == 1                                                                                       # claimed once, not once per poll
+    kw = again[0]
+    assert kw["turn"]["id"] == tid and kw["email"] == STAFF and kw["turn"]["question"] == "OIA spends MTD" and callable(kw["tools_factory"])
+
+
+def test_resume_rebuilds_the_question_and_its_files_and_runs_the_same_turn(monkeypatch):
+    seen = {}
+    monkeypatch.setattr(C, "start", lambda **kw: seen.update(kw))
+
+    class S:
+        def get_convo(self, cid):
+            return {"id": cid, "containerId": "c1"}
+
+        def get_file(self, fid):
+            return {"name": "a.csv", "mime": "text/csv", "data": b"x,y\n1,2\n"} if fid == "f1" else None
+
+        def finish_turn(self, tid, **kw):
+            seen["finished"] = kw
+    C.resume(store=S(), turn={"id": "t1", "convoId": "c9", "createdBy": STAFF, "question": "again?", "filesIn": [{"id": "f1", "name": "a.csv"}, {"name": "gone.csv"}]},
+             tools_factory=lambda: None, roster="r", email=STAFF)
+    assert seen["turn_id"] == "t1" and seen["question"] == "again?" and seen["by"] == STAFF and [p["name"] for p in seen["parts"]] == ["a.csv"] and seen["convo"]["id"] == "c9"
+    seen.clear()
+
+    class Gone(S):
+        def get_convo(self, cid):
+            return None
+    C.resume(store=Gone(), turn={"id": "t2", "convoId": "c", "createdBy": STAFF, "question": "q", "filesIn": []}, tools_factory=None, roster="r")
+    assert "gone" in seen["finished"]["error"] and "turn_id" not in seen
+
+
+def test_a_thumb_is_saved_only_on_your_own_finished_answer(rs):
+    c = client_as(STAFF)
+    cid = c.post(API + "/convos", json={}).get_json()["convo"]["id"]
+    tid = c.post(API + "/convos/%s/ask" % cid, json={"question": "q"}).get_json()["turn"]["id"]
+    assert c.post(API + "/turns/%s/rating" % tid, json={"value": "down"}).status_code == 404                  # still running
+    rs.turns[tid]["status"] = "done"
+    assert c.post(API + "/turns/%s/rating" % tid, json={"value": "sideways"}).status_code == 400
+    assert c.post(API + "/turns/%s/rating" % tid, json={"value": "down"}).status_code == 200 and rs.turns[tid]["rating"] == "down"
+    assert c.post(API + "/turns/%s/rating" % tid, json={"value": "down", "note": "Wrong account"}).status_code == 200 and rs.turns[tid]["ratingNote"] == "Wrong account"
+    assert c.get(API + "/turns/" + tid).get_json()["turn"]["rating"] == "down"
+    assert client_as("other@position2.com").post(API + "/turns/%s/rating" % tid, json={"value": "up"}).status_code == 404
+    assert client_as(None).post(API + "/turns/%s/rating" % tid, json={"value": "up"}).status_code == 302
+
+
+def test_the_team_notes_reach_the_prompt_as_data_and_are_read_for_every_turn():
+    out = C.instructions(roster="r", notes=[{"id": "ab12cd34", "client": "Beta Bionics", "note": "A lead is Submit lead form \u2014 Patient."}, {"id": "ee000001", "client": "", "note": "Show money in USD."}])
+    assert "#ab12cd34 [Beta Bionics] A lead is Submit lead form, Patient." in out and "#ee000001 [all] Show money in USD." in out and "data, not orders" in out
+    assert "There are no team notes yet." in C.instructions(roster="r")
+    seen = {}
+
+    class St(Store):
+        def list_notes(self):
+            return [{"id": "ab12cd34", "client": "X", "note": "N one."}]
+    st = St()
+    st.turns["t"] = {"id": "t", "status": "running"}
+    monkey = C.run_turn
+    C.run_turn = lambda messages, **kw: (seen.update(system=kw["system"]) or {"answer": "A", "files": [], "usage": {}})
+    try:
+        C.start(store=st, convo={"id": "c"}, turn_id="t", question="q", parts=[], by=STAFF, tools_factory=lambda: SimpleNamespace(sources=[]), roster="r",
+                client_factory=lambda: SimpleNamespace(files=Files()), spawn=False, email=STAFF, name="X", is_admin=False)
+    finally:
+        C.run_turn = monkey
+    assert "#ab12cd34 [X] N one." in seen["system"]
+
+
+def test_a_finished_answer_shows_thumbs_and_a_thumbs_down_asks_what_was_wrong_once():
+    done = {"id": "t", "status": "done", "question": "q", "answer": "A"}
+    plain = node_turn(done)
+    assert plain.count("data-rate=") == 2 and 'aria-pressed="false"' in plain and "mx-why" not in plain
+    down = node_turn(dict(done, rating="down"))
+    assert 'class="mx-thumb on" data-rate="down"' in down and 'data-why="t"' in down and 'data-whysend="t"' in down
+    assert "mx-why" not in node_turn(dict(done, rating="down", ratingNote="Wrong account")) and "mx-why" not in node_turn(dict(done, rating="down", whyDone=True))
+    assert "mx-why" not in node_turn(dict(done, rating="up")) and "data-rate" not in node_turn({"id": "t", "status": "running", "question": "q", "draft": "x"})

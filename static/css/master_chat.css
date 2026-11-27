@@ -189,3 +189,13 @@ body.mx-page .footer-note,body.mx-page #kpal-toast{display:none}
 .mx-thread::-webkit-scrollbar,.mx-list::-webkit-scrollbar{width:8px}
 .mx-thread::-webkit-scrollbar-thumb,.mx-list::-webkit-scrollbar-thumb{background:var(--pm-line2);border-radius:8px}
 @media (prefers-reduced-motion:reduce){.mx-u{animation:none}}
+
+/* thumbs and the "what was wrong" line */
+.mx-thumb{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:8px;border:1px solid transparent;background:none;color:var(--pm-faint);cursor:pointer;transition:color .15s,background .15s}
+.mx-thumb svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.mx-thumb:hover{color:var(--pm-ink);background:var(--pm-raise)}
+.mx-thumb.on{color:var(--pm-a);background:color-mix(in srgb,var(--pm-a) 14%,transparent)}
+.mx-why{display:flex;gap:8px;margin-top:8px;max-width:520px}
+.mx-why input{flex:1;min-width:0;padding:8px 12px;border-radius:10px;border:1px solid var(--pm-line2);background:var(--pm-panel2);color:var(--pm-ink);font:inherit;font-size:13px}
+.mx-why input:focus{outline:2px solid var(--pm-a);outline-offset:1px}
+.mx-why button{border:0;border-radius:10px;padding:0 14px;background:linear-gradient(135deg,var(--pm-a),var(--pm-a2));color:#fff;font:inherit;font-size:13px;font-weight:600;cursor:pointer}
