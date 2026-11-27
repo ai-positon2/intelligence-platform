@@ -45,6 +45,7 @@ CREATE TABLE IF NOT EXISTS pm_master_turns (
     error         TEXT
 );
 ALTER TABLE pm_master_turns ADD COLUMN IF NOT EXISTS draft TEXT;
+ALTER TABLE pm_master_turns ADD COLUMN IF NOT EXISTS beat_at TIMESTAMPTZ;
 CREATE INDEX IF NOT EXISTS pm_master_turns_convo ON pm_master_turns (convo_id, created_at);
 CREATE INDEX IF NOT EXISTS pm_master_turns_by ON pm_master_turns (created_by, created_at);
 CREATE TABLE IF NOT EXISTS pm_master_files (
@@ -141,19 +142,19 @@ def touch_convo(cid):
 
 # ── turns ──────────────────────────────────────────────────────────────────
 
-TURN_COLS = "id, convo_id, created_by, created_at, finished_at, status, question, files_in, steps, answer, files_out, sources, usage, error, draft"
+TURN_COLS = "id, convo_id, created_by, created_at, finished_at, status, question, files_in, steps, answer, files_out, sources, usage, error, draft, beat_at"
 
 
 def _turn_row(r):
     return {"id": r[0], "convoId": r[1], "createdBy": r[2], "createdAt": _iso(r[3]), "finishedAt": _iso(r[4]), "status": r[5], "question": r[6],
             "filesIn": r[7] or [], "steps": r[8] or [], "answer": r[9], "filesOut": r[10] or [], "sources": r[11] or [], "usage": r[12] or {}, "error": r[13],
-            "draft": r[14] if len(r) > 14 else None}
+            "draft": r[14] if len(r) > 14 else None, "beatAt": _iso(r[15]) if len(r) > 15 else None}
 
 
 def create_turn(cid, by, question, files_in):
     tid = uuid.uuid4().hex
     with _tx() as cur:
-        cur.execute("INSERT INTO pm_master_turns (id, convo_id, created_by, status, question, files_in) VALUES (%s, %s, %s, 'running', %s, %s)",
+        cur.execute("INSERT INTO pm_master_turns (id, convo_id, created_by, status, question, files_in, beat_at) VALUES (%s, %s, %s, 'running', %s, %s, now())",
                     (tid, cid, by, (question or "")[:20000], json.dumps(files_in or [])))
         cur.execute("UPDATE pm_master_convos SET updated_at = now() WHERE id = %s", (cid,))
     return tid
@@ -161,13 +162,27 @@ def create_turn(cid, by, question, files_in):
 
 def add_step(tid, step):
     with _tx() as cur:
-        cur.execute("UPDATE pm_master_turns SET steps = steps || %s::jsonb WHERE id = %s", (json.dumps([step], default=str), tid))
+        cur.execute("UPDATE pm_master_turns SET steps = steps || %s::jsonb, beat_at = now() WHERE id = %s", (json.dumps([step], default=str), tid))
 
 
 def set_draft(tid, text):
     """The answer as it is being written, for the page to show while the turn runs."""
     with _tx() as cur:
-        cur.execute("UPDATE pm_master_turns SET draft = %s WHERE id = %s AND status = 'running'", ((text or "")[:60000], tid))
+        cur.execute("UPDATE pm_master_turns SET draft = %s, beat_at = now() WHERE id = %s AND status = 'running'", ((text or "")[:60000], tid))
+
+
+def beat(tid):
+    """The worker is alive: said every few seconds while a turn runs, so a turn whose worker died (a deploy, a restart) is told apart from one still working."""
+    with _tx() as cur:
+        cur.execute("UPDATE pm_master_turns SET beat_at = now() WHERE id = %s AND status = 'running'", (tid,))
+
+
+def recent_turns(limit=60):
+    """The latest turns of everyone, for an admin looking for what is failing (question cut short, no answer text)."""
+    with _tx() as cur:
+        cur.execute("SELECT id, created_by, created_at, finished_at, status, left(question, 160), error, usage FROM pm_master_turns ORDER BY created_at DESC LIMIT %s", (int(limit),))
+        return [{"id": r[0], "by": r[1], "at": _iso(r[2]), "finishedAt": _iso(r[3]), "status": r[4], "question": r[5], "error": r[6],
+                 "seconds": round((r[3] - r[2]).total_seconds()) if r[3] and r[2] else None, "cost": (r[7] or {}).get("cost_usd")} for r in cur.fetchall()]
 
 
 def finish_turn(tid, *, answer=None, files_out=None, sources=None, usage=None, error=None):
@@ -201,7 +216,7 @@ def list_turns(cid, limit=200):
 def turn_counts(by, stale_s):
     """(turns still running, turns started in the last 24 hours) for one person; a turn older than stale_s is not running: its worker is gone."""
     with _tx() as cur:
-        cur.execute("SELECT count(*) FILTER (WHERE status = 'running' AND created_at > now() - %s * interval '1 second'), "
+        cur.execute("SELECT count(*) FILTER (WHERE status = 'running' AND coalesce(beat_at, created_at) > now() - %s * interval '1 second'), "
                     "count(*) FILTER (WHERE created_at > now() - interval '1 day') FROM pm_master_turns WHERE created_by = %s", (stale_s, by))
         running, today = cur.fetchone()
     return int(running or 0), int(today or 0)

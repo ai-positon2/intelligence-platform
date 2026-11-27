@@ -37,7 +37,8 @@ MAX_TOKENS = 64000
 MAX_ROUNDS = 60
 WALL_S = 20 * 60
 CALL_TIMEOUT_S = 200                 # one tool call; the sandbox waits about 270 s for a result before the code sees a TimeoutError
-JOB_STALE_S = 30 * 60
+JOB_STALE_S = 150                  # a turn still "running" with no sign of life (a beat every 20 s) for this long lost its worker: a deploy or restart
+BEAT_EVERY_S = 20
 MAX_HISTORY_TURNS = 24
 MAX_TURN_CHARS = 16000
 MAX_QUESTION_CHARS = 20000
@@ -531,6 +532,16 @@ def _dedupe(sources):
 def start(*, store, convo, turn_id, question, parts, by, tools_factory, roster, client_factory=None, spawn=True, tune=None, **ctx):
     """Run one turn in a thread. `store` is tracker.master_store (or a fake); `parts` come from master_files.prepare."""
     def work():
+        alive = threading.Event()
+
+        def pulse():
+            while not alive.wait(BEAT_EVERY_S):
+                try:
+                    store.beat(turn_id)
+                except Exception:                                            # noqa: BLE001 (a missed beat is retried in 20 s)
+                    pass
+        if spawn and hasattr(store, "beat"):
+            threading.Thread(target=pulse, name="master-beat-" + turn_id[:8], daemon=True).start()
         try:
             client = (client_factory or default_client)()
             fapi = files_api(client)
@@ -576,6 +587,8 @@ def start(*, store, convo, turn_id, question, parts, by, tools_factory, roster, 
         except Exception as e:                                               # noqa: BLE001 (any failure ends the turn in words, so the page never polls forever)
             log.exception("master: turn %s failed", turn_id)
             store.finish_turn(turn_id, error="%s: %s" % (type(e).__name__, str(e)[:500]))
+        finally:
+            alive.set()
 
     if spawn:
         threading.Thread(target=work, name="master-" + turn_id[:8], daemon=True).start()
@@ -586,10 +599,11 @@ def start(*, store, convo, turn_id, question, parts, by, tools_factory, roster, 
 
 def read_turn(turn, *, now=None):
     """The turn, with a run its worker abandoned reported as failed."""
-    if turn and turn["status"] == "running" and turn.get("createdAt"):
-        started = datetime.fromisoformat(turn["createdAt"])
+    seen = turn and (turn.get("beatAt") or turn.get("createdAt"))
+    if turn and turn["status"] == "running" and seen:
+        started = datetime.fromisoformat(seen)
         if ((now or datetime.now(timezone.utc)) - started).total_seconds() > JOB_STALE_S:
-            turn = dict(turn, status="failed", error="The server restarted while answering this. Ask again.")
+            turn = dict(turn, status="failed", error="The server was updated while answering this. Please ask again.")
     return turn
 
 

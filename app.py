@@ -6583,6 +6583,19 @@ def master_chat_ask(cid):
     return jsonify(turn=_master_turn_view(master_store.get_turn(tid))), 202
 
 
+@app.route("/p2/paid-marketing/api/master/chat/admin/recent")
+@position2_required
+def master_chat_admin_recent():
+    """Admins: the latest questions of everyone with how each ended, to see what is failing for the team."""
+    from tracker import master_store
+    if not _pm_is_admin():
+        abort(404)
+    try:
+        return jsonify(turns=master_store.recent_turns())
+    except master_store.StoreUnavailable as e:
+        return _pm_store_error(e)
+
+
 @app.route("/p2/paid-marketing/api/master/chat/turns/<tid>")
 @position2_required
 def master_chat_turn(tid):

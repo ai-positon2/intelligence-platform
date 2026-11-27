@@ -540,6 +540,40 @@ def test_a_turn_left_running_by_a_dead_worker_reads_as_failed():
     assert C.read_turn(new)["status"] == "running"
 
 
+def test_a_turn_whose_worker_keeps_beating_is_not_failed_however_long_it_runs_and_one_that_stopped_beating_is():
+    long_ago = (datetime.now(timezone.utc) - timedelta(minutes=9)).isoformat()
+    alive = {"status": "running", "createdAt": long_ago, "beatAt": datetime.now(timezone.utc).isoformat()}
+    assert C.read_turn(alive)["status"] == "running"
+    dead = {"status": "running", "createdAt": long_ago, "beatAt": (datetime.now(timezone.utc) - timedelta(seconds=C.JOB_STALE_S + 5)).isoformat()}
+    r = C.read_turn(dead)
+    assert r["status"] == "failed" and "updated" in r["error"] and "Please ask again" in r["error"]
+
+
+def test_the_worker_beats_while_it_runs_and_stops_when_done(monkeypatch):
+    import threading
+    import time as _t
+    monkeypatch.setattr(C, "BEAT_EVERY_S", 0.05)
+    st = Store()
+    beats = []
+    st.beat = lambda tid: beats.append(tid)
+    st.turns["t"] = {"id": "t", "status": "running"}
+    done = threading.Event()
+
+    def slow(*a, **k):
+        _t.sleep(0.4)
+        done.set()
+        return {"answer": "A", "files": [], "usage": {}}
+    monkeypatch.setattr(C, "run_turn", slow)
+    C.start(store=st, convo={"id": "c"}, turn_id="t", question="q", parts=[], by="x@position2.com", tools_factory=lambda: SimpleNamespace(sources=[]), roster="r",
+            client_factory=lambda: SimpleNamespace(files=SimpleNamespace(), beta=SimpleNamespace(files=Files())), email="x@position2.com", name="X", is_admin=False)
+    assert done.wait(3)
+    _t.sleep(0.2)
+    n = len(beats)
+    assert n >= 3 and set(beats) == {"t"}
+    _t.sleep(0.3)
+    assert len(beats) == n                                             # stopped with the turn
+
+
 def ev(kind, **kw):
     return SimpleNamespace(type=kind, **kw)
 
