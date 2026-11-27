@@ -144,6 +144,13 @@ class Tools:
     # ── reading ───────────────────────────────────────────────────────────────
 
     def read_agent(self, inp):
+        got = self.fetch(inp)
+        if isinstance(got, str):
+            return got
+        return self._answer(*got)
+
+    def fetch(self, inp):
+        """Check and run one catalog read. Returns the refusal text, or (title, agent, view, account label, HTTP status, data)."""
         a = cat.find(inp.get("agent"))
         if a is None or a["id"] in self.hidden:
             return "No agent '%s'. Call agent_info (no argument) for the roster." % (inp.get("agent") or "")
@@ -196,7 +203,7 @@ class Tools:
         except Exception as e:                                       # noqa: BLE001 (the model is told the read failed and why, so it can say so)
             self.sources.append({"agent": a["title"], "view": view, "account": label, "failed": True})
             return "%s could not be read: %s: %s" % (title, type(e).__name__, str(e)[:300])
-        return self._answer(title, a, view, label, status, data)
+        return (title, a, view, label, status, data)
 
     def _answer(self, title, a, view, label, status, data):
         src = {"agent": a["title"], "agentId": a["id"], "view": view, "account": label}
