@@ -273,6 +273,7 @@ def test_the_code_tools_are_offered_to_the_sandbox_only_and_the_direct_ones_are_
         assert "allowed_callers" not in specs[n]
     assert "Querying Google Ads (campaign)" in T.step_label("google_ads_query", {"query": "SELECT a FROM campaign", "account": "1234567890"})
     assert T.step_label("meta_graph", {"path": "insights"}).startswith("Querying Meta Ads (insights)")
+    assert T.step_label("agent_info", {"agent": "pacing-desk"}) == "Reading about Pacing Desk" and T.step_label("agent_info", {}) == "Reading about the agents"
 
 
 # ── the loop ───────────────────────────────────────────────────────────────
@@ -777,7 +778,7 @@ def test_the_answer_markdown_never_lets_html_or_bad_links_through():
 
 
 def test_tables_lists_headings_and_code_render():
-    out = node_md("## Spend\n\n| Campaign | Cost |\n|---|---:|\n| Brand | $1,200 |\n| <b>X</b> | 5% |\n\n- one\n- two\n\n1. a\n2. b\n\n```\n<raw>\n```")
+    out = node_md("## Spend\n\n| Campaign | Cost |\n|---|---:|\n| Brand | $1,200 |\n| <b>X</b> | \u20119.0% |\n\n- one\n- two\n\n1. a\n2. b\n\n```\n<raw>\n```")
     assert "<h4>Spend</h4>" in out and '<th class="n">Cost</th>' in out and '<td class="n">$1,200</td>' in out and "&lt;b&gt;X&lt;/b&gt;" in out
     assert "<ul><li>one</li><li>two</li></ul>" in out and "<ol><li>a</li><li>b</li></ol>" in out and "<pre><code>&lt;raw&gt;</code></pre>" in out
 

@@ -224,6 +224,10 @@ def step_label(name, inp, tools=None):
         return "Querying Google Ads%s%s" % ((" (" + m.group(1) + ")") if m else "", who)
     if name == "meta_graph":
         return "Querying Meta Ads (%s)%s" % (str(inp.get("path") or "account")[:40], who)
+    if name == "agent_info":
+        from . import vimi_catalog as cat
+        a = cat.find(inp.get("agent")) if inp.get("agent") else None
+        return "Reading about %s" % (a["title"] if a else (str(inp.get("agent") or "the agents")[:70]))
     if name == "agent_data":
         return "Loading all of " + vt.step_label("read_agent", inp, tools)[len("Reading "):]
     return vt.step_label(name, inp, tools)

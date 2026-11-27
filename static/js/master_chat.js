@@ -48,7 +48,7 @@ function md(src){
     if (/^\s*\|.*\|\s*$/.test(l) && i + 1 < lines.length && /^\s*\|?\s*:?-{2,}/.test(lines[i + 1])){
       var head = cells(l), rows = []; i += 2;
       while (i < lines.length && /^\s*\|.*\|\s*$/.test(lines[i])){ rows.push(cells(lines[i])); i++; }
-      var num = head.map(function(_h, k){ return rows.length > 0 && rows.every(function(r){ return !r[k] || /^[-+$€£₹(]?[\d,.]+%?\)?[A-Za-z]{0,3}$/.test(r[k].replace(/\s/g, "")); }); });
+      var num = head.map(function(_h, k){ return rows.length > 0 && rows.every(function(r){ return !r[k] || /^[-+‑−$€£₹(]*[\d,.]+%?\)?[A-Za-z]{0,3}$/.test(r[k].replace(/\s|\*\*/g, "")); }); });
       out.push('<div class="mx-tw"><table><thead><tr>' + head.map(function(h, k){ return "<th" + (num[k] ? ' class="n"' : "") + ">" + inline(h) + "</th>"; }).join("") +
         "</tr></thead><tbody>" + rows.map(function(r){ return "<tr>" + head.map(function(_h, k){ return "<td" + (num[k] ? ' class="n"' : "") + ">" + inline(r[k] || "") + "</td>"; }).join("") + "</tr>"; }).join("") +
         "</tbody></table></div>");
@@ -108,7 +108,11 @@ function drawConvos(){
   }).join("");
 }
 function loadConvos(){
-  return api("/convos").then(function(j){ S.convos = j.convos || []; drawConvos(); }).catch(function(e){ toast(e.message); });
+  return api("/convos").then(function(j){
+    S.convos = j.convos || []; drawConvos();
+    var cur = S.convos.filter(function(c){ return c.id === S.cid; })[0];
+    if (cur && cur.title){ $("#title").textContent = cur.title; $("#renameBtn").hidden = false; }
+  }).catch(function(e){ toast(e.message); });
 }
 function openConvo(cid){
   stopPolling();
