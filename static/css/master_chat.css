@@ -82,12 +82,24 @@ body.mx-page .footer-note,body.mx-page #kpal-toast{display:none}
 .mx-tw tbody tr:hover td{background:var(--pm-panel2)}
 
 /* while it works: a quiet "Thinking" line, never the steps */
-.mx-think{display:flex;align-items:center;gap:10px;height:28px;font-size:14.5px;color:var(--pm-muted)}
+.mx-think{display:flex;align-items:center;gap:16px;min-height:76px;font-size:15px;color:var(--pm-muted)}
+.mx-orb{position:relative;display:block;flex:none;width:76px;height:76px;margin:2px 6px 2px 0}
+.mx-orb::before{content:"";position:absolute;inset:-22px;border-radius:50%;background:radial-gradient(circle,color-mix(in srgb,var(--pm-a) 55%,transparent),color-mix(in srgb,var(--pm-a2) 25%,transparent) 45%,transparent 70%);filter:blur(10px);animation:mxHalo 3.2s ease-in-out infinite}
+.mx-orb i{position:absolute;inset:0;border-radius:50%;display:block}
+.mx-orb i:nth-child(1){background:conic-gradient(from 0deg,var(--pm-a),var(--pm-a2),#34d399,#f472b6,var(--pm-a));animation:mxTurn 5s linear infinite;box-shadow:inset 0 0 18px rgba(255,255,255,.35)}
+.mx-orb i:nth-child(2){inset:8px;background:conic-gradient(from 180deg,#fff,transparent 35%,var(--pm-a2) 55%,transparent 80%,#fff);mix-blend-mode:soft-light;filter:blur(5px);animation:mxTurn 3.4s linear infinite reverse;opacity:.95}
+.mx-orb i:nth-child(3){inset:0;border:2px solid color-mix(in srgb,var(--pm-a) 70%,transparent);animation:mxRipple 2.8s ease-out infinite}
+.mx-orb::after{content:"";position:absolute;left:16%;top:11%;width:46%;height:32%;border-radius:50%;background:radial-gradient(ellipse at 40% 40%,rgba(255,255,255,.95),rgba(255,255,255,0) 70%);transform:rotate(-24deg);animation:mxBreathe 3.2s ease-in-out infinite}
+@keyframes mxHalo{50%{transform:scale(1.18);opacity:.75}}
+@keyframes mxBreathe{50%{opacity:.55}}
+@keyframes mxRipple{from{transform:scale(1);opacity:.8}to{transform:scale(1.9);opacity:0}}
+.mx-tl{display:flex;flex-direction:column;gap:2px}
+.mx-tl .mx-shim{font-size:15.5px;font-weight:600}
 .mx-shim{font-weight:500;background:linear-gradient(90deg,var(--pm-faint) 0%,var(--pm-ink) 45%,var(--pm-faint) 90%);background-size:220% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:mxShim 2.2s linear infinite}
 .mx-think .sec{font-size:12px;color:var(--pm-faint);font-variant-numeric:tabular-nums}
 @keyframes mxShim{from{background-position:120% 0}to{background-position:-120% 0}}
-.mx-a.busy>.mx-mark{animation:mxPulse 1.6s ease-in-out infinite,mxTurn 3s linear infinite}
-@keyframes mxPulse{50%{box-shadow:0 0 26px 0 var(--pm-a)}}
+.mx-a.busy{grid-template-columns:minmax(0,1fr)}
+.mx-a.busy>.mx-mark{display:none}
 .mx-caret{display:inline-block;width:8px;height:8px;margin-left:6px;border-radius:50%;vertical-align:middle;background:var(--pm-a);animation:mxBlink 1s ease-in-out infinite}
 @keyframes mxBlink{50%{opacity:.2}}
 @media (prefers-reduced-motion:reduce){.mx-mark-lg,.mx-a.busy>.mx-mark,.mx-shim,.mx-caret{animation:none}.mx-shim{color:var(--pm-muted);background:none}}
@@ -150,3 +162,41 @@ body.mx-page .footer-note,body.mx-page #kpal-toast{display:none}
   .mx-a{grid-template-columns:minmax(0,1fr)}
   .mx-a>.mx-mark{display:none}
 }
+
+/* ── polish: ambient light, depth, motion ─────────────────────────────── */
+.mx-main::before{content:"";position:absolute;inset:0;pointer-events:none;z-index:0;
+  background:radial-gradient(60% 45% at 50% -8%,color-mix(in srgb,var(--pm-a) 16%,transparent),transparent 70%),
+             radial-gradient(40% 35% at 100% 100%,color-mix(in srgb,var(--pm-a2) 10%,transparent),transparent 70%)}
+.mx-main>*{position:relative;z-index:1}
+.mx-head{border-bottom:1px solid transparent;background:linear-gradient(var(--pm-panel),transparent)}
+.mx-title{font-size:15px;font-weight:650;letter-spacing:-.01em}
+.mx-side{background:linear-gradient(180deg,var(--pm-panel),var(--pm-panel2))}
+.mx-brand{font-size:15.5px}
+.mx-new{background:linear-gradient(135deg,color-mix(in srgb,var(--pm-a) 22%,transparent),color-mix(in srgb,var(--pm-a2) 16%,transparent));border-color:color-mix(in srgb,var(--pm-a) 35%,transparent)}
+.mx-new:hover{box-shadow:0 8px 24px -12px var(--pm-a);transform:translateY(-1px)}
+.mx-ci.on{background:linear-gradient(90deg,color-mix(in srgb,var(--pm-a) 16%,transparent),var(--pm-raise));box-shadow:inset 2px 0 0 var(--pm-a)}
+
+.mx-empty h2{font-size:clamp(30px,4vw,46px)}
+.mx-mark-lg{width:72px;height:72px;margin-bottom:22px;box-shadow:0 0 80px -6px var(--pm-a),0 0 24px -4px var(--pm-a2)}
+.mx-mark-lg::after{inset:11px}
+.mx-sugs{counter-reset:sug}
+.mx-sug{position:relative;padding:16px 16px 16px 50px;counter-increment:sug;background:linear-gradient(160deg,var(--pm-raise),var(--pm-panel2));backdrop-filter:blur(6px)}
+.mx-sug::before{content:counter(sug);position:absolute;left:14px;top:15px;width:24px;height:24px;border-radius:8px;display:grid;place-items:center;font-size:12px;font-weight:700;color:#fff;background:linear-gradient(135deg,var(--pm-a),var(--pm-a2))}
+.mx-sug:hover{box-shadow:0 14px 30px -18px var(--pm-a)}
+
+.mx-bub{background:linear-gradient(135deg,color-mix(in srgb,var(--pm-a) 20%,transparent),color-mix(in srgb,var(--pm-a2) 14%,transparent));border-color:color-mix(in srgb,var(--pm-a) 30%,transparent);box-shadow:0 8px 24px -16px var(--pm-a)}
+.mx-u{animation:mxIn .35s cubic-bezier(.2,.7,.2,1) both}
+@keyframes mxIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.mx-a>.mx-mark{box-shadow:0 0 22px -3px var(--pm-a)}
+.mx-ans h3{padding-bottom:6px;border-bottom:1px solid var(--pm-line)}
+.mx-tw{background:var(--pm-panel2);box-shadow:0 10px 30px -22px rgba(0,0,0,.7)}
+.mx-tw th{background:linear-gradient(180deg,var(--pm-raise),var(--pm-panel2));text-transform:uppercase;letter-spacing:.04em;font-size:11.5px}
+.mx-file{background:linear-gradient(160deg,var(--pm-raise),var(--pm-panel2))}
+.mx-file:hover{transform:translateY(-1px);box-shadow:0 10px 24px -16px var(--pm-a)}
+
+.mx-box{background:linear-gradient(180deg,var(--pm-raise),var(--pm-panel2));backdrop-filter:blur(10px);box-shadow:0 18px 50px -22px rgba(0,0,0,.7),0 0 0 1px rgba(255,255,255,.02) inset}
+.mx-go{width:38px;height:38px;box-shadow:0 8px 22px -6px var(--pm-a)}
+.mx-thread::-webkit-scrollbar,.mx-list::-webkit-scrollbar{width:8px}
+.mx-thread::-webkit-scrollbar-thumb,.mx-list::-webkit-scrollbar-thumb{background:var(--pm-line2);border-radius:8px}
+@media (prefers-reduced-motion:reduce){.mx-u{animation:none}}
+@media (prefers-reduced-motion:reduce){.mx-orb::before,.mx-orb i,.mx-orb::after{animation:none}}

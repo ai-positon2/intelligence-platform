@@ -1,7 +1,7 @@
 {% extends "_paid_base.html" %}
 {% block title %}Master Agent{% endblock %}
 {% block head %}
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/master_chat.css') }}?v=3">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/master_chat.css') }}?v=7">
 {% endblock %}
 {% block vimi %}{# the page is itself the assistant: no second chat bubble over its composer #}{% endblock %}
 {% block content %}
@@ -58,5 +58,5 @@
 </div>
 {% endblock %}
 {% block scripts %}
-<script src="{{ url_for('static', filename='js/master_chat.js') }}?v=4"></script>
+<script src="{{ url_for('static', filename='js/master_chat.js') }}?v=6"></script>
 {% endblock %}

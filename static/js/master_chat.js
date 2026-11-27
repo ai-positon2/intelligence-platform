@@ -142,7 +142,7 @@ function turnHtml(t){
   var running = t.status === "running", body = "";
   if (t.status === "done") body = '<div class="mx-ans">' + md(t.answer || "") + "</div>" + filesHtml(t.filesOut, true);
   else if (running && t.draft) body = '<div class="mx-ans mx-draft">' + md(t.draft) + '<span class="mx-caret" aria-hidden="true"></span></div>';
-  else if (running) body = '<div class="mx-think" role="status"><span class="mx-shim">Thinking</span><span class="sec" data-since="' + esc(t.createdAt || "") + '">' + secs(t) + " s</span></div>";
+  else if (running) body = '<div class="mx-think" role="status"><span class="mx-orb" aria-hidden="true"><i></i><i></i><i></i></span><span class="mx-tl"><span class="mx-shim">Thinking</span><span class="sec" data-since="' + esc(t.createdAt || "") + '">' + secs(t) + " s</span></span></div>";
   else if (t.status === "failed") body = '<div class="mx-err">' + esc(t.error === "Stopped." ? "Stopped." : ("This did not finish: " + (t.error || "an error"))) + "</div>";
   var meta = "";
   if (t.status === "done"){
@@ -152,7 +152,7 @@ function turnHtml(t){
     meta = '<div class="mx-meta"><button type="button" class="mx-copy" data-copy="' + esc(t.id) + '">Copy</button>' + src +
       (t.finishedAt && t.createdAt ? "<span>" + Math.max(1, Math.round((Date.parse(t.finishedAt) - Date.parse(t.createdAt)) / 1000)) + " s</span>" : "") + "</div>";
   }
-  return u + '<div class="mx-a' + (running ? " busy" : "") + '" id="t-' + esc(t.id) + '"><span class="mx-mark" aria-hidden="true"></span><div class="mx-body">' + body + meta + "</div></div>";
+  return u + '<div class="mx-a' + (running && !t.draft ? " busy" : "") + '" id="t-' + esc(t.id) + '"><span class="mx-mark" aria-hidden="true"></span><div class="mx-body">' + body + meta + "</div></div>";
 }
 function drawThread(){
   var th = $("#thread");
