@@ -70,3 +70,10 @@ def test_the_evidence_is_what_was_given_or_printed_not_what_the_model_wrote_or_t
 def test_a_pdf_or_image_the_model_read_itself_switches_the_check_off():
     assert V.has_unreadable([{"role": "user", "content": [{"type": "document", "source": {}}]}]) is True
     assert V.has_unreadable([{"role": "user", "content": [{"type": "text", "text": "x"}]}, {"role": "assistant", "content": "y"}]) is False
+
+
+def test_a_huge_early_data_pull_never_crowds_out_the_code_output_that_comes_after_it(monkeypatch):
+    monkeypatch.setattr(V, "MAX_EVIDENCE_CHARS", 1000)
+    texts = ["9.5 " * 5000, "acct CPA 72.54"]
+    assert V.unverified("The cost per lead was $72.54.", texts) == []
+    assert 72.54 in V.evidence_values(texts)

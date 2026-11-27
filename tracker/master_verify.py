@@ -12,7 +12,7 @@ from __future__ import annotations
 import bisect
 import re
 
-MAX_EVIDENCE_CHARS = 8_000_000
+MAX_EVIDENCE_CHARS = 60_000_000
 MAX_REPORTED = 12
 
 # a figure as written: optional sign and currency, digits with thousands separators or a decimal part, an optional K/M/B/% suffix
@@ -54,24 +54,26 @@ def _parse(m):
     return value, decimals, suffix == "%", scale, bool(cur or suffix)
 
 
+_NUMBER = re.compile(r"-?\d[\d,]*(?:\.\d+)?(?:[eE][-+]?\d+)?")
+
+
 def evidence_values(texts):
-    """Every number found in the evidence texts, sorted, for matching."""
-    vals, used = [], 0
-    for t in texts:
-        if not t:
-            continue
+    """Every number found in the evidence texts, sorted, for matching. The newest texts are read first (the code's printed output comes last and is the
+    most useful), and a very large one is read in part, so the budget is never spent on the first big data pull alone."""
+    vals, used = set(), 0
+    for t in reversed([x for x in texts if x]):
         t = str(t)
-        used += len(t)
-        if used > MAX_EVIDENCE_CHARS:
+        room = MAX_EVIDENCE_CHARS - used
+        if room <= 0:
             break
-        for m in re.finditer(r"-?\d[\d,]*(?:\.\d+)?(?:[eE][-+]?\d+)?", t):
-            raw = m.group(0).replace(",", "")
+        t = t[:room]
+        used += len(t)
+        for raw in _NUMBER.findall(t):
             try:
-                vals.append(abs(float(raw)))
+                vals.add(abs(float(raw.replace(",", ""))))
             except ValueError:
                 continue
-    vals.sort()
-    return vals
+    return sorted(vals)
 
 
 def _has(vals, x, tol):
