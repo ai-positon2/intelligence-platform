@@ -1,4 +1,4 @@
-"""The Master Agent: the routes and the page (app.py, templates/master_agent.html). No network."""
+"""The Master Agent: the routes and the page (app.py, templates/master_clients.html). No network."""
 import os
 import re
 import sys
@@ -16,7 +16,7 @@ from tracker import paid_master as m  # noqa: E402
 
 STAFF = "ana@position2.com"
 API = "/p2/paid-marketing/api/master"
-PAGE = "/p2/paid-marketing/master-agent"
+PAGE = "/p2/paid-marketing/master-agent/clients"          # the client set-up moved to its own tab when the Master Agent became a chat (2026-11-27)
 G, MA = "1234567890", "act_1234567"
 
 

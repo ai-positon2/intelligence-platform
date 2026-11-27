@@ -1,0 +1,59 @@
+{% extends "_paid_base.html" %}
+{% block title %}Master Agent{% endblock %}
+{% block head %}
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/master_chat.css') }}?v=1">
+{% endblock %}
+{% block vimi %}{# the page is itself the assistant: no second chat bubble over its composer #}{% endblock %}
+{% block content %}
+<div class="pm mx" id="mc">
+  <nav class="mx-tabs" aria-label="Master Agent"><a href="/p2/paid-marketing/master-agent" class="on" aria-current="page">Ask</a><a href="/p2/paid-marketing/master-agent/clients">Clients</a></nav>
+
+  <div class="mx-shell">
+    <aside class="mx-side" id="side" aria-label="Conversations">
+      <button type="button" class="pm-btn mx-new" id="newBtn">New conversation</button>
+      <div class="mx-list" id="convos" role="list"></div>
+    </aside>
+
+    <section class="mx-main">
+      <header class="mx-head">
+        <button type="button" class="mx-sidebtn" id="sideBtn" aria-label="Show conversations" aria-controls="side">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
+        <h1 class="mx-title" id="title">Master Agent</h1>
+        <button type="button" class="pm-btn-ghost mx-rename" id="renameBtn" hidden>Rename</button>
+      </header>
+
+      <div class="mx-thread" id="thread" aria-live="polite">
+        <div class="mx-empty" id="empty">
+          <span class="pm-eyebrow"><span class="d"></span>Paid Marketing · Master Agent</span>
+          <h2>Ask anything about your <span class="pm-grad">paid accounts.</span></h2>
+          <p>It reads every Paid Marketing agent, queries Google Ads and Meta directly, reads the files you give it, and works the numbers out in code.
+            Ask in plain English and get the answer, a table, or a file (Excel, CSV, Word, PDF, PowerPoint, charts).</p>
+          <div class="mx-sugs" id="sugs"></div>
+        </div>
+      </div>
+
+      <form class="mx-composer" id="composer" autocomplete="off">
+        <div class="mx-drop" id="drop" hidden>Drop files or a folder to attach them</div>
+        <div class="mx-chips" id="chips"></div>
+        <div class="mx-row">
+          <label class="mx-attach" title="Attach files (CSV, Excel, PDF, Word, PowerPoint, images, text, zip)">
+            <input type="file" id="fileIn" multiple hidden>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.5l-8.5 8.5a6 6 0 0 1-8.5-8.5L12.5 4a4 4 0 0 1 5.7 5.7L9.6 18.3a2 2 0 0 1-2.8-2.8L14.5 7.8"/></svg>
+            <span class="sr-only">Attach files</span></label>
+          <label class="mx-attach" title="Attach a folder">
+            <input type="file" id="folderIn" webkitdirectory multiple hidden>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+            <span class="sr-only">Attach a folder</span></label>
+          <textarea id="q" rows="1" maxlength="20000" placeholder="Ask about any client, account, campaign or file..." aria-label="Your question"></textarea>
+          <button type="submit" class="pm-btn mx-send" id="sendBtn">Ask</button>
+          <button type="button" class="pm-btn-ghost mx-stop" id="stopBtn" hidden>Stop</button>
+        </div>
+        <p class="mx-foot" id="foot">Reads only: it never changes an ad account. Enter to send, Shift+Enter for a new line.</p>
+      </form>
+    </section>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/master_chat.js') }}?v=1"></script>
+{% endblock %}

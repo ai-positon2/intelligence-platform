@@ -19,7 +19,7 @@ from tracker import paid_master as m  # noqa: E402
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 JS = os.path.join(ROOT, "static", "js")
 DATA, PAGE = os.path.join(JS, "master_agent_data.js"), os.path.join(JS, "master_agent.js")
-TEMPLATE = os.path.join(ROOT, "templates", "master_agent.html")
+TEMPLATE = os.path.join(ROOT, "templates", "master_clients.html")
 pytestmark = pytest.mark.skipif(not shutil.which("node"), reason="node is not installed")
 
 G, G2, MA = "1234567890", "2222222222", "act_1234567"

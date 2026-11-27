@@ -161,7 +161,7 @@ PAID_AGENTS = [
           [read("report", API + "/kpi/report", "Each campaign's last-7-day numbers against target and the issues found.", _acct(), account=True),
            read("settings", API + "/kpi/settings", "The saved targets and muted campaigns.")]),
     agent("master-agent", "Master Agent", "paid", PAID + "/master-agent",
-          "The Client Master Config: per client its Google and Meta accounts, budgets, KPI targets, locations, phone numbers, brand terms, allowed domains, competitors and offers, and where agents disagree.",
+          "A chat that answers anything about the paid accounts (its own page), and the Client Master Config on its Clients tab: per client its Google and Meta accounts, budgets, KPI targets, locations, phone numbers, brand terms, allowed domains, competitors and offers, and where agents disagree.",
           [read("state", API + "/master/state", "Every client with its accounts and shared settings, and the drift between the agents' own saved settings and the master.")]),
     agent("alert-hub", "Alert Hub", "paid", PAID + "/alert-hub",
           "Every monitor's alerts through one layer: P1/P2/P3, issues held back while another covers them, the destinations, the weekly summary.",

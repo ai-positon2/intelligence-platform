@@ -6353,7 +6353,14 @@ def paid_kpi_settings_unmute():
 @app.route("/p2/paid-marketing/master-agent")
 @position2_required
 def paid_master_agent():
+    """The Master Agent: a chat that answers anything about the paid accounts (tracker/master_chat.py). The client set-up is its Clients tab."""
     return render_template("master_agent.html", user=_get_user())
+
+
+@app.route("/p2/paid-marketing/master-agent/clients")
+@position2_required
+def paid_master_clients():
+    return render_template("master_clients.html", user=_get_user())
 
 
 @app.route("/p2/paid-marketing/api/master/state")
@@ -6393,6 +6400,231 @@ def paid_master_client():
 @position2_required
 def paid_master_client_delete():
     return _ma_save(lambda pm, store, body: {"removed": pm.delete_client(store, body.get("id"), _pm_user_email())})
+
+
+# ── Master Agent chat (2026-11-27) ───────────────────────────────────────────────────────────────────────────────────────
+# Ask anything about the paid accounts in plain English, with files, and get an answer, a table or a file back (tracker/master_chat.py). A question is a turn in
+# a conversation and runs in a background thread; the page polls the turn. Conversations, turns and files live in Postgres (tracker/master_store.py) and are
+# readable only by the person who owns them (or an admin). Files come as base64 in JSON, like every other state change under Paid Marketing.
+
+MASTER_DAILY_CAP = 150
+MASTER_ID = re.compile(r"^[0-9a-f]{32}$")
+
+
+def _master_owner_ok(row):
+    return bool(row) and (row.get("createdBy") == _pm_user_email() or _pm_is_admin())
+
+
+def _master_convo_or_404(cid):
+    from tracker import master_store
+    if not MASTER_ID.match(cid or ""):
+        abort(404)
+    convo = master_store.get_convo(cid)
+    if not _master_owner_ok(convo) or convo.get("archived"):
+        abort(404)
+    return convo
+
+
+def _master_turn_view(t):
+    from tracker import master_chat
+    t = master_chat.read_turn(t)
+    keep = ("id", "convoId", "createdAt", "finishedAt", "status", "question", "filesIn", "steps", "answer", "filesOut", "sources", "error")
+    out = {k: t.get(k) for k in keep}
+    out["cost"] = (t.get("usage") or {}).get("cost_usd")
+    return out
+
+
+class _MasterAds:
+    """The direct Google Ads and Meta reads the chat's code makes: the platform's own clients, counted and rate limited like every agent's reads."""
+
+    def gaql(self, customer_id, query):
+        from tracker import paid_gads, paid_store
+        return paid_gads.search(customer_id, query, paid_store)
+
+    def meta(self, path, params, paged):
+        from tracker import paid_meta, paid_store
+        if paged:
+            return paid_meta._pages(path, params, paid_store, cap=60000)
+        return paid_meta._get(path, params, paid_store)
+
+
+def _master_tools_factory(email):
+    from tracker import master_tools
+    hidden = set(PAID_HIDDEN_SLUGS)
+    admin = email in ADMIN_EMAILS
+    user = dict(_get_user() or {})
+
+    def make():
+        call = _vimi_route_caller(user)
+        return master_tools.Tools(route=call, accounts=lambda: _vimi_accounts(call), web=_vimi_web, local=_vimi_locals(email), is_admin=admin,
+                                  hidden=hidden, knowledge=_vimi_knowledge(), ads=_MasterAds())
+    return make, hidden, admin, user
+
+
+@app.route("/p2/paid-marketing/api/master/chat/convos")
+@position2_required
+def master_chat_convos():
+    from tracker import master_store
+    try:
+        return jsonify(convos=master_store.list_convos(_pm_user_email()))
+    except master_store.StoreUnavailable as e:
+        return _pm_store_error(e)
+
+
+@app.route("/p2/paid-marketing/api/master/chat/convos", methods=["POST"])
+@position2_required
+def master_chat_new():
+    from tracker import master_store
+    body = request.get_json(silent=True) or {}
+    try:
+        cid = master_store.create_convo(_pm_user_email(), str(body.get("title") or "")[:140])
+        return jsonify(convo=master_store.get_convo(cid)), 201
+    except master_store.StoreUnavailable as e:
+        return _pm_store_error(e)
+
+
+@app.route("/p2/paid-marketing/api/master/chat/convos/<cid>")
+@position2_required
+def master_chat_convo(cid):
+    from tracker import master_store
+    try:
+        convo = _master_convo_or_404(cid)
+        turns = [_master_turn_view(t) for t in master_store.list_turns(cid)]
+    except master_store.StoreUnavailable as e:
+        return _pm_store_error(e)
+    return jsonify(convo={k: convo.get(k) for k in ("id", "title", "createdAt", "updatedAt")}, turns=turns)
+
+
+@app.route("/p2/paid-marketing/api/master/chat/convos/<cid>/rename", methods=["POST"])
+@position2_required
+def master_chat_rename(cid):
+    from tracker import master_store
+    title = re.sub(r"\s+", " ", str((request.get_json(silent=True) or {}).get("title") or "")).strip()[:140]
+    if not title:
+        return jsonify(error="Give the conversation a name."), 400
+    try:
+        _master_convo_or_404(cid)
+        master_store.rename_convo(cid, title)
+    except master_store.StoreUnavailable as e:
+        return _pm_store_error(e)
+    return jsonify(ok=True, title=title)
+
+
+@app.route("/p2/paid-marketing/api/master/chat/convos/<cid>/delete", methods=["POST"])
+@position2_required
+def master_chat_delete(cid):
+    from tracker import master_store
+    try:
+        _master_convo_or_404(cid)
+        master_store.archive_convo(cid)
+    except master_store.StoreUnavailable as e:
+        return _pm_store_error(e)
+    return jsonify(ok=True)
+
+
+@app.route("/p2/paid-marketing/api/master/chat/convos/<cid>/ask", methods=["POST"])
+@position2_required
+def master_chat_ask(cid):
+    """Ask a question in a conversation, with files as [{name, mime, base64}]. 202 {turn} to poll."""
+    import base64 as _b64
+    from tracker import master_chat, master_files, master_store, vimi_catalog
+    body = request.get_json(silent=True) or {}
+    question = str(body.get("question") or "").strip()
+    raw_files = body.get("files") if isinstance(body.get("files"), list) else []
+    if len(question) > master_chat.MAX_QUESTION_CHARS:
+        return jsonify(error="That message is over %d characters. Attach long text as a file." % master_chat.MAX_QUESTION_CHARS), 400
+    if not question and not raw_files:
+        return jsonify(error="Ask a question or attach a file."), 400
+    if not os.environ.get("ANTHROPIC_API_KEY"):
+        return jsonify(error="The Master Agent is not configured on this server (no ANTHROPIC_API_KEY)."), 503
+    uploads = []
+    for f in raw_files[:master_files.MAX_FILES]:
+        if not isinstance(f, dict):
+            continue
+        try:
+            data = _b64.b64decode(str(f.get("base64") or ""), validate=True)
+        except (ValueError, TypeError):
+            return jsonify(error="The file %s could not be read. Attach it again." % str(f.get("name") or "")[:80]), 400
+        uploads.append((str(f.get("name") or "file"), data, str(f.get("mime") or "")))
+    if len(raw_files) > master_files.MAX_FILES:
+        return jsonify(error="That is %d files; the most at once is %d." % (len(raw_files), master_files.MAX_FILES)), 400
+    try:
+        parts = master_files.prepare(uploads)
+    except master_files.FileProblem as e:
+        return jsonify(error=str(e)), 400
+    email = _pm_user_email()
+    try:
+        convo = _master_convo_or_404(cid)
+        running, today = master_store.turn_counts(email, master_chat.JOB_STALE_S)
+        if running:
+            return jsonify(error="Your previous question is still being answered. Wait for it, or press Stop."), 429
+        if today >= MASTER_DAILY_CAP:
+            return jsonify(error="That is %d questions in a day, the most this allows." % today), 429
+        for p in parts:
+            p["storeId"] = master_store.save_file(cid, email, "in", p["name"], p["mime"], p["data"])
+        files_in = [dict(master_files.describe(p), id=p["storeId"]) for p in parts]
+        tid = master_store.create_turn(cid, email, question, files_in)
+        if not convo.get("title"):
+            master_store.rename_convo(cid, master_chat.title_for(question, parts))
+    except master_store.StoreUnavailable as e:
+        return _pm_store_error(e)
+    make, hidden, admin, user = _master_tools_factory(email)
+    master_chat.start(store=master_store, convo=convo, turn_id=tid, question=question, parts=parts, by=email, tools_factory=make,
+                      roster=vimi_catalog.roster(hidden), is_admin=admin, email=email, name=str(user.get("name") or ""))
+    return jsonify(turn=_master_turn_view(master_store.get_turn(tid))), 202
+
+
+@app.route("/p2/paid-marketing/api/master/chat/turns/<tid>")
+@position2_required
+def master_chat_turn(tid):
+    from tracker import master_store
+    if not MASTER_ID.match(tid or ""):
+        abort(404)
+    try:
+        t = master_store.get_turn(tid)
+    except master_store.StoreUnavailable as e:
+        return _pm_store_error(e)
+    if not _master_owner_ok(t):
+        abort(404)
+    return jsonify(turn=_master_turn_view(t))
+
+
+@app.route("/p2/paid-marketing/api/master/chat/turns/<tid>/cancel", methods=["POST"])
+@position2_required
+def master_chat_cancel(tid):
+    from tracker import master_store
+    if not MASTER_ID.match(tid or ""):
+        abort(404)
+    try:
+        t = master_store.get_turn(tid)
+        if not _master_owner_ok(t):
+            abort(404)
+        stopped = master_store.cancel_turn(tid)
+    except master_store.StoreUnavailable as e:
+        return _pm_store_error(e)
+    return jsonify(ok=True, stopped=stopped)
+
+
+@app.route("/p2/paid-marketing/api/master/chat/files/<fid>")
+@position2_required
+def master_chat_file(fid):
+    from tracker import master_files, master_store
+    if not MASTER_ID.match(fid or ""):
+        abort(404)
+    try:
+        f = master_store.get_file(fid)
+    except master_store.StoreUnavailable as e:
+        return _pm_store_error(e)
+    if not _master_owner_ok(f):
+        abort(404)
+    name = master_files.download_name(f["name"])
+    inline = request.args.get("inline") == "1" and master_files.is_image_name(name)
+    resp = make_response(f["data"])
+    resp.headers["Content-Type"] = master_files.mime_of(name, f.get("mime") or "") if inline else (f.get("mime") or "application/octet-stream")
+    resp.headers["Content-Disposition"] = "%s; filename=\"%s\"" % ("inline" if inline else "attachment", name)
+    resp.headers["X-Content-Type-Options"] = "nosniff"
+    resp.headers["Cache-Control"] = "private, max-age=300"
+    return resp
 
 
 # ── Alert Hub (sheet item #38, 2026-10-27) ────────────────────────────────────────────────────────────────────────────────
@@ -22879,7 +23111,7 @@ Location Conflicts (/p2/paid-marketing/location-conflicts): do the campaigns sho
 
 KPI Monitoring (/p2/paid-marketing/kpi-monitoring): are the campaigns hitting their targets. Pick a Google Ads account, an MCC to check every account in one go, or a Meta ad account, and it reads, read only, each live campaign's last two weeks (cost, clicks, impressions, conversions and their value by day), its delivery status, its bid strategy status and the strategy's own target, and holds the last 7 whole days against the campaign's target and against the 7 days before. A target is the one the team saved for the campaign, then the one saved for the account (cost per conversion or lead, return on ad spend, lowest conversion rate and click-through rate, with a tolerance of 20 percent unless saved), then, for cost and return on Google, the campaign's own bid strategy target. It flags a cost or return off target (high at twice the target, or half again two weeks running), a campaign that stopped converting or spent twice its target cost with no conversion, a campaign that is not delivering (not eligible, misconfigured, ended or no impressions), a misconfigured or CPC-limited bid strategy, a campaign stuck in learning (14 days, counted from the day the daily check first saw it) or limited by data, a campaign limited by budget (medium when it is on target, so there is room to grow) and a conversion or click-through rate under the lowest wanted. A figure with too little behind it (under 5 conversions, 100 clicks or 1,000 impressions in the week) is never judged and the page says so. The team can leave a campaign out with a reason. A monitor reads every account daily and alerts by email and Slack to the recipients saved on the page's Alerts and history panel (the first run sets a baseline and sends nothing; only medium and high are alerted). It changes nothing in any ad account.
 
-Master Agent (/p2/paid-marketing/master-agent): the one place a client is written down. The team creates a client, picks the Google Ads and Meta accounts it owns (an account is in one client only) and saves, per account, the monthly budget and the weekly floor and ceiling, the KPI targets (cost per conversion, return on ad spend, lowest conversion rate and click-through rate) and the tolerance; and for the whole client the phone numbers, the places it serves, regions people say, the brand terms, the way the name is written, words that are right, the domains its ads may send people to, and offers with the day each ends. The other agents read it: Brand Spend Alert takes the budget and brand terms, KPI Monitoring the targets and tolerance, the Ad Copy Checker the phone numbers, places, written name and allowed words, Location Conflicts the regions, and Unknown Domains counts the allowed domains as known for the client's accounts. The master only fills what an agent has not saved for itself: a figure saved on an agent's own page still wins, and the page lists every place that differs so the team can settle it. Offers and notes are kept but no agent reads them yet. Each change says who made it and when. It reads and changes nothing in an ad account.
+Master Agent (/p2/paid-marketing/master-agent): a chat that answers anything about the paid accounts in plain English. It reads every Paid Marketing agent as the person asking, runs read-only Google Ads (GAQL) and Meta (Graph API) queries for anything no agent shows, reads files people attach (CSV, Excel, JSON, XML, text, PDF, Word, PowerPoint, images, or a zip or folder of them), does every sum in Python in a code sandbox, and answers with the evidence and sources, or hands back Excel, CSV, Word, PDF, PowerPoint or charts. Conversations are kept per person; the sandbox keeps files and variables for the whole conversation. It only reads: it changes nothing in an ad account. Its Clients tab (/p2/paid-marketing/master-agent/clients) is the one place a client is written down. The team creates a client, picks the Google Ads and Meta accounts it owns (an account is in one client only) and saves, per account, the monthly budget and the weekly floor and ceiling, the KPI targets (cost per conversion, return on ad spend, lowest conversion rate and click-through rate) and the tolerance; and for the whole client the phone numbers, the places it serves, regions people say, the brand terms, the way the name is written, words that are right, the domains its ads may send people to, and offers with the day each ends. The other agents read it: Brand Spend Alert takes the budget and brand terms, KPI Monitoring the targets and tolerance, the Ad Copy Checker the phone numbers, places, written name and allowed words, Location Conflicts the regions, and Unknown Domains counts the allowed domains as known for the client's accounts. The master only fills what an agent has not saved for itself: a figure saved on an agent's own page still wins, and the page lists every place that differs so the team can settle it. Offers and notes are kept but no agent reads them yet. Each change says who made it and when. It reads and changes nothing in an ad account.
 
 Alert Hub (/p2/paid-marketing/alert-hub): the one layer every monitor's alert goes through. Each issue a monitor raises is P1 (high), P2 (medium) or P3 (low). P1 and P2 are alerted; P3 stays on its page and in the Monday summary. A scheduled run sends one message per destination for all the monitors together, not one per monitor, and Mondays one summary of every monitor. The default destination is the email list and Slack channel every monitor page shows; a client written down in the Master Agent can have a Slack channel, emails and a floor (P1 only, or P1 and P2) of its own, and its accounts' alerts go there. An issue is held back, not sent and not marked as alerted, while another monitor's issue of the same or a higher level on the same account already says it: when an account itself is not serving (Account Watch), what follows from it (KPI Monitoring, Keyword Visibility, Creative and Asset Health, a spend drop, conversions that stopped or dropped, an ad group that cannot show) is held back, and two monitors saying the same thing (a stopped ad group, a campaign not delivering and a spend drop; or conversions that stopped in Tracking and in KPI Monitoring) are said once by the one that names the cause. When the issue that covers it is fixed, the held one is alerted at the next run. The page lists the destinations, every open issue of every monitor with its level, client and what covers it (filters and CSV), the last sends and the rules. It does not snooze, throttle an issue that keeps coming back or page a person. It reads and changes nothing in an ad account.
 

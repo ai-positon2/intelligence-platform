@@ -15,7 +15,7 @@
   <link rel="stylesheet" href="/static/css/aurora-app.css?v=3">
   <script src="/static/js/aurora.js?v=1" defer></script>
   <link rel="stylesheet" href="/static/css/thinking-orb.css">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/paid_marketing.css') }}?v=72">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/paid_marketing.css') }}?v=73">
   {% block head %}{% endblock %}
 </head>
 <body>
@@ -60,7 +60,7 @@
     <p class="footer-note">Position2 · Internal use only</p>
   </div>
 
-  {% include 'ppc_chat_widget.html' %}
+  {% block vimi %}{% include 'ppc_chat_widget.html' %}{% endblock %}
 
   <script>
     function toggleMenu() {
