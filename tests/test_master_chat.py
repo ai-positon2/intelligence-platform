@@ -880,7 +880,7 @@ def test_the_working_steps_are_never_shown_only_a_thinking_line():
     steps = [{"kind": "tool", "label": "Querying Google Ads (campaign) for Acme (from code)"}, {"kind": "code", "label": "Running Python", "code": "print(1)"}]
     busy = node_turn({"id": "t", "status": "running", "question": "q", "steps": steps, "createdAt": "2026-11-27T10:00:00+00:00"})
     assert "Thinking" in busy and "mx-think" in busy and "busy" in busy
-    assert 'class="mx-orb"' in busy and busy.count("<i></i>") == 3 and "mx-orb" not in node_turn({"id": "t", "status": "done", "question": "q", "answer": "A"})
+    assert 'class="mx-orb" data-orb' in busy and "mx-orb" not in node_turn({"id": "t", "status": "done", "question": "q", "answer": "A"})
     assert "busy" not in node_turn({"id": "t", "status": "running", "question": "q", "draft": "so far"})     # once the answer is being written the small mark takes the orb's place
     for t in (busy, node_turn({"id": "t", "status": "done", "question": "q", "answer": "A", "steps": steps})):
         assert "Querying" not in t and "Running Python" not in t and "print(1)" not in t and "mx-step" not in t and "mx-work" not in t

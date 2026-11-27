@@ -142,7 +142,7 @@ function turnHtml(t){
   var running = t.status === "running", body = "";
   if (t.status === "done") body = '<div class="mx-ans">' + md(t.answer || "") + "</div>" + filesHtml(t.filesOut, true);
   else if (running && t.draft) body = '<div class="mx-ans mx-draft">' + md(t.draft) + '<span class="mx-caret" aria-hidden="true"></span></div>';
-  else if (running) body = '<div class="mx-think" role="status"><span class="mx-orb" aria-hidden="true"><i></i><i></i><i></i></span><span class="mx-tl"><span class="mx-shim">Thinking</span><span class="sec" data-since="' + esc(t.createdAt || "") + '">' + secs(t) + " s</span></span></div>";
+  else if (running) body = '<div class="mx-think" role="status"><span class="mx-orb" data-orb aria-hidden="true"></span><span class="mx-tl"><span class="mx-shim">Thinking</span><span class="sec" data-since="' + esc(t.createdAt || "") + '">' + secs(t) + " s</span></span></div>";
   else if (t.status === "failed") body = '<div class="mx-err">' + esc(t.error === "Stopped." ? "Stopped." : ("This did not finish: " + (t.error || "an error"))) + "</div>";
   var meta = "";
   if (t.status === "done"){
@@ -154,6 +154,22 @@ function turnHtml(t){
   }
   return u + '<div class="mx-a' + (running && !t.draft ? " busy" : "") + '" id="t-' + esc(t.id) + '"><span class="mx-mark" aria-hidden="true"></span><div class="mx-body">' + body + meta + "</div></div>";
 }
+/* the dotted thinking orb: the platform's shared orb (static/js/thinking-orb.js), mounted into each [data-orb] slot; orbs whose slot has gone are stopped */
+var ORBS = [], orbMod = null;
+function mountOrbs(){
+  ORBS = ORBS.filter(function(o){ if (o.el.isConnected) return true; try { o.c.destroy(); } catch (e) {} return false; });
+  var slots = document.querySelectorAll("[data-orb]:not([data-orb-on])");
+  if (!slots.length) return;
+  var go = function(m){
+    for (var k = 0; k < slots.length; k++){
+      if (!slots[k].isConnected || slots[k].getAttribute("data-orb-on")) continue;
+      slots[k].setAttribute("data-orb-on", "1");
+      try { ORBS.push({el: slots[k], c: m.mountThinkingOrb(slots[k], {state: "breathing", size: 64, layout: "row"})}); } catch (e) {}
+    }
+  };
+  if (orbMod) go(orbMod);
+  else try { import("/static/js/thinking-orb.js").then(function(m){ orbMod = m; go(m); }).catch(function(){}); } catch (e) {}
+}
 function drawThread(){
   var th = $("#thread");
   if (!S.turns.length){
@@ -162,7 +178,7 @@ function drawThread(){
   } else {
     th.innerHTML = S.turns.map(turnHtml).join("");
   }
-  th.scrollTop = th.scrollHeight;
+  th.scrollTop = th.scrollHeight; mountOrbs();
   var running = S.turns.some(function(t){ return t.status === "running"; });
   $("#stopBtn").hidden = !running; $("#sendBtn").hidden = running; $("#sendBtn").disabled = S.sending;
 }
@@ -227,7 +243,7 @@ function poll(tid){
         var old = S.turns[at]; S.turns[at] = t;
         var node = document.getElementById("t-" + tid);
         if (node && old.status === t.status && (old.draft || "") === (t.draft || "")) { /* nothing new to show */ }
-        else if (node){ var wrap = document.createElement("div"); wrap.innerHTML = turnHtml(t); node.replaceWith(wrap.lastChild); $("#thread").scrollTop = $("#thread").scrollHeight; }
+        else if (node){ var wrap = document.createElement("div"); wrap.innerHTML = turnHtml(t); node.replaceWith(wrap.lastChild); $("#thread").scrollTop = $("#thread").scrollHeight; mountOrbs(); }
         else drawThread();
       }
       if (t.status === "running") S.polling = setTimeout(tick, 1000);
