@@ -349,7 +349,7 @@ def run_turn(messages, *, client, tools, system, files_sink, container=None, on_
     usage, made, seen = {}, [], set()
     answer = None
     told_to_finish = False
-    live = {"blocks": 0, "draft": "", "sent": 0.0}
+    live = {"blocks": 0, "draft": "", "sent": 0.0, "types": {}, "drafts": 0}
 
     def save_file(fid):
         if fid in seen:
@@ -367,6 +367,7 @@ def run_turn(messages, *, client, tools, system, files_sink, container=None, on_
     def on_event(ev):
         """A finished block shows its sandbox step (and hands over any file it made) at once; text is shown as it is written, at most once a second."""
         kind = getattr(ev, "type", None)
+        live["types"][str(kind)] = live["types"].get(str(kind), 0) + 1
         if kind == "content_block_stop":
             block = getattr(ev, "content_block", None)
             if block is not None:
@@ -379,6 +380,7 @@ def run_turn(messages, *, client, tools, system, files_sink, container=None, on_
             live["draft"] += getattr(ev, "text", "") or ""
             if time.monotonic() - live["sent"] >= DRAFT_EVERY_S:
                 live["sent"] = time.monotonic()
+                live["drafts"] += 1
                 on_draft(no_dash(live["draft"]))
 
     for _round in range(max_rounds):
@@ -438,6 +440,7 @@ def run_turn(messages, *, client, tools, system, files_sink, container=None, on_
         break
     if answer is None:
         answer = "I ran out of steps before I could finish. Ask a narrower question, or ask me to continue."
+    usage["stream"] = {"events": live["types"], "drafts": live["drafts"]}
     return {"answer": answer, "files": made, "usage": usage, "container": container}
 
 

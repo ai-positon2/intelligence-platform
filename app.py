@@ -6431,6 +6431,8 @@ def _master_turn_view(t):
     keep = ("id", "convoId", "createdAt", "finishedAt", "status", "question", "filesIn", "steps", "answer", "filesOut", "sources", "error", "draft")
     out = {k: t.get(k) for k in keep}
     out["cost"] = (t.get("usage") or {}).get("cost_usd")
+    if _pm_is_admin():
+        out["usage"] = t.get("usage") or {}
     return out
 
 
