@@ -474,7 +474,7 @@ def run_turn(messages, *, client, tools, system, files_sink, container=None, on_
             answer = (answer + "\n\n" if answer else "") + "I can't help with that request as asked."
         elif checking and answer:
             try:
-                bad = mv.unverified(answer, mv.evidence_from_messages(messages[:-1]))
+                bad = mv.unverified(answer, mv.evidence_from_messages(messages))
             except Exception as e:                                           # noqa: BLE001 (the check never stops an answer)
                 log.warning("master: the figure check failed: %s", e)
                 bad = []

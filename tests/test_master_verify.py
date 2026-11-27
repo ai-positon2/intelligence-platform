@@ -77,3 +77,11 @@ def test_a_huge_early_data_pull_never_crowds_out_the_code_output_that_comes_afte
     texts = ["9.5 " * 5000, "acct CPA 72.54"]
     assert V.unverified("The cost per lead was $72.54.", texts) == []
     assert 72.54 in V.evidence_values(texts)
+
+
+def test_code_output_in_the_same_message_as_the_answer_counts_but_the_answer_text_does_not():
+    msgs = [{"role": "user", "content": [{"type": "text", "text": "q"}]},
+            {"role": "assistant", "content": [{"type": "server_tool_use", "name": "code_execution", "input": {"code": "print(1)"}},
+                                              {"type": "code_execution_tool_result", "content": {"stdout": "share 45.9%"}},
+                                              {"type": "text", "text": "It is 45.9% and 77.7%."}]}]
+    assert V.unverified("It is 45.9% and 77.7%.", V.evidence_from_messages(msgs)) == ["77.7%"]
