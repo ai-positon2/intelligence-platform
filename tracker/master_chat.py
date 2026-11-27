@@ -29,6 +29,8 @@ log = logging.getLogger(__name__)
 
 MODEL = os.environ.get("MASTER_MODEL", "").strip() or "claude-opus-5-5"
 EFFORT = os.environ.get("MASTER_EFFORT", "").strip() or "high"
+SPEED = os.environ.get("MASTER_SPEED", "").strip().lower()          # "fast": Opus fast mode (up to 2.5x output speed, twice the price); anything else: standard
+EFFORTS = ("low", "medium", "high", "xhigh", "max")
 CODE_TOOL = {"type": "code_execution_20260521", "name": "code_execution"}
 FALLBACK_BETA = "server-side-fallback-2026-07-01"
 MAX_TOKENS = 64000
@@ -42,7 +44,8 @@ MAX_QUESTION_CHARS = 20000
 DRAFT_EVERY_S = 1.0               # how often the answer being written is saved for the page to show
 PRICE = {"input": 4.0, "output": 20.0, "cache_read": 0.4, "cache_write": 5.0}     # $ per million tokens (Claude Opus 5.5); cache write at 1.25x
 
-_FLAGS = {"no_fallbacks": False}
+_FLAGS = {"no_fallbacks": False, "no_fast": 0.0}
+FAST_PAUSE_S = 600                # after fast mode is refused or rate limited, standard speed for this long
 
 
 # ── the prompt ────────────────────────────────────────────────────────────────
@@ -225,13 +228,16 @@ def _status(e):
     return getattr(e, "status_code", None) or getattr(getattr(e, "response", None), "status_code", None)
 
 
-def call_model(client, *, system, messages, tools, container=None, tool_choice=None, on_event=None):
+def call_model(client, *, system, messages, tools, container=None, tool_choice=None, on_event=None, effort=None, speed=None):
     """One streamed model call; each stream event goes to `on_event` as it arrives (the page shows the answer and the sandbox steps live). The Opus server-side fallback is asked for (dropped if the key refuses it); a dead container is dropped
     (the caller then re-attaches files). Returns (message, container_id_or_None)."""
     for _attempt in range(3):
         kw = dict(model=MODEL, max_tokens=MAX_TOKENS, messages=_cached(messages), tools=tools,
                   system=[{"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}],
-                  thinking={"type": "adaptive"}, output_config={"effort": EFFORT})
+                  thinking={"type": "adaptive"}, output_config={"effort": effort if effort in EFFORTS else EFFORT})
+        fast = (speed or SPEED) == "fast" and time.monotonic() >= _FLAGS["no_fast"]
+        if fast:
+            kw["speed"] = "fast"
         if container:
             kw["container"] = container
         if tool_choice:
@@ -257,6 +263,10 @@ def call_model(client, *, system, messages, tools, container=None, tool_choice=N
             if ((status == 400) or isinstance(e, TypeError)) and "fallback" in text and not _FLAGS["no_fallbacks"]:
                 _FLAGS["no_fallbacks"] = True
                 log.warning("master: fallbacks refused (%s); going on without", str(e)[:200])
+                continue
+            if fast and (status == 429 or (status == 400 and ("speed" in text or "fast" in text)) or (isinstance(e, TypeError) and "speed" in text)):
+                _FLAGS["no_fast"] = time.monotonic() + FAST_PAUSE_S
+                log.warning("master: fast mode refused (%s); standard speed for %d s", str(e)[:200], FAST_PAUSE_S)
                 continue
             if container and status in (400, 404) and "container" in text:
                 log.warning("master: container %s refused (%s); starting a new one", container, str(e)[:200])
@@ -332,16 +342,22 @@ def final_text(msg):
 
 
 def _add_usage(total, msg):
+    """Add one call's tokens and price to the turn's total. A call served in fast mode (usage.speed) costs twice the standard rate."""
     u = _block_dict(getattr(msg, "usage", None)) if getattr(msg, "usage", None) is not None else {}
-    for k in ("input_tokens", "output_tokens", "cache_read_input_tokens", "cache_creation_input_tokens"):
-        total[k] = total.get(k, 0) + int(u.get(k) or 0)
-    total["cost_usd"] = round((total.get("input_tokens", 0) * PRICE["input"] + total.get("output_tokens", 0) * PRICE["output"]
-                               + total.get("cache_read_input_tokens", 0) * PRICE["cache_read"] + total.get("cache_creation_input_tokens", 0) * PRICE["cache_write"]) / 1e6, 4)
+    n = {k: int(u.get(k) or 0) for k in ("input_tokens", "output_tokens", "cache_read_input_tokens", "cache_creation_input_tokens")}
+    for k, v in n.items():
+        total[k] = total.get(k, 0) + v
+    fast = str(u.get("speed") or "") == "fast"
+    if fast:
+        total["fast_calls"] = total.get("fast_calls", 0) + 1
+    cost = (n["input_tokens"] * PRICE["input"] + n["output_tokens"] * PRICE["output"] + n["cache_read_input_tokens"] * PRICE["cache_read"]
+            + n["cache_creation_input_tokens"] * PRICE["cache_write"]) / 1e6 * (2 if fast else 1)
+    total["cost_usd"] = round(total.get("cost_usd", 0.0) + cost, 4)
     return total
 
 
 def run_turn(messages, *, client, tools, system, files_sink, container=None, on_step=lambda s: None, on_container=lambda c: None,
-             stop=lambda: False, now=time.monotonic, wall_s=WALL_S, max_rounds=MAX_ROUNDS, reattach=None, on_draft=lambda text: None):
+             stop=lambda: False, now=time.monotonic, wall_s=WALL_S, max_rounds=MAX_ROUNDS, reattach=None, on_draft=lambda text: None, tune=None):
     """The loop for one question. Returns {answer, files, usage, container} or None when the person pressed Stop.
     `files_sink(file_id) -> {id,name,mime,size}` saves a file the sandbox made. `reattach()` gives container_upload blocks for a new container."""
     started = now()
@@ -397,7 +413,7 @@ def run_turn(messages, *, client, tools, system, files_sink, container=None, on_
         choice = {"type": "none"} if told_to_finish else None
         try:
             live["blocks"], live["draft"] = 0, ""
-            msg, container = call_model(client, system=system, messages=messages, tools=specs, container=container, tool_choice=choice, on_event=on_event)
+            msg, container = call_model(client, system=system, messages=messages, tools=specs, container=container, tool_choice=choice, on_event=on_event, effort=(tune or {}).get("effort"), speed=(tune or {}).get("speed"))
         except ContainerGone:
             container = None
             on_container(None)
@@ -407,7 +423,7 @@ def run_turn(messages, *, client, tools, system, files_sink, container=None, on_
                 last["content"] = extra + [b for b in last["content"] if not (isinstance(b, dict) and b.get("type") == "container_upload")] + [
                     {"type": "text", "text": "(The sandbox was reset: this conversation's files are copied in again. Earlier Python variables are gone.)"}]
             live["blocks"], live["draft"] = 0, ""
-            msg, container = call_model(client, system=system, messages=messages, tools=specs, container=None, tool_choice=choice, on_event=on_event)
+            msg, container = call_model(client, system=system, messages=messages, tools=specs, container=None, tool_choice=choice, on_event=on_event, effort=(tune or {}).get("effort"), speed=(tune or {}).get("speed"))
         _add_usage(usage, msg)
         if live["draft"]:
             on_draft("")
@@ -441,6 +457,7 @@ def run_turn(messages, *, client, tools, system, files_sink, container=None, on_
     if answer is None:
         answer = "I ran out of steps before I could finish. Ask a narrower question, or ask me to continue."
     usage["stream"] = {"events": live["types"], "drafts": live["drafts"]}
+    usage["tune"] = {"effort": (tune or {}).get("effort") or EFFORT, "speed": (tune or {}).get("speed") or SPEED or "standard"}
     return {"answer": answer, "files": made, "usage": usage, "container": container}
 
 
@@ -511,7 +528,7 @@ def _dedupe(sources):
     return out[:80]
 
 
-def start(*, store, convo, turn_id, question, parts, by, tools_factory, roster, client_factory=None, spawn=True, **ctx):
+def start(*, store, convo, turn_id, question, parts, by, tools_factory, roster, client_factory=None, spawn=True, tune=None, **ctx):
     """Run one turn in a thread. `store` is tracker.master_store (or a fake); `parts` come from master_files.prepare."""
     def work():
         try:
@@ -553,7 +570,7 @@ def start(*, store, convo, turn_id, question, parts, by, tools_factory, roster, 
                            on_step=lambda s: store.add_step(turn_id, dict(s, t=time.time())),
                            on_container=lambda c: store.set_container(convo["id"], c),
                            stop=lambda: (store.get_turn(turn_id) or {}).get("status") != "running", reattach=reattach,
-                           on_draft=lambda text: store.set_draft(turn_id, text))
+                           on_draft=lambda text: store.set_draft(turn_id, text), tune=tune)
             if out is not None:
                 store.finish_turn(turn_id, answer=out["answer"], files_out=out["files"], sources=_dedupe(tools.sources), usage=out["usage"])
         except Exception as e:                                               # noqa: BLE001 (any failure ends the turn in words, so the page never polls forever)

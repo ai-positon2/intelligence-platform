@@ -418,6 +418,28 @@ def test_fallbacks_are_dropped_once_if_the_key_refuses_them():
     assert "fallbacks" not in client2.calls[0]
 
 
+def test_effort_and_fast_mode_can_be_set_per_turn_and_fast_mode_falls_back_when_refused(monkeypatch):
+    out, client, _, _ = run([msg([{"type": "text", "text": "a"}])], tune={"effort": "medium", "speed": "fast"})
+    assert client.calls[0]["output_config"] == {"effort": "medium"} and client.calls[0]["speed"] == "fast" and out["usage"]["tune"] == {"effort": "medium", "speed": "fast"}
+    out, client, _, _ = run([msg([{"type": "text", "text": "a"}])], tune={"effort": "nonsense", "speed": "standard"})
+    assert client.calls[0]["output_config"] == {"effort": C.EFFORT} and "speed" not in client.calls[0]
+    monkeypatch.setitem(C._FLAGS, "no_fast", 0.0)
+    out, client, _, _ = run([ApiError(429, "fast mode rate limit"), msg([{"type": "text", "text": "ok"}]), msg([{"type": "text", "text": "ok2"}])], tune={"speed": "fast"})
+    assert out["answer"] == "ok" and client.calls[0]["speed"] == "fast" and "speed" not in client.calls[1] and C._FLAGS["no_fast"] > 0
+    out, client, _, _ = run([msg([{"type": "text", "text": "ok2"}])], tune={"speed": "fast"})
+    assert "speed" not in client.calls[0]                                             # standard speed for a while after a refusal
+    monkeypatch.setitem(C._FLAGS, "no_fast", 0.0)
+
+
+def test_a_fast_call_costs_twice_as_much():
+    std, fast = {}, {}
+    C._add_usage(std, msg([], usage={"input_tokens": 1000, "output_tokens": 100}))
+    C._add_usage(fast, msg([], usage={"input_tokens": 1000, "output_tokens": 100, "speed": "fast"}))
+    assert fast["cost_usd"] == 2 * std["cost_usd"] and fast["fast_calls"] == 1 and "fast_calls" not in std
+    C._add_usage(std, msg([], usage={"input_tokens": 1000, "output_tokens": 100}))
+    assert std["cost_usd"] == round(2 * (1000 * 4 + 100 * 20) / 1e6, 4) and std["input_tokens"] == 2000
+
+
 def test_other_errors_are_raised():
     with pytest.raises(ApiError):
         run([ApiError(500, "overloaded")])
@@ -760,6 +782,19 @@ def test_asking_is_refused_with_words(rs, monkeypatch):
     assert ask({"question": "q"}).status_code == 503
     assert not rs.started
     assert c.post(API + "/convos/%s/ask" % cid, data="question=q").status_code == 415
+
+
+def test_only_admins_can_set_the_speed_settings(rs, monkeypatch):
+    monkeypatch.setattr(appmod, "ADMIN_EMAILS", set(appmod.ADMIN_EMAILS) | {"boss@position2.com"})
+    for who, want in ((STAFF, None), ("boss@position2.com", {"effort": "medium", "speed": "fast"})):
+        c = client_as(who)
+        cid = c.post(API + "/convos", json={}).get_json()["convo"]["id"]
+        c.post(API + "/convos/%s/ask" % cid, json={"question": "q", "tune": {"effort": "medium", "speed": "fast"}})
+        assert rs.started[-1]["tune"] == want, who
+    c = client_as("boss@position2.com")
+    cid = c.post(API + "/convos", json={}).get_json()["convo"]["id"]
+    c.post(API + "/convos/%s/ask" % cid, json={"question": "q", "tune": {"effort": "huge", "speed": "warp"}})
+    assert rs.started[-1]["tune"] == {"effort": None, "speed": None}
 
 
 def test_other_peoples_conversations_turns_and_files_are_not_found(rs):

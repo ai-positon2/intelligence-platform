@@ -6571,8 +6571,12 @@ def master_chat_ask(cid):
     except master_store.StoreUnavailable as e:
         return _pm_store_error(e)
     make, hidden, admin, user = _master_tools_factory(email)
+    tune = None
+    if admin and isinstance(body.get("tune"), dict):            # admins can time a setting on a real question (effort, fast mode) without a deploy
+        eff, spd = str(body["tune"].get("effort") or ""), str(body["tune"].get("speed") or "")
+        tune = {"effort": eff if eff in master_chat.EFFORTS else None, "speed": spd if spd in ("fast", "standard") else None}
     master_chat.start(store=master_store, convo=convo, turn_id=tid, question=question, parts=parts, by=email, tools_factory=make,
-                      roster=vimi_catalog.roster(hidden), is_admin=admin, email=email, name=str(user.get("name") or ""))
+                      roster=vimi_catalog.roster(hidden), is_admin=admin, email=email, name=str(user.get("name") or ""), tune=tune)
     return jsonify(turn=_master_turn_view(master_store.get_turn(tid))), 202
 
 
