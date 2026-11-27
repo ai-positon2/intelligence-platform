@@ -177,25 +177,46 @@ def user_content(question, parts, uploaded):
     return blocks
 
 
+def _code_call_ids(messages):
+    ids = set()
+    for m in messages:
+        if m.get("role") == "assistant":
+            for b in m.get("content") or []:
+                d = _block_dict(b)
+                if d.get("type") == "tool_use" and (d.get("caller") or {}).get("type", "direct") != "direct":
+                    ids.add(d.get("id"))
+    return ids
+
+
+CACHEABLE = ("text", "image", "document", "tool_result")
+
+
 def _cached(messages):
-    """The conversation with one cache breakpoint on its last block, so each round re-reads the earlier rounds at the cached rate."""
+    """The conversation with one cache breakpoint, so each round re-reads the earlier rounds at the cached rate. It goes on the newest block of a
+    message we wrote (a user message) that the API lets carry one: never on a result handed back to code in the sandbox (the API refuses that,
+    those results are not in the model's context), and never on the model's own blocks (those are passed back exactly as they came)."""
     msgs = copy.copy(messages)
+    code_ids = _code_call_ids(messages)
     for i in range(len(msgs) - 1, -1, -1):
         m = msgs[i]
-        if m.get("role") == "system":
+        if m.get("role") != "user":
             continue
-        last = dict(m)
-        content = last.get("content")
+        content = m.get("content")
         if isinstance(content, str):
-            last["content"] = [{"type": "text", "text": content, "cache_control": {"type": "ephemeral"}}]
-        elif isinstance(content, list) and content:
+            msgs[i] = dict(m, content=[{"type": "text", "text": content, "cache_control": {"type": "ephemeral"}}])
+            return msgs
+        if not isinstance(content, list):
+            continue
+        for j in range(len(content) - 1, -1, -1):
+            b = content[j]
+            if not isinstance(b, dict) or b.get("type") not in CACHEABLE:
+                continue
+            if b.get("type") == "tool_result" and b.get("tool_use_id") in code_ids:
+                continue
             blocks = list(content)
-            tail = blocks[-1]
-            if isinstance(tail, dict) and tail.get("type") not in ("thinking", "redacted_thinking"):
-                blocks[-1] = dict(tail, cache_control={"type": "ephemeral"})
-                last["content"] = blocks
-        msgs[i] = last
-        break
+            blocks[j] = dict(b, cache_control={"type": "ephemeral"})
+            msgs[i] = dict(m, content=blocks)
+            return msgs
     return msgs
 
 

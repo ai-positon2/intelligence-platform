@@ -357,6 +357,10 @@ def test_direct_and_code_tool_calls_are_answered_with_tool_results_only():
     assert second["role"] == "user" and all(b["type"] == "tool_result" for b in second["content"]) and "Acme Dental" in second["content"][0]["content"]
     third = client.calls[2]
     assert third["container"] == "cont_1" and all(b["type"] == "tool_result" for b in third["messages"][-1]["content"])
+    assert all("cache_control" not in b for b in third["messages"][-1]["content"])           # results for code never carry a cache mark (the API refuses it)
+    marked = [b for m in third["messages"] if m["role"] == "user" and isinstance(m["content"], list) for b in m["content"] if "cache_control" in b]
+    assert len(marked) == 1 and marked[0]["type"] == "tool_result" and marked[0]["tool_use_id"] == "tu1"
+    assert "cache_control" in second["content"][-1]
     assert json.loads(third["messages"][-1]["content"][0]["content"])["rows"][0]["metrics.clicks"] == 5
     labels = [s["label"] for s in steps]
     assert any("Finding the account" in l for l in labels) and any("(from code)" in l for l in labels) and any(s["kind"] == "output" and "clicks 5" in s["output"] for s in steps)
@@ -467,6 +471,17 @@ def test_the_message_for_a_new_question_carries_every_file_the_right_way():
     assert C.user_content("hi", [], {}) == [{"type": "text", "text": "hi"}]
     pdf_only = C.user_content("q", F.prepare([("p.pdf", b"%PDF-1.4", "")]), {"p.pdf": "file_p"})
     assert [b["type"] for b in pdf_only] == ["document", "text"]
+
+
+def test_the_cache_mark_goes_on_our_own_newest_block_only():
+    msgs = [{"role": "user", "content": "q"}, {"role": "assistant", "content": [{"type": "text", "text": "a"}]}]
+    out = C._cached(msgs)
+    assert out[0]["content"][0]["cache_control"] == {"type": "ephemeral"} and "cache_control" not in str(out[1]) and msgs[0]["content"] == "q"
+    msgs = [{"role": "user", "content": [{"type": "text", "text": "q"}, {"type": "container_upload", "file_id": "f"}]},
+            {"role": "assistant", "content": [{"type": "tool_use", "id": "x", "name": "n", "input": {}, "caller": {"type": "code_execution_20260120"}}]},
+            {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "x", "content": "r"}]}, {"role": "system", "content": "now"}]
+    out = C._cached(msgs)
+    assert "cache_control" not in out[2]["content"][0] and out[0]["content"][0]["cache_control"] and "cache_control" not in out[0]["content"][1]
 
 
 def test_history_is_the_finished_turns_as_plain_text():
