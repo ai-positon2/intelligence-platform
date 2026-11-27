@@ -914,7 +914,7 @@ def test_every_element_the_script_uses_is_on_the_page_and_nothing_has_a_dash():
 def test_the_hub_the_palette_and_vimi_know_the_master_agent_only_answers():
     paid = read("templates/paid_marketing.html")
     card = paid.split('href="/p2/paid-marketing/master-agent" class="dash-card', 1)[1].split("</a>", 1)[0]
-    assert "Ask anything" in card and "Clients" not in card and "Client master" not in card
+    assert "plain English" in card and "Clients" not in card and "Client master" not in card
     for p in ("templates/paid_marketing.html", "templates/_paid_kpal.html", "templates/master_agent.html"):
         assert "master-agent/clients" not in read(p) and "mx-tabs" not in read(p), p
     kn = appmod._VIMI_PLATFORM_KNOWLEDGE
