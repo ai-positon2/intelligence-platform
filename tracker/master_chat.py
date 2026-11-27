@@ -39,6 +39,7 @@ JOB_STALE_S = 30 * 60
 MAX_HISTORY_TURNS = 24
 MAX_TURN_CHARS = 16000
 MAX_QUESTION_CHARS = 20000
+DRAFT_EVERY_S = 1.0               # how often the answer being written is saved for the page to show
 PRICE = {"input": 4.0, "output": 20.0, "cache_read": 0.4, "cache_write": 5.0}     # $ per million tokens (Claude Opus 5.5); cache write at 1.25x
 
 _FLAGS = {"no_fallbacks": False}
@@ -224,8 +225,8 @@ def _status(e):
     return getattr(e, "status_code", None) or getattr(getattr(e, "response", None), "status_code", None)
 
 
-def call_model(client, *, system, messages, tools, container=None, tool_choice=None):
-    """One streamed model call. The Opus server-side fallback is asked for (dropped if the key refuses it); a dead container is dropped
+def call_model(client, *, system, messages, tools, container=None, tool_choice=None, on_event=None):
+    """One streamed model call; each stream event goes to `on_event` as it arrives (the page shows the answer and the sandbox steps live). The Opus server-side fallback is asked for (dropped if the key refuses it); a dead container is dropped
     (the caller then re-attaches files). Returns (message, container_id_or_None)."""
     for _attempt in range(3):
         kw = dict(model=MODEL, max_tokens=MAX_TOKENS, messages=_cached(messages), tools=tools,
@@ -243,6 +244,12 @@ def call_model(client, *, system, messages, tools, container=None, tool_choice=N
             kw["betas"] = betas
         try:
             with client.beta.messages.stream(**kw) as stream:
+                if on_event is not None:
+                    for event in stream:
+                        try:
+                            on_event(event)
+                        except Exception as e:                               # noqa: BLE001 (showing progress must never break the answer)
+                            log.warning("master: progress event failed: %s", e)
                 msg = stream.get_final_message()
             return msg, container
         except Exception as e:                                               # noqa: BLE001 (each known refusal changes the request once; anything else is raised)
@@ -334,7 +341,7 @@ def _add_usage(total, msg):
 
 
 def run_turn(messages, *, client, tools, system, files_sink, container=None, on_step=lambda s: None, on_container=lambda c: None,
-             stop=lambda: False, now=time.monotonic, wall_s=WALL_S, max_rounds=MAX_ROUNDS, reattach=None):
+             stop=lambda: False, now=time.monotonic, wall_s=WALL_S, max_rounds=MAX_ROUNDS, reattach=None, on_draft=lambda text: None):
     """The loop for one question. Returns {answer, files, usage, container} or None when the person pressed Stop.
     `files_sink(file_id) -> {id,name,mime,size}` saves a file the sandbox made. `reattach()` gives container_upload blocks for a new container."""
     started = now()
@@ -342,6 +349,38 @@ def run_turn(messages, *, client, tools, system, files_sink, container=None, on_
     usage, made, seen = {}, [], set()
     answer = None
     told_to_finish = False
+    live = {"blocks": 0, "draft": "", "sent": 0.0}
+
+    def save_file(fid):
+        if fid in seen:
+            return
+        seen.add(fid)
+        try:
+            saved = files_sink(fid)
+            if saved:
+                made.append(saved)
+                on_step({"kind": "file", "label": "Made %s" % saved["name"], "file": saved})
+        except Exception as e:                                               # noqa: BLE001 (a file that cannot be fetched is said, the answer still comes)
+            log.warning("master: could not fetch output file %s: %s", fid, e)
+            on_step({"kind": "warn", "label": "A file the sandbox made could not be fetched (%s)" % type(e).__name__})
+
+    def on_event(ev):
+        """A finished block shows its sandbox step (and hands over any file it made) at once; text is shown as it is written, at most once a second."""
+        kind = getattr(ev, "type", None)
+        if kind == "content_block_stop":
+            block = getattr(ev, "content_block", None)
+            if block is not None:
+                live["blocks"] += 1
+                for st in code_steps([block]):
+                    on_step(st)
+                for fid in output_file_ids([block]):
+                    save_file(fid)
+        elif kind == "text":
+            live["draft"] += getattr(ev, "text", "") or ""
+            if time.monotonic() - live["sent"] >= DRAFT_EVERY_S:
+                live["sent"] = time.monotonic()
+                on_draft(no_dash(live["draft"]))
+
     for _round in range(max_rounds):
         if stop():
             return None
@@ -355,7 +394,8 @@ def run_turn(messages, *, client, tools, system, files_sink, container=None, on_
             break
         choice = {"type": "none"} if told_to_finish else None
         try:
-            msg, container = call_model(client, system=system, messages=messages, tools=specs, container=container, tool_choice=choice)
+            live["blocks"], live["draft"] = 0, ""
+            msg, container = call_model(client, system=system, messages=messages, tools=specs, container=container, tool_choice=choice, on_event=on_event)
         except ContainerGone:
             container = None
             on_container(None)
@@ -364,27 +404,21 @@ def run_turn(messages, *, client, tools, system, files_sink, container=None, on_
             if extra and last.get("role") == "user" and isinstance(last.get("content"), list) and not any(isinstance(b, dict) and b.get("type") == "tool_result" for b in last["content"]):
                 last["content"] = extra + [b for b in last["content"] if not (isinstance(b, dict) and b.get("type") == "container_upload")] + [
                     {"type": "text", "text": "(The sandbox was reset: this conversation's files are copied in again. Earlier Python variables are gone.)"}]
-            msg, container = call_model(client, system=system, messages=messages, tools=specs, container=None, tool_choice=choice)
+            live["blocks"], live["draft"] = 0, ""
+            msg, container = call_model(client, system=system, messages=messages, tools=specs, container=None, tool_choice=choice, on_event=on_event)
         _add_usage(usage, msg)
+        if live["draft"]:
+            on_draft("")
         cont = getattr(msg, "container", None)
         cid = getattr(cont, "id", None) or (cont.get("id") if isinstance(cont, dict) else None)
         if cid and cid != container:
             container = cid
             on_container(cid)
-        for s in code_steps(msg.content):
-            on_step(s)
+        if not live["blocks"]:                                               # no stream events (an older SDK, or a test): read the steps from the whole message
+            for st in code_steps(msg.content):
+                on_step(st)
         for fid in output_file_ids(msg.content):
-            if fid in seen:
-                continue
-            seen.add(fid)
-            try:
-                saved = files_sink(fid)
-                if saved:
-                    made.append(saved)
-                    on_step({"kind": "file", "label": "Made %s" % saved["name"], "file": saved})
-            except Exception as e:                                           # noqa: BLE001 (a file that cannot be fetched is said, the answer still comes)
-                log.warning("master: could not fetch output file %s: %s", fid, e)
-                on_step({"kind": "warn", "label": "A file the sandbox made could not be fetched (%s)" % type(e).__name__})
+            save_file(fid)
         messages.append({"role": "assistant", "content": msg.content})
         reason = msg.stop_reason
         if reason == "pause_turn":
@@ -515,7 +549,8 @@ def start(*, store, convo, turn_id, question, parts, by, tools_factory, roster, 
             out = run_turn(messages, client=client, tools=tools, system=system, files_sink=sink, container=convo.get("containerId"),
                            on_step=lambda s: store.add_step(turn_id, dict(s, t=time.time())),
                            on_container=lambda c: store.set_container(convo["id"], c),
-                           stop=lambda: (store.get_turn(turn_id) or {}).get("status") != "running", reattach=reattach)
+                           stop=lambda: (store.get_turn(turn_id) or {}).get("status") != "running", reattach=reattach,
+                           on_draft=lambda text: store.set_draft(turn_id, text))
             if out is not None:
                 store.finish_turn(turn_id, answer=out["answer"], files_out=out["files"], sources=_dedupe(tools.sources), usage=out["usage"])
         except Exception as e:                                               # noqa: BLE001 (any failure ends the turn in words, so the page never polls forever)

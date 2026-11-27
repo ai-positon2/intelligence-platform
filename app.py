@@ -6428,7 +6428,7 @@ def _master_convo_or_404(cid):
 def _master_turn_view(t):
     from tracker import master_chat
     t = master_chat.read_turn(t)
-    keep = ("id", "convoId", "createdAt", "finishedAt", "status", "question", "filesIn", "steps", "answer", "filesOut", "sources", "error")
+    keep = ("id", "convoId", "createdAt", "finishedAt", "status", "question", "filesIn", "steps", "answer", "filesOut", "sources", "error", "draft")
     out = {k: t.get(k) for k in keep}
     out["cost"] = (t.get("usage") or {}).get("cost_usd")
     return out

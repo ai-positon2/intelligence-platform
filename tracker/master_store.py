@@ -44,6 +44,7 @@ CREATE TABLE IF NOT EXISTS pm_master_turns (
     usage         JSONB NOT NULL DEFAULT '{}'::jsonb,
     error         TEXT
 );
+ALTER TABLE pm_master_turns ADD COLUMN IF NOT EXISTS draft TEXT;
 CREATE INDEX IF NOT EXISTS pm_master_turns_convo ON pm_master_turns (convo_id, created_at);
 CREATE INDEX IF NOT EXISTS pm_master_turns_by ON pm_master_turns (created_by, created_at);
 CREATE TABLE IF NOT EXISTS pm_master_files (
@@ -140,12 +141,13 @@ def touch_convo(cid):
 
 # ── turns ──────────────────────────────────────────────────────────────────
 
-TURN_COLS = "id, convo_id, created_by, created_at, finished_at, status, question, files_in, steps, answer, files_out, sources, usage, error"
+TURN_COLS = "id, convo_id, created_by, created_at, finished_at, status, question, files_in, steps, answer, files_out, sources, usage, error, draft"
 
 
 def _turn_row(r):
     return {"id": r[0], "convoId": r[1], "createdBy": r[2], "createdAt": _iso(r[3]), "finishedAt": _iso(r[4]), "status": r[5], "question": r[6],
-            "filesIn": r[7] or [], "steps": r[8] or [], "answer": r[9], "filesOut": r[10] or [], "sources": r[11] or [], "usage": r[12] or {}, "error": r[13]}
+            "filesIn": r[7] or [], "steps": r[8] or [], "answer": r[9], "filesOut": r[10] or [], "sources": r[11] or [], "usage": r[12] or {}, "error": r[13],
+            "draft": r[14] if len(r) > 14 else None}
 
 
 def create_turn(cid, by, question, files_in):
@@ -162,10 +164,16 @@ def add_step(tid, step):
         cur.execute("UPDATE pm_master_turns SET steps = steps || %s::jsonb WHERE id = %s", (json.dumps([step], default=str), tid))
 
 
+def set_draft(tid, text):
+    """The answer as it is being written, for the page to show while the turn runs."""
+    with _tx() as cur:
+        cur.execute("UPDATE pm_master_turns SET draft = %s WHERE id = %s AND status = 'running'", ((text or "")[:60000], tid))
+
+
 def finish_turn(tid, *, answer=None, files_out=None, sources=None, usage=None, error=None):
     """Close a running turn. A turn the person stopped is already closed and is left as it is."""
     with _tx() as cur:
-        cur.execute("UPDATE pm_master_turns SET status = %s, answer = %s, files_out = %s, sources = %s, usage = %s, error = %s, finished_at = now() "
+        cur.execute("UPDATE pm_master_turns SET status = %s, answer = %s, files_out = %s, sources = %s, usage = %s, error = %s, draft = NULL, finished_at = now() "
                     "WHERE id = %s AND status = 'running'",
                     ("failed" if error else "done", answer, json.dumps(files_out or []), json.dumps(sources or [], default=str), json.dumps(usage or {}), error, tid))
         return cur.rowcount > 0

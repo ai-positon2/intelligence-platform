@@ -284,8 +284,13 @@ def msg(content, stop="end_turn", container=None, usage=None):
 
 
 class Stream:
-    def __init__(self, out):
-        self.out = out
+    def __init__(self, out, events=()):
+        self.out, self.events = out, list(events)
+
+    def __iter__(self):
+        if isinstance(self.out, Exception):
+            raise self.out
+        return iter(self.events)
 
     def __enter__(self):
         return self
@@ -296,6 +301,7 @@ class Stream:
     def get_final_message(self):
         if isinstance(self.out, Exception):
             raise self.out
+        Stream.finals = getattr(Stream, "finals", 0) + 1
         return self.out
 
 
@@ -306,7 +312,8 @@ class Client:
 
     def stream(self, **kw):
         self.calls.append(json.loads(json.dumps(kw, default=str)))
-        return Stream(self.script.pop(0))
+        item = self.script.pop(0)
+        return Stream(*item) if isinstance(item, tuple) else Stream(item)
 
 
 class ApiError(Exception):
@@ -511,6 +518,40 @@ def test_a_turn_left_running_by_a_dead_worker_reads_as_failed():
     assert C.read_turn(new)["status"] == "running"
 
 
+def ev(kind, **kw):
+    return SimpleNamespace(type=kind, **kw)
+
+
+def test_the_answer_and_the_sandbox_steps_are_shown_as_they_arrive(monkeypatch):
+    monkeypatch.setattr(C, "DRAFT_EVERY_S", 0)
+    code = {"type": "server_tool_use", "id": "s", "name": "bash_code_execution", "input": {"command": "python a.py"}}
+    made = {"type": "bash_code_execution_tool_result", "tool_use_id": "s", "content": {"stdout": "ok", "stderr": "", "return_code": 0,
+                                                                                  "content": [{"type": "bash_code_execution_output", "file_id": "F9"}]}}
+    final = msg([code, made, {"type": "text", "text": "Spend \u2014 up"}])
+    events = [ev("content_block_stop", content_block=code), ev("content_block_stop", content_block=made), ev("text", text="Spend "), ev("text", text="\u2014 up")]
+    drafts, saved = [], []
+
+    def sink(fid):
+        saved.append((fid, getattr(Stream, "finals", 0)))
+        return {"id": "x", "name": "a.xlsx", "mime": "m", "size": 1}
+    Stream.finals = 0
+    client = Client([(final, events)])
+    steps = []
+    out = C.run_turn([{"role": "user", "content": "q"}], client=client, tools=tools(), system="S", files_sink=sink, on_step=steps.append, on_draft=drafts.append)
+    assert out["answer"] == "Spend, up" and saved == [("F9", 0)] and [f["name"] for f in out["files"]] == ["a.xlsx"]
+    assert [s["kind"] for s in steps] == ["code", "output", "file"]                 # each once: from the stream, not again from the whole message
+    assert drafts[0] == "Spend " and drafts[1] == "Spend, up" and drafts[-1] == ""
+
+
+def test_a_progress_event_that_fails_does_not_break_the_answer(monkeypatch):
+    def boom(fid):
+        raise RuntimeError("x")
+    monkeypatch.setattr(C, "code_steps", lambda blocks: (_ for _ in ()).throw(RuntimeError("bad")) if blocks and blocks[0].get("type") == "boom" else [])
+    out = C.run_turn([{"role": "user", "content": "q"}], client=Client([(msg([{"type": "text", "text": "fine"}]), [ev("content_block_stop", content_block={"type": "boom"})])]),
+                     tools=tools(), system="S", files_sink=boom)
+    assert out["answer"] == "fine"
+
+
 def test_titles():
     assert C.title_for("  how   is spend? ", []) == "how is spend?"
     assert C.title_for("x" * 100, []).endswith("...")
@@ -546,6 +587,9 @@ class Store:
 
     def set_container(self, cid, c):
         self.container = c
+
+    def set_draft(self, tid, text):
+        self.drafts = getattr(self, "drafts", []) + [text]
 
     def save_file(self, cid, by, direction, name, mime, data, anthropic_id=None):
         fid = "s%d" % len(self.files)
@@ -781,6 +825,20 @@ def test_tables_lists_headings_and_code_render():
     out = node_md("## Spend\n\n| Campaign | Cost |\n|---|---:|\n| Brand | $1,200 |\n| <b>X</b> | \u20119.0% |\n\n- one\n- two\n\n1. a\n2. b\n\n```\n<raw>\n```")
     assert "<h4>Spend</h4>" in out and '<th class="n">Cost</th>' in out and '<td class="n">$1,200</td>' in out and "&lt;b&gt;X&lt;/b&gt;" in out
     assert "<ul><li>one</li><li>two</li></ul>" in out and "<ol><li>a</li><li>b</li></ol>" in out and "<pre><code>&lt;raw&gt;</code></pre>" in out
+
+
+def node_turn(turn):
+    script = "global.window={};global.document={addEventListener:function(){}};" + read("static/js/master_chat.js") + \
+        ";process.stdout.write(window.MasterChat.turnHtml(%s))" % json.dumps(turn)
+    return subprocess.run(["node", "-e", script], capture_output=True, text=True, check=True).stdout
+
+
+def test_a_running_turn_shows_the_answer_being_written():
+    html = node_turn({"id": "t", "status": "running", "question": "q", "steps": [{"kind": "tool", "label": "Reading"}], "draft": "**$5** so far <b>"})
+    assert "mx-draft" in html and "<b>$5</b>" in html and "&lt;b&gt;" in html and "mx-caret" in html
+    assert "mx-draft" not in node_turn({"id": "t", "status": "running", "question": "q", "steps": []})
+    done = node_turn({"id": "t", "status": "done", "question": "q", "answer": "Final", "steps": [], "draft": "old"})
+    assert "Final" in done and "mx-draft" not in done
 
 
 def test_every_element_the_script_uses_is_on_the_page_and_nothing_has_a_dash():

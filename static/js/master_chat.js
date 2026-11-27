@@ -160,6 +160,7 @@ function turnHtml(t){
   }
   var body = "";
   if (t.status === "done") body = '<div class="mx-ans">' + md(t.answer || "") + "</div>" + filesHtml(t.filesOut, true);
+  else if (t.status === "running" && t.draft) body = '<div class="mx-ans mx-draft">' + md(t.draft) + '<span class="mx-caret" aria-hidden="true"></span></div>';
   else if (t.status === "failed") body = '<div class="mx-err">' + esc(t.error === "Stopped." ? "Stopped." : ("This did not finish: " + (t.error || "an error"))) + "</div>";
   var src = "";
   if (t.status === "done" && t.sources && t.sources.length){
@@ -243,11 +244,11 @@ function poll(tid){
       if (at >= 0){
         var old = S.turns[at]; S.turns[at] = t;
         var node = document.getElementById("t-" + tid);
-        if (node && old.status === t.status && (old.steps || []).length === (t.steps || []).length) { /* nothing new */ }
+        if (node && old.status === t.status && (old.steps || []).length === (t.steps || []).length && (old.draft || "") === (t.draft || "")) { /* nothing new */ }
         else if (node){ var wrap = document.createElement("div"); wrap.innerHTML = turnHtml(t); node.replaceWith(wrap.lastChild); $("#thread").scrollTop = $("#thread").scrollHeight; }
         else drawThread();
       }
-      if (t.status === "running") S.polling = setTimeout(tick, 1500);
+      if (t.status === "running") S.polling = setTimeout(tick, 1000);
       else { stopPolling(); drawThread(); loadConvos(); }
     }).catch(function(){ if (S.running === tid) S.polling = setTimeout(tick, 4000); });
   };
@@ -308,5 +309,5 @@ document.addEventListener("DOMContentLoaded", function(){
   loadConvos().then(function(){ if (m) openConvo(m[1]); });
 });
 
-window.MasterChat = {md: md, esc: esc};
+window.MasterChat = {md: md, esc: esc, turnHtml: turnHtml};
 })();

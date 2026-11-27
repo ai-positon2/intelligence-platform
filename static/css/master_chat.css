@@ -93,3 +93,7 @@
   .mx-thread{padding:16px 14px}
   .mx-bub{max-width:92%}
 }
+.mx-draft{opacity:.92}
+.mx-caret{display:inline-block;width:8px;height:15px;margin-left:2px;vertical-align:text-bottom;background:var(--pm-a);animation:mxBlink 1s steps(2) infinite}
+@keyframes mxBlink{50%{opacity:0}}
+@media (prefers-reduced-motion:reduce){.mx-caret{animation:none}}
