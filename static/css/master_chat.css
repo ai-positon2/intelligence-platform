@@ -199,3 +199,5 @@ body.mx-page .footer-note,body.mx-page #kpal-toast{display:none}
 .mx-why input{flex:1;min-width:0;padding:8px 12px;border-radius:10px;border:1px solid var(--pm-line2);background:var(--pm-panel2);color:var(--pm-ink);font:inherit;font-size:13px}
 .mx-why input:focus{outline:2px solid var(--pm-a);outline-offset:1px}
 .mx-why button{border:0;border-radius:10px;padding:0 14px;background:linear-gradient(135deg,var(--pm-a),var(--pm-a2));color:#fff;font:inherit;font-size:13px;font-weight:600;cursor:pointer}
+.mx-tw td,.mx-tw th{overflow-wrap:normal;word-break:normal}
+.mx-tw td:not(:first-child){min-width:4.5em}
