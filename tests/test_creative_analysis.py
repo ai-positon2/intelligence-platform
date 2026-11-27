@@ -105,6 +105,7 @@ def test_the_report_reads_a_google_account_up_to_today_in_its_time_zone_and_a_wh
     search, pruned, calls = searcher([ad_row("2026-11-25", "11", 20), ad_row("2026-11-25", "13", 10, camp_status="PAUSED", camp="Old")])
     rep = ca.report_for("1234567890", google_accounts_fn=lambda: [ACCT], search_fn=search, search_pruned_fn=pruned, today=TODAY)
     assert rep["platform"] == "google" and rep["account"] == dict(ACCT, platform="google") and rep["today"] == "2026-11-26" and rep["until"] == "2026-11-26"
+    assert rep["tooEarlyX"] == 1 and ca.TOO_EARLY_X == {"act_261215873024315": 1.5, "9557969390": 1.5}     # 1.5 × CPA is Soteri's alone
     assert rep["since"] == "2026-08-29" and len(rep["ads"]) == 2 and rep["rowFields"][-1] == "leads" and "landing" in rep["ads"][0]
     with pytest.raises(ca.BadRequest):
         ca.report_for("mcc-1234567890", google_accounts_fn=lambda: [ACCT], today=TODAY)
@@ -164,19 +165,20 @@ const D = {since:"2026-08-29", until:"2026-11-26", today:"2026-11-26", platform:
 const r = CA.presetRange(D, 30);
 const C = CA.compute(D, {since:r[0], until:r[1], goal:"roas"});
 const list = CA.creatives(C, "ad");
-console.log(JSON.stringify({range:r, spend:C.total.spend, paused:C.total.paused.spend, autoMin:C.rules.autoMin, avg:+C.rules.avg.toFixed(3),
+const C15 = CA.compute(Object.assign({}, D, {tooEarlyX:1.5}), {since:r[0], until:r[1], goal:"roas"});
+console.log(JSON.stringify({range:r, spend:C.total.spend, paused:C.total.paused.spend, autoMin:C.rules.autoMin, autoMin15:C15.rules.autoMin, avg:+C.rules.avg.toFixed(3),
   verdicts:list.map(t => t.ad.id + ":" + t.verdict), goal:CA.defaultGoal(D), kind:CA.kindOf(D.ads[2], true), metaKind:CA.kindOf({format:"Flexible (videos)"}, false)}));
 """
 
 
 @pytest.mark.skipif(not shutil.which("node"), reason="node is not installed")
-def test_the_page_counts_paused_campaigns_ends_on_yesterday_and_waits_for_one_and_a_half_costs_per_purchase():
+def test_the_page_counts_paused_campaigns_ends_on_yesterday_and_waits_for_one_cost_per_purchase_or_what_the_client_asked():
     out = subprocess.run(["node", "-e", NODE, os.path.join(ROOT, "static", "js", "creative_analysis_data.js")], capture_output=True, text=True, timeout=30)
     assert out.returncode == 0, out.stderr
     j = json.loads(out.stdout)
     assert j["range"] == ["2026-10-27", "2026-11-25"]                                    # Last 30 days ends yesterday, like Google Ads
     assert j["spend"] == 250 and j["paused"] == 50                                       # the paused campaign counts in the total; today's 999 does not
-    assert j["avg"] == 2.0 and j["autoMin"] == 63                                        # 1.5 × the $41.67 cost per purchase
+    assert j["avg"] == 2.0 and j["autoMin"] == 42 and j["autoMin15"] == 63               # one $41.67 cost per purchase; 1.5 × it for Soteri
     assert j["verdicts"] == ["1:Scale", "2:Cut"] and j["goal"] == "roas" and j["kind"] == "Shopping" and j["metaKind"] == "Video"
 
 
@@ -194,7 +196,7 @@ def test_the_agent_is_on_the_paid_marketing_page_the_palettes_the_hub_counts_the
     assert ("<span>%d</span> dashboards" % cards) in hub and ("<span>%d</span> live" % cards) in hub
     kn = app_module._VIMI_PLATFORM_KNOWLEDGE
     mine = kn.split("Creative Analysis (", 1)[1].split("\n", 1)[0]
-    assert "Creative Analysis (/p2/paid-marketing/creative-analysis)" in kn and "1.5 times" in mine and "—" not in mine and "–" not in mine
+    assert "Creative Analysis (/p2/paid-marketing/creative-analysis)" in kn and "Soteri Skin's accounts wait for 1.5 times" in mine and "—" not in mine and "–" not in mine
     card = paid.split('href="/p2/paid-marketing/creative-analysis" class="dash-card', 1)[1].split("</a>", 1)[0]
     assert "—" not in card and "–" not in card
     a = vimi_catalog.BY_ID["creative-analysis"]

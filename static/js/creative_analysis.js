@@ -133,7 +133,8 @@ function compute(){
                          scaleX:$("#scaleX").value, keepX:$("#keepX").value, minRes:$("#minPurch").value, minSpend:S.minSpendTouched ? $("#minSpend").value : null});
   var cpr = C.total.all.cpr;
   if (!S.minSpendTouched) $("#minSpend").value = C.rules.autoMin;
-  $("#minSpendNote").textContent = S.minSpendTouched ? "(1.5 × account " + L.cpr + " is " + cost(C.rules.autoMin) + ")" : "(1.5 × the " + cost(cpr) + " account " + L.cpr + ")";
+  var x = C.rules.tooEarlyX, xs = x === 1 ? "" : x + " × ";
+  $("#minSpendNote").textContent = S.minSpendTouched ? "(" + xs + "account " + L.cpr + " is " + cost(C.rules.autoMin) + ")" : x === 1 ? "(one average " + L.cpr + ")" : "(" + xs + "the " + cost(cpr) + " account " + L.cpr + ")";
   return C;
 }
 function creatives(C){ return CA.creatives(C, $("#group").value, function(x){ return money0.format(x); }); }

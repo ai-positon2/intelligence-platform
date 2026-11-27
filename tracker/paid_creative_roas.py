@@ -31,6 +31,9 @@ BadRequest = seg.BadRequest
 AGENT = "creative-analysis"
 
 LOOKBACK_DAYS = 90
+# How many average costs per result an ad spends before it is judged ("Too early" until then): one, unless a client asked otherwise.
+# Soteri Skin asked to wait for 1.5 x CPA (its Meta and Google Ads accounts).
+TOO_EARLY_X = {"act_261215873024315": 1.5, "9557969390": 1.5}
 CHUNK_DAYS = 10                  # insights are read ten days at a time so no one answer is huge
 EXTRAS_MAX = 300                 # creatives whose thumbnail and partnership setting are read one by one
 WORKERS = 6
@@ -312,7 +315,7 @@ def report_for(account_id, *, force=False, store=None, today=None, now=None, pag
             raise seg.gads.translate(e) from e
         raise
     out = dict(compact(raw), account=account, platform=account["platform"], since=raw.get("since") or since.isoformat(), until=raw.get("until") or until.isoformat(),
-               today=day.isoformat(), lookbackDays=LOOKBACK_DAYS, warnings=list(raw.get("warnings") or []), extrasRead=raw.get("extrasRead", 0),
+               today=day.isoformat(), lookbackDays=LOOKBACK_DAYS, tooEarlyX=TOO_EARLY_X.get(account["id"], 1), warnings=list(raw.get("warnings") or []), extrasRead=raw.get("extrasRead", 0),
                extrasCapped=bool(raw.get("extrasCapped")), extrasMax=EXTRAS_MAX, readAt=raw.get("readAt") or "")
     if stale:
         out["stale"] = stale

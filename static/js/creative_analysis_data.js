@@ -12,7 +12,7 @@
  *   Verdict     Scale   at least scaleX times the average and at least minRes results
  *               Keep    at least keepX times the average
  *               Cut     below that
- *               Too early  less than minSpend spent (by default 1.5 times the average cost per result)
+ *               Too early  less than minSpend spent (by default one average cost per result, or D.tooEarlyX of them for a client that asked: Soteri 1.5)
  */
 (function(root){
 "use strict";
@@ -77,7 +77,7 @@ function defaultGoal(D){
   return rev > 0 ? "roas" : leads > 0 ? "cpl" : "roas";
 }
 
-/* o: {since, until, campaign, kind, partner, goal, scaleX, keepX, minRes, minSpend (null = 1.5 average costs per result)} */
+/* o: {since, until, campaign, kind, partner, goal, scaleX, keepX, minRes, minSpend (null = D.tooEarlyX average costs per result, 1 by default)} */
 function compute(D, o){
   var keep = adFilter(o.kind, o.partner, D.platform === "google"), perAd = {}, order = [], total = blank(), paused = blank(), all = blank();
   D.rows.forEach(function(r){
@@ -94,9 +94,11 @@ function compute(D, o){
   });
   finish(total, o.goal); finish(all, o.goal); finish(paused, o.goal);
   total.paused = paused; total.all = all; total.filtered = !!keep;
-  var autoMin = all.cpr ? Math.round(all.cpr * 1.5) : 75;          // 1.5 × the account's cost per result before an ad is judged
+  var x = +D.tooEarlyX || 1;                                          // costs per result an ad spends before it is judged
+  var autoMin = all.cpr ? Math.round(all.cpr * x) : Math.round(50 * x);
   var rules = {goal:o.goal, avg:all.score, scaleX:+o.scaleX || 1.2, keepX:+o.keepX || 0.8, minRes:+o.minRes || 0,
                minSpend:o.minSpend == null || o.minSpend === "" ? autoMin : +o.minSpend || 0, autoMin:autoMin};
+  rules.tooEarlyX = x;
   return {since:o.since, until:o.until, perAd:order.map(function(k){ return finish(perAd[k], o.goal); }), total:total, rules:rules};
 }
 
