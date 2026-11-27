@@ -1,7 +1,7 @@
 {% extends "_paid_base.html" %}
 {% block title %}Master Agent{% endblock %}
 {% block head %}
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/master_chat.css') }}?v=8">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/master_chat.css') }}?v=11">
 {% endblock %}
 {% block vimi %}{# the page is itself the assistant: no second chat bubble over its composer #}{% endblock %}
 {% block content %}
@@ -26,7 +26,7 @@
 
       <div class="mx-thread" id="thread" aria-live="polite">
         <div class="mx-empty" id="empty">
-          <span class="mx-mark mx-mark-lg" aria-hidden="true"></span>
+          <span class="mx-orb mx-orb-lg" data-orb aria-hidden="true"></span>
           <h2>What would you like to <span class="mx-grad">know?</span></h2>
           <p>Ask about any client, account or campaign.</p>
           <div class="mx-sugs" id="sugs"></div>
@@ -58,5 +58,5 @@
 </div>
 {% endblock %}
 {% block scripts %}
-<script src="{{ url_for('static', filename='js/master_chat.js') }}?v=7"></script>
+<script src="{{ url_for('static', filename='js/master_chat.js') }}?v=8"></script>
 {% endblock %}

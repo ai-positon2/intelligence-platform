@@ -277,7 +277,7 @@ document.addEventListener("DOMContentLoaded", function(){
   window.addEventListener("resize", fit);
   setInterval(tickSeconds, 1000);
   EMPTY = $("#empty").outerHTML;
-  drawSugs();
+  drawSugs(); mountOrbs();
   $("#composer").addEventListener("submit", function(e){ e.preventDefault(); ask(); });
   $("#q").addEventListener("keydown", function(e){ if (e.key === "Enter" && !e.shiftKey && !e.isComposing){ e.preventDefault(); ask(); } });
   $("#q").addEventListener("input", autosize);
